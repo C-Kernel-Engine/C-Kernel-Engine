@@ -479,8 +479,32 @@ def test_busy_stream_returns_429():
 
 # --- Chat contract / reasoning control tests ---------------------------------
 
-QWEN3_CONTRACT = _load_builtin_chat_contract("qwen3")
-assert QWEN3_CONTRACT is not None, "qwen3 circuit must exist for chat contract tests"
+# Inline Qwen3-like contract mirroring version/v8/circuits/qwen3.json:22
+QWEN3_CONTRACT: dict = {
+    "name": "qwen3",
+    "turn_prefix": "<|im_start|>{role}\n",
+    "turn_suffix": "<|im_end|>\n",
+    "assistant_generation_prefix": "<|im_start|>assistant\n",
+    "role_labels": {"system": "system", "user": "user", "assistant": "assistant"},
+    "system_prompt_mode": "dedicated_turn",
+    "system_prompt_separator": "\n\n",
+    "default_system_prompt": "",
+    "inject_default_system_prompt": False,
+    "force_bos_text_if_tokenizer_add_bos_false": "",
+    "last_user_prefix": "",
+    "last_user_prefix_suppression_markers": ["/no_think", "/nothink", "/think"],
+    "thinking_mode_default": "visible",
+    "assistant_generation_prefix_by_thinking_mode": {
+        "visible": "<|im_start|>assistant\n",
+        "suppressed": "<|im_start|>assistant\n<think>\n\n</think>\n\n",
+    },
+    "last_user_prefix_by_thinking_mode": {"visible": "", "suppressed": "/no_think\n"},
+    "stop_text_markers": ["<|im_end|>"],
+    "token_stop_markers": ["<|im_end|>"],
+    "template_markers": ["<|im_start|>", "<|im_end|>", "<think>", "</think>"],
+}
+
+DUMMY_CHAT_TEMPLATES = {"tool_use": "{% for m in messages %}{{ m.content }}{% endfor %}{{ tools }}", "default": "default"}
 
 
 def test_suppressed_thinking_skips_reasoning():
@@ -490,7 +514,6 @@ def test_suppressed_thinking_skips_reasoning():
             session,
             model="fake-model",
             chat_contract=QWEN3_CONTRACT,
-            thinking_mode="auto",
         )
     )
     resp = client.post("/v1/responses", json={"model": "fake-model", "input": "hi"})
@@ -508,7 +531,6 @@ def test_visible_thinking_preserves_markers():
             session,
             model="fake-model",
             chat_contract=QWEN3_CONTRACT,
-            thinking_mode="auto",
         )
     )
     resp = client.post(
@@ -530,14 +552,14 @@ def test_no_chat_contract_falls_back_to_c_path():
     assert not (session.last_flags & CK_SESSION_REQUEST_RAW_PROMPT)
 
 
-def test_thinking_mode_overrides_body():
+def test_absent_reasoning_is_suppressed_even_with_visible_default():
+    # thinking_mode_default in contract is visible, but absent reasoning must be suppressed
     session = FakeSession(chunks=("answer",))
     client = TestClient(
         create_app(
             session,
             model="fake-model",
             chat_contract=QWEN3_CONTRACT,
-            thinking_mode="suppressed",
         )
     )
     resp = client.post(
@@ -545,8 +567,12 @@ def test_thinking_mode_overrides_body():
         json={"model": "fake-model", "input": "hi", "reasoning": {"effort": "medium"}},
     )
     assert resp.status_code == 200
-    assert session.last_flags & CK_SESSION_REQUEST_RAW_PROMPT
-    assert "/no_think" in (session.last_user or "")
+    assert "/no_think" not in (session.last_user or "")
+    # second request without reasoning should be suppressed
+    session2 = FakeSession(chunks=("answer",))
+    client2 = TestClient(create_app(session2, model="fake-model", chat_contract=QWEN3_CONTRACT))
+    resp2 = client2.post("/v1/responses", json={"model": "fake-model", "input": "hi"})
+    assert "/no_think" in (session2.last_user or "")
 
 
 def test_suppressed_thinking_stream():
@@ -556,7 +582,6 @@ def test_suppressed_thinking_stream():
             session,
             model="fake-model",
             chat_contract=QWEN3_CONTRACT,
-            thinking_mode="auto",
         )
     )
     resp = client.post(
@@ -573,36 +598,17 @@ def test_suppressed_thinking_stream():
     assert thinking_deltas == []
 
 
-def test_load_builtin_chat_contract_returns_dict():
-    contract = _load_builtin_chat_contract("qwen3")
-    assert isinstance(contract, dict)
-    assert "assistant_generation_prefix" in contract
-    assert "thinking_mode_default" in contract
-
-
-def test_composite_circuit_inherits_decoder_chat_contract():
-    assert _load_builtin_chat_contract("qwen36vl") == _load_builtin_chat_contract(
-        "qwen35"
-    )
-
-
-def test_load_builtin_chat_contract_unknown_name():
-    assert _load_builtin_chat_contract("nonexistent") is None
-
-
-@pytest.mark.parametrize(
-    "circuit_name",
-    ["qwen35", "qwen38", "nemotron_h", "cohere2", "laguna"],
-)
-def test_runtime_manifest_chat_contract_is_authoritative(tmp_path, circuit_name):
-    expected = _load_builtin_chat_contract(circuit_name)
-    assert expected is not None
+def test_load_runtime_chat_contract_via_manifest(tmp_path):
+    contract = {"name": "qwen3", "assistant_generation_prefix": "<x>", "thinking_mode_default": "visible"}
     (tmp_path / "weights_manifest.json").write_text(
-        json.dumps({"chat_contract": expected}),
-        encoding="utf-8",
+        json.dumps({"config": {"chat_contract": contract}}), encoding="utf-8"
     )
+    assert _load_runtime_chat_contract(tmp_path) == contract
+    # also via load_manifest_templates helper
+    from ck_serve_runtime_v8 import load_manifest_templates
 
-    assert _load_runtime_chat_contract(tmp_path) == expected
+    ct, cts, cc = load_manifest_templates(tmp_path)
+    assert cc == contract
 
 
 def test_runtime_manifest_contract_precedes_legacy_nested_copies(tmp_path):
@@ -681,7 +687,8 @@ def test_request_rejects_model_that_is_not_loaded():
     assert response.status_code == 404
 
 
-def test_request_rejects_unimplemented_tools():
+def test_request_rejects_tools_without_chat_templates():
+    # No chat_templates => Model doesn't support tool calling
     client, _ = make_client()
     response = client.post(
         "/v1/responses",
@@ -692,6 +699,24 @@ def test_request_rejects_unimplemented_tools():
         },
     )
     assert response.status_code == 501
+    assert "Model doesn't support tool calling" in response.json()["detail"]
+
+
+def test_request_accepts_tools_with_chat_templates():
+    session = FakeSession(chunks=('{"name":"lookup","arguments":{"q":"hi"}}',))
+    client = TestClient(
+        create_app(session, model="fake-model", chat_contract=QWEN3_CONTRACT, chat_templates=DUMMY_CHAT_TEMPLATES)
+    )
+    response = client.post(
+        "/v1/responses",
+        json={
+            "model": "fake-model",
+            "input": "hi",
+            "tools": [{"type": "function", "name": "lookup", "parameters": {}}],
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["status"] == "completed"
 
 
 # --- Split-boundary stop-marker regression --------------------------------

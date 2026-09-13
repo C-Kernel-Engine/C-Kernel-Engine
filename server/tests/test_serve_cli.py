@@ -248,25 +248,45 @@ def test_package_import_reuses_runtime_module():
     assert package_server._resolve_run_dir is package_runtime._resolve_run_dir
 
 
-def test_parser_thinking_mode_flag():
-    parser = _build_arg_parser()
-    ns = parser.parse_args([HF_MODEL, "--thinking-mode", "suppressed"])
-    assert ns.thinking_mode == "suppressed"
-
-
-def test_parser_thinking_mode_default():
+def test_parser_has_no_thinking_mode_flag():
     parser = _build_arg_parser()
     ns = parser.parse_args([HF_MODEL])
-    assert ns.thinking_mode == "auto"
-
-
-def test_parser_thinking_mode_visible():
-    parser = _build_arg_parser()
-    ns = parser.parse_args([HF_MODEL, "--thinking-mode", "visible"])
-    assert ns.thinking_mode == "visible"
-
-
-def test_parser_thinking_mode_invalid():
-    parser = _build_arg_parser()
+    assert not hasattr(ns, "thinking_mode")
     with pytest.raises(SystemExit):
-        parser.parse_args([HF_MODEL, "--thinking-mode", "invalid"])
+        parser.parse_args([HF_MODEL, "--thinking-mode", "suppressed"])
+
+
+def test_manifest_loader_returns_none_without_manifest(tmp_path):
+    from ck_serve_runtime_v8 import load_manifest_templates
+
+    chat_template, chat_templates, contract = load_manifest_templates(tmp_path)
+    assert chat_template is None
+    assert chat_templates is None
+    assert contract is None
+
+
+def test_manifest_loader_reads_chat_template_and_contract(tmp_path):
+    import json
+
+    from ck_serve_runtime_v8 import load_manifest_templates
+
+    contract = {
+        "name": "qwen3",
+        "turn_prefix": "<|im_start|>{role}\n",
+        "turn_suffix": "<|im_end|>\n",
+        "assistant_generation_prefix": "<|im_start|>assistant\n",
+        "thinking_mode_default": "visible",
+        "assistant_generation_prefix_by_thinking_mode": {
+            "visible": "<|im_start|>assistant\n",
+            "suppressed": "<|im_start|>assistant\n<think>\n\n</think>\n\n",
+        },
+        "last_user_prefix_by_thinking_mode": {"visible": "", "suppressed": "/no_think\n"},
+    }
+    (tmp_path / "weights_manifest.json").write_text(
+        json.dumps({"config": {"chat_template": "my-jinja", "chat_templates": {"tool_use": "tool-jinja"}, "chat_contract": contract}}),
+        encoding="utf-8",
+    )
+    ct, cts, cc = load_manifest_templates(tmp_path)
+    assert ct == "my-jinja"
+    assert cts == {"tool_use": "tool-jinja"}
+    assert cc == contract

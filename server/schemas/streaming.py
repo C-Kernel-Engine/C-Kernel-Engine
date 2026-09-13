@@ -51,6 +51,12 @@ class ResponseIncompleteEvent(BaseModel):
     sequence_number: int = 0
 
 
+class ResponseCancelledEvent(BaseModel):
+    type: Literal["response.cancelled"] = "response.cancelled"
+    response: dict[str, Any]
+    sequence_number: int = 0
+
+
 class ResponseErrorEvent(BaseModel):
     type: Literal["error"] = "error"
     code: str | None = None
@@ -217,6 +223,7 @@ ResponseStreamEvent = (
     | ResponseCompletedEvent
     | ResponseFailedEvent
     | ResponseIncompleteEvent
+    | ResponseCancelledEvent
     | ResponseErrorEvent
     | ResponseOutputItemAddedEvent
     | ResponseOutputItemDoneEvent
