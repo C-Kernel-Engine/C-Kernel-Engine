@@ -40,11 +40,15 @@ The current session ABI deliberately fails closed when a generated model lacks
 the required tokenizer or chat capability. It does not infer a tokenizer or
 chat template from the model name.
 
-## Qwen Code pilot
+## Qwen Code profiles
 
 The validated pilot uses Qwen Code 0.21.5 and the Qwen3.8 27B Q4_K_M artifact.
-Generate at least a 16K runtime because the client's built-in system and tool
-catalog can exceed small development contexts:
+CKE provides separate settings profiles for short interactive work and large,
+unattended artifact generation. They are loaded as Qwen Code system settings
+and do not overwrite `~/.qwen/settings.json`.
+
+Generate the runtime capacity required by the selected profile. This example is
+the 16K interactive runtime:
 
 ```bash
 CK_NUM_THREADS=16 OMP_NUM_THREADS=1 \
@@ -63,19 +67,56 @@ later `--no-build` starts it reads the compiled capacity from
 Point Qwen Code at the local server and begin with a read-only, bounded task:
 
 ```bash
+CKE_ROOT=$(pwd)
 OPENAI_API_KEY=cke-local-only \
 OPENAI_BASE_URL=http://127.0.0.1:8080/v1 \
 OPENAI_MODEL=qwen38-27b-q4km \
+QWEN_CODE_SYSTEM_SETTINGS_PATH="$CKE_ROOT/server/qwen-code/interactive.settings.json" \
 qwen --bare \
-  --core-tools read_file \
+  --system-prompt 'Use read_file exactly once when asked, then answer without another tool call.' \
   --allowed-tools read_file \
+  --exclude-tools edit,notebook_edit,run_shell_command,get_goal,update_goal \
   --max-tool-calls 1 \
   --model qwen38-27b-q4km
 ```
 
+Qwen Code 0.21.5 ignores `--core-tools` in bare mode, so the command explicitly
+removes the other bare-mode tools. The interactive profile declares 16,384
+context tokens, a 2,048-token output allowance, and a 30-minute wall deadline.
 The real-model pilot certifies a two-turn `read_file` workflow. Editing, shell
-execution, concurrent sessions, and unattended operation require separate
-permission and reliability validation.
+execution, and concurrent sessions require separate permission and reliability
+validation.
+
+For a generated runtime with 262,144-token capacity, select the overnight
+profile instead:
+
+```bash
+CKE_ROOT=$(pwd)
+OPENAI_API_KEY=cke-local-only \
+OPENAI_BASE_URL=http://127.0.0.1:8080/v1 \
+OPENAI_MODEL=qwen38-27b-q4km \
+QWEN_CODE_SYSTEM_SETTINGS_PATH="$CKE_ROOT/server/qwen-code/overnight.settings.json" \
+qwen --bare \
+  --allowed-tools read_file \
+  --exclude-tools edit,notebook_edit,run_shell_command,get_goal,update_goal \
+  --max-wall-time 18h \
+  --model qwen38-27b-q4km \
+  --output-format stream-json \
+  --prompt "$(cat /path/to/reviewed-task.txt)" \
+  > /path/to/task-events.jsonl
+```
+
+The overnight profile declares 262,144 context tokens and reserves up to 32,768
+tokens for output. It does not provide mid-generation resume, a durable server
+queue, or permission to publish, commit, or deploy results. Use an external
+task ledger to retry whole tasks after interruption and retain outputs for
+review.
+
+`GET /v1/models/{model}` reports `cke_context_length` and
+`cke_default_max_output_tokens`. Before native execution, the server tokenizes
+the fully rendered request and rejects prompt plus output reservations that
+exceed the loaded runtime capacity. The Qwen Code profile must not advertise a
+larger context than the generated runtime.
 
 Chat Completions responses include a CKE extension named `cke_performance`.
 For streaming requests it appears on the terminal chunk. The extension retains

@@ -34,6 +34,11 @@ class FakeSession:
         self.stop_reason = stop_reason
         self.error = error
         self.last_prompt = None
+        self.counted_prompt = None
+
+    def count_tokens(self, prompt):
+        self.counted_prompt = prompt
+        return len(prompt.split())
 
     def generate(self, _system, prompt, *, on_token, **_kwargs):
         self.last_prompt = prompt
@@ -263,3 +268,76 @@ def test_non_stream_runtime_failure_is_not_a_successful_completion():
     )
     assert response.status_code == 500
     assert "native failure" in response.json()["detail"]
+
+
+def test_chat_rejects_output_budget_larger_than_loaded_context():
+    session = FakeSession()
+    app = create_app(
+        session,
+        model="qwen38-local",
+        context_length=16384,
+        chat_template=TOOL_TEMPLATE,
+        chat_contract={"name": "test"},
+        viz=False,
+    )
+    response = TestClient(app).post(
+        "/v1/chat/completions",
+        json={
+            "model": "qwen38-local",
+            "messages": [{"role": "user", "content": "read the file"}],
+            "max_tokens": 32768,
+        },
+    )
+    assert response.status_code == 400
+    assert "loaded context capacity 16384" in response.json()["detail"]
+    assert session.last_prompt is None
+
+    valid = TestClient(app).post(
+        "/v1/chat/completions",
+        json={
+            "model": "qwen38-local",
+            "messages": [{"role": "user", "content": "hello"}],
+            "max_tokens": 32,
+        },
+    )
+    assert valid.status_code == 200
+
+
+def test_chat_rejects_rendered_prompt_plus_output_overflow():
+    session = FakeSession()
+    session.count_tokens = lambda prompt: 120
+    app = create_app(
+        session,
+        model="qwen38-local",
+        context_length=128,
+        chat_template=TOOL_TEMPLATE,
+        chat_contract={"name": "test"},
+        viz=False,
+    )
+    response = TestClient(app).post(
+        "/v1/chat/completions",
+        json={
+            "model": "qwen38-local",
+            "messages": [{"role": "user", "content": "read the file"}],
+            "max_tokens": 16,
+        },
+    )
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert "rendered prompt has 120 tokens" in detail
+    assert "at most 8 output tokens remain" in detail
+    assert session.last_prompt is None
+
+
+def test_models_advertise_loaded_context_and_default_output_budget():
+    session = FakeSession()
+    app = create_app(
+        session,
+        model="qwen38-local",
+        context_length=262144,
+        max_tokens=16384,
+        viz=False,
+    )
+    model = TestClient(app).get("/v1/models/qwen38-local").json()
+    assert model["cke_context_length"] == 262144
+    assert model["cke_default_max_output_tokens"] == 16384

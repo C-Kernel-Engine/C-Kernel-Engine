@@ -165,6 +165,23 @@ def _detect_threads() -> int:
     return max(1, os.cpu_count() or 1)
 
 
+def _resolve_num_threads(explicit: int | None = None) -> int:
+    if explicit is not None:
+        if explicit < 1:
+            raise ValueError("num_threads must be a positive integer")
+        return explicit
+    configured = os.environ.get("CK_NUM_THREADS")
+    if configured is not None:
+        try:
+            value = int(configured)
+        except ValueError as exc:
+            raise ValueError("CK_NUM_THREADS must be a positive integer") from exc
+        if value < 1:
+            raise ValueError("CK_NUM_THREADS must be a positive integer")
+        return value
+    return _detect_threads()
+
+
 # --- Native session binding ---------------------------------------------------
 #
 # ``create_app`` depends only on this duck-typed surface, so the tests inject a
@@ -233,6 +250,14 @@ def _configure_abi(lib: Any, name: str) -> None:
     if name == "ck_session_v8_open":
         fn.restype = ctypes.c_int
         fn.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p)]
+    elif name == "ck_session_v8_encode":
+        fn.restype = ctypes.c_int
+        fn.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_char_p,
+            ctypes.POINTER(ctypes.c_int32),
+            ctypes.c_int32,
+        ]
     elif name == "ck_session_v8_generate":
         fn.restype = ctypes.c_int
         fn.argtypes = [
@@ -261,6 +286,7 @@ def _last_error(lib: Any, session: Any) -> str:
 def _configure_lib(lib: Any) -> None:
     for name in (
         "ck_session_v8_open",
+        "ck_session_v8_encode",
         "ck_session_v8_generate",
         "ck_session_v8_cancel",
         "ck_session_v8_close",
@@ -320,7 +346,7 @@ class SessionV8:
             weights_path=str(work_dir / "weights.bump").encode(),
             manifest_path=str(work_dir / "weights_manifest.map").encode(),
             context_length=int(context_length or 2048),
-            num_threads=int(num_threads or _detect_threads()),
+            num_threads=_resolve_num_threads(num_threads),
         )
         session = ctypes.c_void_p()
         status = lib.ck_session_v8_open(ctypes.byref(cfg), ctypes.byref(session))
@@ -341,6 +367,19 @@ class SessionV8:
         self.lib = lib
         self.session = session
         return self
+
+    def count_tokens(self, text: str) -> int:
+        count = self.lib.ck_session_v8_encode(
+            self.session, (text or "").encode(), None, 0
+        )
+        if count < 0:
+            msg = "ck_session_v8_encode failed while validating request capacity"
+            native_msg = _last_error(self.lib, self.session)
+            if native_msg:
+                msg += f": {native_msg}"
+            exc_cls = _SESSION_STATUS_EXCEPTIONS.get(count, SessionError)
+            raise exc_cls(count, msg)
+        return int(count)
 
     def generate(
         self,
@@ -1215,6 +1254,7 @@ def create_app(
     session,
     *,
     model: str = "ck-v8",
+    context_length: int | None = None,
     stats: bool = True,
     viz: bool = True,
     temperature: float = 0.7,
@@ -1398,6 +1438,31 @@ def create_app(
                 prompt = f"{body.instructions}\n{prompt}".strip()
             if not prompt.strip():
                 prompt = "Hello"
+
+        if context_length is not None:
+            if tok_limit >= context_length:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"max_output_tokens {tok_limit} leaves no room in the loaded "
+                        f"context capacity {context_length}; request a smaller output "
+                        "budget or load a larger generated runtime"
+                    ),
+                )
+            count_tokens = getattr(session, "count_tokens", None)
+            if callable(count_tokens):
+                prompt_tokens = count_tokens(prompt)
+                if prompt_tokens + tok_limit > context_length:
+                    available = max(0, context_length - prompt_tokens)
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            f"rendered prompt has {prompt_tokens} tokens and the request "
+                            f"reserves {tok_limit} output tokens, exceeding loaded context "
+                            f"capacity {context_length}; at most {available} output tokens "
+                            "remain"
+                        ),
+                    )
 
         return prompt, tok_limit, temperature_eff, top_p_eff, effective_flags
 
@@ -2417,16 +2482,20 @@ def create_app(
 
     @router.post("/responses", response_model=None)
     def create_response(body: CreateResponseRequest, request: Request):
-        (
-            prompt,
-            tok_limit,
-            temperature_eff,
-            top_p_eff,
-            effective_flags,
-        ) = _prepare_request(body)
-        think_enabled = body.reasoning is not None
-
+        _validate_request(body)
         _acquire_flight_or_429(timeout=2.0)
+        try:
+            (
+                prompt,
+                tok_limit,
+                temperature_eff,
+                top_p_eff,
+                effective_flags,
+            ) = _prepare_request(body)
+            think_enabled = body.reasoning is not None
+        except Exception:
+            _flight_lock.release()
+            raise
 
         if body.stream:
             return StreamingResponse(
@@ -2665,12 +2734,16 @@ def create_app(
     model_created_at = int(time.time())
 
     def _model_obj(mid: str) -> dict[str, Any]:
-        return {
+        result = {
             "id": mid,
             "object": "model",
             "created": model_created_at,
             "owned_by": "cke",
         }
+        if context_length is not None:
+            result["cke_context_length"] = context_length
+            result["cke_default_max_output_tokens"] = max_tokens
+        return result
 
     @router.get("/models")
     def list_models():
@@ -2919,6 +2992,7 @@ def main(argv: list[str] | None = None) -> int:
     app = create_app(
         session,
         model=args.model_name,
+        context_length=runtime_context_length,
         stats=args.stats,
         viz=not args.no_viz,
         temperature=args.temperature,

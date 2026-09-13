@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "version" / "v8" / 
 import pytest
 
 import ck_serve_runtime_v8
-from ck_serve_v8 import _build_arg_parser, _build_runtime, main
+from ck_serve_v8 import _build_arg_parser, _build_runtime, _resolve_num_threads, main
 
 HF_MODEL = "hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf"
 
@@ -34,6 +34,19 @@ def test_parser_flag_defaults():
     ns = parser.parse_args(["model", "--host", "0.0.0.0", "--port", "9000"])
     assert ns.host == "0.0.0.0"
     assert ns.port == 9000
+
+
+def test_session_threads_honor_environment(monkeypatch):
+    monkeypatch.setenv("CK_NUM_THREADS", "16")
+    assert _resolve_num_threads() == 16
+    assert _resolve_num_threads(8) == 8
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "not-a-number"])
+def test_session_threads_reject_invalid_environment(monkeypatch, value):
+    monkeypatch.setenv("CK_NUM_THREADS", value)
+    with pytest.raises(ValueError, match="CK_NUM_THREADS must be a positive integer"):
+        _resolve_num_threads()
 
 
 def test_parser_forwarded_build_flags():
