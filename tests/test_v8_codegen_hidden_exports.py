@@ -320,6 +320,19 @@ class HiddenExportExtentTests(unittest.TestCase):
                 ],
             }
         )
+        sliding_attention = codegen.emit_op(
+            {
+                "op": "attn_sliding",
+                "function": "attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4_token_output",
+                "layer": 3,
+                "args": [
+                    _arg("output", "SLIDING_ATTN"),
+                    _arg("num_heads", "8"),
+                    _arg("num_tokens", "61"),
+                    _arg("aligned_head_dim", "256"),
+                ],
+            }
+        )
         qsa_attention = codegen.emit_op(
             {
                 "op": "qsa_attention",
@@ -351,6 +364,10 @@ class HiddenExportExtentTests(unittest.TestCase):
 
         self.assertIn('"attn_gate", (const float*)GATE, (1) * (2048)', split)
         self.assertIn('"attn_pregate", (const float*)ATTN, (8) * (1) * (256)', attention)
+        self.assertIn(
+            '"attn_pregate", (const float*)SLIDING_ATTN, (8) * (61) * (256)',
+            sliding_attention,
+        )
         self.assertIn(
             '"attn_pregate", (const float*)QSA_ATTN, (8) * (1) * (256)',
             qsa_attention,
@@ -808,6 +825,29 @@ class HiddenExportExtentTests(unittest.TestCase):
         self.assertIn(expected, prefill)
         self.assertLess(decode.index('"state_predelta"'), decode.index("gated_deltanet_forward("))
         self.assertLess(prefill.index('"state_predelta"'), prefill.index("gated_deltanet_forward("))
+
+    def test_sliding_attention_prefill_exports_complete_attention_output(self) -> None:
+        emitted = prefill_codegen.emit_prefill_op(
+            {
+                "op": "attn_sliding",
+                "function": "attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4_token_output",
+                "layer": 0,
+                "args": [
+                    _arg("output", "SLIDING_ATTN"),
+                    _arg("num_heads", "8"),
+                    _arg("num_tokens", "num_tokens"),
+                    _arg("aligned_head_dim", "256"),
+                ],
+            },
+            61,
+            {"embed_dim": 2560},
+        )
+
+        self.assertIn(
+            '"attn_pregate", (const float*)SLIDING_ATTN, '
+            "(num_tokens) * (8) * (256)",
+            emitted,
+        )
 
     def test_quantized_projection_exports_full_prefill_extents(self) -> None:
         resolved = {

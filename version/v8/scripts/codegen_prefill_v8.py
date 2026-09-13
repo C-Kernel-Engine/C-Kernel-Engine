@@ -1327,7 +1327,7 @@ def emit_prefill_op(
         )
         _emit_head_major_last(_hidden_arg("q"), "rope_q", _hidden_arg("num_heads") or "NUM_HEADS", _hidden_arg("aligned_head_dim", "head_dim") or "HEAD_DIM")
         _emit_head_major_last(_hidden_arg("k"), "rope_k", _hidden_arg("num_kv_heads") or "NUM_KV_HEADS", _hidden_arg("aligned_head_dim", "head_dim") or "HEAD_DIM")
-    elif op_type in ("attn", "qsa_attention"):
+    elif op_type in ("attn", "attn_sliding", "qsa_attention"):
         _emit_hidden_full(
             _hidden_arg("out_token", "output", "out", "c", "y"),
             "attn_pregate",

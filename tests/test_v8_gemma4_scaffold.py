@@ -16,6 +16,8 @@ from convert_gguf_to_bump_v8 import (  # type: ignore
     GGUFError,
     build_gemma3_rope_plan,
     build_gemma4_attention_plan,
+    gemma4_layer_produces_kv,
+    validate_gemma4_attention_plan,
     classify_layer_contract,
     describe_layer_contract,
     select_gguf_tokenizer_source,
@@ -409,6 +411,38 @@ class V8Gemma4ScaffoldTests(unittest.TestCase):
         self.assertEqual(plan["layer_q_dim"], [2048, 4096, 2048, 4096])
         self.assertEqual(plan["layer_kv_dim"], [512, 1024, 512, 1024])
         self.assertEqual(plan["layer_attention_output_dim"], [2048, 4096, 2048, 4096])
+
+        for layer, record in enumerate(plan["layer_attention_plan"]):
+            self.assertEqual(record["kind"], plan["layer_kinds"][layer])
+            self.assertEqual(record["kv_policy"], plan["layer_kv_policy"][layer])
+            self.assertEqual(record["kv_source_layer"], plan["layer_kv_source"][layer])
+
+    def test_gemma4_attention_plan_rejects_split_brain_shared_kv_metadata(self) -> None:
+        plan = build_gemma4_attention_plan(
+            {
+                "gemma4.attention.sliding_window_pattern": [True, False, True, False],
+                "gemma4.attention.shared_kv_layers": 2,
+            },
+            4,
+        )
+        plan["layer_kinds"][2] = "sliding_attention_kv"
+        plan["layer_kv_policy"][2] = "produce"
+
+        with self.assertRaisesRegex(GGUFError, "attention plan disagrees at layer 2"):
+            validate_gemma4_attention_plan(plan, 4)
+
+    def test_gemma4_kv_projection_ownership_follows_attention_plan(self) -> None:
+        plan = build_gemma4_attention_plan(
+            {
+                "gemma4.attention.sliding_window_pattern": [True, False, True, False],
+                "gemma4.attention.shared_kv_layers": 2,
+            },
+            4,
+        )
+        self.assertEqual(
+            [gemma4_layer_produces_kv(plan, layer) for layer in range(4)],
+            [True, True, False, False],
+        )
 
     def test_full_attention_output_projection_uses_per_layer_value_width(self) -> None:
         config = {
