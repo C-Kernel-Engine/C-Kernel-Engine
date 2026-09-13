@@ -2172,11 +2172,13 @@ make test-native-session-v8</pre>
 </div>
 
 <div class="card">
-    <h3 style="margin-top: 0;">Qwen Code Local Agent Pilot</h3>
+    <h3 style="margin-top: 0;">Qwen Code Interactive And Overnight Profiles</h3>
     <p>
         The validated pilot connects Qwen Code 0.21.5 to the Chat Completions compatibility route
         backed by the native Responses server. It uses the pinned Qwen3.8 27B Q4_K_M artifact and a
-        generated runtime with at least 16K context so the client system prompt and tool catalog fit.
+        generated runtime with at least 16K context. Repository-owned settings separate short
+        interactive work from large overnight artifact generation without replacing the user's
+        <code>~/.qwen/settings.json</code>.
     </p>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
@@ -2193,17 +2195,42 @@ version/v8/scripts/cks-v8-run serve \
 <pre>OPENAI_API_KEY=cke-local-only \
 OPENAI_BASE_URL=http://127.0.0.1:8080/v1 \
 OPENAI_MODEL=qwen38-27b-q4km \
+QWEN_CODE_SYSTEM_SETTINGS_PATH="$PWD/server/qwen-code/interactive.settings.json" \
 qwen --bare \
-  --core-tools read_file \
+  --system-prompt 'Use read_file exactly once when asked, then answer without another tool call.' \
   --allowed-tools read_file \
+  --exclude-tools edit,notebook_edit,run_shell_command,get_goal,update_goal \
   --max-tool-calls 1 \
   --model qwen38-27b-q4km</pre>
     </div>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>OPENAI_API_KEY=cke-local-only \
+OPENAI_BASE_URL=http://127.0.0.1:8080/v1 \
+OPENAI_MODEL=qwen38-27b-q4km \
+QWEN_CODE_SYSTEM_SETTINGS_PATH="$PWD/server/qwen-code/overnight.settings.json" \
+qwen --bare \
+  --allowed-tools read_file \
+  --exclude-tools edit,notebook_edit,run_shell_command,get_goal,update_goal \
+  --max-wall-time 18h \
+  --model qwen38-27b-q4km \
+  --output-format stream-json \
+  --prompt "$(cat /path/to/reviewed-task.txt)" \
+  &gt; /path/to/task-events.jsonl</pre>
+    </div>
     <p style="margin-bottom: 0;" class="mini-note">
-        The retained real-model evidence covers one bounded, two-turn <code>read_file</code> task.
-        Editing, shell execution, concurrent sessions, and unattended operation are not certified by
-        this pilot. On later <code>--no-build</code> starts, the server reads the compiled context
-        capacity from <code>layout_decode.json</code> and rejects requests that exceed the plan.
+        Qwen Code 0.21.5 ignores <code>--core-tools</code> in bare mode, so these commands explicitly
+        remove unused bare-mode tools. The interactive profile uses 16K context and a 2K output
+        allowance. The overnight profile requires a 256K generated runtime, advertises that capacity
+        to the client, and reserves up to 32K output tokens. It does not add mid-generation resume,
+        automatic publication, commits, or deployment. On later <code>--no-build</code> starts, the
+        server reads the compiled capacity from <code>layout_decode.json</code>.
+    </p>
+    <p class="mini-note">
+        <code>GET /v1/models/{model}</code> reports the loaded CKE context capacity. The server uses
+        the native tokenizer to validate the fully rendered prompt plus requested output before
+        generation and rejects an oversized request with the exact token counts. The selected Qwen
+        profile must not advertise more context than the generated runtime.
     </p>
     <p class="mini-note">
         Each non-streaming completion and terminal streaming chunk includes

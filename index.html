@@ -1227,55 +1227,94 @@
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════════════
-     WHAT IS IT
+     GET STARTED
 ═══════════════════════════════════════════════════════════════════════ -->
-<h2>What is C-Kernel-Engine?</h2>
+<h2 id="get-started">Get Started</h2>
 
-<p>C-Kernel-Engine is split into two layers. The <strong>tooling layer</strong> uses Python for model import, GGUF/safetensors conversion, IR construction, code generation, and PyTorch/llama.cpp parity testing. The <strong>execution layer</strong> is generated C plus hand-written C kernels with explicit memory offsets, quantization layouts, SIMD dispatch, and native compiler optimization.</p>
-
-<p>The intended deployment model is dependency-light execution, not dependency-free development. The generated runtime can be compiled with GCC or Clang, but the preferred path is to use the strongest native CPU toolchain for the target machine: Intel oneAPI/ICX on Intel CPUs, tuned GCC/Clang on AMD CPUs, ARM toolchains on ARM systems, and standard systems libraries for cluster execution.</p>
+<p>v8 is the current inference runtime. One wrapper command converts a model to <code>weights.bump</code>, lowers its circuit, generates and compiles the C runtime, and runs it on a plain Linux CPU. Start with a small model, then pick your family in the runbook.</p>
 
 <div class="card card-accent">
-    <h3 style="margin-top: 0;">Long-Horizon Commodity Compute Bet</h3>
-    <p>CKE assumes AI execution will not remain permanently locked inside expensive accelerator stacks, because the underlying workload is still math, memory movement, and systems software. Accelerators matter, but they do not change the shape of the problem: tensors must live somewhere, bytes must move through memory hierarchies, kernels must execute, and distributed systems must coordinate the work.</p>
-    <p style="margin-bottom: 0;">If CPUs keep gaining cores, SIMD and matrix units, memory channels, NUMA controls, and fast interconnects, then a clean generated-C runtime that can orchestrate many cheap Linux nodes becomes increasingly interesting. The bet is not that one CPU beats every GPU. The bet is that commodity CPU clusters can become a practical, auditable, incrementally scalable execution substrate for a large class of AI inference and training workloads.</p>
-</div>
+    <h3 style="margin-top: 0;">Run your first model — Gemma 3 270M (v8)</h3>
+    <pre>git clone https://github.com/C-Kernel-Engine/C-Kernel-Engine.git
+cd C-Kernel-Engine
+python3 -m venv .venv &amp;&amp; . .venv/bin/activate
+python -m pip install -r version/v8/requirements.txt
 
-<div class="card card-blue">
-    <h3 style="margin-top: 0;">CKU: CKE Throughput Unit</h3>
-    <p>CKU is the project’s north-star systems metric: active model bytes cycled through useful model math per second. It is not memcpy or DSA copy bandwidth. The reference workload is full-context prefill, where active weights and activations flow through GEMM/FMA/attention; decode is tracked separately as GEMV plus KV/cache traffic.</p>
-    <p style="margin-bottom: 0;">
-        <a href="cke-throughput-unit.html" class="btn btn-sm">Read the CKU page →</a>
+version/v8/scripts/cks-v8-run run \
+  hf://unsloth/gemma-3-270m-it-GGUF/gemma-3-270m-it-Q5_K_M.gguf \
+  --context-len 1024 --force-compile --force-convert --chat-template=auto \
+  --generate-visualizer</pre>
+    <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 0;">The first run is cold: it downloads the GGUF, converts weights, generates C, and compiles it; later runs reuse the artifact and start warm. <code>--generate-visualizer</code> opens the IR visualizer so you can inspect every operation, selected provider, and memory offset of the run you just produced.</p>
+    <p style="margin-bottom: 0; margin-top: 0.75rem;">
+        <a href="v8-runbook.html" class="btn btn-sm">v8 Runbook — every model family →</a>
+        <a href="quickstart.html" class="btn btn-sm" style="margin-left:0.4rem;">Full Quickstart →</a>
+        <a href="model-kernel-matrix.html" class="btn btn-sm" style="margin-left:0.4rem;">Model Support Matrix →</a>
     </p>
 </div>
 
-<div class="card card-green">
-    <h3 style="margin-top: 0;">Generated C, Planned Memory</h3>
-    <p>C-Kernel-Engine uses C as an <strong>auditable compiler target</strong>, not as a large hand-written pointer maze. The model graph, tensor shapes, lifetimes, kernel contracts, and memory sections are resolved before code emission. The generated C then reads and writes deterministic offsets from planned buffers instead of allocating or guessing inside the hot path.</p>
-    <p>This is the memory-safety model: avoid most ordinary C mistakes by not hand-authoring the model body in C in the first place. The compiler pipeline emits explicit offsets, optional bounds/canary checks, cache-aligned sections, and reproducible layout reports; ASAN, Valgrind, PyTorch parity, llama.cpp parity, perf, VTune, and Advisor validate the artifact from correctness down to memory behavior.</p>
-    <p style="margin-bottom: 0;">The result is still native C, but the important contract is visible: <code>IR op -> tensor lifetime -> byte offset -> generated pointer -> kernel call</code>. That makes the execution path deterministic, inspectable, and measurable for applications where memory layout is the application.</p>
+<div class="grid grid-2" style="gap: 1rem; margin-top: 1rem;">
+    <div class="card">
+        <h3 style="margin-top: 0;">Verify the kernel library</h3>
+        <pre style="font-size: 0.78rem;">make                  # builds build/libckernel_engine.so
+make test             # kernel parity tests vs PyTorch</pre>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0;">Each kernel ships its own Python ctypes parity test with a hard max-diff &lt; 1e-5 gate. AVX2 is the x86 production baseline; ARM NEON is an active portability lane; AVX-512, VNNI, BF16, and AMX paths enable only where the host supports them.</p>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Where to go next</h3>
+        <table class="pillar-evidence">
+            <tr>
+                <td><a href="concepts.html" style="color: var(--orange);">Concepts</a></td>
+                <td>How circuits, kernel maps, and generated C fit together.</td>
+            </tr>
+            <tr>
+                <td><a href="xray.html" style="color: var(--orange);">X-Ray</a></td>
+                <td>Inspect a run: selected providers, rejection reasons, per-op evidence.</td>
+            </tr>
+            <tr>
+                <td><a href="kernel-maps.html" style="color: var(--orange);">Kernel maps</a></td>
+                <td>Bring up a new model family or provider.</td>
+            </tr>
+            <tr>
+                <td><a href="audio-kernels-deep-dive.html" style="color: var(--orange);">Audio deep dive</a></td>
+                <td>Speech kernels from WAV to transcript, visually explained.</td>
+            </tr>
+        </table>
+    </div>
 </div>
 
-<p>The north star is distributed CPU inference and training: model/layer ownership across CPU nodes, explicit activation and gradient movement, MPI/RDMA-style communication where available, and pipeline parallelism over hardware that can be bought, powered, audited, and scaled incrementally.</p>
-
-<p>The first version of C-Kernel-Engine tried to drive generation from HuggingFace <code>config.json</code> alone. That was not enough: config metadata does not fully capture quantized weight packing/layout details, nor all runtime stitching constraints needed for reliable kernel binding.</p>
-
-<p>The current pipeline pulls GGUF or safetensors metadata as the weight/layout source of truth, parses it, and combines that with C-Kernel-Engine templates and config hints. That merge produces deterministic <code>weights.bump</code> + sidecar metadata. From that point forward, the same IR chain can target v8 inference and v7 training/backprop paths.</p>
-
-<p>The architecture is deliberately split into a <em>smart</em> front-end (template selection, manifest resolution, IR construction, backward synthesis, layout planning, fusion detection) and a <em>dumb</em> back-end (a codegen emitter that only writes what the lowered IR already decided). This makes correctness auditable at every stage.</p>
-
-<h3>Why the Bump Format Exists</h3>
-
-<ul>
-    <li><code>weights.bump</code> is a contiguous binary blob optimized for deterministic C runtime access by offset.</li>
-    <li>The sidecar (for example <code>weights_manifest.json</code>) records tensor names, offsets, shapes, dtypes, quantization metadata, and template bindings.</li>
-    <li><code>bump + sidecar</code> is the handoff contract that gives IR1 enough concrete information to lower, codegen, and run inference or backprop paths without hidden runtime guesses.</li>
-</ul>
+<div class="grid grid-2" style="gap: 1rem; margin-top: 1rem;">
+    <div class="card">
+        <h3 style="margin-top: 0;">Inference — Generate C Runtime</h3>
+        <pre style="font-size: 0.78rem;">make ck-emit \
+  CONFIG=path/to/config.json \
+  OUT=build/generated_model.c</pre>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0;">Emits a complete C file from IR. Load GGUF quantized weights via <code>make gguf-convert</code>.</p>
+        <p style="margin-top: 0.75rem; margin-bottom: 0;"><a href="quickstart.html" class="btn btn-sm">Full Quickstart →</a></p>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Training — v7 IR Runtime</h3>
+        <pre style="font-size: 0.78rem;">. .venv/bin/activate
+python version/v7/scripts/ck_run_v7.py init \
+  --run /tmp/myrun \
+  --template qwen3 \
+  --generate-ir --generate-runtime --strict
+python version/v7/scripts/ck_run_v7.py train \
+  --run /tmp/myrun \
+  --backend ck --parity-on</pre>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0;">Produces IR1, IR2, layout, generated C runtime, and parity artifacts.</p>
+        <p style="margin-top: 0.75rem; margin-bottom: 0;">
+            <a href="v7-backprop-ir.html" class="btn btn-sm">v7 Guide →</a>
+            <a href="v7-runbook.html" class="btn btn-sm" style="margin-left:0.4rem;">v7 Runbook →</a>
+        </p>
+    </div>
+</div>
 
 <!-- ═══════════════════════════════════════════════════════════════════════
-     IR PIPELINE — THE CENTERPIECE
+     HOW CKE WORKS — CONCEPTS
 ═══════════════════════════════════════════════════════════════════════ -->
-<h2>The IR Pipeline</h2>
+<h2 id="how-cke-works">How CKE Works</h2>
+
+<p>C-Kernel-Engine is split into two layers. The <strong>tooling layer</strong> uses Python for model import, GGUF/safetensors conversion, IR construction, code generation, and PyTorch/llama.cpp parity testing. The <strong>execution layer</strong> is generated C plus hand-written C kernels with explicit memory offsets, quantization layouts, SIMD dispatch, and native compiler optimization.</p>
 
 <p>Both inference and training share the same IR foundation. The inference path (v8) adds quantized dispatch, model-family contracts, multimodal coverage, and runtime profiling hooks. The training path (v7) adds backward synthesis, explicit gradient accumulation, and a separate training memory layout — built on top of the same IR1/IR2 lowering chain.</p>
 
@@ -1385,31 +1424,116 @@
     <span style="margin-left: 1rem;"><a href="ir-pipeline.html" style="color: var(--orange);">IR Pipeline v6.6 →</a> &nbsp; <a href="v7-backprop-ir.html" style="color: var(--green);">v7 Backprop IR →</a></span>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════════════════
-     ARCHITECTURE OVERVIEW SVG
-═══════════════════════════════════════════════════════════════════════ -->
 <p>The kernel library is the shared foundation for both pipelines — every kernel used in inference is also the backward-pass primitive used in training:</p>
 
 <div class="img-container svg-viewer" data-title="C-Kernel-Engine Architecture">
     <img src="assets/architecture-overview.svg" alt="C-Kernel-Engine: Kernel Library → IR Pipeline → Memory Layout → Dumb Codegen → Inference Runtime + Training Runtime v7">
 </div>
 
-<div class="card card-blue">
-    <h3 style="margin-top: 0;">Featured Deep Dive: Gated DeltaNet</h3>
-    <p>Qwen3.5/qwen3next-style recurrent attention uses a compact state matrix instead of scanning the full KV-cache in every recurrent layer. CK implements that path as a dedicated Gated DeltaNet kernel family with parity-focused docs.</p>
-    <p style="margin-bottom: 0;"><a href="deltanet-deep-dive.html" class="btn btn-sm">Open Gated DeltaNet Deep Dive →</a></p>
+<h3 id="deep-dives">Deep Dives — See How Real Models Run</h3>
+
+<div class="grid grid-2" style="gap: 1rem;">
+    <div class="card card-blue">
+        <h3 style="margin-top: 0;">Featured Deep Dive: Gated DeltaNet</h3>
+        <p>Qwen3.5/qwen3next-style recurrent attention uses a compact state matrix instead of scanning the full KV-cache in every recurrent layer. CK implements that path as a dedicated Gated DeltaNet kernel family with parity-focused docs.</p>
+        <p style="margin-bottom: 0;"><a href="deltanet-deep-dive.html" class="btn btn-sm">Open Gated DeltaNet Deep Dive →</a></p>
+    </div>
+    <div class="card card-blue">
+        <h3 style="margin-top: 0;">Audio Kernels, Visually</h3>
+        <p>From WAV bytes to transcript: resampling, STFT, log-mel, Conformer convolution, relative attention, LSTM, and transducer decode — each kernel drawn with its real shapes, layouts, and numerical contracts.</p>
+        <p style="margin-bottom: 0;"><a href="audio-kernels-deep-dive.html" class="btn btn-sm">Open Audio Kernel Deep Dive →</a></p>
+    </div>
+    <div class="card card-blue">
+        <h3 style="margin-top: 0;">Parakeet TDT on CPU</h3>
+        <p>NVIDIA's 0.6B transducer runs end to end on native CKE kernels: exact token-and-duration trajectories, deterministic five-minute runs, and a bounded 42-minute windowing policy — with a full architecture diagram and runbook.</p>
+        <p style="margin-bottom: 0;"><a href="v8-parakeet-tdt.html" class="btn btn-sm">Open Parakeet TDT Bring-up →</a></p>
+    </div>
+    <div class="card card-blue">
+        <h3 style="margin-top: 0;">Whisper Tiny End-to-End</h3>
+        <p>A generated FP32 Whisper Tiny encoder and decoder run from PCM16 WAV, with the JFK fixture matching Hugging Face token for token. The audio pipeline infographic shows every contracted kernel from log-Mel to persistent-KV decode.</p>
+        <p style="margin-bottom: 0;"><a href="v8-whisper-tiny.html" class="btn btn-sm">Open Whisper Tiny End-to-End →</a></p>
+    </div>
 </div>
 
-<div class="card card-blue">
-    <h3 style="margin-top: 0;">Audio Inference: Whisper Tiny End-to-End</h3>
-    <p>The same circuit and kernel-contract path now transcribes audio: a generated FP32 Whisper Tiny encoder and decoder run from PCM16 WAV, with the JFK fixture matching Hugging Face token for token. The audio pipeline infographic shows every contracted kernel from log-Mel to persistent-KV decode.</p>
-    <p style="margin-bottom: 0;"><a href="v8-whisper-tiny.html" class="btn btn-sm">Open Whisper Tiny End-to-End →</a></p>
-</div>
+<h3 id="kernel-library">Kernel Library</h3>
+
+<p>All kernels implement forward and backward passes. Each ships with a Python ctypes parity test that loads <code>libckernel_engine.so</code> and compares output against PyTorch autograd with max diff &lt; 1e-5:</p>
+
+<table>
+    <tr>
+        <th>Kernel</th>
+        <th>Forward</th>
+        <th>Backward</th>
+        <th>Notes</th>
+    </tr>
+    <tr>
+        <td><code>attention</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td>Causal mask, GQA, sliding-window, head-major layout</td>
+    </tr>
+    <tr>
+        <td><code>rope</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td>Rotary position embeddings, precomputed cache</td>
+    </tr>
+    <tr>
+        <td><code>rmsnorm</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td>Fused normalization, rstd caching, learned scale</td>
+    </tr>
+    <tr>
+        <td><code>swiglu</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td>Fused gate activation for Llama/Qwen-style MLP</td>
+    </tr>
+    <tr>
+        <td><code>softmax</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td>Causal row-wise, numerically stable</td>
+    </tr>
+    <tr>
+        <td><code>layernorm</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td>Rolled and unrolled variants</td>
+    </tr>
+    <tr>
+        <td><code>gelu</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td>Exact and fast approximation variants</td>
+    </tr>
+    <tr>
+        <td><code>cross_entropy</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td>Stable log-sum-exp, mean reduction, ignore-index</td>
+    </tr>
+    <tr>
+        <td><code>gemm</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-indigo">N/A</span></td>
+        <td>Blocked serial, AVX-512, parallel — Q4_K · Q5_K · Q6_K · Q8_0 · FP32</td>
+    </tr>
+    <tr>
+        <td><code>mlp</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td>FC1 + activation + FC2, token-parallel</td>
+    </tr>
+</table>
+
+<p style="margin-top: 0.75rem;"><a href="kernels.html" class="btn btn-sm">Kernel Reference →</a> <a href="model-kernel-matrix.html" class="btn btn-sm" style="margin-left:0.4rem;">Model × Kernel Matrix →</a> <a href="concepts.html" class="btn btn-sm" style="margin-left:0.4rem;">Concepts →</a></p>
 
 <!-- ═══════════════════════════════════════════════════════════════════════
      CORRECTNESS
 ═══════════════════════════════════════════════════════════════════════ -->
-<h2>Correctness</h2>
+<h2 id="correctness">Correctness</h2>
 
 <p>Every claim of correctness is backed by a specific, reproducible test. Parity is not a property we assert — it is something we measure at every kernel boundary, training step, and memory section.</p>
 
@@ -1461,7 +1585,7 @@
 <!-- ═══════════════════════════════════════════════════════════════════════
      PERFORMANCE
 ═══════════════════════════════════════════════════════════════════════ -->
-<h2>Performance</h2>
+<h2 id="performance">Performance</h2>
 
 <div class="card card-accent">
     <h3 style="margin-top: 0;">Measured Across CPU Classes</h3>
@@ -1549,123 +1673,46 @@
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════════════
-     KERNEL LIBRARY
+     DESIGN PHILOSOPHY
 ═══════════════════════════════════════════════════════════════════════ -->
-<h2>Kernel Library</h2>
+<h2 id="design-philosophy">Design Philosophy</h2>
 
-<p>All kernels implement forward and backward passes. Each ships with a Python ctypes parity test that loads <code>libckernel_engine.so</code> and compares output against PyTorch autograd with max diff &lt; 1e-5:</p>
-
-<table>
-    <tr>
-        <th>Kernel</th>
-        <th>Forward</th>
-        <th>Backward</th>
-        <th>Notes</th>
-    </tr>
-    <tr>
-        <td><code>attention</code></td>
-        <td><span class="badge badge-green">Yes</span></td>
-        <td><span class="badge badge-green">Yes</span></td>
-        <td>Causal mask, GQA, sliding-window, head-major layout</td>
-    </tr>
-    <tr>
-        <td><code>rope</code></td>
-        <td><span class="badge badge-green">Yes</span></td>
-        <td><span class="badge badge-green">Yes</span></td>
-        <td>Rotary position embeddings, precomputed cache</td>
-    </tr>
-    <tr>
-        <td><code>rmsnorm</code></td>
-        <td><span class="badge badge-green">Yes</span></td>
-        <td><span class="badge badge-green">Yes</span></td>
-        <td>Fused normalization, rstd caching, learned scale</td>
-    </tr>
-    <tr>
-        <td><code>swiglu</code></td>
-        <td><span class="badge badge-green">Yes</span></td>
-        <td><span class="badge badge-green">Yes</span></td>
-        <td>Fused gate activation for Llama/Qwen-style MLP</td>
-    </tr>
-    <tr>
-        <td><code>softmax</code></td>
-        <td><span class="badge badge-green">Yes</span></td>
-        <td><span class="badge badge-green">Yes</span></td>
-        <td>Causal row-wise, numerically stable</td>
-    </tr>
-    <tr>
-        <td><code>layernorm</code></td>
-        <td><span class="badge badge-green">Yes</span></td>
-        <td><span class="badge badge-green">Yes</span></td>
-        <td>Rolled and unrolled variants</td>
-    </tr>
-    <tr>
-        <td><code>gelu</code></td>
-        <td><span class="badge badge-green">Yes</span></td>
-        <td><span class="badge badge-green">Yes</span></td>
-        <td>Exact and fast approximation variants</td>
-    </tr>
-    <tr>
-        <td><code>cross_entropy</code></td>
-        <td><span class="badge badge-green">Yes</span></td>
-        <td><span class="badge badge-green">Yes</span></td>
-        <td>Stable log-sum-exp, mean reduction, ignore-index</td>
-    </tr>
-    <tr>
-        <td><code>gemm</code></td>
-        <td><span class="badge badge-green">Yes</span></td>
-        <td><span class="badge badge-indigo">N/A</span></td>
-        <td>Blocked serial, AVX-512, parallel — Q4_K · Q5_K · Q6_K · Q8_0 · FP32</td>
-    </tr>
-    <tr>
-        <td><code>mlp</code></td>
-        <td><span class="badge badge-green">Yes</span></td>
-        <td><span class="badge badge-green">Yes</span></td>
-        <td>FC1 + activation + FC2, token-parallel</td>
-    </tr>
-</table>
-
-<p style="margin-top: 0.75rem;"><a href="kernels.html" class="btn btn-sm">Kernel Reference →</a> <a href="model-kernel-matrix.html" class="btn btn-sm" style="margin-left:0.4rem;">Model × Kernel Matrix →</a></p>
-
-<!-- ═══════════════════════════════════════════════════════════════════════
-     QUICK START
-═══════════════════════════════════════════════════════════════════════ -->
-<h2>Quick Start</h2>
+<p>The intended deployment model is dependency-light execution, not dependency-free development. The generated runtime can be compiled with GCC or Clang, but the preferred path is to use the strongest native CPU toolchain for the target machine: Intel oneAPI/ICX on Intel CPUs, tuned GCC/Clang on AMD CPUs, ARM toolchains on ARM systems, and standard systems libraries for cluster execution.</p>
 
 <div class="card card-accent">
-    <h3 style="margin-top: 0;">Build + Parity Test</h3>
-    <pre>git clone https://github.com/antshiv/C-Kernel-Engine.git
-cd C-Kernel-Engine
-make                  # builds build/libckernel_engine.so
-make test             # runs all kernel parity tests vs PyTorch</pre>
-    <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 0;">Requires Linux, a supported C toolchain, and Python 3 + PyTorch for parity tests. AVX2 is the current x86 production baseline; ARM NEON is an active portability lane; AVX-512, VNNI, BF16, and AMX paths are enabled only where the host supports them.</p>
+    <h3 style="margin-top: 0;">Long-Horizon Commodity Compute Bet</h3>
+    <p>CKE assumes AI execution will not remain permanently locked inside expensive accelerator stacks, because the underlying workload is still math, memory movement, and systems software. Accelerators matter, but they do not change the shape of the problem: tensors must live somewhere, bytes must move through memory hierarchies, kernels must execute, and distributed systems must coordinate the work.</p>
+    <p style="margin-bottom: 0;">If CPUs keep gaining cores, SIMD and matrix units, memory channels, NUMA controls, and fast interconnects, then a clean generated-C runtime that can orchestrate many cheap Linux nodes becomes increasingly interesting. The bet is not that one CPU beats every GPU. The bet is that commodity CPU clusters can become a practical, auditable, incrementally scalable execution substrate for a large class of AI inference and training workloads.</p>
 </div>
 
-<div class="grid grid-2" style="gap: 1rem; margin-top: 1rem;">
-    <div class="card">
-        <h3 style="margin-top: 0;">Inference — Generate C Runtime</h3>
-        <pre style="font-size: 0.78rem;">make ck-emit \
-  CONFIG=path/to/config.json \
-  OUT=build/generated_model.c</pre>
-        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0;">Emits a complete C file from IR. Load GGUF quantized weights via <code>make gguf-convert</code>.</p>
-        <p style="margin-top: 0.75rem;"><a href="quickstart.html" class="btn btn-sm">Full Quickstart →</a></p>
-    </div>
-    <div class="card">
-        <h3 style="margin-top: 0;">Training — v7 IR Runtime</h3>
-        <pre style="font-size: 0.78rem;">. .venv/bin/activate
-python version/v7/scripts/ck_run_v7.py init \
-  --run /tmp/myrun \
-  --template qwen3 \
-  --generate-ir --generate-runtime --strict
-python version/v7/scripts/ck_run_v7.py train \
-  --run /tmp/myrun \
-  --backend ck --parity-on</pre>
-        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0;">Produces IR1, IR2, layout, generated C runtime, and parity artifacts.</p>
-        <p style="margin-top: 0.75rem;">
-            <a href="v7-backprop-ir.html" class="btn btn-sm">v7 Guide →</a>
-            <a href="v7-runbook.html" class="btn btn-sm" style="margin-left:0.4rem;">v7 Runbook →</a>
-        </p>
-    </div>
+<div class="card card-blue">
+    <h3 style="margin-top: 0;">CKU: CKE Throughput Unit</h3>
+    <p>CKU is the project's north-star systems metric: active model bytes cycled through useful model math per second. It is not memcpy or DSA copy bandwidth. The reference workload is full-context prefill, where active weights and activations flow through GEMM/FMA/attention; decode is tracked separately as GEMV plus KV/cache traffic.</p>
+    <p style="margin-bottom: 0;">
+        <a href="cke-throughput-unit.html" class="btn btn-sm">Read the CKU page →</a>
+    </p>
 </div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">Generated C, Planned Memory</h3>
+    <p>C-Kernel-Engine uses C as an <strong>auditable compiler target</strong>, not as a large hand-written pointer maze. The model graph, tensor shapes, lifetimes, kernel contracts, and memory sections are resolved before code emission. The generated C then reads and writes deterministic offsets from planned buffers instead of allocating or guessing inside the hot path.</p>
+    <p>This is the memory-safety model: avoid most ordinary C mistakes by not hand-authoring the model body in C in the first place. The compiler pipeline emits explicit offsets, optional bounds/canary checks, cache-aligned sections, and reproducible layout reports; ASAN, Valgrind, PyTorch parity, llama.cpp parity, perf, VTune, and Advisor validate the artifact from correctness down to memory behavior.</p>
+    <p style="margin-bottom: 0;">The result is still native C, but the important contract is visible: <code>IR op -> tensor lifetime -> byte offset -> generated pointer -> kernel call</code>. That makes the execution path deterministic, inspectable, and measurable for applications where memory layout is the application.</p>
+</div>
+
+<p>The north star is distributed CPU inference and training: model/layer ownership across CPU nodes, explicit activation and gradient movement, MPI/RDMA-style communication where available, and pipeline parallelism over hardware that can be bought, powered, audited, and scaled incrementally.</p>
+
+<p>The first version of C-Kernel-Engine tried to drive generation from HuggingFace <code>config.json</code> alone. That was not enough: config metadata does not fully capture quantized weight packing/layout details, nor all runtime stitching constraints needed for reliable kernel binding. The current pipeline pulls GGUF or safetensors metadata as the weight/layout source of truth, parses it, and combines that with C-Kernel-Engine templates and config hints. That merge produces deterministic <code>weights.bump</code> + sidecar metadata. From that point forward, the same IR chain can target v8 inference and v7 training/backprop paths.</p>
+
+<p>The architecture is deliberately split into a <em>smart</em> front-end (template selection, manifest resolution, IR construction, backward synthesis, layout planning, fusion detection) and a <em>dumb</em> back-end (a codegen emitter that only writes what the lowered IR already decided). This makes correctness auditable at every stage.</p>
+
+<h3>Why the Bump Format Exists</h3>
+
+<ul>
+    <li><code>weights.bump</code> is a contiguous binary blob optimized for deterministic C runtime access by offset.</li>
+    <li>The sidecar (for example <code>weights_manifest.json</code>) records tensor names, offsets, shapes, dtypes, quantization metadata, and template bindings.</li>
+    <li><code>bump + sidecar</code> is the handoff contract that gives IR1 enough concrete information to lower, codegen, and run inference or backprop paths without hidden runtime guesses.</li>
+</ul>
 
 <div class="card card-blue">
     <h3 style="margin-top: 0;">Operator Spectrum (1 → 8)</h3>
@@ -1676,7 +1723,7 @@ python version/v7/scripts/ck_run_v7.py train \
     </p>
 </div>
 
-<h2>Work With Us</h2>
+<h2 id="work-with-us">Work With Us</h2>
 
 <div class="card card-accent">
     <h3 style="margin-top: 0;">CPU AI and High-Performance Linux Engineering</h3>
@@ -1691,13 +1738,13 @@ python version/v7/scripts/ck_run_v7.py train \
 <!-- ═══════════════════════════════════════════════════════════════════════
      PROJECT STRUCTURE
 ═══════════════════════════════════════════════════════════════════════ -->
-<h2>Project Structure</h2>
+<h2 id="project-structure">Project Structure</h2>
 
 <div class="folder-structure">
     <div class="folder-header">
         <span class="folder-title">Focused Source Tree</span>
         <span class="folder-scope">src/kernels · version/v6.6 · version/v7</span>
-        <span class="folder-updated">Updated: 2026-09-13 15:25</span>
+        <span class="folder-updated">Updated: 2026-09-13 15:50</span>
     </div>
     <pre class="tree-output">
 src/kernels
