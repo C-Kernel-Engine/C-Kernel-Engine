@@ -289,9 +289,8 @@ int attention_forward_query_key_head_major_f32_decode_heads(
     ck_threadpool_t *pool = ck_threadpool_global();
     int active = pool ? ck_threadpool_n_threads(pool) : 1;
     if (active <= 1) {
-        return ck_attention_forward_query_key_head_major_f32_run(
-            query, key, value, output, score_scratch, NULL, num_heads,
-            query_tokens, key_tokens, head_dim, scale);
+        ck_attention_query_key_f32_head_work(0, 1, &args);
+        return 0;
     }
     if (active > num_heads) active = num_heads;
     ck_threadpool_dispatch_n(pool, active,

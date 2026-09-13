@@ -1082,6 +1082,17 @@ def _check_cross_attention(name: str, heads: int, query_tokens: int, key_tokens:
         _fptr(query), _fptr(key), _fptr(value), _fptr(serial), _fptr(scratch),
         heads, query_tokens, key_tokens, dim, float(scale),
     ) == 0
+    serial_decode_scratch = None
+    if query_tokens == 1:
+        serial_decode = np.empty_like(query)
+        serial_decode_scratch = np.full((heads, key_tokens), np.nan, dtype=np.float32)
+        assert attention_lib.attention_forward_query_key_head_major_f32_decode_heads(
+            _fptr(query), _fptr(key), _fptr(value), _fptr(serial_decode),
+            _fptr(serial_decode_scratch), heads, query_tokens, key_tokens, dim,
+            float(scale),
+        ) == 0
+        assert np.array_equal(serial_decode, serial), name
+        assert np.isfinite(serial_decode_scratch).all(), name
     attention_lib.ck_threadpool_global_destroy()
     attention_lib.ck_set_num_threads(20)
     if query_tokens == 1:
@@ -1096,6 +1107,9 @@ def _check_cross_attention(name: str, heads: int, query_tokens: int, key_tokens:
                 heads, query_tokens, key_tokens, dim, float(scale),
             ) == 0
             assert np.array_equal(actual, serial), (name, replay)
+            assert np.array_equal(scratch.reshape(heads, key_tokens), serial_decode_scratch), (
+                name, replay,
+            )
     else:
         assert attention_lib.attention_forward_query_key_head_major_f32(
             _fptr(query), _fptr(key), _fptr(value), _fptr(actual), _fptr(scratch),
