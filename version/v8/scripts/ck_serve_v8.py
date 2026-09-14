@@ -559,9 +559,7 @@ def _input_chat_messages(value: Any) -> list[dict[str, Any]]:
         ):
             role = getattr(item, "role", "user")
             role = getattr(role, "value", role)
-            messages.append(
-                {"role": str(role), "content": _content_text(item.content)}
-            )
+            messages.append({"role": str(role), "content": _content_text(item.content)})
         elif item_type == "function_call":
             try:
                 arguments = json.loads(item.arguments)
@@ -986,6 +984,42 @@ def _format_prompt_with_chat_contract(
 
 
 # --- Tool-call helpers -------------------------------------------------------
+#
+# Tool policy: all ToolDefinition types are accepted (Pydantic validation) and
+# echoed verbatim in build_response["tools"], and ALL of them are passed into
+# the Jinja ``tools`` context in _render_with_chat_templates for model context.
+# The server never executes any tool server-side (no vector store, browser /
+# computer action, code container, fetch, or image model). Only function-like
+# tools (function/mcp) are parsed back into FunctionCall items for the client
+# to execute (e.g. weather get_weather). The ignored families below are
+# accepted + prompt-visible but never emitted as output items:
+#   file_search, computer, computer_use_preview, web_search(_2025_08_26),
+#   code_interpreter, image_generation (programmatic_tool_calling has no name
+#   and is implicitly ignored for parsing).
+_IGNORED_TOOL_TYPES = frozenset(
+    {
+        "file_search",
+        "computer",
+        "computer_use_preview",
+        "web_search",
+        "code_interpreter",
+        "image_generation",
+    }
+)
+
+_FUNCTION_LIKE_TYPES = frozenset({"function", "mcp"})
+
+
+def _effective_tools(body: Any) -> list[Any]:
+    """Function-like tools that participate in 501-gating and call parsing."""
+    tools = getattr(body, "tools", None) if body is not None else None
+    if not tools:
+        return []
+    return [t for t in tools if getattr(t, "type", None) in _FUNCTION_LIKE_TYPES]
+
+
+def _has_function_tools(body: Any) -> bool:
+    return bool(_effective_tools(body))
 
 
 def _has_tool_support(
@@ -1018,10 +1052,17 @@ def _render_with_chat_templates(
     chat_contract: dict[str, Any] | None = None,
     effective_thinking: str = "suppressed",
 ) -> str | None:
-    """Try to render a jinja chat template with tools. Returns None on failure or absence."""
+    """Try to render a jinja chat template with tools. Returns None on failure or absence.
+
+    All request tools (including ignored file_search/computer/web_search/
+    code_interpreter/image_generation families) are passed verbatim into the
+    Jinja ``tools`` context for model visibility. Only function-like tools
+    gate parsing elsewhere; this function never executes any tool.
+    """
     if not _JINJA_AVAILABLE:
         return None
-    # Prefer tool_use variant when tools are present
+    # Prefer tool_use variant when any tools are present (including ignored
+    # families, which stay prompt-visible but are never executed).
     tmpl_str: str | None = None
     if (
         body is not None
@@ -1043,6 +1084,8 @@ def _render_with_chat_templates(
             messages = [{"role": "system", "content": instructions}, *messages]
         tools = None
         if body is not None and getattr(body, "tools", None):
+            # Pass ALL tools (function + ignored families) verbatim into Jinja
+            # for model context; server never executes any of them.
             tools = [t.model_dump() for t in body.tools]  # type: ignore
         env = jinja2.sandbox.SandboxedEnvironment(
             undefined=jinja2.StrictUndefined, autoescape=False
@@ -1322,7 +1365,12 @@ def create_app(
                 detail=f"Model {body.model!r} is not loaded; available model: {model!r}",
             )
         if body.tools:
-            if not _has_tool_support(chat_template, chat_templates):
+            # 501 only when a function-like tool needs template support.
+            # Pure file_search/computer/web_search/code_interpreter/
+            # image_generation requests are accepted as plain text.
+            if _effective_tools(body) and not _has_tool_support(
+                chat_template, chat_templates
+            ):
                 raise HTTPException(
                     status_code=501,
                     detail="Model doesn't support tool calling",
@@ -1563,6 +1611,9 @@ def create_app(
             "top_p": body.top_p if body.top_p is not None else top_p,
             "top_logprobs": body.top_logprobs,
             "tool_choice": body.tool_choice,
+            # Echo the original request tools verbatim (OpenAI parity), including
+            # ignored families. Filtering to function-like tools is internal only
+            # (501-gating, Jinja follows full list, parsing uses effective list).
             "tools": [t.model_dump() for t in body.tools] if body.tools else [],
             "truncation": body.truncation,
             "text": body.text.model_dump() if body.text is not None else None,
@@ -1673,14 +1724,12 @@ def create_app(
         def on_token(_tid, text):
             if text:
                 complete.append(text)
-                if not body.tools:
+                if not _has_function_tools(body):
                     if splitter is not None:
                         for state, delta in splitter.feed(text):
                             events.put(
                                 (
-                                    "reasoning_text"
-                                    if state == "thinking"
-                                    else "text",
+                                    "reasoning_text" if state == "thinking" else "text",
                                     delta,
                                 )
                             )
@@ -1701,7 +1750,7 @@ def create_app(
                     stop_on_text=stop_markers,
                     stop_at_eos=stop_at_eos,
                 )
-                if splitter is not None and not body.tools:
+                if splitter is not None and not _has_function_tools(body):
                     for state, delta in splitter.flush():
                         events.put(
                             ("reasoning_text" if state == "thinking" else "text", delta)
@@ -1867,16 +1916,20 @@ def create_app(
                     message_index = 1 if think_enabled else 0
 
                     # --- Tool-call detection (manifest chat_templates-gated) ---
+                    # Only function-like tools are parsed into FunctionCall items
+                    # for client-side execution. Ignored families (file_search /
+                    # computer / web_search / code_interpreter / image_generation)
+                    # were passed into Jinja above but are never executed or
+                    # emitted here; they fall through to plain text.
                     tool_calls: list[dict[str, Any]] | None = None
                     tool_error_code: str | None = None
                     tool_error_msg: str | None = None
-                    has_tools = bool(getattr(body, "tools", None))
+                    has_tools = _has_function_tools(body)
                     if has_tools:
                         allowed = {
                             t.name
-                            for t in body.tools  # type: ignore
-                            if getattr(t, "type", None) == "function"
-                            and getattr(t, "name", None)
+                            for t in _effective_tools(body)
+                            if getattr(t, "name", None)
                         }
                         tool_calls, tool_error_code, tool_error_msg = (
                             _extract_tool_calls_from_text(text, allowed)
@@ -2598,15 +2651,14 @@ def create_app(
             thinking = thinking or None
             if thinking is not None:
                 reasoning_tokens = max(0, len(thinking) // 4)
-        # Tool parsing for non-stream
+        # Tool parsing for non-stream (function-like only; ignored families are
+        # accepted + Jinja-visible but never parsed/executed -> plain text).
         tool_calls: list[dict[str, Any]] | None = None
         tool_error_code: str | None = None
         tool_error_msg: str | None = None
-        if body.tools:
+        if _has_function_tools(body):
             allowed = {
-                t.name
-                for t in body.tools
-                if getattr(t, "type", None) == "function" and getattr(t, "name", None)  # type: ignore
+                t.name for t in _effective_tools(body) if getattr(t, "name", None)
             }
             tool_calls, tool_error_code, tool_error_msg = _extract_tool_calls_from_text(
                 text, allowed
