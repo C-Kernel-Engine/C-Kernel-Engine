@@ -46,6 +46,65 @@ def _arg(name: str, expr: str) -> dict[str, str]:
 
 
 class HiddenExportExtentTests(unittest.TestCase):
+    def test_q_only_geometry_controls_prefill_layout_bridges(self) -> None:
+        ops = [
+            {
+                "op": "transpose_qkv_to_head_major",
+                "function": "transpose_inplace",
+                "layer": 24,
+                "args": [],
+            },
+            {
+                "op": "q_norm",
+                "function": "q_norm_forward",
+                "layer": 24,
+                "args": [
+                    _arg("q", "Q"),
+                    _arg("num_heads", "8"),
+                    _arg("num_tokens", "1024"),
+                    _arg("head_dim", "256"),
+                ],
+            },
+            {
+                "op": "transpose_attn_out_to_token_major",
+                "function": "transpose_inplace",
+                "layer": 24,
+                "args": [],
+            },
+        ]
+
+        prefill_codegen._annotate_kv_transpose_roles(ops)
+        q_bridge = prefill_codegen.emit_prefill_op(
+            ops[0], 1, {"num_heads": 8, "head_dim": 512}
+        )
+        out_bridge = prefill_codegen.emit_prefill_op(
+            ops[2], 2, {"num_heads": 8, "head_dim": 512}
+        )
+
+        self.assertIn("const int H = 8;", q_bridge)
+        self.assertIn("const int D = 256;", q_bridge)
+        self.assertIn("const int H = 8;", out_bridge)
+        self.assertIn("const int D = 256;", out_bridge)
+
+    def test_conflicting_prefill_geometry_is_rejected(self) -> None:
+        ops = [
+            {
+                "op": "q_norm",
+                "layer": 24,
+                "args": [_arg("num_heads", "8"), _arg("head_dim", "256")],
+            },
+            {
+                "op": "rope_q",
+                "layer": 24,
+                "args": [_arg("num_heads", "8"), _arg("head_dim", "512")],
+            },
+        ]
+
+        with self.assertRaisesRegex(
+            ValueError, "conflicting resolved head_dim for layer 24"
+        ):
+            prefill_codegen._annotate_kv_transpose_roles(ops)
+
     def test_prefill_attention_export_covers_every_token_row(self) -> None:
         emitted = prefill_codegen.emit_prefill_op(
             {
@@ -882,6 +941,78 @@ class HiddenExportExtentTests(unittest.TestCase):
             "(num_tokens) * (8) * (256)",
             emitted,
         )
+
+    def test_split_rope_exports_complete_runtime_extent(self) -> None:
+        cases = (
+            ("rope_q", "Q", "num_heads", "8", "rope_q"),
+            ("rope_k", "K", "num_kv_heads", "2", "rope_k"),
+        )
+        for op_name, tensor, heads_name, heads, label in cases:
+            with self.subTest(op=op_name):
+                op = {
+                    "op": op_name,
+                    "function": f"{op_name}_forward",
+                    "layer": 24,
+                    "args": [
+                        _arg("q" if op_name == "rope_q" else "k", tensor),
+                        _arg(heads_name, heads),
+                        _arg("num_tokens", "1024"),
+                        _arg("aligned_head_dim", "256"),
+                    ],
+                }
+
+                decode = codegen.emit_op(op)
+                prefill = prefill_codegen.emit_prefill_op(
+                    op, 61, {"embed_dim": 2560}
+                )
+
+                self.assertIn(
+                    f'"{label}", (const float*){tensor}, '
+                    f"({heads}) * (1024) * (256)",
+                    decode,
+                )
+                self.assertIn(
+                    f'"{label}", (const float*){tensor}, '
+                    f"({heads}) * (num_tokens) * (256)",
+                    prefill,
+                )
+                self.assertIn(f'"{label}_last"', prefill)
+
+    def test_split_qk_norm_exports_complete_runtime_extent(self) -> None:
+        cases = (
+            ("q_norm", "Q", "num_heads", "8", "qk_norm_q"),
+            ("k_norm", "K", "num_kv_heads", "2", "qk_norm_k"),
+        )
+        for op_name, tensor, heads_name, heads, label in cases:
+            with self.subTest(op=op_name):
+                op = {
+                    "op": op_name,
+                    "function": f"{op_name}_forward",
+                    "layer": 24,
+                    "args": [
+                        _arg("q" if op_name == "q_norm" else "k", tensor),
+                        _arg(heads_name, heads),
+                        _arg("num_tokens", "1024"),
+                        _arg("aligned_head_dim", "256"),
+                    ],
+                }
+
+                decode = codegen.emit_op(op)
+                prefill = prefill_codegen.emit_prefill_op(
+                    op, 61, {"embed_dim": 2560}
+                )
+
+                self.assertIn(
+                    f'"{label}", (const float*){tensor}, '
+                    f"({heads}) * (1024) * (256)",
+                    decode,
+                )
+                self.assertIn(
+                    f'"{label}", (const float*){tensor}, '
+                    f"({heads}) * (num_tokens) * (256)",
+                    prefill,
+                )
+                self.assertIn(f'"{label}_last"', prefill)
 
     def test_shared_attention_prefill_uses_runtime_segment_extent(self) -> None:
         for op_name in ("attn_shared_kv", "attn_sliding_shared_kv"):
