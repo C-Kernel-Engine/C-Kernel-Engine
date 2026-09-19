@@ -771,6 +771,11 @@ TEST_SUITES = {
         "parity",
         ROOT / "tests" / "test_v8_qwen3vl_private_corpus_certification.py",
     ),
+    "v8_generated_layout_bridges": TestSuite(
+        "v8 Generated Layout Bridge Execution",
+        "parity",
+        ROOT / "tests" / "test_v8_layout_provider_selection.py",
+    ),
     "rope_pairwise_layout": TestSuite(
         "RoPE Pairwise Layout (Llama)",
         "parity",
@@ -1269,7 +1274,7 @@ BENCH_TARGETS = {
 # Quick subset for fast validation
 QUICK_TESTS = [
     "gemm", "relu", "relu2", "nemotron_router", "moe_relu2_expert", "mamba2_reference", "gemma4_assistant", "softmax", "rmsnorm", "attention", "attention_sliding",
-    "deltanet_backward",
+    "deltanet_backward", "v8_generated_layout_bridges",
     "relu_bf16", "rmsnorm_bf16",
     "q4k_kernels", "idle_nightly_coordinator",
 ]

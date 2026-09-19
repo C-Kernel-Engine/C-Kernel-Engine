@@ -93,6 +93,133 @@ class LayoutProviderSelectionTests(unittest.TestCase):
         )
         self.assertEqual(source.tobytes(), restored.tobytes())
 
+    def test_emitted_prefill_layout_bridges_execute_resolved_geometry(self):
+        tokens, heads, layer_dim, global_dim = 4, 3, 5, 9
+        elements = tokens * heads * layer_dim
+        guard = 8
+        q_offset = guard
+        attn_offset = q_offset + elements + guard
+        scratch_offset = attn_offset + elements + guard
+        total = scratch_offset + elements + guard
+        ops = [
+            {
+                "op": "transpose_qkv_to_head_major",
+                "function": "transpose_inplace",
+                "layer": 7,
+                "args": [],
+            },
+            {
+                "op": "q_norm",
+                "function": "q_norm_forward",
+                "layer": 7,
+                "args": [
+                    {"name": "num_heads", "expr": str(heads)},
+                    {"name": "num_tokens", "expr": str(tokens)},
+                    {"name": "head_dim", "expr": str(layer_dim)},
+                ],
+            },
+            {
+                "op": "transpose_attn_out_to_token_major",
+                "function": "transpose_inplace",
+                "layer": 7,
+                "args": [],
+            },
+        ]
+        codegen._annotate_kv_transpose_roles(ops)
+        to_head = codegen.emit_prefill_op(
+            ops[0], 1, {"num_heads": heads, "head_dim": global_dim}
+        )
+        to_token = codegen.emit_prefill_op(
+            ops[2], 2, {"num_heads": heads, "head_dim": global_dim}
+        )
+
+        with tempfile.TemporaryDirectory(prefix="cke-generated-layout-") as td:
+            root = Path(td)
+            source_path = root / "generated_layout.c"
+            library_path = root / "libgenerated_layout.so"
+            source_path.write_text(
+                f"""
+#include <stddef.h>
+#include <string.h>
+
+typedef struct {{ unsigned char *bump; }} CKModel;
+void ck_layout_token_to_head_f32(const float *, float *, int, int, int);
+void ck_layout_head_to_token_f32(const float *, float *, int, int, int);
+
+#define A_Q_SCRATCH ((size_t){q_offset} * sizeof(float))
+#define A_ATTN_SCRATCH ((size_t){attn_offset} * sizeof(float))
+#define A_LAYER_OUTPUT ((size_t){scratch_offset} * sizeof(float))
+
+int run_generated_layout(float *arena, int num_tokens) {{
+    CKModel storage = {{ (unsigned char *)arena }};
+    CKModel *model = &storage;
+{to_head}
+    memcpy(
+        model->bump + A_ATTN_SCRATCH,
+        model->bump + A_Q_SCRATCH,
+        (size_t){elements} * sizeof(float));
+{to_token}
+    return 0;
+}}
+""",
+                encoding="utf-8",
+            )
+            subprocess.run(
+                [
+                    "gcc", "-std=c11", "-O2", "-shared", "-fPIC",
+                    str(source_path),
+                    str(ROOT / "src" / "kernels" / "layout_kernels.c"),
+                    "-o", str(library_path),
+                ],
+                check=True,
+            )
+            library = ctypes.CDLL(str(library_path))
+            library.run_generated_layout.argtypes = [
+                ctypes.POINTER(ctypes.c_float), ctypes.c_int
+            ]
+            library.run_generated_layout.restype = ctypes.c_int
+
+            sentinel = 0xA5A5A5A5
+            arena_bits = (ctypes.c_uint32 * total)(*[sentinel] * total)
+            arena_floats = ctypes.cast(
+                arena_bits, ctypes.POINTER(ctypes.c_float)
+            )
+            values = [
+                float(1000 * token + 100 * head + channel) + 0.25
+                for token in range(tokens)
+                for head in range(heads)
+                for channel in range(layer_dim)
+            ]
+            for index, value in enumerate(values):
+                arena_floats[q_offset + index] = value
+
+            self.assertEqual(library.run_generated_layout(arena_floats, tokens), 0)
+
+            expected_head = [0.0] * elements
+            for token in range(tokens):
+                for head in range(heads):
+                    for channel in range(layer_dim):
+                        source_index = (token * heads + head) * layer_dim + channel
+                        target_index = (head * tokens + token) * layer_dim + channel
+                        expected_head[target_index] = values[source_index]
+            self.assertEqual(
+                [arena_floats[q_offset + index] for index in range(elements)],
+                expected_head,
+            )
+            self.assertEqual(
+                [arena_floats[attn_offset + index] for index in range(elements)],
+                values,
+            )
+            for start, stop in (
+                (0, q_offset),
+                (q_offset + elements, attn_offset),
+                (attn_offset + elements, scratch_offset),
+                (scratch_offset + elements, total),
+            ):
+                self.assertTrue(
+                    all(arena_bits[index] == sentinel for index in range(start, stop))
+                )
+
     def test_checked_in_layout_converters_match_physical_schema(self):
         schema = json.loads(
             (ROOT / "version" / "v8" / "schemas" / "kernel_physical_layout.schema.json").read_text()
