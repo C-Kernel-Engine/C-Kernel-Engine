@@ -2162,10 +2162,21 @@ def _apply_hidden_oracle_name_map(
     """Relabel explicitly mapped llama.cpp graph nodes to CKE semantics."""
     if not mapping:
         return dumps
-    inverse = {oracle_name: semantic for semantic, oracle_name in mapping.items()}
+    inverse: dict[str, str] = {}
+    for semantic, oracle_name in mapping.items():
+        _, normalized = first_token.parity_test_v7._normalize_layer_and_op(
+            -1, oracle_name
+        )
+        canonical = first_token._canonical_dump_op_name(normalized)
+        if canonical in inverse:
+            raise ValueError(
+                f"oracle graph nodes normalize to the same boundary {canonical!r}"
+            )
+        inverse[canonical] = semantic
     out: list[Any] = []
     for dump in dumps:
-        semantic = inverse.get(str(dump.op_name), str(dump.op_name))
+        canonical = first_token._canonical_dump_op_name(str(dump.op_name))
+        semantic = inverse.get(canonical, str(dump.op_name))
         out.append(
             first_token.parity_test_v7.ParityDump(
                 int(dump.layer_id),
