@@ -776,13 +776,55 @@ jobs:
                       "Preserved because this workflow did not publish a fresh backprop family summary."
                   ).strip()
 
+          training_cert_report = Path("version/v8/.cache/reports/training_certification_latest.json")
+          training_cert_result = results_by_name.get("v8 FP32 Generated Training Certification")
+          training_cert_payload = {
+              "status": "not_run",
+              "passed": False,
+              "checks": {},
+              "negative_controls": {},
+              "note": "v8-training-certify-fp32 did not publish a nightly report.",
+          }
+          if training_cert_report.exists():
+              cert_doc = json.loads(training_cert_report.read_text(encoding="utf-8"))
+              training_cert_payload = {
+                  "status": str(cert_doc.get("status", "INCOMPLETE")).lower(),
+                  "passed": bool(cert_doc.get("passed", False)),
+                  "generated_at": str(cert_doc.get("generated_at") or _utc_mtime(training_cert_report)),
+                  "summary_path": str(training_cert_report),
+                  "configuration": cert_doc.get("configuration") or {},
+                  "checks": cert_doc.get("checks") or {},
+                  "negative_controls": cert_doc.get("negative_controls") or {},
+                  "failures": cert_doc.get("failures") or [],
+                  "note": f"Source: {training_cert_report}",
+              }
+          elif isinstance(training_cert_result, dict):
+              result_status = str(training_cert_result.get("status", "fail")).lower()
+              training_cert_payload.update({
+                  "status": "fail" if result_status in ("fail", "timeout") else result_status,
+                  "note": (
+                      "v8-training-certify-fp32 ran but did not publish "
+                      "training_certification_latest.json. "
+                      + str(training_cert_result.get("error_msg", "") or "")
+                  ).strip(),
+              })
+          else:
+              prev = _load_previous_payload("training_certification")
+              if prev and prev.get("status") not in (None, "not_run"):
+                  training_cert_payload = dict(prev)
+                  training_cert_payload["note"] = (
+                      f"{prev.get('note', 'Preserved previous training certification.')} "
+                      "Preserved because this workflow did not run the certification gate."
+                  ).strip()
+
           data["regression_fast"] = regression_payload
           data["kernel_map_contracts"] = kernel_map_payload
           data["kernel_allocation"] = kernel_allocation_payload
           data["backprop_regression"] = backprop_payload
+          data["training_certification"] = training_cert_payload
           latest_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
           Path("build/nightly_report.json").write_text(json.dumps(data, indent=2), encoding="utf-8")
-          print("Attached v8 inference and v7 training summaries to nightly latest.json")
+          print("Attached v8 inference/training and v7 training summaries to nightly latest.json")
           PY
 
       - name: Clean regression run artifacts

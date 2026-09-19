@@ -622,6 +622,46 @@ class TrainBridgeLoweringTests(unittest.TestCase):
         self.assertIn("gradient_global_norm_multi_f32(grads, numels,", c_src)
         self.assertNotIn("double gv = (double)", c_src)
 
+    def test_codegen_exports_named_parameter_gradients_and_contract_digest(self) -> None:
+        ir1 = build_ir_train_v7.build_ir1_train(
+            manifest=self.manifest,
+            registry=self.registry,
+            bindings_doc=self.bindings,
+            grad_rules=self.grad_rules,
+            max_layers=1,
+            strict=False,
+            bridge_lowering="explicit",
+        )
+        ir2 = lower_ir2_backward_v7.synthesize_ir2_backward(
+            ir1=ir1,
+            registry=self.registry,
+            bindings_doc=self.bindings,
+            grad_rules=self.grad_rules,
+            strict=False,
+            allow_partial=True,
+            checkpoint_policy="none",
+        )
+        layout = generate_train_layout_v7.build_layout(ir2, self.manifest, 64, strict=False)
+        c_src, summary = codegen_train_runtime_v7.generate_c(
+            ir2,
+            self.registry,
+            manifest=self.manifest,
+            layout=layout,
+            exec_plan=None,
+        )
+        digest = str(summary.get("runtime_contract_sha256", ""))
+        names = list(summary.get("parameter_gradient_order") or [])
+        numels = list(summary.get("parameter_gradient_numel") or [])
+        self.assertRegex(digest, r"^[0-9a-f]{64}$")
+        self.assertIn(digest, c_src)
+        self.assertTrue(names)
+        self.assertEqual(len(names), len(set(names)))
+        self.assertEqual(len(names), len(numels))
+        self.assertEqual(sum(int(value) for value in numels), summary["parameter_gradient_snapshot_floats"])
+        self.assertIn("ck_train_get_parameter_gradient_snapshot_numel", c_src)
+        self.assertIn("ck_train_export_parameter_gradient_snapshot", c_src)
+        self.assertIn("ck_train_get_loss", c_src)
+
     def test_codegen_batches_grad_accumulate_only_in_non_trace_backward(self) -> None:
         ir1 = build_ir_train_v7.build_ir1_train(
             manifest=self.manifest,

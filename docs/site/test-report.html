@@ -2120,6 +2120,17 @@
     </div>
 
     <div class="regression-section">
+      <h2>v8 FP32 Training Certification</h2>
+      <p class="regression-meta" id="training-certification-meta"><code>make v8-training-certify-fp32</code> status is not available in this report yet.</p>
+      <div class="summary-cards" style="margin: 0 0 1rem 0;">
+        <div class="summary-card"><div class="value" id="training-certification-status">-</div><div class="label">Overall</div></div>
+        <div class="summary-card"><div class="value" id="training-certification-parameters">0</div><div class="label">Parameters Compared</div></div>
+        <div class="summary-card"><div class="value" id="training-certification-gradients">-</div><div class="label">Gradient Parity</div></div>
+        <div class="summary-card"><div class="value" id="training-certification-controls">0/0</div><div class="label">Negative Controls</div></div>
+      </div>
+    </div>
+
+    <div class="regression-section">
       <h2>v7 Training Family Regression</h2>
       <p class="regression-meta" id="backprop-regression-meta">
         `make regression-training-full` status is not available in this report yet.
@@ -2685,6 +2696,7 @@ function renderResults(data) {
   renderVisionVisualizer(data.vision_visualizer || null);
   renderKernelMapContracts(data.kernel_map_contracts || null);
   renderKernelAllocation(data.kernel_allocation || null);
+  renderTrainingCertification(data.training_certification || null);
   renderBackpropRegression(data.backprop_regression || null);
 
   const statusEl = document.getElementById('overall-status');
@@ -3462,6 +3474,27 @@ function renderKernelAllocation(data) {
     <td><code>${escapeHtml(row.allocator || '-')}()</code></td>
     <td>${escapeHtml((row.provider_ids || []).join(', ') || '-')}</td></tr>`;
   }).join('');
+}
+
+function renderTrainingCertification(data) {
+  const metaEl = document.getElementById('training-certification-meta');
+  const statusEl = document.getElementById('training-certification-status');
+  const parametersEl = document.getElementById('training-certification-parameters');
+  const gradientsEl = document.getElementById('training-certification-gradients');
+  const controlsEl = document.getElementById('training-certification-controls');
+  if (!data) return;
+  const checks = data.checks || {};
+  const gradients = checks.gradients || {};
+  const inventory = checks.parameter_inventory || {};
+  const controls = data.negative_controls || {};
+  const controlRows = Object.values(controls).filter(row => row && typeof row === 'object');
+  const controlsPassed = controlRows.filter(row => row.passed === true).length;
+  const status = String(data.status || 'not_run').toLowerCase();
+  metaEl.textContent = data.note || 'Generated forward/backward parity against independent PyTorch.';
+  statusEl.textContent = status === 'pass' ? 'PASS' : status === 'fail' ? 'FAIL' : 'N/R';
+  parametersEl.textContent = String(Number(inventory.count || gradients.compared || 0));
+  gradientsEl.textContent = gradients.passed === true ? 'PASS' : gradients.passed === false ? 'FAIL' : '-';
+  controlsEl.textContent = `${controlsPassed}/${controlRows.length}`;
 }
 
 function renderBackpropRegression(data) {

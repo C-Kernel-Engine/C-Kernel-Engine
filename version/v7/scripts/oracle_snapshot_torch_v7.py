@@ -912,6 +912,72 @@ def compute_loss_logits_and_slots_from_snapshot_array(
     return loss_val, logits_flat, slot_map
 
 
+def compute_loss_logits_and_gradients_from_snapshot_array(
+    run_dir: Path,
+    runtime_summary: Mapping[str, object],
+    snapshot: np.ndarray,
+    input_ids: Sequence[int],
+    targets: Sequence[int],
+    *,
+    parameter_names: Sequence[str],
+    valid_tokens: Optional[int] = None,
+) -> tuple[float, np.ndarray, Dict[str, np.ndarray]]:
+    """Independent Torch forward/backward over an explicit CK parameter inventory."""
+    _require_torch()
+    names = [str(name) for name in parameter_names]
+    if not names:
+        raise ValueError("parameter_names must not be empty")
+    if len(set(names)) != len(names):
+        raise ValueError("parameter_names contains duplicates")
+
+    if not isinstance(snapshot, np.ndarray):
+        snapshot = np.asarray(snapshot, dtype=np.float32)
+    if snapshot.dtype != np.float32:
+        snapshot = snapshot.astype(np.float32, copy=False)
+
+    decoded, cfg = _decode_weight_snapshot(run_dir, runtime_summary, snapshot)
+    missing = [name for name in names if name not in decoded]
+    if missing:
+        raise ValueError(f"Torch oracle is missing parameters: {missing}")
+
+    expected = set(names)
+    weights: Dict[str, torch.Tensor] = {
+        name: value.detach().clone().requires_grad_(name in expected)
+        for name, value in decoded.items()
+    }
+    model = SnapshotQwenLikeOracle(weights, cfg)
+    x = torch.tensor(list(input_ids), dtype=torch.long).view(1, -1)
+    y = torch.tensor(list(targets), dtype=torch.long).view(1, -1)
+    logits = model.forward(x)
+    active = int(valid_tokens) if valid_tokens is not None else int(y.shape[1])
+    active = max(1, min(active, int(logits.shape[1]), int(y.shape[1])))
+    loss = F.cross_entropy(
+        logits[:, :active, :].reshape(-1, logits.shape[-1]),
+        y[:, :active].reshape(-1),
+        reduction="mean",
+    )
+    loss.backward()
+
+    gradients: Dict[str, np.ndarray] = {}
+    missing_gradients: List[str] = []
+    for name in names:
+        grad = weights[name].grad
+        if grad is None:
+            missing_gradients.append(name)
+            continue
+        gradients[name] = (
+            grad.detach().cpu().float().contiguous().reshape(-1).numpy().astype(np.float32, copy=False)
+        )
+    if missing_gradients:
+        raise ValueError(f"Torch oracle produced no gradient for: {missing_gradients}")
+
+    return (
+        float(loss.detach().cpu().item()),
+        logits.detach().cpu().float().contiguous().reshape(-1).numpy().astype(np.float32, copy=False),
+        gradients,
+    )
+
+
 def compute_loss_and_logits_from_snapshot_array(
     run_dir: Path,
     runtime_summary: Mapping[str, object],

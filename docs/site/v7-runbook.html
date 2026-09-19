@@ -1905,7 +1905,8 @@ python3 version/v7/tools/open_ir_hub.py --open</pre>
 
     <div style="font-size:0.63rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#888;margin:0.5rem 0 0.15rem 0.5rem;">Validate + Train</div>
     <ul>
-        <li><a href="#step-3-5-parity-gate"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;background:rgba(231,76,60,0.15);border-color:rgba(231,76,60,0.4);color:#e74c3c;">3.1</span> Parity Gate</a></li>
+        <li><a href="#step-3-generated-certification"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;background:rgba(71,180,117,0.15);border-color:rgba(71,180,117,0.4);color:#7de59f;">3.0</span> Runtime Certification</a></li>
+        <li><a href="#step-3-5-parity-gate"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;background:rgba(231,76,60,0.15);border-color:rgba(231,76,60,0.4);color:#e74c3c;">3.1</span> SVG Parity Gate</a></li>
         <li><a href="#step-3-6-parity-regimen"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">3.2</span> Parity Regimen</a></li>
         <li><a href="#step-3-6-nightly-core-stabilization"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">3.3</span> Nightly Matrix</a></li>
         <li><a href="#step-3-train"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;background:rgba(71,180,117,0.2);border-color:rgba(71,180,117,0.5);color:#7de59f;">3.7</span> Full Train</a></li>
@@ -3626,7 +3627,22 @@ PY</pre>
     <span class="produces-item">$DATA_TXT overwritten from JSONL text fields</span>
 </div>
 
-<h2 id="step-3-5-parity-gate">Step 3.1: Mandatory CK vs PyTorch Parity Gate (10 epochs)</h2>
+<h2 id="step-3-generated-certification">Step 3.0: Certify the Generated Training Runtime</h2>
+
+<div class="card card-green">
+    <p style="margin-bottom: 0.4rem;"><strong>Run this after compiler, codegen, backward-kernel, or generated-runtime changes.</strong> It uses a fixed two-layer FP32 model and one serialized batch to compare generated logits, loss, and every trainable parameter gradient against an independent PyTorch implementation.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>cd "$ROOT"
+make v8-training-certify-fp32
+
+# Machine-readable evidence:
+# version/v8/.cache/reports/training_certification_latest.json</pre>
+    </div>
+    <p class="mini-note">This gate certifies the numerical machinery before the SVG corpus influences the result. The training builder remains useful for defining datasets, tokenizer lineage, stages, and reproducible commands. Step 3.1 then checks the SVG-backed training path, while later SVG evaluation measures learning quality. Keep those outcomes separate in the dashboard.</p>
+</div>
+
+<h2 id="step-3-5-parity-gate">Step 3.1: Mandatory SVG CK vs PyTorch Parity Gate (10 epochs)</h2>
 
 <div class="card card-accent">
     <p style="margin-bottom: 0.4rem;"><strong>Required gate before long CK-only training:</strong> run two tiny canaries (dataset rows 1 and 2) for 10 epochs with <code>--with-torch-ref</code>. This catches generated-runtime or codegen corruption early.</p>

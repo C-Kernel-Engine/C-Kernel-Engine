@@ -3415,7 +3415,14 @@ def _materialize_train_telemetry(summary_json: Path, profile_meta: Optional[dict
     else:
         training_loss_curve = {
             "steps": [
-                {"step": step, "loss_ck": loss_ck, "loss_pt": loss_pt, "lr": lr, "grad_norm": 0.0}
+                {
+                    "step": step,
+                    "loss_ck": loss_ck,
+                    "loss_pt": loss_pt,
+                    "lr": lr,
+                    "grad_norm": None,
+                    "grad_norm_status": "NOT_MEASURED",
+                }
             ],
             "source": "train_e2e_summary",
         }
@@ -3435,9 +3442,16 @@ def _materialize_train_telemetry(summary_json: Path, profile_meta: Optional[dict
         }
 
     grad_series = s.get("grad_norm_series") if isinstance(s.get("grad_norm_series"), dict) else {}
+    raw_global_grad_norms = grad_series.get("global")
+    global_grad_norms = (
+        raw_global_grad_norms
+        if isinstance(raw_global_grad_norms, list)
+        else [row.get("grad_norm") for row in training_loss_curve.get("steps", [])]
+    )
     training_grad_norms = {
         "steps": grad_series.get("steps", [row.get("step", step) for row in training_loss_curve.get("steps", [])]),
-        "global": grad_series.get("global", [row.get("grad_norm", 0.0) for row in training_loss_curve.get("steps", [])]),
+        "global": global_grad_norms,
+        "measurement_status": "measured" if any(value is not None for value in global_grad_norms) else "NOT_MEASURED",
         "params": grad_series.get("params", {}),
         "source": "train_e2e_detailed" if grad_series else "train_e2e_summary",
     }
@@ -4911,7 +4925,7 @@ def _ensure_train_runtime_artifacts(
         (not ir1.exists())
         or (manifest.exists() and manifest.stat().st_mtime > ir1.stat().st_mtime)
         or (build_ir_script.exists() and build_ir_script.stat().st_mtime > ir1.stat().st_mtime)
-        or (existing_ir1_tokens is not None and int(existing_ir1_tokens) != int(desired_tokens))
+        or (existing_ir1_tokens is None or int(existing_ir1_tokens) != int(desired_tokens))
         or (existing_ir1_bridge_lowering != desired_bridge_lowering)
     )
     if needs_ir1:
@@ -5046,7 +5060,11 @@ def _ensure_train_runtime_artifacts(
 
     lib_ck = BUILD_DIR / "libckernel_engine.so"
     if not lib_ck.exists():
-        run_cmd(["make", "--no-print-directory", str(lib_ck)], cwd=PROJECT_ROOT)
+        try:
+            make_target = str(lib_ck.relative_to(PROJECT_ROOT))
+        except ValueError:
+            make_target = str(lib_ck)
+        run_cmd(["make", "--no-print-directory", make_target], cwd=PROJECT_ROOT)
 
     libtrain_so = run_dir / "libtrain.so"
     defines = dict(runtime_defines or {})
@@ -5362,6 +5380,7 @@ def _run_ck_train_runtime_body(
     has_accum_counter_api = bool(hasattr(lib, "ck_train_get_accum_counter"))
     has_accum_steps_api = bool(hasattr(lib, "ck_train_get_accum_steps"))
     has_opt_step_getter_api = bool(hasattr(lib, "ck_train_get_opt_step"))
+    has_grad_norm_api = bool(hasattr(lib, "ck_train_get_last_step_grad_norm"))
     if hasattr(lib, "ck_train_memory_diagnostic"):
         lib.ck_train_memory_diagnostic.argtypes = [
             ctypes.POINTER(ctypes.c_float),
@@ -5420,6 +5439,9 @@ def _run_ck_train_runtime_body(
     if has_opt_step_getter_api:
         lib.ck_train_get_opt_step.argtypes = []
         lib.ck_train_get_opt_step.restype = ctypes.c_int
+    if has_grad_norm_api:
+        lib.ck_train_get_last_step_grad_norm.argtypes = [ctypes.POINTER(ctypes.c_float)]
+        lib.ck_train_get_last_step_grad_norm.restype = ctypes.c_int
 
     float_ptr = ctypes.cast(init_payload["float_buffer"], ctypes.POINTER(ctypes.c_float))
     size_ptr = ctypes.cast(init_payload["sizes_buffer"], ctypes.POINTER(ctypes.c_int))
@@ -5879,7 +5901,7 @@ def _run_ck_train_runtime_body(
     loss_curve: list[dict] = []
     parity_steps: list[dict] = []
     grad_steps: list[int] = []
-    grad_global: list[float] = []
+    grad_global: list[Optional[float]] = []
     parity_failures: list[dict] = []
     replay_failures: list[dict] = []
     checked_diffs: list[float] = []
@@ -5966,6 +5988,13 @@ def _run_ck_train_runtime_body(
             processed_tokens += consumed_tokens
             epoch_tokens_consumed += consumed_tokens
             loss_val = float(loss_out.value)
+            grad_norm_value = None
+            if has_grad_norm_api:
+                grad_norm_out = ctypes.c_float()
+                if int(lib.ck_train_get_last_step_grad_norm(ctypes.byref(grad_norm_out))) == 0:
+                    measured_grad_norm = float(grad_norm_out.value)
+                    if math.isfinite(measured_grad_norm):
+                        grad_norm_value = measured_grad_norm
             if epoch_loss_start is None:
                 epoch_loss_start = float(loss_val)
             epoch_loss_end = float(loss_val)
@@ -6646,7 +6675,6 @@ def _run_ck_train_runtime_body(
                             "reason": oracle_error or "oracle_unavailable",
                         })
 
-            # grad_norm is a placeholder until runtime exports per-step grad telemetry.
             loss_curve.append(
                 {
                     "step": step,
@@ -6667,7 +6695,8 @@ def _run_ck_train_runtime_body(
                     "slots_compared": oracle_slots_compared,
                     "slots_matched": oracle_slots_matched,
                     "lr": lr,
-                    "grad_norm": 0.0,
+                    "grad_norm": grad_norm_value,
+                    "grad_norm_status": "measured" if grad_norm_value is not None else "NOT_MEASURED",
                     "forward_ms": 0.0,
                     "backward_ms": 0.0,
                     "optimizer_ms": 0.0,
@@ -6734,7 +6763,7 @@ def _run_ck_train_runtime_body(
                 }
             )
             grad_steps.append(step)
-            grad_global.append(0.0)
+            grad_global.append(grad_norm_value)
 
         if epoch_rows_sampled > 0:
             rows_total = train_data_source.get("rows_total")
@@ -7074,7 +7103,14 @@ def _export_train_telemetry_to_run_dir(summary_json: Path, run_dir: Path) -> Non
         training_loss_curve = {"steps": raw_curve, "source": "train_e2e_detailed"}
     else:
         training_loss_curve = {
-            "steps": [{"step": step, "loss_ck": loss_ck, "loss_pt": loss_pt, "lr": lr, "grad_norm": 0.0}],
+            "steps": [{
+                "step": step,
+                "loss_ck": loss_ck,
+                "loss_pt": loss_pt,
+                "lr": lr,
+                "grad_norm": None,
+                "grad_norm_status": "NOT_MEASURED",
+            }],
             "source": "train_e2e_summary",
         }
 
@@ -7088,9 +7124,16 @@ def _export_train_telemetry_to_run_dir(summary_json: Path, run_dir: Path) -> Non
         }
 
     grad_series = s.get("grad_norm_series") if isinstance(s.get("grad_norm_series"), dict) else {}
+    raw_global_grad_norms = grad_series.get("global")
+    global_grad_norms = (
+        raw_global_grad_norms
+        if isinstance(raw_global_grad_norms, list)
+        else [row.get("grad_norm") for row in training_loss_curve.get("steps", [])]
+    )
     training_grad_norms = {
         "steps": grad_series.get("steps", [row.get("step", step) for row in training_loss_curve.get("steps", [])]),
-        "global": grad_series.get("global", [row.get("grad_norm", 0.0) for row in training_loss_curve.get("steps", [])]),
+        "global": global_grad_norms,
+        "measurement_status": "measured" if any(value is not None for value in global_grad_norms) else "NOT_MEASURED",
         "params": grad_series.get("params", {}),
         "source": "train_e2e_detailed" if grad_series else "train_e2e_summary",
     }
