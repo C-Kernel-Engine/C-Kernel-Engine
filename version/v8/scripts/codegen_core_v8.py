@@ -1986,7 +1986,13 @@ def emit_op(
         )
         _emit_hidden_export(out_expr, "out_proj", count_expr)
         _emit_hidden_export_last_row(out_expr, "out_proj", _hidden_arg("N", "out_dim", "embed_dim"))
-    elif op_name in ("attn", "attn_sliding", "qsa_attention"):
+    elif op_name in (
+        "attn",
+        "attn_sliding",
+        "attn_shared_kv",
+        "attn_sliding_shared_kv",
+        "qsa_attention",
+    ):
         out_expr = _hidden_arg("out_token", "output", "out", "c", "y")
         count_expr = _mul_expr(
             _hidden_arg("num_heads", "query_heads"),

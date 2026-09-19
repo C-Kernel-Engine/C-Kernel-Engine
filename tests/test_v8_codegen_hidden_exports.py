@@ -346,6 +346,32 @@ class HiddenExportExtentTests(unittest.TestCase):
                 ],
             }
         )
+        shared_attention = codegen.emit_op(
+            {
+                "op": "attn_shared_kv",
+                "function": "attention_forward_causal_head_major_gqa_flash_strided_gemma4_token_output",
+                "layer": 24,
+                "args": [
+                    _arg("output", "SHARED_ATTN"),
+                    _arg("num_heads", "8"),
+                    _arg("num_tokens", "61"),
+                    _arg("aligned_head_dim", "512"),
+                ],
+            }
+        )
+        sliding_shared_attention = codegen.emit_op(
+            {
+                "op": "attn_sliding_shared_kv",
+                "function": "attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4_token_output",
+                "layer": 24,
+                "args": [
+                    _arg("output", "SLIDING_SHARED_ATTN"),
+                    _arg("num_heads", "8"),
+                    _arg("num_tokens", "61"),
+                    _arg("aligned_head_dim", "256"),
+                ],
+            }
+        )
         gated = codegen.emit_op(
             {
                 "op": "attn_gate_sigmoid_mul",
@@ -371,6 +397,14 @@ class HiddenExportExtentTests(unittest.TestCase):
         self.assertIn(
             '"attn_pregate", (const float*)QSA_ATTN, (8) * (1) * (256)',
             qsa_attention,
+        )
+        self.assertIn(
+            '"attn_pregate", (const float*)SHARED_ATTN, (8) * (61) * (512)',
+            shared_attention,
+        )
+        self.assertIn(
+            '"attn_pregate", (const float*)SLIDING_SHARED_ATTN, (8) * (61) * (256)',
+            sliding_shared_attention,
         )
         self.assertIn('"attn_out", (const float*)ATTN, (8) * (18) * (256)', gated)
 
