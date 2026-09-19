@@ -8,6 +8,8 @@ var audio__kernels_8c =
     [ "audio_conv1d_channel_major_f32", "audio__kernels_8c.html#adf8b1ff9727b956bc11157aa96051a62", null ],
     [ "audio_conv1d_channel_major_grouped_f32", "audio__kernels_8c.html#a36584a0e3906919cb7a61e8580a41650", null ],
     [ "audio_conv2d_whc_grouped_f32", "audio__kernels_8c.html#a22989c8a6e322876f77121af26925f68", null ],
+    [ "audio_fastconformer_subsampling_f32", "audio__kernels_8c.html#aae15c48212bb495557101834d21bc0d9", null ],
+    [ "audio_fastconformer_subsampling_workspace_bytes", "audio__kernels_8c.html#a4406f8086dad4484c9eefde35eda957a", null ],
     [ "audio_feature_normalize_per_feature_f32", "audio__kernels_8c.html#ad288c2085ac8030c9255ed07d25fc2bd", null ],
     [ "audio_glu_split_channel_major_f32", "audio__kernels_8c.html#a84d2e62cdcb2b35fb692831c4e767566", null ],
     [ "audio_hann_window_f32", "audio__kernels_8c.html#ae40602291761aaeba8358d37f704c955", null ],
@@ -39,12 +41,17 @@ var audio__kernels_8c =
     [ "audio_whisper_log_mel_window_wav_pcm16_f32", "audio__kernels_8c.html#a3cfe264d4c0a3c1552fdcfb8ef9d5761", null ],
     [ "audio_whisper_mel_filters_slaney_f32", "audio__kernels_8c.html#a01991d85b95102453b3912c03f83f2cb", null ],
     [ "audio_whisper_stft_power_reference_f32", "audio__kernels_8c.html#a6cc87d2eaa6781543bc2730968241057", null ],
+    [ "checked_mul_size", "audio__kernels_8c.html#ad899f5b1a0b235a700a22a316e284f2a", null ],
     [ "ck_audio_conformer_relative_attention_f32_head_range", "audio__kernels_8c.html#a6bc3b046b2b14b89b7837f70f2e5195a", null ],
     [ "ck_audio_conv1d_channel_major_f32_work", "audio__kernels_8c.html#a89c6ec8d05af4d452933a0091ef15df7", null ],
     [ "ck_audio_conv2d_whc_grouped_f32_range", "audio__kernels_8c.html#afca6a710888587007175544a5cf1f144", null ],
     [ "ck_audio_glu_split_f32_range", "audio__kernels_8c.html#af73450729ab2539a82695d0e5c7a35bb", null ],
     [ "ck_audio_relative_shift_f32_range", "audio__kernels_8c.html#a2c0c1096e51b4f9fc1ffa64dbbd081c2", null ],
+    [ "conv_output_extent", "audio__kernels_8c.html#a73f81766398a23c42eb95eb6078d4c27", null ],
+    [ "gemm_nt_f32_llama_production_parallel_dispatch", "audio__kernels_8c.html#a94582962081db2a5e46147c5aef2fca3", null ],
     [ "read_u16_le", "audio__kernels_8c.html#a5326a387c09d9ac2c0365910e9fa67f3", null ],
     [ "read_u32_le", "audio__kernels_8c.html#ad2dea24c20761250c3df3b634ffabed4", null ],
-    [ "reflect_index", "audio__kernels_8c.html#a5a6560a6e827e927a14e20dc7a25500f", null ]
+    [ "reflect_index", "audio__kernels_8c.html#a5a6560a6e827e927a14e20dc7a25500f", null ],
+    [ "relu_subsampling_inplace", "audio__kernels_8c.html#a46bae17e239f020712ae6643cee32ab6", null ],
+    [ "zero_subsampling_padding", "audio__kernels_8c.html#aa8d72745cafb18a9bfd58a88e1e0cf9f", null ]
 ];

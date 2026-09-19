@@ -1,5 +1,14 @@
 var NAVTREEINDEX17 =
 {
+"structCKBufferSpec.html#a2b1e3d9cac9dfffef27a598dc88207c9":[1,0,17,2],
+"structCKBufferSpec.html#a313cd889d11375cfaf4db616ed1c99ac":[1,0,17,5],
+"structCKBufferSpec.html#a3d2e80ce499f08ea3e9d969de367f945":[1,0,17,0],
+"structCKBufferSpec.html#a4af21c5671866d5883b7c95cd9032afd":[1,0,17,1],
+"structCKBufferSpec.html#a557043a61f56575dfa44c4f13b31cddb":[1,0,17,4],
+"structCKBufferSpec.html#a81f2619d250bfb5c7401070c0345353a":[1,0,17,6],
+"structCKBufferSpec.html#a92c6aec4e6937bbec34f20ddc341b14c":[1,0,17,3],
+"structCKBufferSpec.html#ae34b00c892e6e3ffd7928a0a31924b59":[1,0,17,7],
+"structCKBumpHeaderV5.html":[1,0,18],
 "structCKBumpHeaderV5.html#a058e1844933d1781580b4693be8be8bc":[1,0,18,11],
 "structCKBumpHeaderV5.html#a113ec8251095c1a8650a93e1c3855701":[1,0,18,9],
 "structCKBumpHeaderV5.html#a1d7ceb3da86e1cc40493cf185e486507":[1,0,18,18],
@@ -240,14 +249,5 @@ var NAVTREEINDEX17 =
 "structCKLayerForwardParamsQ4K.html#a150feea348e2b0c728b05364bc291d68":[1,0,35,44],
 "structCKLayerForwardParamsQ4K.html#a1923b2ba97133951c6705efd90978c72":[1,0,35,33],
 "structCKLayerForwardParamsQ4K.html#a1c7b2b14198b4296631e7169eec94919":[1,0,35,10],
-"structCKLayerForwardParamsQ4K.html#a1ed95932b94db2f9a45cdb1cc987f6da":[1,0,35,50],
-"structCKLayerForwardParamsQ4K.html#a2309c41abca4ad1bc357dd780e55fecb":[1,0,35,23],
-"structCKLayerForwardParamsQ4K.html#a2532f454e8565aafe5bc975e518e90e2":[1,0,35,27],
-"structCKLayerForwardParamsQ4K.html#a2aecde76c05afca045048df499be02f5":[1,0,35,5],
-"structCKLayerForwardParamsQ4K.html#a2b71fe14402b1fa2a52ff6d212a42a21":[1,0,35,47],
-"structCKLayerForwardParamsQ4K.html#a2ddfb5a4e6442a028d7475dc1e9266cd":[1,0,35,32],
-"structCKLayerForwardParamsQ4K.html#a31e2ba79a8c69429c6e31c20ee1c6efa":[1,0,35,17],
-"structCKLayerForwardParamsQ4K.html#a3372d9668e65bc5a77fcdb3e69547af3":[1,0,35,4],
-"structCKLayerForwardParamsQ4K.html#a35349f8d709bd6b19b8bdc1b46cbf10f":[1,0,35,49],
-"structCKLayerForwardParamsQ4K.html#a4384a52ba7c2f30d4895d3edd4321cab":[1,0,35,3]
+"structCKLayerForwardParamsQ4K.html#a1ed95932b94db2f9a45cdb1cc987f6da":[1,0,35,50]
 };

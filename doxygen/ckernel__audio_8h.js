@@ -11,6 +11,8 @@ var ckernel__audio_8h =
     [ "audio_conv1d_channel_major_f32", "ckernel__audio_8h.html#adf8b1ff9727b956bc11157aa96051a62", null ],
     [ "audio_conv1d_channel_major_grouped_f32", "ckernel__audio_8h.html#a36584a0e3906919cb7a61e8580a41650", null ],
     [ "audio_conv2d_whc_grouped_f32", "ckernel__audio_8h.html#a22989c8a6e322876f77121af26925f68", null ],
+    [ "audio_fastconformer_subsampling_f32", "ckernel__audio_8h.html#aae15c48212bb495557101834d21bc0d9", null ],
+    [ "audio_fastconformer_subsampling_workspace_bytes", "ckernel__audio_8h.html#a4406f8086dad4484c9eefde35eda957a", null ],
     [ "audio_feature_normalize_per_feature_f32", "ckernel__audio_8h.html#ad288c2085ac8030c9255ed07d25fc2bd", null ],
     [ "audio_glu_split_channel_major_f32", "ckernel__audio_8h.html#a84d2e62cdcb2b35fb692831c4e767566", null ],
     [ "audio_hann_window_f32", "ckernel__audio_8h.html#ae40602291761aaeba8358d37f704c955", null ],

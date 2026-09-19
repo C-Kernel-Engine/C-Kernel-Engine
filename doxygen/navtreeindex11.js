@@ -1,5 +1,14 @@
 var NAVTREEINDEX11 =
 {
+"gelu__kernels_8c.html#a25b9eee043b230c304d7d44b0cfe54d4":[2,0,1,1,17,2],
+"gelu__kernels_8c.html#a28b32095708fdb6304b1b7d322942e42":[2,0,1,1,17,38],
+"gelu__kernels_8c.html#a2abcc2be3ca0cce23cd0e4b0ee3f7a58":[2,0,1,1,17,4],
+"gelu__kernels_8c.html#a2f0b0fab254b6af615754ac2eaf84ddb":[2,0,1,1,17,23],
+"gelu__kernels_8c.html#a3075b77764b4b408e3c1c9b89a2822ad":[2,0,1,1,17,15],
+"gelu__kernels_8c.html#a315f43ac44656b5d77360d9879c5f122":[2,0,1,1,17,21],
+"gelu__kernels_8c.html#a363cbee84a1de5954c8bcd09cc2c5683":[2,0,1,1,17,37],
+"gelu__kernels_8c.html#a369266c24eacffb87046522897a570d5":[2,0,1,1,17,0],
+"gelu__kernels_8c.html#a3781af580a3fe9c5c3df37db21a18ede":[2,0,1,1,17,25],
 "gelu__kernels_8c.html#a47aef981ac51c59b32d08bc11446d1b5":[2,0,1,1,17,14],
 "gelu__kernels_8c.html#a5bad3e98efcaf996272c57b45c43d60b":[2,0,1,1,17,6],
 "gelu__kernels_8c.html#a5eafec0c7299984eb731b697944ebdaa":[2,0,1,1,17,30],
@@ -240,14 +249,5 @@ var NAVTREEINDEX11 =
 "gemm__kernels__q4k_8c.html#a46e8ba6be5972385ee543a75f00ef7a0":[2,0,1,1,29,8],
 "gemm__kernels__q4k_8c.html#a55c547c2be59d44bfaadc80d08858117":[2,0,1,1,29,11],
 "gemm__kernels__q4k_8c.html#a586e5ae7f4140549ea000507020e9352":[2,0,1,1,29,0],
-"gemm__kernels__q4k_8c.html#a5932901345563fd991c906b9bd5afcdb":[2,0,1,1,29,9],
-"gemm__kernels__q4k_8c.html#a64b28ca8a25883986a0d22e39a574a32":[2,0,1,1,29,12],
-"gemm__kernels__q4k_8c.html#a9beb124343d26ac4870d92b2f047d643":[2,0,1,1,29,7],
-"gemm__kernels__q4k_8c.html#abd2ce09c06d448b502b30fac01bc1d30":[2,0,1,1,29,10],
-"gemm__kernels__q4k_8c.html#ac277a5257dc44a48af4ebaa8691806cf":[2,0,1,1,29,4],
-"gemm__kernels__q4k_8c.html#ae58d283a48844d06148ea54d020e9b84":[2,0,1,1,29,1],
-"gemm__kernels__q4k_8c_source.html":[2,0,1,1,29],
-"gemm__kernels__q4k__avx_8c.html":[2,0,1,1,30],
-"gemm__kernels__q4k__avx_8c.html#a7016896cc83c1467204ed6b8cc7356c6":[2,0,1,1,30,1],
-"gemm__kernels__q4k__avx_8c.html#ac01f8caf84e100f3c72919c71217010e":[2,0,1,1,30,3]
+"gemm__kernels__q4k_8c.html#a5932901345563fd991c906b9bd5afcdb":[2,0,1,1,29,9]
 };
