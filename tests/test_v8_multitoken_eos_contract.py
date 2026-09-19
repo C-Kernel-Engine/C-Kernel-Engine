@@ -123,6 +123,25 @@ class MultitokenEOSContractTests(unittest.TestCase):
         self.assertEqual(relabeled[0].source_name, "kqv_out-2-occ-0")
         np.testing.assert_array_equal(relabeled[0].data, dump.data)
 
+    def test_hidden_xray_relabels_after_oracle_loader_normalization(self) -> None:
+        dump = self.runner.first_token.parity_test_v7.ParityDump(
+            23,
+            "layer_out",
+            np.array([1.0, 2.0], dtype=np.float32),
+            0,
+            "fp32",
+            source_token_id=60,
+            source_name="l_out-23-token-000060-occ-000",
+        )
+
+        relabeled = self.runner._apply_hidden_oracle_name_map(
+            [dump], {"gemma4_per_layer_embed": "l_out"}
+        )
+
+        self.assertEqual(relabeled[0].op_name, "gemma4_per_layer_embed")
+        self.assertEqual(relabeled[0].source_name, dump.source_name)
+        np.testing.assert_array_equal(relabeled[0].data, dump.data)
+
     def test_load_ck_hidden_exports_preserves_layer_and_position(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

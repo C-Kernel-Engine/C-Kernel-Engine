@@ -1986,11 +1986,17 @@ def emit_op(
         )
         _emit_hidden_export(out_expr, "out_proj", count_expr)
         _emit_hidden_export_last_row(out_expr, "out_proj", _hidden_arg("N", "out_dim", "embed_dim"))
-    elif op_name in ("attn", "qsa_attention"):
+    elif op_name in (
+        "attn",
+        "attn_sliding",
+        "attn_shared_kv",
+        "attn_sliding_shared_kv",
+        "qsa_attention",
+    ):
         out_expr = _hidden_arg("out_token", "output", "out", "c", "y")
         count_expr = _mul_expr(
             _hidden_arg("num_heads", "query_heads"),
-            _hidden_arg("num_tokens", "tokens", "rows"),
+            _hidden_arg("num_tokens", "q_tokens", "tokens", "rows"),
             _hidden_arg("aligned_head_dim", "head_dim"),
         )
         _emit_hidden_export(
@@ -2332,7 +2338,11 @@ def emit_op(
     elif op_name == "gemma4_per_layer_embed":
         out_expr = _hidden_raw(_hidden_arg("hidden", "output", "out", "x", "y"))
         if out_expr:
-            lines.append(f'    ck_debug_export_hidden(model, {layer}, "gemma4_per_layer_embed", (const float*){out_expr}, EMBED_DIM);')
+            count_expr = _hidden_count("tokens", "rows", "num_tokens", default="1")
+            lines.append(
+                f'    ck_debug_export_hidden(model, {layer}, "gemma4_per_layer_embed", '
+                f'(const float*){out_expr}, ({count_expr}) * EMBED_DIM);'
+            )
             _emit_hidden_export_last_row(out_expr, "gemma4_per_layer_embed", "EMBED_DIM")
     elif op_name == "recurrent_qkv_proj":
         _emit_hidden_export(

@@ -1639,16 +1639,14 @@ def _validate_segmented_prefill_contract(
         raise RuntimeError(
             f"HARD CONTRACT FAULT: multimodal bridge in {source} must declare prefill_schedules."
         )
-    expected_schedules = {
+    expected_schedule_core = {
         "segmented_append": {
             "segments": ["text_before", "visual", "text_after"],
             "cache_transition": "append_preserve",
-            "position_transition": "segment_defined",
         },
         "unified_mixed": {
             "segments": ["text_before", "visual", "text_after"],
             "cache_transition": "single_pass",
-            "position_transition": "explicit_full_sequence",
         },
     }
     for name, schedule in schedules.items():
@@ -1661,12 +1659,24 @@ def _validate_segmented_prefill_contract(
             schedule_core.pop("deepstack_injection", None)
             if isinstance(schedule_core, dict) else None
         )
-        if name not in expected_schedules or schedule_core != expected_schedules[name]:
+        expected = expected_schedule_core.get(name)
+        if expected is None or not isinstance(schedule_core, dict):
+            raise RuntimeError(
+                "HARD CONTRACT FAULT: unsupported mixed-prefill schedule "
+                f"{name!r} in {source}."
+            )
+        position_transition = schedule_core.pop("position_transition", None)
+        if schedule_core != expected:
             raise RuntimeError(
                 "HARD CONTRACT FAULT: unsupported mixed-prefill schedule "
                 f"{name!r} in {source}."
             )
         if name == "unified_mixed":
+            if position_transition != "explicit_full_sequence":
+                raise RuntimeError(
+                    "HARD CONTRACT FAULT: unified mixed-prefill requires "
+                    f"explicit_full_sequence positions in {source}."
+                )
             if (
                 not isinstance(position_transform, dict)
                 or not str(position_transform.get("kernel_id", "") or "").strip()
@@ -1688,7 +1698,7 @@ def _validate_segmented_prefill_contract(
                     f"deepstack injection kernel and numerical contract in {source}."
                 )
         else:
-            if (
+            if position_transition == "segment_defined" and (
                 not isinstance(position_transform, dict)
                 or not str(position_transform.get("kernel_id", "") or "").strip()
                 or not str(position_transform.get("contract_id", "") or "").strip()
@@ -1696,6 +1706,16 @@ def _validate_segmented_prefill_contract(
                 raise RuntimeError(
                     "HARD CONTRACT FAULT: segmented mixed-prefill requires an exact "
                     f"positions-aware kernel and numerical contract in {source}."
+                )
+            if position_transition == "runtime_offset" and position_transform is not None:
+                raise RuntimeError(
+                    "HARD CONTRACT FAULT: runtime-offset segmented prefill must not "
+                    f"declare an explicit position transform in {source}."
+                )
+            if position_transition not in {"segment_defined", "runtime_offset"}:
+                raise RuntimeError(
+                    "HARD CONTRACT FAULT: segmented mixed-prefill has unsupported "
+                    f"position transition {position_transition!r} in {source}."
                 )
             if deepstack_injection is not None:
                 raise RuntimeError(
@@ -6205,6 +6225,14 @@ def apply_layer_attention_dims(op_name: str, params: Dict, layer: int, config: D
         int(config.get("num_heads", config.get("num_attention_heads", 1)) or 1),
     )
     num_kv_heads = int(config.get("num_kv_heads", config.get("num_key_value_heads", num_heads)) or num_heads)
+    has_declared_kv_source = isinstance(config.get("layer_kv_source"), list)
+    kv_source_layer = _config_layer_int(config, "layer_kv_source", layer, layer)
+    source_num_kv_heads = _config_layer_int(
+        config,
+        "layer_num_kv_heads",
+        kv_source_layer,
+        num_kv_heads,
+    )
     q_head_dim = _config_layer_int(config, "layer_q_head_dim", layer, int(config.get("head_dim", 0) or 0))
     k_head_dim = _config_layer_int(config, "layer_k_head_dim", layer, q_head_dim)
     v_head_dim = _config_layer_int(
@@ -6212,6 +6240,18 @@ def apply_layer_attention_dims(op_name: str, params: Dict, layer: int, config: D
         "layer_v_head_dim",
         layer,
         int(config.get("v_head_dim", k_head_dim) or k_head_dim),
+    )
+    source_k_head_dim = _config_layer_int(
+        config,
+        "layer_k_head_dim",
+        kv_source_layer,
+        k_head_dim,
+    )
+    source_v_head_dim = _config_layer_int(
+        config,
+        "layer_v_head_dim",
+        kv_source_layer,
+        v_head_dim,
     )
     q_dim = _config_layer_int(
         config,
@@ -6339,13 +6379,31 @@ def apply_layer_attention_dims(op_name: str, params: Dict, layer: int, config: D
         params["k_head_dim"] = k_head_dim
         params["v_head_dim"] = v_head_dim
         params["q_dim"] = q_dim
-        if op_name in ("q_norm", "rope_q", "attn_shared_kv", "attn_sliding_shared_kv"):
+        if op_name in ("q_norm", "rope_q"):
             params["k_dim"] = q_dim
             params["v_dim"] = q_dim
+        elif (
+            op_name in ("attn_shared_kv", "attn_sliding_shared_kv")
+            and has_declared_kv_source
+        ):
+            if source_k_head_dim != q_head_dim or source_v_head_dim != q_head_dim:
+                raise ValueError(
+                    "shared-KV attention requires source K/V head dimensions to match Q: "
+                    f"layer={layer} source={kv_source_layer} q={q_head_dim} "
+                    f"k={source_k_head_dim} v={source_v_head_dim}"
+                )
+            params["num_kv_heads"] = source_num_kv_heads
+            params["k_dim"] = source_num_kv_heads * source_k_head_dim
+            params["v_dim"] = source_num_kv_heads * source_v_head_dim
+        elif op_name in ("attn_shared_kv", "attn_sliding_shared_kv"):
             params["num_kv_heads"] = num_heads
+            params["k_dim"] = q_dim
+            params["v_dim"] = q_dim
         else:
             params["k_dim"] = k_dim
             params["v_dim"] = v_dim
+        if op_name == "kv_cache_store":
+            params["head_dim"] = k_head_dim
         params["rotary_dim"] = rotary_dim
         params["n_dims"] = rotary_dim
         params["rope_freq_base"] = rope_freq_base
@@ -11096,11 +11154,14 @@ def generate_ir_lower_1(
             pass
         return int(layer)
 
-    def _bind_decode_attention_cache_inputs(
+    def _layer_produces_kv(layer: int) -> bool:
+        return _kv_read_layer_for(layer) == int(layer)
+
+    def _bind_attention_cache_inputs(
         attention_op: Dict[str, Any],
         kv_read_layer: int,
     ) -> None:
-        """Rebind the provider-declared K/V cache ports for decode.
+        """Rebind the provider-declared K/V cache ports to their source layer.
 
         Most attention providers expose ``k_cache``/``v_cache`` while sparse
         attention providers may use the more explicit
@@ -11263,16 +11324,19 @@ def generate_ir_lower_1(
                 and layer not in decode_rope_layers
             )
             if should_store_after_rope or should_store_after_v or should_store_after_qk_norm:
-                final_ops.append(_make_decode_kv_store_op(op))
-                kv_store_count += 1
+                if _layer_produces_kv(layer):
+                    final_ops.append(_make_decode_kv_store_op(op))
+                    kv_store_count += 1
             elif should_store_after_v_bias:
-                final_ops.append(
-                    _make_decode_kv_store_op(decode_v_projection_by_layer[layer])
-                )
-                kv_store_count += 1
+                if _layer_produces_kv(layer):
+                    final_ops.append(
+                        _make_decode_kv_store_op(decode_v_projection_by_layer[layer])
+                    )
+                    kv_store_count += 1
             elif should_store_after_q_rope:
-                final_ops.append(_make_decode_shared_q_kv_store_op(op))
-                kv_store_count += 1
+                if _layer_produces_kv(layer):
+                    final_ops.append(_make_decode_shared_q_kv_store_op(op))
+                    kv_store_count += 1
             elif explicit_mla_decode_cache and op_name == "partial_rope_concat" and layer in decode_mla_layers:
                 final_ops.append(_make_mla_kv_store_op(op, batch=False))
                 kv_store_count += 1
@@ -11282,7 +11346,7 @@ def generate_ir_lower_1(
                 _require_resolved_decode_attention_kernel(op)
                 kv_read_layer = _kv_read_layer_for(int(op.get("layer", 0)))
                 op["_kv_cache_read_layer"] = kv_read_layer
-                _bind_decode_attention_cache_inputs(op, kv_read_layer)
+                _bind_attention_cache_inputs(op, kv_read_layer)
             elif op["op"] in _DECODE_ATTENTION_OPS:
                 decode_kernel = _require_resolved_decode_attention_kernel(op)
                 decode_attention_count += 1
@@ -11294,7 +11358,7 @@ def generate_ir_lower_1(
                     )
                 kv_read_layer = _kv_read_layer_for(int(op.get("layer", 0)))
                 op["_kv_cache_read_layer"] = kv_read_layer
-                _bind_decode_attention_cache_inputs(op, kv_read_layer)
+                _bind_attention_cache_inputs(op, kv_read_layer)
 
             if op_name in ("cross_k_proj", "cross_v_proj"):
                 is_key = op_name == "cross_k_proj"
@@ -11489,7 +11553,8 @@ def generate_ir_lower_1(
                         "Fix the circuit cache contract; do not fall back to full-sequence prefill."
                     )
                 kv_batch_copy_op = None
-                if uses_kv_cache:
+                layer_produces_kv = _layer_produces_kv(int(layer))
+                if uses_kv_cache and layer_produces_kv:
                     shared_q_prefill = op["op"] in ("attn_shared_kv", "attn_sliding_shared_kv")
                     copy_src = "q_scratch" if shared_q_prefill else "k_scratch"
                     batch_store_kernel = (
@@ -11522,11 +11587,22 @@ def generate_ir_lower_1(
                         "_auto_inserted": True,
                         "_cache_append": append_before_attention,
                     }
+                    apply_layer_attention_dims(
+                        "kv_cache_store",
+                        kv_batch_copy_op["params"],
+                        int(layer),
+                        config,
+                    )
+                if uses_kv_cache:
+                    kv_read_layer = _kv_read_layer_for(int(layer))
+                    op["_kv_cache_read_layer"] = kv_read_layer
+                    _bind_attention_cache_inputs(op, kv_read_layer)
                 if append_before_attention:
                     # Append providers consume current K/V through the persistent
                     # cache. Commit the current token block before invoking them.
-                    final_ops.insert(len(final_ops) - 1, kv_batch_copy_op)
-                    kv_store_count += 1
+                    if kv_batch_copy_op is not None:
+                        final_ops.insert(len(final_ops) - 1, kv_batch_copy_op)
+                        kv_store_count += 1
                 if output_converter is not None:
                     transpose_attn_out_op = {
                         "idx": len(final_ops),
@@ -11542,7 +11618,7 @@ def generate_ir_lower_1(
                         "_auto_inserted": True,
                     }
                     final_ops.append(transpose_attn_out_op)
-                if uses_kv_cache and not append_before_attention:
+                if kv_batch_copy_op is not None and not append_before_attention:
                     final_ops.append(kv_batch_copy_op)
                     kv_store_count += 1
 

@@ -6407,6 +6407,7 @@ typedef struct {
     float *partials;
     int num_heads;
     int num_kv_heads;
+    int kv_start;
     int kv_tokens;
     int cache_capacity;
     int head_dim;
@@ -6414,6 +6415,7 @@ typedef struct {
     int split_chunks;
     int scheduled_chunks;
     int partition_tokens;
+    float attention_scale;
 } ck_attention_f16_split_args_t;
 
 static inline float ck_attention_f16_reduce_expf(float value)
@@ -6592,7 +6594,7 @@ static void ck_attention_f16_split_work(int ith, int nth, void *opaque)
     const int chunk_size =
         (args->partition_tokens + args->split_chunks - 1) / args->split_chunks;
     const size_t head_stride = (size_t) args->cache_capacity * (size_t) args->aligned_head_dim;
-    const float scale = ck_attention_strict_scale_f32(args->head_dim);
+    const float scale = args->attention_scale;
     uint16_t *q_half = (uint16_t *) alloca((size_t) args->aligned_head_dim * sizeof(uint16_t));
     uint16_t *acc_half = (uint16_t *) alloca((size_t) args->aligned_head_dim * sizeof(uint16_t));
 
@@ -6601,7 +6603,7 @@ static void ck_attention_f16_split_work(int ith, int nth, void *opaque)
         const int chunk = job % args->scheduled_chunks;
         const int kv_head = (int) ((long long) h * (long long) args->num_kv_heads /
                                    (long long) args->num_heads);
-        const int begin = chunk * chunk_size;
+        const int begin = args->kv_start + chunk * chunk_size;
         const int end = begin < args->kv_tokens
             ? (begin + chunk_size < args->kv_tokens ? begin + chunk_size : args->kv_tokens)
             : begin;
@@ -6669,21 +6671,26 @@ static void attention_forward_decode_head_major_gqa_flash_f16cache_split_partiti
     int head_dim,
     int aligned_head_dim,
     int split_chunks,
-    int partition_tokens)
+    int partition_tokens,
+    int kv_start,
+    float attention_scale)
 {
     if (!q_token || !k_cache || !v_cache || !out_token ||
         num_heads <= 0 || num_kv_heads <= 0 || kv_tokens <= 0 ||
         cache_capacity <= 0 || kv_tokens > cache_capacity ||
+        kv_start < 0 || kv_start >= kv_tokens ||
         head_dim <= 0 || aligned_head_dim < head_dim ||
-        partition_tokens < kv_tokens) {
+        partition_tokens < kv_tokens - kv_start || !isfinite(attention_scale)) {
         return;
     }
+
+    const int live_tokens = kv_tokens - kv_start;
 
     if (split_chunks < 1) {
         split_chunks = 1;
     }
-    if (split_chunks > kv_tokens) {
-        split_chunks = kv_tokens;
+    if (split_chunks > live_tokens) {
+        split_chunks = live_tokens;
     }
 
     const int partial_stride = aligned_head_dim + 2;
@@ -6695,7 +6702,7 @@ static void attention_forward_decode_head_major_gqa_flash_f16cache_split_partiti
     }
 
     const int chunk_size = (partition_tokens + split_chunks - 1) / split_chunks;
-    const int scheduled_chunks = (kv_tokens + chunk_size - 1) / chunk_size;
+    const int scheduled_chunks = (live_tokens + chunk_size - 1) / chunk_size;
     const size_t resolved_count =
         (size_t) num_heads * (size_t) scheduled_chunks * (size_t) partial_stride;
     float *partials = (float *) alloca(resolved_count * sizeof(float));
@@ -6706,6 +6713,7 @@ static void attention_forward_decode_head_major_gqa_flash_f16cache_split_partiti
         .partials = partials,
         .num_heads = num_heads,
         .num_kv_heads = num_kv_heads,
+        .kv_start = kv_start,
         .kv_tokens = kv_tokens,
         .cache_capacity = cache_capacity,
         .head_dim = head_dim,
@@ -6713,6 +6721,7 @@ static void attention_forward_decode_head_major_gqa_flash_f16cache_split_partiti
         .split_chunks = split_chunks,
         .scheduled_chunks = scheduled_chunks,
         .partition_tokens = partition_tokens,
+        .attention_scale = attention_scale,
     };
 
     ck_threadpool_t *pool = ck_threadpool_global();
@@ -6790,7 +6799,64 @@ void attention_forward_decode_head_major_gqa_flash_f16cache_split(const float *q
     attention_forward_decode_head_major_gqa_flash_f16cache_split_partitioned(
         q_token, k_cache, v_cache, out_token,
         num_heads, num_kv_heads, kv_tokens, cache_capacity,
-        head_dim, aligned_head_dim, split_chunks, partition_tokens);
+        head_dim, aligned_head_dim, split_chunks, partition_tokens, 0,
+        ck_attention_strict_scale_f32(head_dim));
+}
+
+static ck_attention_status_t ck_attention_forward_decode_f16cache_gemma4(
+    const float *q_token,
+    const uint16_t *k_cache,
+    const uint16_t *v_cache,
+    float *out_token,
+    int num_heads,
+    int num_kv_heads,
+    int kv_tokens,
+    int cache_capacity,
+    int head_dim,
+    int aligned_head_dim,
+    int sliding_window,
+    ck_attention_reduction_t reduction)
+{
+    if (!q_token || !k_cache || !v_cache || !out_token ||
+        num_heads <= 0 || num_kv_heads <= 0 || kv_tokens <= 0 ||
+        cache_capacity <= 0 || kv_tokens > cache_capacity ||
+        head_dim <= 0 || aligned_head_dim < head_dim || sliding_window < 0) {
+        return CK_ATTENTION_STATUS_INVALID_ARGUMENT;
+    }
+    if (reduction != CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE) {
+        return CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT;
+    }
+    const int kv_start = sliding_window > 0 && kv_tokens > sliding_window
+        ? kv_tokens - sliding_window : 0;
+    const int live_tokens = kv_tokens - kv_start;
+    attention_forward_decode_head_major_gqa_flash_f16cache_split_partitioned(
+        q_token, k_cache, v_cache, out_token,
+        num_heads, num_kv_heads, kv_tokens, cache_capacity,
+        head_dim, aligned_head_dim, 1, live_tokens, kv_start, 1.0f);
+    return CK_ATTENTION_STATUS_OK;
+}
+
+ck_attention_status_t attention_forward_decode_head_major_gqa_f16cache_gemma4_contract(
+    const float *q_token, const uint16_t *k_cache, const uint16_t *v_cache,
+    float *out_token, int num_heads, int num_kv_heads, int kv_tokens,
+    int cache_capacity, int head_dim, int aligned_head_dim,
+    ck_attention_reduction_t reduction)
+{
+    return ck_attention_forward_decode_f16cache_gemma4(
+        q_token, k_cache, v_cache, out_token, num_heads, num_kv_heads,
+        kv_tokens, cache_capacity, head_dim, aligned_head_dim, 0, reduction);
+}
+
+ck_attention_status_t attention_forward_decode_head_major_gqa_f16cache_sliding_gemma4_contract(
+    const float *q_token, const uint16_t *k_cache, const uint16_t *v_cache,
+    float *out_token, int num_heads, int num_kv_heads, int kv_tokens,
+    int cache_capacity, int head_dim, int aligned_head_dim, int sliding_window,
+    ck_attention_reduction_t reduction)
+{
+    return ck_attention_forward_decode_f16cache_gemma4(
+        q_token, k_cache, v_cache, out_token, num_heads, num_kv_heads,
+        kv_tokens, cache_capacity, head_dim, aligned_head_dim,
+        sliding_window, reduction);
 }
 
 ck_attention_status_t attention_forward_decode_head_major_gqa_flash_f16cache_contract(
@@ -7708,6 +7774,88 @@ ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_f16
     }
 
     return status;
+}
+
+static ck_attention_status_t ck_attention_prefill_append_f16cache_gemma4_workspace(
+    const float *q,
+    const uint16_t *k_cache,
+    const uint16_t *v_cache,
+    float *output,
+    int num_heads,
+    int num_kv_heads,
+    int q_tokens,
+    int past_tokens,
+    int cache_capacity,
+    int head_dim,
+    int aligned_head_dim,
+    int sliding_window,
+    ck_attention_reduction_t reduction,
+    float *token_workspace,
+    size_t token_workspace_bytes)
+{
+    if (!q || !k_cache || !v_cache || !output || num_heads <= 0 ||
+        num_kv_heads <= 0 || q_tokens <= 0 || past_tokens < 0 ||
+        past_tokens + q_tokens > cache_capacity || head_dim <= 0 ||
+        aligned_head_dim < head_dim || sliding_window < 0) {
+        return CK_ATTENTION_STATUS_INVALID_ARGUMENT;
+    }
+    const size_t token_elems = (size_t) num_heads * (size_t) aligned_head_dim;
+    if (token_elems > SIZE_MAX / (2 * sizeof(float)) || !token_workspace ||
+        token_workspace_bytes < 2 * token_elems * sizeof(float)) {
+        return CK_ATTENTION_STATUS_INVALID_ARGUMENT;
+    }
+    float *q_token = token_workspace;
+    float *out_token = token_workspace + token_elems;
+    for (int t = 0; t < q_tokens; ++t) {
+        for (int h = 0; h < num_heads; ++h) {
+            const float *src = q +
+                ((size_t) h * (size_t) q_tokens + (size_t) t) *
+                (size_t) aligned_head_dim;
+            memcpy(q_token + (size_t) h * (size_t) aligned_head_dim, src,
+                   (size_t) aligned_head_dim * sizeof(float));
+        }
+        const ck_attention_status_t status = ck_attention_forward_decode_f16cache_gemma4(
+            q_token, k_cache, v_cache, out_token, num_heads, num_kv_heads,
+            past_tokens + t + 1, cache_capacity, head_dim, aligned_head_dim,
+            sliding_window, reduction);
+        if (status != CK_ATTENTION_STATUS_OK) {
+            return status;
+        }
+        for (int h = 0; h < num_heads; ++h) {
+            float *dst = output +
+                ((size_t) h * (size_t) q_tokens + (size_t) t) *
+                (size_t) aligned_head_dim;
+            memcpy(dst, out_token + (size_t) h * (size_t) aligned_head_dim,
+                   (size_t) aligned_head_dim * sizeof(float));
+        }
+    }
+    return CK_ATTENTION_STATUS_OK;
+}
+
+ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_f16cache_gemma4_workspace(
+    const float *q, const uint16_t *k_cache, const uint16_t *v_cache,
+    float *output, int num_heads, int num_kv_heads, int q_tokens,
+    int past_tokens, int cache_capacity, int head_dim, int aligned_head_dim,
+    ck_attention_reduction_t reduction, float *token_workspace,
+    size_t token_workspace_bytes)
+{
+    return ck_attention_prefill_append_f16cache_gemma4_workspace(
+        q, k_cache, v_cache, output, num_heads, num_kv_heads, q_tokens,
+        past_tokens, cache_capacity, head_dim, aligned_head_dim, 0, reduction,
+        token_workspace, token_workspace_bytes);
+}
+
+ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_f16cache_sliding_gemma4_workspace(
+    const float *q, const uint16_t *k_cache, const uint16_t *v_cache,
+    float *output, int num_heads, int num_kv_heads, int q_tokens,
+    int past_tokens, int cache_capacity, int head_dim, int aligned_head_dim,
+    int sliding_window, ck_attention_reduction_t reduction,
+    float *token_workspace, size_t token_workspace_bytes)
+{
+    return ck_attention_prefill_append_f16cache_gemma4_workspace(
+        q, k_cache, v_cache, output, num_heads, num_kv_heads, q_tokens,
+        past_tokens, cache_capacity, head_dim, aligned_head_dim, sliding_window,
+        reduction, token_workspace, token_workspace_bytes);
 }
 
 static ck_attention_status_t ck_attention_forward_causal_head_major_gqa_prefill_segmented_f16cache_schedule_workspace(

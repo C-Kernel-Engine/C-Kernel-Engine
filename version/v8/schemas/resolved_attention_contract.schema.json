@@ -14,7 +14,19 @@
     "engine_contract_version": {"const": "8"},
     "circuit": {"type": ["string", "null"]},
     "operation": {"type": "string", "minLength": 1},
-    "template_ops": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["attn", "attn_sliding"]}},
+    "template_ops": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "attn",
+          "attn_sliding",
+          "attn_shared_kv",
+          "attn_sliding_shared_kv"
+        ]
+      }
+    },
     "phase": {"enum": ["prefill", "decode"]},
     "resolution_mode": {"enum": ["bringup", "production"]},
     "kernel": {

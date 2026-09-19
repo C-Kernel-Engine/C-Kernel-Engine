@@ -1,3 +1,4 @@
+import copy
 import json
 import subprocess
 import sys
@@ -16,6 +17,8 @@ from convert_gguf_to_bump_v8 import (  # type: ignore
     GGUFError,
     build_gemma3_rope_plan,
     build_gemma4_attention_plan,
+    gemma4_layer_produces_kv,
+    validate_gemma4_attention_plan,
     classify_layer_contract,
     describe_layer_contract,
     select_gguf_tokenizer_source,
@@ -410,6 +413,38 @@ class V8Gemma4ScaffoldTests(unittest.TestCase):
         self.assertEqual(plan["layer_kv_dim"], [512, 1024, 512, 1024])
         self.assertEqual(plan["layer_attention_output_dim"], [2048, 4096, 2048, 4096])
 
+        for layer, record in enumerate(plan["layer_attention_plan"]):
+            self.assertEqual(record["kind"], plan["layer_kinds"][layer])
+            self.assertEqual(record["kv_policy"], plan["layer_kv_policy"][layer])
+            self.assertEqual(record["kv_source_layer"], plan["layer_kv_source"][layer])
+
+    def test_gemma4_attention_plan_rejects_split_brain_shared_kv_metadata(self) -> None:
+        plan = build_gemma4_attention_plan(
+            {
+                "gemma4.attention.sliding_window_pattern": [True, False, True, False],
+                "gemma4.attention.shared_kv_layers": 2,
+            },
+            4,
+        )
+        plan["layer_kinds"][2] = "sliding_attention_kv"
+        plan["layer_kv_policy"][2] = "produce"
+
+        with self.assertRaisesRegex(GGUFError, "attention plan disagrees at layer 2"):
+            validate_gemma4_attention_plan(plan, 4)
+
+    def test_gemma4_kv_projection_ownership_follows_attention_plan(self) -> None:
+        plan = build_gemma4_attention_plan(
+            {
+                "gemma4.attention.sliding_window_pattern": [True, False, True, False],
+                "gemma4.attention.shared_kv_layers": 2,
+            },
+            4,
+        )
+        self.assertEqual(
+            [gemma4_layer_produces_kv(plan, layer) for layer in range(4)],
+            [True, True, False, False],
+        )
+
     def test_full_attention_output_projection_uses_per_layer_value_width(self) -> None:
         config = {
             "embed_dim": 2560,
@@ -437,6 +472,47 @@ class V8Gemma4ScaffoldTests(unittest.TestCase):
         apply_layer_attention_dims("quantize_out_proj_input", quantize, 1, config)
         self.assertEqual(quantize["_input_dim"], 4096)
         self.assertEqual(quantize["input_dim"], 4096)
+
+    def test_shared_kv_dimensions_follow_the_declared_source_layer(self) -> None:
+        config = {
+            "embed_dim": 2560,
+            "num_heads": 8,
+            "num_kv_heads": 2,
+            "head_dim": 512,
+            "layer_kv_source": [0, 1, 0, 1],
+            "layer_q_head_dim": [256, 512, 256, 512],
+            "layer_k_head_dim": [256, 512, 256, 512],
+            "layer_v_head_dim": [256, 512, 256, 512],
+            "layer_q_dim": [2048, 4096, 2048, 4096],
+            "layer_attention_output_dim": [2048, 4096, 2048, 4096],
+            "layer_rotary_dim": [256, 512, 256, 512],
+            "layer_sliding_window": [512, 0, 512, 0],
+            "layer_rope_kind": ["swa", "full", "swa", "full"],
+        }
+
+        sliding_store = {}
+        apply_layer_attention_dims("kv_cache_store", sliding_store, 0, config)
+        self.assertEqual(sliding_store["num_kv_heads"], 2)
+        self.assertEqual(sliding_store["head_dim"], 256)
+
+        shared_sliding = {}
+        apply_layer_attention_dims(
+            "attn_sliding_shared_kv",
+            shared_sliding,
+            2,
+            config,
+        )
+        self.assertEqual(shared_sliding["num_kv_heads"], 2)
+        self.assertEqual(shared_sliding["head_dim"], 256)
+        self.assertEqual(shared_sliding["k_dim"], 512)
+        self.assertEqual(shared_sliding["v_dim"], 512)
+
+        shared_full = {}
+        apply_layer_attention_dims("attn_shared_kv", shared_full, 3, config)
+        self.assertEqual(shared_full["num_kv_heads"], 2)
+        self.assertEqual(shared_full["head_dim"], 512)
+        self.assertEqual(shared_full["k_dim"], 1024)
+        self.assertEqual(shared_full["v_dim"], 1024)
 
     def test_gemma4_template_declares_q_only_shared_kv_kinds(self) -> None:
         template_path = REPO_ROOT / "version" / "v8" / "circuits" / "gemma4.json"
@@ -719,6 +795,34 @@ class V8Gemma4ScaffoldTests(unittest.TestCase):
             self.assertIn("rope_qk", ops)
             self.assertNotIn("q_norm", ops)
             self.assertNotIn("rope_q", ops)
+
+    def test_gemma4_segmented_prefill_uses_runtime_position_offsets(self) -> None:
+        import build_ir_v8  # type: ignore
+
+        template = build_ir_v8._load_builtin_template_doc("gemma4")
+        self.assertIsNotNone(template)
+        schedule = template["contract"]["multimodal_bridge"]["prefill_schedules"][
+            "segmented_append"
+        ]
+        self.assertEqual(schedule["position_transition"], "runtime_offset")
+        self.assertNotIn("position_transform", schedule)
+        build_ir_v8._validate_segmented_prefill_contract(
+            template,
+            source="test:gemma4",
+        )
+
+        invalid = copy.deepcopy(template)
+        invalid["contract"]["multimodal_bridge"]["prefill_schedules"][
+            "segmented_append"
+        ]["position_transform"] = {
+            "kernel_id": "mrope_qk_imrope_positions",
+            "contract_id": "text_imrope_positions_fp32_input_fp32_compute_fp32_output",
+        }
+        with self.assertRaisesRegex(RuntimeError, "must not declare"):
+            build_ir_v8._validate_segmented_prefill_contract(
+                invalid,
+                source="test:gemma4-invalid",
+            )
 
     def test_gemma4_v_norm_is_unweighted_rmsnorm(self) -> None:
         import json

@@ -1639,6 +1639,78 @@ def qwen35_decoder_layer_count(block_count: int, nextn_layers: int) -> int:
     return block_count - nextn_layers
 
 
+def validate_gemma4_attention_plan(plan: Dict[str, object], num_layers: int) -> None:
+    """Reject split-brain Gemma4 layer and shared-KV metadata."""
+    field_to_record_key = {
+        "layer_kinds": "kind",
+        "layer_kv_policy": "kv_policy",
+        "layer_kv_source": "kv_source_layer",
+        "layer_sliding_window": "sliding_window",
+        "layer_rope_kind": "rope_kind",
+        "layer_q_head_dim": "q_head_dim",
+        "layer_k_head_dim": "k_head_dim",
+        "layer_v_head_dim": "v_head_dim",
+        "layer_rotary_dim": "rotary_dim",
+        "layer_q_dim": "q_dim",
+        "layer_kv_dim": "kv_dim",
+        "layer_attention_output_dim": "attention_output_dim",
+    }
+    records = plan.get("layer_attention_plan")
+    if not isinstance(records, list) or len(records) != num_layers:
+        raise GGUFError(
+            "Gemma4 layer_attention_plan must contain one record per layer "
+            f"(expected {num_layers}, got {len(records) if isinstance(records, list) else 'invalid'})."
+        )
+
+    for field, record_key in field_to_record_key.items():
+        values = plan.get(field)
+        if not isinstance(values, list) or len(values) != num_layers:
+            raise GGUFError(
+                f"Gemma4 {field} must contain one value per layer "
+                f"(expected {num_layers}, got {len(values) if isinstance(values, list) else 'invalid'})."
+            )
+        for layer, (value, record) in enumerate(zip(values, records)):
+            if not isinstance(record, dict) or record.get("layer") != layer:
+                raise GGUFError(f"Gemma4 layer_attention_plan[{layer}] has invalid layer identity")
+            if record.get(record_key) != value:
+                raise GGUFError(
+                    f"Gemma4 attention plan disagrees at layer {layer}: "
+                    f"{field}={value!r}, {record_key}={record.get(record_key)!r}."
+                )
+
+    policies = plan["layer_kv_policy"]
+    sources = plan["layer_kv_source"]
+    kinds = plan["layer_kinds"]
+    for layer, (policy, source, kind) in enumerate(zip(policies, sources, kinds)):
+        if policy == "produce":
+            if source != layer or not str(kind).endswith("_attention_kv"):
+                raise GGUFError(f"Gemma4 KV producer metadata is inconsistent at layer {layer}")
+            continue
+        if policy != "reuse" or not str(kind).endswith("_attention_shared_kv"):
+            raise GGUFError(f"Gemma4 shared-KV metadata is inconsistent at layer {layer}")
+        if not isinstance(source, int) or source < 0 or source >= num_layers or source == layer:
+            raise GGUFError(f"Gemma4 shared-KV source is invalid at layer {layer}: {source!r}")
+        if policies[source] != "produce":
+            raise GGUFError(f"Gemma4 layer {layer} reuses KV from non-producing layer {source}")
+        source_attention = str(records[source].get("attention_kind"))
+        layer_attention = str(records[layer].get("attention_kind"))
+        if source_attention != layer_attention:
+            raise GGUFError(
+                f"Gemma4 layer {layer} reuses {source_attention} KV for {layer_attention} attention"
+            )
+
+
+def gemma4_layer_produces_kv(plan: Dict[str, object], layer: int) -> bool:
+    """Return whether a Gemma4 layer owns K/V projection weights."""
+    policies = plan.get("layer_kv_policy")
+    if not isinstance(policies, list) or layer < 0 or layer >= len(policies):
+        raise GGUFError(f"Gemma4 layer {layer} has no declared KV policy")
+    policy = policies[layer]
+    if policy not in {"produce", "reuse"}:
+        raise GGUFError(f"Gemma4 layer {layer} has unsupported KV policy {policy!r}")
+    return policy == "produce"
+
+
 def build_gemma4_attention_plan(meta: Dict[str, object], num_layers: int) -> Dict[str, object]:
     """Resolve Gemma4 attention/cache policy from GGUF metadata.
 
@@ -1771,7 +1843,7 @@ def build_gemma4_attention_plan(meta: Dict[str, object], num_layers: int) -> Dic
         layer_v_cache_offset.append(kv_cache_token_stride_total)
         kv_cache_token_stride_total += v_elems
 
-    return {
+    plan = {
         "layer_kinds": layer_kinds,
         "layer_attention_plan": layer_attention_plan,
         "layer_kv_policy": layer_kv_policy,
@@ -1800,6 +1872,8 @@ def build_gemma4_attention_plan(meta: Dict[str, object], num_layers: int) -> Dic
         "shared_kv_layers": shared_kv_layers,
         "first_shared_kv_layer": first_shared_kv_layer,
     }
+    validate_gemma4_attention_plan(plan, num_layers)
+    return plan
 
 
 def build_gemma3_rope_plan(meta: Dict[str, object], num_layers: int) -> Dict[str, object]:
@@ -5993,37 +6067,6 @@ def main() -> None:
             attention_plan = build_gemma4_attention_plan(meta, num_layers)
             layer_kinds = attention_plan["layer_kinds"]
 
-            gemma4_materialized_shared_kv = False
-            shared_layers = [
-                layer
-                for layer, policy in enumerate(attention_plan.get("layer_kv_policy", []))
-                if str(policy) == "reuse"
-            ]
-            if shared_layers:
-                materializable = all(
-                    tensors.get(f"blk.{layer}.attn_k.weight") is not None
-                    and tensors.get(f"blk.{layer}.attn_v.weight") is not None
-                    and tensors.get(f"blk.{layer}.attn_k_norm.weight") is not None
-                    for layer in shared_layers
-                )
-                if materializable:
-                    # llama.cpp treats these as shared-KV/Q-only layers. CK does not yet
-                    # lower that form, but this GGUF carries optional per-layer K/V tensors,
-                    # so materialize them for the first compile/run bring-up. This is not
-                    # final parity; it is an explicit temporary fallback.
-                    gemma4_materialized_shared_kv = True
-                    for layer in shared_layers:
-                        kind = str(attention_plan["layer_kinds"][layer])
-                        if kind == "sliding_attention_shared_kv":
-                            attention_plan["layer_kinds"][layer] = "sliding_attention_kv"
-                        elif kind == "full_attention_shared_kv":
-                            attention_plan["layer_kinds"][layer] = "full_attention_kv"
-                        # Keep the original llama.cpp source layer for attention reads.
-                        # We still materialize optional per-layer K/V tensors as a compile/run
-                        # fallback, but shared-KV layers must attend to the producer cache.
-                        attention_plan["layer_kv_policy"][layer] = "produce"
-                    layer_kinds = attention_plan["layer_kinds"]
-
             gemma4_per_layer_dim = int(meta.get("gemma4.embedding_length_per_layer_input", 0) or 0)
             per_layer_token_emb = tensors.get("per_layer_token_embd.weight")
             per_layer_model_proj = tensors.get("per_layer_model_proj.weight")
@@ -6089,19 +6132,12 @@ def main() -> None:
                 )
                 if name in tensors
             ]
-            if any(str(policy) == "reuse" for policy in attention_plan.get("layer_kv_policy", [])):
-                raise GGUFError(
-                    "Gemma4 shared-KV/Q-only layers are detected, but v8 does not lower shared-KV attention yet. "
-                    f"Detected layer_kinds={layer_kinds[:8]}{'...' if len(layer_kinds) > 8 else ''}, "
-                    f"kv_policy={attention_plan['layer_kv_policy'][:8]}{'...' if len(attention_plan['layer_kv_policy']) > 8 else ''}, "
-                    f"kv_source={attention_plan['layer_kv_source'][:8]}{'...' if len(attention_plan['layer_kv_source']) > 8 else ''}."
-                )
             print(
-                "[gemma4] Experimental bring-up: lowering KV-producing Gemma4 layers with per-layer "
+                "[gemma4] Lowering Gemma4 attention from the declared producer/shared-KV plan with per-layer "
                 f"attention dims. layer_kinds={layer_kinds[:8]}{'...' if len(layer_kinds) > 8 else ''}, "
                 f"q_head_dim={attention_plan['layer_q_head_dim'][:8]}{'...' if len(attention_plan['layer_q_head_dim']) > 8 else ''}, "
                 f"rotary_dim={attention_plan['layer_rotary_dim'][:8]}{'...' if len(attention_plan['layer_rotary_dim']) > 8 else ''}, "
-                f"materialized_shared_kv={gemma4_materialized_shared_kv}, "
+                f"shared_kv_layers={attention_plan['shared_kv_layers']}, "
                 f"extra_projection_tensors={extra_tensors}."
             )
 
@@ -7097,6 +7133,7 @@ def main() -> None:
             # 3) per-layer
             for layer in range(num_layers):
                 info = layer_infos[layer]
+                writes_kv = arch != "gemma4" or gemma4_layer_produces_kv(attention_plan, layer)
 
                 # RMSNorm weights
                 ln1 = read_vector_f32(f, data_start, info["attn_norm"])
@@ -7157,52 +7194,53 @@ def main() -> None:
                     record_entry(f"layer.{layer}.q_norm", "fp32", q_norm_size)
                     write_f32_padded(w, q_norm_vec, layer_q_head_dim)
 
-                # WK
-                wk_size = ggml_row_bytes(info["wk"].ggml_type, aligned_embed_dim) * layer_k_dim
-                record_entry(f"layer.{layer}.wk", get_quant_type_name(info["wk"].ggml_type), wk_size)
-                copy_qk_head_packed(
-                    f, data_start, info["wk"], w,
-                    group_count=num_kv_heads,
-                    head_dim=layer_k_head_dim,
-                    aligned_head_dim=layer_k_head_dim,
-                    aligned_embed_dim=aligned_embed_dim,
-                )
+                if writes_kv:
+                    # WK
+                    wk_size = ggml_row_bytes(info["wk"].ggml_type, aligned_embed_dim) * layer_k_dim
+                    record_entry(f"layer.{layer}.wk", get_quant_type_name(info["wk"].ggml_type), wk_size)
+                    copy_qk_head_packed(
+                        f, data_start, info["wk"], w,
+                        group_count=num_kv_heads,
+                        head_dim=layer_k_head_dim,
+                        aligned_head_dim=layer_k_head_dim,
+                        aligned_embed_dim=aligned_embed_dim,
+                    )
 
-                # bk
-                bk_size = layer_k_dim * 4
-                record_entry(f"layer.{layer}.bk", "fp32", bk_size)
-                if info["bk"] is not None:
-                    bk_vec = read_vector_f32(f, data_start, info["bk"])
-                    write_f32_padded(w, bk_vec, layer_k_dim)
-                else:
-                    write_f32_zeros(w, layer_k_dim)
+                    # bk
+                    bk_size = layer_k_dim * 4
+                    record_entry(f"layer.{layer}.bk", "fp32", bk_size)
+                    if info["bk"] is not None:
+                        bk_vec = read_vector_f32(f, data_start, info["bk"])
+                        write_f32_padded(w, bk_vec, layer_k_dim)
+                    else:
+                        write_f32_zeros(w, layer_k_dim)
 
-                # k_norm - per-head RMSNorm on K (Qwen3-style)
-                if info["k_norm"] is not None:
-                    k_norm_vec = read_vector_f32(f, data_start, info["k_norm"])
-                    k_norm_size = layer_k_head_dim * 4
-                    record_entry(f"layer.{layer}.k_norm", "fp32", k_norm_size)
-                    write_f32_padded(w, k_norm_vec, layer_k_head_dim)
+                    # k_norm - per-head RMSNorm on K (Qwen3-style)
+                    if info["k_norm"] is not None:
+                        k_norm_vec = read_vector_f32(f, data_start, info["k_norm"])
+                        k_norm_size = layer_k_head_dim * 4
+                        record_entry(f"layer.{layer}.k_norm", "fp32", k_norm_size)
+                        write_f32_padded(w, k_norm_vec, layer_k_head_dim)
 
-                # WV
-                wv_size = ggml_row_bytes(info["wv"].ggml_type, aligned_embed_dim) * layer_v_dim
-                record_entry(f"layer.{layer}.wv", get_quant_type_name(info["wv"].ggml_type), wv_size)
-                copy_qk_head_packed(
-                    f, data_start, info["wv"], w,
-                    group_count=num_kv_heads,
-                    head_dim=layer_v_head_dim,
-                    aligned_head_dim=layer_v_head_dim,
-                    aligned_embed_dim=aligned_embed_dim,
-                )
+                    # WV
+                    wv_size = ggml_row_bytes(info["wv"].ggml_type, aligned_embed_dim) * layer_v_dim
+                    record_entry(f"layer.{layer}.wv", get_quant_type_name(info["wv"].ggml_type), wv_size)
+                    copy_qk_head_packed(
+                        f, data_start, info["wv"], w,
+                        group_count=num_kv_heads,
+                        head_dim=layer_v_head_dim,
+                        aligned_head_dim=layer_v_head_dim,
+                        aligned_embed_dim=aligned_embed_dim,
+                    )
 
-                # bv
-                bv_size = layer_v_dim * 4
-                record_entry(f"layer.{layer}.bv", "fp32", bv_size)
-                if info["bv"] is not None:
-                    bv_vec = read_vector_f32(f, data_start, info["bv"])
-                    write_f32_padded(w, bv_vec, layer_v_dim)
-                else:
-                    write_f32_zeros(w, layer_v_dim)
+                    # bv
+                    bv_size = layer_v_dim * 4
+                    record_entry(f"layer.{layer}.bv", "fp32", bv_size)
+                    if info["bv"] is not None:
+                        bv_vec = read_vector_f32(f, data_start, info["bv"])
+                        write_f32_padded(w, bv_vec, layer_v_dim)
+                    else:
+                        write_f32_zeros(w, layer_v_dim)
 
                 if arch == "gemma4":
                     # llama.cpp applies RMSNorm to V without a learned scale.
@@ -7321,7 +7359,6 @@ def main() -> None:
                 if arch == "gemma4":
                     config.update(attention_plan)
                     config.update({
-                        "gemma4_materialized_shared_kv": bool(gemma4_materialized_shared_kv),
                         "gemma4_per_layer_embedding": True,
                         "per_layer_dim": int(gemma4_per_layer_dim),
                         "final_logit_softcapping": float(meta.get("gemma4.final_logit_softcapping", 0.0) or 0.0),
