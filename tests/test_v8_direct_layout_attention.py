@@ -1,6 +1,7 @@
 import ctypes
 import math
 import os
+import struct
 import subprocess
 import tempfile
 import unittest
@@ -58,6 +59,33 @@ class DirectLayoutAttentionTests(unittest.TestCase):
             prefill_workspace_signature
         )
         cls._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract_workspace.restype = ctypes.c_int
+        cls._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_gemma4_workspace.argtypes = (
+            prefill_workspace_signature
+        )
+        cls._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_gemma4_workspace.restype = ctypes.c_int
+        gemma_sliding_prefill_signature = prefill_workspace_signature[:11] + [
+            ctypes.c_int,
+        ] + prefill_workspace_signature[11:]
+        cls._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_sliding_gemma4_workspace.argtypes = (
+            gemma_sliding_prefill_signature
+        )
+        cls._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_sliding_gemma4_workspace.restype = ctypes.c_int
+        gemma_decode_signature = [
+            ctypes.POINTER(ctypes.c_float),
+            ctypes.POINTER(ctypes.c_uint16),
+            ctypes.POINTER(ctypes.c_uint16),
+            ctypes.POINTER(ctypes.c_float),
+            ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+            ctypes.c_int, ctypes.c_int, ctypes.c_int,
+        ]
+        cls._lib.attention_forward_decode_head_major_gqa_f16cache_gemma4_contract.argtypes = (
+            gemma_decode_signature
+        )
+        cls._lib.attention_forward_decode_head_major_gqa_f16cache_gemma4_contract.restype = ctypes.c_int
+        cls._lib.attention_forward_decode_head_major_gqa_f16cache_sliding_gemma4_contract.argtypes = (
+            gemma_decode_signature[:10] + [ctypes.c_int] + gemma_decode_signature[10:]
+        )
+        cls._lib.attention_forward_decode_head_major_gqa_f16cache_sliding_gemma4_contract.restype = ctypes.c_int
         qtile_schedule_signature = [
             ctypes.POINTER(ctypes.c_float),
             ctypes.POINTER(ctypes.c_uint16),
@@ -98,6 +126,264 @@ class DirectLayoutAttentionTests(unittest.TestCase):
             + [ctypes.POINTER(ctypes.c_int), ctypes.c_int]
         )
         cls._lib.attention_forward_causal_head_major_gqa_prefill_segmented_f16cache_contract_workspace.restype = ctypes.c_int
+
+    def test_gemma4_f16cache_prefill_honors_unit_scale_and_sliding_range(self):
+        heads, kv_heads, tokens, dim = 2, 1, 5, 8
+        q = array("f", (0.1 + math.sin(i * 0.17) for i in range(heads * tokens * dim)))
+
+        def fp16_bits(value):
+            return int.from_bytes(struct.pack("<e", value), "little")
+
+        k = array("H", (fp16_bits(math.cos(i * 0.11)) for i in range(kv_heads * tokens * dim)))
+        v = array("H", (fp16_bits(math.sin(i * 0.13 + 0.4)) for i in range(kv_heads * tokens * dim)))
+        workspace = array("f", [0.0]) * (2 * heads * dim)
+
+        def float_pointer(values):
+            return (ctypes.c_float * len(values)).from_buffer(values)
+
+        def half_pointer(values):
+            return (ctypes.c_uint16 * len(values)).from_buffer(values)
+
+        def run(function, *extra):
+            output = array("f", [0.0]) * (heads * tokens * dim)
+            status = function(
+                float_pointer(q), half_pointer(k), half_pointer(v),
+                float_pointer(output), heads, kv_heads, tokens, 0, tokens,
+                dim, dim, *extra, 2, float_pointer(workspace),
+                len(workspace) * ctypes.sizeof(ctypes.c_float),
+            )
+            self.assertEqual(status, 0)
+            return output
+
+        full = run(
+            self._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_gemma4_workspace
+        )
+        unbounded_sliding = run(
+            self._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_sliding_gemma4_workspace,
+            tokens,
+        )
+        bounded_sliding = run(
+            self._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_sliding_gemma4_workspace,
+            2,
+        )
+        scaled = run(
+            self._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract_workspace
+        )
+
+        self.assertEqual(full.tobytes(), unbounded_sliding.tobytes())
+        self.assertNotEqual(full.tobytes(), bounded_sliding.tobytes())
+        self.assertNotEqual(full.tobytes(), scaled.tobytes())
+
+    def test_gemma4_f16cache_matches_independent_rounding_oracle(self):
+        heads, kv_heads = 6, 2
+        past_tokens, q_tokens, capacity = 3, 5, 11
+        head_dim, aligned_dim, sliding_window = 40, 48, 4
+        reduction = 2  # CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE
+
+        def f32(value):
+            return ctypes.c_float(value).value
+
+        def f16(value):
+            return struct.unpack("<e", struct.pack("<e", value))[0]
+
+        libm = ctypes.CDLL("libm.so.6")
+        libm.expf.argtypes = [ctypes.c_float]
+        libm.expf.restype = ctypes.c_float
+        libm.fmaf.argtypes = [ctypes.c_float, ctypes.c_float, ctypes.c_float]
+        libm.fmaf.restype = ctypes.c_float
+
+        q = array("f", (
+            f32(math.sin(i * 0.19) * 0.7 + math.cos(i * 0.07) * 0.2)
+            for i in range(heads * q_tokens * aligned_dim)
+        ))
+
+        def fp16_bits(value):
+            return int.from_bytes(struct.pack("<e", value), "little")
+
+        k = array("H", (
+            fp16_bits(math.cos(i * 0.11) * 0.6 + math.sin(i * 0.03) * 0.1)
+            for i in range(kv_heads * capacity * aligned_dim)
+        ))
+        v = array("H", (
+            fp16_bits(math.sin(i * 0.13 + 0.4) * 0.8)
+            for i in range(kv_heads * capacity * aligned_dim)
+        ))
+
+        def float_pointer(values):
+            return (ctypes.c_float * len(values)).from_buffer(values)
+
+        def half_pointer(values):
+            return (ctypes.c_uint16 * len(values)).from_buffer(values)
+
+        def half_value(values, index):
+            return struct.unpack("<e", struct.pack("<H", values[index]))[0]
+
+        def avx2_f16_dot(q_half, cache_values, row):
+            accumulators = [[f32(0.0)] * 8 for _ in range(4)]
+            vector_end = head_dim & ~31
+            for block in range(0, vector_end, 32):
+                for group in range(4):
+                    for lane in range(8):
+                        d = block + group * 8 + lane
+                        accumulators[group][lane] = libm.fmaf(
+                            q_half[d], half_value(cache_values, row + d),
+                            accumulators[group][lane],
+                        )
+            merged = [
+                f32(f32(accumulators[0][lane] + accumulators[2][lane]) +
+                    f32(accumulators[1][lane] + accumulators[3][lane]))
+                for lane in range(8)
+            ]
+            pairs = [f32(merged[lane] + merged[lane + 4]) for lane in range(4)]
+            vector_result = f32(
+                f32(pairs[0] + pairs[1]) + f32(pairs[2] + pairs[3])
+            )
+            result = float(vector_result)
+            for d in range(vector_end, head_dim):
+                product = f32(q_half[d] * half_value(cache_values, row + d))
+                result += float(product)
+            return f32(result)
+
+        def oracle_token(q_values, token, kv_tokens, window):
+            result = array("f", [0.0]) * (heads * aligned_dim)
+            kv_start = max(0, kv_tokens - window) if window else 0
+            for head in range(heads):
+                kv_head = head * kv_heads // heads
+                q_base = (head * len(q_values) // heads) + token * aligned_dim
+                q_half = [f16(q_values[q_base + d]) for d in range(aligned_dim)]
+                accumulator = [f16(0.0)] * aligned_dim
+                maximum = -math.inf
+                total = f32(0.0)
+                cache_base = kv_head * capacity * aligned_dim
+                for position in range(kv_start, kv_tokens):
+                    row = cache_base + position * aligned_dim
+                    dot = avx2_f16_dot(q_half, k, row)
+                    old_maximum = maximum
+                    max_scale = f32(1.0)
+                    value_scale = f32(1.0)
+                    if dot > maximum:
+                        maximum = dot
+                        max_scale = (
+                            libm.expf(f32(old_maximum - maximum))
+                            if math.isfinite(old_maximum) else f32(0.0)
+                        )
+                        for d in range(head_dim):
+                            accumulator[d] = f16(f32(accumulator[d] * max_scale))
+                    else:
+                        value_scale = libm.expf(f32(dot - maximum))
+                    for d in range(head_dim):
+                        product = f32(half_value(v, row + d) * value_scale)
+                        accumulator[d] = f16(f32(accumulator[d] + product))
+                    total = libm.fmaf(total, max_scale, value_scale)
+                inverse = f32(1.0 / total)
+                for d in range(head_dim):
+                    result[head * aligned_dim + d] = f32(accumulator[d] * inverse)
+            return result
+
+        def prefill(q_values, count, past, window):
+            output = array("f", [0.0]) * (heads * count * aligned_dim)
+            workspace = array("f", [0.0]) * (2 * heads * aligned_dim)
+            common = (
+                float_pointer(q_values), half_pointer(k), half_pointer(v),
+                float_pointer(output), heads, kv_heads, count, past, capacity,
+                head_dim, aligned_dim,
+            )
+            if window:
+                status = self._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_sliding_gemma4_workspace(
+                    *common, window, reduction, float_pointer(workspace),
+                    len(workspace) * ctypes.sizeof(ctypes.c_float),
+                )
+            else:
+                status = self._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_gemma4_workspace(
+                    *common, reduction, float_pointer(workspace),
+                    len(workspace) * ctypes.sizeof(ctypes.c_float),
+                )
+            self.assertEqual(status, 0)
+            return output
+
+        def expected_prefill(window):
+            expected = array("f", [0.0]) * (heads * q_tokens * aligned_dim)
+            for token in range(q_tokens):
+                token_output = oracle_token(q, token, past_tokens + token + 1, window)
+                for head in range(heads):
+                    src = head * aligned_dim
+                    dst = (head * q_tokens + token) * aligned_dim
+                    expected[dst:dst + aligned_dim] = token_output[src:src + aligned_dim]
+            return expected
+
+        for window in (0, sliding_window):
+            actual = prefill(q, q_tokens, past_tokens, window)
+            expected = expected_prefill(window)
+            self.assertEqual(actual.tobytes(), expected.tobytes())
+
+            split = 2
+            q_first = array("f")
+            q_second = array("f")
+            for head in range(heads):
+                base = head * q_tokens * aligned_dim
+                q_first.extend(q[base:base + split * aligned_dim])
+                q_second.extend(q[base + split * aligned_dim:base + q_tokens * aligned_dim])
+            first = prefill(q_first, split, past_tokens, window)
+            second = prefill(q_second, q_tokens - split, past_tokens + split, window)
+            segmented = array("f", [0.0]) * len(actual)
+            for head in range(heads):
+                dst = head * q_tokens * aligned_dim
+                first_src = head * split * aligned_dim
+                second_src = head * (q_tokens - split) * aligned_dim
+                segmented[dst:dst + split * aligned_dim] = first[
+                    first_src:first_src + split * aligned_dim
+                ]
+                segmented[dst + split * aligned_dim:dst + q_tokens * aligned_dim] = second[
+                    second_src:second_src + (q_tokens - split) * aligned_dim
+                ]
+            self.assertEqual(actual.tobytes(), segmented.tobytes())
+
+            final_q = array("f")
+            for head in range(heads):
+                src = (head * q_tokens + q_tokens - 1) * aligned_dim
+                final_q.extend(q[src:src + aligned_dim])
+            decode = array("f", [0.0]) * (heads * aligned_dim)
+            common = (
+                float_pointer(final_q), half_pointer(k), half_pointer(v),
+                float_pointer(decode), heads, kv_heads, past_tokens + q_tokens,
+                capacity, head_dim, aligned_dim,
+            )
+            if window:
+                status = self._lib.attention_forward_decode_head_major_gqa_f16cache_sliding_gemma4_contract(
+                    *common, window, reduction,
+                )
+            else:
+                status = self._lib.attention_forward_decode_head_major_gqa_f16cache_gemma4_contract(
+                    *common, reduction,
+                )
+            self.assertEqual(status, 0)
+            expected_final = array("f")
+            for head in range(heads):
+                src = (head * q_tokens + q_tokens - 1) * aligned_dim
+                expected_final.extend(actual[src:src + aligned_dim])
+            self.assertEqual(decode.tobytes(), expected_final.tobytes())
+
+    def test_gemma4_prefill_rejects_overflowing_extent_before_workspace_use(self):
+        q = array("f", [1.0])
+        cache = array("H", [0])
+        output = array("f", [123.0])
+        workspace = array("f", [456.0, 789.0])
+
+        def float_pointer(values):
+            return (ctypes.c_float * len(values)).from_buffer(values)
+
+        def half_pointer(values):
+            return (ctypes.c_uint16 * len(values)).from_buffer(values)
+
+        status = self._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_gemma4_workspace(
+            float_pointer(q), half_pointer(cache), half_pointer(cache),
+            float_pointer(output), 1, 1, 2, 2_147_483_646, 2_147_483_647,
+            1, 1, 2, float_pointer(workspace),
+            len(workspace) * ctypes.sizeof(ctypes.c_float),
+        )
+        self.assertEqual(status, -1)
+        self.assertEqual(output.tolist(), [123.0])
+        self.assertEqual(workspace.tolist(), [456.0, 789.0])
 
     @classmethod
     def tearDownClass(cls):

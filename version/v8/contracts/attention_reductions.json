@@ -134,6 +134,32 @@
         "reference": "current llama.cpp ggml_flash_attn_ext short-query path"
       }
     },
+    "f16_online_single_range_noscale": {
+      "status": "validated",
+      "q_compute": "fp16_rounded",
+      "k_compute": "fp16_rounded",
+      "score_accumulator": "fp32",
+      "softmax_statistics": "fp32",
+      "value_compute": "fp16_rounded",
+      "value_accumulator": "fp16_rounded_each_update",
+      "partial_storage": "none",
+      "partial_merge": "none",
+      "partition": {
+        "kind": "single_range"
+      },
+      "description": "Single-range llama-compatible FP16 attention with Gemma4's explicit unit attention scale.",
+      "validation": {
+        "test": "tests/test_v8_direct_layout_attention.py",
+        "cases": [
+          "full and sliding cache with nonzero past tokens",
+          "single-pass versus segmented append",
+          "prefill final token versus decode",
+          "grouped KV heads with padded AVX2 geometry",
+          "window-boundary positions"
+        ],
+        "reference": "independent scalar oracle reproducing the declared FP16 rounding and AVX2 reduction order"
+      }
+    },
     "f16_online_fp32_merge": {
       "status": "validated",
       "q_compute": "fp16_rounded",

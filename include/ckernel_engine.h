@@ -2309,6 +2309,28 @@ ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_f16
     ck_attention_reduction_t reduction,
     float *token_workspace,
     size_t token_workspace_bytes);
+ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_f16cache_gemma4_workspace(
+    const float *q, const uint16_t *k_cache, const uint16_t *v_cache,
+    float *output, int num_heads, int num_kv_heads, int q_tokens,
+    int past_tokens, int cache_capacity, int head_dim, int aligned_head_dim,
+    ck_attention_reduction_t reduction, float *token_workspace,
+    size_t token_workspace_bytes);
+ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_f16cache_sliding_gemma4_workspace(
+    const float *q, const uint16_t *k_cache, const uint16_t *v_cache,
+    float *output, int num_heads, int num_kv_heads, int q_tokens,
+    int past_tokens, int cache_capacity, int head_dim, int aligned_head_dim,
+    int sliding_window, ck_attention_reduction_t reduction,
+    float *token_workspace, size_t token_workspace_bytes);
+ck_attention_status_t attention_forward_decode_head_major_gqa_f16cache_gemma4_contract(
+    const float *q_token, const uint16_t *k_cache, const uint16_t *v_cache,
+    float *out_token, int num_heads, int num_kv_heads, int kv_tokens,
+    int cache_capacity, int head_dim, int aligned_head_dim,
+    ck_attention_reduction_t reduction);
+ck_attention_status_t attention_forward_decode_head_major_gqa_f16cache_sliding_gemma4_contract(
+    const float *q_token, const uint16_t *k_cache, const uint16_t *v_cache,
+    float *out_token, int num_heads, int num_kv_heads, int kv_tokens,
+    int cache_capacity, int head_dim, int aligned_head_dim, int sliding_window,
+    ck_attention_reduction_t reduction);
 ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_f16cache_auto_workspace(
     const float *q,
     const uint16_t *k_cache,

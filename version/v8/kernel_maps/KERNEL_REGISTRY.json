@@ -5,14 +5,14 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 371,
+      "total": 375,
       "by_op": {
         "add_backward": 1,
         "add_stream": 2,
         "assistant_layer_scale": 1,
-        "attention": 36,
+        "attention": 38,
         "attention_projection": 1,
-        "attention_sliding": 11,
+        "attention_sliding": 13,
         "attn_gate_sigmoid_mul": 2,
         "attn_gate_sigmoid_mul_backward": 1,
         "attn_gate_softplus_mul": 1,
@@ -5003,6 +5003,247 @@
       "_source_file": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_flash_auto_qtile64.json"
     },
     {
+      "id": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_gemma4",
+      "op": "attention",
+      "variant": "gemma4_prefill_append_f16cache_noscale",
+      "mode": "prefill",
+      "contract_schema_version": 1,
+      "provides": {
+        "execution.phase": [
+          "prefill"
+        ],
+        "execution.prefill_batching": [
+          "segmented_append"
+        ],
+        "tensor.q.dtype": [
+          "fp32"
+        ],
+        "tensor.kv.dtype": [
+          "fp16"
+        ],
+        "tensor.layout": [
+          "head_major"
+        ],
+        "numerics.attention_reduction": [
+          "f16_online_single_range_noscale"
+        ]
+      },
+      "supported_reductions": {
+        "f16_online_single_range_noscale": {
+          "status": "validated",
+          "function": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_gemma4_workspace",
+          "explicit_selector": true,
+          "selector": "CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE",
+          "notes": "Gemma4 unit-scale, single-range FP16 online attention over an append-preserving cache."
+        }
+      },
+      "numerical_capabilities": {
+        "input_dtype": "fp32_q_fp16_kv",
+        "accumulation_dtype": "fp32_scores_fp16_value_updates",
+        "reduction_order": "f16_online_single_range_noscale",
+        "output_dtype": "fp32"
+      },
+      "operation_interface": "attention.causal_gqa.append_f16cache.noscale.prefill.v1",
+      "selection": {
+        "status": "production",
+        "priority": 330,
+        "equivalence_group": "attention.gemma4.f16_noscale.full.v1",
+        "phases": [
+          "prefill"
+        ]
+      },
+      "implementation": {
+        "isa_dispatch": "runtime",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": [
+            "serial"
+          ],
+          "dispatch": [
+            "inline"
+          ],
+          "reduction_order_effect": "contract_defined"
+        }
+      },
+      "inputs": [
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "num_heads",
+            "q_tokens",
+            "head_dim"
+          ],
+          "layout": "head_major_contiguous",
+          "access": "read",
+          "storage_class": "scratch",
+          "consumption": "required"
+        },
+        {
+          "name": "k_cache",
+          "dtype": "fp16",
+          "shape": [
+            "num_kv_heads",
+            "cache_capacity",
+            "head_dim"
+          ],
+          "layout": "head_major_contiguous",
+          "access": "read",
+          "storage_class": "state",
+          "consumption": "required"
+        },
+        {
+          "name": "v_cache",
+          "dtype": "fp16",
+          "shape": [
+            "num_kv_heads",
+            "cache_capacity",
+            "head_dim"
+          ],
+          "layout": "head_major_contiguous",
+          "access": "read",
+          "storage_class": "state",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "num_heads",
+            "q_tokens",
+            "head_dim"
+          ],
+          "layout": "head_major_contiguous",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "token_workspace",
+          "dtype": "fp32",
+          "shape": [
+            2,
+            "H",
+            "D"
+          ],
+          "size_resolution": "required",
+          "lifetime": "kernel_call"
+        }
+      ],
+      "dims": [
+        "num_heads",
+        "num_kv_heads",
+        "q_tokens",
+        "past_tokens",
+        "cache_capacity",
+        "head_dim",
+        "aligned_head_dim"
+      ],
+      "params": [
+        {
+          "name": "reduction",
+          "dtype": "ck_attention_reduction_t"
+        }
+      ],
+      "impl": {
+        "function": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_gemma4_workspace",
+        "c_declaration": "ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_f16cache_gemma4_workspace(const float *q, const uint16_t *k_cache, const uint16_t *v_cache, float *output, int num_heads, int num_kv_heads, int q_tokens, int past_tokens, int cache_capacity, int head_dim, int aligned_head_dim, ck_attention_reduction_t reduction, float *token_workspace, size_t token_workspace_bytes);",
+        "sources": [
+          "src/kernels/attention_kernels.c"
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_direct_layout_attention.py"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "q",
+            "source": "scratch:q_scratch",
+            "cast": "const float*",
+            "ports": [
+              "input:q"
+            ]
+          },
+          {
+            "name": "k_cache",
+            "source": "runtime:kv_cache_k_layer_f16",
+            "cast": "const uint16_t*",
+            "ports": [
+              "input:k_cache"
+            ]
+          },
+          {
+            "name": "v_cache",
+            "source": "runtime:kv_cache_v_layer_f16",
+            "cast": "const uint16_t*",
+            "ports": [
+              "input:v_cache"
+            ]
+          },
+          {
+            "name": "output",
+            "source": "output:out",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "num_heads",
+            "source": "dim:num_heads"
+          },
+          {
+            "name": "num_kv_heads",
+            "source": "dim:num_kv_heads"
+          },
+          {
+            "name": "q_tokens",
+            "source": "dim:seq_len"
+          },
+          {
+            "name": "past_tokens",
+            "source": "runtime:prefill_start_pos"
+          },
+          {
+            "name": "cache_capacity",
+            "source": "dim:max_seq_len"
+          },
+          {
+            "name": "head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "aligned_head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "reduction",
+            "source": "const:CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE"
+          },
+          {
+            "name": "token_workspace",
+            "source": "scratch:token_workspace",
+            "cast": "float*"
+          },
+          {
+            "name": "token_workspace_bytes",
+            "source": "scratch_size:token_workspace"
+          }
+        ]
+      },
+      "name": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_gemma4",
+      "_source_file": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_gemma4.json"
+    },
+    {
       "id": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_single_range",
       "op": "attention",
       "variant": "causal_head_major_gqa_prefill_append_f16cache_single_range",
@@ -5195,6 +5436,252 @@
       },
       "name": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_single_range",
       "_source_file": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_single_range.json"
+    },
+    {
+      "id": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_sliding_gemma4",
+      "op": "attention_sliding",
+      "variant": "gemma4_prefill_append_f16cache_sliding_noscale",
+      "mode": "prefill",
+      "contract_schema_version": 1,
+      "provides": {
+        "execution.phase": [
+          "prefill"
+        ],
+        "execution.prefill_batching": [
+          "segmented_append"
+        ],
+        "tensor.q.dtype": [
+          "fp32"
+        ],
+        "tensor.kv.dtype": [
+          "fp16"
+        ],
+        "tensor.layout": [
+          "head_major"
+        ],
+        "numerics.attention_reduction": [
+          "f16_online_single_range_noscale"
+        ]
+      },
+      "supported_reductions": {
+        "f16_online_single_range_noscale": {
+          "status": "validated",
+          "function": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_sliding_gemma4_workspace",
+          "explicit_selector": true,
+          "selector": "CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE",
+          "notes": "Gemma4 unit-scale sliding attention over the declared live cache range."
+        }
+      },
+      "numerical_capabilities": {
+        "input_dtype": "fp32_q_fp16_kv",
+        "accumulation_dtype": "fp32_scores_fp16_value_updates",
+        "reduction_order": "f16_online_single_range_noscale",
+        "output_dtype": "fp32"
+      },
+      "operation_interface": "attention.causal_gqa.append_f16cache.noscale.sliding.prefill.v1",
+      "selection": {
+        "status": "production",
+        "priority": 330,
+        "equivalence_group": "attention.gemma4.f16_noscale.sliding.v1",
+        "phases": [
+          "prefill"
+        ]
+      },
+      "implementation": {
+        "isa_dispatch": "runtime",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": [
+            "serial"
+          ],
+          "dispatch": [
+            "inline"
+          ],
+          "reduction_order_effect": "contract_defined"
+        }
+      },
+      "inputs": [
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "num_heads",
+            "q_tokens",
+            "head_dim"
+          ],
+          "layout": "head_major_contiguous",
+          "access": "read",
+          "storage_class": "scratch",
+          "consumption": "required"
+        },
+        {
+          "name": "k_cache",
+          "dtype": "fp16",
+          "shape": [
+            "num_kv_heads",
+            "cache_capacity",
+            "head_dim"
+          ],
+          "layout": "head_major_contiguous",
+          "access": "read",
+          "storage_class": "state",
+          "consumption": "required"
+        },
+        {
+          "name": "v_cache",
+          "dtype": "fp16",
+          "shape": [
+            "num_kv_heads",
+            "cache_capacity",
+            "head_dim"
+          ],
+          "layout": "head_major_contiguous",
+          "access": "read",
+          "storage_class": "state",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "num_heads",
+            "q_tokens",
+            "head_dim"
+          ],
+          "layout": "head_major_contiguous",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "token_workspace",
+          "dtype": "fp32",
+          "shape": [
+            2,
+            "H",
+            "D"
+          ],
+          "size_resolution": "required",
+          "lifetime": "kernel_call"
+        }
+      ],
+      "dims": [
+        "num_heads",
+        "num_kv_heads",
+        "q_tokens",
+        "past_tokens",
+        "cache_capacity",
+        "head_dim",
+        "aligned_head_dim",
+        "sliding_window"
+      ],
+      "params": [
+        {
+          "name": "reduction",
+          "dtype": "ck_attention_reduction_t"
+        }
+      ],
+      "impl": {
+        "function": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_sliding_gemma4_workspace",
+        "c_declaration": "ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_f16cache_sliding_gemma4_workspace(const float *q, const uint16_t *k_cache, const uint16_t *v_cache, float *output, int num_heads, int num_kv_heads, int q_tokens, int past_tokens, int cache_capacity, int head_dim, int aligned_head_dim, int sliding_window, ck_attention_reduction_t reduction, float *token_workspace, size_t token_workspace_bytes);",
+        "sources": [
+          "src/kernels/attention_kernels.c"
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_direct_layout_attention.py"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "q",
+            "source": "scratch:q_scratch",
+            "cast": "const float*",
+            "ports": [
+              "input:q"
+            ]
+          },
+          {
+            "name": "k_cache",
+            "source": "runtime:kv_cache_k_layer_f16",
+            "cast": "const uint16_t*",
+            "ports": [
+              "input:k_cache"
+            ]
+          },
+          {
+            "name": "v_cache",
+            "source": "runtime:kv_cache_v_layer_f16",
+            "cast": "const uint16_t*",
+            "ports": [
+              "input:v_cache"
+            ]
+          },
+          {
+            "name": "output",
+            "source": "output:out",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "num_heads",
+            "source": "dim:num_heads"
+          },
+          {
+            "name": "num_kv_heads",
+            "source": "dim:num_kv_heads"
+          },
+          {
+            "name": "q_tokens",
+            "source": "dim:seq_len"
+          },
+          {
+            "name": "past_tokens",
+            "source": "runtime:prefill_start_pos"
+          },
+          {
+            "name": "cache_capacity",
+            "source": "dim:max_seq_len"
+          },
+          {
+            "name": "head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "aligned_head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "sliding_window",
+            "source": "dim:sliding_window"
+          },
+          {
+            "name": "reduction",
+            "source": "const:CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE"
+          },
+          {
+            "name": "token_workspace",
+            "source": "scratch:token_workspace",
+            "cast": "float*"
+          },
+          {
+            "name": "token_workspace_bytes",
+            "source": "scratch_size:token_workspace"
+          }
+        ]
+      },
+      "name": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_sliding_gemma4",
+      "_source_file": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_sliding_gemma4.json"
     },
     {
       "id": "attention_forward_causal_head_major_gqa_prefill_full_bf16cache_pytorch_contract",
@@ -5630,6 +6117,429 @@
       },
       "name": "attention_forward_decode_head_major_gqa_bf16cache_pytorch_contract",
       "_source_file": "attention_forward_decode_head_major_gqa_bf16cache_pytorch_contract.json"
+    },
+    {
+      "id": "attention_forward_decode_head_major_gqa_f16cache_gemma4_contract",
+      "op": "attention",
+      "variant": "gemma4_decode_f16cache_noscale",
+      "mode": "decode",
+      "contract_schema_version": 1,
+      "provides": {
+        "execution.phase": [
+          "decode"
+        ],
+        "tensor.q.dtype": [
+          "fp32"
+        ],
+        "tensor.kv.dtype": [
+          "fp16"
+        ],
+        "tensor.layout": [
+          "head_major"
+        ],
+        "numerics.attention_reduction": [
+          "f16_online_single_range_noscale"
+        ]
+      },
+      "supported_reductions": {
+        "f16_online_single_range_noscale": {
+          "status": "validated",
+          "function": "attention_forward_decode_head_major_gqa_f16cache_gemma4_contract",
+          "explicit_selector": true,
+          "selector": "CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE",
+          "notes": "Gemma4 unit-scale decode over an FP16 persistent cache."
+        }
+      },
+      "numerical_capabilities": {
+        "input_dtype": "fp32_q_fp16_kv",
+        "accumulation_dtype": "fp32_scores_fp16_value_updates",
+        "reduction_order": "f16_online_single_range_noscale",
+        "output_dtype": "fp32"
+      },
+      "operation_interface": "attention.causal_gqa.f16cache.noscale.decode.v1",
+      "selection": {
+        "status": "production",
+        "priority": 330,
+        "equivalence_group": "attention.gemma4.f16_noscale.full.v1",
+        "phases": [
+          "decode"
+        ]
+      },
+      "implementation": {
+        "isa_dispatch": "runtime",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": [
+            "serial"
+          ],
+          "dispatch": [
+            "inline"
+          ],
+          "reduction_order_effect": "contract_defined"
+        }
+      },
+      "inputs": [
+        {
+          "name": "q_token",
+          "dtype": "fp32",
+          "shape": [
+            "num_heads",
+            "head_dim"
+          ],
+          "layout": "head_major_contiguous",
+          "access": "read",
+          "storage_class": "scratch",
+          "consumption": "required"
+        },
+        {
+          "name": "k_cache",
+          "dtype": "fp16",
+          "shape": [
+            "num_kv_heads",
+            "cache_capacity",
+            "head_dim"
+          ],
+          "layout": "head_major_contiguous",
+          "access": "read",
+          "storage_class": "state",
+          "consumption": "required"
+        },
+        {
+          "name": "v_cache",
+          "dtype": "fp16",
+          "shape": [
+            "num_kv_heads",
+            "cache_capacity",
+            "head_dim"
+          ],
+          "layout": "head_major_contiguous",
+          "access": "read",
+          "storage_class": "state",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "out_token",
+          "dtype": "fp32",
+          "shape": [
+            "num_heads",
+            "head_dim"
+          ],
+          "layout": "head_major_contiguous",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "dims": [
+        "num_heads",
+        "num_kv_heads",
+        "kv_tokens",
+        "cache_capacity",
+        "head_dim",
+        "aligned_head_dim"
+      ],
+      "params": [
+        {
+          "name": "reduction",
+          "dtype": "ck_attention_reduction_t"
+        }
+      ],
+      "impl": {
+        "function": "attention_forward_decode_head_major_gqa_f16cache_gemma4_contract",
+        "c_declaration": "ck_attention_status_t attention_forward_decode_head_major_gqa_f16cache_gemma4_contract(const float *q_token, const uint16_t *k_cache, const uint16_t *v_cache, float *out_token, int num_heads, int num_kv_heads, int kv_tokens, int cache_capacity, int head_dim, int aligned_head_dim, ck_attention_reduction_t reduction);",
+        "sources": [
+          "src/kernels/attention_kernels.c"
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_direct_layout_attention.py"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "q_token",
+            "source": "scratch:q_scratch",
+            "cast": "const float*",
+            "ports": [
+              "input:q_token"
+            ]
+          },
+          {
+            "name": "k_cache",
+            "source": "runtime:kv_cache_k_layer_f16",
+            "cast": "const uint16_t*",
+            "ports": [
+              "input:k_cache"
+            ]
+          },
+          {
+            "name": "v_cache",
+            "source": "runtime:kv_cache_v_layer_f16",
+            "cast": "const uint16_t*",
+            "ports": [
+              "input:v_cache"
+            ]
+          },
+          {
+            "name": "out_token",
+            "source": "output:out",
+            "cast": "float*",
+            "ports": [
+              "output:out_token"
+            ]
+          },
+          {
+            "name": "num_heads",
+            "source": "dim:num_heads"
+          },
+          {
+            "name": "num_kv_heads",
+            "source": "dim:num_kv_heads"
+          },
+          {
+            "name": "kv_tokens",
+            "source": "runtime:kv_tokens"
+          },
+          {
+            "name": "cache_capacity",
+            "source": "dim:max_seq_len"
+          },
+          {
+            "name": "head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "aligned_head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "reduction",
+            "source": "const:CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE"
+          }
+        ]
+      },
+      "name": "attention_forward_decode_head_major_gqa_f16cache_gemma4_contract",
+      "_source_file": "attention_forward_decode_head_major_gqa_f16cache_gemma4_contract.json"
+    },
+    {
+      "id": "attention_forward_decode_head_major_gqa_f16cache_sliding_gemma4_contract",
+      "op": "attention_sliding",
+      "variant": "gemma4_decode_f16cache_sliding_noscale",
+      "mode": "decode",
+      "contract_schema_version": 1,
+      "provides": {
+        "execution.phase": [
+          "decode"
+        ],
+        "tensor.q.dtype": [
+          "fp32"
+        ],
+        "tensor.kv.dtype": [
+          "fp16"
+        ],
+        "tensor.layout": [
+          "head_major"
+        ],
+        "numerics.attention_reduction": [
+          "f16_online_single_range_noscale"
+        ]
+      },
+      "supported_reductions": {
+        "f16_online_single_range_noscale": {
+          "status": "validated",
+          "function": "attention_forward_decode_head_major_gqa_f16cache_sliding_gemma4_contract",
+          "explicit_selector": true,
+          "selector": "CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE",
+          "notes": "Gemma4 unit-scale decode over the declared sliding range of an FP16 persistent cache."
+        }
+      },
+      "numerical_capabilities": {
+        "input_dtype": "fp32_q_fp16_kv",
+        "accumulation_dtype": "fp32_scores_fp16_value_updates",
+        "reduction_order": "f16_online_single_range_noscale",
+        "output_dtype": "fp32"
+      },
+      "operation_interface": "attention.causal_gqa.f16cache.noscale.sliding.decode.v1",
+      "selection": {
+        "status": "production",
+        "priority": 330,
+        "equivalence_group": "attention.gemma4.f16_noscale.sliding.v1",
+        "phases": [
+          "decode"
+        ]
+      },
+      "implementation": {
+        "isa_dispatch": "runtime",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": [
+            "serial"
+          ],
+          "dispatch": [
+            "inline"
+          ],
+          "reduction_order_effect": "contract_defined"
+        }
+      },
+      "inputs": [
+        {
+          "name": "q_token",
+          "dtype": "fp32",
+          "shape": [
+            "num_heads",
+            "head_dim"
+          ],
+          "layout": "head_major_contiguous",
+          "access": "read",
+          "storage_class": "scratch",
+          "consumption": "required"
+        },
+        {
+          "name": "k_cache",
+          "dtype": "fp16",
+          "shape": [
+            "num_kv_heads",
+            "cache_capacity",
+            "head_dim"
+          ],
+          "layout": "head_major_contiguous",
+          "access": "read",
+          "storage_class": "state",
+          "consumption": "required"
+        },
+        {
+          "name": "v_cache",
+          "dtype": "fp16",
+          "shape": [
+            "num_kv_heads",
+            "cache_capacity",
+            "head_dim"
+          ],
+          "layout": "head_major_contiguous",
+          "access": "read",
+          "storage_class": "state",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "out_token",
+          "dtype": "fp32",
+          "shape": [
+            "num_heads",
+            "head_dim"
+          ],
+          "layout": "head_major_contiguous",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "dims": [
+        "num_heads",
+        "num_kv_heads",
+        "kv_tokens",
+        "cache_capacity",
+        "head_dim",
+        "aligned_head_dim",
+        "sliding_window"
+      ],
+      "params": [
+        {
+          "name": "reduction",
+          "dtype": "ck_attention_reduction_t"
+        }
+      ],
+      "impl": {
+        "function": "attention_forward_decode_head_major_gqa_f16cache_sliding_gemma4_contract",
+        "c_declaration": "ck_attention_status_t attention_forward_decode_head_major_gqa_f16cache_sliding_gemma4_contract(const float *q_token, const uint16_t *k_cache, const uint16_t *v_cache, float *out_token, int num_heads, int num_kv_heads, int kv_tokens, int cache_capacity, int head_dim, int aligned_head_dim, int sliding_window, ck_attention_reduction_t reduction);",
+        "sources": [
+          "src/kernels/attention_kernels.c"
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_direct_layout_attention.py"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "q_token",
+            "source": "scratch:q_scratch",
+            "cast": "const float*",
+            "ports": [
+              "input:q_token"
+            ]
+          },
+          {
+            "name": "k_cache",
+            "source": "runtime:kv_cache_k_layer_f16",
+            "cast": "const uint16_t*",
+            "ports": [
+              "input:k_cache"
+            ]
+          },
+          {
+            "name": "v_cache",
+            "source": "runtime:kv_cache_v_layer_f16",
+            "cast": "const uint16_t*",
+            "ports": [
+              "input:v_cache"
+            ]
+          },
+          {
+            "name": "out_token",
+            "source": "output:out",
+            "cast": "float*",
+            "ports": [
+              "output:out_token"
+            ]
+          },
+          {
+            "name": "num_heads",
+            "source": "dim:num_heads"
+          },
+          {
+            "name": "num_kv_heads",
+            "source": "dim:num_kv_heads"
+          },
+          {
+            "name": "kv_tokens",
+            "source": "runtime:kv_tokens"
+          },
+          {
+            "name": "cache_capacity",
+            "source": "dim:max_seq_len"
+          },
+          {
+            "name": "head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "aligned_head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "sliding_window",
+            "source": "dim:sliding_window"
+          },
+          {
+            "name": "reduction",
+            "source": "const:CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE"
+          }
+        ]
+      },
+      "name": "attention_forward_decode_head_major_gqa_f16cache_sliding_gemma4_contract",
+      "_source_file": "attention_forward_decode_head_major_gqa_f16cache_sliding_gemma4_contract.json"
     },
     {
       "id": "attention_forward_decode_head_major_gqa_flash_f16cache",
