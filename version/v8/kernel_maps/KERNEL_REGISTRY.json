@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 376,
+      "total": 377,
       "by_op": {
         "add_backward": 1,
         "add_stream": 2,
@@ -20,6 +20,7 @@
         "audio_batch_norm": 1,
         "audio_conv1d": 2,
         "audio_conv2d": 1,
+        "audio_fastconformer_subsampling": 1,
         "audio_feature_normalize": 1,
         "audio_feature_window": 1,
         "audio_glu": 1,
@@ -13099,6 +13100,453 @@
       },
       "name": "audio_conv2d_whc_grouped_f32",
       "_source_file": "audio_conv2d_whc_grouped_f32.json"
+    },
+    {
+      "id": "audio_fastconformer_subsampling_f32",
+      "op": "audio_fastconformer_subsampling",
+      "operation_interface": "audio_fastconformer_subsampling.three_stride2.fp32.v1",
+      "variant": "three_stride2_grouped_conv2d_relu_production_gemm_fp32",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "equivalence_group": "audio_fastconformer_subsampling_three_stride2_fp32",
+        "phases": [
+          "prefill",
+          "decode"
+        ]
+      },
+      "quant": {
+        "weight": "fp32",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "features",
+          "dtype": "fp32",
+          "shape": [
+            "feature_frames",
+            "feature_channels"
+          ],
+          "layout": "time_major_contiguous",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "conv0_weight",
+          "dtype": "fp32",
+          "shape": [
+            "conv_channels",
+            1,
+            3,
+            3
+          ],
+          "layout": "output_input_height_width_contiguous",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "conv0_bias",
+          "dtype": "fp32",
+          "shape": [
+            "conv_channels"
+          ],
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "depthwise1_weight",
+          "dtype": "fp32",
+          "shape": [
+            "conv_channels",
+            1,
+            3,
+            3
+          ],
+          "layout": "output_input_height_width_contiguous",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "depthwise1_bias",
+          "dtype": "fp32",
+          "shape": [
+            "conv_channels"
+          ],
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "pointwise1_weight",
+          "dtype": "fp32",
+          "shape": [
+            "conv_channels",
+            "conv_channels",
+            1,
+            1
+          ],
+          "layout": "output_input_height_width_contiguous",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "pointwise1_bias",
+          "dtype": "fp32",
+          "shape": [
+            "conv_channels"
+          ],
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "depthwise2_weight",
+          "dtype": "fp32",
+          "shape": [
+            "conv_channels",
+            1,
+            3,
+            3
+          ],
+          "layout": "output_input_height_width_contiguous",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "depthwise2_bias",
+          "dtype": "fp32",
+          "shape": [
+            "conv_channels"
+          ],
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "pointwise2_weight",
+          "dtype": "fp32",
+          "shape": [
+            "conv_channels",
+            "conv_channels",
+            1,
+            1
+          ],
+          "layout": "output_input_height_width_contiguous",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "pointwise2_bias",
+          "dtype": "fp32",
+          "shape": [
+            "conv_channels"
+          ],
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "linear_weight",
+          "dtype": "fp32",
+          "shape": [
+            "hidden_size",
+            "flattened_width"
+          ],
+          "layout": "output_input_contiguous",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "linear_bias",
+          "dtype": "fp32",
+          "shape": [
+            "hidden_size"
+          ],
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "output_frames",
+            "hidden_size"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "workspace",
+          "dtype": "fp32",
+          "shape": [
+            "workspace_elements"
+          ],
+          "size_bytes": "audio_subsampling_workspace_bytes",
+          "size_resolution": "required",
+          "lifetime": "kernel_call",
+          "alignment": 64,
+          "layout": "contiguous",
+          "access": "read_write",
+          "storage_class": "scratch",
+          "consumption": "required"
+        }
+      ],
+      "dims": [
+        "workspace_bytes",
+        "feature_frames",
+        "live_frames",
+        "feature_channels",
+        "conv_channels",
+        "hidden_size",
+        "kernel_size",
+        "stride",
+        "output_capacity_frames"
+      ],
+      "impl": {
+        "function": "audio_fastconformer_subsampling_f32",
+        "c_declaration": "int audio_fastconformer_subsampling_f32(const float *features, const float *conv0_weight, const float *conv0_bias, const float *depthwise1_weight, const float *depthwise1_bias, const float *pointwise1_weight, const float *pointwise1_bias, const float *depthwise2_weight, const float *depthwise2_bias, const float *pointwise2_weight, const float *pointwise2_bias, const float *linear_weight, const float *linear_bias, float *output, void *workspace, size_t workspace_bytes, int feature_frames, int live_frames, int feature_channels, int conv_channels, int hidden_size, int kernel_size, int stride, int output_capacity_frames, int *output_frames);",
+        "sources": [
+          "src/kernels/audio_kernels.c"
+        ]
+      },
+      "composition": [
+        {
+          "provider_id": "gemm_nt_f32_llama_production",
+          "role": "output_projection",
+          "function": "gemm_nt_f32_llama_production_parallel_dispatch"
+        }
+      ],
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "audio_fastconformer_subsampling_three_stride2_fp32",
+          "status": "validated",
+          "phases": [
+            "prefill",
+            "decode"
+          ],
+          "function": "audio_fastconformer_subsampling_f32",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "ck_threadpool",
+              "work_partition": [
+                "output_tiles"
+              ],
+              "dispatch": [
+                "internal_threaded"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp32",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "independent_outputs"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "features",
+            "source": "activation:features",
+            "cast": "const float*",
+            "ports": [
+              "input:features"
+            ]
+          },
+          {
+            "name": "conv0_weight",
+            "source": "weight:conv0_weight",
+            "cast": "const float*",
+            "ports": [
+              "weight:conv0_weight"
+            ]
+          },
+          {
+            "name": "conv0_bias",
+            "source": "weight:conv0_bias",
+            "cast": "const float*",
+            "ports": [
+              "weight:conv0_bias"
+            ]
+          },
+          {
+            "name": "depthwise1_weight",
+            "source": "weight:depthwise1_weight",
+            "cast": "const float*",
+            "ports": [
+              "weight:depthwise1_weight"
+            ]
+          },
+          {
+            "name": "depthwise1_bias",
+            "source": "weight:depthwise1_bias",
+            "cast": "const float*",
+            "ports": [
+              "weight:depthwise1_bias"
+            ]
+          },
+          {
+            "name": "pointwise1_weight",
+            "source": "weight:pointwise1_weight",
+            "cast": "const float*",
+            "ports": [
+              "weight:pointwise1_weight"
+            ]
+          },
+          {
+            "name": "pointwise1_bias",
+            "source": "weight:pointwise1_bias",
+            "cast": "const float*",
+            "ports": [
+              "weight:pointwise1_bias"
+            ]
+          },
+          {
+            "name": "depthwise2_weight",
+            "source": "weight:depthwise2_weight",
+            "cast": "const float*",
+            "ports": [
+              "weight:depthwise2_weight"
+            ]
+          },
+          {
+            "name": "depthwise2_bias",
+            "source": "weight:depthwise2_bias",
+            "cast": "const float*",
+            "ports": [
+              "weight:depthwise2_bias"
+            ]
+          },
+          {
+            "name": "pointwise2_weight",
+            "source": "weight:pointwise2_weight",
+            "cast": "const float*",
+            "ports": [
+              "weight:pointwise2_weight"
+            ]
+          },
+          {
+            "name": "pointwise2_bias",
+            "source": "weight:pointwise2_bias",
+            "cast": "const float*",
+            "ports": [
+              "weight:pointwise2_bias"
+            ]
+          },
+          {
+            "name": "linear_weight",
+            "source": "weight:linear_weight",
+            "cast": "const float*",
+            "ports": [
+              "weight:linear_weight"
+            ]
+          },
+          {
+            "name": "linear_bias",
+            "source": "weight:linear_bias",
+            "cast": "const float*",
+            "ports": [
+              "weight:linear_bias"
+            ]
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "workspace",
+            "source": "scratch:workspace",
+            "cast": "void*"
+          },
+          {
+            "name": "workspace_bytes",
+            "source": "scratch_size:workspace"
+          },
+          {
+            "name": "feature_frames",
+            "source": "dim:feature_frames"
+          },
+          {
+            "name": "live_frames",
+            "source": "dim:live_frames"
+          },
+          {
+            "name": "feature_channels",
+            "source": "dim:feature_channels"
+          },
+          {
+            "name": "conv_channels",
+            "source": "dim:conv_channels"
+          },
+          {
+            "name": "hidden_size",
+            "source": "dim:hidden_size"
+          },
+          {
+            "name": "kernel_size",
+            "source": "dim:kernel_size"
+          },
+          {
+            "name": "stride",
+            "source": "dim:stride"
+          },
+          {
+            "name": "output_capacity_frames",
+            "source": "dim:output_capacity_frames"
+          },
+          {
+            "name": "output_frames",
+            "source": "runtime:audio_subsampling_output_frames",
+            "cast": "int*"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_audio_encoder.py"
+        ]
+      },
+      "name": "audio_fastconformer_subsampling_f32",
+      "_source_file": "audio_fastconformer_subsampling_f32.json"
     },
     {
       "id": "audio_feature_normalize_per_feature_f32",

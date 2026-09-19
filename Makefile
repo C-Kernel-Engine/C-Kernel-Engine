@@ -1305,8 +1305,8 @@ $(LIB_RELU): $(BUILD_STAMP) src/kernels/relu_kernels.c src/kernels/relu_kernels_
 $(LIB_VISION): $(BUILD_STAMP) src/kernels/vision_kernels.c src/kernels/vision_kernels_bf16.c src/kernels/rope_kernels.c src/kernels/rope_kernels_bf16.c src/ckernel_strict.c src/ck_threadpool.c include/ckernel_engine.h
 	$(CC) $(CFLAGS) -shared -o $@ src/kernels/vision_kernels.c src/kernels/vision_kernels_bf16.c src/kernels/rope_kernels.c src/kernels/rope_kernels_bf16.c src/ckernel_strict.c src/ck_threadpool.c -lm -lpthread
 
-$(LIB_AUDIO): $(BUILD_STAMP) src/kernels/audio_kernels.c src/ckernel_strict.c src/ck_threadpool.c include/ckernel_audio.h
-	$(CC) $(CFLAGS) -shared -o $@ src/kernels/audio_kernels.c src/ckernel_strict.c src/ck_threadpool.c -lm -lpthread
+$(LIB_AUDIO): $(LIB) $(BUILD_STAMP) src/kernels/audio_kernels.c src/ckernel_strict.c src/ck_threadpool.c include/ckernel_audio.h
+	$(CC) $(CFLAGS) -shared -o $@ src/kernels/audio_kernels.c src/ckernel_strict.c src/ck_threadpool.c -L$(BUILD_DIR) -lckernel_engine -Wl,-rpath,'$$ORIGIN' -lm -lpthread
 
 $(LIB_ATTENTION): $(BUILD_STAMP) src/kernels/attention_kernels.c src/kernels/attention_kernels_sliding.c src/kernels/attention_flash_true.c src/kernels/softmax_kernels.c src/kernels/gemm_kernels_bf16.c src/ckernel_strict.c src/ck_threadpool.c include/ckernel_engine.h
 	$(CC) $(CFLAGS) -shared -o $@ src/kernels/attention_kernels.c src/kernels/attention_kernels_sliding.c src/kernels/attention_flash_true.c src/kernels/softmax_kernels.c src/kernels/gemm_kernels_bf16.c src/ckernel_strict.c src/ck_threadpool.c -lm -lpthread
@@ -1369,6 +1369,7 @@ test-audio-v8-contracts:
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_parakeet_inventory.py
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_parakeet_native.py
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_parakeet_generated_frontend.py
+	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_parakeet_generated_subsampling.py
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_safetensors_to_bump.py -k "whisper_encoder or whisper_decoder"
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_whisper_runner.py
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_whisper_long_audio_certification.py

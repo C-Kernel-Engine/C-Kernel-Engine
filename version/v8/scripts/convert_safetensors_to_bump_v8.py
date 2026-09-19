@@ -1625,6 +1625,12 @@ def _build_config(model_dir: Path, arch: str, config_template: Path | None) -> d
         subsampling_factor = int(encoder["subsampling_factor"])
         max_feature_frames = max_encoder_frames * subsampling_factor
         max_source_frames = (max_feature_frames - 1) * hop_length
+        conv_channels = int(encoder["subsampling_conv_channels"])
+        subsampling_kernel = int(encoder["subsampling_conv_kernel_size"])
+        subsampling_stride = int(encoder["subsampling_conv_stride"])
+        stage0_frames = (max_feature_frames + subsampling_stride - 1) // subsampling_stride
+        stage0_width = (int(encoder["num_mel_bins"]) + subsampling_stride - 1) // subsampling_stride
+        workspace_elements = 2 * conv_channels * stage0_frames * stage0_width
         cfg.update({
             "num_layers": int(encoder["num_hidden_layers"]),
             "num_hidden_layers": int(encoder["num_hidden_layers"]),
@@ -1653,6 +1659,13 @@ def _build_config(model_dir: Path, arch: str, config_template: Path | None) -> d
             "audio_power_bins": 257,
             "audio_feature_channels": int(encoder["num_mel_bins"]),
             "audio_feature_frames": max_feature_frames,
+            "audio_feature_live_frames": max_feature_frames - 1,
+            "audio_subsampling_conv_channels": conv_channels,
+            "audio_subsampling_kernel_size": subsampling_kernel,
+            "audio_subsampling_stride": subsampling_stride,
+            "audio_subsampling_output_frames": max_encoder_frames,
+            "audio_subsampling_workspace_elements": workspace_elements,
+            "audio_subsampling_workspace_bytes": workspace_elements * 4,
             "audio_preemphasis_coefficient": 0.97,
             "audio_log_epsilon": 2.0 ** -24,
             "audio_normalization_epsilon": 1.0e-5,

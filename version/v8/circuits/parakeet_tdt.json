@@ -58,6 +58,26 @@
           "pattern": "*",
           "reason": "frontend_component_has_no_model_weights",
           "when": {"config_key": "artifact_scope", "equals": "audio_frontend"}
+        },
+        {
+          "pattern": "encoder.layers.*",
+          "reason": "subsampling_component_excludes_encoder_blocks",
+          "when": {"config_key": "artifact_scope", "equals": "audio_subsampling"}
+        },
+        {
+          "pattern": "encoder_projector.*",
+          "reason": "subsampling_component_excludes_encoder_projection",
+          "when": {"config_key": "artifact_scope", "equals": "audio_subsampling"}
+        },
+        {
+          "pattern": "decoder.*",
+          "reason": "subsampling_component_excludes_transducer_decoder",
+          "when": {"config_key": "artifact_scope", "equals": "audio_subsampling"}
+        },
+        {
+          "pattern": "joint.*",
+          "reason": "subsampling_component_excludes_transducer_joint",
+          "when": {"config_key": "artifact_scope", "equals": "audio_subsampling"}
         }
       ]
     }
@@ -70,6 +90,7 @@
     "audio_mel_filters": "audio_whisper_mel_filters_slaney_f32",
     "audio_log_mel": "audio_log_mel_time_major_f32",
     "audio_feature_normalize": "audio_feature_normalize_per_feature_f32",
+    "audio_fastconformer_subsampling": "audio_fastconformer_subsampling_f32",
     "relative_position": "audio_relative_sinusoidal_position_f32",
     "relative_attention": "audio_conformer_relative_attention_f32",
     "grouped_conv1d": "audio_conv1d_channel_major_grouped_f32",
@@ -88,7 +109,8 @@
     "audio_power": {"shape": [{"config": "audio_feature_frames"}, {"config": "audio_power_bins"}]},
     "audio_mel_filters": {"shape": [{"config": "audio_feature_channels"}, {"config": "audio_power_bins"}]},
     "audio_features": {"shape": [{"config": "audio_feature_frames"}, {"config": "audio_feature_channels"}]},
-    "audio_features_normalized": {"shape": [{"config": "audio_feature_frames"}, {"config": "audio_feature_channels"}]}
+    "audio_features_normalized": {"shape": [{"config": "audio_feature_frames"}, {"config": "audio_feature_channels"}]},
+    "audio_encoder_tokens": {"shape": [{"config": "audio_subsampling_output_frames"}, {"config": "hidden_size"}]}
   },
   "activation_bindings": {
     "audio_samples": "audio_samples",
@@ -100,7 +122,8 @@
     "audio_power": "audio_power",
     "audio_mel_filters": "audio_mel_filters",
     "audio_features": "audio_features",
-    "audio_features_normalized": "audio_features_normalized"
+    "audio_features_normalized": "audio_features_normalized",
+    "audio_encoder_tokens": "audio_encoder_tokens"
   },
   "block_configs": {
     "frontend": {"artifact_scope": "audio_frontend"}
@@ -191,7 +214,44 @@
         }
       ]
     },
-    "encoder": {"sequence": ["subsampling", "relative_position", "fastconformer_blocks", "encoder_projection"]},
+    "encoder": {
+      "sequence": ["subsampling", "relative_position", "fastconformer_blocks", "encoder_projection"],
+      "subsampling": [
+        {
+          "id": "fastconformer_subsampling",
+          "op": "audio_fastconformer_subsampling",
+          "params": {
+            "workspace_bytes_from_config": "audio_subsampling_workspace_bytes",
+            "feature_frames_from_config": "audio_feature_frames",
+            "live_frames_from_config": "audio_feature_live_frames",
+            "feature_channels_from_config": "audio_feature_channels",
+            "conv_channels_from_config": "audio_subsampling_conv_channels",
+            "hidden_size_from_config": "hidden_size",
+            "kernel_size_from_config": "audio_subsampling_kernel_size",
+            "stride_from_config": "audio_subsampling_stride",
+            "output_capacity_frames_from_config": "audio_subsampling_output_frames"
+          },
+          "graph_slots": {
+            "inputs": {"features": "audio_features_normalized"},
+            "outputs": {"output": "audio_encoder_tokens"}
+          },
+          "weight_refs": {
+            "conv0_weight": "encoder.subsampling.layers.0.weight",
+            "conv0_bias": "encoder.subsampling.layers.0.bias",
+            "depthwise1_weight": "encoder.subsampling.layers.2.weight",
+            "depthwise1_bias": "encoder.subsampling.layers.2.bias",
+            "pointwise1_weight": "encoder.subsampling.layers.3.weight",
+            "pointwise1_bias": "encoder.subsampling.layers.3.bias",
+            "depthwise2_weight": "encoder.subsampling.layers.5.weight",
+            "depthwise2_bias": "encoder.subsampling.layers.5.bias",
+            "pointwise2_weight": "encoder.subsampling.layers.6.weight",
+            "pointwise2_bias": "encoder.subsampling.layers.6.bias",
+            "linear_weight": "encoder.subsampling.linear.weight",
+            "linear_bias": "encoder.subsampling.linear.bias"
+          }
+        }
+      ]
+    },
     "transducer": {"sequence": ["embedding_lookup", "lstm", "decoder_projection", "joint_relu", "joint_head", "tdt_greedy_step"]}
   }
 }
