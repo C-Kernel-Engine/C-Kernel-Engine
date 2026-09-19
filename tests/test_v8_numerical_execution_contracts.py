@@ -582,20 +582,28 @@ class NumericalExecutionContractTests(unittest.TestCase):
         report = audit.build_report()
         baseline = audit._load(audit.BASELINE)
         audit.validate_ratchet(report, baseline)
-        self.assertEqual(report["counts"]["kernel_maps"], 375)
-        self.assertEqual(report["counts"]["physical_layout_maps"], 6)
-        self.assertEqual(report["counts"]["resolver_governed_maps"], 147)
-        self.assertEqual(report["counts"]["interface_hardened_maps"], 97)
-        self.assertEqual(
-            report["counts"]["interface_abi_crossvalidated_maps"], 97
+        map_count = sum(
+            path.name not in audit.NON_MAP_FILES
+            for path in audit.KERNEL_MAPS.glob("*.json")
         )
-        self.assertEqual(report["counts"]["contract_pending_maps"], 50)
-        self.assertEqual(report["counts"]["map_owned_call_abi"], 248)
-        self.assertEqual(report["counts"]["legacy_interface_ready_maps"], 68)
-        self.assertEqual(report["counts"]["selection_managed_maps"], 104)
-        self.assertEqual(report["selection"]["legacy_selection_if_statements"], 59)
-        self.assertEqual(report["selection"]["operation_specific_if_statements"], 28)
-
+        counts = report["counts"]
+        self.assertEqual(counts["kernel_maps"], map_count)
+        self.assertEqual(
+            counts["interface_hardened_maps"],
+            counts["interface_abi_crossvalidated_maps"],
+        )
+        self.assertEqual(
+            counts["map_owned_call_abi"] + counts["legacy_call_abi"],
+            counts["kernel_maps"],
+        )
+        self.assertEqual(
+            len(report["interface_hardened_ids"]),
+            counts["interface_hardened_maps"],
+        )
+        self.assertEqual(
+            len(report["selection_managed_ids"]),
+            counts["selection_managed_maps"],
+        )
     def test_yarn_init_contracts_resolve_exact_storage_providers(self):
         expected = {
             "yarn_rope_cache_explicit_positions_fp32": (

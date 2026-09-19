@@ -571,6 +571,108 @@ class AudioEncoderContractTests(unittest.TestCase):
         self.assertIn("missing contract section: tokenizer_contract", decoder_issues)
         self.assertIn("missing contract section: quant_contract", decoder_issues)
 
+    def test_audio_frontend_codegen_contract_is_capability_scoped_and_fail_closed(self):
+        config = {
+            "artifact_scope": "audio_frontend",
+            "contract": {
+                "audio_frontend": {
+                    "input_modality": "wav_bytes",
+                    "sample_encoding": "pcm_s16_le",
+                    "sample_rate": 16000,
+                    "n_fft": 512,
+                    "hop_length": 160,
+                    "output": "normalized_log_mel",
+                }
+            },
+        }
+        self.assertEqual(codegen_core._validate_codegen_contract(config), [])
+
+        missing_output = copy.deepcopy(config)
+        del missing_output["contract"]["audio_frontend"]["output"]
+        self.assertEqual(
+            codegen_core._validate_codegen_contract(missing_output),
+            ["missing contract field: audio_frontend.output"],
+        )
+
+    def test_parakeet_frontend_detection_requires_the_complete_operation_set(self):
+        operations = set(codegen._NORMALIZED_LOG_MEL_FRONTEND_OPS)
+        self.assertTrue(codegen._has_audio_frontend(operations))
+        for operation in sorted(operations):
+            with self.subTest(missing=operation):
+                self.assertFalse(codegen._has_audio_frontend(operations - {operation}))
+
+    def test_generated_parakeet_frontend_uses_runtime_extents(self):
+        def call(operation, function, *sources):
+            return {
+                "op": operation,
+                "function": function,
+                "args": [
+                    {"name": f"arg_{index}", "source": source, "expr": source.replace(":", "_")}
+                    for index, source in enumerate(sources)
+                ],
+            }
+
+        operations = [
+            call("audio_wav_decode", "decode", "runtime:audio_wav_bytes"),
+            call("audio_preemphasis", "preemphasis", "dim:frames"),
+            call("audio_hann_window", "hann", "dim:window_length"),
+            call("audio_stft_tables", "tables", "dim:n_fft"),
+            call("audio_stft", "stft", "dim:n_samples", "dim:n_frames"),
+            call("audio_mel_filters", "mel_filters", "dim:n_mels"),
+            call("audio_log_mel", "log_mel", "dim:frames"),
+            call(
+                "audio_feature_normalize",
+                "normalize",
+                "dim:frames",
+                "output:output",
+            ),
+        ]
+        generated = codegen._emit_audio_wav_entrypoint(
+            operations,
+            {
+                "audio_sample_rate": 16000,
+                "audio_max_source_frames": 32000,
+                "audio_hop_length": 160,
+                "audio_feature_channels": 128,
+            },
+        )
+        self.assertIn("const int required_frames = audio_wav_info->frames / 160 + 1;", generated)
+        self.assertIn("preemphasis(audio_source_frames)", generated)
+        self.assertIn("stft(audio_source_frames, required_frames)", generated)
+        self.assertIn("log_mel(required_frames)", generated)
+        self.assertIn("normalize(live_frames, audio_features)", generated)
+        self.assertIn("audio_wav_info->channels != 1", generated)
+        self.assertIn("audio_wav_info->bits_per_sample != 16", generated)
+
+    def test_runtime_generated_frontend_tables_are_activation_inputs(self):
+        stft = resolver.load_json(
+            V8 / "kernel_maps" / "audio_stft_power_centered_window_f32.json"
+        )
+        log_mel = resolver.load_json(
+            V8 / "kernel_maps" / "audio_log_mel_time_major_f32.json"
+        )
+        self.assertEqual(stft["weights"], [])
+        self.assertEqual(log_mel["weights"], [])
+        self.assertEqual(
+            {row["name"]: row["storage_class"] for row in stft["inputs"]},
+            {
+                "samples": "activation",
+                "window": "activation",
+                "cos_table": "activation",
+                "sin_table": "activation",
+            },
+        )
+        self.assertEqual(
+            {row["name"]: row["storage_class"] for row in log_mel["inputs"]},
+            {"power": "activation", "mel_filters": "activation"},
+        )
+        stft_sources = {row["name"]: row["source"] for row in stft["call_abi"]["params"]}
+        mel_sources = {row["name"]: row["source"] for row in log_mel["call_abi"]["params"]}
+        self.assertEqual(stft_sources["window"], "activation:window")
+        self.assertEqual(stft_sources["cos_table"], "activation:cos_table")
+        self.assertEqual(stft_sources["sin_table"], "activation:sin_table")
+        self.assertEqual(mel_sources["mel_filters"], "activation:mel_filters")
+
     def test_audio_encoder_geometry_mismatch_is_a_hard_failure(self):
         manifest = _make_audio_encoder_manifest()
         manifest["config"]["context_length"] = 5

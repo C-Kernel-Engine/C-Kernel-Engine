@@ -1776,6 +1776,14 @@ OP_DATAFLOW = {
         "inputs": {"input": "audio_resampled"},
         "outputs": {"output": {"slot": "audio_normalized", "dtype": "fp32"}},
     },
+    "audio_hann_window": {
+        "inputs": {},
+        "outputs": {"window": {"slot": "audio_window", "dtype": "fp32"}},
+    },
+    "audio_preemphasis": {
+        "inputs": {"input": "audio_samples"},
+        "outputs": {"output": {"slot": "audio_preemphasized", "dtype": "fp32"}},
+    },
     "audio_stft_tables": {
         "inputs": {},
         "outputs": {
@@ -1805,6 +1813,10 @@ OP_DATAFLOW = {
             "mel_filters": "audio_mel_filters",
         },
         "outputs": {"log_mel": {"slot": "audio_features", "dtype": "fp32"}},
+    },
+    "audio_feature_normalize": {
+        "inputs": {"input": "audio_features"},
+        "outputs": {"output": {"slot": "audio_features_normalized", "dtype": "fp32"}},
     },
     "audio_feature_window": {
         "inputs": {
@@ -3531,6 +3543,8 @@ def _audio_activation_specs(
     seq_len: int,
     embed_dim: int,
 ) -> List[Tuple[str, int, str]]:
+    if str(config.get("audio_activation_profile", "") or "") == "circuit_declared":
+        return []
     feature_frames = int(config.get("audio_feature_frames", 0) or 0)
     feature_channels = int(config.get("audio_feature_channels", 0) or 0)
     if feature_frames <= 0 or feature_channels <= 0:
@@ -4203,10 +4217,13 @@ TEMPLATE_TO_KERNEL_OP = {
     "audio_pcm_decode": "audio_pcm_decode",
     "audio_resample": "audio_resample",
     "audio_pad_or_truncate": "audio_pad_or_truncate",
+    "audio_hann_window": "audio_hann_window",
+    "audio_preemphasis": "audio_preemphasis",
     "audio_stft_tables": "audio_stft_tables",
     "audio_stft": "audio_stft",
     "audio_mel_filters": "audio_mel_filters",
     "audio_log_mel": "audio_log_mel",
+    "audio_feature_normalize": "audio_feature_normalize",
     "audio_feature_window": "audio_feature_window",
     "audio_conv1d_stem_1": "audio_conv1d",
     "audio_conv1d_stem_2": "audio_conv1d",
@@ -8749,10 +8766,13 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
         "audio_pcm_decode": None,
         "audio_resample": None,
         "audio_pad_or_truncate": None,
+        "audio_hann_window": None,
+        "audio_preemphasis": None,
         "audio_stft_tables": None,
         "audio_stft": None,
         "audio_mel_filters": None,
         "audio_log_mel": None,
+        "audio_feature_normalize": None,
         "audio_feature_window": None,
         "audio_conv1d_stem_1": ["audio_conv1_weight", "audio_conv1_bias"],
         "audio_conv1d_stem_2": ["audio_conv2_weight", "audio_conv2_bias"],
@@ -11867,10 +11887,13 @@ TEMPLATE_OP_WEIGHTS = {
     "audio_pcm_decode": [],
     "audio_resample": [],
     "audio_pad_or_truncate": [],
+    "audio_hann_window": [],
+    "audio_preemphasis": [],
     "audio_stft_tables": [],
     "audio_stft": [],
     "audio_mel_filters": [],
     "audio_log_mel": [],
+    "audio_feature_normalize": [],
     "audio_feature_window": [],
     "audio_conv1d_stem_1": ["audio_conv1_weight", "audio_conv1_bias"],
     "audio_conv1d_stem_2": ["audio_conv2_weight", "audio_conv2_bias"],

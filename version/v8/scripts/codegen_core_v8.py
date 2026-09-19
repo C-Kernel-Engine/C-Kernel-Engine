@@ -680,6 +680,17 @@ ENCODER_CODEGEN_REQUIRED_CONTRACT_FIELDS: dict[str, tuple[str, ...]] = {
     "block_contract": ("norm_type", "mlp_formula", "activation"),
 }
 
+AUDIO_FRONTEND_CODEGEN_REQUIRED_CONTRACT_FIELDS: dict[str, tuple[str, ...]] = {
+    "audio_frontend": (
+        "input_modality",
+        "sample_encoding",
+        "sample_rate",
+        "n_fft",
+        "hop_length",
+        "output",
+    ),
+}
+
 
 def _validate_codegen_contract(config: Dict) -> list[str]:
     issues: list[str] = []
@@ -687,11 +698,12 @@ def _validate_codegen_contract(config: Dict) -> list[str]:
     if not isinstance(contract, dict):
         return ["missing config.contract object in lowered IR"]
     artifact_scope = str(config.get("artifact_scope") or "").strip().lower()
-    required = (
-        ENCODER_CODEGEN_REQUIRED_CONTRACT_FIELDS
-        if artifact_scope == "encoder_only"
-        else CODEGEN_REQUIRED_CONTRACT_FIELDS
-    )
+    if artifact_scope == "audio_frontend":
+        required = AUDIO_FRONTEND_CODEGEN_REQUIRED_CONTRACT_FIELDS
+    elif artifact_scope == "encoder_only":
+        required = ENCODER_CODEGEN_REQUIRED_CONTRACT_FIELDS
+    else:
+        required = CODEGEN_REQUIRED_CONTRACT_FIELDS
     for section, fields in required.items():
         sec = contract.get(section)
         if not isinstance(sec, dict):

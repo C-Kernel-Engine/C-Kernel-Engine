@@ -300,6 +300,22 @@ int audio_pad_or_truncate_f32(
     return copied;
 }
 
+int audio_hann_window_f32(float *output, int frames, int periodic)
+{
+    if (output == NULL) {
+        return -1;
+    }
+    if (frames <= 1 || (periodic != 0 && periodic != 1)) {
+        return -2;
+    }
+    const double denominator = (double)(periodic ? frames : frames - 1);
+    for (int frame = 0; frame < frames; ++frame) {
+        const double phase = 2.0 * CK_AUDIO_PI_D * (double)frame / denominator;
+        output[frame] = (float)(0.5 - 0.5 * cos(phase));
+    }
+    return 0;
+}
+
 int audio_preemphasis_f32(
     const float *input,
     float *output,

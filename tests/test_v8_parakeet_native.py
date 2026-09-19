@@ -88,6 +88,13 @@ def test_complete_checkpoint_mapping_has_no_silent_leftovers() -> None:
 def test_circuit_binds_new_native_providers_and_declares_memory_ownership() -> None:
     circuit = load(ROOT / "version/v8/circuits/parakeet_tdt.json")
     assert circuit["kernels"] == {
+        "audio_hann_window": "audio_hann_window_f32",
+        "audio_preemphasis": "audio_preemphasis_f32",
+        "audio_stft_tables": "audio_stft_precompute_tables_f32",
+        "audio_stft": "audio_stft_power_centered_window_f32",
+        "audio_mel_filters": "audio_whisper_mel_filters_slaney_f32",
+        "audio_log_mel": "audio_log_mel_time_major_f32",
+        "audio_feature_normalize": "audio_feature_normalize_per_feature_f32",
         "relative_position": "audio_relative_sinusoidal_position_f32",
         "relative_attention": "audio_conformer_relative_attention_f32",
         "grouped_conv1d": "audio_conv1d_channel_major_grouped_f32",
@@ -99,6 +106,30 @@ def test_circuit_binds_new_native_providers_and_declares_memory_ownership() -> N
     invariants = circuit["contract"]["runtime_invariants"]
     assert invariants["weight_container"] == "BUMPWGT5"
     assert invariants["production_kernel_heap_allocation"] is False
+
+
+def test_frontend_is_an_executable_compiler_component() -> None:
+    circuit = load(ROOT / "version/v8/circuits/parakeet_tdt.json")
+    frontend = circuit["block_types"]["frontend"]
+    assert frontend["sequence"] == ["header"]
+    assert [item["op"] for item in frontend["header"]] == [
+        "audio_wav_decode",
+        "audio_preemphasis",
+        "audio_hann_window",
+        "audio_stft_tables",
+        "audio_stft",
+        "audio_mel_filters",
+        "audio_log_mel",
+        "audio_feature_normalize",
+    ]
+    assert circuit["block_configs"]["frontend"]["artifact_scope"] == "audio_frontend"
+    assert circuit["contract"]["weight_policy"]["ignore"] == [
+        {
+            "pattern": "*",
+            "reason": "frontend_component_has_no_model_weights",
+            "when": {"config_key": "artifact_scope", "equals": "audio_frontend"},
+        }
+    ]
 
 
 def test_normal_inference_runner_has_no_reference_framework_import() -> None:

@@ -1,0 +1,44 @@
+{
+  "id": "audio_hann_window_f32",
+  "op": "audio_hann_window",
+  "operation_interface": "audio_hann_window.fp64_cosine.fp32_storage.v1",
+  "variant": "explicit_periodicity_fp64_cosine_fp32_storage",
+  "quant": {"weight": "none", "activation": "none", "output": "fp32"},
+  "inputs": [],
+  "weights": [],
+  "outputs": [
+    {"name": "window", "dtype": "fp32", "shape": ["N_frames"], "layout": "contiguous", "access": "write", "storage_class": "activation", "consumption": "required"}
+  ],
+  "scratch": [],
+  "dims": ["frames", "periodic"],
+  "impl": {
+    "function": "audio_hann_window_f32",
+    "c_declaration": "int audio_hann_window_f32(float *output, int frames, int periodic);",
+    "sources": ["src/kernels/audio_kernels.c"]
+  },
+  "modes": {"inference": true, "training": false, "backward": false},
+  "numerical_capabilities": [{
+    "contract_id": "audio_hann_window_fp64_cosine_fp32_storage",
+    "status": "validated",
+    "phases": ["prefill"],
+    "function": "audio_hann_window_f32",
+    "explicit_selector": true,
+    "implementation": {
+      "isa_dispatch": "scalar",
+      "threading": {"runtime": "serial", "work_partition": ["serial"], "dispatch": ["inline"], "reduction_order_effect": "none"}
+    },
+    "arithmetic": {
+      "partial_accumulator": "none",
+      "merge_order": "none",
+      "deterministic": true,
+      "thread_count_changes_arithmetic_order": false,
+      "split_strategy": "independent_outputs"
+    }
+  }],
+  "call_abi": {"version": 1, "params": [
+    {"name": "output", "source": "output:window", "cast": "float*", "ports": ["output:window"]},
+    {"name": "frames", "source": "dim:frames"},
+    {"name": "periodic", "source": "dim:periodic"}
+  ]},
+  "tests": {"unit": ["unittest/test_audio_encoder.py"]}
+}
