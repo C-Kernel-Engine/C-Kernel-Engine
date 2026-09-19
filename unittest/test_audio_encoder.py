@@ -170,6 +170,8 @@ lib.audio_preemphasis_f32.argtypes = [
     _FLOAT_P, _FLOAT_P, ctypes.c_int, ctypes.c_float,
 ]
 lib.audio_preemphasis_f32.restype = ctypes.c_int
+lib.audio_hann_window_f32.argtypes = [_FLOAT_P, ctypes.c_int, ctypes.c_int]
+lib.audio_hann_window_f32.restype = ctypes.c_int
 lib.audio_feature_normalize_per_feature_f32.argtypes = [
     _FLOAT_P, _FLOAT_P, ctypes.c_int, ctypes.c_int, ctypes.c_float,
 ]
@@ -385,6 +387,31 @@ def check_preemphasis() -> None:
     ) == 0
     assert np.array_equal(inplace, expected)
     print("audio_preemphasis max_diff=0 tol=0 [PASS]")
+
+
+def check_hann_window() -> None:
+    for frames, periodic in ((10, 0), (11, 1)):
+        denominator = frames if periodic else frames - 1
+        expected = np.asarray(
+            [
+                0.5 - 0.5 * math.cos(2.0 * math.pi * frame / denominator)
+                for frame in range(frames)
+            ],
+            dtype=np.float32,
+        )
+        actual = np.empty(frames, dtype=np.float32)
+        assert lib.audio_hann_window_f32(
+            _fptr(actual), frames, periodic,
+        ) == 0
+        assert np.array_equal(actual, expected)
+
+    guard = np.array([17.0, 19.0, 23.0], dtype=np.float32)
+    before = guard.copy()
+    assert lib.audio_hann_window_f32(_fptr(guard), 1, 0) != 0
+    assert np.array_equal(guard, before)
+    assert lib.audio_hann_window_f32(_fptr(guard), 3, 2) != 0
+    assert np.array_equal(guard, before)
+    print("audio_hann_window max_diff=0 tol=0 [PASS]")
 
 
 def check_per_feature_normalization() -> None:
@@ -1176,6 +1203,7 @@ def main() -> None:
     check_wav_pcm16()
     check_pcm()
     check_pad_or_truncate()
+    check_hann_window()
     check_preemphasis()
     check_relative_sinusoidal_position()
     check_batch_norm_inference()
@@ -1200,7 +1228,7 @@ def main() -> None:
     _check_cross_attention("audio_cross_attention_unequal_small", 3, 5, 17, 8)
     _check_cross_attention("audio_cross_attention_whisper_decode", 6, 1, 1500, 64)
     check_tiled_f16kv_encoder_attention()
-    print("ALL TESTS PASSED (29/29)")
+    print("ALL TESTS PASSED (30/30)")
 
 
 if __name__ == "__main__":

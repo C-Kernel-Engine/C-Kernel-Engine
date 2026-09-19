@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "name": "parakeet_tdt",
   "family": "audio_transducer",
   "flags": {
@@ -25,7 +25,8 @@
       "mel_bins": 128,
       "mel_scale": "slaney",
       "log_zero_guard": 5.960464477539063e-8,
-      "normalization": "per_feature_sample_variance_live_frames"
+      "normalization": "per_feature_sample_variance_live_frames",
+      "output": "normalized_log_mel"
     },
     "audio_encoder": {
       "stem": "three_stride2_grouped_conv2d_subsampling",
@@ -50,9 +51,25 @@
       "production_kernel_heap_allocation": false,
       "attention_scratch": "one_fp32_score_row_per_head",
       "lstm_scratch": "four_hidden_width_fp32_gates"
+    },
+    "weight_policy": {
+      "ignore": [
+        {
+          "pattern": "*",
+          "reason": "frontend_component_has_no_model_weights",
+          "when": {"config_key": "artifact_scope", "equals": "audio_frontend"}
+        }
+      ]
     }
   },
   "kernels": {
+    "audio_hann_window": "audio_hann_window_f32",
+    "audio_preemphasis": "audio_preemphasis_f32",
+    "audio_stft_tables": "audio_stft_precompute_tables_f32",
+    "audio_stft": "audio_stft_power_centered_window_f32",
+    "audio_mel_filters": "audio_whisper_mel_filters_slaney_f32",
+    "audio_log_mel": "audio_log_mel_time_major_f32",
+    "audio_feature_normalize": "audio_feature_normalize_per_feature_f32",
     "relative_position": "audio_relative_sinusoidal_position_f32",
     "relative_attention": "audio_conformer_relative_attention_f32",
     "grouped_conv1d": "audio_conv1d_channel_major_grouped_f32",
@@ -61,9 +78,119 @@
     "scaled_residual_add": "audio_scaled_residual_add_f32",
     "argmax": "audio_argmax_first_f32"
   },
+  "activation_buffers": {
+    "audio_samples": {"shape": [{"config": "audio_max_source_frames"}]},
+    "audio_preemphasized": {"shape": [{"config": "audio_max_source_frames"}]},
+    "audio_table_window": {"shape": [{"config": "audio_n_fft"}]},
+    "audio_window": {"shape": [{"config": "audio_window_length"}]},
+    "audio_cos_table": {"shape": [{"config": "audio_power_bins"}, {"config": "audio_n_fft"}]},
+    "audio_sin_table": {"shape": [{"config": "audio_power_bins"}, {"config": "audio_n_fft"}]},
+    "audio_power": {"shape": [{"config": "audio_feature_frames"}, {"config": "audio_power_bins"}]},
+    "audio_mel_filters": {"shape": [{"config": "audio_feature_channels"}, {"config": "audio_power_bins"}]},
+    "audio_features": {"shape": [{"config": "audio_feature_frames"}, {"config": "audio_feature_channels"}]},
+    "audio_features_normalized": {"shape": [{"config": "audio_feature_frames"}, {"config": "audio_feature_channels"}]}
+  },
+  "activation_bindings": {
+    "audio_samples": "audio_samples",
+    "audio_preemphasized": "audio_preemphasized",
+    "audio_table_window": "audio_table_window",
+    "audio_window": "audio_window",
+    "audio_cos_table": "audio_cos_table",
+    "audio_sin_table": "audio_sin_table",
+    "audio_power": "audio_power",
+    "audio_mel_filters": "audio_mel_filters",
+    "audio_features": "audio_features",
+    "audio_features_normalized": "audio_features_normalized"
+  },
+  "block_configs": {
+    "frontend": {"artifact_scope": "audio_frontend"}
+  },
   "sequence": ["frontend", "encoder", "transducer"],
   "block_types": {
-    "frontend": {"sequence": ["audio_wav_decode", "audio_preemphasis", "audio_stft_tables", "audio_stft", "audio_mel_filters", "audio_log_mel", "audio_feature_normalize"]},
+    "frontend": {
+      "sequence": ["header"],
+      "header": [
+        {
+          "id": "wav_decode",
+          "op": "audio_wav_decode",
+          "params": {"mono_capacity_from_config": "audio_max_source_frames"}
+        },
+        {
+          "id": "preemphasis",
+          "op": "audio_preemphasis",
+          "params": {
+            "frames_from_config": "audio_max_source_frames",
+            "preemphasis_coefficient_from_config": "audio_preemphasis_coefficient"
+          }
+        },
+        {
+          "id": "hann_window",
+          "op": "audio_hann_window",
+          "params": {"frames_from_config": "audio_window_length", "periodic": 0}
+        },
+        {
+          "id": "stft_tables",
+          "op": "audio_stft_tables",
+          "params": {"n_fft_from_config": "audio_n_fft"},
+          "graph_slots": {
+            "outputs": {
+              "window": "audio_table_window",
+              "cos_table": "audio_cos_table",
+              "sin_table": "audio_sin_table"
+            }
+          }
+        },
+        {
+          "id": "stft",
+          "op": "audio_stft",
+          "params": {
+            "n_samples_from_config": "audio_max_source_frames",
+            "window_length_from_config": "audio_window_length",
+            "n_fft_from_config": "audio_n_fft",
+            "hop_length_from_config": "audio_hop_length",
+            "reflect_padding": 0,
+            "n_frames_from_config": "audio_feature_frames"
+          },
+          "graph_slots": {
+            "inputs": {
+              "samples": "audio_preemphasized",
+              "window": "audio_window",
+              "cos_table": "audio_cos_table",
+              "sin_table": "audio_sin_table"
+            },
+            "outputs": {"power": "audio_power"}
+          }
+        },
+        {
+          "id": "mel_filters",
+          "op": "audio_mel_filters",
+          "params": {
+            "sample_rate_from_config": "audio_sample_rate",
+            "n_fft_from_config": "audio_n_fft",
+            "n_mels_from_config": "audio_feature_channels"
+          }
+        },
+        {
+          "id": "log_mel",
+          "op": "audio_log_mel",
+          "params": {
+            "frames_from_config": "audio_feature_frames",
+            "bins_from_config": "audio_power_bins",
+            "channels_from_config": "audio_feature_channels",
+            "log_epsilon_from_config": "audio_log_epsilon"
+          }
+        },
+        {
+          "id": "feature_normalize",
+          "op": "audio_feature_normalize",
+          "params": {
+            "channels_from_config": "audio_feature_channels",
+            "frames_from_config": "audio_feature_frames",
+            "normalization_epsilon_from_config": "audio_normalization_epsilon"
+          }
+        }
+      ]
+    },
     "encoder": {"sequence": ["subsampling", "relative_position", "fastconformer_blocks", "encoder_projection"]},
     "transducer": {"sequence": ["embedding_lookup", "lstm", "decoder_projection", "joint_relu", "joint_head", "tdt_greedy_step"]}
   }

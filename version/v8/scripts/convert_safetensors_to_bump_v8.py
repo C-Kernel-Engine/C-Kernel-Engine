@@ -1620,6 +1620,11 @@ def _build_config(model_dir: Path, arch: str, config_template: Path | None) -> d
         encoder = hf.get("encoder_config")
         if not isinstance(encoder, dict):
             raise SystemExit("Parakeet TDT config missing encoder_config")
+        max_encoder_frames = int(encoder["max_position_embeddings"])
+        hop_length = 160
+        subsampling_factor = int(encoder["subsampling_factor"])
+        max_feature_frames = max_encoder_frames * subsampling_factor
+        max_source_frames = (max_feature_frames - 1) * hop_length
         cfg.update({
             "num_layers": int(encoder["num_hidden_layers"]),
             "num_hidden_layers": int(encoder["num_hidden_layers"]),
@@ -1639,6 +1644,18 @@ def _build_config(model_dir: Path, arch: str, config_template: Path | None) -> d
             "durations": [int(value) for value in hf["durations"]],
             "max_symbols_per_step": int(hf["max_symbols_per_step"]),
             "encoder_config": encoder,
+            "audio_activation_profile": "circuit_declared",
+            "audio_sample_rate": 16000,
+            "audio_max_source_frames": max_source_frames,
+            "audio_n_fft": 512,
+            "audio_window_length": 400,
+            "audio_hop_length": hop_length,
+            "audio_power_bins": 257,
+            "audio_feature_channels": int(encoder["num_mel_bins"]),
+            "audio_feature_frames": max_feature_frames,
+            "audio_preemphasis_coefficient": 0.97,
+            "audio_log_epsilon": 2.0 ** -24,
+            "audio_normalization_epsilon": 1.0e-5,
         })
     config_builder = str(arch_contract.get("config_builder") or "").strip().lower()
     cfg.setdefault("model", arch)

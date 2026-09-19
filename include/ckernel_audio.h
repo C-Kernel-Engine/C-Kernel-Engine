@@ -84,6 +84,11 @@ int audio_pad_or_truncate_f32(
     float *output,
     int output_frames);
 
+int audio_hann_window_f32(
+    float *output,
+    int frames,
+    int periodic);
+
 int audio_preemphasis_f32(
     const float *input,
     float *output,

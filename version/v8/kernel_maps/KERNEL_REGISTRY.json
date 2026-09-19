@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 375,
+      "total": 376,
       "by_op": {
         "add_backward": 1,
         "add_stream": 2,
@@ -23,6 +23,7 @@
         "audio_feature_normalize": 1,
         "audio_feature_window": 1,
         "audio_glu": 1,
+        "audio_hann_window": 1,
         "audio_log_mel": 3,
         "audio_lstm": 1,
         "audio_mel_filters": 1,
@@ -13355,6 +13356,108 @@
       "_source_file": "audio_glu_split_channel_major_f32.json"
     },
     {
+      "id": "audio_hann_window_f32",
+      "op": "audio_hann_window",
+      "operation_interface": "audio_hann_window.fp64_cosine.fp32_storage.v1",
+      "variant": "explicit_periodicity_fp64_cosine_fp32_storage",
+      "quant": {
+        "weight": "none",
+        "activation": "none",
+        "output": "fp32"
+      },
+      "inputs": [],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "window",
+          "dtype": "fp32",
+          "shape": [
+            "N_frames"
+          ],
+          "layout": "contiguous",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "frames",
+        "periodic"
+      ],
+      "impl": {
+        "function": "audio_hann_window_f32",
+        "c_declaration": "int audio_hann_window_f32(float *output, int frames, int periodic);",
+        "sources": [
+          "src/kernels/audio_kernels.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "audio_hann_window_fp64_cosine_fp32_storage",
+          "status": "validated",
+          "phases": [
+            "prefill"
+          ],
+          "function": "audio_hann_window_f32",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "none",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "independent_outputs"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "output",
+            "source": "output:window",
+            "cast": "float*",
+            "ports": [
+              "output:window"
+            ]
+          },
+          {
+            "name": "frames",
+            "source": "dim:frames"
+          },
+          {
+            "name": "periodic",
+            "source": "dim:periodic"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_audio_encoder.py"
+        ]
+      },
+      "name": "audio_hann_window_f32",
+      "_source_file": "audio_hann_window_f32.json"
+    },
+    {
       "id": "audio_log_mel_time_major_f32",
       "op": "audio_log_mel",
       "operation_interface": "audio_log_mel.time_major.natural_log_add_epsilon.fp32.v1",
@@ -13377,9 +13480,7 @@
           "storage_class": "activation",
           "consumption": "required",
           "desc": "Frame-major power spectrum"
-        }
-      ],
-      "weights": [
+        },
         {
           "name": "mel_filters",
           "dtype": "fp32",
@@ -13389,11 +13490,12 @@
           ],
           "layout": "row_major",
           "access": "read",
-          "storage_class": "weight",
+          "storage_class": "activation",
           "consumption": "required",
-          "desc": "Model-provided Mel filter bank"
+          "desc": "Runtime-prepared Mel filter bank"
         }
       ],
+      "weights": [],
       "outputs": [
         {
           "name": "log_mel",
@@ -13472,10 +13574,10 @@
           },
           {
             "name": "mel_filters",
-            "source": "weight:mel_filters",
+            "source": "activation:mel_filters",
             "cast": "const float*",
             "ports": [
-              "weight:mel_filters"
+              "input:mel_filters"
             ]
           },
           {
@@ -14811,9 +14913,7 @@
           "storage_class": "activation",
           "consumption": "required",
           "desc": "Preprocessed PCM samples"
-        }
-      ],
-      "weights": [
+        },
         {
           "name": "window",
           "dtype": "fp32",
@@ -14822,9 +14922,9 @@
           ],
           "layout": "contiguous",
           "access": "read",
-          "storage_class": "weight",
+          "storage_class": "activation",
           "consumption": "required",
-          "desc": "Model-provided window centered within the FFT frame"
+          "desc": "Runtime-prepared window centered within the FFT frame"
         },
         {
           "name": "cos_table",
@@ -14835,9 +14935,9 @@
           ],
           "layout": "row_major",
           "access": "read",
-          "storage_class": "prepared_weight",
+          "storage_class": "activation",
           "consumption": "required",
-          "desc": "Precomputed cosine table"
+          "desc": "Runtime-precomputed cosine table"
         },
         {
           "name": "sin_table",
@@ -14848,11 +14948,12 @@
           ],
           "layout": "row_major",
           "access": "read",
-          "storage_class": "prepared_weight",
+          "storage_class": "activation",
           "consumption": "required",
-          "desc": "Precomputed sine table"
+          "desc": "Runtime-precomputed sine table"
         }
       ],
+      "weights": [],
       "outputs": [
         {
           "name": "power",
@@ -14937,10 +15038,10 @@
           },
           {
             "name": "window",
-            "source": "weight:window",
+            "source": "activation:window",
             "cast": "const float*",
             "ports": [
-              "weight:window"
+              "input:window"
             ]
           },
           {
@@ -14949,18 +15050,18 @@
           },
           {
             "name": "cos_table",
-            "source": "weight:cos_table",
+            "source": "activation:cos_table",
             "cast": "const float*",
             "ports": [
-              "weight:cos_table"
+              "input:cos_table"
             ]
           },
           {
             "name": "sin_table",
-            "source": "weight:sin_table",
+            "source": "activation:sin_table",
             "cast": "const float*",
             "ports": [
-              "weight:sin_table"
+              "input:sin_table"
             ]
           },
           {

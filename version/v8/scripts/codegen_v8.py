@@ -29,7 +29,7 @@ import codegen_prefill_v8  # type: ignore  # noqa: E402
 from vision_bridge_runtime_v8 import resolve_vision_bridge_contract  # type: ignore  # noqa: E402
 
 
-_AUDIO_FRONTEND_OPS = {
+_WHISPER_AUDIO_FRONTEND_OPS = {
     "audio_wav_decode",
     "audio_resample",
     "audio_pad_or_truncate",
@@ -39,6 +39,26 @@ _AUDIO_FRONTEND_OPS = {
     "audio_log_mel",
     "audio_feature_window",
 }
+
+_NORMALIZED_LOG_MEL_FRONTEND_OPS = {
+    "audio_wav_decode",
+    "audio_preemphasis",
+    "audio_hann_window",
+    "audio_stft_tables",
+    "audio_stft",
+    "audio_mel_filters",
+    "audio_log_mel",
+    "audio_feature_normalize",
+}
+
+_AUDIO_FRONTEND_OPS = _WHISPER_AUDIO_FRONTEND_OPS | _NORMALIZED_LOG_MEL_FRONTEND_OPS
+
+
+def _has_audio_frontend(op_names: set[str]) -> bool:
+    return (
+        _WHISPER_AUDIO_FRONTEND_OPS.issubset(op_names)
+        or _NORMALIZED_LOG_MEL_FRONTEND_OPS.issubset(op_names)
+    )
 
 
 def _init_has_tokenizer_api(init_call_obj: Dict[str, Any] | None) -> bool:
@@ -105,7 +125,7 @@ def _emit_runtime_capability_api(
     bridge = resolve_vision_bridge_contract(layout_obj, by_name)
 
     scope = str(config.get("artifact_scope") or "").strip().lower()
-    has_encoder_input = _AUDIO_FRONTEND_OPS.issubset(op_names) or "image_input" in buffer_names
+    has_encoder_input = _has_audio_frontend(op_names) or "image_input" in buffer_names
     has_decoder_state = bool(
         {"logits", "kv_cache"}.intersection(buffer_names)
         or {"logits", "kv_cache_store"}.intersection(op_names)
@@ -159,7 +179,7 @@ def _emit_runtime_capability_api(
     encoder_output_dim = int(bridge.get("embed_dim", 0) or 0)
     if encoder_only and encoder_output_name and encoder_output_tokens > 0 and encoder_output_dim > 0:
         capabilities.append("CK_MODEL_CAP_ENCODER_OUTPUT")
-    if _AUDIO_FRONTEND_OPS.issubset(op_names):
+    if _has_audio_frontend(op_names):
         capabilities.append("CK_MODEL_CAP_AUDIO_WAV_ENCODER")
     image_tensor_api = ""
     image_buf = by_name.get("image_input")
@@ -408,7 +428,10 @@ def _emit_audio_wav_entrypoint(
     }
     if not by_op:
         return ""
-    missing = sorted(_AUDIO_FRONTEND_OPS - set(by_op))
+    if _NORMALIZED_LOG_MEL_FRONTEND_OPS.issubset(by_op):
+        return _emit_normalized_log_mel_entrypoint(by_op, config)
+
+    missing = sorted(_WHISPER_AUDIO_FRONTEND_OPS - set(by_op))
     if missing:
         raise RuntimeError(
             "audio frontend circuit did not lower every required operation: "
@@ -421,7 +444,10 @@ def _emit_audio_wav_entrypoint(
     if min(sample_rate, sample_extent, max_source_frames, hop_length) <= 0:
         raise RuntimeError("audio frontend codegen requires explicit positive extents")
 
-    calls = {name: _audio_call_expression(by_op[name]) for name in _AUDIO_FRONTEND_OPS}
+    calls = {
+        name: _audio_call_expression(by_op[name])
+        for name in _WHISPER_AUDIO_FRONTEND_OPS
+    }
     full_feature_call = _audio_call_expression(
         by_op["audio_feature_window"],
         source_overrides={
@@ -513,6 +539,89 @@ CK_EXPORT int ck_model_run_audio_wav(const uint8_t *audio_wav_bytes,
                                      CKAudioWavInfo *audio_metadata) {{
     return ck_model_run_audio_wav_window(
         audio_wav_bytes, audio_wav_byte_count, 0, audio_metadata);
+}}
+"""
+
+
+def _emit_normalized_log_mel_entrypoint(
+    by_op: Dict[str, Dict[str, Any]],
+    config: Dict[str, Any],
+) -> str:
+    sample_rate = int(config.get("audio_sample_rate", 0) or 0)
+    max_source_frames = int(config.get("audio_max_source_frames", 0) or 0)
+    hop_length = int(config.get("audio_hop_length", 0) or 0)
+    if min(sample_rate, max_source_frames, hop_length) <= 0:
+        raise RuntimeError(
+            "normalized log-Mel frontend requires explicit positive extents"
+        )
+
+    calls = {
+        name: _audio_call_expression(by_op[name])
+        for name in _NORMALIZED_LOG_MEL_FRONTEND_OPS
+    }
+    preemphasis = _audio_call_expression(
+        by_op["audio_preemphasis"],
+        source_overrides={"dim:frames": "audio_source_frames"},
+    )
+    stft = _audio_call_expression(
+        by_op["audio_stft"],
+        source_overrides={
+            "dim:n_samples": "audio_source_frames",
+            "dim:n_frames": "required_frames",
+        },
+    )
+    log_mel = _audio_call_expression(
+        by_op["audio_log_mel"],
+        source_overrides={"dim:frames": "required_frames"},
+    )
+    normalize = _audio_call_expression(
+        by_op["audio_feature_normalize"],
+        source_overrides={
+            "dim:frames": "live_frames",
+            "output:output": "audio_features",
+        },
+    )
+    return f"""
+/* Generated from the resolved normalized log-Mel frontend call IR. */
+CK_EXPORT int ck_model_prepare_audio_wav_features(
+    const uint8_t *audio_wav_bytes,
+    size_t audio_wav_byte_count,
+    float *audio_features,
+    int audio_feature_frame_capacity,
+    int *audio_feature_frames,
+    CKAudioWavInfo *audio_metadata) {{
+    if (!g_model || !audio_wav_bytes || audio_wav_byte_count == 0 ||
+        !audio_features || audio_feature_frame_capacity <= 0) return -1;
+    CKModel *model = g_model;
+    CKAudioWavInfo local_info;
+    CKAudioWavInfo *audio_wav_info = audio_metadata ? audio_metadata : &local_info;
+    if (audio_wav_parse_memory(
+            audio_wav_bytes, audio_wav_byte_count, audio_wav_info) != 0) return -2;
+    if (audio_wav_info->sample_rate != {sample_rate} ||
+        audio_wav_info->channels != 1 || audio_wav_info->bits_per_sample != 16) return -10;
+    if (audio_wav_info->frames <= 0 || audio_wav_info->frames > {max_source_frames}) return -3;
+    const int required_frames = audio_wav_info->frames / {hop_length} + 1;
+    const int live_frames = audio_wav_info->frames / {hop_length};
+    if (live_frames <= 0 || required_frames > audio_feature_frame_capacity) return -4;
+
+    float *audio_mono = (float*)(model->bump + A_AUDIO_SAMPLES);
+    const int audio_mono_capacity = {max_source_frames};
+    const int audio_window_start_frame = 0;
+    const int audio_source_frames = {calls["audio_wav_decode"]};
+    if (audio_source_frames != audio_wav_info->frames) return -5;
+    if ({preemphasis} != 0) return -6;
+    if ({calls["audio_hann_window"]} != 0) return -7;
+    if ({calls["audio_stft_tables"]} != 0) return -8;
+    if ({stft} != 0) return -9;
+    if ({calls["audio_mel_filters"]} != 0) return -11;
+    if ({log_mel} != 0) return -12;
+    memset(
+        audio_features,
+        0,
+        (size_t)required_frames * (size_t){int(config.get("audio_feature_channels", 0) or 0)} * sizeof(float));
+    if ({normalize} != 0) return -13;
+    if (audio_feature_frames) *audio_feature_frames = required_frames;
+    return 0;
 }}
 """
 
@@ -1433,11 +1542,18 @@ def _inject_prefill_multimodal_bridge(
     profile: bool = False,
     dump: bool = False,
 ) -> str:
-    if "ck_model_forward_mixed(" in code or "ck_prefill_from_embedded(" in code:
+    config = ir_obj.get("config", {})
+    scope = (
+        str(config.get("artifact_scope", "") or "").strip().lower()
+        if isinstance(config, dict)
+        else ""
+    )
+    if "ck_model_forward_mixed(" in code or (
+        "ck_prefill_from_embedded(" in code and scope != "audio_frontend"
+    ):
         return code
 
     ops = ir_obj.get("operations", [])
-    config = ir_obj.get("config", {})
     if not isinstance(ops, list) or not isinstance(config, dict):
         return code
 
@@ -1451,7 +1567,8 @@ def _inject_prefill_multimodal_bridge(
         dump=dump,
     )
     bridge_api = codegen_prefill_v8.emit_multimodal_bridge_api(ops, config)
-    if not embedded_prefill and not bridge_api:
+    audio_entrypoint = _emit_audio_wav_entrypoint(ops, config)
+    if not embedded_prefill and not bridge_api and not audio_entrypoint:
         return code
 
     extra_parts = []
@@ -1478,9 +1595,8 @@ CK_EXPORT int ck_model_run_encoder(void) {{
 }}
 """
             )
-            audio_entrypoint = _emit_audio_wav_entrypoint(ops, config)
-            if audio_entrypoint:
-                extra_parts.append(audio_entrypoint)
+    if audio_entrypoint:
+        extra_parts.append(audio_entrypoint)
     if bridge_api:
         extra_parts.append(bridge_api)
     return code + "\n\n" + "\n\n".join(extra_parts)
@@ -1599,7 +1715,10 @@ def main(argv: list[str] | None = None) -> int:
         ir_path = td_path / "call.v8.json"
         layout_path = td_path / "layout.v8.json"
         core_ir_obj = ir_obj
-        if str((ir_obj.get("config") or {}).get("artifact_scope", "")).strip().lower() == "encoder_only":
+        if str((ir_obj.get("config") or {}).get("artifact_scope", "")).strip().lower() in {
+            "encoder_only",
+            "audio_frontend",
+        }:
             core_ir_obj = dict(ir_obj)
             core_ir_obj["operations"] = [
                 op

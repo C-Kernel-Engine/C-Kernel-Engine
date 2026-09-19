@@ -5,13 +5,12 @@
   "variant": "centered_explicit_window_zero_or_reflect_padding_direct_dft_fp32",
   "quant": {"weight": "fp32", "activation": "fp32", "output": "fp32"},
   "inputs": [
-    {"name": "samples", "dtype": "fp32", "shape": ["N_samples"], "layout": "contiguous", "access": "read", "storage_class": "activation", "consumption": "required", "desc": "Preprocessed PCM samples"}
+    {"name": "samples", "dtype": "fp32", "shape": ["N_samples"], "layout": "contiguous", "access": "read", "storage_class": "activation", "consumption": "required", "desc": "Preprocessed PCM samples"},
+    {"name": "window", "dtype": "fp32", "shape": ["N_window"], "layout": "contiguous", "access": "read", "storage_class": "activation", "consumption": "required", "desc": "Runtime-prepared window centered within the FFT frame"},
+    {"name": "cos_table", "dtype": "fp32", "shape": ["N_bins", "N_fft"], "layout": "row_major", "access": "read", "storage_class": "activation", "consumption": "required", "desc": "Runtime-precomputed cosine table"},
+    {"name": "sin_table", "dtype": "fp32", "shape": ["N_bins", "N_fft"], "layout": "row_major", "access": "read", "storage_class": "activation", "consumption": "required", "desc": "Runtime-precomputed sine table"}
   ],
-  "weights": [
-    {"name": "window", "dtype": "fp32", "shape": ["N_window"], "layout": "contiguous", "access": "read", "storage_class": "weight", "consumption": "required", "desc": "Model-provided window centered within the FFT frame"},
-    {"name": "cos_table", "dtype": "fp32", "shape": ["N_bins", "N_fft"], "layout": "row_major", "access": "read", "storage_class": "prepared_weight", "consumption": "required", "desc": "Precomputed cosine table"},
-    {"name": "sin_table", "dtype": "fp32", "shape": ["N_bins", "N_fft"], "layout": "row_major", "access": "read", "storage_class": "prepared_weight", "consumption": "required", "desc": "Precomputed sine table"}
-  ],
+  "weights": [],
   "outputs": [
     {"name": "power", "dtype": "fp32", "shape": ["N_frames", "N_bins"], "layout": "time_major_contiguous", "access": "write", "storage_class": "activation", "consumption": "required", "desc": "Frame-major power spectrum"}
   ],
@@ -35,10 +34,10 @@
   "call_abi": {"version": 1, "params": [
     {"name": "samples", "source": "activation:samples", "cast": "const float*", "ports": ["input:samples"]},
     {"name": "n_samples", "source": "dim:n_samples"},
-    {"name": "window", "source": "weight:window", "cast": "const float*", "ports": ["weight:window"]},
+    {"name": "window", "source": "activation:window", "cast": "const float*", "ports": ["input:window"]},
     {"name": "window_length", "source": "dim:window_length"},
-    {"name": "cos_table", "source": "weight:cos_table", "cast": "const float*", "ports": ["weight:cos_table"]},
-    {"name": "sin_table", "source": "weight:sin_table", "cast": "const float*", "ports": ["weight:sin_table"]},
+    {"name": "cos_table", "source": "activation:cos_table", "cast": "const float*", "ports": ["input:cos_table"]},
+    {"name": "sin_table", "source": "activation:sin_table", "cast": "const float*", "ports": ["input:sin_table"]},
     {"name": "n_fft", "source": "dim:n_fft"},
     {"name": "hop_length", "source": "dim:hop_length"},
     {"name": "reflect_padding", "source": "dim:reflect_padding"},

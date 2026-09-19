@@ -91,6 +91,17 @@
       "position_transform": null,
       "description": "Copies the available sample prefix exactly, truncates excess input, and zero-fills a short input to the circuit-declared sample extent."
     },
+    "audio_hann_window_fp64_cosine_fp32_storage": {
+      "operator_family": "audio_hann_window",
+      "status": "validated",
+      "storage": {"input": "none", "weight": "none", "output": "fp32"},
+      "compute": {"input": "fp64", "weight": "none", "accumulator": "fp64", "contraction": "disabled", "evaluation_order": "ascending_sample_fp64_phase_then_cosine_then_fp32_store"},
+      "rounding": {"mode": "rne", "points": ["weighted_product", "output_store"]},
+      "reduction": {"kind": "none", "order": "none", "partial_accumulator": "none", "merge_order": "none"},
+      "threading": {"work_partition": "serial", "split_strategy": "independent_outputs", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Constructs periodic or nonperiodic Hann coefficients with FP64 phase/cosine evaluation and one FP32 output-storage rounding boundary."
+    },
     "audio_preemphasis_previous_sample_fp32": {
       "operator_family": "audio_preemphasis",
       "status": "validated",
