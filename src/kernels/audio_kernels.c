@@ -18,6 +18,34 @@
 #define CK_AUDIO_PI_F 3.14159265358979323846f
 #define CK_AUDIO_PI_D 3.14159265358979323846264338327950288
 
+/* Shared production GEMM; provided by the engine in generated runtimes. */
+void gemm_nt_f32_llama_production_parallel_dispatch(
+    const float *A,
+    const float *B,
+    const float *bias,
+    float *C,
+    int M,
+    int N,
+    int K);
+
+static int checked_mul_size(size_t left, size_t right, size_t *result)
+{
+    if (result == NULL || (right != 0 && left > SIZE_MAX / right)) {
+        return -1;
+    }
+    *result = left * right;
+    return 0;
+}
+
+static int conv_output_extent(int input, int kernel, int stride, int padding)
+{
+    if (input <= 0 || kernel <= 0 || stride <= 0 || padding < 0 ||
+        input > INT_MAX - 2 * padding || input + 2 * padding < kernel) {
+        return -1;
+    }
+    return (input + 2 * padding - kernel) / stride + 1;
+}
+
 static int reflect_index(int index, int length)
 {
     while (index < 0 || index >= length) {
@@ -906,6 +934,205 @@ int audio_whisper_log_mel_window_wav_pcm16_f32(
         }
     }
     return valid_frames;
+}
+
+size_t audio_fastconformer_subsampling_workspace_bytes(
+    int feature_frames,
+    int feature_channels,
+    int conv_channels,
+    int kernel_size,
+    int stride)
+{
+    if (feature_frames <= 0 || feature_channels <= 0 || conv_channels <= 0 ||
+        kernel_size != 3 || stride != 2) {
+        return 0;
+    }
+    const int padding = kernel_size / 2;
+    const int stage_frames = conv_output_extent(
+        feature_frames, kernel_size, stride, padding);
+    const int stage_width = conv_output_extent(
+        feature_channels, kernel_size, stride, padding);
+    if (stage_frames <= 0 || stage_width <= 0) {
+        return 0;
+    }
+    size_t elements = 0;
+    size_t bytes = 0;
+    if (checked_mul_size((size_t)stage_frames, (size_t)stage_width, &elements) != 0 ||
+        checked_mul_size(elements, (size_t)conv_channels, &elements) != 0 ||
+        checked_mul_size(elements, 2u * sizeof(float), &bytes) != 0) {
+        return 0;
+    }
+    return bytes;
+}
+
+static void zero_subsampling_padding(
+    float *value,
+    int channels,
+    int frames,
+    int width,
+    int live_frames)
+{
+    if (live_frames >= frames) {
+        return;
+    }
+    const size_t row_bytes = (size_t)width * sizeof(float);
+    for (int channel = 0; channel < channels; ++channel) {
+        float *channel_data = value + (size_t)channel * (size_t)frames * (size_t)width;
+        for (int frame = live_frames; frame < frames; ++frame) {
+            memset(channel_data + (size_t)frame * (size_t)width, 0, row_bytes);
+        }
+    }
+}
+
+static void relu_subsampling_inplace(float *value, size_t elements)
+{
+    for (size_t index = 0; index < elements; ++index) {
+        if (value[index] < 0.0f) {
+            value[index] = 0.0f;
+        }
+    }
+}
+
+int audio_fastconformer_subsampling_f32(
+    const float *features,
+    const float *conv0_weight,
+    const float *conv0_bias,
+    const float *depthwise1_weight,
+    const float *depthwise1_bias,
+    const float *pointwise1_weight,
+    const float *pointwise1_bias,
+    const float *depthwise2_weight,
+    const float *depthwise2_bias,
+    const float *pointwise2_weight,
+    const float *pointwise2_bias,
+    const float *linear_weight,
+    const float *linear_bias,
+    float *output,
+    void *workspace,
+    size_t workspace_bytes,
+    int feature_frames,
+    int live_frames,
+    int feature_channels,
+    int conv_channels,
+    int hidden_size,
+    int kernel_size,
+    int stride,
+    int output_capacity_frames,
+    int *output_frames)
+{
+    if (features == NULL || conv0_weight == NULL || conv0_bias == NULL ||
+        depthwise1_weight == NULL || depthwise1_bias == NULL ||
+        pointwise1_weight == NULL || pointwise1_bias == NULL ||
+        depthwise2_weight == NULL || depthwise2_bias == NULL ||
+        pointwise2_weight == NULL || pointwise2_bias == NULL ||
+        linear_weight == NULL || linear_bias == NULL || output == NULL ||
+        workspace == NULL || output_frames == NULL || feature_frames <= 0 ||
+        live_frames <= 0 || live_frames > feature_frames || feature_channels <= 0 ||
+        conv_channels <= 0 || hidden_size <= 0 || kernel_size != 3 || stride != 2 ||
+        output_capacity_frames <= 0) {
+        return -1;
+    }
+
+    const size_t required_workspace = audio_fastconformer_subsampling_workspace_bytes(
+        feature_frames, feature_channels, conv_channels, kernel_size, stride);
+    if (required_workspace == 0 || workspace_bytes < required_workspace) {
+        return -2;
+    }
+
+    const int padding = kernel_size / 2;
+    int heights[3];
+    int widths[3];
+    int live_heights[3];
+    heights[0] = conv_output_extent(feature_frames, kernel_size, stride, padding);
+    widths[0] = conv_output_extent(feature_channels, kernel_size, stride, padding);
+    live_heights[0] = conv_output_extent(live_frames, kernel_size, stride, padding);
+    for (int stage = 1; stage < 3; ++stage) {
+        heights[stage] = conv_output_extent(heights[stage - 1], kernel_size, stride, padding);
+        widths[stage] = conv_output_extent(widths[stage - 1], kernel_size, stride, padding);
+        live_heights[stage] = conv_output_extent(
+            live_heights[stage - 1], kernel_size, stride, padding);
+    }
+    if (heights[2] <= 0 || widths[2] <= 0 || live_heights[2] <= 0 ||
+        output_capacity_frames < heights[2]) {
+        return -3;
+    }
+
+    size_t stage0_elements = 0;
+    if (checked_mul_size((size_t)conv_channels, (size_t)heights[0], &stage0_elements) != 0 ||
+        checked_mul_size(stage0_elements, (size_t)widths[0], &stage0_elements) != 0) {
+        return -4;
+    }
+    float *ping = (float *)workspace;
+    float *pong = ping + stage0_elements;
+
+    int status = audio_conv2d_whc_grouped_f32(
+        features, conv0_weight, conv0_bias, ping,
+        feature_channels, feature_frames, 1, conv_channels,
+        kernel_size, kernel_size, stride, stride, padding, padding, 1,
+        widths[0], heights[0]);
+    if (status != 0) return -10;
+    zero_subsampling_padding(ping, conv_channels, heights[0], widths[0], live_heights[0]);
+    relu_subsampling_inplace(ping, stage0_elements);
+
+    status = audio_conv2d_whc_grouped_f32(
+        ping, depthwise1_weight, depthwise1_bias, pong,
+        widths[0], heights[0], conv_channels, conv_channels,
+        kernel_size, kernel_size, stride, stride, padding, padding, conv_channels,
+        widths[1], heights[1]);
+    if (status != 0) return -11;
+    zero_subsampling_padding(pong, conv_channels, heights[1], widths[1], live_heights[1]);
+
+    status = audio_conv2d_whc_grouped_f32(
+        pong, pointwise1_weight, pointwise1_bias, ping,
+        widths[1], heights[1], conv_channels, conv_channels,
+        1, 1, 1, 1, 0, 0, 1, widths[1], heights[1]);
+    if (status != 0) return -12;
+    size_t stage1_elements = 0;
+    if (checked_mul_size((size_t)conv_channels, (size_t)heights[1], &stage1_elements) != 0 ||
+        checked_mul_size(stage1_elements, (size_t)widths[1], &stage1_elements) != 0) {
+        return -4;
+    }
+    zero_subsampling_padding(ping, conv_channels, heights[1], widths[1], live_heights[1]);
+    relu_subsampling_inplace(ping, stage1_elements);
+
+    status = audio_conv2d_whc_grouped_f32(
+        ping, depthwise2_weight, depthwise2_bias, pong,
+        widths[1], heights[1], conv_channels, conv_channels,
+        kernel_size, kernel_size, stride, stride, padding, padding, conv_channels,
+        widths[2], heights[2]);
+    if (status != 0) return -13;
+    zero_subsampling_padding(pong, conv_channels, heights[2], widths[2], live_heights[2]);
+
+    status = audio_conv2d_whc_grouped_f32(
+        pong, pointwise2_weight, pointwise2_bias, ping,
+        widths[2], heights[2], conv_channels, conv_channels,
+        1, 1, 1, 1, 0, 0, 1, widths[2], heights[2]);
+    if (status != 0) return -14;
+    size_t final_elements = 0;
+    if (checked_mul_size((size_t)conv_channels, (size_t)heights[2], &final_elements) != 0 ||
+        checked_mul_size(final_elements, (size_t)widths[2], &final_elements) != 0) {
+        return -4;
+    }
+    zero_subsampling_padding(ping, conv_channels, heights[2], widths[2], live_heights[2]);
+    relu_subsampling_inplace(ping, final_elements);
+
+    if (widths[2] > INT_MAX / conv_channels) return -4;
+    const int flattened_width = conv_channels * widths[2];
+    for (int frame = 0; frame < heights[2]; ++frame) {
+        float *row = pong + (size_t)frame * (size_t)flattened_width;
+        for (int channel = 0; channel < conv_channels; ++channel) {
+            const float *source = ping +
+                ((size_t)channel * (size_t)heights[2] + (size_t)frame) * (size_t)widths[2];
+            memcpy(row + (size_t)channel * (size_t)widths[2], source,
+                   (size_t)widths[2] * sizeof(float));
+        }
+    }
+
+    gemm_nt_f32_llama_production_parallel_dispatch(
+        pong, linear_weight, linear_bias, output,
+        heights[2], hidden_size, flattened_width);
+    *output_frames = heights[2];
+    return 0;
 }
 
 typedef struct {

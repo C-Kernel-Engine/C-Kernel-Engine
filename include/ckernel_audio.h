@@ -234,6 +234,40 @@ int audio_conv2d_whc_grouped_f32(
     int output_width,
     int output_height);
 
+size_t audio_fastconformer_subsampling_workspace_bytes(
+    int feature_frames,
+    int feature_channels,
+    int conv_channels,
+    int kernel_size,
+    int stride);
+
+int audio_fastconformer_subsampling_f32(
+    const float *features,
+    const float *conv0_weight,
+    const float *conv0_bias,
+    const float *depthwise1_weight,
+    const float *depthwise1_bias,
+    const float *pointwise1_weight,
+    const float *pointwise1_bias,
+    const float *depthwise2_weight,
+    const float *depthwise2_bias,
+    const float *pointwise2_weight,
+    const float *pointwise2_bias,
+    const float *linear_weight,
+    const float *linear_bias,
+    float *output,
+    void *workspace,
+    size_t workspace_bytes,
+    int feature_frames,
+    int live_frames,
+    int feature_channels,
+    int conv_channels,
+    int hidden_size,
+    int kernel_size,
+    int stride,
+    int output_capacity_frames,
+    int *output_frames);
+
 int audio_glu_split_channel_major_f32(
     const float *input,
     float *output,

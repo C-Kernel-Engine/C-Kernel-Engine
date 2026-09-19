@@ -15,8 +15,8 @@ SCHEMA = ROOT / "version" / "v8" / "schemas" / "kernel_call_abi.schema.json"
 REGISTRY = MAPS / "KERNEL_REGISTRY.json"
 EXCLUDED = {"KERNEL_REGISTRY.json", "kernel_bindings.json", "kernel_bindings.overlay.json"}
 BUILD_IR = ROOT / "version" / "v8" / "scripts" / "build_ir_v8.py"
-EXPECTED_GOVERNED_MAP_COUNT = 170
-EXPECTED_MAP_OWNED_ABI_COUNT = 249
+EXPECTED_GOVERNED_MAP_COUNT = 171
+EXPECTED_MAP_OWNED_ABI_COUNT = 250
 GLM4_PARITY_PROVIDERS = {
     "rope_forward_qk_pairwise_llama_cpu",
     "rope_precompute_cache_llama_cpu",
@@ -102,6 +102,7 @@ class V8KernelCallABITests(unittest.TestCase):
         legacy = build_ir_v8.load_kernel_bindings()
         self.assertEqual(len(call_abis), EXPECTED_MAP_OWNED_ABI_COUNT)
         self.assertIn("audio_hann_window_f32", call_abis)
+        self.assertIn("audio_fastconformer_subsampling_f32", call_abis)
         self.assertTrue(QWEN3VL_PARITY_PROVIDERS.issubset(call_abis))
         self.assertTrue(GLM4_PARITY_PROVIDERS.issubset(call_abis))
         for kernel_id, entry in call_abis.items():

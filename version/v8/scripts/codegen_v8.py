@@ -52,6 +52,7 @@ _NORMALIZED_LOG_MEL_FRONTEND_OPS = {
 }
 
 _AUDIO_FRONTEND_OPS = _WHISPER_AUDIO_FRONTEND_OPS | _NORMALIZED_LOG_MEL_FRONTEND_OPS
+_AUDIO_SUBSAMPLING_OPS = {"audio_fastconformer_subsampling"}
 
 
 def _has_audio_frontend(op_names: set[str]) -> bool:
@@ -626,6 +627,80 @@ CK_EXPORT int ck_model_prepare_audio_wav_features(
 """
 
 
+def _emit_audio_subsampling_entrypoint(
+    ops: list[Dict[str, Any]],
+    config: Dict[str, Any],
+) -> str:
+    matches = [
+        op for op in ops
+        if str(op.get("op", "")) == "audio_fastconformer_subsampling"
+    ]
+    if not matches:
+        return ""
+    if len(matches) != 1:
+        raise RuntimeError(
+            "generated audio subsampling requires exactly one resolved operation"
+        )
+    call = _audio_call_expression(
+        matches[0],
+        source_overrides={
+            "activation:features": "audio_features",
+            "scratch:workspace": "workspace",
+            "output:output": "audio_encoder_output",
+            "scratch_size:workspace": "workspace_bytes",
+            "dim:feature_frames": "audio_feature_frames",
+            "dim:live_frames": "audio_feature_live_frames",
+            "dim:output_capacity_frames": "output_capacity_frames",
+            "runtime:audio_subsampling_output_frames": "output_frames",
+        },
+    )
+    max_feature_frames = int(config.get("audio_feature_frames", 0) or 0)
+    feature_channels = int(config.get("audio_feature_channels", 0) or 0)
+    conv_channels = int(config.get("audio_subsampling_conv_channels", 0) or 0)
+    kernel_size = int(config.get("audio_subsampling_kernel_size", 0) or 0)
+    stride = int(config.get("audio_subsampling_stride", 0) or 0)
+    if min(
+        max_feature_frames,
+        feature_channels,
+        conv_channels,
+        kernel_size,
+        stride,
+    ) <= 0:
+        raise RuntimeError(
+            "generated audio subsampling requires explicit positive geometry"
+        )
+    return f"""
+CK_EXPORT size_t ck_model_audio_subsampling_workspace_bytes(
+    int audio_feature_frames) {{
+    return audio_fastconformer_subsampling_workspace_bytes(
+        audio_feature_frames,
+        {feature_channels},
+        {conv_channels},
+        {kernel_size},
+        {stride});
+}}
+
+CK_EXPORT int ck_model_run_audio_subsampling(
+    const float *audio_features,
+    int audio_feature_frames,
+    int audio_feature_live_frames,
+    float *audio_encoder_output,
+    int output_capacity_frames,
+    int *output_frames,
+    void *workspace,
+    size_t workspace_bytes) {{
+    if (!g_model || !audio_features || !audio_encoder_output || !output_frames ||
+        !workspace || audio_feature_frames <= 0 ||
+        audio_feature_frames > {max_feature_frames} ||
+        audio_feature_live_frames <= 0 ||
+        audio_feature_live_frames > audio_feature_frames ||
+        output_capacity_frames <= 0) return -1;
+    CKModel *model = g_model;
+    return {call};
+}}
+"""
+
+
 def _patch_codegen_config(obj: Dict[str, Any]) -> Dict[str, Any]:
     out = dict(obj)
     cfg = dict(out.get("config", {}) or {})
@@ -955,6 +1030,11 @@ def _uses_generated_batched_prefill(
 ) -> bool:
     """Return whether the supplied prefill contract permits generated prefill."""
     policy_source = prefill_obj if prefill_obj is not None else ir_obj
+    scope = str(
+        (policy_source.get("config") or {}).get("artifact_scope") or ""
+    ).strip().lower()
+    if scope in {"audio_frontend", "audio_subsampling"}:
+        return False
     policy = str(
         (policy_source.get("config") or {}).get("prefill_policy") or ""
     ).strip().lower()
@@ -1549,7 +1629,8 @@ def _inject_prefill_multimodal_bridge(
         else ""
     )
     if "ck_model_forward_mixed(" in code or (
-        "ck_prefill_from_embedded(" in code and scope != "audio_frontend"
+        "ck_prefill_from_embedded(" in code
+        and scope not in {"audio_frontend", "audio_subsampling"}
     ):
         return code
 
@@ -1558,17 +1639,27 @@ def _inject_prefill_multimodal_bridge(
         return code
 
     encoder_ops = [
-        op for op in ops if str(op.get("op", "")) not in _AUDIO_FRONTEND_OPS
+        op for op in ops
+        if str(op.get("op", "")) not in (_AUDIO_FRONTEND_OPS | _AUDIO_SUBSAMPLING_OPS)
     ]
-    embedded_prefill = codegen_prefill_v8.emit_prefill_from_embedded_function(
-        encoder_ops,
-        config,
-        profile=profile,
-        dump=dump,
-    )
+    artifact_scope = str(config.get("artifact_scope", "") or "").strip().lower()
+    embedded_prefill = ""
+    if artifact_scope not in {"audio_frontend", "audio_subsampling"}:
+        embedded_prefill = codegen_prefill_v8.emit_prefill_from_embedded_function(
+            encoder_ops,
+            config,
+            profile=profile,
+            dump=dump,
+        )
     bridge_api = codegen_prefill_v8.emit_multimodal_bridge_api(ops, config)
     audio_entrypoint = _emit_audio_wav_entrypoint(ops, config)
-    if not embedded_prefill and not bridge_api and not audio_entrypoint:
+    audio_subsampling_entrypoint = _emit_audio_subsampling_entrypoint(ops, config)
+    if (
+        not embedded_prefill
+        and not bridge_api
+        and not audio_entrypoint
+        and not audio_subsampling_entrypoint
+    ):
         return code
 
     extra_parts = []
@@ -1597,6 +1688,8 @@ CK_EXPORT int ck_model_run_encoder(void) {{
             )
     if audio_entrypoint:
         extra_parts.append(audio_entrypoint)
+    if audio_subsampling_entrypoint:
+        extra_parts.append(audio_subsampling_entrypoint)
     if bridge_api:
         extra_parts.append(bridge_api)
     return code + "\n\n" + "\n\n".join(extra_parts)
@@ -1715,15 +1808,20 @@ def main(argv: list[str] | None = None) -> int:
         ir_path = td_path / "call.v8.json"
         layout_path = td_path / "layout.v8.json"
         core_ir_obj = ir_obj
-        if str((ir_obj.get("config") or {}).get("artifact_scope", "")).strip().lower() in {
+        artifact_scope = str(
+            (ir_obj.get("config") or {}).get("artifact_scope", "")
+        ).strip().lower()
+        if artifact_scope in {
             "encoder_only",
             "audio_frontend",
+            "audio_subsampling",
         }:
             core_ir_obj = dict(ir_obj)
             core_ir_obj["operations"] = [
                 op
                 for op in ir_obj.get("operations", [])
-                if str(op.get("op", "")) not in _AUDIO_FRONTEND_OPS
+                if str(op.get("op", ""))
+                not in (_AUDIO_FRONTEND_OPS | _AUDIO_SUBSAMPLING_OPS)
             ]
         ir_path.write_text(json.dumps(core_ir_obj, indent=2), encoding="utf-8")
         layout_path.write_text(json.dumps(layout_obj, indent=2), encoding="utf-8")
@@ -1757,6 +1855,15 @@ def main(argv: list[str] | None = None) -> int:
             if args.prefill_layout is None:
                 code = _inject_decode_runtime_multimodal_fallback(code, layout_obj, ir_obj)
         elif str(layout_obj.get("mode", "")).lower() == "prefill":
+            code = _inject_prefill_multimodal_bridge(
+                code,
+                ir_obj,
+                profile=args.profile,
+                dump=emit_parity_dumps,
+            )
+        elif artifact_scope in {"audio_frontend", "audio_subsampling"}:
+            # Component artifacts use dedicated native entry points even when
+            # their primary layout is decode-shaped for the shared emitter.
             code = _inject_prefill_multimodal_bridge(
                 code,
                 ir_obj,

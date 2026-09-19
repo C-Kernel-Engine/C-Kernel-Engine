@@ -101,6 +101,18 @@ lib.audio_conv2d_whc_grouped_f32.argtypes = [
     ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
 ]
 lib.audio_conv2d_whc_grouped_f32.restype = ctypes.c_int
+lib.audio_fastconformer_subsampling_workspace_bytes.argtypes = [
+    ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+]
+lib.audio_fastconformer_subsampling_workspace_bytes.restype = ctypes.c_size_t
+lib.audio_fastconformer_subsampling_f32.argtypes = [
+    *([_FLOAT_P] * 14),
+    ctypes.c_void_p,
+    ctypes.c_size_t,
+    *([ctypes.c_int] * 8),
+    ctypes.POINTER(ctypes.c_int),
+]
+lib.audio_fastconformer_subsampling_f32.restype = ctypes.c_int
 lib.audio_glu_split_channel_major_f32.argtypes = [
     _FLOAT_P, _FLOAT_P, ctypes.c_int, ctypes.c_int,
 ]
@@ -786,6 +798,106 @@ def check_grouped_conv2d() -> None:
     )
 
 
+def check_fastconformer_subsampling() -> None:
+    rng = np.random.default_rng(20260919)
+    feature_frames, live_frames, feature_channels = 9, 8, 16
+    conv_channels, hidden_size = 4, 6
+    kernel_size, stride = 3, 2
+
+    features = rng.normal(0.0, 0.2, (feature_frames, feature_channels)).astype(np.float32)
+    weights = [
+        rng.normal(0.0, 0.1, (conv_channels, 1, 3, 3)).astype(np.float32),
+        rng.normal(0.0, 0.03, conv_channels).astype(np.float32),
+        rng.normal(0.0, 0.1, (conv_channels, 1, 3, 3)).astype(np.float32),
+        rng.normal(0.0, 0.03, conv_channels).astype(np.float32),
+        rng.normal(0.0, 0.1, (conv_channels, conv_channels, 1, 1)).astype(np.float32),
+        rng.normal(0.0, 0.03, conv_channels).astype(np.float32),
+        rng.normal(0.0, 0.1, (conv_channels, 1, 3, 3)).astype(np.float32),
+        rng.normal(0.0, 0.03, conv_channels).astype(np.float32),
+        rng.normal(0.0, 0.1, (conv_channels, conv_channels, 1, 1)).astype(np.float32),
+        rng.normal(0.0, 0.03, conv_channels).astype(np.float32),
+    ]
+
+    value = torch.from_numpy(features)[None, None]
+    live = live_frames
+    for weight_index, groups, apply_relu in ((0, 1, True), (2, conv_channels, False)):
+        value = F.conv2d(
+            value,
+            torch.from_numpy(weights[weight_index]),
+            torch.from_numpy(weights[weight_index + 1]),
+            stride=2,
+            padding=1,
+            groups=groups,
+        )
+        live = (live + 1) // 2
+        value[:, :, live:, :] = 0.0
+        if apply_relu:
+            value = torch.relu(value)
+    value = F.conv2d(value, torch.from_numpy(weights[4]), torch.from_numpy(weights[5]))
+    value[:, :, live:, :] = 0.0
+    value = torch.relu(value)
+    value = F.conv2d(
+        value, torch.from_numpy(weights[6]), torch.from_numpy(weights[7]),
+        stride=2, padding=1, groups=conv_channels,
+    )
+    live = (live + 1) // 2
+    value[:, :, live:, :] = 0.0
+    value = F.conv2d(value, torch.from_numpy(weights[8]), torch.from_numpy(weights[9]))
+    value[:, :, live:, :] = 0.0
+    value = torch.relu(value)
+    tokens = value.permute(0, 2, 1, 3).reshape(value.shape[2], -1)
+    linear_weight = rng.normal(0.0, 0.1, (hidden_size, tokens.shape[1])).astype(np.float32)
+    linear_bias = rng.normal(0.0, 0.03, hidden_size).astype(np.float32)
+    expected = F.linear(
+        tokens, torch.from_numpy(linear_weight), torch.from_numpy(linear_bias)
+    ).numpy()
+
+    workspace_bytes = int(lib.audio_fastconformer_subsampling_workspace_bytes(
+        feature_frames, feature_channels, conv_channels, kernel_size, stride,
+    ))
+    assert workspace_bytes > 0
+    workspace = np.empty(workspace_bytes, dtype=np.uint8)
+    actual = np.empty_like(expected)
+    produced = ctypes.c_int(-1)
+    arguments = [
+        _fptr(features),
+        *(_fptr(weight) for weight in weights),
+        _fptr(linear_weight),
+        _fptr(linear_bias),
+        _fptr(actual),
+        ctypes.c_void_p(workspace.ctypes.data),
+        workspace_bytes,
+        feature_frames,
+        live_frames,
+        feature_channels,
+        conv_channels,
+        hidden_size,
+        kernel_size,
+        stride,
+        actual.shape[0],
+        ctypes.byref(produced),
+    ]
+    assert lib.audio_fastconformer_subsampling_f32(*arguments) == 0
+    assert produced.value == expected.shape[0]
+    difference = np.abs(actual - expected)
+    maximum = float(np.max(difference))
+    rmse = float(np.sqrt(np.mean(difference * difference)))
+    assert maximum <= 3.0e-7, maximum
+    assert rmse <= 1.0e-7, rmse
+
+    undersized = list(arguments)
+    undersized[15] = workspace_bytes - 1
+    assert lib.audio_fastconformer_subsampling_f32(*undersized) == -2
+    insufficient_output = list(arguments)
+    insufficient_output[23] = actual.shape[0] - 1
+    assert lib.audio_fastconformer_subsampling_f32(*insufficient_output) == -3
+    print(
+        "audio_fastconformer_subsampling "
+        f"max_diff={maximum:.8e} tol=3.0e-07 [PASS] "
+        f"rmse={rmse:.8e} rmse_tol=1.0e-07"
+    )
+
+
 def check_split_glu() -> None:
     rng = np.random.default_rng(20260830)
     channels, frames = 1280, 37
@@ -1214,6 +1326,7 @@ def main() -> None:
     check_precomputed_stft()
     check_centered_window_stft_and_log_mel()
     check_grouped_conv2d()
+    check_fastconformer_subsampling()
     check_split_glu()
     check_relative_shift()
     check_conformer_relative_attention()
@@ -1228,7 +1341,7 @@ def main() -> None:
     _check_cross_attention("audio_cross_attention_unequal_small", 3, 5, 17, 8)
     _check_cross_attention("audio_cross_attention_whisper_decode", 6, 1, 1500, 64)
     check_tiled_f16kv_encoder_attention()
-    print("ALL TESTS PASSED (30/30)")
+    print("ALL TESTS PASSED (31/31)")
 
 
 if __name__ == "__main__":

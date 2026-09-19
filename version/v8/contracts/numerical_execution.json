@@ -234,6 +234,17 @@
       "position_transform": null,
       "description": "Grouped channel-major 2D convolution. Groups=1 selects ordinary convolution; groups=input_channels=output_channels selects depthwise convolution without changing the provider ABI."
     },
+    "audio_fastconformer_subsampling_three_stride2_fp32": {
+      "operator_family": "audio_fastconformer_subsampling",
+      "status": "validated",
+      "storage": {"input": "fp32", "weight": "fp32", "output": "fp32"},
+      "compute": {"input": "fp32", "weight": "fp32", "accumulator": "fp32", "contraction": "enabled", "evaluation_order": "three_stride2_grouped_convolutions_with_pointwise_stages_then_token_major_flatten_then_gemm_nt_f32_llama_production_parallel_dispatch"},
+      "rounding": {"mode": "rne", "points": ["weighted_product", "reduction_update", "activation_intermediate_store", "output_store"]},
+      "reduction": {"kind": "composite", "order": "stage_ordered", "partial_accumulator": "fp32", "merge_order": "none"},
+      "threading": {"work_partition": "output_tiles", "split_strategy": "independent_outputs", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Reusable FastConformer stem with three stride-2 grouped Conv2D reductions, two intervening pointwise Conv2D stages, live-frame zeroing after every stage, ReLU at declared boundaries, token-major flattening, and CKE's shared production FP32 GEMM projection."
+    },
     "audio_glu_split_sigmoid_fp32": {
       "operator_family": "audio_glu",
       "status": "validated",

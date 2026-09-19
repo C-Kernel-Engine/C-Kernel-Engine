@@ -1818,6 +1818,10 @@ OP_DATAFLOW = {
         "inputs": {"input": "audio_features"},
         "outputs": {"output": {"slot": "audio_features_normalized", "dtype": "fp32"}},
     },
+    "audio_fastconformer_subsampling": {
+        "inputs": {"features": "audio_features_normalized"},
+        "outputs": {"output": {"slot": "audio_encoder_tokens", "dtype": "fp32"}},
+    },
     "audio_feature_window": {
         "inputs": {
             "wav_bytes": "external:audio_wav_bytes",
@@ -4224,6 +4228,7 @@ TEMPLATE_TO_KERNEL_OP = {
     "audio_mel_filters": "audio_mel_filters",
     "audio_log_mel": "audio_log_mel",
     "audio_feature_normalize": "audio_feature_normalize",
+    "audio_fastconformer_subsampling": "audio_fastconformer_subsampling",
     "audio_feature_window": "audio_feature_window",
     "audio_conv1d_stem_1": "audio_conv1d",
     "audio_conv1d_stem_2": "audio_conv1d",
@@ -8773,6 +8778,14 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
         "audio_mel_filters": None,
         "audio_log_mel": None,
         "audio_feature_normalize": None,
+        "audio_fastconformer_subsampling": [
+            "conv0_weight", "conv0_bias",
+            "depthwise1_weight", "depthwise1_bias",
+            "pointwise1_weight", "pointwise1_bias",
+            "depthwise2_weight", "depthwise2_bias",
+            "pointwise2_weight", "pointwise2_bias",
+            "linear_weight", "linear_bias",
+        ],
         "audio_feature_window": None,
         "audio_conv1d_stem_1": ["audio_conv1_weight", "audio_conv1_bias"],
         "audio_conv1d_stem_2": ["audio_conv2_weight", "audio_conv2_bias"],
@@ -9705,6 +9718,10 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                             graph_slots = _template_graph_slots(op_item)
                             if graph_slots:
                                 arranged["graph_slots"] = graph_slots
+                            if isinstance(op_item.get("weight_refs"), dict):
+                                arranged["template_weight_refs"] = copy.deepcopy(
+                                    op_item["weight_refs"]
+                                )
                             arranged_kernels.append(arranged)
                             print(f"      [{op_info['op_id']:3d}] {split_op:20s} → {kernel_id}  (inst: {op_info['instance']})")
 
@@ -9904,6 +9921,10 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                         graph_slots = _template_graph_slots(op_item)
                         if graph_slots:
                             arranged["graph_slots"] = graph_slots
+                        if isinstance(op_item.get("weight_refs"), dict):
+                            arranged["template_weight_refs"] = copy.deepcopy(
+                                op_item["weight_refs"]
+                            )
                         arranged_kernels.append(arranged)
                         print(f"      [{op_info['op_id']:3d}] {split_op:20s} → {kernel_id}  (inst: {op_info['instance']})")
 
@@ -10195,6 +10216,24 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                 return cand
         return None
 
+    def resolve_explicit_weight_name(
+        ir_op: Dict[str, Any], weight_key: str
+    ) -> Optional[str]:
+        explicit_refs = (
+            ir_op.get("template_weight_refs")
+            if isinstance(ir_op.get("template_weight_refs"), dict)
+            else {}
+        )
+        explicit = explicit_refs.get(weight_key)
+        if not isinstance(explicit, str) or not explicit.strip():
+            return None
+        try:
+            op_layer = int(ir_op.get("layer", -1))
+        except Exception:
+            op_layer = -1
+        candidate = explicit.replace("{L}", str(op_layer))
+        return candidate if candidate in weight_index else None
+
     for ir_op in arranged_kernels:
         op = ir_op["op"]
         layer = ir_op["layer"]
@@ -10204,8 +10243,12 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
         instance_idx = ir_op.get("instance", 0)
 
         # Get weight keys for this op - check repeated op mapping first
+        explicit_refs = (
+            ir_op.get("template_weight_refs")
+            if isinstance(ir_op.get("template_weight_refs"), dict)
+            else {}
+        )
         if section == "branch":
-            explicit_refs = ir_op.get("template_weight_refs") if isinstance(ir_op.get("template_weight_refs"), dict) else {}
             branch_weight_map = {
                 "layernorm": ["branch_norm_gamma", "branch_norm_beta"],
                 "branch_layernorm": ["branch_norm_gamma", "branch_norm_beta"],
@@ -10215,6 +10258,8 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
             weight_keys = list(branch_weight_map.get(op, []))
             if not weight_keys and explicit_refs:
                 weight_keys = list(explicit_refs.keys())
+        elif explicit_refs:
+            weight_keys = list(explicit_refs.keys())
         elif _circuit_op_weight_keys(template, section, op) is not None:
             weight_keys = _circuit_op_weight_keys(template, section, op) or []
         elif section == "body" and (op, instance_idx) in REPEATED_OP_WEIGHTS:
@@ -10231,6 +10276,8 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
         for wkey in weight_keys:
             if section == "branch":
                 weight_name = resolve_branch_weight_name(ir_op, str(wkey))
+            elif explicit_refs:
+                weight_name = resolve_explicit_weight_name(ir_op, str(wkey))
             else:
                 weight_name = resolve_weight_name(str(wkey), section, int(layer))
 
@@ -11894,6 +11941,14 @@ TEMPLATE_OP_WEIGHTS = {
     "audio_mel_filters": [],
     "audio_log_mel": [],
     "audio_feature_normalize": [],
+    "audio_fastconformer_subsampling": [
+        "conv0_weight", "conv0_bias",
+        "depthwise1_weight", "depthwise1_bias",
+        "pointwise1_weight", "pointwise1_bias",
+        "depthwise2_weight", "depthwise2_bias",
+        "pointwise2_weight", "pointwise2_bias",
+        "linear_weight", "linear_bias",
+    ],
     "audio_feature_window": [],
     "audio_conv1d_stem_1": ["audio_conv1_weight", "audio_conv1_bias"],
     "audio_conv1d_stem_2": ["audio_conv2_weight", "audio_conv2_bias"],
@@ -16121,6 +16176,7 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
                     "audio_source_rate": "audio_source_rate",
                     "audio_resampled": "audio_resampled",
                     "audio_resampled_frames": "audio_resampled_frames",
+                    "audio_subsampling_output_frames": "audio_subsampling_output_frames",
                 }
                 if key in audio_runtime_exprs:
                     expr = audio_runtime_exprs[key]
