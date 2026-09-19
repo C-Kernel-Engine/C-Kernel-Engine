@@ -6225,6 +6225,14 @@ def apply_layer_attention_dims(op_name: str, params: Dict, layer: int, config: D
         int(config.get("num_heads", config.get("num_attention_heads", 1)) or 1),
     )
     num_kv_heads = int(config.get("num_kv_heads", config.get("num_key_value_heads", num_heads)) or num_heads)
+    has_declared_kv_source = isinstance(config.get("layer_kv_source"), list)
+    kv_source_layer = _config_layer_int(config, "layer_kv_source", layer, layer)
+    source_num_kv_heads = _config_layer_int(
+        config,
+        "layer_num_kv_heads",
+        kv_source_layer,
+        num_kv_heads,
+    )
     q_head_dim = _config_layer_int(config, "layer_q_head_dim", layer, int(config.get("head_dim", 0) or 0))
     k_head_dim = _config_layer_int(config, "layer_k_head_dim", layer, q_head_dim)
     v_head_dim = _config_layer_int(
@@ -6232,6 +6240,18 @@ def apply_layer_attention_dims(op_name: str, params: Dict, layer: int, config: D
         "layer_v_head_dim",
         layer,
         int(config.get("v_head_dim", k_head_dim) or k_head_dim),
+    )
+    source_k_head_dim = _config_layer_int(
+        config,
+        "layer_k_head_dim",
+        kv_source_layer,
+        k_head_dim,
+    )
+    source_v_head_dim = _config_layer_int(
+        config,
+        "layer_v_head_dim",
+        kv_source_layer,
+        v_head_dim,
     )
     q_dim = _config_layer_int(
         config,
@@ -6359,13 +6379,31 @@ def apply_layer_attention_dims(op_name: str, params: Dict, layer: int, config: D
         params["k_head_dim"] = k_head_dim
         params["v_head_dim"] = v_head_dim
         params["q_dim"] = q_dim
-        if op_name in ("q_norm", "rope_q", "attn_shared_kv", "attn_sliding_shared_kv"):
+        if op_name in ("q_norm", "rope_q"):
             params["k_dim"] = q_dim
             params["v_dim"] = q_dim
+        elif (
+            op_name in ("attn_shared_kv", "attn_sliding_shared_kv")
+            and has_declared_kv_source
+        ):
+            if source_k_head_dim != q_head_dim or source_v_head_dim != q_head_dim:
+                raise ValueError(
+                    "shared-KV attention requires source K/V head dimensions to match Q: "
+                    f"layer={layer} source={kv_source_layer} q={q_head_dim} "
+                    f"k={source_k_head_dim} v={source_v_head_dim}"
+                )
+            params["num_kv_heads"] = source_num_kv_heads
+            params["k_dim"] = source_num_kv_heads * source_k_head_dim
+            params["v_dim"] = source_num_kv_heads * source_v_head_dim
+        elif op_name in ("attn_shared_kv", "attn_sliding_shared_kv"):
             params["num_kv_heads"] = num_heads
+            params["k_dim"] = q_dim
+            params["v_dim"] = q_dim
         else:
             params["k_dim"] = k_dim
             params["v_dim"] = v_dim
+        if op_name == "kv_cache_store":
+            params["head_dim"] = k_head_dim
         params["rotary_dim"] = rotary_dim
         params["n_dims"] = rotary_dim
         params["rope_freq_base"] = rope_freq_base
@@ -11549,6 +11587,12 @@ def generate_ir_lower_1(
                         "_auto_inserted": True,
                         "_cache_append": append_before_attention,
                     }
+                    apply_layer_attention_dims(
+                        "kv_cache_store",
+                        kv_batch_copy_op["params"],
+                        int(layer),
+                        config,
+                    )
                 if uses_kv_cache:
                     kv_read_layer = _kv_read_layer_for(int(layer))
                     op["_kv_cache_read_layer"] = kv_read_layer

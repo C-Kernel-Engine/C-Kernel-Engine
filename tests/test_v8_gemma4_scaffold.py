@@ -473,6 +473,47 @@ class V8Gemma4ScaffoldTests(unittest.TestCase):
         self.assertEqual(quantize["_input_dim"], 4096)
         self.assertEqual(quantize["input_dim"], 4096)
 
+    def test_shared_kv_dimensions_follow_the_declared_source_layer(self) -> None:
+        config = {
+            "embed_dim": 2560,
+            "num_heads": 8,
+            "num_kv_heads": 2,
+            "head_dim": 512,
+            "layer_kv_source": [0, 1, 0, 1],
+            "layer_q_head_dim": [256, 512, 256, 512],
+            "layer_k_head_dim": [256, 512, 256, 512],
+            "layer_v_head_dim": [256, 512, 256, 512],
+            "layer_q_dim": [2048, 4096, 2048, 4096],
+            "layer_attention_output_dim": [2048, 4096, 2048, 4096],
+            "layer_rotary_dim": [256, 512, 256, 512],
+            "layer_sliding_window": [512, 0, 512, 0],
+            "layer_rope_kind": ["swa", "full", "swa", "full"],
+        }
+
+        sliding_store = {}
+        apply_layer_attention_dims("kv_cache_store", sliding_store, 0, config)
+        self.assertEqual(sliding_store["num_kv_heads"], 2)
+        self.assertEqual(sliding_store["head_dim"], 256)
+
+        shared_sliding = {}
+        apply_layer_attention_dims(
+            "attn_sliding_shared_kv",
+            shared_sliding,
+            2,
+            config,
+        )
+        self.assertEqual(shared_sliding["num_kv_heads"], 2)
+        self.assertEqual(shared_sliding["head_dim"], 256)
+        self.assertEqual(shared_sliding["k_dim"], 512)
+        self.assertEqual(shared_sliding["v_dim"], 512)
+
+        shared_full = {}
+        apply_layer_attention_dims("attn_shared_kv", shared_full, 3, config)
+        self.assertEqual(shared_full["num_kv_heads"], 2)
+        self.assertEqual(shared_full["head_dim"], 512)
+        self.assertEqual(shared_full["k_dim"], 1024)
+        self.assertEqual(shared_full["v_dim"], 1024)
+
     def test_gemma4_template_declares_q_only_shared_kv_kinds(self) -> None:
         template_path = REPO_ROOT / "version" / "v8" / "circuits" / "gemma4.json"
         import json
