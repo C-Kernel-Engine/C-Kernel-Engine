@@ -328,7 +328,7 @@ class HiddenExportExtentTests(unittest.TestCase):
                 "args": [
                     _arg("output", "SLIDING_ATTN"),
                     _arg("num_heads", "8"),
-                    _arg("num_tokens", "61"),
+                    _arg("q_tokens", "61"),
                     _arg("aligned_head_dim", "256"),
                 ],
             }
@@ -354,7 +354,7 @@ class HiddenExportExtentTests(unittest.TestCase):
                 "args": [
                     _arg("output", "SHARED_ATTN"),
                     _arg("num_heads", "8"),
-                    _arg("num_tokens", "61"),
+                    _arg("q_tokens", "61"),
                     _arg("aligned_head_dim", "512"),
                 ],
             }
@@ -882,6 +882,31 @@ class HiddenExportExtentTests(unittest.TestCase):
             "(num_tokens) * (8) * (256)",
             emitted,
         )
+
+    def test_shared_attention_prefill_uses_runtime_segment_extent(self) -> None:
+        for op_name in ("attn_shared_kv", "attn_sliding_shared_kv"):
+            with self.subTest(op=op_name):
+                emitted = prefill_codegen.emit_prefill_op(
+                    {
+                        "op": op_name,
+                        "function": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_gemma4_workspace",
+                        "layer": 24,
+                        "args": [
+                            _arg("output", "SHARED_ATTN"),
+                            _arg("num_heads", "8"),
+                            _arg("q_tokens", "1024"),
+                            _arg("aligned_head_dim", "256"),
+                        ],
+                    },
+                    61,
+                    {"embed_dim": 2560},
+                )
+
+                self.assertIn(
+                    '"attn_pregate", (const float*)SHARED_ATTN, '
+                    "(num_tokens) * (8) * (256)",
+                    emitted,
+                )
 
     def test_quantized_projection_exports_full_prefill_extents(self) -> None:
         resolved = {

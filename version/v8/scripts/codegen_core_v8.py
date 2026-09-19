@@ -1996,7 +1996,7 @@ def emit_op(
         out_expr = _hidden_arg("out_token", "output", "out", "c", "y")
         count_expr = _mul_expr(
             _hidden_arg("num_heads", "query_heads"),
-            _hidden_arg("num_tokens", "tokens", "rows"),
+            _hidden_arg("num_tokens", "q_tokens", "tokens", "rows"),
             _hidden_arg("aligned_head_dim", "head_dim"),
         )
         _emit_hidden_export(
