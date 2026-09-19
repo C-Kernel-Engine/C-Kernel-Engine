@@ -135,7 +135,7 @@
       }
     },
     "f16_online_single_range_noscale": {
-      "status": "observed",
+      "status": "validated",
       "q_compute": "fp16_rounded",
       "k_compute": "fp16_rounded",
       "score_accumulator": "fp32",
@@ -149,9 +149,15 @@
       },
       "description": "Single-range llama-compatible FP16 attention with Gemma4's explicit unit attention scale.",
       "validation": {
-        "test": "tests/test_v8_gemma4_attention_f16cache.py",
-        "cases": ["full cache", "sliding cache", "segmented append"],
-        "reference": "llama.cpp Gemma4 attention capture"
+        "test": "tests/test_v8_direct_layout_attention.py",
+        "cases": [
+          "full and sliding cache with nonzero past tokens",
+          "single-pass versus segmented append",
+          "prefill final token versus decode",
+          "grouped KV heads with padded AVX2 geometry",
+          "window-boundary positions"
+        ],
+        "reference": "independent scalar oracle reproducing the declared FP16 rounding and AVX2 reduction order"
       }
     },
     "f16_online_fp32_merge": {

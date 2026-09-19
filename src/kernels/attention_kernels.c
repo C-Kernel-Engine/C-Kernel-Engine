@@ -7795,8 +7795,12 @@ static ck_attention_status_t ck_attention_prefill_append_f16cache_gemma4_workspa
 {
     if (!q || !k_cache || !v_cache || !output || num_heads <= 0 ||
         num_kv_heads <= 0 || q_tokens <= 0 || past_tokens < 0 ||
-        past_tokens + q_tokens > cache_capacity || head_dim <= 0 ||
+        cache_capacity <= 0 || past_tokens > cache_capacity ||
+        q_tokens > cache_capacity - past_tokens || head_dim <= 0 ||
         aligned_head_dim < head_dim || sliding_window < 0) {
+        return CK_ATTENTION_STATUS_INVALID_ARGUMENT;
+    }
+    if ((size_t) num_heads > SIZE_MAX / (size_t) aligned_head_dim) {
         return CK_ATTENTION_STATUS_INVALID_ARGUMENT;
     }
     const size_t token_elems = (size_t) num_heads * (size_t) aligned_head_dim;

@@ -5030,12 +5030,27 @@
       },
       "supported_reductions": {
         "f16_online_single_range_noscale": {
-          "status": "observed",
+          "status": "validated",
           "function": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_gemma4_workspace",
           "explicit_selector": true,
           "selector": "CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE",
           "notes": "Gemma4 unit-scale, single-range FP16 online attention over an append-preserving cache."
         }
+      },
+      "numerical_capabilities": {
+        "input_dtype": "fp32_q_fp16_kv",
+        "accumulation_dtype": "fp32_scores_fp16_value_updates",
+        "reduction_order": "f16_online_single_range_noscale",
+        "output_dtype": "fp32"
+      },
+      "operation_interface": "attention.causal_gqa.append_f16cache.noscale.prefill.v1",
+      "selection": {
+        "status": "production",
+        "priority": 330,
+        "equivalence_group": "attention.gemma4.f16_noscale.full.v1",
+        "phases": [
+          "prefill"
+        ]
       },
       "implementation": {
         "isa_dispatch": "runtime",
@@ -5058,7 +5073,11 @@
             "num_heads",
             "q_tokens",
             "head_dim"
-          ]
+          ],
+          "layout": "head_major_contiguous",
+          "access": "read",
+          "storage_class": "scratch",
+          "consumption": "required"
         },
         {
           "name": "k_cache",
@@ -5067,7 +5086,11 @@
             "num_kv_heads",
             "cache_capacity",
             "head_dim"
-          ]
+          ],
+          "layout": "head_major_contiguous",
+          "access": "read",
+          "storage_class": "state",
+          "consumption": "required"
         },
         {
           "name": "v_cache",
@@ -5076,9 +5099,14 @@
             "num_kv_heads",
             "cache_capacity",
             "head_dim"
-          ]
+          ],
+          "layout": "head_major_contiguous",
+          "access": "read",
+          "storage_class": "state",
+          "consumption": "required"
         }
       ],
+      "weights": [],
       "outputs": [
         {
           "name": "output",
@@ -5087,7 +5115,11 @@
             "num_heads",
             "q_tokens",
             "head_dim"
-          ]
+          ],
+          "layout": "head_major_contiguous",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
         }
       ],
       "scratch": [
@@ -5125,28 +5157,45 @@
           "src/kernels/attention_kernels.c"
         ]
       },
+      "tests": {
+        "unit": [
+          "tests/test_v8_direct_layout_attention.py"
+        ]
+      },
       "call_abi": {
         "version": 1,
         "params": [
           {
             "name": "q",
             "source": "scratch:q_scratch",
-            "cast": "const float*"
+            "cast": "const float*",
+            "ports": [
+              "input:q"
+            ]
           },
           {
             "name": "k_cache",
             "source": "runtime:kv_cache_k_layer_f16",
-            "cast": "const uint16_t*"
+            "cast": "const uint16_t*",
+            "ports": [
+              "input:k_cache"
+            ]
           },
           {
             "name": "v_cache",
             "source": "runtime:kv_cache_v_layer_f16",
-            "cast": "const uint16_t*"
+            "cast": "const uint16_t*",
+            "ports": [
+              "input:v_cache"
+            ]
           },
           {
             "name": "output",
             "source": "output:out",
-            "cast": "float*"
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
           },
           {
             "name": "num_heads",
@@ -5416,12 +5465,27 @@
       },
       "supported_reductions": {
         "f16_online_single_range_noscale": {
-          "status": "observed",
+          "status": "validated",
           "function": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_sliding_gemma4_workspace",
           "explicit_selector": true,
           "selector": "CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE",
           "notes": "Gemma4 unit-scale sliding attention over the declared live cache range."
         }
+      },
+      "numerical_capabilities": {
+        "input_dtype": "fp32_q_fp16_kv",
+        "accumulation_dtype": "fp32_scores_fp16_value_updates",
+        "reduction_order": "f16_online_single_range_noscale",
+        "output_dtype": "fp32"
+      },
+      "operation_interface": "attention.causal_gqa.append_f16cache.noscale.sliding.prefill.v1",
+      "selection": {
+        "status": "production",
+        "priority": 330,
+        "equivalence_group": "attention.gemma4.f16_noscale.sliding.v1",
+        "phases": [
+          "prefill"
+        ]
       },
       "implementation": {
         "isa_dispatch": "runtime",
@@ -5444,7 +5508,11 @@
             "num_heads",
             "q_tokens",
             "head_dim"
-          ]
+          ],
+          "layout": "head_major_contiguous",
+          "access": "read",
+          "storage_class": "scratch",
+          "consumption": "required"
         },
         {
           "name": "k_cache",
@@ -5453,7 +5521,11 @@
             "num_kv_heads",
             "cache_capacity",
             "head_dim"
-          ]
+          ],
+          "layout": "head_major_contiguous",
+          "access": "read",
+          "storage_class": "state",
+          "consumption": "required"
         },
         {
           "name": "v_cache",
@@ -5462,9 +5534,14 @@
             "num_kv_heads",
             "cache_capacity",
             "head_dim"
-          ]
+          ],
+          "layout": "head_major_contiguous",
+          "access": "read",
+          "storage_class": "state",
+          "consumption": "required"
         }
       ],
+      "weights": [],
       "outputs": [
         {
           "name": "output",
@@ -5473,7 +5550,11 @@
             "num_heads",
             "q_tokens",
             "head_dim"
-          ]
+          ],
+          "layout": "head_major_contiguous",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
         }
       ],
       "scratch": [
@@ -5512,28 +5593,45 @@
           "src/kernels/attention_kernels.c"
         ]
       },
+      "tests": {
+        "unit": [
+          "tests/test_v8_direct_layout_attention.py"
+        ]
+      },
       "call_abi": {
         "version": 1,
         "params": [
           {
             "name": "q",
             "source": "scratch:q_scratch",
-            "cast": "const float*"
+            "cast": "const float*",
+            "ports": [
+              "input:q"
+            ]
           },
           {
             "name": "k_cache",
             "source": "runtime:kv_cache_k_layer_f16",
-            "cast": "const uint16_t*"
+            "cast": "const uint16_t*",
+            "ports": [
+              "input:k_cache"
+            ]
           },
           {
             "name": "v_cache",
             "source": "runtime:kv_cache_v_layer_f16",
-            "cast": "const uint16_t*"
+            "cast": "const uint16_t*",
+            "ports": [
+              "input:v_cache"
+            ]
           },
           {
             "name": "output",
             "source": "output:out",
-            "cast": "float*"
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
           },
           {
             "name": "num_heads",
@@ -6045,12 +6143,27 @@
       },
       "supported_reductions": {
         "f16_online_single_range_noscale": {
-          "status": "observed",
+          "status": "validated",
           "function": "attention_forward_decode_head_major_gqa_f16cache_gemma4_contract",
           "explicit_selector": true,
           "selector": "CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE",
           "notes": "Gemma4 unit-scale decode over an FP16 persistent cache."
         }
+      },
+      "numerical_capabilities": {
+        "input_dtype": "fp32_q_fp16_kv",
+        "accumulation_dtype": "fp32_scores_fp16_value_updates",
+        "reduction_order": "f16_online_single_range_noscale",
+        "output_dtype": "fp32"
+      },
+      "operation_interface": "attention.causal_gqa.f16cache.noscale.decode.v1",
+      "selection": {
+        "status": "production",
+        "priority": 330,
+        "equivalence_group": "attention.gemma4.f16_noscale.full.v1",
+        "phases": [
+          "decode"
+        ]
       },
       "implementation": {
         "isa_dispatch": "runtime",
@@ -6072,7 +6185,11 @@
           "shape": [
             "num_heads",
             "head_dim"
-          ]
+          ],
+          "layout": "head_major_contiguous",
+          "access": "read",
+          "storage_class": "scratch",
+          "consumption": "required"
         },
         {
           "name": "k_cache",
@@ -6081,7 +6198,11 @@
             "num_kv_heads",
             "cache_capacity",
             "head_dim"
-          ]
+          ],
+          "layout": "head_major_contiguous",
+          "access": "read",
+          "storage_class": "state",
+          "consumption": "required"
         },
         {
           "name": "v_cache",
@@ -6090,9 +6211,14 @@
             "num_kv_heads",
             "cache_capacity",
             "head_dim"
-          ]
+          ],
+          "layout": "head_major_contiguous",
+          "access": "read",
+          "storage_class": "state",
+          "consumption": "required"
         }
       ],
+      "weights": [],
       "outputs": [
         {
           "name": "out_token",
@@ -6100,7 +6226,11 @@
           "shape": [
             "num_heads",
             "head_dim"
-          ]
+          ],
+          "layout": "head_major_contiguous",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
         }
       ],
       "dims": [
@@ -6124,28 +6254,45 @@
           "src/kernels/attention_kernels.c"
         ]
       },
+      "tests": {
+        "unit": [
+          "tests/test_v8_direct_layout_attention.py"
+        ]
+      },
       "call_abi": {
         "version": 1,
         "params": [
           {
             "name": "q_token",
             "source": "scratch:q_scratch",
-            "cast": "const float*"
+            "cast": "const float*",
+            "ports": [
+              "input:q_token"
+            ]
           },
           {
             "name": "k_cache",
             "source": "runtime:kv_cache_k_layer_f16",
-            "cast": "const uint16_t*"
+            "cast": "const uint16_t*",
+            "ports": [
+              "input:k_cache"
+            ]
           },
           {
             "name": "v_cache",
             "source": "runtime:kv_cache_v_layer_f16",
-            "cast": "const uint16_t*"
+            "cast": "const uint16_t*",
+            "ports": [
+              "input:v_cache"
+            ]
           },
           {
             "name": "out_token",
             "source": "output:out",
-            "cast": "float*"
+            "cast": "float*",
+            "ports": [
+              "output:out_token"
+            ]
           },
           {
             "name": "num_heads",
@@ -6205,12 +6352,27 @@
       },
       "supported_reductions": {
         "f16_online_single_range_noscale": {
-          "status": "observed",
+          "status": "validated",
           "function": "attention_forward_decode_head_major_gqa_f16cache_sliding_gemma4_contract",
           "explicit_selector": true,
           "selector": "CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE",
           "notes": "Gemma4 unit-scale decode over the declared sliding range of an FP16 persistent cache."
         }
+      },
+      "numerical_capabilities": {
+        "input_dtype": "fp32_q_fp16_kv",
+        "accumulation_dtype": "fp32_scores_fp16_value_updates",
+        "reduction_order": "f16_online_single_range_noscale",
+        "output_dtype": "fp32"
+      },
+      "operation_interface": "attention.causal_gqa.f16cache.noscale.sliding.decode.v1",
+      "selection": {
+        "status": "production",
+        "priority": 330,
+        "equivalence_group": "attention.gemma4.f16_noscale.sliding.v1",
+        "phases": [
+          "decode"
+        ]
       },
       "implementation": {
         "isa_dispatch": "runtime",
@@ -6232,7 +6394,11 @@
           "shape": [
             "num_heads",
             "head_dim"
-          ]
+          ],
+          "layout": "head_major_contiguous",
+          "access": "read",
+          "storage_class": "scratch",
+          "consumption": "required"
         },
         {
           "name": "k_cache",
@@ -6241,7 +6407,11 @@
             "num_kv_heads",
             "cache_capacity",
             "head_dim"
-          ]
+          ],
+          "layout": "head_major_contiguous",
+          "access": "read",
+          "storage_class": "state",
+          "consumption": "required"
         },
         {
           "name": "v_cache",
@@ -6250,9 +6420,14 @@
             "num_kv_heads",
             "cache_capacity",
             "head_dim"
-          ]
+          ],
+          "layout": "head_major_contiguous",
+          "access": "read",
+          "storage_class": "state",
+          "consumption": "required"
         }
       ],
+      "weights": [],
       "outputs": [
         {
           "name": "out_token",
@@ -6260,7 +6435,11 @@
           "shape": [
             "num_heads",
             "head_dim"
-          ]
+          ],
+          "layout": "head_major_contiguous",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
         }
       ],
       "dims": [
@@ -6285,28 +6464,45 @@
           "src/kernels/attention_kernels.c"
         ]
       },
+      "tests": {
+        "unit": [
+          "tests/test_v8_direct_layout_attention.py"
+        ]
+      },
       "call_abi": {
         "version": 1,
         "params": [
           {
             "name": "q_token",
             "source": "scratch:q_scratch",
-            "cast": "const float*"
+            "cast": "const float*",
+            "ports": [
+              "input:q_token"
+            ]
           },
           {
             "name": "k_cache",
             "source": "runtime:kv_cache_k_layer_f16",
-            "cast": "const uint16_t*"
+            "cast": "const uint16_t*",
+            "ports": [
+              "input:k_cache"
+            ]
           },
           {
             "name": "v_cache",
             "source": "runtime:kv_cache_v_layer_f16",
-            "cast": "const uint16_t*"
+            "cast": "const uint16_t*",
+            "ports": [
+              "input:v_cache"
+            ]
           },
           {
             "name": "out_token",
             "source": "output:out",
-            "cast": "float*"
+            "cast": "float*",
+            "ports": [
+              "output:out_token"
+            ]
           },
           {
             "name": "num_heads",
