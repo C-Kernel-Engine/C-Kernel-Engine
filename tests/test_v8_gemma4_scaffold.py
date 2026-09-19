@@ -1,3 +1,4 @@
+import copy
 import json
 import subprocess
 import sys
@@ -753,6 +754,34 @@ class V8Gemma4ScaffoldTests(unittest.TestCase):
             self.assertIn("rope_qk", ops)
             self.assertNotIn("q_norm", ops)
             self.assertNotIn("rope_q", ops)
+
+    def test_gemma4_segmented_prefill_uses_runtime_position_offsets(self) -> None:
+        import build_ir_v8  # type: ignore
+
+        template = build_ir_v8._load_builtin_template_doc("gemma4")
+        self.assertIsNotNone(template)
+        schedule = template["contract"]["multimodal_bridge"]["prefill_schedules"][
+            "segmented_append"
+        ]
+        self.assertEqual(schedule["position_transition"], "runtime_offset")
+        self.assertNotIn("position_transform", schedule)
+        build_ir_v8._validate_segmented_prefill_contract(
+            template,
+            source="test:gemma4",
+        )
+
+        invalid = copy.deepcopy(template)
+        invalid["contract"]["multimodal_bridge"]["prefill_schedules"][
+            "segmented_append"
+        ]["position_transform"] = {
+            "kernel_id": "mrope_qk_imrope_positions",
+            "contract_id": "text_imrope_positions_fp32_input_fp32_compute_fp32_output",
+        }
+        with self.assertRaisesRegex(RuntimeError, "must not declare"):
+            build_ir_v8._validate_segmented_prefill_contract(
+                invalid,
+                source="test:gemma4-invalid",
+            )
 
     def test_gemma4_v_norm_is_unweighted_rmsnorm(self) -> None:
         import json

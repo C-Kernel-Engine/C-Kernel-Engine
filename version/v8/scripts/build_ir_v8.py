@@ -1639,16 +1639,14 @@ def _validate_segmented_prefill_contract(
         raise RuntimeError(
             f"HARD CONTRACT FAULT: multimodal bridge in {source} must declare prefill_schedules."
         )
-    expected_schedules = {
+    expected_schedule_core = {
         "segmented_append": {
             "segments": ["text_before", "visual", "text_after"],
             "cache_transition": "append_preserve",
-            "position_transition": "segment_defined",
         },
         "unified_mixed": {
             "segments": ["text_before", "visual", "text_after"],
             "cache_transition": "single_pass",
-            "position_transition": "explicit_full_sequence",
         },
     }
     for name, schedule in schedules.items():
@@ -1661,12 +1659,24 @@ def _validate_segmented_prefill_contract(
             schedule_core.pop("deepstack_injection", None)
             if isinstance(schedule_core, dict) else None
         )
-        if name not in expected_schedules or schedule_core != expected_schedules[name]:
+        expected = expected_schedule_core.get(name)
+        if expected is None or not isinstance(schedule_core, dict):
+            raise RuntimeError(
+                "HARD CONTRACT FAULT: unsupported mixed-prefill schedule "
+                f"{name!r} in {source}."
+            )
+        position_transition = schedule_core.pop("position_transition", None)
+        if schedule_core != expected:
             raise RuntimeError(
                 "HARD CONTRACT FAULT: unsupported mixed-prefill schedule "
                 f"{name!r} in {source}."
             )
         if name == "unified_mixed":
+            if position_transition != "explicit_full_sequence":
+                raise RuntimeError(
+                    "HARD CONTRACT FAULT: unified mixed-prefill requires "
+                    f"explicit_full_sequence positions in {source}."
+                )
             if (
                 not isinstance(position_transform, dict)
                 or not str(position_transform.get("kernel_id", "") or "").strip()
@@ -1688,7 +1698,7 @@ def _validate_segmented_prefill_contract(
                     f"deepstack injection kernel and numerical contract in {source}."
                 )
         else:
-            if (
+            if position_transition == "segment_defined" and (
                 not isinstance(position_transform, dict)
                 or not str(position_transform.get("kernel_id", "") or "").strip()
                 or not str(position_transform.get("contract_id", "") or "").strip()
@@ -1696,6 +1706,16 @@ def _validate_segmented_prefill_contract(
                 raise RuntimeError(
                     "HARD CONTRACT FAULT: segmented mixed-prefill requires an exact "
                     f"positions-aware kernel and numerical contract in {source}."
+                )
+            if position_transition == "runtime_offset" and position_transform is not None:
+                raise RuntimeError(
+                    "HARD CONTRACT FAULT: runtime-offset segmented prefill must not "
+                    f"declare an explicit position transform in {source}."
+                )
+            if position_transition not in {"segment_defined", "runtime_offset"}:
+                raise RuntimeError(
+                    "HARD CONTRACT FAULT: segmented mixed-prefill has unsupported "
+                    f"position transition {position_transition!r} in {source}."
                 )
             if deepstack_injection is not None:
                 raise RuntimeError(
