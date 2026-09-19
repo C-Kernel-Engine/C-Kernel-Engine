@@ -11096,11 +11096,14 @@ def generate_ir_lower_1(
             pass
         return int(layer)
 
-    def _bind_decode_attention_cache_inputs(
+    def _layer_produces_kv(layer: int) -> bool:
+        return _kv_read_layer_for(layer) == int(layer)
+
+    def _bind_attention_cache_inputs(
         attention_op: Dict[str, Any],
         kv_read_layer: int,
     ) -> None:
-        """Rebind the provider-declared K/V cache ports for decode.
+        """Rebind the provider-declared K/V cache ports to their source layer.
 
         Most attention providers expose ``k_cache``/``v_cache`` while sparse
         attention providers may use the more explicit
@@ -11263,16 +11266,19 @@ def generate_ir_lower_1(
                 and layer not in decode_rope_layers
             )
             if should_store_after_rope or should_store_after_v or should_store_after_qk_norm:
-                final_ops.append(_make_decode_kv_store_op(op))
-                kv_store_count += 1
+                if _layer_produces_kv(layer):
+                    final_ops.append(_make_decode_kv_store_op(op))
+                    kv_store_count += 1
             elif should_store_after_v_bias:
-                final_ops.append(
-                    _make_decode_kv_store_op(decode_v_projection_by_layer[layer])
-                )
-                kv_store_count += 1
+                if _layer_produces_kv(layer):
+                    final_ops.append(
+                        _make_decode_kv_store_op(decode_v_projection_by_layer[layer])
+                    )
+                    kv_store_count += 1
             elif should_store_after_q_rope:
-                final_ops.append(_make_decode_shared_q_kv_store_op(op))
-                kv_store_count += 1
+                if _layer_produces_kv(layer):
+                    final_ops.append(_make_decode_shared_q_kv_store_op(op))
+                    kv_store_count += 1
             elif explicit_mla_decode_cache and op_name == "partial_rope_concat" and layer in decode_mla_layers:
                 final_ops.append(_make_mla_kv_store_op(op, batch=False))
                 kv_store_count += 1
@@ -11282,7 +11288,7 @@ def generate_ir_lower_1(
                 _require_resolved_decode_attention_kernel(op)
                 kv_read_layer = _kv_read_layer_for(int(op.get("layer", 0)))
                 op["_kv_cache_read_layer"] = kv_read_layer
-                _bind_decode_attention_cache_inputs(op, kv_read_layer)
+                _bind_attention_cache_inputs(op, kv_read_layer)
             elif op["op"] in _DECODE_ATTENTION_OPS:
                 decode_kernel = _require_resolved_decode_attention_kernel(op)
                 decode_attention_count += 1
@@ -11294,7 +11300,7 @@ def generate_ir_lower_1(
                     )
                 kv_read_layer = _kv_read_layer_for(int(op.get("layer", 0)))
                 op["_kv_cache_read_layer"] = kv_read_layer
-                _bind_decode_attention_cache_inputs(op, kv_read_layer)
+                _bind_attention_cache_inputs(op, kv_read_layer)
 
             if op_name in ("cross_k_proj", "cross_v_proj"):
                 is_key = op_name == "cross_k_proj"
@@ -11489,7 +11495,8 @@ def generate_ir_lower_1(
                         "Fix the circuit cache contract; do not fall back to full-sequence prefill."
                     )
                 kv_batch_copy_op = None
-                if uses_kv_cache:
+                layer_produces_kv = _layer_produces_kv(int(layer))
+                if uses_kv_cache and layer_produces_kv:
                     shared_q_prefill = op["op"] in ("attn_shared_kv", "attn_sliding_shared_kv")
                     copy_src = "q_scratch" if shared_q_prefill else "k_scratch"
                     batch_store_kernel = (
@@ -11522,11 +11529,16 @@ def generate_ir_lower_1(
                         "_auto_inserted": True,
                         "_cache_append": append_before_attention,
                     }
+                if uses_kv_cache:
+                    kv_read_layer = _kv_read_layer_for(int(layer))
+                    op["_kv_cache_read_layer"] = kv_read_layer
+                    _bind_attention_cache_inputs(op, kv_read_layer)
                 if append_before_attention:
                     # Append providers consume current K/V through the persistent
                     # cache. Commit the current token block before invoking them.
-                    final_ops.insert(len(final_ops) - 1, kv_batch_copy_op)
-                    kv_store_count += 1
+                    if kv_batch_copy_op is not None:
+                        final_ops.insert(len(final_ops) - 1, kv_batch_copy_op)
+                        kv_store_count += 1
                 if output_converter is not None:
                     transpose_attn_out_op = {
                         "idx": len(final_ops),
@@ -11542,7 +11554,7 @@ def generate_ir_lower_1(
                         "_auto_inserted": True,
                     }
                     final_ops.append(transpose_attn_out_op)
-                if uses_kv_cache and not append_before_attention:
+                if kv_batch_copy_op is not None and not append_before_attention:
                     final_ops.append(kv_batch_copy_op)
                     kv_store_count += 1
 

@@ -58,6 +58,17 @@ class DirectLayoutAttentionTests(unittest.TestCase):
             prefill_workspace_signature
         )
         cls._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract_workspace.restype = ctypes.c_int
+        cls._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_gemma4_workspace.argtypes = (
+            prefill_workspace_signature
+        )
+        cls._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_gemma4_workspace.restype = ctypes.c_int
+        gemma_sliding_prefill_signature = prefill_workspace_signature[:11] + [
+            ctypes.c_int,
+        ] + prefill_workspace_signature[11:]
+        cls._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_sliding_gemma4_workspace.argtypes = (
+            gemma_sliding_prefill_signature
+        )
+        cls._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_sliding_gemma4_workspace.restype = ctypes.c_int
         qtile_schedule_signature = [
             ctypes.POINTER(ctypes.c_float),
             ctypes.POINTER(ctypes.c_uint16),
@@ -98,6 +109,55 @@ class DirectLayoutAttentionTests(unittest.TestCase):
             + [ctypes.POINTER(ctypes.c_int), ctypes.c_int]
         )
         cls._lib.attention_forward_causal_head_major_gqa_prefill_segmented_f16cache_contract_workspace.restype = ctypes.c_int
+
+    def test_gemma4_f16cache_prefill_honors_unit_scale_and_sliding_range(self):
+        import struct
+
+        heads, kv_heads, tokens, dim = 2, 1, 5, 8
+        q = array("f", (0.1 + math.sin(i * 0.17) for i in range(heads * tokens * dim)))
+
+        def fp16_bits(value):
+            return int.from_bytes(struct.pack("<e", value), "little")
+
+        k = array("H", (fp16_bits(math.cos(i * 0.11)) for i in range(kv_heads * tokens * dim)))
+        v = array("H", (fp16_bits(math.sin(i * 0.13 + 0.4)) for i in range(kv_heads * tokens * dim)))
+        workspace = array("f", [0.0]) * (2 * heads * dim)
+
+        def float_pointer(values):
+            return (ctypes.c_float * len(values)).from_buffer(values)
+
+        def half_pointer(values):
+            return (ctypes.c_uint16 * len(values)).from_buffer(values)
+
+        def run(function, *extra):
+            output = array("f", [0.0]) * (heads * tokens * dim)
+            status = function(
+                float_pointer(q), half_pointer(k), half_pointer(v),
+                float_pointer(output), heads, kv_heads, tokens, 0, tokens,
+                dim, dim, *extra, 2, float_pointer(workspace),
+                len(workspace) * ctypes.sizeof(ctypes.c_float),
+            )
+            self.assertEqual(status, 0)
+            return output
+
+        full = run(
+            self._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_gemma4_workspace
+        )
+        unbounded_sliding = run(
+            self._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_sliding_gemma4_workspace,
+            tokens,
+        )
+        bounded_sliding = run(
+            self._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_sliding_gemma4_workspace,
+            2,
+        )
+        scaled = run(
+            self._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract_workspace
+        )
+
+        self.assertEqual(full.tobytes(), unbounded_sliding.tobytes())
+        self.assertNotEqual(full.tobytes(), bounded_sliding.tobytes())
+        self.assertNotEqual(full.tobytes(), scaled.tobytes())
 
     @classmethod
     def tearDownClass(cls):
