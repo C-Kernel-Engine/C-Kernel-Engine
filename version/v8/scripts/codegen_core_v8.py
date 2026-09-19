@@ -1978,6 +1978,15 @@ def emit_op(
         )
         _emit_hidden_export(_hidden_arg("q"), "rope_q", q_count)
         _emit_hidden_export(_hidden_arg("k"), "rope_k", k_count)
+    elif op_name in ("rope_q", "rope_k"):
+        tensor_name = "q" if op_name == "rope_q" else "k"
+        heads_name = "num_heads" if op_name == "rope_q" else "num_kv_heads"
+        count = _mul_expr(
+            _hidden_arg(heads_name),
+            _hidden_arg("num_tokens", "tokens", "rows"),
+            _hidden_arg("aligned_head_dim", "head_dim"),
+        )
+        _emit_hidden_export(_hidden_arg(tensor_name), op_name, count)
     elif op_name in ("out_proj", "attn_out_proj"):
         out_expr = _hidden_arg("output", "out", "c", "y")
         count_expr = _mul_expr(
@@ -2254,6 +2263,21 @@ def emit_op(
             lines.append(f'    ck_debug_export_hidden(model, {layer}, "qk_norm_q", (const float*){q_expr}, {q_count});')
         if k_expr and k_count:
             lines.append(f'    ck_debug_export_hidden(model, {layer}, "qk_norm_k", (const float*){k_expr}, {k_count});')
+    elif op_name in ("q_norm", "k_norm"):
+        tensor_name = "q" if op_name == "q_norm" else "k"
+        label = "qk_norm_q" if op_name == "q_norm" else "qk_norm_k"
+        heads_name = "num_heads" if op_name == "q_norm" else "num_kv_heads"
+        tensor = _hidden_raw(_hidden_arg(tensor_name))
+        count = _mul_expr(
+            _hidden_arg(heads_name),
+            _hidden_arg("num_tokens", "tokens", "rows"),
+            _hidden_arg("aligned_head_dim", "head_dim"),
+        )
+        if tensor and count:
+            lines.append(
+                f'    ck_debug_export_hidden(model, {layer}, "{label}", '
+                f'(const float*){tensor}, {count});'
+            )
     elif op_name == "rope_qk":
         q_expr = _hidden_raw(_hidden_arg("q"))
         k_expr = _hidden_raw(_hidden_arg("k"))

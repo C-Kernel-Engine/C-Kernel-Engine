@@ -77,7 +77,7 @@ def _emit_terminal_row_selection(op: Dict) -> str:
 
 
 def _annotate_kv_transpose_roles(ops: List[Dict]) -> None:
-    """Mark synthetic transpose ops with K/V role and per-layer head geometry."""
+    """Mark synthetic transpose ops with role and resolved per-layer geometry."""
 
     def _arg_expr(op: Dict, name: str) -> Optional[str]:
         target = name.lower()
@@ -87,20 +87,40 @@ def _annotate_kv_transpose_roles(ops: List[Dict]) -> None:
                 return expr or None
         return None
 
+    def _record_dim(dims: Dict[str, str], name: str, value: Optional[str], layer: int) -> None:
+        if not value:
+            return
+        previous = dims.get(name)
+        if previous is not None and previous != value:
+            raise ValueError(
+                f"conflicting resolved {name} for layer {layer}: "
+                f"{previous} != {value}"
+            )
+        dims[name] = value
+
     layer_dims: Dict[int, Dict[str, str]] = {}
     for op in ops:
-        if op.get("op") != "qk_norm":
+        if op.get("op") not in {
+            "qk_norm",
+            "q_norm",
+            "k_norm",
+            "rope_qk",
+            "rope_q",
+            "rope_k",
+            "attn",
+            "attn_sliding",
+            "attn_shared_kv",
+            "attn_sliding_shared_kv",
+        }:
             continue
         layer = int(op.get("layer", 0))
         num_heads = _arg_expr(op, "num_heads")
         num_kv_heads = _arg_expr(op, "num_kv_heads")
-        head_dim = _arg_expr(op, "head_dim")
-        if num_heads and num_kv_heads and head_dim:
-            layer_dims[layer] = {
-                "num_heads": num_heads,
-                "num_kv_heads": num_kv_heads,
-                "head_dim": head_dim,
-            }
+        head_dim = _arg_expr(op, "aligned_head_dim") or _arg_expr(op, "head_dim")
+        dims = layer_dims.setdefault(layer, {})
+        _record_dim(dims, "num_heads", num_heads, layer)
+        _record_dim(dims, "num_kv_heads", num_kv_heads, layer)
+        _record_dim(dims, "head_dim", head_dim, layer)
 
     layer_kv_count: Dict[int, int] = {}
     for op in ops:
@@ -120,9 +140,12 @@ def _annotate_kv_transpose_roles(ops: List[Dict]) -> None:
         layer = int(op.get("layer", 0))
         dims = layer_dims.get(layer)
         if dims:
-            op["_num_heads"] = dims["num_heads"]
-            op["_num_kv_heads"] = dims["num_kv_heads"]
-            op["_head_dim"] = dims["head_dim"]
+            if dims.get("num_heads"):
+                op["_num_heads"] = dims["num_heads"]
+            if dims.get("num_kv_heads"):
+                op["_num_kv_heads"] = dims["num_kv_heads"]
+            if dims.get("head_dim"):
+                op["_head_dim"] = dims["head_dim"]
         if op_name == "transpose_kv_to_head_major":
             count = layer_kv_count.get(layer, 0)
             op["_is_k"] = (count == 0)
@@ -1316,6 +1339,24 @@ def emit_prefill_op(
         )
         _emit_head_major_last(_hidden_arg("q"), "qk_norm_q", _hidden_arg("num_heads") or "NUM_HEADS", _hidden_arg("aligned_head_dim", "head_dim") or "HEAD_DIM")
         _emit_head_major_last(_hidden_arg("k"), "qk_norm_k", _hidden_arg("num_kv_heads") or "NUM_KV_HEADS", _hidden_arg("aligned_head_dim", "head_dim") or "HEAD_DIM")
+    elif op_type in ("q_norm", "k_norm"):
+        tensor_name = "q" if op_type == "q_norm" else "k"
+        label = "qk_norm_q" if op_type == "q_norm" else "qk_norm_k"
+        heads_name = "num_heads" if op_type == "q_norm" else "num_kv_heads"
+        default_heads = "NUM_HEADS" if op_type == "q_norm" else "NUM_KV_HEADS"
+        tensor = _hidden_arg(tensor_name)
+        heads = _hidden_arg(heads_name) or default_heads
+        width = _hidden_arg("aligned_head_dim", "head_dim") or "HEAD_DIM"
+        _emit_hidden_full(
+            tensor,
+            label,
+            _hidden_mul(
+                heads,
+                _hidden_arg("num_tokens", "rows") or "num_tokens",
+                width,
+            ),
+        )
+        _emit_head_major_last(tensor, label, heads, width)
     elif op_type == "rope_qk":
         _emit_hidden_full(
             _hidden_arg("q"), "rope_q",
@@ -1327,6 +1368,23 @@ def emit_prefill_op(
         )
         _emit_head_major_last(_hidden_arg("q"), "rope_q", _hidden_arg("num_heads") or "NUM_HEADS", _hidden_arg("aligned_head_dim", "head_dim") or "HEAD_DIM")
         _emit_head_major_last(_hidden_arg("k"), "rope_k", _hidden_arg("num_kv_heads") or "NUM_KV_HEADS", _hidden_arg("aligned_head_dim", "head_dim") or "HEAD_DIM")
+    elif op_type in ("rope_q", "rope_k"):
+        tensor_name = "q" if op_type == "rope_q" else "k"
+        heads_name = "num_heads" if op_type == "rope_q" else "num_kv_heads"
+        default_heads = "NUM_HEADS" if op_type == "rope_q" else "NUM_KV_HEADS"
+        tensor = _hidden_arg(tensor_name)
+        heads = _hidden_arg(heads_name) or default_heads
+        width = _hidden_arg("aligned_head_dim", "head_dim") or "HEAD_DIM"
+        _emit_hidden_full(
+            tensor,
+            op_type,
+            _hidden_mul(
+                heads,
+                _hidden_arg("num_tokens", "rows") or "num_tokens",
+                width,
+            ),
+        )
+        _emit_head_major_last(tensor, op_type, heads, width)
     elif op_type in (
         "attn",
         "attn_sliding",
