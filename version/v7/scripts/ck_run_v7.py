@@ -4826,6 +4826,107 @@ def _run_pr37_memory_verification(
 
 
 
+def _normalize_compile_define(value: Any) -> str:
+    if isinstance(value, bool):
+        return "1" if value else "0"
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
+        text = f"{value:.9g}"
+        return text if ("." in text or "e" in text.lower()) else text + ".0"
+    return str(value)
+
+
+def _train_runtime_build_identity_payload(
+    c_src: Path,
+    lib_ck: Path,
+    *,
+    cc: str,
+    cflags: Sequence[str],
+    defines: dict[str, Any],
+) -> dict[str, Any]:
+    resolved_cc = shutil.which(cc)
+    cc_version = subprocess.run(
+        [cc, "--version"],
+        cwd=str(PROJECT_ROOT),
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+    codegen_script = SCRIPTS_DIR / "codegen_train_runtime_v7.py"
+    identity_inputs = {
+        "generated_source_sha256": _hash_sha256_file(c_src),
+        "codegen_source_sha256": _hash_sha256_file(codegen_script),
+        "kernel_library_sha256": _hash_sha256_file(lib_ck),
+        "compiler": {
+            "requested": cc,
+            "resolved": str(Path(resolved_cc).resolve()) if resolved_cc else None,
+            "version": cc_version.stdout.splitlines()[0] if cc_version.returncode == 0 and cc_version.stdout else None,
+        },
+        "compile_flags": ["-shared", "-fPIC", "-O3", *[str(flag) for flag in cflags]],
+        "defines": {str(key): _normalize_compile_define(value) for key, value in sorted(defines.items())},
+        "include_dirs": [str(PROJECT_ROOT / "include"), str(PROJECT_ROOT)],
+        "library_dirs": [str(BUILD_DIR)],
+        "libraries": ["ckernel_engine", "m"],
+        "rpath": str(BUILD_DIR),
+    }
+    return {
+        "schema": "cke.v7.train_runtime_build_identity.v1",
+        "build_identity_sha256": _hash_sha256_bytes(_canonical_json_bytes(identity_inputs)),
+        "inputs": identity_inputs,
+    }
+
+
+def _compile_train_runtime_with_identity(
+    c_src: Path,
+    output: Path,
+    *,
+    lib_ck: Path,
+    cflags: Sequence[str],
+    defines: dict[str, Any],
+    identity_out: Optional[Path] = None,
+) -> dict[str, Any]:
+    cc = os.environ.get("CC") or "gcc"
+    identity = _train_runtime_build_identity_payload(
+        c_src,
+        lib_ck,
+        cc=cc,
+        cflags=cflags,
+        defines=defines,
+    )
+    digest = str(identity["build_identity_sha256"])
+    cmd = [
+        cc,
+        "-shared",
+        "-fPIC",
+        "-O3",
+        *[str(flag) for flag in cflags],
+        str(c_src),
+        "-o",
+        str(output),
+        "-I",
+        str(PROJECT_ROOT / "include"),
+        "-I",
+        str(PROJECT_ROOT),
+        "-L",
+        str(BUILD_DIR),
+        "-lckernel_engine",
+        "-lm",
+        f"-Wl,-rpath,{BUILD_DIR}",
+    ]
+    for key, value in sorted(defines.items()):
+        cmd.append(f"-D{key}={_normalize_compile_define(value)}")
+    cmd.append(f'-DCK_TRAIN_BUILD_IDENTITY_SHA256="{digest}"')
+    run_cmd(cmd, cwd=PROJECT_ROOT)
+    identity["output_library"] = str(output.resolve())
+    identity["output_library_sha256"] = _hash_sha256_file(output)
+    identity["compile_command"] = cmd
+    if identity_out is not None:
+        _write_json_if_changed(identity_out, identity)
+    return identity
+
+
 def _ensure_train_runtime_artifacts(
     run_dir: Path,
     python_exec: str,
@@ -5067,47 +5168,38 @@ def _ensure_train_runtime_artifacts(
         run_cmd(["make", "--no-print-directory", make_target], cwd=PROJECT_ROOT)
 
     libtrain_so = run_dir / "libtrain.so"
+    build_identity_path = run_dir / "generated_train_build_identity_v7.json"
     defines = dict(runtime_defines or {})
     cflags = [str(f) for f in (extra_cflags or []) if str(f).strip()]
+    cc = os.environ.get("CC") or "gcc"
+    expected_build_identity = _train_runtime_build_identity_payload(
+        c_src,
+        lib_ck,
+        cc=cc,
+        cflags=cflags,
+        defines=defines,
+    )
     needs_compile = (not libtrain_so.exists()) or (c_src.stat().st_mtime > libtrain_so.stat().st_mtime)
+    existing_build_identity = _load_json_dict(build_identity_path)
+    if (
+        not isinstance(existing_build_identity, dict)
+        or existing_build_identity.get("build_identity_sha256")
+        != expected_build_identity.get("build_identity_sha256")
+    ):
+        needs_compile = True
     if defines:
         needs_compile = True
     if cflags:
         needs_compile = True
     if needs_compile:
-        cc = os.environ.get("CC") or "gcc"
-        cmd = [
-            cc,
-            "-shared",
-            "-fPIC",
-            "-O3",
-            *cflags,
-            str(c_src),
-            "-o",
-            str(libtrain_so),
-            "-I",
-            str(PROJECT_ROOT / "include"),
-            "-I",
-            str(PROJECT_ROOT),
-            "-L",
-            str(BUILD_DIR),
-            "-lckernel_engine",
-            "-lm",
-            f"-Wl,-rpath,{BUILD_DIR}",
-        ]
-        for k, v in sorted(defines.items()):
-            if isinstance(v, bool):
-                dval = "1" if v else "0"
-            elif isinstance(v, int):
-                dval = str(v)
-            elif isinstance(v, float):
-                dval = f"{v:.9g}"
-                if ("." not in dval) and ("e" not in dval.lower()):
-                    dval += ".0"
-            else:
-                dval = str(v)
-            cmd.append(f"-D{k}={dval}")
-        run_cmd(cmd, cwd=PROJECT_ROOT)
+        _compile_train_runtime_with_identity(
+            c_src,
+            libtrain_so,
+            lib_ck=lib_ck,
+            cflags=cflags,
+            defines=defines,
+            identity_out=build_identity_path,
+        )
 
     return c_src, libtrain_so
 

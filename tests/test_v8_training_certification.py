@@ -32,6 +32,14 @@ cert = _load_module()
 
 
 class V8TrainingCertificationTests(unittest.TestCase):
+    def test_nightly_requires_current_run_attempt_and_commit_for_pass(self) -> None:
+        workflow = (ROOT / ".github" / "workflows" / "nightly.yml").read_text(encoding="utf-8")
+        self.assertIn('github_identity.get("run_id")', workflow)
+        self.assertIn('github_identity.get("run_attempt")', workflow)
+        self.assertIn('execution.get("git_commit")', workflow)
+        self.assertIn('else "historical"', workflow)
+        self.assertIn('training_cert_payload["passed"] = False', workflow)
+
     def test_tensor_comparison_rejects_corruption_and_nonfinite_values(self) -> None:
         reference = np.asarray([0.25, -0.5], dtype=np.float32)
         self.assertTrue(cert._compare_tensor(reference.copy(), reference, 1e-6, 1e-6)["passed"])
@@ -41,6 +49,13 @@ class V8TrainingCertificationTests(unittest.TestCase):
         result = cert._compare_tensor(nonfinite, reference, 1e-6, 1e-6)
         self.assertFalse(result["passed"])
         self.assertEqual(result["reason"], "non_finite")
+
+        mixed_reference = np.asarray([1000.0, 0.0], dtype=np.float32)
+        mixed_actual = np.asarray([1000.0, 1.0], dtype=np.float32)
+        mixed = cert._compare_tensor(mixed_actual, mixed_reference, 3e-4, 3e-3)
+        self.assertFalse(mixed["passed"])
+        self.assertEqual(mixed["first_violating_index"], 1)
+        self.assertEqual(mixed["worst_index"], 1)
 
     def test_parameter_inventory_requires_exact_named_shape_mapping(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -53,6 +68,19 @@ class V8TrainingCertificationTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
+            (run_dir / "ir1_train_forward.json").write_text(
+                json.dumps(
+                    {
+                        "tensors": {
+                            "weight.weight.a": {
+                                "kind": "weight",
+                                "requires_grad": True,
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
             summary = {
                 "parameter_gradient_order": ["weight.a"],
                 "parameter_gradient_numel": [6],
@@ -61,7 +89,8 @@ class V8TrainingCertificationTests(unittest.TestCase):
                     {"name": "grad.weight.weight.a"},
                 ],
             }
-            inventory = cert._validate_parameter_inventory(summary, run_dir)
+            expected = [{"name": "weight.a", "manifest_name": "weight.a", "shape": [2, 3], "numel": 6}]
+            inventory = cert._validate_parameter_inventory(summary, run_dir, expected)
             self.assertEqual(inventory[0]["shape"], [2, 3])
             np.testing.assert_array_equal(cert._serialized_weight_snapshot(run_dir, summary), serialized)
 
@@ -69,12 +98,35 @@ class V8TrainingCertificationTests(unittest.TestCase):
             duplicate["parameter_gradient_order"] = ["weight.a", "weight.a"]
             duplicate["parameter_gradient_numel"] = [6, 6]
             with self.assertRaisesRegex(ValueError, "duplicate"):
-                cert._validate_parameter_inventory(duplicate, run_dir)
+                cert._validate_parameter_inventory(duplicate, run_dir, expected)
 
             missing = dict(summary)
             missing["parameter_gradient_order"] = ["weight.missing"]
             with self.assertRaisesRegex(ValueError, "mismatch"):
-                cert._validate_parameter_inventory(missing, run_dir)
+                cert._validate_parameter_inventory(missing, run_dir, expected)
+
+            omitted_everywhere = {
+                "parameter_gradient_order": ["weight.a"],
+                "parameter_gradient_numel": [6],
+                "tensor_slots": [{"name": "grad.weight.weight.a"}],
+            }
+            independently_expected = [
+                *expected,
+                {"name": "weight.b", "manifest_name": "weight.b", "shape": [1], "numel": 1},
+            ]
+            (run_dir / "ir1_train_forward.json").write_text(
+                json.dumps(
+                    {
+                        "tensors": {
+                            "weight.weight.a": {"kind": "weight", "requires_grad": True},
+                            "weight.weight.b": {"kind": "weight", "requires_grad": True},
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "missing_expected=.*weight.b"):
+                cert._validate_parameter_inventory(omitted_everywhere, run_dir, independently_expected)
 
     def test_initialization_failure_still_publishes_complete_report(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -95,6 +147,8 @@ class V8TrainingCertificationTests(unittest.TestCase):
             self.assertEqual(report["status"], "FAIL")
             self.assertEqual(published["status"], "FAIL")
             self.assertFalse(published["passed"])
+            self.assertEqual(published["coverage"]["certified"], [])
+            self.assertTrue(published["coverage"]["requested"])
             self.assertIn("tiny model initialization failed", published["failures"])
             self.assertIn("completed_at", published)
 

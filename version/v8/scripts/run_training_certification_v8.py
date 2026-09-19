@@ -15,10 +15,12 @@ import importlib.util
 import json
 import math
 import os
+import socket
 import shutil
 import subprocess
 import sys
 import traceback
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -133,6 +135,82 @@ def _manifest_shapes(run_dir: Path) -> dict[str, list[int]]:
     return out
 
 
+def _expected_trainable_parameters(run_dir: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Derive this FP32 fixture's trainable set without using generated IR inventories."""
+    manifest_path = run_dir / "weights_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    entries = manifest.get("entries")
+    if not isinstance(entries, list):
+        raise ValueError("weights manifest has no entries[]")
+    expected: list[dict[str, Any]] = []
+    excluded_fixture: list[str] = []
+    frozen_dtype: list[str] = []
+    tied: list[dict[str, str]] = []
+    for raw_entry in entries:
+        if not isinstance(raw_entry, Mapping) or not raw_entry.get("name"):
+            continue
+        name = str(raw_entry["name"])
+        if name.startswith("tiny."):
+            excluded_fixture.append(name)
+            continue
+        dtype = str(raw_entry.get("dtype", "")).lower()
+        if dtype not in {"fp32", "f32"}:
+            frozen_dtype.append(name)
+            continue
+        alias_of = raw_entry.get("alias_of") or raw_entry.get("tied_to")
+        if alias_of:
+            tied.append({"name": name, "canonical": str(alias_of)})
+            continue
+        shape = raw_entry.get("shape")
+        if not isinstance(shape, list) or not shape:
+            raise ValueError(f"manifest parameter {name!r} has no declared shape")
+        normalized_shape = [int(value) for value in shape]
+        numel = math.prod(normalized_shape)
+        byte_size = int(raw_entry.get("size", numel * 4) or 0)
+        if byte_size != numel * 4:
+            raise ValueError(f"manifest FP32 byte size mismatch for {name!r}")
+        expected.append(
+            {
+                "name": name,
+                "manifest_name": name,
+                "shape": normalized_shape,
+                "numel": numel,
+            }
+        )
+    if not expected:
+        raise ValueError("forward parameter contract declares no trainable parameters")
+    names = [str(row["name"]) for row in expected]
+    if len(names) != len(set(names)):
+        raise ValueError("manifest parameter contract contains duplicate trainable names")
+    return expected, {
+        "source": str(manifest_path),
+        "policy": "all_primary_fp32_manifest_parameters_excluding_tiny_parity_fixture_and_aliases",
+        "excluded_fixture": sorted(excluded_fixture),
+        "frozen_by_dtype": sorted(frozen_dtype),
+        "tied": tied,
+    }
+
+
+def _forward_ir_trainable_names(run_dir: Path) -> list[str]:
+    ir1 = json.loads((run_dir / "ir1_train_forward.json").read_text(encoding="utf-8"))
+    tensors = ir1.get("tensors")
+    if not isinstance(tensors, Mapping):
+        raise ValueError("IR1 forward parameter contract has no tensors map")
+    names: list[str] = []
+    for tensor_name, raw_meta in tensors.items():
+        if not isinstance(raw_meta, Mapping) or raw_meta.get("kind") != "weight":
+            continue
+        if raw_meta.get("requires_grad") is not True:
+            continue
+        name = str(tensor_name)
+        if not name.startswith("weight."):
+            raise ValueError(f"forward weight tensor lacks weight. prefix: {name}")
+        names.append(name[len("weight.") :])
+    if len(names) != len(set(names)):
+        raise ValueError("forward IR contains duplicate trainable names")
+    return names
+
+
 def _serialized_weight_snapshot(run_dir: Path, summary: Mapping[str, Any]) -> np.ndarray:
     manifest = json.loads((run_dir / "weights_manifest.json").read_text(encoding="utf-8"))
     entries = manifest.get("entries")
@@ -175,7 +253,11 @@ def _serialized_weight_snapshot(run_dir: Path, summary: Mapping[str, Any]) -> np
     return np.concatenate(chunks)
 
 
-def _validate_parameter_inventory(summary: Mapping[str, Any], run_dir: Path) -> list[dict[str, Any]]:
+def _validate_parameter_inventory(
+    summary: Mapping[str, Any],
+    run_dir: Path,
+    expected: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
     names = summary.get("parameter_gradient_order")
     numels = summary.get("parameter_gradient_numel")
     if not isinstance(names, list) or not isinstance(numels, list) or not names:
@@ -185,6 +267,23 @@ def _validate_parameter_inventory(summary: Mapping[str, Any], run_dir: Path) -> 
     text_names = [str(name) for name in names]
     if len(set(text_names)) != len(text_names):
         raise ValueError("parameter gradient inventory contains duplicate names")
+
+    expected_by_name = {str(row["name"]): row for row in expected}
+    forward_names = _forward_ir_trainable_names(run_dir)
+    missing_forward = sorted(set(expected_by_name) - set(forward_names))
+    unexpected_forward = sorted(set(forward_names) - set(expected_by_name))
+    if missing_forward or unexpected_forward:
+        raise ValueError(
+            "expected/forward IR parameter mismatch: "
+            f"missing_expected={missing_forward}, unexpected_forward={unexpected_forward}"
+        )
+    missing_expected = sorted(set(expected_by_name) - set(text_names))
+    unexpected_generated = sorted(set(text_names) - set(expected_by_name))
+    if missing_expected or unexpected_generated:
+        raise ValueError(
+            "expected/generated parameter mismatch: "
+            f"missing_expected={missing_expected}, unexpected_generated={unexpected_generated}"
+        )
 
     slot_rows = summary.get("tensor_slots")
     if not isinstance(slot_rows, list):
@@ -201,16 +300,14 @@ def _validate_parameter_inventory(summary: Mapping[str, Any], run_dir: Path) -> 
     if missing or extra:
         raise ValueError(f"gradient inventory/slot mismatch: missing={missing}, extra={extra}")
 
-    shapes = _manifest_shapes(run_dir)
     inventory: list[dict[str, Any]] = []
     for name, raw_numel in zip(text_names, numels):
         numel = int(raw_numel)
-        manifest_name = name if name in shapes else f"tiny.{name}"
-        if manifest_name not in shapes:
-            raise ValueError(f"parameter {name!r} is absent from weights manifest")
-        shape = shapes[manifest_name]
+        expected_row = expected_by_name[name]
+        manifest_name = str(expected_row["manifest_name"])
+        shape = [int(value) for value in expected_row["shape"]]
         shape_numel = math.prod(shape)
-        if numel <= 0 or shape_numel != numel:
+        if numel <= 0 or shape_numel != numel or int(expected_row["numel"]) != numel:
             raise ValueError(
                 f"parameter {name!r} shape/numel mismatch: shape={shape}, inventory={numel}"
             )
@@ -275,16 +372,38 @@ def _compare_tensor(actual: np.ndarray, expected: np.ndarray, abs_tol: float, re
             "expected_finite": finite_expected,
         }
     delta = np.abs(actual - expected)
+    allowed = float(abs_tol) + float(rel_tol) * np.abs(expected)
+    violating = delta > allowed
+    violation_indices = np.flatnonzero(violating)
     max_abs = float(delta.max()) if delta.size else 0.0
     mean_abs = float(delta.mean()) if delta.size else 0.0
     ref_scale = float(np.abs(expected).max()) if expected.size else 0.0
-    threshold = float(abs_tol + rel_tol * ref_scale)
+    if delta.size:
+        ratios = np.zeros_like(delta)
+        np.divide(delta, allowed, out=ratios, where=allowed > 0.0)
+        ratios[(allowed == 0.0) & (delta > 0.0)] = np.inf
+        worst_index = int(np.argmax(ratios))
+        worst_ratio = float(ratios[worst_index])
+    else:
+        worst_index = None
+        worst_ratio = 0.0
+    first_violation = int(violation_indices[0]) if violation_indices.size else None
     return {
-        "passed": bool(max_abs <= threshold),
+        "passed": bool(not violation_indices.size),
+        "contract": "elementwise_abs_plus_relative",
         "max_abs_diff": max_abs,
         "mean_abs_diff": mean_abs,
         "reference_max_abs": ref_scale,
-        "threshold": threshold,
+        "abs_tolerance": float(abs_tol),
+        "relative_tolerance": float(rel_tol),
+        "violations": int(violation_indices.size),
+        "first_violating_index": first_violation,
+        "worst_index": worst_index,
+        "worst_error_ratio": worst_ratio,
+        "worst_actual": float(actual[worst_index]) if worst_index is not None else None,
+        "worst_expected": float(expected[worst_index]) if worst_index is not None else None,
+        "worst_abs_diff": float(delta[worst_index]) if worst_index is not None else None,
+        "worst_allowed_error": float(allowed[worst_index]) if worst_index is not None else None,
         "numel": int(actual.size),
     }
 
@@ -293,6 +412,14 @@ def _contract_check(lib: ctypes.CDLL, expected: str) -> dict[str, Any]:
     lib.ck_train_get_runtime_contract_sha256.argtypes = []
     lib.ck_train_get_runtime_contract_sha256.restype = ctypes.c_char_p
     raw = lib.ck_train_get_runtime_contract_sha256()
+    actual = raw.decode("ascii") if raw else ""
+    return {"passed": bool(actual and actual == expected), "expected": expected, "loaded": actual}
+
+
+def _build_identity_check(lib: ctypes.CDLL, expected: str) -> dict[str, Any]:
+    lib.ck_train_get_build_identity_sha256.argtypes = []
+    lib.ck_train_get_build_identity_sha256.restype = ctypes.c_char_p
+    raw = lib.ck_train_get_build_identity_sha256()
     actual = raw.decode("ascii") if raw else ""
     return {"passed": bool(actual and actual == expected), "expected": expected, "loaded": actual}
 
@@ -324,6 +451,53 @@ def _configure_runtime(lib: ctypes.CDLL) -> None:
     lib.ck_train_export_parameter_gradient_snapshot.restype = ctypes.c_int
 
 
+def _execution_identity() -> dict[str, Any]:
+    affinity = sorted(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else None
+    return {
+        "run_id": str(uuid.uuid4()),
+        "started_at": _utc_now(),
+        "hostname": socket.gethostname(),
+        "pid": os.getpid(),
+        "git_commit": _git_identity().get("commit"),
+        "github": {
+            "sha": os.environ.get("GITHUB_SHA"),
+            "run_id": os.environ.get("GITHUB_RUN_ID"),
+            "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
+        },
+        "thread_environment": {
+            "CK_NUM_THREADS": os.environ.get("CK_NUM_THREADS"),
+            "OMP_NUM_THREADS": os.environ.get("OMP_NUM_THREADS"),
+        },
+        "cpu_affinity": affinity,
+        "cpu_affinity_count": len(affinity) if affinity is not None else None,
+    }
+
+
+def _compile_stale_library_control(
+    ck_run: Any,
+    c_source: Path,
+    run_dir: Path,
+    *,
+    seq_len: int,
+) -> tuple[Path, dict[str, Any]]:
+    """Build a distinct implementation artifact under the same runtime contract."""
+    stale_source = run_dir / "generated_train_runtime_stale_control.c"
+    stale_library = run_dir / "libtrain_stale_control.so"
+    stale_source.write_text(
+        c_source.read_text(encoding="utf-8")
+        + "\nint ck_train_stale_control_marker(void) { return 1; }\n",
+        encoding="utf-8",
+    )
+    identity = ck_run._compile_train_runtime_with_identity(
+        stale_source,
+        stale_library,
+        lib_ck=ROOT / "build" / "libckernel_engine.so",
+        cflags=[],
+        defines={"CK_NUM_TOKENS": int(seq_len)},
+    )
+    return stale_library, identity
+
+
 def _write_report(path: Path, report: Mapping[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
@@ -332,11 +506,19 @@ def _write_report(path: Path, report: Mapping[str, Any]) -> None:
 
 
 def run(args: argparse.Namespace) -> dict[str, Any]:
+    requested_coverage = [
+        "two_layer_fp32_dense_transformer",
+        "equal_head_attention_4q_4kv",
+        "generated_forward",
+        "generated_backward",
+        "per_parameter_gradients",
+    ]
     report: dict[str, Any] = {
         "schema": "cke.v8.training_certification.v1",
         "generated_at": _utc_now(),
         "status": "INCOMPLETE",
         "passed": False,
+        "execution": _execution_identity(),
         "configuration": {
             "model": "fp32_dense_2layer",
             "layers": 2,
@@ -356,13 +538,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "oracle": "version/v7/scripts/oracle_snapshot_torch_v7.py:SnapshotQwenLikeOracle",
         },
         "coverage": {
-            "certified": [
-                "two_layer_fp32_dense_transformer",
-                "equal_head_attention_4q_4kv",
-                "generated_forward",
-                "generated_backward",
-                "per_parameter_gradients",
-            ],
+            "requested": requested_coverage,
+            "certified": [],
             "not_certified": [
                 "adamw_update_and_accumulation",
                 "durable_checkpoint_resume",
@@ -418,14 +595,36 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         )
         summary_path = args.run_dir / "generated_train_runtime_summary_v7.json"
         summary = json.loads(summary_path.read_text(encoding="utf-8"))
-        inventory = _validate_parameter_inventory(summary, args.run_dir)
+        expected_inventory, parameter_policy = _expected_trainable_parameters(args.run_dir)
+        inventory = _validate_parameter_inventory(summary, args.run_dir, expected_inventory)
+
+        build_identity_path = args.run_dir / "generated_train_build_identity_v7.json"
+        build_identity = json.loads(build_identity_path.read_text(encoding="utf-8"))
+        expected_build_identity = str(build_identity.get("build_identity_sha256", ""))
+        if not expected_build_identity:
+            raise RuntimeError("generated training build identity is missing")
 
         lib = ctypes.CDLL(str(library_path.resolve()), mode=ctypes.RTLD_GLOBAL)
         _configure_runtime(lib)
+        lib.ck_get_num_threads.argtypes = []
+        lib.ck_get_num_threads.restype = ctypes.c_int
+        report["execution"]["actual_runtime_threads"] = int(lib.ck_get_num_threads())
         contract = _contract_check(lib, str(summary.get("runtime_contract_sha256", "")))
+        loaded_build = _build_identity_check(lib, expected_build_identity)
+        loaded_library = _loaded_library_evidence(library_path)
         report["checks"]["loaded_library_contract"] = contract
+        report["checks"]["loaded_library_build_identity"] = loaded_build
+        report["checks"]["loaded_library_observed"] = {
+            "passed": bool(loaded_library["observed_in_process_maps"]),
+            "path": loaded_library["path"],
+            "process_map_entries": loaded_library["process_map_entries"],
+        }
         if not contract["passed"]:
             raise RuntimeError("loaded training library contract does not match generated runtime summary")
+        if not loaded_build["passed"]:
+            raise RuntimeError("loaded training library build identity does not match build inputs")
+        if not loaded_library["observed_in_process_maps"]:
+            raise RuntimeError("loaded training library was not observed in /proc/self/maps")
 
         init_payload = ck_run._build_ck_runtime_init_payload(args.run_dir, summary)
         init_rc = int(lib.ck_train_init(
@@ -504,6 +703,13 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "count": len(inventory),
             "total_gradient_floats": grad_count,
             "parameters": inventory,
+            "expected_source": parameter_policy,
+            "agreement": {
+                "expected": [str(row["name"]) for row in expected_inventory],
+                "generated_inventory": [str(row["name"]) for row in inventory],
+                "exported_gradients": sorted(ck_gradients),
+                "pytorch_gradients": sorted(torch_gradients),
+            },
         }
         report["checks"]["generated_execution"] = {
             "passed": True,
@@ -549,11 +755,24 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "injected_parameter": corrupt_name,
             "detector_result": corrupt_eval,
         }
-        stale_expected = "0" * 64 if contract["expected"] != "0" * 64 else "f" * 64
-        stale_eval = _contract_check(lib, stale_expected)
+        stale_library_path, stale_identity = _compile_stale_library_control(
+            ck_run, c_source, args.run_dir, seq_len=int(args.seq_len)
+        )
+        stale_lib = ctypes.CDLL(str(stale_library_path.resolve()), mode=ctypes.RTLD_LOCAL)
+        stale_contract = _contract_check(stale_lib, contract["expected"])
+        stale_eval = _build_identity_check(stale_lib, expected_build_identity)
+        stale_library_evidence = _loaded_library_evidence(stale_library_path)
         report["negative_controls"]["stale_library"] = {
-            "passed": not bool(stale_eval.get("passed")),
-            "detector_result": stale_eval,
+            "passed": bool(
+                stale_contract.get("passed")
+                and not stale_eval.get("passed")
+                and stale_library_evidence.get("observed_in_process_maps")
+                and stale_identity.get("output_library_sha256") != loaded_library.get("sha256")
+            ),
+            "same_runtime_contract": stale_contract,
+            "build_identity_detector": stale_eval,
+            "substituted_library": stale_library_evidence,
+            "substituted_build_identity": stale_identity,
         }
 
         report["provenance"] = {
@@ -568,14 +787,18 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "exec_plan": _file_identity(args.run_dir / "train_exec_plan.json"),
             "generated_source": _file_identity(c_source),
             "runtime_summary": _file_identity(summary_path),
-            "loaded_library": _loaded_library_evidence(library_path),
+            "build_identity": build_identity,
+            "loaded_library": loaded_library,
             "runtime_contract_sha256": contract["loaded"],
+            "build_identity_sha256": loaded_build["loaded"],
             "backward_ops": summary.get("backward_op_trace", []),
         }
         all_checks = [bool(row.get("passed")) for row in report["checks"].values() if isinstance(row, Mapping)]
         all_controls = [bool(row.get("passed")) for row in report["negative_controls"].values() if isinstance(row, Mapping)]
         report["passed"] = bool(all_checks and all(all_checks) and all_controls and all(all_controls))
         report["status"] = "PASS" if report["passed"] else "FAIL"
+        if report["passed"]:
+            report["coverage"]["certified"] = list(requested_coverage)
         if not report["passed"]:
             report["failures"] = [
                 name for name, row in report["checks"].items()
@@ -591,6 +814,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         report["exception"] = {"type": type(exc).__name__, "message": str(exc), "traceback": traceback.format_exc()}
     finally:
         report["completed_at"] = _utc_now()
+        report["execution"]["completed_at"] = report["completed_at"]
         _write_report(args.report, report)
     return report
 

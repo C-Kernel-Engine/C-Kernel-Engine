@@ -661,6 +661,8 @@ class TrainBridgeLoweringTests(unittest.TestCase):
         self.assertIn("ck_train_get_parameter_gradient_snapshot_numel", c_src)
         self.assertIn("ck_train_export_parameter_gradient_snapshot", c_src)
         self.assertIn("ck_train_get_loss", c_src)
+        self.assertIn("ck_train_get_build_identity_sha256", c_src)
+        self.assertIn("CK_TRAIN_BUILD_IDENTITY_SHA256", c_src)
 
     def test_codegen_batches_grad_accumulate_only_in_non_trace_backward(self) -> None:
         ir1 = build_ir_train_v7.build_ir1_train(

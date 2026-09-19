@@ -781,22 +781,48 @@ jobs:
           training_cert_payload = {
               "status": "not_run",
               "passed": False,
+              "current": False,
               "checks": {},
               "negative_controls": {},
               "note": "v8-training-certify-fp32 did not publish a nightly report.",
           }
           if training_cert_report.exists():
               cert_doc = json.loads(training_cert_report.read_text(encoding="utf-8"))
+              execution = cert_doc.get("execution") if isinstance(cert_doc.get("execution"), dict) else {}
+              github_identity = execution.get("github") if isinstance(execution.get("github"), dict) else {}
+              result_status = (
+                  str(training_cert_result.get("status", "fail")).lower()
+                  if isinstance(training_cert_result, dict)
+                  else "not_run"
+              )
+              identity_matches = bool(
+                  os.environ.get("GITHUB_RUN_ID")
+                  and str(github_identity.get("run_id") or "") == os.environ.get("GITHUB_RUN_ID")
+                  and str(github_identity.get("run_attempt") or "") == os.environ.get("GITHUB_RUN_ATTEMPT")
+                  and str(execution.get("git_commit") or "") == os.environ.get("GITHUB_SHA")
+              )
+              current_pass = bool(
+                  identity_matches
+                  and result_status == "pass"
+                  and cert_doc.get("status") == "PASS"
+                  and cert_doc.get("passed") is True
+              )
               training_cert_payload = {
-                  "status": str(cert_doc.get("status", "INCOMPLETE")).lower(),
-                  "passed": bool(cert_doc.get("passed", False)),
+                  "status": "pass" if current_pass else "fail" if identity_matches else "historical",
+                  "passed": current_pass,
+                  "current": identity_matches,
                   "generated_at": str(cert_doc.get("generated_at") or _utc_mtime(training_cert_report)),
                   "summary_path": str(training_cert_report),
+                  "execution": execution,
                   "configuration": cert_doc.get("configuration") or {},
                   "checks": cert_doc.get("checks") or {},
                   "negative_controls": cert_doc.get("negative_controls") or {},
                   "failures": cert_doc.get("failures") or [],
-                  "note": f"Source: {training_cert_report}",
+                  "note": (
+                      f"Current workflow evidence: {training_cert_report}"
+                      if identity_matches
+                      else f"Historical evidence only; run/attempt/commit identity does not match this workflow: {training_cert_report}"
+                  ),
               }
           elif isinstance(training_cert_result, dict):
               result_status = str(training_cert_result.get("status", "fail")).lower()
@@ -812,6 +838,9 @@ jobs:
               prev = _load_previous_payload("training_certification")
               if prev and prev.get("status") not in (None, "not_run"):
                   training_cert_payload = dict(prev)
+                  training_cert_payload["status"] = "historical"
+                  training_cert_payload["passed"] = False
+                  training_cert_payload["current"] = False
                   training_cert_payload["note"] = (
                       f"{prev.get('note', 'Preserved previous training certification.')} "
                       "Preserved because this workflow did not run the certification gate."
