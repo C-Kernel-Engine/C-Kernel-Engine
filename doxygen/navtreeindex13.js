@@ -1,5 +1,15 @@
 var NAVTREEINDEX13 =
 {
+"gemm__kernels__q8__0_8c.html#a7522a539e09d34bc1298e9d5a3d09692":[2,0,1,1,44,25],
+"gemm__kernels__q8__0_8c.html#a79cb8f09192d8d62f7413e7f27fc6512":[2,0,1,1,44,16],
+"gemm__kernels__q8__0_8c.html#a7e5a611b6fcfc7119a1c689a7347f768":[2,0,1,1,44,18],
+"gemm__kernels__q8__0_8c.html#a8085f1506d8fadd2070f5b71fedb5554":[2,0,1,1,44,7],
+"gemm__kernels__q8__0_8c.html#a85197b983d949018f42bd43e3751478b":[2,0,1,1,44,5],
+"gemm__kernels__q8__0_8c.html#a93f8f68b0da241b2dc1e6c2a70bef457":[2,0,1,1,44,9],
+"gemm__kernels__q8__0_8c.html#a954875a4cb83dc1047be856c77770525":[2,0,1,1,44,1],
+"gemm__kernels__q8__0_8c.html#ab56038b4e1cf73692b6be9c28ada9023":[2,0,1,1,44,15],
+"gemm__kernels__q8__0_8c.html#adf8ea140a408f51698d95718f1d8db49":[2,0,1,1,44,22],
+"gemm__kernels__q8__0_8c.html#aea5f7a52ed3f21e0c6795766cfb28751":[2,0,1,1,44,24],
 "gemm__kernels__q8__0_8c.html#aeb957672a1aa94abab5a5aac111742d3":[2,0,1,1,44,10],
 "gemm__kernels__q8__0_8c.html#af81f5e920a8025d1f3034b56b43f42dc":[2,0,1,1,44,13],
 "gemm__kernels__q8__0_8c.html#af900f8a5b4172fadbb2342b63276e7c3":[2,0,1,1,44,4],
@@ -239,15 +249,5 @@ var NAVTREEINDEX13 =
 "hash__table_8c.html#ab4009b6a76738c2ad1c3ff4854f20d87":[2,0,1,2,0,9],
 "hash__table_8c.html#ac8630a38f4582c3ed7cda06a0c6f9cc0":[2,0,1,2,0,13],
 "hash__table_8c.html#aca592de9ebe7baad906c049a9b262a35":[2,0,1,2,0,1],
-"hash__table_8c.html#ad903066c5a6e160332bb1163b9eabbef":[2,0,1,2,0,2],
-"hash__table_8c.html#ad920309838359d19228788a76adaad96":[2,0,1,2,0,6],
-"hash__table_8c.html#aef91982d5e7f9ee528aa966b08badd03":[2,0,1,2,0,16],
-"hash__table_8c.html#af81905a0c1fc31346ff3b77c555453f3":[2,0,1,2,0,12],
-"hash__table_8c.html#af9702d4ef5621d02bcd87a3390c0aefc":[2,0,1,2,0,7],
-"hash__table_8c.html#afe7abb14ee631582c7585b8a67debe1e":[2,0,1,2,0,3],
-"hash__table_8c_source.html":[2,0,1,2,0],
-"hash__table_8h.html":[2,0,0,1,0],
-"hash__table_8h.html#a02bf78e014e041c6233f26603bf8dcff":[2,0,0,1,0,3],
-"hash__table_8h.html#a0e16265f47b209eccc74d3b82d56b1c3":[2,0,0,1,0,8],
-"hash__table_8h.html#a2591835a5e1dc5e656771c59811d60f9":[2,0,0,1,0,2]
+"hash__table_8c.html#ad903066c5a6e160332bb1163b9eabbef":[2,0,1,2,0,2]
 };

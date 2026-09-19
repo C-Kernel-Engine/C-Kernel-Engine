@@ -1,5 +1,15 @@
 var NAVTREEINDEX19 =
 {
+"structCKModelConfig.html":[1,0,48],
+"structCKModelConfig.html#a01453afe2f69986d9ca04a10f7b9d0a4":[1,0,48,11],
+"structCKModelConfig.html#a18a327829d25405e92ba46a79009b89f":[1,0,48,1],
+"structCKModelConfig.html#a29e2840f627ec455aca6820f5f671999":[1,0,48,7],
+"structCKModelConfig.html#a2da9b0b988ccf3b7117a611da5984d34":[1,0,48,5],
+"structCKModelConfig.html#a3be18cb0e7b29fa1449ac753beeca7db":[1,0,48,0],
+"structCKModelConfig.html#a3e5c8e6d2da07805365ec6b4db29b9ea":[1,0,48,9],
+"structCKModelConfig.html#a47a1c1e684f06184220bc13087dda0ff":[1,0,48,2],
+"structCKModelConfig.html#a4ee532eb7546fdf393220affe68d6e64":[1,0,48,16],
+"structCKModelConfig.html#a5d3ef4cd4a7f401a8f6cca7bab276869":[1,0,48,8],
 "structCKModelConfig.html#a754dcfd82ab5195c2c13ba88c1b8d252":[1,0,48,6],
 "structCKModelConfig.html#a8260b38867febb60f03ccad62b6cd7ea":[1,0,48,17],
 "structCKModelConfig.html#a902b19335449fa61c1e532d9999aa342":[1,0,48,10],
@@ -239,15 +249,5 @@ var NAVTREEINDEX19 =
 "structCPUInfo.html#ad3efc23f84451ced9b6085cb036ceb7d":[1,0,68,25],
 "structCPUInfo.html#ad5a579994982f5cee575bb9674abd238":[1,0,68,9],
 "structCPUInfo.html#ade0ca8a679c8ba6761283507550f2b84":[1,0,68,13],
-"structCPUInfo.html#ae25e58f2b50c70a860e5dcafa0af8d37":[1,0,68,17],
-"structCPUInfo.html#aec1d73dace532ccaa255243ad9222d44":[1,0,68,27],
-"structCPUInfo.html#aef5b41cc946c52f34e354c69a66bcde3":[1,0,68,39],
-"structCPUInfo.html#af5794c564eefe3fab7338e7fe1c5f61b":[1,0,68,16],
-"structCacheInfo.html":[1,0,10],
-"structCacheInfo.html#a2bbafb632144b03c4ac4d74fea63b438":[1,0,10,0],
-"structCacheInfo.html#a2d480cc7cf9fcab61720174ffad45770":[1,0,10,4],
-"structCacheInfo.html#a6998f8578822bdc01a41f3a9d695e7ac":[1,0,10,1],
-"structCacheInfo.html#a9ad45f782f3a898bbd3848b8a5f52d83":[1,0,10,5],
-"structCacheInfo.html#aefdbeadd9d601084c823c530a35e4e5c":[1,0,10,2],
-"structCacheInfo.html#af0d7fd2b3b6d58a409f2e91419970a87":[1,0,10,3]
+"structCPUInfo.html#ae25e58f2b50c70a860e5dcafa0af8d37":[1,0,68,17]
 };

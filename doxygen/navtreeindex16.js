@@ -1,5 +1,15 @@
 var NAVTREEINDEX16 =
 {
+"rmsnorm__kernels_8c.html#aae8ede0a82b914bbd6191d39c29b4e76":[2,0,1,1,79,15],
+"rmsnorm__kernels_8c.html#ab929ece66f6bc3c22f4cd1562eff8089":[2,0,1,1,79,5],
+"rmsnorm__kernels_8c.html#abf3180347af2f640c551aa53af1878b8":[2,0,1,1,79,0],
+"rmsnorm__kernels_8c.html#ac429025594088a6caf98de6d42095692":[2,0,1,1,79,2],
+"rmsnorm__kernels_8c.html#ac7fcb3a53a8ee217dc90001f3d4e049e":[2,0,1,1,79,16],
+"rmsnorm__kernels_8c.html#aca68d7dda1a7de9ff926920804751db0":[2,0,1,1,79,1],
+"rmsnorm__kernels_8c.html#accc4a3419798ce8ce3780b0f366f080a":[2,0,1,1,79,12],
+"rmsnorm__kernels_8c.html#adc6b003cb5d9f1c2977a6b9b209b84b7":[2,0,1,1,79,17],
+"rmsnorm__kernels_8c.html#ae1a6abc49e4fb2e3e65f0f105e357e1f":[2,0,1,1,79,7],
+"rmsnorm__kernels_8c_source.html":[2,0,1,1,79],
 "rmsnorm__kernels__bf16_8c.html":[2,0,1,1,80],
 "rmsnorm__kernels__bf16_8c.html#a14d80153de303766038a231e4932e357":[2,0,1,1,80,0],
 "rmsnorm__kernels__bf16_8c.html#a4f024774420774821f805d0742694d02":[2,0,1,1,80,1],
@@ -239,15 +249,5 @@ var NAVTREEINDEX16 =
 "structCKBufferSpec.html#ae34b00c892e6e3ffd7928a0a31924b59":[1,0,17,7],
 "structCKBumpHeaderV5.html":[1,0,18],
 "structCKBumpHeaderV5.html#a058e1844933d1781580b4693be8be8bc":[1,0,18,11],
-"structCKBumpHeaderV5.html#a113ec8251095c1a8650a93e1c3855701":[1,0,18,9],
-"structCKBumpHeaderV5.html#a1d7ceb3da86e1cc40493cf185e486507":[1,0,18,18],
-"structCKBumpHeaderV5.html#a26da4b574a720c2727e31646d2fdd300":[1,0,18,15],
-"structCKBumpHeaderV5.html#a2a92218149c8c8944fc3ed09a19b31a5":[1,0,18,1],
-"structCKBumpHeaderV5.html#a2bd2228d0a6b39db1149c477bf24b436":[1,0,18,5],
-"structCKBumpHeaderV5.html#a34256a5791efef6fd0acb56bc485de48":[1,0,18,6],
-"structCKBumpHeaderV5.html#a386daca855110634a91f576358285725":[1,0,18,2],
-"structCKBumpHeaderV5.html#a39f4fdd08a53aa82afcbd0c838f01100":[1,0,18,8],
-"structCKBumpHeaderV5.html#a78cf59a40d01f7905c75e7d809fdf6e5":[1,0,18,3],
-"structCKBumpHeaderV5.html#a9a68a418088e75ae9bc3ff643c021f0c":[1,0,18,12],
-"structCKBumpHeaderV5.html#aa6180be6914b09dc9d1466caa7402c75":[1,0,18,13]
+"structCKBumpHeaderV5.html#a113ec8251095c1a8650a93e1c3855701":[1,0,18,9]
 };

@@ -1,5 +1,15 @@
 var NAVTREEINDEX10 =
 {
+"ckernel__strict_8c_source.html":[2,0,1,25],
+"classes.html":[1,1],
+"cpu__features_8c.html":[2,0,1,26],
+"cpu__features_8c.html#a538a4414821926cda2c9e989764c00fd":[2,0,1,26,5],
+"cpu__features_8c.html#a6465c90ac7e832c18d8e5a21df58653b":[2,0,1,26,0],
+"cpu__features_8c.html#a7193b331026b925552b30e70dbca6727":[2,0,1,26,4],
+"cpu__features_8c.html#a72d28b72d616253f12ef0eff36325cba":[2,0,1,26,3],
+"cpu__features_8c.html#a87e02c44ce8117ceb227f928980a175a":[2,0,1,26,6],
+"cpu__features_8c.html#a8f4a571a19e02f7714b53aa1e5d50f91":[2,0,1,26,2],
+"cpu__features_8c.html#a9f67b8a4e1c74de8b6f0d8b535e44877":[2,0,1,26,7],
 "cpu__features_8c.html#ab051fa0f4c2fc0723066eab07401fed6":[2,0,1,26,1],
 "cpu__features_8c.html#add9495a8b0827ace67807e0826a890d1":[2,0,1,26,8],
 "cpu__features_8c_source.html":[2,0,1,26],
@@ -171,8 +181,8 @@ var NAVTREEINDEX10 =
 "functions_t.html":[1,2,0,18],
 "functions_u.html":[1,2,0,19],
 "functions_v.html":[1,2,0,20],
-"functions_vars.html":[1,2,1],
 "functions_vars.html":[1,2,1,0],
+"functions_vars.html":[1,2,1],
 "functions_vars_b.html":[1,2,1,1],
 "functions_vars_c.html":[1,2,1,2],
 "functions_vars_d.html":[1,2,1,3],
@@ -239,15 +249,5 @@ var NAVTREEINDEX10 =
 "gelu__kernels_8c.html#a369266c24eacffb87046522897a570d5":[2,0,1,1,17,0],
 "gelu__kernels_8c.html#a3781af580a3fe9c5c3df37db21a18ede":[2,0,1,1,17,25],
 "gelu__kernels_8c.html#a47aef981ac51c59b32d08bc11446d1b5":[2,0,1,1,17,14],
-"gelu__kernels_8c.html#a5bad3e98efcaf996272c57b45c43d60b":[2,0,1,1,17,6],
-"gelu__kernels_8c.html#a5eafec0c7299984eb731b697944ebdaa":[2,0,1,1,17,30],
-"gelu__kernels_8c.html#a60911ac4b2f37a346b3b2c7fd97b6e9e":[2,0,1,1,17,33],
-"gelu__kernels_8c.html#a638388379a18442d0a3c03256243a95b":[2,0,1,1,17,3],
-"gelu__kernels_8c.html#a767033c1118c22705a32726c7f29440f":[2,0,1,1,17,35],
-"gelu__kernels_8c.html#a7c38a6b5cd1fecc82b417ccffc2b2493":[2,0,1,1,17,11],
-"gelu__kernels_8c.html#a874db4408c347018b2eaafc7bc9e4dde":[2,0,1,1,17,34],
-"gelu__kernels_8c.html#a93f0be0bc415f9ba50f36df3f800b85c":[2,0,1,1,17,1],
-"gelu__kernels_8c.html#a9ab50f30203202d636562268e29e582d":[2,0,1,1,17,10],
-"gelu__kernels_8c.html#aa998c45037468b03c5fd465c640f0646":[2,0,1,1,17,9],
-"gelu__kernels_8c.html#ab02e6492df3fa0c77460a903b9b03fcc":[2,0,1,1,17,26]
+"gelu__kernels_8c.html#a5bad3e98efcaf996272c57b45c43d60b":[2,0,1,1,17,6]
 };

@@ -1,5 +1,15 @@
 var NAVTREEINDEX20 =
 {
+"structCPUInfo.html#aec1d73dace532ccaa255243ad9222d44":[1,0,68,27],
+"structCPUInfo.html#aef5b41cc946c52f34e354c69a66bcde3":[1,0,68,39],
+"structCPUInfo.html#af5794c564eefe3fab7338e7fe1c5f61b":[1,0,68,16],
+"structCacheInfo.html":[1,0,10],
+"structCacheInfo.html#a2bbafb632144b03c4ac4d74fea63b438":[1,0,10,0],
+"structCacheInfo.html#a2d480cc7cf9fcab61720174ffad45770":[1,0,10,4],
+"structCacheInfo.html#a6998f8578822bdc01a41f3a9d695e7ac":[1,0,10,1],
+"structCacheInfo.html#a9ad45f782f3a898bbd3848b8a5f52d83":[1,0,10,5],
+"structCacheInfo.html#aefdbeadd9d601084c823c530a35e4e5c":[1,0,10,2],
+"structCacheInfo.html#af0d7fd2b3b6d58a409f2e91419970a87":[1,0,10,3],
 "structCacheTopology.html":[1,0,11],
 "structCacheTopology.html#a312d10896e318962d7a948eb04aaddd0":[1,0,11,1],
 "structCacheTopology.html#a7d8f011d2962b633861d25e320df4d7b":[1,0,11,2],
@@ -239,15 +249,5 @@ var NAVTREEINDEX20 =
 "swiglu__kernels_8c.html#a2f11fffb4367674cd2d81a375fef8067":[2,0,1,1,90,2],
 "swiglu__kernels_8c.html#a369266c24eacffb87046522897a570d5":[2,0,1,1,90,0],
 "swiglu__kernels_8c.html#a4d4e4e82751b575680dda192237167da":[2,0,1,1,90,3],
-"swiglu__kernels_8c.html#a771ec9e8b054416576cf1788ea8d3747":[2,0,1,1,90,7],
-"swiglu__kernels_8c.html#a9f878d17d42282d00f88d10c0bfd603c":[2,0,1,1,90,13],
-"swiglu__kernels_8c.html#acb190f66cb5c281730a5137b2c9a729c":[2,0,1,1,90,5],
-"swiglu__kernels_8c.html#acb65349d061ea0910dd80602f5f210df":[2,0,1,1,90,10],
-"swiglu__kernels_8c.html#ad0d3e95f8d1c4c192a2d487b4d5ec8cf":[2,0,1,1,90,11],
-"swiglu__kernels_8c.html#ae2bf28baddabb6f944e7a01f0edf93a2":[2,0,1,1,90,4],
-"swiglu__kernels_8c_source.html":[2,0,1,1,90],
-"swiglu__kernels__bf16_8c.html":[2,0,1,1,91],
-"swiglu__kernels__bf16_8c.html#a41a1dfc5976b7c2e2539a2811dc0b07f":[2,0,1,1,91,1],
-"swiglu__kernels__bf16_8c.html#a77fb89fc5fa2dcc73d9d37ccf9c50322":[2,0,1,1,91,0],
-"swiglu__kernels__bf16_8c_source.html":[2,0,1,1,91]
+"swiglu__kernels_8c.html#a771ec9e8b054416576cf1788ea8d3747":[2,0,1,1,90,7]
 };
