@@ -2338,7 +2338,11 @@ def emit_op(
     elif op_name == "gemma4_per_layer_embed":
         out_expr = _hidden_raw(_hidden_arg("hidden", "output", "out", "x", "y"))
         if out_expr:
-            lines.append(f'    ck_debug_export_hidden(model, {layer}, "gemma4_per_layer_embed", (const float*){out_expr}, EMBED_DIM);')
+            count_expr = _hidden_count("tokens", "rows", "num_tokens", default="1")
+            lines.append(
+                f'    ck_debug_export_hidden(model, {layer}, "gemma4_per_layer_embed", '
+                f'(const float*){out_expr}, ({count_expr}) * EMBED_DIM);'
+            )
             _emit_hidden_export_last_row(out_expr, "gemma4_per_layer_embed", "EMBED_DIM")
     elif op_name == "recurrent_qkv_proj":
         _emit_hidden_export(

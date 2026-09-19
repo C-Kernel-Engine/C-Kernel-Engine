@@ -908,6 +908,30 @@ class HiddenExportExtentTests(unittest.TestCase):
                     emitted,
                 )
 
+    def test_gemma4_layer_output_exports_complete_runtime_extent(self) -> None:
+        op = {
+            "op": "gemma4_per_layer_embed",
+            "function": "gemma4_per_layer_embed_forward",
+            "layer": 23,
+            "args": [
+                _arg("hidden", "HIDDEN"),
+                _arg("tokens", "1024"),
+            ],
+        }
+
+        decode = codegen.emit_op(op)
+        prefill = prefill_codegen.emit_prefill_op(op, 61, {"embed_dim": 2560})
+
+        self.assertIn(
+            '"gemma4_per_layer_embed", (const float*)HIDDEN, (1024) * EMBED_DIM',
+            decode,
+        )
+        self.assertIn(
+            '"gemma4_per_layer_embed", (const float*)HIDDEN, '
+            "(num_tokens) * (EMBED_DIM)",
+            prefill,
+        )
+
     def test_quantized_projection_exports_full_prefill_extents(self) -> None:
         resolved = {
             "numerical_contract": "q4_k_x_q8_k_repacked_matmul_fp32",
