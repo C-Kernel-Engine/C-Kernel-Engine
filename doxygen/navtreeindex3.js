@@ -1,5 +1,6 @@
 var NAVTREEINDEX3 =
 {
+"ck__parity__api_8c.html#a3265c272255a0c4c6ee8c2fd36a34a72":[2,0,1,11,7],
 "ck__parity__api_8c.html#a3858997f4aa8579cd1e5ef3af9c1b633":[2,0,1,11,35],
 "ck__parity__api_8c.html#a39be7f87179b07496459ac582b0358fc":[2,0,1,11,18],
 "ck__parity__api_8c.html#a3b27a697b6b8b2463b5ae6da599d7d81":[2,0,1,11,24],
@@ -248,6 +249,5 @@ var NAVTREEINDEX3 =
 "ck__tokenizer_8c.html#aea40301f8452f2b4cc6ed912d0b724b1":[2,0,1,13,9],
 "ck__tokenizer_8c.html#aec779163dcf0f67868d1fdf622326da3":[2,0,1,13,14],
 "ck__tokenizer_8c.html#aedb60f83a635dc16ac2ceb687a911e17":[2,0,1,13,19],
-"ck__tokenizer_8c.html#aee9814670b666abb18ca2b92936d4716":[2,0,1,13,17],
-"ck__tokenizer_8c_source.html":[2,0,1,13]
+"ck__tokenizer_8c.html#aee9814670b666abb18ca2b92936d4716":[2,0,1,13,17]
 };
