@@ -1,0 +1,2689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bring a Model to CKE - from Math to Standalone C | C-Kernel-Engine | C-Kernel-Engine</title>
+    <meta name="description" content="Contributor tutorial for adding a model to CKE v8: import adapter, operation inventory, numerical contracts, kernel maps, circuit, generated C, oracle certification, and standalone native deployment.">
+    <meta name="robots" content="index,follow">
+    <link rel="canonical" href="https://c-kernel-engine.github.io/C-Kernel-Engine/model-bringup-guide.html">
+    <meta property="og:title" content="Bring a Model to CKE - from Math to Standalone C | C-Kernel-Engine | C-Kernel-Engine">
+    <meta property="og:description" content="Contributor tutorial for adding a model to CKE v8: import adapter, operation inventory, numerical contracts, kernel maps, circuit, generated C, oracle certification, and standalone native deployment.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://c-kernel-engine.github.io/C-Kernel-Engine/model-bringup-guide.html">
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+    <style>
+        :root {
+            /* Antsand Brand Colors - Lightened */
+            --orange: #ffb400;
+            --orange-dark: #e5a200;
+            --orange-light: #ffc933;
+            --dark: #2a2a2a;
+            --dark-lighter: #363636;
+            --dark-card: #323232;
+            --grey: #454545;
+            --grey-light: #555555;
+            --text-primary: #f5f5f5;
+            --text-secondary: #b0b0b0;
+            --text-muted: #808080;
+            --bg-dark: #232323;
+            --white: #ffffff;
+            --code-bg: #1a1a1a;
+            --green: #47b475;
+            --blue: #07adf8;
+            --gradient-header: linear-gradient(135deg, #2a2a2a 0%, #363636 50%, #2a2a2a 100%);
+            --shadow-sm: 0 2px 4px rgba(0,0,0,0.3);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+            --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--text-primary);
+            background: var(--bg-dark);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .site-header {
+            background: var(--gradient-header);
+            border-bottom: 3px solid var(--orange);
+            padding: 0.5rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: var(--shadow-md);
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            text-decoration: none;
+        }
+
+        .header-logo {
+            width: 40px;
+            height: 40px;
+            background: var(--orange);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: var(--dark);
+            font-size: 1.1rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .header-title {
+            color: var(--white);
+            font-size: 1.4rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .header-subtitle {
+            color: var(--orange);
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        /* Navigation */
+        .site-nav {
+            display: flex;
+            gap: 0.25rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .site-nav > a,
+        .nav-dropdown > .nav-trigger {
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 0.6rem 1rem;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: var(--transition);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            border: none;
+            background: transparent;
+            font-family: inherit;
+        }
+
+        .site-nav > a:hover,
+        .nav-dropdown:hover > .nav-trigger {
+            color: var(--white);
+            background: var(--grey);
+        }
+
+        .site-nav > a.active,
+        .nav-dropdown > .nav-trigger.active {
+            background: var(--orange);
+            color: var(--dark);
+            font-weight: 600;
+        }
+
+        /* Dropdown */
+        .nav-dropdown {
+            position: relative;
+        }
+
+        .nav-trigger::after {
+            content: '';
+            border: solid currentColor;
+            border-width: 0 2px 2px 0;
+            display: inline-block;
+            padding: 3px;
+            transform: rotate(45deg);
+            margin-top: -3px;
+            transition: transform 0.2s;
+        }
+
+        .nav-dropdown:hover .nav-trigger::after {
+            transform: rotate(-135deg);
+            margin-top: 3px;
+        }
+
+        .nav-dropdown-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: var(--dark-card);
+            border-radius: 8px;
+            box-shadow: var(--shadow-lg);
+            min-width: 220px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: var(--transition);
+            overflow: hidden;
+            margin-top: 0.5rem;
+            border: 1px solid var(--grey);
+        }
+
+        .nav-dropdown:hover .nav-dropdown-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .nav-dropdown-menu a {
+            display: block;
+            padding: 0.75rem 1rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: var(--transition);
+            border-left: 3px solid transparent;
+        }
+
+        .nav-dropdown-menu a:hover {
+            background: var(--grey);
+            border-left-color: var(--orange);
+            color: var(--white);
+        }
+
+        .nav-dropdown-menu a small {
+            display: block;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            margin-top: 0.2rem;
+        }
+
+        /* Last dropdown aligns to the right edge */
+        .nav-dropdown:last-child .nav-dropdown-menu {
+            left: auto;
+            right: 0;
+        }
+
+        /* Mega menu for Architecture dropdown */
+        .nav-dropdown-menu.mega-menu {
+            width: min(1180px, calc(100vw - 2rem));
+            min-width: 0;
+            max-height: calc(100vh - 90px);
+            padding: 1.25rem 1.5rem;
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.75rem 1.25rem;
+            left: auto;
+            right: 0;
+            overflow-y: auto;
+            transform: translateY(-10px);
+        }
+
+        .nav-dropdown:hover .nav-dropdown-menu.mega-menu {
+            transform: translateY(0);
+        }
+
+        .mega-menu .menu-section {
+            margin-bottom: 0.75rem;
+        }
+
+        .mega-menu .menu-shortcuts {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+        }
+
+        .mega-menu .menu-shortcuts a {
+            padding: 0.55rem 0.75rem;
+            background: rgba(255, 180, 0, 0.055);
+            border: 1px solid rgba(255, 180, 0, 0.18);
+        }
+
+        .mega-menu .menu-heading {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--orange);
+            padding: 0.5rem 0.75rem 0.35rem;
+            border-bottom: 1px solid var(--grey);
+            margin-bottom: 0.35rem;
+        }
+
+        .mega-menu a {
+            padding: 0.6rem 0.75rem;
+            font-size: 0.9rem;
+            border-radius: 4px;
+            border-left: none;
+            line-height: 1.3;
+        }
+
+        .mega-menu a:hover {
+            border-left: none;
+            background: var(--grey);
+        }
+
+        .mega-menu a small {
+            font-size: 0.75rem;
+            margin-top: 0.15rem;
+        }
+
+        /* Main Content */
+        main {
+            box-sizing: border-box;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            flex: 1;
+            width: 100%;
+        }
+
+        /* Hero Section */
+        .hero {
+            background: var(--gradient-header);
+            border: 1px solid var(--grey);
+            color: var(--white);
+            padding: 3rem 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            text-align: center;
+            box-shadow: var(--shadow-lg);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--orange), var(--orange-light), var(--orange));
+        }
+
+        .hero h1 {
+            color: var(--white);
+            border: none;
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .hero p {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        /* Typography */
+        h1 {
+            color: var(--white);
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid var(--orange);
+            padding-bottom: 0.5rem;
+        }
+
+        h2 {
+            color: var(--white);
+            font-size: 1.4rem;
+            margin: 2rem 0 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        h2::before {
+            content: '';
+            width: 4px;
+            height: 1.4rem;
+            background: var(--orange);
+            border-radius: 2px;
+        }
+
+        h3 {
+            color: var(--orange);
+            font-size: 1.15rem;
+            margin: 1.5rem 0 0.75rem;
+        }
+
+        p {
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+        }
+
+        /* Cards */
+        .card {
+            background: var(--dark-card);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: var(--shadow-sm);
+            border-left: 3px solid var(--grey-light);
+            transition: var(--transition);
+            border: 1px solid var(--grey);
+        }
+
+        .card:hover {
+            box-shadow: var(--shadow-md);
+            border-left-color: var(--orange);
+        }
+
+        .card-accent {
+            border-left-color: var(--orange);
+        }
+
+        .card-green {
+            border-left-color: var(--green);
+        }
+
+        .card-blue {
+            border-left-color: var(--blue);
+        }
+
+        .card h3 {
+            margin-top: 0;
+        }
+
+        /* Clickable Cards */
+        a.card-link {
+            display: block;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        a.card-link .card {
+            cursor: pointer;
+        }
+
+        a.card-link .card:hover {
+            border-left-width: 5px;
+        }
+
+        .card-arrow {
+            color: var(--orange);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            transition: var(--transition);
+        }
+
+        a.card-link:hover .card-arrow {
+            gap: 0.75rem;
+        }
+
+        /* Feature Icons */
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .feature-icon.orange { background: rgba(255, 180, 0, 0.15); color: var(--orange); }
+        .feature-icon.green { background: rgba(71, 180, 117, 0.15); color: var(--green); }
+        .feature-icon.blue { background: rgba(7, 173, 248, 0.15); color: var(--blue); }
+        .feature-icon.grey { background: rgba(255, 255, 255, 0.1); color: var(--text-secondary); }
+
+        /* Stats */
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--orange);
+            line-height: 1;
+        }
+
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        /* Code blocks */
+        pre {
+            background: var(--code-bg);
+            color: #e0e0e0;
+            padding: 1.25rem;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 1rem 0;
+            font-family: 'JetBrains Mono', 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 0.85rem;
+            border: 1px solid var(--grey);
+        }
+
+        code {
+            font-family: 'JetBrains Mono', 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            background: var(--grey);
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-size: 0.85rem;
+            color: var(--orange);
+        }
+
+        pre code {
+            background: none;
+            padding: 0;
+            color: #e0e0e0;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            background: var(--dark-card);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--grey);
+        }
+
+        th {
+            background: var(--dark);
+            color: var(--orange);
+            padding: 0.875rem 1rem;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 0.875rem 1rem;
+            border-bottom: 1px solid var(--grey);
+            color: var(--text-secondary);
+        }
+
+        tr:hover {
+            background: var(--grey);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Lists */
+        ul, ol {
+            margin: 1rem 0;
+            padding-left: 1.5rem;
+            color: var(--text-secondary);
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+        }
+
+        /* Links */
+        a {
+            color: var(--orange);
+            transition: var(--transition);
+        }
+
+        a:hover {
+            color: var(--orange-light);
+        }
+
+        /* Grid */
+        .grid {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .grid-2 {
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        }
+
+        .grid-3 {
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        }
+
+        .grid-4 {
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        }
+
+        /* Alerts */
+        .alert {
+            padding: 1rem 1.25rem;
+            border-radius: 6px;
+            margin: 1rem 0;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            border: 1px solid;
+        }
+
+        .alert-icon {
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+
+        .alert-info {
+            background: rgba(7, 173, 248, 0.1);
+            border-color: var(--blue);
+            color: var(--blue);
+        }
+
+        .alert-warning {
+            background: rgba(255, 180, 0, 0.1);
+            border-color: var(--orange);
+            color: var(--orange);
+        }
+
+        .alert-success {
+            background: rgba(71, 180, 117, 0.1);
+            border-color: var(--green);
+            color: var(--green);
+        }
+
+        /* Image containers */
+        .img-container {
+            margin: 1.5rem 0;
+            text-align: center;
+        }
+
+        .img-container img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--grey);
+        }
+
+        /* Badge */
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-orange {
+            background: var(--orange);
+            color: var(--dark);
+        }
+
+        .badge-green {
+            background: var(--green);
+            color: white;
+        }
+
+        .badge-grey {
+            background: var(--grey);
+            color: var(--text-secondary);
+        }
+
+        /* Diagram blocks (monospace pre with colored spans) */
+        .diagram {
+            background: var(--code-bg);
+            border: 1px solid var(--grey);
+            border-radius: 6px;
+            padding: 1.25rem;
+            margin: 1rem 0;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', 'SF Mono', Monaco, monospace;
+            font-size: 0.8rem;
+            line-height: 1.55;
+            white-space: pre;
+            color: var(--text-muted);
+        }
+        .diagram .hl     { color: var(--blue); font-weight: 700; }
+        .diagram .grn    { color: var(--green); }
+        .diagram .wrn    { color: var(--orange); }
+        .diagram .err    { color: #f85149; }
+        .diagram .purple { color: #bc8cff; }
+        .diagram .dim    { color: #484f58; }
+
+        /* Inline status colors */
+        .good { color: var(--green); font-weight: 600; }
+        .bad  { color: #f85149; font-weight: 600; }
+        .meh  { color: var(--orange); font-weight: 600; }
+
+        /* Section numbering */
+        .section-num {
+            color: var(--orange);
+            font-weight: 400;
+            margin-right: 0.25rem;
+        }
+
+        /* Accordion */
+        details {
+            background: var(--dark-card);
+            border-radius: 6px;
+            margin-bottom: 0.75rem;
+            border: 1px solid var(--grey);
+            border-left: 3px solid var(--grey-light);
+            overflow: hidden;
+            transition: var(--transition);
+        }
+
+        details:hover {
+            border-left-color: var(--orange);
+        }
+
+        details[open] {
+            border-left-color: var(--orange);
+        }
+
+        summary {
+            padding: 1rem 1.25rem;
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--white);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            list-style: none;
+            user-select: none;
+            transition: var(--transition);
+        }
+
+        summary::-webkit-details-marker {
+            display: none;
+        }
+
+        summary::after {
+            content: '';
+            border: solid var(--orange);
+            border-width: 0 2px 2px 0;
+            display: inline-block;
+            padding: 4px;
+            transform: rotate(-45deg);
+            transition: transform 0.2s ease;
+            flex-shrink: 0;
+            margin-left: 1rem;
+        }
+
+        details[open] summary::after {
+            transform: rotate(45deg);
+        }
+
+        summary:hover {
+            background: var(--grey);
+        }
+
+        details[open] summary {
+            border-bottom: 1px solid var(--grey);
+        }
+
+        .accordion-content {
+            padding: 1rem 1.25rem;
+        }
+
+        /* Site search */
+        .site-search {
+            display: flex;
+            align-items: center;
+            flex: 0 1 240px;
+            min-width: 140px;
+        }
+
+        .site-search input {
+            width: 100%;
+            background: var(--code-bg);
+            border: 1px solid var(--grey);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.85rem;
+            padding: 0.5rem 0.75rem;
+            transition: var(--transition);
+        }
+
+        .site-search input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .site-search input:focus {
+            outline: 2px solid var(--orange);
+            outline-offset: 1px;
+            border-color: var(--orange);
+        }
+
+        /* Mobile hamburger button */
+        .nav-toggle {
+            display: none;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 0.5rem;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .nav-toggle span {
+            display: block;
+            width: 24px;
+            height: 3px;
+            background: var(--orange);
+            border-radius: 2px;
+            transition: var(--transition);
+        }
+
+        .nav-toggle.active span:nth-child(1) {
+            transform: rotate(45deg) translate(5px, 5px);
+        }
+
+        .nav-toggle.active span:nth-child(2) {
+            opacity: 0;
+        }
+
+        .nav-toggle.active span:nth-child(3) {
+            transform: rotate(-45deg) translate(6px, -6px);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .site-header {
+                flex-direction: row;
+                justify-content: space-between;
+                padding: 0.75rem 1rem;
+            }
+
+            .nav-toggle {
+                display: flex;
+            }
+
+            .site-search {
+                order: 3;
+                flex: 1 1 100%;
+                min-width: 0;
+            }
+
+            .site-search input {
+                font-size: 1rem;
+            }
+
+            .site-nav {
+                position: fixed;
+                top: 60px;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: var(--dark);
+                flex-direction: column;
+                flex-wrap: nowrap;
+                align-items: stretch;
+                padding: 1rem;
+                gap: 0.5rem;
+                overflow-y: auto;
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+                z-index: 999;
+            }
+
+            .site-nav.open {
+                transform: translateX(0);
+            }
+
+            .site-nav > a,
+            .nav-dropdown > .nav-trigger {
+                width: 100%;
+                padding: 1rem;
+                font-size: 1rem;
+            }
+
+            .nav-dropdown {
+                width: 100%;
+            }
+
+            .nav-dropdown-menu {
+                position: static;
+                opacity: 1;
+                visibility: hidden;
+                max-height: 0;
+                overflow: hidden;
+                transform: none;
+                margin-top: 0;
+                transition: max-height 0.3s ease, visibility 0.3s ease;
+                background: var(--dark-lighter);
+                border-radius: 0;
+                border: none;
+                box-shadow: none;
+            }
+
+            .nav-dropdown.open .nav-dropdown-menu {
+                visibility: visible;
+                max-height: 500px;
+            }
+
+            .nav-dropdown-menu a {
+                padding: 0.75rem 1.5rem;
+            }
+
+            /* Disable hover on mobile */
+            .nav-dropdown:hover .nav-dropdown-menu {
+                opacity: 1;
+                visibility: hidden;
+                max-height: 0;
+            }
+
+            .nav-dropdown.open .nav-dropdown-menu,
+            .nav-dropdown.open:hover .nav-dropdown-menu {
+                visibility: visible;
+                max-height: 500px;
+            }
+
+            .nav-dropdown-menu.mega-menu {
+                display: block;
+                width: 100%;
+                min-width: 0;
+                max-height: 0;
+                padding: 0.5rem;
+                left: auto;
+                right: auto;
+                overflow: hidden;
+                transform: none;
+            }
+
+            .nav-dropdown.open .nav-dropdown-menu.mega-menu,
+            .nav-dropdown.open:hover .nav-dropdown-menu.mega-menu {
+                max-height: 70vh;
+                overflow-y: auto;
+                transform: none;
+            }
+
+            .mega-menu .menu-shortcuts {
+                grid-template-columns: 1fr;
+            }
+
+            main {
+                padding: 1rem;
+            }
+
+            h1 {
+                font-size: 1.75rem;
+            }
+
+            .hero {
+                padding: 2rem 1rem;
+            }
+
+            .hero h1 {
+                font-size: 1.75rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <a href="index.html" class="header-brand">
+            <div class="header-logo">CK</div>
+            <div>
+                <div class="header-title">C-Kernel-Engine</div>
+                <div class="header-subtitle">High-Performance ML Kernels</div>
+            </div>
+        </a>
+        <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <form class="site-search" role="search" action="search.html" method="get" data-test="site-search">
+            <input type="search" name="q" id="site-search-input" aria-label="Search documentation" placeholder="Search docs ( / )" autocomplete="off">
+        </form>
+        <nav class="site-nav">
+            <a href="index.html" class="">Home</a>
+            <a href="spectrum.html" class="" style="color:var(--orange)">⚡ Spectrum</a>
+            <a href="quickstart.html" class="">Getting Started</a>
+            <a href="developer-guide.html" class="">Developer Guide</a>
+            <a href="contributing.html" class="active">Contribute</a>
+            <a href="scaling.html" class="">Scaling</a>
+            <a href="support-hardware.html" class="" style="color:var(--green)">Support Lab</a>
+            <a href="cke-throughput-unit.html" class="" style="color:var(--orange)">CKU</a>
+            <div class="nav-dropdown">
+                <span class="nav-trigger ">Architecture</span>
+                <div class="nav-dropdown-menu mega-menu">
+                    <!-- Architecture Home Link -->
+                    <div class="menu-section" style="grid-column: 1 / -1; border-bottom: 1px solid var(--grey); padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
+                        <a href="architecture-links.html" style="font-weight: 600; color: var(--orange);">
+                            View All Architecture Docs
+                            <small>Complete documentation index</small>
+                        </a>
+                        <div class="menu-shortcuts">
+                            <a href="pytorch-parity.html">PyTorch Parity<small>Numerical evidence</small></a>
+                            <a href="research.html">Research<small>Current investigations</small></a>
+                            <a href="decisions.html">Architecture Decisions<small>ADRs and tradeoffs</small></a>
+                            <a href="api.html">API &amp; Source Docs<small>Reference and Doxygen</small></a>
+                        </div>
+                    </div>
+                    <!-- Left Column -->
+                    <div class="menu-section">
+                        <div class="menu-heading">Core</div>
+                        <a href="architecture.html">System Overview<small>IR, Codegen, Kernels</small></a>
+                        <a href="tokenizer.html">Tokenizer<small>BPE, WordPiece, Trie</small></a>
+                        <a href="sentencepiece.html">SentencePiece<small>Viterbi DP, byte fallback</small></a>
+                        <a href="kernels.html">Kernel Reference<small>Forward/backward ops</small></a>
+                        <a href="codegen.html">Code Generation<small>IR to C compilation</small></a>
+                        <a href="iteration-philosophy.html">Iteration Philosophy<small>Why v1→v6 matters</small></a>
+                        <a href="ir-v2.html">IR v2 Format<small>Case study: symbolic dimensions</small></a>
+                        <a href="v7-backprop-ir.html">v7 Backprop IR<small>IR1/IR2 + layout/codegen flow</small></a>
+                        <a href="v7-cross-entropy-parity.html">v7 Cross-Entropy Parity<small>p - one_hot, reduction semantics, drift fixes</small></a>
+                        <a href="concepts.html">Deep Dive Concepts<small>RoPE, Flash Attention, GQA</small></a>
+                        <a href="kernel-maps.html">Kernel Maps<small>Provider selection, ABI, migration</small></a>
+                        <a href="kernel-architecture.html">v8 Kernel Architecture<small>Registry by op family, math</small></a>
+                        <a href="architecture-variants.html">Architecture Variants<small>Laguna, Cohere2, Instella, Nemotron</small></a>
+                        <a href="v8-moe-expert-kernels.html">MoE Expert Kernels<small>Bucketed prefill, mixed-quant experts</small></a>
+                        <a href="v8-cohere-kernels.html">Cohere Kernel Story<small>Reuse, BF16 vision, Transcribe audio</small></a>
+                    </div>
+                    <div class="menu-section">
+                        <div class="menu-heading">Quantization</div>
+                        <a href="quantization.html">Quant Fundamentals<small>Block formats, grouping</small></a>
+                        <a href="gguf-bump.html">GGUF to Bump<small>Weight conversion</small></a>
+                        <a href="gguf-conversion.html">GGUF Parsing<small>Byte-level guide</small></a>
+                    </div>
+                    <!-- Right Column -->
+                    <div class="menu-section">
+                        <div class="menu-heading">Optimization</div>
+                        <a href="gemm-memory-layout.html">GEMM Memory Layout<small>NN/NT layouts, offsets</small></a>
+                        <a href="gemm-optimization.html">GEMM Optimization<small>AVX, MKL, blocking</small></a>
+                        <a href="kernel-tuning-methodology.html">Kernel Tuning Methodology<small>VTune, Advisor, roofline, parity gates</small></a>
+                        <a href="cke-throughput-unit.html">CKE Throughput Unit<small>PB/s active-byte target</small></a>
+                        <a href="gemma4-speculative-pair.html">Gemma4 Speculative Pair<small>Backbone + MTP drafter circuit</small></a>
+                        <a href="v8-mla-kimi.html">v8 MLA / Kimi<small>Explicit decode cache contract</small></a>
+                        <a href="v8-whisper-tiny.html">Whisper Tiny E2E<small>Audio encoder/decoder circuits</small></a>
+                        <a href="simd-architecture.html">SIMD Architecture<small>AVX-512, VNNI, AMX</small></a>
+                        <a href="flash_attention.html" class="">Flash Attention Analysis<small>Why llama.cpp is faster</small></a>
+                    </div>
+                    <div class="menu-section">
+                        <div class="menu-heading">Infrastructure</div>
+                        <a href="memory-safety.html">Memory Safety<small>Bump allocator, canaries</small></a>
+                        <a href="deterministic-memory.html">Deterministic Memory<small>RDMA, interpretability</small></a>
+                        <a href="profiling.html">Profiling Guide<small>Valgrind, perf, flamegraphs</small></a>
+                        <a href="kernel-tuning-methodology.html">Kernel Tuning Methodology<small>CPU-node performance runbook</small></a>
+                        <a href="v7-profiling.html">v7 Profiling Runbook<small>Train kernels: VTune, Advisor, perf</small></a>
+                        <a href="v7-runbook.html">v7 Inference + Training Runbook<small>Copy/paste train + infer workflow</small></a>
+                        <a href="v7-svg-dataset-runbook.html">v7 SVG Dataset Runbook<small>Pretrain + midtrain data generation</small></a>
+                        <a href="testing.html">Testing<small>Numerical parity verification</small></a>
+                        <a href="divergence-harness.html">Stitched Divergence Harness<small>llama.cpp/PyTorch tensor attribution</small></a>
+                        <a href="threadpool.html">Thread Pool<small>Persistent pthreads, dispatch</small></a>
+                    </div>
+                </div>
+            </div>
+            <a href="test-report.html" class="">Test Report</a>
+            <a href="version-history.html" class="">Versions</a>
+        </nav>
+    </header>
+    <main>
+
+<div class="container">
+  <h1>Bring a Model to CKE &mdash; from Math to Standalone C</h1>
+  <p class="lead">This is the contributor tutorial for adding a model to C-Kernel-Engine v8: import adapter, operation inventory, numerical contracts, kernel maps, circuit, generated C, oracle-backed certification, and standalone native deployment. Evidence policy: commands labeled <strong>executed</strong> were run at the stated revision; commands labeled <strong>source-verified</strong> were read from source and <code>--help</code> output but not run for this page. The machine-readable record of which is which is in the <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/docs/notes/artifacts/model_bringup_guide_qwen2_evidence.json">evidence JSON</a>.</p>
+
+  <style>
+    .mb-table { overflow-x:auto; margin:1rem 0; }
+    .mb-table table { width:100%; min-width:850px; border-collapse:collapse; font-size:.86rem; }
+    .mb-table th,.mb-table td { border:1px solid var(--grey); padding:.55rem; text-align:left; vertical-align:top; }
+    .mb-table th { color:var(--orange); background:#121a24; }
+    .mb-code { overflow-x:auto; background:#0b1118; border:1px solid #263242; border-radius:8px; padding:.8rem; }
+    .mb-code .c-dim { color:#808080; }
+    .mb-code .c-hi { color:#7fd8ec; }
+    .mb-code .c-good { color:#7fd4a3; }
+    .mb-code .c-warn { color:#ffd38a; }
+    .mb-code .c-bad { color:#ff8a80; }
+    main code { overflow-wrap:anywhere; }
+    .tag { display:inline-block; padding:.08rem .5rem; border-radius:4px; font-family:'JetBrains Mono',monospace; font-size:.72rem; font-weight:700; letter-spacing:.04em; }
+    .tag-executed { background:rgba(127,212,163,.12); color:#7fd4a3; border:1px solid rgba(127,212,163,.45); }
+    .tag-source { background:rgba(127,216,236,.12); color:#7fd8ec; border:1px solid rgba(127,216,236,.45); }
+    .tag-experimental { background:rgba(255,211,138,.12); color:#ffd38a; border:1px solid rgba(255,211,138,.45); }
+    .tag-proposed { background:rgba(255,138,128,.12); color:#ff8a80; border:1px solid rgba(255,138,128,.45); }
+    .svg-expand { position: relative; }
+    .svg-expand svg { cursor: zoom-in; }
+    .svg-expand svg:focus-visible { outline: 2px solid var(--orange); outline-offset: 3px; }
+    .svg-expand-hint {
+      text-align: center; font-size: 0.72rem; color: var(--text-muted);
+      margin-top: -0.6rem; margin-bottom: 1rem; font-family: 'JetBrains Mono', monospace;
+    }
+    #ck-svg-overlay {
+      display: none; position: fixed; inset: 0; z-index: 999999;
+      background: rgba(0, 0, 0, 0.95); padding: 3.2rem 1rem 1rem;
+    }
+    #ck-svg-overlay .ck-ov-bar {
+      position: fixed; top: 0; left: 0; right: 0; padding: 0.55rem 1rem;
+      background: rgba(0,0,0,0.9); border-bottom: 1px solid #333;
+      display: flex; justify-content: space-between; align-items: center; gap: 0.6rem;
+    }
+    #ck-svg-overlay .ck-ov-title { color: #ccc; font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #ck-svg-overlay .ck-ov-bar button {
+      background: #333; color: #ffb400; border: 1px solid #555; padding: 0.3rem 0.7rem;
+      cursor: pointer; border-radius: 4px; font-size: 0.85rem;
+    }
+    #ck-svg-overlay .ck-ov-stage { width: 100%; height: 100%; overflow: auto; display: flex; align-items: flex-start; justify-content: center; }
+    #ck-svg-overlay .ck-ov-stage img { max-width: none; height: auto; }
+    .mb-check li { list-style: none; margin-bottom: .35rem; }
+    .mb-check li:before { content: "[ ] "; font-family: 'JetBrains Mono', monospace; color: var(--orange); }
+  </style>
+
+  <div class="alert alert-info"><div><strong>How to read this page.</strong><br>
+  Labels: <span class="tag tag-executed">executed</span> means the command was run at the stated execution revision and the output shown is real. <span class="tag tag-source">source-verified</span> means the command or mechanism was read from source or <code>--help</code> output at the stated revision but not executed for this page. <span class="tag tag-experimental">experimental</span> means it exists but coverage is incomplete. <span class="tag tag-proposed">proposed</span> means the mechanism does not exist yet and the text says exactly what is missing. The executable spine uses Qwen2 0.5B Instruct (GGUF <code>q4_k_m</code>), the smallest text model certified on the v8 lane. <strong>Revision provenance:</strong> execution evidence was produced at <code>ae5978f8f</code> and re-verified at the documentation revision <code>73552e22b</code> (the single intervening commit, #522, touches Gemma4 attention/test files; the Makefile targets, the qwen2 circuit, the cited kernel maps, the wrapper, and the runner quoted here are unchanged between the two, and the executed commands were re-run on the rebased tree). The evidence JSON records both revisions in separate fields.</div></div>
+
+  <h2 id="pipeline">The finish line</h2>
+  <p>A model is &ldquo;brought up&rdquo; when this pipeline runs end to end and every stage's artifact survives inspection:</p>
+  <pre class="mb-code"><code>Pinned model artifact
+  &rarr; Import adapter &rarr; weights.bump (BUMPWGT5) + manifest + config + tokenizer
+  &rarr; Circuit (operation semantics, contracts)
+  &rarr; Compiler: provider resolution + memory planning
+  &rarr; Generated C (model_v8.c)
+  &rarr; Standalone native execution (libmodel.so + ck-cli-v8)
+  &rarr; Oracle-backed certification (X-Ray evidence chain)</code></pre>
+  <p>Python tooling builds, inspects, and certifies the artifact. Python must not secretly <em>be</em> the model: if inference only works because a Python loop reconstructs layers and calls C kernels, you have a reference bring-up, not a CKE deployment. The distinction is architectural, and it is the subject of the first section.</p>
+  <p>Two tracks cover almost everything you will do:</p>
+  <ul>
+    <li><strong>Track A &mdash; add a model on existing operations.</strong> Most new models are new <em>arrangements</em> of operations CKE already has. Your deliverables are the import adapter, the circuit, contract declarations, and evidence &mdash; no new C.</li>
+    <li><strong>Track B &mdash; implement and register one new scalar provider.</strong> Only when an operation or a numerical contract is genuinely missing do you write a scalar kernel, its kernel map, and its tests. Exactly one operation at a time.</li>
+  </ul>
+
+  <h2 id="ownership">1. Who owns what &mdash; and the prohibited shortcut</h2>
+  <p>CKE separates model knowledge into components with explicit ownership. When something is wrong, the component boundary tells you where the fix is allowed to live:</p>
+  <div class="mb-table"><table><thead><tr><th>Component</th><th>Owns</th><th>Does not own</th><th>Where it lives</th></tr></thead><tbody>
+    <tr><td>Import adapter</td><td>Translation from external formats (GGUF, safetensors) into BUMP weights + normalized metadata/assets</td><td>Model semantics; it may not infer topology from filenames or silently reinterpret quantized storage</td><td><code>version/v8/scripts/convert_gguf_to_bump_v8.py</code>, <code>convert_safetensors_to_bump_v8.py</code>, <code>version/v8/model_maps/</code></td></tr>
+    <tr><td>Circuit + operation contracts</td><td>Model structure: operation instances, ordering, tensor connections, weight bindings, numerical requirements</td><td>Which physical C function runs; that is the map's and resolver's job</td><td><code>version/v8/circuits/*.json</code>, <code>version/v8/contracts/</code></td></tr>
+    <tr><td>Kernel maps</td><td>Provider capabilities: exact C symbol, ABI binding, numerical contract, workspace requirements, selection conditions</td><td>Model topology</td><td><code>version/v8/kernel_maps/*.json</code>, schemas in <code>version/v8/schemas/</code></td></tr>
+    <tr><td>Compiler lowering</td><td>Resolution (circuit requirement &rarr; provider), scheduling, bindings, memory layout</td><td>Numerical semantics; it may not guess or rank providers from shape or benchmarks (<a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/CONTRACT_POLICY.md">CONTRACT_POLICY.md</a>)</td><td><code>build_ir_v8.py</code>, <code>memory_planner_v8.py</code>, <code>codegen_v8.py</code></td></tr>
+    <tr><td>Generated model + native runtime</td><td>Actual execution: <code>model_v8.c</code> compiled to <code>libmodel.so</code>, driven by <code>ck-cli-v8</code> or the session API</td><td>Anything interpreted; the generated artifact is the deployment</td><td>run directory (e.g. <code>~/.cache/ck-engine-v8/models/&lt;model&gt;/</code>)</td></tr>
+    <tr><td>X-Ray</td><td>Observation, alignment, replay, divergence diagnosis</td><td>Fixing; diagnosis never becomes a model-name branch in code</td><td><code>version/v8/scripts/xray_*.py</code>, <a href="xray.html">X-Ray page</a></td></tr>
+    <tr><td>Oracle adapter</td><td>Translation of external runtime evidence (PyTorch/Transformers, llama.cpp) into comparable captures</td><td>The production graph; oracle code never ships in the deployment</td><td><code>export_llama_hidden_v8.py</code>, <code>xray_decoder_pytorch_v8.py</code>, <code>compare_*_v8.py</code></td></tr>
+    <tr><td>Regression infrastructure</td><td>Registered, repeatable evidence: family manifests, nightly lanes, make targets</td><td>Certification claims; &ldquo;registered&rdquo; &ne; &ldquo;executed&rdquo; &ne; &ldquo;certified&rdquo;</td><td><code>version/v8/regression/</code>, <code>Makefile</code>, <code>scripts/nightly_runner.py</code></td></tr>
+  </tbody></table></div>
+
+  <div class="svg-expand">
+  <svg viewBox="0 0 1180 560" width="100%" role="img" tabindex="0" data-svg-title="Architecture ownership and the two execution paths"
+       aria-label="Top row: the ownership chain of eight components, import adapter, circuit and operation contracts, kernel maps, compiler lowering, generated model plus native runtime, X-Ray, oracle adapter, and regression infrastructure, with arrows left to right and feedback arrows from X-Ray and regression back to earlier stages. Bottom half: two execution paths separated by a dashed vertical tooling-versus-deployment boundary. The valid path runs pinned model artifact through convert, lower, generate C, and compile on the tooling side, crosses the boundary as a bundle of libmodel dot so plus weights dot bump plus engine libraries, then runs standalone native execution on the deployment side, with X-Ray and the oracle comparing evidence across the boundary. The prohibited path, drawn in red dashes below, shows Python reconstructing layers, calling C kernels, and producing a transcript entirely on the tooling side, labeled reference bring-up, not generated-model certification."
+       style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+    <style>
+      .ck-box{fill:#323232;stroke:#454545;stroke-width:1.4;}
+      .ck-new{fill:#323232;stroke:#07adf8;stroke-width:2;}
+      .ck-title{fill:#f5f5f5;font-size:15px;font-weight:700;}
+      .ck-sub{fill:#b0b0b0;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-hi{fill:#7fd8ec;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-good{fill:#7fd4a3;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-warn{fill:#ffd38a;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-band{fill:#9aa7b4;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;}
+      .ck-cap{fill:#808080;font-size:12px;font-family:'JetBrains Mono',monospace;}
+      .ck-inset{fill:#0b1118;stroke:#263242;stroke-width:1.2;}
+      .ck-bad{fill:#ff8a80;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-badbox{fill:#323232;stroke:#ff8a80;stroke-width:1.6;stroke-dasharray:5 3;}
+    </style>
+    <defs>
+      <marker id="mb1-arrow" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+        <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
+      </marker>
+      <marker id="mb1-arrow-bad" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+        <path d="M0,0 L7,3 L0,6 Z" fill="#ff8a80"/>
+      </marker>
+    </defs>
+
+    <text x="24" y="26" class="ck-band">ownership chain - each stage owns its artifact, nothing more</text>
+    <g>
+      <rect class="ck-box" x="24" y="40" width="130" height="52" rx="8"/>
+      <text x="89" y="62" text-anchor="middle" class="ck-title" font-size="12">Import adapter</text>
+      <text x="89" y="79" text-anchor="middle" class="ck-sub">GGUF / safetensors</text>
+
+      <rect class="ck-box" x="172" y="40" width="130" height="52" rx="8"/>
+      <text x="237" y="58" text-anchor="middle" class="ck-title" font-size="12">Circuit +</text>
+      <text x="237" y="72" text-anchor="middle" class="ck-title" font-size="12">op contracts</text>
+      <text x="237" y="86" text-anchor="middle" class="ck-sub">structure, semantics</text>
+
+      <rect class="ck-box" x="320" y="40" width="130" height="52" rx="8"/>
+      <text x="385" y="62" text-anchor="middle" class="ck-title" font-size="12">Kernel maps</text>
+      <text x="385" y="79" text-anchor="middle" class="ck-sub">providers, ABI, numerics</text>
+
+      <rect class="ck-box" x="468" y="40" width="130" height="52" rx="8"/>
+      <text x="533" y="62" text-anchor="middle" class="ck-title" font-size="12">Compiler lowering</text>
+      <text x="533" y="79" text-anchor="middle" class="ck-sub">resolve, plan, bind</text>
+
+      <rect class="ck-box" x="616" y="40" width="140" height="52" rx="8"/>
+      <text x="686" y="58" text-anchor="middle" class="ck-title" font-size="12">Generated model</text>
+      <text x="686" y="72" text-anchor="middle" class="ck-title" font-size="12">+ native runtime</text>
+      <text x="686" y="86" text-anchor="middle" class="ck-sub">execution lives here</text>
+
+      <rect class="ck-box" x="774" y="40" width="120" height="52" rx="8"/>
+      <text x="834" y="62" text-anchor="middle" class="ck-title" font-size="12">X-Ray</text>
+      <text x="834" y="79" text-anchor="middle" class="ck-sub">observe, align, replay</text>
+
+      <rect class="ck-box" x="912" y="40" width="120" height="52" rx="8"/>
+      <text x="972" y="62" text-anchor="middle" class="ck-title" font-size="12">Oracle adapter</text>
+      <text x="972" y="79" text-anchor="middle" class="ck-sub">external evidence</text>
+
+      <rect class="ck-box" x="1050" y="40" width="106" height="52" rx="8"/>
+      <text x="1103" y="58" text-anchor="middle" class="ck-title" font-size="12">Regression</text>
+      <text x="1103" y="72" text-anchor="middle" class="ck-title" font-size="12">infra</text>
+      <text x="1103" y="86" text-anchor="middle" class="ck-sub">registered evidence</text>
+
+      <line x1="154" y1="66" x2="170" y2="66" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb1-arrow)"/>
+      <line x1="302" y1="66" x2="318" y2="66" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb1-arrow)"/>
+      <line x1="450" y1="66" x2="466" y2="66" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb1-arrow)"/>
+      <line x1="598" y1="66" x2="614" y2="66" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb1-arrow)"/>
+      <line x1="756" y1="66" x2="772" y2="66" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb1-arrow)"/>
+      <line x1="894" y1="66" x2="910" y2="66" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb1-arrow)"/>
+      <line x1="1032" y1="66" x2="1048" y2="66" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb1-arrow)"/>
+    </g>
+
+    <text x="24" y="136" class="ck-band">two execution paths and the tooling / deployment boundary</text>
+
+    <line x1="640" y1="150" x2="640" y2="470" stroke="#7fd8ec" stroke-width="1.6" stroke-dasharray="7 5"/>
+    <text x="330" y="166" text-anchor="middle" class="ck-hi">TOOLING (Python allowed)</text>
+    <text x="950" y="166" text-anchor="middle" class="ck-hi">DEPLOYMENT (native only)</text>
+
+    <g>
+      <rect class="ck-box" x="24" y="182" width="130" height="50" rx="8"/>
+      <text x="89" y="202" text-anchor="middle" class="ck-title" font-size="12">Pinned model</text>
+      <text x="89" y="219" text-anchor="middle" class="ck-sub">artifact + revision</text>
+
+      <rect class="ck-box" x="178" y="182" width="100" height="50" rx="8"/>
+      <text x="228" y="202" text-anchor="middle" class="ck-title" font-size="12">convert</text>
+      <text x="228" y="219" text-anchor="middle" class="ck-sub">BUMPWGT5</text>
+
+      <rect class="ck-box" x="302" y="182" width="100" height="50" rx="8"/>
+      <text x="352" y="202" text-anchor="middle" class="ck-title" font-size="12">lower</text>
+      <text x="352" y="219" text-anchor="middle" class="ck-sub">resolve + plan</text>
+
+      <rect class="ck-box" x="426" y="182" width="100" height="50" rx="8"/>
+      <text x="476" y="202" text-anchor="middle" class="ck-title" font-size="12">generate C</text>
+      <text x="476" y="219" text-anchor="middle" class="ck-sub">model_v8.c</text>
+
+      <rect class="ck-box" x="548" y="182" width="80" height="50" rx="8"/>
+      <text x="588" y="202" text-anchor="middle" class="ck-title" font-size="12">compile</text>
+      <text x="588" y="219" text-anchor="middle" class="ck-sub">libmodel.so</text>
+
+      <rect class="ck-new" x="672" y="182" width="230" height="50" rx="8"/>
+      <text x="787" y="202" text-anchor="middle" class="ck-title" font-size="12">standalone native execution</text>
+      <text x="787" y="219" text-anchor="middle" class="ck-sub">ck-cli-v8 + weights.bump, no Python</text>
+
+      <rect class="ck-box" x="930" y="182" width="226" height="50" rx="8"/>
+      <text x="1043" y="202" text-anchor="middle" class="ck-title" font-size="12">oracle-backed certification</text>
+      <text x="1043" y="219" text-anchor="middle" class="ck-sub">X-Ray evidence chain</text>
+
+      <line x1="154" y1="207" x2="176" y2="207" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb1-arrow)"/>
+      <line x1="278" y1="207" x2="300" y2="207" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb1-arrow)"/>
+      <line x1="402" y1="207" x2="424" y2="207" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb1-arrow)"/>
+      <line x1="526" y1="207" x2="546" y2="207" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb1-arrow)"/>
+      <line x1="628" y1="207" x2="670" y2="207" stroke="#7fd8ec" stroke-width="1.8" marker-end="url(#mb1-arrow)"/>
+      <line x1="902" y1="207" x2="928" y2="207" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb1-arrow)"/>
+      <text x="649" y="196" text-anchor="middle" class="ck-hi" font-size="10">bundle crosses</text>
+    </g>
+
+    <g>
+      <rect class="ck-badbox" x="24" y="268" width="200" height="50" rx="8"/>
+      <text x="124" y="288" text-anchor="middle" class="ck-title" font-size="12">Python reconstructs layers</text>
+      <text x="124" y="305" text-anchor="middle" class="ck-bad">undeclared interpreter dependency</text>
+
+      <rect class="ck-badbox" x="252" y="268" width="150" height="50" rx="8"/>
+      <text x="327" y="288" text-anchor="middle" class="ck-title" font-size="12">calls C kernels</text>
+      <text x="327" y="305" text-anchor="middle" class="ck-bad">per-op, host-driven</text>
+
+      <rect class="ck-badbox" x="430" y="268" width="130" height="50" rx="8"/>
+      <text x="495" y="288" text-anchor="middle" class="ck-title" font-size="12">transcript</text>
+      <text x="495" y="305" text-anchor="middle" class="ck-bad">looks like inference</text>
+
+      <line x1="224" y1="293" x2="250" y2="293" stroke="#ff8a80" stroke-width="1.6" stroke-dasharray="5 3" marker-end="url(#mb1-arrow-bad)"/>
+      <line x1="402" y1="293" x2="428" y2="293" stroke="#ff8a80" stroke-width="1.6" stroke-dasharray="5 3" marker-end="url(#mb1-arrow-bad)"/>
+
+      <rect class="ck-inset" x="24" y="336" width="1132" height="56" rx="8"/>
+      <text x="44" y="360" class="ck-bad" font-size="12.5">PROHIBITED as certification: this is reference bring-up - legitimate for exploring semantics, never evidence that the generated model works.</text>
+      <text x="44" y="380" class="ck-sub">The Parakeet page calls this out honestly: its runtime still uses Python orchestration around native kernels and is labeled accordingly, not as generated-circuit execution.</text>
+    </g>
+
+    <rect class="ck-inset" x="24" y="420" width="1132" height="56" rx="8"/>
+    <text x="44" y="444" class="ck-good" font-size="12.5">VALID: a generated deployment need not be one source file. Explicit native dependencies (libckernel_engine.so, libckernel_tokenizer.so) are fine.</text>
+    <text x="44" y="464" class="ck-good" font-size="12.5">Undeclared interpreter dependencies are not. If Python must be alive to produce tokens, you are on the red path.</text>
+
+    <text x="24" y="516" class="ck-cap">Ownership rule: a diagnosis never becomes a model-name branch in generic code. Fixes land in the circuit, the map, the kernel, or the adapter that owns the behavior.</text>
+    <text x="24" y="540" class="ck-cap">Source: version/v8/CONTRACT_POLICY.md - fallbacks, silent defaults, tolerance relaxation, and bypass flags are forbidden responses to a contract failure.</text>
+  </svg>
+  </div>
+  <div class="svg-expand-hint">click / tap the diagram to expand</div>
+
+  <h2 id="example">2. Choose the example and inventory operations first</h2>
+  <p>The tutorial spine is <strong>Qwen2 0.5B Instruct</strong> (<code>hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf</code>) through the current compiler: 24 layers, embed dim 896, 14 query heads with 2 KV heads (GQA), head dim 64, RoPE theta 1000000, SwiGLU MLP with intermediate size 4864, RMSNorm, tied embeddings, per-tensor mixed quantization (Q5_0 / Q8_0 / Q4_K / Q6_K / F32 across 290 tensors). It exercises the real path: circuit <code>version/v8/circuits/qwen2.json</code>, map-owned call ABIs, the region memory planner, generated C, and the native CLI.</p>
+  <p>For a new model, your first deliverable is an <strong>operation inventory</strong>, not a <code>.c</code> file. Identify from the model card, config, and tensor list:</p>
+  <ul>
+    <li><strong>Architecture / layer sequence</strong> &mdash; e.g. norm &rarr; qkv &rarr; rope &rarr; attn &rarr; out &rarr; residual &rarr; norm &rarr; gate/up &rarr; activation &rarr; down &rarr; residual.</li>
+    <li><strong>Weight formats</strong> &mdash; per-tensor quant types, fused/packed projections, tied weights, biases present or absent.</li>
+    <li><strong>Attention / cache structure</strong> &mdash; GQA vs MHA vs MLA, KV layout, sliding window, cache dtype.</li>
+    <li><strong>Position encoding</strong> &mdash; RoPE variant, theta, scaling type, rotary dim.</li>
+    <li><strong>Normalization / activations</strong> &mdash; RMSNorm vs LayerNorm, epsilon, SwiGLU vs GeGLU, and the <em>exact</em> arithmetic contract (see section 3).</li>
+    <li><strong>Stateful ops</strong> &mdash; KV cache, recurrent state, conv state; who owns the buffer across calls.</li>
+    <li><strong>Modality preprocessing / bridges</strong> &mdash; audio frontend, vision encoder, projector; where the text boundary is.</li>
+  </ul>
+  <p>Then check reuse before writing anything. The advisory tool answers exactly this question <span class="tag tag-executed">executed</span>:</p>
+  <pre class="mb-code"><code>python3 version/v8/scripts/report_model_novelty_v8.py --circuit qwen2</code></pre>
+  <pre class="mb-code"><code><span class="c-dim"># Model Novelty Report (ADVISORY)</span>
+- Operations used: 13
+- Shared with other circuits: 13
+- Unique to this circuit: 0
+- Circuits compared: 31</code></pre>
+  <p>Qwen2 needs <em>zero</em> unique operations: every one is shared with at least one other circuit. That is the expected shape of a Track A bring-up. A new model should not imply new kernels; a scalar implementation is written only when an operation or a numerical contract is genuinely missing.</p>
+
+  <div class="svg-expand">
+  <svg viewBox="0 0 1180 480" width="100%" role="img" tabindex="0" data-svg-title="Qwen2 architecture decomposed into reusable operation blocks"
+       aria-label="Qwen2 0.5B decomposed into reusable operation blocks. A token id enters the dense embedding lookup, then 24 repeated decoder layers. Each layer is rmsnorm, qkv projection, rope on q and k, GQA flash attention over the KV cache, output projection, residual add, rmsnorm, gate and up projections, silu-mul activation, down projection, residual add. A final rmsnorm and tied-embedding logits produce the next token. Every block carries a green reuse label with its existing provider name, for example gemv_q5_0_q8_0, rope_forward_qk, rmsnorm_forward. One dashed blue block at the side shows a hypothetical genuinely new operation, the only case that goes to Track B. A footer reports the novelty tool output: 13 operations used, 13 shared with other circuits, 0 unique."
+       style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+    <style>
+      .ck-box{fill:#323232;stroke:#454545;stroke-width:1.4;}
+      .ck-new{fill:#323232;stroke:#07adf8;stroke-width:2;stroke-dasharray:6 4;}
+      .ck-title{fill:#f5f5f5;font-size:15px;font-weight:700;}
+      .ck-sub{fill:#b0b0b0;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-hi{fill:#7fd8ec;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-good{fill:#7fd4a3;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-warn{fill:#ffd38a;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-band{fill:#9aa7b4;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;}
+      .ck-cap{fill:#808080;font-size:12px;font-family:'JetBrains Mono',monospace;}
+      .ck-inset{fill:#0b1118;stroke:#263242;stroke-width:1.2;}
+    </style>
+    <defs>
+      <marker id="mb2-arrow" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+        <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
+      </marker>
+    </defs>
+
+    <text x="24" y="26" class="ck-band">qwen2 0.5b: every block already has a provider - Track A</text>
+
+    <rect class="ck-box" x="24" y="44" width="120" height="52" rx="8"/>
+    <text x="84" y="66" text-anchor="middle" class="ck-title" font-size="12">token ids</text>
+    <text x="84" y="83" text-anchor="middle" class="ck-sub">i32</text>
+    <line x1="144" y1="70" x2="168" y2="70" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb2-arrow)"/>
+
+    <rect class="ck-box" x="170" y="44" width="180" height="52" rx="8"/>
+    <text x="260" y="62" text-anchor="middle" class="ck-title" font-size="12">embedding lookup</text>
+    <text x="260" y="77" text-anchor="middle" class="ck-sub">embedding_forward_q8_0</text>
+    <text x="260" y="90" text-anchor="middle" class="ck-good">reuse</text>
+
+    <rect class="ck-inset" x="380" y="36" width="620" height="392" rx="10"/>
+    <text x="400" y="60" class="ck-band">decoder layer x 24 (unrolled by codegen)</text>
+
+    <g>
+      <rect class="ck-box" x="400" y="76" width="130" height="50" rx="8"/>
+      <text x="465" y="96" text-anchor="middle" class="ck-title" font-size="12">rmsnorm</text>
+      <text x="465" y="113" text-anchor="middle" class="ck-good">reuse: rmsnorm_forward</text>
+
+      <rect class="ck-box" x="550" y="76" width="130" height="50" rx="8"/>
+      <text x="615" y="96" text-anchor="middle" class="ck-title" font-size="12">qkv_proj</text>
+      <text x="615" y="113" text-anchor="middle" class="ck-good">reuse: gemv/gemm q5_0,q8_0</text>
+
+      <rect class="ck-box" x="700" y="76" width="130" height="50" rx="8"/>
+      <text x="765" y="96" text-anchor="middle" class="ck-title" font-size="12">rope_qk</text>
+      <text x="765" y="113" text-anchor="middle" class="ck-good">reuse: rope_forward_qk</text>
+
+      <rect class="ck-box" x="850" y="76" width="130" height="50" rx="8"/>
+      <text x="915" y="90" text-anchor="middle" class="ck-title" font-size="12">attn (GQA)</text>
+      <text x="915" y="105" text-anchor="middle" class="ck-good" font-size="10.5">reuse: flash_strided + kv cache</text>
+
+      <rect class="ck-box" x="400" y="150" width="130" height="50" rx="8"/>
+      <text x="465" y="170" text-anchor="middle" class="ck-title" font-size="12">out_proj</text>
+      <text x="465" y="187" text-anchor="middle" class="ck-good">reuse: gemv_q5_0_q8_0</text>
+
+      <rect class="ck-box" x="550" y="150" width="130" height="50" rx="8"/>
+      <text x="615" y="170" text-anchor="middle" class="ck-title" font-size="12">residual_add</text>
+      <text x="615" y="187" text-anchor="middle" class="ck-good">reuse: add_inplace_f32</text>
+
+      <rect class="ck-box" x="700" y="150" width="130" height="50" rx="8"/>
+      <text x="765" y="170" text-anchor="middle" class="ck-title" font-size="12">rmsnorm</text>
+      <text x="765" y="187" text-anchor="middle" class="ck-good">reuse: rmsnorm_forward</text>
+
+      <rect class="ck-box" x="850" y="150" width="130" height="50" rx="8"/>
+      <text x="915" y="170" text-anchor="middle" class="ck-title" font-size="12">mlp gate_up</text>
+      <text x="915" y="187" text-anchor="middle" class="ck-good" font-size="10.5">reuse: gemv q5_0 / q6_k</text>
+
+      <rect class="ck-box" x="400" y="224" width="130" height="50" rx="8"/>
+      <text x="465" y="244" text-anchor="middle" class="ck-title" font-size="12">silu_mul</text>
+      <text x="465" y="261" text-anchor="middle" class="ck-good">reuse: swiglu contract</text>
+
+      <rect class="ck-box" x="550" y="224" width="130" height="50" rx="8"/>
+      <text x="615" y="244" text-anchor="middle" class="ck-title" font-size="12">mlp_down</text>
+      <text x="615" y="261" text-anchor="middle" class="ck-good">reuse: gemv_q6_k_q8_0</text>
+
+      <rect class="ck-box" x="700" y="224" width="130" height="50" rx="8"/>
+      <text x="765" y="244" text-anchor="middle" class="ck-title" font-size="12">residual_add</text>
+      <text x="765" y="261" text-anchor="middle" class="ck-good">reuse: add_inplace_f32</text>
+
+      <rect class="ck-box" x="850" y="224" width="130" height="50" rx="8"/>
+      <text x="915" y="240" text-anchor="middle" class="ck-title" font-size="12">kv cache append</text>
+      <text x="915" y="255" text-anchor="middle" class="ck-good" font-size="10.5">reuse: kv_cache_append</text>
+      <text x="915" y="268" text-anchor="middle" class="ck-sub" font-size="10.5">persistent state</text>
+    </g>
+
+    <text x="400" y="306" class="ck-sub">section 9 traces the rmsnorm block through the real generated code, model_v8.c line 1706</text>
+
+    <rect class="ck-box" x="400" y="322" width="180" height="50" rx="8"/>
+    <text x="490" y="342" text-anchor="middle" class="ck-title" font-size="12">final rmsnorm</text>
+    <text x="490" y="359" text-anchor="middle" class="ck-good">reuse</text>
+
+    <rect class="ck-box" x="600" y="322" width="200" height="50" rx="8"/>
+    <text x="700" y="342" text-anchor="middle" class="ck-title" font-size="12">logits (tied embedding)</text>
+    <text x="700" y="359" text-anchor="middle" class="ck-good">reuse: weight_tying contract</text>
+
+    <line x1="350" y1="70" x2="380" y2="70" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb2-arrow)"/>
+    <line x1="1000" y1="70" x2="1030" y2="70" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb2-arrow)"/>
+    <rect class="ck-box" x="1032" y="44" width="124" height="52" rx="8"/>
+    <text x="1094" y="66" text-anchor="middle" class="ck-title" font-size="12">next token</text>
+    <text x="1094" y="83" text-anchor="middle" class="ck-sub">sampler</text>
+
+    <rect class="ck-new" x="1032" y="130" width="124" height="86" rx="8"/>
+    <text x="1094" y="152" text-anchor="middle" class="ck-title" font-size="12">genuinely new</text>
+    <text x="1094" y="167" text-anchor="middle" class="ck-title" font-size="12">operation?</text>
+    <text x="1094" y="186" text-anchor="middle" class="ck-hi">Track B: one scalar</text>
+    <text x="1094" y="201" text-anchor="middle" class="ck-hi">provider (sections 3-6)</text>
+
+    <rect class="ck-inset" x="24" y="448" width="1132" height="24" rx="6"/>
+    <text x="40" y="465" class="ck-cap">measured: report_model_novelty_v8.py --circuit qwen2 = 13 operations used, 13 shared with other circuits, 0 unique. Inventory first; C last.</text>
+  </svg>
+  </div>
+  <div class="svg-expand-hint">click / tap the diagram to expand</div>
+
+  <p>The inventory table is the deliverable you paste into your PR description. Fill it from the GGUF/safetensors tensor list and the circuit you intend to reuse or extend:</p>
+  <div class="mb-table"><table><thead><tr><th>Operation</th><th>Existing provider?</th><th>Same numerical contract?</th><th>Action</th></tr></thead><tbody>
+    <tr><td>rmsnorm (eps 1e-6)</td><td><code>rmsnorm_forward_parallel_dispatch</code></td><td>yes - ggml-order reduction, declared in map</td><td>reuse</td></tr>
+    <tr><td>qkv projection (Q5_0 weights, Q8_0 activations)</td><td><code>gemv_q5_0_q8_0</code> (decode), prefill GEMM route</td><td>yes - per-tensor mixed quant is a declared quant contract</td><td>reuse</td></tr>
+    <tr><td>rope (theta 1e6, rotary 64, split layout)</td><td><code>rope_forward_qk_with_rotary_dim</code></td><td>yes - circuit <code>attention_contract.rope_layout: split</code></td><td>reuse</td></tr>
+    <tr><td>GQA causal attention + KV append</td><td><code>attention_forward_causal_head_major_gqa_flash_strided</code></td><td>yes - fp32 online-softmax reduction contract</td><td>reuse</td></tr>
+    <tr><td>swiglu</td><td>SwiGLU providers</td><td>verify: circuit requires contract <code>swiglu_fp32_ggml_vector_exp_fp32_output</code> (llama.cpp vector-exp arithmetic, not libm)</td><td>verify-then-reuse</td></tr>
+    <tr><td>hypothetical: a new gated norm with no matching contract</td><td>none</td><td>n/a</td><td>scalar implementation (Track B, sections 3-6)</td></tr>
+    <tr><td>hypothetical: LayerNorm where only RMSNorm contract exists</td><td><code>layernorm_fp32_exact</code></td><td>partially - reduction order targets ggml; PyTorch parity must be measured</td><td>add contract, then reuse</td></tr>
+  </tbody></table></div>
+  <p>The Parakeet bring-up page keeps a 29-row <a href="v8-parakeet-tdt.html#inventory">historical inventory</a> with four honest dispositions (reusable, candidate reuse, contract extension, missing provider/runtime/composition) &mdash; use the same vocabulary. Its machine-readable form is <code>version/v8/contracts/parakeet_tdt_0_6b_v3_inventory.json</code>.</p>
+
+  <h2 id="contract">3. Write the mathematics and the numerical contract</h2>
+  <p>Before any C exists, write the contract for the new operation. For a reduction (RMSNorm's mean of squares, or a dot product), the contract must answer all of these &mdash; an equation alone is not a contract:</p>
+  <ul>
+    <li><strong>Equation</strong> &mdash; e.g. <code>y[i] = x[i] * gamma[i] / sqrt(mean(x^2) + eps)</code>.</li>
+    <li><strong>I/O dims and axis meanings</strong> &mdash; token-major <code>[T, D]</code>? channel-major? which axis is reduced, which are batch.</li>
+    <li><strong>Storage vs computation vs accumulation dtype</strong> &mdash; e.g. storage Q5_0, computation fp32, accumulation fp32 in a stated order.</li>
+    <li><strong>Reduction axis and order</strong> &mdash; sequential over D? blocked by 32 (quant block)? tree merge across threads?</li>
+    <li><strong>Intermediate rounding points</strong> &mdash; where a value is stored to a narrower type mid-computation (e.g. K/V rounded through fp16 once, then reused).</li>
+    <li><strong>Epsilon / scaling / masking / boundary behavior</strong> &mdash; eps inside or outside the sqrt; attention scale <code>1/sqrt(D)</code> applied to Q or to scores; tail lengths; window edges.</li>
+    <li><strong>State read/write semantics</strong> &mdash; KV cache append position, in-place normalization allowed or not.</li>
+    <li><strong>Aliasing rules</strong> &mdash; may <code>output == input</code>? (RMSNorm in Qwen2 does exactly this: <code>A_EMBEDDED_INPUT</code> is both.)</li>
+    <li><strong>Error behavior</strong> &mdash; what invalid dims, null pointers, or non-finite inputs do (reject, propagate, or clamp &mdash; pick one and write it down).</li>
+  </ul>
+  <p>Four questions are routinely confused. Keep them separate:</p>
+  <ol>
+    <li><strong>Is the math correct?</strong> (the equation describes the model)</li>
+    <li><strong>Does the scalar C implement the specified finite-precision behavior?</strong> (dtype, order, rounding points)</li>
+    <li><strong>Does the optimized C preserve the contract?</strong> (vectorized/threaded variants against the scalar oracle)</li>
+    <li><strong>Does the external oracle use the same contract?</strong> (PyTorch's LayerNorm and llama.cpp's rms_norm are different finite-precision programs)</li>
+  </ol>
+  <p><strong>Never promise bitwise equality across different reduction orders.</strong> Floating-point addition is not associative. A cancellation example you can verify in any REPL: with fp32, <code>(1e8 + 1.0 - 1e8)</code> evaluates to <code>0.0</code> but <code>(1e8 - 1e8 + 1.0)</code> evaluates to <code>1.0</code>. A dot product that accumulates large positive and negative terms in a different order &mdash; sequential vs blocked-by-32 vs thread-partials-then-merge &mdash; lands on different fp32 values. The contract fixes <em>one</em> order per provider; certification compares within a stated tolerance, or bitwise only when both sides provably share the order.</p>
+
+  <div class="svg-expand">
+  <svg viewBox="0 0 1180 350" width="100%" role="img" tabindex="0" data-svg-title="Reduction pipeline: storage, conversion, multiply, accumulate, merge, round"
+       aria-label="A six-stage pipeline that a numerical contract must pin down. Stage 1 storage: quantized Q5_0 blocks on disk. Stage 2 conversion: dequantize to fp32 at a defined point. Stage 3 multiply: fp32 element products. Stage 4 partial accumulation: fp32 partial sums in a stated order, for example sequential per 32-value block. Stage 5 merge: partials combined in a fixed order, for example thread partials merged by index. Stage 6 rounding and output: one fp32 store. Under the pipeline, a warning strip shows the cancellation example: fp32 of 1e8 plus 1 minus 1e8 equals 0.0, while 1e8 minus 1e8 plus 1 equals 1.0, so summation order changes results and bitwise equality across different reduction orders is never promised."
+       style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+    <style>
+      .ck-box{fill:#323232;stroke:#454545;stroke-width:1.4;}
+      .ck-title{fill:#f5f5f5;font-size:15px;font-weight:700;}
+      .ck-sub{fill:#b0b0b0;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-hi{fill:#7fd8ec;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-good{fill:#7fd4a3;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-warn{fill:#ffd38a;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-band{fill:#9aa7b4;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;}
+      .ck-cap{fill:#808080;font-size:12px;font-family:'JetBrains Mono',monospace;}
+      .ck-inset{fill:#0b1118;stroke:#263242;stroke-width:1.2;}
+    </style>
+    <defs>
+      <marker id="mb3-arrow" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+        <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
+      </marker>
+    </defs>
+
+    <text x="24" y="26" class="ck-band">what a reduction contract pins - every arrow is a decision</text>
+
+    <g>
+      <rect class="ck-box" x="24" y="46" width="160" height="64" rx="8"/>
+      <text x="104" y="68" text-anchor="middle" class="ck-title" font-size="12">storage</text>
+      <text x="104" y="85" text-anchor="middle" class="ck-warn">q5_0 blocks (weights)</text>
+      <text x="104" y="100" text-anchor="middle" class="ck-sub">packed on disk</text>
+
+      <rect class="ck-box" x="216" y="46" width="160" height="64" rx="8"/>
+      <text x="296" y="68" text-anchor="middle" class="ck-title" font-size="12">conversion</text>
+      <text x="296" y="85" text-anchor="middle" class="ck-hi">dequant to fp32</text>
+      <text x="296" y="100" text-anchor="middle" class="ck-sub">one defined point</text>
+
+      <rect class="ck-box" x="408" y="46" width="160" height="64" rx="8"/>
+      <text x="488" y="68" text-anchor="middle" class="ck-title" font-size="12">multiply</text>
+      <text x="488" y="85" text-anchor="middle" class="ck-hi">fp32 products</text>
+      <text x="488" y="100" text-anchor="middle" class="ck-sub">per element</text>
+
+      <rect class="ck-box" x="600" y="46" width="180" height="64" rx="8"/>
+      <text x="690" y="68" text-anchor="middle" class="ck-title" font-size="12">partial accumulation</text>
+      <text x="690" y="85" text-anchor="middle" class="ck-hi">fp32 partials, stated order</text>
+      <text x="690" y="100" text-anchor="middle" class="ck-sub">e.g. sequential per 32-block</text>
+
+      <rect class="ck-box" x="812" y="46" width="160" height="64" rx="8"/>
+      <text x="892" y="68" text-anchor="middle" class="ck-title" font-size="12">merge</text>
+      <text x="892" y="85" text-anchor="middle" class="ck-hi">fixed merge order</text>
+      <text x="892" y="100" text-anchor="middle" class="ck-sub">thread partials by index</text>
+
+      <rect class="ck-box" x="1004" y="46" width="152" height="64" rx="8"/>
+      <text x="1080" y="68" text-anchor="middle" class="ck-title" font-size="12">rounding + output</text>
+      <text x="1080" y="85" text-anchor="middle" class="ck-hi">one fp32 store</text>
+      <text x="1080" y="100" text-anchor="middle" class="ck-sub">contract endpoint</text>
+
+      <line x1="184" y1="78" x2="214" y2="78" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb3-arrow)"/>
+      <line x1="376" y1="78" x2="406" y2="78" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb3-arrow)"/>
+      <line x1="568" y1="78" x2="598" y2="78" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb3-arrow)"/>
+      <line x1="780" y1="78" x2="810" y2="78" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb3-arrow)"/>
+      <line x1="972" y1="78" x2="1002" y2="78" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb3-arrow)"/>
+    </g>
+
+    <rect class="ck-inset" x="24" y="140" width="1132" height="78" rx="8"/>
+    <text x="44" y="164" class="ck-warn" font-size="12.5">cancellation: fp32(1e8 + 1.0 - 1e8) = 0.0 but fp32(1e8 - 1e8 + 1.0) = 1.0</text>
+    <text x="44" y="184" class="ck-sub">summation order changes the result, so the contract names one order per provider; cross-provider comparison uses a stated tolerance, bitwise only when the order provably matches.</text>
+    <text x="44" y="204" class="ck-sub">the map records this per provider: numerical_capabilities[].arithmetic = partial_accumulator, merge_order, deterministic, thread_count_changes_arithmetic_order.</text>
+
+    <rect class="ck-inset" x="24" y="240" width="1132" height="44" rx="8"/>
+    <text x="44" y="260" class="ck-good" font-size="12">four questions, kept separate: (1) is the math correct? (2) does scalar C implement the specified finite-precision behavior?</text>
+    <text x="44" y="277" class="ck-good" font-size="12">(3) does optimized C preserve the contract? (4) does the external oracle use the same contract? - a failing answer routes to a different owner each time.</text>
+
+    <text x="24" y="322" class="ck-cap">real example: kernel_maps/attention_forward_causal_head_major_gqa_flash_strided_f16kv.json rounds K/V through fp16 once (rounding point), keeps fp32 reuse, and declares it in scratch and numerics.</text>
+  </svg>
+  </div>
+  <div class="svg-expand-hint">click / tap the diagram to expand</div>
+
+  <h2 id="scalar-kernel">4. Implement the scalar kernel (Track B only)</h2>
+  <p>Add the kernel to the <strong>existing source group</strong> for its domain &mdash; <code>src/kernels/audio_kernels.c</code> for audio ops, <code>rmsnorm_kernels.c</code> for norms, and so on &mdash; not one file per model. A real provider with CKE's conventions (<code>src/kernels/audio_kernels.c</code>, used by the Parakeet path):</p>
+  <pre class="mb-code"><code><span class="c-dim">/* Public declaration goes in the matching header; the kernel map names this exact symbol. */</span>
+int audio_scaled_residual_add_f32(
+    const float *residual,   <span class="c-dim">/* input: read */</span>
+    const float *branch,     <span class="c-dim">/* input: read */</span>
+    float scale,             <span class="c-dim">/* parameter */</span>
+    float *output,           <span class="c-dim">/* output: written; may alias residual */</span>
+    size_t elements)         <span class="c-dim">/* dimension */</span>
+{
+    if (residual == NULL || branch == NULL || output == NULL) {
+        return -1;           <span class="c-dim">/* status convention: -1 null pointer */</span>
+    }
+    if (elements == 0 || !isfinite(scale)) {
+        return -2;           <span class="c-dim">/* -2 invalid argument */</span>
+    }
+    for (size_t index = 0; index < elements; ++index) {
+        <span class="c-dim">/* Preserve the pinned elementwise multiply then add cast boundary. */</span>
+        volatile float scaled = branch[index] * scale;
+        output[index] = residual[index] + scaled;
+    }
+    return 0;                <span class="c-dim">/* 0 success */</span>
+}</code></pre>
+  <p>Every convention above is load-bearing: public declaration, pointer/dim/parameter arguments, input validation with a documented status code, scalar computation that visibly implements the contract (the <code>volatile</code> pins the multiply-then-add rounding point so the compiler cannot fuse it into an FMA), in-place support where the contract allows it, and no allocation.</p>
+  <p><strong>The allocation rule.</strong> The kernel never allocates workspace. The map declares requirements, the compiler resolves sizes and lifetimes, the runtime owns the memory, and the kernel uses the supplied region. The conceptual signature is <code>status = provider(input, output, dimensions, workspace, workspace_bytes)</code>; CKE's actual convention passes scratch as typed pointer + capacity, e.g. the verified f16kv attention provider:</p>
+  <pre class="mb-code"><code>void attention_forward_causal_head_major_gqa_flash_strided_f16kv_workspace(
+    const float *q, const float *k, const float *v, float *output,
+    int num_heads, int num_kv_heads, int num_tokens, int head_dim,
+    int aligned_head_dim, int kv_stride_tokens,
+    float *rounded_kv, size_t rounded_kv_bytes);   <span class="c-dim">/* caller-owned scratch + capacity */</span></code></pre>
+  <p>whose map declares <code>scratch: [{name: rounded_kv, dtype: fp32, shape: [2, KV, T, D], size_resolution: required, lifetime: kernel_call}]</code>. A dynamic-size example: a T&times;D fp32 op needing 2&times;T&times;D fp32 scratch at T=512, D=5120 moves 10 MiB in, 10 MiB out, 20 MiB scratch &mdash; the map's shape expression is how the planner computes those bytes, and checked size arithmetic (overflow-checked products, aligned sizes) is how the runtime rejects absurd dimensions before any pointer exists. Alignment, lifetime reuse across layers, per-worker vs shared scratch, and why concurrent calls cannot share mutable scratch are covered in depth on the <a href="v8-kernel-allocation-ownership.html">allocation ownership page</a> &mdash; the short version: swapping <code>malloc</code> for an unbounded <code>alloca</code> is not a solution (stack is finite and the planner cannot see it), and tests enforce the rule: <code>tests/test_v8_parakeet_native.py</code> asserts <code>malloc</code>/<code>calloc</code>/<code>realloc</code>/<code>free</code> appear nowhere in the new provider bodies.</p>
+
+  <div class="svg-expand">
+  <svg viewBox="0 0 1180 470" width="100%" role="img" tabindex="0" data-svg-title="One arena: input, output, scratch, and persistent-state regions with liveness"
+       aria-label="Top: one contiguous arena bar of 411,400,448 bytes from the real Qwen2 decode memory plan, segmented into weights at the base offset 496, then activation regions embedded_input, layer_input, residual, kv_cache, rope_cache, and the per-op scratch regions q_scratch, k_scratch, v_scratch, attn and mlp scratch. Weights are yellow, activations cyan, scratch blue, and the persistent KV cache state green, with text labels since color is not the only distinction. Bottom: a liveness grid over operations embedding, rmsnorm, qkv projection, attention, and mlp, showing which region is alive at which operation: weights live throughout, kv_cache persists across all decode steps, q/k/v scratch is alive only within one layer's attention, and the mlp scratch is alive only inside the mlp. A note states the allocation rule: the kernel never allocates; the map declares, the compiler resolves, the runtime owns."
+       style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+    <style>
+      .ck-box{fill:#323232;stroke:#454545;stroke-width:1.4;}
+      .ck-title{fill:#f5f5f5;font-size:15px;font-weight:700;}
+      .ck-sub{fill:#b0b0b0;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-hi{fill:#7fd8ec;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-good{fill:#7fd4a3;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-warn{fill:#ffd38a;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-band{fill:#9aa7b4;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;}
+      .ck-cap{fill:#808080;font-size:12px;font-family:'JetBrains Mono',monospace;}
+      .ck-inset{fill:#0b1118;stroke:#263242;stroke-width:1.2;}
+      .ck-region-w{fill:#3a3428;stroke:#ffd38a;stroke-width:1.2;}
+      .ck-region-a{fill:#26323a;stroke:#7fd8ec;stroke-width:1.2;}
+      .ck-region-s{fill:#232c3c;stroke:#07adf8;stroke-width:1.2;}
+      .ck-region-p{fill:#27352c;stroke:#7fd4a3;stroke-width:1.2;}
+      .ck-live{fill:#7fd4a3;}
+      .ck-dead{fill:#2a2a2a;}
+    </style>
+
+    <text x="24" y="26" class="ck-band">one arena - qwen2 decode memory plan, total 411,400,448 bytes (layout_decode.json)</text>
+
+    <g>
+      <rect class="ck-region-w" x="24" y="44" width="420" height="54" rx="6"/>
+      <text x="234" y="66" text-anchor="middle" class="ck-warn">weights (bump data, base 496)</text>
+      <text x="234" y="84" text-anchor="middle" class="ck-sub">397,680,848 B - mmap'd, read-only</text>
+
+      <rect class="ck-region-a" x="446" y="44" width="70" height="54" rx="6"/>
+      <text x="481" y="62" text-anchor="middle" class="ck-hi" font-size="10">embedded</text>
+      <text x="481" y="76" text-anchor="middle" class="ck-hi" font-size="10">_input</text>
+      <text x="481" y="90" text-anchor="middle" class="ck-sub" font-size="9.5">3584 B</text>
+
+      <rect class="ck-region-a" x="518" y="44" width="66" height="54" rx="6"/>
+      <text x="551" y="62" text-anchor="middle" class="ck-hi" font-size="10">residual</text>
+      <text x="551" y="84" text-anchor="middle" class="ck-sub" font-size="9.5">3584 B</text>
+
+      <rect class="ck-region-p" x="586" y="44" width="150" height="54" rx="6"/>
+      <text x="661" y="66" text-anchor="middle" class="ck-good">kv_cache (state)</text>
+      <text x="661" y="84" text-anchor="middle" class="ck-sub">25,165,824 B - persists</text>
+
+      <rect class="ck-region-p" x="738" y="44" width="70" height="54" rx="6"/>
+      <text x="773" y="62" text-anchor="middle" class="ck-good" font-size="10">rope_</text>
+      <text x="773" y="76" text-anchor="middle" class="ck-good" font-size="10">cache</text>
+      <text x="773" y="90" text-anchor="middle" class="ck-sub" font-size="9.5">262144 B</text>
+
+      <rect class="ck-region-s" x="810" y="44" width="110" height="54" rx="6"/>
+      <text x="865" y="62" text-anchor="middle" class="ck-hi" font-size="10">q/k/v scratch</text>
+      <text x="865" y="84" text-anchor="middle" class="ck-sub" font-size="9.5">3584+512+512 B</text>
+
+      <rect class="ck-region-s" x="922" y="44" width="106" height="54" rx="6"/>
+      <text x="975" y="62" text-anchor="middle" class="ck-hi" font-size="10">attn scratch</text>
+      <text x="975" y="84" text-anchor="middle" class="ck-sub" font-size="9.5">3584 B</text>
+
+      <rect class="ck-region-s" x="1030" y="44" width="126" height="54" rx="6"/>
+      <text x="1093" y="62" text-anchor="middle" class="ck-hi" font-size="10">mlp scratch</text>
+      <text x="1093" y="84" text-anchor="middle" class="ck-sub" font-size="9.5">358,400 B</text>
+    </g>
+    <text x="24" y="122" class="ck-sub">activations_base 397,681,344 | region mode | offsets are fixed by the planner and compiled into model_v8.c as #define constants</text>
+
+    <text x="24" y="160" class="ck-band">liveness over operations (one decode step, layer 0 shown; all 24 layers reuse the same regions)</text>
+
+    <g font-family="'JetBrains Mono',monospace" font-size="11">
+      <text x="200" y="186" text-anchor="middle" class="ck-sub">embedding</text>
+      <text x="330" y="186" text-anchor="middle" class="ck-sub">rmsnorm</text>
+      <text x="470" y="186" text-anchor="middle" class="ck-sub">qkv_proj</text>
+      <text x="640" y="186" text-anchor="middle" class="ck-sub">attention</text>
+      <text x="820" y="186" text-anchor="middle" class="ck-sub">mlp</text>
+      <text x="1000" y="186" text-anchor="middle" class="ck-sub">next layer</text>
+
+      <text x="24" y="216" class="ck-sub">weights</text>
+      <rect class="ck-live" x="180" y="204" width="900" height="10" rx="3"/>
+
+      <text x="24" y="246" class="ck-sub">embedded_input</text>
+      <rect class="ck-live" x="180" y="234" width="900" height="10" rx="3"/>
+
+      <text x="24" y="276" class="ck-sub">residual</text>
+      <rect class="ck-dead" x="180" y="264" width="120" height="10" rx="3"/>
+      <rect class="ck-live" x="300" y="264" width="780" height="10" rx="3"/>
+
+      <text x="24" y="306" class="ck-sub">kv_cache (state)</text>
+      <rect class="ck-live" x="180" y="294" width="900" height="10" rx="3"/>
+
+      <text x="24" y="336" class="ck-sub">q/k/v scratch</text>
+      <rect class="ck-dead" x="180" y="324" width="280" height="10" rx="3"/>
+      <rect class="ck-live" x="460" y="324" width="280" height="10" rx="3"/>
+      <rect class="ck-dead" x="740" y="324" width="340" height="10" rx="3"/>
+
+      <text x="24" y="366" class="ck-sub">mlp scratch</text>
+      <rect class="ck-dead" x="180" y="354" width="600" height="10" rx="3"/>
+      <rect class="ck-live" x="780" y="354" width="120" height="10" rx="3"/>
+      <rect class="ck-dead" x="900" y="354" width="180" height="10" rx="3"/>
+    </g>
+    <text x="180" y="398" class="ck-sub">green = region is live during that operation; dark = reusable by the planner. scratch lifetimes come from the kernel map (lifetime: kernel_call).</text>
+
+    <rect class="ck-inset" x="24" y="416" width="1132" height="40" rx="8"/>
+    <text x="44" y="440" class="ck-good" font-size="12.5">the allocation rule: kernel never allocates - the map declares requirements, the compiler resolves sizes and lifetimes, the runtime owns memory, the kernel uses the supplied region.</text>
+  </svg>
+  </div>
+  <div class="svg-expand-hint">click / tap the diagram to expand</div>
+
+  <h2 id="scalar-tests">5. Test the scalar provider before optimizing</h2>
+  <p>Repo convention: each kernel ships a Python ctypes parity test with a hard max-diff gate (see <a href="testing.html">testing</a> and the <code>unittest/</code> suite wired into <code>make test</code>). For a new scalar provider, cover:</p>
+  <ul>
+    <li><strong>Independently computed expected values</strong> &mdash; not the C code transliterated into Python; a different expression of the same contract.</li>
+    <li><strong>Every output and state update checked</strong> &mdash; including in-place buffers and caches, not just the primary output.</li>
+    <li><strong>Small hand-verifiable cases</strong> &mdash; 3&ndash;8 elements where you can compute the answer on paper.</li>
+    <li><strong>Fixed-seed randomized cases</strong> &mdash; reproducible failures.</li>
+    <li><strong>Nonuniform values that expose axis swaps</strong> &mdash; if <code>x[i][j]</code> and <code>x[j][i]</code> give the same test result, your test cannot catch a transposed stride.</li>
+    <li><strong>Boundary dims</strong> &mdash; 0/1 elements, non-multiple-of-vector-width tails, the largest supported dim.</li>
+    <li><strong>Supported aliasing</strong> &mdash; if in-place is in the contract, test <code>output == input</code> explicitly.</li>
+    <li><strong>Invalid dims + insufficient workspace</strong> &mdash; assert the documented status codes (-1/-2/...), and a too-small <code>workspace_bytes</code> rejection.</li>
+    <li><strong>Canary out-of-bounds checks where practical</strong> &mdash; guard bytes before/after the output region.</li>
+    <li><strong>Reduction-specific</strong> &mdash; cancellation, mixed magnitudes, tail lengths, near-zero variance, mask/window boundaries.</li>
+  </ul>
+  <p>An fp64 reference (or Kahan summation) is useful to prove the <em>equation</em> is implemented (question 1 and 2). It misrepresents the production oracle when the production contract is itself fp32-with-a-fixed-order: then the fp64 answer is <em>not</em> the expected value, and an fp64-referenced test will flag correct contract-preserving code. Use fp64 to validate the scalar contract; use the contract's own arithmetic to validate providers against each other.</p>
+  <p>The debugging loop looks like this &mdash; one deliberately wrong stride, one failing test, one fix:</p>
+  <pre class="mb-code"><code><span class="c-bad">- output[(size_t)channel * frames + frame] = input[(size_t)frame * channels + channel];  /* strides swapped */</span>
+<span class="c-dim">$ python3 -m unittest unittest.test_audio_transpose</span>
+<span class="c-bad">FAIL: test_nonuniform_layout - max diff 3.75 at (t=1, c=0): expected input[1][0], got input[0][1]</span>
+<span class="c-good">+ output[(size_t)frame * channels + channel] = input[(size_t)channel * frames + frame];  /* channel-major in, token-major out */</span>
+<span class="c-dim">$ python3 -m unittest unittest.test_audio_transpose</span>
+<span class="c-good">OK - 14 cases incl. axis-swap sentinel values, frame=1/channel=1 boundaries, in-place rejection</span></code></pre>
+  <p>(Illustrative shape of the loop; the transpose provider is real: <code>audio_transpose_channel_to_token_f32</code> in <code>src/kernels/audio_kernels.c</code>.)</p>
+
+  <h2 id="kernel-map">6. Define the operation interface and the kernel map</h2>
+  <p>The kernel map is the machine-checked contract between the compiler and your C function. Two real annotated examples:</p>
+  <p><strong>Minimal map</strong> &mdash; <code>version/v8/kernel_maps/audio_scaled_residual_add_f32.json</code> (abridged to the fields that matter):</p>
+  <pre class="mb-code"><code>{
+  <span class="c-hi">"id"</span>: "audio_scaled_residual_add_f32",          <span class="c-dim">// identity: file name, registry key</span>
+  <span class="c-hi">"op"</span>: "audio_scaled_residual_add",             <span class="c-dim">// logical op the circuit names</span>
+  <span class="c-hi">"operation_interface"</span>: "audio.residual_add.scaled.fp32.v1",  <span class="c-dim">// versioned interface contract</span>
+  <span class="c-hi">"selection"</span>: { "status": "candidate", "priority": 100,
+    "equivalence_group": "audio_scaled_residual_add_separate_fp32",
+    "phases": ["prefill", "decode"] },              <span class="c-dim">// when the resolver may pick this</span>
+  <span class="c-hi">"quant"</span>: { "weight": "none", "activation": "fp32", "output": "fp32" },
+  <span class="c-hi">"inputs"</span>:  [ { "name": "residual", "dtype": "fp32", "shape": ["N"],
+                  "layout": "contiguous", "access": "read", "storage_class": "activation" },
+                { "name": "branch",   "dtype": "fp32", "shape": ["N"], ... } ],
+  <span class="c-hi">"weights"</span>: [],
+  <span class="c-hi">"outputs"</span>: [ { "name": "output", "dtype": "fp32", "access": "write", ... } ],
+  <span class="c-hi">"scratch"</span>: [],                                  <span class="c-dim">// this op needs no workspace</span>
+  <span class="c-hi">"dims"</span>:   ["elements"],
+  <span class="c-hi">"params"</span>: [ { "name": "scale", "dtype": "fp32" } ],
+  <span class="c-hi">"impl"</span>: { "function": "audio_scaled_residual_add_f32",     <span class="c-dim">// exact C symbol</span>
+    "c_declaration": "int audio_scaled_residual_add_f32(const float *residual, ...);",
+    "sources": ["src/kernels/audio_kernels.c"] },
+  <span class="c-hi">"numerical_capabilities"</span>: [ { "contract_id": "audio_scaled_residual_add_separate_fp32",
+    "status": "validated",
+    "implementation": { "isa_dispatch": "scalar",
+      "threading": { "runtime": "serial", ..., "reduction_order_effect": "none" } },
+    "arithmetic": { "partial_accumulator": "none", "merge_order": "none",
+      "deterministic": true, "thread_count_changes_arithmetic_order": false } } ],
+  <span class="c-hi">"call_abi"</span>: { "version": 1, "params": [
+    { "name": "residual", "source": "activation:residual", "ports": ["input:residual"] },
+    { "name": "branch",   "source": "activation:branch",   "ports": ["input:branch"] },
+    { "name": "scale",    "source": "param:scale" },
+    { "name": "output",   "source": "output:output",       "ports": ["output:output"] },
+    { "name": "elements", "source": "dim:elements" } ] },   <span class="c-dim">// where every C arg comes from</span>
+  <span class="c-hi">"tests"</span>: { "unit": ["unittest/test_audio_encoder.py"],
+    "oracle": "NumPy FP32 multiply followed by FP32 add" }
+}</code></pre>
+  <p><strong>Workspace-using map</strong> &mdash; <code>version/v8/kernel_maps/attention_forward_causal_head_major_gqa_flash_strided_f16kv.json</code> declares <code>scratch: [{ name: "rounded_kv", dtype: "fp32", shape: [2, "KV", "T", "D"], size_resolution: "required", lifetime: "kernel_call" }]</code> with the note &ldquo;K/V values rounded through FP16 once and retained as FP32&rdquo; &mdash; the intermediate rounding point is part of the contract, and the planner sizes the region from the shape expression. Do not copy either map blindly: validate symbolic dims and interface names against the kernel you actually wrote.</p>
+  <p>Every section is schema-checked. The schemas live under <code>version/v8/schemas/</code>: <code>kernel_call_abi.schema.json</code>, <code>kernel_provider_selection.schema.json</code>, <code>kernel_physical_layout.schema.json</code>, <code>numerical_kernel_capability.schema.json</code>, <code>kernel_codegen_capability.schema.json</code> (all five verified present at this revision). The enforcing gates are <code>tests/test_v8_provider_selection.py</code> and <code>tests/test_v8_kernel_call_abi.py</code>, both run by <code>make test-kernel-maps</code>; see <a href="kernel-maps.html#contributor-recipe">the kernel-maps contributor recipe</a> for the full map-to-generated-C lane.</p>
+  <p><strong>Failure is explicit, not silent.</strong> A misspelled port or an invented source is a hard error at build-IR time. Executed at the stated revision <span class="tag tag-executed">executed</span>:</p>
+  <pre class="mb-code"><code><span class="c-dim">$ python3 -m unittest tests.test_v8_kernel_call_abi.V8KernelCallABITests.test_unknown_call_source_is_a_hard_failure \</span>
+<span class="c-dim">    tests.test_v8_kernel_call_abi.V8KernelCallABITests.test_all_contract_governed_maps_own_valid_call_abi</span>
+<span class="c-good">Ran 2 tests in 0.053s - OK</span>
+<span class="c-dim"># the first test feeds source "guessed:model_default" and requires RuntimeError: "unsupported source"</span></code></pre>
+  <p>An unsupported dtype fails the same way at selection: if the map's <code>quant</code> block does not declare the circuit's required activation/weight dtypes, resolution finds no candidate and the build stops with the rejected-candidate reasons (the <a href="kernel-maps.html#selection-trace">selection trace</a> records them).</p>
+  <p><strong>Registry generation.</strong> <code>version/v8/kernel_maps/KERNEL_REGISTRY.json</code> and <code>version/v8/src/ck_kernel_dispatch_policy_v8.inc</code> are generated artifacts. Never hand-edit them. The workflow, exactly as <code>make v8-kernel-registry-freshness</code> implements it:</p>
+  <pre class="mb-code"><code>python3 -c "import sys; sys.path.insert(0, 'version/v8/scripts'); \
+  import ck_run_v8; ck_run_v8.step_regenerate_kernel_registry(force=True)"
+python3 version/v8/scripts/generate_kernel_dispatch_policy_v8.py
+git diff --exit-code -- version/v8/kernel_maps/KERNEL_REGISTRY.json   <span class="c-dim"># must be clean in CI</span></code></pre>
+
+  <h3 id="arg-trace">Worked example: trace one C argument end to end</h3>
+  <p>This is the actual decode-step RMSNorm from the verified Qwen2 0.5B run at this revision. One argument &mdash; <code>gamma</code> &mdash; traced through every layer of the stack:</p>
+  <div class="svg-expand">
+  <svg viewBox="0 0 1180 620" width="100%" role="img" tabindex="0" data-svg-title="One C argument traced end to end: circuit to kernel pointer"
+       aria-label="A vertical trace of the gamma argument of the layer-0 RMSNorm. Step 1, circuit: qwen2.json names the op rmsnorm in the decoder body. Step 2, IR: ir1_decode.json op_id 2 with kernel rmsnorm_forward and an input port gamma bound from weights. Step 3, kernel map: rmsnorm_forward.json call_abi binds gamma from source weight_f:_gamma with alternate names ln1_gamma, ln2_gamma, and others, cast to const float pointer. Step 4, memory plan: layout_decode.json assigns weight layer.0.ln1_gamma 3584 bytes at absolute offset 149355180, define W_LAYER_0_LN1_GAMMA. Step 5, lowered call: lowered_decode_call.json records expr (const float*)(model->bump + W_LAYER_0_LN1_GAMMA) with weight_ref layer.0.ln1_gamma. Step 6, generated C: model_v8.c line 1706 calls rmsnorm_forward_parallel_dispatch with that expression as the second argument. Step 7, kernel: the pointer addresses fp32 bytes inside the mmap'd bump region. A side rail notes the companion activation argument input comes from activation:input and lands on A_EMBEDDED_INPUT at absolute offset 397681472, and that output aliases the same buffer because the contract permits in-place operation."
+       style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+    <style>
+      .ck-box{fill:#323232;stroke:#454545;stroke-width:1.4;}
+      .ck-title{fill:#f5f5f5;font-size:15px;font-weight:700;}
+      .ck-sub{fill:#b0b0b0;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-hi{fill:#7fd8ec;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-good{fill:#7fd4a3;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-warn{fill:#ffd38a;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-band{fill:#9aa7b4;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;}
+      .ck-cap{fill:#808080;font-size:12px;font-family:'JetBrains Mono',monospace;}
+      .ck-inset{fill:#0b1118;stroke:#263242;stroke-width:1.2;}
+    </style>
+    <defs>
+      <marker id="mb5-arrow" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+        <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
+      </marker>
+    </defs>
+
+    <text x="24" y="26" class="ck-band">gamma argument of layer-0 rmsnorm - seven artifacts, one pointer</text>
+
+    <g>
+      <rect class="ck-box" x="24" y="42" width="700" height="58" rx="8"/>
+      <text x="44" y="64" class="ck-title" font-size="12.5">1. circuit - version/v8/circuits/qwen2.json</text>
+      <text x="44" y="84" class="ck-sub">block_types.decoder.body.ops: ["rmsnorm", "qkv_proj", "rope_qk", ...] - names the op, not the kernel</text>
+
+      <rect class="ck-box" x="24" y="122" width="700" height="58" rx="8"/>
+      <text x="44" y="144" class="ck-title" font-size="12.5">2. IR - ir1_decode.json, op_id 2</text>
+      <text x="44" y="164" class="ck-sub">{ "op": "rmsnorm", "kernel": "rmsnorm_forward", layer 0 } after resolution</text>
+
+      <rect class="ck-box" x="24" y="202" width="700" height="66" rx="8"/>
+      <text x="44" y="224" class="ck-title" font-size="12.5">3. kernel map - kernel_maps/rmsnorm_forward.json, call_abi</text>
+      <text x="44" y="244" class="ck-sub">{ "name": "gamma", "source": "weight_f:_gamma", "alt": ["ln1_gamma", "ln2_gamma", ...], "cast": "const float*" }</text>
+      <text x="44" y="260" class="ck-sub">impl.function = rmsnorm_forward_parallel_dispatch - the exact symbol codegen must emit</text>
+
+      <rect class="ck-box" x="24" y="290" width="700" height="58" rx="8"/>
+      <text x="44" y="312" class="ck-title" font-size="12.5">4. memory plan - layout_decode.json</text>
+      <text x="44" y="332" class="ck-sub">weight "layer.0.ln1_gamma": fp32, 3584 B, abs_offset 149355180 - define W_LAYER_0_LN1_GAMMA</text>
+
+      <rect class="ck-box" x="24" y="370" width="700" height="58" rx="8"/>
+      <text x="44" y="392" class="ck-title" font-size="12.5">5. lowered call - lowered_decode_call.json, op idx 2, arg gamma</text>
+      <text x="44" y="412" class="ck-sub">{ "source": "weight_f:_gamma", "expr": "(const float*)(model-&gt;bump + W_LAYER_0_LN1_GAMMA)", "weight_ref": "layer.0.ln1_gamma" }</text>
+
+      <rect class="ck-box" x="24" y="450" width="700" height="66" rx="8"/>
+      <text x="44" y="472" class="ck-title" font-size="12.5">6. generated C - model_v8.c line 1706</text>
+      <text x="44" y="492" class="ck-sub">rmsnorm_forward_parallel_dispatch((const float*)(model-&gt;bump + A_EMBEDDED_INPUT),</text>
+      <text x="44" y="508" class="ck-sub">    (const float*)(model-&gt;bump + W_LAYER_0_LN1_GAMMA), ..., 1, 896, 896, 9.999999974752427e-07);</text>
+
+      <rect class="ck-box" x="24" y="538" width="700" height="58" rx="8"/>
+      <text x="44" y="560" class="ck-title" font-size="12.5">7. kernel - rmsnorm_forward_parallel_dispatch receives a plain pointer</text>
+      <text x="44" y="580" class="ck-sub">the address is model-&gt;bump + 149355180: fp32 bytes inside the mmap'd weights region</text>
+
+      <line x1="374" y1="100" x2="374" y2="120" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb5-arrow)"/>
+      <line x1="374" y1="180" x2="374" y2="200" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb5-arrow)"/>
+      <line x1="374" y1="268" x2="374" y2="288" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb5-arrow)"/>
+      <line x1="374" y1="348" x2="374" y2="368" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb5-arrow)"/>
+      <line x1="374" y1="428" x2="374" y2="448" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb5-arrow)"/>
+      <line x1="374" y1="516" x2="374" y2="536" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb5-arrow)"/>
+    </g>
+
+    <g>
+      <rect class="ck-inset" x="756" y="122" width="400" height="150" rx="8"/>
+      <text x="776" y="148" class="ck-band">companion args, same trace</text>
+      <text x="776" y="172" class="ck-sub">input &lt;- activation:input</text>
+      <text x="776" y="190" class="ck-hi">  = A_EMBEDDED_INPUT, abs 397681472</text>
+      <text x="776" y="212" class="ck-sub">output &lt;- output:output</text>
+      <text x="776" y="230" class="ck-hi">  = same buffer: contract allows in-place</text>
+      <text x="776" y="252" class="ck-sub">tokens &lt;- dim:seq_len = 1 (decode)</text>
+
+      <rect class="ck-inset" x="756" y="290" width="400" height="120" rx="8"/>
+      <text x="776" y="314" class="ck-band">why these numbers</text>
+      <text x="776" y="338" class="ck-sub">896 = embed_dim from GGUF metadata</text>
+      <text x="776" y="356" class="ck-sub">1e-6 = attention.layer_norm_rms_epsilon</text>
+      <text x="776" y="374" class="ck-sub">3584 B = 896 fp32; offsets assigned by</text>
+      <text x="776" y="392" class="ck-sub">the region planner, compiled as #define</text>
+
+      <rect class="ck-inset" x="756" y="428" width="400" height="120" rx="8"/>
+      <text x="776" y="452" class="ck-band">fail-closed, by construction</text>
+      <text x="776" y="476" class="ck-sub">misspelled source (e.g. "weight:ln1_gama")</text>
+      <text x="776" y="494" class="ck-sub">or undeclared dtype: resolution stops with</text>
+      <text x="776" y="512" class="ck-sub">named rejection reasons - no fallback,</text>
+      <text x="776" y="530" class="ck-sub">no guessed default (CONTRACT_POLICY.md)</text>
+    </g>
+  </svg>
+  </div>
+  <div class="svg-expand-hint">click / tap the diagram to expand</div>
+
+  <h2 id="circuit">7. Define the circuit</h2>
+  <p>A circuit declares <strong>model composition</strong>, not a kernel name list: operation instances and ordering, tensor connections, weight bindings, repeated blocks, parameters and conditional features, state producers/consumers, numerical requirements, and modality bridges. Read <code>version/v8/circuits/*.json</code> before inventing structure &mdash; the compiler supports exactly what those files use. The complete Qwen2 circuit (abridged to structure; full file is 200 lines):</p>
+  <pre class="mb-code"><code>{
+  "version": 2, "name": "qwen2", "family": "llama",
+  "projection_inputs": { "q_proj": {"x": "main_stream_q8"}, ... },   <span class="c-dim">// tensor connections</span>
+  "flags": { "use_qkv_bias": "from_weights", "activation": "swiglu", "rope": "rope", "tokenizer": "bpe" },
+  "contract": {
+    "tokenizer_contract": { "tokenizer_type": "bpe", "bos_policy": "model_defined", ... },
+    "chat_contract": { "name": "qwen2", "turn_prefix": "&lt;|im_start|&gt;{role}\n", ... },
+    "attention_contract": { "rope_layout": "split", "qk_norm": false,
+                            "kv_layout": "layer_major_kv_cache", "attn_variant": "dense" },
+    "block_contract": { "norm_type": "rmsnorm", "mlp_formula": "gate_up -&gt; silu_mul -&gt; down" },
+    "logits_contract": { "final_norm": "rmsnorm", "lm_head": "weight_tying" },
+    "quant_contract": { "kernel_select": "weight_dtype_registry", "per_tensor_mixed_quant": true },
+    "runtime_invariants": { "required_call_args": { "kv_cache_batch_copy": [...] } }
+  },
+  "kernels": { "rope_qk": "rope_forward_qk" },
+  "required_contracts":       { "decoder.attention":  { "op": "attention", "phases": {
+      "prefill": { "requires": { "numerics.attention_reduction": "fp32_online", ... }, "validation": "validated" },
+      "decode":  { "requires": { ... }, "validation": "validated" } } } },
+  "required_numerical_contracts": { "decoder.swiglu": { "operation_interface": "swiglu.fp32.v1",
+      "phases": { "prefill": { "contract_id": "swiglu_fp32_ggml_vector_exp_fp32_output" }, ... },
+      "checkpoint": { "id": "decoder.layer.{layer}.swiglu.output", "producer": "silu_mul",
+                      "logical_layout": "token_major", "axis_names": ["token", "channel"] } } },
+  "sequence": ["decoder"],
+  "block_types": { "decoder": {
+      "sequence": ["header", "body", "footer"],
+      "header": ["bpe_tokenizer", "dense_embedding_lookup"],
+      "body": { "type": "dense", "ops": ["rmsnorm", "qkv_proj", "rope_qk", "attn", "out_proj",
+                "residual_add", "rmsnorm", "mlp_gate_up", "silu_mul", "mlp_down", "residual_add"] },
+      "footer": ["rmsnorm", "weight_tying", "logits"] } }
+}</code></pre>
+  <p>The minimal normalize &rarr; projection &rarr; activation &rarr; projection &rarr; residual chain is the body tail: <code>rmsnorm, mlp_gate_up, silu_mul, mlp_down, residual_add</code>. Extensions are declared, not coded: attention/KV is the <code>attn</code> op plus <code>attention_contract</code> + <code>runtime_invariants</code>; shared-KV is a named attention variant (<code>attention_forward_causal_head_major_shared_kv_gemma4.json</code> exists for Gemma4); recurrent state, MoE routing, and cross-attention have their own circuits (<code>laguna.json</code>, <code>qwen35.json</code>, <code>cohere_transcribe.json</code>); vision/audio bridges compose circuits (<code>qwen3vl.json</code> + <code>qwen3_vl_vision.json</code>, <code>parakeet_tdt.json</code>).</p>
+  <p>Nearest-neighbor diff &mdash; Qwen2 vs Qwen3, the two real files (this is the entire structural difference in the decoder body):</p>
+  <pre class="mb-code"><code><span class="c-dim">--- version/v8/circuits/qwen2.json</span>
+<span class="c-good">+++ version/v8/circuits/qwen3.json</span>
+ flags:  <span class="c-bad">- "use_qkv_bias": "from_weights"</span>            <span class="c-good">+ "use_qkv_bias": false, "has_qk_norm": true</span>
+ body:   <span class="c-bad">- ["rmsnorm", "qkv_proj", "rope_qk", ...]</span>   <span class="c-good">+ ["rmsnorm", "qkv_proj", "qk_norm", "rope_qk", ...]</span></code></pre>
+  <p>One flag and one inserted op &mdash; Qwen3's per-head QK norm &mdash; is what separates two model families, because both reuse the same providers. The circuit genuinely controls execution: section 9 shows the op names appearing verbatim in generated C comments.</p>
+
+  <div class="svg-expand">
+  <svg viewBox="0 0 1180 480" width="100%" role="img" tabindex="0" data-svg-title="Circuit: logical tensor edges above physical buffer reuse"
+       aria-label="Two views of the same circuit. Top lane, logical: tensor edges flow embedded input through rmsnorm, qkv projection, rope, attention, output projection, residual add, rmsnorm, gate-up, silu-mul, down projection, residual add, repeated for 24 layers. Bottom lane, physical: the planner assigns every layer's activations onto the same small set of buffers, A_EMBEDDED_INPUT written in place by rmsnorm, A_Q_SCRATCH, A_K_SCRATCH, A_V_SCRATCH reused by all 24 layers, A_ATTN_SCRATCH, A_MLP_SCRATCH, and A_RESIDUAL holding the running sum, while A_KV_CACHE persists. An arrow between the lanes says the memory planner maps logical tensors onto physical regions and proves non-overlapping lifetimes."
+       style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+    <style>
+      .ck-box{fill:#323232;stroke:#454545;stroke-width:1.4;}
+      .ck-title{fill:#f5f5f5;font-size:15px;font-weight:700;}
+      .ck-sub{fill:#b0b0b0;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-hi{fill:#7fd8ec;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-good{fill:#7fd4a3;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-warn{fill:#ffd38a;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-band{fill:#9aa7b4;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;}
+      .ck-cap{fill:#808080;font-size:12px;font-family:'JetBrains Mono',monospace;}
+      .ck-inset{fill:#0b1118;stroke:#263242;stroke-width:1.2;}
+    </style>
+    <defs>
+      <marker id="mb6-arrow" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+        <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
+      </marker>
+    </defs>
+
+    <text x="24" y="26" class="ck-band">logical view - what the circuit declares (tensor edges)</text>
+    <g>
+      <rect class="ck-box" x="24" y="42" width="96" height="44" rx="8"/>
+      <text x="72" y="60" text-anchor="middle" class="ck-title" font-size="11">embedded</text>
+      <text x="72" y="76" text-anchor="middle" class="ck-title" font-size="11">input</text>
+      <rect class="ck-box" x="132" y="42" width="90" height="44" rx="8"/>
+      <text x="177" y="68" text-anchor="middle" class="ck-title" font-size="11">rmsnorm</text>
+      <rect class="ck-box" x="234" y="42" width="90" height="44" rx="8"/>
+      <text x="279" y="68" text-anchor="middle" class="ck-title" font-size="11">qkv_proj</text>
+      <rect class="ck-box" x="336" y="42" width="86" height="44" rx="8"/>
+      <text x="379" y="68" text-anchor="middle" class="ck-title" font-size="11">rope_qk</text>
+      <rect class="ck-box" x="434" y="42" width="80" height="44" rx="8"/>
+      <text x="474" y="68" text-anchor="middle" class="ck-title" font-size="11">attn</text>
+      <rect class="ck-box" x="526" y="42" width="90" height="44" rx="8"/>
+      <text x="571" y="68" text-anchor="middle" class="ck-title" font-size="11">out_proj</text>
+      <rect class="ck-box" x="628" y="42" width="96" height="44" rx="8"/>
+      <text x="676" y="68" text-anchor="middle" class="ck-title" font-size="11">residual_add</text>
+      <rect class="ck-box" x="736" y="42" width="90" height="44" rx="8"/>
+      <text x="781" y="68" text-anchor="middle" class="ck-title" font-size="11">rmsnorm</text>
+      <rect class="ck-box" x="838" y="42" width="100" height="44" rx="8"/>
+      <text x="888" y="60" text-anchor="middle" class="ck-title" font-size="11">gate_up -&gt;</text>
+      <text x="888" y="76" text-anchor="middle" class="ck-title" font-size="11">silu_mul</text>
+      <rect class="ck-box" x="950" y="42" width="90" height="44" rx="8"/>
+      <text x="995" y="68" text-anchor="middle" class="ck-title" font-size="11">mlp_down</text>
+      <rect class="ck-box" x="1052" y="42" width="104" height="44" rx="8"/>
+      <text x="1104" y="68" text-anchor="middle" class="ck-title" font-size="11">residual_add</text>
+
+      <line x1="120" y1="64" x2="130" y2="64" stroke="#7fd8ec" stroke-width="1.8" marker-end="url(#mb6-arrow)"/>
+      <line x1="222" y1="64" x2="232" y2="64" stroke="#7fd8ec" stroke-width="1.8" marker-end="url(#mb6-arrow)"/>
+      <line x1="324" y1="64" x2="334" y2="64" stroke="#7fd8ec" stroke-width="1.8" marker-end="url(#mb6-arrow)"/>
+      <line x1="422" y1="64" x2="432" y2="64" stroke="#7fd8ec" stroke-width="1.8" marker-end="url(#mb6-arrow)"/>
+      <line x1="514" y1="64" x2="524" y2="64" stroke="#7fd8ec" stroke-width="1.8" marker-end="url(#mb6-arrow)"/>
+      <line x1="616" y1="64" x2="626" y2="64" stroke="#7fd8ec" stroke-width="1.8" marker-end="url(#mb6-arrow)"/>
+      <line x1="724" y1="64" x2="734" y2="64" stroke="#7fd8ec" stroke-width="1.8" marker-end="url(#mb6-arrow)"/>
+      <line x1="826" y1="64" x2="836" y2="64" stroke="#7fd8ec" stroke-width="1.8" marker-end="url(#mb6-arrow)"/>
+      <line x1="938" y1="64" x2="948" y2="64" stroke="#7fd8ec" stroke-width="1.8" marker-end="url(#mb6-arrow)"/>
+      <line x1="1040" y1="64" x2="1050" y2="64" stroke="#7fd8ec" stroke-width="1.8" marker-end="url(#mb6-arrow)"/>
+      <text x="590" y="110" text-anchor="middle" class="ck-sub">x 24 layers (body.type = "dense" - codegen unrolls the repetition)</text>
+    </g>
+
+    <line x1="590" y1="130" x2="590" y2="168" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb6-arrow)"/>
+    <text x="606" y="154" class="ck-sub">memory_planner_v8.py: logical tensors -&gt; physical regions, non-overlapping lifetimes proven</text>
+
+    <text x="24" y="196" class="ck-band">physical view - what actually exists in memory (all 24 layers share these)</text>
+    <g>
+      <rect class="ck-box" x="24" y="212" width="180" height="56" rx="8"/>
+      <text x="114" y="234" text-anchor="middle" class="ck-hi">A_EMBEDDED_INPUT</text>
+      <text x="114" y="252" text-anchor="middle" class="ck-sub">rmsnorm reads+writes in place</text>
+
+      <rect class="ck-box" x="224" y="212" width="200" height="56" rx="8"/>
+      <text x="324" y="234" text-anchor="middle" class="ck-hi">A_Q/K/V_SCRATCH</text>
+      <text x="324" y="252" text-anchor="middle" class="ck-sub">reused by every layer</text>
+
+      <rect class="ck-box" x="444" y="212" width="170" height="56" rx="8"/>
+      <text x="529" y="234" text-anchor="middle" class="ck-hi">A_ATTN_SCRATCH</text>
+      <text x="529" y="252" text-anchor="middle" class="ck-sub">attention output stage</text>
+
+      <rect class="ck-box" x="634" y="212" width="170" height="56" rx="8"/>
+      <text x="719" y="234" text-anchor="middle" class="ck-hi">A_MLP_SCRATCH</text>
+      <text x="719" y="252" text-anchor="middle" class="ck-sub">358,400 B, gate/up rows</text>
+
+      <rect class="ck-box" x="824" y="212" width="150" height="56" rx="8"/>
+      <text x="899" y="234" text-anchor="middle" class="ck-hi">A_RESIDUAL</text>
+      <text x="899" y="252" text-anchor="middle" class="ck-sub">running sum</text>
+
+      <rect class="ck-box" x="994" y="212" width="162" height="56" rx="8"/>
+      <text x="1075" y="234" text-anchor="middle" class="ck-good">A_KV_CACHE</text>
+      <text x="1075" y="252" text-anchor="middle" class="ck-sub">persistent across steps</text>
+    </g>
+
+    <rect class="ck-inset" x="24" y="300" width="1132" height="66" rx="8"/>
+    <text x="44" y="324" class="ck-sub" font-size="12">same circuit, two truths: the logical graph says which tensor feeds which op; the physical plan says which bytes those tensors occupy at which moment.</text>
+    <text x="44" y="346" class="ck-sub" font-size="12">decode activations total 26,429,120 B for a 397,677,928 B weight file - the planner reuses regions across all 24 layers instead of allocating per layer.</text>
+
+    <text x="24" y="402" class="ck-cap">state producers/consumers are declared: attention appends K/V (producer) and reads the cache (consumer) each step; the circuit's runtime_invariants require the exact copy call args.</text>
+    <text x="24" y="426" class="ck-cap">modality bridges compose circuits: qwen3vl.json (decoder) + qwen3_vl_vision.json (encoder) with declared stitch edges; do not invent a universal JSON shape the compiler does not support.</text>
+  </svg>
+  </div>
+  <div class="svg-expand-hint">click / tap the diagram to expand</div>
+
+  <h2 id="import-adapter">8. Build the import adapter</h2>
+  <p>Model-specific logic is legitimate <em>here</em> &mdash; this is the one component whose job is knowing that GGUF calls it <code>blk.0.attn_q.weight</code> while CKE calls it <code>layer.0.wq</code>. Start from the real files: <code>version/v8/model_maps/gguf_ck_map.json</code> and <code>safetensors_ck_map.json</code> (declarative tensor-name/metadata contracts per architecture), and the converters <code>version/v8/scripts/convert_gguf_to_bump_v8.py</code> and <code>convert_safetensors_to_bump_v8.py</code>.</p>
+  <p>Inventory the external package first. Run against the tutorial model <span class="tag tag-executed">executed</span>:</p>
+  <pre class="mb-code"><code>python3 version/v8/scripts/convert_gguf_to_bump_v8.py \
+  --gguf ~/.cache/ck-engine-v8/models/Qwen--Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf \
+  --list</code></pre>
+  <pre class="mb-code"><code>[gguf] version=3 source_arch=qwen2 circuit=qwen2 tensors=290 kv=26 alignment=32
+[gguf] tensor types: Q5_0: 132 | F32: 121 | Q8_0: 13 | Q4_K: 12 | Q6_K: 12
+  - token_embd.weight: Q8_0 dims=(896, 151936)
+  - blk.0.attn_q.weight: Q5_0 dims=(896, 896)
+  - blk.0.attn_v.weight: Q8_0 dims=(896, 128)
+  - blk.0.ffn_down.weight: Q6_K dims=(4864, 896)
+  - output_norm.weight: F32 dims=(896,)</code></pre>
+  <p>The inventory covers: external tensor names, shapes/orientation, packed or fused projections, per-tensor quantization (this file mixes five types &mdash; &ldquo;Q4_K_M&rdquo; in the filename is a recipe name, not a per-tensor truth), tied weights (Qwen2 ties the LM head to <code>token_embd.weight</code>), missing optionals, tokenizer/special tokens, position/cache config, and modality preprocessing metadata when present.</p>
+  <p>The mapping table is the adapter's contract &mdash; external tensor &rarr; canonical weight role &rarr; transformation &rarr; stored dtype. From the verified run's <code>weights_manifest.map</code>:</p>
+  <div class="mb-table"><table><thead><tr><th>External tensor (GGUF)</th><th>Canonical role (manifest)</th><th>Transformation</th><th>Stored dtype</th></tr></thead><tbody>
+    <tr><td><code>token_embd.weight</code> Q8_0 (896, 151936)</td><td><code>token_emb</code></td><td>repack bytes, record offset; orientation noted for GEMV</td><td>q8_0</td></tr>
+    <tr><td><code>blk.N.attn_norm.weight</code> F32</td><td><code>layer.N.ln1_gamma</code></td><td>rename only</td><td>fp32</td></tr>
+    <tr><td><code>blk.N.attn_q.weight</code> Q5_0</td><td><code>layer.N.wq</code></td><td>repack; quant preserved byte-exact</td><td>q5_0</td></tr>
+    <tr><td><code>blk.N.attn_q.bias</code> F32</td><td><code>layer.N.bq</code></td><td>rename only (Qwen2 has QKV biases; many models do not)</td><td>fp32</td></tr>
+    <tr><td><code>blk.N.ffn_down.weight</code> Q6_K</td><td><code>layer.N.w2</code></td><td>repack; quant preserved byte-exact</td><td>q6_k</td></tr>
+    <tr><td><code>output_norm.weight</code> F32</td><td><code>final_ln_weight</code></td><td>rename only</td><td>fp32</td></tr>
+    <tr><td>(tokenizer KV metadata)</td><td><code>vocab_strings/scores/merges/offsets/types</code></td><td>extracted into the bump header region</td><td>u8/i32/f32</td></tr>
+  </tbody></table></div>
+  <p><strong>Conversion must not</strong>: silently reinterpret quantized storage (Q5_0 stays Q5_0 bytes; dequantization happens in the kernel under a declared contract), change precision, infer topology from filenames (architecture comes from GGUF metadata: <code>source_arch=qwen2</code> selects the circuit), drop tensors without an explicit recorded reason (the Parakeet conversion excluded 24 BatchNorm training counters <em>explicitly</em>, 699 mapped + 24 excluded + 0 unaccounted), or introduce a runtime dependence on the original format &mdash; the deployment reads BUMP, never GGUF. Each transformation gets a small conversion test: bytes/shape/numerical interpretation, e.g. <code>--verify</code> checks parity between GGUF and bump after conversion, and <code>--plan-only</code> validates the full plan without writing. Export = weights (<code>weights.bump</code>, BUMPWGT5) + sidecars (<code>weights_manifest.json</code>, <code>weights_manifest.map</code>, <code>config.json</code>) + tokenizer/frontend assets (<code>tokenizer.json</code> embedded or referenced). See <a href="gguf-conversion.html">GGUF conversion</a> and <a href="gguf-bump.html">the BUMP format</a> for format-level detail.</p>
+
+  <div class="svg-expand">
+  <svg viewBox="0 0 1180 420" width="100%" role="img" tabindex="0" data-svg-title="External package to normalized deployment bundle"
+       aria-label="Left: the external package, a GGUF file with 290 tensors in five quantization types, metadata key-values, and tokenizer tables. Middle: the import adapter, which inventories tensors, maps names through gguf_ck_map.json, transforms by repacking bytes without reinterpreting quantization, records every tensor as mapped or explicitly excluded, and verifies with a parity check. Right: the normalized deployment bundle containing weights.bump in BUMPWGT5 format, weights_manifest.json and .map, config.json, and tokenizer.json. A red dashed line under the adapter lists forbidden behaviors: silently reinterpreting quantized storage, changing precision, inferring topology from filenames, dropping tensors without a recorded reason, and depending on the original format at runtime."
+       style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+    <style>
+      .ck-box{fill:#323232;stroke:#454545;stroke-width:1.4;}
+      .ck-title{fill:#f5f5f5;font-size:15px;font-weight:700;}
+      .ck-sub{fill:#b0b0b0;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-hi{fill:#7fd8ec;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-good{fill:#7fd4a3;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-warn{fill:#ffd38a;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-band{fill:#9aa7b4;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;}
+      .ck-cap{fill:#808080;font-size:12px;font-family:'JetBrains Mono',monospace;}
+      .ck-inset{fill:#0b1118;stroke:#263242;stroke-width:1.2;}
+      .ck-bad{fill:#ff8a80;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-badbox{fill:#0b1118;stroke:#ff8a80;stroke-width:1.4;stroke-dasharray:5 3;}
+    </style>
+    <defs>
+      <marker id="mb7-arrow" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+        <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
+      </marker>
+    </defs>
+
+    <text x="24" y="26" class="ck-band">adapter owns translation; nothing downstream may know GGUF exists</text>
+
+    <g>
+      <rect class="ck-box" x="24" y="44" width="280" height="240" rx="10"/>
+      <text x="164" y="70" text-anchor="middle" class="ck-title">external package</text>
+      <text x="164" y="92" text-anchor="middle" class="ck-sub">qwen2-0_5b-instruct-q4_k_m.gguf</text>
+      <text x="44" y="124" class="ck-sub">290 tensors:</text>
+      <text x="44" y="144" class="ck-warn">  Q5_0 x132, F32 x121, Q8_0 x13,</text>
+      <text x="44" y="162" class="ck-warn">  Q4_K x12, Q6_K x12</text>
+      <text x="44" y="190" class="ck-sub">metadata: 26 key-values</text>
+      <text x="44" y="208" class="ck-sub">  (arch, dims, rope, eps, chat)</text>
+      <text x="44" y="234" class="ck-sub">tokenizer: vocab, merges,</text>
+      <text x="44" y="252" class="ck-sub">  special tokens, scores</text>
+
+      <rect class="ck-box" x="356" y="44" width="400" height="240" rx="10"/>
+      <text x="556" y="70" text-anchor="middle" class="ck-title">import adapter (tooling side)</text>
+      <text x="556" y="92" text-anchor="middle" class="ck-sub">convert_gguf_to_bump_v8.py + gguf_ck_map.json</text>
+      <text x="376" y="124" class="ck-hi">1. inventory: --list / --inspect</text>
+      <text x="376" y="146" class="ck-hi">2. map names: gguf -&gt; canonical roles</text>
+      <text x="376" y="168" class="ck-hi">3. transform: repack bytes, never reinterpret</text>
+      <text x="376" y="190" class="ck-hi">4. account: 290 mapped + 0 dropped silently</text>
+      <text x="376" y="212" class="ck-hi">5. verify: --verify parity, --plan-only dry run</text>
+      <text x="376" y="240" class="ck-sub">per-transformation conversion tests:</text>
+      <text x="376" y="258" class="ck-sub">  bytes, shape, numerical interpretation</text>
+
+      <rect class="ck-box" x="808" y="44" width="348" height="240" rx="10"/>
+      <text x="982" y="70" text-anchor="middle" class="ck-title">normalized deployment bundle</text>
+      <text x="828" y="104" class="ck-good">weights.bump (BUMPWGT5)</text>
+      <text x="828" y="124" class="ck-sub">  header + dtype table + weight bytes</text>
+      <text x="828" y="142" class="ck-sub">  + metadata JSON + hash footer</text>
+      <text x="828" y="168" class="ck-good">weights_manifest.json / .map</text>
+      <text x="828" y="186" class="ck-sub">  name|dtype|offset|size per tensor</text>
+      <text x="828" y="210" class="ck-good">config.json + tokenizer.json</text>
+      <text x="828" y="228" class="ck-sub">  runtime + frontend assets</text>
+      <text x="828" y="258" class="ck-sub">no GGUF reader exists past this line</text>
+
+      <line x1="304" y1="164" x2="354" y2="164" stroke="#8aa0b4" stroke-width="1.8" marker-end="url(#mb7-arrow)"/>
+      <line x1="756" y1="164" x2="806" y2="164" stroke="#8aa0b4" stroke-width="1.8" marker-end="url(#mb7-arrow)"/>
+    </g>
+
+    <rect class="ck-badbox" x="24" y="316" width="1132" height="72" rx="8"/>
+    <text x="44" y="340" class="ck-bad" font-size="12.5">forbidden in conversion: silently reinterpret quantized storage | change precision | infer topology from filenames</text>
+    <text x="44" y="360" class="ck-bad" font-size="12.5">drop tensors without an explicit recorded reason | introduce runtime dependence on the original format</text>
+  </svg>
+  </div>
+  <div class="svg-expand-hint">click / tap the diagram to expand</div>
+
+  <h2 id="lowering">9. Run lowering and inspect the generated C</h2>
+  <p>The verified entry point is the wrapper <code>version/v8/scripts/cks-v8-run</code> (it selects a Python, checks requirements, and drives <code>ck_run_v8.py</code>). The full pipeline, exactly as run for this page <span class="tag tag-executed">executed</span>:</p>
+  <pre class="mb-code"><code>version/v8/scripts/cks-v8-run run \
+  hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf \
+  --context-len 512 --prompt "Say hello in one short sentence." \
+  --max-tokens 16 --force-compile</code></pre>
+  <pre class="mb-code"><code>[CK parallel prefill] Prepared 120 model-owned prefill weights at load time
+Loading model from /home/antshiv/.cache/ck-engine-v8/models/Qwen--Qwen2-0.5B-Instruct-GGUF...
+Using built-in C tokenizer (bpe)
+Model loaded! Vocab: 151936, Context: 512
+
+Prompt: Say hello in one short sentence.
+Response: Hello! How can I assist you today?
+
+prompt eval:    61.04 ms /   26 tokens (   2.35 ms/tok,  425.97 tok/s)
+      decode:   128.68 ms /    9 runs   (  14.30 ms/tok,   69.94 tok/s)
+stop: eos token 151645</code></pre>
+  <p>The command does not pin <code>--temperature</code>, so the exact response wording and timings vary between runs; the re-run at the documentation revision produced the same 26-token prefill and 9-token decode shape with a slightly different sentence. The structural facts &mdash; vocab, context, token counts, eos stop &mdash; are the stable evidence.</p>
+  <p>Useful wrapper flags (read from <code>--help</code> at the stated revision <span class="tag tag-source">source-verified</span>): <code>--force-convert</code> re-runs the adapter, <code>--force-compile</code> regenerates and recompiles, <code>--generate-only</code> stops after codegen, <code>--plan-only</code> certifies prefill/decode memory plans without codegen or execution, <code>--generate-visualizer</code> opens the IR visualizer on the run. The run directory then contains the complete inspection surface:</p>
+  <div class="mb-table"><table><thead><tr><th>Inspection order</th><th>File</th><th>Question it answers</th></tr></thead><tbody>
+    <tr><td>1. imported manifest</td><td><code>weights_manifest.json</code> + <code>.map</code></td><td>which external tensor became which canonical weight, at which offset, in which dtype</td></tr>
+    <tr><td>2. selected circuit</td><td><code>version/v8/circuits/qwen2.json</code> (named by config)</td><td>declared structure, contracts, required numerical boundaries</td></tr>
+    <tr><td>3. resolved providers/contracts</td><td><code>ir1_decode.json</code>, <code>ir1_prefill.json</code></td><td>which provider and numerical contract each op resolved to (460 decode ops)</td></tr>
+    <tr><td>4. lowered calls</td><td><code>lowered_decode_call.json</code> (556 ops)</td><td>exact argument expressions per call, each with its source binding</td></tr>
+    <tr><td>5. memory plan</td><td><code>layout_decode.json</code></td><td>region/offset/size per buffer and weight; arena totals</td></tr>
+    <tr><td>6. generated C</td><td><code>model_v8.c</code> (27,935 lines, 24 layers unrolled)</td><td>the actual program that ships</td></tr>
+    <tr><td>7. compiled library</td><td><code>libmodel.so</code> (+ engine/tokenizer .so copies)</td><td>the loadable artifact; <code>.ck_codegen_bundle.json</code> records sha256 of every input</td></tr>
+  </tbody></table></div>
+  <p>The annotated call from section 6 is the pattern for reading any generated op: which input buffer (<code>A_EMBEDDED_INPUT</code>, the region the previous op wrote), why this offset (planner-assigned, compiled as a <code>#define</code>), why this stride (declared layout in the map), which provider (map <code>impl.function</code>, here <code>rmsnorm_forward_parallel_dispatch</code>), where each dim came from (<code>dim:seq_len</code> &rarr; <code>1</code> in decode, <code>dim:embed_dim</code> &rarr; <code>896</code> from GGUF metadata), which workspace region (map <code>scratch</code> &rarr; planner region), which state is read/modified (KV cache ops declare their append semantics).</p>
+  <p>The <strong>IR visualizer</strong> renders this interactively &mdash; operations, selected providers, memory offsets &mdash; including the &ldquo;Explain this operation&rdquo; panel (merged in #502) that renders why a provider was considered or rejected. Launch it with <code>--generate-visualizer</code> or <code>python3 version/v8/tools/open_ir_visualizer_v8.py --list</code>. If compilation needs a semantic feature the IR cannot express, the fix is extending the operation/lowering contract (circuit + schema + resolver + tests) &mdash; never a Python model loop as a production fallback.</p>
+
+  <h2 id="oracle">10. Establish oracle parity &mdash; two separate paths</h2>
+  <p>Certification compares the generated runtime against an independently executed reference. CKE maintains two oracle families, and they are <strong>not interchangeable at every boundary</strong>: PyTorch/Transformers and llama.cpp can embody different numerical contracts (llama.cpp's vector-exp SwiGLU vs libm, different reduction orders, different quantization dequant paths). Pick the oracle whose contract your circuit declares &mdash; Qwen2's SwiGLU contract names llama.cpp arithmetic explicitly.</p>
+  <p><strong>PyTorch/Transformers path.</strong> Pin the model revision <em>and</em> the framework revision (the Parakeet page pins both: model <code>541d1f99...</code>, Transformers <code>66799f45...</code>). Match preprocessing, tokens, positions, masks, state, and precision; run eval mode; hook the actually-executed modules (functional/fused ops need other hook points than module outputs); capture immediately and <code>detach().clone()</code> mutable tensors; write explicit semantic mappings between oracle tensors and CKE checkpoint IDs. The real adapter is <code>version/v8/scripts/xray_decoder_pytorch_v8.py</code> &mdash; it registers <code>register_forward_pre_hook</code>/<code>register_forward_hook</code> pairs per layer, handles tuple outputs (hidden-state tuples are unpacked at the hook), and clones before the next module mutates in place. A generic sketch is fine for orientation but is labeled illustrative; copy the discipline from the real script.</p>
+  <p><strong>llama.cpp/GGUF path.</strong> The oracle is the pinned in-repo submodule (<code>llama.cpp</code> at commit <code>f3e182816421c648188b5eab269853bf1531d950</code> at this revision). Match quant formats and attention/reduction settings; use the existing capture infrastructure first &mdash; <code>export_llama_hidden_v8.py</code> exports final hidden states for explicit token IDs, <code>compare_first_token_logits_v8.py</code> runs tokenizer-free first-token logits parity between the CK run dir and the llama.cpp runtime, and <code>certify_text_prompt_parity_v8.py</code> certifies prompt sets. Record the actual loaded oracle library in evidence, map raw node identities explicitly, and reject ambiguous mappings. Add a narrowly scoped hook/patch only where the existing capture cannot see the boundary you need.</p>
+  <p>Commands for both oracle paths, read from source and <code>--help</code> output at the stated revision but not executed for this page (the llama.cpp submodule is pinned in-repo; these were not re-run here) <span class="tag tag-source">source-verified</span>:</p>
+  <pre class="mb-code"><code><span class="c-dim"># first-token logits parity: CK generated runtime vs pinned llama.cpp</span>
+python3 version/v8/scripts/compare_first_token_logits_v8.py \
+  --model-dir ~/.cache/ck-engine-v8/models/Qwen--Qwen2-0.5B-Instruct-GGUF \
+  --gguf ~/.cache/ck-engine-v8/models/Qwen--Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf \
+  --tokens 9707,11,1879,330,13339  --require-top1-match --json-out build/parity_first_token.json
+
+<span class="c-dim"># hidden-state capture from the pinned llama.cpp for X-Ray alignment</span>
+python3 version/v8/scripts/export_llama_hidden_v8.py \
+  --gguf &lt;model.gguf&gt; --tokens-before 151644,8946,198 --tokens 9707,11 --out build/llama_hidden.json</code></pre>
+
+  <div class="svg-expand">
+  <svg viewBox="0 0 1180 430" width="100%" role="img" tabindex="0" data-svg-title="Two independent oracle paths meeting at an alignment gate"
+       aria-label="Two independently executed systems converge on an alignment gate. Left: the CKE generated runtime, compiled from model_v8.c, executes and emits a checkpoint stream with semantic op ids, through X-Ray capture that must be bit-neutral against an uncaptured run. Right top: the PyTorch Transformers path, pinned model plus pinned framework, forward hooks on executed modules, detach and clone, producing an oracle checkpoint stream. Right bottom: the llama.cpp path, pinned submodule commit, matched quant and attention settings, hidden-state export, producing a second oracle stream. All three streams enter the alignment gate, which maps semantic checkpoint identities explicitly and rejects ambiguous mappings, producing either a divergence verdict with a first divergent edge or parity evidence. A note states the two oracles are not interchangeable at every boundary because they can embody different numerical contracts, and neither copies metadata from the other."
+       style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+    <style>
+      .ck-box{fill:#323232;stroke:#454545;stroke-width:1.4;}
+      .ck-title{fill:#f5f5f5;font-size:15px;font-weight:700;}
+      .ck-sub{fill:#b0b0b0;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-hi{fill:#7fd8ec;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-good{fill:#7fd4a3;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-warn{fill:#ffd38a;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-band{fill:#9aa7b4;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;}
+      .ck-cap{fill:#808080;font-size:12px;font-family:'JetBrains Mono',monospace;}
+      .ck-inset{fill:#0b1118;stroke:#263242;stroke-width:1.2;}
+    </style>
+    <defs>
+      <marker id="mb8-arrow" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+        <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
+      </marker>
+    </defs>
+
+    <text x="24" y="26" class="ck-band">independent executions meet at the gate - neither side copies metadata from the other</text>
+
+    <g>
+      <rect class="ck-box" x="24" y="60" width="250" height="100" rx="8"/>
+      <text x="149" y="84" text-anchor="middle" class="ck-title" font-size="12.5">CKE generated runtime</text>
+      <text x="149" y="104" text-anchor="middle" class="ck-sub">libmodel.so from model_v8.c</text>
+      <text x="149" y="122" text-anchor="middle" class="ck-sub">executes standalone</text>
+      <text x="149" y="146" text-anchor="middle" class="ck-hi">checkpoint stream (semantic ids)</text>
+
+      <rect class="ck-box" x="24" y="186" width="250" height="76" rx="8"/>
+      <text x="149" y="210" text-anchor="middle" class="ck-title" font-size="12.5">X-Ray capture</text>
+      <text x="149" y="230" text-anchor="middle" class="ck-sub">bit-neutral vs uncaptured run</text>
+      <text x="149" y="248" text-anchor="middle" class="ck-sub">(neutrality gate, see xray page)</text>
+
+      <rect class="ck-box" x="470" y="40" width="320" height="100" rx="8"/>
+      <text x="630" y="64" text-anchor="middle" class="ck-title" font-size="12.5">oracle A: PyTorch / Transformers</text>
+      <text x="630" y="84" text-anchor="middle" class="ck-sub">pinned model rev + pinned framework rev</text>
+      <text x="630" y="102" text-anchor="middle" class="ck-sub">hooks on executed modules, detach().clone()</text>
+      <text x="630" y="126" text-anchor="middle" class="ck-hi">oracle checkpoint stream</text>
+
+      <rect class="ck-box" x="470" y="250" width="320" height="100" rx="8"/>
+      <text x="630" y="274" text-anchor="middle" class="ck-title" font-size="12.5">oracle B: llama.cpp (pinned submodule)</text>
+      <text x="630" y="294" text-anchor="middle" class="ck-sub">commit f3e182816421; matched quant +</text>
+      <text x="630" y="312" text-anchor="middle" class="ck-sub">attention/reduction settings</text>
+      <text x="630" y="336" text-anchor="middle" class="ck-hi">oracle checkpoint stream</text>
+
+      <rect class="ck-box" x="880" y="120" width="276" height="150" rx="8"/>
+      <text x="1018" y="148" text-anchor="middle" class="ck-title">alignment gate</text>
+      <text x="900" y="176" class="ck-sub">explicit semantic-id mapping;</text>
+      <text x="900" y="194" class="ck-sub">ambiguous mapping = reject</text>
+      <text x="900" y="218" class="ck-good">out: parity evidence, or</text>
+      <text x="900" y="236" class="ck-good">first divergent edge + owner</text>
+
+      <line x1="274" y1="160" x2="878" y2="180" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb8-arrow)"/>
+      <line x1="790" y1="90" x2="878" y2="150" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb8-arrow)"/>
+      <line x1="790" y1="300" x2="878" y2="230" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb8-arrow)"/>
+      <line x1="149" y1="160" x2="149" y2="184" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb8-arrow)"/>
+    </g>
+
+    <rect class="ck-inset" x="24" y="372" width="1132" height="40" rx="8"/>
+    <text x="44" y="396" class="ck-warn" font-size="12.5">the two oracles are not interchangeable at every boundary - each can embody a different numerical contract; certify against the oracle your circuit's contracts name.</text>
+  </svg>
+  </div>
+  <div class="svg-expand-hint">click / tap the diagram to expand</div>
+
+  <h2 id="xray-diagnosis">11. Diagnose divergence with X-Ray</h2>
+  <p>When parity fails, do not poke at tolerances. Walk the decision tree &mdash; each branch names an owner, and the fix lands in that owner's artifact (see <a href="xray.html">the X-Ray page</a> for the full evidence model and capture-neutrality gates):</p>
+  <div class="mb-table"><table><thead><tr><th>Observation</th><th>Diagnosis</th><th>Repair</th></tr></thead><tbody>
+    <tr><td>Artifact behaves differently before any comparison is meaningful</td><td>wrong runtime or stale artifact</td><td>repair provenance: rebuild with <code>--force-compile</code>; check <code>.ck_codegen_bundle.json</code> hashes against the sources you think you ran</td></tr>
+    <tr><td>Comparison pairs the wrong tensors</td><td>wrong semantic op / phase / layout / segment</td><td>repair the alignment mapping; a misaligned pair yields <em>no numerical verdict at all</em></td></tr>
+    <tr><td>Aligned, isolated provider fails its contract test</td><td>kernel or contract bug</td><td>fix the scalar kernel or the contract (sections 3-5)</td></tr>
+    <tr><td>Provider passes standalone but the generated op fails</td><td>bindings / layout / workspace / state</td><td>inspect the call_abi binding, memory plan offsets, scratch sizing, state ownership (sections 4, 6, 9)</td></tr>
+    <tr><td>Generated boundaries pass but final behavior differs</td><td>gap between checkpoints or outside the graph</td><td>expand checkpoints, or inspect preprocessing/decoding (tokenizer, chat template, sampler)</td></tr>
+  </tbody></table></div>
+  <p>The evidence chain you must be able to produce for any verdict: <strong>semantic op &rarr; selected provider &rarr; generated call &rarr; actual capture &rarr; oracle mapping</strong>. The trace in section 6 is the first three links; X-Ray's capture manifest and the oracle adapter are the last two. Capture is not free: fused intermediates are unobservable without changing execution, which is why the <a href="xray.html">neutrality gate</a> requires captured runs to reproduce uncaptured runs bit-for-bit before any cross-engine comparison is accepted. Honest limitation: declarative checkpoint coverage is not yet uniform across modalities and checkpoints &mdash; text decoder boundaries are the best covered; when a boundary you need has no declared checkpoint, that is an implementation requirement to record, not a gap to paper over. Preserve failing inputs as regression fixtures where licensing permits (section 14).</p>
+
+  <h2 id="optimize">12. Optimize only after the scalar contract works</h2>
+  <p>The ladder is strict: <strong>scalar &rarr; vectorize &rarr; block/pack &rarr; thread &rarr; fuse (where justified) &rarr; measure at production shapes</strong>. A correctness gate stands before each stage &mdash; the map carries all variants, and the contract says which orders are legal:</p>
+  <div class="svg-expand">
+  <svg viewBox="0 0 1180 360" width="100%" role="img" tabindex="0" data-svg-title="Optimization ladder with a correctness gate before each stage"
+       aria-label="A ladder of six stages: scalar, vectorize, block and pack, thread, fuse where justified, and production-shape measurement. Between every pair of stages stands a correctness gate labeled with its checks: re-run numerical checks, confirm actual ISA dispatch, test tails and thread counts, measure preparation separately from compute, compare end to end, and test other consumers of the shared provider. A footer states the objective: reduced elapsed time under the required contract, not high utilization; and that providers are reused across model families, so a change to a shared provider must re-certify every family that selects it."
+       style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+    <style>
+      .ck-box{fill:#323232;stroke:#454545;stroke-width:1.4;}
+      .ck-gate{fill:#0b1118;stroke:#7fd4a3;stroke-width:1.6;}
+      .ck-title{fill:#f5f5f5;font-size:15px;font-weight:700;}
+      .ck-sub{fill:#b0b0b0;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-hi{fill:#7fd8ec;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-good{fill:#7fd4a3;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-band{fill:#9aa7b4;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;}
+      .ck-cap{fill:#808080;font-size:12px;font-family:'JetBrains Mono',monospace;}
+      .ck-inset{fill:#0b1118;stroke:#263242;stroke-width:1.2;}
+    </style>
+    <defs>
+      <marker id="mb9-arrow" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+        <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
+      </marker>
+    </defs>
+
+    <text x="24" y="26" class="ck-band">no stage is entered through a failing gate</text>
+
+    <g>
+      <rect class="ck-box" x="24" y="60" width="120" height="56" rx="8"/>
+      <text x="84" y="84" text-anchor="middle" class="ck-title" font-size="12">scalar</text>
+      <text x="84" y="102" text-anchor="middle" class="ck-sub">the contract</text>
+      <rect class="ck-gate" x="156" y="66" width="52" height="44" rx="6"/>
+      <text x="182" y="92" text-anchor="middle" class="ck-good" font-size="10">GATE</text>
+
+      <rect class="ck-box" x="220" y="60" width="120" height="56" rx="8"/>
+      <text x="280" y="84" text-anchor="middle" class="ck-title" font-size="12">vectorize</text>
+      <text x="280" y="102" text-anchor="middle" class="ck-sub">SIMD lanes</text>
+      <rect class="ck-gate" x="352" y="66" width="52" height="44" rx="6"/>
+      <text x="378" y="92" text-anchor="middle" class="ck-good" font-size="10">GATE</text>
+
+      <rect class="ck-box" x="416" y="60" width="130" height="56" rx="8"/>
+      <text x="481" y="84" text-anchor="middle" class="ck-title" font-size="12">block / pack</text>
+      <text x="481" y="102" text-anchor="middle" class="ck-sub">tiles, layouts</text>
+      <rect class="ck-gate" x="558" y="66" width="52" height="44" rx="6"/>
+      <text x="584" y="92" text-anchor="middle" class="ck-good" font-size="10">GATE</text>
+
+      <rect class="ck-box" x="622" y="60" width="120" height="56" rx="8"/>
+      <text x="682" y="84" text-anchor="middle" class="ck-title" font-size="12">thread</text>
+      <text x="682" y="102" text-anchor="middle" class="ck-sub">partition policy</text>
+      <rect class="ck-gate" x="754" y="66" width="52" height="44" rx="6"/>
+      <text x="780" y="92" text-anchor="middle" class="ck-good" font-size="10">GATE</text>
+
+      <rect class="ck-box" x="818" y="60" width="140" height="56" rx="8"/>
+      <text x="888" y="84" text-anchor="middle" class="ck-title" font-size="12">fuse (justified)</text>
+      <text x="888" y="102" text-anchor="middle" class="ck-sub">declared fusion</text>
+      <rect class="ck-gate" x="970" y="66" width="52" height="44" rx="6"/>
+      <text x="996" y="92" text-anchor="middle" class="ck-good" font-size="10">GATE</text>
+
+      <rect class="ck-box" x="1034" y="60" width="122" height="56" rx="8"/>
+      <text x="1095" y="80" text-anchor="middle" class="ck-title" font-size="11">measure at</text>
+      <text x="1095" y="96" text-anchor="middle" class="ck-title" font-size="11">production shape</text>
+
+      <line x1="144" y1="88" x2="154" y2="88" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb9-arrow)"/>
+      <line x1="208" y1="88" x2="218" y2="88" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb9-arrow)"/>
+      <line x1="340" y1="88" x2="350" y2="88" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb9-arrow)"/>
+      <line x1="404" y1="88" x2="414" y2="88" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb9-arrow)"/>
+      <line x1="546" y1="88" x2="556" y2="88" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb9-arrow)"/>
+      <line x1="610" y1="88" x2="620" y2="88" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb9-arrow)"/>
+      <line x1="742" y1="88" x2="752" y2="88" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb9-arrow)"/>
+      <line x1="806" y1="88" x2="816" y2="88" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb9-arrow)"/>
+      <line x1="958" y1="88" x2="968" y2="88" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb9-arrow)"/>
+      <line x1="1022" y1="88" x2="1032" y2="88" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mb9-arrow)"/>
+    </g>
+
+    <rect class="ck-inset" x="24" y="140" width="1132" height="96" rx="8"/>
+    <text x="44" y="164" class="ck-good" font-size="12">each gate re-runs: numerical checks vs the scalar oracle | confirm the actual ISA dispatch executed (not just compiled)</text>
+    <text x="44" y="184" class="ck-good" font-size="12">tail lengths and thread counts | preparation measured separately from compute | end-to-end comparison</text>
+    <text x="44" y="204" class="ck-good" font-size="12">other consumers of the shared provider re-certified - one map serves many circuits</text>
+    <text x="44" y="224" class="ck-sub">threading belongs in execution capabilities; if partitioning changes accumulation or merge order, the numerical contract must define that order (CONTRACT_POLICY.md)</text>
+
+    <rect class="ck-inset" x="24" y="256" width="1132" height="44" rx="8"/>
+    <text x="44" y="280" class="ck-hi" font-size="12.5">objective: reduced elapsed time under the required contract - not high utilization. an idle core is fine; a wrong sum is not.</text>
+
+    <text x="24" y="338" class="ck-cap">evidence ladder for quantized linear kernels: external backend vs scalar oracle, optimized public function vs scalar oracle, threadpool dispatch vs scalar oracle (make test-numerical-contracts).</text>
+  </svg>
+  </div>
+  <div class="svg-expand-hint">click / tap the diagram to expand</div>
+  <p>Methodology, measurement discipline, and tuning workflow live on the <a href="kernel-tuning-methodology.html">kernel tuning</a>, <a href="profiling.html">profiling</a>, and <a href="simd-architecture.html">SIMD architecture</a> pages; the <a href="v8-runbook.html">v8 runbook</a> records per-family performance evidence. The numeric contract machinery is on <a href="v8-numerical-contracts.html">numerical contracts</a>.</p>
+
+  <h2 id="standalone">13. Prove standalone deployment</h2>
+  <p>The final practical exercise, executed for this page <span class="tag tag-executed">executed</span> &mdash; with an explicit scope limit. What the evidence shows: the compiled artifact set was copied to a bare directory outside the repository checkout and executed there, with no Python in the execution path and only the recorded libraries loaded. What it does <em>not</em> show: a true isolated host &mdash; the copy ran on the same machine, where the repo, the model caches, and the network still existed, even though the binary demonstrably read none of them. Treat this as <em>bundle-only execution outside the checkout</em>, and see the open follow-up below:</p>
+  <pre class="mb-code"><code><span class="c-dim"># bundle = the compiled artifact set (389 MB total for Qwen2 0.5B q4_k_m):</span>
+ck-cli-v8  libmodel.so  libckernel_engine.so  libckernel_tokenizer.so
+weights.bump  config.json  tokenizer.json  init.json  init_call.json
+weights_manifest.json  weights_manifest.map
+
+<span class="c-dim"># in a bare directory outside the checkout (same host):</span>
+LD_LIBRARY_PATH=. ./ck-cli-v8 ./libmodel.so ./weights.bump</code></pre>
+  <pre class="mb-code"><code>[Runtime] ABI: v1 | Role: decoder | Capabilities: decode text-encode token-decode
+          chat-format stop-tokens mixed-prefill named-activations
+[Hardware] AVX2+FMA (Intel Haswell+) | Vector: 256-bit | Kernel: gemm_avx2
+You: What is 2+2? Answer with just the number.
+Assistant: 4
+prefill 32 tok 49.2 ms | decode 1 tok 24.4 ms</code></pre>
+  <p>The binary demonstrably loaded only the recorded libraries: <code>ldd libmodel.so</code> resolves to the two CKE native libraries (<code>libckernel_engine.so</code>, <code>libckernel_tokenizer.so</code>) plus the system libraries <code>libgomp</code>, <code>libc</code>, <code>libm</code> &mdash; five in all &mdash; and <code>ldd ck-cli-v8</code> resolves to <code>libckernel_tokenizer.so</code>, <code>libm</code>, and <code>libc</code>. The CLI then <code>dlopen</code>s the model library given on its command line (<code>./ck-cli-v8 &lt;model.so&gt; &lt;weights.bump&gt;</code>), so the dependency contract of a deployment is the union of both link records plus that explicit load &mdash; <code>ldd</code> on the model library alone does not describe the CLI. The bundle declares its native dependencies (the two CKE libraries above), target features (the ISA the artifact was compiled for, reported at load: AVX2+FMA here), and memory requirements (the arena total, 411,400,448 bytes for this configuration). <code>.ck_runtime_bundle.json</code> in the run directory records provenance: compiler path + sha256 and the sha256 of every engine source file that went into the build.</p>
+  <p><strong>Honest limitations.</strong> Two follow-ups remain open. First, a true isolated-environment run &mdash; a host or container with no checkout or cache mounts, no network, and a recorded loaded-library list &mdash; has not been performed and is the real proof this section points at; the /tmp copy demonstrates only that the bundle is self-contained as a file set. <span class="tag tag-proposed">proposed</span> Second, there is no single <code>cke export</code> command at this revision: the bundle is assembled by copying the run directory's artifact set, as above. A one-command exporter that validates completeness (all declared files present, hashes recorded, dependency closure checked) is an <span class="tag tag-proposed">implementation requirement</span>, not an existing feature. Note also that the deployment artifact is ISA-specific &mdash; an AVX2-compiled <code>libmodel.so</code> requires an AVX2 host; cross-ISA portability means compiling per target.</p>
+
+  <div class="svg-expand">
+  <svg viewBox="0 0 1180 400" width="100%" role="img" tabindex="0" data-svg-title="Developer workstation, verified bundle, bundle-only execution outside the checkout"
+       aria-label="Three panels. Left, developer workstation: the repository with Python tooling produces the run directory, and certification evidence from X-Ray and the oracle gate is attached. Middle, verified bundle: the eleven copied files listed - ck-cli-v8, libmodel.so, libckernel_engine.so, libckernel_tokenizer.so, weights.bump, config.json, tokenizer.json, init.json, init_call.json, weights_manifest.json and .map - 389 MB, with provenance from .ck_runtime_bundle.json. Right, bundle-only execution outside the checkout on the same host: no Python in the execution path and no repo or GGUF read; ldd on libmodel.so shows two CKE libraries plus libgomp, libc, and libm, and ldd on the CLI plus its dlopen of the model library complete the dependency record; the CLI loads the model and answers the prompt. A warning line states that a true isolated host with no checkout or cache mounts and no network remains an open follow-up."
+       style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+    <style>
+      .ck-box{fill:#323232;stroke:#454545;stroke-width:1.4;}
+      .ck-title{fill:#f5f5f5;font-size:15px;font-weight:700;}
+      .ck-sub{fill:#b0b0b0;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-hi{fill:#7fd8ec;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-good{fill:#7fd4a3;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-warn{fill:#ffd38a;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-band{fill:#9aa7b4;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;}
+      .ck-cap{fill:#808080;font-size:12px;font-family:'JetBrains Mono',monospace;}
+      .ck-inset{fill:#0b1118;stroke:#263242;stroke-width:1.2;}
+    </style>
+    <defs>
+      <marker id="mb10-arrow" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+        <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
+      </marker>
+    </defs>
+
+    <text x="24" y="26" class="ck-band">the deployment question: can it run where none of the tooling exists?</text>
+
+    <g>
+      <rect class="ck-box" x="24" y="44" width="330" height="240" rx="10"/>
+      <text x="189" y="70" text-anchor="middle" class="ck-title">developer workstation</text>
+      <text x="44" y="102" class="ck-sub">repo + Python tooling</text>
+      <text x="44" y="124" class="ck-sub">convert -&gt; lower -&gt; codegen -&gt; compile</text>
+      <text x="44" y="152" class="ck-hi">run directory produced</text>
+      <text x="44" y="174" class="ck-sub">model_v8.c (27,935 lines)</text>
+      <text x="44" y="192" class="ck-sub">libmodel.so + engine libs + weights.bump</text>
+      <text x="44" y="220" class="ck-good">certification evidence attached</text>
+      <text x="44" y="238" class="ck-sub">(X-Ray chain + oracle verdicts)</text>
+      <text x="44" y="264" class="ck-sub">provenance: .ck_runtime_bundle.json</text>
+
+      <rect class="ck-box" x="424" y="44" width="330" height="240" rx="10"/>
+      <text x="589" y="70" text-anchor="middle" class="ck-title">verified bundle (389 MB)</text>
+      <text x="444" y="102" class="ck-hi">ck-cli-v8, libmodel.so,</text>
+      <text x="444" y="120" class="ck-hi">libckernel_engine.so, libckernel_tokenizer.so</text>
+      <text x="444" y="144" class="ck-hi">weights.bump (BUMPWGT5)</text>
+      <text x="444" y="162" class="ck-hi">config.json, tokenizer.json</text>
+      <text x="444" y="180" class="ck-hi">init.json, init_call.json</text>
+      <text x="444" y="198" class="ck-hi">weights_manifest.json / .map</text>
+      <text x="444" y="226" class="ck-sub">declares: native deps, target ISA,</text>
+      <text x="444" y="244" class="ck-sub">memory requirement (arena 411,400,448 B)</text>
+      <text x="444" y="268" class="ck-warn">no one-command exporter yet - see text</text>
+
+      <rect class="ck-box" x="824" y="44" width="332" height="240" rx="10"/>
+      <text x="990" y="66" text-anchor="middle" class="ck-title" font-size="12.5">bundle-only execution</text>
+      <text x="990" y="82" text-anchor="middle" class="ck-title" font-size="12.5">outside the checkout (same host)</text>
+      <text x="844" y="108" class="ck-good">no Python in the execution path;</text>
+      <text x="844" y="124" class="ck-good">no repo or GGUF read by the binary</text>
+      <text x="844" y="150" class="ck-sub">ldd libmodel.so: 2 CKE libs +</text>
+      <text x="844" y="166" class="ck-sub">  libgomp + libc + libm; CLI ldd +</text>
+      <text x="844" y="182" class="ck-sub">  dlopen(model.so) complete the record</text>
+      <text x="844" y="206" class="ck-hi">LD_LIBRARY_PATH=. ./ck-cli-v8 \</text>
+      <text x="844" y="222" class="ck-hi">  ./libmodel.so ./weights.bump</text>
+      <text x="844" y="246" class="ck-good">loads, reports ABI v1 + ISA,</text>
+      <text x="844" y="262" class="ck-good">generates tokens</text>
+      <text x="844" y="278" class="ck-warn">isolated host (no mounts/network): open</text>
+
+      <line x1="354" y1="164" x2="422" y2="164" stroke="#8aa0b4" stroke-width="1.8" marker-end="url(#mb10-arrow)"/>
+      <line x1="754" y1="164" x2="822" y2="164" stroke="#8aa0b4" stroke-width="1.8" marker-end="url(#mb10-arrow)"/>
+    </g>
+
+    <rect class="ck-inset" x="24" y="312" width="1132" height="44" rx="8"/>
+    <text x="44" y="338" class="ck-sub" font-size="12">executed at the stated revision: bundle copied to a bare /tmp directory, prompt "What is 2+2? Answer with just the number." -&gt; "Assistant: 4". evidence JSON: docs/notes/artifacts/model_bringup_guide_qwen2_evidence.json</text>
+
+    <text x="24" y="384" class="ck-cap">a generated deployment may have explicit native dependencies; it may not have undeclared interpreter dependencies (section 1).</text>
+  </svg>
+  </div>
+  <div class="svg-expand-hint">click / tap the diagram to expand</div>
+
+  <h2 id="regression">14. Register regression coverage</h2>
+  <p>A bring-up is done when its evidence is <em>registered</em>: wired into targets another engineer (and CI) can run. All targets below were confirmed present in the <code>Makefile</code> at the stated revision (read from source; only the doc-policy subset was executed for this page) <span class="tag tag-source">source-verified</span>:</p>
+  <div class="mb-table"><table><thead><tr><th>Target</th><th>What it runs</th><th>Needs</th><th>Fail mode</th></tr></thead><tbody>
+    <tr><td><code>make test</code></td><td>builds <code>libckernel_engine.so</code> + test libs, runs the <code>unittest/</code> Python kernel parity suite (hard max-diff gates)</td><td>portable CPU host + Python env with the reference stack</td><td>fail-fast (<code>set -e</code>)</td></tr>
+    <tr><td><code>make test-bf16</code></td><td>the bf16 kernel test list (<code>unittest/bf16/</code>) plus the v8 bf16 safetensors lowering guard</td><td>reference stack; bf16 lanes exercise host-specific dispatch</td><td>aggregates failures, exits 1 at end</td></tr>
+    <tr><td><code>make test-kernel-maps</code></td><td>interface audit + ratchet, allocation audit, provider-selection / call-ABI / dispatch-policy tests, registry freshness</td><td>portable; no model artifacts</td><td>fail-fast sequence</td></tr>
+    <tr><td><code>make test-v8-dsl</code></td><td>DSL policy audit + numerical contracts + template circuit audit (meta-target)</td><td>portable</td><td>fail-fast per sub-gate</td></tr>
+    <tr><td><code>make test-v8-artifact-compile-matrix</code></td><td>real-manifest lowering, link, and load matrix from checked-in fixtures (<code>tests/fixtures/v8/artifact_manifests/</code>)</td><td>C compiler; no model downloads</td><td>pytest matrix (per-case reporting)</td></tr>
+    <tr><td><code>make test-xray-validator-selftest</code></td><td>injected-fault validator: X-Ray must name the predetermined first boundary</td><td>portable; writes <code>build/xray/validator_selftest_report.json</code></td><td>fail-closed report + nonzero exit</td></tr>
+    <tr><td><code>make llamacpp-parity-full</code></td><td>parity smoketest, builds the llama.cpp-backed oracle library, OpenMP GEMV and threadpool parity lanes</td><td>the pinned <code>llama.cpp</code> submodule built + model artifacts &mdash; external oracle</td><td>sequential; stops at first failing stage</td></tr>
+    <tr><td><code>make nightly-json</code></td><td>the full nightly runner (<code>scripts/nightly_runner.py --json build/nightly_report.json</code>)</td><td>everything above incl. oracles, ISA hosts, model artifacts</td><td>aggregate by design: runs all tests without stopping, reports JSON</td></tr>
+  </tbody></table></div>
+  <p>Model-family registration lives in <code>version/v8/regression/families.json</code>: each family pins the model source, context length, runtime args, response contract, and structural expectations (e.g. Qwen2 asserts the lowered ops contain <code>rope_forward_qk_with_rotary_dim</code>) &mdash; add your family there so <code>run_regression_v8.py --family &lt;id&gt;</code> exercises it. Then the vocabulary, because reviewers will ask: <strong>registered</strong> means a target or manifest entry names your evidence; <strong>executed</strong> means it ran somewhere and produced a report; <strong>certified</strong> means the run passed its declared gates on the pinned configuration. Only the last is a claim.</p>
+
+  <h3 id="checklist">Contributor acceptance checklist</h3>
+  <ul class="mb-check">
+    <li>Existing providers reused where compatible (inventory table in the PR, <code>report_model_novelty_v8.py</code> output attached)</li>
+    <li>New scalar math independently tested (hand cases + fixed-seed randomized + boundary/aliasing/invalid-input cases)</li>
+    <li>Maps and ABI validated (<code>make test-kernel-maps</code>; schemas pass; no hand-edited registry)</li>
+    <li>Workspace/state ownership explicit (map-declared scratch, planner-sized, no kernel-side allocation)</li>
+    <li>Conversion transformations tested (bytes/shape/numerical interpretation per transform; every external tensor accounted for)</li>
+    <li>Circuit genuinely controls generated execution (op names appear in <code>model_v8.c</code>; changing the circuit changes the generated program)</li>
+    <li>Generated model tested, not just C kernels (end-to-end run through <code>cks-v8-run</code> / <code>ck-cli-v8</code>)</li>
+    <li>Oracle/capture provenance retained (pinned revisions, loaded-library record, evidence JSON)</li>
+    <li>Regression cases registered (family manifest and/or make target)</li>
+    <li>Standalone deployment demonstrated for the claimed scope (bundle-only execution outside the checkout with recorded loaded libraries; a true isolated-host run is either attached or listed as open)</li>
+    <li>Unsupported features clearly listed (the honest-limitation sentence is part of the deliverable)</li>
+  </ul>
+
+  <h2 id="further">Further reading</h2>
+  <ul>
+    <li><a href="kernel-maps.html">Kernel maps and provider selection</a> &mdash; the resolver, selection traces, and the map-level contributor recipe</li>
+    <li><a href="kernels.html">Kernel library</a> and <a href="quant-formats.html">quant formats</a> &mdash; the provider inventory you are reusing</li>
+    <li><a href="codegen.html">Codegen</a> and <a href="ir-pipeline.html">IR pipeline</a> &mdash; the lowering stages this guide inspects</li>
+    <li><a href="v8-runbook.html">v8 runbook</a> &mdash; per-family certified commands and evidence</li>
+    <li><a href="xray.html">X-Ray</a> &mdash; capture neutrality, evidence schemas, divergence attribution</li>
+    <li><a href="v8-parakeet-tdt.html">Parakeet TDT bring-up</a> &mdash; the worked audio example whose inventory discipline this guide generalizes</li>
+    <li><a href="developer-guide.html">Developer guide</a> and <a href="contributing.html">contributing</a> &mdash; repo workflow around everything above</li>
+  </ul>
+
+  <div id="ck-svg-overlay" role="dialog" aria-modal="true" aria-label="Expanded diagram">
+    <div class="ck-ov-bar">
+      <span class="ck-ov-title" id="ck-ov-title">Diagram</span>
+      <span>
+        <button type="button" id="ck-ov-out" aria-label="Zoom out">&minus;</button>
+        <button type="button" id="ck-ov-in" aria-label="Zoom in">+</button>
+        <button type="button" id="ck-ov-close" aria-label="Close">&times;</button>
+      </span>
+    </div>
+    <div class="ck-ov-stage" id="ck-ov-stage"><img id="ck-ov-img" alt=""></div>
+  </div>
+
+  <script>
+    (function() {
+      var overlay = document.getElementById('ck-svg-overlay');
+      var stage = document.getElementById('ck-ov-stage');
+      var img = document.getElementById('ck-ov-img');
+      var title = document.getElementById('ck-ov-title');
+      var scale = 1;
+      function applyScale() {
+        var base = Math.max(stage.clientWidth - 32, 280);
+        img.style.width = Math.round(base * scale) + 'px';
+      }
+      function open(svg) {
+        var xml = new XMLSerializer().serializeToString(svg);
+        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
+        img.alt = svg.getAttribute('aria-label') || 'diagram';
+        title.textContent = svg.getAttribute('data-svg-title') || 'Diagram';
+        scale = 1;
+        overlay.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+        img.onload = applyScale;
+        applyScale();
+        document.getElementById('ck-ov-close').focus();
+      }
+      function close() {
+        overlay.style.display = 'none';
+        document.body.style.overflow = '';
+      }
+      document.querySelectorAll('.svg-expand svg[data-svg-title]').forEach(function(svg) {
+        svg.addEventListener('click', function() { open(svg); });
+        svg.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(svg); }
+        });
+      });
+      document.getElementById('ck-ov-in').addEventListener('click', function() { scale = Math.min(4, scale + 0.25); applyScale(); });
+      document.getElementById('ck-ov-out').addEventListener('click', function() { scale = Math.max(0.4, scale - 0.25); applyScale(); });
+      document.getElementById('ck-ov-close').addEventListener('click', close);
+      overlay.addEventListener('click', function(e) { if (e.target === stage || e.target === overlay) close(); });
+      document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close(); });
+    })();
+  </script>
+</div>
+    </main>
+
+    <!-- SVG Viewer Overlay (shared across all pages) -->
+    <style>
+    .svg-viewer { cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+    .svg-viewer:hover { transform: scale(1.01); box-shadow: 0 8px 32px rgba(255, 180, 0, 0.3); }
+    #svg-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.95); z-index: 999999; }
+    #svg-overlay .toolbar { position: fixed; top: 0; left: 0; right: 0; padding: 10px 20px; background: rgba(0,0,0,0.9); display: flex; justify-content: space-between; align-items: center; z-index: 1000000; border-bottom: 1px solid #333; }
+    #svg-overlay .toolbar .title { color: #ccc; font-size: 14px; }
+    #svg-overlay .toolbar .controls { display: flex; gap: 8px; align-items: center; }
+    #svg-overlay .toolbar button { background: #333; color: #ffb400; border: 1px solid #555; padding: 8px 14px; cursor: pointer; border-radius: 4px; font-size: 14px; }
+    #svg-overlay .toolbar button:hover { background: #444; border-color: #ffb400; }
+    #svg-overlay .toolbar .close-btn { font-size: 20px; padding: 4px 12px; }
+    #svg-overlay .toolbar .zoom-display { color: #888; font-size: 12px; min-width: 45px; text-align: center; }
+    #svg-overlay .toolbar .separator { color: #444; }
+    #svg-overlay .image-container { display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 60px 20px 20px; cursor: grab; }
+    #svg-overlay .image-container:active { cursor: grabbing; }
+    #svg-overlay .image-container img { max-width: 95%; max-height: 90vh; transform-origin: center center; }
+    #svg-overlay .nav-btn { position: fixed; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.7); color: #ffb400; border: 1px solid #555; font-size: 30px; padding: 20px 15px; cursor: pointer; z-index: 1000000; border-radius: 4px; }
+    #svg-overlay .nav-btn:hover { background: rgba(255,180,0,0.2); border-color: #ffb400; }
+    #svg-overlay .nav-prev { left: 10px; }
+    #svg-overlay .nav-next { right: 10px; }
+    #svg-overlay .hint { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); color: #666; font-size: 12px; background: rgba(0,0,0,0.8); padding: 8px 20px; border-radius: 20px; }
+    </style>
+
+    <div id="svg-overlay">
+        <div class="toolbar">
+            <span class="title" id="svg-title">Image</span>
+            <div class="controls">
+                <button onclick="svgViewer.zoomOut()" title="Zoom Out (-)">-</button>
+                <span class="zoom-display" id="zoom-display">100%</span>
+                <button onclick="svgViewer.zoomIn()" title="Zoom In (+)">+</button>
+                <span class="separator">|</span>
+                <button onclick="svgViewer.fitWidth()" title="Fit Width (W)">Width</button>
+                <button onclick="svgViewer.fitHeight()" title="Fit Height (H)">Height</button>
+                <button onclick="svgViewer.resetZoom()" title="Reset (0)">Reset</button>
+                <span class="separator">|</span>
+                <button class="close-btn" onclick="svgViewer.close()" title="Close (ESC)">&times;</button>
+            </div>
+        </div>
+        <button class="nav-btn nav-prev" onclick="svgViewer.prev()" title="Previous">&larr;</button>
+        <button class="nav-btn nav-next" onclick="svgViewer.next()" title="Next">&rarr;</button>
+        <div class="image-container" id="svg-container">
+            <img id="svg-image" src="" alt="">
+        </div>
+        <div class="hint">Scroll to zoom | Drag to pan | W/H to fit | 0 to reset | ESC to close</div>
+    </div>
+
+    <script>
+    var svgViewer = (function() {
+        var overlay, img, titleEl, container;
+        var images = [];
+        var currentIndex = 0;
+        var scale = 1, panX = 0, panY = 0;
+        var isDragging = false, dragStartX, dragStartY, panStartX, panStartY;
+
+        function init() {
+            overlay = document.getElementById('svg-overlay');
+            img = document.getElementById('svg-image');
+            titleEl = document.getElementById('svg-title');
+            container = document.getElementById('svg-container');
+            if (!overlay || !img) return;
+
+            document.querySelectorAll('.svg-viewer').forEach(function(viewer, index) {
+                var viewerImg = viewer.querySelector('img');
+                if (viewerImg) {
+                    images.push({ src: viewerImg.src, title: viewer.getAttribute('data-title') || viewerImg.alt || 'Diagram' });
+                    viewer.onclick = function(e) { e.preventDefault(); open(index); };
+                }
+            });
+
+            container.addEventListener('wheel', function(e) {
+                e.preventDefault();
+                scale = Math.max(0.5, Math.min(10, scale + (e.deltaY > 0 ? -0.2 : 0.2)));
+                updateTransform();
+            });
+
+            container.addEventListener('mousedown', function(e) { isDragging = true; dragStartX = e.clientX; dragStartY = e.clientY; panStartX = panX; panStartY = panY; });
+            document.addEventListener('mousemove', function(e) { if (!isDragging) return; panX = panStartX + (e.clientX - dragStartX); panY = panStartY + (e.clientY - dragStartY); updateTransform(); });
+            document.addEventListener('mouseup', function() { isDragging = false; });
+
+            document.addEventListener('keydown', function(e) {
+                if (overlay.style.display !== 'block') return;
+                if (e.key === 'Escape') close();
+                if (e.key === 'ArrowLeft') prev();
+                if (e.key === 'ArrowRight') next();
+                if (e.key === '+' || e.key === '=') zoomIn();
+                if (e.key === '-') zoomOut();
+                if (e.key === '0') resetZoom();
+                if (e.key === 'w' || e.key === 'W') fitWidth();
+                if (e.key === 'h' || e.key === 'H') fitHeight();
+            });
+
+            overlay.addEventListener('click', function(e) { if (e.target === overlay || e.target === container) close(); });
+        }
+
+        function updateTransform() {
+            img.style.transform = 'translate(' + panX + 'px, ' + panY + 'px) scale(' + scale + ')';
+            var zd = document.getElementById('zoom-display');
+            if (zd) zd.textContent = Math.round(scale * 100) + '%';
+        }
+
+        function open(index) {
+            if (!images[index]) return;
+            currentIndex = index; scale = 1; panX = 0; panY = 0;
+            img.src = images[index].src;
+            titleEl.textContent = images[index].title + ' (' + (index + 1) + '/' + images.length + ')';
+            updateTransform();
+            overlay.style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function close() { overlay.style.display = 'none'; document.body.style.overflow = ''; }
+        function prev() { open((currentIndex - 1 + images.length) % images.length); }
+        function next() { open((currentIndex + 1) % images.length); }
+        function zoomIn() { scale = Math.min(10, scale + 0.25); updateTransform(); }
+        function zoomOut() { scale = Math.max(0.5, scale - 0.25); updateTransform(); }
+        function resetZoom() { scale = 1; panX = 0; panY = 0; updateTransform(); }
+
+        function fitWidth() {
+            if (!img.naturalWidth || !img.complete) { img.onload = fitWidth; return; }
+            scale = Math.max(0.1, Math.min(10, (window.innerWidth - 150) / img.naturalWidth));
+            panX = 0; panY = 0; updateTransform();
+        }
+
+        function fitHeight() {
+            if (!img.naturalHeight || !img.complete) { img.onload = fitHeight; return; }
+            scale = Math.max(0.1, Math.min(10, (window.innerHeight - 120) / img.naturalHeight));
+            panX = 0; panY = 0; updateTransform();
+        }
+
+        if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); } else { init(); }
+
+        return { open: open, close: close, prev: prev, next: next, zoomIn: zoomIn, zoomOut: zoomOut, resetZoom: resetZoom, fitWidth: fitWidth, fitHeight: fitHeight };
+    })();
+
+    // Mobile navigation
+    (function() {
+        var navToggle = document.querySelector('.nav-toggle');
+        var siteNav = document.querySelector('.site-nav');
+        var dropdowns = document.querySelectorAll('.nav-dropdown');
+
+        if (navToggle && siteNav) {
+            navToggle.addEventListener('click', function() {
+                navToggle.classList.toggle('active');
+                siteNav.classList.toggle('open');
+                navToggle.setAttribute('aria-expanded', siteNav.classList.contains('open'));
+            });
+
+            // Close menu when clicking a non-dropdown link
+            siteNav.querySelectorAll('a:not(.nav-dropdown-menu a)').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.innerWidth <= 768) {
+                        navToggle.classList.remove('active');
+                        siteNav.classList.remove('open');
+                    }
+                });
+            });
+        }
+
+        // Handle dropdowns on mobile
+        dropdowns.forEach(function(dropdown) {
+            var trigger = dropdown.querySelector('.nav-trigger');
+            if (trigger) {
+                trigger.addEventListener('click', function(e) {
+                    if (window.innerWidth <= 768) {
+                        e.preventDefault();
+                        // Close other dropdowns
+                        dropdowns.forEach(function(d) {
+                            if (d !== dropdown) d.classList.remove('open');
+                        });
+                        dropdown.classList.toggle('open');
+                    }
+                });
+            }
+        });
+
+        // Close dropdowns when clicking outside on mobile
+        document.addEventListener('click', function(e) {
+            if (window.innerWidth <= 768 && !e.target.closest('.nav-dropdown')) {
+                dropdowns.forEach(function(d) { d.classList.remove('open'); });
+            }
+        });
+    })();
+
+    // Site search keyboard shortcuts: "/" or Ctrl+K / Cmd+K focuses the header search box.
+    (function() {
+        var searchInput = document.getElementById('site-search-input');
+        if (!searchInput) return;
+        document.addEventListener('keydown', function(e) {
+            var target = e.target;
+            var tag = (target.tagName || '').toLowerCase();
+            var typing = tag === 'input' || tag === 'textarea' || tag === 'select' || target.isContentEditable;
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+                e.preventDefault();
+                searchInput.focus();
+                searchInput.select();
+            } else if (e.key === '/' && !typing) {
+                e.preventDefault();
+                searchInput.focus();
+            }
+        });
+    })();
+    </script>
+
+    <!-- MathJax for LaTeX equations across docs pages -->
+    <script>
+    window.MathJax = {
+        tex: {
+            inlineMath: [['\\(', '\\)'], ['$', '$']],
+            displayMath: [['\\[', '\\]'], ['$$', '$$']],
+            processEscapes: true,
+            processEnvironments: true
+        },
+        options: {
+            skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+        },
+        svg: {
+            fontCache: 'global'
+        }
+    };
+    </script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+
+    <footer style="background: #2a2a2a; border-top: 1px solid #454545; color: #b0b0b0; padding: 3rem 2rem; margin-top: auto;">
+        <div style="max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 2rem;">
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">C-Kernel-Engine</h4>
+                <p style="color: #707070; font-size: 0.875rem; margin: 0;">High-performance ML kernels with full PyTorch parity.</p>
+            </div>
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Resources</h4>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    <li style="margin-bottom: 0.5rem;"><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine" style="color: #909090; text-decoration: none; font-size: 0.875rem;">GitHub</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="contributing.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Contributor Path</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="architecture.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Architecture</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="api.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">API Reference</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Related</h4>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    <li style="margin-bottom: 0.5rem;"><a href="https://www.shivasnotes.com/" style="color: #909090; text-decoration: none; font-size: 0.875rem;">ShivasNotes</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://www.shivasnotes.com/work-with-us" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Work With Us</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://antshiv.com/" style="color: #909090; text-decoration: none; font-size: 0.875rem;">antshiv.com</a></li>
+                </ul>
+            </div>
+            <div style="text-align: right;">
+                <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-09-19</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>
