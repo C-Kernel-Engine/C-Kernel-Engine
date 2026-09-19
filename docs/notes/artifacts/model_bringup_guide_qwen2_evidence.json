@@ -1,0 +1,118 @@
+{
+  "schema": "cke.docs.model_bringup_guide_evidence.v1",
+  "title": "Executable-spine evidence for the model bring-up contributor guide",
+  "execution_revision": "ae5978f8f4ac996f39aa7ac116f2c3e12ef9a8dc",
+  "documentation_revision": "73552e22b (origin/main at PR update; the docs commit sits on top and changes no executed code)",
+  "revision_note": "Commands labeled executed were first run at execution_revision and re-run on the rebased tree at documentation_revision. The intervening commit (#522) changes Gemma4 attention/test files and two expected-count constants in tests/test_v8_kernel_call_abi.py; the Makefile targets, qwen2 circuit, cited kernel maps, wrapper, and runner quoted on the page are unchanged between the two revisions.",
+  "captured": "2026-09-19",
+  "host": {
+    "cores": 28,
+    "isa": "AVX2+FMA (Intel Haswell+), VNNI reported by engine feature probe",
+    "os": "Linux x86_64"
+  },
+  "model": {
+    "source": "hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf",
+    "run_dir": "~/.cache/ck-engine-v8/models/Qwen--Qwen2-0.5B-Instruct-GGUF",
+    "gguf_tensors": 290,
+    "gguf_tensor_types": {"Q5_0": 132, "F32": 121, "Q8_0": 13, "Q4_K": 12, "Q6_K": 12},
+    "config": {
+      "embed_dim": 896,
+      "num_heads": 14,
+      "num_kv_heads": 2,
+      "head_dim": 64,
+      "intermediate_size": 4864,
+      "num_layers": 24,
+      "vocab_size": 151936,
+      "rms_eps": 1e-06,
+      "tie_word_embeddings": true
+    }
+  },
+  "commands_run": [
+    {
+      "purpose": "full pipeline: convert, lower, generate C, compile, run",
+      "label": "executed",
+      "command": "version/v8/scripts/cks-v8-run run hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf --context-len 512 --prompt \"Say hello in one short sentence.\" --max-tokens 16 --force-compile",
+      "observed_output_excerpt": "Model loaded! Vocab: 151936, Context: 512 | Response: Hello! How can I assist you today? | prompt eval: 61.04 ms / 26 tokens (425.97 tok/s) | decode: 128.68 ms / 9 runs | stop: eos token 151645",
+      "reverification": "Re-run at documentation_revision: same 26-token prefill / 9-token decode / eos 151645 shape; response wording differed ('Hello! How can I help you today?') because the command does not pin --temperature.",
+      "status": "pass"
+    },
+    {
+      "purpose": "bundle-only native execution from a copied artifact set outside the repository checkout",
+      "label": "executed",
+      "command": "cd /tmp/cke-standalone-demo && LD_LIBRARY_PATH=. ./ck-cli-v8 ./libmodel.so ./weights.bump",
+      "observed_output_excerpt": "[Runtime] ABI: v1 | Role: decoder | Capabilities: decode text-encode token-decode chat-format stop-tokens mixed-prefill named-activations | [Hardware] AVX2+FMA | Assistant: 4 (prompt: What is 2+2? Answer with just the number.) | prefill 32 tok 49.2 ms | decode 1 tok 24.4 ms",
+      "bundle_files": ["ck-cli-v8", "libmodel.so", "libckernel_engine.so", "libckernel_tokenizer.so", "weights.bump", "config.json", "tokenizer.json", "init.json", "init_call.json", "weights_manifest.json", "weights_manifest.map"],
+      "bundle_size_bytes": 407894015,
+      "loaded_libraries": {
+        "ldd_libmodel.so": ["libckernel_tokenizer.so (bundle copy)", "libckernel_engine.so (bundle copy)", "libgomp.so.1", "libc.so.6", "libm.so.6"],
+        "ldd_ck-cli-v8": ["libckernel_tokenizer.so", "libm.so.6", "libc.so.6"],
+        "dynamic_loads": "ck-cli-v8 dlopens the model library passed as argv (./ck-cli-v8 <model.so> <weights.bump>)"
+      },
+      "scope_limit": "The copy ran on the SAME host where the repository checkout, the model caches, and the network still existed; the binary demonstrably read none of them, but this is not an isolated-environment proof. A true isolated run (no checkout/cache mounts, no network, recorded loaded-library list) remains an open follow-up.",
+      "status": "pass"
+    },
+    {
+      "purpose": "GGUF tensor inventory for the import-adapter mapping table",
+      "label": "executed",
+      "command": "python3 version/v8/scripts/convert_gguf_to_bump_v8.py --gguf <model.gguf> --list",
+      "observed_output_excerpt": "[gguf] version=3 source_arch=qwen2 circuit=qwen2 tensors=290 kv=26; token_embd.weight Q8_0 dims=(896,151936); blk.0.attn_q.weight Q5_0 dims=(896,896); blk.0.ffn_down.weight Q6_K dims=(4864,896)",
+      "reverification": "Re-run at documentation_revision with identical output (the converter changed in #522 but not for this model's path).",
+      "status": "pass"
+    },
+    {
+      "purpose": "advisory operation inventory (Track A reuse check)",
+      "label": "executed",
+      "command": "python3 version/v8/scripts/report_model_novelty_v8.py --circuit qwen2",
+      "observed_output_excerpt": "Operations used: 13; Shared with other circuits: 13; Unique to this circuit: 0; Circuits compared: 31",
+      "reverification": "Re-run at documentation_revision with identical output.",
+      "status": "pass"
+    },
+    {
+      "purpose": "call-ABI hard-failure evidence (unknown source is rejected)",
+      "label": "executed",
+      "command": "python3 -m unittest tests.test_v8_kernel_call_abi.V8KernelCallABITests.test_unknown_call_source_is_a_hard_failure tests.test_v8_kernel_call_abi.V8KernelCallABITests.test_all_contract_governed_maps_own_valid_call_abi",
+      "observed_output_excerpt": "Ran 2 tests - OK",
+      "reverification": "Re-run at documentation_revision: OK (the file changed in #522 only in two expected-count constants, not in these tests).",
+      "status": "pass"
+    },
+    {
+      "purpose": "llama.cpp and PyTorch oracle commands quoted in section 10",
+      "label": "source_verified",
+      "command": "compare_first_token_logits_v8.py / export_llama_hidden_v8.py / certify_text_prompt_parity_v8.py (see page)",
+      "observed_output_excerpt": "Read from source and --help output only; NOT executed for this page. llama.cpp submodule pinned at f3e182816421c648188b5eab269853bf1531d950.",
+      "status": "source-verified only"
+    },
+    {
+      "purpose": "make targets listed in section 14",
+      "label": "source_verified",
+      "command": "make test / test-bf16 / test-kernel-maps / test-v8-dsl / test-v8-artifact-compile-matrix / test-xray-validator-selftest / llamacpp-parity-full / nightly-json",
+      "observed_output_excerpt": "Confirmed present in the Makefile at documentation_revision by reading the target recipes; not executed for this page.",
+      "status": "source-verified only"
+    }
+  ],
+  "generated_artifact_facts": {
+    "model_v8_c_lines": 27935,
+    "model_v8_c_header": "Auto-generated by codegen_core_v8.py, Generated: 2026-09-19 17:54:48, Model: qwen2, Mode: decode, Layers: 24 (unrolled)",
+    "worked_example_op": {
+      "generated_c_line": 1706,
+      "comment": "/* Op 2: rmsnorm_forward_parallel_dispatch (rmsnorm) layer=0 section=body */",
+      "call": "rmsnorm_forward_parallel_dispatch((const float*)(model->bump + A_EMBEDDED_INPUT), (const float*)(model->bump + W_LAYER_0_LN1_GAMMA), (float*)(model->bump + A_EMBEDDED_INPUT), NULL, 1, 896, 896, 9.999999974752427e-07);",
+      "kernel_map": "version/v8/kernel_maps/rmsnorm_forward.json",
+      "call_abi_owner": "kernel_map (kernel_id rmsnorm_forward, source_file rmsnorm_forward.json)",
+      "memory_plan": {
+        "A_EMBEDDED_INPUT": {"buffer": "embedded_input", "size": 3584, "activation_offset": 128, "abs_offset": 397681472},
+        "W_LAYER_0_LN1_GAMMA": {"weight": "layer.0.ln1_gamma", "size": 3584, "abs_offset": 149355180},
+        "arena": {"mode": "region", "weights_base": 496, "activations_base": 397681344, "total_size": 411400448}
+      }
+    },
+    "artifact_hashes_sha256": {
+      "libmodel.so": "0220134645d72429fde30407f91393426a6595b6f0b51870d6c34bd54453f000",
+      "weights.bump": "0f8ddffa3b45f36b9a2409aa58a2f0f9d296fc4a39b1a30b53be6c7eadce3745"
+    }
+  },
+  "notes": [
+    "Executed commands ran inside a clean worktree; artifact paths are the shared local model cache.",
+    "The standalone bundle ran with no Python in the execution path and read only the copied files; it ran on the same host as the checkout and caches, so isolated-host execution remains an open follow-up (see commands_run[1].scope_limit).",
+    "llama.cpp oracle commands are documented from the pinned in-repo submodule (f3e182816421c648188b5eab269853bf1531d950) and script --help output; they were not re-executed for this page."
+  ]
+}
