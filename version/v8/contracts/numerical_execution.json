@@ -245,6 +245,17 @@
       "position_transform": null,
       "description": "Reusable FastConformer stem with three stride-2 grouped Conv2D reductions, two intervening pointwise Conv2D stages, live-frame zeroing after every stage, ReLU at declared boundaries, token-major flattening, and CKE's shared production FP32 GEMM projection."
     },
+    "audio_fastconformer_block_macaron_relative_conv_fp32": {
+      "operator_family": "audio_fastconformer_block",
+      "status": "validated",
+      "storage": {"input": "fp32", "weight": "fp32", "output": "fp32"},
+      "compute": {"input": "fp32", "weight": "fp32", "accumulator": "fp32", "contraction": "enabled", "evaluation_order": "macaron_ffn_half_residual_then_relative_attention_then_pointwise_glu_depthwise_batchnorm_silu_pointwise_conv_then_macaron_ffn_half_residual_then_layernorm"},
+      "rounding": {"mode": "rne", "points": ["input_load", "activation_intermediate_store", "output_store"]},
+      "reduction": {"kind": "composite", "order": "stage_ordered", "partial_accumulator": "fp32", "merge_order": "implementation_defined"},
+      "threading": {"work_partition": "output_tiles", "split_strategy": "independent_outputs", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Reusable FP32 FastConformer encoder block composed from registered LayerNorm, production GEMM, relative-attention, grouped Conv1D, GLU, BatchNorm, SiLU, and scaled-residual providers with caller-owned workspace."
+    },
     "audio_glu_split_sigmoid_fp32": {
       "operator_family": "audio_glu",
       "status": "validated",

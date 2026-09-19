@@ -1631,6 +1631,20 @@ def _build_config(model_dir: Path, arch: str, config_template: Path | None) -> d
         stage0_frames = (max_feature_frames + subsampling_stride - 1) // subsampling_stride
         stage0_width = (int(encoder["num_mel_bins"]) + subsampling_stride - 1) // subsampling_stride
         workspace_elements = 2 * conv_channels * stage0_frames * stage0_width
+        hidden_size = int(encoder["hidden_size"])
+        intermediate_size = int(encoder["intermediate_size"])
+        attention_heads = int(encoder["num_attention_heads"])
+        block_token_elements = max_encoder_frames * hidden_size
+        block_large_elements = max(
+            max_encoder_frames * intermediate_size,
+            (2 * max_encoder_frames - 1) * hidden_size,
+            2 * block_token_elements,
+        )
+        block_workspace_elements = (
+            5 * block_token_elements
+            + block_large_elements
+            + attention_heads * max_encoder_frames
+        )
         cfg.update({
             "num_layers": int(encoder["num_hidden_layers"]),
             "num_hidden_layers": int(encoder["num_hidden_layers"]),
@@ -1666,6 +1680,12 @@ def _build_config(model_dir: Path, arch: str, config_template: Path | None) -> d
             "audio_subsampling_output_frames": max_encoder_frames,
             "audio_subsampling_workspace_elements": workspace_elements,
             "audio_subsampling_workspace_bytes": workspace_elements * 4,
+            "audio_relative_position_frames": 2 * max_encoder_frames - 1,
+            "audio_fastconformer_conv_kernel_size": int(encoder["conv_kernel_size"]),
+            "audio_fastconformer_layer_norm_epsilon": 1.0e-5,
+            "audio_fastconformer_batch_norm_epsilon": 1.0e-5,
+            "audio_fastconformer_block_workspace_elements": block_workspace_elements,
+            "audio_fastconformer_block_workspace_bytes": block_workspace_elements * 4,
             "audio_preemphasis_coefficient": 0.97,
             "audio_log_epsilon": 2.0 ** -24,
             "audio_normalization_epsilon": 1.0e-5,
