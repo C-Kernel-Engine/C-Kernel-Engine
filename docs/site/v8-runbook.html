@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>v8 Inference Runbook | C-Kernel-Engine</title>
-    <meta name="description" content="Operator runbook for the current C-Kernel-Engine v8 inference lane, covering promoted text-family bring-up and the validated Qwen3-VL multimodal path.">
+    <title>v8 Inference and Certified Training Runbook | C-Kernel-Engine</title>
+    <meta name="description" content="Operator runbook for C-Kernel-Engine v8 inference and its certified FP32 training starter, including generated training, checkpoint resume, visualizer evidence, and inference export.">
     <meta name="robots" content="index,follow">
     <link rel="canonical" href="https://c-kernel-engine.github.io/C-Kernel-Engine/v8-runbook.html">
-    <meta property="og:title" content="v8 Inference Runbook | C-Kernel-Engine">
-    <meta property="og:description" content="Operator runbook for the current C-Kernel-Engine v8 inference lane, covering promoted text-family bring-up and the validated Qwen3-VL multimodal path.">
+    <meta property="og:title" content="v8 Inference and Certified Training Runbook | C-Kernel-Engine">
+    <meta property="og:description" content="Operator runbook for C-Kernel-Engine v8 inference and its certified FP32 training starter, including generated training, checkpoint resume, visualizer evidence, and inference export.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://c-kernel-engine.github.io/C-Kernel-Engine/v8-runbook.html">
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
@@ -1144,11 +1144,12 @@
 }
 </style>
 
-<h1>v8 Inference Runbook</h1>
+<h1>v8 Inference and Certified Training Runbook</h1>
 
 <p>
-    This is the operator runbook for the current <code>v8</code> inference lane:
-    promoted text-family bring-up through the <code>v8</code> runner surface plus the validated
+    This is the operator runbook for the current <code>v8</code> inference lane and its
+    bounded FP32 training starter: promoted text-family bring-up through the <code>v8</code>
+    runner surface plus the validated
     <strong>Qwen3-VL-8B-Instruct</strong> multimodal path with the matching
     <code>mmproj-Qwen3VL-8B-Instruct</code> encoder projection file.
 </p>
@@ -1167,8 +1168,10 @@
     <div class="v8-runbook-card">
         <h2>What This Runbook Covers</h2>
         <p>
-            Three things: the promoted text-family <code>v8</code> bring-up commands, the one multimodal family that is validated today, and the Whisper Tiny audio lane within its certified scope.
-            It does not claim that unrelated multimodal families are ready in <code>v8</code>.
+            Four things: the promoted text-family <code>v8</code> bring-up commands, the certified
+            FP32 training starter, the one multimodal family that is validated today, and the
+            Whisper Tiny audio lane within its certified scope. It does not claim that unrelated
+            model families or the complete historical v7 training surface are ready in <code>v8</code>.
         </p>
         <div class="v8-chip-row">
             <span class="v8-chip">version/v8/scripts/cks-v8-run</span>
@@ -1176,7 +1179,7 @@
             <span class="v8-chip">Qwen3-VL</span>
             <span class="v8-chip">cks-v8-run audio</span>
             <span class="v8-chip">Whisper Tiny</span>
-            <span class="v8-chip">inference only</span>
+            <span class="v8-chip">FP32 training starter</span>
         </div>
     </div>
     <div class="v8-runbook-card">
@@ -1193,7 +1196,111 @@
     </div>
     <div>
         <strong>Boundary</strong><br>
-        <code>v8</code> is the inference bring-up lane. Training workflows remain in <code>v7</code>.
+        <code>v8</code> owns inference bring-up and one certified FP32 training-to-inference
+        starter. The wider training circuit matrix, SVG workload, pipeline builder, BF16,
+        and adapter-training lanes remain in <code>v7</code> or are not yet certified in v8.
+    </div>
+</div>
+
+<h2 id="certified-fp32-training">Training: Certified FP32 Starter</h2>
+
+<div class="card card-green">
+    <p>
+        These commands exercise production generated runtimes. They do not substitute a Python
+        operation when generated C coverage is missing.
+    </p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre># Fast two-layer forward/backward numerical certification.
+make v8-training-certify-fp32
+
+# Four-layer English learning, AdamW, restart, export, and visualizer workflow.
+make v8-training-workflow-fp32</pre>
+    </div>
+    <table class="table">
+        <thead><tr><th>Command</th><th>What a PASS proves</th><th>Primary evidence</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><code>v8-training-certify-fp32</code></td>
+                <td>Identical serialized weights and tokens satisfy the declared PyTorch contracts for generated forward output, loss, every expected parameter gradient, and runtime provenance. Injected gradient, stale-library, and alternate-engine faults are detected.</td>
+                <td><code>version/v8/.cache/reports/training_certification_latest.json</code></td>
+            </tr>
+            <tr>
+                <td><code>v8-training-workflow-fp32</code></td>
+                <td>A four-layer reduced Qwen3-style circuit learns a pinned English byte-token fixture through generated C and native AdamW, resumes complete state in a fresh process, and exports weights into an independently built v8 inference runtime.</td>
+                <td><code>version/v8/.cache/reports/training_workflow_latest.json</code></td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Artifacts and visual inspection</h3>
+    <p>The full workflow writes its current run under <code>version/v8/.cache/training_workflow/qwen3_4layer_fp32/</code>.</p>
+    <div class="v8-path-scroll">
+    <table class="table v8-path-table">
+        <thead><tr><th>Path below the run directory</th><th>What to inspect</th></tr></thead>
+        <tbody>
+            <tr><td><code>ir_report.html</code></td><td>Interactive training IR report: Data Lab, tokenizer, forward/backward graph, gradient stitching, learning, parity, checkpoint, and performance panels.</td></tr>
+            <tr><td><code>dataset/</code>, <code>tokenizer.json</code>, <code>tokenizer_roundtrip.json</code></td><td>Exact serialized token IDs, byte vocabulary, split lineage, and encode/decode round-trip evidence.</td></tr>
+            <tr><td><code>dataset_profile.json</code>, <code>dataset_qc.json</code></td><td>Split counts, hashes, overlap checks, and quality status for the current run.</td></tr>
+            <tr><td><code>checkpoints/latest.json</code></td><td>Pointer to the last atomically published complete checkpoint. The checkpoint owns the resume cursor and binds runtime, configuration, and dataset identities.</td></tr>
+            <tr><td><code>training_parity_latest.json</code>, <code>training_loss_curve_latest.json</code></td><td>Per-tensor PyTorch discrepancies, first-update evidence, and ten-epoch CKE/oracle loss trajectories.</td></tr>
+            <tr><td><code>backprop_stitch_runtime_latest.json</code></td><td>Saved tensors, gradient producers and consumers, accumulation state, and generated backward execution evidence.</td></tr>
+            <tr><td><code>exported_inference/</code>, <code>v8_inference_runtime/</code></td><td>Independent training-forward rebuild and v8 prefill/decode export used for the generated-token trajectory check.</td></tr>
+        </tbody>
+    </table>
+    </div>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>RUN=version/v8/.cache/training_workflow/qwen3_4layer_fp32
+
+# The workflow creates this report. Regenerate it after inspecting or moving artifacts.
+.venv/bin/python version/v8/tools/open_ir_visualizer_v8.py \
+  --generate --run "$RUN" --html-only --strict-run-artifacts \
+  --output "$RUN/ir_report.html"
+
+# Open locally, or serve the run directory on a headless host.
+xdg-open "$RUN/ir_report.html"
+python3 -m http.server 7021 --bind 127.0.0.1 --directory "$RUN"</pre>
+    </div>
+</div>
+
+<div class="card card-blue">
+    <h3 style="margin-top: 0;">Annotated certified-run example</h3>
+    <p>
+        A current four-layer run presents 10,000 pinned training tokens for ten epochs. Use the
+        report navigation rather than treating the presence of an HTML file as certification.
+    </p>
+    <table class="table">
+        <thead><tr><th>Panel</th><th>Expected current-run evidence</th><th>Certified example</th></tr></thead>
+        <tbody>
+            <tr><td>Data Lab</td><td>Train/validation hashes, token counts, tokenizer lineage, round-trip and QC PASS.</td><td>10,000 training tokens; 2,048 held-out tokens.</td></tr>
+            <tr><td>Training graph</td><td>109 forward and 209 backward operations with no unresolved backward operation; stitching data names every gradient edge.</td><td>Training IR invariants PASS.</td></tr>
+            <tr><td>Learning</td><td>CKE and PyTorch epoch curves plus held-out measurements from the same serialized batches.</td><td>Training loss <code>5.2214 -&gt; 3.1566</code>; held-out loss <code>5.5629 -&gt; 4.3848</code>.</td></tr>
+            <tr><td>Restart</td><td>Checkpoint-owned cursor and accumulated gradients restore in a fresh PID; incompatible identity controls fail.</td><td>Weights and optimizer state match uninterrupted execution with <code>0.0</code> maximum difference.</td></tr>
+            <tr><td>Export</td><td>Independent v8 runtime provenance, exact generated token sequence, and bounded per-step logit discrepancy.</td><td>12 generation steps match; maximum trajectory-logit difference <code>0.000353</code>.</td></tr>
+        </tbody>
+    </table>
+    <p class="v8-note">
+        A failed run still writes the JSON report. Read top-level <code>status</code>,
+        <code>failures</code>, and every entry under <code>checks</code>. Missing evidence is
+        <code>NOT_CERTIFIED</code> or a failed check; it is never converted to a zero measurement.
+    </p>
+</div>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+    </div>
+    <div>
+        <strong>Implementation and coverage boundary</strong><br>
+        v8 owns the command, evidence contract, export, and visualizer integration. It currently
+        imports the proven v7 training IR builder, generated-runtime code generator, and PyTorch
+        oracle through explicit interfaces. Certified coverage is the reduced dense FP32 circuit.
+        Unequal-head GQA, BF16 training, the v7 interactive plan builder, frozen SVG training and
+        gallery, additional model circuits, standalone native training/inference executables,
+        LoRA/QLoRA, Muon, and training-state offload require separate executable evidence.
     </div>
 </div>
 
@@ -2419,8 +2526,9 @@ make v8-visualizer-generated-e2e
 make v8-visualizer-vision-artifacts</pre>
     </div>
     <p class="v8-note" style="margin-bottom: 0;">
-        v7 still owns the promoted training/backprop visualizer lane. v8 now owns inference and multimodal observability:
-        lowered decoder graphs, generated C metadata, logical memory, kernel-flow summaries, bridge reports, and vision-prefix dataflow.
+        v8 owns the certified FP32 starter's training/backprop report and continues to own inference
+        and multimodal observability. v7 remains the reference for the broader training visualizer,
+        interactive builder, SVG workload, and training circuit matrix until each path has v8 evidence.
     </p>
 </div>
 
@@ -2722,7 +2830,7 @@ make v8-visualizer-vision-artifacts</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-09-13</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-09-20</p>
             </div>
         </div>
     </footer>

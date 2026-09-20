@@ -6340,7 +6340,7 @@ V7_STABILIZATION_HISTORY ?= $(V7_REPORT_DIR)/training_stabilization_history.json
 	v7-ctop v7-ctop-demo
 
 .PHONY: v8-init v8-doctor v8-capture-artifacts v8-capture-artifacts-run v8-profile-dashboard v8-profile-dashboard-run \
-	v8-compile-train-runtime v8-training-certify-fp32 v8-regression-fast v8-regression-full v8-regression-family
+	v8-compile-train-runtime v8-training-certify-fp32 v8-training-workflow-fp32 v8-regression-fast v8-regression-full v8-regression-family
 
 v7-help:
 	@echo "=== v7 Training Foundation (fp32 correctness-first) ==="
@@ -6635,6 +6635,14 @@ v8-training-certify-fp32:
 	@$(PYTHON) version/v8/scripts/run_training_certification_v8.py \
 		--run-dir "$(V8_TRAIN_CERT_RUN_DIR)" \
 		--json-out "$(V8_TRAIN_CERT_REPORT)"
+
+V8_TRAIN_WORKFLOW_REPORT ?= version/v8/.cache/reports/training_workflow_latest.json
+V8_TRAIN_WORKFLOW_RUN_DIR ?= version/v8/.cache/training_workflow/qwen3_4layer_fp32
+
+v8-training-workflow-fp32:
+	@$(PYTHON) version/v8/scripts/run_training_workflow_v8.py \
+		--run-dir "$(V8_TRAIN_WORKFLOW_RUN_DIR)" \
+		--json-out "$(V8_TRAIN_WORKFLOW_REPORT)"
 
 v7-ctop:
 	@RUN_DIR="$(if $(RUN),$(RUN),$(V7_CKTOP_RUN))"; \

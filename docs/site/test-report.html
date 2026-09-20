@@ -2131,6 +2131,18 @@
     </div>
 
     <div class="regression-section">
+      <h2>v8 Training-to-Inference Workflow</h2>
+      <p class="regression-meta" id="training-workflow-meta"><code>make v8-training-workflow-fp32</code> status is not available in this report yet.</p>
+      <div class="summary-cards" style="margin: 0 0 1rem 0;">
+        <div class="summary-card"><div class="value" id="training-workflow-status">-</div><div class="label">Overall</div></div>
+        <div class="summary-card"><div class="value" id="training-workflow-loss">-</div><div class="label">Train Loss</div></div>
+        <div class="summary-card"><div class="value" id="training-workflow-resume">-</div><div class="label">Fresh Resume</div></div>
+        <div class="summary-card"><div class="value" id="training-workflow-export">-</div><div class="label">v8 Export</div></div>
+        <div class="summary-card"><div class="value" id="training-workflow-throughput">-</div><div class="label">Generated C tok/s</div></div>
+      </div>
+    </div>
+
+    <div class="regression-section">
       <h2>v7 Training Family Regression</h2>
       <p class="regression-meta" id="backprop-regression-meta">
         `make regression-training-full` status is not available in this report yet.
@@ -2697,6 +2709,7 @@ function renderResults(data) {
   renderKernelMapContracts(data.kernel_map_contracts || null);
   renderKernelAllocation(data.kernel_allocation || null);
   renderTrainingCertification(data.training_certification || null);
+  renderTrainingWorkflow(data.training_workflow || null);
   renderBackpropRegression(data.backprop_regression || null);
 
   const statusEl = document.getElementById('overall-status');
@@ -3497,6 +3510,25 @@ function renderTrainingCertification(data) {
   controlsEl.textContent = `${controlsPassed}/${controlRows.length}`;
 }
 
+function renderTrainingWorkflow(data) {
+  if (!data) return;
+  const checks = data.checks || {};
+  const learning = checks.learning || {};
+  const resume = checks.fresh_process_resume || {};
+  const exported = checks.inference_export || {};
+  const performance = data.performance || {};
+  const status = String(data.status || 'not_run').toLowerCase();
+  document.getElementById('training-workflow-meta').textContent = data.note || 'Four-layer FP32 generated-C training, restart, and v8 inference export.';
+  document.getElementById('training-workflow-status').textContent = status === 'pass' ? 'PASS' : status === 'fail' ? 'FAIL' : 'N/R';
+  const first = Number(learning.first_epoch_loss);
+  const last = Number(learning.last_epoch_loss);
+  document.getElementById('training-workflow-loss').textContent = Number.isFinite(first) && Number.isFinite(last) ? `${first.toFixed(3)} → ${last.toFixed(3)}` : '-';
+  document.getElementById('training-workflow-resume').textContent = resume.passed === true ? 'PASS' : resume.passed === false ? 'FAIL' : '-';
+  document.getElementById('training-workflow-export').textContent = exported.passed === true ? 'PASS' : exported.passed === false ? 'FAIL' : '-';
+  const throughput = Number(performance.tokens_per_second);
+  document.getElementById('training-workflow-throughput').textContent = Number.isFinite(throughput) ? throughput.toFixed(0) : '-';
+}
+
 function renderBackpropRegression(data) {
   const metaEl = document.getElementById('backprop-regression-meta');
   const statusEl = document.getElementById('backprop-regression-status');
@@ -3906,7 +3938,7 @@ document.getElementById('copy-failures-btn').addEventListener('click', copyFaile
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-09-12</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-09-20</p>
             </div>
         </div>
     </footer>

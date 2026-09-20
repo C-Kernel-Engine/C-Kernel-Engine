@@ -44,6 +44,10 @@ class NightlyRunnerV7GateTests(unittest.TestCase):
             nightly.MAKE_TARGETS["v8_training_certification_fp32"]["target"],
             "v8-training-certify-fp32",
         )
+        self.assertEqual(
+            nightly.MAKE_TARGETS["v8_training_workflow_fp32"]["target"],
+            "v8-training-workflow-fp32",
+        )
 
     def test_kernel_map_failure_artifact_summary_uses_validator_counts(self) -> None:
         with tempfile.TemporaryDirectory() as td:

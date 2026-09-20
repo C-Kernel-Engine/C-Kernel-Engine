@@ -883,11 +883,41 @@ jobs:
                       "Preserved because this workflow did not run the certification gate."
                   ).strip()
 
+          training_workflow_report = Path("version/v8/.cache/reports/training_workflow_latest.json")
+          training_workflow_result = results_by_name.get("v8 FP32 Training-to-Inference Workflow")
+          training_workflow_payload = {
+              "status": "not_run", "passed": False, "current": False, "checks": {},
+              "note": "v8-training-workflow-fp32 did not publish a nightly report.",
+          }
+          if training_workflow_report.exists():
+              workflow_doc = json.loads(training_workflow_report.read_text(encoding="utf-8"))
+              execution = workflow_doc.get("execution") if isinstance(workflow_doc.get("execution"), dict) else {}
+              github_identity = execution.get("github") if isinstance(execution.get("github"), dict) else {}
+              result_status = str((training_workflow_result or {}).get("status", "not_run")).lower()
+              identity_matches = bool(
+                  os.environ.get("GITHUB_RUN_ID")
+                  and str(github_identity.get("run_id") or "") == os.environ.get("GITHUB_RUN_ID")
+                  and str(github_identity.get("run_attempt") or "") == os.environ.get("GITHUB_RUN_ATTEMPT")
+                  and str(execution.get("git_commit") or "") == os.environ.get("GITHUB_SHA")
+              )
+              current_pass = bool(identity_matches and result_status == "pass" and workflow_doc.get("status") == "PASS" and workflow_doc.get("passed") is True)
+              training_workflow_payload = {
+                  "status": "pass" if current_pass else ("fail" if identity_matches else "historical"),
+                  "passed": current_pass, "current": identity_matches, "execution": execution,
+                  "configuration": workflow_doc.get("configuration") or {}, "checks": workflow_doc.get("checks") or {},
+                  "performance": workflow_doc.get("performance") or {}, "failures": workflow_doc.get("failures") or [],
+                  "summary_path": str(training_workflow_report),
+                  "note": "Current four-layer training-to-inference evidence." if identity_matches else "Historical four-layer training-to-inference evidence.",
+              }
+          elif isinstance(training_workflow_result, dict):
+              training_workflow_payload.update({"status": "fail", "current": True, "note": str(training_workflow_result.get("error_msg") or "workflow report missing")})
+
           data["regression_fast"] = regression_payload
           data["kernel_map_contracts"] = kernel_map_payload
           data["kernel_allocation"] = kernel_allocation_payload
           data["backprop_regression"] = backprop_payload
           data["training_certification"] = training_cert_payload
+          data["training_workflow"] = training_workflow_payload
           latest_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
           Path("build/nightly_report.json").write_text(json.dumps(data, indent=2), encoding="utf-8")
           print("Attached v8 inference/training and v7 training summaries to nightly latest.json")

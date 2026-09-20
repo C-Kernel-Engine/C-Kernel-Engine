@@ -1,0 +1,55 @@
+# Activation Parity Testing Guide: CK vs llama.cpp
+
+This guide explains how to systematically debug activation divergence between
+C-Kernel-Engine and llama.cpp, testing one op at a time.
+
+## Prerequisites
+
+```bash
+# 1. Built llama.cpp
+cd /home/antshiv/Workspace/C-Kernel-Engine/llama.cpp
+cmake -B build && cmake --build build
+
+# 2. Built CK model
+cd ~/.cache/ck-engine-v6.6/models/unsloth--gemma-3-270m-it-GGUF/ck_build
+make
+```
+
+## Quick Reference: Environment Variables
+
+| Variable | Purpose |
+|----------|---------|
+| `CK_TRACE_OPS=1` | Print each op as it executes |
+| `CK_STOP_OP=N` | Stop after op N and return |
+| `CK_PARITY_DUMP=1` | Enable activation dumps (requires rebuild with `-DCK_PARITY_DUMP`) |
+
+---
+
+## Phase 1: Understand the Op Sequence (Layer 0)
+
+Gemma-3 Layer 0 ops for single-token decode:
+
+| Op# | Kernel | Output Buffer | Size |
+|-----|--------|---------------|------|
+| 0 | embedding_forward_q8_0 | A_EMBEDDED_INPUT | 640 |
+| 1 | memcpy (residual_save) | A_RESIDUAL | 640 |
+| 2 | rmsnorm_forward (attn_norm) | A_EMBEDDED_INPUT | 640 |
+| 3 | quantize_row_q8_0 | A_LAYER_INPUT | Q8_0 |
+| 4 | gemv_q5_1 (q_proj) | A_Q_SCRATCH | 1024 |
+| 5 | add_inplace_f32 (bias) | A_Q_SCRATCH | 1024 |
+| 6 | gemv_q5_1 (k_proj) | A_K_SCRATCH | 256 |
+| 7 | add_inplace_f32 (bias) | A_K_SCRATCH | 256 |
+| 8 | gemv_q8_0_q8_0 (v_proj) | A_V_SCRATCH | 256 |
+| 9 | add_inplace_f32 (bias) | A_V_SCRATCH | 256 |
+| 10 | qk_norm_forward | Q/K in-place | 1024/256 |
+| 11 | rope_forward_qk | Q/K in-place | 1024/256 |
+| 12 | kv_cache_store | KV cache | - |
+| 13 | attention_forward_sliding | A_ATTN_SCRATCH | 1024 |
+| 14 | gemv_q5_k (out_proj) | A_EMBEDDED_INPUT | 640 |
+| 15 | add_inplace_f32 (bias) | A_EMBEDDED_INPUT | 640 |
+| 16 | rmsnorm_forward (post_attn) | A_EMBEDDED_INPUT | 640 |
+| 17 | residual_add | A_EMBEDDED_INPUT | 640 |
+| 18 | memcpy (residual_save) | A_RESIDUAL | 640 |
+| 19 | rmsnorm_forward (ffn_norm) | A_EMBEDDED_INPUT | 640 |
+| 20 | gemv_q5_1 (mlp_gate_up) | A_MLP_SCRATCH | 4096 |
+| 21 | add_inplace_f32 (bias) | A_MLP_SCRATCH | 4
