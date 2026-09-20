@@ -3360,6 +3360,9 @@ CK_EXPORT void ck_model_profile_dump(void) {
     uses_persistent_cross_kv_cache = bool(
         config.get("_template_uses_persistent_cross_kv_cache", False)
     )
+    dynamic_encoder_memory_length = bool(
+        config.get("dynamic_encoder_memory_length", False)
+    )
     if bool(config.get("uses_cross_attention", False)):
         encoder_tokens = int(config.get("encoder_memory_length", 0) or 0)
         encoder_dim = int(config.get("embed_dim", 0) or 0)
@@ -3386,21 +3389,30 @@ CK_EXPORT void ck_model_profile_dump(void) {
             raise RuntimeError(
                 "encoder_memory layout does not match the declared FP32 cross-attention contract"
             )
+        encoder_token_guard = (
+            f"tokens <= 0 || tokens > {encoder_tokens}"
+            if dynamic_encoder_memory_length
+            else f"tokens != {encoder_tokens}"
+        )
         encoder_memory_api = f"""
 /* Immutable encoder context consumed by encoder-decoder cross-attention. */
 CK_EXPORT int ck_model_set_encoder_memory(const float *data, int tokens, int dim) {{
     if (!g_model || !data) return -1;
-    if (tokens != {encoder_tokens} || dim != {encoder_dim}) return -2;
+    if ({encoder_token_guard} || dim != {encoder_dim}) return -2;
     memcpy(
         g_model->bump + A_ENCODER_MEMORY,
         data,
-        (size_t){encoder_tokens} * (size_t){encoder_dim} * sizeof(float)
+        (size_t)tokens * (size_t){encoder_dim} * sizeof(float)
     );
+    g_model->encoder_memory_tokens = tokens;
     g_model->encoder_kv_ready = 0;
     return 0;
 }}
 
-CK_EXPORT int ck_model_get_encoder_memory_tokens(void) {{ return {encoder_tokens}; }}
+CK_EXPORT int ck_model_get_encoder_memory_tokens(void) {{
+    return {"g_model ? g_model->encoder_memory_tokens : 0" if dynamic_encoder_memory_length else str(encoder_tokens)};
+}}
+CK_EXPORT int ck_model_get_encoder_memory_capacity(void) {{ return {encoder_tokens}; }}
 CK_EXPORT int ck_model_get_encoder_memory_dim(void) {{ return {encoder_dim}; }}
 """
     recurrent_reset_lines: list[str] = []
@@ -3451,6 +3463,7 @@ typedef struct {{
     int pos;                 /* Current KV slot / active token count */
     int rope_pos;            /* Text-position counter used by RoPE */
     int encoder_kv_ready;    /* Immutable cross-attention projections populated */
+    int encoder_memory_tokens; /* Active rows within compiled encoder capacity */
     int bridge_has_explicit_positions;
     int32_t bridge_positions[4];
 {tokenizer_field_line}
@@ -3631,6 +3644,7 @@ static int do_init(const char *weights_path) {{
 #endif
     g_model->pos = 0;
     g_model->rope_pos = 0;
+    g_model->encoder_memory_tokens = {encoder_tokens if bool(config.get("uses_cross_attention", False)) and not dynamic_encoder_memory_length else 0};
     g_model->bridge_has_explicit_positions = 0;
 
 {init_ops_code}
