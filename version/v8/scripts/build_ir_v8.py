@@ -3430,9 +3430,10 @@ class DataflowTracker:
     When an op is added, records its inputs (from current slot state) and outputs (updates slot state).
     """
 
-    def __init__(self):
+    def __init__(self, external_slots: Optional[set[str]] = None):
         # Map slot name -> {op_id, output_name, dtype}
         self.slots: Dict[str, Dict[str, Any]] = {}
+        self.external_slots = set(external_slots or ())
         # For residual_save tracking within a layer
         self.layer_residual_sources: Dict[int, Dict[str, Any]] = {}  # layer -> slot info
 
@@ -3493,13 +3494,17 @@ class DataflowTracker:
         for input_name, slot_name in dataflow_def.get("inputs", {}).items():
             if input_slot_override and input_name in input_slot_override:
                 slot_name = input_slot_override[input_name]
-            if slot_name.startswith("external:"):
+            if slot_name.startswith("external:") or slot_name in self.external_slots:
                 # External input (token_ids, etc.)
+                external_name = (
+                    slot_name if slot_name.startswith("external:")
+                    else f"external:{slot_name}"
+                )
                 inputs[input_name] = {
-                    "from": slot_name,
+                    "from": external_name,
                     "dtype": input_dtypes.get(
                         input_name,
-                        "i32" if "token" in slot_name else "fp32",
+                        "i32" if "token" in external_name else "fp32",
                     ),
                     "slot": slot_name,
                 }
@@ -8685,7 +8690,27 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
     # ═══════════════════════════════════════════════════════════
 
     # Initialize dataflow tracker
-    dataflow_tracker = DataflowTracker()
+    external_activation_slots = config.get("external_activation_slots", [])
+    if not isinstance(external_activation_slots, list) or any(
+        not isinstance(slot, str) or not slot.strip()
+        for slot in external_activation_slots
+    ):
+        raise RuntimeError(
+            "HARD CIRCUIT DATAFLOW FAULT: external_activation_slots must be a list "
+            "of non-empty activation slot names"
+        )
+    declared_activation_slots = template.get("activation_buffers", {})
+    if not isinstance(declared_activation_slots, dict):
+        declared_activation_slots = {}
+    unknown_external_slots = sorted(
+        set(external_activation_slots) - set(declared_activation_slots)
+    )
+    if unknown_external_slots:
+        raise RuntimeError(
+            "HARD CIRCUIT DATAFLOW FAULT: external activation slots are not declared "
+            f"by the circuit: {unknown_external_slots}"
+        )
+    dataflow_tracker = DataflowTracker(set(external_activation_slots))
 
     # Build activation dtype lookup (kernel_id -> activation dtype)
     kernel_act_dtype = {
@@ -15843,6 +15868,27 @@ def _c_scalar_expr(value: Any) -> str:
     return str(value)
 
 
+def _is_bias_call_weight(key: str, weight_info: Dict) -> bool:
+    if WEIGHT_TO_KERNEL_INPUT.get(key) == "bias":
+        return True
+    key_lc = str(key or "").lower()
+    explicit_bias_aliases = {
+        "bq", "bk", "bv", "bo", "b1", "b2", "bqkv",
+        "final_ln_bias", "patch_bias",
+    }
+    if key_lc in explicit_bias_aliases or key_lc.endswith("_b") or "bias" in key_lc:
+        return True
+    weight_name = str((weight_info or {}).get("name", "")).lower()
+    return ".bias" in weight_name or weight_name.endswith("bias")
+
+
+def _select_first_non_bias_call_weight(weights: Dict) -> Optional[Tuple[str, Dict]]:
+    for key, value in weights.items():
+        if not _is_bias_call_weight(key, value):
+            return key, value
+    return None
+
+
 def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
     """
     IR Lower 3: Emit call-ready ops with ordered args (function + expr list).
@@ -15908,24 +15954,7 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
         return None
 
     def is_bias_weight_binding(key: str, winfo: Dict) -> bool:
-        if WEIGHT_TO_KERNEL_INPUT.get(key) == "bias":
-            return True
-        key_lc = str(key or "").lower()
-        explicit_bias_aliases = {
-            "bq",
-            "bk",
-            "bv",
-            "bo",
-            "b1",
-            "b2",
-            "bqkv",
-            "final_ln_bias",
-            "patch_bias",
-        }
-        if key_lc in explicit_bias_aliases or key_lc.endswith("_b") or "bias" in key_lc:
-            return True
-        weight_name = str((winfo or {}).get("name", "")).lower()
-        return ".bias" in weight_name or weight_name.endswith("bias")
+        return _is_bias_call_weight(key, winfo)
 
     def select_weight(name: str, weights: Dict, alt: Optional[List[str]] = None) -> Optional[Tuple[str, Dict]]:
         if name in weights:
@@ -15935,9 +15964,7 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
                 if a in weights:
                     return a, weights[a]
         if name == "_first_weight":
-            if weights:
-                k = next(iter(weights.keys()))
-                return k, weights[k]
+            return _select_first_non_bias_call_weight(weights)
         if name == "_bias":
             for k, v in weights.items():
                 if is_bias_weight_binding(k, v):

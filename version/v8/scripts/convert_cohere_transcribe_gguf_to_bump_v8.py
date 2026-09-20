@@ -59,10 +59,38 @@ def positive(metadata: dict[str, object], key: str) -> int:
     return value
 
 
+COMPONENT_SCOPES = (
+    "audio_frontend",
+    "audio_subsampling",
+    "audio_encoder_block",
+    "audio_encoder",
+)
+
+
+def _promote_to_fp32(name: str, ggml_type: int, artifact_scope: str) -> bool:
+    if ggml_type != c.GGML_TYPE_F16:
+        return False
+    if name == "fe.mel_fb":
+        return artifact_scope in {"audio_frontend", "audio_subsampling", "audio_encoder"}
+    if name.startswith("enc.pre."):
+        return artifact_scope in {"audio_subsampling", "audio_encoder"}
+    if name.startswith("enc.blk."):
+        return artifact_scope in {"audio_encoder_block", "audio_encoder"}
+    if name.startswith("enc.proj."):
+        return artifact_scope == "audio_encoder"
+    return False
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--gguf", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument(
+        "--artifact-scope",
+        choices=COMPONENT_SCOPES,
+        default="audio_frontend",
+        help="Generated component to retain and prepare in the BUMP artifact",
+    )
     parser.add_argument("--plan-only", action="store_true")
     args = parser.parse_args()
     source = args.gguf.resolve()
@@ -100,22 +128,70 @@ def main() -> int:
         encoder_head_dim = positive(metadata, "cohere_transcribe.encoder.head_dim")
         encoder_layers = positive(metadata, "cohere_transcribe.encoder.n_layers")
         encoder_ffn_dim = positive(metadata, "cohere_transcribe.encoder.ffn_dim")
+        encoder_conv_kernel = positive(metadata, "cohere_transcribe.encoder.conv_kernel")
+        decoder_dim = positive(metadata, "cohere_transcribe.decoder.d_model")
         vocab_size = positive(metadata, "cohere_transcribe.vocab_size")
         decoder_context = positive(metadata, "cohere_transcribe.decoder.max_ctx")
+        feature_frames = max_source_frames // hop_length + 1
+        subsampling_frames = (feature_frames + 7) // 8
+        conv0 = tensors.get("enc.pre.conv.0.weight")
+        if conv0 is None or len(conv0.dims) != 4:
+            raise c.GGUFError("enc.pre.conv.0.weight must be a rank-4 tensor")
+        subsampling_kernel = int(conv0.dims[0])
+        if int(conv0.dims[1]) != subsampling_kernel or subsampling_kernel <= 0:
+            raise c.GGUFError("Cohere subsampling requires a square convolution kernel")
+        conv_channels = int(conv0.dims[-1])
+        if encoder_heads * encoder_head_dim != encoder_dim:
+            raise c.GGUFError(
+                "Cohere encoder head geometry does not match the model width"
+            )
+        stage0_frames = (feature_frames + 1) // 2
+        feature_channels = positive(metadata, "cohere_transcribe.audio.n_mels")
+        stage0_width = (feature_channels + 1) // 2
+        subsampling_workspace_elements = (
+            2 * conv_channels * stage0_frames * stage0_width
+        )
+        block_token_elements = subsampling_frames * encoder_dim
+        block_large_elements = max(
+            subsampling_frames * encoder_ffn_dim,
+            (2 * subsampling_frames - 1) * encoder_dim,
+            2 * block_token_elements,
+        )
+        block_workspace_elements = (
+            5 * block_token_elements
+            + block_large_elements
+            + encoder_heads * subsampling_frames
+        )
         config.update({
             "model": "cohere_transcribe",
             "model_type": "cohere_transcribe",
             "source_architecture": "cohere-transcribe",
             "tensor_count": len(tensors),
             "embed_dim": encoder_dim,
+            "hidden_size": encoder_dim,
             "num_heads": encoder_heads,
+            "num_attention_heads": encoder_heads,
             "num_kv_heads": encoder_heads,
             "head_dim": encoder_head_dim,
             "num_layers": encoder_layers,
             "intermediate_size": encoder_ffn_dim,
             "vocab_size": vocab_size,
             "context_length": decoder_context,
-            "artifact_scope": "audio_frontend",
+            "artifact_scope": args.artifact_scope,
+            "audio_include_frontend": args.artifact_scope in {
+                "audio_frontend", "audio_subsampling", "audio_encoder"
+            },
+            "audio_include_subsampling": args.artifact_scope in {
+                "audio_subsampling", "audio_encoder"
+            },
+            "audio_include_encoder_blocks": args.artifact_scope in {
+                "audio_encoder_block", "audio_encoder"
+            },
+            "external_activation_slots": (
+                ["audio_encoder_tokens"]
+                if args.artifact_scope == "audio_encoder_block"
+                else []
+            ),
             "audio_activation_profile": "circuit_declared",
             "audio_frontend_asset_policy": "model_assets",
             "audio_sample_rate": sample_rate,
@@ -124,8 +200,24 @@ def main() -> int:
             "audio_n_fft": n_fft,
             "audio_power_bins": n_fft // 2 + 1,
             "audio_window_length": positive(metadata, "cohere_transcribe.audio.win_length"),
-            "audio_feature_channels": positive(metadata, "cohere_transcribe.audio.n_mels"),
-            "audio_feature_frames": max_source_frames // hop_length + 1,
+            "audio_feature_channels": feature_channels,
+            "audio_feature_frames": feature_frames,
+            "audio_feature_live_frames": feature_frames,
+            "audio_subsampling_conv_channels": conv_channels,
+            "audio_subsampling_kernel_size": subsampling_kernel,
+            "audio_subsampling_stride": 2,
+            "audio_subsampling_factor": 8,
+            "audio_subsampling_output_frames": subsampling_frames,
+            "audio_subsampling_workspace_elements": subsampling_workspace_elements,
+            "audio_subsampling_workspace_bytes": subsampling_workspace_elements * 4,
+            "audio_relative_position_frames": 2 * subsampling_frames - 1,
+            "audio_fastconformer_conv_kernel_size": encoder_conv_kernel,
+            "audio_fastconformer_layer_norm_epsilon": 1.0e-5,
+            "audio_fastconformer_batch_norm_epsilon": 1.0e-5,
+            "audio_fastconformer_block_workspace_elements": block_workspace_elements,
+            "audio_fastconformer_block_workspace_bytes": block_workspace_elements * 4,
+            "audio_encoder_projection_size": decoder_dim,
+            "audio_include_encoder_projection": args.artifact_scope == "audio_encoder",
             "audio_preemphasis_coefficient": 0.97,
             "audio_log_epsilon": 2.0 ** -24,
             "audio_normalization_epsilon": 1.0e-5,
@@ -135,8 +227,8 @@ def main() -> int:
         cursor = c.DATA_START + 4 + len(tensors)
         for name, info in tensors.items():
             cursor = c.align_up(cursor, 32)
-            promote_to_fp32 = (
-                info.name == "fe.mel_fb" and info.ggml_type == c.GGML_TYPE_F16
+            promote_to_fp32 = _promote_to_fp32(
+                info.name, info.ggml_type, args.artifact_scope
             )
             size = (
                 math.prod(info.dims) * 4

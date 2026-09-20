@@ -691,6 +691,11 @@ AUDIO_FRONTEND_CODEGEN_REQUIRED_CONTRACT_FIELDS: dict[str, tuple[str, ...]] = {
     ),
 }
 
+AUDIO_ENCODER_CODEGEN_REQUIRED_CONTRACT_FIELDS: dict[str, tuple[str, ...]] = {
+    "audio_encoder": ("stem", "blocks", "width", "heads", "head_dimension"),
+    "runtime_invariants": ("production_kernel_heap_allocation",),
+}
+
 
 def _validate_codegen_contract(config: Dict) -> list[str]:
     issues: list[str] = []
@@ -700,6 +705,12 @@ def _validate_codegen_contract(config: Dict) -> list[str]:
     artifact_scope = str(config.get("artifact_scope") or "").strip().lower()
     if artifact_scope == "audio_frontend":
         required = AUDIO_FRONTEND_CODEGEN_REQUIRED_CONTRACT_FIELDS
+    elif artifact_scope in {
+        "audio_subsampling",
+        "audio_encoder_block",
+        "audio_encoder",
+    }:
+        required = AUDIO_ENCODER_CODEGEN_REQUIRED_CONTRACT_FIELDS
     elif artifact_scope == "encoder_only":
         required = ENCODER_CODEGEN_REQUIRED_CONTRACT_FIELDS
     else:

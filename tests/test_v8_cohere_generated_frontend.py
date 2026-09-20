@@ -183,7 +183,12 @@ class GeneratedCohereFrontendTests(unittest.TestCase):
             "per_feature_sample_variance_all_stft_frames",
         )
         ignored = circuit["contract"]["weight_policy"]["ignore"]
-        self.assertEqual({row["pattern"] for row in ignored}, {"enc.*", "dec.*"})
+        frontend_ignored = {
+            row["pattern"]
+            for row in ignored
+            if row.get("when", {}).get("equals") == "audio_frontend"
+        }
+        self.assertEqual(frontend_ignored, {"enc.*", "dec.*"})
 
     def test_model_asset_recipe_does_not_synthesize_window_or_filter(self) -> None:
         emitted = codegen._emit_audio_wav_entrypoint(_operations(), _config())
