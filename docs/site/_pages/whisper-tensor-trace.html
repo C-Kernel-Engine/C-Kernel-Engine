@@ -1,0 +1,602 @@
+<!-- TITLE: Whisper: Trace One Encoder Tensor into Every Decoder Layer -->
+<!-- NAV: kernels -->
+
+<div class="container">
+  <h1>Whisper: Trace One Encoder Tensor into Every Decoder Layer</h1>
+  <p class="lead">Linear &ldquo;layer &rarr; layer&rdquo; diagrams hide the interesting part of encoder-decoder models: one tensor feeding <em>many</em> consumers, and one operation receiving inputs from <em>different parts</em> of the graph. This deep dive follows Whisper's encoder memory &mdash; the tensor produced once by the encoder and consumed by every decoder layer's cross-attention &mdash; through CKE's real circuit, compiler tables, kernel maps, memory plan, and generated C. It is a companion to the <a href="model-bringup-guide.html">model bring-up guide</a>, which teaches the full bring-up lane; this page zooms into one tensor's edges. Machine-readable evidence: <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/docs/notes/artifacts/whisper_cross_attn_trace_evidence.json">whisper_cross_attn_trace_evidence.json</a>.</p>
+
+  <style>
+    .wt-table { overflow-x:auto; margin:1rem 0; }
+    .wt-table table { width:100%; min-width:850px; border-collapse:collapse; font-size:.86rem; }
+    .wt-table th,.wt-table td { border:1px solid var(--grey); padding:.55rem; text-align:left; vertical-align:top; }
+    .wt-table th { color:var(--orange); background:#121a24; }
+    .wt-code { overflow-x:auto; background:#0b1118; border:1px solid #263242; border-radius:8px; padding:.8rem; }
+    .wt-code .c-dim { color:#808080; }
+    .wt-code .c-hi { color:#7fd8ec; }
+    .wt-code .c-good { color:#7fd4a3; }
+    .wt-code .c-warn { color:#ffd38a; }
+    .wt-code .c-bad { color:#ff8a80; }
+    main code { overflow-wrap:anywhere; }
+    .tag { display:inline-block; padding:.08rem .5rem; border-radius:4px; font-family:'JetBrains Mono',monospace; font-size:.72rem; font-weight:700; letter-spacing:.04em; }
+    .tag-executed { background:rgba(127,212,163,.12); color:#7fd4a3; border:1px solid rgba(127,212,163,.45); }
+    .tag-source { background:rgba(127,216,236,.12); color:#7fd8ec; border:1px solid rgba(127,216,236,.45); }
+    .tag-experimental { background:rgba(255,211,138,.12); color:#ffd38a; border:1px solid rgba(255,211,138,.45); }
+    .tag-proposed { background:rgba(255,138,128,.12); color:#ff8a80; border:1px solid rgba(255,138,128,.45); }
+    .svg-expand { position: relative; }
+    .svg-expand svg { cursor: zoom-in; }
+    .svg-expand svg:focus-visible { outline: 2px solid var(--orange); outline-offset: 3px; }
+    .svg-expand-hint {
+      text-align: center; font-size: 0.72rem; color: var(--text-muted);
+      margin-top: -0.6rem; margin-bottom: 1rem; font-family: 'JetBrains Mono', monospace;
+    }
+    .wx-arg { cursor: pointer; }
+    .wx-arg rect { fill:#26323a; stroke:#454545; stroke-width:1.2; transition: stroke .12s ease; }
+    .wx-region { transition: stroke .12s ease, stroke-width .12s ease; }
+    .wx-on { stroke: #7fd8ec !important; stroke-width: 3 !important; }
+    #ck-svg-overlay {
+      display: none; position: fixed; inset: 0; z-index: 999999;
+      background: rgba(0, 0, 0, 0.95); padding: 3.2rem 1rem 1rem;
+    }
+    #ck-svg-overlay .ck-ov-bar {
+      position: fixed; top: 0; left: 0; right: 0; padding: 0.55rem 1rem;
+      background: rgba(0,0,0,0.9); border-bottom: 1px solid #333;
+      display: flex; justify-content: space-between; align-items: center; gap: 0.6rem;
+    }
+    #ck-svg-overlay .ck-ov-title { color: #ccc; font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #ck-svg-overlay .ck-ov-bar button {
+      background: #333; color: #ffb400; border: 1px solid #555; padding: 0.3rem 0.7rem;
+      cursor: pointer; border-radius: 4px; font-size: 0.85rem;
+    }
+    #ck-svg-overlay .ck-ov-stage { width: 100%; height: 100%; overflow: auto; display: flex; align-items: flex-start; justify-content: center; }
+    #ck-svg-overlay .ck-ov-stage img { max-width: none; height: auto; }
+  </style>
+
+  <div class="alert alert-info"><div><strong>Evidence labels on this page.</strong><br>
+  <span class="tag tag-executed">executed</span> the command was run at the stated revision and the output shown is real. <span class="tag tag-source">source-verified</span> the file or mechanism was read at the stated revision but the behavior was not re-executed for this page. <span class="tag tag-experimental">experimental</span> exists with incomplete coverage. <span class="tag tag-proposed">proposed</span> does not exist yet. Everything below is pinned to one freshly generated artifact: Whisper Base decoder, regenerated at revision <code>bc04db403</code> by <code>cks-v8-run audio hf://openai/whisper-base --force-compile</code> on 2026-09-20 (artifact hashes in the evidence JSON). Quoted generated C comes from that artifact's <code>model_v8.c</code>; JSON excerpts come from its <code>lowered_*_call.json</code> and <code>layout_*.json</code>; nothing is hand-invented.</div></div>
+
+  <h2 id="concept">The concept: one tensor, many consumers</h2>
+  <p>In a decoder-only model, the dominant dataflow pattern is a chain: layer <em>n</em> feeds layer <em>n</em>+1. Whisper's decoder breaks that pattern. The encoder runs once over the audio features and produces <strong>encoder memory E</strong> &mdash; for Whisper Base, a <code>[1500, 512]</code> fp32 token-major grid (1500 frames &times; 512 channels). Then <strong>each decoder layer applies its own projections</strong> to that one tensor:</p>
+  <pre class="wt-code"><code>Q_l = decoder_hidden_l x WQ_l        <span class="c-dim"># from the current decoder stream</span>
+K_l = E x WK_l                       <span class="c-dim"># from encoder memory, layer l's own WK</span>
+V_l = E x WV_l                       <span class="c-dim"># from encoder memory, layer l's own WV</span>
+cross_attention(Q_l, K_l, V_l)</code></pre>
+  <p>So the cross-attention operation has <strong>three input edges from different parts of the graph</strong>: Q from the decoder stream at layer <em>l</em>, K and V from layer <em>l</em>'s own projections of the encoder memory. Two consequences that linear diagrams miss:</p>
+  <ul>
+    <li><strong>One producer, six consumers.</strong> E is written once and read by twelve projections (K and V per layer &times; 6 layers). It is <em>not</em> the encoder's internal K/V handed down &mdash; each decoder layer owns fresh WK/WV weights and re-projects E for itself.</li>
+    <li><strong>The edge, not the layer, is the unit of truth.</strong> The vocabulary that survives contact with the compiler is <strong>producer</strong> (which operation writes the tensor), <strong>consumer</strong> (which operations read it), and <strong>explicit tensor edge</strong> (the declared connection between them, with dtype/shape/layout semantics). Not messages, not pub/sub &mdash; edges.</li>
+  </ul>
+  <p>The circuit declares exactly this, in <code>version/v8/circuits/audio_transformer_decoder.json</code> <span class="tag tag-source">source-verified</span>:</p>
+  <pre class="wt-code"><code>"cross_attention": {
+  "causal": false,
+  "query_source": "decoder_stream",
+  "key_value_source": "encoder_memory",
+  "kv_layout": "immutable_encoder_context",
+  "projection_cache": {
+    "populate_phase": "prefill",
+    "reuse_phase": "decode",
+    "invalidation": "encoder_memory_update",
+    "storage": "layer_major_head_major_fp32"
+  }
+}</code></pre>
+  <p>and the decoder body names the operation instances explicitly: <code>"cross_attn_norm", "cross_q_proj", "cross_k_proj", "cross_v_proj", "cross_attn", "cross_out_proj"</code> between the self-attention residual and the MLP.</p>
+
+  <h2 id="ownership">Who owns which fact about the tensor</h2>
+  <p>A kernel map is <em>not</em> the whole wiring diagram. Six components each own a different fact about encoder memory; a correct bring-up writes each fact once, in the component that owns it:</p>
+  <div class="wt-table"><table><thead><tr><th>Component</th><th>Owns (for encoder memory E)</th><th>Concrete instance in this trace</th></tr></thead><tbody>
+    <tr><td>Circuit / resolved IR</td><td>Which operation produces the tensor and which consumers receive it (the logical edges)</td><td><code>audio_transformer_decoder.json</code>: <code>key_value_source: encoder_memory</code>; compiler dataflow table binds <code>cross_k_proj.inputs.x = "external:encoder_memory"</code> (<code>build_ir_v8.py</code>)</td></tr>
+    <tr><td>Operation contract</td><td>Port meanings and logical dimensions (what Q/K/V <em>mean</em>, which axis is tokens)</td><td><code>required_numerical_contracts.audio.decoder.cross_attention</code> + checkpoint <code>audio.decoder.layer.{layer}.cross_attention.output</code>, <code>logical_layout: head_major</code>, axis names head/query_token/channel</td></tr>
+    <tr><td>Kernel map / provider</td><td>Implementation, physical layout, dtype, ABI, scratch</td><td><code>attention_forward_query_key_head_major_f32_decode_heads.json</code>: ports <code>query/key/value [H,Tq,D]/[H,Tk,D]</code> fp32, scratch <code>score_scratch [H,Tk]</code>, exact C symbol</td></tr>
+    <tr><td>Compiler</td><td>Binding resolution, compatibility validation, memory planning, call emission</td><td><code>build_ir_v8.py</code> resolves the provider and sizes <code>encoder_memory</code> / <code>cross_k_cache</code> regions; <code>codegen_v8.py</code> emits the call with resolved offsets</td></tr>
+    <tr><td>Native runtime</td><td>State and schedule execution (flag ownership, call order, cache lifetime)</td><td>generated <code>ck_model_set_encoder_memory</code>, <code>encoder_kv_ready</code> flag, prefill-then-decode schedule in <code>model_v8.c</code></td></tr>
+    <tr><td>Kernel</td><td>Computing on supplied pointers &mdash; nothing else</td><td><code>attention_forward_query_key_head_major_f32_decode_heads</code> in <code>src/kernels/attention_kernels.c</code></td></tr>
+  </tbody></table></div>
+  <p>Two honesty notes. First, the compiler must understand enough semantics &mdash; via contracts &mdash; to validate shapes, layouts, state, aliasing, and execution order; it does <em>not</em> need (or get) the handwritten arithmetic inside kernels. Second, current CKE still carries explicit operation knowledge in compiler tables: the <code>cross_k_proj</code>/<code>cross_v_proj</code> edge to <code>external:encoder_memory</code> is a literal entry in a dataflow table inside <code>build_ir_v8.py</code> (quoted below), not something derived solely from kernel maps. Do not claim otherwise.</p>
+
+  <h2 id="what-runs-where">What runs where (the honest split)</h2>
+  <div class="wt-table"><table><thead><tr><th>Responsibility</th><th>Status</th><th>Mechanism</th></tr></thead><tbody>
+    <tr><td>Encoder inference (audio features &rarr; E)</td><td><span class="tag tag-executed">executed</span></td><td>generated encoder artifact (<code>libmodel.so</code>), run at this revision on the JFK sample: <code>frontend=0.084s encoder=0.493s</code></td></tr>
+    <tr><td>Decoder inference with cross-attention over E</td><td><span class="tag tag-executed">executed</span></td><td>generated decoder artifact, same run: <code>prefill=0.061s decode=0.158s tokens=25 stop=eos</code>, transcript matches the known JFK reference sentence</td></tr>
+    <tr><td>Transport of E from encoder process to decoder process</td><td><span class="tag tag-executed">executed</span> (host-side bridge)</td><td>the runner writes <code>encoder-NNNN.npy</code> per window into a temp dir, the decoder side <code>np.load</code>s it and calls <code>ck_model_set_encoder_memory</code> (<code>run_whisper_v8.py</code>). Python/numpy performs this transport &mdash; it is tooling, not generated-model execution</td></tr>
+    <tr><td>Installing E inside the decoder arena + invalidation</td><td><span class="tag tag-executed">executed</span> (generated code)</td><td>generated <code>ck_model_set_encoder_memory</code>: validates <code>tokens==1500 &amp;&amp; dim==512</code>, copies 3,072,000 bytes into <code>A_ENCODER_MEMORY</code>, clears <code>encoder_kv_ready</code></td></tr>
+    <tr><td>Fully native encoder&rarr;decoder orchestration (one generated schedule, no host transport)</td><td><span class="tag tag-proposed">proposed</span></td><td>no demonstrated deployment does this for Whisper at this revision; the inspected path is encoder artifact + host transport + decoder artifact. Do not draw it as one schedule</td></tr>
+  </tbody></table></div>
+
+  <h2 id="view1">View 1 &mdash; follow the tensor</h2>
+  <p>Encoder memory E from production to every consumer. The dashed middle hop is the host-side bridge (a file + <code>np.load</code> + one generated API call); everything to its right is the decoder's generated runtime. All shapes, sizes, and flags below come from the pinned artifact's <code>layout_prefill.json</code>/<code>layout_decode.json</code> and <code>model_v8.c</code> <span class="tag tag-executed">executed</span>:</p>
+
+  <div class="svg-expand">
+  <svg viewBox="0 0 1180 600" width="100%" role="img" tabindex="0" data-svg-title="Follow the tensor: encoder memory into every decoder layer"
+       aria-label="Left: the generated encoder artifact produces encoder memory E, a 1500 by 512 fp32 token-major grid of 3,072,000 bytes. A dashed middle hop marks the host-side bridge: the runner writes encoder-0000.npy, the decoder side loads it and calls the generated ck_model_set_encoder_memory, which validates the shape and copies E into the decoder arena region A_ENCODER_MEMORY, clearing the encoder_kv_ready flag. Right: six rows, one per decoder layer; in each row E feeds that layer's own cross_k_proj and cross_v_proj operations, with weight bindings WK_l and WV_l shown as separate dashed yellow edges, producing K_l and V_l slabs inside the persistent A_CROSS_K_CACHE and A_CROSS_V_CACHE regions, each a 6 by 8 by 1500 by 64 fp32 tensor with a 3,072,000-byte layer stride. Bottom: a lifetime strip shows E immutable across the whole decode of a window, and invalidation when a new audio window installs new encoder memory. A legend distinguishes solid cyan tensor data edges, dashed yellow weight bindings, and green persistent-state dependencies."
+       style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+    <style>
+      .ck-box{fill:#323232;stroke:#454545;stroke-width:1.4;}
+      .ck-title{fill:#f5f5f5;font-size:15px;font-weight:700;}
+      .ck-sub{fill:#b0b0b0;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-hi{fill:#7fd8ec;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-good{fill:#7fd4a3;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-warn{fill:#ffd38a;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-band{fill:#9aa7b4;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;}
+      .ck-cap{fill:#808080;font-size:12px;font-family:'JetBrains Mono',monospace;}
+      .ck-inset{fill:#0b1118;stroke:#263242;stroke-width:1.2;}
+      .ck-region-a{fill:#26323a;stroke:#7fd8ec;stroke-width:1.4;}
+      .ck-region-p{fill:#27352c;stroke:#7fd4a3;stroke-width:1.4;}
+    </style>
+    <defs>
+      <marker id="wt1-arrow" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+        <path d="M0,0 L7,3 L0,6 Z" fill="#7fd8ec"/>
+      </marker>
+      <marker id="wt1-arrow-w" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+        <path d="M0,0 L7,3 L0,6 Z" fill="#ffd38a"/>
+      </marker>
+      <marker id="wt1-arrow-s" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+        <path d="M0,0 L7,3 L0,6 Z" fill="#7fd4a3"/>
+      </marker>
+    </defs>
+
+    <text x="24" y="26" class="ck-band">producer - generated encoder artifact</text>
+    <rect class="ck-box" x="24" y="40" width="220" height="92" rx="8"/>
+    <text x="134" y="64" text-anchor="middle" class="ck-title" font-size="12.5">encoder model (libmodel.so)</text>
+    <text x="134" y="84" text-anchor="middle" class="ck-sub">audio features -&gt; E</text>
+    <text x="134" y="102" text-anchor="middle" class="ck-hi">E: [1500, 512] fp32 token-major</text>
+    <text x="134" y="118" text-anchor="middle" class="ck-sub">3,072,000 bytes, written once</text>
+
+    <text x="270" y="26" class="ck-band">host-side bridge (tooling, not generated schedule)</text>
+    <rect class="ck-inset" x="270" y="40" width="220" height="92" rx="8"/>
+    <text x="380" y="64" text-anchor="middle" class="ck-title" font-size="12.5">runner transport</text>
+    <text x="380" y="84" text-anchor="middle" class="ck-sub">encoder-0000.npy -&gt; np.load</text>
+    <text x="380" y="102" text-anchor="middle" class="ck-sub">-&gt; ck_model_set_encoder_memory</text>
+    <text x="380" y="118" text-anchor="middle" class="ck-warn">clears encoder_kv_ready</text>
+    <line x1="244" y1="86" x2="268" y2="86" stroke="#7fd8ec" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#wt1-arrow)"/>
+
+    <text x="516" y="26" class="ck-band">decoder arena (generated runtime)</text>
+    <rect class="ck-region-a" x="516" y="40" width="240" height="92" rx="8" id="wx1-emem"/>
+    <text x="636" y="64" text-anchor="middle" class="ck-title" font-size="12.5">A_ENCODER_MEMORY</text>
+    <text x="636" y="84" text-anchor="middle" class="ck-hi">[1500, 512] fp32, 3,072,000 B</text>
+    <text x="636" y="102" text-anchor="middle" class="ck-sub">immutable during one window's decode</text>
+    <text x="636" y="118" text-anchor="middle" class="ck-sub">planner-owned region, runtime-owned memory</text>
+    <line x1="490" y1="86" x2="514" y2="86" stroke="#7fd8ec" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#wt1-arrow)"/>
+
+    <text x="800" y="26" class="ck-band">consumers - each layer re-projects E with its own weights</text>
+
+    <g>
+      <rect class="ck-box" x="800" y="40" width="356" height="72" rx="8"/>
+      <text x="816" y="60" class="ck-title" font-size="11.5">layer 0: cross_k_proj + cross_v_proj</text>
+      <text x="816" y="78" class="ck-sub">E x WK_0 -&gt; K_0 | E x WV_0 -&gt; V_0</text>
+      <text x="816" y="96" class="ck-sub" font-size="10.5">GEMM [1500,512]x[512,512] + head-major transpose</text>
+      <line x1="756" y1="76" x2="798" y2="76" stroke="#7fd8ec" stroke-width="1.8" marker-end="url(#wt1-arrow)"/>
+
+      <rect class="ck-box" x="800" y="122" width="356" height="72" rx="8"/>
+      <text x="816" y="142" class="ck-title" font-size="11.5">layer 1: cross_k_proj + cross_v_proj</text>
+      <text x="816" y="160" class="ck-sub">E x WK_1 -&gt; K_1 | E x WV_1 -&gt; V_1</text>
+      <text x="816" y="178" class="ck-sub" font-size="10.5">own weights, own cache slab (+3,072,000 B)</text>
+      <line x1="756" y1="86" x2="780" y2="86" stroke="#7fd8ec" stroke-width="1.8"/>
+      <line x1="780" y1="86" x2="780" y2="158" stroke="#7fd8ec" stroke-width="1.8"/>
+      <line x1="780" y1="158" x2="798" y2="158" stroke="#7fd8ec" stroke-width="1.8" marker-end="url(#wt1-arrow)"/>
+
+      <rect class="ck-box" x="800" y="204" width="356" height="72" rx="8"/>
+      <text x="816" y="224" class="ck-title" font-size="11.5">layer 2: same pattern</text>
+      <text x="816" y="242" class="ck-sub">E x WK_2, E x WV_2</text>
+      <text x="816" y="260" class="ck-sub" font-size="10.5">cache slab at +6,144,000 B</text>
+      <line x1="780" y1="158" x2="780" y2="240" stroke="#7fd8ec" stroke-width="1.8"/>
+      <line x1="780" y1="240" x2="798" y2="240" stroke="#7fd8ec" stroke-width="1.8" marker-end="url(#wt1-arrow)"/>
+
+      <rect class="ck-box" x="800" y="286" width="356" height="72" rx="8"/>
+      <text x="816" y="306" class="ck-title" font-size="11.5">layers 3-4: same pattern</text>
+      <text x="816" y="324" class="ck-sub">E x WK_l, E x WV_l</text>
+      <text x="816" y="342" class="ck-sub" font-size="10.5">slabs at +9,216,000 / +12,288,000 B</text>
+      <line x1="780" y1="240" x2="780" y2="322" stroke="#7fd8ec" stroke-width="1.8"/>
+      <line x1="780" y1="322" x2="798" y2="322" stroke="#7fd8ec" stroke-width="1.8" marker-end="url(#wt1-arrow)"/>
+
+      <rect class="ck-box" x="800" y="368" width="356" height="72" rx="8"/>
+      <text x="816" y="388" class="ck-title" font-size="11.5">layer 5: same pattern</text>
+      <text x="816" y="406" class="ck-sub">E x WK_5, E x WV_5</text>
+      <text x="816" y="424" class="ck-sub" font-size="10.5">cache slab at +15,360,000 B</text>
+      <line x1="780" y1="322" x2="780" y2="404" stroke="#7fd8ec" stroke-width="1.8"/>
+      <line x1="780" y1="404" x2="798" y2="404" stroke="#7fd8ec" stroke-width="1.8" marker-end="url(#wt1-arrow)"/>
+    </g>
+
+    <rect class="ck-region-p" x="516" y="180" width="240" height="120" rx="8"/>
+    <text x="636" y="204" text-anchor="middle" class="ck-title" font-size="12.5">A_CROSS_K_CACHE</text>
+    <text x="636" y="222" text-anchor="middle" class="ck-good">[6, 8, 1500, 64] fp32</text>
+    <text x="636" y="238" text-anchor="middle" class="ck-sub">18,432,000 B, layer stride 3,072,000</text>
+    <text x="636" y="262" text-anchor="middle" class="ck-title" font-size="12.5">A_CROSS_V_CACHE (same)</text>
+    <text x="636" y="284" text-anchor="middle" class="ck-sub">persistent state: layer-major head-major</text>
+    <line x1="880" y1="440" x2="880" y2="466" stroke="#7fd4a3" stroke-width="1.8" marker-end="url(#wt1-arrow-s)"/>
+    <line x1="880" y1="466" x2="636" y2="466" stroke="#7fd4a3" stroke-width="1.8"/>
+    <line x1="636" y1="466" x2="636" y2="302" stroke="#7fd4a3" stroke-width="1.8" marker-end="url(#wt1-arrow-s)"/>
+
+    <text x="24" y="180" class="ck-band">weight bindings (one pair per layer)</text>
+    <rect class="ck-box" x="24" y="196" width="220" height="104" rx="8"/>
+    <text x="134" y="218" text-anchor="middle" class="ck-warn">WK_0..WK_5, WV_0..WV_5</text>
+    <text x="134" y="236" text-anchor="middle" class="ck-sub">decoder weights (bump region)</text>
+    <text x="134" y="254" text-anchor="middle" class="ck-sub">W_LAYER_l_CROSS_WK / _WV</text>
+    <text x="134" y="272" text-anchor="middle" class="ck-sub">+ biases BK_l / BV_l</text>
+    <line x1="244" y1="248" x2="500" y2="248" stroke="#ffd38a" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#wt1-arrow-w)"/>
+    <line x1="500" y1="248" x2="790" y2="248" stroke="#ffd38a" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#wt1-arrow-w)"/>
+
+    <text x="24" y="350" class="ck-band">lifetime across decoding</text>
+    <rect class="ck-inset" x="24" y="366" width="466" height="120" rx="8"/>
+    <text x="40" y="392" class="ck-sub">window N: set_encoder_memory -&gt; kv_ready=0</text>
+    <text x="40" y="412" class="ck-sub">prefill: 12 GEMMs + 12 transposes populate caches</text>
+    <text x="40" y="432" class="ck-sub">decode (every token): all 6 layers read E's projections;</text>
+    <text x="40" y="450" class="ck-sub">  E itself is never re-read, never mutated</text>
+    <text x="40" y="472" class="ck-warn">window N+1 arrives: set_encoder_memory overwrites E,</text>
+    <text x="40" y="486" class="ck-warn">  kv_ready=0 -&gt; decode refuses (-2) until re-prefill</text>
+
+    <rect class="ck-inset" x="24" y="516" width="1132" height="62" rx="8"/>
+    <text x="44" y="540" class="ck-hi" font-size="12">solid cyan = tensor data edge</text>
+    <text x="320" y="540" class="ck-warn" font-size="12">dashed yellow = weight binding</text>
+    <text x="640" y="540" class="ck-good" font-size="12">green = persistent-state dependency</text>
+    <text x="44" y="562" class="ck-cap">one producer, twelve projection consumers, six attention consumers per decode step - and E is never the encoder's internal K/V; each layer re-projects from E with its own weights.</text>
+  </svg>
+  </div>
+  <div class="svg-expand-hint">click / tap the diagram to expand</div>
+
+  <h2 id="view2">View 2 &mdash; expand one cross-attention operation</h2>
+  <p>One decode-step cross-attention at layer 0, traced through every artifact layer. <strong>Click a pointer argument in the generated call</strong> to highlight the arena region it references (and, for K/V, the prefill producer edge back to encoder memory). Everything quoted is from the pinned artifact <span class="tag tag-executed">executed</span>:</p>
+
+  <div class="svg-expand">
+  <svg viewBox="0 0 1180 700" width="100%" role="img" tabindex="0" data-svg-title="One cross-attention operation expanded across all artifact layers"
+       aria-label="Left column, the chain: circuit operation cross_attn with contract query_source decoder_stream and key_value_source encoder_memory; resolved I/O edges from lowered_decode_call.json; selected provider and kernel map attention_forward_query_key_head_major_f32_decode_heads with fp32 head-major ports and score_scratch; the call ABI bindings mapping each argument to a source like activation:key, output:output, scratch:score_scratch, dim:num_heads; the generated C call at model_v8.c line 1484 with five clickable pointer arguments; the source implementation in src/kernels/attention_kernels.c; and the test plus X-Ray checkpoint audio.decoder.layer.cross_attention.output. Right column, the decoder arena: A_ENCODER_MEMORY feeding the prefill cross_k_proj and cross_v_proj producers into the persistent A_CROSS_K_CACHE and A_CROSS_V_CACHE, the decoder stream feeding cross_q_proj into A_CROSS_Q_SCRATCH, plus A_CROSS_ATTN_SCRATCH and A_MLP_SCRATCH aliasing score_scratch. Clicking the key argument highlights A_CROSS_K_CACHE and its producer edge from encoder memory."
+       style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+    <style>
+      .ck-box{fill:#323232;stroke:#454545;stroke-width:1.4;}
+      .ck-title{fill:#f5f5f5;font-size:15px;font-weight:700;}
+      .ck-sub{fill:#b0b0b0;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-hi{fill:#7fd8ec;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-good{fill:#7fd4a3;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-warn{fill:#ffd38a;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-band{fill:#9aa7b4;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;}
+      .ck-cap{fill:#808080;font-size:12px;font-family:'JetBrains Mono',monospace;}
+      .ck-inset{fill:#0b1118;stroke:#263242;stroke-width:1.2;}
+      .ck-region-a{fill:#26323a;stroke:#7fd8ec;stroke-width:1.4;}
+      .ck-region-p{fill:#27352c;stroke:#7fd4a3;stroke-width:1.4;}
+      .wx-edge{stroke:#5a6a7a;stroke-width:1.1;stroke-dasharray:4 3;}
+    </style>
+    <defs>
+      <marker id="wt2-arrow" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+        <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
+      </marker>
+    </defs>
+
+    <text x="24" y="24" class="ck-band">artifact chain (click a pointer argument in step 5)</text>
+
+    <g>
+      <rect class="ck-box" x="24" y="38" width="540" height="74" rx="8"/>
+      <text x="40" y="60" class="ck-title" font-size="12.5">1. circuit operation - audio_transformer_decoder.json</text>
+      <text x="40" y="78" class="ck-sub">body ops: ... cross_q_proj, cross_k_proj, cross_v_proj, cross_attn, ...</text>
+      <text x="40" y="96" class="ck-sub">contract: query_source=decoder_stream, key_value_source=encoder_memory</text>
+
+      <rect class="ck-box" x="24" y="126" width="540" height="74" rx="8"/>
+      <text x="40" y="148" class="ck-title" font-size="12.5">2. resolved I/O edges - lowered_decode_call.json, op cross_attn</text>
+      <text x="40" y="166" class="ck-sub">query &lt;- activation:query | key &lt;- activation:key | value &lt;- activation:value</text>
+      <text x="40" y="184" class="ck-sub">call_abi owner: kernel_map (attention_forward_query_key_head_major_f32_decode_heads.json)</text>
+
+      <rect class="ck-box" x="24" y="214" width="540" height="74" rx="8"/>
+      <text x="40" y="236" class="ck-title" font-size="12.5">3. provider + kernel map</text>
+      <text x="40" y="254" class="ck-sub">ports fp32 [H,Tq,D] / [H,Tk,D]; scratch score_scratch [H,Tk]</text>
+      <text x="40" y="272" class="ck-sub">contract: attention_query_key_scaled_ordered_fp32_decode_heads</text>
+
+      <rect class="ck-box" x="24" y="302" width="540" height="58" rx="8"/>
+      <text x="40" y="324" class="ck-title" font-size="12.5">4. ABI bindings (map-owned call_abi, version 1)</text>
+      <text x="40" y="342" class="ck-sub">activation:* / output:* / scratch:* / dim:* / runtime:query_tokens</text>
+
+      <rect class="ck-box" x="24" y="374" width="540" height="172" rx="8"/>
+      <text x="40" y="396" class="ck-title" font-size="12.5">5. generated C - model_v8.c:1484 (decode, layer 0)</text>
+      <g class="wx-arg" data-ref="qs" tabindex="0" role="button" aria-label="argument query references A_CROSS_Q_SCRATCH">
+        <rect x="40" y="408" width="252" height="26" rx="5"/>
+        <text x="52" y="426" class="ck-hi" font-size="11">query -&gt; A_CROSS_Q_SCRATCH</text>
+      </g>
+      <g class="wx-arg" data-ref="kc" tabindex="0" role="button" aria-label="argument key references A_CROSS_K_CACHE">
+        <rect x="300" y="408" width="252" height="26" rx="5"/>
+        <text x="312" y="426" class="ck-hi" font-size="11">key -&gt; A_CROSS_K_CACHE</text>
+      </g>
+      <g class="wx-arg" data-ref="vc" tabindex="0" role="button" aria-label="argument value references A_CROSS_V_CACHE">
+        <rect x="40" y="442" width="252" height="26" rx="5"/>
+        <text x="52" y="460" class="ck-hi" font-size="11">value -&gt; A_CROSS_V_CACHE</text>
+      </g>
+      <g class="wx-arg" data-ref="cs" tabindex="0" role="button" aria-label="argument output references A_CROSS_ATTN_SCRATCH">
+        <rect x="300" y="442" width="252" height="26" rx="5"/>
+        <text x="312" y="460" class="ck-hi" font-size="11">output -&gt; A_CROSS_ATTN_SCRATCH</text>
+      </g>
+      <g class="wx-arg" data-ref="ms" tabindex="0" role="button" aria-label="argument score_scratch aliases A_MLP_SCRATCH">
+        <rect x="40" y="476" width="252" height="26" rx="5"/>
+        <text x="52" y="494" class="ck-hi" font-size="11">score_scratch -&gt; A_MLP_SCRATCH</text>
+      </g>
+      <text x="40" y="528" class="ck-sub" font-size="10.5">dims: num_heads 8, query_tokens 1 (runtime), key_tokens 1500, head_dim 64, scale 0.125</text>
+
+      <rect class="ck-box" x="24" y="560" width="540" height="52" rx="8"/>
+      <text x="40" y="582" class="ck-title" font-size="12.5">6. source implementation</text>
+      <text x="40" y="600" class="ck-sub">src/kernels/attention_kernels.c - computes on supplied pointers</text>
+
+      <rect class="ck-box" x="24" y="626" width="540" height="58" rx="8"/>
+      <text x="40" y="648" class="ck-title" font-size="12.5">7. tests + X-Ray checkpoint</text>
+      <text x="40" y="666" class="ck-sub">unittest/test_audio_encoder.py | checkpoint audio.decoder.layer.{layer}.cross_attention.output</text>
+
+      <line x1="294" y1="112" x2="294" y2="124" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#wt2-arrow)"/>
+      <line x1="294" y1="200" x2="294" y2="212" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#wt2-arrow)"/>
+      <line x1="294" y1="288" x2="294" y2="300" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#wt2-arrow)"/>
+      <line x1="294" y1="360" x2="294" y2="372" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#wt2-arrow)"/>
+      <line x1="294" y1="546" x2="294" y2="558" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#wt2-arrow)"/>
+      <line x1="294" y1="612" x2="294" y2="624" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#wt2-arrow)"/>
+    </g>
+
+    <text x="640" y="24" class="ck-band">decoder arena (regions referenced by the call)</text>
+
+    <g>
+      <rect class="ck-region-a wx-region" id="wx2-emem" x="640" y="38" width="240" height="86" rx="8"/>
+      <text x="760" y="62" text-anchor="middle" class="ck-title" font-size="12">A_ENCODER_MEMORY</text>
+      <text x="760" y="80" text-anchor="middle" class="ck-hi">[1500, 512] fp32</text>
+      <text x="760" y="98" text-anchor="middle" class="ck-sub">installed by ck_model_set_encoder_memory</text>
+
+      <rect class="ck-box" x="920" y="38" width="236" height="86" rx="8"/>
+      <text x="1038" y="62" text-anchor="middle" class="ck-title" font-size="12">prefill producers</text>
+      <text x="1038" y="80" text-anchor="middle" class="ck-sub">cross_k_proj / cross_v_proj</text>
+      <text x="1038" y="98" text-anchor="middle" class="ck-sub">GEMM + head-major transpose</text>
+      <line x1="880" y1="81" x2="918" y2="81" stroke="#7fd8ec" stroke-width="1.6" marker-end="url(#wt2-arrow)"/>
+
+      <rect class="ck-region-p wx-region" id="wx2-kc" x="920" y="160" width="236" height="66" rx="8"/>
+      <text x="1038" y="184" text-anchor="middle" class="ck-title" font-size="12">A_CROSS_K_CACHE</text>
+      <text x="1038" y="202" text-anchor="middle" class="ck-good">[6, 8, 1500, 64] fp32 - persistent</text>
+      <text x="1038" y="218" text-anchor="middle" class="ck-sub" font-size="10.5">layer l slab at + l*3,072,000 B</text>
+      <line id="wx2-path-kc" class="wx-edge" x1="1038" y1="124" x2="1038" y2="158"/>
+
+      <rect class="ck-region-p wx-region" id="wx2-vc" x="920" y="240" width="236" height="66" rx="8"/>
+      <text x="1038" y="264" text-anchor="middle" class="ck-title" font-size="12">A_CROSS_V_CACHE</text>
+      <text x="1038" y="282" text-anchor="middle" class="ck-good">[6, 8, 1500, 64] fp32 - persistent</text>
+      <line id="wx2-path-vc" class="wx-edge" x1="1000" y1="124" x2="1000" y2="150" />
+      <line class="wx-edge" x1="1000" y1="150" x2="1000" y2="238"/>
+
+      <rect class="ck-region-a wx-region" id="wx2-qs" x="640" y="160" width="240" height="66" rx="8"/>
+      <text x="760" y="184" text-anchor="middle" class="ck-title" font-size="12">A_CROSS_Q_SCRATCH</text>
+      <text x="760" y="202" text-anchor="middle" class="ck-hi">[8, 1, 64] fp32 - this decode step</text>
+      <text x="760" y="218" text-anchor="middle" class="ck-sub" font-size="10.5">produced by cross_q_proj from decoder stream</text>
+
+      <rect class="ck-region-a wx-region" id="wx2-cs" x="640" y="240" width="240" height="66" rx="8"/>
+      <text x="760" y="264" text-anchor="middle" class="ck-title" font-size="12">A_CROSS_ATTN_SCRATCH</text>
+      <text x="760" y="282" text-anchor="middle" class="ck-hi">[8, 1, 64] fp32 - op output</text>
+
+      <rect class="ck-region-a wx-region" id="wx2-ms" x="640" y="320" width="240" height="66" rx="8"/>
+      <text x="760" y="344" text-anchor="middle" class="ck-title" font-size="12">A_MLP_SCRATCH</text>
+      <text x="760" y="362" text-anchor="middle" class="ck-hi">score_scratch aliases it (decode)</text>
+      <text x="760" y="378" text-anchor="middle" class="ck-sub" font-size="10.5">planner lifetime reuse: MLP idle during attn</text>
+
+      <line class="wx-edge" x1="564" y1="421" x2="638" y2="193"/>
+      <line class="wx-edge" x1="564" y1="421" x2="918" y2="193"/>
+      <line class="wx-edge" x1="564" y1="455" x2="918" y2="273"/>
+      <line class="wx-edge" x1="564" y1="455" x2="638" y2="273"/>
+      <line class="wx-edge" x1="564" y1="489" x2="638" y2="353"/>
+    </g>
+
+    <rect class="ck-inset" x="640" y="420" width="516" height="120" rx="8"/>
+    <text x="660" y="446" class="ck-band">read the call like a compiler</text>
+    <text x="660" y="470" class="ck-sub">Q edge: decoder stream (this step) | K/V edges: encoder memory,</text>
+    <text x="660" y="488" class="ck-sub">  projected at prefill, head-major, immutable during decode</text>
+    <text x="660" y="510" class="ck-sub">shape equality is NOT compatibility: the [H,Tk,D] head-major port</text>
+    <text x="660" y="528" class="ck-sub">  contract is why the prefill transpose ops exist (view 3)</text>
+
+    <rect class="ck-inset" x="640" y="556" width="516" height="64" rx="8"/>
+    <text x="660" y="580" class="ck-cap">the compiled #define offsets in this hybrid runtime come from the prefill plan</text>
+    <text x="660" y="598" class="ck-cap">(layout_prefill.json, arena 380,258,816 B); layout_decode.json is the decode-only view.</text>
+
+    <text x="24" y="692" class="ck-cap">interactive: click an argument box to highlight its arena region (keyboard: tab + enter).</text>
+  </svg>
+  </div>
+  <div class="svg-expand-hint">click / tap the diagram to expand; click an argument to highlight its buffer</div>
+
+  <p>The copyable excerpts behind View 2, verbatim from the pinned artifact:</p>
+  <pre class="wt-code"><code><span class="c-dim">/* Op 18: attention_forward_query_key_head_major_f32_decode_heads (cross_attn) layer=0 section=body */</span>
+attention_forward_query_key_head_major_f32_decode_heads(
+    (const float*)(model-&gt;bump + <span class="c-hi">A_CROSS_Q_SCRATCH</span>),     <span class="c-dim">/* query &lt;- activation:query  */</span>
+    (const float*)(model-&gt;bump + <span class="c-hi">A_CROSS_K_CACHE</span>),        <span class="c-dim">/* key   &lt;- activation:key    */</span>
+    (const float*)(model-&gt;bump + <span class="c-hi">A_CROSS_V_CACHE</span>),        <span class="c-dim">/* value &lt;- activation:value  */</span>
+    (float*)(model-&gt;bump + <span class="c-hi">A_CROSS_ATTN_SCRATCH</span>),          <span class="c-dim">/* output &lt;- output:output    */</span>
+    (float*)(model-&gt;bump + <span class="c-hi">A_MLP_SCRATCH</span>),                <span class="c-dim">/* score_scratch &lt;- scratch:* */</span>
+    8,      <span class="c-dim">/* num_heads    &lt;- dim:num_heads        */</span>
+    1,      <span class="c-dim">/* query_tokens &lt;- runtime:query_tokens */</span>
+    1500,   <span class="c-dim">/* key_tokens   &lt;- dim:key_tokens (= encoder_memory_length) */</span>
+    64,     <span class="c-dim">/* head_dim     &lt;- dim:head_dim         */</span>
+    0.125   <span class="c-dim">/* scale        &lt;- dim:attention_scale  */</span>
+);</code></pre>
+  <p>And the layer-5 decode call reads <code>(const float*)(model-&gt;bump + (A_CROSS_K_CACHE + 15360000))</code> &mdash; the same persistent cache, fifth layer slab. The K/V caches are the <em>projected</em> encoder memory, one slab per layer, exactly as the circuit's <code>projection_cache.storage: layer_major_head_major_fp32</code> declares.</p>
+
+  <h2 id="view3">View 3 &mdash; prefill vs decode: when the projections happen</h2>
+  <p>The projection cache is both a correctness story and an optimization story. <strong>Correctness:</strong> decode must never read stale projections, so installing new encoder memory invalidates the cache by flag (<code>encoder_kv_ready = 0</code>), and decode refuses (<code>-2</code>) until prefill repopulates it. <strong>Optimization:</strong> within one window, the 1500-frame encoder memory is projected once per layer at prefill and reused by every decode step &mdash; unchanged audio features are never re-projected per token. Timeline from the pinned artifact <span class="tag tag-executed">executed</span>:</p>
+
+  <div class="svg-expand">
+  <svg viewBox="0 0 1180 560" width="100%" role="img" tabindex="0" data-svg-title="Prefill versus decode: cross-projection cache lifecycle"
+       aria-label="A timeline in four phases. Phase 0, encoder memory becomes available: the host bridge installs E and clears encoder_kv_ready. Phase 1, decoder prefill: the generated ck_prefill_range runs each layer's cross_k_proj and cross_v_proj GEMMs from A_ENCODER_MEMORY plus the head-major transposes, populating all six K and V slabs, then sets encoder_kv_ready to 1; a real generated excerpt shows the layer-0 GEMM call reading A_ENCODER_MEMORY and writing A_CROSS_K_CACHE with M 1500, N 512, K 512. Phase 2, decode: each token reuses the immutable projected context - the cross-attention call reads the cache slabs, query_tokens 1 - while the self-attention KV cache grows by one token per step. Phase 3, a new audio window arrives: ck_model_set_encoder_memory overwrites E and clears the flag; decode called before re-prefill returns -2, so stale projections are never read. Footers state the correctness rule and the optimization: 12 projections per window instead of 12 per token."
+       style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+    <style>
+      .ck-box{fill:#323232;stroke:#454545;stroke-width:1.4;}
+      .ck-title{fill:#f5f5f5;font-size:15px;font-weight:700;}
+      .ck-sub{fill:#b0b0b0;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-hi{fill:#7fd8ec;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-good{fill:#7fd4a3;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-warn{fill:#ffd38a;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-bad{fill:#ff8a80;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-band{fill:#9aa7b4;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;}
+      .ck-cap{fill:#808080;font-size:12px;font-family:'JetBrains Mono',monospace;}
+      .ck-inset{fill:#0b1118;stroke:#263242;stroke-width:1.2;}
+    </style>
+    <defs>
+      <marker id="wt3-arrow" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+        <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
+      </marker>
+    </defs>
+
+    <g>
+      <text x="24" y="26" class="ck-band">phase 0 - encoder memory becomes available</text>
+      <rect class="ck-box" x="24" y="40" width="260" height="120" rx="8"/>
+      <text x="154" y="64" text-anchor="middle" class="ck-title" font-size="12">host bridge installs E</text>
+      <text x="40" y="88" class="ck-sub">ck_model_set_encoder_memory(data,</text>
+      <text x="40" y="104" class="ck-sub">  tokens=1500, dim=512)</text>
+      <text x="40" y="126" class="ck-sub">memcpy 3,072,000 B -&gt; A_ENCODER_MEMORY</text>
+      <text x="40" y="146" class="ck-warn">encoder_kv_ready = 0</text>
+
+      <text x="316" y="26" class="ck-band">phase 1 - decoder prefill (once per window)</text>
+      <rect class="ck-box" x="316" y="40" width="320" height="120" rx="8"/>
+      <text x="476" y="64" text-anchor="middle" class="ck-title" font-size="12">ck_prefill_range populates projections</text>
+      <text x="332" y="88" class="ck-sub">per layer l: cross_k_proj, cross_v_proj GEMMs</text>
+      <text x="332" y="104" class="ck-sub">  read A_ENCODER_MEMORY, write slab l</text>
+      <text x="332" y="120" class="ck-sub">transpose_cross_key/value_to_head_major</text>
+      <text x="332" y="136" class="ck-sub">self-attn KV seeded by prompt tokens</text>
+      <text x="332" y="152" class="ck-good">encoder_kv_ready = 1</text>
+
+      <text x="668" y="26" class="ck-band">phase 2 - decode (once per generated token)</text>
+      <rect class="ck-box" x="668" y="40" width="250" height="120" rx="8"/>
+      <text x="793" y="64" text-anchor="middle" class="ck-title" font-size="12">reuse, never re-project</text>
+      <text x="684" y="88" class="ck-sub">cross_attn reads K/V cache slabs</text>
+      <text x="684" y="104" class="ck-sub">  (query_tokens = 1)</text>
+      <text x="684" y="122" class="ck-sub">self-attention KV cache grows +1 token</text>
+      <text x="684" y="140" class="ck-sub">E untouched; projections immutable</text>
+
+      <text x="950" y="26" class="ck-band">phase 3 - new audio window</text>
+      <rect class="ck-box" x="950" y="40" width="206" height="120" rx="8"/>
+      <text x="1053" y="64" text-anchor="middle" class="ck-title" font-size="12">invalidation</text>
+      <text x="966" y="88" class="ck-sub">set_encoder_memory overwrites E</text>
+      <text x="966" y="104" class="ck-warn">encoder_kv_ready = 0</text>
+      <text x="966" y="124" class="ck-bad">decode before re-prefill: -2</text>
+      <text x="966" y="144" class="ck-sub">stale projections never read</text>
+
+      <line x1="284" y1="100" x2="314" y2="100" stroke="#8aa0b4" stroke-width="1.8" marker-end="url(#wt3-arrow)"/>
+      <line x1="636" y1="100" x2="666" y2="100" stroke="#8aa0b4" stroke-width="1.8" marker-end="url(#wt3-arrow)"/>
+      <line x1="918" y1="100" x2="948" y2="100" stroke="#8aa0b4" stroke-width="1.8" marker-end="url(#wt3-arrow)"/>
+    </g>
+
+    <text x="24" y="196" class="ck-band">the prefill producer, verbatim from the pinned artifact (model_v8.c:3633)</text>
+    <rect class="ck-inset" x="24" y="210" width="1132" height="118" rx="8"/>
+    <text x="44" y="236" class="ck-sub">/* Op 18: gemm_nt_f32_llama_production_parallel_dispatch (cross_k_proj) layer=0 */</text>
+    <text x="44" y="256" class="ck-hi">gemm_nt_f32_llama_production_parallel_dispatch(</text>
+    <text x="44" y="274" class="ck-hi">    (const float*)(model-&gt;bump + A_ENCODER_MEMORY),   /* A &lt;- activation:a        */</text>
+    <text x="44" y="292" class="ck-hi">    (const float*)(model-&gt;bump + W_LAYER_0_CROSS_WK),  /* B &lt;- weight:_first_weight */</text>
+    <text x="44" y="310" class="ck-hi">    (float*)(model-&gt;bump + W_LAYER_0_CROSS_BK), ...,  (float*)(model-&gt;bump + A_CROSS_K_CACHE),</text>
+
+    <text x="24" y="356" class="ck-band">the flag contract, verbatim (model_v8.c)</text>
+    <rect class="ck-inset" x="24" y="370" width="1132" height="66" rx="8"/>
+    <text x="44" y="392" class="ck-sub">ck_model_decode:            if (!g_model-&gt;encoder_kv_ready) return -2;</text>
+    <text x="44" y="410" class="ck-sub">ck_model_set_encoder_memory: ... memcpy(...); g_model-&gt;encoder_kv_ready = 0; return 0;</text>
+    <text x="44" y="428" class="ck-sub">end of ck_prefill_range:    model-&gt;encoder_kv_ready = 1;   (after all cross-K/V slabs + transposes)</text>
+
+    <rect class="ck-inset" x="24" y="462" width="560" height="76" rx="8"/>
+    <text x="44" y="486" class="ck-good" font-size="12">correctness: decode can never observe stale projections -</text>
+    <text x="44" y="504" class="ck-good" font-size="12">the flag is the runtime witness of the circuit's declared</text>
+    <text x="44" y="522" class="ck-good" font-size="12">invalidation: encoder_memory_update.</text>
+
+    <rect class="ck-inset" x="608" y="462" width="548" height="76" rx="8"/>
+    <text x="628" y="486" class="ck-hi" font-size="12">optimization: 12 cross projections per window, not per token -</text>
+    <text x="628" y="504" class="ck-hi" font-size="12">a 25-token answer reuses 12 prefill projections instead of</text>
+    <text x="628" y="522" class="ck-hi" font-size="12">running 300; unchanged audio features are projected once.</text>
+  </svg>
+  </div>
+  <div class="svg-expand-hint">click / tap the diagram to expand</div>
+
+  <p>The compiler-side declaration behind this is literal and readable <span class="tag tag-source">source-verified</span> &mdash; <code>build_ir_v8.py</code>'s dataflow table:</p>
+  <pre class="wt-code"><code>"cross_k_proj": {
+    "inputs": {"x": <span class="c-hi">"external:encoder_memory"</span>},
+    "outputs": {"y": {"slot": "cross_k_cache", "dtype": "fp32"}},
+},
+"cross_v_proj": {
+    "inputs": {"x": <span class="c-hi">"external:encoder_memory"</span>},
+    "outputs": {"y": {"slot": "cross_v_cache", "dtype": "fp32"}},
+},</code></pre>
+  <p>and its buffer sizing fails closed when the geometry is undeclared: <code>"encoder-decoder artifacts require a positive encoder_memory_length"</code> and <code>"num_heads * head_dim == embed_dim"</code> are hard errors, not defaults. Note again: this is explicit operation knowledge in the compiler, not knowledge derived from kernel maps.</p>
+
+  <h2 id="failure">Deliberate failure: token-major K meets a head-major consumer</h2>
+  <p>Suppose a contributor wires a cross-K projection that emits token-major output straight into a cross-attention consumer whose port is head-major &mdash; and no transform is declared. <strong>Shape equality does not establish compatibility</strong>: both layouts carry the same element count, so only the declared physical layout distinguishes them. The mechanical join in <code>version/v8/scripts/resolve_layout_chain_v8.py</code> (circuits own logical edges; maps own physical layouts; the module joins the declarations) rejects it. Executed at this revision with the real consumer map and a synthetic token-major producer <span class="tag tag-executed">executed</span>:</p>
+  <pre class="wt-code"><code><span class="c-bad">RuntimeError: no compatible physical provider chain: no physical-layout route from
+cross_k_proj_token_major_hypothetical:y/token_major_contiguous/local to
+attention_forward_causal_head_major_gqa_flash_compact_token_output:q/head_major_contiguous/local</span></code></pre>
+  <p>Read the diagnostic as an edge report: it names the producer endpoint (<code>producer:port/layout/placement</code>) and the consumer endpoint &mdash; the <em>edge</em> is the failure, not either operation alone. The contributor's repair path is to reach the responsible contract, not to patch the kernel: declare the transform. With the real converter map registered, the same join resolves:</p>
+  <pre class="wt-code"><code><span class="c-good">route: cross_k_proj_token_major_hypothetical -&gt; layout_convert_token_to_head_f32
+       -&gt; attention_forward_causal_head_major_gqa_flash_compact_token_output | cost 10</span></code></pre>
+  <p>(<code>layout_convert_token_to_head_f32.json</code> declares <code>from_layout: token_major_contiguous, to_layout: head_major_contiguous, value_semantics: bit_exact_copy</code>.) In the real Whisper circuit this transform exists as the generated <code>transpose_cross_key_to_head_major</code>/<code>transpose_cross_value_to_head_major</code> ops in prefill &mdash; the GEMM emits token-major rows, the transpose re-lays them head-major, and only then does the attention provider's port contract hold. For compiler-failure vocabulary beyond layouts (missing ports, unknown slots, aliasing without declaration), the fail-closed messages are <code>HARD CIRCUIT INTERFACE FAULT</code>/<code>HARD CIRCUIT DATAFLOW FAULT</code> from <code>validate_circuit_interfaces_v8.py</code> and <code>build_ir_v8.py</code>; the <a href="kernel-maps.html#contributor-recipe">kernel-maps contributor recipe</a> walks the general lane.</p>
+
+  <h2 id="inspect">Inspect this yourself</h2>
+  <ul>
+    <li><strong>IR visualizer</strong> &mdash; the operations, providers, and memory offsets above render interactively, including the &ldquo;Explain this operation&rdquo; panel with rejection reasons: <code>python3 version/v8/tools/open_ir_visualizer_v8.py --list</code> (see <a href="xray.html">X-Ray</a> for the evidence model and capture-neutrality gates).</li>
+    <li><strong>The checkpoint named in the contract</strong> &mdash; <code>audio.decoder.layer.{layer}.cross_attention.output</code> (producer <code>cross_attn</code>, head_major) is the seam X-Ray aligns against an oracle; section 11 of the <a href="model-bringup-guide.html#xray-diagnosis">bring-up guide</a> is the decision tree for what diverges where.</li>
+    <li><strong>Re-run the trace</strong> &mdash; <code>version/v8/scripts/cks-v8-run audio hf://openai/whisper-base --wav &lt;file.wav&gt; --force-compile</code> rebuilds both artifacts; the inspected run used <code>run_whisper_v8.py run --worker-lifecycle per-window</code> against the regenerated dirs (the wrapper's persistent-worker dispatch is environment-sensitive &mdash; see the evidence JSON note).</li>
+    <li><strong>Whisper operations page</strong> &mdash; <a href="v8-whisper-tiny.html">Whisper Tiny on v8</a> covers the frontend, nightly gates, and correctness findings; this page adds the tensor-edge view.</li>
+  </ul>
+
+  <div id="ck-svg-overlay" role="dialog" aria-modal="true" aria-label="Expanded diagram">
+    <div class="ck-ov-bar">
+      <span class="ck-ov-title" id="ck-ov-title">Diagram</span>
+      <span>
+        <button type="button" id="ck-ov-out" aria-label="Zoom out">&minus;</button>
+        <button type="button" id="ck-ov-in" aria-label="Zoom in">+</button>
+        <button type="button" id="ck-ov-close" aria-label="Close">&times;</button>
+      </span>
+    </div>
+    <div class="ck-ov-stage" id="ck-ov-stage"><img id="ck-ov-img" alt=""></div>
+  </div>
+
+  <script>
+    (function() {
+      var overlay = document.getElementById('ck-svg-overlay');
+      var stage = document.getElementById('ck-ov-stage');
+      var img = document.getElementById('ck-ov-img');
+      var title = document.getElementById('ck-ov-title');
+      var scale = 1;
+      function applyScale() {
+        var base = Math.max(stage.clientWidth - 32, 280);
+        img.style.width = Math.round(base * scale) + 'px';
+      }
+      function open(svg) {
+        var xml = new XMLSerializer().serializeToString(svg);
+        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
+        img.alt = svg.getAttribute('aria-label') || 'diagram';
+        title.textContent = svg.getAttribute('data-svg-title') || 'Diagram';
+        scale = 1;
+        overlay.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+        img.onload = applyScale;
+        applyScale();
+        document.getElementById('ck-ov-close').focus();
+      }
+      function close() {
+        overlay.style.display = 'none';
+        document.body.style.overflow = '';
+      }
+      document.querySelectorAll('.svg-expand svg[data-svg-title]').forEach(function(svg) {
+        svg.addEventListener('click', function() { open(svg); });
+        svg.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter' && e.target === svg) { e.preventDefault(); open(svg); }
+        });
+      });
+      document.getElementById('ck-ov-in').addEventListener('click', function() { scale = Math.min(4, scale + 0.25); applyScale(); });
+      document.getElementById('ck-ov-out').addEventListener('click', function() { scale = Math.max(0.4, scale - 0.25); applyScale(); });
+      document.getElementById('ck-ov-close').addEventListener('click', close);
+      overlay.addEventListener('click', function(e) { if (e.target === stage || e.target === overlay) close(); });
+      document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close(); });
+    })();
+  </script>
+
+  <script>
+    (function() {
+      function toggle(ref) {
+        var region = document.getElementById('wx2-' + ref);
+        if (!region) return;
+        var on = region.classList.contains('wx-on');
+        document.querySelectorAll('.wx-region.wx-on').forEach(function(el) { el.classList.remove('wx-on'); });
+        document.querySelectorAll('.wx-edge.wx-on').forEach(function(el) { el.classList.remove('wx-on'); });
+        if (on) return;
+        region.classList.add('wx-on');
+        var path = document.getElementById('wx2-path-' + ref);
+        if (path) path.classList.add('wx-on');
+        if (ref === 'kc' || ref === 'vc') {
+          var emem = document.getElementById('wx2-emem');
+          if (emem) emem.classList.add('wx-on');
+        }
+      }
+      document.querySelectorAll('.wx-arg').forEach(function(el) {
+        var ref = el.getAttribute('data-ref');
+        el.addEventListener('click', function(e) { e.stopPropagation(); toggle(ref); });
+        el.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); toggle(ref); }
+        });
+      });
+    })();
+  </script>
+</div>
