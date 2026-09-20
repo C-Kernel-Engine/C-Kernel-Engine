@@ -1,5 +1,12 @@
 var NAVTREEINDEX16 =
 {
+"relu__kernels_8c.html#ab7af1607007954a2841bad370c7f9e35":[2,0,1,1,77,1],
+"relu__kernels_8c.html#abbc4f192b13bed9ed1614c99cee2db91":[2,0,1,1,77,4],
+"relu__kernels_8c_source.html":[2,0,1,1,77],
+"relu__kernels__bf16_8c.html":[2,0,1,1,78],
+"relu__kernels__bf16_8c.html#a55d24741c224580192c6104c2eb4525a":[2,0,1,1,78,2],
+"relu__kernels__bf16_8c.html#a842c2002210a04d9dc4d9bdabed4fcc2":[2,0,1,1,78,1],
+"relu__kernels__bf16_8c.html#af64829ad63a9c81784d64d4f447ee39a":[2,0,1,1,78,0],
 "relu__kernels__bf16_8c_source.html":[2,0,1,1,78],
 "rmsnorm__kernels_8c.html":[2,0,1,1,79],
 "rmsnorm__kernels_8c.html#a15bad3d2cc858e8f44ec48f7aa045b59":[2,0,1,1,79,10],
@@ -242,12 +249,5 @@ var NAVTREEINDEX16 =
 "structCKAudioWavInfo.html#a7f03c9c155c83eadf60a4bf620d62ebd":[1,0,15,3],
 "structCKAudioWavInfo.html#abb73452bfec57f0df42413bf289b49e7":[1,0,15,4],
 "structCKAudioWavInfo.html#ad270c19780c360f69c9276cb9e89cff9":[1,0,15,0],
-"structCKAudioWavInfo.html#ad5701d8a252c6d90e2658d18638b8eb0":[1,0,15,2],
-"structCKBPEConfig.html":[1,0,16],
-"structCKBPEConfig.html#a6d2ef23c628fac092ae6085b54705bb5":[1,0,16,2],
-"structCKBPEConfig.html#a8425351ff0b3ec6e13ab4dd55644911c":[1,0,16,4],
-"structCKBPEConfig.html#ab6d9b2ee3a8b5f532432a50c0613354c":[1,0,16,3],
-"structCKBPEConfig.html#abfb01eec95857319bd1dafbaf6336238":[1,0,16,0],
-"structCKBPEConfig.html#af3e1a881a51c302240ff8581f4cfcba5":[1,0,16,1],
-"structCKBufferSpec.html":[1,0,17]
+"structCKAudioWavInfo.html#ad5701d8a252c6d90e2658d18638b8eb0":[1,0,15,2]
 };
