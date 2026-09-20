@@ -871,7 +871,11 @@ def _resume_worker(args: argparse.Namespace) -> int:
 
 def run(args: argparse.Namespace) -> dict[str, Any]:
     report: dict[str, Any] = {"schema": "cke.v8.training_workflow.v1", "status": "FAIL", "passed": False,
-                              "execution": CERT._execution_identity(), "checks": {}, "negative_controls": {}, "failures": []}
+                              "execution": CERT._execution_identity(),
+                              "matrix_identity": {"run_id": args.matrix_run_id, "case_id": args.matrix_case_id,
+                                                  "profile": args.matrix_case_id,
+                                                  "run_dir": str(args.run_dir), "report": str(args.report)},
+                              "checks": {}, "negative_controls": {}, "failures": []}
     started = time.perf_counter()
     try:
         import torch
@@ -1269,6 +1273,7 @@ def main() -> int:
     p.add_argument("--probe-trajectory-logits", type=Path)
     p.add_argument("--run-dir", type=Path, default=DEFAULT_RUN); p.add_argument("--json-out", dest="report", type=Path, default=DEFAULT_REPORT)
     p.add_argument("--corpus", type=Path, default=CORPUS_SPEC); p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--matrix-run-id"); p.add_argument("--matrix-case-id")
     p.add_argument("--seq-len", type=int, default=32); p.add_argument("--epochs", type=int, default=10)
     p.add_argument("--layers", type=int, choices=(4, 6, 10), default=4)
     p.add_argument("--d-model", type=int, default=32); p.add_argument("--hidden", type=int, default=64)
