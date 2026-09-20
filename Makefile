@@ -5317,6 +5317,7 @@ CK_CLI_V66 := version/v6.6/src/ck_cli_v6.6.c
 CK_CLI_V7 := version/v7/src/ck_cli_v7.c
 CK_CLI_V8 := version/v8/src/ck_cli_v8.c
 CK_AUDIO_TRANSCRIBE_V8 := version/v8/src/ck_audio_transcribe_v8.c
+CK_AUDIO_ENCODER_DECODER_TRANSCRIBE_V8 := version/v8/src/ck_audio_encoder_decoder_transcribe_v8.c
 CK_SAMPLER_V8 := version/v8/src/ck_sampler_v8.c
 CK_BPE_TRAIN_V7 := version/v7/src/ck_bpe_train.c
 
@@ -5438,6 +5439,13 @@ $(BUILD_DIR)/ck-audio-transcribe-v8: $(CK_AUDIO_TRANSCRIBE_V8)
 
 ck-audio-transcribe-v8: $(BUILD_DIR)/ck-audio-transcribe-v8
 	@echo "Built: $(BUILD_DIR)/ck-audio-transcribe-v8"
+
+$(BUILD_DIR)/ck-audio-encoder-decoder-transcribe-v8: $(CK_AUDIO_ENCODER_DECODER_TRANSCRIBE_V8)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -o $@ $(CK_AUDIO_ENCODER_DECODER_TRANSCRIBE_V8) -ldl
+
+ck-audio-encoder-decoder-transcribe-v8: $(BUILD_DIR)/ck-audio-encoder-decoder-transcribe-v8
+	@echo "Built: $(BUILD_DIR)/ck-audio-encoder-decoder-transcribe-v8"
 
 ck-session-v8: $(BUILD_DIR)/libck_session_v8.so
 	@echo "Built: $(BUILD_DIR)/libck_session_v8.so"

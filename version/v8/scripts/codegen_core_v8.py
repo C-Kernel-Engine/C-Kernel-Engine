@@ -3357,6 +3357,7 @@ CK_EXPORT void ck_model_profile_dump(void) {
             "(size_t)(layer * 2 + 1) * (size_t)NUM_KV_HEADS * head_stride"
         )
     encoder_memory_api = ""
+    audio_prompt_api = ""
     uses_persistent_cross_kv_cache = bool(
         config.get("_template_uses_persistent_cross_kv_cache", False)
     )
@@ -3414,6 +3415,36 @@ CK_EXPORT int ck_model_get_encoder_memory_tokens(void) {{
 }}
 CK_EXPORT int ck_model_get_encoder_memory_capacity(void) {{ return {encoder_tokens}; }}
 CK_EXPORT int ck_model_get_encoder_memory_dim(void) {{ return {encoder_dim}; }}
+"""
+    audio_prompt_tokens = config.get("audio_decoder_prompt_tokens", [])
+    if audio_prompt_tokens:
+        if (
+            not isinstance(audio_prompt_tokens, list)
+            or not all(isinstance(token, str) and token for token in audio_prompt_tokens)
+        ):
+            raise RuntimeError("audio decoder prompt tokens must be non-empty strings")
+        prompt_literals = ",\n    ".join(
+            json.dumps(token, ensure_ascii=True) for token in audio_prompt_tokens
+        )
+        audio_prompt_api = f"""
+/* Artifact-owned default prompt for native encoder-decoder sessions. */
+static const char *g_audio_decoder_prompt_tokens[] = {{
+    {prompt_literals}
+}};
+
+CK_EXPORT int ck_model_audio_prompt_token_count(void) {{
+    return (int)(sizeof(g_audio_decoder_prompt_tokens) /
+                 sizeof(g_audio_decoder_prompt_tokens[0]));
+}}
+
+CK_EXPORT int32_t ck_model_audio_prompt_token_id(int index) {{
+    if (!g_model || !g_model->tokenizer || index < 0 ||
+        index >= ck_model_audio_prompt_token_count()) return -1;
+    const char *wanted = g_audio_decoder_prompt_tokens[index];
+    const int32_t id = ck_tokenizer_lookup(g_model->tokenizer, wanted);
+    const char *actual = id >= 0 ? ck_tokenizer_id_to_token(g_model->tokenizer, id) : NULL;
+    return actual && strcmp(actual, wanted) == 0 ? id : -1;
+}}
 """
     recurrent_reset_lines: list[str] = []
     prefill_policy = str(config.get("prefill_policy") or "").strip().lower()
@@ -3923,6 +3954,7 @@ CK_EXPORT float* ck_model_get_logits(void) {{ return g_model ? g_model->logits :
 CK_EXPORT uintptr_t ck_model_get_base_ptr(void) {{ return (uintptr_t)(g_model ? g_model->bump : NULL); }}
 
 {encoder_memory_api}
+{audio_prompt_api}
 {tokenizer_api_functions}
 {stop_tokens_api}
 {profile_dump_api}
