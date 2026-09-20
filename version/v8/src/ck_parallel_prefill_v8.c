@@ -46,6 +46,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <pthread.h>
+#include <time.h>
 
 extern void mamba2_conv1d_decode_f32(
     const float *state_in, const float *x, const float *weight,
@@ -3085,6 +3086,116 @@ static void work_gemm_nt_f32_llama_production(int ith, int nth, void *args)
         a->M, a->N, a->K, begin, end);
 }
 
+#define CK_F32_GEMM_PROFILE_CAPACITY 128
+
+typedef struct {
+    int M;
+    int N;
+    int K;
+    int active_threads;
+    int parallel;
+    uint64_t calls;
+    uint64_t elapsed_ns;
+} ck_f32_gemm_profile_entry_t;
+
+static pthread_mutex_t ck_f32_gemm_profile_mutex = PTHREAD_MUTEX_INITIALIZER;
+static ck_f32_gemm_profile_entry_t
+    ck_f32_gemm_profile_entries[CK_F32_GEMM_PROFILE_CAPACITY];
+static size_t ck_f32_gemm_profile_entry_count;
+static uint64_t ck_f32_gemm_profile_dropped_calls;
+static atomic_int ck_f32_gemm_profile_enabled;
+
+static uint64_t ck_f32_gemm_profile_now_ns(void)
+{
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    return (uint64_t)now.tv_sec * UINT64_C(1000000000) + (uint64_t)now.tv_nsec;
+}
+
+void ck_f32_gemm_profile_reset(void)
+{
+    pthread_mutex_lock(&ck_f32_gemm_profile_mutex);
+    memset(ck_f32_gemm_profile_entries, 0, sizeof(ck_f32_gemm_profile_entries));
+    ck_f32_gemm_profile_entry_count = 0;
+    ck_f32_gemm_profile_dropped_calls = 0;
+    atomic_store_explicit(&ck_f32_gemm_profile_enabled, 1, memory_order_release);
+    pthread_mutex_unlock(&ck_f32_gemm_profile_mutex);
+}
+
+size_t ck_f32_gemm_profile_count(void)
+{
+    size_t count;
+    pthread_mutex_lock(&ck_f32_gemm_profile_mutex);
+    count = ck_f32_gemm_profile_entry_count;
+    pthread_mutex_unlock(&ck_f32_gemm_profile_mutex);
+    return count;
+}
+
+uint64_t ck_f32_gemm_profile_overflow_calls(void)
+{
+    uint64_t calls;
+    pthread_mutex_lock(&ck_f32_gemm_profile_mutex);
+    calls = ck_f32_gemm_profile_dropped_calls;
+    pthread_mutex_unlock(&ck_f32_gemm_profile_mutex);
+    return calls;
+}
+
+int ck_f32_gemm_profile_get(
+    size_t index, int *M, int *N, int *K, int *active_threads,
+    int *parallel, uint64_t *calls, uint64_t *elapsed_ns)
+{
+    ck_f32_gemm_profile_entry_t entry;
+    if (!M || !N || !K || !active_threads || !parallel || !calls || !elapsed_ns) {
+        return -1;
+    }
+    pthread_mutex_lock(&ck_f32_gemm_profile_mutex);
+    if (index >= ck_f32_gemm_profile_entry_count) {
+        pthread_mutex_unlock(&ck_f32_gemm_profile_mutex);
+        return -2;
+    }
+    entry = ck_f32_gemm_profile_entries[index];
+    pthread_mutex_unlock(&ck_f32_gemm_profile_mutex);
+    *M = entry.M;
+    *N = entry.N;
+    *K = entry.K;
+    *active_threads = entry.active_threads;
+    *parallel = entry.parallel;
+    *calls = entry.calls;
+    *elapsed_ns = entry.elapsed_ns;
+    return 0;
+}
+
+static void ck_f32_gemm_profile_record(
+    int M, int N, int K, int active_threads, int parallel, uint64_t elapsed_ns)
+{
+    if (!atomic_load_explicit(&ck_f32_gemm_profile_enabled, memory_order_acquire)) return;
+    pthread_mutex_lock(&ck_f32_gemm_profile_mutex);
+    for (size_t index = 0; index < ck_f32_gemm_profile_entry_count; ++index) {
+        ck_f32_gemm_profile_entry_t *entry = &ck_f32_gemm_profile_entries[index];
+        if (entry->M == M && entry->N == N && entry->K == K &&
+            entry->active_threads == active_threads && entry->parallel == parallel) {
+            entry->calls++;
+            entry->elapsed_ns += elapsed_ns;
+            pthread_mutex_unlock(&ck_f32_gemm_profile_mutex);
+            return;
+        }
+    }
+    if (ck_f32_gemm_profile_entry_count < CK_F32_GEMM_PROFILE_CAPACITY) {
+        ck_f32_gemm_profile_entry_t *entry =
+            &ck_f32_gemm_profile_entries[ck_f32_gemm_profile_entry_count++];
+        entry->M = M;
+        entry->N = N;
+        entry->K = K;
+        entry->active_threads = active_threads;
+        entry->parallel = parallel;
+        entry->calls = 1;
+        entry->elapsed_ns = elapsed_ns;
+    } else {
+        ck_f32_gemm_profile_dropped_calls++;
+    }
+    pthread_mutex_unlock(&ck_f32_gemm_profile_mutex);
+}
+
 /* ============================================================================
  * Parallel Dispatch Wrappers
  *
@@ -3143,9 +3254,17 @@ void gemm_nt_f32_llama_production_parallel_dispatch(
     const int total = M > 0 && N > 0 ? M * N : 0;
     const size_t decode_work = M == 1 && N > 0 && K > 0
         ? (size_t)N * (size_t)K : 0;
-    if (!pool || ck_threadpool_n_threads(pool) <= 1 || total < 96 ||
-        (M == 1 && decode_work < 512u * 1024u)) {
+    const int serial = !pool || ck_threadpool_n_threads(pool) <= 1 || total < 96 ||
+        (M == 1 && decode_work < 512u * 1024u);
+    const uint64_t profile_started = atomic_load_explicit(
+        &ck_f32_gemm_profile_enabled, memory_order_acquire)
+        ? ck_f32_gemm_profile_now_ns() : 0;
+    if (serial) {
         gemm_nt_f32_llama_production(A, B, bias, C, M, N, K);
+        if (profile_started) {
+            ck_f32_gemm_profile_record(
+                M, N, K, 1, 0, ck_f32_gemm_profile_now_ns() - profile_started);
+        }
         return;
     }
 
@@ -3157,6 +3276,10 @@ void gemm_nt_f32_llama_production_parallel_dispatch(
     if (active > total) active = total;
     ck_threadpool_dispatch_n(
         pool, active, work_gemm_nt_f32_llama_production, &args);
+    if (profile_started) {
+        ck_f32_gemm_profile_record(
+            M, N, K, active, 1, ck_f32_gemm_profile_now_ns() - profile_started);
+    }
 }
 
 void gemm_nt_q8_0_q8_0_parallel_dispatch(

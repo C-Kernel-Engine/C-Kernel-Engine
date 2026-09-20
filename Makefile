@@ -1523,6 +1523,8 @@ test-cohere-transcribe-generated-long-audio-auto:
 		echo "SKIP: set CK_COHERE_GENERATED_ENCODER_RUNTIME, CK_COHERE_GENERATED_DECODER_RUNTIME, CK_COHERE_TRANSCRIBE_LONG_AUDIO, CK_COHERE_TRANSCRIBE_SPEECH_SEGMENTS, and CK_COHERE_GENERATED_LONG_REFERENCE"; \
 	else \
 		output_dir="$${CK_COHERE_GENERATED_LONG_OUTPUT:-build/cohere-generated-long-audio}"; \
+		profile_arg=""; \
+		if [ "$${CK_COHERE_GENERATED_PROFILE:-0}" = "1" ]; then profile_arg="--profile"; fi; \
 		mkdir -p "$$output_dir"; \
 		$(PYTHON) $(PYTHONFLAGS) version/v8/scripts/export_audio_segment_plan_v8.py \
 			--vad "$$CK_COHERE_TRANSCRIBE_SPEECH_SEGMENTS" \
@@ -1541,6 +1543,7 @@ test-cohere-transcribe-generated-long-audio-auto:
 			--segment-plan "$$output_dir/segments.txt" \
 			--reference-report "$$CK_COHERE_GENERATED_LONG_REFERENCE" \
 			--timeout "$${CK_COHERE_GENERATED_LONG_TIMEOUT:-7200}" \
+			$$profile_arg \
 			--output "$$output_dir/certification.json"; \
 	fi
 
@@ -1776,6 +1779,7 @@ test-v8-cohere-laguna-contracts:
 		tests.test_v8_cohere2_contract \
 		tests.test_v8_cohere2_moe_contract \
 		tests.test_v8_cohere_compass_contract \
+		tests.test_v8_cohere_generated_audio_profile \
 		tests.test_v8_laguna_contract \
 		-v
 

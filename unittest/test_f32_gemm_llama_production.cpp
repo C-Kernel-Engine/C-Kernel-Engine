@@ -20,6 +20,12 @@ void gemm_nt_f32_llama_production_output_range(
 void gemm_nt_f32_llama_production_parallel_dispatch(
         const float * A, const float * B, const float * bias, float * C,
         int M, int N, int K);
+void ck_f32_gemm_profile_reset(void);
+size_t ck_f32_gemm_profile_count(void);
+uint64_t ck_f32_gemm_profile_overflow_calls(void);
+int ck_f32_gemm_profile_get(
+        size_t index, int * M, int * N, int * K, int * active_threads,
+        int * parallel, uint64_t * calls, uint64_t * elapsed_ns);
 }
 
 namespace {
@@ -153,10 +159,36 @@ int main() {
         {"audio_ffn_down", 9, 1280, 5120},
     };
     int passed = 0;
+    ck_f32_gemm_profile_reset();
     for (const case_spec & spec : cases) {
         passed += run_case(spec) ? 1 : 0;
     }
+    const size_t case_count = sizeof(cases) / sizeof(cases[0]);
+    bool profile_ok = ck_f32_gemm_profile_count() == case_count
+            && ck_f32_gemm_profile_overflow_calls() == 0;
+    for (size_t index = 0; profile_ok && index < case_count; ++index) {
+        int M = 0, N = 0, K = 0, active_threads = 0, parallel = -1;
+        uint64_t calls = 0, elapsed_ns = 0;
+        profile_ok = ck_f32_gemm_profile_get(
+                index, &M, &N, &K, &active_threads, &parallel,
+                &calls, &elapsed_ns) == 0
+                && M == cases[index].rows
+                && N == cases[index].outputs
+                && K == cases[index].width
+                && active_threads >= 1
+                && (parallel == 0 || parallel == 1)
+                && calls == 1
+                && elapsed_ns > 0;
+    }
+    int unused = 0;
+    uint64_t unused_u64 = 0;
+    profile_ok = profile_ok && ck_f32_gemm_profile_get(
+            case_count, &unused, &unused, &unused, &unused, &unused,
+            &unused_u64, &unused_u64) != 0;
+    std::printf("FP32 GEMM profile: %zu/%zu shapes [%s]\n",
+            ck_f32_gemm_profile_count(), case_count,
+            profile_ok ? "PASS" : "FAIL");
     std::printf("FP32 GEMM llama production: %d/%zu passed\n",
-            passed, sizeof(cases) / sizeof(cases[0]));
-    return passed == static_cast<int>(sizeof(cases) / sizeof(cases[0])) ? 0 : 1;
+            passed, case_count);
+    return passed == static_cast<int>(case_count) && profile_ok ? 0 : 1;
 }

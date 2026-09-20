@@ -26,6 +26,24 @@ COMPLETION = re.compile(
     r"^completed_windows=(\d+) source_frames=(\d+) consumed_frames=(\d+)$",
     re.MULTILINE,
 )
+RUNTIME_PROFILE = re.compile(
+    r"^audio_runtime_profile requested_threads=(\S+) actual_threads=(-?\d+)$",
+    re.MULTILINE,
+)
+GEMM_PROFILE = re.compile(
+    r"^gemm_profile window=(\d+) M=(\d+) N=(\d+) K=(\d+) "
+    r"active_threads=(\d+) mode=(serial|parallel) calls=(\d+) elapsed_ns=(\d+)$",
+    re.MULTILINE,
+)
+GEMM_PROFILE_SUMMARY = re.compile(
+    r"^gemm_profile_summary window=(\d+) shapes=(\d+) overflow_calls=(\d+)$",
+    re.MULTILINE,
+)
+THREADPOOL_PROFILE = re.compile(
+    r"^threadpool_profile window=(\d+) dispatches=(\d+) total_ns=(\d+) "
+    r"main_work_ns=(\d+) completion_wait_ns=(\d+)$",
+    re.MULTILINE,
+)
 
 
 def identity(path: Path) -> dict[str, Any]:
@@ -106,6 +124,74 @@ def parse_native(stderr: str) -> tuple[list[dict[str, Any]], dict[str, int]]:
             raise ValueError(f"native window {index} token count is inconsistent")
         windows.append(row)
     return windows, completion
+
+
+def parse_performance_profile(stderr: str, expected_windows: int) -> dict[str, Any]:
+    runtime_matches = list(RUNTIME_PROFILE.finditer(stderr))
+    if len(runtime_matches) != 1:
+        raise ValueError("native host did not publish exactly one runtime profile")
+    entries = [
+        {
+            "window": int(match.group(1)),
+            "M": int(match.group(2)),
+            "N": int(match.group(3)),
+            "K": int(match.group(4)),
+            "active_threads": int(match.group(5)),
+            "mode": match.group(6),
+            "calls": int(match.group(7)),
+            "elapsed_ns": int(match.group(8)),
+        }
+        for match in GEMM_PROFILE.finditer(stderr)
+    ]
+    summary_matches = list(GEMM_PROFILE_SUMMARY.finditer(stderr))
+    summaries = {
+        int(match.group(1)): {
+            "shapes": int(match.group(2)),
+            "overflow_calls": int(match.group(3)),
+        }
+        for match in summary_matches
+    }
+    threadpool_matches = list(THREADPOOL_PROFILE.finditer(stderr))
+    threadpool = {
+        int(match.group(1)): {
+            "dispatches": int(match.group(2)),
+            "total_ns": int(match.group(3)),
+            "main_work_ns": int(match.group(4)),
+            "completion_wait_ns": int(match.group(5)),
+        }
+        for match in threadpool_matches
+    }
+    if (len(summary_matches) != len(summaries) or len(summaries) != expected_windows
+            or set(summaries) != set(range(expected_windows))):
+        raise ValueError("native GEMM profile summary inventory is incomplete")
+    if (len(threadpool_matches) != len(threadpool) or len(threadpool) != expected_windows
+            or set(threadpool) != set(range(expected_windows))):
+        raise ValueError("native thread-pool profile inventory is incomplete")
+    shape_keys = {
+        (entry["window"], entry["M"], entry["N"], entry["K"],
+         entry["active_threads"], entry["mode"])
+        for entry in entries
+    }
+    if len(shape_keys) != len(entries):
+        raise ValueError("native GEMM profile contains duplicate shape identities")
+    for window in range(expected_windows):
+        observed = sum(entry["window"] == window for entry in entries)
+        if observed != summaries[window]["shapes"]:
+            raise ValueError(f"native GEMM profile shape count differs for window {window}")
+        if summaries[window]["overflow_calls"]:
+            raise ValueError(f"native GEMM profile overflowed for window {window}")
+    requested = runtime_matches[0].group(1)
+    return {
+        "instrumented": True,
+        "requested_threads": requested if requested == "auto" else int(requested),
+        "actual_threads": int(runtime_matches[0].group(2)),
+        "cpu_affinity": sorted(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else None,
+        "gemm_shapes": entries,
+        "windows": [summaries[index] for index in range(expected_windows)],
+        "threadpool_windows": [threadpool[index] for index in range(expected_windows)],
+        "total_profiled_calls": sum(entry["calls"] for entry in entries),
+        "total_profiled_elapsed_ns": sum(entry["elapsed_ns"] for entry in entries),
+    }
 
 
 def load_reference(
@@ -221,6 +307,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         key: value for key, value in os.environ.items()
         if not key.startswith("PYTHON") and key not in {"VIRTUAL_ENV", "CONDA_PREFIX"}
     }
+    if args.profile:
+        environment["CK_AUDIO_PERF_PROFILE"] = "1"
     started = time.perf_counter()
     completed = subprocess.run(
         command, env=environment, text=True, capture_output=True,
@@ -228,6 +316,10 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     )
     elapsed = time.perf_counter() - started
     windows, coverage = parse_native(completed.stderr) if completed.returncode == 0 else ([], {})
+    performance_profile = (
+        parse_performance_profile(completed.stderr, len(segments))
+        if completed.returncode == 0 and args.profile else {"instrumented": False}
+    )
     expected_consumed = sum(end - start for start, end in segments)
     token_mismatches = [
         row["index"] for row, reference in zip(windows, reference_windows)
@@ -281,6 +373,13 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "transcript": completed.stdout.strip(),
         "elapsed_seconds": elapsed,
         "peak_rss_bytes": int(usage.ru_maxrss) * 1024,
+        "performance_profile": performance_profile,
+        "measurement_policy": {
+            "instrumentation": "enabled" if args.profile else "disabled",
+            "window_temperature": "first_after_load_then_persistent_loaded_session",
+            "timing_clock": "CLOCK_MONOTONIC_in_native_host",
+            "profile_scope": "generated_encoder_fp32_gemm_and_threadpool",
+        },
         "stderr": completed.stderr,
         "not_certified": [
             "timestamps", "resampling", "multilingual quality", "cancellation",
@@ -300,6 +399,10 @@ def main() -> int:
     parser.add_argument("--segment-plan", required=True, type=Path)
     parser.add_argument("--reference-report", required=True, type=Path)
     parser.add_argument("--timeout", default=7200.0, type=float)
+    parser.add_argument(
+        "--profile", action="store_true",
+        help="collect instrumented FP32 GEMM shape and elapsed-time evidence",
+    )
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
     try:
