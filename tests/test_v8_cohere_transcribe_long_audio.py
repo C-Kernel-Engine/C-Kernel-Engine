@@ -13,6 +13,8 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "version/v8/scripts/run_cohere_transcribe_long_audio_v8.py"
 CERTIFIER = ROOT / "version/v8/scripts/certify_cohere_transcribe_long_audio_v8.py"
+SEGMENT_EXPORTER = ROOT / "version/v8/scripts/export_audio_segment_plan_v8.py"
+GENERATED_RUNNER = ROOT / "version/v8/scripts/run_cohere_generated_long_audio_v8.py"
 
 
 def _load_module():
@@ -37,6 +39,30 @@ def _load_certifier():
 
 
 certifier = _load_certifier()
+
+
+def _load_segment_exporter():
+    spec = importlib.util.spec_from_file_location("cke_audio_segment_exporter", SEGMENT_EXPORTER)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+segment_exporter = _load_segment_exporter()
+
+
+def _load_generated_runner():
+    spec = importlib.util.spec_from_file_location("cke_cohere_generated_long_audio", GENERATED_RUNNER)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+generated_runner = _load_generated_runner()
 
 
 def test_window_plan_has_exact_single_owner_coverage() -> None:
@@ -115,6 +141,98 @@ def test_imported_speech_windows_are_strict_and_hashed(tmp_path: Path) -> None:
         long_audio.load_speech_windows(
             path, total_frames=400, sample_rate=10, max_window_seconds=10.0,
         )
+
+
+def test_native_segment_plan_export_is_versioned_and_exact(tmp_path: Path) -> None:
+    path = tmp_path / "vad.json"
+    path.write_text(json.dumps({
+        "crispasr_vad": {
+            "version": 1,
+            "sample_rate": 16000,
+            "num_slices": 2,
+            "slices": [{"start": 10, "end": 100}, {"start": 200, "end": 300}],
+        },
+    }))
+    sample_rate, segments = segment_exporter.load_segments(path)
+    assert sample_rate == 16000
+    assert segments == [(10, 100), (200, 300)]
+    assert segment_exporter.render(sample_rate, segments) == (
+        "cke_audio_segments_v1 16000 2\n10 100\n200 300\n"
+    )
+
+    document = json.loads(path.read_text())
+    document["crispasr_vad"]["slices"][1]["start"] = 99
+    path.write_text(json.dumps(document))
+    with pytest.raises(ValueError, match="overlapping"):
+        segment_exporter.load_segments(path)
+
+
+def test_generated_native_report_parser_requires_complete_window_evidence() -> None:
+    stderr = """
+window=0 source_frames=10:100 frontend=0.100000s encoder=1.200000s decoder=0.300000s encoder_frames=7 tokens=2
+window_token_ids[0]=4,5
+window=1 source_frames=200:300 frontend=0.200000s encoder=1.300000s decoder=0.400000s encoder_frames=8 tokens=1
+window_token_ids[1]=6
+completed_windows=2 source_frames=400 consumed_frames=190
+"""
+    windows, coverage = generated_runner.parse_native(stderr)
+    assert [row["generated_token_ids"] for row in windows] == [[4, 5], [6]]
+    assert coverage == {
+        "completed_windows": 2,
+        "source_frames": 400,
+        "consumed_frames": 190,
+    }
+    with pytest.raises(ValueError, match="inventories differ"):
+        generated_runner.parse_native(stderr.replace("window_token_ids[1]=6\n", ""))
+    with pytest.raises(ValueError, match="completion accounting"):
+        generated_runner.parse_native(stderr.replace(
+            "completed_windows=2 source_frames=400 consumed_frames=190\n", ""
+        ))
+    with pytest.raises(ValueError, match="duplicate window identities"):
+        generated_runner.parse_native(stderr.replace(
+            "window=1 source_frames=200:300", "window=0 source_frames=200:300"
+        ).replace("window_token_ids[1]", "window_token_ids[0]"))
+
+
+def test_generated_reference_requires_exact_plan_and_tokens(tmp_path: Path) -> None:
+    reference = tmp_path / "reference.json"
+    reference.write_text(json.dumps({
+        "status": "PASS",
+        "input": {"sha256": "audio-sha"},
+        "windows": [{
+            "index": 0,
+            "start_frame": 10,
+            "end_frame": 20,
+            "generated_token_ids": [2, 7, 3],
+        }],
+    }))
+    rows = generated_runner.load_reference(reference, [(10, 20)], "audio-sha")
+    assert rows[0]["generated_token_ids"] == [2, 7, 3]
+    with pytest.raises(ValueError, match="segment plan"):
+        generated_runner.load_reference(reference, [(10, 21)], "audio-sha")
+    with pytest.raises(ValueError, match="input identity"):
+        generated_runner.load_reference(reference, [(10, 20)], "wrong-audio")
+
+
+def test_generated_runtime_bundle_rejects_stale_library(tmp_path: Path) -> None:
+    names = ("libmodel.so", "libckernel_engine.so", "libckernel_tokenizer.so")
+    outputs = {}
+    for index, name in enumerate(names):
+        path = tmp_path / name
+        path.write_bytes(bytes([index + 1]))
+        outputs[name] = {
+            "path": str(path),
+            "size": 1,
+            "sha256": generated_runner.identity(path)["sha256"],
+        }
+    (tmp_path / ".ck_runtime_bundle.json").write_text(json.dumps({
+        "inputs": {"schema": "ck-v8-runtime-bundle-v2"},
+        "outputs": outputs,
+    }))
+    generated_runner.validate_runtime_bundle(tmp_path)
+    (tmp_path / "libmodel.so").write_bytes(b"stale")
+    with pytest.raises(ValueError, match="stale generated runtime output"):
+        generated_runner.validate_runtime_bundle(tmp_path)
 
 
 def test_decode_loop_detection_and_word_error_rate() -> None:
@@ -232,6 +350,22 @@ def test_long_audio_make_target_is_optional_portable_and_fail_closed() -> None:
     assert "CK_COHERE_TRANSCRIBE_LONG_REFERENCE" in target
     assert "first repeat" in target
     assert "|| exit $$?" in target
+    assert "/data/" not in target
+
+
+def test_generated_long_audio_target_uses_standalone_components() -> None:
+    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+    start = makefile.index("test-cohere-transcribe-generated-long-audio-auto:")
+    end = makefile.index("# Policy:", start)
+    target = makefile[start:end]
+    assert "ck_audio_encoder_decoder_transcribe_v8.c" in target
+    assert "run_cohere_generated_long_audio_v8.py" in target
+    assert "--host-source version/v8/src/ck_audio_encoder_decoder_transcribe_v8.c" in target
+    assert '--source-revision "$$(git rev-parse HEAD)"' in target
+    assert "CK_COHERE_GENERATED_ENCODER_RUNTIME" in target
+    assert "CK_COHERE_GENERATED_DECODER_RUNTIME" in target
+    assert "CK_COHERE_GENERATED_LONG_REFERENCE" in target
+    assert "run_cohere_transcribe_long_audio_v8.py" not in target
     assert "/data/" not in target
 
 
