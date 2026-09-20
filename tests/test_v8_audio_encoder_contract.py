@@ -599,7 +599,26 @@ class AudioEncoderContractTests(unittest.TestCase):
         self.assertTrue(codegen._has_audio_frontend(operations))
         for operation in sorted(operations):
             with self.subTest(missing=operation):
-                self.assertFalse(codegen._has_audio_frontend(operations - {operation}))
+                incomplete = operations - {operation}
+                if operation in {"audio_hann_window", "audio_mel_filters"}:
+                    self.assertTrue(codegen._has_audio_frontend(incomplete))
+                else:
+                    self.assertFalse(codegen._has_audio_frontend(incomplete))
+                with self.assertRaisesRegex(
+                    RuntimeError,
+                    "missing ops|did not lower every required operation",
+                ):
+                    codegen._emit_audio_wav_entrypoint(
+                        [
+                            {"op": name, "function": "stub", "args": []}
+                            for name in incomplete
+                        ],
+                        {
+                            "audio_sample_rate": 16000,
+                            "audio_max_source_frames": 320,
+                            "audio_hop_length": 160,
+                        },
+                    )
 
     def test_generated_parakeet_frontend_uses_runtime_extents(self):
         def call(operation, function, *sources):

@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 379,
+      "total": 381,
       "by_op": {
         "add_backward": 1,
         "add_stream": 2,
@@ -26,7 +26,7 @@
         "audio_feature_window": 1,
         "audio_glu": 1,
         "audio_hann_window": 1,
-        "audio_log_mel": 3,
+        "audio_log_mel": 4,
         "audio_lstm": 1,
         "audio_mel_filters": 1,
         "audio_pad_or_truncate": 1,
@@ -38,7 +38,7 @@
         "audio_relu": 1,
         "audio_resample": 2,
         "audio_scaled_residual_add": 1,
-        "audio_stft": 3,
+        "audio_stft": 4,
         "audio_stft_tables": 1,
         "audio_wav_decode": 1,
         "bias_add": 1,
@@ -15038,6 +15038,170 @@
       "_source_file": "audio_log_mel_time_major_f32.json"
     },
     {
+      "id": "audio_log_mel_time_major_model_filter_f32",
+      "op": "audio_log_mel",
+      "operation_interface": "audio_log_mel.time_major.model_filter.natural_log_add_epsilon.fp32.v1",
+      "variant": "time_major_model_mel_projection_natural_log_add_epsilon_fp32",
+      "selection": {
+        "status": "production",
+        "priority": 110,
+        "equivalence_group": "audio_log_mel_time_major_ln_add_epsilon_fp32",
+        "phases": [
+          "prefill"
+        ]
+      },
+      "quant": {
+        "weight": "fp32",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "power",
+          "dtype": "fp32",
+          "shape": [
+            "N_frames",
+            "N_bins"
+          ],
+          "layout": "time_major_contiguous",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "mel_filters",
+          "dtype": "fp32",
+          "shape": [
+            "N_channels",
+            "N_bins"
+          ],
+          "layout": "row_major",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "log_mel",
+          "dtype": "fp32",
+          "shape": [
+            "N_frames",
+            "N_channels"
+          ],
+          "layout": "time_major_contiguous",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "frames",
+        "bins",
+        "channels",
+        "log_epsilon"
+      ],
+      "impl": {
+        "function": "audio_log_mel_time_major_f32",
+        "c_declaration": "int audio_log_mel_time_major_f32(const float *power, const float *mel_filters, float *log_mel, int frames, int bins, int channels, float epsilon);",
+        "sources": [
+          "src/kernels/audio_kernels.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "audio_log_mel_time_major_ln_add_epsilon_fp32",
+          "status": "validated",
+          "phases": [
+            "prefill"
+          ],
+          "function": "audio_log_mel_time_major_f32",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "contract_defined"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp32",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "independent_outputs"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "power",
+            "source": "activation:power",
+            "cast": "const float*",
+            "ports": [
+              "input:power"
+            ]
+          },
+          {
+            "name": "mel_filters",
+            "source": "weight:mel_filters",
+            "cast": "const float*",
+            "ports": [
+              "weight:mel_filters"
+            ]
+          },
+          {
+            "name": "log_mel",
+            "source": "output:log_mel",
+            "cast": "float*",
+            "ports": [
+              "output:log_mel"
+            ]
+          },
+          {
+            "name": "frames",
+            "source": "dim:frames"
+          },
+          {
+            "name": "bins",
+            "source": "dim:bins"
+          },
+          {
+            "name": "channels",
+            "source": "dim:channels"
+          },
+          {
+            "name": "epsilon",
+            "source": "dim:log_epsilon"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_audio_encoder.py"
+        ],
+        "oracle": "Cohere model-filter frontend fixture"
+      },
+      "name": "audio_log_mel_time_major_model_filter_f32",
+      "_source_file": "audio_log_mel_time_major_model_filter_f32.json"
+    },
+    {
       "id": "audio_lstm_step_f32",
       "op": "audio_lstm",
       "operation_interface": "audio_lstm.single_step.pytorch_ifgo.fp32.v1",
@@ -16439,6 +16603,218 @@
       },
       "name": "audio_scaled_residual_add_f32",
       "_source_file": "audio_scaled_residual_add_f32.json"
+    },
+    {
+      "id": "audio_stft_power_centered_model_window_f32",
+      "op": "audio_stft",
+      "operation_interface": "audio_stft.centered.model_window.fp32.v1",
+      "variant": "centered_model_window_zero_or_reflect_padding_direct_dft_fp32",
+      "selection": {
+        "status": "production",
+        "priority": 110,
+        "equivalence_group": "audio_stft_centered_explicit_window_direct_fp32",
+        "phases": [
+          "prefill"
+        ]
+      },
+      "quant": {
+        "weight": "fp32",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "samples",
+          "dtype": "fp32",
+          "shape": [
+            "N_samples"
+          ],
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "cos_table",
+          "dtype": "fp32",
+          "shape": [
+            "N_bins",
+            "N_fft"
+          ],
+          "layout": "row_major",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "sin_table",
+          "dtype": "fp32",
+          "shape": [
+            "N_bins",
+            "N_fft"
+          ],
+          "layout": "row_major",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "window",
+          "dtype": "fp32",
+          "shape": [
+            "N_window"
+          ],
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "power",
+          "dtype": "fp32",
+          "shape": [
+            "N_frames",
+            "N_bins"
+          ],
+          "layout": "time_major_contiguous",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "n_samples",
+        "window_length",
+        "n_fft",
+        "hop_length",
+        "reflect_padding",
+        "n_frames"
+      ],
+      "impl": {
+        "function": "audio_stft_power_centered_window_f32",
+        "c_declaration": "int audio_stft_power_centered_window_f32(const float *samples, int n_samples, const float *window, int window_length, const float *cos_table, const float *sin_table, int n_fft, int hop_length, int reflect_padding, float *power, int n_frames);",
+        "sources": [
+          "src/kernels/audio_kernels.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "audio_stft_centered_explicit_window_direct_fp32",
+          "status": "validated",
+          "phases": [
+            "prefill"
+          ],
+          "function": "audio_stft_power_centered_window_f32",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "contract_defined"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp32",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "independent_outputs"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "samples",
+            "source": "activation:samples",
+            "cast": "const float*",
+            "ports": [
+              "input:samples"
+            ]
+          },
+          {
+            "name": "n_samples",
+            "source": "dim:n_samples"
+          },
+          {
+            "name": "window",
+            "source": "weight:window",
+            "cast": "const float*",
+            "ports": [
+              "weight:window"
+            ]
+          },
+          {
+            "name": "window_length",
+            "source": "dim:window_length"
+          },
+          {
+            "name": "cos_table",
+            "source": "activation:cos_table",
+            "cast": "const float*",
+            "ports": [
+              "input:cos_table"
+            ]
+          },
+          {
+            "name": "sin_table",
+            "source": "activation:sin_table",
+            "cast": "const float*",
+            "ports": [
+              "input:sin_table"
+            ]
+          },
+          {
+            "name": "n_fft",
+            "source": "dim:n_fft"
+          },
+          {
+            "name": "hop_length",
+            "source": "dim:hop_length"
+          },
+          {
+            "name": "reflect_padding",
+            "source": "dim:reflect_padding"
+          },
+          {
+            "name": "power",
+            "source": "output:power",
+            "cast": "float*",
+            "ports": [
+              "output:power"
+            ]
+          },
+          {
+            "name": "n_frames",
+            "source": "dim:n_frames"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_audio_encoder.py"
+        ],
+        "oracle": "Cohere model-window frontend fixture"
+      },
+      "name": "audio_stft_power_centered_model_window_f32",
+      "_source_file": "audio_stft_power_centered_model_window_f32.json"
     },
     {
       "id": "audio_stft_power_centered_window_f32",
