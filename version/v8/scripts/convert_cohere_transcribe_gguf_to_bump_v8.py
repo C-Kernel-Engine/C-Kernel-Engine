@@ -8,6 +8,7 @@ import importlib.util
 import json
 import math
 import os
+import re
 import struct
 import sys
 from pathlib import Path
@@ -64,7 +65,73 @@ COMPONENT_SCOPES = (
     "audio_subsampling",
     "audio_encoder_block",
     "audio_encoder",
+    "audio_decoder",
 )
+
+
+_DECODER_LAYER_WEIGHT_ROLES = {
+    "attn_ln.weight": "ln1_gamma",
+    "attn_ln.bias": "ln1_beta",
+    "attn_q.weight": "wq",
+    "attn_q.bias": "bq",
+    "attn_k.weight": "wk",
+    "attn_k.bias": "bk",
+    "attn_v.weight": "wv",
+    "attn_v.bias": "bv",
+    "attn_o.weight": "wo",
+    "attn_o.bias": "bo",
+    "cross_ln.weight": "cross_ln_gamma",
+    "cross_ln.bias": "cross_ln_beta",
+    "cross_q.weight": "cross_wq",
+    "cross_q.bias": "cross_bq",
+    "cross_k.weight": "cross_wk",
+    "cross_k.bias": "cross_bk",
+    "cross_v.weight": "cross_wv",
+    "cross_v.bias": "cross_bv",
+    "cross_o.weight": "cross_wo",
+    "cross_o.bias": "cross_bo",
+    "ffn_ln.weight": "ln2_gamma",
+    "ffn_ln.bias": "ln2_beta",
+    "ffn_up.weight": "w3",
+    "ffn_up.bias": "b1",
+    "ffn_down.weight": "w2",
+    "ffn_down.bias": "b2",
+}
+
+
+def _component_weight_name(name: str, artifact_scope: str) -> str:
+    if artifact_scope != "audio_decoder":
+        return name
+    global_names = {
+        "dec.emb.weight": "token_emb",
+        "dec.pos.weight": "pos_emb",
+        "dec.emb_ln.weight": "embedding_ln_weight",
+        "dec.emb_ln.bias": "embedding_ln_bias",
+        "dec.out_ln.weight": "final_ln_weight",
+        "dec.out_ln.bias": "final_ln_bias",
+        "dec.head.weight": "lm_head",
+        "dec.head.bias": "lm_head_bias",
+    }
+    if name in global_names:
+        return global_names[name]
+    match = re.fullmatch(r"dec\.blk\.(\d+)\.(.+)", name)
+    if match and match.group(2) in _DECODER_LAYER_WEIGHT_ROLES:
+        return f"layer.{match.group(1)}.{_DECODER_LAYER_WEIGHT_ROLES[match.group(2)]}"
+    return name
+
+
+def _component_tensors(tensors, artifact_scope: str):
+    if artifact_scope == "audio_decoder":
+        return [(name, info) for name, info in tensors.items() if name.startswith("dec.")]
+    return list(tensors.items())
+
+
+def _component_circuit_name(artifact_scope: str) -> str:
+    return (
+        "audio_transformer_decoder.json"
+        if artifact_scope == "audio_decoder"
+        else "cohere_transcribe.json"
+    )
 
 
 def _promote_to_fp32(name: str, ggml_type: int, artifact_scope: str) -> bool:
@@ -78,6 +145,8 @@ def _promote_to_fp32(name: str, ggml_type: int, artifact_scope: str) -> bool:
         return artifact_scope in {"audio_encoder_block", "audio_encoder"}
     if name.startswith("enc.proj."):
         return artifact_scope == "audio_encoder"
+    if name.startswith("dec."):
+        return artifact_scope == "audio_decoder"
     return False
 
 
@@ -130,6 +199,9 @@ def main() -> int:
         encoder_ffn_dim = positive(metadata, "cohere_transcribe.encoder.ffn_dim")
         encoder_conv_kernel = positive(metadata, "cohere_transcribe.encoder.conv_kernel")
         decoder_dim = positive(metadata, "cohere_transcribe.decoder.d_model")
+        decoder_heads = positive(metadata, "cohere_transcribe.decoder.n_heads")
+        decoder_layers = positive(metadata, "cohere_transcribe.decoder.n_layers")
+        decoder_ffn_dim = positive(metadata, "cohere_transcribe.decoder.ffn_dim")
         vocab_size = positive(metadata, "cohere_transcribe.vocab_size")
         decoder_context = positive(metadata, "cohere_transcribe.decoder.max_ctx")
         feature_frames = max_source_frames // hop_length + 1
@@ -144,6 +216,10 @@ def main() -> int:
         if encoder_heads * encoder_head_dim != encoder_dim:
             raise c.GGUFError(
                 "Cohere encoder head geometry does not match the model width"
+            )
+        if decoder_dim % decoder_heads != 0:
+            raise c.GGUFError(
+                "Cohere decoder width is not divisible by its attention heads"
             )
         stage0_frames = (feature_frames + 1) // 2
         feature_channels = positive(metadata, "cohere_transcribe.audio.n_mels")
@@ -223,9 +299,47 @@ def main() -> int:
             "audio_normalization_epsilon": 1.0e-5,
             "audio_normalization_frame_policy": "all_stft_frames",
         })
+        if args.artifact_scope == "audio_decoder":
+            config.update({
+                "embed_dim": decoder_dim,
+                "hidden_size": decoder_dim,
+                "num_heads": decoder_heads,
+                "num_attention_heads": decoder_heads,
+                "num_kv_heads": decoder_heads,
+                "num_key_value_heads": decoder_heads,
+                "head_dim": decoder_dim // decoder_heads,
+                "attention_scale": (decoder_dim // decoder_heads) ** -0.5,
+                "num_layers": decoder_layers,
+                "num_hidden_layers": decoder_layers,
+                "intermediate_size": decoder_ffn_dim,
+                "encoder_memory_length": subsampling_frames,
+                "dynamic_encoder_memory_length": True,
+                "uses_cross_attention": True,
+                "decode_kv_cache_dtype": "fp16",
+                "decoder_activation": "relu",
+                "decoder_embedding_layernorm": True,
+                "decoder_output_bias": True,
+                "tie_word_embeddings": False,
+                "has_attention_biases": True,
+                "rms_eps": 1.0e-5,
+                "prefer_q8_activation": False,
+                "prefill_policy": "encoder_decoder",
+                "audio_include_frontend": False,
+                "audio_include_subsampling": False,
+                "audio_include_encoder_blocks": False,
+                "audio_include_encoder_projection": False,
+            })
+        component_tensors = _component_tensors(tensors, args.artifact_scope)
+        if not component_tensors:
+            raise c.GGUFError(
+                f"no tensors selected for artifact scope {args.artifact_scope}"
+            )
+        component_source_names = {name for name, _ in component_tensors}
+        config["source_tensor_count"] = len(tensors)
+        config["tensor_count"] = len(component_tensors)
         entries = []
-        cursor = c.DATA_START + 4 + len(tensors)
-        for name, info in tensors.items():
+        cursor = c.DATA_START + 4 + len(component_tensors)
+        for name, info in component_tensors:
             cursor = c.align_up(cursor, 32)
             promote_to_fp32 = _promote_to_fp32(
                 info.name, info.ggml_type, args.artifact_scope
@@ -236,7 +350,7 @@ def main() -> int:
                 else c.ggml_tensor_bytes(info)
             )
             entries.append({
-                "name": name,
+                "name": _component_weight_name(name, args.artifact_scope),
                 "dtype": (
                     "fp32"
                     if promote_to_fp32 or info.ggml_type == c.GGML_TYPE_F32
@@ -252,7 +366,15 @@ def main() -> int:
                 "shape": [int(value) for value in reversed(info.dims)],
             })
             cursor += size
-        circuit = json.loads((ROOT / "version/v8/circuits/cohere_transcribe.json").read_text(encoding="utf-8"))
+        circuit_name = _component_circuit_name(args.artifact_scope)
+        circuit = json.loads(
+            (ROOT / "version/v8/circuits" / circuit_name).read_text(encoding="utf-8")
+        )
+        if args.artifact_scope == "audio_decoder":
+            circuit.setdefault("contract", {}).setdefault("artifact", {}).update({
+                "source_architecture": "cohere-transcribe",
+                "component": "decoder",
+            })
         manifest = {
             "version": 5,
             "model": "cohere_transcribe",
@@ -268,14 +390,17 @@ def main() -> int:
             "source_tensor_coverage": {
                 "total_source_tensors": len(tensors),
                 "consumed_source_tensors": len(entries),
-                "unconsumed_source_tensors": [],
+                "unconsumed_source_tensors": [
+                    name for name in tensors if name not in component_source_names
+                ],
                 "pass": True,
+                "scope": args.artifact_scope,
             },
-            "num_layers": encoder_layers,
-            "embed_dim": encoder_dim,
-            "num_heads": encoder_heads,
-            "head_dim": encoder_head_dim,
-            "intermediate_size": encoder_ffn_dim,
+            "num_layers": int(config["num_layers"]),
+            "embed_dim": int(config["embed_dim"]),
+            "num_heads": int(config["num_heads"]),
+            "head_dim": int(config["head_dim"]),
+            "intermediate_size": int(config["intermediate_size"]),
             "vocab_size": vocab_size,
             "context_length": decoder_context,
             "entries": entries,
@@ -296,13 +421,13 @@ def main() -> int:
             output.write(b"\x00" * c.HEADER_SIZE)
             output.write(b"\x00" * c.EXT_METADATA_SIZE)
             writer = c.HashingWriter(output)
-            writer.write(struct.pack("<I", len(tensors)))
+            writer.write(struct.pack("<I", len(entries)))
             writer.write(bytes(
                 c.CK_DT_FP32 if entry["dtype"] == "fp32" else c.CK_DT_FP16
                 for entry in entries
             ))
-            position = c.DATA_START + 4 + len(tensors)
-            for entry, info in zip(entries, tensors.values()):
+            position = c.DATA_START + 4 + len(entries)
+            for entry, (_, info) in zip(entries, component_tensors):
                 if int(entry["file_offset"]) > position:
                     writer.write(b"\x00" * (int(entry["file_offset"]) - position))
                 if entry.get("conversion") == "fp16_to_fp32_exact":
