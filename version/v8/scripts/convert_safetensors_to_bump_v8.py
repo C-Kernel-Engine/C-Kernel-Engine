@@ -1677,6 +1677,7 @@ def _build_config(model_dir: Path, arch: str, config_template: Path | None) -> d
             "audio_subsampling_conv_channels": conv_channels,
             "audio_subsampling_kernel_size": subsampling_kernel,
             "audio_subsampling_stride": subsampling_stride,
+            "audio_subsampling_factor": subsampling_factor,
             "audio_subsampling_output_frames": max_encoder_frames,
             "audio_subsampling_workspace_elements": workspace_elements,
             "audio_subsampling_workspace_bytes": workspace_elements * 4,
@@ -1690,6 +1691,11 @@ def _build_config(model_dir: Path, arch: str, config_template: Path | None) -> d
             "audio_include_encoder_projection": str(
                 cfg.get("artifact_scope") or ""
             ) not in {"audio_subsampling", "audio_encoder_block"},
+            "audio_tdt_duration_count": len(hf["durations"]),
+            "audio_tdt_joint_output_size": int(hf["vocab_size"]) + len(hf["durations"]),
+            "audio_include_tdt_decode": str(cfg.get("artifact_scope") or "") not in {
+                "audio_frontend", "audio_subsampling", "audio_encoder_block", "audio_encoder"
+            },
             "audio_preemphasis_coefficient": 0.97,
             "audio_log_epsilon": 2.0 ** -24,
             "audio_normalization_epsilon": 1.0e-5,

@@ -1371,6 +1371,7 @@ test-audio-v8-contracts:
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_parakeet_generated_frontend.py
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_parakeet_generated_subsampling.py
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_parakeet_generated_fastconformer.py
+	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_parakeet_generated_tdt.py
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_safetensors_to_bump.py -k "whisper_encoder or whisper_decoder"
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_whisper_runner.py
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_whisper_long_audio_certification.py
@@ -5312,6 +5313,7 @@ CK_CLI_V65 := src/v6.5/ck_cli_v6.5.c
 CK_CLI_V66 := version/v6.6/src/ck_cli_v6.6.c
 CK_CLI_V7 := version/v7/src/ck_cli_v7.c
 CK_CLI_V8 := version/v8/src/ck_cli_v8.c
+CK_AUDIO_TRANSCRIBE_V8 := version/v8/src/ck_audio_transcribe_v8.c
 CK_SAMPLER_V8 := version/v8/src/ck_sampler_v8.c
 CK_BPE_TRAIN_V7 := version/v7/src/ck_bpe_train.c
 
@@ -5426,6 +5428,13 @@ ck-cli-v8: $(BUILD_DIR)/ck-cli-v8
 	@echo "    ./$(BUILD_DIR)/ck-cli-v8 --list"
 	@echo "    ./$(BUILD_DIR)/ck-cli-v8 <model.so> <weights.bump>"
 	@echo ""
+
+$(BUILD_DIR)/ck-audio-transcribe-v8: $(CK_AUDIO_TRANSCRIBE_V8)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -o $@ $(CK_AUDIO_TRANSCRIBE_V8) -ldl
+
+ck-audio-transcribe-v8: $(BUILD_DIR)/ck-audio-transcribe-v8
+	@echo "Built: $(BUILD_DIR)/ck-audio-transcribe-v8"
 
 ck-session-v8: $(BUILD_DIR)/libck_session_v8.so
 	@echo "Built: $(BUILD_DIR)/libck_session_v8.so"
