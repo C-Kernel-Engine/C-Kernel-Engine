@@ -51,7 +51,20 @@ _NORMALIZED_LOG_MEL_FRONTEND_OPS = {
     "audio_feature_normalize",
 }
 
-_AUDIO_FRONTEND_OPS = _WHISPER_AUDIO_FRONTEND_OPS | _NORMALIZED_LOG_MEL_FRONTEND_OPS
+_MODEL_ASSET_LOG_MEL_FRONTEND_OPS = {
+    "audio_wav_decode",
+    "audio_preemphasis",
+    "audio_stft_tables",
+    "audio_stft",
+    "audio_log_mel",
+    "audio_feature_normalize",
+}
+
+_AUDIO_FRONTEND_OPS = (
+    _WHISPER_AUDIO_FRONTEND_OPS
+    | _NORMALIZED_LOG_MEL_FRONTEND_OPS
+    | _MODEL_ASSET_LOG_MEL_FRONTEND_OPS
+)
 _AUDIO_SUBSAMPLING_OPS = {"audio_fastconformer_subsampling"}
 _AUDIO_FASTCONFORMER_BLOCK_OPS = {
     "audio_relative_position",
@@ -73,6 +86,7 @@ def _has_audio_frontend(op_names: set[str]) -> bool:
     return (
         _WHISPER_AUDIO_FRONTEND_OPS.issubset(op_names)
         or _NORMALIZED_LOG_MEL_FRONTEND_OPS.issubset(op_names)
+        or _MODEL_ASSET_LOG_MEL_FRONTEND_OPS.issubset(op_names)
     )
 
 
@@ -443,7 +457,10 @@ def _emit_audio_wav_entrypoint(
     }
     if not by_op:
         return ""
-    if _NORMALIZED_LOG_MEL_FRONTEND_OPS.issubset(by_op):
+    if (
+        _NORMALIZED_LOG_MEL_FRONTEND_OPS.issubset(by_op)
+        or _MODEL_ASSET_LOG_MEL_FRONTEND_OPS.issubset(by_op)
+    ):
         return _emit_normalized_log_mel_entrypoint(by_op, config)
 
     missing = sorted(_WHISPER_AUDIO_FRONTEND_OPS - set(by_op))
@@ -569,11 +586,49 @@ def _emit_normalized_log_mel_entrypoint(
         raise RuntimeError(
             "normalized log-Mel frontend requires explicit positive extents"
         )
+    normalization_frame_policy = str(
+        config.get("audio_normalization_frame_policy")
+        or "exclude_terminal_padding"
+    )
+    if normalization_frame_policy == "all_stft_frames":
+        normalization_frames = "required_frames"
+    elif normalization_frame_policy == "exclude_terminal_padding":
+        normalization_frames = "live_frames"
+    else:
+        raise RuntimeError(
+            "normalized log-Mel frontend has unsupported "
+            f"audio_normalization_frame_policy={normalization_frame_policy!r}"
+        )
 
-    calls = {
-        name: _audio_call_expression(by_op[name])
-        for name in _NORMALIZED_LOG_MEL_FRONTEND_OPS
-    }
+    frontend_asset_policy = str(
+        config.get("audio_frontend_asset_policy") or "generated_tables"
+    )
+    if frontend_asset_policy == "generated_tables":
+        required = _NORMALIZED_LOG_MEL_FRONTEND_OPS
+    elif frontend_asset_policy == "model_assets":
+        required = _MODEL_ASSET_LOG_MEL_FRONTEND_OPS
+    else:
+        raise RuntimeError(
+            "normalized log-Mel frontend has unsupported "
+            f"audio_frontend_asset_policy={frontend_asset_policy!r}"
+        )
+    missing = sorted(required - set(by_op))
+    if missing:
+        raise RuntimeError(
+            f"normalized log-Mel {frontend_asset_policy} frontend missing ops: "
+            + ", ".join(missing)
+        )
+    calls = {name: _audio_call_expression(by_op[name]) for name in required}
+    prepare_window = (
+        f'if ({calls["audio_hann_window"]} != 0) return -7;'
+        if "audio_hann_window" in calls
+        else ""
+    )
+    prepare_mel_filters = (
+        f'if ({calls["audio_mel_filters"]} != 0) return -11;'
+        if "audio_mel_filters" in calls
+        else ""
+    )
     preemphasis = _audio_call_expression(
         by_op["audio_preemphasis"],
         source_overrides={"dim:frames": "audio_source_frames"},
@@ -592,7 +647,7 @@ def _emit_normalized_log_mel_entrypoint(
     normalize = _audio_call_expression(
         by_op["audio_feature_normalize"],
         source_overrides={
-            "dim:frames": "live_frames",
+            "dim:frames": normalization_frames,
             "output:output": "audio_features",
         },
     )
@@ -625,10 +680,10 @@ CK_EXPORT int ck_model_prepare_audio_wav_features(
     const int audio_source_frames = {calls["audio_wav_decode"]};
     if (audio_source_frames != audio_wav_info->frames) return -5;
     if ({preemphasis} != 0) return -6;
-    if ({calls["audio_hann_window"]} != 0) return -7;
+    {prepare_window}
     if ({calls["audio_stft_tables"]} != 0) return -8;
     if ({stft} != 0) return -9;
-    if ({calls["audio_mel_filters"]} != 0) return -11;
+    {prepare_mel_filters}
     if ({log_mel} != 0) return -12;
     memset(
         audio_features,

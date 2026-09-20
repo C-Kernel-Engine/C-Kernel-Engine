@@ -74,28 +74,40 @@ def _runtime_artifacts(runtime_dir: Path, manifest_map: Path) -> dict[str, Path]
     }
 
 
-def create_build_manifest(runtime_dir: Path, manifest_map: Path) -> dict[str, object]:
+def create_build_manifest(
+    runtime_dir: Path,
+    manifest_map: Path,
+    compiler_sources: dict[str, Path] | None = None,
+) -> dict[str, object]:
     runtime_dir = runtime_dir.resolve()
+    sources = compiler_sources or COMPILER_SOURCES
     artifacts = _runtime_artifacts(runtime_dir, manifest_map.resolve())
-    missing = [str(path) for path in (*artifacts.values(), *COMPILER_SOURCES.values()) if not path.is_file()]
+    missing = [
+        str(path)
+        for path in (*artifacts.values(), *sources.values())
+        if not path.is_file()
+    ]
     if missing:
         raise FileNotFoundError("missing generated build input: " + ", ".join(missing))
     return {
         "schema": BUILD_MANIFEST_SCHEMA,
         "artifacts": {name: _identity(path) for name, path in artifacts.items()},
         "compiler_sources": {
-            name: _identity(path) for name, path in COMPILER_SOURCES.items()
+            name: _identity(path) for name, path in sources.items()
         },
     }
 
 
 def _validate_build_manifest(
-    manifest_path: Path, runtime_dir: Path, manifest_map: Path
+    manifest_path: Path,
+    runtime_dir: Path,
+    manifest_map: Path,
+    compiler_sources: dict[str, Path] | None = None,
 ) -> dict[str, object]:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if manifest.get("schema") != BUILD_MANIFEST_SCHEMA:
         raise ValueError("generated runtime build manifest has an unsupported schema")
-    current = create_build_manifest(runtime_dir, manifest_map)
+    current = create_build_manifest(runtime_dir, manifest_map, compiler_sources)
     for section in ("artifacts", "compiler_sources"):
         expected_rows = manifest.get(section)
         if not isinstance(expected_rows, dict):
@@ -126,20 +138,24 @@ def _resolved_symbol_library(library: ctypes.CDLL, symbol: str) -> Path:
     return Path(os.fsdecode(info.dli_fname)).resolve()
 
 
-def _verify_loaded_libraries(library: ctypes.CDLL, runtime_dir: Path) -> dict[str, Path]:
+def _verify_loaded_libraries(
+    library: ctypes.CDLL,
+    runtime_dir: Path,
+    symbols: dict[str, str] | None = None,
+) -> dict[str, Path]:
     requested = {
         "model_library": runtime_dir / "libmodel.so",
         "engine_library": runtime_dir / "libckernel_engine.so",
         "tokenizer_library": runtime_dir / "libckernel_tokenizer.so",
     }
-    symbols = {
+    resolved_symbols = symbols or {
         "model_library": "ck_model_prepare_audio_wav_features",
         "engine_library": "ck_set_num_threads",
         "tokenizer_library": "ck_tokenizer_create",
     }
     loaded = {
         name: _resolved_symbol_library(library, symbol)
-        for name, symbol in symbols.items()
+        for name, symbol in resolved_symbols.items()
     }
     for name, path in loaded.items():
         expected = requested[name].resolve()
@@ -151,11 +167,15 @@ def _verify_loaded_libraries(library: ctypes.CDLL, runtime_dir: Path) -> dict[st
     return loaded
 
 
-def _load_expected_fixture(path: Path, expected_channels: int) -> np.ndarray:
+def _load_expected_fixture(
+    path: Path,
+    expected_channels: int,
+    fixture_key: str = "frontend.input_features",
+) -> np.ndarray:
     with np.load(path, allow_pickle=False) as fixture:
-        if "frontend.input_features" not in fixture:
-            raise ValueError("fixture missing frontend.input_features")
-        raw = fixture["frontend.input_features"]
+        if fixture_key not in fixture:
+            raise ValueError(f"fixture missing {fixture_key}")
+        raw = fixture[fixture_key]
     if raw.dtype != np.float32:
         raise ValueError(f"frontend fixture must be float32, got {raw.dtype}")
     if raw.ndim != 3 or raw.shape[0] != 1:
@@ -178,6 +198,13 @@ def certify(
     wav_path: Path,
     fixture_path: Path,
     build_manifest_path: Path,
+    *,
+    compiler_sources: dict[str, Path] | None = None,
+    fixture_key: str = "frontend.input_features",
+    schema: str = "cke.parakeet.generated_frontend_certification.v1",
+    require_terminal_padding_zero: bool = True,
+    claim_boundary: dict[str, str] | None = None,
+    loaded_library_symbols: dict[str, str] | None = None,
 ) -> dict[str, object]:
     runtime_dir = runtime_dir.resolve()
     artifacts = _runtime_artifacts(runtime_dir, manifest_map.resolve())
@@ -196,14 +223,17 @@ def certify(
         wav_path,
         fixture_path,
         build_manifest_path,
-        *COMPILER_SOURCES.values(),
+        *(compiler_sources or COMPILER_SOURCES).values(),
     )
     missing = [str(path) for path in required if not path.is_file()]
     if missing:
         raise FileNotFoundError("missing generated frontend evidence: " + ", ".join(missing))
 
     build_manifest = _validate_build_manifest(
-        build_manifest_path.resolve(), runtime_dir, manifest_map.resolve()
+        build_manifest_path.resolve(),
+        runtime_dir,
+        manifest_map.resolve(),
+        compiler_sources,
     )
     call_ir = json.loads(call_path.read_text(encoding="utf-8"))
     config = call_ir.get("config")
@@ -212,11 +242,13 @@ def certify(
     expected_channels = int(config.get("audio_feature_channels", 0) or 0)
     if expected_channels <= 0:
         raise ValueError("generated call IR has invalid audio_feature_channels")
-    expected = _load_expected_fixture(fixture_path, expected_channels)
+    expected = _load_expected_fixture(fixture_path, expected_channels, fixture_key)
 
     mode = getattr(ctypes, "RTLD_GLOBAL", 0)
     library = ctypes.CDLL(str(library_path), mode=mode)
-    loaded_libraries = _verify_loaded_libraries(library, runtime_dir)
+    loaded_libraries = _verify_loaded_libraries(
+        library, runtime_dir, loaded_library_symbols
+    )
     u8p = ctypes.POINTER(ctypes.c_uint8)
     f32p = ctypes.POINTER(ctypes.c_float)
     library.ck_model_init_with_manifest.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
@@ -269,14 +301,15 @@ def certify(
         "run_success": run_status == 0,
         "shape_exact": int(produced.value) == expected.shape[0],
         "finite": finite,
-        "padding_row_exact_zero": bool(
-            run_status == 0 and np.array_equal(actual[-1], np.zeros_like(actual[-1]))
-        ),
         "rmse_within_5e_4": rmse <= 5.0e-4,
         "max_abs_within_5e_2": max_abs <= MAX_ABS_TOLERANCE,
     }
+    if require_terminal_padding_zero:
+        checks["padding_row_exact_zero"] = bool(
+            run_status == 0 and np.array_equal(actual[-1], np.zeros_like(actual[-1]))
+        )
     return {
-        "schema": "cke.parakeet.generated_frontend_certification.v1",
+        "schema": schema,
         "status": "pass" if all(checks.values()) else "fail",
         "scope": "generated_c_frontend_only",
         "checks": checks,
@@ -308,7 +341,8 @@ def certify(
             "wav": _identity(wav_path),
             "fixture": _identity(fixture_path),
             "compiler_sources": {
-                name: _identity(path) for name, path in COMPILER_SOURCES.items()
+                name: _identity(path)
+                for name, path in (compiler_sources or COMPILER_SOURCES).items()
             },
             "loaded_libraries": {
                 name: _identity(path) for name, path in loaded_libraries.items()
@@ -318,7 +352,7 @@ def certify(
                 "schema": build_manifest["schema"],
             },
         },
-        "claim_boundary": {
+        "claim_boundary": claim_boundary or {
             "frontend": "certified",
             "subsampling": "not_tested",
             "encoder": "not_generated",
