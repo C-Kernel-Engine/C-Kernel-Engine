@@ -174,14 +174,10 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         args, rows=rows, run_id=run_id, git_commit=git_commit,
         started_at=started_at, started=started,
     ))
-    for name in args.profile:
+    for profile_index, name in enumerate(args.profile):
         profile = PROFILES[name]
         run_dir = args.run_root / name
         report_path = run_dir / "training_workflow.json"
-        report_path.parent.mkdir(parents=True, exist_ok=True)
-        if report_path.exists():
-            report_path.unlink()
-        case_started_ns = time.time_ns()
         command = [
             args.python, str(args.workflow), "--run-dir", str(run_dir), "--json-out", str(report_path),
             "--corpus", str(args.corpus), "--matrix-run-id", run_id, "--matrix-case-id", name,
@@ -198,6 +194,30 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "requested": _expected_config(profile, args), "report": str(report_path),
             "run_dir": str(run_dir), "command": command,
         }
+        try:
+            report_path.parent.mkdir(parents=True, exist_ok=True)
+            if report_path.exists():
+                report_path.unlink()
+        except OSError as exc:
+            row.update({"failure_kind": "infrastructure_error", "fatal": True,
+                        "error": f"{type(exc).__name__}: {exc}", "returncode": None,
+                        "wall_seconds": time.perf_counter() - case_started})
+            rows.append(row)
+            for pending_name in args.profile[profile_index + 1:]:
+                pending_profile = PROFILES[pending_name]
+                rows.append({
+                    "profile": pending_name, "case_id": pending_name, "passed": False,
+                    "requested": _expected_config(pending_profile, args),
+                    "report": str(args.run_root / pending_name / "training_workflow.json"),
+                    "run_dir": str(args.run_root / pending_name), "failure_kind": "unexecuted",
+                    "reason": f"not run after fatal infrastructure failure in {name}",
+                })
+            _write_json(args.report, _result(
+                args, rows=rows, run_id=run_id, git_commit=git_commit,
+                started_at=started_at, started=started,
+            ))
+            break
+        case_started_ns = time.time_ns()
         try:
             returncode, stdout = _execute(command, float(args.case_timeout))
             row.update({"returncode": returncode, "stdout_tail": stdout[-4000:]})
@@ -272,10 +292,14 @@ def main() -> int:
     try:
         result = run(args)
     except Exception as exc:
-        result = {
-            "schema": "cke.v8.training_matrix.v2", "status": "FAIL", "passed": False,
-            "fatal_error": f"{type(exc).__name__}: {exc}", "cases": [],
-        }
+        try:
+            previous = json.loads(args.report.read_text(encoding="utf-8"))
+            result = previous if isinstance(previous, dict) else {}
+        except (OSError, UnicodeError, json.JSONDecodeError):
+            result = {}
+        result.update({"schema": "cke.v8.training_matrix.v2", "status": "FAIL", "passed": False,
+                       "fatal_error": f"{type(exc).__name__}: {exc}"})
+        result.setdefault("cases", [])
     _write_json(args.report, result)
     print(json.dumps({"status": result["status"], "report": str(args.report)}, indent=2))
     return 0 if result["passed"] else 1

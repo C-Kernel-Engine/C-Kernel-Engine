@@ -6,6 +6,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "version" / "v8" / "scripts" / "run_training_matrix_v8.py"
@@ -89,6 +90,38 @@ class V8TrainingMatrixTests(unittest.TestCase):
             for key in expected:
                 altered = json.loads(json.dumps(document)); altered["configuration"][key] = "wrong"
                 self.assertIn(f"configuration.{key}", self.matrix._validate_case_report(altered, **kwargs))
+
+    def test_fatal_directory_error_preserves_completed_and_marks_remaining(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td); fake = root / "fake.py"
+            fake.write_text(
+                "import pathlib,sys\na=sys.argv\nout=pathlib.Path(a[a.index('--json-out')+1]); out.write_text('{bad')\n",
+                encoding="utf-8",
+            )
+            args = self._args(root, fake, ["4l_dense", "6l_gqa", "10l_gqa"])
+            (args.run_root / "4l_dense").mkdir(parents=True)
+            (args.run_root / "6l_gqa").write_text("blocks directory creation", encoding="utf-8")
+            result = self.matrix.run(args)
+            self.assertEqual([row["failure_kind"] for row in result["cases"]],
+                             ["malformed_report", "infrastructure_error", "unexecuted"])
+            self.assertTrue(result["cases"][1]["fatal"])
+            published = json.loads(args.report.read_text(encoding="utf-8"))
+            self.assertEqual([row["profile"] for row in published["cases"]],
+                             ["4l_dense", "6l_gqa", "10l_gqa"])
+
+    def test_top_level_fatal_error_does_not_erase_partial_report(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            report = Path(td) / "matrix.json"
+            report.write_text(json.dumps({"schema": "cke.v8.training_matrix.v2",
+                                          "cases": [{"profile": "4l_dense", "passed": True}]}), encoding="utf-8")
+            argv = [str(SCRIPT), "--json-out", str(report), "--run-root", str(Path(td) / "runs")]
+            with mock.patch.object(sys, "argv", argv), mock.patch.object(
+                self.matrix, "run", side_effect=RuntimeError("injected fatal error")
+            ):
+                self.assertEqual(self.matrix.main(), 1)
+            published = json.loads(report.read_text(encoding="utf-8"))
+            self.assertEqual(published["cases"], [{"profile": "4l_dense", "passed": True}])
+            self.assertIn("injected fatal error", published["fatal_error"])
 
 
 if __name__ == "__main__":
