@@ -197,6 +197,16 @@ void gemm_nt_f32_llama_production_parallel_dispatch(
     const float *A, const float *B, const float *bias, float *C,
     int M, int N, int K);
 
+/* Opt-in diagnosis for the production FP32 GEMM dispatcher. Profiling uses a
+ * fixed-capacity table and is disabled until reset, so ordinary execution has
+ * no allocation or clock-read overhead. */
+void ck_f32_gemm_profile_reset(void);
+size_t ck_f32_gemm_profile_count(void);
+uint64_t ck_f32_gemm_profile_overflow_calls(void);
+int ck_f32_gemm_profile_get(
+    size_t index, int *M, int *N, int *K, int *active_threads,
+    int *parallel, uint64_t *calls, uint64_t *elapsed_ns);
+
 void gemm_nt_q5_k_parallel_dispatch_with_scratch(
     const float *A, const void *B, const float *bias, float *C,
     int M, int N, int K, void *scratch, size_t scratch_bytes);

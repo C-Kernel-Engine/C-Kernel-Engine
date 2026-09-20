@@ -23,6 +23,21 @@ typedef int (*ck_forward_fn)(float *);
 typedef int (*ck_decode_step_fn)(int32_t, float *);
 typedef int (*ck_decode_tokens_fn)(const int32_t *, int, char *, int);
 typedef int (*ck_stop_fn)(int32_t);
+typedef void (*ck_profile_reset_fn)(void);
+typedef size_t (*ck_profile_count_fn)(void);
+typedef uint64_t (*ck_profile_overflow_fn)(void);
+typedef int (*ck_profile_get_fn)(
+    size_t, int *, int *, int *, int *, int *, uint64_t *, uint64_t *);
+typedef int (*ck_get_threads_fn)(void);
+typedef void *(*ck_threadpool_global_fn)(void);
+typedef void (*ck_threadpool_profile_reset_fn)(void *);
+typedef struct {
+    uint64_t dispatch_count;
+    uint64_t dispatch_total_ns;
+    uint64_t main_work_ns;
+    uint64_t completion_wait_ns;
+} CKThreadpoolProfile;
+typedef void (*ck_threadpool_profile_snapshot_fn)(const void *, CKThreadpoolProfile *);
 
 typedef struct {
     void *handle;
@@ -252,6 +267,43 @@ static int ck_argmax(const float *values, int count) {
     return best;
 }
 
+static int ck_profile_requested(void) {
+    const char *value = getenv("CK_AUDIO_PERF_PROFILE");
+    return value && value[0] && strcmp(value, "0") != 0;
+}
+
+static void ck_print_gemm_profile(
+    size_t window_index, ck_profile_count_fn count_fn,
+    ck_profile_overflow_fn overflow_fn, ck_profile_get_fn get_fn) {
+    const size_t count = count_fn();
+    for (size_t index = 0; index < count; ++index) {
+        int M, N, K, active_threads, parallel;
+        uint64_t calls, elapsed_ns;
+        if (get_fn(index, &M, &N, &K, &active_threads, &parallel,
+                   &calls, &elapsed_ns) != 0) continue;
+        fprintf(stderr,
+                "gemm_profile window=%zu M=%d N=%d K=%d active_threads=%d "
+                "mode=%s calls=%" PRIu64 " elapsed_ns=%" PRIu64 "\n",
+                window_index, M, N, K, active_threads,
+                parallel ? "parallel" : "serial", calls, elapsed_ns);
+    }
+    fprintf(stderr, "gemm_profile_summary window=%zu shapes=%zu overflow_calls=%" PRIu64 "\n",
+            window_index, count, overflow_fn());
+}
+
+static void ck_print_threadpool_profile(
+    size_t window_index, ck_threadpool_profile_snapshot_fn snapshot_fn,
+    void *pool) {
+    CKThreadpoolProfile profile = {0};
+    snapshot_fn(pool, &profile);
+    fprintf(stderr,
+            "threadpool_profile window=%zu dispatches=%" PRIu64
+            " total_ns=%" PRIu64 " main_work_ns=%" PRIu64
+            " completion_wait_ns=%" PRIu64 "\n",
+            window_index, profile.dispatch_count, profile.dispatch_total_ns,
+            profile.main_work_ns, profile.completion_wait_ns);
+}
+
 int main(int argc, char **argv) {
     CKComponent encoder = {0}, decoder = {0};
     CKWav wav = {0};
@@ -265,6 +317,13 @@ int main(int argc, char **argv) {
     uint64_t consumed_frames = 0;
     int last_token_count = 0;
     int exit_code = 1, encoder_initialized = 0, decoder_initialized = 0;
+    ck_profile_reset_fn profile_reset = NULL;
+    ck_profile_count_fn profile_count = NULL;
+    ck_profile_overflow_fn profile_overflow = NULL;
+    ck_profile_get_fn profile_get = NULL;
+    void *profile_pool = NULL;
+    ck_threadpool_profile_reset_fn threadpool_profile_reset = NULL;
+    ck_threadpool_profile_snapshot_fn threadpool_profile_snapshot = NULL;
 
     if (argc != 8 && argc != 9) {
         fprintf(stderr, "usage: %s ENCODER_SO ENCODER_WEIGHTS ENCODER_MAP "
@@ -292,6 +351,35 @@ int main(int argc, char **argv) {
     encoder_initialized = 1;
     if (ck_open_component(&decoder, argv[4], argv[5], argv[6]) != 0) goto done;
     decoder_initialized = 1;
+
+    if (ck_profile_requested()) {
+        *(void **)(&profile_reset) = dlsym(encoder.handle, "ck_f32_gemm_profile_reset");
+        *(void **)(&profile_count) = dlsym(encoder.handle, "ck_f32_gemm_profile_count");
+        *(void **)(&profile_overflow) = dlsym(
+            encoder.handle, "ck_f32_gemm_profile_overflow_calls");
+        *(void **)(&profile_get) = dlsym(encoder.handle, "ck_f32_gemm_profile_get");
+        if (!profile_reset || !profile_count || !profile_overflow || !profile_get) {
+            fprintf(stderr, "generated encoder lacks FP32 GEMM profiling API\n");
+            goto done;
+        }
+        ck_get_threads_fn get_threads = NULL;
+        ck_threadpool_global_fn threadpool_global = NULL;
+        *(void **)(&get_threads) = dlsym(encoder.handle, "ck_get_num_threads");
+        *(void **)(&threadpool_global) = dlsym(encoder.handle, "ck_threadpool_global");
+        *(void **)(&threadpool_profile_reset) = dlsym(
+            encoder.handle, "ck_threadpool_profile_reset");
+        *(void **)(&threadpool_profile_snapshot) = dlsym(
+            encoder.handle, "ck_threadpool_profile_snapshot");
+        if (!threadpool_global || !threadpool_profile_reset ||
+            !threadpool_profile_snapshot) {
+            fprintf(stderr, "generated encoder lacks thread-pool profiling API\n");
+            goto done;
+        }
+        profile_pool = threadpool_global();
+        fprintf(stderr, "audio_runtime_profile requested_threads=%s actual_threads=%d\n",
+                getenv("CK_NUM_THREADS") ? getenv("CK_NUM_THREADS") : "auto",
+                get_threads ? get_threads() : -1);
+    }
 
 #define LOAD_ENCODER(type, name) type name; *(void **)(&name) = ck_symbol(encoder.handle, #name)
 #define LOAD_DECODER(type, name) type name; *(void **)(&name) = ck_symbol(decoder.handle, #name)
@@ -403,6 +491,10 @@ int main(int argc, char **argv) {
             goto done;
         }
         encoder_started = ck_now();
+        if (profile_reset) {
+            profile_reset();
+            threadpool_profile_reset(profile_pool);
+        }
         if (ck_model_run_audio_encoder(
                 features, feature_frames,
                 (int)((segment.end_frame - segment.start_frame) / (uint32_t)hop_length),
@@ -411,6 +503,12 @@ int main(int argc, char **argv) {
             free(window);
             fprintf(stderr, "generated encoder failed for window %zu\n", window_index);
             goto done;
+        }
+        if (profile_reset) {
+            ck_print_gemm_profile(
+                window_index, profile_count, profile_overflow, profile_get);
+            ck_print_threadpool_profile(
+                window_index, threadpool_profile_snapshot, profile_pool);
         }
         decoder_started = ck_now();
         ck_model_kv_cache_reset();
