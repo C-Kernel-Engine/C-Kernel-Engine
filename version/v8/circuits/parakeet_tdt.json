@@ -98,6 +98,16 @@
           "pattern": "joint.*",
           "reason": "encoder_block_component_excludes_transducer_joint",
           "when": {"config_key": "artifact_scope", "equals": "audio_encoder_block"}
+        },
+        {
+          "pattern": "decoder.*",
+          "reason": "generated_encoder_component_excludes_transducer_decoder",
+          "when": {"config_key": "artifact_scope", "equals": "audio_encoder"}
+        },
+        {
+          "pattern": "joint.*",
+          "reason": "generated_encoder_component_excludes_transducer_joint",
+          "when": {"config_key": "artifact_scope", "equals": "audio_encoder"}
         }
       ]
     }
@@ -113,6 +123,7 @@
     "audio_fastconformer_subsampling": "audio_fastconformer_subsampling_f32",
     "audio_relative_position": "audio_relative_sinusoidal_position_f32",
     "audio_fastconformer_block": "audio_fastconformer_block_f32",
+    "audio_encoder_projection": "gemm_nt_f32_llama_production",
     "relative_position": "audio_relative_sinusoidal_position_f32",
     "relative_attention": "audio_conformer_relative_attention_f32",
     "grouped_conv1d": "audio_conv1d_channel_major_grouped_f32",
@@ -133,7 +144,8 @@
     "audio_features": {"shape": [{"config": "audio_feature_frames"}, {"config": "audio_feature_channels"}]},
     "audio_features_normalized": {"shape": [{"config": "audio_feature_frames"}, {"config": "audio_feature_channels"}]},
     "audio_encoder_tokens": {"shape": [{"config": "audio_subsampling_output_frames"}, {"config": "hidden_size"}]},
-    "audio_relative_positions": {"shape": [{"config": "audio_relative_position_frames"}, {"config": "hidden_size"}]}
+    "audio_relative_positions": {"shape": [{"config": "audio_relative_position_frames"}, {"config": "hidden_size"}]},
+    "audio_encoder_projected": {"shape": [{"config": "audio_subsampling_output_frames"}, {"config": "audio_encoder_projection_size"}]}
   },
   "activation_bindings": {
     "audio_samples": "audio_samples",
@@ -147,7 +159,8 @@
     "audio_features": "audio_features",
     "audio_features_normalized": "audio_features_normalized",
     "audio_encoder_tokens": "audio_encoder_tokens",
-    "audio_relative_positions": "audio_relative_positions"
+    "audio_relative_positions": "audio_relative_positions",
+    "audio_encoder_projected": "audio_encoder_projected"
   },
   "block_configs": {
     "frontend": {"artifact_scope": "audio_frontend"}
@@ -355,7 +368,30 @@
             }
           }
         ]
-      }
+      },
+      "encoder_projection": [
+        {
+          "id": "encoder_projection",
+          "op": "audio_encoder_projection",
+          "when": {
+            "config_key": "audio_include_encoder_projection",
+            "equals": true
+          },
+          "params": {
+            "seq_len_from_config": "audio_subsampling_output_frames",
+            "_input_dim_from_config": "hidden_size",
+            "_output_dim_from_config": "audio_encoder_projection_size"
+          },
+          "graph_slots": {
+            "inputs": {"A": "audio_encoder_tokens"},
+            "outputs": {"C": "audio_encoder_projected"}
+          },
+          "weight_refs": {
+            "weight": "encoder_projector.weight",
+            "bias": "encoder_projector.bias"
+          }
+        }
+      ]
     },
     "transducer": {"sequence": ["embedding_lookup", "lstm", "decoder_projection", "joint_relu", "joint_head", "tdt_greedy_step"]}
   }
