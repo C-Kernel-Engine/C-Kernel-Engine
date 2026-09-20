@@ -43,6 +43,9 @@
   kernels prepare the log-Mel grid, the generated encoder writes an
   immutable encoder memory once, and the generated decoder reads it on
   every cross-attention step while its own KV-cache grows token by token.
+  For the tensor-edge view of that encoder memory &mdash; one producer, six
+  per-layer cross-projection consumers, prefill/decode lifecycle &mdash; see
+  the <a href="whisper-tensor-trace.html">Whisper tensor trace deep dive</a>.
 </p>
 
 <div style="overflow-x:auto; margin:2rem 0;">

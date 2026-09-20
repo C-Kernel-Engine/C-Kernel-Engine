@@ -1069,6 +1069,9 @@
   kernels prepare the log-Mel grid, the generated encoder writes an
   immutable encoder memory once, and the generated decoder reads it on
   every cross-attention step while its own KV-cache grows token by token.
+  For the tensor-edge view of that encoder memory &mdash; one producer, six
+  per-layer cross-projection consumers, prefill/decode lifecycle &mdash; see
+  the <a href="whisper-tensor-trace.html">Whisper tensor trace deep dive</a>.
 </p>
 
 <div style="overflow-x:auto; margin:2rem 0;">
@@ -1837,6 +1840,7 @@ make test-whisper-pytorch-e2e-auto</code></pre>
             }
         });
     })();
+
     // Site search keyboard shortcuts: "/" or Ctrl+K / Cmd+K focuses the header search box.
     (function() {
         var searchInput = document.getElementById('site-search-input');
@@ -1901,7 +1905,7 @@ make test-whisper-pytorch-e2e-auto</code></pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-09-06</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-09-20</p>
             </div>
         </div>
     </footer>
