@@ -1513,6 +1513,37 @@ test-cohere-transcribe-long-audio-auto: $(BUILD_DIR)/libckernel_engine.so $(LIB_
 			--output "$$output_dir/certification.json"; \
 	fi
 
+.PHONY: test-cohere-transcribe-generated-long-audio-auto
+test-cohere-transcribe-generated-long-audio-auto:
+	@if [ -z "$$CK_COHERE_GENERATED_ENCODER_RUNTIME" ] || \
+	    [ -z "$$CK_COHERE_GENERATED_DECODER_RUNTIME" ] || \
+	    [ -z "$$CK_COHERE_TRANSCRIBE_LONG_AUDIO" ] || \
+	    [ -z "$$CK_COHERE_TRANSCRIBE_SPEECH_SEGMENTS" ] || \
+	    [ -z "$$CK_COHERE_GENERATED_LONG_REFERENCE" ]; then \
+		echo "SKIP: set CK_COHERE_GENERATED_ENCODER_RUNTIME, CK_COHERE_GENERATED_DECODER_RUNTIME, CK_COHERE_TRANSCRIBE_LONG_AUDIO, CK_COHERE_TRANSCRIBE_SPEECH_SEGMENTS, and CK_COHERE_GENERATED_LONG_REFERENCE"; \
+	else \
+		output_dir="$${CK_COHERE_GENERATED_LONG_OUTPUT:-build/cohere-generated-long-audio}"; \
+		mkdir -p "$$output_dir"; \
+		$(PYTHON) $(PYTHONFLAGS) version/v8/scripts/export_audio_segment_plan_v8.py \
+			--vad "$$CK_COHERE_TRANSCRIBE_SPEECH_SEGMENTS" \
+			--audio "$$CK_COHERE_TRANSCRIBE_LONG_AUDIO" \
+			--output "$$output_dir/segments.txt" && \
+		$(CC) $(CFLAGS) -std=c11 -Wall -Wextra -Werror \
+			version/v8/src/ck_audio_encoder_decoder_transcribe_v8.c \
+			-ldl -o "$$output_dir/cohere-transcribe" && \
+		$(PYTHON) $(PYTHONFLAGS) version/v8/scripts/run_cohere_generated_long_audio_v8.py \
+			--host "$$output_dir/cohere-transcribe" \
+			--host-source version/v8/src/ck_audio_encoder_decoder_transcribe_v8.c \
+			--source-revision "$$(git rev-parse HEAD)" \
+			--encoder-runtime "$$CK_COHERE_GENERATED_ENCODER_RUNTIME" \
+			--decoder-runtime "$$CK_COHERE_GENERATED_DECODER_RUNTIME" \
+			--input "$$CK_COHERE_TRANSCRIBE_LONG_AUDIO" \
+			--segment-plan "$$output_dir/segments.txt" \
+			--reference-report "$$CK_COHERE_GENERATED_LONG_REFERENCE" \
+			--timeout "$${CK_COHERE_GENERATED_LONG_TIMEOUT:-7200}" \
+			--output "$$output_dir/certification.json"; \
+	fi
+
 # Policy:
 # - Keep public/operator-facing test entrypoints version-neutral (`make test`,
 #   `make nightly`, `make regression-fast`, future `make vision-test`,
