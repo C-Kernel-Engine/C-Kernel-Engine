@@ -1686,6 +1686,10 @@ def _build_config(model_dir: Path, arch: str, config_template: Path | None) -> d
             "audio_fastconformer_batch_norm_epsilon": 1.0e-5,
             "audio_fastconformer_block_workspace_elements": block_workspace_elements,
             "audio_fastconformer_block_workspace_bytes": block_workspace_elements * 4,
+            "audio_encoder_projection_size": int(hf["decoder_hidden_size"]),
+            "audio_include_encoder_projection": str(
+                cfg.get("artifact_scope") or ""
+            ) not in {"audio_subsampling", "audio_encoder_block"},
             "audio_preemphasis_coefficient": 0.97,
             "audio_log_epsilon": 2.0 ** -24,
             "audio_normalization_epsilon": 1.0e-5,

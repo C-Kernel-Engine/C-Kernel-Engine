@@ -158,6 +158,80 @@ class GeneratedParakeetFastConformerTests(unittest.TestCase):
                 },
             )
 
+    def test_encoder_projection_entrypoint_uses_resolved_provider(self) -> None:
+        operation = {
+            "op": "audio_encoder_projection",
+            "function": "resolved_projection",
+            "args": [
+                {"name": "A", "source": "activation:a", "expr": "old_input"},
+                {"name": "B", "source": "weight:_first_weight", "expr": "projector_weight"},
+                {"name": "bias", "source": "weight_f:_bias", "expr": "projector_bias"},
+                {"name": "C", "source": "output:c", "expr": "old_output"},
+                {"name": "M", "source": "runtime:seq_len", "expr": "93"},
+                {"name": "N", "source": "dim:_output_dim", "expr": "640"},
+                {"name": "K", "source": "dim:_input_dim", "expr": "1024"},
+            ],
+        }
+        generated = codegen._emit_audio_encoder_projection_entrypoint(
+            [operation],
+            {
+                "audio_subsampling_output_frames": 93,
+                "hidden_size": 1024,
+                "audio_encoder_projection_size": 640,
+            },
+        )
+        self.assertIn("ck_model_run_audio_encoder_projection", generated)
+        self.assertIn(
+            "resolved_projection(input, projector_weight, projector_bias, output, frames, 640, 1024)",
+            generated,
+        )
+        self.assertIn("frames > 93", generated)
+
+    def test_native_encoder_schedule_is_derived_from_resolved_operations(self) -> None:
+        operations = [
+            {"op": "audio_fastconformer_subsampling"},
+            {"op": "audio_relative_position"},
+            _operation(0),
+            _operation(1),
+            {"op": "audio_encoder_projection"},
+        ]
+        generated = codegen._emit_audio_encoder_entrypoint(
+            operations,
+            {
+                "audio_feature_frames": 32,
+                "audio_subsampling_output_frames": 4,
+                "audio_feature_channels": 6,
+                "hidden_size": 8,
+                "audio_encoder_projection_size": 5,
+            },
+        )
+        self.assertIn("CK_EXPORT int ck_model_run_audio_encoder", generated)
+        self.assertLess(
+            generated.index("\n        0, hidden_a, relative_positions"),
+            generated.index("\n        1, hidden_b, relative_positions"),
+        )
+        self.assertIn(
+            "ck_model_run_audio_encoder_projection(\n        hidden_a",
+            generated,
+        )
+
+    def test_native_encoder_rejects_incomplete_resolved_schedule(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "resolved sequence"):
+            codegen._emit_audio_encoder_entrypoint(
+                [
+                    {"op": "audio_fastconformer_subsampling"},
+                    _operation(0),
+                    {"op": "audio_encoder_projection"},
+                ],
+                {
+                    "audio_feature_frames": 32,
+                    "audio_subsampling_output_frames": 4,
+                    "audio_feature_channels": 6,
+                    "hidden_size": 8,
+                    "audio_encoder_projection_size": 5,
+                },
+            )
+
     def test_circuit_produces_relative_positions_before_repeated_blocks(self) -> None:
         circuit = json.loads(
             (ROOT / "version/v8/circuits/parakeet_tdt.json").read_text(
@@ -177,6 +251,30 @@ class GeneratedParakeetFastConformerTests(unittest.TestCase):
             block["graph_slots"]["inputs"]["relative_positions"],
             "audio_relative_positions",
         )
+        projection = encoder["encoder_projection"][0]
+        self.assertEqual(projection["op"], "audio_encoder_projection")
+        self.assertEqual(
+            projection["when"],
+            {"config_key": "audio_include_encoder_projection", "equals": True},
+        )
+        self.assertEqual(
+            projection["weight_refs"]["weight"], "encoder_projector.weight")
+
+    def test_projection_is_excluded_from_diagnostic_component_scopes(self) -> None:
+        circuit = json.loads(
+            (ROOT / "version/v8/circuits/parakeet_tdt.json").read_text(
+                encoding="utf-8"))
+        projection = circuit["block_types"]["encoder"]["encoder_projection"]
+        self.assertEqual(
+            build_ir._normalize_template_op_items(
+                projection, config={"audio_include_encoder_projection": True}),
+            projection,
+        )
+        self.assertEqual(
+            build_ir._normalize_template_op_items(
+                projection, config={"audio_include_encoder_projection": False}),
+            [],
+        )
 
     def test_fixture_validation_rejects_mismatched_layers(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -185,8 +283,11 @@ class GeneratedParakeetFastConformerTests(unittest.TestCase):
                 fixture,
                 **{
                     "encoder.subsampling": np.zeros((1, 4, 8), np.float32),
+                    "frontend.input_features": np.zeros((1, 32, 6), np.float32),
+                    "frontend.attention_mask": np.ones((1, 32), np.bool_),
                     "encoder.layer.0": np.zeros((1, 4, 8), np.float32),
                     "encoder.layer.23": np.zeros((1, 3, 8), np.float32),
+                    "encoder.projected": np.zeros((1, 4, 6), np.float32),
                 },
             )
             with self.assertRaisesRegex(ValueError, "shapes must agree"):

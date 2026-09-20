@@ -1837,6 +1837,12 @@ OP_DATAFLOW = {
             "output": {"slot": "audio_encoder_tokens", "dtype": "fp32"}
         },
     },
+    "audio_encoder_projection": {
+        "inputs": {"input": "audio_encoder_tokens"},
+        "outputs": {
+            "output": {"slot": "audio_encoder_projected", "dtype": "fp32"}
+        },
+    },
     "audio_feature_window": {
         "inputs": {
             "wav_bytes": "external:audio_wav_bytes",
@@ -4246,6 +4252,7 @@ TEMPLATE_TO_KERNEL_OP = {
     "audio_fastconformer_subsampling": "audio_fastconformer_subsampling",
     "audio_relative_position": "audio_relative_position",
     "audio_fastconformer_block": "audio_fastconformer_block",
+    "audio_encoder_projection": "gemm",
     "audio_feature_window": "audio_feature_window",
     "audio_conv1d_stem_1": "audio_conv1d",
     "audio_conv1d_stem_2": "audio_conv1d",
@@ -8816,6 +8823,7 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
             "ff2_up_bias", "ff2_down_weight", "ff2_down_bias", "out_norm_weight",
             "out_norm_bias",
         ],
+        "audio_encoder_projection": ["weight", "bias"],
         "audio_feature_window": None,
         "audio_conv1d_stem_1": ["audio_conv1_weight", "audio_conv1_bias"],
         "audio_conv1d_stem_2": ["audio_conv2_weight", "audio_conv2_bias"],
@@ -11994,6 +12002,7 @@ TEMPLATE_OP_WEIGHTS = {
         "ff2_up_bias", "ff2_down_weight", "ff2_down_bias", "out_norm_weight",
         "out_norm_bias",
     ],
+    "audio_encoder_projection": ["weight", "bias"],
     "audio_feature_window": [],
     "audio_conv1d_stem_1": ["audio_conv1_weight", "audio_conv1_bias"],
     "audio_conv1d_stem_2": ["audio_conv2_weight", "audio_conv2_bias"],

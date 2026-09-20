@@ -57,6 +57,7 @@ _AUDIO_FASTCONFORMER_BLOCK_OPS = {
     "audio_relative_position",
     "audio_fastconformer_block",
 }
+_AUDIO_ENCODER_PROJECTION_OPS = {"audio_encoder_projection"}
 
 
 def _has_audio_frontend(op_names: set[str]) -> bool:
@@ -814,6 +815,211 @@ CK_EXPORT int ck_model_prepare_audio_relative_positions(
     if (!g_model || !output || required == 0 || output_elements < required) return -1;
     CKModel *model = g_model;
     return {call};
+}}
+"""
+
+
+def _emit_audio_encoder_projection_entrypoint(
+    ops: list[Dict[str, Any]],
+    config: Dict[str, Any],
+) -> str:
+    matches = [
+        op for op in ops if str(op.get("op", "")) == "audio_encoder_projection"
+    ]
+    if not matches:
+        return ""
+    if len(matches) != 1:
+        raise RuntimeError(
+            "generated audio encoder projection requires exactly one resolved operation"
+        )
+    max_frames = int(config.get("audio_subsampling_output_frames", 0) or 0)
+    input_size = int(config.get("hidden_size", 0) or 0)
+    output_size = int(config.get("audio_encoder_projection_size", 0) or 0)
+    if min(max_frames, input_size, output_size) <= 0:
+        raise RuntimeError(
+            "generated audio encoder projection requires explicit positive geometry"
+        )
+    call = _audio_call_expression(
+        matches[0],
+        source_overrides={
+            "activation:a": "input",
+            "output:c": "output",
+            "runtime:seq_len": "frames",
+            "dim:_input_dim": str(input_size),
+            "dim:_output_dim": str(output_size),
+        },
+    )
+    return f"""
+CK_EXPORT int ck_model_run_audio_encoder_projection(
+    const float *input,
+    int frames,
+    float *output) {{
+    if (!g_model || !input || !output || frames <= 0 ||
+        frames > {max_frames}) return -1;
+    CKModel *model = g_model;
+    {call};
+    return 0;
+}}
+"""
+
+
+def _emit_audio_encoder_entrypoint(
+    ops: list[Dict[str, Any]],
+    config: Dict[str, Any],
+) -> str:
+    selected = [
+        op for op in ops
+        if str(op.get("op", "")) in (
+            _AUDIO_SUBSAMPLING_OPS
+            | _AUDIO_FASTCONFORMER_BLOCK_OPS
+            | _AUDIO_ENCODER_PROJECTION_OPS
+        )
+    ]
+    if not selected:
+        return ""
+    operation_names = [str(op.get("op", "")) for op in selected]
+    if "audio_encoder_projection" not in operation_names:
+        return ""
+    block_count = operation_names.count("audio_fastconformer_block")
+    expected = [
+        "audio_fastconformer_subsampling",
+        "audio_relative_position",
+        *(["audio_fastconformer_block"] * block_count),
+        "audio_encoder_projection",
+    ]
+    if operation_names != expected:
+        raise RuntimeError(
+            "generated audio encoder requires the resolved sequence "
+            "subsampling -> relative position -> contiguous blocks -> projection"
+        )
+    blocks = selected[2:-1]
+    layers = [int(op.get("layer", -1)) for op in blocks]
+    if not blocks or layers != list(range(len(blocks))):
+        raise RuntimeError(
+            "generated audio encoder requires contiguous zero-based blocks"
+        )
+    max_feature_frames = int(config.get("audio_feature_frames", 0) or 0)
+    max_encoder_frames = int(config.get("audio_subsampling_output_frames", 0) or 0)
+    feature_channels = int(config.get("audio_feature_channels", 0) or 0)
+    hidden_size = int(config.get("hidden_size", 0) or 0)
+    projection_size = int(config.get("audio_encoder_projection_size", 0) or 0)
+    if min(
+        max_feature_frames,
+        max_encoder_frames,
+        feature_channels,
+        hidden_size,
+        projection_size,
+    ) <= 0:
+        raise RuntimeError("generated audio encoder requires explicit positive geometry")
+
+    block_calls = []
+    current = "hidden_a"
+    other = "hidden_b"
+    for layer in layers:
+        block_calls.append(
+            f"""    status = ck_model_run_audio_fastconformer_block(
+        {layer}, {current}, relative_positions, encoded_frames, {other},
+        block_workspace, block_workspace_bytes);
+    if (status != 0) return -{20 + layer};"""
+        )
+        current, other = other, current
+    block_schedule = "\n".join(block_calls)
+
+    return f"""
+static int ck_audio_encoder_reserve(
+    size_t *offset, size_t bytes, size_t *start) {{
+    if (!offset || !start || *offset > SIZE_MAX - 63u) return -1;
+    const size_t aligned = (*offset + 63u) & ~(size_t)63u;
+    if (aligned > SIZE_MAX - bytes) return -1;
+    *start = aligned;
+    *offset = aligned + bytes;
+    return 0;
+}}
+
+CK_EXPORT size_t ck_model_audio_encoder_workspace_bytes(
+    int audio_feature_frames,
+    int output_capacity_frames) {{
+    if (audio_feature_frames <= 0 || audio_feature_frames > {max_feature_frames} ||
+        output_capacity_frames <= 0 || output_capacity_frames > {max_encoder_frames}) return 0;
+    const size_t hidden_bytes =
+        (size_t)output_capacity_frames * (size_t){hidden_size} * sizeof(float);
+    const size_t relative_bytes =
+        (size_t)(2 * output_capacity_frames - 1) * (size_t){hidden_size} * sizeof(float);
+    const size_t subsampling_bytes =
+        ck_model_audio_subsampling_workspace_bytes(audio_feature_frames);
+    const size_t block_bytes =
+        ck_model_audio_fastconformer_block_workspace_bytes(output_capacity_frames);
+    if (subsampling_bytes == 0 || block_bytes == 0) return 0;
+    size_t offset = 0, start = 0;
+    if (ck_audio_encoder_reserve(&offset, subsampling_bytes, &start) != 0 ||
+        ck_audio_encoder_reserve(&offset, hidden_bytes, &start) != 0 ||
+        ck_audio_encoder_reserve(&offset, hidden_bytes, &start) != 0 ||
+        ck_audio_encoder_reserve(&offset, relative_bytes, &start) != 0 ||
+        ck_audio_encoder_reserve(&offset, block_bytes, &start) != 0) return 0;
+    return offset;
+}}
+
+CK_EXPORT int ck_model_run_audio_encoder(
+    const float *audio_features,
+    int audio_feature_frames,
+    int audio_feature_live_frames,
+    float *encoder_output,
+    int output_capacity_frames,
+    int *output_frames,
+    void *workspace,
+    size_t workspace_bytes) {{
+    if (!g_model || !audio_features || !encoder_output || !output_frames ||
+        !workspace || audio_feature_frames <= 0 ||
+        audio_feature_frames > {max_feature_frames} ||
+        audio_feature_live_frames <= 0 ||
+        audio_feature_live_frames > audio_feature_frames ||
+        output_capacity_frames <= 0 ||
+        output_capacity_frames > {max_encoder_frames}) return -1;
+    const size_t required = ck_model_audio_encoder_workspace_bytes(
+        audio_feature_frames, output_capacity_frames);
+    if (required == 0 || workspace_bytes < required) return -2;
+    const size_t hidden_bytes =
+        (size_t)output_capacity_frames * (size_t){hidden_size} * sizeof(float);
+    const size_t relative_bytes =
+        (size_t)(2 * output_capacity_frames - 1) * (size_t){hidden_size} * sizeof(float);
+    const size_t subsampling_bytes =
+        ck_model_audio_subsampling_workspace_bytes(audio_feature_frames);
+    const size_t block_workspace_bytes =
+        ck_model_audio_fastconformer_block_workspace_bytes(output_capacity_frames);
+    uint8_t *base = (uint8_t*)workspace;
+    size_t offset = 0;
+    size_t subsampling_start, hidden_a_start, hidden_b_start, relative_start, block_start;
+    if (ck_audio_encoder_reserve(&offset, subsampling_bytes, &subsampling_start) != 0 ||
+        ck_audio_encoder_reserve(&offset, hidden_bytes, &hidden_a_start) != 0 ||
+        ck_audio_encoder_reserve(&offset, hidden_bytes, &hidden_b_start) != 0 ||
+        ck_audio_encoder_reserve(&offset, relative_bytes, &relative_start) != 0 ||
+        ck_audio_encoder_reserve(&offset, block_workspace_bytes, &block_start) != 0 ||
+        offset > workspace_bytes) return -3;
+    void *subsampling_workspace = base + subsampling_start;
+    float *hidden_a = (float*)(base + hidden_a_start);
+    float *hidden_b = (float*)(base + hidden_b_start);
+    float *relative_positions = (float*)(base + relative_start);
+    void *block_workspace = base + block_start;
+    int encoded_frames = 0;
+    int status = ck_model_run_audio_subsampling(
+        audio_features, audio_feature_frames, audio_feature_live_frames,
+        hidden_a, output_capacity_frames, &encoded_frames,
+        subsampling_workspace, subsampling_bytes);
+    if (status != 0) return -4;
+    if (encoded_frames <= 0 || encoded_frames > output_capacity_frames) return -5;
+    const size_t relative_elements =
+        ck_model_audio_relative_position_elements(encoded_frames);
+    if (relative_elements == 0 ||
+        relative_elements > relative_bytes / sizeof(float)) return -6;
+    status = ck_model_prepare_audio_relative_positions(
+        encoded_frames, relative_positions, relative_elements);
+    if (status != 0) return -7;
+{block_schedule}
+    status = ck_model_run_audio_encoder_projection(
+        {current}, encoded_frames, encoder_output);
+    if (status != 0) return -50;
+    *output_frames = encoded_frames;
+    return 0;
 }}
 """
 
@@ -1751,6 +1957,7 @@ def _inject_prefill_multimodal_bridge(
             "audio_frontend",
             "audio_subsampling",
             "audio_encoder_block",
+            "audio_encoder",
         }
     ):
         return code
@@ -1765,6 +1972,7 @@ def _inject_prefill_multimodal_bridge(
             _AUDIO_FRONTEND_OPS
             | _AUDIO_SUBSAMPLING_OPS
             | _AUDIO_FASTCONFORMER_BLOCK_OPS
+            | _AUDIO_ENCODER_PROJECTION_OPS
         )
     ]
     artifact_scope = str(config.get("artifact_scope", "") or "").strip().lower()
@@ -1773,6 +1981,7 @@ def _inject_prefill_multimodal_bridge(
         "audio_frontend",
         "audio_subsampling",
         "audio_encoder_block",
+        "audio_encoder",
     }:
         embedded_prefill = codegen_prefill_v8.emit_prefill_from_embedded_function(
             encoder_ops,
@@ -1789,6 +1998,10 @@ def _inject_prefill_multimodal_bridge(
     audio_fastconformer_block_entrypoint = (
         _emit_audio_fastconformer_block_entrypoint(ops, config)
     )
+    audio_encoder_projection_entrypoint = (
+        _emit_audio_encoder_projection_entrypoint(ops, config)
+    )
+    audio_encoder_entrypoint = _emit_audio_encoder_entrypoint(ops, config)
     if (
         not embedded_prefill
         and not bridge_api
@@ -1796,6 +2009,8 @@ def _inject_prefill_multimodal_bridge(
         and not audio_subsampling_entrypoint
         and not audio_relative_position_entrypoint
         and not audio_fastconformer_block_entrypoint
+        and not audio_encoder_projection_entrypoint
+        and not audio_encoder_entrypoint
     ):
         return code
 
@@ -1831,6 +2046,10 @@ CK_EXPORT int ck_model_run_encoder(void) {{
         extra_parts.append(audio_relative_position_entrypoint)
     if audio_fastconformer_block_entrypoint:
         extra_parts.append(audio_fastconformer_block_entrypoint)
+    if audio_encoder_projection_entrypoint:
+        extra_parts.append(audio_encoder_projection_entrypoint)
+    if audio_encoder_entrypoint:
+        extra_parts.append(audio_encoder_entrypoint)
     if bridge_api:
         extra_parts.append(bridge_api)
     return code + "\n\n" + "\n\n".join(extra_parts)
@@ -1957,6 +2176,7 @@ def main(argv: list[str] | None = None) -> int:
             "audio_frontend",
             "audio_subsampling",
             "audio_encoder_block",
+            "audio_encoder",
         }:
             core_ir_obj = dict(ir_obj)
             core_ir_obj["operations"] = [
@@ -1967,6 +2187,7 @@ def main(argv: list[str] | None = None) -> int:
                     _AUDIO_FRONTEND_OPS
                     | _AUDIO_SUBSAMPLING_OPS
                     | _AUDIO_FASTCONFORMER_BLOCK_OPS
+                    | _AUDIO_ENCODER_PROJECTION_OPS
                 )
             ]
         ir_path.write_text(json.dumps(core_ir_obj, indent=2), encoding="utf-8")
@@ -2011,6 +2232,7 @@ def main(argv: list[str] | None = None) -> int:
             "audio_frontend",
             "audio_subsampling",
             "audio_encoder_block",
+            "audio_encoder",
         }:
             # Component artifacts use dedicated native entry points even when
             # their primary layout is decode-shaped for the shared emitter.
