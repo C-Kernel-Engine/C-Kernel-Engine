@@ -195,6 +195,10 @@ class GeneratedCohereFrontendTests(unittest.TestCase):
         self.assertNotIn("audio_hann_window", emitted)
         self.assertNotIn("audio_mel_filters", emitted)
         self.assertIn("stub_normalize(required_frames, audio_features)", emitted)
+        self.assertIn("ck_model_audio_sample_rate(void) { return 16000; }", emitted)
+        self.assertIn("ck_model_audio_max_source_frames(void) { return 320; }", emitted)
+        self.assertIn("ck_model_audio_hop_length(void) { return 160; }", emitted)
+        self.assertIn("ck_model_audio_feature_channels(void)", emitted)
 
     def test_unknown_normalization_frame_policy_fails_closed(self) -> None:
         with self.assertRaisesRegex(RuntimeError, "unsupported.*frame_policy"):

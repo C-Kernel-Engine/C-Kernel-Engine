@@ -653,6 +653,13 @@ def _emit_normalized_log_mel_entrypoint(
     )
     return f"""
 /* Generated from the resolved normalized log-Mel frontend call IR. */
+CK_EXPORT int ck_model_audio_sample_rate(void) {{ return {sample_rate}; }}
+CK_EXPORT int ck_model_audio_max_source_frames(void) {{ return {max_source_frames}; }}
+CK_EXPORT int ck_model_audio_hop_length(void) {{ return {hop_length}; }}
+CK_EXPORT int ck_model_audio_feature_channels(void) {{
+    return {int(config.get("audio_feature_channels", 0) or 0)};
+}}
+
 CK_EXPORT int ck_model_prepare_audio_wav_features(
     const uint8_t *audio_wav_bytes,
     size_t audio_wav_byte_count,
@@ -998,6 +1005,16 @@ static int ck_audio_encoder_reserve(
     *start = aligned;
     *offset = aligned + bytes;
     return 0;
+}}
+
+CK_EXPORT int ck_model_audio_subsampling_factor(void) {{
+    return {int(config.get("audio_subsampling_factor", 0) or 0)};
+}}
+CK_EXPORT int ck_model_audio_encoder_output_dim(void) {{
+    return {projection_size};
+}}
+CK_EXPORT int ck_model_audio_encoder_frame_capacity(void) {{
+    return {max_encoder_frames};
 }}
 
 CK_EXPORT size_t ck_model_audio_encoder_workspace_bytes(

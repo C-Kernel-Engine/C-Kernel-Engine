@@ -2935,6 +2935,12 @@ CK_EXPORT int32_t ck_model_lookup_token(const char *text) {
         }
 
     elif tokenizer_type == "sentencepiece":
+        model_identity = " ".join(
+            value.lower()
+            for value in (model_type, template_name)
+            if isinstance(value, str)
+        )
+        is_gemma_family = "gemma" in model_identity
         add_bos = None
         add_eos = None
         add_space_prefix = None

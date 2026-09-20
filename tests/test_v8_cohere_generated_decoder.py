@@ -71,6 +71,15 @@ def test_decoder_weights_map_to_shared_decoder_roles() -> None:
     } == expected
 
 
+def test_cohere_special_token_lookup_comes_from_gguf_vocabulary() -> None:
+    metadata = {
+        "tokenizer.ggml.tokens": ["<unk>", "<pad>", "<|endoftext|>"]
+    }
+    assert converter._token_id(metadata, "<unk>") == 0
+    assert converter._token_id(metadata, "<|endoftext|>") == 2
+    assert converter._token_id(metadata, "<missing>") == -1
+
+
 def test_shared_decoder_declares_cohere_variants_without_family_dispatch() -> None:
     circuit = json.loads(
         (V8 / "circuits" / "audio_transformer_decoder.json").read_text(
@@ -122,6 +131,14 @@ def test_decoder_artifact_selects_shared_decoder_without_mutating_family_graph()
         "lm_head",
         "greedy_eos",
     ]
+
+
+def test_decoder_prompt_is_artifact_metadata_not_host_policy() -> None:
+    source = (V8 / "scripts" / "convert_cohere_transcribe_gguf_to_bump_v8.py").read_text(
+        encoding="utf-8"
+    )
+    assert '"audio_decoder_prompt_tokens"' in source
+    assert source.count('"<|en|>"') >= 2
 
 
 def test_decoder_certifier_requires_explicit_valid_prompt_ids() -> None:

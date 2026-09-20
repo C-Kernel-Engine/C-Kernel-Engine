@@ -134,6 +134,16 @@ def _component_circuit_name(artifact_scope: str) -> str:
     )
 
 
+def _token_id(metadata: dict[str, object], token: str) -> int:
+    pieces = metadata.get("tokenizer.ggml.tokens")
+    if not isinstance(pieces, list):
+        return -1
+    try:
+        return pieces.index(token)
+    except ValueError:
+        return -1
+
+
 def _promote_to_fp32(name: str, ggml_type: int, artifact_scope: str) -> bool:
     if ggml_type != c.GGML_TYPE_F16:
         return False
@@ -321,6 +331,18 @@ def main() -> int:
                 "decoder_output_bias": True,
                 "tie_word_embeddings": False,
                 "has_attention_biases": True,
+                "audio_decoder_prompt_tokens": [
+                    "▁",
+                    "<|startofcontext|>",
+                    "<|startoftranscript|>",
+                    "<|emo:undefined|>",
+                    "<|en|>",
+                    "<|en|>",
+                    "<|pnc|>",
+                    "<|noitn|>",
+                    "<|notimestamp|>",
+                    "<|nodiarize|>",
+                ],
                 "rms_eps": 1.0e-5,
                 "prefer_q8_activation": False,
                 "prefill_policy": "encoder_decoder",
@@ -337,6 +359,38 @@ def main() -> int:
         component_source_names = {name for name, _ in component_tensors}
         config["source_tensor_count"] = len(tensors)
         config["tensor_count"] = len(component_tensors)
+        tokenizer_payloads: list[tuple[str, str, bytes, list[int]]] = []
+        special_tokens: dict[str, object] = {}
+        if args.artifact_scope == "audio_decoder":
+            tokenizer = c.load_tokenizer_from_gguf(metadata, vocab_size)
+            if tokenizer is None:
+                raise c.GGUFError("Cohere decoder requires tokenizer data in GGUF metadata")
+            offsets, strings, merges, scores, types = tokenizer
+            tokenizer_payloads = [
+                ("vocab_offsets", "i32", struct.pack(f"<{len(offsets)}i", *offsets), [len(offsets)]),
+                ("vocab_strings", "u8", strings, [len(strings)]),
+                ("vocab_merges", "i32", struct.pack(f"<{len(merges)}i", *merges), [len(merges)]),
+                ("vocab_scores", "fp32", struct.pack(f"<{len(scores)}f", *scores), [len(scores)]),
+                ("vocab_types", "u8", bytes(types), [len(types)]),
+            ]
+            special_tokens = {
+                "tokenizer_model": "sentencepiece",
+                "unk_token_id": _token_id(metadata, "<unk>"),
+                "pad_token_id": _token_id(metadata, "<pad>"),
+                "eos_token_id": _token_id(metadata, "<|endoftext|>"),
+                "add_bos_token": False,
+                "add_eos_token": False,
+                "add_space_prefix": False,
+            }
+            if any(int(special_tokens[name]) < 0 for name in (
+                "unk_token_id", "pad_token_id", "eos_token_id"
+            )):
+                raise c.GGUFError("Cohere tokenizer is missing required special tokens")
+            config["tokenizer_contract"] = {
+                "tokenizer_type": "sentencepiece",
+                "source": "gguf_metadata",
+            }
+            config["eos_token_id"] = int(special_tokens["eos_token_id"])
         entries = []
         cursor = c.DATA_START + 4 + len(component_tensors)
         for name, info in component_tensors:
@@ -366,6 +420,19 @@ def main() -> int:
                 "shape": [int(value) for value in reversed(info.dims)],
             })
             cursor += size
+        weight_entries = list(entries)
+        for name, dtype, payload, shape in tokenizer_payloads:
+            cursor = c.align_up(cursor, 32)
+            entries.append({
+                "name": name,
+                "dtype": dtype,
+                "file_offset": cursor,
+                "size": len(payload),
+                "source_name": "gguf_tokenizer_metadata",
+                "conversion": "identity",
+                "shape": shape,
+            })
+            cursor += len(payload)
         circuit_name = _component_circuit_name(args.artifact_scope)
         circuit = json.loads(
             (ROOT / "version/v8/circuits" / circuit_name).read_text(encoding="utf-8")
@@ -403,6 +470,7 @@ def main() -> int:
             "intermediate_size": int(config["intermediate_size"]),
             "vocab_size": vocab_size,
             "context_length": decoder_context,
+            "special_tokens": special_tokens,
             "entries": entries,
         }
         print(
@@ -421,13 +489,13 @@ def main() -> int:
             output.write(b"\x00" * c.HEADER_SIZE)
             output.write(b"\x00" * c.EXT_METADATA_SIZE)
             writer = c.HashingWriter(output)
-            writer.write(struct.pack("<I", len(entries)))
+            writer.write(struct.pack("<I", len(weight_entries)))
             writer.write(bytes(
                 c.CK_DT_FP32 if entry["dtype"] == "fp32" else c.CK_DT_FP16
-                for entry in entries
+                for entry in weight_entries
             ))
-            position = c.DATA_START + 4 + len(entries)
-            for entry, (_, info) in zip(entries, component_tensors):
+            position = c.DATA_START + 4 + len(weight_entries)
+            for entry, (_, info) in zip(weight_entries, component_tensors):
                 if int(entry["file_offset"]) > position:
                     writer.write(b"\x00" * (int(entry["file_offset"]) - position))
                 if entry.get("conversion") == "fp16_to_fp32_exact":
@@ -442,6 +510,13 @@ def main() -> int:
                         handle, source_data_start + info.offset, int(entry["size"]), writer
                     )
                 position = int(entry["file_offset"]) + int(entry["size"])
+            payload_by_name = {name: payload for name, _, payload, _ in tokenizer_payloads}
+            for entry in entries[len(weight_entries):]:
+                if int(entry["file_offset"]) > position:
+                    writer.write(b"\x00" * (int(entry["file_offset"]) - position))
+                payload = payload_by_name[entry["name"]]
+                writer.write(payload)
+                position = int(entry["file_offset"]) + len(payload)
             checksum = writer.digest()
             manifest_hash = c.calculate_manifest_hash(manifest)
             metadata_blob = c.build_bumpv5_metadata(
