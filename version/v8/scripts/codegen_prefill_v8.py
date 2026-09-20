@@ -426,7 +426,12 @@ def emit_prefill_op(
     if op_type == "transpose_cross_kv_to_head_major":
         num_heads = config.get("num_heads", 1)
         head_dim = config.get("head_dim", 1)
-        encoder_tokens = config.get("encoder_memory_length", 0)
+        encoder_capacity = config.get("encoder_memory_length", 0)
+        encoder_tokens = (
+            "model->encoder_memory_tokens"
+            if bool(config.get("dynamic_encoder_memory_length", False))
+            else str(encoder_capacity)
+        )
         kind = str(op.get("_cross_kv_kind", "key"))
         cache_name = "A_CROSS_K_CACHE" if kind == "key" else "A_CROSS_V_CACHE"
         return f"""    /* Op {seq_idx}: transpose_cross_{kind}_to_head_major layer={layer} */
@@ -434,7 +439,7 @@ def emit_prefill_op(
         const int H = {num_heads};
         const int T = {encoder_tokens};
         const int D = {head_dim};
-        const size_t layer_stride = (size_t)H * (size_t)T * (size_t)D;
+        const size_t layer_stride = (size_t)H * (size_t){encoder_capacity} * (size_t)D;
         float *buf = (float*)(model->bump + {cache_name}) + (size_t){layer} * layer_stride;
         float *tmp = (float*)(model->bump + A_CROSS_LAYOUT_SCRATCH);
         for (int t = 0; t < T; ++t) {{

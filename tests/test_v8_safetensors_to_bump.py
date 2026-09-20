@@ -1165,6 +1165,93 @@ def test_whisper_decoder_safetensors_keeps_self_and_cross_attention_distinct(
         "        4,\n"
         "        0.5"
     ) == 4
+
+    dynamic_manifest = json.loads(json.dumps(manifest))
+    dynamic_manifest["config"]["dynamic_encoder_memory_length"] = True
+    dynamic_manifest_path = out / "weights_manifest_dynamic_encoder.json"
+    dynamic_manifest_path.write_text(
+        json.dumps(dynamic_manifest, indent=2) + "\n", encoding="utf-8"
+    )
+    for mode in ("prefill", "decode"):
+        subprocess.run(
+            [
+                sys.executable,
+                "version/v8/scripts/build_ir_v8.py",
+                "--manifest",
+                str(dynamic_manifest_path),
+                "--mode",
+                mode,
+                "--output",
+                str(out / f"dynamic_lowered_{mode}.json"),
+                "--layout-output",
+                str(out / f"dynamic_layout_{mode}.json"),
+                "--call-output",
+                str(out / f"dynamic_lowered_{mode}_call.json"),
+                "--context-len",
+                "8",
+            ],
+            check=True,
+        )
+    dynamic_prefill = json.loads(
+        (out / "dynamic_lowered_prefill_call.json").read_text(encoding="utf-8")
+    )
+    dynamic_calls = dynamic_prefill["operations"]
+    for op_name in ("cross_k_proj", "cross_v_proj"):
+        projection = next(row for row in dynamic_calls if row["op"] == op_name)
+        projection_args = {arg["name"]: arg for arg in projection["args"]}
+        assert projection_args["M"] == {
+            "name": "M",
+            "source": "runtime:encoder_memory_tokens",
+            "expr": "model->encoder_memory_tokens",
+        }
+    cross_attention = next(row for row in dynamic_calls if row["op"] == "cross_attn")
+    cross_attention_args = {arg["name"]: arg for arg in cross_attention["args"]}
+    assert cross_attention_args["key_tokens"] == {
+        "name": "key_tokens",
+        "source": "runtime:encoder_memory_tokens",
+        "expr": "model->encoder_memory_tokens",
+    }
+    dynamic_decode = json.loads(
+        (out / "dynamic_lowered_decode_call.json").read_text(encoding="utf-8")
+    )
+    decode_cross_attention = next(
+        row for row in dynamic_decode["operations"] if row["op"] == "cross_attn"
+    )
+    decode_cross_attention_args = {
+        arg["name"]: arg for arg in decode_cross_attention["args"]
+    }
+    assert decode_cross_attention_args["key_tokens"] == {
+        "name": "key_tokens",
+        "source": "runtime:encoder_memory_tokens",
+        "expr": "model->encoder_memory_tokens",
+    }
+
+    dynamic_generated_c = out / "whisper_decoder_dynamic_encoder_v8.c"
+    subprocess.run(
+        [
+            sys.executable,
+            "version/v8/scripts/codegen_v8.py",
+            "--ir",
+            str(out / "dynamic_lowered_decode_call.json"),
+            "--prefill",
+            str(out / "dynamic_lowered_prefill_call.json"),
+            "--prefill-layout",
+            str(out / "dynamic_layout_prefill.json"),
+            "--layout",
+            str(out / "dynamic_layout_decode.json"),
+            "--output",
+            str(dynamic_generated_c),
+            "--strict-contracts",
+        ],
+        check=True,
+    )
+    dynamic_generated = dynamic_generated_c.read_text(encoding="utf-8")
+    assert "if (tokens <= 0 || tokens > 4 || dim != 8) return -2;" in dynamic_generated
+    assert "g_model->encoder_memory_tokens = tokens;" in dynamic_generated
+    assert "const int T = model->encoder_memory_tokens;" in dynamic_generated
+    assert "(size_t)H * (size_t)4 * (size_t)D" in dynamic_generated
+    assert "model->encoder_memory_tokens" in dynamic_generated
+    assert "CK_EXPORT int ck_model_get_encoder_memory_capacity(void) { return 4; }" in dynamic_generated
     subprocess.run(
         [
             "cc",
@@ -1173,6 +1260,17 @@ def test_whisper_decoder_safetensors_keeps_self_and_cross_attention_distinct(
             "-Iinclude",
             "-Iversion/v8/src",
             str(generated_c),
+        ],
+        check=True,
+    )
+    subprocess.run(
+        [
+            "cc",
+            "-fsyntax-only",
+            "-fopenmp",
+            "-Iinclude",
+            "-Iversion/v8/src",
+            str(dynamic_generated_c),
         ],
         check=True,
     )

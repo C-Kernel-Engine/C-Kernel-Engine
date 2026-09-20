@@ -11567,6 +11567,9 @@ def generate_ir_lower_1(
                     "_cross_kv_kind": "key" if is_key else "value",
                     "_cross_num_heads": int(config.get("num_heads", 0) or 0),
                     "_cross_encoder_tokens": int(config.get("encoder_memory_length", 0) or 0),
+                    "_cross_encoder_tokens_runtime": bool(
+                        config.get("dynamic_encoder_memory_length", False)
+                    ),
                     "_cross_head_dim": int(config.get("head_dim", 0) or 0),
                 })
 
@@ -13565,6 +13568,10 @@ def generate_ir_lower_2(
             lowered_op["_kv_cache_read_layer"] = int(ir_op["_kv_cache_read_layer"])
         if "_cross_kv_kind" in ir_op:
             lowered_op["_cross_kv_kind"] = str(ir_op["_cross_kv_kind"])
+        if "_cross_encoder_tokens_runtime" in ir_op:
+            lowered_op["_cross_encoder_tokens_runtime"] = bool(
+                ir_op["_cross_encoder_tokens_runtime"]
+            )
         if "bias_for" in ir_op:
             lowered_op["bias_for"] = str(ir_op["bias_for"])
         for cross_dim in (
@@ -16065,6 +16072,10 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
             }
             if "_cross_kv_kind" in op:
                 transpose_op["_cross_kv_kind"] = op["_cross_kv_kind"]
+            if "_cross_encoder_tokens_runtime" in op:
+                transpose_op["_cross_encoder_tokens_runtime"] = bool(
+                    op["_cross_encoder_tokens_runtime"]
+                )
             for cross_dim in (
                 "_cross_num_heads",
                 "_cross_encoder_tokens",
@@ -16451,12 +16462,22 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
                 and src in {"dim:_m", "runtime:seq_len"}
             ):
                 arg_doc["source"] = "dim:encoder_memory_length"
+                if bool(config.get("dynamic_encoder_memory_length", False)):
+                    arg_doc["source"] = "runtime:encoder_memory_tokens"
+                    arg_doc["expr"] = "model->encoder_memory_tokens"
             elif (
                 op_name == "cross_attn"
                 and str(name).lower() == "query_tokens"
                 and src == "dim:query_tokens"
             ):
                 arg_doc["source"] = "runtime:query_tokens"
+            elif (
+                op_name == "cross_attn"
+                and str(name).lower() == "key_tokens"
+                and bool(config.get("dynamic_encoder_memory_length", False))
+            ):
+                arg_doc["source"] = "runtime:encoder_memory_tokens"
+                arg_doc["expr"] = "model->encoder_memory_tokens"
             if src.startswith(("activation:", "output:", "scratch:")):
                 info = None
                 if src.startswith("activation:"):
