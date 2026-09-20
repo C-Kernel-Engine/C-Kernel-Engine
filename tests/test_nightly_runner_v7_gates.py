@@ -48,6 +48,14 @@ class NightlyRunnerV7GateTests(unittest.TestCase):
             nightly.MAKE_TARGETS["v8_training_workflow_fp32"]["target"],
             "v8-training-workflow-fp32",
         )
+        self.assertEqual(
+            nightly.MAKE_TARGETS["v8_training_matrix_gqa"]["target"],
+            "v8-training-matrix-nightly",
+        )
+        self.assertEqual(
+            nightly.MAKE_TARGET_FAILURE_ARTIFACTS["v8-training-matrix-nightly"],
+            ROOT / "version" / "v8" / ".cache" / "reports" / "training_matrix_latest.json",
+        )
 
     def test_kernel_map_failure_artifact_summary_uses_validator_counts(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -140,6 +148,21 @@ class NightlyRunnerV7GateTests(unittest.TestCase):
                 nightly.MAKE_TARGET_FAILURE_ARTIFACTS["v8-training-certify-fp32"] = original
             self.assertIn("status=FAIL", summary)
             self.assertIn("failed_checks=logits", summary)
+
+    def test_v8_training_matrix_failure_summary_names_case_and_reason(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            report = Path(td) / "training_matrix_latest.json"
+            report.write_text(json.dumps({"status": "FAIL", "cases": [
+                {"profile": "6l_gqa", "passed": False, "failure_kind": "stale_report",
+                 "identity_errors": ["matrix_identity.run_id"]}
+            ]}), encoding="utf-8")
+            original = nightly.MAKE_TARGET_FAILURE_ARTIFACTS["v8-training-matrix-nightly"]
+            nightly.MAKE_TARGET_FAILURE_ARTIFACTS["v8-training-matrix-nightly"] = report
+            try:
+                summary = nightly._summarize_make_failure_artifact("v8-training-matrix-nightly", start_ts=0.0)
+            finally:
+                nightly.MAKE_TARGET_FAILURE_ARTIFACTS["v8-training-matrix-nightly"] = original
+            self.assertIn("6l_gqa:stale_report:matrix_identity.run_id", summary)
 
 
 if __name__ == "__main__":

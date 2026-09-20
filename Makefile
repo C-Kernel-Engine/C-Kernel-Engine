@@ -6351,7 +6351,7 @@ V7_STABILIZATION_HISTORY ?= $(V7_REPORT_DIR)/training_stabilization_history.json
 	v7-ctop v7-ctop-demo
 
 .PHONY: v8-init v8-doctor v8-capture-artifacts v8-capture-artifacts-run v8-profile-dashboard v8-profile-dashboard-run \
-	v8-compile-train-runtime v8-training-certify-fp32 v8-training-workflow-fp32 v8-regression-fast v8-regression-full v8-regression-family
+	v8-compile-train-runtime v8-training-certify-fp32 v8-training-workflow-fp32 v8-training-matrix-fp32 v8-training-matrix-nightly v8-regression-fast v8-regression-full v8-regression-family
 
 v7-help:
 	@echo "=== v7 Training Foundation (fp32 correctness-first) ==="
@@ -6654,6 +6654,24 @@ v8-training-workflow-fp32:
 	@$(PYTHON) version/v8/scripts/run_training_workflow_v8.py \
 		--run-dir "$(V8_TRAIN_WORKFLOW_RUN_DIR)" \
 		--json-out "$(V8_TRAIN_WORKFLOW_REPORT)"
+
+V8_TRAIN_MATRIX_REPORT ?= version/v8/.cache/reports/training_matrix_latest.json
+V8_TRAIN_MATRIX_RUN_ROOT ?= version/v8/.cache/training_matrix
+
+v8-training-matrix-fp32:
+	@$(PYTHON) version/v8/scripts/run_training_matrix_v8.py \
+		--run-root "$(V8_TRAIN_MATRIX_RUN_ROOT)" \
+		--json-out "$(V8_TRAIN_MATRIX_REPORT)"
+
+# The existing nightly already covers the two-layer and four-layer dense lanes.
+# Add one bounded BPE/GQA case automatically; keep the complete depth sweep manual.
+v8-training-matrix-nightly:
+	@$(PYTHON) version/v8/scripts/run_training_matrix_v8.py \
+		--profile 6l_gqa --epochs 2 --grad-accum 2 \
+		--max-train-tokens 128 --max-validation-tokens 64 \
+		--case-timeout 1200 \
+		--run-root "$(V8_TRAIN_MATRIX_RUN_ROOT)/nightly" \
+		--json-out "$(V8_TRAIN_MATRIX_REPORT)"
 
 v7-ctop:
 	@RUN_DIR="$(if $(RUN),$(RUN),$(V7_CKTOP_RUN))"; \

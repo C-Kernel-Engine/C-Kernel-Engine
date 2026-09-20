@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import copy
 import importlib.util
 import json
@@ -43,6 +44,16 @@ class V8TrainingWorkflowTests(unittest.TestCase):
         self.assertEqual(sum(row[2] for row in batches), 30)
         self.assertEqual([row[2] for row in batches[:3]], [4, 4, 2])
         self.assertTrue(all(row[0].shape == (4,) and row[1].shape == (4,) for row in batches))
+
+    def test_training_configuration_records_requested_circuit_and_tokenizer(self) -> None:
+        args = argparse.Namespace(
+            layers=10, d_model=64, hidden=128, num_heads=8, num_kv_heads=2,
+            vocab_size=384, tokenizer="bpe", seq_len=64, epochs=3, grad_accum=4,
+            lr=3e-4, beta1=.9, beta2=.999, eps=1e-8, weight_decay=.01,
+        )
+        config = self.workflow._training_config(args)
+        self.assertEqual((config["layers"], config["heads"], config["kv_heads"]), (10, 8, 2))
+        self.assertEqual((config["tokenizer"], config["vocab_size"]), ("bpe", 384))
 
     def test_v8_export_adds_loader_header_and_rebases_file_offsets(self) -> None:
         with tempfile.TemporaryDirectory() as td:

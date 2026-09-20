@@ -1215,7 +1215,10 @@
 make v8-training-certify-fp32
 
 # Four-layer English learning, AdamW, restart, export, and visualizer workflow.
-make v8-training-workflow-fp32</pre>
+make v8-training-workflow-fp32
+
+# CKE BPE plus 4-layer dense, 6-layer GQA, and 10-layer GQA full workflows.
+make v8-training-matrix-fp32</pre>
     </div>
     <table class="table">
         <thead><tr><th>Command</th><th>What a PASS proves</th><th>Primary evidence</th></tr></thead>
@@ -1230,6 +1233,11 @@ make v8-training-workflow-fp32</pre>
                 <td>A four-layer reduced Qwen3-style circuit learns a pinned English byte-token fixture through generated C and native AdamW, resumes complete state in a fresh process, and exports weights into an independently built v8 inference runtime.</td>
                 <td><code>version/v8/.cache/reports/training_workflow_latest.json</code></td>
             </tr>
+            <tr>
+                <td><code>v8-training-matrix-fp32</code></td>
+                <td>The same complete contract runs reduced Qwen3-style variants at 4, 6, and 10 layers, including unequal-head GQA. CKE trains a BPE tokenizer from the training split, verifies exact round trips and tokenizer quality, then gives generated C and PyTorch the same serialized token IDs. Nightly schedules the bounded 6-layer 4/2 GQA case; this command runs the complete depth sweep.</td>
+                <td><code>version/v8/.cache/reports/training_matrix_latest.json</code></td>
+            </tr>
         </tbody>
     </table>
 </div>
@@ -1242,7 +1250,7 @@ make v8-training-workflow-fp32</pre>
         <thead><tr><th>Path below the run directory</th><th>What to inspect</th></tr></thead>
         <tbody>
             <tr><td><code>ir_report.html</code></td><td>Interactive training IR report: Data Lab, tokenizer, forward/backward graph, gradient stitching, learning, parity, checkpoint, and performance panels.</td></tr>
-            <tr><td><code>dataset/</code>, <code>tokenizer.json</code>, <code>tokenizer_roundtrip.json</code></td><td>Exact serialized token IDs, byte vocabulary, split lineage, and encode/decode round-trip evidence.</td></tr>
+            <tr><td><code>dataset/</code>, <code>tokenizer.json</code>, <code>tokenizer_roundtrip.json</code></td><td>Exact serialized token IDs, vocabulary, split lineage, and encode/decode round-trip evidence. Matrix runs also retain CKE BPE binary artifacts and <code>tokenizer_quality_gate.json</code>.</td></tr>
             <tr><td><code>dataset_profile.json</code>, <code>dataset_qc.json</code></td><td>Split counts, hashes, overlap checks, and quality status for the current run.</td></tr>
             <tr><td><code>checkpoints/latest.json</code></td><td>Pointer to the last atomically published complete checkpoint. The checkpoint owns the resume cursor and binds runtime, configuration, and dataset identities.</td></tr>
             <tr><td><code>training_parity_latest.json</code>, <code>training_loss_curve_latest.json</code></td><td>Per-tensor PyTorch discrepancies, first-update evidence, and ten-epoch CKE/oracle loss trajectories.</td></tr>

@@ -15,6 +15,7 @@ import json
 import os
 import resource
 import shutil
+import shlex
 import subprocess
 import sys
 import time
@@ -61,8 +62,10 @@ def _json_sha256(value: Mapping[str, Any]) -> str:
 
 def _training_config(args: argparse.Namespace) -> dict[str, Any]:
     return {
-        "architecture": "qwen3_style_dense_reduced", "layers": 4, "dtype": "fp32",
-        "d_model": int(args.d_model), "hidden": int(args.hidden), "heads": 4, "kv_heads": 4,
+        "architecture": "qwen3_style_dense_reduced", "layers": int(args.layers), "dtype": "fp32",
+        "d_model": int(args.d_model), "hidden": int(args.hidden), "heads": int(args.num_heads),
+        "kv_heads": int(args.num_kv_heads), "vocab_size": int(args.vocab_size),
+        "tokenizer": str(args.tokenizer),
         "seq_len": int(args.seq_len), "epochs": int(args.epochs), "grad_accum": int(args.grad_accum),
         "optimizer": "generated_c_adamw", "lr": float(args.lr), "beta1": float(args.beta1),
         "beta2": float(args.beta2), "eps": float(args.eps), "weight_decay": float(args.weight_decay),
@@ -85,31 +88,103 @@ def _git_blob(path: Path) -> str:
     return result.stdout.strip()
 
 
-def _load_corpus(spec_path: Path, out_dir: Path) -> tuple[np.ndarray, np.ndarray, dict[str, Any]]:
+def _ensure_bpe_tools(python: str) -> tuple[Path, Path]:
+    trainer = ROOT / "build" / "ck-bpe-train"
+    library = ROOT / "build" / "libckernel_tokenizer.so"
+    if not trainer.is_file() or not library.is_file():
+        result = subprocess.run(
+            ["make", "tokenizer", "ck-bpe-train"], cwd=ROOT, text=True,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        )
+        if result.returncode != 0:
+            raise RuntimeError("failed to build CKE BPE tools: " + result.stdout[-4000:])
+    return trainer, library
+
+
+def _load_corpus(args: argparse.Namespace, out_dir: Path, python: str) -> tuple[np.ndarray, np.ndarray, dict[str, Any]]:
+    spec_path = args.corpus
     spec = json.loads(spec_path.read_text(encoding="utf-8"))
+    tokenizer_kind = str(args.tokenizer)
+    bpe_handle = None
+    tokenizer_meta: dict[str, Any]
+    if tokenizer_kind == "bpe":
+        trainer, library = _ensure_bpe_tools(python)
+        tokenizer_dir = out_dir / "tokenizer_bin"
+        tokenizer_json = out_dir / "tokenizer.json"
+        trainer_corpus = out_dir / "tokenizer_corpus"
+        trainer_corpus.mkdir(parents=True, exist_ok=True)
+        train_row = spec["train"]
+        train_source = ROOT / str(train_row["path"])
+        (trainer_corpus / "train.txt").write_bytes(train_source.read_bytes()[: int(train_row["token_count"])])
+        tokenizer_dir.mkdir(parents=True, exist_ok=True)
+        command = [str(trainer), "--corpus-dir", str(trainer_corpus), "--out", str(tokenizer_json),
+                   "--binary-out-dir", str(tokenizer_dir), "--vocab-size", str(args.vocab_size),
+                   "--min-freq", str(args.bpe_min_freq), "--max-piece-bytes", str(args.bpe_max_piece_bytes),
+                   "--threads", "1"]
+        completed = subprocess.run(command, cwd=ROOT, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        if completed.returncode != 0:
+            raise RuntimeError("CKE BPE training failed: " + completed.stdout[-4000:])
+        pipeline = _load_module("cke_v7_tokenizer_runtime", V7 / "train_data_pipeline_v7.py")
+        bpe_handle = pipeline._TrueBPEHandle(library, tokenizer_dir, tokenizer_json)
+        bpe_encode = pipeline._encode_large_text_with_bpe_handle
+        if int(bpe_handle.vocab_size) != int(args.vocab_size):
+            raise RuntimeError(f"BPE vocab mismatch: requested={args.vocab_size} actual={bpe_handle.vocab_size}")
+        tokenizer_meta = {
+            "name": "cke_true_bpe_v1", "mode": "bpe", "vocab_size": int(bpe_handle.vocab_size),
+            "tokenizer_json": str(tokenizer_json), "tokenizer_json_sha256": _sha256(tokenizer_json),
+            "binary_dir": str(tokenizer_dir),
+            "binary_sha256": {p.name: _sha256(p) for p in sorted(tokenizer_dir.iterdir()) if p.is_file()},
+            "training_split_only": True, "trainer_command": shlex.join(command),
+        }
+    elif tokenizer_kind == "byte":
+        if int(args.vocab_size) != 256:
+            raise RuntimeError("byte tokenizer requires --vocab-size 256")
+        tokenizer_meta = dict(spec["tokenizer"])
+        tokenizer_meta["mode"] = "byte"
+    else:
+        raise RuntimeError(f"unsupported tokenizer: {tokenizer_kind}")
     outputs: dict[str, Any] = {}
     arrays: list[np.ndarray] = []
-    for split in ("train", "validation"):
-        row = spec[split]
-        source = ROOT / str(row["path"])
-        actual_blob = _git_blob(source)
-        if actual_blob != str(row["git_blob"]):
-            raise RuntimeError(f"{split} corpus blob changed: expected={row['git_blob']} actual={actual_blob}")
-        raw = source.read_bytes()[: int(row["token_count"])]
-        if len(raw) != int(row["token_count"]):
-            raise RuntimeError(f"{split} corpus has only {len(raw)} bytes")
-        ids = np.frombuffer(raw, dtype=np.uint8).astype(np.int32)
-        token_path = out_dir / f"{split}_token_ids.i32"
-        token_path.parent.mkdir(parents=True, exist_ok=True)
-        token_path.write_bytes(ids.astype("<i4", copy=False).tobytes())
-        outputs[split] = {
-            "source": str(row["path"]), "git_blob": actual_blob, "tokens": int(ids.size),
-            "original_source": str(row["source_path"]), "source_revision": str(row["source_revision"]),
-            "source_blob": str(row["source_blob"]),
-            "source_sha256": _sha256(source), "token_ids": str(token_path), "token_ids_sha256": _sha256(token_path),
-        }
-        arrays.append(ids)
-    return arrays[0], arrays[1], {"spec": str(spec_path), "spec_sha256": _sha256(spec_path), "tokenizer": spec["tokenizer"], "splits": outputs}
+    try:
+        for split in ("train", "validation"):
+            row = spec[split]
+            source = ROOT / str(row["path"])
+            actual_blob = _git_blob(source)
+            if actual_blob != str(row["git_blob"]):
+                raise RuntimeError(f"{split} corpus blob changed: expected={row['git_blob']} actual={actual_blob}")
+            raw = source.read_bytes()[: int(row["token_count"])]
+            if len(raw) != int(row["token_count"]):
+                raise RuntimeError(f"{split} corpus has only {len(raw)} bytes")
+            if bpe_handle is None:
+                ids = np.frombuffer(raw, dtype=np.uint8).astype(np.int32)
+                exact_roundtrip = True
+            else:
+                text = raw.decode("utf-8")
+                ids = np.asarray(bpe_encode(bpe_handle, text), dtype=np.int32)
+                exact_roundtrip = bpe_handle.decode(ids.tolist()) == text
+                if not exact_roundtrip:
+                    raise RuntimeError(f"{split} BPE encode/decode roundtrip failed")
+            limit = int(args.max_train_tokens if split == "train" else args.max_validation_tokens)
+            if limit > 0:
+                ids = ids[:limit]
+            if ids.size < 2 or int(ids.min()) < 0 or int(ids.max()) >= int(args.vocab_size):
+                raise RuntimeError(f"{split} token IDs violate vocab contract")
+            token_path = out_dir / f"{split}_token_ids.i32"
+            token_path.parent.mkdir(parents=True, exist_ok=True)
+            token_path.write_bytes(ids.astype("<i4", copy=False).tobytes())
+            outputs[split] = {
+                "source": str(row["path"]), "git_blob": actual_blob, "tokens": int(ids.size),
+                "source_bytes": len(raw), "exact_roundtrip": exact_roundtrip,
+                "original_source": str(row["source_path"]), "source_revision": str(row["source_revision"]),
+                "source_blob": str(row["source_blob"]), "source_sha256": _sha256(source),
+                "token_ids": str(token_path), "token_ids_sha256": _sha256(token_path),
+            }
+            arrays.append(ids)
+    finally:
+        if bpe_handle is not None:
+            bpe_handle.close()
+    return arrays[0], arrays[1], {"spec": str(spec_path), "spec_sha256": _sha256(spec_path),
+                                  "tokenizer": tokenizer_meta, "splits": outputs}
 
 
 def _batches(tokens: np.ndarray, seq_len: int, epochs: int) -> list[tuple[np.ndarray, np.ndarray, int, int]]:
@@ -374,7 +449,10 @@ def _forward_logits(lib: ctypes.CDLL, summary: Mapping[str, Any], x: np.ndarray,
     rows = [value for name, value in activations.items() if ".logits." in name]
     if len(rows) != 1:
         raise RuntimeError(f"expected one logits tensor, found {len(rows)}")
-    return rows[0].reshape(-1, 256)
+    vocab_size = int(rows[0].size // max(1, int(x.size)))
+    if vocab_size <= 0:
+        raise RuntimeError("generated runtime summary does not declare vocab_size")
+    return rows[0].reshape(-1, vocab_size)
 
 
 def _cross_entropy(logits: np.ndarray, targets: np.ndarray, valid: int) -> float:
@@ -396,10 +474,10 @@ def _sample_trajectory(
     lib: ctypes.CDLL,
     summary: Mapping[str, Any],
     seq_len: int,
-    prompt: bytes = b"The ",
+    prompt: Sequence[int] = (84, 104, 101, 32),
     new_tokens: int = 48,
 ) -> tuple[list[int], np.ndarray]:
-    generated = list(prompt)
+    generated = [int(value) for value in prompt]
     trajectory: list[np.ndarray] = []
     dummy = np.zeros(seq_len, dtype=np.int32)
     for _ in range(new_tokens):
@@ -409,12 +487,31 @@ def _sample_trajectory(
         last = logits[len(context) - 1].copy()
         trajectory.append(last)
         generated.append(int(np.argmax(last)))
-    return generated, np.stack(trajectory) if trajectory else np.empty((0, 256), dtype=np.float32)
+    vocab_size = int(summary.get("vocab_size") or summary.get("config", {}).get("vocab_size") or 0)
+    return generated, np.stack(trajectory) if trajectory else np.empty((0, vocab_size), dtype=np.float32)
 
 
-def _sample(lib: ctypes.CDLL, summary: Mapping[str, Any], seq_len: int, prompt: bytes = b"The ", new_tokens: int = 48) -> str:
-    generated, _ = _sample_trajectory(lib, summary, seq_len, prompt=prompt, new_tokens=new_tokens)
-    return bytes(generated).decode("utf-8", errors="replace")
+def _tokenizer_codec(corpus: Mapping[str, Any]):
+    tokenizer = corpus["tokenizer"]
+    if tokenizer.get("mode") == "byte":
+        return (lambda text: list(text.encode("utf-8")),
+                lambda ids: bytes(int(value) & 0xff for value in ids).decode("utf-8", errors="replace"),
+                None)
+    pipeline = _load_module("cke_v7_tokenizer_runtime_codec", V7 / "train_data_pipeline_v7.py")
+    handle = pipeline._TrueBPEHandle(ROOT / "build" / "libckernel_tokenizer.so",
+                                     Path(tokenizer["binary_dir"]), Path(tokenizer["tokenizer_json"]))
+    return handle.encode, handle.decode, handle
+
+
+def _sample(lib: ctypes.CDLL, summary: Mapping[str, Any], seq_len: int, corpus: Mapping[str, Any],
+            prompt: str = "The ", new_tokens: int = 48) -> str:
+    encode, decode, handle = _tokenizer_codec(corpus)
+    try:
+        generated, _ = _sample_trajectory(lib, summary, seq_len, prompt=encode(prompt), new_tokens=new_tokens)
+        return decode(generated)
+    finally:
+        if handle is not None:
+            handle.close()
 
 
 def _split_optimizer_snapshot(summary: Mapping[str, Any], flat: np.ndarray) -> dict[str, np.ndarray]:
@@ -542,28 +639,45 @@ def _write_visualizer_artifacts(
     checkpoint_path: Path,
 ) -> dict[str, Any]:
     tokenizer_path = run_dir / "tokenizer.json"
-    tokenizer = {
-        "version": "1.0", "truncation": None, "padding": None, "added_tokens": [],
-        "normalizer": None, "pre_tokenizer": {"type": "ByteLevel", "add_prefix_space": False},
-        "post_processor": None, "decoder": {"type": "ByteLevel"},
-        "model": {"type": "WordLevel", "unk_token": "<0x00>",
-                  "vocab": {f"<0x{idx:02X}>": idx for idx in range(256)}},
-        "cke_contract": corpus["tokenizer"],
-    }
-    _write_json(tokenizer_path, tokenizer)
+    if corpus["tokenizer"].get("mode") == "byte":
+        tokenizer = {
+            "version": "1.0", "truncation": None, "padding": None, "added_tokens": [],
+            "normalizer": None, "pre_tokenizer": {"type": "ByteLevel", "add_prefix_space": False},
+            "post_processor": None, "decoder": {"type": "ByteLevel"},
+            "model": {"type": "WordLevel", "unk_token": "<0x00>",
+                      "vocab": {f"<0x{idx:02X}>": idx for idx in range(256)}},
+            "cke_contract": corpus["tokenizer"],
+        }
+        _write_json(tokenizer_path, tokenizer)
+    elif tokenizer_path.resolve() != Path(corpus["tokenizer"]["tokenizer_json"]).resolve():
+        shutil.copy2(Path(corpus["tokenizer"]["tokenizer_json"]), tokenizer_path)
 
     sample_rows = []
-    for line_no, raw in enumerate((ROOT / str(corpus["splits"]["train"]["source"])).read_bytes().splitlines()[:4], 1):
-        ids = [int(value) for value in raw[:96]]
-        decoded = bytes(ids).decode("utf-8", errors="replace")
-        sample_rows.append({"line_no": line_no, "exact_match": bytes(ids) == raw[:96],
-                            "token_count": len(ids), "token_ids": ids, "decoded": decoded})
+    encode, decode, handle = _tokenizer_codec(corpus)
+    try:
+        for line_no, raw in enumerate((ROOT / str(corpus["splits"]["train"]["source"])).read_bytes().splitlines()[:4], 1):
+            text = raw.decode("utf-8")[:96]
+            ids = encode(text)
+            decoded = decode(ids)
+            sample_rows.append({"line_no": line_no, "exact_match": decoded == text,
+                                "token_count": len(ids), "token_ids": ids, "decoded": decoded})
+    finally:
+        if handle is not None:
+            handle.close()
     roundtrip_path = run_dir / "tokenizer_roundtrip.json"
     _write_json(roundtrip_path, {
-        "schema": "cke.v8.byte_tokenizer_roundtrip.v1", "status": "pass", "exact_match": True,
+        "schema": "cke.v8.tokenizer_roundtrip.v1", "status": "pass",
+        "exact_match": all(row["exact_match"] for row in sample_rows),
         "tokenizer_json_path": str(tokenizer_path), "line_eval": {"passed": len(sample_rows), "failed": 0},
         "sample_rows": sample_rows,
     })
+    tokenizer_quality_path: Path | None = None
+    if corpus["tokenizer"].get("mode") == "bpe":
+        quality = _load_module("cke_v8_tokenizer_quality", Path(__file__).with_name("tokenizer_quality_gate_v8.py"))
+        quality_report = quality.run_gate(run_dir=run_dir, tokenizer_path=tokenizer_path)
+        if quality_report.get("verdict") == "FAIL":
+            raise RuntimeError("CKE tokenizer quality gate rejected the training tokenizer")
+        tokenizer_quality_path = run_dir / "tokenizer_quality_gate.json"
     qc_path = run_dir / "dataset_qc.json"
     _write_json(qc_path, {
         "schema": "cke.v8.dataset_qc.v1", "status": "pass",
@@ -618,6 +732,8 @@ def _write_visualizer_artifacts(
         "dataset_qc_json": str(qc_path), "dataset_profile_json": str(profile_path),
         "tokenizer_roundtrip_json": str(roundtrip_path),
     }
+    if tokenizer_quality_path is not None:
+        artifacts["tokenizer_quality_gate_json"] = str(tokenizer_quality_path)
     data_provenance = [
         {"stage": "pretrain", "dataset_name": name, "source_path": row["source"], "split": name,
          "token_count": row["tokens"], "hash": {"sha256": row["token_ids_sha256"]},
@@ -631,11 +747,13 @@ def _write_visualizer_artifacts(
         "optimizer": {"name": "adamw", "lr": float(args.lr), "hparams": {"beta1": args.beta1, "beta2": args.beta2,
                        "eps": args.eps, "weight_decay": args.weight_decay}},
         "execution": {"epochs": int(args.epochs), "micro_steps": int(sum(1 for _ in _batches(
-            np.zeros(10000, dtype=np.int32), int(args.seq_len), int(args.epochs)))),
+            np.zeros(int(corpus["splits"]["train"]["tokens"]), dtype=np.int32), int(args.seq_len), int(args.epochs)))),
             "optimizer_steps": int(performance["optimizer_steps"]), "seq_len": int(args.seq_len),
-            "grad_accum": int(args.grad_accum), "tokens_total": 10000 * int(args.epochs)},
+            "grad_accum": int(args.grad_accum),
+            "tokens_total": int(corpus["splits"]["train"]["tokens"]) * int(args.epochs)},
         "data_provenance": data_provenance,
-        "tokenizer_lineage": {"type": "utf8_byte_v1", "vocab_size": 256, "tokenizer_path": str(tokenizer_path),
+        "tokenizer_lineage": {"type": corpus["tokenizer"]["name"],
+                              "vocab_size": int(corpus["tokenizer"]["vocab_size"]), "tokenizer_path": str(tokenizer_path),
                               "tokenizer_sha256": _sha256(tokenizer_path)},
         "data_lab": {"dataset_dir": str(run_dir / "dataset"),
                      "dataset_path": str(ROOT / str(corpus["splits"]["train"]["source"])),
@@ -656,7 +774,8 @@ def _write_visualizer_artifacts(
         "command": command, "stdout": completed.stdout[-4000:],
         "artifacts": {path.name: _sha256(path) for path in (
             tokenizer_path, roundtrip_path, qc_path, profile_path, loss_path, parity_path,
-            step_profile_path, checkpoint_policy_path, stitch_path, pipeline_path)},
+            step_profile_path, checkpoint_policy_path, stitch_path, pipeline_path,
+            *([tokenizer_quality_path] if tokenizer_quality_path is not None else []))},
     }
 
 
@@ -695,7 +814,7 @@ def _inference_probe(args: argparse.Namespace) -> int:
     rc = int(lib.ck_model_init_with_manifest(str(runtime / "weights.bump").encode(), str(runtime / "weights_manifest.map").encode()))
     if rc != 0: return 2
     tokens = np.fromfile(args.probe_tokens, dtype="<i4")[:args.probe_count].astype(np.int32, copy=True)
-    output = np.empty(256, dtype=np.float32)
+    output = np.empty(int(args.probe_vocab_size), dtype=np.float32)
     if int(lib.ck_model_embed_tokens(tokens.ctypes.data_as(ctypes.POINTER(ctypes.c_int32)), int(tokens.size))) != 0: return 3
     if int(lib.ck_model_forward(output.ctypes.data_as(ctypes.POINTER(ctypes.c_float)))) != 0: return 4
     output.astype("<f4").tofile(args.probe_logits)
@@ -752,25 +871,30 @@ def _resume_worker(args: argparse.Namespace) -> int:
 
 def run(args: argparse.Namespace) -> dict[str, Any]:
     report: dict[str, Any] = {"schema": "cke.v8.training_workflow.v1", "status": "FAIL", "passed": False,
-                              "execution": CERT._execution_identity(), "checks": {}, "negative_controls": {}, "failures": []}
+                              "execution": CERT._execution_identity(),
+                              "matrix_identity": {"run_id": args.matrix_run_id, "case_id": args.matrix_case_id,
+                                                  "profile": args.matrix_case_id,
+                                                  "run_dir": str(args.run_dir), "report": str(args.report)},
+                              "checks": {}, "negative_controls": {}, "failures": []}
     started = time.perf_counter()
     try:
         import torch
         import torch.nn.functional as F
+        python = str(ROOT / ".venv" / "bin" / "python") if (ROOT / ".venv" / "bin" / "python").exists() else sys.executable
         args.run_dir.mkdir(parents=True, exist_ok=True)
-        train_ids, val_ids, corpus = _load_corpus(args.corpus, args.run_dir / "dataset")
+        train_ids, val_ids, corpus = _load_corpus(args, args.run_dir / "dataset", python)
         batches = _batches(train_ids, args.seq_len, args.epochs)
         ck_run = _load_module("cke_v7_runtime_workflow", V7 / "ck_run_v7.py")
         oracle = _load_module("cke_v7_oracle_workflow", V7 / "oracle_snapshot_torch_v7.py")
-        python = str(ROOT / ".venv" / "bin" / "python") if (ROOT / ".venv" / "bin" / "python").exists() else sys.executable
         init_cmd = [python, str(V7 / "ck_run_v7.py"), "init", "--run", str(args.run_dir), "--allow-non-cache-run-dir",
-                    "--train-seed", str(args.seed), "--layers", "4", "--vocab-size", "256", "--embed-dim", str(args.d_model),
-                    "--hidden-dim", str(args.hidden), "--num-heads", "4", "--num-kv-heads", "4", "--context-len", str(args.seq_len),
+                    "--train-seed", str(args.seed), "--layers", str(args.layers), "--vocab-size", str(args.vocab_size),
+                    "--embed-dim", str(args.d_model), "--hidden-dim", str(args.hidden),
+                    "--num-heads", str(args.num_heads), "--num-kv-heads", str(args.num_kv_heads), "--context-len", str(args.seq_len),
                     "--template", "qwen3", "--generate-ir", "--generate-runtime", "--train-bridge-lowering", "explicit",
                     "--adamw-beta1", str(args.beta1), "--adamw-beta2", str(args.beta2), "--adamw-eps", str(args.eps),
                     "--adamw-weight-decay", str(args.weight_decay)]
         init = subprocess.run(init_cmd, cwd=ROOT, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        if init.returncode: raise RuntimeError("four-layer initialization failed: " + init.stdout[-4000:])
+        if init.returncode: raise RuntimeError(f"{args.layers}-layer initialization failed: " + init.stdout[-4000:])
         build_started = time.perf_counter()
         defines = {"CK_NUM_TOKENS": args.seq_len, "CK_GRAD_ACCUM_STEPS": args.grad_accum, "CK_TRAIN_USE_CE_PTREF": 1,
                    "CK_ADAMW_BETA1": args.beta1, "CK_ADAMW_BETA2": args.beta2, "CK_ADAMW_EPS": args.eps,
@@ -787,7 +911,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         report["execution"]["actual_runtime_threads"] = main_provenance.get("actual_runtime_threads")
         initial = _weight_export(lib)
         heldout_before = _evaluate(lib, summary, val_ids, args.seq_len)
-        sample_before = _sample(lib, summary, args.seq_len)
+        sample_before = _sample(lib, summary, args.seq_len, corpus)
         decoded, cfg = oracle._decode_weight_snapshot(args.run_dir, summary, initial)
         names = [str(r["name"]) for r in inventory]
         weights = {n: v.detach().clone().requires_grad_(n in names) for n, v in decoded.items()}
@@ -812,7 +936,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             for key in timing: timing[key] += float(profile[key])
             tx = torch.from_numpy(x.astype(np.int64)).view(1, -1); ty = torch.from_numpy(y.astype(np.int64)).view(1, -1)
             logits = model.forward(tx)
-            t_loss = F.cross_entropy(logits[:, :valid, :].reshape(-1, 256), ty[:, :valid].reshape(-1), reduction="mean")
+            t_loss = F.cross_entropy(logits[:, :valid, :].reshape(-1, args.vocab_size), ty[:, :valid].reshape(-1), reduction="mean")
             max_loss_diff = max(max_loss_diff, abs(ck_loss - float(t_loss.item())))
             if micro == 1 or ((micro - 1) % (len(batches) // args.epochs) == 0):
                 ck_logits = [value for name, value in CERT._activation_snapshot(lib, summary).items() if ".logits." in name][0]
@@ -965,7 +1089,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         trained_logits = _forward_logits(lib, summary, ex, ey, ev); exported_logits = _forward_logits(export_lib, export_summary, ex, ey, ev)
         export_diff = float(np.max(np.abs(trained_logits - exported_logits)))
         heldout_after = _evaluate(export_lib, export_summary, val_ids, args.seq_len)
-        sample_after = _sample(export_lib, export_summary, args.seq_len)
+        sample_after = _sample(export_lib, export_summary, args.seq_len, corpus)
         # Build the actual inference-only v8 prefill/decode library from the exported weights.
         v8_source = args.run_dir / "v8_inference_source"
         v8_runtime = args.run_dir / "v8_inference_runtime"
@@ -985,7 +1109,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         probe = subprocess.run([python, str(Path(__file__).resolve()), "--inference-probe", "--inference-runtime", str(v8_runtime),
                                 "--probe-tokens", corpus["splits"]["validation"]["token_ids"], "--probe-count", str(ev),
                                 "--probe-logits", str(v8_logits_path), "--probe-provenance", str(v8_provenance_path),
-                                "--probe-library-sha256", v8_library_sha256, "--probe-engine-sha256", v8_engine_sha256],
+                                "--probe-library-sha256", v8_library_sha256, "--probe-engine-sha256", v8_engine_sha256,
+                                "--probe-vocab-size", str(args.vocab_size)],
                                cwd=ROOT, env=probe_env, text=True,
                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         if probe.returncode != 0:
@@ -993,13 +1118,17 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         v8_logits = np.fromfile(v8_logits_path, dtype="<f4")
         v8_inference_diff = float(np.max(np.abs(trained_logits[ev - 1] - v8_logits)))
         v8_provenance = json.loads(v8_provenance_path.read_text(encoding="utf-8"))
-        generation_prompt = np.frombuffer(b"The ", dtype=np.uint8).astype(np.int32)
+        encode_prompt, _, prompt_handle = _tokenizer_codec(corpus)
+        try:
+            generation_prompt = np.asarray(encode_prompt("The "), dtype=np.int32)
+        finally:
+            if prompt_handle is not None:
+                prompt_handle.close()
         generation_prompt_path = args.run_dir / "generation_prompt.i32"
         generation_prompt.astype("<i4").tofile(generation_prompt_path)
         generation_steps = 12
         reference_sequence, reference_trajectory = _sample_trajectory(
-            export_lib, export_summary, args.seq_len, prompt=b"The ", new_tokens=generation_steps
-        )
+            export_lib, export_summary, args.seq_len, prompt=generation_prompt, new_tokens=generation_steps)
         trajectory_logits_path = args.run_dir / "v8_generation_logits.f32"
         trajectory_sequence_path = args.run_dir / "v8_generation_sequence.i32"
         trajectory_provenance_path = args.run_dir / "v8_generation_provenance.json"
@@ -1010,25 +1139,27 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "--probe-generate-count", str(generation_steps), "--probe-sequence", str(trajectory_sequence_path),
             "--probe-trajectory-logits", str(trajectory_logits_path), "--probe-provenance", str(trajectory_provenance_path),
             "--probe-library-sha256", v8_library_sha256, "--probe-engine-sha256", v8_engine_sha256,
+            "--probe-vocab-size", str(args.vocab_size),
         ], cwd=ROOT, env=probe_env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         if trajectory_probe.returncode != 0:
             raise RuntimeError("v8 generation trajectory probe failed: " + trajectory_probe.stdout[-4000:])
         v8_sequence = np.fromfile(trajectory_sequence_path, dtype="<i4").astype(np.int32).tolist()
-        v8_trajectory = np.fromfile(trajectory_logits_path, dtype="<f4").reshape(generation_steps, 256)
+        v8_trajectory = np.fromfile(trajectory_logits_path, dtype="<f4").reshape(generation_steps, args.vocab_size)
         trajectory_logits_diff = float(np.max(np.abs(reference_trajectory - v8_trajectory)))
         trajectory_tokens_match = v8_sequence == reference_sequence
         trajectory_provenance = json.loads(trajectory_provenance_path.read_text(encoding="utf-8"))
-        first_loss = sum(r["cke"]*r["valid_tokens"] for r in loss_rows[:len(batches)//args.epochs]) / 10000.0
-        last_loss = sum(r["cke"]*r["valid_tokens"] for r in loss_rows[-len(batches)//args.epochs:]) / 10000.0
+        train_token_count = int(train_ids.size)
+        first_loss = sum(r["cke"]*r["valid_tokens"] for r in loss_rows[:len(batches)//args.epochs]) / train_token_count
+        last_loss = sum(r["cke"]*r["valid_tokens"] for r in loss_rows[-len(batches)//args.epochs:]) / train_token_count
         generated_c_seconds = timing["step_ms"] / 1000.0 + final_flush_seconds
         performance = {
             "setup_compile_seconds": build_seconds,
             "certification_loop_seconds": train_seconds,
-            "certification_workflow_tokens_per_second": (10000 * args.epochs) / train_seconds,
+            "certification_workflow_tokens_per_second": (train_token_count * args.epochs) / train_seconds,
             "generated_c_training_seconds": generated_c_seconds,
-            "generated_c_tokens_per_second": (10000 * args.epochs) / generated_c_seconds,
+            "generated_c_tokens_per_second": (train_token_count * args.epochs) / generated_c_seconds,
             "generated_c_optimizer_steps_per_second": update_count / generated_c_seconds,
-            "tokens_per_second": (10000 * args.epochs) / generated_c_seconds,
+            "tokens_per_second": (train_token_count * args.epochs) / generated_c_seconds,
             "tokens_per_second_scope": "generated_c_profiled_steps_plus_final_flush",
             "export_compile_seconds": export_build_seconds, "v8_inference_compile_seconds": v8_build_seconds,
             "generated_profile_ms": {**timing, "final_flush_ms": final_flush_seconds * 1000.0},
@@ -1114,7 +1245,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                                        "checkpoint_identity": checkpoint_controls}
         report.update({"status": "PASS" if all(v["passed"] for v in checks.values()) else "FAIL", "checks": checks, "corpus": corpus,
             "configuration": {**configuration, "training_config_sha256": training_config_sha256,
-                "unique_train_tokens": 10000, "token_presentations": 10000*args.epochs,
+                "unique_train_tokens": train_token_count, "token_presentations": train_token_count*args.epochs,
                 "numerical_contract": "strict_reference_order", "parallel_scaling_certified": False},
             "implementation": {"orchestrator": str(Path(__file__).relative_to(ROOT)), "shared_training_codegen": "version/v7/scripts/codegen_train_runtime_v7.py",
                 "shared_oracle": "version/v7/scripts/oracle_snapshot_torch_v7.py", "v7_training_cli_invoked": False,
@@ -1137,17 +1268,33 @@ def main() -> int:
     p.add_argument("--inference-probe", action="store_true"); p.add_argument("--inference-runtime", type=Path)
     p.add_argument("--probe-tokens", type=Path); p.add_argument("--probe-count", type=int); p.add_argument("--probe-logits", type=Path)
     p.add_argument("--probe-provenance", type=Path); p.add_argument("--probe-library-sha256"); p.add_argument("--probe-engine-sha256")
+    p.add_argument("--probe-vocab-size", type=int, default=256)
     p.add_argument("--probe-generate-count", type=int, default=0); p.add_argument("--probe-sequence", type=Path)
     p.add_argument("--probe-trajectory-logits", type=Path)
     p.add_argument("--run-dir", type=Path, default=DEFAULT_RUN); p.add_argument("--json-out", dest="report", type=Path, default=DEFAULT_REPORT)
     p.add_argument("--corpus", type=Path, default=CORPUS_SPEC); p.add_argument("--seed", type=int, default=42)
-    p.add_argument("--seq-len", type=int, default=32); p.add_argument("--epochs", type=int, default=10); p.add_argument("--d-model", type=int, default=32); p.add_argument("--hidden", type=int, default=64)
+    p.add_argument("--matrix-run-id"); p.add_argument("--matrix-case-id")
+    p.add_argument("--seq-len", type=int, default=32); p.add_argument("--epochs", type=int, default=10)
+    p.add_argument("--layers", type=int, choices=(4, 6, 10), default=4)
+    p.add_argument("--d-model", type=int, default=32); p.add_argument("--hidden", type=int, default=64)
+    p.add_argument("--num-heads", type=int, default=4); p.add_argument("--num-kv-heads", type=int, default=4)
+    p.add_argument("--tokenizer", choices=("byte", "bpe"), default="byte")
+    p.add_argument("--vocab-size", type=int, default=256)
+    p.add_argument("--bpe-min-freq", type=int, default=2); p.add_argument("--bpe-max-piece-bytes", type=int, default=24)
+    p.add_argument("--max-train-tokens", type=int, default=0, help="Bound post-tokenization training IDs; 0 uses all")
+    p.add_argument("--max-validation-tokens", type=int, default=0, help="Bound post-tokenization validation IDs; 0 uses all")
     p.add_argument("--grad-accum", type=int, default=8); p.add_argument("--lr", type=float, default=3e-4); p.add_argument("--beta1", type=float, default=.9); p.add_argument("--beta2", type=float, default=.999)
     p.add_argument("--eps", type=float, default=1e-8); p.add_argument("--weight-decay", type=float, default=.01)
     p.add_argument("--param-tol", type=float, default=5e-3); p.add_argument("--moment-tol", type=float, default=1e-3); p.add_argument("--grad-tol", type=float, default=5e-3)
     p.add_argument("--loss-tol", type=float, default=2e-2); p.add_argument("--logits-tol", type=float, default=5e-2)
     p.add_argument("--inference-tol", type=float, default=1e-3)
     args = p.parse_args(); args.run_dir=args.run_dir.resolve(); args.report=args.report.resolve(); args.corpus=args.corpus.resolve()
+    if args.d_model % args.num_heads != 0:
+        p.error("--d-model must be divisible by --num-heads")
+    if args.num_heads % args.num_kv_heads != 0:
+        p.error("--num-heads must be divisible by --num-kv-heads")
+    if args.tokenizer == "bpe" and args.vocab_size < 257:
+        p.error("--tokenizer bpe requires --vocab-size >= 257")
     if args.resume_worker: return _resume_worker(args)
     if args.inference_probe: return _inference_probe(args)
     result=run(args); print(json.dumps({"status":result["status"],"passed":result["passed"],"report":str(args.report)}, indent=2)); return 0 if result["passed"] else 1
