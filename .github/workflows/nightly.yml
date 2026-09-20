@@ -807,10 +807,9 @@ jobs:
                   and cert_doc.get("status") == "PASS"
                   and cert_doc.get("passed") is True
               )
-              training_cert_payload = {
-                  "status": "pass" if current_pass else "fail" if identity_matches else "historical",
-                  "passed": current_pass,
-                  "current": identity_matches,
+              report_payload = {
+                  "status": str(cert_doc.get("status", "INCOMPLETE")).lower(),
+                  "passed": bool(cert_doc.get("passed", False)),
                   "generated_at": str(cert_doc.get("generated_at") or _utc_mtime(training_cert_report)),
                   "summary_path": str(training_cert_report),
                   "execution": execution,
@@ -818,12 +817,50 @@ jobs:
                   "checks": cert_doc.get("checks") or {},
                   "negative_controls": cert_doc.get("negative_controls") or {},
                   "failures": cert_doc.get("failures") or [],
-                  "note": (
-                      f"Current workflow evidence: {training_cert_report}"
-                      if identity_matches
-                      else f"Historical evidence only; run/attempt/commit identity does not match this workflow: {training_cert_report}"
-                  ),
               }
+              current_result_exists = bool(
+                  isinstance(training_cert_result, dict)
+                  and result_status not in ("", "not_run", "skip", "skipped")
+              )
+              if identity_matches:
+                  training_cert_payload = dict(report_payload)
+                  training_cert_payload.update({
+                      "status": "pass" if current_pass else "fail",
+                      "passed": current_pass,
+                      "current": True,
+                      "current_result": training_cert_result,
+                      "note": f"Current workflow evidence: {training_cert_report}",
+                  })
+              elif current_result_exists:
+                  training_cert_payload = {
+                      "status": "fail",
+                      "passed": False,
+                      "current": True,
+                      "checks": {},
+                      "negative_controls": {},
+                      "failures": [
+                          "current certification result has no matching run/attempt/commit report"
+                      ],
+                      "current_result": training_cert_result,
+                      "historical_evidence": report_payload,
+                      "note": (
+                          "Current certification failed or published mismatched evidence; "
+                          f"the older report is retained under historical_evidence: {training_cert_report}. "
+                          + str(training_cert_result.get("error_msg", "") or "")
+                      ).strip(),
+                  }
+              else:
+                  training_cert_payload = dict(report_payload)
+                  training_cert_payload.update({
+                      "status": "historical",
+                      "passed": False,
+                      "current": False,
+                      "historical_evidence": report_payload,
+                      "note": (
+                          "Historical evidence only; run/attempt/commit identity does not match "
+                          f"this workflow: {training_cert_report}"
+                      ),
+                  })
           elif isinstance(training_cert_result, dict):
               result_status = str(training_cert_result.get("status", "fail")).lower()
               training_cert_payload.update({

@@ -37,8 +37,20 @@ class V8TrainingCertificationTests(unittest.TestCase):
         self.assertIn('github_identity.get("run_id")', workflow)
         self.assertIn('github_identity.get("run_attempt")', workflow)
         self.assertIn('execution.get("git_commit")', workflow)
-        self.assertIn('else "historical"', workflow)
+        self.assertIn('"historical_evidence": report_payload', workflow)
+        self.assertIn('"current_result": training_cert_result', workflow)
+        self.assertIn('"status": "fail"', workflow)
         self.assertIn('training_cert_payload["passed"] = False', workflow)
+
+    def test_alternate_engine_control_has_distinct_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            base = Path(td)
+            engine = base / "libckernel_engine.so"
+            engine.write_bytes(b"ELF fixture")
+            alternate = cert._alternate_engine_control(engine, base / "run")
+            self.assertEqual(alternate.name, engine.name)
+            self.assertNotEqual(cert._sha256(alternate), cert._sha256(engine))
+            self.assertTrue(alternate.read_bytes().startswith(engine.read_bytes()))
 
     def test_tensor_comparison_rejects_corruption_and_nonfinite_values(self) -> None:
         reference = np.asarray([0.25, -0.5], dtype=np.float32)

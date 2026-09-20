@@ -114,6 +114,37 @@ def _loaded_library_evidence(path: Path) -> dict[str, Any]:
     return identity
 
 
+def _mapped_library_evidence(basename: str) -> dict[str, Any]:
+    maps = Path("/proc/self/maps")
+    entries: list[str] = []
+    mapped_paths: list[str] = []
+    if maps.exists():
+        for line in maps.read_text(encoding="utf-8", errors="replace").splitlines():
+            fields = line.split(maxsplit=5)
+            if len(fields) < 6:
+                continue
+            raw_path = fields[5].removesuffix(" (deleted)")
+            if Path(raw_path).name != basename:
+                continue
+            entries.append(line)
+            mapped_paths.append(str(Path(raw_path).resolve()))
+    unique_paths = sorted(set(mapped_paths))
+    identities: list[dict[str, Any]] = []
+    for raw_path in unique_paths:
+        path = Path(raw_path)
+        if path.is_file():
+            identities.append(_file_identity(path))
+        else:
+            identities.append({"path": raw_path, "missing": True})
+    return {
+        "basename": basename,
+        "observed_in_process_maps": bool(entries),
+        "mapped_paths": unique_paths,
+        "process_map_entries": entries,
+        "identities": identities,
+    }
+
+
 def _manifest_shapes(run_dir: Path) -> dict[str, list[int]]:
     doc = json.loads((run_dir / "weights_manifest.json").read_text(encoding="utf-8"))
     rows = doc.get("entries")
@@ -424,6 +455,86 @@ def _build_identity_check(lib: ctypes.CDLL, expected: str) -> dict[str, Any]:
     return {"passed": bool(actual and actual == expected), "expected": expected, "loaded": actual}
 
 
+def _probe_loaded_dependencies(
+    library_path: Path,
+    *,
+    expected_contract: str,
+    expected_build_identity: str,
+    expected_engine_sha256: str,
+) -> dict[str, Any]:
+    lib = ctypes.CDLL(str(library_path.resolve()), mode=ctypes.RTLD_LOCAL)
+    training_contract = _contract_check(lib, expected_contract)
+    training_build = _build_identity_check(lib, expected_build_identity)
+    training_library = _loaded_library_evidence(library_path)
+    engine = _mapped_library_evidence("libckernel_engine.so")
+    engine_hashes = [
+        str(row.get("sha256"))
+        for row in engine["identities"]
+        if isinstance(row, Mapping) and row.get("sha256")
+    ]
+    engine["expected_sha256"] = expected_engine_sha256
+    engine["loaded_sha256"] = engine_hashes
+    engine["passed"] = bool(
+        engine["observed_in_process_maps"]
+        and len(engine["mapped_paths"]) == 1
+        and engine_hashes == [expected_engine_sha256]
+    )
+    passed = bool(
+        training_contract["passed"]
+        and training_build["passed"]
+        and training_library["observed_in_process_maps"]
+        and engine["passed"]
+    )
+    return {
+        "passed": passed,
+        "training_contract": training_contract,
+        "training_build_identity": training_build,
+        "training_library": training_library,
+        "engine_dependency": engine,
+    }
+
+
+def _run_dependency_probe(
+    library_path: Path,
+    output_path: Path,
+    *,
+    expected_contract: str,
+    expected_build_identity: str,
+    expected_engine_sha256: str,
+    environment: Mapping[str, str] | None = None,
+) -> tuple[subprocess.CompletedProcess[str], dict[str, Any]]:
+    cmd = [
+        sys.executable,
+        str(Path(__file__).resolve()),
+        "--probe-loaded-dependencies",
+        "--probe-library", str(library_path.resolve()),
+        "--probe-json-out", str(output_path.resolve()),
+        "--probe-runtime-contract", expected_contract,
+        "--probe-build-identity", expected_build_identity,
+        "--probe-engine-sha256", expected_engine_sha256,
+    ]
+    completed = subprocess.run(
+        cmd,
+        cwd=str(ROOT),
+        env=dict(environment) if environment is not None else None,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+    if not output_path.exists():
+        raise RuntimeError(
+            f"dependency probe did not publish {output_path}: rc={completed.returncode} output={completed.stdout[-4000:]}"
+        )
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise RuntimeError("dependency probe output is not an object")
+    payload["command"] = cmd
+    payload["returncode"] = int(completed.returncode)
+    payload["stdout"] = completed.stdout[-4000:]
+    return completed, payload
+
+
 def _configure_runtime(lib: ctypes.CDLL) -> None:
     lib.ck_train_init.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_int), ctypes.c_int]
     lib.ck_train_init.restype = ctypes.c_int
@@ -496,6 +607,18 @@ def _compile_stale_library_control(
         defines={"CK_NUM_TOKENS": int(seq_len)},
     )
     return stale_library, identity
+
+
+def _alternate_engine_control(engine_path: Path, run_dir: Path) -> Path:
+    alternate_dir = run_dir / "alternate_engine_control"
+    alternate_dir.mkdir(parents=True, exist_ok=True)
+    alternate_engine = alternate_dir / engine_path.name
+    shutil.copy2(engine_path, alternate_engine)
+    with alternate_engine.open("ab") as handle:
+        handle.write(b"\nCKE_ALTERNATE_ENGINE_NEGATIVE_CONTROL\n")
+    if _sha256(alternate_engine) == _sha256(engine_path):
+        raise RuntimeError("alternate engine control did not change engine identity")
+    return alternate_engine
 
 
 def _write_report(path: Path, report: Mapping[str, Any]) -> None:
@@ -603,6 +726,23 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         expected_build_identity = str(build_identity.get("build_identity_sha256", ""))
         if not expected_build_identity:
             raise RuntimeError("generated training build identity is missing")
+        build_inputs = build_identity.get("inputs") if isinstance(build_identity.get("inputs"), Mapping) else {}
+        expected_engine_sha256 = str(build_inputs.get("kernel_library_sha256", ""))
+        engine_path = ROOT / "build" / "libckernel_engine.so"
+        if not expected_engine_sha256 or not engine_path.is_file():
+            raise RuntimeError("training build identity has no usable engine-library identity")
+
+        dependency_probe_path = args.run_dir / "loaded_dependency_probe.json"
+        dependency_process, dependency_probe = _run_dependency_probe(
+            library_path,
+            dependency_probe_path,
+            expected_contract=str(summary.get("runtime_contract_sha256", "")),
+            expected_build_identity=expected_build_identity,
+            expected_engine_sha256=expected_engine_sha256,
+        )
+        report["checks"]["loaded_engine_dependency"] = dependency_probe
+        if dependency_process.returncode != 0 or not dependency_probe.get("passed"):
+            raise RuntimeError("fresh-process loaded engine dependency does not match the build identity")
 
         lib = ctypes.CDLL(str(library_path.resolve()), mode=ctypes.RTLD_GLOBAL)
         _configure_runtime(lib)
@@ -774,6 +914,39 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "substituted_library": stale_library_evidence,
             "substituted_build_identity": stale_identity,
         }
+        alternate_engine_path = _alternate_engine_control(engine_path, args.run_dir)
+        alternate_probe_path = args.run_dir / "alternate_engine_dependency_probe.json"
+        alternate_environment = dict(os.environ)
+        existing_library_path = alternate_environment.get("LD_LIBRARY_PATH", "")
+        alternate_environment["LD_LIBRARY_PATH"] = (
+            str(alternate_engine_path.parent)
+            + (os.pathsep + existing_library_path if existing_library_path else "")
+        )
+        alternate_environment.pop("LD_PRELOAD", None)
+        alternate_process, alternate_probe = _run_dependency_probe(
+            library_path,
+            alternate_probe_path,
+            expected_contract=contract["expected"],
+            expected_build_identity=expected_build_identity,
+            expected_engine_sha256=expected_engine_sha256,
+            environment=alternate_environment,
+        )
+        alternate_engine = alternate_probe.get("engine_dependency")
+        alternate_engine = alternate_engine if isinstance(alternate_engine, Mapping) else {}
+        mapped_paths = [str(path) for path in alternate_engine.get("mapped_paths", [])]
+        report["negative_controls"]["alternate_engine"] = {
+            "passed": bool(
+                alternate_process.returncode != 0
+                and not alternate_probe.get("passed")
+                and alternate_probe.get("training_contract", {}).get("passed")
+                and alternate_probe.get("training_build_identity", {}).get("passed")
+                and not alternate_engine.get("passed")
+                and str(alternate_engine_path.resolve()) in mapped_paths
+            ),
+            "injected_engine": _file_identity(alternate_engine_path),
+            "expected_engine": _file_identity(engine_path),
+            "detector_result": alternate_probe,
+        }
 
         report["provenance"] = {
             "git": _git_identity(),
@@ -789,6 +962,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "runtime_summary": _file_identity(summary_path),
             "build_identity": build_identity,
             "loaded_library": loaded_library,
+            "loaded_engine_dependency": dependency_probe.get("engine_dependency"),
             "runtime_contract_sha256": contract["loaded"],
             "build_identity_sha256": loaded_build["loaded"],
             "backward_ops": summary.get("backward_op_trace", []),
@@ -821,6 +995,12 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Certify generated v8 FP32 forward/backward against PyTorch")
+    parser.add_argument("--probe-loaded-dependencies", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--probe-library", type=Path, help=argparse.SUPPRESS)
+    parser.add_argument("--probe-json-out", type=Path, help=argparse.SUPPRESS)
+    parser.add_argument("--probe-runtime-contract", help=argparse.SUPPRESS)
+    parser.add_argument("--probe-build-identity", help=argparse.SUPPRESS)
+    parser.add_argument("--probe-engine-sha256", help=argparse.SUPPRESS)
     parser.add_argument("--run-dir", type=Path, default=DEFAULT_RUN_DIR)
     parser.add_argument("--json-out", dest="report", type=Path, default=DEFAULT_REPORT)
     parser.add_argument("--seed", type=int, default=42)
@@ -834,6 +1014,25 @@ def main() -> int:
     parser.add_argument("--gradient-abs-tol", type=float, default=3e-4)
     parser.add_argument("--gradient-rel-tol", type=float, default=3e-3)
     args = parser.parse_args()
+    if args.probe_loaded_dependencies:
+        required = {
+            "probe_library": args.probe_library,
+            "probe_json_out": args.probe_json_out,
+            "probe_runtime_contract": args.probe_runtime_contract,
+            "probe_build_identity": args.probe_build_identity,
+            "probe_engine_sha256": args.probe_engine_sha256,
+        }
+        missing = [name for name, value in required.items() if not value]
+        if missing:
+            parser.error(f"dependency probe is missing: {', '.join(missing)}")
+        probe = _probe_loaded_dependencies(
+            args.probe_library.expanduser().resolve(),
+            expected_contract=str(args.probe_runtime_contract),
+            expected_build_identity=str(args.probe_build_identity),
+            expected_engine_sha256=str(args.probe_engine_sha256),
+        )
+        _write_report(args.probe_json_out.expanduser().resolve(), probe)
+        return 0 if probe["passed"] else 1
     args.run_dir = args.run_dir.expanduser().resolve()
     args.report = args.report.expanduser().resolve()
     report = run(args)
