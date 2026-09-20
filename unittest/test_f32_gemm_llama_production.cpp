@@ -149,6 +149,8 @@ int main() {
         {"prefill_four", 4, 48, 5120},
         {"prefill_chunk_tail", 65, 48, 5120},
         {"qwen35_router_chunk", 65, 256, 2048},
+        {"audio_ffn_up", 9, 5120, 1280},
+        {"audio_ffn_down", 9, 1280, 5120},
     };
     int passed = 0;
     for (const case_spec & spec : cases) {
