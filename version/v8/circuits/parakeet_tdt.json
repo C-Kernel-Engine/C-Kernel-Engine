@@ -124,6 +124,13 @@
     "audio_relative_position": "audio_relative_sinusoidal_position_f32",
     "audio_fastconformer_block": "audio_fastconformer_block_f32",
     "audio_encoder_projection": "gemm_nt_f32_llama_production",
+    "audio_tdt_embedding": "embedding_forward_fp32",
+    "audio_tdt_lstm": "audio_lstm_step_f32",
+    "audio_tdt_projection": "gemm_nt_f32_llama_production",
+    "audio_tdt_joint_add": "audio_scaled_residual_add_f32",
+    "audio_tdt_relu": "audio_relu_inplace_f32",
+    "audio_tdt_joint_head": "gemm_nt_f32_llama_production",
+    "audio_tdt_argmax": "audio_argmax_first_f32",
     "relative_position": "audio_relative_sinusoidal_position_f32",
     "relative_attention": "audio_conformer_relative_attention_f32",
     "grouped_conv1d": "audio_conv1d_channel_major_grouped_f32",
@@ -145,7 +152,15 @@
     "audio_features_normalized": {"shape": [{"config": "audio_feature_frames"}, {"config": "audio_feature_channels"}]},
     "audio_encoder_tokens": {"shape": [{"config": "audio_subsampling_output_frames"}, {"config": "hidden_size"}]},
     "audio_relative_positions": {"shape": [{"config": "audio_relative_position_frames"}, {"config": "hidden_size"}]},
-    "audio_encoder_projected": {"shape": [{"config": "audio_subsampling_output_frames"}, {"config": "audio_encoder_projection_size"}]}
+    "audio_encoder_projected": {"shape": [{"config": "audio_subsampling_output_frames"}, {"config": "audio_encoder_projection_size"}]},
+    "audio_tdt_embedding": {"shape": [{"config": "decoder_hidden_size"}]},
+    "audio_tdt_lstm_0": {"shape": [{"config": "decoder_hidden_size"}]},
+    "audio_tdt_lstm_1": {"shape": [{"config": "decoder_hidden_size"}]},
+    "audio_tdt_decoder_projected": {"shape": [{"config": "decoder_hidden_size"}]},
+    "audio_tdt_joint_hidden": {"shape": [{"config": "decoder_hidden_size"}]},
+    "audio_tdt_logits": {"shape": [{"config": "audio_tdt_joint_output_size"}]},
+    "audio_tdt_token_index": {"shape": [1]},
+    "audio_tdt_duration_index": {"shape": [1]}
   },
   "activation_bindings": {
     "audio_samples": "audio_samples",
@@ -160,7 +175,15 @@
     "audio_features_normalized": "audio_features_normalized",
     "audio_encoder_tokens": "audio_encoder_tokens",
     "audio_relative_positions": "audio_relative_positions",
-    "audio_encoder_projected": "audio_encoder_projected"
+    "audio_encoder_projected": "audio_encoder_projected",
+    "audio_tdt_embedding": "audio_tdt_embedding",
+    "audio_tdt_lstm_0": "audio_tdt_lstm_0",
+    "audio_tdt_lstm_1": "audio_tdt_lstm_1",
+    "audio_tdt_decoder_projected": "audio_tdt_decoder_projected",
+    "audio_tdt_joint_hidden": "audio_tdt_joint_hidden",
+    "audio_tdt_logits": "audio_tdt_logits",
+    "audio_tdt_token_index": "audio_tdt_token_index",
+    "audio_tdt_duration_index": "audio_tdt_duration_index"
   },
   "block_configs": {
     "frontend": {"artifact_scope": "audio_frontend"}
@@ -393,6 +416,155 @@
         }
       ]
     },
-    "transducer": {"sequence": ["embedding_lookup", "lstm", "decoder_projection", "joint_relu", "joint_head", "tdt_greedy_step"]}
+    "transducer": {
+      "sequence": ["decode"],
+      "decode": [
+        {
+          "id": "tdt_embedding",
+          "op": "audio_tdt_embedding",
+          "when": {"config_key": "audio_include_tdt_decode", "equals": true},
+          "params": {
+            "seq_len": 1,
+            "vocab_size_from_config": "vocab_size",
+            "embed_dim_from_config": "decoder_hidden_size"
+          },
+          "graph_slots": {
+            "inputs": {"tokens": "external:audio_tdt_token"},
+            "outputs": {"output": "audio_tdt_embedding"}
+          },
+          "weight_refs": {"token_emb": "decoder.embedding.weight"}
+        },
+        {
+          "id": "tdt_lstm_0",
+          "op": "audio_tdt_lstm",
+          "when": {"config_key": "audio_include_tdt_decode", "equals": true},
+          "params": {
+            "input_size_from_config": "decoder_hidden_size",
+            "hidden_size_from_config": "decoder_hidden_size"
+          },
+          "graph_slots": {
+            "inputs": {
+              "input": "audio_tdt_embedding",
+              "hidden_state_in": "external:audio_tdt_hidden_0",
+              "cell_state_in": "external:audio_tdt_cell_0"
+            },
+            "outputs": {
+              "output": "audio_tdt_lstm_0",
+              "hidden_state": "external:audio_tdt_hidden_0",
+              "cell_state": "external:audio_tdt_cell_0"
+            }
+          },
+          "weight_refs": {
+            "weight_ih": "decoder.lstm.weight_ih_l0",
+            "weight_hh": "decoder.lstm.weight_hh_l0",
+            "bias_ih": "decoder.lstm.bias_ih_l0",
+            "bias_hh": "decoder.lstm.bias_hh_l0"
+          }
+        },
+        {
+          "id": "tdt_lstm_1",
+          "op": "audio_tdt_lstm",
+          "when": {"config_key": "audio_include_tdt_decode", "equals": true},
+          "params": {
+            "input_size_from_config": "decoder_hidden_size",
+            "hidden_size_from_config": "decoder_hidden_size"
+          },
+          "graph_slots": {
+            "inputs": {
+              "input": "audio_tdt_lstm_0",
+              "hidden_state_in": "external:audio_tdt_hidden_1",
+              "cell_state_in": "external:audio_tdt_cell_1"
+            },
+            "outputs": {
+              "output": "audio_tdt_lstm_1",
+              "hidden_state": "external:audio_tdt_hidden_1",
+              "cell_state": "external:audio_tdt_cell_1"
+            }
+          },
+          "weight_refs": {
+            "weight_ih": "decoder.lstm.weight_ih_l1",
+            "weight_hh": "decoder.lstm.weight_hh_l1",
+            "bias_ih": "decoder.lstm.bias_ih_l1",
+            "bias_hh": "decoder.lstm.bias_hh_l1"
+          }
+        },
+        {
+          "id": "tdt_decoder_projection",
+          "op": "audio_tdt_projection",
+          "when": {"config_key": "audio_include_tdt_decode", "equals": true},
+          "params": {
+            "seq_len": 1,
+            "_input_dim_from_config": "decoder_hidden_size",
+            "_output_dim_from_config": "decoder_hidden_size"
+          },
+          "graph_slots": {
+            "inputs": {"A": "audio_tdt_lstm_1"},
+            "outputs": {"C": "audio_tdt_decoder_projected"}
+          },
+          "weight_refs": {
+            "weight": "decoder.decoder_projector.weight",
+            "bias": "decoder.decoder_projector.bias"
+          }
+        },
+        {
+          "id": "tdt_joint_add",
+          "op": "audio_tdt_joint_add",
+          "when": {"config_key": "audio_include_tdt_decode", "equals": true},
+          "params": {"scale": 1.0, "elements_from_config": "decoder_hidden_size"},
+          "graph_slots": {
+            "inputs": {
+              "residual": "external:audio_tdt_encoder_row",
+              "branch": "audio_tdt_decoder_projected"
+            },
+            "outputs": {"output": "audio_tdt_joint_hidden"}
+          }
+        },
+        {
+          "id": "tdt_joint_relu",
+          "op": "audio_tdt_relu",
+          "when": {"config_key": "audio_include_tdt_decode", "equals": true},
+          "params": {"elements_from_config": "decoder_hidden_size"},
+          "graph_slots": {
+            "inputs": {"input": "audio_tdt_joint_hidden"},
+            "outputs": {"output": "audio_tdt_joint_hidden"}
+          }
+        },
+        {
+          "id": "tdt_joint_head",
+          "op": "audio_tdt_joint_head",
+          "when": {"config_key": "audio_include_tdt_decode", "equals": true},
+          "params": {
+            "seq_len": 1,
+            "_input_dim_from_config": "decoder_hidden_size",
+            "_output_dim_from_config": "audio_tdt_joint_output_size"
+          },
+          "graph_slots": {
+            "inputs": {"A": "audio_tdt_joint_hidden"},
+            "outputs": {"C": "audio_tdt_logits"}
+          },
+          "weight_refs": {"weight": "joint.head.weight", "bias": "joint.head.bias"}
+        },
+        {
+          "id": "tdt_token_argmax",
+          "op": "audio_tdt_argmax",
+          "when": {"config_key": "audio_include_tdt_decode", "equals": true},
+          "params": {"elements_from_config": "vocab_size"},
+          "graph_slots": {
+            "inputs": {"values": "audio_tdt_logits"},
+            "outputs": {"index": "audio_tdt_token_index"}
+          }
+        },
+        {
+          "id": "tdt_duration_argmax",
+          "op": "audio_tdt_argmax",
+          "when": {"config_key": "audio_include_tdt_decode", "equals": true},
+          "params": {"elements_from_config": "audio_tdt_duration_count"},
+          "graph_slots": {
+            "inputs": {"values": "audio_tdt_logits"},
+            "outputs": {"index": "audio_tdt_duration_index"}
+          }
+        }
+      ]
+    }
   }
 }

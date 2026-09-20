@@ -3,7 +3,7 @@
   "op": "audio_lstm",
   "operation_interface": "audio_lstm.single_step.pytorch_ifgo.fp32.v1",
   "variant": "single_layer_stateful_ifgo_fp32",
-   "selection": {"status": "candidate", "priority": 100, "equivalence_group": "audio_lstm_pytorch_ifgo_single_step_fp32", "phases": ["decode"]},
+   "selection": {"status": "candidate", "priority": 100, "equivalence_group": "audio_lstm_pytorch_ifgo_single_step_fp32", "phases": ["prefill", "decode"]},
   "quant": {"weight": "fp32", "activation": "fp32", "output": "fp32"},
   "inputs": [
     {"name": "input", "dtype": "fp32", "shape": ["I"], "layout": "feature_contiguous", "placement": "local", "access": "read", "storage_class": "activation", "consumption": "required"},
@@ -22,14 +22,14 @@
     {"name": "hidden_state", "dtype": "fp32", "shape": ["H"], "layout": "feature_contiguous", "placement": "local", "access": "read_write", "storage_class": "state", "consumption": "required", "alias_of": "input:hidden_state_in"},
     {"name": "cell_state", "dtype": "fp32", "shape": ["H"], "layout": "feature_contiguous", "placement": "local", "access": "read_write", "storage_class": "state", "consumption": "required", "alias_of": "input:cell_state_in"}
   ],
-  "scratch": [{"name": "gates", "dtype": "fp32", "shape": ["4*H"], "size_resolution": "required", "lifetime": "kernel_call", "alignment": 64, "layout": "ifgo_contiguous", "access": "read_write", "storage_class": "scratch", "consumption": "required"}],
+  "scratch": [{"name": "gates", "dtype": "fp32", "shape": ["4*H"], "size_bytes": "4 * hidden_size * 4", "size_resolution": "required", "lifetime": "kernel_call", "alignment": 64, "layout": "ifgo_contiguous", "access": "read_write", "storage_class": "scratch", "consumption": "required"}],
   "dims": ["input_size", "hidden_size"],
   "impl": {"function": "audio_lstm_step_f32", "c_declaration": "int audio_lstm_step_f32(const float *input, const float *weight_ih, const float *weight_hh, const float *bias_ih, const float *bias_hh, float *hidden_state, float *cell_state, float *output, float *gates_scratch, size_t gates_scratch_bytes, int input_size, int hidden_size);", "sources": ["src/kernels/audio_kernels.c"]},
   "modes": {"inference": true, "training": false, "backward": false},
   "numerical_capabilities": [{
     "contract_id": "audio_lstm_pytorch_ifgo_single_step_fp32",
     "status": "validated",
-    "phases": ["decode"],
+    "phases": ["prefill", "decode"],
     "function": "audio_lstm_step_f32",
     "explicit_selector": true,
     "implementation": {"isa_dispatch": "scalar", "threading": {"runtime": "serial", "work_partition": ["serial"], "dispatch": ["inline"], "reduction_order_effect": "contract_defined"}},

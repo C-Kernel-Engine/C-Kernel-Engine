@@ -1,0 +1,51 @@
+{
+  "id": "audio_relu_inplace_f32",
+  "op": "audio_relu",
+  "operation_interface": "audio.relu.inplace.fp32.v1",
+  "variant": "inplace_fp32",
+  "selection": {
+    "status": "production",
+    "priority": 100,
+    "equivalence_group": "audio_relu_inplace_fp32",
+    "phases": ["prefill", "decode"]
+  },
+  "quant": {"weight": "none", "activation": "fp32", "output": "fp32"},
+  "inputs": [
+    {"name": "input", "dtype": "fp32", "shape": ["N"], "layout": "contiguous", "access": "read", "storage_class": "activation", "consumption": "required"}
+  ],
+  "weights": [],
+  "outputs": [
+    {"name": "output", "dtype": "fp32", "shape": ["N"], "layout": "contiguous", "access": "write", "storage_class": "activation", "consumption": "required", "alias_of": "input:input"}
+  ],
+  "scratch": [],
+  "dims": ["elements"],
+  "params": [],
+  "impl": {
+    "function": "relu_forward_inplace",
+    "c_declaration": "void relu_forward_inplace(float *data, size_t n);",
+    "sources": ["src/kernels/relu_kernels.c"]
+  },
+  "modes": {"inference": true, "training": false, "backward": false},
+  "numerical_capabilities": [
+    {
+      "contract_id": "audio_relu_inplace_fp32",
+      "status": "validated",
+      "phases": ["prefill", "decode"],
+      "function": "relu_forward_inplace",
+      "explicit_selector": true,
+      "implementation": {
+        "isa_dispatch": "scalar",
+        "threading": {"runtime": "serial", "work_partition": ["serial"], "dispatch": ["inline"], "reduction_order_effect": "none"}
+      },
+      "arithmetic": {"partial_accumulator": "none", "merge_order": "none", "deterministic": true, "thread_count_changes_arithmetic_order": false, "split_strategy": "independent_outputs"}
+    }
+  ],
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {"name": "data", "source": "activation:input", "cast": "float*", "ports": ["input:input", "output:output"]},
+      {"name": "n", "source": "dim:elements"}
+    ]
+  },
+  "tests": {"unit": ["unittest/test_audio_encoder.py"], "oracle": "NumPy maximum(input, 0) over finite FP32 values"}
+}

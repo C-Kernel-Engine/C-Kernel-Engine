@@ -1843,6 +1843,45 @@ OP_DATAFLOW = {
             "output": {"slot": "audio_encoder_projected", "dtype": "fp32"}
         },
     },
+    "audio_tdt_embedding": {
+        "inputs": {"tokens": "external:audio_tdt_token"},
+        "outputs": {"output": {"slot": "audio_tdt_embedding", "dtype": "fp32"}},
+    },
+    "audio_tdt_lstm": {
+        "inputs": {
+            "input": "audio_tdt_embedding",
+            "hidden_state_in": "external:audio_tdt_hidden_state",
+            "cell_state_in": "external:audio_tdt_cell_state",
+        },
+        "outputs": {
+            "output": {"slot": "audio_tdt_lstm_0", "dtype": "fp32"},
+            "hidden_state": {"slot": "external:audio_tdt_hidden_state", "dtype": "fp32"},
+            "cell_state": {"slot": "external:audio_tdt_cell_state", "dtype": "fp32"},
+        },
+    },
+    "audio_tdt_projection": {
+        "inputs": {"input": "audio_tdt_lstm_1"},
+        "outputs": {"output": {"slot": "audio_tdt_decoder_projected", "dtype": "fp32"}},
+    },
+    "audio_tdt_joint_add": {
+        "inputs": {
+            "residual": "external:audio_tdt_encoder_row",
+            "branch": "audio_tdt_decoder_projected",
+        },
+        "outputs": {"output": {"slot": "audio_tdt_joint_hidden", "dtype": "fp32"}},
+    },
+    "audio_tdt_relu": {
+        "inputs": {"input": "audio_tdt_joint_hidden"},
+        "outputs": {"output": {"slot": "audio_tdt_joint_hidden", "dtype": "fp32"}},
+    },
+    "audio_tdt_joint_head": {
+        "inputs": {"input": "audio_tdt_joint_hidden"},
+        "outputs": {"output": {"slot": "audio_tdt_logits", "dtype": "fp32"}},
+    },
+    "audio_tdt_argmax": {
+        "inputs": {"values": "audio_tdt_logits"},
+        "outputs": {"index": {"slot": "audio_tdt_token_index", "dtype": "i32"}},
+    },
     "audio_feature_window": {
         "inputs": {
             "wav_bytes": "external:audio_wav_bytes",
@@ -4253,6 +4292,13 @@ TEMPLATE_TO_KERNEL_OP = {
     "audio_relative_position": "audio_relative_position",
     "audio_fastconformer_block": "audio_fastconformer_block",
     "audio_encoder_projection": "gemm",
+    "audio_tdt_embedding": "embedding",
+    "audio_tdt_lstm": "audio_lstm",
+    "audio_tdt_projection": "gemm",
+    "audio_tdt_joint_add": "audio_scaled_residual_add",
+    "audio_tdt_relu": "audio_relu",
+    "audio_tdt_joint_head": "gemm",
+    "audio_tdt_argmax": "audio_argmax",
     "audio_feature_window": "audio_feature_window",
     "audio_conv1d_stem_1": "audio_conv1d",
     "audio_conv1d_stem_2": "audio_conv1d",
@@ -8824,6 +8870,13 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
             "out_norm_bias",
         ],
         "audio_encoder_projection": ["weight", "bias"],
+        "audio_tdt_embedding": ["token_emb"],
+        "audio_tdt_lstm": ["weight_ih", "weight_hh", "bias_ih", "bias_hh"],
+        "audio_tdt_projection": ["weight", "bias"],
+        "audio_tdt_joint_add": None,
+        "audio_tdt_relu": None,
+        "audio_tdt_joint_head": ["weight", "bias"],
+        "audio_tdt_argmax": None,
         "audio_feature_window": None,
         "audio_conv1d_stem_1": ["audio_conv1_weight", "audio_conv1_bias"],
         "audio_conv1d_stem_2": ["audio_conv2_weight", "audio_conv2_bias"],
@@ -11035,6 +11088,10 @@ def generate_ir_lower_1(
             "bias_for": ir_op.get("bias_for"),
             "dataflow": ir_op.get("dataflow", {}),  # Preserve dataflow for memory planner
         }
+        if ir_op.get("template_op_id") is not None:
+            lowered_op["template_op_id"] = str(ir_op["template_op_id"])
+        if ir_op.get("instance") is not None:
+            lowered_op["instance"] = int(ir_op["instance"])
         if ir_op.get("output_view") is not None:
             lowered_op["output_view"] = copy.deepcopy(ir_op["output_view"])
         codegen_capability = _validated_kernel_codegen_capability(kernel_id, kernel_map)
@@ -12003,6 +12060,13 @@ TEMPLATE_OP_WEIGHTS = {
         "out_norm_bias",
     ],
     "audio_encoder_projection": ["weight", "bias"],
+    "audio_tdt_embedding": ["token_emb"],
+    "audio_tdt_lstm": ["weight_ih", "weight_hh", "bias_ih", "bias_hh"],
+    "audio_tdt_projection": ["weight", "bias"],
+    "audio_tdt_joint_add": [],
+    "audio_tdt_relu": [],
+    "audio_tdt_joint_head": ["weight", "bias"],
+    "audio_tdt_argmax": [],
     "audio_feature_window": [],
     "audio_conv1d_stem_1": ["audio_conv1_weight", "audio_conv1_bias"],
     "audio_conv1d_stem_2": ["audio_conv2_weight", "audio_conv2_bias"],
@@ -13424,6 +13488,10 @@ def generate_ir_lower_2(
             "outputs": {},
             "params": {},
         }
+        if ir_op.get("template_op_id") is not None:
+            lowered_op["template_op_id"] = str(ir_op["template_op_id"])
+        if ir_op.get("instance") is not None:
+            lowered_op["instance"] = int(ir_op["instance"])
         if ir_op.get("required_contract") is not None:
             lowered_op["required_contract"] = copy.deepcopy(ir_op["required_contract"])
         if ir_op.get("interface_validation") is not None:
@@ -16231,6 +16299,8 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
                     "audio_resampled": "audio_resampled",
                     "audio_resampled_frames": "audio_resampled_frames",
                     "audio_subsampling_output_frames": "audio_subsampling_output_frames",
+                    "hidden_state": "audio_tdt_hidden_state",
+                    "cell_state": "audio_tdt_cell_state",
                 }
                 if key in audio_runtime_exprs:
                     expr = audio_runtime_exprs[key]
@@ -16411,6 +16481,10 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
                 ),
             },
         }
+        if op.get("template_op_id") is not None:
+            call_op["template_op_id"] = str(op["template_op_id"])
+        if op.get("instance") is not None:
+            call_op["instance"] = int(op["instance"])
         weight_preparation = kernel_weight_preparations.get(kernel_id)
         if weight_preparation is not None:
             call_op["call_abi"]["weight_preparation"] = weight_preparation

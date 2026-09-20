@@ -58,6 +58,15 @@ _AUDIO_FASTCONFORMER_BLOCK_OPS = {
     "audio_fastconformer_block",
 }
 _AUDIO_ENCODER_PROJECTION_OPS = {"audio_encoder_projection"}
+_AUDIO_TDT_OPS = {
+    "audio_tdt_embedding",
+    "audio_tdt_lstm",
+    "audio_tdt_projection",
+    "audio_tdt_joint_add",
+    "audio_tdt_relu",
+    "audio_tdt_joint_head",
+    "audio_tdt_argmax",
+}
 
 
 def _has_audio_frontend(op_names: set[str]) -> bool:
@@ -1024,6 +1033,350 @@ CK_EXPORT int ck_model_run_audio_encoder(
 """
 
 
+def _emit_audio_tdt_entrypoint(
+    ops: list[Dict[str, Any]],
+    config: Dict[str, Any],
+) -> str:
+    selected = [op for op in ops if str(op.get("op", "")) in _AUDIO_TDT_OPS]
+    if not selected:
+        return ""
+    by_id = {str(op.get("template_op_id", "")): op for op in selected}
+    expected_ids = [
+        "tdt_embedding",
+        "tdt_lstm_0",
+        "tdt_lstm_1",
+        "tdt_decoder_projection",
+        "tdt_joint_add",
+        "tdt_joint_relu",
+        "tdt_joint_head",
+        "tdt_token_argmax",
+        "tdt_duration_argmax",
+    ]
+    if len(selected) != len(expected_ids) or set(by_id) != set(expected_ids):
+        raise RuntimeError(
+            "generated TDT decode requires the complete resolved prediction, joint, "
+            "and token-duration selection sequence"
+        )
+    hidden_size = int(config.get("decoder_hidden_size", 0) or 0)
+    decoder_layers = int(config.get("num_decoder_layers", 0) or 0)
+    vocab_size = int(config.get("vocab_size", 0) or 0)
+    blank = int(config.get("blank_token_id", -1))
+    pad = int(config.get("pad_token_id", -1))
+    max_symbols = int(config.get("max_symbols_per_step", 0) or 0)
+    subsampling_factor = int(
+        config.get("audio_subsampling_factor", 0)
+        or (config.get("encoder_config") or {}).get("subsampling_factor", 0)
+        or 0
+    )
+    durations = config.get("durations")
+    if (
+        hidden_size <= 0
+        or decoder_layers != 2
+        or vocab_size <= 0
+        or blank < 0
+        or pad < 0
+        or max_symbols <= 0
+        or subsampling_factor <= 0
+        or not isinstance(durations, list)
+        or not durations
+        or any(not isinstance(value, int) or value < 0 for value in durations)
+    ):
+        raise RuntimeError("generated TDT decode requires explicit valid state geometry")
+    joint_size = vocab_size + len(durations)
+    configured_joint = int(config.get("audio_tdt_joint_output_size", 0) or 0)
+    if configured_joint != joint_size:
+        raise RuntimeError("generated TDT joint size disagrees with vocabulary and durations")
+
+    embedding = _audio_call_expression(
+        by_id["tdt_embedding"],
+        source_overrides={
+            "activation:tokens": "&token",
+            "dim:seq_len": "1",
+            "output:output": "embedding",
+        },
+    )
+    lstm_calls = []
+    for layer in range(decoder_layers):
+        lstm_calls.append(
+            _audio_call_expression(
+                by_id[f"tdt_lstm_{layer}"],
+                source_overrides={
+                    "activation:input": "embedding" if layer == 0 else "lstm_0",
+                    "runtime:hidden_state": f"hidden_state + {layer} * {hidden_size}",
+                    "runtime:cell_state": f"cell_state + {layer} * {hidden_size}",
+                    "output:output": f"lstm_{layer}",
+                    "scratch:gates": "gates",
+                    "scratch_size:gates": f"(size_t)(4 * {hidden_size}) * sizeof(float)",
+                },
+            )
+        )
+    projection = _audio_call_expression(
+        by_id["tdt_decoder_projection"],
+        source_overrides={
+            "activation:a": "lstm_1",
+            "output:c": "decoder_cache",
+            "runtime:seq_len": "1",
+        },
+    )
+    joint_add = _audio_call_expression(
+        by_id["tdt_joint_add"],
+        source_overrides={
+            "activation:residual": "encoder + (size_t)frame * (size_t)" + str(hidden_size),
+            "activation:branch": "decoder_cache",
+            "output:output": "joint_hidden",
+        },
+    )
+    joint_relu = _audio_call_expression(
+        by_id["tdt_joint_relu"],
+        source_overrides={"activation:input": "joint_hidden"},
+    )
+    joint_head = _audio_call_expression(
+        by_id["tdt_joint_head"],
+        source_overrides={
+            "activation:a": "joint_hidden",
+            "output:c": "logits",
+            "runtime:seq_len": "1",
+        },
+    )
+    token_argmax = _audio_call_expression(
+        by_id["tdt_token_argmax"],
+        source_overrides={
+            "activation:values": "logits",
+            "output:index": "&selected_token",
+        },
+    )
+    duration_argmax = _audio_call_expression(
+        by_id["tdt_duration_argmax"],
+        source_overrides={
+            "activation:values": f"logits + {vocab_size}",
+            "output:index": "&selected_duration",
+        },
+    )
+    duration_values = ", ".join(str(int(value)) for value in durations)
+    return f"""
+#include <limits.h>
+
+static int ck_audio_tdt_reserve(size_t *offset, size_t bytes, size_t *start) {{
+    if (!offset || !start || *offset > SIZE_MAX - 63u) return -1;
+    const size_t aligned = (*offset + 63u) & ~(size_t)63u;
+    if (aligned > SIZE_MAX - bytes) return -1;
+    *start = aligned;
+    *offset = aligned + bytes;
+    return 0;
+}}
+
+CK_EXPORT size_t ck_model_audio_tdt_workspace_bytes(void) {{
+    const size_t hidden_bytes = (size_t){hidden_size} * sizeof(float);
+    const size_t state_bytes = (size_t){decoder_layers} * hidden_bytes;
+    const size_t logits_bytes = (size_t){joint_size} * sizeof(float);
+    const size_t gates_bytes = (size_t)(4 * {hidden_size}) * sizeof(float);
+    size_t offset = 0, start = 0;
+    if (ck_audio_tdt_reserve(&offset, state_bytes, &start) != 0 ||
+        ck_audio_tdt_reserve(&offset, state_bytes, &start) != 0 ||
+        ck_audio_tdt_reserve(&offset, hidden_bytes, &start) != 0 ||
+        ck_audio_tdt_reserve(&offset, hidden_bytes, &start) != 0 ||
+        ck_audio_tdt_reserve(&offset, hidden_bytes, &start) != 0 ||
+        ck_audio_tdt_reserve(&offset, hidden_bytes, &start) != 0 ||
+        ck_audio_tdt_reserve(&offset, hidden_bytes, &start) != 0 ||
+        ck_audio_tdt_reserve(&offset, logits_bytes, &start) != 0 ||
+        ck_audio_tdt_reserve(&offset, gates_bytes, &start) != 0) return 0;
+    return offset;
+}}
+
+CK_EXPORT int ck_model_audio_blank_token_id(void) {{ return {blank}; }}
+CK_EXPORT int ck_model_audio_pad_token_id(void) {{ return {pad}; }}
+CK_EXPORT int ck_model_audio_frame_stride_samples(void) {{
+    return {int(config.get("audio_hop_length", 0) or 0)} * {subsampling_factor};
+}}
+
+CK_EXPORT int ck_model_audio_transcription_output_capacity(
+    const uint8_t *audio_wav_bytes,
+    size_t audio_wav_byte_count) {{
+    if (!g_model || !audio_wav_bytes || audio_wav_byte_count == 0) return 0;
+    CKAudioWavInfo info;
+    if (audio_wav_parse_memory(audio_wav_bytes, audio_wav_byte_count, &info) != 0 ||
+        info.sample_rate != {int(config.get("audio_sample_rate", 0) or 0)} ||
+        info.channels != 1 || info.bits_per_sample != 16 || info.frames <= 0 ||
+        info.frames > {int(config.get("audio_max_source_frames", 0) or 0)}) return 0;
+    const int feature_frames = info.frames / {int(config.get("audio_hop_length", 0) or 0)} + 1;
+    const int encoder_capacity =
+        (feature_frames + {subsampling_factor} - 1) / {subsampling_factor};
+    if (encoder_capacity <= 0 ||
+        encoder_capacity > {int(config.get("audio_subsampling_output_frames", 0) or 0)} ||
+        encoder_capacity > (INT_MAX - 1) / {max_symbols}) return 0;
+    return {max_symbols} * encoder_capacity + 1;
+}}
+
+CK_EXPORT int ck_model_run_audio_tdt_decode(
+    const float *encoder,
+    int encoder_frames,
+    int32_t *tokens,
+    int32_t *token_durations,
+    int output_capacity,
+    int *output_count,
+    float *first_logits,
+    int first_logits_capacity,
+    void *workspace,
+    size_t workspace_bytes) {{
+    if (!g_model || !encoder || encoder_frames <= 0 || !tokens ||
+        !token_durations || !output_count || !workspace) return -1;
+    CKModel *model = g_model;
+    if (encoder_frames > (INT_MAX - 1) / {max_symbols}) return -2;
+    const int max_steps = {max_symbols} * encoder_frames;
+    if (output_capacity < max_steps + 1) return -3;
+    if ((first_logits && first_logits_capacity < {joint_size}) ||
+        (!first_logits && first_logits_capacity != 0)) return -4;
+    const size_t required = ck_model_audio_tdt_workspace_bytes();
+    if (required == 0 || workspace_bytes < required) return -5;
+    const size_t hidden_bytes = (size_t){hidden_size} * sizeof(float);
+    const size_t state_bytes = (size_t){decoder_layers} * hidden_bytes;
+    const size_t logits_bytes = (size_t){joint_size} * sizeof(float);
+    const size_t gates_bytes = (size_t)(4 * {hidden_size}) * sizeof(float);
+    uint8_t *base = (uint8_t *)workspace;
+    size_t offset = 0;
+    size_t hidden_start, cell_start, embedding_start, lstm0_start, lstm1_start;
+    size_t decoder_start, joint_start, logits_start, gates_start;
+    if (ck_audio_tdt_reserve(&offset, state_bytes, &hidden_start) != 0 ||
+        ck_audio_tdt_reserve(&offset, state_bytes, &cell_start) != 0 ||
+        ck_audio_tdt_reserve(&offset, hidden_bytes, &embedding_start) != 0 ||
+        ck_audio_tdt_reserve(&offset, hidden_bytes, &lstm0_start) != 0 ||
+        ck_audio_tdt_reserve(&offset, hidden_bytes, &lstm1_start) != 0 ||
+        ck_audio_tdt_reserve(&offset, hidden_bytes, &decoder_start) != 0 ||
+        ck_audio_tdt_reserve(&offset, hidden_bytes, &joint_start) != 0 ||
+        ck_audio_tdt_reserve(&offset, logits_bytes, &logits_start) != 0 ||
+        ck_audio_tdt_reserve(&offset, gates_bytes, &gates_start) != 0 ||
+        offset > workspace_bytes) return -6;
+    float *hidden_state = (float *)(base + hidden_start);
+    float *cell_state = (float *)(base + cell_start);
+    float *embedding = (float *)(base + embedding_start);
+    float *lstm_0 = (float *)(base + lstm0_start);
+    float *lstm_1 = (float *)(base + lstm1_start);
+    float *decoder_cache = (float *)(base + decoder_start);
+    float *joint_hidden = (float *)(base + joint_start);
+    float *logits = (float *)(base + logits_start);
+    float *gates = (float *)(base + gates_start);
+    memset(hidden_state, 0, state_bytes);
+    memset(cell_state, 0, state_bytes);
+    static const int ck_tdt_durations[{len(durations)}] = {{{duration_values}}};
+    int token = {blank};
+    int frame = 0;
+    int count = 1;
+    int decoder_cache_valid = 0;
+    tokens[0] = {blank};
+    token_durations[0] = 0;
+    while (frame < encoder_frames && count <= max_steps) {{
+        if (!decoder_cache_valid || token != {blank}) {{
+            {embedding};
+            if ({lstm_calls[0]} != 0) return -10;
+            if ({lstm_calls[1]} != 0) return -11;
+            {projection};
+            decoder_cache_valid = 1;
+        }}
+        if ({joint_add} != 0) return -12;
+        {joint_relu};
+        {joint_head};
+        if (first_logits && count == 1) memcpy(first_logits, logits, logits_bytes);
+        int selected_token = -1;
+        int selected_duration = -1;
+        if ({token_argmax} != 0) return -13;
+        if ({duration_argmax} != 0) return -14;
+        if (selected_token < 0 || selected_token >= {vocab_size} ||
+            selected_duration < 0 || selected_duration >= {len(durations)}) return -15;
+        token = selected_token;
+        int duration = ck_tdt_durations[selected_duration];
+        if (token == {blank} && duration == 0) duration = 1;
+        tokens[count] = (int32_t)token;
+        token_durations[count] = (int32_t)duration;
+        count++;
+        frame += duration;
+    }}
+    if (frame < encoder_frames) return -16;
+    *output_count = count;
+    return 0;
+}}
+
+CK_EXPORT size_t ck_model_audio_transcription_workspace_bytes(
+    const uint8_t *audio_wav_bytes,
+    size_t audio_wav_byte_count,
+    int output_capacity) {{
+    if (!g_model || !audio_wav_bytes || audio_wav_byte_count == 0) return 0;
+    CKAudioWavInfo info;
+    if (audio_wav_parse_memory(audio_wav_bytes, audio_wav_byte_count, &info) != 0 ||
+        info.sample_rate != {int(config.get("audio_sample_rate", 0) or 0)} ||
+        info.channels != 1 || info.bits_per_sample != 16 || info.frames <= 0 ||
+        info.frames > {int(config.get("audio_max_source_frames", 0) or 0)}) return 0;
+    const int required_output = ck_model_audio_transcription_output_capacity(
+        audio_wav_bytes, audio_wav_byte_count);
+    if (required_output <= 0 || output_capacity < required_output) return 0;
+    const int feature_frames = info.frames / {int(config.get("audio_hop_length", 0) or 0)} + 1;
+    const int encoder_capacity =
+        (feature_frames + {subsampling_factor} - 1) / {subsampling_factor};
+    const size_t feature_bytes = (size_t)feature_frames *
+        (size_t){int(config.get("audio_feature_channels", 0) or 0)} * sizeof(float);
+    const size_t encoder_bytes = (size_t)encoder_capacity * (size_t){hidden_size} * sizeof(float);
+    const size_t encoder_workspace = ck_model_audio_encoder_workspace_bytes(
+        feature_frames, encoder_capacity);
+    const size_t tdt_workspace = ck_model_audio_tdt_workspace_bytes();
+    if (encoder_workspace == 0 || tdt_workspace == 0) return 0;
+    size_t offset = 0, start = 0;
+    if (ck_audio_tdt_reserve(&offset, feature_bytes, &start) != 0 ||
+        ck_audio_tdt_reserve(&offset, encoder_bytes, &start) != 0 ||
+        ck_audio_tdt_reserve(&offset, encoder_workspace, &start) != 0 ||
+        ck_audio_tdt_reserve(&offset, tdt_workspace, &start) != 0) return 0;
+    return offset;
+}}
+
+CK_EXPORT int ck_model_transcribe_audio_wav(
+    const uint8_t *audio_wav_bytes,
+    size_t audio_wav_byte_count,
+    int32_t *tokens,
+    int32_t *token_durations,
+    int output_capacity,
+    int *output_count,
+    void *workspace,
+    size_t workspace_bytes) {{
+    if (!audio_wav_bytes || !tokens || !token_durations || !output_count || !workspace) return -1;
+    const size_t required = ck_model_audio_transcription_workspace_bytes(
+        audio_wav_bytes, audio_wav_byte_count, output_capacity);
+    if (required == 0 || workspace_bytes < required) return -2;
+    CKAudioWavInfo info;
+    if (audio_wav_parse_memory(audio_wav_bytes, audio_wav_byte_count, &info) != 0) return -3;
+    const int feature_capacity = info.frames / {int(config.get("audio_hop_length", 0) or 0)} + 1;
+    const int encoder_capacity =
+        (feature_capacity + {subsampling_factor} - 1) / {subsampling_factor};
+    const size_t feature_bytes = (size_t)feature_capacity *
+        (size_t){int(config.get("audio_feature_channels", 0) or 0)} * sizeof(float);
+    const size_t encoder_bytes = (size_t)encoder_capacity * (size_t){hidden_size} * sizeof(float);
+    const size_t encoder_workspace_bytes = ck_model_audio_encoder_workspace_bytes(
+        feature_capacity, encoder_capacity);
+    const size_t tdt_workspace_bytes = ck_model_audio_tdt_workspace_bytes();
+    uint8_t *base = (uint8_t *)workspace;
+    size_t offset = 0;
+    size_t feature_start, encoder_start, encoder_workspace_start, tdt_workspace_start;
+    if (ck_audio_tdt_reserve(&offset, feature_bytes, &feature_start) != 0 ||
+        ck_audio_tdt_reserve(&offset, encoder_bytes, &encoder_start) != 0 ||
+        ck_audio_tdt_reserve(&offset, encoder_workspace_bytes, &encoder_workspace_start) != 0 ||
+        ck_audio_tdt_reserve(&offset, tdt_workspace_bytes, &tdt_workspace_start) != 0 ||
+        offset > workspace_bytes) return -4;
+    float *features = (float *)(base + feature_start);
+    float *encoder = (float *)(base + encoder_start);
+    int feature_frames = 0;
+    if (ck_model_prepare_audio_wav_features(
+            audio_wav_bytes, audio_wav_byte_count, features, feature_capacity,
+            &feature_frames, &info) != 0) return -5;
+    const int live_frames = info.frames / {int(config.get("audio_hop_length", 0) or 0)};
+    int encoder_frames = 0;
+    if (ck_model_run_audio_encoder(
+            features, feature_frames, live_frames, encoder, encoder_capacity,
+            &encoder_frames, base + encoder_workspace_start,
+            encoder_workspace_bytes) != 0) return -6;
+    return ck_model_run_audio_tdt_decode(
+        encoder, encoder_frames, tokens, token_durations, output_capacity,
+        output_count, NULL, 0, base + tdt_workspace_start, tdt_workspace_bytes);
+}}
+"""
+
+
 def _patch_codegen_config(obj: Dict[str, Any]) -> Dict[str, Any]:
     out = dict(obj)
     cfg = dict(out.get("config", {}) or {})
@@ -1958,6 +2311,7 @@ def _inject_prefill_multimodal_bridge(
             "audio_subsampling",
             "audio_encoder_block",
             "audio_encoder",
+            "audio_transducer",
         }
     ):
         return code
@@ -1973,6 +2327,7 @@ def _inject_prefill_multimodal_bridge(
             | _AUDIO_SUBSAMPLING_OPS
             | _AUDIO_FASTCONFORMER_BLOCK_OPS
             | _AUDIO_ENCODER_PROJECTION_OPS
+            | _AUDIO_TDT_OPS
         )
     ]
     artifact_scope = str(config.get("artifact_scope", "") or "").strip().lower()
@@ -1982,6 +2337,7 @@ def _inject_prefill_multimodal_bridge(
         "audio_subsampling",
         "audio_encoder_block",
         "audio_encoder",
+        "audio_transducer",
     }:
         embedded_prefill = codegen_prefill_v8.emit_prefill_from_embedded_function(
             encoder_ops,
@@ -2002,6 +2358,7 @@ def _inject_prefill_multimodal_bridge(
         _emit_audio_encoder_projection_entrypoint(ops, config)
     )
     audio_encoder_entrypoint = _emit_audio_encoder_entrypoint(ops, config)
+    audio_tdt_entrypoint = _emit_audio_tdt_entrypoint(ops, config)
     if (
         not embedded_prefill
         and not bridge_api
@@ -2011,6 +2368,7 @@ def _inject_prefill_multimodal_bridge(
         and not audio_fastconformer_block_entrypoint
         and not audio_encoder_projection_entrypoint
         and not audio_encoder_entrypoint
+        and not audio_tdt_entrypoint
     ):
         return code
 
@@ -2050,6 +2408,8 @@ CK_EXPORT int ck_model_run_encoder(void) {{
         extra_parts.append(audio_encoder_projection_entrypoint)
     if audio_encoder_entrypoint:
         extra_parts.append(audio_encoder_entrypoint)
+    if audio_tdt_entrypoint:
+        extra_parts.append(audio_tdt_entrypoint)
     if bridge_api:
         extra_parts.append(bridge_api)
     return code + "\n\n" + "\n\n".join(extra_parts)
@@ -2177,6 +2537,7 @@ def main(argv: list[str] | None = None) -> int:
             "audio_subsampling",
             "audio_encoder_block",
             "audio_encoder",
+            "audio_transducer",
         }:
             core_ir_obj = dict(ir_obj)
             core_ir_obj["operations"] = [
@@ -2188,6 +2549,7 @@ def main(argv: list[str] | None = None) -> int:
                     | _AUDIO_SUBSAMPLING_OPS
                     | _AUDIO_FASTCONFORMER_BLOCK_OPS
                     | _AUDIO_ENCODER_PROJECTION_OPS
+                    | _AUDIO_TDT_OPS
                 )
             ]
         ir_path.write_text(json.dumps(core_ir_obj, indent=2), encoding="utf-8")
@@ -2233,6 +2595,7 @@ def main(argv: list[str] | None = None) -> int:
             "audio_subsampling",
             "audio_encoder_block",
             "audio_encoder",
+            "audio_transducer",
         }:
             # Component artifacts use dedicated native entry points even when
             # their primary layout is decode-shaped for the shared emitter.

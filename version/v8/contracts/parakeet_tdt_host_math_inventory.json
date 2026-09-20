@@ -1,6 +1,6 @@
 {
   "schema": "cke.parakeet.host_math_inventory.v1",
-  "status": "native_kernel_session_with_declared_host_math_debt",
+  "status": "generated_runtime_certified_short_and_five_minute",
   "source": "version/v8/scripts/run_parakeet_native_v8.py",
   "target": "generated circuit with planner-owned memory and session-owned decoder state",
   "entries": [
@@ -19,7 +19,8 @@
       "current": "NumPy slice assignment after every strided Conv2D",
       "classification": "model_math",
       "required_resolution": "lower a declared masked-fill operation using the live subsampled length",
-      "status": "open"
+      "status": "resolved_compiler_provider",
+      "resolution": "audio_fastconformer_subsampling_f32 receives the live frame extent through generated call IR and owns the zero-fill boundary"
     },
     {
       "site": "ParakeetSession.subsampling and convolution",
@@ -27,7 +28,8 @@
       "current": "NumPy transpose/reshape/copy",
       "classification": "layout_math",
       "required_resolution": "bind declared layout providers and planner-owned destination buffers",
-      "status": "open"
+      "status": "resolved_compiler_provider",
+      "resolution": "the generated subsampling provider owns channel/time layout changes and writes the declared token-major output"
     },
     {
       "site": "ParakeetSession.encoder_block",
@@ -35,8 +37,8 @@
       "current": "NumPy FP32 add and multiply composition",
       "classification": "model_math",
       "required_resolution": "lower explicit scaled and unscaled residual operations without changing evaluation order",
-      "status": "resolved_native_provider",
-      "resolution": "audio_scaled_residual_add_f32 preserves an explicit FP32 multiply then add boundary for scaled and unscaled branches"
+      "status": "resolved_compiler_provider",
+      "resolution": "audio_scaled_residual_add_f32 is selected through the FastConformer composite contract and preserves an explicit FP32 multiply then add boundary"
     },
     {
       "site": "ParakeetSession.joint",
@@ -44,8 +46,8 @@
       "current": "NumPy FP32 addition before native ReLU",
       "classification": "model_math",
       "required_resolution": "lower the broadcast-free FP32 add through a declared provider",
-      "status": "resolved_native_provider",
-      "resolution": "audio_scaled_residual_add_f32 with scale 1.0"
+      "status": "resolved_compiler_provider",
+      "resolution": "the executable transducer circuit selects audio_scaled_residual_add_f32 with scale 1.0"
     },
     {
       "site": "ParakeetSession.decode",
@@ -53,8 +55,8 @@
       "current": "two NumPy argmax calls",
       "classification": "model_math",
       "required_resolution": "select an exact first-index-on-tie CKE argmax provider for each declared logits slice",
-      "status": "resolved_native_provider",
-      "resolution": "audio_argmax_first_f32 provides deterministic first-index-on-tie selection over finite FP32 logits"
+      "status": "resolved_compiler_provider",
+      "resolution": "the executable transducer circuit selects audio_argmax_first_f32 separately for token and duration logits"
     },
     {
       "site": "ParakeetSession.decode",
@@ -62,7 +64,8 @@
       "current": "Python loop with blank-zero correction and encoder-derived step bound",
       "classification": "runtime_model_semantics",
       "required_resolution": "move into a versioned native session API with explicit reset and termination state",
-      "status": "open"
+      "status": "resolved_generated_runtime",
+      "resolution": "ck_model_run_audio_tdt_decode owns blank-zero correction, the encoder-derived step bound, termination, and duration advancement"
     },
     {
       "site": "ParakeetSession.decode",
@@ -70,15 +73,17 @@
       "current": "NumPy zero arrays created for every trajectory",
       "classification": "session_ownership",
       "required_resolution": "own prepared state in the native session and zero it through an explicit reset operation",
-      "status": "open"
+      "status": "resolved_generated_runtime",
+      "resolution": "generated TDT execution reserves caller-owned workspace for both LSTM states and deterministically resets it for each trajectory"
     },
     {
       "site": "decode_token_timestamps",
       "operation": "token streaming and timestamp refinement",
       "current": "Python tokenizers orchestration and cumulative duration arithmetic",
       "classification": "output_orchestration",
-      "required_resolution": "retain as declared host postprocessing until the shared audio output ABI owns timestamps",
-      "status": "retained_boundary"
+      "required_resolution": "native deployment tooling owns timestamp accumulation and overlap reconciliation without reconstructing model arithmetic",
+      "status": "resolved_native_host",
+      "resolution": "ck-audio-transcribe-v8 uses generated frame-stride and token metadata and applies word-midpoint ownership"
     },
     {
       "site": "Kernels methods and ParakeetSession intermediates",
@@ -86,7 +91,8 @@
       "current": "NumPy-owned arrays passed to allocation-free C entry points",
       "classification": "planning_debt",
       "required_resolution": "replace request-scoped arrays with planned arena slots and declared per-call scratch",
-      "status": "open"
+      "status": "resolved_generated_runtime",
+      "resolution": "generated encoder and TDT entry points expose bounded workspace queries and use caller-owned arenas"
     },
     {
       "site": "BumpWeights",
@@ -94,7 +100,8 @@
       "current": "NumPy memmap backed by BUMPWGT5 offsets",
       "classification": "host_orchestration",
       "required_resolution": "native model/session loader owns the same immutable mappings",
-      "status": "retained_boundary"
+      "status": "resolved_native_runtime",
+      "resolution": "ck_model_init_with_manifest maps the immutable BUMP artifact and compiler-produced manifest map without the Python reference session"
     },
     {
       "site": "compare and report checks",
@@ -113,9 +120,10 @@
     "reference_framework_import_during_inference": false
   },
   "summary": {
-    "resolved_native_model_math_entries": 4,
-    "open_model_or_layout_math_entries": 2,
-    "open_runtime_or_planning_entries": 3,
-    "retained_host_output_loader_certification_entries": 3
+    "resolved_compiler_model_or_layout_entries": 6,
+    "resolved_generated_runtime_or_planning_entries": 3,
+    "resolved_native_host_or_loader_entries": 2,
+    "retained_certification_entries": 1,
+    "open_entries": 0
   }
 }
