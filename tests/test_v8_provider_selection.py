@@ -133,6 +133,15 @@ class ProviderSelectionTests(unittest.TestCase):
         schema = json.loads(
             (ROOT / "version" / "v8" / "schemas" / "kernel_provider_selection.schema.json").read_text()
         )
+        baseline = json.loads(
+            (
+                ROOT
+                / "version"
+                / "v8"
+                / "contracts"
+                / "kernel_interface_migration_baseline.json"
+            ).read_text()
+        )
         validator = Draft202012Validator(schema)
         maps = ROOT / "version" / "v8" / "kernel_maps"
         selected = []
@@ -143,7 +152,11 @@ class ProviderSelectionTests(unittest.TestCase):
             selected.append(document["id"])
             errors = sorted(validator.iter_errors(document["selection"]), key=str)
             self.assertEqual(errors, [], path.name)
-        self.assertEqual(len(selected), 109)
+        self.assertGreaterEqual(
+            len(selected),
+            baseline["minimum_selection_managed_maps"],
+            "selection-managed map count regressed",
+        )
 
     def test_gemma_q5_prefill_providers_are_production_selected(self):
         maps = ROOT / "version" / "v8" / "kernel_maps"

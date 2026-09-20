@@ -604,6 +604,32 @@ class NumericalExecutionContractTests(unittest.TestCase):
             len(report["selection_managed_ids"]),
             counts["selection_managed_maps"],
         )
+
+    def test_selection_managed_map_ratchet_allows_growth_but_rejects_loss(self):
+        scripts = ROOT / "version" / "v8" / "scripts"
+        spec = importlib.util.spec_from_file_location(
+            "audit_kernel_map_interfaces_v8_selection_ratchet",
+            scripts / "audit_kernel_map_interfaces_v8.py",
+        )
+        assert spec is not None and spec.loader is not None
+        audit = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(audit)
+        report = audit.build_report()
+        baseline = audit._load(audit.BASELINE)
+
+        grown = json.loads(json.dumps(report))
+        grown["counts"]["selection_managed_maps"] += 1
+        audit.validate_ratchet(grown, baseline)
+
+        regressed = json.loads(json.dumps(report))
+        regressed["counts"]["selection_managed_maps"] = (
+            baseline["minimum_selection_managed_maps"] - 1
+        )
+        with self.assertRaisesRegex(
+            RuntimeError, "selection-managed map count regressed"
+        ):
+            audit.validate_ratchet(regressed, baseline)
+
     def test_yarn_init_contracts_resolve_exact_storage_providers(self):
         expected = {
             "yarn_rope_cache_explicit_positions_fp32": (
