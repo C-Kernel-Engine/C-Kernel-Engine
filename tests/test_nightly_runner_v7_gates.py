@@ -40,6 +40,14 @@ class NightlyRunnerV7GateTests(unittest.TestCase):
             nightly.MAKE_TARGETS["v7_training_family_regression_full"]["target"],
             "regression-training-full",
         )
+        self.assertEqual(
+            nightly.MAKE_TARGETS["v8_training_certification_fp32"]["target"],
+            "v8-training-certify-fp32",
+        )
+        self.assertEqual(
+            nightly.MAKE_TARGETS["v8_training_workflow_fp32"]["target"],
+            "v8-training-workflow-fp32",
+        )
 
     def test_kernel_map_failure_artifact_summary_uses_validator_counts(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -106,6 +114,32 @@ class NightlyRunnerV7GateTests(unittest.TestCase):
                 nightly.MAKE_TARGET_FAILURE_ARTIFACTS["regression-training-full"] = original
             self.assertIn("families:3/4", summary)
             self.assertIn("qwen3:B2,C2", summary)
+
+    def test_v8_training_certification_failure_summary_names_failed_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            report = Path(td) / "training_certification_latest.json"
+            report.write_text(
+                json.dumps(
+                    {
+                        "status": "FAIL",
+                        "checks": {"logits": {"passed": False}},
+                        "negative_controls": {"stale_library": {"passed": True}},
+                        "failures": ["logits"],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            original = nightly.MAKE_TARGET_FAILURE_ARTIFACTS["v8-training-certify-fp32"]
+            nightly.MAKE_TARGET_FAILURE_ARTIFACTS["v8-training-certify-fp32"] = report
+            try:
+                summary = nightly._summarize_make_failure_artifact(
+                    "v8-training-certify-fp32",
+                    start_ts=0.0,
+                )
+            finally:
+                nightly.MAKE_TARGET_FAILURE_ARTIFACTS["v8-training-certify-fp32"] = original
+            self.assertIn("status=FAIL", summary)
+            self.assertIn("failed_checks=logits", summary)
 
 
 if __name__ == "__main__":

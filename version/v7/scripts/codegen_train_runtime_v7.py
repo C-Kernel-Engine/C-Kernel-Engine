@@ -17,6 +17,7 @@ Goal:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -1134,6 +1135,18 @@ def _bridge_head_group_macro(head_group: Any) -> str:
 
 
 def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional[Dict[str, Any]] = None, layout: Optional[Dict[str, Any]] = None, exec_plan: Optional[Dict[str, Any]] = None) -> Tuple[str, Dict[str, Any]]:
+    runtime_contract_sha256 = hashlib.sha256(
+        json.dumps(
+            {
+                "ir2": ir2,
+                "manifest": manifest or {},
+                "layout": layout or {},
+                "exec_plan": exec_plan or {},
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
     cfg = dict(ir2.get("config") or {})
     bridge_lowering = str(ir2.get("bridge_lowering", "legacy") or "legacy").strip().lower()
     bindings_doc = _load_json(DEFAULT_BINDINGS) if DEFAULT_BINDINGS.exists() else {}
@@ -1245,6 +1258,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
         if not isinstance(numel, int) or numel <= 0:
             raise RuntimeError("Missing positive numel for optimizer tensor pair: %s" % wname)
         opt_pairs.append((wname, gvar, wvar, mvar, vvar, int(numel)))
+    parameter_gradient_snapshot_floats = sum(int(row[5]) for row in opt_pairs)
 
     # Runtime weight hydration order for ck_train_init (flattened fp32 payload).
     init_weight_specs: List[Tuple[str, str, int]] = []
@@ -1390,6 +1404,14 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("#include <math.h>")
     ap("#include <time.h>")
     ap("#include \"ckernel_engine.h\"")
+    ap("")
+    ap('static const char *CK_TRAIN_RUNTIME_CONTRACT_SHA256 = "%s";' % runtime_contract_sha256)
+    ap("const char *ck_train_get_runtime_contract_sha256(void) { return CK_TRAIN_RUNTIME_CONTRACT_SHA256; }")
+    ap("#ifndef CK_TRAIN_BUILD_IDENTITY_SHA256")
+    ap('#define CK_TRAIN_BUILD_IDENTITY_SHA256 "UNSPECIFIED"')
+    ap("#endif")
+    ap("static const char *CK_TRAIN_BUILD_IDENTITY = CK_TRAIN_BUILD_IDENTITY_SHA256;")
+    ap("const char *ck_train_get_build_identity_sha256(void) { return CK_TRAIN_BUILD_IDENTITY; }")
     ap("")
     ap("#ifndef CK_NUM_TOKENS")
     ap("#define CK_NUM_TOKENS 1")
@@ -1595,6 +1617,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                 seen_v.add(vvar)
     ap("static int g_opt_step = 0;")
     ap("static int g_accum_step = 0;")
+    ap("static int64_t g_accum_tokens = 0;")
     ap("static int g_active_tokens = CK_NUM_TOKENS;")
     ap("static int g_profile_steps = 0;")
     ap("static int g_profile_optimizer_steps = 0;")
@@ -1700,6 +1723,8 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("int ck_train_get_accum_counter(void);")
     ap("int ck_train_get_accum_steps(void);")
     ap("int ck_train_set_accum_counter(int accum_step);")
+    ap("int64_t ck_train_get_accum_tokens(void);")
+    ap("int64_t ck_train_set_accum_tokens(int64_t accum_tokens);")
     ap("int ck_train_get_opt_step(void);")
     ap("int ck_train_set_opt_step(int opt_step);")
     ap("void ck_train_reset_profile(void);")
@@ -1712,6 +1737,9 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("int ck_train_get_accum_snapshot_numel(void);")
     ap("int ck_train_export_accum_snapshot(float *dst, int dst_numel);")
     ap("int ck_train_import_accum_snapshot(const float *src, int src_numel);")
+    ap("int ck_train_get_parameter_gradient_snapshot_numel(void);")
+    ap("int ck_train_export_parameter_gradient_snapshot(float *dst, int dst_numel);")
+    ap("int ck_train_get_loss(float *loss_out);")
     ap("int ck_train_set_batch_ex(const int32_t *token_ids, const int32_t *targets, int valid_tokens);")
     ap("int ck_train_step_ex(const int32_t *token_ids, const int32_t *targets, int valid_tokens, float *loss_out, float lr);")
     ap("")
@@ -1759,6 +1787,26 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("int ck_train_export_weight_snapshot(float *dst, int dst_numel) {")
     ap("    if (dst_numel < 0) return -1;")
     ap("    return ck_train_snapshot_weights(dst, (size_t)dst_numel);")
+    ap("}")
+    ap("")
+    ap("int ck_train_get_parameter_gradient_snapshot_numel(void) {")
+    ap("    return %d;" % int(parameter_gradient_snapshot_floats))
+    ap("}")
+    ap("")
+    ap("int ck_train_export_parameter_gradient_snapshot(float *dst, int dst_numel) {")
+    ap("    if (g_memory == NULL || dst == NULL) return -1;")
+    ap("    if (dst_numel < %d) return -2;" % int(parameter_gradient_snapshot_floats))
+    ap("    size_t cursor = 0;")
+    for _wname, gvar, _wvar, _mvar, _vvar, numel in sorted(opt_pairs, key=lambda x: x[0]):
+        ap("    memcpy(dst + cursor, %s, (size_t)%d * sizeof(float));" % (gvar, int(numel)))
+        ap("    cursor += (size_t)%d;" % int(numel))
+    ap("    return (int)cursor;")
+    ap("}")
+    ap("")
+    ap("int ck_train_get_loss(float *loss_out) {")
+    ap("    if (loss_out == NULL) return -1;")
+    ap("    *loss_out = g_loss_scalar[0];")
+    ap("    return 0;")
     ap("}")
     ap("")
     ap("static int ck_train_snapshot_activations(float *dst, size_t dst_numel) {")
@@ -2020,6 +2068,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     if opt_pairs:
         ap("    g_opt_step = 0;")
     ap("    g_accum_step = 0;")
+    ap("    g_accum_tokens = 0;")
     ap("    g_active_tokens = CK_NUM_TOKENS;")
     ap("    ck_train_reset_profile();")
     ap("    g_loss_scalar[0] = 0.0f;")
@@ -4360,18 +4409,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
         ap("    const float weight_decay = (float)CK_ADAMW_WEIGHT_DECAY;")
         ap("    const float max_grad_norm = (float)CK_MAX_GRAD_NORM;")
         ap("    int call_count = 0;")
-        ap("    /*")
-        ap("     * Match PyTorch grad-accum semantics: optimizer consumes averaged")
-        ap("     * gradient over the current accumulation window, not the raw sum.")
-        ap("     */")
-        ap("    int accum_denom = (g_accum_step > 0) ? g_accum_step : CK_GRAD_ACCUM_STEPS;")
-        ap("    if (accum_denom < 1) accum_denom = 1;")
-        ap("    const float accum_scale = 1.0f / (float)accum_denom;")
-        ap("    if (accum_denom > 1) {")
-        for _wname, gvar, _wvar, _mvar, _vvar, numel in opt_pairs:
-            n_expr = str(int(numel))
-            ap("        for (size_t gi = 0; gi < (size_t)%s; ++gi) { %s[gi] *= accum_scale; }" % (n_expr, gvar))
-        ap("    }")
+        ap("    /* Parameter gradients are already a token-weighted mean. */")
         ap("    g_opt_step += 1;")
         if skipped_opt_non_fp32:
             ap("    /* skipped non-fp32 optimizer params: %d */" % len(skipped_opt_non_fp32))
@@ -4406,6 +4444,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("    double t_opt1 = ck_now_ms();")
     ap("    double opt_ms = t_opt1 - t_opt0;")
     ap("    g_accum_step = 0;")
+    ap("    g_accum_tokens = 0;")
     ap("    ck_zero_grad();")
     ap("    g_last_step_ms = opt_ms;")
     ap("    g_last_fwd_ms = 0.0;")
@@ -4428,6 +4467,12 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("    if (CK_GRAD_ACCUM_STEPS > 0) accum_step = accum_step % CK_GRAD_ACCUM_STEPS;")
     ap("    g_accum_step = accum_step;")
     ap("    return g_accum_step;")
+    ap("}")
+    ap("int64_t ck_train_get_accum_tokens(void) { return g_accum_tokens; }")
+    ap("int64_t ck_train_set_accum_tokens(int64_t accum_tokens) {")
+    ap("    if (accum_tokens < 0) accum_tokens = 0;")
+    ap("    g_accum_tokens = accum_tokens;")
+    ap("    return g_accum_tokens;")
     ap("}")
     ap("int ck_train_get_opt_step(void) { return g_opt_step; }")
     ap("int ck_train_set_opt_step(int opt_step) {")
@@ -4519,7 +4564,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("    /*")
     ap("     * Grad-accum window contract (must match PyTorch):")
     ap("     * - zero grads once at window start")
-    ap("     * - accumulate forward/backward across micro-steps")
+    ap("     * - maintain a token-weighted gradient mean across micro-steps")
     ap("     * - run optimizer exactly at accumulation boundary")
     ap("     */")
     ap("    if (g_accum_step <= 0) {")
@@ -4537,7 +4582,22 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("    double t_fwd1 = ck_now_ms();")
     ap("    if (CK_RUNTIME_CANARY_CHECKS && ck_train_check_canaries(\"step_forward\", &first) != 0) return -1000 - first;")
     ap("    double t_bwd0 = ck_now_ms();")
+    if opt_pairs:
+        ap("    /* Convert the retained weighted mean so adding this batch's mean can be reweighted exactly. */")
+        ap("    if (g_accum_tokens > 0) {")
+        ap("        const float old_scale = (float)g_accum_tokens / (float)g_active_tokens;")
+        for _wname, gvar, _wvar, _mvar, _vvar, numel in opt_pairs:
+            ap("        for (size_t gi = 0; gi < (size_t)%d; ++gi) %s[gi] *= old_scale;" % (int(numel), gvar))
+        ap("    }")
     ap("    int bwd = ck_train_backward_step();")
+    if opt_pairs:
+        ap("    {")
+        ap("        const int64_t total_tokens = g_accum_tokens + (int64_t)g_active_tokens;")
+        ap("        const float mean_scale = (float)g_active_tokens / (float)total_tokens;")
+        for _wname, gvar, _wvar, _mvar, _vvar, numel in opt_pairs:
+            ap("        for (size_t gi = 0; gi < (size_t)%d; ++gi) %s[gi] *= mean_scale;" % (int(numel), gvar))
+        ap("        g_accum_tokens = total_tokens;")
+        ap("    }")
     ap("    double t_bwd1 = ck_now_ms();")
     ap("    if (CK_RUNTIME_CANARY_CHECKS && ck_train_check_canaries(\"step_backward\", &first) != 0) return -1100 - first;")
     ap("    g_last_grad_norm = ck_train_compute_global_grad_norm();")
@@ -4553,6 +4613,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("        opt_ms = t_opt1 - t_opt0;")
     ap("        opt_applied = 1;")
     ap("        g_accum_step = 0;")
+    ap("        g_accum_tokens = 0;")
     ap("        if (CK_RUNTIME_CANARY_CHECKS && ck_train_check_canaries(\"step_optimizer\", &first) != 0) return -1200 - first;")
     ap("    }")
     ap("    double t_step1 = ck_now_ms();")
@@ -4592,6 +4653,10 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
         "batched_grad_accumulate_tensors": int(batched_grad_accumulate_tensors),
         "callable_kernels": len(used_decl),
         "optimizer_pairs": len(opt_pairs),
+        "runtime_contract_sha256": runtime_contract_sha256,
+        "parameter_gradient_order": [wname for (wname, _gvar, _wvar, _mvar, _vvar, _numel) in sorted(opt_pairs, key=lambda x: x[0])],
+        "parameter_gradient_numel": [int(_numel) for (_wname, _gvar, _wvar, _mvar, _vvar, _numel) in sorted(opt_pairs, key=lambda x: x[0])],
+        "parameter_gradient_snapshot_floats": int(parameter_gradient_snapshot_floats),
         "optimizer_skipped_non_fp32": skipped_opt_non_fp32,
         "init_weight_count": len(init_weight_specs),
         "init_weight_order": [wname for (wname, _wvar, _numel) in init_weight_specs],

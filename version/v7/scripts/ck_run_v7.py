@@ -3415,7 +3415,14 @@ def _materialize_train_telemetry(summary_json: Path, profile_meta: Optional[dict
     else:
         training_loss_curve = {
             "steps": [
-                {"step": step, "loss_ck": loss_ck, "loss_pt": loss_pt, "lr": lr, "grad_norm": 0.0}
+                {
+                    "step": step,
+                    "loss_ck": loss_ck,
+                    "loss_pt": loss_pt,
+                    "lr": lr,
+                    "grad_norm": None,
+                    "grad_norm_status": "NOT_MEASURED",
+                }
             ],
             "source": "train_e2e_summary",
         }
@@ -3435,9 +3442,16 @@ def _materialize_train_telemetry(summary_json: Path, profile_meta: Optional[dict
         }
 
     grad_series = s.get("grad_norm_series") if isinstance(s.get("grad_norm_series"), dict) else {}
+    raw_global_grad_norms = grad_series.get("global")
+    global_grad_norms = (
+        raw_global_grad_norms
+        if isinstance(raw_global_grad_norms, list)
+        else [row.get("grad_norm") for row in training_loss_curve.get("steps", [])]
+    )
     training_grad_norms = {
         "steps": grad_series.get("steps", [row.get("step", step) for row in training_loss_curve.get("steps", [])]),
-        "global": grad_series.get("global", [row.get("grad_norm", 0.0) for row in training_loss_curve.get("steps", [])]),
+        "global": global_grad_norms,
+        "measurement_status": "measured" if any(value is not None for value in global_grad_norms) else "NOT_MEASURED",
         "params": grad_series.get("params", {}),
         "source": "train_e2e_detailed" if grad_series else "train_e2e_summary",
     }
@@ -4812,6 +4826,107 @@ def _run_pr37_memory_verification(
 
 
 
+def _normalize_compile_define(value: Any) -> str:
+    if isinstance(value, bool):
+        return "1" if value else "0"
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
+        text = f"{value:.9g}"
+        return text if ("." in text or "e" in text.lower()) else text + ".0"
+    return str(value)
+
+
+def _train_runtime_build_identity_payload(
+    c_src: Path,
+    lib_ck: Path,
+    *,
+    cc: str,
+    cflags: Sequence[str],
+    defines: dict[str, Any],
+) -> dict[str, Any]:
+    resolved_cc = shutil.which(cc)
+    cc_version = subprocess.run(
+        [cc, "--version"],
+        cwd=str(PROJECT_ROOT),
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+    codegen_script = SCRIPTS_DIR / "codegen_train_runtime_v7.py"
+    identity_inputs = {
+        "generated_source_sha256": _hash_sha256_file(c_src),
+        "codegen_source_sha256": _hash_sha256_file(codegen_script),
+        "kernel_library_sha256": _hash_sha256_file(lib_ck),
+        "compiler": {
+            "requested": cc,
+            "resolved": str(Path(resolved_cc).resolve()) if resolved_cc else None,
+            "version": cc_version.stdout.splitlines()[0] if cc_version.returncode == 0 and cc_version.stdout else None,
+        },
+        "compile_flags": ["-shared", "-fPIC", "-O3", *[str(flag) for flag in cflags]],
+        "defines": {str(key): _normalize_compile_define(value) for key, value in sorted(defines.items())},
+        "include_dirs": [str(PROJECT_ROOT / "include"), str(PROJECT_ROOT)],
+        "library_dirs": [str(BUILD_DIR)],
+        "libraries": ["ckernel_engine", "m"],
+        "rpath": str(BUILD_DIR),
+    }
+    return {
+        "schema": "cke.v7.train_runtime_build_identity.v1",
+        "build_identity_sha256": _hash_sha256_bytes(_canonical_json_bytes(identity_inputs)),
+        "inputs": identity_inputs,
+    }
+
+
+def _compile_train_runtime_with_identity(
+    c_src: Path,
+    output: Path,
+    *,
+    lib_ck: Path,
+    cflags: Sequence[str],
+    defines: dict[str, Any],
+    identity_out: Optional[Path] = None,
+) -> dict[str, Any]:
+    cc = os.environ.get("CC") or "gcc"
+    identity = _train_runtime_build_identity_payload(
+        c_src,
+        lib_ck,
+        cc=cc,
+        cflags=cflags,
+        defines=defines,
+    )
+    digest = str(identity["build_identity_sha256"])
+    cmd = [
+        cc,
+        "-shared",
+        "-fPIC",
+        "-O3",
+        *[str(flag) for flag in cflags],
+        str(c_src),
+        "-o",
+        str(output),
+        "-I",
+        str(PROJECT_ROOT / "include"),
+        "-I",
+        str(PROJECT_ROOT),
+        "-L",
+        str(BUILD_DIR),
+        "-lckernel_engine",
+        "-lm",
+        f"-Wl,-rpath,{BUILD_DIR}",
+    ]
+    for key, value in sorted(defines.items()):
+        cmd.append(f"-D{key}={_normalize_compile_define(value)}")
+    cmd.append(f'-DCK_TRAIN_BUILD_IDENTITY_SHA256="{digest}"')
+    run_cmd(cmd, cwd=PROJECT_ROOT)
+    identity["output_library"] = str(output.resolve())
+    identity["output_library_sha256"] = _hash_sha256_file(output)
+    identity["compile_command"] = cmd
+    if identity_out is not None:
+        _write_json_if_changed(identity_out, identity)
+    return identity
+
+
 def _ensure_train_runtime_artifacts(
     run_dir: Path,
     python_exec: str,
@@ -4911,7 +5026,7 @@ def _ensure_train_runtime_artifacts(
         (not ir1.exists())
         or (manifest.exists() and manifest.stat().st_mtime > ir1.stat().st_mtime)
         or (build_ir_script.exists() and build_ir_script.stat().st_mtime > ir1.stat().st_mtime)
-        or (existing_ir1_tokens is not None and int(existing_ir1_tokens) != int(desired_tokens))
+        or (existing_ir1_tokens is None or int(existing_ir1_tokens) != int(desired_tokens))
         or (existing_ir1_bridge_lowering != desired_bridge_lowering)
     )
     if needs_ir1:
@@ -5046,50 +5161,45 @@ def _ensure_train_runtime_artifacts(
 
     lib_ck = BUILD_DIR / "libckernel_engine.so"
     if not lib_ck.exists():
-        run_cmd(["make", "--no-print-directory", str(lib_ck)], cwd=PROJECT_ROOT)
+        try:
+            make_target = str(lib_ck.relative_to(PROJECT_ROOT))
+        except ValueError:
+            make_target = str(lib_ck)
+        run_cmd(["make", "--no-print-directory", make_target], cwd=PROJECT_ROOT)
 
     libtrain_so = run_dir / "libtrain.so"
+    build_identity_path = run_dir / "generated_train_build_identity_v7.json"
     defines = dict(runtime_defines or {})
     cflags = [str(f) for f in (extra_cflags or []) if str(f).strip()]
+    cc = os.environ.get("CC") or "gcc"
+    expected_build_identity = _train_runtime_build_identity_payload(
+        c_src,
+        lib_ck,
+        cc=cc,
+        cflags=cflags,
+        defines=defines,
+    )
     needs_compile = (not libtrain_so.exists()) or (c_src.stat().st_mtime > libtrain_so.stat().st_mtime)
+    existing_build_identity = _load_json_dict(build_identity_path)
+    if (
+        not isinstance(existing_build_identity, dict)
+        or existing_build_identity.get("build_identity_sha256")
+        != expected_build_identity.get("build_identity_sha256")
+    ):
+        needs_compile = True
     if defines:
         needs_compile = True
     if cflags:
         needs_compile = True
     if needs_compile:
-        cc = os.environ.get("CC") or "gcc"
-        cmd = [
-            cc,
-            "-shared",
-            "-fPIC",
-            "-O3",
-            *cflags,
-            str(c_src),
-            "-o",
-            str(libtrain_so),
-            "-I",
-            str(PROJECT_ROOT / "include"),
-            "-I",
-            str(PROJECT_ROOT),
-            "-L",
-            str(BUILD_DIR),
-            "-lckernel_engine",
-            "-lm",
-            f"-Wl,-rpath,{BUILD_DIR}",
-        ]
-        for k, v in sorted(defines.items()):
-            if isinstance(v, bool):
-                dval = "1" if v else "0"
-            elif isinstance(v, int):
-                dval = str(v)
-            elif isinstance(v, float):
-                dval = f"{v:.9g}"
-                if ("." not in dval) and ("e" not in dval.lower()):
-                    dval += ".0"
-            else:
-                dval = str(v)
-            cmd.append(f"-D{k}={dval}")
-        run_cmd(cmd, cwd=PROJECT_ROOT)
+        _compile_train_runtime_with_identity(
+            c_src,
+            libtrain_so,
+            lib_ck=lib_ck,
+            cflags=cflags,
+            defines=defines,
+            identity_out=build_identity_path,
+        )
 
     return c_src, libtrain_so
 
@@ -5362,6 +5472,7 @@ def _run_ck_train_runtime_body(
     has_accum_counter_api = bool(hasattr(lib, "ck_train_get_accum_counter"))
     has_accum_steps_api = bool(hasattr(lib, "ck_train_get_accum_steps"))
     has_opt_step_getter_api = bool(hasattr(lib, "ck_train_get_opt_step"))
+    has_grad_norm_api = bool(hasattr(lib, "ck_train_get_last_step_grad_norm"))
     if hasattr(lib, "ck_train_memory_diagnostic"):
         lib.ck_train_memory_diagnostic.argtypes = [
             ctypes.POINTER(ctypes.c_float),
@@ -5420,6 +5531,9 @@ def _run_ck_train_runtime_body(
     if has_opt_step_getter_api:
         lib.ck_train_get_opt_step.argtypes = []
         lib.ck_train_get_opt_step.restype = ctypes.c_int
+    if has_grad_norm_api:
+        lib.ck_train_get_last_step_grad_norm.argtypes = [ctypes.POINTER(ctypes.c_float)]
+        lib.ck_train_get_last_step_grad_norm.restype = ctypes.c_int
 
     float_ptr = ctypes.cast(init_payload["float_buffer"], ctypes.POINTER(ctypes.c_float))
     size_ptr = ctypes.cast(init_payload["sizes_buffer"], ctypes.POINTER(ctypes.c_int))
@@ -5879,7 +5993,7 @@ def _run_ck_train_runtime_body(
     loss_curve: list[dict] = []
     parity_steps: list[dict] = []
     grad_steps: list[int] = []
-    grad_global: list[float] = []
+    grad_global: list[Optional[float]] = []
     parity_failures: list[dict] = []
     replay_failures: list[dict] = []
     checked_diffs: list[float] = []
@@ -5966,6 +6080,13 @@ def _run_ck_train_runtime_body(
             processed_tokens += consumed_tokens
             epoch_tokens_consumed += consumed_tokens
             loss_val = float(loss_out.value)
+            grad_norm_value = None
+            if has_grad_norm_api:
+                grad_norm_out = ctypes.c_float()
+                if int(lib.ck_train_get_last_step_grad_norm(ctypes.byref(grad_norm_out))) == 0:
+                    measured_grad_norm = float(grad_norm_out.value)
+                    if math.isfinite(measured_grad_norm):
+                        grad_norm_value = measured_grad_norm
             if epoch_loss_start is None:
                 epoch_loss_start = float(loss_val)
             epoch_loss_end = float(loss_val)
@@ -6646,7 +6767,6 @@ def _run_ck_train_runtime_body(
                             "reason": oracle_error or "oracle_unavailable",
                         })
 
-            # grad_norm is a placeholder until runtime exports per-step grad telemetry.
             loss_curve.append(
                 {
                     "step": step,
@@ -6667,7 +6787,8 @@ def _run_ck_train_runtime_body(
                     "slots_compared": oracle_slots_compared,
                     "slots_matched": oracle_slots_matched,
                     "lr": lr,
-                    "grad_norm": 0.0,
+                    "grad_norm": grad_norm_value,
+                    "grad_norm_status": "measured" if grad_norm_value is not None else "NOT_MEASURED",
                     "forward_ms": 0.0,
                     "backward_ms": 0.0,
                     "optimizer_ms": 0.0,
@@ -6734,7 +6855,7 @@ def _run_ck_train_runtime_body(
                 }
             )
             grad_steps.append(step)
-            grad_global.append(0.0)
+            grad_global.append(grad_norm_value)
 
         if epoch_rows_sampled > 0:
             rows_total = train_data_source.get("rows_total")
@@ -7074,7 +7195,14 @@ def _export_train_telemetry_to_run_dir(summary_json: Path, run_dir: Path) -> Non
         training_loss_curve = {"steps": raw_curve, "source": "train_e2e_detailed"}
     else:
         training_loss_curve = {
-            "steps": [{"step": step, "loss_ck": loss_ck, "loss_pt": loss_pt, "lr": lr, "grad_norm": 0.0}],
+            "steps": [{
+                "step": step,
+                "loss_ck": loss_ck,
+                "loss_pt": loss_pt,
+                "lr": lr,
+                "grad_norm": None,
+                "grad_norm_status": "NOT_MEASURED",
+            }],
             "source": "train_e2e_summary",
         }
 
@@ -7088,9 +7216,16 @@ def _export_train_telemetry_to_run_dir(summary_json: Path, run_dir: Path) -> Non
         }
 
     grad_series = s.get("grad_norm_series") if isinstance(s.get("grad_norm_series"), dict) else {}
+    raw_global_grad_norms = grad_series.get("global")
+    global_grad_norms = (
+        raw_global_grad_norms
+        if isinstance(raw_global_grad_norms, list)
+        else [row.get("grad_norm") for row in training_loss_curve.get("steps", [])]
+    )
     training_grad_norms = {
         "steps": grad_series.get("steps", [row.get("step", step) for row in training_loss_curve.get("steps", [])]),
-        "global": grad_series.get("global", [row.get("grad_norm", 0.0) for row in training_loss_curve.get("steps", [])]),
+        "global": global_grad_norms,
+        "measurement_status": "measured" if any(value is not None for value in global_grad_norms) else "NOT_MEASURED",
         "params": grad_series.get("params", {}),
         "source": "train_e2e_detailed" if grad_series else "train_e2e_summary",
     }

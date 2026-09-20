@@ -921,6 +921,18 @@ MAKE_TARGETS = {
         "target": "regression-training-full",
         "timeout_sec": 10800,
     },
+    "v8_training_certification_fp32": {
+        "name": "v8 FP32 Generated Training Certification",
+        "category": "training",
+        "target": "v8-training-certify-fp32",
+        "timeout_sec": 1800,
+    },
+    "v8_training_workflow_fp32": {
+        "name": "v8 FP32 Training-to-Inference Workflow",
+        "category": "training",
+        "target": "v8-training-workflow-fp32",
+        "timeout_sec": 2400,
+    },
     "v7_backprop_long_epoch_nightly": {
         "name": "v7 Backprop Long-Epoch Drift",
         "category": "training",
@@ -1354,6 +1366,8 @@ MAKE_TARGET_FAILURE_ARTIFACTS = {
     "v6.6-validate-matrix-nightly": ROOT / "version" / "v6.6" / "tools" / "model_matrix_report_latest.json",
     "v7-kernel-map-contracts": ROOT / "version" / "v7" / ".cache" / "reports" / "kernel_map_validation_latest.json",
     "regression-training-full": ROOT / "version" / "v7" / ".cache" / "reports" / "backprop_family_matrix" / "full" / "v7_backprop_family_matrix_latest.json",
+    "v8-training-certify-fp32": ROOT / "version" / "v8" / ".cache" / "reports" / "training_certification_latest.json",
+    "v8-training-workflow-fp32": ROOT / "version" / "v8" / ".cache" / "reports" / "training_workflow_latest.json",
     "v7-ir-visualizer-e2e-nightly": ROOT / "version" / "v7" / ".cache" / "reports" / "ir_visualizer_e2e_latest.json",
     "v7-visualizer-health": ROOT / "version" / "v7" / ".cache" / "reports" / "visualizer_health_latest.json",
     "v7-visualizer-generated-e2e": ROOT / "version" / "v7" / ".cache" / "reports" / "visualizer_generated_e2e_latest.json",
@@ -1493,6 +1507,28 @@ def _summarize_make_failure_artifact(target: str, *, start_ts: float) -> str:
                 details.append(f"+{len(failing) - 4} more")
             parts.append("family_fail=" + " | ".join(details))
         return f"{prefix}; {'; '.join(parts)}"
+
+    if target == "v8-training-certify-fp32":
+        checks = payload.get("checks") if isinstance(payload.get("checks"), dict) else {}
+        controls = payload.get("negative_controls") if isinstance(payload.get("negative_controls"), dict) else {}
+        failed_checks = [name for name, row in checks.items() if isinstance(row, dict) and not row.get("passed", False)]
+        failed_controls = [name for name, row in controls.items() if isinstance(row, dict) and not row.get("passed", False)]
+        failures = payload.get("failures") if isinstance(payload.get("failures"), list) else []
+        return (
+            f"{prefix}; status={payload.get('status')} "
+            f"failed_checks={','.join(failed_checks) or '-'} "
+            f"failed_controls={','.join(failed_controls) or '-'} "
+            f"failures={' | '.join(str(item) for item in failures[:3]) or '-'}"
+        )
+
+    if target == "v8-training-workflow-fp32":
+        checks = payload.get("checks") if isinstance(payload.get("checks"), dict) else {}
+        failed_checks = [name for name, row in checks.items() if isinstance(row, dict) and not row.get("passed", False)]
+        return (
+            f"{prefix}; status={payload.get('status')} "
+            f"failed_checks={','.join(failed_checks) or '-'} "
+            f"failures={' | '.join(str(item) for item in list(payload.get('failures') or [])[:3]) or '-'}"
+        )
 
     if target == "v7-ir-visualizer-e2e-nightly":
         checks = payload.get("checks")
