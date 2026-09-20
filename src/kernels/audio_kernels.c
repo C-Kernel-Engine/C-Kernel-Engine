@@ -28,12 +28,38 @@ void gemm_nt_f32_llama_production_parallel_dispatch(
     int N,
     int K);
 
+void layernorm_naive_serial_matched_precision(
+    const float *input,
+    const float *gamma,
+    const float *beta,
+    float *output,
+    float *mean_cache,
+    float *rstd_cache,
+    int tokens,
+    int d_model,
+    float eps);
+
+void recurrent_silu_forward(
+    const float *input,
+    float *output,
+    int rows,
+    int dim);
+
 static int checked_mul_size(size_t left, size_t right, size_t *result)
 {
     if (result == NULL || (right != 0 && left > SIZE_MAX / right)) {
         return -1;
     }
     *result = left * right;
+    return 0;
+}
+
+static int checked_add_size(size_t left, size_t right, size_t *result)
+{
+    if (result == NULL || left > SIZE_MAX - right) {
+        return -1;
+    }
+    *result = left + right;
     return 0;
 }
 
@@ -1783,6 +1809,261 @@ int audio_scaled_residual_add_f32(
         volatile float scaled = branch[index] * scale;
         output[index] = residual[index] + scaled;
     }
+    return 0;
+}
+
+size_t audio_fastconformer_block_workspace_bytes(
+    int frames,
+    int hidden_size,
+    int intermediate_size,
+    int heads)
+{
+    if (frames <= 0 || frames > (INT_MAX / 2) + 1 || hidden_size <= 0 ||
+        intermediate_size <= 0 || heads <= 0 || hidden_size % heads != 0) {
+        return 0;
+    }
+    size_t token_elements = 0;
+    size_t ff_elements = 0;
+    size_t relative_elements = 0;
+    size_t doubled_token_elements = 0;
+    size_t score_elements = 0;
+    if (checked_mul_size((size_t)frames, (size_t)hidden_size, &token_elements) != 0 ||
+        checked_mul_size((size_t)frames, (size_t)intermediate_size, &ff_elements) != 0 ||
+        checked_mul_size((size_t)(2 * frames - 1), (size_t)hidden_size,
+                         &relative_elements) != 0 ||
+        checked_mul_size(token_elements, 2u, &doubled_token_elements) != 0 ||
+        checked_mul_size((size_t)heads, (size_t)frames, &score_elements) != 0) {
+        return 0;
+    }
+    size_t large_elements = ff_elements;
+    if (relative_elements > large_elements) large_elements = relative_elements;
+    if (doubled_token_elements > large_elements) {
+        large_elements = doubled_token_elements;
+    }
+    size_t total_elements = 0;
+    size_t token_buffers = 0;
+    if (checked_mul_size(token_elements, 5u, &token_buffers) != 0 ||
+        checked_add_size(token_buffers, large_elements, &total_elements) != 0 ||
+        checked_add_size(total_elements, score_elements, &total_elements) != 0 ||
+        checked_mul_size(total_elements, sizeof(float), &total_elements) != 0) {
+        return 0;
+    }
+    return total_elements;
+}
+
+int audio_fastconformer_block_f32(
+    const float *input,
+    const float *relative_positions,
+    const float *ff1_norm_weight,
+    const float *ff1_norm_bias,
+    const float *ff1_up_weight,
+    const float *ff1_up_bias,
+    const float *ff1_down_weight,
+    const float *ff1_down_bias,
+    const float *attn_norm_weight,
+    const float *attn_norm_bias,
+    const float *q_weight,
+    const float *q_bias,
+    const float *k_weight,
+    const float *k_bias,
+    const float *v_weight,
+    const float *v_bias,
+    const float *relative_weight,
+    const float *attn_bias_u,
+    const float *attn_bias_v,
+    const float *attn_out_weight,
+    const float *attn_out_bias,
+    const float *conv_norm_weight,
+    const float *conv_norm_bias,
+    const float *conv_pw1_weight,
+    const float *conv_pw1_bias,
+    const float *conv_dw_weight,
+    const float *conv_dw_bias,
+    const float *conv_bn_mean,
+    const float *conv_bn_variance,
+    const float *conv_bn_weight,
+    const float *conv_bn_bias,
+    const float *conv_pw2_weight,
+    const float *conv_pw2_bias,
+    const float *ff2_norm_weight,
+    const float *ff2_norm_bias,
+    const float *ff2_up_weight,
+    const float *ff2_up_bias,
+    const float *ff2_down_weight,
+    const float *ff2_down_bias,
+    const float *out_norm_weight,
+    const float *out_norm_bias,
+    float *output,
+    void *workspace,
+    size_t workspace_bytes,
+    int frames,
+    int hidden_size,
+    int intermediate_size,
+    int heads,
+    int head_dim,
+    int conv_kernel_size,
+    float layer_norm_epsilon,
+    float batch_norm_epsilon)
+{
+    if (input == NULL || relative_positions == NULL ||
+        ff1_norm_weight == NULL || ff1_norm_bias == NULL ||
+        ff1_up_weight == NULL || ff1_down_weight == NULL ||
+        attn_norm_weight == NULL || attn_norm_bias == NULL ||
+        q_weight == NULL || k_weight == NULL || v_weight == NULL ||
+        relative_weight == NULL || attn_bias_u == NULL || attn_bias_v == NULL ||
+        attn_out_weight == NULL || conv_norm_weight == NULL ||
+        conv_norm_bias == NULL || conv_pw1_weight == NULL ||
+        conv_dw_weight == NULL || conv_bn_mean == NULL ||
+        conv_bn_variance == NULL || conv_bn_weight == NULL ||
+        conv_bn_bias == NULL || conv_pw2_weight == NULL ||
+        ff2_norm_weight == NULL || ff2_norm_bias == NULL ||
+        ff2_up_weight == NULL || ff2_down_weight == NULL ||
+        out_norm_weight == NULL || out_norm_bias == NULL || output == NULL ||
+        workspace == NULL) {
+        return -1;
+    }
+    if (frames <= 0 || hidden_size <= 0 || intermediate_size <= 0 ||
+        heads <= 0 || head_dim <= 0 || heads > INT_MAX / head_dim ||
+        heads * head_dim != hidden_size || conv_kernel_size <= 0 ||
+        (conv_kernel_size & 1) == 0 || !isfinite(layer_norm_epsilon) ||
+        layer_norm_epsilon <= 0.0f || !isfinite(batch_norm_epsilon) ||
+        batch_norm_epsilon <= 0.0f) {
+        return -2;
+    }
+    const size_t required_workspace = audio_fastconformer_block_workspace_bytes(
+        frames, hidden_size, intermediate_size, heads);
+    if (required_workspace == 0 || workspace_bytes < required_workspace) {
+        return -3;
+    }
+
+    const size_t token_elements = (size_t)frames * (size_t)hidden_size;
+    const size_t ff_elements = (size_t)frames * (size_t)intermediate_size;
+    const size_t relative_elements =
+        (size_t)(2 * frames - 1) * (size_t)hidden_size;
+    const size_t doubled_token_elements = 2u * token_elements;
+    size_t large_elements = ff_elements;
+    if (relative_elements > large_elements) large_elements = relative_elements;
+    if (doubled_token_elements > large_elements) {
+        large_elements = doubled_token_elements;
+    }
+
+    float *cursor = (float *)workspace;
+    float *norm = cursor;
+    cursor += token_elements;
+    float *large = cursor;
+    cursor += large_elements;
+    float *buffer2 = cursor;
+    cursor += token_elements;
+    float *buffer3 = cursor;
+    cursor += token_elements;
+    float *buffer4 = cursor;
+    cursor += token_elements;
+    float *buffer5 = cursor;
+    cursor += token_elements;
+    float *scores = cursor;
+
+    memcpy(output, input, token_elements * sizeof(float));
+
+    layernorm_naive_serial_matched_precision(
+        output, ff1_norm_weight, ff1_norm_bias, norm, NULL, NULL,
+        frames, hidden_size, layer_norm_epsilon);
+    gemm_nt_f32_llama_production_parallel_dispatch(
+        norm, ff1_up_weight, ff1_up_bias, large,
+        frames, intermediate_size, hidden_size);
+    recurrent_silu_forward(large, large, frames, intermediate_size);
+    gemm_nt_f32_llama_production_parallel_dispatch(
+        large, ff1_down_weight, ff1_down_bias, buffer2,
+        frames, hidden_size, intermediate_size);
+    if (audio_scaled_residual_add_f32(
+            output, buffer2, 0.5f, output, token_elements) != 0) {
+        return -10;
+    }
+
+    layernorm_naive_serial_matched_precision(
+        output, attn_norm_weight, attn_norm_bias, norm, NULL, NULL,
+        frames, hidden_size, layer_norm_epsilon);
+    gemm_nt_f32_llama_production_parallel_dispatch(
+        norm, q_weight, q_bias, buffer2, frames, hidden_size, hidden_size);
+    gemm_nt_f32_llama_production_parallel_dispatch(
+        norm, k_weight, k_bias, buffer3, frames, hidden_size, hidden_size);
+    gemm_nt_f32_llama_production_parallel_dispatch(
+        norm, v_weight, v_bias, buffer4, frames, hidden_size, hidden_size);
+    gemm_nt_f32_llama_production_parallel_dispatch(
+        relative_positions, relative_weight, NULL, large,
+        2 * frames - 1, hidden_size, hidden_size);
+    if (audio_conformer_relative_attention_f32(
+            buffer2, buffer3, buffer4, large, attn_bias_u, attn_bias_v,
+            buffer5, frames, heads, head_dim, 1.0f / sqrtf((float)head_dim),
+            scores, (size_t)heads * (size_t)frames * sizeof(float)) != 0) {
+        return -11;
+    }
+    gemm_nt_f32_llama_production_parallel_dispatch(
+        buffer5, attn_out_weight, attn_out_bias, norm,
+        frames, hidden_size, hidden_size);
+    if (audio_scaled_residual_add_f32(
+            output, norm, 1.0f, output, token_elements) != 0) {
+        return -12;
+    }
+
+    layernorm_naive_serial_matched_precision(
+        output, conv_norm_weight, conv_norm_bias, norm, NULL, NULL,
+        frames, hidden_size, layer_norm_epsilon);
+    for (int frame = 0; frame < frames; ++frame) {
+        for (int channel = 0; channel < hidden_size; ++channel) {
+            buffer2[(size_t)channel * (size_t)frames + (size_t)frame] =
+                norm[(size_t)frame * (size_t)hidden_size + (size_t)channel];
+        }
+    }
+    if (audio_conv1d_channel_major_grouped_f32(
+            buffer2, conv_pw1_weight, conv_pw1_bias, large,
+            hidden_size, 2 * hidden_size, frames, 1, 1, 0, 1, frames) != 0 ||
+        audio_glu_split_channel_major_f32(
+            large, buffer3, hidden_size, frames) != 0 ||
+        audio_conv1d_channel_major_grouped_f32(
+            buffer3, conv_dw_weight, conv_dw_bias, buffer4,
+            hidden_size, hidden_size, frames, conv_kernel_size, 1,
+            conv_kernel_size / 2, hidden_size, frames) != 0 ||
+        audio_batch_norm_inference_channel_major_f32(
+            buffer4, conv_bn_mean, conv_bn_variance, conv_bn_weight,
+            conv_bn_bias, buffer5, hidden_size, frames,
+            batch_norm_epsilon) != 0) {
+        return -13;
+    }
+    recurrent_silu_forward(buffer5, buffer5, hidden_size, frames);
+    if (audio_conv1d_channel_major_grouped_f32(
+            buffer5, conv_pw2_weight, conv_pw2_bias, buffer3,
+            hidden_size, hidden_size, frames, 1, 1, 0, 1, frames) != 0) {
+        return -14;
+    }
+    for (int frame = 0; frame < frames; ++frame) {
+        for (int channel = 0; channel < hidden_size; ++channel) {
+            norm[(size_t)frame * (size_t)hidden_size + (size_t)channel] =
+                buffer3[(size_t)channel * (size_t)frames + (size_t)frame];
+        }
+    }
+    if (audio_scaled_residual_add_f32(
+            output, norm, 1.0f, output, token_elements) != 0) {
+        return -15;
+    }
+
+    layernorm_naive_serial_matched_precision(
+        output, ff2_norm_weight, ff2_norm_bias, norm, NULL, NULL,
+        frames, hidden_size, layer_norm_epsilon);
+    gemm_nt_f32_llama_production_parallel_dispatch(
+        norm, ff2_up_weight, ff2_up_bias, large,
+        frames, intermediate_size, hidden_size);
+    recurrent_silu_forward(large, large, frames, intermediate_size);
+    gemm_nt_f32_llama_production_parallel_dispatch(
+        large, ff2_down_weight, ff2_down_bias, buffer2,
+        frames, hidden_size, intermediate_size);
+    if (audio_scaled_residual_add_f32(
+            output, buffer2, 0.5f, output, token_elements) != 0) {
+        return -16;
+    }
+    layernorm_naive_serial_matched_precision(
+        output, out_norm_weight, out_norm_bias, norm, NULL, NULL,
+        frames, hidden_size, layer_norm_epsilon);
+    memcpy(output, norm, token_elements * sizeof(float));
     return 0;
 }
 

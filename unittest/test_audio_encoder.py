@@ -113,6 +113,19 @@ lib.audio_fastconformer_subsampling_f32.argtypes = [
     ctypes.POINTER(ctypes.c_int),
 ]
 lib.audio_fastconformer_subsampling_f32.restype = ctypes.c_int
+lib.audio_fastconformer_block_workspace_bytes.argtypes = [
+    ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+]
+lib.audio_fastconformer_block_workspace_bytes.restype = ctypes.c_size_t
+lib.audio_fastconformer_block_f32.argtypes = [
+    *([_FLOAT_P] * 42),
+    ctypes.c_void_p,
+    ctypes.c_size_t,
+    *([ctypes.c_int] * 6),
+    ctypes.c_float,
+    ctypes.c_float,
+]
+lib.audio_fastconformer_block_f32.restype = ctypes.c_int
 lib.audio_glu_split_channel_major_f32.argtypes = [
     _FLOAT_P, _FLOAT_P, ctypes.c_int, ctypes.c_int,
 ]
@@ -898,6 +911,166 @@ def check_fastconformer_subsampling() -> None:
     )
 
 
+def check_fastconformer_block() -> None:
+    rng = np.random.default_rng(20260920)
+    frames, hidden_size, intermediate_size = 5, 8, 13
+    heads, head_dim, conv_kernel = 2, 4, 3
+    norm_epsilon = batch_epsilon = 1.0e-5
+
+    def random(shape: tuple[int, ...], scale: float = 0.08) -> np.ndarray:
+        return rng.normal(0.0, scale, shape).astype(np.float32)
+
+    def norm_pair() -> tuple[np.ndarray, np.ndarray]:
+        return random((hidden_size,), 0.03) + 1.0, random((hidden_size,), 0.02)
+
+    input_value = random((frames, hidden_size), 0.2)
+    relative_positions = random((2 * frames - 1, hidden_size), 0.2)
+    ff1_norm_weight, ff1_norm_bias = norm_pair()
+    ff1_up_weight = random((intermediate_size, hidden_size))
+    ff1_up_bias = random((intermediate_size,), 0.02)
+    ff1_down_weight = random((hidden_size, intermediate_size))
+    ff1_down_bias = random((hidden_size,), 0.02)
+    attn_norm_weight, attn_norm_bias = norm_pair()
+    q_weight, k_weight, v_weight = (
+        random((hidden_size, hidden_size)) for _ in range(3)
+    )
+    q_bias, k_bias, v_bias = (random((hidden_size,), 0.02) for _ in range(3))
+    relative_weight = random((hidden_size, hidden_size))
+    attn_bias_u = random((hidden_size,), 0.03)
+    attn_bias_v = random((hidden_size,), 0.03)
+    attn_out_weight = random((hidden_size, hidden_size))
+    attn_out_bias = random((hidden_size,), 0.02)
+    conv_norm_weight, conv_norm_bias = norm_pair()
+    conv_pw1_weight = random((2 * hidden_size, hidden_size, 1))
+    conv_pw1_bias = random((2 * hidden_size,), 0.02)
+    conv_dw_weight = random((hidden_size, 1, conv_kernel))
+    conv_dw_bias = random((hidden_size,), 0.02)
+    conv_bn_mean = random((hidden_size,), 0.04)
+    conv_bn_variance = np.abs(random((hidden_size,), 0.08)) + 0.5
+    conv_bn_weight = random((hidden_size,), 0.03) + 1.0
+    conv_bn_bias = random((hidden_size,), 0.02)
+    conv_pw2_weight = random((hidden_size, hidden_size, 1))
+    conv_pw2_bias = random((hidden_size,), 0.02)
+    ff2_norm_weight, ff2_norm_bias = norm_pair()
+    ff2_up_weight = random((intermediate_size, hidden_size))
+    ff2_up_bias = random((intermediate_size,), 0.02)
+    ff2_down_weight = random((hidden_size, intermediate_size))
+    ff2_down_bias = random((hidden_size,), 0.02)
+    out_norm_weight, out_norm_bias = norm_pair()
+
+    def tensor(value: np.ndarray) -> torch.Tensor:
+        return torch.from_numpy(value)
+
+    def layer_norm(value: torch.Tensor, weight: np.ndarray, bias: np.ndarray) -> torch.Tensor:
+        return F.layer_norm(value, (hidden_size,), tensor(weight), tensor(bias), norm_epsilon)
+
+    value = tensor(input_value)
+    branch = F.linear(
+        F.silu(F.linear(layer_norm(value, ff1_norm_weight, ff1_norm_bias),
+                        tensor(ff1_up_weight), tensor(ff1_up_bias))),
+        tensor(ff1_down_weight), tensor(ff1_down_bias),
+    )
+    value = value + 0.5 * branch
+    normalized = layer_norm(value, attn_norm_weight, attn_norm_bias)
+    query = F.linear(normalized, tensor(q_weight), tensor(q_bias)).reshape(frames, heads, head_dim)
+    key = F.linear(normalized, tensor(k_weight), tensor(k_bias)).reshape(frames, heads, head_dim)
+    val = F.linear(normalized, tensor(v_weight), tensor(v_bias)).reshape(frames, heads, head_dim)
+    relative = F.linear(tensor(relative_positions), tensor(relative_weight), None).reshape(
+        2 * frames - 1, heads, head_dim
+    )
+    u = tensor(attn_bias_u).reshape(heads, head_dim)
+    v = tensor(attn_bias_v).reshape(heads, head_dim)
+    scores = torch.empty((heads, frames, frames), dtype=torch.float32)
+    for query_frame in range(frames):
+        for key_frame in range(frames):
+            relative_frame = frames - 1 + key_frame - query_frame
+            scores[:, query_frame, key_frame] = (
+                ((query[query_frame] + u) * key[key_frame]).sum(dim=-1)
+                + ((query[query_frame] + v) * relative[relative_frame]).sum(dim=-1)
+            ) * (head_dim ** -0.5)
+    probabilities = torch.softmax(scores, dim=-1)
+    attended = torch.einsum("hqk,khd->qhd", probabilities, val).reshape(frames, hidden_size)
+    value = value + F.linear(attended, tensor(attn_out_weight), tensor(attn_out_bias))
+    channel = layer_norm(value, conv_norm_weight, conv_norm_bias).T[None]
+    packed = F.conv1d(channel, tensor(conv_pw1_weight), tensor(conv_pw1_bias))
+    gated = packed[:, :hidden_size] * torch.sigmoid(packed[:, hidden_size:])
+    convolved = F.conv1d(
+        gated, tensor(conv_dw_weight), tensor(conv_dw_bias),
+        padding=conv_kernel // 2, groups=hidden_size,
+    )
+    convolved = (convolved - tensor(conv_bn_mean)[None, :, None]) / torch.sqrt(
+        tensor(conv_bn_variance)[None, :, None] + batch_epsilon
+    )
+    convolved = convolved * tensor(conv_bn_weight)[None, :, None]
+    convolved = convolved + tensor(conv_bn_bias)[None, :, None]
+    convolved = F.silu(convolved)
+    value = value + F.conv1d(
+        convolved, tensor(conv_pw2_weight), tensor(conv_pw2_bias)
+    )[0].T
+    branch = F.linear(
+        F.silu(F.linear(layer_norm(value, ff2_norm_weight, ff2_norm_bias),
+                        tensor(ff2_up_weight), tensor(ff2_up_bias))),
+        tensor(ff2_down_weight), tensor(ff2_down_bias),
+    )
+    expected = layer_norm(
+        value + 0.5 * branch, out_norm_weight, out_norm_bias
+    ).numpy()
+
+    ordered = [
+        input_value, relative_positions,
+        ff1_norm_weight, ff1_norm_bias, ff1_up_weight, ff1_up_bias,
+        ff1_down_weight, ff1_down_bias, attn_norm_weight, attn_norm_bias,
+        q_weight, q_bias, k_weight, k_bias, v_weight, v_bias,
+        relative_weight, attn_bias_u, attn_bias_v, attn_out_weight,
+        attn_out_bias, conv_norm_weight, conv_norm_bias, conv_pw1_weight,
+        conv_pw1_bias, conv_dw_weight, conv_dw_bias, conv_bn_mean,
+        conv_bn_variance, conv_bn_weight, conv_bn_bias, conv_pw2_weight,
+        conv_pw2_bias, ff2_norm_weight, ff2_norm_bias, ff2_up_weight,
+        ff2_up_bias, ff2_down_weight, ff2_down_bias, out_norm_weight,
+        out_norm_bias,
+    ]
+    workspace_bytes = int(lib.audio_fastconformer_block_workspace_bytes(
+        frames, hidden_size, intermediate_size, heads,
+    ))
+    assert workspace_bytes > 0
+    workspace = np.empty(workspace_bytes, dtype=np.uint8)
+    actual = np.empty_like(expected)
+    arguments = [
+        *(_fptr(item) for item in ordered), _fptr(actual),
+        ctypes.c_void_p(workspace.ctypes.data), workspace_bytes,
+        frames, hidden_size, intermediate_size, heads, head_dim, conv_kernel,
+        norm_epsilon, batch_epsilon,
+    ]
+    assert lib.audio_fastconformer_block_f32(*arguments) == 0
+    difference = np.abs(actual - expected)
+    maximum = float(np.max(difference))
+    rmse = float(np.sqrt(np.mean(difference * difference)))
+    assert maximum <= 2.0e-6, maximum
+    assert rmse <= 5.0e-7, rmse
+
+    in_place = input_value.copy()
+    in_place_arguments = list(arguments)
+    in_place_arguments[0] = _fptr(in_place)
+    in_place_arguments[41] = _fptr(in_place)
+    assert lib.audio_fastconformer_block_f32(*in_place_arguments) == 0
+    assert np.array_equal(in_place, actual)
+
+    undersized = list(arguments)
+    undersized[43] = workspace_bytes - 1
+    assert lib.audio_fastconformer_block_f32(*undersized) == -3
+    invalid_geometry = list(arguments)
+    invalid_geometry[48] = head_dim + 1
+    assert lib.audio_fastconformer_block_f32(*invalid_geometry) == -2
+    assert lib.audio_fastconformer_block_workspace_bytes(
+        2**30 + 1, hidden_size, intermediate_size, heads,
+    ) == 0
+    print(
+        "audio_fastconformer_block "
+        f"max_diff={maximum:.8e} tol=2.0e-06 [PASS] "
+        f"rmse={rmse:.8e} rmse_tol=5.0e-07"
+    )
+
+
 def check_split_glu() -> None:
     rng = np.random.default_rng(20260830)
     channels, frames = 1280, 37
@@ -1327,6 +1500,7 @@ def main() -> None:
     check_centered_window_stft_and_log_mel()
     check_grouped_conv2d()
     check_fastconformer_subsampling()
+    check_fastconformer_block()
     check_split_glu()
     check_relative_shift()
     check_conformer_relative_attention()

@@ -1822,6 +1822,21 @@ OP_DATAFLOW = {
         "inputs": {"features": "audio_features_normalized"},
         "outputs": {"output": {"slot": "audio_encoder_tokens", "dtype": "fp32"}},
     },
+    "audio_relative_position": {
+        "inputs": {},
+        "outputs": {
+            "output": {"slot": "audio_relative_positions", "dtype": "fp32"}
+        },
+    },
+    "audio_fastconformer_block": {
+        "inputs": {
+            "input": "audio_encoder_tokens",
+            "relative_positions": "audio_relative_positions",
+        },
+        "outputs": {
+            "output": {"slot": "audio_encoder_tokens", "dtype": "fp32"}
+        },
+    },
     "audio_feature_window": {
         "inputs": {
             "wav_bytes": "external:audio_wav_bytes",
@@ -4229,6 +4244,8 @@ TEMPLATE_TO_KERNEL_OP = {
     "audio_log_mel": "audio_log_mel",
     "audio_feature_normalize": "audio_feature_normalize",
     "audio_fastconformer_subsampling": "audio_fastconformer_subsampling",
+    "audio_relative_position": "audio_relative_position",
+    "audio_fastconformer_block": "audio_fastconformer_block",
     "audio_feature_window": "audio_feature_window",
     "audio_conv1d_stem_1": "audio_conv1d",
     "audio_conv1d_stem_2": "audio_conv1d",
@@ -8786,6 +8803,19 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
             "pointwise2_weight", "pointwise2_bias",
             "linear_weight", "linear_bias",
         ],
+        "audio_relative_position": None,
+        "audio_fastconformer_block": [
+            "ff1_norm_weight", "ff1_norm_bias", "ff1_up_weight", "ff1_up_bias",
+            "ff1_down_weight", "ff1_down_bias", "attn_norm_weight", "attn_norm_bias",
+            "q_weight", "q_bias", "k_weight", "k_bias", "v_weight", "v_bias",
+            "relative_weight", "attn_bias_u", "attn_bias_v", "attn_out_weight",
+            "attn_out_bias", "conv_norm_weight", "conv_norm_bias", "conv_pw1_weight",
+            "conv_pw1_bias", "conv_dw_weight", "conv_dw_bias", "conv_bn_mean",
+            "conv_bn_variance", "conv_bn_weight", "conv_bn_bias", "conv_pw2_weight",
+            "conv_pw2_bias", "ff2_norm_weight", "ff2_norm_bias", "ff2_up_weight",
+            "ff2_up_bias", "ff2_down_weight", "ff2_down_bias", "out_norm_weight",
+            "out_norm_bias",
+        ],
         "audio_feature_window": None,
         "audio_conv1d_stem_1": ["audio_conv1_weight", "audio_conv1_bias"],
         "audio_conv1d_stem_2": ["audio_conv2_weight", "audio_conv2_bias"],
@@ -9513,7 +9543,7 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                         base_layer_quant = {}
                     layer_quant = _apply_layer_quant_aliases(
                         base_layer_quant,
-                        block["body"],
+                        block_def["body"],
                         config,
                         layer_idx,
                     )
@@ -9522,7 +9552,9 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                                              if k[0] != layer_idx}
 
                     print(f"\n    Layer {layer_idx}:")
-                    layer_items = _resolve_body_items_for_layer(block["body"], config, layer_idx)
+                    layer_items = _resolve_body_items_for_layer(
+                        block_def["body"], config, layer_idx
+                    )
                     layer_ops = [item["op"] for item in layer_items]
 
                     # Track pre-norm instance for quantize insertion
@@ -11948,6 +11980,19 @@ TEMPLATE_OP_WEIGHTS = {
         "depthwise2_weight", "depthwise2_bias",
         "pointwise2_weight", "pointwise2_bias",
         "linear_weight", "linear_bias",
+    ],
+    "audio_relative_position": [],
+    "audio_fastconformer_block": [
+        "ff1_norm_weight", "ff1_norm_bias", "ff1_up_weight", "ff1_up_bias",
+        "ff1_down_weight", "ff1_down_bias", "attn_norm_weight", "attn_norm_bias",
+        "q_weight", "q_bias", "k_weight", "k_bias", "v_weight", "v_bias",
+        "relative_weight", "attn_bias_u", "attn_bias_v", "attn_out_weight",
+        "attn_out_bias", "conv_norm_weight", "conv_norm_bias", "conv_pw1_weight",
+        "conv_pw1_bias", "conv_dw_weight", "conv_dw_bias", "conv_bn_mean",
+        "conv_bn_variance", "conv_bn_weight", "conv_bn_bias", "conv_pw2_weight",
+        "conv_pw2_bias", "ff2_norm_weight", "ff2_norm_bias", "ff2_up_weight",
+        "ff2_up_bias", "ff2_down_weight", "ff2_down_bias", "out_norm_weight",
+        "out_norm_bias",
     ],
     "audio_feature_window": [],
     "audio_conv1d_stem_1": ["audio_conv1_weight", "audio_conv1_bias"],

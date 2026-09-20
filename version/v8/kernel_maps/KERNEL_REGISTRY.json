@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 377,
+      "total": 378,
       "by_op": {
         "add_backward": 1,
         "add_stream": 2,
@@ -20,6 +20,7 @@
         "audio_batch_norm": 1,
         "audio_conv1d": 2,
         "audio_conv2d": 1,
+        "audio_fastconformer_block": 1,
         "audio_fastconformer_subsampling": 1,
         "audio_feature_normalize": 1,
         "audio_feature_window": 1,
@@ -13100,6 +13101,977 @@
       },
       "name": "audio_conv2d_whc_grouped_f32",
       "_source_file": "audio_conv2d_whc_grouped_f32.json"
+    },
+    {
+      "id": "audio_fastconformer_block_f32",
+      "op": "audio_fastconformer_block",
+      "operation_interface": "audio_fastconformer_block.macaron_relative_conv.fp32.v1",
+      "variant": "macaron_relative_attention_conv_fp32",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "equivalence_group": "audio_fastconformer_block_fp32",
+        "phases": [
+          "prefill"
+        ]
+      },
+      "quant": {
+        "weight": "fp32",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            "frames",
+            "hidden_size"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "relative_positions",
+          "dtype": "fp32",
+          "shape": [
+            "2*frames-1",
+            "hidden_size"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "ff1_norm_weight",
+          "dtype": "fp32",
+          "shape": [
+            "hidden_size"
+          ],
+          "consumption": "required",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        },
+        {
+          "name": "ff1_norm_bias",
+          "dtype": "fp32",
+          "shape": [
+            "hidden_size"
+          ],
+          "consumption": "required",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        },
+        {
+          "name": "ff1_up_weight",
+          "dtype": "fp32",
+          "shape": [
+            "intermediate_size",
+            "hidden_size"
+          ],
+          "consumption": "required",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        },
+        {
+          "name": "ff1_up_bias",
+          "dtype": "fp32",
+          "shape": [
+            "intermediate_size"
+          ],
+          "consumption": "optional",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        },
+        {
+          "name": "ff1_down_weight",
+          "dtype": "fp32",
+          "shape": [
+            "hidden_size",
+            "intermediate_size"
+          ],
+          "consumption": "required",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        },
+        {
+          "name": "ff1_down_bias",
+          "dtype": "fp32",
+          "shape": [
+            "hidden_size"
+          ],
+          "consumption": "optional",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        },
+        {
+          "name": "attn_norm_weight",
+          "dtype": "fp32",
+          "shape": [
+            "hidden_size"
+          ],
+          "consumption": "required",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        },
+        {
+          "name": "attn_norm_bias",
+          "dtype": "fp32",
+          "shape": [
+            "hidden_size"
+          ],
+          "consumption": "required",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        },
+        {
+          "name": "q_weight",
+          "dtype": "fp32",
+          "shape": [
+            "hidden_size",
+            "hidden_size"
+          ],
+          "consumption": "required",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        },
+        {
+          "name": "q_bias",
+          "dtype": "fp32",
+          "shape": [
+            "hidden_size"
+          ],
+          "consumption": "optional",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        },
+        {
+          "name": "k_weight",
+          "dtype": "fp32",
+          "shape": [
+            "hidden_size",
+            "hidden_size"
+          ],
+          "consumption": "required",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        },
+        {
+          "name": "k_bias",
+          "dtype": "fp32",
+          "shape": [
+            "hidden_size"
+          ],
+          "consumption": "optional",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        },
+        {
+          "name": "v_weight",
+          "dtype": "fp32",
+          "shape": [
+            "hidden_size",
+            "hidden_size"
+          ],
+          "consumption": "required",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        },
+        {
+          "name": "v_bias",
+          "dtype": "fp32",
+          "shape": [
+            "hidden_size"
+          ],
+          "consumption": "optional",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        },
+        {
+          "name": "relative_weight",
+          "dtype": "fp32",
+          "shape": [
+            "hidden_size",
+            "hidden_size"
+          ],
+          "consumption": "required",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        },
+        {
+          "name": "attn_bias_u",
+          "dtype": "fp32",
+          "shape": [
+            "hidden_size"
+          ],
+          "consumption": "required",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        },
+        {
+          "name": "attn_bias_v",
+          "dtype": "fp32",
+          "shape": [
+            "hidden_size"
+          ],
+          "consumption": "required",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        },
+        {
+          "name": "attn_out_weight",
+          "dtype": "fp32",
+          "shape": [
+            "hidden_size",
+            "hidden_size"
+          ],
+          "consumption": "required",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        },
+        {
+          "name": "attn_out_bias",
+          "dtype": "fp32",
+          "shape": [
+            "hidden_size"
+          ],
+          "consumption": "optional",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        },
+        {
+          "name": "conv_norm_weight",
+          "dtype": "fp32",
+          "shape": [
+            "hidden_size"
+          ],
+          "consumption": "required",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        },
+        {
+          "name": "conv_norm_bias",
+          "dtype": "fp32",
+          "shape": [
+            "hidden_size"
+          ],
+          "consumption": "required",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        },
+        {
+          "name": "conv_pw1_weight",
+          "dtype": "fp32",
+          "shape": [
+            "2*hidden_size",
+            "hidden_size",
+            1
+          ],
+          "consumption": "required",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        },
+        {
+          "name": "conv_pw1_bias",
+          "dtype": "fp32",
+          "shape": [
+            "2*hidden_size"
+          ],
+          "consumption": "optional",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        },
+        {
+          "name": "conv_dw_weight",
+          "dtype": "fp32",
+          "shape": [
+            "hidden_size",
+            1,
+            "conv_kernel_size"
+          ],
+          "consumption": "required",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        },
+        {
+          "name": "conv_dw_bias",
+          "dtype": "fp32",
+          "shape": [
+            "hidden_size"
+          ],
+          "consumption": "optional",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        },
+        {
+          "name": "conv_bn_mean",
+          "dtype": "fp32",
+          "shape": [
+            "hidden_size"
+          ],
+          "consumption": "required",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        },
+        {
+          "name": "conv_bn_variance",
+          "dtype": "fp32",
+          "shape": [
+            "hidden_size"
+          ],
+          "consumption": "required",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        },
+        {
+          "name": "conv_bn_weight",
+          "dtype": "fp32",
+          "shape": [
+            "hidden_size"
+          ],
+          "consumption": "required",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        },
+        {
+          "name": "conv_bn_bias",
+          "dtype": "fp32",
+          "shape": [
+            "hidden_size"
+          ],
+          "consumption": "required",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        },
+        {
+          "name": "conv_pw2_weight",
+          "dtype": "fp32",
+          "shape": [
+            "hidden_size",
+            "hidden_size",
+            1
+          ],
+          "consumption": "required",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        },
+        {
+          "name": "conv_pw2_bias",
+          "dtype": "fp32",
+          "shape": [
+            "hidden_size"
+          ],
+          "consumption": "optional",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        },
+        {
+          "name": "ff2_norm_weight",
+          "dtype": "fp32",
+          "shape": [
+            "hidden_size"
+          ],
+          "consumption": "required",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        },
+        {
+          "name": "ff2_norm_bias",
+          "dtype": "fp32",
+          "shape": [
+            "hidden_size"
+          ],
+          "consumption": "required",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        },
+        {
+          "name": "ff2_up_weight",
+          "dtype": "fp32",
+          "shape": [
+            "intermediate_size",
+            "hidden_size"
+          ],
+          "consumption": "required",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        },
+        {
+          "name": "ff2_up_bias",
+          "dtype": "fp32",
+          "shape": [
+            "intermediate_size"
+          ],
+          "consumption": "optional",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        },
+        {
+          "name": "ff2_down_weight",
+          "dtype": "fp32",
+          "shape": [
+            "hidden_size",
+            "intermediate_size"
+          ],
+          "consumption": "required",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        },
+        {
+          "name": "ff2_down_bias",
+          "dtype": "fp32",
+          "shape": [
+            "hidden_size"
+          ],
+          "consumption": "optional",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        },
+        {
+          "name": "out_norm_weight",
+          "dtype": "fp32",
+          "shape": [
+            "hidden_size"
+          ],
+          "consumption": "required",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        },
+        {
+          "name": "out_norm_bias",
+          "dtype": "fp32",
+          "shape": [
+            "hidden_size"
+          ],
+          "consumption": "required",
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "weight"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "frames",
+            "hidden_size"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required",
+          "may_alias": [
+            "input:input"
+          ]
+        }
+      ],
+      "scratch": [
+        {
+          "name": "workspace",
+          "dtype": "fp32",
+          "shape": [
+            "workspace_elements"
+          ],
+          "size_bytes": "audio_fastconformer_block_workspace_bytes",
+          "size_resolution": "required",
+          "lifetime": "kernel_call",
+          "alignment": 64,
+          "layout": "contiguous",
+          "access": "read_write",
+          "storage_class": "scratch",
+          "consumption": "required"
+        }
+      ],
+      "dims": [
+        "workspace_bytes",
+        "frames",
+        "hidden_size",
+        "intermediate_size",
+        "heads",
+        "head_dim",
+        "conv_kernel_size",
+        "layer_norm_epsilon",
+        "batch_norm_epsilon"
+      ],
+      "impl": {
+        "function": "audio_fastconformer_block_f32",
+        "c_declaration": "int audio_fastconformer_block_f32(const float *input, const float *relative_positions, const float *ff1_norm_weight, const float *ff1_norm_bias, const float *ff1_up_weight, const float *ff1_up_bias, const float *ff1_down_weight, const float *ff1_down_bias, const float *attn_norm_weight, const float *attn_norm_bias, const float *q_weight, const float *q_bias, const float *k_weight, const float *k_bias, const float *v_weight, const float *v_bias, const float *relative_weight, const float *attn_bias_u, const float *attn_bias_v, const float *attn_out_weight, const float *attn_out_bias, const float *conv_norm_weight, const float *conv_norm_bias, const float *conv_pw1_weight, const float *conv_pw1_bias, const float *conv_dw_weight, const float *conv_dw_bias, const float *conv_bn_mean, const float *conv_bn_variance, const float *conv_bn_weight, const float *conv_bn_bias, const float *conv_pw2_weight, const float *conv_pw2_bias, const float *ff2_norm_weight, const float *ff2_norm_bias, const float *ff2_up_weight, const float *ff2_up_bias, const float *ff2_down_weight, const float *ff2_down_bias, const float *out_norm_weight, const float *out_norm_bias, float *output, void *workspace, size_t workspace_bytes, int frames, int hidden_size, int intermediate_size, int heads, int head_dim, int conv_kernel_size, float layer_norm_epsilon, float batch_norm_epsilon);",
+        "sources": [
+          "src/kernels/audio_kernels.c"
+        ]
+      },
+      "composition": [
+        {
+          "provider_id": "gemm_nt_f32_llama_production",
+          "role": "projections",
+          "function": "gemm_nt_f32_llama_production_parallel_dispatch"
+        },
+        {
+          "provider_id": "layernorm_fp32_exact",
+          "role": "normalization",
+          "function": "layernorm_naive_serial_matched_precision"
+        },
+        {
+          "provider_id": "audio_conformer_relative_attention_f32",
+          "role": "relative_attention",
+          "function": "audio_conformer_relative_attention_f32"
+        },
+        {
+          "provider_id": "audio_conv1d_channel_major_grouped_f32",
+          "role": "convolution",
+          "function": "audio_conv1d_channel_major_grouped_f32"
+        },
+        {
+          "provider_id": "audio_glu_split_channel_major_f32",
+          "role": "gating",
+          "function": "audio_glu_split_channel_major_f32"
+        },
+        {
+          "provider_id": "audio_batch_norm_inference_channel_major_f32",
+          "role": "batch_normalization",
+          "function": "audio_batch_norm_inference_channel_major_f32"
+        },
+        {
+          "provider_id": "recurrent_silu_forward",
+          "role": "activation",
+          "function": "recurrent_silu_forward"
+        },
+        {
+          "provider_id": "audio_scaled_residual_add_f32",
+          "role": "residual_composition",
+          "function": "audio_scaled_residual_add_f32"
+        }
+      ],
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "audio_fastconformer_block_macaron_relative_conv_fp32",
+          "status": "validated",
+          "phases": [
+            "prefill"
+          ],
+          "function": "audio_fastconformer_block_f32",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "runtime",
+            "threading": {
+              "runtime": "ck_threadpool",
+              "work_partition": [
+                "output_tiles"
+              ],
+              "dispatch": [
+                "internal_threaded"
+              ],
+              "reduction_order_effect": "contract_defined"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp32",
+            "merge_order": "implementation_defined",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "independent_outputs"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const float*",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "relative_positions",
+            "source": "activation:relative_positions",
+            "cast": "const float*",
+            "ports": [
+              "input:relative_positions"
+            ]
+          },
+          {
+            "name": "ff1_norm_weight",
+            "source": "weight:ff1_norm_weight",
+            "ports": [
+              "weight:ff1_norm_weight"
+            ]
+          },
+          {
+            "name": "ff1_norm_bias",
+            "source": "weight:ff1_norm_bias",
+            "ports": [
+              "weight:ff1_norm_bias"
+            ]
+          },
+          {
+            "name": "ff1_up_weight",
+            "source": "weight:ff1_up_weight",
+            "ports": [
+              "weight:ff1_up_weight"
+            ]
+          },
+          {
+            "name": "ff1_up_bias",
+            "source": "weight_f:ff1_up_bias",
+            "ports": [
+              "weight:ff1_up_bias"
+            ]
+          },
+          {
+            "name": "ff1_down_weight",
+            "source": "weight:ff1_down_weight",
+            "ports": [
+              "weight:ff1_down_weight"
+            ]
+          },
+          {
+            "name": "ff1_down_bias",
+            "source": "weight_f:ff1_down_bias",
+            "ports": [
+              "weight:ff1_down_bias"
+            ]
+          },
+          {
+            "name": "attn_norm_weight",
+            "source": "weight:attn_norm_weight",
+            "ports": [
+              "weight:attn_norm_weight"
+            ]
+          },
+          {
+            "name": "attn_norm_bias",
+            "source": "weight:attn_norm_bias",
+            "ports": [
+              "weight:attn_norm_bias"
+            ]
+          },
+          {
+            "name": "q_weight",
+            "source": "weight:q_weight",
+            "ports": [
+              "weight:q_weight"
+            ]
+          },
+          {
+            "name": "q_bias",
+            "source": "weight_f:q_bias",
+            "ports": [
+              "weight:q_bias"
+            ]
+          },
+          {
+            "name": "k_weight",
+            "source": "weight:k_weight",
+            "ports": [
+              "weight:k_weight"
+            ]
+          },
+          {
+            "name": "k_bias",
+            "source": "weight_f:k_bias",
+            "ports": [
+              "weight:k_bias"
+            ]
+          },
+          {
+            "name": "v_weight",
+            "source": "weight:v_weight",
+            "ports": [
+              "weight:v_weight"
+            ]
+          },
+          {
+            "name": "v_bias",
+            "source": "weight_f:v_bias",
+            "ports": [
+              "weight:v_bias"
+            ]
+          },
+          {
+            "name": "relative_weight",
+            "source": "weight:relative_weight",
+            "ports": [
+              "weight:relative_weight"
+            ]
+          },
+          {
+            "name": "attn_bias_u",
+            "source": "weight:attn_bias_u",
+            "ports": [
+              "weight:attn_bias_u"
+            ]
+          },
+          {
+            "name": "attn_bias_v",
+            "source": "weight:attn_bias_v",
+            "ports": [
+              "weight:attn_bias_v"
+            ]
+          },
+          {
+            "name": "attn_out_weight",
+            "source": "weight:attn_out_weight",
+            "ports": [
+              "weight:attn_out_weight"
+            ]
+          },
+          {
+            "name": "attn_out_bias",
+            "source": "weight_f:attn_out_bias",
+            "ports": [
+              "weight:attn_out_bias"
+            ]
+          },
+          {
+            "name": "conv_norm_weight",
+            "source": "weight:conv_norm_weight",
+            "ports": [
+              "weight:conv_norm_weight"
+            ]
+          },
+          {
+            "name": "conv_norm_bias",
+            "source": "weight:conv_norm_bias",
+            "ports": [
+              "weight:conv_norm_bias"
+            ]
+          },
+          {
+            "name": "conv_pw1_weight",
+            "source": "weight:conv_pw1_weight",
+            "ports": [
+              "weight:conv_pw1_weight"
+            ]
+          },
+          {
+            "name": "conv_pw1_bias",
+            "source": "weight_f:conv_pw1_bias",
+            "ports": [
+              "weight:conv_pw1_bias"
+            ]
+          },
+          {
+            "name": "conv_dw_weight",
+            "source": "weight:conv_dw_weight",
+            "ports": [
+              "weight:conv_dw_weight"
+            ]
+          },
+          {
+            "name": "conv_dw_bias",
+            "source": "weight_f:conv_dw_bias",
+            "ports": [
+              "weight:conv_dw_bias"
+            ]
+          },
+          {
+            "name": "conv_bn_mean",
+            "source": "weight:conv_bn_mean",
+            "ports": [
+              "weight:conv_bn_mean"
+            ]
+          },
+          {
+            "name": "conv_bn_variance",
+            "source": "weight:conv_bn_variance",
+            "ports": [
+              "weight:conv_bn_variance"
+            ]
+          },
+          {
+            "name": "conv_bn_weight",
+            "source": "weight:conv_bn_weight",
+            "ports": [
+              "weight:conv_bn_weight"
+            ]
+          },
+          {
+            "name": "conv_bn_bias",
+            "source": "weight:conv_bn_bias",
+            "ports": [
+              "weight:conv_bn_bias"
+            ]
+          },
+          {
+            "name": "conv_pw2_weight",
+            "source": "weight:conv_pw2_weight",
+            "ports": [
+              "weight:conv_pw2_weight"
+            ]
+          },
+          {
+            "name": "conv_pw2_bias",
+            "source": "weight_f:conv_pw2_bias",
+            "ports": [
+              "weight:conv_pw2_bias"
+            ]
+          },
+          {
+            "name": "ff2_norm_weight",
+            "source": "weight:ff2_norm_weight",
+            "ports": [
+              "weight:ff2_norm_weight"
+            ]
+          },
+          {
+            "name": "ff2_norm_bias",
+            "source": "weight:ff2_norm_bias",
+            "ports": [
+              "weight:ff2_norm_bias"
+            ]
+          },
+          {
+            "name": "ff2_up_weight",
+            "source": "weight:ff2_up_weight",
+            "ports": [
+              "weight:ff2_up_weight"
+            ]
+          },
+          {
+            "name": "ff2_up_bias",
+            "source": "weight_f:ff2_up_bias",
+            "ports": [
+              "weight:ff2_up_bias"
+            ]
+          },
+          {
+            "name": "ff2_down_weight",
+            "source": "weight:ff2_down_weight",
+            "ports": [
+              "weight:ff2_down_weight"
+            ]
+          },
+          {
+            "name": "ff2_down_bias",
+            "source": "weight_f:ff2_down_bias",
+            "ports": [
+              "weight:ff2_down_bias"
+            ]
+          },
+          {
+            "name": "out_norm_weight",
+            "source": "weight:out_norm_weight",
+            "ports": [
+              "weight:out_norm_weight"
+            ]
+          },
+          {
+            "name": "out_norm_bias",
+            "source": "weight:out_norm_bias",
+            "ports": [
+              "weight:out_norm_bias"
+            ]
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "workspace",
+            "source": "scratch:workspace",
+            "cast": "void*"
+          },
+          {
+            "name": "workspace_bytes",
+            "source": "scratch_size:workspace"
+          },
+          {
+            "name": "frames",
+            "source": "dim:frames"
+          },
+          {
+            "name": "hidden_size",
+            "source": "dim:hidden_size"
+          },
+          {
+            "name": "intermediate_size",
+            "source": "dim:intermediate_size"
+          },
+          {
+            "name": "heads",
+            "source": "dim:heads"
+          },
+          {
+            "name": "head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "conv_kernel_size",
+            "source": "dim:conv_kernel_size"
+          },
+          {
+            "name": "layer_norm_epsilon",
+            "source": "dim:layer_norm_epsilon"
+          },
+          {
+            "name": "batch_norm_epsilon",
+            "source": "dim:batch_norm_epsilon"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_audio_encoder.py"
+        ]
+      },
+      "name": "audio_fastconformer_block_f32",
+      "_source_file": "audio_fastconformer_block_f32.json"
     },
     {
       "id": "audio_fastconformer_subsampling_f32",
