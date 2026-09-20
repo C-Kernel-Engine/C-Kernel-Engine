@@ -4422,6 +4422,7 @@ TEMPLATE_TO_KERNEL_OP = {
 
     # Residual
     "residual_add": "residual_add",
+    "bias_add": "bias_add",
 
     # MLP block
     # NOTE: mega_fused_outproj_mlp_prefill expects head-major attention output,
@@ -15043,6 +15044,11 @@ def generate_ir_lower_2(
         if op_type == "gelu":
             explicit_elements = int(params.get("elements", 0) or 0)
             params["gelu_elems"] = explicit_elements or (
+                int(params.get("_m", params.get("seq_len", 0)) or 0)
+                * int(params.get("intermediate_size", 0) or 0)
+            )
+        if op_type == "audio_tdt_relu":
+            params["elements"] = int(params.get("elements", 0) or 0) or (
                 int(params.get("_m", params.get("seq_len", 0)) or 0)
                 * int(params.get("intermediate_size", 0) or 0)
             )

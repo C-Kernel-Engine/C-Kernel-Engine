@@ -1367,6 +1367,7 @@ test-audio-v8-contracts:
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_cohere_transcribe_native.py
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_cohere_generated_frontend.py
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_cohere_generated_encoder.py
+	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_cohere_generated_decoder.py
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_cohere_transcribe_long_audio.py
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_parakeet_inventory.py
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_parakeet_native.py

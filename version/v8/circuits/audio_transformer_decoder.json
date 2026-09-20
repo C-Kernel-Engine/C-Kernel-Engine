@@ -14,6 +14,9 @@
     "tokenizer": "bpe",
     "position_encoding": "absolute"
   },
+  "kernels": {
+    "audio_tdt_relu": "audio_relu_inplace_f32"
+  },
   "contract": {
     "tokenizer_contract": {
       "tokenizer_type": "bpe",
@@ -146,6 +149,9 @@
       "operation_interface": "gelu.fp32_inplace.v1",
       "op": "gelu",
       "template_ops": ["gelu"],
+      "selector": {
+        "config_not_equals": {"decoder_activation": "relu"}
+      },
       "phases": {
         "prefill": {
           "contract_id": "gelu_erf_fp64_parallel_fp32_storage",
@@ -161,6 +167,32 @@
       "checkpoint": {
         "id": "audio.decoder.layer.{layer}.activation.output",
         "producer": "gelu",
+        "logical_layout": "token_major",
+        "axis_names": ["token", "channel"]
+      }
+    },
+    "audio.decoder.relu_activation": {
+      "operation_interface": "audio.relu.inplace.fp32.v1",
+      "op": "audio_relu",
+      "template_ops": ["audio_tdt_relu"],
+      "selector": {
+        "config_equals": {"decoder_activation": "relu"}
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "audio_relu_inplace_fp32",
+          "validation": "validated",
+          "evidence": "unittest/test_audio_encoder.py NumPy maximum(input, 0) oracle"
+        },
+        "decode": {
+          "contract_id": "audio_relu_inplace_fp32",
+          "validation": "validated",
+          "evidence": "unittest/test_audio_encoder.py NumPy maximum(input, 0) oracle"
+        }
+      },
+      "checkpoint": {
+        "id": "audio.decoder.layer.{layer}.activation.output",
+        "producer": "audio_relu",
         "logical_layout": "token_major",
         "axis_names": ["token", "channel"]
       }
@@ -194,7 +226,20 @@
       "header": [
         "bpe_tokenizer",
         "dense_embedding_lookup",
-        "position_embeddings"
+        "position_embeddings",
+        {
+          "id": "embedding_layernorm",
+          "op": "layernorm",
+          "when": {"config_key": "decoder_embedding_layernorm", "equals": true},
+          "weight_refs": {
+            "gamma": "embedding_ln_weight",
+            "beta": "embedding_ln_bias"
+          },
+          "graph_slots": {
+            "inputs": {"input": "main_stream"},
+            "outputs": {"output": "main_stream"}
+          }
+        }
       ],
       "body": {
         "type": "dense",
@@ -215,7 +260,20 @@
           "residual_add",
           "layernorm",
           "mlp_up",
-          "gelu",
+          {
+            "id": "ffn_gelu",
+            "op": "gelu",
+            "when": {"config_key": "decoder_activation", "not_equals": "relu"}
+          },
+          {
+            "id": "ffn_relu",
+            "op": "audio_tdt_relu",
+            "when": {"config_key": "decoder_activation", "equals": "relu"},
+            "graph_slots": {
+              "inputs": {"input": "mlp_scratch"},
+              "outputs": {"output": "mlp_scratch"}
+            }
+          },
           "mlp_down",
           "residual_add"
         ]
@@ -223,7 +281,18 @@
       "footer": [
         "layernorm",
         "weight_tying",
-        "logits"
+        "logits",
+        {
+          "id": "logits_bias",
+          "op": "bias_add",
+          "when": {"config_key": "decoder_output_bias", "equals": true},
+          "weight_refs": {"bias": "lm_head_bias"},
+          "params": {"_output_dim_from_config": "vocab_size"},
+          "graph_slots": {
+            "inputs": {"y": "logits"},
+            "outputs": {"y": "logits"}
+          }
+        }
       ]
     }
   },
