@@ -227,6 +227,8 @@ class Qwen38ContractTests(unittest.TestCase):
         self.assertEqual(specs["embedded_input"]["size"], 4096 * 5120 * 4)
         self.assertEqual(specs["logits"]["size"], 248_320 * 4)
         self.assertEqual(config["kv_cache_token_stride_total"], 32_768)
+        self.assertEqual(config["layer_k_head_dim"], [256] * 64)
+        self.assertEqual(config["layer_v_head_dim"], [256] * 64)
         self.assertEqual(
             sum(offset >= 0 for offset in config["layer_k_cache_offset"]),
             16,
@@ -250,6 +252,11 @@ class Qwen38ContractTests(unittest.TestCase):
         out_of_bounds["layer_v_cache_offset"][1] = 24
         with self.assertRaisesRegex(RuntimeError, "interval exceeds token stride"):
             build_ir_v8._materialize_compact_kv_layout(out_of_bounds)
+
+        malformed_dimensions = copy.deepcopy(base)
+        malformed_dimensions["layer_k_head_dim"] = "8"
+        with self.assertRaisesRegex(RuntimeError, "per-layer KV dimensions must be lists"):
+            build_ir_v8._materialize_compact_kv_layout(malformed_dimensions)
 
     def test_chunked_prefill_codegen_preserves_absolute_position(self) -> None:
         emitted = codegen_prefill_v8.emit_prefill_function(
