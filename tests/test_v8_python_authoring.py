@@ -113,10 +113,7 @@ class V8PythonAuthoringTests(unittest.TestCase):
         self.assertFalse(hasattr(cke.models, "rwkv"))
 
     def test_notebook_and_ci_companion_use_the_same_v8_adapter(self) -> None:
-        notebook_path = (
-            ROOT / "docs" / "notebooks" / "python_authoring" / "v8_training"
-            / "01_v8_generated_training_quickstart.ipynb"
-        )
+        notebook_path = ROOT / "version" / "v8" / "notebooks" / "01_generated_training_quickstart.ipynb"
         notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
         source = "\n".join(
             "".join(cell.get("source", [])) for cell in notebook.get("cells", [])
@@ -133,6 +130,12 @@ class V8PythonAuthoringTests(unittest.TestCase):
         makefile = (ROOT / "Makefile").read_text()
         self.assertIn("v8-training-python-authoring-smoke:", makefile)
         self.assertIn("version/v8/examples/python_authoring_tiny_lm_v8.py", makefile)
+
+        runbook = (ROOT / "docs" / "site" / "_pages" / "v8-runbook.html").read_text()
+        self.assertIn("id=\"python-training-authoring\"", runbook)
+        self.assertIn("v8-training-python-authoring-smoke", runbook)
+        self.assertIn("version/v8/notebooks/01_generated_training_quickstart.ipynb", runbook)
+        self.assertIn("RWKV is outside this workstream", runbook)
 
 
 if __name__ == "__main__":
