@@ -13,10 +13,19 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "version" / "v8" / "scripts" / "run_training_workflow_v8.py"
+VISUALIZER = ROOT / "version" / "v8" / "tools" / "open_ir_visualizer_v8.py"
 
 
 def _load():
     spec = importlib.util.spec_from_file_location("run_training_workflow_v8_test", SCRIPT)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_visualizer():
+    spec = importlib.util.spec_from_file_location("open_ir_visualizer_v8_training_test", VISUALIZER)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -113,6 +122,44 @@ class V8TrainingWorkflowTests(unittest.TestCase):
         self.assertIn("generated_c_tokens_per_second", source)
         self.assertIn("generation_tokens_match", source)
         self.assertNotIn('"start_microstep": int(', source)
+
+    def test_training_manifest_detects_hash_missing_and_run_identity_failures(self) -> None:
+        visualizer = _load_visualizer()
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            identity = {
+                "run_id": "run-1", "case_id": "case-1", "repository_commit": "a" * 40,
+                "training_config_sha256": "b" * 64, "corpus_spec_sha256": "c" * 64,
+                "train_token_ids_sha256": "d" * 64,
+            }
+            artifact = root / "parity.json"
+            artifact.write_text(json.dumps({"experiment_identity": identity, "steps": []}) + "\n")
+            manifest = {
+                "schema": "cke.v8.training_experiment_manifest.v1", "identity": identity,
+                "verdict": {"status": "PASS", "passed": True},
+                "artifacts": [{
+                    "role": "pytorch_parity", "path": artifact.name, "required": True,
+                    "sha256": self.workflow._sha256(artifact),
+                }],
+            }
+            manifest_path = root / "training_experiment_manifest.json"
+            manifest_path.write_text(json.dumps(manifest) + "\n")
+            result = visualizer.validate_training_experiment_manifest(manifest, manifest_path)
+            self.assertEqual(result["status"], "MATCHED")
+            self.assertEqual(result["certification_status"], "PASS")
+
+            artifact.write_text(json.dumps({
+                "experiment_identity": {**identity, "run_id": "wrong-run"}, "steps": [],
+            }) + "\n")
+            manifest["artifacts"][0]["sha256"] = self.workflow._sha256(artifact)
+            mismatch = visualizer.validate_training_experiment_manifest(manifest, manifest_path)
+            self.assertEqual(mismatch["status"], "MISMATCH")
+            self.assertTrue(any(row["reason"] == "artifact_identity" for row in mismatch["failures"]))
+
+            artifact.unlink()
+            missing = visualizer.validate_training_experiment_manifest(manifest, manifest_path)
+            self.assertEqual(missing["status"], "MISMATCH")
+            self.assertTrue(any(row.get("status") == "MISSING" for row in missing["failures"]))
 
     def test_v8_runbook_exposes_bounded_training_workflow(self) -> None:
         required = (

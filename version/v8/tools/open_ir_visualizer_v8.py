@@ -62,6 +62,61 @@ def _sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
+def validate_training_experiment_manifest(manifest: Any, manifest_path: Path) -> dict[str, Any]:
+    """Validate the identity-bound training artifact set without changing it."""
+    failures: list[dict[str, Any]] = []
+    if not isinstance(manifest, dict):
+        return {"status": "MISMATCH", "passed": False, "failures": [{"reason": "manifest_not_object"}]}
+    if manifest.get("schema") != "cke.v8.training_experiment_manifest.v1":
+        failures.append({"reason": "schema", "observed": manifest.get("schema")})
+    identity = manifest.get("identity") if isinstance(manifest.get("identity"), dict) else {}
+    for key in ("run_id", "case_id", "repository_commit", "training_config_sha256",
+                "corpus_spec_sha256", "train_token_ids_sha256"):
+        if not identity.get(key):
+            failures.append({"reason": "missing_identity", "field": key})
+    artifact_rows = manifest.get("artifacts") if isinstance(manifest.get("artifacts"), list) else []
+    checked = []
+    for row in artifact_rows:
+        if not isinstance(row, dict):
+            failures.append({"reason": "malformed_artifact"})
+            continue
+        raw_path = row.get("path")
+        path = Path(str(raw_path)).expanduser() if raw_path else Path()
+        if raw_path and not path.is_absolute():
+            path = manifest_path.parent / path
+        required = row.get("required") is True
+        present = bool(raw_path and path.is_file())
+        observed_sha = _sha256_file(path) if present else None
+        expected_sha = row.get("sha256")
+        status = "MATCHED" if present and expected_sha and observed_sha == expected_sha else "MISSING" if not present else "MISMATCH"
+        if status == "MATCHED" and path.suffix == ".json":
+            try:
+                child = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeError, json.JSONDecodeError):
+                child = None
+            child_identity = child.get("experiment_identity") if isinstance(child, dict) else None
+            if isinstance(child_identity, dict):
+                for key in ("run_id", "case_id", "training_config_sha256", "train_token_ids_sha256"):
+                    if child_identity.get(key) != identity.get(key):
+                        status = "MISMATCH"
+                        failures.append({"reason": "artifact_identity", "role": row.get("role"), "field": key})
+                        break
+        checked.append({**row, "resolved_path": str(path) if raw_path else None,
+                        "observed_sha256": observed_sha, "validation_status": status})
+        if required and status != "MATCHED":
+            failures.append({"reason": "required_artifact", "role": row.get("role"), "status": status})
+        elif present and expected_sha and observed_sha != expected_sha:
+            failures.append({"reason": "artifact_hash", "role": row.get("role"), "status": status})
+    verdict = manifest.get("verdict") if isinstance(manifest.get("verdict"), dict) else {}
+    status = "MISMATCH" if failures else "MATCHED"
+    return {
+        "status": status, "passed": not failures, "failures": failures,
+        "checked_artifacts": checked, "artifact_count": len(checked),
+        "certification_status": verdict.get("status", "MISSING"),
+        "certification_passed": verdict.get("passed") is True,
+    }
+
+
 def _read_os_release() -> dict[str, str]:
     path = Path("/etc/os-release")
     if not path.exists():
@@ -3829,6 +3884,8 @@ def load_model_data(
         "training_canary_summary",
         "training_step_profile",
         "training_checkpoint_policy",
+        "training_experiment_manifest",
+        "training_batch_preview",
         "training_pipeline",
         "corpus_sampling_log",
         "training_logbook",
@@ -3965,6 +4022,8 @@ def load_model_data(
         "training_canary_summary": model_candidates("training_canary_summary.json"),
         "training_step_profile": model_candidates("training_step_profile.json") + model_candidates("training_step_profile_latest.json") + [V8_REPORT_PATH / "training_step_profile_latest.json", V8_REPORT_PATH_LEGACY / "training_step_profile_latest.json"],
         "training_checkpoint_policy": model_candidates("training_checkpoint_policy.json") + model_candidates("training_checkpoint_policy_latest.json") + [V8_REPORT_PATH / "training_checkpoint_policy_latest.json", V8_REPORT_PATH_LEGACY / "training_checkpoint_policy_latest.json"],
+        "training_experiment_manifest": model_candidates("training_experiment_manifest.json"),
+        "training_batch_preview": model_candidates("training_batch_preview.json"),
         "training_pipeline": model_candidates("training_pipeline_latest.json") + model_candidates("training_pipeline.json") + [V8_REPORT_PATH / "training_pipeline_latest.json", V8_REPORT_PATH_LEGACY / "training_pipeline_latest.json"],
         "training_plan": model_candidates("training_plan.json") + [V8_REPORT_PATH / "training_plan.json", V8_REPORT_PATH_LEGACY / "training_plan.json"],
         "run_ledger": model_candidates("run_ledger.jsonl"),
@@ -4183,6 +4242,13 @@ def load_model_data(
                 missing_required.append(key)
             else:
                 missing_optional.append(key)
+
+    manifest_payload = data["files"].get("training_experiment_manifest")
+    manifest_loaded_path = loaded_paths.get("training_experiment_manifest")
+    if isinstance(manifest_payload, dict) and manifest_loaded_path:
+        manifest_payload["validation"] = validate_training_experiment_manifest(
+            manifest_payload, Path(manifest_loaded_path),
+        )
 
     analysis_roots = list(search_roots)
     if not strict_run_scope:
@@ -5105,6 +5171,8 @@ def serve_live(run_dir: Path, html_path: Path, port: int = 7700, interval_ms: in
     import mimetypes
 
     LIVE_FILES = [
+        "training_experiment_manifest.json",
+        "training_batch_preview.json",
         "training_pipeline_latest.json",
         "training_loss_curve_latest.json",
         "training_grad_norms_latest.json",

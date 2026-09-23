@@ -191,6 +191,50 @@ class V8PythonAuthoringTests(unittest.TestCase):
                 experiment.run()
             self.assertFalse(stale.exists())
 
+    def test_historical_inspection_is_read_only_and_identity_bound(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            experiment = cke.v8.compile(_model(), run_name="historical", run_dir=Path(td))
+            preflight = experiment.preflight()
+            experiment_sha = preflight["experiment_sha256"]
+            command = experiment.command(invocation_id="historical-run", experiment_sha256=experiment_sha)
+            report = _passing_report(command)
+            experiment.report_path.write_text(json.dumps(report) + "\n")
+            identity = {
+                "run_id": report["matrix_identity"]["run_id"],
+                "case_id": report["matrix_identity"]["case_id"],
+                "repository_commit": report["execution"]["git_commit"],
+                "training_config_sha256": report["configuration"]["training_config_sha256"],
+                "corpus_spec_sha256": report["corpus"]["spec_sha256"],
+                "train_token_ids_sha256": "tokens-1",
+                "python_experiment_sha256": hashlib.sha256(experiment.experiment_path.read_bytes()).hexdigest(),
+            }
+            report["corpus"]["splits"] = {"train": {"token_ids_sha256": "tokens-1"}}
+            experiment.report_path.write_text(json.dumps(report) + "\n")
+            manifest = {
+                "schema": "cke.v8.training_experiment_manifest.v1", "identity": identity,
+                "verdict": {"status": "PASS", "passed": True},
+                "artifacts": [{
+                    "role": "authored_experiment", "path": experiment.experiment_path.name,
+                    "required": True,
+                    "sha256": hashlib.sha256(experiment.experiment_path.read_bytes()).hexdigest(),
+                }],
+            }
+            experiment.manifest_path.write_text(json.dumps(manifest) + "\n")
+            before = {path: path.read_bytes() for path in (
+                experiment.experiment_path, experiment.preflight_path,
+                experiment.report_path, experiment.manifest_path,
+            )}
+            inspection = experiment.inspect_existing()
+            self.assertEqual(inspection["status"], "MATCHED")
+            self.assertTrue(inspection["read_only"])
+            self.assertEqual(before, {path: path.read_bytes() for path in before})
+
+            report["matrix_identity"]["run_id"] = "different-run"
+            experiment.report_path.write_text(json.dumps(report) + "\n")
+            mismatch = experiment.inspect_existing()
+            self.assertEqual(mismatch["status"], "MISMATCH")
+            self.assertIn("identity.run_id", mismatch["failures"])
+
     def test_malformed_stale_and_mismatched_reports_fail_closed(self) -> None:
         def runner(mode: str):
             def write_report(command, _cwd) -> None:
@@ -249,6 +293,9 @@ class V8PythonAuthoringTests(unittest.TestCase):
         self.assertIn("Open the interactive training IR visualizer", source)
         self.assertIn("tokenizer_roundtrip.json", source)
         self.assertIn("fresh identity-bound execution", source)
+        self.assertIn("experiment.inspect_existing()", source)
+        self.assertIn("READ-ONLY historical inspection", source)
+        self.assertIn("experiment.manifest_path", source)
 
         example = (ROOT / "version" / "v8" / "examples" / "python_authoring_tiny_lm_v8.py").read_text()
         self.assertIn("cke.v8.compile", example)
