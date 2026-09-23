@@ -1097,6 +1097,49 @@ static inline void ck_gemm_nt_f32_llama_production_outputs4_avx2(
 }
 #endif
 
+#if defined(__AVX512F__)
+/* Reuse each activation vector across independent contraction outputs. */
+static inline void ck_gemm_nt_f32_llama_production_outputs4_avx512(
+        const float *A, const float *B, const float *bias, float *C,
+        int N, int K, int row, int col)
+{
+    const float *a = A + (size_t)row * (size_t)K;
+    const float *b[4] = {
+        B + (size_t)(col + 0) * (size_t)K,
+        B + (size_t)(col + 1) * (size_t)K,
+        B + (size_t)(col + 2) * (size_t)K,
+        B + (size_t)(col + 3) * (size_t)K,
+    };
+    float sum[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    int k = 0;
+
+    __m512 acc[4] = {
+        _mm512_setzero_ps(), _mm512_setzero_ps(),
+        _mm512_setzero_ps(), _mm512_setzero_ps()
+    };
+    for (; k + 16 <= K; k += 16) {
+        const __m512 av = _mm512_loadu_ps(a + k);
+        for (int output = 0; output < 4; ++output) {
+            acc[output] = _mm512_fmadd_ps(
+                av, _mm512_loadu_ps(b[output] + k), acc[output]);
+        }
+    }
+    for (int output = 0; output < 4; ++output) {
+        sum[output] = _mm512_reduce_add_ps(acc[output]);
+    }
+    for (; k < K; ++k) {
+        const float av = a[k];
+        for (int output = 0; output < 4; ++output) {
+            sum[output] += av * b[output][k];
+        }
+    }
+    for (int output = 0; output < 4; ++output) {
+        C[(size_t)row * (size_t)N + (size_t)(col + output)] =
+            bias ? sum[output] + bias[col + output] : sum[output];
+    }
+}
+#endif
+
 void gemm_nt_f32_llama_production_output_range(
         const float *A, const float *B, const float *bias, float *C,
         int M, int N, int K, int output_begin, int output_end)
@@ -1107,6 +1150,8 @@ void gemm_nt_f32_llama_production_output_range(
     if (output_end > total) output_end = total;
 #if defined(__AVX__) && !defined(__AVX512F__)
     const int grouped_reduction = K % 8 == 0;
+#elif defined(__AVX512F__)
+    const int grouped_reduction = K % 16 == 0;
 #endif
     int index = output_begin;
     while (index < output_end) {
@@ -1115,6 +1160,15 @@ void gemm_nt_f32_llama_production_output_range(
         const int col = index - row * N;
         if (grouped_reduction && M > 1 && col + 4 <= N && index + 4 <= output_end) {
             ck_gemm_nt_f32_llama_production_outputs4_avx2(
+                A, B, bias, C, N, K, row, col);
+            index += 4;
+            continue;
+        }
+#elif defined(__AVX512F__)
+        const int row = index / N;
+        const int col = index - row * N;
+        if (grouped_reduction && M > 1 && col + 4 <= N && index + 4 <= output_end) {
+            ck_gemm_nt_f32_llama_production_outputs4_avx512(
                 A, B, bias, C, N, K, row, col);
             index += 4;
             continue;
