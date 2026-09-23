@@ -772,11 +772,21 @@ def check_centered_window_stft_and_log_mel() -> None:
 def check_grouped_conv2d() -> None:
     rng = np.random.default_rng(20260829)
 
-    def run_case(channels_in: int, channels_out: int, groups: int) -> float:
-        width, height = 7, 6
-        kernel_width = kernel_height = 3
-        stride_width = stride_height = 2
-        padding_width = padding_height = 1
+    def run_case(
+        channels_in: int,
+        channels_out: int,
+        groups: int,
+        *,
+        width: int = 7,
+        height: int = 6,
+        kernel: int = 3,
+        stride: int = 2,
+        padding: int = 1,
+        with_bias: bool = True,
+    ) -> float:
+        kernel_width = kernel_height = kernel
+        stride_width = stride_height = stride
+        padding_width = padding_height = padding
         output_width = (width + 2 * padding_width - kernel_width) // stride_width + 1
         output_height = (height + 2 * padding_height - kernel_height) // stride_height + 1
         input_value = rng.normal(0.0, 0.2, (channels_in, height, width)).astype(np.float32)
@@ -784,17 +794,48 @@ def check_grouped_conv2d() -> None:
             0.0, 0.1,
             (channels_out, channels_in // groups, kernel_height, kernel_width),
         ).astype(np.float32)
-        bias = rng.normal(0.0, 0.05, channels_out).astype(np.float32)
+        bias = (rng.normal(0.0, 0.05, channels_out).astype(np.float32)
+                if with_bias else None)
+        scalar = np.empty((channels_out, output_height, output_width), dtype=np.float32)
+        serial_simd = np.empty_like(scalar)
         actual = np.empty((channels_out, output_height, output_width), dtype=np.float32)
-        assert lib.audio_conv2d_whc_grouped_f32(
-            _fptr(input_value), _fptr(weight), _fptr(bias), _fptr(actual),
-            width, height, channels_in, channels_out, kernel_width, kernel_height,
-            stride_width, stride_height, padding_width, padding_height, groups,
-            output_width, output_height,
-        ) == 0
+        original_threads = lib.ck_get_num_threads()
+        os.environ["CK_AUDIO_DISABLE_CONV2D_WIDTH_SIMD"] = "1"
+        try:
+            assert lib.audio_conv2d_whc_grouped_f32(
+                _fptr(input_value), _fptr(weight),
+                _fptr(bias) if bias is not None else None, _fptr(scalar),
+                width, height, channels_in, channels_out, kernel_width, kernel_height,
+                stride_width, stride_height, padding_width, padding_height, groups,
+                output_width, output_height,
+            ) == 0
+        finally:
+            os.environ.pop("CK_AUDIO_DISABLE_CONV2D_WIDTH_SIMD", None)
+        try:
+            lib.ck_set_num_threads(1)
+            assert lib.audio_conv2d_whc_grouped_f32(
+                _fptr(input_value), _fptr(weight),
+                _fptr(bias) if bias is not None else None, _fptr(serial_simd),
+                width, height, channels_in, channels_out, kernel_width, kernel_height,
+                stride_width, stride_height, padding_width, padding_height, groups,
+                output_width, output_height,
+            ) == 0
+            lib.ck_set_num_threads(max(2, original_threads))
+            assert lib.audio_conv2d_whc_grouped_f32(
+                _fptr(input_value), _fptr(weight),
+                _fptr(bias) if bias is not None else None, _fptr(actual),
+                width, height, channels_in, channels_out, kernel_width, kernel_height,
+                stride_width, stride_height, padding_width, padding_height, groups,
+                output_width, output_height,
+            ) == 0
+        finally:
+            lib.ck_set_num_threads(original_threads)
+        assert np.array_equal(actual.view(np.uint32), scalar.view(np.uint32))
+        assert np.array_equal(serial_simd.view(np.uint32), scalar.view(np.uint32))
         expected = F.conv2d(
             torch.from_numpy(input_value[None]), torch.from_numpy(weight),
-            torch.from_numpy(bias), stride=(stride_height, stride_width),
+            torch.from_numpy(bias) if bias is not None else None,
+            stride=(stride_height, stride_width),
             padding=(padding_height, padding_width), groups=groups,
         ).numpy()[0]
         difference = np.abs(actual - expected)
@@ -804,9 +845,16 @@ def check_grouped_conv2d() -> None:
 
     regular = run_case(3, 5, 1)
     depthwise = run_case(4, 4, 4)
+    pointwise_tail = run_case(
+        17, 9, 1, width=19, height=5, kernel=1, stride=1, padding=0)
+    depthwise_width = run_case(
+        8, 8, 8, width=19, height=5, kernel=3, stride=1, padding=1,
+        with_bias=False)
     print(
         "audio_grouped_conv2d "
         f"regular_max_diff={regular:.8e} depthwise_max_diff={depthwise:.8e} "
+        f"pointwise_tail_max_diff={pointwise_tail:.8e} "
+        f"depthwise_width_max_diff={depthwise_width:.8e} "
         "tol=3.0e-07 [PASS]"
     )
 

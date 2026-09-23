@@ -1402,6 +1402,7 @@ typedef struct {
     int groups;
     int output_width;
     int output_height;
+    int use_width_simd;
 } ck_audio_conv2d_whc_f32_args_t;
 
 static void ck_audio_conv2d_whc_grouped_f32_range(
@@ -1414,13 +1415,53 @@ static void ck_audio_conv2d_whc_grouped_f32_range(
     const int outputs_per_channel = args->output_width * args->output_height;
     const int input_channels_per_group = args->input_channels / args->groups;
     const int output_channels_per_group = args->output_channels / args->groups;
-    for (int index = begin; index < end; ++index) {
+    int index = begin;
+    while (index < end) {
         const int output_channel = index / outputs_per_channel;
         const int spatial = index - output_channel * outputs_per_channel;
         const int output_y = spatial / args->output_width;
         const int output_x = spatial - output_y * args->output_width;
         const int group = output_channel / output_channels_per_group;
         const int input_channel_begin = group * input_channels_per_group;
+#if defined(__AVX2__) && defined(__FMA__)
+        const int input_x_begin = output_x - args->padding_width;
+        if (args->use_width_simd && args->stride_width == 1 &&
+            output_x + 8 <= args->output_width && index + 8 <= end &&
+            input_x_begin >= 0 &&
+            input_x_begin + 7 + args->kernel_width <= args->input_width) {
+            __m256 sums = _mm256_set1_ps(
+                args->bias != NULL ? args->bias[output_channel] : 0.0f);
+            for (int input_channel_offset = 0;
+                 input_channel_offset < input_channels_per_group;
+                 ++input_channel_offset) {
+                const int input_channel =
+                    input_channel_begin + input_channel_offset;
+                for (int kernel_y = 0; kernel_y < args->kernel_height; ++kernel_y) {
+                    const int input_y =
+                        output_y * args->stride_height + kernel_y -
+                        args->padding_height;
+                    if (input_y < 0 || input_y >= args->input_height) {
+                        continue;
+                    }
+                    for (int kernel_x = 0; kernel_x < args->kernel_width; ++kernel_x) {
+                        const size_t input_index =
+                            ((size_t)input_channel * args->input_height + input_y) *
+                            args->input_width + input_x_begin + kernel_x;
+                        const size_t weight_index =
+                            (((size_t)output_channel * input_channels_per_group +
+                              input_channel_offset) * args->kernel_height + kernel_y) *
+                            args->kernel_width + kernel_x;
+                        sums = _mm256_fmadd_ps(
+                            _mm256_loadu_ps(args->input + input_index),
+                            _mm256_set1_ps(args->weight[weight_index]), sums);
+                    }
+                }
+            }
+            _mm256_storeu_ps(args->output + index, sums);
+            index += 8;
+            continue;
+        }
+#endif
         float sum = args->bias != NULL ? args->bias[output_channel] : 0.0f;
         for (int input_channel_offset = 0;
              input_channel_offset < input_channels_per_group;
@@ -1450,6 +1491,7 @@ static void ck_audio_conv2d_whc_grouped_f32_range(
             }
         }
         args->output[index] = sum;
+        ++index;
     }
 }
 
@@ -1508,7 +1550,13 @@ int audio_conv2d_whc_grouped_f32(
         .groups = groups,
         .output_width = output_width,
         .output_height = output_height,
+        .use_width_simd = 1,
     };
+    const char *disable_width_simd = getenv("CK_AUDIO_DISABLE_CONV2D_WIDTH_SIMD");
+    if (disable_width_simd != NULL && disable_width_simd[0] != '\0' &&
+        strcmp(disable_width_simd, "0") != 0) {
+        args.use_width_simd = 0;
+    }
     const int output_elements = output_channels * output_height * output_width;
     ck_threadpool_t *pool = ck_threadpool_global();
     int active = pool ? ck_threadpool_n_threads(pool) : 1;
