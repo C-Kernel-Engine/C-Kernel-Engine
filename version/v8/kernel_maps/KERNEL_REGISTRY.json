@@ -12234,7 +12234,7 @@
       "id": "audio_conformer_relative_attention_f32",
       "op": "audio_relative_attention",
       "operation_interface": "audio_attention.transformer_xl_relative.full.fp32.v1",
-      "variant": "token_major_transformer_xl_relative_head_parallel_fp32",
+      "variant": "token_major_transformer_xl_relative_row_parallel_fp32",
       "selection": {
         "status": "candidate",
         "priority": 100,
@@ -12354,7 +12354,7 @@
           "size_resolution": "required",
           "lifetime": "kernel_call",
           "alignment": 64,
-          "layout": "head_major_key_contiguous",
+          "layout": "worker_major_key_contiguous",
           "access": "read_write",
           "storage_class": "scratch",
           "consumption": "required"
@@ -12392,7 +12392,8 @@
             "threading": {
               "runtime": "ck_threadpool",
               "work_partition": [
-                "independent_heads"
+                "independent_heads",
+                "independent_rows"
               ],
               "dispatch": [
                 "ck_threadpool_parallel_for_n",
@@ -12500,7 +12501,7 @@
         ],
         "oracle": "Transformers ParakeetConformerSelfAttention eager FP32 CPU"
       },
-      "notes": "Uses one caller-owned T-element score row per head so head workers never share mutable scratch; it does not materialize a T-by-T score matrix.",
+      "notes": "Requires at least one caller-owned T-element score row per head for compatibility and uses additional rows, when supplied, as private worker scratch. Independent head/query rows are dynamically claimed without splitting their key or value reductions; it does not materialize a T-by-T score matrix.",
       "name": "audio_conformer_relative_attention_f32",
       "_source_file": "audio_conformer_relative_attention_f32.json"
     },

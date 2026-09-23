@@ -1218,8 +1218,10 @@ def check_conformer_relative_attention() -> None:
     expected = (probability @ v).permute(1, 0, 2).reshape(frames, channels).numpy()
 
     actual = np.empty_like(query)
+    row_parallel = np.empty_like(query)
     serial = np.empty_like(query)
     scratch = np.empty((heads, frames), dtype=np.float32)
+    row_scratch = np.empty((64, frames), dtype=np.float32)
     original_threads = lib.ck_get_num_threads()
     lib.ck_set_num_threads(1)
     assert lib.audio_conformer_relative_attention_f32(
@@ -1233,8 +1235,14 @@ def check_conformer_relative_attention() -> None:
         _fptr(bias_u), _fptr(bias_v), _fptr(actual), frames, heads,
         head_dim, float(scale), _fptr(scratch), scratch.nbytes,
     ) == 0
+    assert lib.audio_conformer_relative_attention_f32(
+        _fptr(query), _fptr(key), _fptr(value), _fptr(relative),
+        _fptr(bias_u), _fptr(bias_v), _fptr(row_parallel), frames, heads,
+        head_dim, float(scale), _fptr(row_scratch), row_scratch.nbytes,
+    ) == 0
     lib.ck_set_num_threads(original_threads)
     assert np.array_equal(actual, serial)
+    assert np.array_equal(row_parallel, serial)
     maximum = float(np.max(np.abs(actual - expected)))
     rmse = float(np.sqrt(np.mean((actual - expected) ** 2)))
     assert maximum <= 1.5e-7, maximum
@@ -1248,6 +1256,11 @@ def check_conformer_relative_attention() -> None:
         _fptr(query), _fptr(key), _fptr(value), _fptr(relative),
         _fptr(bias_u), _fptr(bias_v), _fptr(actual), 2**30 + 1, heads,
         head_dim, float(scale), _fptr(scratch), scratch.nbytes,
+    ) == -2
+    assert lib.audio_conformer_relative_attention_f32(
+        _fptr(query), _fptr(key), _fptr(value), _fptr(relative),
+        _fptr(bias_u), _fptr(bias_v), _fptr(actual), 2**30, 3,
+        1, 1.0, _fptr(scratch), scratch.nbytes,
     ) == -2
     print(
         "audio_conformer_relative_attention "
