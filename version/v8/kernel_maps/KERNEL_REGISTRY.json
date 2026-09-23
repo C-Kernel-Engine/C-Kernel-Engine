@@ -12987,7 +12987,7 @@
           "function": "audio_conv2d_whc_grouped_f32",
           "explicit_selector": true,
           "implementation": {
-            "isa_dispatch": "scalar",
+            "isa_dispatch": "compile_time",
             "threading": {
               "runtime": "ck_threadpool",
               "work_partition": [
@@ -13100,7 +13100,8 @@
       "tests": {
         "unit": [
           "unittest/test_audio_encoder.py"
-        ]
+        ],
+        "oracle": "torch.nn.functional.conv2d groups parameter FP32 CPU"
       },
       "name": "audio_conv2d_whc_grouped_f32",
       "_source_file": "audio_conv2d_whc_grouped_f32.json"

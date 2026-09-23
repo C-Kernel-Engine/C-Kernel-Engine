@@ -24,7 +24,7 @@
     "phases": ["prefill"],
     "function": "audio_conv2d_whc_grouped_f32",
     "explicit_selector": true,
-    "implementation": {"isa_dispatch": "scalar", "threading": {"runtime": "ck_threadpool", "work_partition": ["output_tiles"], "dispatch": ["ck_threadpool_parallel_for_n"], "reduction_order_effect": "none"}},
+    "implementation": {"isa_dispatch": "compile_time", "threading": {"runtime": "ck_threadpool", "work_partition": ["output_tiles"], "dispatch": ["ck_threadpool_parallel_for_n"], "reduction_order_effect": "none"}},
     "arithmetic": {"partial_accumulator": "fp32", "merge_order": "none", "deterministic": true, "thread_count_changes_arithmetic_order": false, "split_strategy": "independent_outputs"}
   }],
   "call_abi": {"version": 1, "params": [
@@ -46,5 +46,5 @@
     {"name": "output_width", "source": "dim:output_width"},
     {"name": "output_height", "source": "dim:output_height"}
   ]},
-  "tests": {"unit": ["unittest/test_audio_encoder.py"]}
+  "tests": {"unit": ["unittest/test_audio_encoder.py"], "oracle": "torch.nn.functional.conv2d groups parameter FP32 CPU"}
 }
