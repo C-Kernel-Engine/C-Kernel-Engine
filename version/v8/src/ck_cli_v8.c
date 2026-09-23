@@ -2932,13 +2932,18 @@ static int run_bridge_report_with_prefix(
 
     int forward_rc = -1;
     if (before_count > 0) {
-        if (spec.has_prefix_grid && api->forward_segments_grid_ex) {
-            int prefix_text_pos = spec.has_prefix_text_pos ? spec.prefix_text_pos : (before_count + prefix_tokens);
+        if (api->forward_segments_grid_ex) {
+            const int grid_x = spec.has_prefix_grid ? spec.prefix_grid_x : 0;
+            const int grid_y = spec.has_prefix_grid ? spec.prefix_grid_y : 0;
+            const int prefix_extent = spec.has_prefix_grid
+                ? (grid_x > grid_y ? grid_x : grid_y) : prefix_tokens;
+            int prefix_text_pos = spec.has_prefix_text_pos
+                ? spec.prefix_text_pos : (before_count + prefix_extent);
             if (opt->verbose) {
                 fprintf(stderr,
-                        "[DEBUG] Running ck_model_forward_segments_grid_ex with before=%d prefix_tokens=%d embed_dim=%d grid=%dx%d text_pos=%d after=%d\n",
-                        before_count, prefix_tokens, prefix_embed_dim,
-                        spec.prefix_grid_x, spec.prefix_grid_y, prefix_text_pos, after_count);
+                    "[DEBUG] Running ck_model_forward_segments_grid_ex with before=%d prefix_tokens=%d embed_dim=%d grid=%dx%d text_pos=%d after=%d\n",
+                    before_count, prefix_tokens, prefix_embed_dim,
+                    grid_x, grid_y, prefix_text_pos, after_count);
             }
             forward_rc = api->forward_segments_grid_ex(
                 spec.prompt_tokens_before_image,
@@ -2946,8 +2951,8 @@ static int run_bridge_report_with_prefix(
                 prefix_embeddings,
                 prefix_tokens,
                 prefix_embed_dim,
-                spec.prefix_grid_x,
-                spec.prefix_grid_y,
+                grid_x,
+                grid_y,
                 prefix_text_pos,
                 spec.prompt_tokens_after_image,
                 after_count,

@@ -1876,6 +1876,56 @@ class V8NativeBridgeHostTests(unittest.TestCase):
             self.assertEqual(token_trace_path.stat().st_mode & 0o777, 0o600)
             self.assertFalse(list(tmp.glob("native_token_trace.json.tmp.*")))
 
+    def test_ck_cli_v8_replays_gridless_segmented_bridge_report(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="v8_gridless_segmented_cli_") as tmpdir:
+            tmp = Path(tmpdir)
+            so_path, bump_path, manifest_map = _build_tiny_decoder_runtime(tmp)
+            prefix_path = tmp / "prefix.f32"
+            prefix_path.write_bytes(array("f", [0.0] * (3 * 32)).tobytes())
+            report_path = tmp / "bridge_report.json"
+
+            for grid_x, grid_y, text_pos in ((None, None, None), (None, None, 9), (3, 1, None)):
+                with self.subTest(grid_x=grid_x, grid_y=grid_y, text_pos=text_pos):
+                    report_path.write_text(
+                        json.dumps(
+                            {
+                                "prefix_dump_path": str(prefix_path),
+                                "prefix_embed_dim": 32,
+                                "prompt_tokens_before_image": [1, 2],
+                                "prompt_tokens_after_image": [3, 4],
+                                "stop_token_ids": [],
+                                "prefix_grid_x": grid_x,
+                                "prefix_grid_y": grid_y,
+                                "prefix_text_pos": text_pos,
+                                "multimodal_prompt_segmented": True,
+                            }
+                        ),
+                        encoding="utf-8",
+                    )
+                    result = subprocess.run(
+                        [
+                            str(CK_CLI_V8),
+                            "--lib", str(so_path),
+                            "--weights", str(bump_path),
+                            "--manifest", str(manifest_map),
+                            "--bridge-report", str(report_path),
+                            "--max-tokens", "1",
+                            "--quiet-output",
+                            "--no-timing",
+                            "--verbose",
+                        ],
+                        cwd=str(ROOT),
+                        capture_output=True,
+                        text=True,
+                    )
+                    combined = result.stdout + result.stderr
+                    self.assertEqual(result.returncode, 0, msg=combined)
+                    expected_grid = f"{grid_x}x{grid_y}" if grid_x is not None else "0x0"
+                    self.assertIn(
+                        f"before=2 prefix_tokens=3 embed_dim=32 grid={expected_grid} text_pos={text_pos or 5} after=2",
+                        combined,
+                    )
+
     def test_ck_cli_v8_bridge_report_decodes_output_from_vocab_tables_without_tokenizer(self) -> None:
         with tempfile.TemporaryDirectory(prefix="v8_native_bridge_report_vocab_cli_") as tmpdir:
             tmp = Path(tmpdir)

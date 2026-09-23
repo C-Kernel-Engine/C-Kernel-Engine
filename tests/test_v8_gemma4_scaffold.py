@@ -36,7 +36,7 @@ from build_ir_v8 import (  # type: ignore
 
 
 class Gemma3RopeMetadataTests(unittest.TestCase):
-    def test_gemma3_selects_existing_matched_norm_providers(self):
+    def test_gemma3_and_gemma4_select_ggml_geglu_contract(self):
         gemma3 = _load_builtin_template_doc("gemma3")
         self.assertEqual(gemma3["kernels"]["attn_norm"], "rmsnorm_forward_llama_production")
         self.assertEqual(gemma3["kernels"]["qk_norm"], "qk_norm_forward_llama_production")
@@ -51,10 +51,7 @@ class Gemma3RopeMetadataTests(unittest.TestCase):
         gemma4 = _load_builtin_template_doc("gemma4")
         self.assertNotEqual(gemma4.get("kernels", {}).get("attn_norm"),
                             "rmsnorm_forward_llama_production")
-        self.assertNotEqual(
-            gemma4.get("kernels", {}).get("geglu"),
-            "geglu_forward_ggml_native",
-        )
+        self.assertEqual(gemma4["kernels"]["geglu"], "geglu_forward_ggml_native")
 
     def test_artifact_spm_algorithm_is_not_overridden_by_family(self):
         for family in ("gemma3", "gemma4", "llama"):
