@@ -35,6 +35,7 @@ struct case_spec {
     int rows;
     int outputs;
     int width;
+    bool with_bias = false;
 };
 
 static float fixture(int row, int col, float phase) {
@@ -93,6 +94,7 @@ static bool run_case(const case_spec & spec) {
     std::vector<float> ck_ranges(ck.size(), 0.0f);
     std::vector<float> ck_parallel(ck.size(), 0.0f);
     std::vector<float> llama(ck.size(), 0.0f);
+    std::vector<float> bias(spec.outputs, 0.0f);
     for (int row = 0; row < spec.rows; ++row) {
         for (int col = 0; col < spec.width; ++col) {
             input[static_cast<size_t>(row) * spec.width + col] =
@@ -100,24 +102,41 @@ static bool run_case(const case_spec & spec) {
         }
     }
     for (int row = 0; row < spec.outputs; ++row) {
+        bias[row] = fixture(row, 0, 0.41f) * 0.019f;
         for (int col = 0; col < spec.width; ++col) {
             weight[static_cast<size_t>(row) * spec.width + col] =
                     fixture(row, col, -0.23f) * 0.071f;
         }
     }
+    const float * bias_data = spec.with_bias ? bias.data() : nullptr;
     gemm_nt_f32_llama_production(
-            input.data(), weight.data(), nullptr, ck.data(),
+            input.data(), weight.data(), bias_data, ck.data(),
             spec.rows, spec.outputs, spec.width);
     gemm_nt_f32_llama_production_parallel_dispatch(
-            input.data(), weight.data(), nullptr, ck_parallel.data(),
+            input.data(), weight.data(), bias_data, ck_parallel.data(),
             spec.rows, spec.outputs, spec.width);
     const int total = spec.rows * spec.outputs;
     const int chunk = std::max(1, (total + 6) / 7);
     for (int begin = 0; begin < total; begin += chunk) {
         gemm_nt_f32_llama_production_output_range(
-                input.data(), weight.data(), nullptr, ck_ranges.data(),
+                input.data(), weight.data(), bias_data, ck_ranges.data(),
                 spec.rows, spec.outputs, spec.width,
                 begin, std::min(begin + chunk, total));
+    }
+    for (size_t i = 0; i < ck.size(); ++i) {
+        if (std::memcmp(&ck[i], &ck_ranges[i], sizeof(float)) != 0) {
+            std::fprintf(stderr, "%s: output-range mismatch at %zu\n", spec.name, i);
+            return false;
+        }
+        if (std::memcmp(&ck[i], &ck_parallel[i], sizeof(float)) != 0) {
+            std::fprintf(stderr, "%s: parallel-dispatch mismatch at %zu\n", spec.name, i);
+            return false;
+        }
+    }
+    if (spec.with_bias) {
+        std::printf("%-24s internal_serial_range_parallel=bit_exact [PASS]\n",
+                spec.name);
+        return true;
     }
     if (!llama_matmul(input, weight, llama, spec)) {
         std::fprintf(stderr, "%s: llama.cpp graph execution failed\n", spec.name);
@@ -127,14 +146,6 @@ static bool run_case(const case_spec & spec) {
     float max_abs = 0.0f;
     for (size_t i = 0; i < ck.size(); ++i) {
         different += std::memcmp(&ck[i], &llama[i], sizeof(float)) != 0;
-        if (std::memcmp(&ck[i], &ck_ranges[i], sizeof(float)) != 0) {
-            std::fprintf(stderr, "%s: output-range mismatch at %zu\n", spec.name, i);
-            return false;
-        }
-        if (std::memcmp(&ck[i], &ck_parallel[i], sizeof(float)) != 0) {
-            std::fprintf(stderr, "%s: parallel-dispatch mismatch at %zu\n", spec.name, i);
-            return false;
-        }
         max_abs = std::max(max_abs, std::fabs(ck[i] - llama[i]));
     }
     std::printf("%-24s different=%zu/%zu max_abs=%.9g [%s]\n",
@@ -155,6 +166,8 @@ int main() {
         {"prefill_four", 4, 48, 5120},
         {"prefill_chunk_tail", 65, 48, 5120},
         {"qwen35_router_chunk", 65, 256, 2048},
+        {"prefill_output_tail_bias", 7, 127, 128, true},
+        {"prefill_reduction_tail_bias", 7, 127, 130, true},
         {"audio_ffn_up", 9, 5120, 1280},
         {"audio_ffn_down", 9, 1280, 5120},
     };
