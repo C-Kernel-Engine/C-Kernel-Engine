@@ -943,10 +943,13 @@ void gemm_blocked_serial(const float *A,
  * FP32 provider for llama.cpp's production CPU graph.
  *
  * Multi-token F32 x F32 matmuls are accepted by llamafile_sgemm and accumulate
- * each dot product in one native-width vector.  A one-token matvec is rejected
- * by that path and falls back to ggml_vec_dot_f32, which uses four independent
- * vector accumulators before a fixed pairwise merge.  The distinction is
- * observable for Qwen3.5/3.6's narrow recurrent alpha/beta projections.
+ * each dot product in one native-width vector.  On AVX2, CKE may evaluate four
+ * outputs together to reuse activation loads, while retaining one independent
+ * vector accumulator and the same reduction sequence for every output.  A one-token
+ * matvec is rejected by that path and falls back to ggml_vec_dot_f32, which
+ * uses four independent vector accumulators before a fixed pairwise merge.
+ * The distinction is observable for Qwen3.5/3.6's narrow recurrent alpha/beta
+ * projections.
  *
  * Outputs are independent, so OpenMP changes ownership only, never arithmetic.
  */
@@ -1046,6 +1049,54 @@ static inline void ck_gemm_nt_f32_llama_production_output(
         bias ? sum + bias[col] : sum;
 }
 
+#if defined(__AVX__) && !defined(__AVX512F__)
+static inline void ck_gemm_nt_f32_llama_production_outputs4_avx2(
+        const float *A, const float *B, const float *bias, float *C,
+        int N, int K, int row, int col)
+{
+    const float *a = A + (size_t)row * (size_t)K;
+    const float *b[4] = {
+        B + (size_t)(col + 0) * (size_t)K,
+        B + (size_t)(col + 1) * (size_t)K,
+        B + (size_t)(col + 2) * (size_t)K,
+        B + (size_t)(col + 3) * (size_t)K,
+    };
+    float sum[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    int k = 0;
+
+    __m256 acc[4] = {
+        _mm256_setzero_ps(), _mm256_setzero_ps(),
+        _mm256_setzero_ps(), _mm256_setzero_ps()
+    };
+    for (; k + 8 <= K; k += 8) {
+        const __m256 av = _mm256_loadu_ps(a + k);
+        for (int output = 0; output < 4; ++output) {
+#if defined(__FMA__)
+            acc[output] = _mm256_fmadd_ps(
+                av, _mm256_loadu_ps(b[output] + k), acc[output]);
+#else
+            acc[output] = _mm256_add_ps(
+                acc[output], _mm256_mul_ps(
+                    av, _mm256_loadu_ps(b[output] + k)));
+#endif
+        }
+    }
+    for (int output = 0; output < 4; ++output) {
+        sum[output] = ck_hsum256_llamafile(acc[output]);
+    }
+    for (; k < K; ++k) {
+        const float av = a[k];
+        for (int output = 0; output < 4; ++output) {
+            sum[output] += av * b[output][k];
+        }
+    }
+    for (int output = 0; output < 4; ++output) {
+        C[(size_t)row * (size_t)N + (size_t)(col + output)] =
+            bias ? sum[output] + bias[col + output] : sum[output];
+    }
+}
+#endif
+
 void gemm_nt_f32_llama_production_output_range(
         const float *A, const float *B, const float *bias, float *C,
         int M, int N, int K, int output_begin, int output_end)
@@ -1054,8 +1105,23 @@ void gemm_nt_f32_llama_production_output_range(
     const int total = M * N;
     if (output_begin < 0) output_begin = 0;
     if (output_end > total) output_end = total;
-    for (int index = output_begin; index < output_end; ++index) {
+#if defined(__AVX__) && !defined(__AVX512F__)
+    const int grouped_reduction = K % 8 == 0;
+#endif
+    int index = output_begin;
+    while (index < output_end) {
+#if defined(__AVX__) && !defined(__AVX512F__)
+        const int row = index / N;
+        const int col = index - row * N;
+        if (grouped_reduction && M > 1 && col + 4 <= N && index + 4 <= output_end) {
+            ck_gemm_nt_f32_llama_production_outputs4_avx2(
+                A, B, bias, C, N, K, row, col);
+            index += 4;
+            continue;
+        }
+#endif
         ck_gemm_nt_f32_llama_production_output(A, B, bias, C, M, N, K, index);
+        ++index;
     }
 }
 
