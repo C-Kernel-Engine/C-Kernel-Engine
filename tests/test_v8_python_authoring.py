@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import hashlib
+import math
+import os
 import subprocess
 import sys
 import tempfile
@@ -19,8 +22,43 @@ import ckernel_engine as cke  # noqa: E402
 def _model(*, layers: int = 4, vocab: int = 384):
     return cke.models.qwen3_tiny(
         vocab=vocab, dim=32, layers=layers, hidden=64, heads=4, kv_heads=2,
-        context_len=32, dtype="float32", name="v8_python_authoring_test",
+        context_len=32, init="normal_0p02", dtype="float32", name="v8_python_authoring_test",
     )
+
+
+def _arg(command: list[str], name: str) -> str:
+    return command[command.index(name) + 1]
+
+
+def _passing_report(command: list[str]) -> dict:
+    configuration = {
+        "architecture": "qwen3_style_dense_reduced", "dtype": "fp32",
+        "layers": int(_arg(command, "--layers")), "d_model": int(_arg(command, "--d-model")),
+        "hidden": int(_arg(command, "--hidden")), "heads": int(_arg(command, "--num-heads")),
+        "kv_heads": int(_arg(command, "--num-kv-heads")),
+        "vocab_size": int(_arg(command, "--vocab-size")), "tokenizer": _arg(command, "--tokenizer"),
+        "seq_len": int(_arg(command, "--seq-len")), "epochs": int(_arg(command, "--epochs")),
+        "grad_accum": int(_arg(command, "--grad-accum")), "optimizer": "generated_c_adamw",
+        "lr": float(_arg(command, "--lr")), "beta1": float(_arg(command, "--beta1")),
+        "beta2": float(_arg(command, "--beta2")), "eps": float(_arg(command, "--eps")),
+        "weight_decay": float(_arg(command, "--weight-decay")),
+    }
+    encoded = json.dumps(configuration, sort_keys=True, separators=(",", ":")).encode()
+    configuration["training_config_sha256"] = hashlib.sha256(encoded).hexdigest()
+    corpus_path = Path(_arg(command, "--corpus"))
+    git_commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True, capture_output=True, check=True,
+    ).stdout.strip()
+    case_id = _arg(command, "--matrix-case-id")
+    return {
+        "schema": "cke.v8.training_workflow.v1", "status": "PASS", "passed": True,
+        "matrix_identity": {
+            "run_id": _arg(command, "--matrix-run-id"), "case_id": case_id, "profile": case_id,
+            "run_dir": _arg(command, "--run-dir"), "report": _arg(command, "--json-out"),
+        },
+        "execution": {"git_commit": git_commit}, "configuration": configuration,
+        "corpus": {"spec_sha256": hashlib.sha256(corpus_path.read_bytes()).hexdigest()},
+    }
 
 
 class V8PythonAuthoringTests(unittest.TestCase):
@@ -41,12 +79,16 @@ class V8PythonAuthoringTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             experiment = cke.v8.compile(_model(), run_name="preflight-test", run_dir=Path(td))
             report = experiment.preflight()
-            self.assertTrue(report["passed"])
+            self.assertFalse(report["passed"])
+            self.assertTrue(report["candidate_inventory_complete"])
+            self.assertTrue(report["can_launch_generated_workflow"])
+            self.assertEqual(report["resolved_plan_status"], "PENDING_GENERATED_WORKFLOW")
             self.assertEqual(report["missing"], [])
             by_label = {row["label"]: row for row in report["capabilities"]}
             attention = by_label["causal GQA gradient"]["candidates"]
             self.assertTrue(any(row["provider"] == "attention_backward_causal_head_major_gqa" for row in attention))
-            self.assertTrue(all(row["tests"] for row in attention))
+            self.assertTrue(all(row["registered_tests"] for row in attention))
+            self.assertTrue(all(row["provider_selection_status"] == "CANDIDATE_NOT_RESOLVED" for row in attention))
             self.assertTrue(all("tensor_contract" in row for row in attention))
             self.assertTrue(all("saved_for_backward" in row for row in attention))
             self.assertTrue(all("implementation" in row for row in attention))
@@ -73,7 +115,7 @@ class V8PythonAuthoringTests(unittest.TestCase):
             rendered = [str(part) for part in command]
             calls.append((rendered, Path(cwd)))
             report = Path(rendered[rendered.index("--json-out") + 1])
-            report.write_text(json.dumps({"schema": "cke.v8.training_workflow.v1", "status": "PASS", "passed": True}))
+            report.write_text(json.dumps(_passing_report(rendered)))
 
         with tempfile.TemporaryDirectory() as td:
             experiment = cke.v8.compile(
@@ -84,6 +126,9 @@ class V8PythonAuthoringTests(unittest.TestCase):
             self.assertEqual(len(calls), 1)
             self.assertTrue(experiment.preflight_path.is_file())
             self.assertTrue(experiment.experiment_path.is_file())
+            preflight = json.loads(experiment.preflight_path.read_text())
+            self.assertEqual(preflight["status"], "RESOLVED_EXECUTION_PASS")
+            self.assertEqual(preflight["executed_numerical_evidence"], "PASS")
 
     def test_failed_generated_workflow_names_its_report(self) -> None:
         def failed_runner(command, _cwd) -> None:
@@ -107,6 +152,79 @@ class V8PythonAuthoringTests(unittest.TestCase):
         model.extra = cke.nn.Linear(32, 32)
         with self.assertRaisesRegex(ValueError, "currently expects"):
             cke.v8.compile(model, run_name="bad-module")
+
+    def test_unsupported_authored_semantics_fail_closed(self) -> None:
+        variants = {}
+        variants["rope_theta"] = cke.models.qwen3_tiny(
+            vocab=384, dim=32, layers=4, hidden=64, heads=4, kv_heads=2,
+            context_len=32, rope_theta=10_000.0, init="normal_0p02", dtype="float32",
+        )
+        variants["initialization"] = cke.models.qwen3_tiny(
+            vocab=384, dim=32, layers=4, hidden=64, heads=4, kv_heads=2,
+            context_len=32, init="xavier_uniform", dtype="float32",
+        )
+        for field in ("activation", "norm_epsilon", "bias", "changed_child"):
+            variants[field] = _model()
+        for block in variants["activation"].children()[1:-2]:
+            block.activation = "geglu"
+        variants["norm_epsilon"].children()[-2].eps = 1e-5
+        variants["bias"].children()[1].bias = True
+        variants["changed_child"].children()[1].attention = cke.nn.Linear(32, 32, bias=False)
+        for field, model in variants.items():
+            with self.subTest(field=field):
+                with self.assertRaisesRegex(ValueError, "cannot preserve authored semantics"):
+                    cke.v8.compile(model, run_name=f"unsupported-{field}")
+
+    def test_stale_pass_and_noop_runner_cannot_satisfy_run(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            run_dir = Path(td)
+            stale = run_dir / "training_workflow.json"
+            stale.write_text(json.dumps({"schema": "cke.v8.training_workflow.v1", "status": "PASS", "passed": True}))
+            experiment = cke.v8.compile(
+                _model(), run_name="stale-pass", run_dir=run_dir,
+                command_runner=lambda _command, _cwd: None,
+            )
+            with self.assertRaisesRegex(RuntimeError, "did not publish"):
+                experiment.run()
+            self.assertFalse(stale.exists())
+
+    def test_malformed_stale_and_mismatched_reports_fail_closed(self) -> None:
+        def runner(mode: str):
+            def write_report(command, _cwd) -> None:
+                rendered = [str(part) for part in command]
+                report_path = Path(_arg(rendered, "--json-out"))
+                if mode == "malformed":
+                    report_path.write_text("{bad")
+                    return
+                report = _passing_report(rendered)
+                if mode == "mismatched":
+                    report["matrix_identity"]["run_id"] = "old-invocation"
+                report_path.write_text(json.dumps(report))
+                if mode == "stale":
+                    os.utime(report_path, ns=(1, 1))
+            return write_report
+
+        for mode, message in (
+            ("malformed", "malformed report"),
+            ("stale", "report_stale_mtime"),
+            ("mismatched", "matrix_identity.run_id"),
+        ):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as td:
+                experiment = cke.v8.compile(
+                    _model(), run_name=f"bad-report-{mode}", run_dir=Path(td),
+                    command_runner=runner(mode),
+                )
+                with self.assertRaisesRegex(RuntimeError, message):
+                    experiment.run()
+
+    def test_training_configuration_rejects_nonfinite_values(self) -> None:
+        for kwargs in (
+            {"learning_rate": math.nan}, {"learning_rate": math.inf},
+            {"gradient_tolerance": math.nan}, {"gradient_tolerance": math.inf},
+        ):
+            with self.subTest(kwargs=kwargs):
+                with self.assertRaisesRegex(ValueError, "finite"):
+                    cke.v8.TrainingConfig(**kwargs)
 
     def test_rwkv_is_not_exposed_by_the_supported_authoring_surface(self) -> None:
         self.assertFalse(hasattr(cke.nn, "RWKV"))

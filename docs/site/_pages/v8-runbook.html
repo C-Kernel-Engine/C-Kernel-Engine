@@ -226,7 +226,7 @@ make v8-training-matrix-fp32</pre>
     </p>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
-<pre># Validate the supported Python surface and kernel-map capability preflight.
+<pre># Validate the supported Python surface and kernel-map candidate inventory.
 make v8-training-python-authoring-smoke
 
 # Inspect the same frozen-English experiment without starting training.
@@ -246,19 +246,19 @@ make v8-training-python-authoring-smoke
         <tbody>
             <tr><td><code>cke.models.qwen3_tiny(...)</code></td><td>Builds the existing <code>cke.nn</code> semantic module graph. Initial support is FP32 reduced Qwen3 dense/GQA at 4, 6, or 10 layers.</td></tr>
             <tr><td><code>cke.v8.DatasetConfig</code>, <code>TokenizerConfig</code>, <code>TrainingConfig</code></td><td>Provide one explicit experiment definition for the generated runtime, independent PyTorch oracle, reporting, and export.</td></tr>
-            <tr><td><code>experiment.preflight()</code></td><td>Resolves required forward/backward providers and their tensor, implementation, and test evidence from the canonical v8 kernel maps. Missing capabilities fail before training.</td></tr>
+            <tr><td><code>experiment.preflight()</code></td><td>Inventories candidate forward/backward maps, tensor contracts, implementations, and registered tests. It does not claim provider resolution or executed numerical evidence. Missing candidates fail before training; the generated workflow performs resolution and execution.</td></tr>
             <tr><td><code>python_training_experiment.json</code></td><td>Records the model graph, dataset hash, tokenizer policy, optimizer, tolerances, and deployment boundary.</td></tr>
-            <tr><td><code>training_capability_preflight.json</code></td><td>Records the providers and tests that support each required semantic operation. Missing saved-for-backward metadata remains explicit.</td></tr>
+            <tr><td><code>training_capability_preflight.json</code></td><td>Starts as a candidate inventory with <code>PENDING_GENERATED_WORKFLOW</code> resolution/evidence fields. A successful fresh, identity-bound workflow updates it to <code>RESOLVED_EXECUTION_PASS</code>. Registered tests and executed evidence remain separate.</td></tr>
             <tr><td><code>training_workflow.json</code>, <code>ir_report.html</code></td><td>Contain the generated execution result, PyTorch discrepancies, checkpoint/resume evidence, inference export, and interactive data/IR views.</td></tr>
         </tbody>
     </table>
     <h4>Use the notebook as an experiment controller</h4>
     <ol>
         <li>Launch Jupyter from the repository root and open the v8 notebook path shown above.</li>
-        <li>Run the model and preflight cells first. Inspect the parameter count and provider rows before allocating a training run.</li>
-        <li>Leave <code>EXECUTE = False</code> while changing the circuit, corpus, tokenizer, or numerical contract. Set it to <code>True</code> only after preflight passes.</li>
+        <li>Run the model and preflight cells first. Inspect the parameter count and candidate-map rows before allocating a training run.</li>
+        <li>Leave <code>EXECUTE = False</code> while changing the circuit, corpus, tokenizer, or numerical contract. Set it to <code>True</code> only when <code>can_launch_generated_workflow</code> is true; only the completed workflow can produce a PASS.</li>
         <li>Use <code>DatasetConfig</code> to point at a pinned corpus and bounded train/validation token counts. Keep the model vocabulary equal to <code>TokenizerConfig.vocab_size</code>.</li>
-        <li>Change <code>layers</code> to 4, 6, or 10 and <code>heads</code>/<code>kv_heads</code> for the currently certified dense/GQA experiments. Unsupported modules and dtypes fail before the workflow starts.</li>
+        <li>Change <code>layers</code> to 4, 6, or 10 and <code>heads</code>/<code>kv_heads</code> for the currently certified dense/GQA experiments. The current adapter pins Qwen3 RoPE theta to 1,000,000, SwiGLU, RMSNorm epsilon 1e-6, bias-free projections, <code>normal_0p02</code> initialization, and FP32. Unsupported semantics, modified child modules, and dtypes fail before the workflow starts.</li>
         <li>After execution, inspect the notebook loss plot and parity summary, then open <code>RUN_DIR / "ir_report.html"</code> for the dataset, tokenizer, forward/backward stitching, checkpoint, and export panels.</li>
         <li>Use <code>training_workflow.json</code> as the machine-readable verdict. A generated HTML file alone is not a PASS.</li>
     </ol>

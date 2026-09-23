@@ -2,14 +2,18 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import subprocess
 import sys
+import time
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Mapping, Optional, Sequence
 
 from ..python_authoring.export_v7 import extract_tiny_lm_contract
 from ..python_authoring.graph import AuthoringGraph, build_authoring_graph
+from ..python_authoring.models import qwen3_tiny
 from ..python_authoring.nn import Module
 
 
@@ -87,14 +91,19 @@ class TrainingConfig:
             raise ValueError("epochs and grad_accum must be > 0")
         if not 0.0 <= self.beta1 < 1.0 or not 0.0 <= self.beta2 < 1.0:
             raise ValueError("AdamW beta values must be in [0, 1)")
+        optimizer_values = (
+            self.learning_rate, self.beta1, self.beta2, self.epsilon, self.weight_decay,
+        )
+        if any(not math.isfinite(value) for value in optimizer_values):
+            raise ValueError("optimizer values must be finite")
         if self.learning_rate <= 0.0 or self.epsilon <= 0.0 or self.weight_decay < 0.0:
             raise ValueError("optimizer learning rate/epsilon must be > 0 and weight decay >= 0")
         tolerances = (
             self.parameter_tolerance, self.moment_tolerance, self.gradient_tolerance,
             self.loss_tolerance, self.logits_tolerance, self.inference_tolerance,
         )
-        if any(value < 0.0 for value in tolerances):
-            raise ValueError("numerical tolerances must be >= 0")
+        if any(not math.isfinite(value) or value < 0.0 for value in tolerances):
+            raise ValueError("numerical tolerances must be finite and >= 0")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -168,7 +177,7 @@ def _load_kernel_maps() -> list[tuple[Path, dict[str, Any]]]:
     return rows
 
 
-def _preflight_capabilities() -> dict[str, Any]:
+def _candidate_capability_inventory() -> dict[str, Any]:
     maps = _load_kernel_maps()
     capabilities: list[dict[str, Any]] = []
     missing: list[dict[str, str]] = []
@@ -205,7 +214,9 @@ def _preflight_capabilities() -> dict[str, Any]:
                     "function": implementation.get("function"),
                     "sources": implementation.get("sources", []),
                 },
-                "tests": tests,
+                "registered_tests": tests,
+                "test_evidence_status": "REGISTERED_NOT_EXECUTED_BY_PREFLIGHT",
+                "provider_selection_status": "CANDIDATE_NOT_RESOLVED",
             })
         row = {"label": label, "op": op, "direction": direction, "candidates": candidates}
         capabilities.append(row)
@@ -215,10 +226,67 @@ def _preflight_capabilities() -> dict[str, Any]:
                 "action": f"add an FP32 {direction} kernel map with unit/parity evidence for op={op}",
             })
     return {
-        "schema": "cke.v8.training_capability_preflight.v1",
-        "status": "PASS" if not missing else "FAIL", "passed": not missing,
+        "schema": "cke.v8.training_capability_inventory.v1",
+        "status": "CANDIDATE_INVENTORY_COMPLETE" if not missing else "CANDIDATE_INVENTORY_INCOMPLETE",
+        "candidate_inventory_complete": not missing,
+        "can_launch_generated_workflow": not missing,
+        "resolved_plan_status": "PENDING_GENERATED_WORKFLOW",
+        "executed_numerical_evidence": "PENDING_GENERATED_WORKFLOW",
+        "passed": False,
         "kernel_map_root": str(KERNEL_MAPS), "capabilities": capabilities, "missing": missing,
     }
+
+
+def _module_signature(model: Module) -> dict[str, Any]:
+    signature: dict[str, Any] = {}
+    for path, module in model.named_modules():
+        signature[path or "<root>"] = {
+            "type": module.__class__.__name__,
+            "config": module.spec(),
+            "children": [name for name, _child in module.named_children()],
+            "parameters": {
+                name: parameter.to_dict()
+                for name, parameter in module.named_parameters(recurse=False)
+            },
+        }
+    return signature
+
+
+def _validate_supported_semantics(model: Module, contract: Mapping[str, Any]) -> None:
+    expected = qwen3_tiny(
+        vocab=int(contract["embedding"].vocab), dim=int(contract["dim"]),
+        layers=int(contract["layers"]), hidden=int(contract["hidden"]),
+        heads=int(contract["heads"]), kv_heads=int(contract["kv_heads"]),
+        context_len=int(contract["context_len"]), rope_theta=1_000_000.0,
+        init="normal_0p02", dtype="float32", name=model.name,
+    )
+    actual_signature = _module_signature(model)
+    expected_signature = _module_signature(expected)
+    if actual_signature == expected_signature:
+        return
+    paths = sorted(set(actual_signature) | set(expected_signature))
+    for path in paths:
+        actual = actual_signature.get(path)
+        wanted = expected_signature.get(path)
+        if actual != wanted:
+            raise ValueError(
+                "v8 generated training cannot preserve authored semantics at "
+                f"{path}: authored={actual!r}, supported={wanted!r}"
+            )
+    raise ValueError("v8 generated training cannot preserve the authored model semantics")
+
+
+def _git_commit() -> str:
+    completed = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=REPO_ROOT, text=True,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True,
+    )
+    return completed.stdout.strip()
+
+
+def _json_sha256(value: Mapping[str, Any]) -> str:
+    encoded = json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 @dataclass
@@ -268,9 +336,25 @@ class CompiledTrainingExperiment:
             "unsupported": ["RWKV", "arbitrary torch.nn graph import", "Python arithmetic fallback"],
         }
 
-    def command(self) -> list[str]:
+    def expected_workflow_configuration(self) -> dict[str, Any]:
+        c = self.contract; t = self.tokenizer; train = self.training
+        return {
+            "architecture": "qwen3_style_dense_reduced", "layers": int(c["layers"]),
+            "dtype": "fp32", "d_model": int(c["dim"]), "hidden": int(c["hidden"]),
+            "heads": int(c["heads"]), "kv_heads": int(c["kv_heads"]),
+            "vocab_size": int(t.vocab_size), "tokenizer": t.kind,
+            "seq_len": int(c["context_len"]), "epochs": int(train.epochs),
+            "grad_accum": int(train.grad_accum), "optimizer": "generated_c_adamw",
+            "lr": float(train.learning_rate), "beta1": float(train.beta1),
+            "beta2": float(train.beta2), "eps": float(train.epsilon),
+            "weight_decay": float(train.weight_decay),
+        }
+
+    def command(
+        self, *, invocation_id: Optional[str] = None, experiment_sha256: Optional[str] = None,
+    ) -> list[str]:
         c = self.contract; d = self.dataset; t = self.tokenizer; train = self.training
-        return [
+        command = [
             self.python, str(WORKFLOW), "--run-dir", str(self.run_dir), "--json-out", str(self.report_path),
             "--corpus", str(Path(d.corpus).expanduser().resolve(strict=False)), "--seed", str(train.seed),
             "--seq-len", str(c["context_len"]), "--epochs", str(train.epochs),
@@ -286,27 +370,47 @@ class CompiledTrainingExperiment:
             "--grad-tol", str(train.gradient_tolerance), "--loss-tol", str(train.loss_tolerance),
             "--logits-tol", str(train.logits_tolerance), "--inference-tol", str(train.inference_tolerance),
         ]
+        if (invocation_id is None) != (experiment_sha256 is None):
+            raise ValueError("invocation_id and experiment_sha256 must be supplied together")
+        if invocation_id is not None and experiment_sha256 is not None:
+            case_id = f"python-authoring:{experiment_sha256}"
+            command.extend(["--matrix-run-id", invocation_id, "--matrix-case-id", case_id])
+        return command
 
     def preflight(self) -> dict[str, Any]:
         self.run_dir.mkdir(parents=True, exist_ok=True)
         experiment = self.experiment_document()
         self.experiment_path.write_text(json.dumps(experiment, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        report = _preflight_capabilities()
+        report = _candidate_capability_inventory()
         report["experiment"] = str(self.experiment_path)
         report["experiment_sha256"] = _sha256(self.experiment_path)
         self.preflight_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        if not report["passed"]:
+        if not report["can_launch_generated_workflow"]:
             details = "; ".join(row["action"] for row in report["missing"])
             raise RuntimeError(f"v8 training capability preflight failed: {details}")
         return report
 
     def run(self) -> dict[str, Any]:
-        self.preflight()
+        preflight = self.preflight()
+        experiment_sha256 = str(preflight["experiment_sha256"])
+        invocation_id = str(uuid.uuid4())
+        case_id = f"python-authoring:{experiment_sha256}"
         try:
-            self.command_runner(self.command(), REPO_ROOT)
+            self.report_path.unlink(missing_ok=True)
+        except OSError as exc:
+            raise RuntimeError(f"cannot clear prior workflow report {self.report_path}: {exc}") from exc
+        started_ns = time.time_ns()
+        command = self.command(invocation_id=invocation_id, experiment_sha256=experiment_sha256)
+        try:
+            self.command_runner(command, REPO_ROOT)
         except subprocess.CalledProcessError as exc:
             if self.report_path.is_file():
-                report = json.loads(self.report_path.read_text(encoding="utf-8"))
+                try:
+                    report = json.loads(self.report_path.read_text(encoding="utf-8"))
+                except (OSError, UnicodeError, json.JSONDecodeError) as parse_exc:
+                    raise RuntimeError(
+                        f"generated-C workflow failed and published malformed report={self.report_path}: {parse_exc}"
+                    ) from exc
                 details = report.get("failures") or report.get("exception") or report.get("status")
                 raise RuntimeError(
                     f"generated-C workflow failed; report={self.report_path}; details={details}"
@@ -316,9 +420,52 @@ class CompiledTrainingExperiment:
             ) from exc
         if not self.report_path.is_file():
             raise RuntimeError(f"generated-C workflow did not publish {self.report_path}")
-        report = json.loads(self.report_path.read_text(encoding="utf-8"))
+        try:
+            report = json.loads(self.report_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            raise RuntimeError(f"generated-C workflow published malformed report={self.report_path}: {exc}") from exc
+        if not isinstance(report, dict):
+            raise RuntimeError(f"generated-C workflow report root is not an object: {self.report_path}")
+        identity_errors: list[str] = []
+        if self.report_path.stat().st_mtime_ns < started_ns:
+            identity_errors.append("report_stale_mtime")
+        if report.get("schema") != "cke.v8.training_workflow.v1":
+            identity_errors.append("schema")
         if report.get("status") != "PASS" or report.get("passed") is not True:
-            raise RuntimeError(f"generated-C workflow failed; inspect {self.report_path}")
+            identity_errors.append("workflow_status")
+        identity = report.get("matrix_identity") if isinstance(report.get("matrix_identity"), Mapping) else {}
+        for key, expected in {
+            "run_id": invocation_id, "case_id": case_id, "profile": case_id,
+            "run_dir": str(self.run_dir), "report": str(self.report_path),
+        }.items():
+            if identity.get(key) != expected:
+                identity_errors.append(f"matrix_identity.{key}")
+        execution = report.get("execution") if isinstance(report.get("execution"), Mapping) else {}
+        if execution.get("git_commit") != _git_commit():
+            identity_errors.append("execution.git_commit")
+        configuration = report.get("configuration") if isinstance(report.get("configuration"), Mapping) else {}
+        expected_configuration = self.expected_workflow_configuration()
+        for key, expected in expected_configuration.items():
+            if configuration.get(key) != expected:
+                identity_errors.append(f"configuration.{key}")
+        if configuration.get("training_config_sha256") != _json_sha256(expected_configuration):
+            identity_errors.append("configuration.training_config_sha256")
+        corpus = report.get("corpus") if isinstance(report.get("corpus"), Mapping) else {}
+        corpus_path = Path(self.dataset.corpus).expanduser().resolve(strict=False)
+        if corpus.get("spec_sha256") != _sha256(corpus_path):
+            identity_errors.append("corpus.spec_sha256")
+        if identity_errors:
+            raise RuntimeError(
+                f"generated-C workflow report identity mismatch: {sorted(set(identity_errors))}; "
+                f"inspect {self.report_path}"
+            )
+        preflight.update({
+            "status": "RESOLVED_EXECUTION_PASS", "passed": True,
+            "resolved_plan_status": "VALIDATED_BY_WORKFLOW_REPORT",
+            "executed_numerical_evidence": "PASS", "invocation_id": invocation_id,
+            "workflow_report": str(self.report_path), "workflow_report_sha256": _sha256(self.report_path),
+        })
+        self.preflight_path.write_text(json.dumps(preflight, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         return report
 
 
@@ -333,6 +480,7 @@ def compile(
         raise ValueError("v8 generated training currently supports exactly 4, 6, or 10 dense/GQA layers")
     if any(str(parameter.dtype) != "float32" for parameter in model.parameters()):
         raise ValueError("v8 generated training authoring currently supports FP32 parameters only")
+    _validate_supported_semantics(model, contract)
     token_cfg = tokenizer or TokenizerConfig()
     if contract["embedding"].vocab != token_cfg.vocab_size:
         raise ValueError("model vocabulary must match tokenizer vocab_size")

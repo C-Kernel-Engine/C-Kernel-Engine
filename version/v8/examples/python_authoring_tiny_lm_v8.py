@@ -19,7 +19,7 @@ import ckernel_engine as cke  # noqa: E402
 def build_experiment(run_dir: Path):
     model = cke.models.qwen3_tiny(
         vocab=384, dim=32, layers=4, hidden=64, heads=4, kv_heads=2,
-        context_len=32, dtype="float32", name="v8_python_english_fixture",
+        context_len=32, init="normal_0p02", dtype="float32", name="v8_python_english_fixture",
     )
     return cke.v8.compile(
         model, run_name="v8-python-english-fixture", run_dir=run_dir,
@@ -43,7 +43,10 @@ def main() -> int:
 
     experiment = build_experiment(args.run_dir.expanduser().resolve())
     preflight = experiment.preflight()
-    print(f"preflight={preflight['status']} artifact={experiment.preflight_path}")
+    print(
+        f"preflight={preflight['status']} "
+        f"can_launch={preflight['can_launch_generated_workflow']} artifact={experiment.preflight_path}"
+    )
     print(f"experiment={experiment.experiment_path}")
     print("command=" + " ".join(experiment.command()))
     if args.execute:
