@@ -1868,14 +1868,16 @@ int audio_scaled_residual_add_f32(
     return 0;
 }
 
-size_t audio_fastconformer_block_workspace_bytes(
+static size_t audio_fastconformer_block_workspace_bytes_for_score_slots(
     int frames,
     int hidden_size,
     int intermediate_size,
-    int heads)
+    int heads,
+    size_t score_slots)
 {
     if (frames <= 0 || frames > (INT_MAX / 2) + 1 || hidden_size <= 0 ||
-        intermediate_size <= 0 || heads <= 0 || hidden_size % heads != 0) {
+        intermediate_size <= 0 || heads <= 0 || hidden_size % heads != 0 ||
+        score_slots < (size_t)heads) {
         return 0;
     }
     size_t token_elements = 0;
@@ -1883,10 +1885,6 @@ size_t audio_fastconformer_block_workspace_bytes(
     size_t relative_elements = 0;
     size_t doubled_token_elements = 0;
     size_t score_elements = 0;
-    ck_threadpool_t *pool = ck_threadpool_global();
-    const int requested_threads = pool ? ck_threadpool_n_threads(pool) : 1;
-    const size_t score_slots = (size_t)(requested_threads > heads
-        ? requested_threads : heads);
     if (checked_mul_size((size_t)frames, (size_t)hidden_size, &token_elements) != 0 ||
         checked_mul_size((size_t)frames, (size_t)intermediate_size, &ff_elements) != 0 ||
         checked_mul_size((size_t)(2 * frames - 1), (size_t)hidden_size,
@@ -1909,6 +1907,20 @@ size_t audio_fastconformer_block_workspace_bytes(
         return 0;
     }
     return total_elements;
+}
+
+size_t audio_fastconformer_block_workspace_bytes(
+    int frames,
+    int hidden_size,
+    int intermediate_size,
+    int heads)
+{
+    ck_threadpool_t *pool = ck_threadpool_global();
+    const int requested_threads = pool ? ck_threadpool_n_threads(pool) : 1;
+    const size_t score_slots = (size_t)(requested_threads > heads
+        ? requested_threads : heads);
+    return audio_fastconformer_block_workspace_bytes_for_score_slots(
+        frames, hidden_size, intermediate_size, heads, score_slots);
 }
 
 int audio_fastconformer_block_f32(
@@ -1990,9 +2002,10 @@ int audio_fastconformer_block_f32(
         batch_norm_epsilon <= 0.0f) {
         return -2;
     }
-    const size_t required_workspace = audio_fastconformer_block_workspace_bytes(
-        frames, hidden_size, intermediate_size, heads);
-    if (required_workspace == 0 || workspace_bytes < required_workspace) {
+    const size_t minimum_workspace =
+        audio_fastconformer_block_workspace_bytes_for_score_slots(
+            frames, hidden_size, intermediate_size, heads, (size_t)heads);
+    if (minimum_workspace == 0 || workspace_bytes < minimum_workspace) {
         return -3;
     }
 
