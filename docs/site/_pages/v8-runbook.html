@@ -255,13 +255,21 @@ make v8-training-python-authoring-smoke
     <h4>Use the notebook as an experiment controller</h4>
     <ol>
         <li>Launch Jupyter from the repository root and open the v8 notebook path shown above.</li>
-        <li>Run the model and preflight cells first. Inspect the parameter count and candidate-map rows before allocating a training run.</li>
-        <li>Leave <code>EXECUTE = False</code> while changing the circuit, corpus, tokenizer, or numerical contract. Set it to <code>True</code> only when <code>can_launch_generated_workflow</code> is true; only the completed workflow can produce a PASS.</li>
+        <li>Run the model and preflight cells first. Inspect the authored semantic graph, parameter count, forward/backward requirements, and candidate-map rows before allocating a training run.</li>
+        <li>Leave <code>EXECUTE_TRAINING = False</code> while changing the circuit, corpus, tokenizer, or numerical contract. Set it to <code>True</code> only when <code>can_launch_generated_workflow</code> is true; only the completed workflow can produce a PASS. The equivalent environment switch is <code>CKE_NOTEBOOK_EXECUTE=1</code>.</li>
         <li>Use <code>DatasetConfig</code> to point at a pinned corpus and bounded train/validation token counts. Keep the model vocabulary equal to <code>TokenizerConfig.vocab_size</code>.</li>
         <li>Change <code>layers</code> to 4, 6, or 10 and <code>heads</code>/<code>kv_heads</code> for the currently certified dense/GQA experiments. The current adapter pins Qwen3 RoPE theta to 1,000,000, SwiGLU, RMSNorm epsilon 1e-6, bias-free projections, <code>normal_0p02</code> initialization, and FP32. Unsupported semantics, modified child modules, and dtypes fail before the workflow starts.</li>
-        <li>After execution, inspect the notebook loss plot and parity summary, then open <code>RUN_DIR / "ir_report.html"</code> for the dataset, tokenizer, forward/backward stitching, checkpoint, and export panels.</li>
+        <li>After execution, inspect the exact tokenizer round trips, training and held-out loss curve, optimizer-step parity curve, worst per-tensor differences, exact restart result, and multi-token inference-export result.</li>
+        <li>Open <code>RUN_DIR / "ir_report.html"</code> from the notebook for the dataset, tokenizer, forward/backward stitching, saved tensors, memory, checkpoint, and export panels. Set <code>EMBED_IR_VISUALIZER = True</code> to place that report inside the notebook.</li>
+        <li>Set <code>LOAD_EXISTING_REPORT = True</code> only for exploration. The notebook labels that evidence historical because loading an old JSON file does not bind it to the current invocation.</li>
         <li>Use <code>training_workflow.json</code> as the machine-readable verdict. A generated HTML file alone is not a PASS.</li>
     </ol>
+    <p>
+        The checked-in notebook has no stored outputs. Its code cells execute through capability
+        preflight in <code>v8-training-python-authoring-smoke</code>, so imports, model authoring,
+        report rendering, and the no-training default cannot silently drift. Loss and parity plots
+        use inline SVG and do not require a separate plotting package.
+    </p>
     <p class="v8-note">
         The notebook and CI example use the same adapter. The exported generated-C inference
         runtime does not require Python, but the underlying workflow still reports a standalone
