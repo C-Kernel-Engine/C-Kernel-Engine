@@ -168,6 +168,7 @@ int main() {
         {"qwen35_router_chunk", 65, 256, 2048},
         {"prefill_output_tail_bias", 7, 127, 128, true},
         {"prefill_reduction_tail_bias", 7, 127, 130, true},
+        {"prefill_partition_tail_bias", 9, 131, 512, true},
         {"audio_ffn_up", 9, 5120, 1280},
         {"audio_ffn_down", 9, 1280, 5120},
     };

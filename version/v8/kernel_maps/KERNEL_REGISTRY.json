@@ -27843,7 +27843,7 @@
           }
         ]
       },
-      "notes": "Scoped FP32 projection provider matching llama.cpp's one-accumulator-per-output llamafile prefill, including its high/low then lane 0+2 and 1+3 horizontal reduction, and four-accumulator ggml_vec_dot_f32 decode paths. On AVX2, vector-aligned multi-row output ranges evaluate four independent outputs together to reuse activation loads without changing any output's reduction order; reduction tails and AVX-512 retain the original one-output path. Independent output ranges are assigned to CKE's persistent thread pool when the workload threshold is met; small shapes retain the serial leaf.",
+      "notes": "Scoped FP32 projection provider matching llama.cpp's one-accumulator-per-output llamafile prefill, including its high/low then lane 0+2 and 1+3 horizontal reduction, and four-accumulator ggml_vec_dot_f32 decode paths. On AVX2 and AVX-512, vector-aligned multi-row output ranges evaluate four independent outputs together to reuse activation loads without changing any output's reduction order. Reduction tails retain the original one-output path. Independent output ranges are assigned to CKE's persistent thread pool when the workload threshold is met; small shapes retain the serial leaf.",
       "name": "gemm_nt_f32_llama_production",
       "_source_file": "gemm_nt_f32_llama_production.json"
     },
