@@ -6395,7 +6395,7 @@ V7_STABILIZATION_HISTORY ?= $(V7_REPORT_DIR)/training_stabilization_history.json
 	v7-ctop v7-ctop-demo
 
 .PHONY: v8-init v8-doctor v8-capture-artifacts v8-capture-artifacts-run v8-profile-dashboard v8-profile-dashboard-run \
-	v8-compile-train-runtime v8-training-certify-fp32 v8-training-workflow-fp32 v8-training-matrix-fp32 v8-training-matrix-nightly v8-regression-fast v8-regression-full v8-regression-family
+	v8-compile-train-runtime v8-training-certify-fp32 v8-training-workflow-fp32 v8-training-matrix-fp32 v8-training-matrix-nightly v8-training-python-authoring-smoke v8-regression-fast v8-regression-full v8-regression-family
 
 v7-help:
 	@echo "=== v7 Training Foundation (fp32 correctness-first) ==="
@@ -6699,6 +6699,13 @@ v8-training-workflow-fp32:
 		--run-dir "$(V8_TRAIN_WORKFLOW_RUN_DIR)" \
 		--json-out "$(V8_TRAIN_WORKFLOW_REPORT)"
 
+V8_TRAIN_PYTHON_RUN_DIR ?= version/v8/.cache/python_authoring/english_fixture
+
+v8-training-python-authoring-smoke:
+	@$(PYTHON) -m unittest tests.test_v8_python_authoring
+	@$(PYTHON) version/v8/examples/python_authoring_tiny_lm_v8.py \
+		--run-dir "$(V8_TRAIN_PYTHON_RUN_DIR)"
+
 V8_TRAIN_MATRIX_REPORT ?= version/v8/.cache/reports/training_matrix_latest.json
 V8_TRAIN_MATRIX_RUN_ROOT ?= version/v8/.cache/training_matrix
 
@@ -6761,7 +6768,7 @@ v7-regression-fast: test-v7-dsl-policy
 	@echo "Running v7 regression fast suite..."
 	@$(PYTHON) version/v7/scripts/run_regression_v7.py --mode fast --force-rebuild $(REGRESSION_ARGS)
 
-v8-regression-fast: test-v8-dsl-policy test-v8-artifact-compile-matrix
+v8-regression-fast: test-v8-dsl-policy test-v8-artifact-compile-matrix v8-training-python-authoring-smoke
 	@echo "Running v8 regression fast suite..."
 	@$(PYTHON) version/v8/scripts/run_regression_v8.py --mode fast --force-rebuild $(REGRESSION_ARGS)
 
