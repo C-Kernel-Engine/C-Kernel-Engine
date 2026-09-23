@@ -48,17 +48,17 @@ def _top_level_modules(model: Module) -> list[Module]:
     return modules
 
 
-def _extract_tiny_lm_contract(model: Module) -> dict[str, Any]:
+def extract_tiny_lm_contract(model: Module, *, frontend: str = 'v7') -> dict[str, Any]:
     modules = _top_level_modules(model)
     if not isinstance(modules[0], Embedding):
-        raise ValueError('v7 compile currently expects the first top-level module to be ck.nn.Embedding')
+        raise ValueError(f'{frontend} compile currently expects the first top-level module to be ck.nn.Embedding')
     if len(modules) < 4:
         raise ValueError('v7 compile expects at least Embedding -> TransformerBlock -> RMSNorm -> Linear')
 
     embedding = modules[0]
     lm_head = modules[-1]
     if not isinstance(lm_head, Linear):
-        raise ValueError('v7 compile currently expects the final top-level module to be ck.nn.Linear')
+        raise ValueError(f'{frontend} compile currently expects the final top-level module to be ck.nn.Linear')
 
     final_norm: Optional[RMSNorm] = None
     body = modules[1:-1]
@@ -66,13 +66,13 @@ def _extract_tiny_lm_contract(model: Module) -> dict[str, Any]:
         final_norm = body[-1]
         body = body[:-1]
     if final_norm is None:
-        raise ValueError('v7 compile currently expects a final ck.nn.RMSNorm before the lm_head')
+        raise ValueError(f'{frontend} compile currently expects a final ck.nn.RMSNorm before the lm_head')
     if not body:
         raise ValueError('v7 compile requires at least one ck.nn.TransformerBlock')
     if any(not isinstance(module, TransformerBlock) for module in body):
         unsupported = [module.__class__.__name__ for module in body if not isinstance(module, TransformerBlock)]
         raise ValueError(
-            'v7 compile currently supports only ck.nn.TransformerBlock in the model body; '
+            f'{frontend} compile currently supports only ck.nn.TransformerBlock in the model body; '
             f'found unsupported modules: {unsupported}'
         )
 
@@ -335,7 +335,7 @@ def compile(
     if kernel_policy is not None and config is not None and kernel_policy != config.kernel_policy:
         raise ValueError('kernel_policy conflicts with config.kernel_policy')
     graph = build_authoring_graph(model, name=model.name)
-    contract = _extract_tiny_lm_contract(model)
+    contract = extract_tiny_lm_contract(model, frontend='v7')
     if family_name in {'qwen3', 'qwen35'} and str(contract['activation']) != 'swiglu':
         raise ValueError(f"family {family_name!r} currently expects ck.nn.TransformerBlock(..., activation='swiglu')")
     pass_trace = default_pass_trace(compile_config)
