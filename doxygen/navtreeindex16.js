@@ -1,5 +1,6 @@
 var NAVTREEINDEX16 =
 {
+"relu__kernels_8c.html#a856216dca72f3534c079f429d1d58d48":[2,0,1,1,77,3],
 "relu__kernels_8c.html#ab7af1607007954a2841bad370c7f9e35":[2,0,1,1,77,1],
 "relu__kernels_8c.html#abbc4f192b13bed9ed1614c99cee2db91":[2,0,1,1,77,4],
 "relu__kernels_8c_source.html":[2,0,1,1,77],
@@ -248,6 +249,5 @@ var NAVTREEINDEX16 =
 "structCKAudioWavInfo.html#a5977de925aa541e28ce598ac6005dc19":[1,0,15,1],
 "structCKAudioWavInfo.html#a7f03c9c155c83eadf60a4bf620d62ebd":[1,0,15,3],
 "structCKAudioWavInfo.html#abb73452bfec57f0df42413bf289b49e7":[1,0,15,4],
-"structCKAudioWavInfo.html#ad270c19780c360f69c9276cb9e89cff9":[1,0,15,0],
-"structCKAudioWavInfo.html#ad5701d8a252c6d90e2658d18638b8eb0":[1,0,15,2]
+"structCKAudioWavInfo.html#ad270c19780c360f69c9276cb9e89cff9":[1,0,15,0]
 };

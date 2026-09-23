@@ -90,7 +90,7 @@ var searchData=
   ['ck_5fattention_5fvec_5fdump_5fshould_5femit_87',['ck_attention_vec_dump_should_emit',['../attention__kernels_8c.html#aee5513d8a485e3515e1622f08ad587f6',1,'attention_kernels.c']]],
   ['ck_5fattention_5fvec_5fdump_5ftensor_88',['ck_attention_vec_dump_tensor',['../attention__kernels_8c.html#a1fd060746e84cfd7452152286a656706',1,'attention_kernels.c']]],
   ['ck_5fattention_5fvec_5fdump_5fvcols_5fenabled_89',['ck_attention_vec_dump_vcols_enabled',['../attention__kernels_8c.html#abb8ba30b1b351981a7163ca94ec323c3',1,'attention_kernels.c']]],
-  ['ck_5faudio_5fconformer_5frelative_5fattention_5ff32_5fhead_5frange_90',['ck_audio_conformer_relative_attention_f32_head_range',['../audio__kernels_8c.html#a6bc3b046b2b14b89b7837f70f2e5195a',1,'audio_kernels.c']]],
+  ['ck_5faudio_5fconformer_5frelative_5fattention_5ff32_5frow_5frange_90',['ck_audio_conformer_relative_attention_f32_row_range',['../audio__kernels_8c.html#a7c78965c755ac42fe4abcc5c71c85665',1,'audio_kernels.c']]],
   ['ck_5faudio_5fconv1d_5fchannel_5fmajor_5ff32_5fwork_91',['ck_audio_conv1d_channel_major_f32_work',['../audio__kernels_8c.html#a89c6ec8d05af4d452933a0091ef15df7',1,'audio_kernels.c']]],
   ['ck_5faudio_5fconv2d_5fwhc_5fgrouped_5ff32_5frange_92',['ck_audio_conv2d_whc_grouped_f32_range',['../audio__kernels_8c.html#afca6a710888587007175544a5cf1f144',1,'audio_kernels.c']]],
   ['ck_5faudio_5fglu_5fsplit_5ff32_5frange_93',['ck_audio_glu_split_f32_range',['../audio__kernels_8c.html#af73450729ab2539a82695d0e5c7a35bb',1,'audio_kernels.c']]],
