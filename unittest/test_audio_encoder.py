@@ -779,14 +779,14 @@ def check_grouped_conv2d() -> None:
         *,
         width: int = 7,
         height: int = 6,
-        kernel: int = 3,
-        stride: int = 2,
-        padding: int = 1,
+        kernel_width: int = 3,
+        kernel_height: int = 3,
+        stride_width: int = 2,
+        stride_height: int = 2,
+        padding_width: int = 1,
+        padding_height: int = 1,
         with_bias: bool = True,
     ) -> float:
-        kernel_width = kernel_height = kernel
-        stride_width = stride_height = stride
-        padding_width = padding_height = padding
         output_width = (width + 2 * padding_width - kernel_width) // stride_width + 1
         output_height = (height + 2 * padding_height - kernel_height) // stride_height + 1
         input_value = rng.normal(0.0, 0.2, (channels_in, height, width)).astype(np.float32)
@@ -800,8 +800,9 @@ def check_grouped_conv2d() -> None:
         serial_simd = np.empty_like(scalar)
         actual = np.empty((channels_out, output_height, output_width), dtype=np.float32)
         original_threads = lib.ck_get_num_threads()
-        os.environ["CK_AUDIO_DISABLE_CONV2D_WIDTH_SIMD"] = "1"
+        original_simd_override = os.environ.get("CK_AUDIO_DISABLE_CONV2D_WIDTH_SIMD")
         try:
+            os.environ["CK_AUDIO_DISABLE_CONV2D_WIDTH_SIMD"] = "1"
             assert lib.audio_conv2d_whc_grouped_f32(
                 _fptr(input_value), _fptr(weight),
                 _fptr(bias) if bias is not None else None, _fptr(scalar),
@@ -809,9 +810,7 @@ def check_grouped_conv2d() -> None:
                 stride_width, stride_height, padding_width, padding_height, groups,
                 output_width, output_height,
             ) == 0
-        finally:
             os.environ.pop("CK_AUDIO_DISABLE_CONV2D_WIDTH_SIMD", None)
-        try:
             lib.ck_set_num_threads(1)
             assert lib.audio_conv2d_whc_grouped_f32(
                 _fptr(input_value), _fptr(weight),
@@ -830,6 +829,10 @@ def check_grouped_conv2d() -> None:
             ) == 0
         finally:
             lib.ck_set_num_threads(original_threads)
+            if original_simd_override is None:
+                os.environ.pop("CK_AUDIO_DISABLE_CONV2D_WIDTH_SIMD", None)
+            else:
+                os.environ["CK_AUDIO_DISABLE_CONV2D_WIDTH_SIMD"] = original_simd_override
         assert np.array_equal(actual.view(np.uint32), scalar.view(np.uint32))
         assert np.array_equal(serial_simd.view(np.uint32), scalar.view(np.uint32))
         expected = F.conv2d(
@@ -846,15 +849,42 @@ def check_grouped_conv2d() -> None:
     regular = run_case(3, 5, 1)
     depthwise = run_case(4, 4, 4)
     pointwise_tail = run_case(
-        17, 9, 1, width=19, height=5, kernel=1, stride=1, padding=0)
+        17, 9, 1, width=19, height=5, kernel_width=1, kernel_height=1,
+        stride_width=1, stride_height=1, padding_width=0, padding_height=0)
     depthwise_width = run_case(
-        8, 8, 8, width=19, height=5, kernel=3, stride=1, padding=1,
+        8, 8, 8, width=19, height=5, stride_width=1, stride_height=1,
         with_bias=False)
+    caller_simd_override = os.environ.get("CK_AUDIO_DISABLE_CONV2D_WIDTH_SIMD")
+    os.environ["CK_AUDIO_DISABLE_CONV2D_WIDTH_SIMD"] = "caller-owned"
+    try:
+        stride_one_general = run_case(
+            3, 5, 1, width=17, height=7, stride_width=1, stride_height=1)
+        assert os.environ["CK_AUDIO_DISABLE_CONV2D_WIDTH_SIMD"] == "caller-owned"
+    finally:
+        if caller_simd_override is None:
+            os.environ.pop("CK_AUDIO_DISABLE_CONV2D_WIDTH_SIMD", None)
+        else:
+            os.environ["CK_AUDIO_DISABLE_CONV2D_WIDTH_SIMD"] = caller_simd_override
+    grouped_stride_one = run_case(
+        4, 6, 2, width=16, height=7, stride_width=1, stride_height=1)
+    asymmetric = run_case(
+        4, 6, 2, width=17, height=8, kernel_width=3, kernel_height=2,
+        stride_width=1, stride_height=2, padding_width=1, padding_height=0)
+    threshold_diffs = [
+        run_case(
+            3, 5, 1, width=output_width, height=5,
+            stride_width=1, stride_height=1)
+        for output_width in (7, 8, 9, 15, 16, 17)
+    ]
     print(
         "audio_grouped_conv2d "
         f"regular_max_diff={regular:.8e} depthwise_max_diff={depthwise:.8e} "
         f"pointwise_tail_max_diff={pointwise_tail:.8e} "
         f"depthwise_width_max_diff={depthwise_width:.8e} "
+        f"stride_one_general_max_diff={stride_one_general:.8e} "
+        f"grouped_stride_one_max_diff={grouped_stride_one:.8e} "
+        f"asymmetric_max_diff={asymmetric:.8e} "
+        f"threshold_max_diff={max(threshold_diffs):.8e} "
         "tol=3.0e-07 [PASS]"
     )
 
