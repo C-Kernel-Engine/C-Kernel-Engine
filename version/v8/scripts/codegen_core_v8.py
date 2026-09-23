@@ -3322,25 +3322,60 @@ CK_EXPORT void ck_model_profile_dump(void) {
         debug_kv_dtype = 0
     layer_k_offsets = config.get("layer_k_cache_offset")
     layer_v_offsets = config.get("layer_v_cache_offset")
+    compact_kv_declared = (
+        bool(config.get("kv_cache_layer_stride_variable"))
+        or any(
+            key in config
+            for key in (
+                "layer_k_cache_offset",
+                "layer_v_cache_offset",
+                "kv_cache_token_stride_total",
+            )
+        )
+    )
     compact_kv_debug = (
         isinstance(layer_k_offsets, list)
         and isinstance(layer_v_offsets, list)
+        and int(config.get("num_layers", 0) or 0) > 0
         and len(layer_k_offsets) == int(config.get("num_layers", 0) or 0)
         and len(layer_v_offsets) == int(config.get("num_layers", 0) or 0)
     )
+    if compact_kv_declared and not compact_kv_debug:
+        raise ValueError("compact KV debug export requires complete per-layer K/V offsets")
     if compact_kv_debug:
+        num_layers = int(config["num_layers"])
+        layer_k_dims = config.get("layer_k_head_dim")
+        layer_v_dims = config.get("layer_v_head_dim")
+        if (
+            not isinstance(layer_k_dims, list)
+            or not isinstance(layer_v_dims, list)
+            or len(layer_k_dims) != num_layers
+            or len(layer_v_dims) != num_layers
+        ):
+            raise ValueError("compact KV debug export requires per-layer K/V dimensions")
         debug_kv_offset_decls = (
             "static const int64_t g_layer_k_cache_offset[NUM_LAYERS] = {"
             + ", ".join(str(int(value)) for value in layer_k_offsets)
             + "};\n"
             "static const int64_t g_layer_v_cache_offset[NUM_LAYERS] = {"
             + ", ".join(str(int(value)) for value in layer_v_offsets)
+            + "};\n"
+            "static const int32_t g_layer_k_head_dim[NUM_LAYERS] = {"
+            + ", ".join(str(int(value)) for value in layer_k_dims)
+            + "};\n"
+            "static const int32_t g_layer_v_head_dim[NUM_LAYERS] = {"
+            + ", ".join(str(int(value)) for value in layer_v_dims)
             + "};"
         )
         debug_kv_layer_guard = (
             "    if (g_layer_k_cache_offset[layer] < 0 || "
             "g_layer_v_cache_offset[layer] < 0) return -8;\n"
+            "    if (g_layer_k_head_dim[layer] <= 0 || "
+            "g_layer_k_head_dim[layer] != g_layer_v_head_dim[layer] || "
+            "g_layer_v_cache_offset[layer] - g_layer_k_cache_offset[layer] != "
+            "(int64_t)NUM_KV_HEADS * g_layer_k_head_dim[layer]) return -9;\n"
         )
+        debug_kv_head_dim = "g_layer_k_head_dim[layer]"
         debug_kv_k_base = (
             "(size_t)g_layer_k_cache_offset[layer] * (size_t)MAX_SEQ_LEN"
         )
@@ -3350,6 +3385,7 @@ CK_EXPORT void ck_model_profile_dump(void) {
     else:
         debug_kv_offset_decls = ""
         debug_kv_layer_guard = ""
+        debug_kv_head_dim = "HEAD_DIM"
         debug_kv_k_base = (
             "(size_t)(layer * 2) * (size_t)NUM_KV_HEADS * head_stride"
         )
@@ -3823,15 +3859,16 @@ CK_EXPORT int ck_model_debug_export_kv(const char *path, int layer) {{
     if (!g_model || !path || !path[0] || !{debug_kv_pointer}) return -1;
     if (layer < 0 || layer >= NUM_LAYERS || g_model->pos < 0 || g_model->pos > MAX_SEQ_LEN) return -2;
 {debug_kv_layer_guard}
+    const size_t cache_head_dim = (size_t)({debug_kv_head_dim});
     FILE *f = fopen(path, "wb");
     if (!f) return -3;
     const uint32_t header[8] = {{
         UINT32_C(0x564b5843), UINT32_C(2), (uint32_t)layer, (uint32_t)g_model->pos,
-        (uint32_t)NUM_KV_HEADS, (uint32_t)MAX_SEQ_LEN, (uint32_t)HEAD_DIM, UINT32_C({debug_kv_dtype})
+        (uint32_t)NUM_KV_HEADS, (uint32_t)MAX_SEQ_LEN, (uint32_t)cache_head_dim, UINT32_C({debug_kv_dtype})
     }};
     if (fwrite(header, sizeof(header), 1, f) != 1) {{ fclose(f); return -4; }}
-    const size_t head_stride = (size_t)MAX_SEQ_LEN * (size_t)HEAD_DIM;
-    const size_t valid_bytes = (size_t)g_model->pos * (size_t)HEAD_DIM * sizeof({debug_kv_ctype});
+    const size_t head_stride = (size_t)MAX_SEQ_LEN * cache_head_dim;
+    const size_t valid_bytes = (size_t)g_model->pos * cache_head_dim * sizeof({debug_kv_ctype});
     const {debug_kv_ctype} *layer_k = {debug_kv_pointer} + {debug_kv_k_base};
     const {debug_kv_ctype} *layer_v = {debug_kv_pointer} + {debug_kv_v_base};
     for (int h = 0; h < NUM_KV_HEADS; ++h) {{

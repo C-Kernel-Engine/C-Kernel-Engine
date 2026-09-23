@@ -3886,14 +3886,20 @@ def _materialize_compact_kv_layout(config: Dict[str, Any]) -> None:
 
     layer_k_dims = config.get("layer_k_head_dim")
     layer_v_dims = config.get("layer_v_head_dim")
-    if not isinstance(layer_k_dims, list):
+    if layer_k_dims is None and "layer_k_head_dim" not in config:
         layer_k_dims = [default_dim] * num_layers
-    if not isinstance(layer_v_dims, list):
+    if layer_v_dims is None and "layer_v_head_dim" not in config:
         layer_v_dims = [default_dim] * num_layers
+    if not isinstance(layer_k_dims, list) or not isinstance(layer_v_dims, list):
+        raise RuntimeError(
+            "HARD MEMORY PLAN FAULT: per-layer KV dimensions must be lists"
+        )
     if len(layer_k_dims) != num_layers or len(layer_v_dims) != num_layers:
         raise RuntimeError(
             "HARD MEMORY PLAN FAULT: per-layer KV dimensions must match num_layers"
         )
+    config["layer_k_head_dim"] = layer_k_dims[:]
+    config["layer_v_head_dim"] = layer_v_dims[:]
 
     explicit_k = config.get("layer_k_cache_offset")
     explicit_v = config.get("layer_v_cache_offset")

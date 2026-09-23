@@ -2,7 +2,11 @@
 from __future__ import annotations
 
 import importlib.util
+import shutil
+import struct
+import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -46,6 +50,179 @@ def _arg(name: str, expr: str) -> dict[str, str]:
 
 
 class HiddenExportExtentTests(unittest.TestCase):
+    def test_compact_kv_export_executes_with_mixed_head_widths(self) -> None:
+        compiler = shutil.which("cc")
+        if compiler is None:
+            self.skipTest("C compiler unavailable")
+        source = codegen.emit_model_and_api(
+            layout={"memory": {"activations": {"buffers": []}}},
+            config={
+                "num_layers": 2,
+                "num_kv_heads": 2,
+                "head_dim": 4,
+                "decode_kv_cache_dtype": "fp16",
+                "layer_k_cache_offset": [0, 8],
+                "layer_v_cache_offset": [4, 16],
+                "layer_k_head_dim": [2, 4],
+                "layer_v_head_dim": [2, 4],
+            },
+        )
+        declarations = source[
+            source.index("static const int64_t g_layer_k_cache_offset") :
+            source.index("};", source.index("static const int32_t g_layer_v_head_dim")) + 2
+        ]
+        exporter = source[
+            source.index("CK_EXPORT int ck_model_debug_export_kv(") :
+            source.index("/* Compatibility ABI for existing FP16-only X-ray consumers. */")
+        ]
+        harness = r"""
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#define CK_EXPORT
+#define NUM_LAYERS 2
+#define NUM_KV_HEADS 2
+#define MAX_SEQ_LEN 4
+typedef struct { uint16_t *kv_cache_f16; int pos; } TestModel;
+static TestModel *g_model;
+""" + declarations + "\n" + exporter + r"""
+int main(int argc, char **argv) {
+    if (argc != 3) return 10;
+    uint16_t cache[24 * MAX_SEQ_LEN];
+    for (size_t i = 0; i < sizeof(cache) / sizeof(cache[0]); ++i) cache[i] = 0xeeee;
+    const int widths[2] = {2, 4};
+    const int offsets[2][2] = {{0, 4}, {8, 16}};
+    for (int layer = 0; layer < 2; ++layer)
+        for (int kind = 0; kind < 2; ++kind)
+            for (int head = 0; head < 2; ++head)
+                for (int token = 0; token < 3; ++token)
+                    for (int channel = 0; channel < widths[layer]; ++channel)
+                        cache[offsets[layer][kind] * MAX_SEQ_LEN
+                              + head * MAX_SEQ_LEN * widths[layer]
+                              + token * widths[layer] + channel] =
+                            1000 * layer + 400 * kind + 100 * head + 10 * token + channel;
+    TestModel model = {cache, 3};
+    g_model = &model;
+    if (ck_model_debug_export_kv(argv[1], 0)) return 11;
+    if (ck_model_debug_export_kv(argv[2], 1)) return 12;
+    return 0;
+}
+"""
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            c_path = base / "export.c"
+            executable = base / "export"
+            c_path.write_text(harness, encoding="ascii")
+            subprocess.run(
+                [compiler, "-std=c11", "-Wall", "-Wextra", "-Werror", str(c_path), "-o", str(executable)],
+                check=True, capture_output=True, text=True,
+            )
+            paths = [base / "layer0.bin", base / "layer1.bin"]
+            subprocess.run([str(executable), *(str(path) for path in paths)], check=True)
+            for layer, (path, width) in enumerate(zip(paths, (2, 4))):
+                payload = path.read_bytes()
+                self.assertEqual(len(payload), 32 + 2 * 2 * 3 * width * 2)
+                self.assertEqual(
+                    struct.unpack_from("<8I", payload),
+                    (0x564B5843, 2, layer, 3, 2, 4, width, 1),
+                )
+                values = struct.unpack_from(f"<{2 * 2 * 3 * width}H", payload, 32)
+                expected = tuple(
+                    1000 * layer + 400 * kind + 100 * head + 10 * token + channel
+                    for kind in range(2)
+                    for head in range(2)
+                    for token in range(3)
+                    for channel in range(width)
+                )
+                self.assertEqual(values, expected)
+
+    def test_compact_kv_export_uses_each_layer_head_width(self) -> None:
+        source = codegen.emit_model_and_api(
+            layout={"memory": {"activations": {"buffers": []}}},
+            config={
+                "num_layers": 2,
+                "num_kv_heads": 2,
+                "head_dim": 512,
+                "decode_kv_cache_dtype": "fp16",
+                "layer_k_cache_offset": [0, 1024],
+                "layer_v_cache_offset": [512, 2048],
+                "layer_k_head_dim": [256, 512],
+                "layer_v_head_dim": [256, 512],
+            },
+        )
+
+        self.assertIn("g_layer_k_head_dim[NUM_LAYERS] = {256, 512}", source)
+        self.assertIn("g_layer_v_head_dim[NUM_LAYERS] = {256, 512}", source)
+        self.assertIn("const size_t cache_head_dim = (size_t)(g_layer_k_head_dim[layer]);", source)
+        self.assertIn("(uint32_t)cache_head_dim, UINT32_C(1)", source)
+        self.assertIn("(size_t)MAX_SEQ_LEN * cache_head_dim", source)
+        self.assertIn("(size_t)g_model->pos * cache_head_dim * sizeof(uint16_t)", source)
+        self.assertIn("g_layer_k_head_dim[layer] != g_layer_v_head_dim[layer]", source)
+
+    def test_compact_kv_export_rejects_incomplete_dimensions(self) -> None:
+        with self.assertRaisesRegex(ValueError, "per-layer K/V dimensions"):
+            codegen.emit_model_and_api(
+                layout={"memory": {"activations": {"buffers": []}}},
+                config={
+                    "num_layers": 2,
+                    "num_kv_heads": 2,
+                    "head_dim": 512,
+                    "layer_k_cache_offset": [0, 1024],
+                    "layer_v_cache_offset": [512, 2048],
+                    "layer_k_head_dim": [256],
+                    "layer_v_head_dim": [256, 512],
+                },
+            )
+
+    def test_compact_kv_export_rejects_incomplete_offsets(self) -> None:
+        base = {
+            "num_layers": 2,
+            "num_kv_heads": 2,
+            "head_dim": 4,
+            "layer_k_head_dim": [2, 4],
+            "layer_v_head_dim": [2, 4],
+        }
+        for metadata in (
+            {"layer_k_cache_offset": [0], "layer_v_cache_offset": [4, 16]},
+            {"layer_k_cache_offset": [0, 8]},
+            {"layer_k_cache_offset": "invalid", "layer_v_cache_offset": [4, 16]},
+            {"kv_cache_layer_stride_variable": True},
+        ):
+            with self.subTest(metadata=metadata):
+                with self.assertRaisesRegex(ValueError, "complete per-layer K/V offsets"):
+                    codegen.emit_model_and_api(
+                        layout={"memory": {"activations": {"buffers": []}}},
+                        config={**base, **metadata},
+                    )
+
+    def test_compact_kv_export_rejects_missing_dimensions(self) -> None:
+        base = {
+            "num_layers": 2,
+            "num_kv_heads": 2,
+            "head_dim": 4,
+            "layer_k_cache_offset": [0, 8],
+            "layer_v_cache_offset": [4, 16],
+        }
+        for metadata in (
+            {},
+            {"layer_k_head_dim": [2, 4]},
+            {"layer_k_head_dim": "invalid", "layer_v_head_dim": [2, 4]},
+        ):
+            with self.subTest(metadata=metadata):
+                with self.assertRaisesRegex(ValueError, "per-layer K/V dimensions"):
+                    codegen.emit_model_and_api(
+                        layout={"memory": {"activations": {"buffers": []}}},
+                        config={**base, **metadata},
+                    )
+
+    def test_fixed_width_kv_export_remains_supported(self) -> None:
+        source = codegen.emit_model_and_api(
+            layout={"memory": {"activations": {"buffers": []}}},
+            config={"num_layers": 2, "num_kv_heads": 2, "head_dim": 4},
+        )
+        self.assertIn("const size_t cache_head_dim = (size_t)(HEAD_DIM);", source)
+        self.assertNotIn("g_layer_k_cache_offset[NUM_LAYERS]", source)
+
     def test_q_only_geometry_controls_prefill_layout_bridges(self) -> None:
         ops = [
             {
