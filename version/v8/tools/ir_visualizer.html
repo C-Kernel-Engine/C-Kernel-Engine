@@ -22152,6 +22152,100 @@ function stageTone(status) {
     return 'blue';
 }
 
+function buildTrainingExperimentIdentitySection(files) {
+    const manifest = files.training_experiment_manifest && typeof files.training_experiment_manifest === 'object'
+        ? files.training_experiment_manifest : null;
+    if (!manifest) {
+        return `
+            <div class="parity-section" data-training-experiment-identity="missing">
+                <h3><span class="badge badge-red">MISSING</span> Experiment Identity</h3>
+                <div style="color:#fca5a5;">No authoritative <code>training_experiment_manifest.json</code> is loaded. These panels are historical/unscoped and cannot establish a current PASS.</div>
+            </div>`;
+    }
+    const identity = manifest.identity && typeof manifest.identity === 'object' ? manifest.identity : {};
+    const validation = manifest.validation && typeof manifest.validation === 'object' ? manifest.validation : {};
+    const verdict = manifest.verdict && typeof manifest.verdict === 'object' ? manifest.verdict : {};
+    const graph = manifest.graph_evidence && typeof manifest.graph_evidence === 'object' ? manifest.graph_evidence : {};
+    const navigation = manifest.navigation && typeof manifest.navigation === 'object' ? manifest.navigation : {};
+    const identityStatus = String(validation.status || 'MISSING').toUpperCase();
+    const verdictStatus = String(verdict.status || 'MISSING').toUpperCase();
+    const identityTone = identityStatus === 'MATCHED' ? 'green' : 'red';
+    const verdictTone = verdictStatus === 'PASS' ? 'green' : (verdictStatus === 'FAIL' ? 'red' : 'orange');
+    const shortHash = (value) => {
+        const text = String(value || '—');
+        return text.length > 18 ? `${text.slice(0, 12)}…${text.slice(-6)}` : text;
+    };
+    const localLink = (pathValue, label) => {
+        const raw = String(pathValue || '').trim();
+        if (!raw || !/^[A-Za-z0-9._/-]+$/.test(raw)) return `<code>${htmlEscape(raw || '—')}</code>`;
+        const href = './' + raw.split('/').map((part) => encodeURIComponent(part)).join('/');
+        return `<a href="${href}" target="_blank" rel="noopener" style="color:#7dd3fc;">${htmlEscape(label)}</a>`;
+    };
+    const graphCard = (label, value) => {
+        const row = value && typeof value === 'object' ? value : {};
+        const status = String(row.status || 'MISSING').toUpperCase();
+        const tone = status === 'CERTIFIED' || status === 'GENERATED' || status === 'RECORDED' ? 'green' : 'red';
+        const detail = label === 'Authored'
+            ? `${row.source || '—'} · ${row.path || '—'}`
+            : (label === 'Lowered'
+                ? `${row.forward_ops ?? '—'} forward · ${row.backward_ops ?? '—'} backward ops`
+                : `${Array.isArray(row.provider_ids) ? row.provider_ids.length : 0} providers · ${row.parameter_count ?? '—'} parameters`);
+        return `<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.65rem 0.75rem;">
+            <div style="font-size:0.68rem;color:#9ca3af;font-weight:700;letter-spacing:0.07em;">${label.toUpperCase()} GRAPH</div>
+            <div style="margin-top:0.2rem;"><span class="badge badge-${tone}">${htmlEscape(status)}</span></div>
+            <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.3rem;overflow-wrap:anywhere;">${htmlEscape(detail)}</div>
+        </div>`;
+    };
+    const failures = Array.isArray(validation.failures) ? validation.failures : [];
+    return `
+        <div class="parity-section" data-training-experiment-identity="${htmlEscape(identityStatus.toLowerCase())}">
+            <h3><span class="badge badge-${identityTone}">${htmlEscape(identityStatus)}</span> Experiment Identity <span class="badge badge-${verdictTone}">${htmlEscape(verdictStatus)}</span></h3>
+            <div style="font-size:0.74rem;color:var(--text-muted);margin-bottom:0.55rem;">The verdict comes from the training workflow. This panel verifies that every required artifact still matches the identity-bound manifest.</div>
+            <table>
+                <tbody>
+                    <tr><th>Run</th><td><code>${htmlEscape(identity.run_id || '—')}</code></td><th>Case</th><td><code>${htmlEscape(identity.case_id || '—')}</code></td></tr>
+                    <tr><th>Commit</th><td><code>${htmlEscape(shortHash(identity.repository_commit))}</code></td><th>Experiment</th><td><code>${htmlEscape(shortHash(identity.python_experiment_sha256))}</code></td></tr>
+                    <tr><th>Configuration</th><td><code>${htmlEscape(shortHash(identity.training_config_sha256))}</code></td><th>Train tokens</th><td><code>${htmlEscape(shortHash(identity.train_token_ids_sha256))}</code></td></tr>
+                    <tr><th>Artifacts</th><td><code>${htmlEscape(validation.artifact_count ?? 0)} checked</code></td><th>Failures</th><td><code>${htmlEscape(failures.length)}</code></td></tr>
+                </tbody>
+            </table>
+            ${failures.length ? `<div class="alert-item critical" style="margin-top:0.55rem;">${htmlEscape(JSON.stringify(failures))}</div>` : ''}
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:0.55rem;margin-top:0.65rem;">
+                ${graphCard('Authored', graph.authored)}
+                ${graphCard('Lowered', graph.lowered)}
+                ${graphCard('Executed', graph.executed)}
+            </div>
+            <div style="display:flex;gap:0.8rem;flex-wrap:wrap;margin-top:0.65rem;font-size:0.74rem;">
+                ${localLink(navigation.experiment_summary, 'Experiment summary')}
+                ${localLink(navigation.dataset_and_tokens, 'Dataset tokens + masks')}
+                ${localLink(navigation.forward_ir, 'Forward IR')}
+                ${localLink(navigation.backward_ir, 'Backward IR')}
+                ${localLink(navigation.parity, 'PyTorch parity')}
+                ${localLink(navigation.checkpoint, 'Checkpoint evidence')}
+            </div>
+        </div>`;
+}
+
+function buildTrainingBatchPreviewSection(files) {
+    const preview = files.training_batch_preview && typeof files.training_batch_preview === 'object'
+        ? files.training_batch_preview : null;
+    if (!preview) {
+        return `<div class="parity-section"><h3><span class="badge badge-red">MISSING</span> Serialized Training Batches</h3><div style="color:var(--text-muted);">No identity-bound token/label/mask preview is available.</div></div>`;
+    }
+    const rows = Array.isArray(preview.batches) ? preview.batches.slice(0, 3) : [];
+    const renderIds = (value) => htmlEscape(JSON.stringify(Array.isArray(value) ? value : []));
+    return `
+        <div class="parity-section" data-training-batch-preview="ready">
+            <h3><span class="badge badge-green">Serialized</span> Token IDs + Labels + Masks</h3>
+            <div style="font-size:0.73rem;color:var(--text-muted);margin-bottom:0.5rem;">
+                Policy: <code>${htmlEscape(preview.label_policy || '—')}</code> · stream: <code>${htmlEscape(preview.token_stream_sha256 || '—')}</code>
+            </div>
+            <div style="overflow:auto;"><table><thead><tr><th>Microstep</th><th>Valid</th><th>Input token IDs</th><th>Label token IDs</th><th>Attention mask</th><th>Loss mask</th></tr></thead><tbody>
+                ${rows.map((row) => `<tr><td>${htmlEscape(row.microstep ?? '—')}</td><td>${htmlEscape(row.valid_tokens ?? '—')}</td><td><code>${renderIds(row.input_token_ids)}</code></td><td><code>${renderIds(row.label_token_ids)}</code></td><td><code>${renderIds(row.attention_mask)}</code></td><td><code>${renderIds(row.loss_mask)}</code></td></tr>`).join('')}
+            </tbody></table></div>
+        </div>`;
+}
+
 function renderDataLabPanel(files) {
     const root = document.getElementById('trainDataLabRoot');
     if (!root) return;
@@ -22171,6 +22265,8 @@ function renderDataLabPanel(files) {
         ? dataLab.tokenizer_preview
         : (files.tokenizer_preview || {});
     const parityGateSection = buildDataLabParitySection(files);
+    const experimentIdentitySection = buildTrainingExperimentIdentitySection(files);
+    const batchPreviewSection = buildTrainingBatchPreviewSection(files);
     const readinessSection = buildDataLabReadinessSection(files);
     const evalSummarySection = buildDataLabEvalSummarySection(files, pipeline);
     const prepDiagnosisSection = buildDataPrepDiagnosisSection(files, pipeline);
@@ -23238,6 +23334,7 @@ function renderDataLabPanel(files) {
                 <div style="font-size:0.71rem;color:#9ca3af;"><span style="color:#6ee7b7;font-weight:600;">Sample Browser</span> — row-level tokenizer roundtrip and exact-match rate</div>
             </div>
         </div>
+        ${experimentIdentitySection}
         ${stageFlowSection}
         ${parityGateSection}
         ${readinessSection}
@@ -23279,6 +23376,7 @@ function renderDataLabPanel(files) {
             </div>
             <div style="overflow:auto;">${sampleTable}</div>
         </div>
+        ${batchPreviewSection}
         ${tokenizerSection}
     `;
 
@@ -25350,6 +25448,8 @@ const TRAINING_SIGNAL_KEYS = [
     'training_loss_curve',
     'training_parity',
     'training_step_profile',
+    'training_experiment_manifest',
+    'training_batch_preview',
     'training_pipeline',
     'train_e2e',
     'memory_diagnostic',
@@ -27098,6 +27198,8 @@ function meUpdateLegend() {
 // initLiveMode() is called from main.js init(). No-ops if neither condition holds.
 
 const _LIVE_FILES = [
+    'training_experiment_manifest.json',
+    'training_batch_preview.json',
     'training_pipeline_latest.json',
     'training_loss_curve_latest.json',
     'training_grad_norms_latest.json',
@@ -27118,6 +27220,8 @@ const _LIVE_FILES = [
 ];
 
 const _LIVE_KEY_MAP = {
+    'training_experiment_manifest.json':      'training_experiment_manifest',
+    'training_batch_preview.json':            'training_batch_preview',
     'training_pipeline_latest.json':        'training_pipeline',
     'training_loss_curve_latest.json':        'training_loss_curve',
     'training_grad_norms_latest.json':         'training_grad_norms',

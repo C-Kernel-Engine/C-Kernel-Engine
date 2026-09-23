@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import json
 import hashlib
+import io
 import math
 import os
 import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -188,6 +191,50 @@ class V8PythonAuthoringTests(unittest.TestCase):
                 experiment.run()
             self.assertFalse(stale.exists())
 
+    def test_historical_inspection_is_read_only_and_identity_bound(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            experiment = cke.v8.compile(_model(), run_name="historical", run_dir=Path(td))
+            preflight = experiment.preflight()
+            experiment_sha = preflight["experiment_sha256"]
+            command = experiment.command(invocation_id="historical-run", experiment_sha256=experiment_sha)
+            report = _passing_report(command)
+            experiment.report_path.write_text(json.dumps(report) + "\n")
+            identity = {
+                "run_id": report["matrix_identity"]["run_id"],
+                "case_id": report["matrix_identity"]["case_id"],
+                "repository_commit": report["execution"]["git_commit"],
+                "training_config_sha256": report["configuration"]["training_config_sha256"],
+                "corpus_spec_sha256": report["corpus"]["spec_sha256"],
+                "train_token_ids_sha256": "tokens-1",
+                "python_experiment_sha256": hashlib.sha256(experiment.experiment_path.read_bytes()).hexdigest(),
+            }
+            report["corpus"]["splits"] = {"train": {"token_ids_sha256": "tokens-1"}}
+            experiment.report_path.write_text(json.dumps(report) + "\n")
+            manifest = {
+                "schema": "cke.v8.training_experiment_manifest.v1", "identity": identity,
+                "verdict": {"status": "PASS", "passed": True},
+                "artifacts": [{
+                    "role": "authored_experiment", "path": experiment.experiment_path.name,
+                    "required": True,
+                    "sha256": hashlib.sha256(experiment.experiment_path.read_bytes()).hexdigest(),
+                }],
+            }
+            experiment.manifest_path.write_text(json.dumps(manifest) + "\n")
+            before = {path: path.read_bytes() for path in (
+                experiment.experiment_path, experiment.preflight_path,
+                experiment.report_path, experiment.manifest_path,
+            )}
+            inspection = experiment.inspect_existing()
+            self.assertEqual(inspection["status"], "MATCHED")
+            self.assertTrue(inspection["read_only"])
+            self.assertEqual(before, {path: path.read_bytes() for path in before})
+
+            report["matrix_identity"]["run_id"] = "different-run"
+            experiment.report_path.write_text(json.dumps(report) + "\n")
+            mismatch = experiment.inspect_existing()
+            self.assertEqual(mismatch["status"], "MISMATCH")
+            self.assertIn("identity.run_id", mismatch["failures"])
+
     def test_malformed_stale_and_mismatched_reports_fail_closed(self) -> None:
         def runner(mode: str):
             def write_report(command, _cwd) -> None:
@@ -241,6 +288,14 @@ class V8PythonAuthoringTests(unittest.TestCase):
         self.assertIn("experiment.run()", source)
         self.assertIn("checkpoint/resume", source)
         self.assertIn("inference export", source)
+        self.assertIn("Training loss by epoch", source)
+        self.assertIn("CKE versus PyTorch discrepancy", source)
+        self.assertIn("Open the interactive training IR visualizer", source)
+        self.assertIn("tokenizer_roundtrip.json", source)
+        self.assertIn("fresh identity-bound execution", source)
+        self.assertIn("experiment.inspect_existing()", source)
+        self.assertIn("READ-ONLY historical inspection", source)
+        self.assertIn("experiment.manifest_path", source)
 
         example = (ROOT / "version" / "v8" / "examples" / "python_authoring_tiny_lm_v8.py").read_text()
         self.assertIn("cke.v8.compile", example)
@@ -254,6 +309,36 @@ class V8PythonAuthoringTests(unittest.TestCase):
         self.assertIn("v8-training-python-authoring-smoke", runbook)
         self.assertIn("version/v8/notebooks/01_generated_training_quickstart.ipynb", runbook)
         self.assertIn("RWKV is outside this workstream", runbook)
+
+    def test_notebook_executes_through_preflight_without_training(self) -> None:
+        notebook_path = (
+            ROOT / "version" / "v8" / "notebooks" / "01_generated_training_quickstart.ipynb"
+        )
+        notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
+        code_cells = [cell for cell in notebook["cells"] if cell["cell_type"] == "code"]
+        self.assertTrue(all(cell.get("execution_count") is None for cell in code_cells))
+        self.assertTrue(all(not cell.get("outputs") for cell in code_cells))
+        with tempfile.TemporaryDirectory() as td, mock.patch.dict(
+            os.environ,
+            {
+                "CKE_NOTEBOOK_RUN_DIR": td,
+                "CKE_NOTEBOOK_EXECUTE": "0",
+                "CKE_NOTEBOOK_LOAD_EXISTING": "0",
+                "CKE_NOTEBOOK_EMBED_IR": "0",
+            },
+        ), redirect_stdout(io.StringIO()):
+            namespace = {"__name__": "__cke_notebook_smoke__"}
+            for index, cell in enumerate(notebook["cells"]):
+                if cell["cell_type"] != "code":
+                    continue
+                source = "".join(cell.get("source", []))
+                exec(compile(source, f"{notebook_path}#cell-{index}", "exec"), namespace)
+            run_dir = Path(td)
+            self.assertTrue((run_dir / "python_training_experiment.json").is_file())
+            preflight = json.loads((run_dir / "training_capability_preflight.json").read_text())
+            self.assertEqual(preflight["status"], "CANDIDATE_INVENTORY_COMPLETE")
+            self.assertTrue(preflight["can_launch_generated_workflow"])
+            self.assertFalse((run_dir / "training_workflow.json").exists())
 
 
 if __name__ == "__main__":

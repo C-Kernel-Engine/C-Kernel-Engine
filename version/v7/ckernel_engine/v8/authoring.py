@@ -314,6 +314,10 @@ class CompiledTrainingExperiment:
     def preflight_path(self) -> Path:
         return self.run_dir / "training_capability_preflight.json"
 
+    @property
+    def manifest_path(self) -> Path:
+        return self.run_dir / "training_experiment_manifest.json"
+
     def experiment_document(self) -> dict[str, Any]:
         corpus = Path(self.dataset.corpus).expanduser().resolve(strict=False)
         return {
@@ -389,6 +393,94 @@ class CompiledTrainingExperiment:
             details = "; ".join(row["action"] for row in report["missing"])
             raise RuntimeError(f"v8 training capability preflight failed: {details}")
         return report
+
+    def inspect_existing(self) -> dict[str, Any]:
+        """Read and validate an existing experiment without modifying its artifacts."""
+        paths = {
+            "experiment": self.experiment_path, "preflight": self.preflight_path,
+            "report": self.report_path, "manifest": self.manifest_path,
+        }
+        documents: dict[str, Any] = {}
+        failures: list[str] = []
+        for name, path in paths.items():
+            if not path.is_file():
+                failures.append(f"missing:{name}")
+                continue
+            try:
+                value = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeError, json.JSONDecodeError):
+                failures.append(f"malformed:{name}")
+                continue
+            if not isinstance(value, dict):
+                failures.append(f"not_object:{name}")
+                continue
+            documents[name] = value
+        report = documents.get("report", {})
+        manifest = documents.get("manifest", {})
+        identity = manifest.get("identity") if isinstance(manifest.get("identity"), Mapping) else {}
+        matrix = report.get("matrix_identity") if isinstance(report.get("matrix_identity"), Mapping) else {}
+        configuration = report.get("configuration") if isinstance(report.get("configuration"), Mapping) else {}
+        corpus = report.get("corpus") if isinstance(report.get("corpus"), Mapping) else {}
+        if manifest and manifest.get("schema") != "cke.v8.training_experiment_manifest.v1":
+            failures.append("manifest.schema")
+        for key in ("run_id", "case_id"):
+            if identity.get(key) != matrix.get(key):
+                failures.append(f"identity.{key}")
+        if identity.get("training_config_sha256") != configuration.get("training_config_sha256"):
+            failures.append("identity.training_config_sha256")
+        if identity.get("corpus_spec_sha256") != corpus.get("spec_sha256"):
+            failures.append("identity.corpus_spec_sha256")
+        train_split = corpus.get("splits", {}).get("train", {}) if isinstance(corpus.get("splits"), Mapping) else {}
+        if identity.get("train_token_ids_sha256") != train_split.get("token_ids_sha256"):
+            failures.append("identity.train_token_ids_sha256")
+        experiment = documents.get("experiment")
+        if experiment is not None:
+            if identity.get("python_experiment_sha256") != _sha256(self.experiment_path):
+                failures.append("identity.python_experiment_sha256")
+            if experiment != self.experiment_document():
+                failures.append("current_authored_experiment")
+        verdict = manifest.get("verdict") if isinstance(manifest.get("verdict"), Mapping) else {}
+        if verdict.get("status") != report.get("status") or verdict.get("passed") != report.get("passed"):
+            failures.append("verdict")
+        artifact_rows = manifest.get("artifacts") if isinstance(manifest.get("artifacts"), list) else []
+        checked_artifacts = []
+        for row in artifact_rows:
+            if not isinstance(row, Mapping):
+                failures.append("artifact.malformed")
+                continue
+            raw_path = row.get("path")
+            artifact_path = Path(str(raw_path)).expanduser() if raw_path else Path()
+            if raw_path and not artifact_path.is_absolute():
+                artifact_path = self.run_dir / artifact_path
+            present = bool(raw_path and artifact_path.is_file())
+            observed = _sha256(artifact_path) if present else None
+            matched = present and observed == row.get("sha256")
+            if matched and artifact_path.suffix == ".json":
+                try:
+                    child = json.loads(artifact_path.read_text(encoding="utf-8"))
+                except (OSError, UnicodeError, json.JSONDecodeError):
+                    child = None
+                child_identity = child.get("experiment_identity") if isinstance(child, dict) else None
+                if isinstance(child_identity, Mapping):
+                    for key in ("run_id", "case_id", "training_config_sha256", "train_token_ids_sha256"):
+                        if child_identity.get(key) != identity.get(key):
+                            matched = False
+                            failures.append(f"artifact_identity:{row.get('role')}:{key}")
+                            break
+            checked_artifacts.append({
+                "role": row.get("role"), "path": str(artifact_path), "present": present,
+                "matched": matched, "expected_sha256": row.get("sha256"), "observed_sha256": observed,
+            })
+            if row.get("required") is True and not matched:
+                failures.append(f"artifact:{row.get('role')}")
+            elif present and row.get("sha256") and observed != row.get("sha256"):
+                failures.append(f"artifact_hash:{row.get('role')}")
+        return {
+            "status": "MATCHED" if not failures else "MISMATCH",
+            "identity_matched": not failures, "failures": sorted(set(failures)),
+            "historical": True, "read_only": True, "documents": documents,
+            "checked_artifacts": checked_artifacts,
+        }
 
     def run(self) -> dict[str, Any]:
         preflight = self.preflight()

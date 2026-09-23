@@ -1,0 +1,66 @@
+{
+  "training_experiment_manifest": {
+    "schema": "cke.v8.training_experiment_manifest.v1",
+    "identity": {
+      "run_id": "fixture-run-42",
+      "case_id": "python-authoring:fixture-experiment",
+      "repository_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "training_config_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "corpus_spec_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "train_token_ids_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "python_experiment_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    },
+    "verdict": {
+      "status": "PASS",
+      "passed": true,
+      "authoritative_source": "training_workflow.json"
+    },
+    "validation": {
+      "status": "MATCHED",
+      "passed": true,
+      "failures": [],
+      "artifact_count": 14
+    },
+    "graph_evidence": {
+      "authored": {
+        "status": "RECORDED",
+        "source": "cke.nn",
+        "path": "python_training_experiment.json"
+      },
+      "lowered": {
+        "status": "GENERATED",
+        "forward_ops": 109,
+        "backward_ops": 209
+      },
+      "executed": {
+        "status": "CERTIFIED",
+        "provider_ids": ["gemm_forward", "gemm_backward"],
+        "parameter_count": 39
+      }
+    },
+    "navigation": {
+      "experiment_summary": "python_training_experiment.json",
+      "dataset_and_tokens": "training_batch_preview.json",
+      "forward_ir": "ir1_train_forward.json",
+      "backward_ir": "ir2_train_backward.json",
+      "parity": "training_parity_latest.json",
+      "checkpoint": "training_checkpoint_policy_latest.json"
+    }
+  },
+  "training_batch_preview": {
+    "schema": "cke.v8.training_batch_preview.v1",
+    "status": "pass",
+    "token_stream_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "label_policy": "causal_next_token",
+    "batches": [
+      {
+        "microstep": 1,
+        "valid_tokens": 3,
+        "input_token_ids": [101, 102, 103, 0],
+        "label_token_ids": [102, 103, 104, 0],
+        "attention_mask": [1, 1, 1, 0],
+        "loss_mask": [1, 1, 1, 0]
+      }
+    ]
+  }
+}

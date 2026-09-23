@@ -20,6 +20,7 @@ import subprocess
 import sys
 import time
 import traceback
+import uuid
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -637,6 +638,7 @@ def _write_visualizer_artifacts(
     performance: Mapping[str, Any],
     summary: Mapping[str, Any],
     checkpoint_path: Path,
+    experiment_identity: Mapping[str, Any],
 ) -> dict[str, Any]:
     tokenizer_path = run_dir / "tokenizer.json"
     if corpus["tokenizer"].get("mode") == "byte":
@@ -667,6 +669,7 @@ def _write_visualizer_artifacts(
     roundtrip_path = run_dir / "tokenizer_roundtrip.json"
     _write_json(roundtrip_path, {
         "schema": "cke.v8.tokenizer_roundtrip.v1", "status": "pass",
+        "experiment_identity": dict(experiment_identity),
         "exact_match": all(row["exact_match"] for row in sample_rows),
         "tokenizer_json_path": str(tokenizer_path), "line_eval": {"passed": len(sample_rows), "failed": 0},
         "sample_rows": sample_rows,
@@ -681,6 +684,7 @@ def _write_visualizer_artifacts(
     qc_path = run_dir / "dataset_qc.json"
     _write_json(qc_path, {
         "schema": "cke.v8.dataset_qc.v1", "status": "pass",
+        "experiment_identity": dict(experiment_identity),
         "path": str(ROOT / str(corpus["splits"]["train"]["source"])),
         "non_empty_lines": len((ROOT / str(corpus["splits"]["train"]["source"])).read_bytes().splitlines()),
         "checks": {"pinned_blob": True, "separate_document_split": True, "fixed_token_count": True,
@@ -689,12 +693,14 @@ def _write_visualizer_artifacts(
     profile_path = run_dir / "dataset_profile.json"
     _write_json(profile_path, {
         "schema": "cke.v8.dataset_profile.v1", "status": "pass", "tokenizer": corpus["tokenizer"],
+        "experiment_identity": dict(experiment_identity),
         "splits": {name: {key: row[key] for key in ("tokens", "source", "git_blob", "source_revision", "source_blob", "token_ids_sha256")}
                    for name, row in corpus["splits"].items()},
     })
     loss_path = run_dir / "training_loss_curve_latest.json"
     _write_json(loss_path, {
         "schema": "cke.v8.training_loss_curve.v1",
+        "experiment_identity": dict(experiment_identity),
         "steps": [{"step": int(row["last_microstep"]), "epoch": int(row["epoch"]),
                    "loss_ck": float(row["cke_mean_loss"]), "loss_pt": float(row["pytorch_mean_loss"]),
                    "lr": float(args.lr), "grad_norm": None, "source_stage": "pretrain"}
@@ -702,16 +708,22 @@ def _write_visualizer_artifacts(
         "grad_norm_status": "NOT_MEASURED",
     })
     parity_path = run_dir / "training_parity_latest.json"
-    _write_json(parity_path, {"schema": "cke.v8.training_parity.v1", "steps": list(parity_rows)})
+    _write_json(parity_path, {
+        "schema": "cke.v8.training_parity.v1",
+        "experiment_identity": dict(experiment_identity),
+        "steps": list(parity_rows),
+    })
     step_profile_path = run_dir / "training_step_profile_latest.json"
     _write_json(step_profile_path, {
         "schema": "cke.v8.training_step_profile.v1",
+        "experiment_identity": dict(experiment_identity),
         "train_tok_s": performance["generated_c_tokens_per_second"],
         "scope": "generated_c_profiled_steps_plus_final_flush", "timings": performance["generated_profile_ms"],
     })
     checkpoint_policy_path = run_dir / "training_checkpoint_policy_latest.json"
     _write_json(checkpoint_policy_path, {
         "schema": "cke.v8.training_checkpoint_policy.v1", "status": "pass",
+        "experiment_identity": dict(experiment_identity),
         "checkpoint": str(checkpoint_path), "atomic_publication": True, "power_loss_durability_claim": False,
         "state": ["weights", "optimizer_moments", "accumulated_gradients", "optimizer_step",
                   "accumulation_counter", "contributing_tokens", "next_microstep", "runtime_dataset_config_identity"],
@@ -723,14 +735,38 @@ def _write_visualizer_artifacts(
     backward_count = len(backward_raw) if isinstance(backward_raw, list) else int(backward_raw or 0)
     _write_json(stitch_path, {
         "schema": "cke.v8.backprop_stitch_runtime.v1", "status": "pass", "passed": True,
+        "experiment_identity": dict(experiment_identity),
         "forward_ops": forward_count, "backward_ops": backward_count,
         "execution_plan": str(run_dir / "train_exec_plan.json"),
         "generated_runtime": str(run_dir / "generated_train_runtime_v7.c"),
     })
     pipeline_path = run_dir / "training_pipeline_latest.json"
+    preview_path = run_dir / "training_batch_preview.json"
+    train_token_path = Path(str(corpus["splits"]["train"]["token_ids"]))
+    train_tokens = np.fromfile(train_token_path, dtype="<i4")
+    preview_rows = []
+    for microstep, (inputs, labels, valid, epoch) in enumerate(
+        _batches(train_tokens, int(args.seq_len), 1)[:3], 1
+    ):
+        preview_rows.append({
+            "microstep": microstep, "epoch": int(epoch) + 1, "valid_tokens": int(valid),
+            "input_token_ids": inputs.astype(int).tolist(),
+            "label_token_ids": labels.astype(int).tolist(),
+            "attention_mask": ([1] * int(valid)) + ([0] * (int(args.seq_len) - int(valid))),
+            "loss_mask": ([1] * int(valid)) + ([0] * (int(args.seq_len) - int(valid))),
+        })
+    _write_json(preview_path, {
+        "schema": "cke.v8.training_batch_preview.v1", "status": "pass",
+        "experiment_identity": dict(experiment_identity),
+        "token_stream": str(train_token_path),
+        "token_stream_sha256": corpus["splits"]["train"]["token_ids_sha256"],
+        "label_policy": "causal_next_token", "padding_token_id": 0,
+        "batches": preview_rows,
+    })
     artifacts = {
         "dataset_qc_json": str(qc_path), "dataset_profile_json": str(profile_path),
         "tokenizer_roundtrip_json": str(roundtrip_path),
+        "training_batch_preview_json": str(preview_path),
     }
     if tokenizer_quality_path is not None:
         artifacts["tokenizer_quality_gate_json"] = str(tokenizer_quality_path)
@@ -743,6 +779,7 @@ def _write_visualizer_artifacts(
     ]
     _write_json(pipeline_path, {
         "schema": "cke.v8.training_pipeline.v1", "active_stage": "pretrain", "backend": "generated_c_fp32",
+        "experiment_identity": dict(experiment_identity),
         "stage_timeline": [{"stage": "pretrain", "order": 0, "status": "completed", "active": True}],
         "optimizer": {"name": "adamw", "lr": float(args.lr), "hparams": {"beta1": args.beta1, "beta2": args.beta2,
                        "eps": args.eps, "weight_decay": args.weight_decay}},
@@ -760,23 +797,146 @@ def _write_visualizer_artifacts(
                      "tokenizer_json_path": str(tokenizer_path), "artifacts": artifacts},
         "sources": {"orchestrator": str(Path(__file__).relative_to(ROOT)), "run_dir": str(run_dir)},
     })
+    return {
+        "passed": True,
+        "artifacts": {path.name: _sha256(path) for path in (
+            tokenizer_path, roundtrip_path, qc_path, profile_path, loss_path, parity_path,
+            step_profile_path, checkpoint_policy_path, stitch_path, preview_path, pipeline_path,
+            *([tokenizer_quality_path] if tokenizer_quality_path is not None else []))},
+    }
+
+
+def _generate_identity_bound_visualizer(
+    *, run_dir: Path, python: str, manifest_path: Path,
+) -> dict[str, Any]:
     report_path = run_dir / "ir_report.html"
-    command = [python, str(ROOT / "version" / "v8" / "tools" / "open_ir_visualizer_v8.py"),
-               "--generate", "--run", str(run_dir), "--html-only", "--strict-run-artifacts", "--output", str(report_path)]
+    command = [
+        python, str(ROOT / "version" / "v8" / "tools" / "open_ir_visualizer_v8.py"),
+        "--generate", "--run", str(run_dir), "--html-only", "--strict-run-artifacts",
+        "--output", str(report_path),
+    ]
     completed = subprocess.run(command, cwd=ROOT, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     if completed.returncode != 0 or not report_path.is_file():
         raise RuntimeError("v8 training IR visualizer generation failed: " + completed.stdout[-4000:])
     html = report_path.read_text(encoding="utf-8", errors="replace")
-    if "training_pipeline" not in html or "tokenizer_roundtrip" not in html:
-        raise RuntimeError("v8 training IR visualizer omitted training/data artifacts")
+    required_markers = (
+        "training_pipeline", "tokenizer_roundtrip", "training_experiment_manifest",
+        "Experiment Identity", "training_batch_preview",
+    )
+    missing = [marker for marker in required_markers if marker not in html]
+    if missing:
+        raise RuntimeError(f"v8 training IR visualizer omitted identity-bound panels: {missing}")
     return {
         "passed": True, "report": str(report_path), "report_sha256": _sha256(report_path),
+        "manifest": str(manifest_path), "manifest_sha256": _sha256(manifest_path),
         "command": command, "stdout": completed.stdout[-4000:],
-        "artifacts": {path.name: _sha256(path) for path in (
-            tokenizer_path, roundtrip_path, qc_path, profile_path, loss_path, parity_path,
-            step_profile_path, checkpoint_policy_path, stitch_path, pipeline_path,
-            *([tokenizer_quality_path] if tokenizer_quality_path is not None else []))},
     }
+
+
+def _relative_artifact(run_dir: Path, path: Path, *, role: str, required: bool = True) -> dict[str, Any]:
+    resolved = path.resolve()
+    try:
+        stored_path = str(resolved.relative_to(run_dir.resolve()))
+    except ValueError:
+        stored_path = str(resolved)
+    return {
+        "role": role, "path": stored_path, "required": required,
+        "sha256": _sha256(resolved) if resolved.is_file() else None,
+        "present": resolved.is_file(),
+    }
+
+
+def _write_experiment_manifest(
+    *, run_dir: Path, identity: Mapping[str, Any], checks: Mapping[str, Any],
+    summary: Mapping[str, Any], corpus: Mapping[str, Any], checkpoint_path: Path,
+    visualizer_artifacts: Mapping[str, Any],
+) -> Path:
+    artifact_specs = (
+        ("authored_experiment", run_dir / "python_training_experiment.json", False),
+        ("tokenizer", run_dir / "tokenizer.json", True),
+        ("serialized_train_tokens", Path(str(corpus["splits"]["train"]["token_ids"])), True),
+        ("serialized_validation_tokens", Path(str(corpus["splits"]["validation"]["token_ids"])), True),
+        ("tokenizer_roundtrip", run_dir / "tokenizer_roundtrip.json", True),
+        ("dataset_profile", run_dir / "dataset_profile.json", True),
+        ("training_batch_preview", run_dir / "training_batch_preview.json", True),
+        ("authored_training_template", run_dir / "template_train.json", True),
+        ("forward_ir", run_dir / "ir1_train_forward.json", True),
+        ("backward_ir", run_dir / "ir2_train_backward.json", True),
+        ("execution_plan", run_dir / "train_exec_plan.json", True),
+        ("generated_runtime_summary", run_dir / "generated_train_runtime_summary_v7.json", True),
+        ("loss_curve", run_dir / "training_loss_curve_latest.json", True),
+        ("pytorch_parity", run_dir / "training_parity_latest.json", True),
+        ("checkpoint_policy", run_dir / "training_checkpoint_policy_latest.json", True),
+        ("checkpoint", checkpoint_path / "checkpoint.json", True),
+        ("resume_worker", run_dir / "resume_worker.json", True),
+        ("inference_provenance", run_dir / "v8_inference_provenance.json", True),
+        ("generation_provenance", run_dir / "v8_generation_provenance.json", True),
+        ("generation_sequence", run_dir / "v8_generation_sequence.i32", True),
+        ("generation_logits", run_dir / "v8_generation_logits.f32", True),
+        ("generated_inference_source", run_dir / "v8_inference_runtime" / "model_v8.c", True),
+        ("generated_inference_library", run_dir / "v8_inference_runtime" / "libmodel.so", True),
+    )
+    artifacts = [
+        _relative_artifact(run_dir, path, role=role, required=required)
+        for role, path, required in artifact_specs
+    ]
+    train_plan = json.loads((run_dir / "train_exec_plan.json").read_text(encoding="utf-8"))
+    provider_ids = sorted({
+        str(row.get("kernel_id")) for row in train_plan.get("ops", [])
+        if isinstance(row, Mapping) and row.get("kernel_id")
+    })
+    python_experiment = run_dir / "python_training_experiment.json"
+    authored_path = python_experiment if python_experiment.is_file() else run_dir / "template_train.json"
+    forward_raw = summary.get("forward_op_count", summary.get("forward_ops", 0))
+    backward_raw = summary.get("backward_op_count", summary.get("backward_ops", 0))
+    forward_count = len(forward_raw) if isinstance(forward_raw, list) else int(forward_raw or 0)
+    backward_count = len(backward_raw) if isinstance(backward_raw, list) else int(backward_raw or 0)
+    manifest = {
+        "schema": "cke.v8.training_experiment_manifest.v1",
+        "identity": dict(identity),
+        "verdict": {
+            "status": "PASS" if all(bool(row.get("passed")) for row in checks.values()) else "FAIL",
+            "passed": all(bool(row.get("passed")) for row in checks.values()),
+            "authoritative_source": "training_workflow.json",
+        },
+        "graph_evidence": {
+            "authored": {
+                "status": "RECORDED", "path": str(authored_path.relative_to(run_dir)),
+                "sha256": _sha256(authored_path),
+                "source": "cke.nn" if python_experiment.is_file() else "workflow_configuration",
+            },
+            "lowered": {
+                "status": "GENERATED", "forward_ops": forward_count,
+                "backward_ops": backward_count,
+                "forward_ir": "ir1_train_forward.json", "backward_ir": "ir2_train_backward.json",
+            },
+            "executed": {
+                "status": "CERTIFIED" if checks.get("runtime_provenance", {}).get("passed") else "FAILED",
+                "execution_plan": "train_exec_plan.json", "provider_ids": provider_ids,
+                "parameter_count": len(summary.get("init_weight_order", [])),
+                "gradient_inventory_count": len(summary.get("parameter_gradient_order", [])),
+            },
+        },
+        "dataset": {
+            "corpus_spec_sha256": corpus["spec_sha256"],
+            "train_token_ids": corpus["splits"]["train"]["token_ids"],
+            "train_token_ids_sha256": corpus["splits"]["train"]["token_ids_sha256"],
+            "validation_token_ids": corpus["splits"]["validation"]["token_ids"],
+            "validation_token_ids_sha256": corpus["splits"]["validation"]["token_ids_sha256"],
+            "tokenizer_sha256": corpus["tokenizer"].get("tokenizer_json_sha256"),
+        },
+        "navigation": {
+            "experiment_summary": "python_training_experiment.json" if python_experiment.is_file() else "template_train.json",
+            "dataset_and_tokens": "training_batch_preview.json",
+            "forward_ir": "ir1_train_forward.json", "backward_ir": "ir2_train_backward.json",
+            "parity": "training_parity_latest.json", "checkpoint": "training_checkpoint_policy_latest.json",
+        },
+        "artifacts": artifacts,
+        "visualizer_artifact_hashes": dict(visualizer_artifacts.get("artifacts", {})),
+    }
+    path = run_dir / "training_experiment_manifest.json"
+    _write_json(path, manifest)
+    return path
 
 
 def _inference_probe(args: argparse.Namespace) -> int:
@@ -870,12 +1030,15 @@ def _resume_worker(args: argparse.Namespace) -> int:
 
 
 def run(args: argparse.Namespace) -> dict[str, Any]:
+    effective_run_id = args.matrix_run_id or str(uuid.uuid4())
+    effective_case_id = args.matrix_case_id or "v8-training-workflow-fp32"
     report: dict[str, Any] = {"schema": "cke.v8.training_workflow.v1", "status": "FAIL", "passed": False,
                               "execution": CERT._execution_identity(),
-                              "matrix_identity": {"run_id": args.matrix_run_id, "case_id": args.matrix_case_id,
-                                                  "profile": args.matrix_case_id,
+                              "matrix_identity": {"run_id": effective_run_id, "case_id": effective_case_id,
+                                                  "profile": effective_case_id,
                                                   "run_dir": str(args.run_dir), "report": str(args.report)},
                               "checks": {}, "negative_controls": {}, "failures": []}
+    manifest_path: Path | None = None
     started = time.perf_counter()
     try:
         import torch
@@ -907,6 +1070,16 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         inventory = CERT._validate_parameter_inventory(summary, args.run_dir, expected)
         configuration = _training_config(args)
         training_config_sha256 = _json_sha256(configuration)
+        python_experiment = args.run_dir / "python_training_experiment.json"
+        experiment_identity = {
+            "run_id": effective_run_id, "case_id": effective_case_id,
+            "repository_commit": report["execution"]["git_commit"],
+            "training_config_sha256": training_config_sha256,
+            "corpus_spec_sha256": corpus["spec_sha256"],
+            "train_token_ids_sha256": corpus["splits"]["train"]["token_ids_sha256"],
+            "validation_token_ids_sha256": corpus["splits"]["validation"]["token_ids_sha256"],
+            "python_experiment_sha256": _sha256(python_experiment) if python_experiment.is_file() else None,
+        }
         lib, main_provenance = _init_runtime(args.run_dir, library, summary, ck_run, role="main_training")
         report["execution"]["actual_runtime_threads"] = main_provenance.get("actual_runtime_threads")
         initial = _weight_export(lib)
@@ -1190,9 +1363,10 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             if current > previous_weight_diff:
                 first_growth = dict(row); break
             previous_weight_diff = current
-        visualizer = _write_visualizer_artifacts(
+        visualizer_artifacts = _write_visualizer_artifacts(
             run_dir=args.run_dir, python=python, args=args, corpus=corpus, epoch_rows=epoch_rows,
             parity_rows=parity_rows, performance=performance, summary=summary, checkpoint_path=checkpoint_path,
+            experiment_identity=experiment_identity,
         )
         provenance = {
             "passed": bool(main_provenance.get("passed") and export_provenance.get("passed")
@@ -1239,8 +1413,16 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 "independent_training_build_directory": str(export_dir), "v8_inference_only_build_directory": str(v8_runtime),
                 "standalone_native_executable": "NOT_CERTIFIED",
                 "v8_generated_source_sha256": _sha256(v8_runtime / "model_v8.c"), "v8_library_sha256": v8_library_sha256},
-            "training_ir_visualizer": visualizer,
         }
+        manifest_path = _write_experiment_manifest(
+            run_dir=args.run_dir, identity=experiment_identity, checks=checks, summary=summary,
+            corpus=corpus, checkpoint_path=checkpoint_path,
+            visualizer_artifacts=visualizer_artifacts,
+        )
+        visualizer = _generate_identity_bound_visualizer(
+            run_dir=args.run_dir, python=python, manifest_path=manifest_path,
+        )
+        checks["training_ir_visualizer"] = visualizer
         report["negative_controls"] = {"final_partial_flush_wrong_lr": final_flush_negative,
                                        "checkpoint_identity": checkpoint_controls}
         report.update({"status": "PASS" if all(v["passed"] for v in checks.values()) else "FAIL", "checks": checks, "corpus": corpus,
@@ -1253,10 +1435,19 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 "visualizer": "version/v8/tools/open_ir_visualizer_v8.py (v7 interface lineage)"},
             "performance": performance,
             "artifacts": {"checkpoint": str(checkpoint_path), "training_export": str(export_dir), "v8_inference": str(v8_runtime),
-                          "ir_visualizer": visualizer["report"], "generated_source_sha256": _sha256(source)},
+                          "experiment_manifest": str(manifest_path), "ir_visualizer": visualizer["report"],
+                          "generated_source_sha256": _sha256(source)},
             "passed": all(v["passed"] for v in checks.values())})
     except Exception as exc:
+        report["status"] = "FAIL"; report["passed"] = False
         report["failures"].append(str(exc)); report["exception"] = {"type": type(exc).__name__, "traceback": traceback.format_exc()}
+        if manifest_path is not None and manifest_path.is_file():
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["verdict"] = {
+                "status": "FAIL", "passed": False,
+                "authoritative_source": "training_workflow.json", "failures": list(report["failures"]),
+            }
+            _write_json(manifest_path, manifest)
     report["wall_seconds"] = time.perf_counter() - started
     _write_json(args.report, report)
     return report

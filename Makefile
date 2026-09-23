@@ -6703,6 +6703,7 @@ V8_TRAIN_PYTHON_RUN_DIR ?= version/v8/.cache/python_authoring/english_fixture
 
 v8-training-python-authoring-smoke:
 	@$(PYTHON) -m unittest tests.test_v8_python_authoring
+	@node --test tests/test_v8_training_visualizer_identity.mjs
 	@$(PYTHON) version/v8/examples/python_authoring_tiny_lm_v8.py \
 		--run-dir "$(V8_TRAIN_PYTHON_RUN_DIR)"
 
