@@ -234,6 +234,8 @@ lib.ck_set_num_threads.argtypes = [ctypes.c_int]
 lib.ck_set_num_threads.restype = None
 lib.ck_get_num_threads.argtypes = []
 lib.ck_get_num_threads.restype = ctypes.c_int
+lib.ck_threadpool_global_destroy.argtypes = []
+lib.ck_threadpool_global_destroy.restype = None
 
 
 def test_scaled_residual_add_preserves_separate_fp32_operations() -> None:
@@ -1111,6 +1113,12 @@ def check_fastconformer_block() -> None:
         frames, hidden_size, intermediate_size, heads,
     ))
     assert workspace_bytes > 0
+    configured_threads = int(lib.ck_get_num_threads())
+    extra_score_rows = max(configured_threads, heads) - heads
+    minimum_workspace_bytes = (
+        workspace_bytes - extra_score_rows * frames * np.dtype(np.float32).itemsize
+    )
+    assert minimum_workspace_bytes > 0
     workspace = np.empty(workspace_bytes, dtype=np.uint8)
     actual = np.empty_like(expected)
     arguments = [
@@ -1126,6 +1134,19 @@ def check_fastconformer_block() -> None:
     assert maximum <= 2.0e-6, maximum
     assert rmse <= 5.0e-7, rmse
 
+    minimum_workspace = np.empty(minimum_workspace_bytes, dtype=np.uint8)
+    minimum_workspace_output = np.empty_like(expected)
+    minimum_workspace_arguments = list(arguments)
+    minimum_workspace_arguments[41] = _fptr(minimum_workspace_output)
+    minimum_workspace_arguments[42] = ctypes.c_void_p(
+        minimum_workspace.ctypes.data
+    )
+    minimum_workspace_arguments[43] = minimum_workspace_bytes
+    assert lib.audio_fastconformer_block_f32(*minimum_workspace_arguments) == 0
+    assert np.array_equal(
+        minimum_workspace_output.view(np.uint32), actual.view(np.uint32)
+    )
+
     in_place = input_value.copy()
     in_place_arguments = list(arguments)
     in_place_arguments[0] = _fptr(in_place)
@@ -1134,7 +1155,7 @@ def check_fastconformer_block() -> None:
     assert np.array_equal(in_place, actual)
 
     undersized = list(arguments)
-    undersized[43] = workspace_bytes - 1
+    undersized[43] = minimum_workspace_bytes - 1
     assert lib.audio_fastconformer_block_f32(*undersized) == -3
     invalid_geometry = list(arguments)
     invalid_geometry[48] = head_dim + 1
@@ -1218,23 +1239,20 @@ def check_conformer_relative_attention() -> None:
     expected = (probability @ v).permute(1, 0, 2).reshape(frames, channels).numpy()
 
     actual = np.empty_like(query)
-    serial = np.empty_like(query)
+    row_parallel = np.empty_like(query)
     scratch = np.empty((heads, frames), dtype=np.float32)
-    original_threads = lib.ck_get_num_threads()
-    lib.ck_set_num_threads(1)
-    assert lib.audio_conformer_relative_attention_f32(
-        _fptr(query), _fptr(key), _fptr(value), _fptr(relative),
-        _fptr(bias_u), _fptr(bias_v), _fptr(serial), frames, heads,
-        head_dim, float(scale), _fptr(scratch), scratch.nbytes,
-    ) == 0
-    lib.ck_set_num_threads(max(2, original_threads))
+    row_scratch = np.empty((64, frames), dtype=np.float32)
     assert lib.audio_conformer_relative_attention_f32(
         _fptr(query), _fptr(key), _fptr(value), _fptr(relative),
         _fptr(bias_u), _fptr(bias_v), _fptr(actual), frames, heads,
         head_dim, float(scale), _fptr(scratch), scratch.nbytes,
     ) == 0
-    lib.ck_set_num_threads(original_threads)
-    assert np.array_equal(actual, serial)
+    assert lib.audio_conformer_relative_attention_f32(
+        _fptr(query), _fptr(key), _fptr(value), _fptr(relative),
+        _fptr(bias_u), _fptr(bias_v), _fptr(row_parallel), frames, heads,
+        head_dim, float(scale), _fptr(row_scratch), row_scratch.nbytes,
+    ) == 0
+    assert np.array_equal(row_parallel.view(np.uint32), actual.view(np.uint32))
     maximum = float(np.max(np.abs(actual - expected)))
     rmse = float(np.sqrt(np.mean((actual - expected) ** 2)))
     assert maximum <= 1.5e-7, maximum
@@ -1249,10 +1267,86 @@ def check_conformer_relative_attention() -> None:
         _fptr(bias_u), _fptr(bias_v), _fptr(actual), 2**30 + 1, heads,
         head_dim, float(scale), _fptr(scratch), scratch.nbytes,
     ) == -2
+    assert lib.audio_conformer_relative_attention_f32(
+        _fptr(query), _fptr(key), _fptr(value), _fptr(relative),
+        _fptr(bias_u), _fptr(bias_v), _fptr(actual), 2**30, 3,
+        1, 1.0, _fptr(scratch), scratch.nbytes,
+    ) == -2
+
+    worker_frames, worker_heads, worker_head_dim = 257, 1, 8
+    worker_rng = np.random.default_rng(20260923)
+    worker_channels = worker_heads * worker_head_dim
+    worker_query = worker_rng.normal(
+        0.0, 0.25, (worker_frames, worker_channels)
+    ).astype(np.float32)
+    worker_key = worker_rng.normal(
+        0.0, 0.25, (worker_frames, worker_channels)
+    ).astype(np.float32)
+    worker_value = worker_rng.normal(
+        0.0, 0.25, (worker_frames, worker_channels)
+    ).astype(np.float32)
+    worker_relative = worker_rng.normal(
+        0.0, 0.25, (2 * worker_frames - 1, worker_channels)
+    ).astype(np.float32)
+    worker_bias_u = worker_rng.normal(0.0, 0.1, worker_channels).astype(np.float32)
+    worker_bias_v = worker_rng.normal(0.0, 0.1, worker_channels).astype(np.float32)
+    minimum_output = np.empty_like(worker_query)
+    expanded_output = np.empty_like(worker_query)
+    guard_words = 16
+    guard_pattern = np.uint32(0x7FC12345)
+
+    def guarded_scratch(rows: int) -> tuple[np.ndarray, np.ndarray]:
+        backing = np.full(
+            guard_words + rows * worker_frames + guard_words,
+            guard_pattern,
+            dtype=np.uint32,
+        )
+        payload = backing[guard_words:-guard_words].view(np.float32).reshape(
+            rows, worker_frames
+        )
+        return backing, payload
+
+    minimum_backing, minimum_scratch = guarded_scratch(worker_heads)
+    expanded_backing, expanded_scratch = guarded_scratch(4)
+    original_threads = int(lib.ck_get_num_threads())
+    used_worker_count = 0
+    try:
+        lib.ck_threadpool_global_destroy()
+        lib.ck_set_num_threads(4)
+        assert lib.ck_get_num_threads() == 4
+        worker_arguments = [
+            _fptr(worker_query), _fptr(worker_key), _fptr(worker_value),
+            _fptr(worker_relative), _fptr(worker_bias_u), _fptr(worker_bias_v),
+        ]
+        assert lib.audio_conformer_relative_attention_f32(
+            *worker_arguments, _fptr(minimum_output), worker_frames,
+            worker_heads, worker_head_dim, float(worker_head_dim**-0.5),
+            _fptr(minimum_scratch), minimum_scratch.nbytes,
+        ) == 0
+        assert lib.audio_conformer_relative_attention_f32(
+            *worker_arguments, _fptr(expanded_output), worker_frames,
+            worker_heads, worker_head_dim, float(worker_head_dim**-0.5),
+            _fptr(expanded_scratch), expanded_scratch.nbytes,
+        ) == 0
+        assert np.array_equal(
+            expanded_output.view(np.uint32), minimum_output.view(np.uint32)
+        )
+        used_worker_rows = np.any(
+            expanded_scratch.view(np.uint32) != guard_pattern, axis=1
+        )
+        used_worker_count = int(np.count_nonzero(used_worker_rows))
+        assert used_worker_count > worker_heads
+        for backing in (minimum_backing, expanded_backing):
+            assert np.all(backing[:guard_words] == guard_pattern)
+            assert np.all(backing[-guard_words:] == guard_pattern)
+    finally:
+        lib.ck_threadpool_global_destroy()
+        lib.ck_set_num_threads(original_threads)
     print(
         "audio_conformer_relative_attention "
         f"max_diff={maximum:.8e} tol=1.5e-07 [PASS] "
-        f"rmse={rmse:.8e} rmse_tol=4e-08"
+        f"rmse={rmse:.8e} rmse_tol=4e-08 "
+        f"one_head_workers_used={used_worker_count}"
     )
 
 

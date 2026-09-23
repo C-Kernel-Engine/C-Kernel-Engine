@@ -268,6 +268,11 @@ int audio_fastconformer_subsampling_f32(
     int output_capacity_frames,
     int *output_frames);
 
+/*
+ * Returns the recommended workspace for the configured CK thread pool. The
+ * block also accepts the compatible minimum allocation with one score row per
+ * attention head and caps attention workers to the supplied score capacity.
+ */
 size_t audio_fastconformer_block_workspace_bytes(
     int frames,
     int hidden_size,
