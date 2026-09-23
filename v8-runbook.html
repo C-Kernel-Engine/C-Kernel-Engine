@@ -1242,6 +1242,60 @@ make v8-training-matrix-fp32</pre>
     </table>
 </div>
 
+<div class="card card-blue">
+    <h3 id="python-training-authoring" style="margin-top: 0;">Author the certified workflow from Python or Jupyter</h3>
+    <p>
+        The <code>cke.v8</code> adapter reuses the established <code>cke.nn</code> model surface.
+        Python declares the model, frozen dataset, tokenizer, AdamW settings, and numerical
+        contracts. It emits the existing semantic graph and launches the generated-C workflow;
+        it does not execute replacement model arithmetic or silently fall back to PyTorch.
+    </p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre># Validate the supported Python surface and kernel-map candidate inventory.
+make v8-training-python-authoring-smoke
+
+# Inspect the same frozen-English experiment without starting training.
+.venv/bin/python version/v8/examples/python_authoring_tiny_lm_v8.py \
+  --run-dir version/v8/.cache/python_authoring/english_fixture
+
+# Execute generated forward/backward, native AdamW, parity, restart, and export.
+.venv/bin/python version/v8/examples/python_authoring_tiny_lm_v8.py \
+  --run-dir version/v8/.cache/python_authoring/english_fixture --execute
+
+# Open the notebook authoring and report-inspection flow.
+.venv/bin/jupyter lab \
+  version/v8/notebooks/01_generated_training_quickstart.ipynb</pre>
+    </div>
+    <table class="table">
+        <thead><tr><th>Python object or artifact</th><th>Ownership and evidence</th></tr></thead>
+        <tbody>
+            <tr><td><code>cke.models.qwen3_tiny(...)</code></td><td>Builds the existing <code>cke.nn</code> semantic module graph. Initial support is FP32 reduced Qwen3 dense/GQA at 4, 6, or 10 layers.</td></tr>
+            <tr><td><code>cke.v8.DatasetConfig</code>, <code>TokenizerConfig</code>, <code>TrainingConfig</code></td><td>Provide one explicit experiment definition for the generated runtime, independent PyTorch oracle, reporting, and export.</td></tr>
+            <tr><td><code>experiment.preflight()</code></td><td>Inventories candidate forward/backward maps, tensor contracts, implementations, and registered tests. It does not claim provider resolution or executed numerical evidence. Missing candidates fail before training; the generated workflow performs resolution and execution.</td></tr>
+            <tr><td><code>python_training_experiment.json</code></td><td>Records the model graph, dataset hash, tokenizer policy, optimizer, tolerances, and deployment boundary.</td></tr>
+            <tr><td><code>training_capability_preflight.json</code></td><td>Starts as a candidate inventory with <code>PENDING_GENERATED_WORKFLOW</code> resolution/evidence fields. A successful fresh, identity-bound workflow updates it to <code>RESOLVED_EXECUTION_PASS</code>. Registered tests and executed evidence remain separate.</td></tr>
+            <tr><td><code>training_workflow.json</code>, <code>ir_report.html</code></td><td>Contain the generated execution result, PyTorch discrepancies, checkpoint/resume evidence, inference export, and interactive data/IR views.</td></tr>
+        </tbody>
+    </table>
+    <h4>Use the notebook as an experiment controller</h4>
+    <ol>
+        <li>Launch Jupyter from the repository root and open the v8 notebook path shown above.</li>
+        <li>Run the model and preflight cells first. Inspect the parameter count and candidate-map rows before allocating a training run.</li>
+        <li>Leave <code>EXECUTE = False</code> while changing the circuit, corpus, tokenizer, or numerical contract. Set it to <code>True</code> only when <code>can_launch_generated_workflow</code> is true; only the completed workflow can produce a PASS.</li>
+        <li>Use <code>DatasetConfig</code> to point at a pinned corpus and bounded train/validation token counts. Keep the model vocabulary equal to <code>TokenizerConfig.vocab_size</code>.</li>
+        <li>Change <code>layers</code> to 4, 6, or 10 and <code>heads</code>/<code>kv_heads</code> for the currently certified dense/GQA experiments. The current adapter pins Qwen3 RoPE theta to 1,000,000, SwiGLU, RMSNorm epsilon 1e-6, bias-free projections, <code>normal_0p02</code> initialization, and FP32. Unsupported semantics, modified child modules, and dtypes fail before the workflow starts.</li>
+        <li>After execution, inspect the notebook loss plot and parity summary, then open <code>RUN_DIR / "ir_report.html"</code> for the dataset, tokenizer, forward/backward stitching, checkpoint, and export panels.</li>
+        <li>Use <code>training_workflow.json</code> as the machine-readable verdict. A generated HTML file alone is not a PASS.</li>
+    </ol>
+    <p class="v8-note">
+        The notebook and CI example use the same adapter. The exported generated-C inference
+        runtime does not require Python, but the underlying workflow still reports a standalone
+        native executable as <code>NOT_CERTIFIED</code>. Qwen3.5 DeltaNet authoring remains behind
+        composition-level state and backward certification. RWKV is outside this workstream.
+    </p>
+</div>
+
 <div class="card">
     <h3 style="margin-top: 0;">Artifacts and visual inspection</h3>
     <p>The full workflow writes its current run under <code>version/v8/.cache/training_workflow/qwen3_4layer_fp32/</code>.</p>
@@ -1305,9 +1359,9 @@ python3 -m http.server 7021 --bind 127.0.0.1 --directory "$RUN"</pre>
         <strong>Implementation and coverage boundary</strong><br>
         v8 owns the command, evidence contract, export, and visualizer integration. It currently
         imports the proven v7 training IR builder, generated-runtime code generator, and PyTorch
-        oracle through explicit interfaces. Certified coverage is the reduced dense FP32 circuit.
-        Unequal-head GQA, BF16 training, the v7 interactive plan builder, frozen SVG training and
-        gallery, additional model circuits, standalone native training/inference executables,
+        oracle through explicit interfaces. Certified coverage is the reduced dense/GQA FP32 circuit,
+        including the bounded unequal-head matrix case. BF16 training, the v7 interactive plan
+        builder, frozen SVG training and gallery, additional model circuits, standalone native executables,
         LoRA/QLoRA, Muon, and training-state offload require separate executable evidence.
     </div>
 </div>
