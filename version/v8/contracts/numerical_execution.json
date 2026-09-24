@@ -3459,6 +3459,47 @@
       "position_transform": null,
       "description": "One stateful PyTorch-order LSTM layer step using caller-owned 4H gate scratch and caller/session-owned hidden and cell state."
     },
+    "audio_lstm_bidirectional_scan_pytorch_ifgo_fp32": {
+      "operator_family": "audio_lstm",
+      "status": "validated",
+      "storage": {
+        "input": "fp32",
+        "weight": "fp32",
+        "output": "fp32"
+      },
+      "compute": {
+        "input": "fp32",
+        "weight": "fp32",
+        "accumulator": "fp32",
+        "contraction": "enabled",
+        "evaluation_order": "forward token order then reverse token order; each step follows existing IFGO single-step gate and state update"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": [
+          "input_load",
+          "weighted_product",
+          "reduction_update",
+          "vector_exponential",
+          "activation_intermediate_store",
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "composite",
+        "order": "stage_ordered",
+        "partial_accumulator": "fp32",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "serial",
+        "split_strategy": "serial",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Batch-one bidirectional PyTorch IFGO LSTM over token-major input, zero initial state per call, direction-major weights, caller-owned state and gate scratch, forward and reverse feature concatenation."
+    },
     "audio_scaled_residual_add_separate_fp32": {
       "operator_family": "audio_scaled_residual_add",
       "status": "validated",

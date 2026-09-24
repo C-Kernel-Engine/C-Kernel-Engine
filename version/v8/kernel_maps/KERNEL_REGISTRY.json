@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 385,
+      "total": 386,
       "by_op": {
         "add_backward": 1,
         "add_stream": 2,
@@ -29,7 +29,7 @@
         "audio_hann_window": 1,
         "audio_istft_mag_phase": 1,
         "audio_log_mel": 4,
-        "audio_lstm": 1,
+        "audio_lstm": 2,
         "audio_mel_filters": 1,
         "audio_pad_or_truncate": 1,
         "audio_pcm_decode": 1,
@@ -15588,6 +15588,353 @@
       },
       "name": "audio_log_mel_time_major_model_filter_f32",
       "_source_file": "audio_log_mel_time_major_model_filter_f32.json"
+    },
+    {
+      "id": "audio_lstm_bidirectional_scan_f32",
+      "op": "audio_lstm",
+      "operation_interface": "audio_lstm.bidirectional_scan.pytorch_ifgo.fp32.v1",
+      "variant": "batch_one_zero_initial_state_token_major_fp32",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "equivalence_group": "audio_lstm_bidirectional_scan_pytorch_ifgo_fp32",
+        "phases": [
+          "prefill",
+          "decode"
+        ]
+      },
+      "quant": {
+        "weight": "fp32",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "I"
+          ],
+          "layout": "token_major_input_stride",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "weight_ih",
+          "dtype": "fp32",
+          "shape": [
+            "2",
+            "4*H",
+            "I"
+          ],
+          "layout": "direction_major_ifgo_output_feature_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "weight_hh",
+          "dtype": "fp32",
+          "shape": [
+            "2",
+            "4*H",
+            "H"
+          ],
+          "layout": "direction_major_ifgo_output_feature_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "bias_ih",
+          "dtype": "fp32",
+          "shape": [
+            "2",
+            "4*H"
+          ],
+          "layout": "direction_major_ifgo_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "bias_hh",
+          "dtype": "fp32",
+          "shape": [
+            "2",
+            "4*H"
+          ],
+          "layout": "direction_major_ifgo_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "2*H"
+          ],
+          "layout": "token_major_output_stride",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "hidden_state",
+          "dtype": "fp32",
+          "shape": [
+            "2*H"
+          ],
+          "size_bytes": "2 * hidden_size * 4",
+          "size_resolution": "required",
+          "lifetime": "kernel_call",
+          "alignment": 64,
+          "layout": "direction_major",
+          "access": "read_write",
+          "storage_class": "scratch",
+          "consumption": "required"
+        },
+        {
+          "name": "cell_state",
+          "dtype": "fp32",
+          "shape": [
+            "2*H"
+          ],
+          "size_bytes": "2 * hidden_size * 4",
+          "size_resolution": "required",
+          "lifetime": "kernel_call",
+          "alignment": 64,
+          "layout": "direction_major",
+          "access": "read_write",
+          "storage_class": "scratch",
+          "consumption": "required"
+        },
+        {
+          "name": "gates",
+          "dtype": "fp32",
+          "shape": [
+            "4*H"
+          ],
+          "size_bytes": "4 * hidden_size * 4",
+          "size_resolution": "required",
+          "lifetime": "kernel_call",
+          "alignment": 64,
+          "layout": "ifgo_contiguous",
+          "access": "read_write",
+          "storage_class": "scratch",
+          "consumption": "required"
+        }
+      ],
+      "dims": [
+        "input_elements",
+        "weight_ih_elements",
+        "weight_hh_elements",
+        "bias_ih_elements",
+        "bias_hh_elements",
+        "output_elements",
+        "hidden_state_elements",
+        "cell_state_elements",
+        "gates_scratch_bytes",
+        "tokens",
+        "input_size",
+        "hidden_size",
+        "input_stride",
+        "output_stride"
+      ],
+      "impl": {
+        "function": "audio_lstm_bidirectional_scan_f32",
+        "c_declaration": "int audio_lstm_bidirectional_scan_f32(const float *input, size_t input_elements, const float *weight_ih, size_t weight_ih_elements, const float *weight_hh, size_t weight_hh_elements, const float *bias_ih, size_t bias_ih_elements, const float *bias_hh, size_t bias_hh_elements, float *output, size_t output_elements, float *hidden_state, size_t hidden_state_elements, float *cell_state, size_t cell_state_elements, float *gates_scratch, size_t gates_scratch_bytes, int tokens, int input_size, int hidden_size, size_t input_stride, size_t output_stride);",
+        "sources": [
+          "src/kernels/audio_lstm_scan.c",
+          "src/kernels/audio_kernels.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "audio_lstm_bidirectional_scan_pytorch_ifgo_fp32",
+          "status": "validated",
+          "phases": [
+            "prefill",
+            "decode"
+          ],
+          "function": "audio_lstm_bidirectional_scan_f32",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "contract_defined"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp32",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "serial"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const float*",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "input_elements",
+            "source": "runtime:input_elements"
+          },
+          {
+            "name": "weight_ih",
+            "source": "weight_f:weight_ih",
+            "cast": "const float*",
+            "ports": [
+              "weight:weight_ih"
+            ]
+          },
+          {
+            "name": "weight_ih_elements",
+            "source": "runtime:weight_ih_elements"
+          },
+          {
+            "name": "weight_hh",
+            "source": "weight_f:weight_hh",
+            "cast": "const float*",
+            "ports": [
+              "weight:weight_hh"
+            ]
+          },
+          {
+            "name": "weight_hh_elements",
+            "source": "runtime:weight_hh_elements"
+          },
+          {
+            "name": "bias_ih",
+            "source": "weight_f:bias_ih",
+            "cast": "const float*",
+            "ports": [
+              "weight:bias_ih"
+            ]
+          },
+          {
+            "name": "bias_ih_elements",
+            "source": "runtime:bias_ih_elements"
+          },
+          {
+            "name": "bias_hh",
+            "source": "weight_f:bias_hh",
+            "cast": "const float*",
+            "ports": [
+              "weight:bias_hh"
+            ]
+          },
+          {
+            "name": "bias_hh_elements",
+            "source": "runtime:bias_hh_elements"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements"
+          },
+          {
+            "name": "hidden_state",
+            "source": "scratch:hidden_state",
+            "cast": "float*"
+          },
+          {
+            "name": "hidden_state_elements",
+            "source": "runtime:hidden_state_elements"
+          },
+          {
+            "name": "cell_state",
+            "source": "scratch:cell_state",
+            "cast": "float*"
+          },
+          {
+            "name": "cell_state_elements",
+            "source": "runtime:cell_state_elements"
+          },
+          {
+            "name": "gates_scratch",
+            "source": "scratch:gates",
+            "cast": "float*"
+          },
+          {
+            "name": "gates_scratch_bytes",
+            "source": "scratch_size:gates"
+          },
+          {
+            "name": "tokens",
+            "source": "runtime:tokens"
+          },
+          {
+            "name": "input_size",
+            "source": "dim:input_size"
+          },
+          {
+            "name": "hidden_size",
+            "source": "dim:hidden_size"
+          },
+          {
+            "name": "input_stride",
+            "source": "runtime:input_stride"
+          },
+          {
+            "name": "output_stride",
+            "source": "runtime:output_stride"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_audio_lstm_scan_oracle.py"
+        ],
+        "oracle": "torch.nn.LSTM bidirectional FP32 CPU; committed reference outputs plus live PyTorch reconstruction"
+      },
+      "notes": "Batch-one bidirectional zero-state IFGO scan. Input/output physical row strides are explicit. State and gates are caller-owned scratch reset per invocation. Inputs, weights, output, and scratch must not alias; valid capacity is checked before writing. Serial forward then reverse recurrence; output concatenates forward and reverse hidden features. Inference only; backward unsupported.",
+      "name": "audio_lstm_bidirectional_scan_f32",
+      "_source_file": "audio_lstm_bidirectional_scan_f32.json"
     },
     {
       "id": "audio_lstm_step_f32",
