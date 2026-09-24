@@ -172,6 +172,79 @@ class XRayVisionInterfaceTests(unittest.TestCase):
         )
         self.assertEqual(result["first_divergence"]["fix_owner"], "exact_input_control")
 
+    def test_unequal_capture_extents_are_not_numerical_divergence(self) -> None:
+        profile = xray.load_json(PROFILE)
+        rows = [
+            {"layer": int(mapping.get("result_layer", 0)),
+             "op": str(mapping["result_tensor"]), "status": "PASS", "max_abs_diff": 0.0}
+            for _, mapping in llama._active_checkpoints(profile, 0)
+        ]
+        attention = next(row for row in rows if row["op"] == "kqv_out")
+        attention.update({
+            "status": "ERROR", "size_mismatch": True,
+            "test_shape": [1152], "ref_shape": [2654208],
+        })
+        result = llama.normalize_capture_report({"results": rows}, profile, layer=0)
+        self.assertEqual(result["status"], "incomplete")
+        self.assertIsNone(result["first_divergence"])
+        self.assertEqual(result["first_incomplete_capture"]["classification"], "INCOMPLETE_CAPTURE")
+        self.assertEqual(result["first_incomplete_capture"]["capture_extents"], {
+            "subject": [1152], "oracle": [2654208],
+        })
+        self.assertEqual(result["coverage_status"], "incomplete")
+        self.assertEqual(result["next_plan"]["status"], "incomplete_capture")
+
+    def test_incomplete_then_aligned_failure_preserves_both_without_origin_claim(self) -> None:
+        profile = xray.load_json(PROFILE)
+        rows = [
+            {"layer": int(mapping.get("result_layer", 0)),
+             "op": str(mapping["result_tensor"]), "status": "PASS", "max_abs_diff": 0.0}
+            for _, mapping in llama._active_checkpoints(profile, 0)
+        ]
+        next(row for row in rows if row["op"] == "kqv_out").update({
+            "status": "ERROR", "size_mismatch": True,
+            "test_shape": [1152], "ref_shape": [2654208],
+        })
+        next(row for row in rows if row["op"] == "attn_output").update({
+            "status": "FAIL", "max_abs_diff": 0.5,
+        })
+        result = llama.normalize_capture_report({"results": rows}, profile, layer=0)
+        self.assertEqual(result["status"], "fail")
+        self.assertEqual(result["coverage_status"], "incomplete")
+        self.assertEqual(result["first_incomplete_capture"]["classification"], "INCOMPLETE_CAPTURE")
+        self.assertEqual(result["first_divergence"]["classification"], "OBSERVED_DIVERGENCE")
+        self.assertEqual(result["first_divergence"]["metrics"]["max_abs"], 0.5)
+        self.assertEqual(
+            result["first_divergence"]["attribution_status"], "observed_after_incomplete_capture"
+        )
+        self.assertEqual(result["next_plan"]["status"], "first_observed_comparable_divergence")
+
+    def test_incomplete_xray_report_is_non_passing_at_cli_boundary(self) -> None:
+        with mock.patch.object(llama, "run", return_value={"status": "incomplete", "final_report": {}}):
+            self.assertNotEqual(llama.main(["--gguf", "model.gguf"]), 0)
+
+    def test_later_incomplete_capture_does_not_erase_prior_divergence_attribution(self) -> None:
+        profile = xray.load_json(PROFILE)
+        rows = [
+            {"layer": int(mapping.get("result_layer", 0)),
+             "op": str(mapping["result_tensor"]), "status": "PASS", "max_abs_diff": 0.0}
+            for _, mapping in llama._active_checkpoints(profile, 0)
+        ]
+        next(row for row in rows if row["op"] == "q_proj").update({
+            "status": "FAIL", "max_abs_diff": 0.5,
+        })
+        next(row for row in rows if row["op"] == "kqv_out").update({
+            "status": "ERROR", "size_mismatch": True,
+            "test_shape": [1152], "ref_shape": [2654208],
+        })
+        result = llama.normalize_capture_report({"results": rows}, profile, layer=0)
+        self.assertEqual(result["status"], "fail")
+        self.assertEqual(result["coverage_status"], "incomplete")
+        self.assertEqual(
+            result["first_divergence"]["classification"], "KERNEL_IMPLEMENTATION_DIVERGENCE"
+        )
+        self.assertEqual(result["next_plan"]["status"], "first_divergence_attributed")
+
     def test_capture_mode_controls_strict_parity_flag(self) -> None:
         profile = xray.load_json(PROFILE)
         base = {

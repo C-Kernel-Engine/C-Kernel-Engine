@@ -134,6 +134,8 @@ def normalize_capture_report(
     indexed = _legacy_result_index(report)
     comparisons: list[dict[str, Any]] = []
     first_divergence: dict[str, Any] | None = None
+    first_incomplete_capture: dict[str, Any] | None = None
+    incomplete_before_divergence = False
     first_non_exact: dict[str, Any] | None = None
     last_passing: str | None = None
     consumed_keys: set[tuple[int, str]] = set()
@@ -161,12 +163,15 @@ def normalize_capture_report(
         else:
             consumed_keys.add((result_layer, result_name))
             legacy_status = str(row.get("status", "ERROR")).upper()
-            status = "pass" if legacy_status == "PASS" else "fail"
-            if status == "pass":
+            incomplete = bool(row.get("size_mismatch"))
+            status = "incomplete" if incomplete else ("pass" if legacy_status == "PASS" else "fail")
+            if incomplete:
+                classification = "INCOMPLETE_CAPTURE"
+            elif status == "pass":
                 classification = "MATCH"
             elif bool(row.get("has_nan")) or bool(row.get("has_inf")):
                 classification = "NONFINITE_OUTPUT"
-            elif first_divergence is None:
+            elif first_divergence is None and first_incomplete_capture is None:
                 classification = "KERNEL_IMPLEMENTATION_DIVERGENCE"
             else:
                 classification = "OBSERVED_DIVERGENCE"
@@ -176,11 +181,18 @@ def normalize_capture_report(
                 "classification": classification,
                 "legacy_tensor": result_name,
                 "metrics": _canonical_metrics(row),
+                "capture_extents": {
+                    "subject": row.get("test_shape"), "oracle": row.get("ref_shape")
+                } if incomplete else None,
                 "resolved_execution": _resolved_execution(
                     mapping, layer, profile, checkpoint_id, phase
                 ),
             }
         comparisons.append(comparison)
+        if comparison["status"] == "incomplete":
+            if first_incomplete_capture is None:
+                first_incomplete_capture = comparison
+            continue
         if comparison["status"] == "pass":
             metrics = comparison.get("metrics") or {}
             if first_non_exact is None and float(metrics.get("max_abs", 0.0) or 0.0) != 0.0:
@@ -193,9 +205,18 @@ def normalize_capture_report(
             continue
         if first_divergence is None:
             first_divergence = comparison
+            incomplete_before_divergence = first_incomplete_capture is not None
 
     if first_divergence is not None:
-        if first_non_exact is not None:
+        if incomplete_before_divergence:
+            first_divergence["classification"] = "OBSERVED_DIVERGENCE"
+            first_divergence["attribution_status"] = "observed_after_incomplete_capture"
+            first_divergence["fix_owner"] = "capture_and_exact_input_control"
+            first_divergence["recommended_action"] = (
+                "Repair the earlier incomplete capture, then replay this aligned numerical "
+                "failure with exact inputs before attributing its origin."
+            )
+        elif first_non_exact is not None:
             first_divergence["classification"] = "DOWNSTREAM_OR_PROPAGATED_DIVERGENCE"
             first_divergence["causal_origin_candidate"] = first_non_exact
             first_divergence["fix_owner"] = "exact_input_control"
@@ -229,16 +250,24 @@ def normalize_capture_report(
         "oracle_backend": "llamacpp",
         "execution_mode": execution_mode,
         "circuit_scope": "vision_encoder",
-        "status": "fail" if first_divergence is not None else "pass",
+        "status": "fail" if first_divergence is not None else ("incomplete" if first_incomplete_capture else "pass"),
+        "coverage_status": "incomplete" if first_incomplete_capture else "complete",
         "comparisons": comparisons,
         "first_divergence": first_divergence,
+        "first_incomplete_capture": first_incomplete_capture,
         "last_passing_checkpoint": last_passing,
         "first_non_exact_checkpoint": first_non_exact,
         "unmatched_capture_rows": unmatched_capture_rows,
         "unresolved_contract_checkpoints": [],
         "ranking_divergence": None,
         "next_plan": {
-            "status": "first_divergence_attributed" if first_divergence else "complete",
+            "status": (
+                "first_observed_comparable_divergence"
+                if first_divergence and incomplete_before_divergence
+                else "first_divergence_attributed" if first_divergence
+                else "incomplete_capture" if first_incomplete_capture
+                else "complete"
+            ),
             "first_failure": first_divergence["checkpoint_id"] if first_divergence else None,
             "passing_lower_bound": last_passing,
             "next_checkpoints": [],

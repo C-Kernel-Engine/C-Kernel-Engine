@@ -1493,6 +1493,7 @@ class V8Qwen3VLTemplateTests(unittest.TestCase):
                     "--ir", str(call_path),
                     "--layout", str(layout_path),
                     "--output", str(c_path),
+                    "--parity-dump",
                 ],
                 cwd=str(ROOT),
                 capture_output=True,
@@ -1517,6 +1518,10 @@ class V8Qwen3VLTemplateTests(unittest.TestCase):
             self.assertIn("ck_debug_export_hidden(model, 0, \"rope_q\"", text)
             self.assertIn("ck_debug_export_hidden(model, 0, \"rope_k\"", text)
             self.assertIn("ck_debug_export_hidden(model, 0, \"attn_out_head_major\"", text)
+            self.assertIn(
+                'ck_dump_tensor_head_major_token_major_strided((float*)(model->bump + A_ATTN_SCRATCH), 0, "kqv_out", 16, 2304, 72, 72);',
+                text,
+            )
             self.assertIn("ck_debug_export_hidden(model, 0, \"out_proj\"", text)
             self.assertIn("ck_debug_export_hidden(model, 0, \"ln1\"", text)
             self.assertIn("ck_debug_export_hidden(model, 0, \"ffn_inp_normed\"", text)

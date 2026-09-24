@@ -586,6 +586,14 @@ function xrayBoardVerdict(report, rankingReport) {
     const status = xrayReportStatus(report);
     const checks = rankingReport && Array.isArray(rankingReport.checks) ? rankingReport.checks : [];
     const flips = checks.filter(c => c && c.ck_top1 !== c.oracle_top1).length;
+    if (status === 'incomplete' || report?.final_report?.coverage_status === 'incomplete') {
+        return {
+            level: 'incomplete',
+            line: status === 'fail'
+                ? 'incomplete capture; aligned numerical failure observed'
+                : 'incomplete capture; numerical origin unresolved'
+        };
+    }
     if (flips > 0) {
         return { level: 'behavioral', line: flips + ' top-1 flip(s) vs oracle — behavioral divergence' };
     }
