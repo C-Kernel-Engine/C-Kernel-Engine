@@ -5,6 +5,21 @@ on:
     paths:
       - '.github/workflows/tts-kernels.yml'
       - 'include/ckernel_tts.h'
+      - 'include/ckernel_runtime_extent.h'
+      - 'src/kernels/runtime_extent.c'
+      - 'tests/test_v8_runtime_extent_kernel.py'
+      - 'tests/test_v8_runtime_extent_contract.py'
+      - 'tests/test_v8_checked_call_codegen.py'
+      - 'tests/test_v8_runtime_extent_lowering.py'
+      - 'tests/test_v8_xray_numerical_parity.py'
+      - 'version/v8/scripts/runtime_extent_contract_v8.py'
+      - 'version/v8/scripts/codegen_checked_calls_v8.py'
+      - 'version/v8/scripts/build_xray_checkpoint_manifest_v8.py'
+      - 'version/v8/scripts/xray_numerical_parity_v8.py'
+      - 'version/v8/schemas/checkpoint_manifest.schema.json'
+      - 'version/v8/scripts/build_ir_v8.py'
+      - 'version/v8/kernel_maps/runtime_extent_sum_i32.json'
+      - 'version/v8/kernel_maps/runtime_copy_valid_f32.json'
       - 'src/kernels/audio_duration_expand.c'
       - 'src/kernels/audio_istft_mag_phase.c'
       - 'src/kernels/kokoro_shape_bounds.c'
@@ -22,6 +37,21 @@ on:
     branches: [main]
     paths:
       - 'include/ckernel_tts.h'
+      - 'include/ckernel_runtime_extent.h'
+      - 'src/kernels/runtime_extent.c'
+      - 'tests/test_v8_runtime_extent_kernel.py'
+      - 'tests/test_v8_runtime_extent_contract.py'
+      - 'tests/test_v8_checked_call_codegen.py'
+      - 'tests/test_v8_runtime_extent_lowering.py'
+      - 'tests/test_v8_xray_numerical_parity.py'
+      - 'version/v8/scripts/runtime_extent_contract_v8.py'
+      - 'version/v8/scripts/codegen_checked_calls_v8.py'
+      - 'version/v8/scripts/build_xray_checkpoint_manifest_v8.py'
+      - 'version/v8/scripts/xray_numerical_parity_v8.py'
+      - 'version/v8/schemas/checkpoint_manifest.schema.json'
+      - 'version/v8/scripts/build_ir_v8.py'
+      - 'version/v8/kernel_maps/runtime_extent_sum_i32.json'
+      - 'version/v8/kernel_maps/runtime_copy_valid_f32.json'
       - 'src/kernels/audio_duration_expand.c'
       - 'src/kernels/audio_istft_mag_phase.c'
       - 'src/kernels/kokoro_shape_bounds.c'
@@ -42,10 +72,25 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install numerical test dependencies
+        run: python3 -m pip install numpy jsonschema
       - name: Compile and verify portable scalar kernels
         run: |
           python3 -m unittest \
+            tests.test_v8_runtime_extent_kernel \
+            tests.test_v8_runtime_extent_contract \
+            tests.test_v8_checked_call_codegen \
+            tests.test_v8_runtime_extent_lowering \
             tests.test_v8_kokoro_shape_bounds \
             tests.test_v8_audio_duration_expand_oracle.AudioDurationExpandOracleTest.test_committed_torch_fixture \
             tests.test_v8_audio_istft_oracle.AudioIstftOracleTest.test_committed_torch_fixture \
             tests.test_v8_audio_istft_oracle.AudioIstftSafetyTest
+      - name: Verify generated graph X-Ray capture against independent oracle
+        run: |
+          python3 -m unittest \
+            tests.test_v8_xray_numerical_parity.XRayNumericalParityTests.test_runtime_valid_extent_ignores_padded_physical_columns \
+            tests.test_v8_xray_numerical_parity.XRayNumericalParityTests.test_builder_preserves_runtime_capture_geometry \
+            tests.test_v8_xray_numerical_parity.XRayNumericalParityTests.test_generated_duration_graph_matches_independent_oracle_capture

@@ -1,0 +1,29 @@
+{
+  "id": "runtime_copy_valid_f32",
+  "op": "runtime_copy_valid",
+  "operation_interface": "runtime.copy_valid.strided_channel_major.fp32.v1",
+  "variant": "scalar_checked_strided_fp32",
+  "selection": {"status": "candidate", "priority": 100, "equivalence_group": "runtime_copy_valid_f32", "phases": ["prefill"]},
+  "quant": {"weight": "none", "activation": "fp32", "output": "fp32"},
+  "inputs": [{"name": "input", "dtype": "fp32", "shape": ["C", "A_capacity"], "layout": "channel_major_input_stride", "placement": "local", "access": "read", "storage_class": "activation", "consumption": "required"}],
+  "weights": [],
+  "outputs": [{"name": "output", "dtype": "fp32", "shape": ["C", "A_capacity"], "layout": "channel_major_output_stride", "placement": "local", "access": "write", "storage_class": "activation", "consumption": "required"}],
+  "scratch": [],
+  "dims": ["input_elements", "channels", "valid_frames", "input_stride", "output_elements", "output_stride"],
+  "impl": {"function": "ck_runtime_copy_valid_f32", "c_declaration": "int ck_runtime_copy_valid_f32(const float *input, size_t input_elements, size_t channels, size_t valid_frames, size_t input_stride, float *output, size_t output_elements, size_t output_stride);", "sources": ["src/kernels/runtime_extent.c"]},
+  "modes": {"inference": true, "training": false, "backward": false},
+  "numerical_capabilities": [{"contract_id": "runtime_copy_valid_exact_fp32", "status": "validated", "phases": ["prefill"], "function": "ck_runtime_copy_valid_f32", "explicit_selector": true, "implementation": {"isa_dispatch": "scalar", "threading": {"runtime": "serial", "work_partition": ["serial"], "dispatch": ["inline"], "reduction_order_effect": "none"}}, "arithmetic": {"partial_accumulator": "none", "merge_order": "none", "deterministic": true, "thread_count_changes_arithmetic_order": false, "split_strategy": "independent_outputs"}}],
+  "call_abi": {"version": 1, "params": [
+    {"name": "input", "source": "activation:input", "cast": "const float*", "ports": ["input:input"]},
+    {"name": "input_elements", "source": "runtime:expanded_elements"},
+    {"name": "channels", "source": "runtime:channels"},
+    {"name": "valid_frames", "source": "runtime:expanded_frames"},
+    {"name": "input_stride", "source": "runtime:expanded_stride"},
+    {"name": "output", "source": "output:output", "cast": "float*", "ports": ["output:output"]},
+    {"name": "output_elements", "source": "runtime:output_elements"},
+    {"name": "output_stride", "source": "runtime:output_stride"}
+  ]},
+  "constraints": {"notes": "Only valid columns are read and written. Input/output are disjoint. Zero valid length is a no-write success."},
+  "tests": {"unit": ["tests/test_v8_runtime_extent_kernel.py"], "oracle": "Python exact strided-copy construction with untouched padding and invalid-capacity cases"},
+  "notes": "No allocation or hidden stack workspace. Inference only."
+}

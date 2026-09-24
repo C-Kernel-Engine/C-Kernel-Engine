@@ -1,0 +1,29 @@
+{
+  "id": "runtime_extent_sum_i32",
+  "op": "runtime_extent_sum",
+  "operation_interface": "runtime.extent.sum_checked.i32.v1",
+  "variant": "scalar_checked_i32",
+  "selection": {"status": "candidate", "priority": 100, "equivalence_group": "runtime_extent_sum_i32", "phases": ["prefill"]},
+  "quant": {"weight": "none", "activation": "i32", "output": "i32"},
+  "inputs": [{"name": "values", "dtype": "i32", "shape": ["T"], "layout": "contiguous", "placement": "local", "access": "read", "storage_class": "activation", "consumption": "required"}],
+  "weights": [],
+  "outputs": [{"name": "valid_extent", "dtype": "i32", "shape": [1], "layout": "scalar", "placement": "local", "access": "write", "storage_class": "activation", "consumption": "required"}],
+  "scratch": [],
+  "dims": ["value_elements", "count", "min_value", "max_value", "initial_extent", "capacity"],
+  "impl": {"function": "ck_runtime_sum_i32_checked", "c_declaration": "int ck_runtime_sum_i32_checked(const int32_t *values, size_t value_elements, size_t count, int32_t min_value, int32_t max_value, size_t initial_extent, size_t capacity, int32_t *valid_extent);", "sources": ["src/kernels/runtime_extent.c"]},
+  "modes": {"inference": true, "training": false, "backward": false},
+  "numerical_capabilities": [{"contract_id": "runtime_extent_sum_checked_i32", "status": "validated", "phases": ["prefill"], "function": "ck_runtime_sum_i32_checked", "explicit_selector": true, "implementation": {"isa_dispatch": "scalar", "threading": {"runtime": "serial", "work_partition": ["serial"], "dispatch": ["inline"], "reduction_order_effect": "none"}}, "arithmetic": {"partial_accumulator": "int32", "merge_order": "none", "deterministic": true, "thread_count_changes_arithmetic_order": false, "split_strategy": "serial"}}],
+  "call_abi": {"version": 1, "params": [
+    {"name": "values", "source": "activation:values", "cast": "const int32_t*", "ports": ["input:values"]},
+    {"name": "value_elements", "source": "runtime:value_elements"},
+    {"name": "count", "source": "runtime:phoneme_count"},
+    {"name": "min_value", "source": "const:0"},
+    {"name": "max_value", "source": "runtime:max_duration"},
+    {"name": "initial_extent", "source": "const:0"},
+    {"name": "capacity", "source": "runtime:expanded_capacity"},
+    {"name": "valid_extent", "source": "output:valid_extent", "cast": "int32_t*", "ports": ["output:valid_extent"]}
+  ]},
+  "constraints": {"notes": "Capacity is bounded by INT32_MAX. Zero count and zero result are supported. Return status must be checked before any consumer executes."},
+  "tests": {"unit": ["tests/test_v8_runtime_extent_kernel.py"], "oracle": "Python arbitrary-precision integer sum and checked boundary cases"},
+  "notes": "Caller-owned scalar output is untouched on failure. No allocation. Inference only."
+}

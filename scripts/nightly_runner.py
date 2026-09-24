@@ -702,6 +702,22 @@ TEST_SUITES = {
         "TTS Kokoro Extent and Duration Expansion", "kernels",
         ROOT / "tests" / "test_v8_kokoro_shape_bounds.py",
     ),
+    "tts_runtime_extent": TestSuite(
+        "TTS Runtime Extent Kernels and Compiler Contract", "kernels",
+        ROOT / "tests" / "test_v8_runtime_extent_kernel.py",
+    ),
+    "tts_runtime_extent_contract": TestSuite(
+        "TTS Runtime Extent IR Contract", "kernels",
+        ROOT / "tests" / "test_v8_runtime_extent_contract.py",
+    ),
+    "tts_checked_call_codegen": TestSuite(
+        "TTS Generated Checked Call Graph", "kernels",
+        ROOT / "tests" / "test_v8_checked_call_codegen.py",
+    ),
+    "tts_runtime_extent_lowering": TestSuite(
+        "TTS Runtime Extent Full v8 Lowering", "kernels",
+        ROOT / "tests" / "test_v8_runtime_extent_lowering.py",
+    ),
     "tts_istft_oracle": TestSuite(
         "TTS Inverse STFT PyTorch Oracle", "kernels",
         ROOT / "tests" / "test_v8_audio_istft_oracle.py",
@@ -1318,6 +1334,8 @@ QUICK_TESTS = [
     "relu_bf16", "rmsnorm_bf16",
     "q4k_kernels", "idle_nightly_coordinator",
     "tts_kokoro_shape_bounds", "tts_istft_oracle", "tts_duration_expand_oracle",
+    "tts_runtime_extent", "tts_runtime_extent_contract", "tts_checked_call_codegen",
+    "tts_runtime_extent_lowering",
     "tts_live_torch_oracles",
 ]
 

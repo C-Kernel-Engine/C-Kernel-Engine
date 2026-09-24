@@ -27,7 +27,63 @@ class Qwen38ContractTests(unittest.TestCase):
                     "weights": {"B": {"dtype": dtype}},
                 }]}
                 with self.assertRaisesRegex(RuntimeError, "Weight/kernel dtype mismatch"):
-                    build_ir_v8.validate_buffer_assignments(lowered)
+                    build_ir_v8.validate_weight_kernel_dtypes(lowered)
+
+    def test_normal_lowering_rejects_packed_weight_for_float_provider(self) -> None:
+        # This small valid lowering fixture checks the automatic validation
+        # boundary, independently of the direct validator test above.
+        config = {
+            "context_length": 4, "embed_dim": 8, "num_heads": 1,
+            "num_kv_heads": 1, "head_dim": 8, "intermediate_size": 16,
+            "num_layers": 1,
+        }
+        buffers = [
+            {"name": name, "offset": index * 4096, "size": 4096, "dtype": "fp32"}
+            for index, name in enumerate((
+                "embedded_input", "layer_input", "residual", "mlp_scratch",
+                "kv_cache", "rope_cache", "logits",
+            ))
+        ]
+        for dtype in ("q8_0", "q4_k", "q6_k"):
+            with self.subTest(dtype=dtype):
+                weight_name = "layer.0.ssm_alpha"
+                op = {
+                    "idx": 0, "op": "recurrent_alpha_proj", "layer": 0,
+                    "section": "body", "kernel": "gemm_nt_f32_llama_production",
+                    "function": "gemm_nt_f32_llama_production",
+                    "inputs": {"x": {"dtype": "fp32", "shape": [1, 8]}},
+                    "outputs": {"y": {"dtype": "fp32", "shape": [1, 8]}},
+                    "scratch": [],
+                    "weights": {"B": {"name": weight_name, "dtype": dtype,
+                                      "offset": 0, "size": 32}},
+                    "graph_slots": {
+                        "inputs": {"x": "main_stream"},
+                        "outputs": {"y": "main_stream"},
+                    },
+                    "dataflow": {
+                        "inputs": {"x": {"slot": "main_stream", "dtype": "fp32"}},
+                        "outputs": {"y": {"slot": "main_stream", "dtype": "fp32"}},
+                    },
+                    "params": {"seq_len": 1},
+                }
+                layout = {
+                    "config": config,
+                    "memory": {
+                        "weights": {"entries": [
+                            {"name": weight_name, "offset": 0, "size": 32,
+                             "dtype": dtype},
+                        ]},
+                        "activations": {"buffers": buffers},
+                    },
+                }
+                manifest = {
+                    "config": config,
+                    "template": {"contract": {"version": 1}},
+                }
+                with self.assertRaisesRegex(RuntimeError, "Weight/kernel dtype mismatch"):
+                    build_ir_v8.generate_ir_lower_2(
+                        [op], layout, manifest, {}, mode="prefill"
+                    )
 
     def test_scalar_projection_contract_requires_manifest_fp32_weights(self) -> None:
         for family in ("qwen35", "qwen38"):
