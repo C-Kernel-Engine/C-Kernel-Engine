@@ -11,6 +11,7 @@ var dir_40856f0cdd4bcafd28810d9265a200f7 =
     [ "audio_duration_expand.c", "audio__duration__expand_8c.html", "audio__duration__expand_8c" ],
     [ "audio_istft_mag_phase.c", "audio__istft__mag__phase_8c.html", "audio__istft__mag__phase_8c" ],
     [ "audio_kernels.c", "audio__kernels_8c.html", "audio__kernels_8c" ],
+    [ "audio_lstm_scan.c", "audio__lstm__scan_8c.html", "audio__lstm__scan_8c" ],
     [ "axpy_kernels.c", "axpy__kernels_8c.html", "axpy__kernels_8c" ],
     [ "deepseek_kernels.c", "deepseek__kernels_8c.html", "deepseek__kernels_8c" ],
     [ "deltanet_kernels.c", "deltanet__kernels_8c.html", "deltanet__kernels_8c" ],
