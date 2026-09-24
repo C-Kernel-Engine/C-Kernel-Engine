@@ -1406,10 +1406,10 @@ The provider maps declare backward and training unsupported.</p>
 <tr>
 <td>Generated producer → length validation → consumer</td>
 <td>FP32 / forward</td>
-<td>Synthetic independent reference</td>
-<td>Pending PR A</td>
-<td>NOT_TESTED</td>
-<td>No generated graph exists yet.</td>
+<td>Independent synthetic duration-expansion reference; committed PyTorch inverse-STFT fixture</td>
+<td><code>tests/test_v8_runtime_extent_lowering.py</code>; <code>tests/test_v8_checked_call_codegen.py</code>; <code>tests/test_v8_xray_numerical_parity.py</code></td>
+<td><code>.github/workflows/tts-kernels.yml</code>; <code>scripts/nightly_runner.py</code> keys <code>tts_runtime_extent_lowering</code>, <code>tts_checked_call_codegen</code></td>
+<td>PASS: #560/#566 generate, compile, and execute a bounded synthetic graph through normal v8 codegen. Tests cover valid extents, physical padding, repeated requests, capacity/alignment rejection, and stopping downstream calls on provider failure. This is not a Kokoro acoustic graph.</td>
 </tr>
 <tr>
 <td>Generated Kokoro phoneme → waveform</td>
