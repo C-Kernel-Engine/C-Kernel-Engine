@@ -447,15 +447,10 @@ def compare_dumps(
 ) -> Dict:
     """Compare two dumps and return statistics."""
 
-    # Trim to same size if needed
     ref_data = ref_dump.data.flatten()
     test_data = test_dump.data.flatten()
 
-    min_len = min(len(ref_data), len(test_data))
-    ref_data = ref_data[:min_len]
-    test_data = test_data[:min_len]
-
-    if min_len == 0:
+    if len(ref_data) == 0 or len(ref_data) != len(test_data):
         return {
             "status": "ERROR",
             "max_abs_diff": float('inf'),
@@ -469,6 +464,7 @@ def compare_dumps(
             "ref_shape": [int(x) for x in ref_dump.data.shape],
             "test_shape": [int(x) for x in test_dump.data.shape],
             "size_mismatch": True,
+            "capture_error": "empty or unequal tensor extent",
         }
 
     # Compute differences

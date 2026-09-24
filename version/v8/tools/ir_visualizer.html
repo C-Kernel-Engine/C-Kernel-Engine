@@ -18410,6 +18410,14 @@ ${globalRefreshCmd}</pre>
             const status = xrayReportStatus(report);
             const checks = rankingReport && Array.isArray(rankingReport.checks) ? rankingReport.checks : [];
             const flips = checks.filter(c => c && c.ck_top1 !== c.oracle_top1).length;
+            if (status === 'incomplete' || report?.final_report?.coverage_status === 'incomplete') {
+                return {
+                    level: 'incomplete',
+                    line: status === 'fail'
+                        ? 'incomplete capture; aligned numerical failure observed'
+                        : 'incomplete capture; numerical origin unresolved'
+                };
+            }
             if (flips > 0) {
                 return { level: 'behavioral', line: flips + ' top-1 flip(s) vs oracle — behavioral divergence' };
             }
@@ -19203,6 +19211,7 @@ ${globalRefreshCmd}</pre>
                 : '';
             const verdictChip = (v) => {
                 if (v.level === 'pass') return '<span class="status-chip status-chip-good">pass · within gate</span>';
+                if (v.level === 'incomplete') return '<span class="status-chip status-chip-warn">' + escapeHtml(v.line) + '</span>';
                 if (v.level === 'cosmetic') return '<span class="status-chip status-chip-warn">drift · output unchanged</span>';
                 if (v.level === 'behavioral') return '<span class="status-chip status-chip-bad">behavioral divergence</span>';
                 if (v.level === 'fail') return '<span class="status-chip status-chip-bad">thresholds crossed</span>';
@@ -19210,6 +19219,7 @@ ${globalRefreshCmd}</pre>
             };
             const verdictColor = (v) => (
                 v.level === 'pass' ? '#47b475'
+                : v.level === 'incomplete' ? '#ffb400'
                 : v.level === 'cosmetic' ? '#ffb400'
                 : (v.level === 'behavioral' || v.level === 'fail') ? '#e74c3c'
                 : 'var(--grey)');

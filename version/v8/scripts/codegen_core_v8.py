@@ -2038,10 +2038,22 @@ def emit_op(
         )
         if dump and out_expr:
             lines.append("    #ifdef CK_PARITY_DUMP")
-            lines.append(
-                f'    ck_dump_tensor((float*){_hidden_raw(out_expr)}, {layer}, '
-                '"kqv_out", NUM_HEADS * HEAD_DIM);'
-            )
+            if function.startswith("attention_forward_full_head_major"):
+                heads = _hidden_arg("num_heads", "query_heads")
+                rows = _hidden_arg("num_tokens", "q_tokens", "tokens", "rows")
+                logical_width = _hidden_arg("head_dim")
+                physical_width = _hidden_arg("aligned_head_dim") or logical_width
+                if not all((heads, rows, logical_width, physical_width)):
+                    raise ValueError("full head-major attention parity dump requires resolved geometry")
+                lines.append(
+                    f'    ck_dump_tensor_head_major_token_major_strided((float*){_hidden_raw(out_expr)}, '
+                    f'{layer}, "kqv_out", {heads}, {rows}, {logical_width}, {physical_width});'
+                )
+            else:
+                lines.append(
+                    f'    ck_dump_tensor((float*){_hidden_raw(out_expr)}, {layer}, '
+                    '"kqv_out", NUM_HEADS * HEAD_DIM);'
+                )
             lines.append("    #endif")
     elif op_name in ("attn_gate_sigmoid_mul", "attn_gate_softplus_mul"):
         out_expr = _hidden_arg("output", "out", "y")
