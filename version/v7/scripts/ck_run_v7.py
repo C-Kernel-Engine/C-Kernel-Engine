@@ -7911,6 +7911,8 @@ def step_run_train_init(args: argparse.Namespace) -> None:
     template_file = getattr(args, "template_file", None)
     if template_file:
         cmd.extend(["--template-file", str(template_file)])
+    if bool(getattr(args, "omit_linear_biases", False)):
+        cmd.append("--omit-linear-biases")
     run_cmd(cmd, cwd=PROJECT_ROOT)
 
     # Run-dir aliases for operator workflows.
@@ -11183,6 +11185,8 @@ Examples:
                              help='Training graph template name (built-ins: qwen3, qwen2, gemma3, llama)')
     init_parser.add_argument('--template-file', default=None,
                              help='Optional custom template JSON path (embedded into weights_manifest.json)')
+    init_parser.add_argument('--omit-linear-biases', action='store_true',
+                             help='Omit optional projection/MLP bias tensors from the initialized contract')
     init_parser.add_argument('--generate-ir', action='store_true',
                              help='Also generate train IR artifacts (IR1 + IR2 + invariants)')
     init_parser.add_argument('--generate-runtime', action='store_true',

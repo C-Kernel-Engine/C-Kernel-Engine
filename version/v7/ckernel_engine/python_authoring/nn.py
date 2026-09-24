@@ -268,6 +268,8 @@ class Attention(Module):
         if self.bias:
             self.register_parameter('qkv_bias', Parameter((qkv_out,), init='zeros', dtype=self.dtype, role='bias'))
         self.register_parameter('out_weight', Parameter((self.dim, self.dim), init=self.init, dtype=self.dtype, role='output_projection'))
+        self.register_parameter('q_norm_weight', Parameter((self.head_dim,), init='ones', dtype=self.dtype, role='q_norm_scale'))
+        self.register_parameter('k_norm_weight', Parameter((self.head_dim,), init='ones', dtype=self.dtype, role='k_norm_scale'))
 
     def spec(self) -> dict[str, Any]:
         return {
@@ -276,6 +278,7 @@ class Attention(Module):
             'kv_heads': self.kv_heads,
             'head_dim': self.head_dim,
             'rope_theta': self.rope_theta,
+            'qk_norm': True,
             'bias': self.bias,
             'dtype': self.dtype,
         }

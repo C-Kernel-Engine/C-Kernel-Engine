@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import math
@@ -22,6 +23,7 @@ WORKFLOW = REPO_ROOT / "version" / "v8" / "scripts" / "run_training_workflow_v8.
 KERNEL_MAPS = REPO_ROOT / "version" / "v8" / "kernel_maps"
 DEFAULT_CORPUS = REPO_ROOT / "version" / "v8" / "training" / "english_byte_v1.json"
 DEFAULT_RUN_ROOT = REPO_ROOT / "version" / "v8" / ".cache" / "python_authoring"
+QWEN3_TEMPLATE = REPO_ROOT / "version" / "v7" / "templates" / "qwen3.json"
 
 CommandRunner = Callable[[Sequence[str], Path], None]
 
@@ -253,11 +255,14 @@ def _module_signature(model: Module) -> dict[str, Any]:
 
 
 def _validate_supported_semantics(model: Module, contract: Mapping[str, Any]) -> None:
+    rope_theta = float(contract["rope_theta"])
+    if not math.isfinite(rope_theta) or rope_theta <= 0.0:
+        raise ValueError("v8 generated training requires a finite positive authored rope_theta")
     expected = qwen3_tiny(
         vocab=int(contract["embedding"].vocab), dim=int(contract["dim"]),
         layers=int(contract["layers"]), hidden=int(contract["hidden"]),
         heads=int(contract["heads"]), kv_heads=int(contract["kv_heads"]),
-        context_len=int(contract["context_len"]), rope_theta=1_000_000.0,
+        context_len=int(contract["context_len"]), rope_theta=rope_theta,
         init="normal_0p02", dtype="float32", name=model.name,
     )
     actual_signature = _module_signature(model)
@@ -276,6 +281,107 @@ def _validate_supported_semantics(model: Module, contract: Mapping[str, Any]) ->
     raise ValueError("v8 generated training cannot preserve the authored model semantics")
 
 
+def _node_id_by_scope(graph: AuthoringGraph) -> dict[str, str]:
+    return {node.scope: node.id for node in graph.nodes}
+
+
+def _semantic_parameter_contract(graph: AuthoringGraph, contract: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Map authored parameters to the generated runtime's stable manifest names."""
+    scopes = _node_id_by_scope(graph)
+    rows: list[dict[str, Any]] = []
+
+    def add(authored_scope: str, authored_name: str, runtime_name: str, shape: Sequence[int]) -> None:
+        rows.append({
+            "authored_semantic_id": scopes[authored_scope],
+            "authored_parameter": f"{authored_scope}.{authored_name}",
+            "runtime_parameter": runtime_name,
+            "shape": [int(value) for value in shape],
+            "dtype": "fp32",
+            "trainable": True,
+        })
+
+    dim = int(contract["dim"]); hidden = int(contract["hidden"])
+    heads = int(contract["heads"]); kv_heads = int(contract["kv_heads"])
+    vocab = int(contract["embedding"].vocab); head_dim = dim // heads
+    add("0", "weight", "token_emb", (vocab, dim))
+    for layer in range(int(contract["layers"])):
+        base = str(layer + 1)
+        add(f"{base}.attn_norm", "weight", f"layer.{layer}.ln1_gamma", (dim,))
+        # The Python Attention surface exposes a packed logical qkv parameter. The
+        # generated runtime materializes its independently addressable projections.
+        attention_id = scopes[f"{base}.attention"]
+        for authored_name, runtime_name, shape in (
+            ("qkv_weight:q", f"layer.{layer}.wq", (dim, dim)),
+            ("qkv_weight:k", f"layer.{layer}.wk", (kv_heads * head_dim, dim)),
+            ("qkv_weight:v", f"layer.{layer}.wv", (kv_heads * head_dim, dim)),
+            ("out_weight", f"layer.{layer}.wo", (dim, dim)),
+            ("q_norm_weight", f"layer.{layer}.q_norm", (head_dim,)),
+            ("k_norm_weight", f"layer.{layer}.k_norm", (head_dim,)),
+        ):
+            rows.append({
+                "authored_semantic_id": attention_id,
+                "authored_parameter": f"{base}.attention.{authored_name}",
+                "runtime_parameter": runtime_name,
+                "shape": list(shape), "dtype": "fp32", "trainable": True,
+            })
+        add(f"{base}.ffn_norm", "weight", f"layer.{layer}.ln2_gamma", (dim,))
+        add(f"{base}.feed_forward", "gate_up_weight", f"layer.{layer}.w1", (2 * hidden, dim))
+        add(f"{base}.feed_forward", "down_weight", f"layer.{layer}.w2", (dim, hidden))
+    add(str(int(contract["layers"]) + 1), "weight", "final_ln_weight", (dim,))
+    add(str(int(contract["layers"]) + 2), "weight", "output.weight", (vocab, dim))
+    return rows
+
+
+def _semantic_lowering_document(graph: AuthoringGraph, contract: Mapping[str, Any]) -> dict[str, Any]:
+    scopes = _node_id_by_scope(graph)
+    layers = []
+    for layer in range(int(contract["layers"])):
+        scope = str(layer + 1)
+        layers.append({
+            "index": layer,
+            "block": scopes[scope],
+            "block_label": next(node.label for node in graph.nodes if node.scope == scope),
+            "attn_norm": scopes[f"{scope}.attn_norm"],
+            "attention": scopes[f"{scope}.attention"],
+            "ffn_norm": scopes[f"{scope}.ffn_norm"],
+            "feed_forward": scopes[f"{scope}.feed_forward"],
+            "rope_theta": float(contract["rope_theta"]),
+        })
+    model_contract = {
+        "family": "qwen3_style_dense_reduced", "dtype": "fp32",
+        "layers": int(contract["layers"]), "d_model": int(contract["dim"]),
+        "hidden": int(contract["hidden"]), "heads": int(contract["heads"]),
+        "kv_heads": int(contract["kv_heads"]), "seq_len": int(contract["context_len"]),
+        "vocab_size": int(contract["embedding"].vocab),
+        "rope_theta": float(contract["rope_theta"]), "activation": str(contract["activation"]),
+        "bias": False, "normalization": "rmsnorm", "norm_epsilon": 1e-6,
+        "initialization": "normal_0p02",
+    }
+    template = copy.deepcopy(json.loads(QWEN3_TEMPLATE.read_text(encoding="utf-8")))
+    trace = {
+        "schema": "cke.v8.python_semantic_trace.v1",
+        "root": graph.root_id, "embedding": scopes["0"],
+        "layers": layers,
+        "final_norm": scopes[str(int(contract["layers"]) + 1)],
+        "lm_head": scopes[str(int(contract["layers"]) + 2)],
+    }
+    template["python_semantic_lowering"] = trace
+    return {
+        "schema": "cke.v8.python_semantic_model.v1",
+        "graph": graph.to_dict(), "model_contract": model_contract,
+        "supported_semantics": {
+            "topology": f"Embedding -> ordered TransformerBlock[{int(contract['layers'])}] -> RMSNorm -> Linear",
+            "attention": ["dense", "unequal_head_gqa"], "activation": ["swiglu"],
+            "bias": [False], "normalization": [{"kind": "rmsnorm", "epsilon": 1e-6}],
+            "dtype": ["fp32"], "initialization": ["normal_0p02"],
+            "rope_theta": "finite_positive_global_value",
+        },
+        "operation_trace": trace,
+        "parameter_contract": _semantic_parameter_contract(graph, contract),
+        "template": template,
+    }
+
+
 def _git_commit() -> str:
     completed = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=REPO_ROOT, text=True,
@@ -286,6 +392,11 @@ def _git_commit() -> str:
 
 def _json_sha256(value: Mapping[str, Any]) -> str:
     encoded = json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _json_artifact_sha256(value: Mapping[str, Any]) -> str:
+    encoded = (json.dumps(value, indent=2, sort_keys=True) + "\n").encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
 
 
@@ -318,6 +429,13 @@ class CompiledTrainingExperiment:
     def manifest_path(self) -> Path:
         return self.run_dir / "training_experiment_manifest.json"
 
+    @property
+    def semantic_model_path(self) -> Path:
+        return self.run_dir / "python_training_semantic_model.json"
+
+    def semantic_model_document(self) -> dict[str, Any]:
+        return _semantic_lowering_document(self.graph, self.contract)
+
     def experiment_document(self) -> dict[str, Any]:
         corpus = Path(self.dataset.corpus).expanduser().resolve(strict=False)
         return {
@@ -328,6 +446,8 @@ class CompiledTrainingExperiment:
                 "layers": self.contract["layers"], "d_model": self.contract["dim"],
                 "hidden": self.contract["hidden"], "heads": self.contract["heads"],
                 "kv_heads": self.contract["kv_heads"], "seq_len": self.contract["context_len"],
+                "rope_theta": self.contract["rope_theta"],
+                "semantic_model": str(self.semantic_model_path),
                 "graph": self.graph.to_dict(),
             },
             "dataset": {**self.dataset.to_dict(), "sha256": _sha256(corpus) if corpus.is_file() else None},
@@ -346,24 +466,27 @@ class CompiledTrainingExperiment:
             "architecture": "qwen3_style_dense_reduced", "layers": int(c["layers"]),
             "dtype": "fp32", "d_model": int(c["dim"]), "hidden": int(c["hidden"]),
             "heads": int(c["heads"]), "kv_heads": int(c["kv_heads"]),
+            "rope_theta": float(c["rope_theta"]),
             "vocab_size": int(t.vocab_size), "tokenizer": t.kind,
             "seq_len": int(c["context_len"]), "epochs": int(train.epochs),
             "grad_accum": int(train.grad_accum), "optimizer": "generated_c_adamw",
             "lr": float(train.learning_rate), "beta1": float(train.beta1),
             "beta2": float(train.beta2), "eps": float(train.epsilon),
             "weight_decay": float(train.weight_decay),
+            "semantic_model_sha256": _json_artifact_sha256(self.semantic_model_document()),
         }
 
     def command(
         self, *, invocation_id: Optional[str] = None, experiment_sha256: Optional[str] = None,
     ) -> list[str]:
-        c = self.contract; d = self.dataset; t = self.tokenizer; train = self.training
+        d = self.dataset; t = self.tokenizer; train = self.training
+        semantic_sha256 = _json_artifact_sha256(self.semantic_model_document())
         command = [
             self.python, str(WORKFLOW), "--run-dir", str(self.run_dir), "--json-out", str(self.report_path),
             "--corpus", str(Path(d.corpus).expanduser().resolve(strict=False)), "--seed", str(train.seed),
-            "--seq-len", str(c["context_len"]), "--epochs", str(train.epochs),
-            "--layers", str(c["layers"]), "--d-model", str(c["dim"]), "--hidden", str(c["hidden"]),
-            "--num-heads", str(c["heads"]), "--num-kv-heads", str(c["kv_heads"]),
+            "--semantic-model", str(self.semantic_model_path),
+            "--semantic-model-sha256", semantic_sha256,
+            "--epochs", str(train.epochs),
             "--tokenizer", t.kind, "--vocab-size", str(t.vocab_size),
             "--bpe-min-freq", str(t.min_frequency), "--bpe-max-piece-bytes", str(t.max_piece_bytes),
             "--max-train-tokens", str(d.max_train_tokens),
@@ -383,11 +506,17 @@ class CompiledTrainingExperiment:
 
     def preflight(self) -> dict[str, Any]:
         self.run_dir.mkdir(parents=True, exist_ok=True)
+        semantic_model = self.semantic_model_document()
+        self.semantic_model_path.write_text(
+            json.dumps(semantic_model, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
         experiment = self.experiment_document()
         self.experiment_path.write_text(json.dumps(experiment, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         report = _candidate_capability_inventory()
         report["experiment"] = str(self.experiment_path)
         report["experiment_sha256"] = _sha256(self.experiment_path)
+        report["semantic_model"] = str(self.semantic_model_path)
+        report["semantic_model_sha256"] = _sha256(self.semantic_model_path)
         self.preflight_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         if not report["can_launch_generated_workflow"]:
             details = "; ".join(row["action"] for row in report["missing"])
@@ -568,8 +697,8 @@ def compile(
     python: str = sys.executable,
 ) -> CompiledTrainingExperiment:
     contract = extract_tiny_lm_contract(model, frontend="v8")
-    if contract["layers"] not in {4, 6, 10}:
-        raise ValueError("v8 generated training currently supports exactly 4, 6, or 10 dense/GQA layers")
+    if contract["layers"] not in {4, 5, 6, 10}:
+        raise ValueError("v8 generated training currently supports exactly 4, 5, 6, or 10 dense/GQA layers")
     if any(str(parameter.dtype) != "float32" for parameter in model.parameters()):
         raise ValueError("v8 generated training authoring currently supports FP32 parameters only")
     _validate_supported_semantics(model, contract)

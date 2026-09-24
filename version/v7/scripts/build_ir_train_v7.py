@@ -668,6 +668,9 @@ def build_ir1_train(
     tensors: Dict[str, Dict[str, Any]] = {}
     issues: List[str] = []
     warnings: List[str] = []
+    semantic_trace = template.get("python_semantic_lowering")
+    if not isinstance(semantic_trace, dict):
+        semantic_trace = {}
     bridge_enabled = bridge_lowering == "explicit"
     train_attention_runtime_contract, train_attention_contract_warning = _template_attention_runtime_contract(
         template,
@@ -678,6 +681,37 @@ def build_ir1_train(
 
     op_id = 0
     instance_counter: Dict[str, int] = {}
+
+    def authored_semantic_id(logical_op: str, section: str, layer: int, instance: int = 0) -> Optional[str]:
+        if not semantic_trace:
+            return None
+        if section == "header":
+            return str(semantic_trace.get("embedding") or semantic_trace.get("root") or "") or None
+        if section == "footer":
+            key = "final_norm" if logical_op in ("rmsnorm", "final_rmsnorm") else "lm_head"
+            return str(semantic_trace.get(key) or "") or None
+        rows = semantic_trace.get("layers")
+        if not isinstance(rows, list) or layer < 0 or layer >= len(rows) or not isinstance(rows[layer], dict):
+            return None
+        row = rows[layer]
+        if logical_op == "rmsnorm":
+            key = "attn_norm" if instance == 0 else "ffn_norm"
+        elif logical_op in ("q_proj", "k_proj", "v_proj", "qk_norm", "rope_qk", "attn", "attn_sliding", "out_proj"):
+            key = "attention"
+        elif logical_op in ("mlp_gate_up", "silu_mul", "geglu", "mlp_down"):
+            key = "feed_forward"
+        else:
+            key = "block"
+        return str(row.get(key) or row.get("block") or "") or None
+
+    def authored_semantic_properties(logical_op: str, section: str, layer: int) -> Dict[str, Any]:
+        if logical_op != "rope_qk" or section != "body":
+            return {}
+        rows = semantic_trace.get("layers")
+        if not isinstance(rows, list) or layer < 0 or layer >= len(rows) or not isinstance(rows[layer], dict):
+            return {}
+        theta = rows[layer].get("rope_theta")
+        return {"rope_theta": float(theta)} if theta is not None else {}
 
     # External inputs.
     tensors["input.token_ids"] = {
@@ -897,6 +931,12 @@ def build_ir1_train(
                 "layout_out": layout_out,
             },
         }
+        semantic_id = authored_semantic_id(owner_op, section, layer, instance)
+        if semantic_id:
+            op["authored_semantic_id"] = semantic_id
+        semantic_properties = authored_semantic_properties(owner_op, section, layer)
+        if semantic_properties:
+            op["authored_semantic_properties"] = semantic_properties
         ops.append(op)
         created_op_id = op_id
         op_id += 1
@@ -1307,6 +1347,12 @@ def build_ir1_train(
             "grad_rule": grad_rule,
             "requires_grad": True
         }
+        semantic_id = authored_semantic_id(logical_op, section, layer, instance)
+        if semantic_id:
+            op["authored_semantic_id"] = semantic_id
+        semantic_properties = authored_semantic_properties(logical_op, section, layer)
+        if semantic_properties:
+            op["authored_semantic_properties"] = semantic_properties
 
         derive_save_for_backward(op)
         attach_runtime_contract(op)
@@ -1347,6 +1393,9 @@ def build_ir1_train(
                 "requires_grad": False,
                 "save_for_backward": {}
             }
+            semantic_id = authored_semantic_id(raw_op, "header", -1, int(op["instance"]))
+            if semantic_id:
+                op["authored_semantic_id"] = semantic_id
             ops.append(op)
             op_id += 1
             continue
@@ -1819,6 +1868,9 @@ def build_ir1_train(
                 "requires_grad": False,
                 "save_for_backward": {}
             }
+            semantic_id = authored_semantic_id(raw_op, "footer", -1, int(op["instance"]))
+            if semantic_id:
+                op["authored_semantic_id"] = semantic_id
             ops.append(op)
             op_id += 1
             continue
@@ -1854,6 +1906,7 @@ def build_ir1_train(
         "config": config,
         "template_name": template.get("name", "unknown"),
         "template_source": template_source,
+        "python_semantic_lowering": semantic_trace or None,
         "num_layers": num_layers,
         "ops": ops,
         "tensors": tensors,
