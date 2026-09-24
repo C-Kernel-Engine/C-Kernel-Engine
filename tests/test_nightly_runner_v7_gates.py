@@ -53,6 +53,10 @@ class NightlyRunnerV7GateTests(unittest.TestCase):
             "v8-training-matrix-nightly",
         )
         self.assertEqual(
+            nightly.MAKE_TARGETS["v8_training_composition_gqa"]["target"],
+            "v8-training-composition-nightly",
+        )
+        self.assertEqual(
             nightly.MAKE_TARGET_FAILURE_ARTIFACTS["v8-training-matrix-nightly"],
             ROOT / "version" / "v8" / ".cache" / "reports" / "training_matrix_latest.json",
         )

@@ -697,8 +697,8 @@ def compile(
     python: str = sys.executable,
 ) -> CompiledTrainingExperiment:
     contract = extract_tiny_lm_contract(model, frontend="v8")
-    if contract["layers"] not in {4, 5, 6, 10}:
-        raise ValueError("v8 generated training currently supports exactly 4, 5, 6, or 10 dense/GQA layers")
+    if contract["layers"] not in {2, 4, 5, 6, 10}:
+        raise ValueError("v8 generated training currently supports exactly 2, 4, 5, 6, or 10 dense/GQA layers")
     if any(str(parameter.dtype) != "float32" for parameter in model.parameters()):
         raise ValueError("v8 generated training authoring currently supports FP32 parameters only")
     _validate_supported_semantics(model, contract)

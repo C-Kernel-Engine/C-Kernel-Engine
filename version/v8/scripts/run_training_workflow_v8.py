@@ -93,8 +93,8 @@ def _apply_semantic_model(args: argparse.Namespace) -> tuple[dict[str, Any] | No
     trace = document.get("operation_trace")
     if not all(isinstance(value, dict) for value in (contract, template, graph, trace)):
         raise RuntimeError("semantic model is missing graph, contract, trace, or template")
-    if int(contract.get("layers", 0)) not in {4, 5, 6, 10}:
-        raise RuntimeError("Python semantic graph supports the certified 4, 5, 6, or 10 layer depths")
+    if int(contract.get("layers", 0)) not in {2, 4, 5, 6, 10}:
+        raise RuntimeError("Python semantic graph supports the certified 2, 4, 5, 6, or 10 layer depths")
     if contract.get("dtype") != "fp32" or contract.get("activation") != "swiglu":
         raise RuntimeError("semantic model requests unsupported dtype or activation")
     if contract.get("bias") is not False or contract.get("normalization") != "rmsnorm":
@@ -905,6 +905,152 @@ def _tensor_discrepancies(
     return rows
 
 
+def _compare_named_snapshot(
+    actual: np.ndarray, expected: np.ndarray, names: Sequence[str], numels: Sequence[int],
+    *, atol: float, rtol: float = 0.0,
+) -> dict[str, Any]:
+    """Check every element and retain its owning tensor and worst index."""
+    if not names or len(names) != len(numels) or len(set(names)) != len(names):
+        raise RuntimeError("snapshot comparison requires unique named tensor slots")
+    if not math.isfinite(atol) or not math.isfinite(rtol) or atol < 0 or rtol < 0:
+        raise RuntimeError("snapshot comparison tolerances must be finite and nonnegative")
+    a = np.asarray(actual, dtype=np.float32).reshape(-1)
+    e = np.asarray(expected, dtype=np.float32).reshape(-1)
+    if a.size != e.size or a.size != sum(int(n) for n in numels):
+        raise RuntimeError("named snapshot size does not match the parameter inventory")
+    rows: list[dict[str, Any]] = []
+    cursor = 0
+    for name, raw_count in zip(names, numels):
+        count = int(raw_count)
+        if count <= 0:
+            raise RuntimeError(f"named snapshot has an empty tensor: {name}")
+        left = a[cursor:cursor + count]; right = e[cursor:cursor + count]
+        nonfinite = np.flatnonzero(~(np.isfinite(left) & np.isfinite(right)))
+        if nonfinite.size:
+            rows.append({"name": str(name), "numel": count, "passed": False,
+                         "status": "NONFINITE", "worst_index": int(nonfinite[0]),
+                         "max_abs_diff": None, "max_rel_diff": None})
+        else:
+            delta = np.abs(left.astype(np.float64) - right.astype(np.float64))
+            threshold = atol + rtol * np.abs(right.astype(np.float64))
+            worst = int(np.argmax(delta - threshold))
+            rows.append({"name": str(name), "numel": count,
+                         "passed": bool(np.all(delta <= threshold)), "status": "FINITE",
+                         "worst_index": worst, "max_abs_diff": float(delta.max()),
+                         "max_rel_diff": float(np.max(delta / np.maximum(np.abs(right), 1e-12))),
+                         "worst_actual": float(left[worst]), "worst_reference": float(right[worst]),
+                         "worst_allowed_abs_diff": float(threshold[worst])})
+        cursor += count
+    failures = [row for row in rows if not row["passed"]]
+    finite_rows = [row for row in rows if row["status"] == "FINITE"]
+    worst = failures[0] if failures else max(finite_rows, key=lambda row: row["max_abs_diff"])
+    return {"passed": not failures, "tensor_count": len(rows), "element_count": int(a.size),
+            "atol": atol, "rtol": rtol,
+            "max_abs_diff": max((row["max_abs_diff"] for row in finite_rows), default=None),
+            "max_rel_diff": max((row["max_rel_diff"] for row in finite_rows), default=None),
+            "worst_tensor": worst["name"], "worst_index": worst["worst_index"],
+            "failed_tensors": [row["name"] for row in failures], "tensors": rows}
+
+
+def _gradient_routing_negative_control(names: Sequence[str], numels: Sequence[int]) -> dict[str, Any]:
+    """Swap two distinguishable named gradient slots; the comparator must reject it."""
+    if len(names) < 2:
+        raise RuntimeError("gradient routing control requires two parameter tensors")
+    expected = np.concatenate([
+        np.full(int(count), index + 1, dtype=np.float32)
+        for index, count in enumerate(numels)
+    ])
+    injected = expected.copy()
+    second = int(numels[0])
+    injected[0], injected[second] = injected[second], injected[0]
+    result = _compare_named_snapshot(injected, expected, names, numels, atol=0.0)
+    return {"passed": not result["passed"] and set(result["failed_tensors"]) == set(names[:2]),
+            "injection": "swap_first_element_between_two_named_gradient_slots",
+            "source": str(names[0]), "destination": str(names[1]),
+            "detected_failed_tensors": result["failed_tensors"]}
+
+
+def _new_microstep_parity_state() -> dict[str, Any]:
+    return {"passed": True, "window_passed": True, "first_failed_microstep": None,
+            "window_first_failed_microstep": None, "max_loss_abs_diff": 0.0,
+            "max_logits_abs_diff": 0.0}
+
+
+def _observe_microstep_parity(
+    state: dict[str, Any], microstep: int, logits_comparison: Mapping[str, Any],
+    ck_loss: float, torch_loss: float, *, loss_tol: float,
+) -> dict[str, Any]:
+    """Keep a failed forward comparison failed through the next update boundary."""
+    loss_diff = abs(ck_loss - torch_loss) if math.isfinite(ck_loss) and math.isfinite(torch_loss) else None
+    logits_diff = logits_comparison.get("max_abs_diff")
+    logits_finite = logits_diff is not None and math.isfinite(float(logits_diff))
+    if loss_diff is None:
+        state["max_loss_abs_diff"] = None
+    elif state["max_loss_abs_diff"] is not None:
+        state["max_loss_abs_diff"] = max(state["max_loss_abs_diff"], loss_diff)
+    if not logits_finite:
+        state["max_logits_abs_diff"] = None
+    elif state["max_logits_abs_diff"] is not None:
+        state["max_logits_abs_diff"] = max(state["max_logits_abs_diff"], float(logits_diff))
+    passed = bool(logits_comparison.get("passed") is True and logits_finite
+                  and loss_diff is not None and loss_diff <= loss_tol)
+    if not passed:
+        failure = {"microstep": microstep, "loss_abs_diff": loss_diff,
+                   "loss_status": "NONFINITE" if loss_diff is None else "FINITE",
+                   "logits": dict(logits_comparison)}
+        if state["first_failed_microstep"] is None:
+            state["first_failed_microstep"] = failure
+        if state["window_first_failed_microstep"] is None:
+            state["window_first_failed_microstep"] = failure
+        state["passed"] = False
+        state["window_passed"] = False
+    return {"passed": passed, "loss_abs_diff": loss_diff}
+
+
+def _close_microstep_parity_window(state: dict[str, Any]) -> dict[str, Any]:
+    result = {"passed": state["window_passed"],
+              "first_failed_microstep": state["window_first_failed_microstep"]}
+    state["window_passed"] = True
+    state["window_first_failed_microstep"] = None
+    return result
+
+
+def _trajectory_passed(
+    microstep_state: Mapping[str, Any], parity_rows: Sequence[Mapping[str, Any]],
+    final_partial: Mapping[str, Any],
+) -> bool:
+    return bool(microstep_state.get("passed") is True
+                and all(row.get("passed") is True for row in parity_rows)
+                and final_partial.get("passed") is True)
+
+
+def _microstep_sticky_negative_control() -> dict[str, Any]:
+    """A non-boundary NaN must survive a later finite boundary comparison."""
+    state = _new_microstep_parity_state()
+    good = _compare_named_snapshot(np.array([1.0], dtype=np.float32),
+                                   np.array([1.0], dtype=np.float32), ["logits"], [1], atol=0.0)
+    bad = _compare_named_snapshot(np.array([np.nan], dtype=np.float32),
+                                  np.array([1.0], dtype=np.float32), ["logits"], [1], atol=0.0)
+    for microstep, comparison in ((1, good), (2, bad), (3, good), (4, good)):
+        _observe_microstep_parity(state, microstep, comparison, 1.0, 1.0, loss_tol=0.0)
+    window = _close_microstep_parity_window(state)
+    for microstep in range(5, 9):
+        _observe_microstep_parity(state, microstep, good, 1.0, 1.0, loss_tol=0.0)
+    next_window = _close_microstep_parity_window(state)
+    aggregate_passed = _trajectory_passed(state, [{"passed": True}, {"passed": True}], {"passed": True})
+    return {"passed": bool(not aggregate_passed and not state["passed"] and not window["passed"]
+                           and next_window["passed"]
+                           and state["max_logits_abs_diff"] is None
+                           and state["first_failed_microstep"]["microstep"] == 2
+                           and window["first_failed_microstep"]["microstep"] == 2),
+            "injection": "nonfinite_logits_at_nonboundary_microstep_2_then_finite_boundary_4",
+            "first_failed_microstep": state["first_failed_microstep"],
+            "aggregate_passed": aggregate_passed,
+            "window_passed": window["passed"],
+            "next_window_passed": next_window["passed"],
+            "max_logits_abs_diff": state["max_logits_abs_diff"]}
+
+
 def _restore_training_state(
     lib: ctypes.CDLL,
     *,
@@ -1479,6 +1625,18 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             if semantic_model is not None else None
         )
         inventory = CERT._validate_parameter_inventory(summary, args.run_dir, expected)
+        gradient_names = [str(row["name"]) for row in inventory]
+        gradient_numels = [int(row["numel"]) for row in inventory]
+        gradient_routing_negative = _gradient_routing_negative_control(gradient_names, gradient_numels)
+        microstep_sticky_negative = _microstep_sticky_negative_control()
+        weight_rows = [row for row in summary["tensor_slots"] if str(row.get("name", "")).startswith("weight.") and row.get("section") == "weights"]
+        weight_rows.sort(key=lambda row: int(row.get("offset", 0)))
+        weight_names = [str(row["name"])[len("weight."):] for row in weight_rows]
+        weight_numels = [int(row["numel"]) for row in weight_rows]
+        optimizer_rows = [row for row in summary["tensor_slots"] if row.get("section") in {"optimizer_m", "optimizer_v"}]
+        optimizer_rows.sort(key=lambda row: int(row.get("offset", 0)))
+        optimizer_names = [str(row["name"]) for row in optimizer_rows]
+        optimizer_numels = [int(row["numel"]) for row in optimizer_rows]
         semantic_operation_check = (
             _validate_semantic_operation_trace(args.run_dir, semantic_model)
             if semantic_model is not None else None
@@ -1504,7 +1662,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         sample_prompt = "<svg" if corpus.get("domain") == "svg_xml" else "The "
         sample_before, sample_before_probe = _sample(lib, summary, args.seq_len, corpus, prompt=sample_prompt)
         decoded, cfg = oracle._decode_weight_snapshot(args.run_dir, summary, initial)
-        names = [str(r["name"]) for r in inventory]
+        names = gradient_names
         weights = {n: v.detach().clone().requires_grad_(n in names) for n, v in decoded.items()}
         model = oracle.SnapshotQwenLikeOracle(weights, cfg)
         optimizer = torch.optim.AdamW([weights[n] for n in names], lr=args.lr, betas=(args.beta1, args.beta2),
@@ -1513,7 +1671,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         loss_rows, epoch_rows, parity_rows = [], [], []
         timing = {"step_ms": 0.0, "forward_ms": 0.0, "backward_ms": 0.0, "optimizer_ms": 0.0}
         token_count = 0; update_count = 0; max_weight_diff = 0.0; max_moment_diff = 0.0; max_grad_diff = 0.0
-        max_loss_diff = 0.0; max_logits_diff = 0.0
+        microstep_parity = _new_microstep_parity_state()
         first_update: dict[str, Any] | None = None
         checkpoint_at = max(1, len(batches) // 2)
         checkpoint_at = checkpoint_at - (checkpoint_at % args.grad_accum) + min(3, args.grad_accum - 1)
@@ -1528,27 +1686,45 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             tx = torch.from_numpy(x.astype(np.int64)).view(1, -1); ty = torch.from_numpy(y.astype(np.int64)).view(1, -1)
             logits = model.forward(tx)
             t_loss = F.cross_entropy(logits[:, :valid, :].reshape(-1, args.vocab_size), ty[:, :valid].reshape(-1), reduction="mean")
-            max_loss_diff = max(max_loss_diff, abs(ck_loss - float(t_loss.item())))
-            if micro == 1 or ((micro - 1) % (len(batches) // args.epochs) == 0):
-                ck_logits = [value for name, value in CERT._activation_snapshot(lib, summary).items() if ".logits." in name][0]
-                max_logits_diff = max(max_logits_diff, float(np.max(np.abs(ck_logits - logits.detach().float().reshape(-1).numpy()))))
+            boundary = (micro % args.grad_accum == 0)
+            ck_logits = [value for name, value in CERT._activation_snapshot(lib, summary).items() if ".logits." in name][0]
+            logits_comparison = _compare_named_snapshot(
+                ck_logits[:valid * args.vocab_size],
+                logits[:, :valid, :].detach().float().reshape(-1).numpy(),
+                ["valid_token_logits"], [valid * args.vocab_size], atol=args.logits_tol)
+            microstep_result = _observe_microstep_parity(
+                microstep_parity, micro, logits_comparison, ck_loss, float(t_loss.item()),
+                loss_tol=args.loss_tol)
             (t_loss * valid).backward(); token_count += valid
             epoch_ck_loss_sum += ck_loss * valid; epoch_pt_loss_sum += float(t_loss.item()) * valid; epoch_tokens += valid
             loss_rows.append({"microstep": micro, "epoch": epoch + 1, "valid_tokens": valid, "cke": ck_loss, "pytorch": float(t_loss.item())})
-            boundary = (micro % args.grad_accum == 0)
             if boundary:
+                microstep_window = _close_microstep_parity_window(microstep_parity)
                 for n in names: weights[n].grad.div_(token_count)
                 torch_grad = np.concatenate([weights[n].grad.detach().float().reshape(-1).numpy() for n in names])
-                grad_diff = float(np.max(np.abs(_grad_export(lib) - torch_grad)))
+                grad_comparison = _compare_named_snapshot(
+                    _grad_export(lib), torch_grad, gradient_names, gradient_numels, atol=args.grad_tol)
+                grad_diff = float(grad_comparison["max_abs_diff"] or 0.0)
                 max_grad_diff = max(max_grad_diff, grad_diff)
                 optimizer.step(); optimizer.zero_grad(set_to_none=True); token_count = 0; update_count += 1
                 ck_w = _weight_export(lib); torch_w = _torch_weight_flat(weights, summary)
-                weight_diff = float(np.max(np.abs(ck_w - torch_w)))
-                moment_diff = float(np.max(np.abs(_array_export(lib, "optimizer_state") - _torch_optimizer_flat(torch, weights, optimizer, summary))))
+                weight_comparison = _compare_named_snapshot(
+                    ck_w, torch_w, weight_names, weight_numels, atol=args.param_tol)
+                moment_comparison = _compare_named_snapshot(
+                    _array_export(lib, "optimizer_state"), _torch_optimizer_flat(torch, weights, optimizer, summary),
+                    optimizer_names, optimizer_numels, atol=args.moment_tol)
+                weight_diff = float(weight_comparison["max_abs_diff"] or 0.0)
+                moment_diff = float(moment_comparison["max_abs_diff"] or 0.0)
                 max_weight_diff = max(max_weight_diff, weight_diff); max_moment_diff = max(max_moment_diff, moment_diff)
-                parity_row = {"step": update_count, "microstep": micro, "loss_diff": abs(ck_loss - float(t_loss.item())),
+                parity_row = {"step": update_count, "microstep": micro, "loss_diff": microstep_result["loss_abs_diff"],
                               "gradient_max_abs_diff": grad_diff, "max_param_diff": weight_diff,
-                              "moment_max_abs_diff": moment_diff, "worst_param": "reported_in_final_tensor_inventory"}
+                              "moment_max_abs_diff": moment_diff,
+                              "passed": bool(grad_comparison["passed"] and weight_comparison["passed"]
+                                             and moment_comparison["passed"] and microstep_window["passed"]),
+                              "gradients": grad_comparison, "weights": weight_comparison,
+                              "optimizer_moments": moment_comparison, "forward_logits": logits_comparison,
+                              "microstep_window": microstep_window,
+                              "worst_param": weight_comparison["worst_tensor"]}
                 parity_rows.append(parity_row)
                 if first_update is None:
                     first_update = dict(parity_row)
@@ -1570,10 +1746,13 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         final_flush_seconds = 0.0
         final_grad_ck = np.empty(0, dtype=np.float32); final_grad_torch = np.empty(0, dtype=np.float32)
         if token_count:
+            microstep_window = _close_microstep_parity_window(microstep_parity)
             for n in names: weights[n].grad.div_(token_count)
             torch_grad = np.concatenate([weights[n].grad.detach().float().reshape(-1).numpy() for n in names])
             ck_grad = _grad_export(lib)
-            grad_diff = float(np.max(np.abs(ck_grad - torch_grad)))
+            grad_comparison = _compare_named_snapshot(
+                ck_grad, torch_grad, gradient_names, gradient_numels, atol=args.grad_tol)
+            grad_diff = float(grad_comparison["max_abs_diff"] or 0.0)
             max_grad_diff = max(max_grad_diff, grad_diff)
             pre_state = {
                 "weight": _weight_export(lib), "optimizer": _array_export(lib, "optimizer_state"),
@@ -1590,21 +1769,32 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             correct_accum = _array_export(lib, "accum")
             torch_weight = _torch_weight_flat(weights, summary)
             torch_optimizer = _torch_optimizer_flat(torch, weights, optimizer, summary)
-            weight_diff = float(np.max(np.abs(correct_weight - torch_weight)))
-            moment_diff = float(np.max(np.abs(correct_optimizer - torch_optimizer)))
+            weight_comparison = _compare_named_snapshot(
+                correct_weight, torch_weight, weight_names, weight_numels, atol=args.param_tol)
+            moment_comparison = _compare_named_snapshot(
+                correct_optimizer, torch_optimizer, optimizer_names, optimizer_numels, atol=args.moment_tol)
+            weight_diff = float(weight_comparison["max_abs_diff"] or 0.0)
+            moment_diff = float(moment_comparison["max_abs_diff"] or 0.0)
             counters_pass = bool(int(lib.ck_train_get_accum_counter()) == 0 and int(lib.ck_train_get_accum_tokens()) == 0
                                  and int(lib.ck_train_get_opt_step()) == update_count)
-            final_partial = {"present": True, "passed": bool(grad_diff <= args.grad_tol and weight_diff <= args.param_tol
-                              and moment_diff <= args.moment_tol and counters_pass),
+            final_partial = {"present": True, "passed": bool(grad_comparison["passed"] and weight_comparison["passed"]
+                              and moment_comparison["passed"] and counters_pass),
                              "contributing_tokens": token_count, "gradient_max_abs_diff": grad_diff,
                              "weight_max_abs_diff": weight_diff, "moment_max_abs_diff": moment_diff,
                              "flush_return": flush_rc, "counters_passed": counters_pass,
                              "optimizer_step": int(lib.ck_train_get_opt_step()), "accum_counter": int(lib.ck_train_get_accum_counter()),
                              "accum_tokens": int(lib.ck_train_get_accum_tokens())}
             max_weight_diff = max(max_weight_diff, weight_diff); max_moment_diff = max(max_moment_diff, moment_diff)
-            parity_rows.append({"step": update_count, "microstep": len(batches), "loss_diff": 0.0,
+            parity_rows.append({"step": update_count, "microstep": len(batches),
+                                "loss_diff": microstep_result["loss_abs_diff"],
                                 "gradient_max_abs_diff": grad_diff, "max_param_diff": weight_diff,
-                                "moment_max_abs_diff": moment_diff, "worst_param": "reported_in_final_tensor_inventory",
+                                "moment_max_abs_diff": moment_diff, "worst_param": weight_comparison["worst_tensor"],
+                                "passed": bool(grad_comparison["passed"] and weight_comparison["passed"]
+                                               and moment_comparison["passed"] and microstep_window["passed"]
+                                               and counters_pass),
+                                "gradients": grad_comparison, "weights": weight_comparison,
+                                "optimizer_moments": moment_comparison, "forward_logits": logits_comparison,
+                                "microstep_window": microstep_window,
                                 "partial_window": True})
             final_grad_ck = ck_grad; final_grad_torch = torch_grad
             _restore_training_state(lib, weight=pre_state["weight"], optimizer=pre_state["optimizer"], accum=pre_state["accum"],
@@ -1757,23 +1947,18 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "optimizer_steps": update_count,
             "peak_rss_bytes": int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss) * 1024,
         }
-        weight_rows = [row for row in summary["tensor_slots"] if str(row.get("name", "")).startswith("weight.") and row.get("section") == "weights"]
-        weight_rows.sort(key=lambda row: int(row.get("offset", 0)))
         final_torch_weights = _torch_weight_flat(weights, summary)
         weight_tensor_diffs = _tensor_discrepancies(
-            final_weights, final_torch_weights,
-            [str(row["name"])[len("weight."):] for row in weight_rows], [int(row["numel"]) for row in weight_rows],
+            final_weights, final_torch_weights, weight_names, weight_numels,
         )
-        optimizer_rows = [row for row in summary["tensor_slots"] if row.get("section") in {"optimizer_m", "optimizer_v"}]
-        optimizer_rows.sort(key=lambda row: int(row.get("offset", 0)))
         final_torch_optimizer = _torch_optimizer_flat(torch, weights, optimizer, summary)
         optimizer_tensor_diffs = _tensor_discrepancies(
-            final_opt, final_torch_optimizer,
-            [str(row["name"]) for row in optimizer_rows], [int(row["numel"]) for row in optimizer_rows],
+            final_opt, final_torch_optimizer, optimizer_names, optimizer_numels,
         )
         gradient_tensor_diffs = _tensor_discrepancies(
-            final_grad_ck, final_grad_torch, [str(row["name"]) for row in inventory], [int(row["numel"]) for row in inventory]
+            final_grad_ck, final_grad_torch, gradient_names, gradient_numels
         ) if final_partial["present"] else []
+        first_failed_update = next((dict(row) for row in parity_rows if not row["passed"] or row["loss_diff"] > args.loss_tol), None)
         first_growth = None
         previous_weight_diff = 0.0
         for row in parity_rows:
@@ -1816,10 +2001,14 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "learning": {"passed": last_loss < first_loss and heldout_after < heldout_before, "first_epoch_loss": first_loss, "last_epoch_loss": last_loss,
                 "heldout_loss_before": heldout_before, "heldout_loss_after": heldout_after, "sample_before": sample_before,
                 "sample_after": sample_after, "epochs": epoch_rows},
-            "pytorch_trajectory": {"passed": max_weight_diff <= args.param_tol and max_moment_diff <= args.moment_tol and max_grad_diff <= args.grad_tol and max_loss_diff <= args.loss_tol and max_logits_diff <= args.logits_tol and final_partial["passed"],
+            "pytorch_trajectory": {"passed": _trajectory_passed(microstep_parity, parity_rows, final_partial)
+                and first_failed_update is None,
                 "max_weight_abs_diff": max_weight_diff, "max_moment_abs_diff": max_moment_diff, "max_gradient_abs_diff": max_grad_diff,
-                "max_loss_abs_diff": max_loss_diff, "max_selected_logits_abs_diff": max_logits_diff,
-                "first_update": first_update, "first_divergence_growth": first_growth,
+                "max_loss_abs_diff": microstep_parity["max_loss_abs_diff"],
+                "max_selected_logits_abs_diff": microstep_parity["max_logits_abs_diff"],
+                "first_failed_microstep": microstep_parity["first_failed_microstep"],
+                "first_update": first_update, "first_failed_update": first_failed_update,
+                "first_divergence_growth": first_growth,
                 "trajectory": parity_rows,
                 "final_tensor_discrepancies": {"weights": weight_tensor_diffs, "optimizer": optimizer_tensor_diffs,
                                                "partial_window_gradients": gradient_tensor_diffs},
@@ -1832,10 +2021,13 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "checkpoint_compatibility": {"passed": all(row["passed"] for row in checkpoint_controls.values()),
                                          "authoritative_identity": checkpoint_doc["checkpoint_identity_sha256"],
                                          "negative_controls": checkpoint_controls},
-            "negative_control_detection": {"passed": bool(final_flush_negative["passed"] and
+            "negative_control_detection": {"passed": bool(gradient_routing_negative["passed"]
+                                                   and microstep_sticky_negative["passed"] and final_flush_negative["passed"] and
                                                    all(row["passed"] for row in checkpoint_controls.values())),
                                            "final_partial_flush": final_flush_negative,
-                                           "checkpoint_identity": checkpoint_controls},
+                                           "checkpoint_identity": checkpoint_controls,
+                                           "gradient_routing": gradient_routing_negative,
+                                           "microstep_sticky": microstep_sticky_negative},
             "atomic_checkpoint_publication": {"passed": atomic_ok, "power_loss_durability_claim": False},
             "runtime_provenance": provenance,
             "inference_export": {"passed": export_diff == 0.0 and v8_inference_diff <= args.inference_tol
@@ -1863,7 +2055,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         )
         checks["training_ir_visualizer"] = visualizer
         report["negative_controls"] = {"final_partial_flush_wrong_lr": final_flush_negative,
-                                       "checkpoint_identity": checkpoint_controls}
+                                       "checkpoint_identity": checkpoint_controls,
+                                       "gradient_routing": gradient_routing_negative,
+                                       "microstep_sticky": microstep_sticky_negative}
         report.update({"status": "PASS" if all(v["passed"] for v in checks.values()) else "FAIL", "checks": checks, "corpus": corpus,
             "quality_evaluations": ({
                 "svg_generation": {
@@ -1914,7 +2108,7 @@ def main() -> int:
     p.add_argument("--semantic-model", type=Path)
     p.add_argument("--semantic-model-sha256")
     p.add_argument("--seq-len", type=int, default=32); p.add_argument("--epochs", type=int, default=10)
-    p.add_argument("--layers", type=int, choices=(4, 5, 6, 10), default=4)
+    p.add_argument("--layers", type=int, choices=(2, 4, 5, 6, 10), default=4)
     p.add_argument("--d-model", type=int, default=32); p.add_argument("--hidden", type=int, default=64)
     p.add_argument("--num-heads", type=int, default=4); p.add_argument("--num-kv-heads", type=int, default=4)
     p.add_argument("--rope-theta", type=float, default=1_000_000.0)

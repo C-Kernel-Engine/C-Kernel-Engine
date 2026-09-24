@@ -955,6 +955,12 @@ MAKE_TARGETS = {
         "target": "v8-training-matrix-nightly",
         "timeout_sec": 1500,
     },
+    "v8_training_composition_gqa": {
+        "name": "v8 FP32 Authored Two-Layer GQA Composition",
+        "category": "training",
+        "target": "v8-training-composition-nightly",
+        "timeout_sec": 1500,
+    },
     "v7_backprop_long_epoch_nightly": {
         "name": "v7 Backprop Long-Epoch Drift",
         "category": "training",
@@ -1393,6 +1399,7 @@ MAKE_TARGET_FAILURE_ARTIFACTS = {
     "v8-training-certify-fp32": ROOT / "version" / "v8" / ".cache" / "reports" / "training_certification_latest.json",
     "v8-training-workflow-fp32": ROOT / "version" / "v8" / ".cache" / "reports" / "training_workflow_latest.json",
     "v8-training-matrix-nightly": ROOT / "version" / "v8" / ".cache" / "reports" / "training_matrix_latest.json",
+    "v8-training-composition-nightly": ROOT / "version" / "v8" / ".cache" / "reports" / "training_composition_latest.json",
     "v7-ir-visualizer-e2e-nightly": ROOT / "version" / "v7" / ".cache" / "reports" / "ir_visualizer_e2e_latest.json",
     "v7-visualizer-health": ROOT / "version" / "v7" / ".cache" / "reports" / "visualizer_health_latest.json",
     "v7-visualizer-generated-e2e": ROOT / "version" / "v7" / ".cache" / "reports" / "visualizer_generated_e2e_latest.json",
@@ -1567,6 +1574,16 @@ def _summarize_make_failure_artifact(target: str, *, start_ts: float) -> str:
             f"cases={len(cases) - len(failing)}/{len(cases)} "
             f"failures={details or '-'}"
         )
+
+    if target == "v8-training-composition-nightly":
+        cases = payload.get("cases") if isinstance(payload.get("cases"), list) else []
+        failing = [row for row in cases if isinstance(row, dict) and row.get("status") != "PASS"]
+        details = " | ".join(
+            f"{row.get('case')}:{','.join(str(value) for value in row.get('errors', [])[:2]) or row.get('status')}"
+            for row in failing[:3]
+        )
+        return (f"{prefix}; status={payload.get('status')} "
+                f"cases={len(cases) - len(failing)}/{len(cases)} failures={details or '-'}")
 
     if target == "v7-ir-visualizer-e2e-nightly":
         checks = payload.get("checks")
