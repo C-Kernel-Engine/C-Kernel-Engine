@@ -25,6 +25,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 import codegen_core_v8  # type: ignore  # noqa: E402
+import codegen_checked_calls_v8  # type: ignore  # noqa: E402
 import codegen_prefill_v8  # type: ignore  # noqa: E402
 from vision_bridge_runtime_v8 import resolve_vision_bridge_contract  # type: ignore  # noqa: E402
 
@@ -2562,6 +2563,17 @@ def main(argv: list[str] | None = None) -> int:
         ir_obj = _patch_codegen_config(json.load(f))
     with open(args.layout, "r", encoding="utf-8") as f:
         layout_obj = _patch_codegen_config(json.load(f))
+    if (ir_obj.get("config") or {}).get("runtime_extent_contract"):
+        if not ir_obj.get("entry"):
+            raise RuntimeError("bounded call IR is missing its circuit-declared native entry")
+        if args.prefill or args.prefill_layout or args.init or args.generation_config:
+            raise RuntimeError("bounded native entry does not accept decoder companion artifacts")
+        code = codegen_checked_calls_v8.emit_checked_calls(
+            ir_obj, Path(__file__).resolve().parents[3]
+        )
+        args.output.write_text(code, encoding="utf-8")
+        print(f"Generated: {args.output}")
+        return 0
     supplied_prefill_obj = None
     if args.prefill is not None:
         with open(args.prefill, "r", encoding="utf-8") as f:

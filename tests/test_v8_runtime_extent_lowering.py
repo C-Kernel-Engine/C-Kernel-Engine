@@ -45,17 +45,6 @@ def lower_fixture():
         lower2 = build_ir_v8.generate_ir_lower_2(
             lower1, layout, source, registry, mode="prefill")
         call_ir = build_ir_v8.generate_ir_lower_3(lower2, mode="prefill")
-    call_ir["entry"] = {
-        "function": "ck_test_planned_graph",
-        "params": [
-            {"c_type": "uint8_t *", "name": "arena"},
-            {"c_type": "size_t", "name": "arena_bytes"},
-            {"c_type": "int32_t *", "name": "out_frames"},
-        ],
-        "arena": {"pointer": "arena", "bytes": "arena_bytes"},
-        "runtime_length_outputs": {"expanded_frames": "out_frames"},
-    }
-    call_ir["runtime_extent_contract"] = source["config"]["runtime_extent_contract"]
     return source, layout, call_ir
 
 
@@ -65,8 +54,15 @@ class RuntimeExtentLoweringTest(unittest.TestCase):
         cls.source, cls.layout, cls.call_ir = lower_fixture()
         cls.temp = tempfile.TemporaryDirectory()
         generated = Path(cls.temp.name) / "generated.c"
-        generated.write_text(codegen_checked_calls_v8.emit_checked_calls(
-            cls.call_ir, ROOT), encoding="utf-8")
+        call_path = Path(cls.temp.name) / "call.json"
+        layout_path = Path(cls.temp.name) / "layout.json"
+        call_path.write_text(json.dumps(cls.call_ir), encoding="utf-8")
+        layout_path.write_text(json.dumps(cls.layout), encoding="utf-8")
+        subprocess.run([
+            sys.executable, str(ROOT / "version/v8/scripts/codegen_v8.py"),
+            "--ir", str(call_path), "--layout", str(layout_path),
+            "--output", str(generated),
+        ], check=True, capture_output=True, text=True)
         library = Path(cls.temp.name) / "generated.so"
         subprocess.run([
             "cc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic",
@@ -197,6 +193,51 @@ class RuntimeExtentLoweringTest(unittest.TestCase):
         with self.assertRaisesRegex(codegen_checked_calls_v8.CheckedCallCodegenError,
                                     "alignment must be a positive power of two"):
             codegen_checked_calls_v8.emit_checked_calls(call_ir, ROOT)
+
+    def test_native_entry_and_extent_contract_survive_lowering(self):
+        self.assertEqual(self.call_ir["entry"], self.source["template"]["native_entry"])
+        self.assertEqual(self.call_ir["runtime_extent_contract"],
+                         self.source["config"]["runtime_extent_contract"])
+
+    def _run_codegen_command(self, call_ir, *extra_args):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            call_path = root / "call.json"
+            layout_path = root / "layout.json"
+            output_path = root / "generated.c"
+            companion_path = root / "companion.json"
+            call_path.write_text(json.dumps(call_ir), encoding="utf-8")
+            layout_path.write_text(json.dumps(self.layout), encoding="utf-8")
+            companion_path.write_text("{}", encoding="utf-8")
+            command = [
+                sys.executable, str(ROOT / "version/v8/scripts/codegen_v8.py"),
+                "--ir", str(call_path), "--layout", str(layout_path),
+                "--output", str(output_path),
+            ]
+            command.extend(str(companion_path) if arg == "COMPANION" else arg
+                           for arg in extra_args)
+            result = subprocess.run(command, capture_output=True, text=True)
+            return result, output_path.exists()
+
+    def test_normal_codegen_rejects_missing_circuit_entry(self):
+        call_ir = json.loads(json.dumps(self.call_ir))
+        call_ir.pop("entry")
+        result, emitted = self._run_codegen_command(call_ir)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("bounded call IR is missing its circuit-declared native entry",
+                      result.stderr)
+        self.assertFalse(emitted)
+
+    def test_normal_codegen_rejects_decoder_companion_artifacts(self):
+        for flag in ("--prefill", "--prefill-layout", "--init",
+                     "--generation-config"):
+            with self.subTest(flag=flag):
+                result, emitted = self._run_codegen_command(
+                    self.call_ir, flag, "COMPANION")
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("bounded native entry does not accept decoder companion artifacts",
+                              result.stderr)
+                self.assertFalse(emitted)
 
 
 if __name__ == "__main__":

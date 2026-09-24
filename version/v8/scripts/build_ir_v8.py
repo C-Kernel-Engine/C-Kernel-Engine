@@ -10546,6 +10546,8 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
     _validate_resolved_kernels_are_emitted(numerical_contract_plans, arranged_kernels)
 
     if template.get("runtime_lengths") or template.get("runtime_views"):
+        if "native_entry" in template:
+            manifest["config"]["native_entry"] = copy.deepcopy(template["native_entry"])
         declared_producers = {
             spec.get("producer")
             for spec in template.get("runtime_lengths", {}).values()
@@ -16783,6 +16785,13 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
         "operations": call_ops,
         "errors": all_errors,
     }
+    if config.get("runtime_extent_contract"):
+        native_entry = config.get("native_entry")
+        if native_entry is not None:
+            lowered_call["entry"] = copy.deepcopy(native_entry)
+        lowered_call["runtime_extent_contract"] = copy.deepcopy(
+            config["runtime_extent_contract"]
+        )
 
     from plan_terminal_rows_v8 import plan_terminal_prefill_rows
     plan_terminal_prefill_rows(lowered_call, _contract_selector_matches)
