@@ -30,9 +30,14 @@
       "shape": [
         {"config": "vision_merged_tokens"},
         {
-          "mul": [
-            {"config": "projector_out_dim"},
-            {"config": "num_deepstack_layers"}
+          "max": [
+            1,
+            {
+              "mul": [
+                {"config": "projector_out_dim"},
+                {"config": "num_deepstack_layers"}
+              ]
+            }
           ]
         }
       ]

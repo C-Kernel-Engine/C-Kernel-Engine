@@ -1144,13 +1144,23 @@ class V8Qwen3VLTemplateTests(unittest.TestCase):
         block = manifest["template"]["block_types"]["vision_encoder"]
         footer = build_ir_v8._normalize_block_footer_items(block, manifest["config"])
         self.assertNotIn("branch_concat", [item["op"] for item in footer])
+        collect_width = manifest["template"]["activation_buffers"]["branch_collect"]["shape"][1]
         self.assertEqual(
             build_ir_v8._resolve_activation_extent(
-                {"max": [1, {"mul": [4096, {"config": "num_deepstack_layers"}]}]},
+                collect_width,
                 manifest["config"],
                 "test.branch_collect",
             ),
             1,
+        )
+        manifest["config"]["num_deepstack_layers"] = 1
+        self.assertEqual(
+            build_ir_v8._resolve_activation_extent(
+                collect_width,
+                manifest["config"],
+                "test.branch_collect",
+            ),
+            manifest["config"]["projector_out_dim"],
         )
 
     def test_qwen3vl_prefill_lowering_emits_vision_merger_ops(self) -> None:
