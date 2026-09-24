@@ -22,6 +22,7 @@ import sys
 import time
 import traceback
 import uuid
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -359,6 +360,13 @@ def _ensure_bpe_tools(python: str) -> tuple[Path, Path]:
 def _load_corpus(args: argparse.Namespace, out_dir: Path, python: str) -> tuple[np.ndarray, np.ndarray, dict[str, Any]]:
     spec_path = args.corpus
     spec = json.loads(spec_path.read_text(encoding="utf-8"))
+    svg_domain = spec.get("domain") == "svg_xml"
+    if svg_domain and (
+        spec.get("document_policy") != "one_complete_document_per_split"
+        or spec.get("label_policy") != "cyclic_causal_next_token_within_document"
+        or spec["train"]["git_blob"] == spec["validation"]["git_blob"]
+    ):
+        raise RuntimeError("SVG fixture requires separate complete documents and an explicit cyclic label policy")
     tokenizer_kind = str(args.tokenizer)
     bpe_handle = None
     tokenizer_meta: dict[str, Any]
@@ -399,6 +407,7 @@ def _load_corpus(args: argparse.Namespace, out_dir: Path, python: str) -> tuple[
     else:
         raise RuntimeError(f"unsupported tokenizer: {tokenizer_kind}")
     outputs: dict[str, Any] = {}
+    svg_documents: dict[str, Any] = {}
     arrays: list[np.ndarray] = []
     try:
         for split in ("train", "validation"):
@@ -410,6 +419,33 @@ def _load_corpus(args: argparse.Namespace, out_dir: Path, python: str) -> tuple[
             raw = source.read_bytes()[: int(row["token_count"])]
             if len(raw) != int(row["token_count"]):
                 raise RuntimeError(f"{split} corpus has only {len(raw)} bytes")
+            if svg_domain:
+                if source.stat().st_size != len(raw):
+                    raise RuntimeError(f"{split} SVG corpus must contain exactly one complete source document")
+                svg_text = raw.decode("utf-8")
+                try:
+                    svg_root = ET.fromstring(svg_text)
+                except ET.ParseError as exc:
+                    raise RuntimeError(f"{split} SVG corpus is not well-formed XML: {exc}") from exc
+                if svg_root.tag != "{http://www.w3.org/2000/svg}svg":
+                    raise RuntimeError(f"{split} SVG corpus root must be an SVG element")
+                allowed_elements = {"svg", "rect", "circle"}
+                allowed_attributes = {
+                    "xmlns", "width", "height", "viewBox", "x", "y", "rx", "cx", "cy", "r", "fill"
+                }
+                for element in svg_root.iter():
+                    local_name = element.tag.rsplit("}", 1)[-1]
+                    if local_name not in allowed_elements or any(
+                        key.rsplit("}", 1)[-1] not in allowed_attributes
+                        or "url(" in value.lower() or "://" in value
+                        for key, value in element.attrib.items()
+                    ):
+                        raise RuntimeError(f"{split} SVG corpus contains an unsupported element or attribute")
+                svg_documents[split] = {
+                    "source": str(row["path"]), "sha256": _sha256(source),
+                    "xml": svg_text, "element_count": sum(1 for _ in svg_root.iter()),
+                    "root": "svg", "complete_document": True,
+                }
             if bpe_handle is None:
                 ids = np.frombuffer(raw, dtype=np.uint8).astype(np.int32)
                 exact_roundtrip = True
@@ -438,8 +474,14 @@ def _load_corpus(args: argparse.Namespace, out_dir: Path, python: str) -> tuple[
     finally:
         if bpe_handle is not None:
             bpe_handle.close()
-    return arrays[0], arrays[1], {"spec": str(spec_path), "spec_sha256": _sha256(spec_path),
-                                  "tokenizer": tokenizer_meta, "splits": outputs}
+    return arrays[0], arrays[1], {
+        "spec": str(spec_path), "spec_sha256": _sha256(spec_path),
+        "domain": "svg_xml" if svg_domain else "text",
+        "document_policy": spec.get("document_policy", "continuous_split_stream"),
+        "label_policy": spec.get("label_policy", "cyclic_causal_next_token"),
+        "svg_documents": svg_documents,
+        "tokenizer": tokenizer_meta, "splits": outputs,
+    }
 
 
 def _batches(tokens: np.ndarray, seq_len: int, epochs: int) -> list[tuple[np.ndarray, np.ndarray, int, int]]:
@@ -769,6 +811,17 @@ def _sample(lib: ctypes.CDLL, summary: Mapping[str, Any], seq_len: int, corpus: 
             handle.close()
 
 
+def _svg_sample_quality(sample: str) -> dict[str, Any]:
+    try:
+        root = ET.fromstring(sample)
+    except (ET.ParseError, ValueError) as exc:
+        return {"well_formed_svg": False, "parse_error": str(exc)}
+    return {
+        "well_formed_svg": root.tag == "{http://www.w3.org/2000/svg}svg",
+        "parse_error": None,
+    }
+
+
 def _split_optimizer_snapshot(summary: Mapping[str, Any], flat: np.ndarray) -> dict[str, np.ndarray]:
     rows = [r for r in summary["tensor_slots"] if r.get("section") in {"optimizer_m", "optimizer_v"}]
     rows.sort(key=lambda r: int(r["offset"]))
@@ -893,6 +946,8 @@ def _write_visualizer_artifacts(
     summary: Mapping[str, Any],
     checkpoint_path: Path,
     experiment_identity: Mapping[str, Any],
+    sample_before: str,
+    sample_after: str,
 ) -> dict[str, Any]:
     tokenizer_path = run_dir / "tokenizer.json"
     if corpus["tokenizer"].get("mode") == "byte":
@@ -948,9 +1003,27 @@ def _write_visualizer_artifacts(
     _write_json(profile_path, {
         "schema": "cke.v8.dataset_profile.v1", "status": "pass", "tokenizer": corpus["tokenizer"],
         "experiment_identity": dict(experiment_identity),
+        "domain": corpus.get("domain", "text"),
+        "document_policy": corpus.get("document_policy"),
+        "label_policy": corpus.get("label_policy"),
         "splits": {name: {key: row[key] for key in ("tokens", "source", "git_blob", "source_revision", "source_blob", "token_ids_sha256")}
                    for name, row in corpus["splits"].items()},
     })
+    svg_evidence_path: Path | None = None
+    if corpus.get("domain") == "svg_xml":
+        svg_evidence_path = run_dir / "svg_fixture_evidence.json"
+        _write_json(svg_evidence_path, {
+            "schema": "cke.v8.svg_fixture_evidence.v1", "status": "pass",
+            "experiment_identity": dict(experiment_identity),
+            "document_policy": corpus["document_policy"],
+            "label_policy": corpus["label_policy"],
+            "documents": corpus["svg_documents"],
+            "generated_samples": {
+                "before": {"text": sample_before, **_svg_sample_quality(sample_before)},
+                "after": {"text": sample_after, **_svg_sample_quality(sample_after)},
+                "quality_is_certification_gate": False,
+            },
+        })
     loss_path = run_dir / "training_loss_curve_latest.json"
     _write_json(loss_path, {
         "schema": "cke.v8.training_loss_curve.v1",
@@ -1014,7 +1087,7 @@ def _write_visualizer_artifacts(
         "experiment_identity": dict(experiment_identity),
         "token_stream": str(train_token_path),
         "token_stream_sha256": corpus["splits"]["train"]["token_ids_sha256"],
-        "label_policy": "causal_next_token", "padding_token_id": 0,
+        "label_policy": corpus.get("label_policy", "causal_next_token"), "padding_token_id": 0,
         "batches": preview_rows,
     })
     artifacts = {
@@ -1024,6 +1097,8 @@ def _write_visualizer_artifacts(
     }
     if tokenizer_quality_path is not None:
         artifacts["tokenizer_quality_gate_json"] = str(tokenizer_quality_path)
+    if svg_evidence_path is not None:
+        artifacts["svg_fixture_evidence_json"] = str(svg_evidence_path)
     data_provenance = [
         {"stage": "pretrain", "dataset_name": name, "source_path": row["source"], "split": name,
          "token_count": row["tokens"], "hash": {"sha256": row["token_ids_sha256"]},
@@ -1056,7 +1131,8 @@ def _write_visualizer_artifacts(
         "artifacts": {path.name: _sha256(path) for path in (
             tokenizer_path, roundtrip_path, qc_path, profile_path, loss_path, parity_path,
             step_profile_path, checkpoint_policy_path, stitch_path, preview_path, pipeline_path,
-            *([tokenizer_quality_path] if tokenizer_quality_path is not None else []))},
+            *([tokenizer_quality_path] if tokenizer_quality_path is not None else []),
+            *([svg_evidence_path] if svg_evidence_path is not None else []))},
     }
 
 
@@ -1169,6 +1245,8 @@ def _write_experiment_manifest(
         ("generated_inference_library", run_dir / "v8_inference_runtime" / "libmodel.so", True),
     ]
     artifact_specs[1:1] = semantic_artifacts
+    if corpus.get("domain") == "svg_xml":
+        artifact_specs.append(("svg_fixture_evidence", run_dir / "svg_fixture_evidence.json", True))
     artifacts = [
         _relative_artifact(run_dir, path, role=role, required=required)
         for role, path, required in artifact_specs
@@ -1225,6 +1303,7 @@ def _write_experiment_manifest(
                 "python_training_experiment.json" if active_python_experiment else authored_manifest_path
             ),
             "dataset_and_tokens": "training_batch_preview.json",
+            **({"svg_fixture": "svg_fixture_evidence.json"} if corpus.get("domain") == "svg_xml" else {}),
             "forward_ir": "ir1_train_forward.json", "backward_ir": "ir2_train_backward.json",
             "parity": "training_parity_latest.json", "checkpoint": "training_checkpoint_policy_latest.json",
         },
@@ -1400,7 +1479,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         report["execution"]["actual_runtime_threads"] = main_provenance.get("actual_runtime_threads")
         initial = _weight_export(lib)
         heldout_before = _evaluate(lib, summary, val_ids, args.seq_len)
-        sample_before = _sample(lib, summary, args.seq_len, corpus)
+        sample_prompt = "<svg" if corpus.get("domain") == "svg_xml" else "The "
+        sample_before = _sample(lib, summary, args.seq_len, corpus, prompt=sample_prompt)
         decoded, cfg = oracle._decode_weight_snapshot(args.run_dir, summary, initial)
         names = [str(r["name"]) for r in inventory]
         weights = {n: v.detach().clone().requires_grad_(n in names) for n, v in decoded.items()}
@@ -1578,7 +1658,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         trained_logits = _forward_logits(lib, summary, ex, ey, ev); exported_logits = _forward_logits(export_lib, export_summary, ex, ey, ev)
         export_diff = float(np.max(np.abs(trained_logits - exported_logits)))
         heldout_after = _evaluate(export_lib, export_summary, val_ids, args.seq_len)
-        sample_after = _sample(export_lib, export_summary, args.seq_len, corpus)
+        sample_after = _sample(export_lib, export_summary, args.seq_len, corpus, prompt=sample_prompt)
         # Build the actual inference-only v8 prefill/decode library from the exported weights.
         v8_source = args.run_dir / "v8_inference_source"
         v8_runtime = args.run_dir / "v8_inference_runtime"
@@ -1683,6 +1763,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             run_dir=args.run_dir, python=python, args=args, corpus=corpus, epoch_rows=epoch_rows,
             parity_rows=parity_rows, performance=performance, summary=summary, checkpoint_path=checkpoint_path,
             experiment_identity=experiment_identity,
+            sample_before=sample_before, sample_after=sample_after,
         )
         provenance = {
             "passed": bool(main_provenance.get("passed") and export_provenance.get("passed")
@@ -1693,6 +1774,12 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "generation_probe": trajectory_provenance,
         }
         checks = {
+            **({"svg_fixture_dataset": {
+                "passed": True, "train_source_sha256": corpus["svg_documents"]["train"]["sha256"],
+                "validation_source_sha256": corpus["svg_documents"]["validation"]["sha256"],
+                "document_policy": corpus["document_policy"], "label_policy": corpus["label_policy"],
+                "tokenizer": corpus["tokenizer"]["name"],
+            }} if corpus.get("domain") == "svg_xml" else {}),
             **({"authored_semantic_graph": {
                 "passed": True,
                 "semantic_model_sha256": str(args.semantic_model_sha256),
@@ -1751,6 +1838,13 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         report["negative_controls"] = {"final_partial_flush_wrong_lr": final_flush_negative,
                                        "checkpoint_identity": checkpoint_controls}
         report.update({"status": "PASS" if all(v["passed"] for v in checks.values()) else "FAIL", "checks": checks, "corpus": corpus,
+            "quality_evaluations": ({
+                "svg_generation": {
+                    "before": _svg_sample_quality(sample_before),
+                    "after": _svg_sample_quality(sample_after),
+                    "certification_gate": False,
+                }
+            } if corpus.get("domain") == "svg_xml" else {}),
             "configuration": {**configuration, "training_config_sha256": training_config_sha256,
                 "unique_train_tokens": train_token_count, "token_presentations": train_token_count*args.epochs,
                 "numerical_contract": "strict_reference_order", "parallel_scaling_certified": False},
