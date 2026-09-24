@@ -3886,6 +3886,7 @@ def load_model_data(
         "training_checkpoint_policy",
         "training_experiment_manifest",
         "training_batch_preview",
+        "svg_fixture_evidence",
         "training_pipeline",
         "corpus_sampling_log",
         "training_logbook",
@@ -4024,6 +4025,7 @@ def load_model_data(
         "training_checkpoint_policy": model_candidates("training_checkpoint_policy.json") + model_candidates("training_checkpoint_policy_latest.json") + [V8_REPORT_PATH / "training_checkpoint_policy_latest.json", V8_REPORT_PATH_LEGACY / "training_checkpoint_policy_latest.json"],
         "training_experiment_manifest": model_candidates("training_experiment_manifest.json"),
         "training_batch_preview": model_candidates("training_batch_preview.json"),
+        "svg_fixture_evidence": model_candidates("svg_fixture_evidence.json"),
         "training_pipeline": model_candidates("training_pipeline_latest.json") + model_candidates("training_pipeline.json") + [V8_REPORT_PATH / "training_pipeline_latest.json", V8_REPORT_PATH_LEGACY / "training_pipeline_latest.json"],
         "training_plan": model_candidates("training_plan.json") + [V8_REPORT_PATH / "training_plan.json", V8_REPORT_PATH_LEGACY / "training_plan.json"],
         "run_ledger": model_candidates("run_ledger.jsonl"),
@@ -5173,6 +5175,7 @@ def serve_live(run_dir: Path, html_path: Path, port: int = 7700, interval_ms: in
     LIVE_FILES = [
         "training_experiment_manifest.json",
         "training_batch_preview.json",
+        "svg_fixture_evidence.json",
         "training_pipeline_latest.json",
         "training_loss_curve_latest.json",
         "training_grad_norms_latest.json",

@@ -37,6 +37,17 @@ class V8TrainingWorkflowTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.workflow = _load()
 
+    def test_svg_sample_quality_is_separate_from_training_certification(self) -> None:
+        complete = '<svg xmlns="http://www.w3.org/2000/svg"><rect width="2" height="3"/></svg>'
+        self.assertTrue(self.workflow._svg_sample_quality(complete)["well_formed_svg"])
+        self.assertFalse(self.workflow._svg_sample_quality("<svg")["well_formed_svg"])
+        self.assertFalse(self.workflow._svg_sample_quality("\x00")["well_formed_svg"])
+        probe = {"new_tokens_requested": 48, "new_tokens_generated": 48,
+                 "budget_exhausted": True, "stop_reason": "token_budget_exhausted"}
+        quality = self.workflow._svg_sample_quality("<svg", probe)
+        self.assertFalse(quality["well_formed_svg"])
+        self.assertTrue(quality["budget_exhausted"])
+
     def test_corpus_sources_are_pinned_and_split_before_tokenization(self) -> None:
         spec = json.loads(self.workflow.CORPUS_SPEC.read_text(encoding="utf-8"))
         self.assertNotEqual(spec["train"]["path"], spec["validation"]["path"])
@@ -47,6 +58,63 @@ class V8TrainingWorkflowTests(unittest.TestCase):
             self.assertEqual(len(spec[split]["source_blob"]), 40)
             self.assertEqual(source.stat().st_size, spec[split]["token_count"])
         self.assertEqual(spec["tokenizer"]["vocab_size"], 256)
+
+    def test_frozen_svg_documents_are_complete_separate_and_byte_exact(self) -> None:
+        spec_path = ROOT / "version/v8/training/svg_single_document_v1.json"
+        spec = json.loads(spec_path.read_text(encoding="utf-8"))
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            args = argparse.Namespace(
+                corpus=spec_path, tokenizer="byte", vocab_size=256,
+                max_train_tokens=0, max_validation_tokens=0,
+            )
+            train, validation, corpus = self.workflow._load_corpus(args, root / "tokens", "python3")
+            self.assertEqual(corpus["domain"], "svg_xml")
+            self.assertEqual(len(train), spec["train"]["token_count"])
+            self.assertEqual(len(validation), spec["validation"]["token_count"])
+            self.assertNotEqual(corpus["splits"]["train"]["git_blob"], corpus["splits"]["validation"]["git_blob"])
+            self.assertTrue(all(row["source_complete_document"] and row["consumed_complete_document"]
+                                and row["tokenized_tokens"] == row["consumed_tokens"]
+                                for row in corpus["svg_documents"].values()))
+            for split, field in (("train", "max_train_tokens"), ("validation", "max_validation_tokens")):
+                setattr(args, field, 16)
+                with self.assertRaisesRegex(RuntimeError, f"{split} SVG token limit 16 truncates"):
+                    self.workflow._load_corpus(args, root / f"{split}_limited_tokens", "python3")
+                setattr(args, field, int(spec[split]["token_count"]))
+                _, _, exact_corpus = self.workflow._load_corpus(
+                    args, root / f"{split}_exact_tokens", "python3"
+                )
+                self.assertTrue(exact_corpus["svg_documents"][split]["consumed_complete_document"])
+                setattr(args, field, 0)
+
+            duplicate = copy.deepcopy(spec)
+            duplicate["validation"]["git_blob"] = duplicate["train"]["git_blob"]
+            duplicate_path = root / "duplicate.json"
+            duplicate_path.write_text(json.dumps(duplicate))
+            args.corpus = duplicate_path
+            with self.assertRaisesRegex(RuntimeError, "separate complete documents"):
+                self.workflow._load_corpus(args, root / "duplicate_tokens", "python3")
+
+            invalid_source = root / "invalid.svg"
+            invalid_source.write_text('<svg xmlns="http://www.w3.org/2000/svg"><script/></svg>')
+            invalid = copy.deepcopy(spec)
+            invalid["train"].update({
+                "path": str(invalid_source), "git_blob": self.workflow._git_blob(invalid_source),
+                "token_count": invalid_source.stat().st_size,
+            })
+            invalid_path = root / "invalid.json"
+            invalid_path.write_text(json.dumps(invalid))
+            args.corpus = invalid_path
+            with self.assertRaisesRegex(RuntimeError, "unsupported element"):
+                self.workflow._load_corpus(args, root / "invalid_tokens", "python3")
+
+            truncated = copy.deepcopy(spec)
+            truncated["train"]["token_count"] -= 1
+            truncated_path = root / "truncated.json"
+            truncated_path.write_text(json.dumps(truncated))
+            args.corpus = truncated_path
+            with self.assertRaisesRegex(RuntimeError, "one complete source document"):
+                self.workflow._load_corpus(args, root / "truncated_tokens", "python3")
 
     def test_final_short_batch_preserves_exact_token_presentations(self) -> None:
         batches = self.workflow._batches(np.arange(10, dtype=np.int32), seq_len=4, epochs=3)

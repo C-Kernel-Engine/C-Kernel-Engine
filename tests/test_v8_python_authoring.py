@@ -579,6 +579,32 @@ class V8PythonAuthoringTests(unittest.TestCase):
             self.assertTrue(preflight["can_launch_generated_workflow"])
             self.assertFalse((run_dir / "training_workflow.json").exists())
 
+    def test_svg_notebook_preflights_the_frozen_fixture_without_training(self) -> None:
+        notebook_path = ROOT / "version/v8/notebooks/02_frozen_svg_training_fixture.ipynb"
+        notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
+        code_cells = [cell for cell in notebook["cells"] if cell["cell_type"] == "code"]
+        self.assertTrue(all(cell.get("execution_count") is None and not cell.get("outputs") for cell in code_cells))
+        with tempfile.TemporaryDirectory() as td, mock.patch.dict(
+            os.environ,
+            {
+                "CKE_NOTEBOOK_RUN_DIR": td,
+                "CKE_NOTEBOOK_EXECUTE": "0",
+                "CKE_NOTEBOOK_LOAD_EXISTING": "0",
+                "CKE_NOTEBOOK_EMBED_IR": "0",
+            },
+        ), redirect_stdout(io.StringIO()):
+            namespace = {"__name__": "__cke_svg_notebook_smoke__"}
+            for index, cell in enumerate(notebook["cells"]):
+                if cell["cell_type"] == "code":
+                    exec(compile("".join(cell.get("source", [])), f"{notebook_path}#cell-{index}", "exec"), namespace)
+            run_dir = Path(td)
+            preflight = json.loads((run_dir / "training_capability_preflight.json").read_text())
+            authored = json.loads((run_dir / "python_training_experiment.json").read_text())
+            self.assertEqual(preflight["status"], "CANDIDATE_INVENTORY_COMPLETE")
+            self.assertTrue(preflight["can_launch_generated_workflow"])
+            self.assertIn("svg_single_document_v1.json", json.dumps(authored))
+            self.assertFalse((run_dir / "training_workflow.json").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

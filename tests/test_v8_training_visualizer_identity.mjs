@@ -67,3 +67,47 @@ test('identity panel keeps failed, missing, and mismatched evidence distinct', (
     assert.match(missingHtml, /cannot establish a current PASS/);
     assert.match(renderers.buildTrainingBatchPreviewSection({}), /Serialized Training Batches/);
 });
+
+test('SVG source panel renders escaped documents only as matched run evidence', () => {
+    const renderers = loadRenderers();
+    const files = JSON.parse(fs.readFileSync(fixturePath, 'utf8'));
+    const identity = files.training_experiment_manifest.identity;
+    files.svg_fixture_evidence = {
+        experiment_identity: structuredClone(identity),
+        document_policy: 'one_complete_document_per_split',
+        label_policy: 'cyclic_causal_next_token_within_document',
+        documents: {
+            train: { sha256: 'train-sha', source_complete_document: true, consumed_complete_document: true,
+                tokenized_tokens: 32, consumed_tokens: 32, xml: '<svg><rect fill="red"/></svg>' },
+            validation: { sha256: 'val-sha', source_complete_document: true, consumed_complete_document: true,
+                tokenized_tokens: 32, consumed_tokens: 32, xml: '<svg><circle fill="blue"/></svg>' },
+        },
+        validation_relationship: 'near_duplicate_geometry_with_color_changes_only',
+        generated_samples: {
+            before: { text: '<svg unfinished', well_formed_svg: false, new_tokens_generated: 48,
+                new_tokens_requested: 48, stop_reason: 'token_budget_exhausted' },
+            after: { text: '<svg xmlns="http://www.w3.org/2000/svg"/>', well_formed_svg: true,
+                new_tokens_generated: 48, new_tokens_requested: 48, stop_reason: 'token_budget_exhausted' },
+        },
+    };
+    const matched = renderers.buildTrainingSvgFixtureSection(files);
+    assert.match(matched, /data-training-svg-fixture="matched"/);
+    assert.match(matched, /&lt;svg&gt;&lt;rect/);
+    assert.doesNotMatch(matched, /<svg><rect/);
+    assert.match(matched, /data:image\/svg\+xml/);
+    assert.match(matched, /not well-formed SVG/);
+    assert.match(matched, /well-formed SVG/);
+    assert.match(matched, /diagnostic, not a certification gate/);
+    assert.match(matched, /Consumed complete: yes/);
+    assert.match(matched, /48 \/ 48 new tokens/);
+    assert.match(matched, /near_duplicate_geometry/);
+    const stale = structuredClone(files);
+    stale.svg_fixture_evidence.experiment_identity.run_id = 'older-run';
+    const staleHtml = renderers.buildTrainingSvgFixtureSection(stale);
+    assert.match(staleHtml, /data-training-svg-fixture="unverified"/);
+    assert.doesNotMatch(staleHtml, /data:image\/svg\+xml/);
+    assert.doesNotMatch(staleHtml, /&lt;svg unfinished/);
+    const missing = structuredClone(files);
+    missing.training_experiment_manifest.validation.status = 'MISSING';
+    assert.match(renderers.buildTrainingSvgFixtureSection(missing), /data-training-svg-fixture="unverified"/);
+});
