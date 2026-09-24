@@ -1070,6 +1070,77 @@ class V8Qwen3VLTemplateTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "Weight/kernel dtype mismatch"):
             build_ir_v8.validate_weight_kernel_dtypes(bad_ir)
 
+        # A provider substitution must be rejected by normal lowering.
+        bad_lowered_ir1 = [dict(op) for op in lowered_ir1]
+        next(
+            op for op in bad_lowered_ir1
+            if op.get("layer") == 0 and op.get("op") == "mlp_down"
+        )["kernel"] = "gemm_nt_f16"
+        with self.assertRaisesRegex(RuntimeError, "memory lowering received kernel"):
+            build_ir_v8.generate_ir_lower_2(
+                bad_lowered_ir1, layout, manifest, registry, mode="prefill"
+            )
+
+        # Keep the dtype check in the normal prefill pipeline even when the
+        # resolved-provider invariant accepts the selected provider.
+        with mock.patch.object(
+            build_ir_v8, "validate_weight_kernel_dtypes",
+            side_effect=RuntimeError("dtype validation reached"),
+        ) as validator:
+            with self.assertRaisesRegex(RuntimeError, "dtype validation reached"):
+                build_ir_v8.generate_ir_lower_2(
+                    lowered_ir1, layout, manifest, registry, mode="prefill"
+                )
+            validator.assert_called_once()
+
+    def test_mixed_vision_weight_dtypes_cannot_select_a_global_provider(self) -> None:
+        manifest = _make_qwen3vl_manifest()
+        manifest["config"]["num_layers"] = 2
+        offset = max(entry["offset"] + entry["size"] for entry in manifest["entries"])
+        for entry in list(manifest["entries"]):
+            if not entry["name"].startswith("v.blk.0."):
+                continue
+            second = dict(entry)
+            second["name"] = second["name"].replace("v.blk.0.", "v.blk.1.", 1)
+            second["offset"] = offset
+            if second["name"] == "v.blk.1.ffn_down.weight":
+                second["dtype"] = "bf16"
+            offset += second["size"]
+            manifest["entries"].append(second)
+        manifest["quant_summary"]["layer.1"] = {
+            **manifest["quant_summary"]["layer.0"], "w2": "bf16"
+        }
+        self.assertNotIn(
+            "w2", build_ir_v8._manifest_contract_config(manifest)["layer_weight_dtypes"]
+        )
+        with self.assertRaisesRegex(RuntimeError, "Weight/kernel dtype mismatch.*layer=1"):
+            ops = build_ir_v8.build_ir1_direct(
+                manifest,
+                ROOT / "tests" / "qwen3_vl_vision_manifest.synthetic.json",
+                mode="prefill",
+            )
+            registry = build_ir_v8.load_kernel_registry()
+            lowered_ir1 = build_ir_v8.generate_ir_lower_1(
+                ops, registry, manifest, "prefill"
+            )
+            layout = build_ir_v8.generate_memory_layout(
+                lowered_ir1, manifest, registry, mode="prefill",
+                context_len=manifest["config"]["context_length"],
+            )
+            build_ir_v8.generate_ir_lower_2(
+                lowered_ir1, layout, manifest, registry, mode="prefill"
+            )
+
+    def test_conflicting_vision_entry_and_summary_dtypes_fail_before_selection(self) -> None:
+        manifest = _make_qwen3vl_manifest()
+        manifest["quant_summary"]["layer.0"]["w2"] = "bf16"
+        with self.assertRaisesRegex(RuntimeError, "Conflicting weight dtype.*ffn_down"):
+            build_ir_v8.build_ir1_direct(
+                manifest,
+                ROOT / "tests" / "qwen3_vl_vision_manifest.synthetic.json",
+                mode="prefill",
+            )
+
     def test_default_attention_contract_retains_legacy_owner(self) -> None:
         manifest = _make_qwen3vl_manifest()
         manifest["config"].pop("vision_attention_storage_boundary", None)

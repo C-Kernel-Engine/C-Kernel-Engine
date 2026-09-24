@@ -528,15 +528,37 @@ def _contract_selector_matches(selector: Any, config: Dict[str, Any], operation:
 def _manifest_contract_config(manifest: Dict[str, Any]) -> Dict[str, Any]:
     config = dict(manifest.get("config") or {})
     dtypes: Dict[str, set] = {}
+    summary = manifest.get("quant_summary") or {}
+    if not isinstance(summary, dict):
+        raise RuntimeError("quant_summary must be an object")
+
     def normalized_dtype(value: Any) -> str:
         dtype = str(value or "").lower()
         return {"f16": "fp16", "f32": "fp32"}.get(dtype, dtype)
 
+    vision_weight_aliases = {
+        "attn_qkv": "attn_qkv", "attn_out": "wo",
+        "ffn_up": "w3", "ffn_down": "w2",
+    }
     for entry in manifest.get("entries", []):
-        parts = str(entry.get("name", "")).split(".", 2)
+        name = str(entry.get("name", ""))
+        parts = name.split(".", 2)
         if len(parts) == 3 and parts[0] == "layer" and parts[1].isdigit():
             dtypes.setdefault(parts[2], set()).add(normalized_dtype(entry.get("dtype")))
-    for layer, weights in (manifest.get("quant_summary") or {}).items():
+        vision_match = re.fullmatch(r"v\.blk\.(\d+)\.(attn_qkv|attn_out|ffn_up|ffn_down)\.weight", name)
+        if vision_match:
+            layer_key = f"layer.{vision_match.group(1)}"
+            weight_key = vision_weight_aliases[vision_match.group(2)]
+            layer_summary = summary.get(layer_key)
+            if isinstance(layer_summary, dict) and weight_key in layer_summary:
+                actual = normalized_dtype(entry.get("dtype"))
+                declared = normalized_dtype(layer_summary[weight_key])
+                if actual != declared:
+                    raise RuntimeError(
+                        f"Conflicting weight dtype for {name}: entry={actual} "
+                        f"quant_summary.{layer_key}.{weight_key}={declared}"
+                    )
+    for layer, weights in summary.items():
         if not isinstance(layer, str) or not re.fullmatch(r"layer\.\d+", layer) or not isinstance(weights, dict):
             continue
         for name, dtype in weights.items():
