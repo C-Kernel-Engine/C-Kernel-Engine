@@ -10,14 +10,14 @@ OUTPUT_FILE="$(dirname "$0")/../_partials/folder_structure.html"
 if command -v tree >/dev/null 2>&1; then
     TREE_OUTPUT=$(cd "$PROJECT_ROOT" && tree -d -L 3 --dirsfirst \
         src/kernels version/v6.6 version/v7 \
-        -I '__pycache__|*.o|*.pyc|doxygen_output|build|.git|node_modules|*.bin|*.so' \
+        -I '__pycache__|.cache|*.o|*.pyc|doxygen_output|build|.git|node_modules|*.bin|*.so' \
         --charset=ascii 2>/dev/null)
 else
     TREE_OUTPUT=$(cd "$PROJECT_ROOT" && python3 - <<'PY'
 from pathlib import Path
 
 roots = [Path("src/kernels"), Path("version/v6.6"), Path("version/v7")]
-ignore = {"__pycache__", "doxygen_output", "build", ".git", "node_modules"}
+ignore = {"__pycache__", ".cache", "doxygen_output", "build", ".git", "node_modules"}
 max_depth = 3
 dir_count = 0
 
