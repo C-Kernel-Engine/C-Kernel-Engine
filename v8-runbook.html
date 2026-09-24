@@ -1218,7 +1218,10 @@ make v8-training-certify-fp32
 make v8-training-workflow-fp32
 
 # CKE BPE plus 4-layer dense, 6-layer GQA, and 10-layer GQA full workflows.
-make v8-training-matrix-fp32</pre>
+make v8-training-matrix-fp32
+
+# Two authored 2-layer circuits: dense and unequal-head GQA with width/tail variation.
+make v8-training-composition-fp32</pre>
     </div>
     <table class="table">
         <thead><tr><th>Command</th><th>What a PASS proves</th><th>Primary evidence</th></tr></thead>
@@ -1238,8 +1241,21 @@ make v8-training-matrix-fp32</pre>
                 <td>The same complete contract runs reduced Qwen3-style variants at 4, 6, and 10 layers, including unequal-head GQA. CKE trains a BPE tokenizer from the training split, verifies exact round trips and tokenizer quality, then gives generated C and PyTorch the same serialized token IDs. Nightly schedules the bounded 6-layer 4/2 GQA case; this command runs the complete depth sweep.</td>
                 <td><code>version/v8/.cache/reports/training_matrix_latest.json</code></td>
             </tr>
+            <tr>
+                <td><code>v8-training-composition-fp32</code></td>
+                <td>Two supported Python-authored, two-layer circuits run generated-C forward/backward/AdamW against independent PyTorch at every update using fixed elementwise FP32 tolerances. One has dense 4/4 attention; one has 4/2 GQA, a non-vector-multiple 40-wide feature dimension, 17-token sequences, and a partial final accumulation window. Reports retain each trainable tensor's worst element and reject a synthetic gradient-slot swap. Nightly runs the GQA case.</td>
+                <td><code>version/v8/.cache/reports/training_composition_latest.json</code> and each case's identity-bound <code>training_workflow.json</code></td>
+            </tr>
         </tbody>
     </table>
+</div>
+
+<div class="card" id="training-capability-ledger">
+    <h3 style="margin-top:0;">Training kernel capability ledger</h3>
+    <p>The <a href="v8-training-capability-ledger.html">map-derived ledger</a> groups v8 provider maps by FP32, BF16, quantized, and unspecified dtype tags. It lists declared backward providers separately from backward-named maps missing a mode contract, and from maps with registered tests. These are inventory facts, not executed numerical certification. In particular, a BF16 or quantized forward map does not establish a trainable backward path or QLoRA support.</p>
+    <pre>python3 version/v8/scripts/build_training_capability_ledger_v8.py
+make v8-training-capability-ledger-check</pre>
+    <p>For executed evidence, open the current run's <code>training_workflow.json</code> and identity-bound <code>ir_report.html</code>; the ledger does not turn a registered provider into a PASS.</p>
 </div>
 
 <div class="card card-blue">
