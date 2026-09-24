@@ -432,6 +432,26 @@ def lower(op):
         )
         self.assertIsNone(build_ir._circuit_op_weight_keys(circuit, "body", "q_proj"))
 
+    def test_required_circuit_weight_fails_when_manifest_omits_it(self) -> None:
+        circuit = {
+            "contract": {
+                "weight_policy": {
+                    "op_bindings": [
+                        {"section": "body", "op": "rope_q", "weights": ["rope_freqs"], "required": True}
+                    ]
+                }
+            }
+        }
+        binding = build_ir._circuit_op_weight_binding(circuit, "body", "rope_q")
+        with self.assertRaisesRegex(RuntimeError, "missing required weights: rope_freqs"):
+            build_ir._require_circuit_op_weights(binding, {}, "body", "rope_q", 29)
+        build_ir._require_circuit_op_weights(
+            binding, {"rope_freqs": {"name": "rope_freqs"}}, "body", "rope_q", 29
+        )
+
+        optional = {"section": "body", "op": "rope_qk", "weights": ["rope_freqs"]}
+        build_ir._require_circuit_op_weights(optional, {}, "body", "rope_qk", 5)
+
     def test_policy_rejects_missing_function_instead_of_weakening_scope(self) -> None:
         policy = {
             "schema": "cke.v8_dsl_policy",

@@ -101,6 +101,14 @@
       "per_tensor_mixed_quant": true
     },
     "weight_policy": {
+      "op_bindings": [
+        {
+          "section": "body",
+          "op": "rope_q",
+          "weights": ["rope_freqs"],
+          "required": true
+        }
+      ],
       "ignore": [
         {
           "pattern": "assistant.pre_projection",

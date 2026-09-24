@@ -527,6 +527,15 @@ class V8Gemma4ScaffoldTests(unittest.TestCase):
         self.assertIn("attn_sliding_shared_kv", shared_ops)
         self.assertNotIn("k_proj", shared_ops)
         self.assertNotIn("v_proj", shared_ops)
+        rope_bindings = [
+            binding for binding in template["contract"]["weight_policy"]["op_bindings"]
+            if binding.get("op") in {"rope_q", "rope_qk"}
+        ]
+        self.assertEqual(
+            {binding["op"]: binding["weights"] for binding in rope_bindings},
+            {"rope_q": ["rope_freqs"], "rope_qk": ["rope_freqs"]},
+        )
+        self.assertTrue(all(binding["required"] for binding in rope_bindings))
 
     def test_gemma4_geglu_declares_disjoint_compact_stream(self) -> None:
         template_path = REPO_ROOT / "version" / "v8" / "circuits" / "gemma4.json"
@@ -779,6 +788,13 @@ class V8Gemma4ScaffoldTests(unittest.TestCase):
             self.assertTrue((build_dir / "libmodel.so").exists())
             self.assertIn("assistant_pre_projection", (build_dir / "model_v8.c").read_text(encoding="utf-8"))
             self.assertIn("attn_shared_kv", (build_dir / "lowered_decode_call.json").read_text(encoding="utf-8"))
+            calls = json.loads((build_dir / "lowered_decode_call.json").read_text(encoding="utf-8"))
+            full_rope = next(
+                op for op in calls["operations"] if op["layer"] == 1 and op["op"] == "rope_q"
+            )
+            factor = next(arg for arg in full_rope["args"] if arg["name"] == "freq_factors")
+            self.assertEqual(factor["weight_ref"], "rope_freqs")
+            self.assertNotEqual(factor["expr"], "NULL")
 
     def test_gemma4_kv_layers_use_supported_paired_qk_ops_for_first_bringup(self) -> None:
         template_path = REPO_ROOT / "version" / "v8" / "circuits" / "gemma4.json"
