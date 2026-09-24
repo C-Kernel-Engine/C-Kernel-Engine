@@ -1,0 +1,393 @@
+{
+  "schema_version": 1,
+  "status": "full_oracle_captured",
+  "pin": {
+    "schema_version": 1,
+    "status": "reference_captured",
+    "model": {
+      "repository": "hexgrad/Kokoro-82M",
+      "revision": "e8a90b41091c3c5b70375c47cc959799920fa4d6",
+      "files": [
+        "config.json",
+        "kokoro-v1_0.pth",
+        "voices/af_heart.pt"
+      ],
+      "license": "Apache-2.0"
+    },
+    "reference_code": {
+      "kokoro": "dfb907a02bba8152ca444717ca5d78747ccb4bec",
+      "misaki": "fba1236595f2d2bf21d414ba6e57d25256afada3"
+    },
+    "fixture": {
+      "text": "Read this assistant response aloud.",
+      "language": "a",
+      "voice": "af_heart",
+      "speed": 1.0,
+      "torch_seed": 0,
+      "sample_rate_hz": 24000,
+      "channels": 1,
+      "pcm_reference_dtype": "float32",
+      "condition_selection": "voice_pack[len(phonemes)-1]; predictor style is columns 128:256, decoder style is columns 0:128"
+    },
+    "dependencies": {
+      "oracle": "Kokoro 0.9.4 and Misaki 0.9.4 source pins above; record actual Python packages in generated manifest",
+      "g2p": "Misaki English trf=False; upstream Kokoro pipeline attempts espeak-ng fallback for out-of-dictionary words",
+      "unresolved": [
+        "resolved Python package versions and wheel hashes",
+        "spaCy model/data revision and espeak-ng binary/data version if selected by the environment",
+        "local weight and voice file SHA-256 until artifacts are acquired"
+      ]
+    },
+    "sources": [
+      "https://huggingface.co/hexgrad/Kokoro-82M/tree/e8a90b41091c3c5b70375c47cc959799920fa4d6",
+      "https://github.com/hexgrad/kokoro/blob/dfb907a02bba8152ca444717ca5d78747ccb4bec/kokoro/model.py",
+      "https://github.com/hexgrad/kokoro/blob/dfb907a02bba8152ca444717ca5d78747ccb4bec/kokoro/pipeline.py",
+      "https://github.com/hexgrad/misaki/tree/fba1236595f2d2bf21d414ba6e57d25256afada3"
+    ]
+  },
+  "environment": {
+    "python": "3.13.15 (main, Sep  1 2026, 14:18:08) [Clang 22.1.3 ]",
+    "platform": "Linux-7.0.0-29-generic-x86_64-with-glibc2.43",
+    "packages": {
+      "kokoro": "0.9.4",
+      "misaki": "0.9.4",
+      "torch": "2.8.0+cpu",
+      "transformers": "5.17.0",
+      "spacy": "3.8.16",
+      "num2words": "0.5.14",
+      "phonemizer-fork": "3.3.2",
+      "espeakng-loader": "0.2.4"
+    }
+  },
+  "assets": {
+    "config.json": "5abb01e2403b072bf03d04fde160443e209d7a0dad49a423be15196b9b43c17f",
+    "kokoro-v1_0.pth": "496dba118d1a58f5f3db2efc88dbdc216e0483fc89fe6e47ee1f2c53f18ad1e4",
+    "voices/af_heart.pt": "0ab5709b8ffab19bfd849cd11d98f75b60af7733253ad0d67b12382a102cb4ff"
+  },
+  "graphemes": "Read this assistant response aloud.",
+  "phonemes": "ɹˈid ðɪs əsˈɪstᵊnt ɹəspˈɑns əlˈWd.",
+  "phoneme_codepoints": [
+    "U+0279",
+    "U+02C8",
+    "U+0069",
+    "U+0064",
+    "U+0020",
+    "U+00F0",
+    "U+026A",
+    "U+0073",
+    "U+0020",
+    "U+0259",
+    "U+0073",
+    "U+02C8",
+    "U+026A",
+    "U+0073",
+    "U+0074",
+    "U+1D4A",
+    "U+006E",
+    "U+0074",
+    "U+0020",
+    "U+0279",
+    "U+0259",
+    "U+0073",
+    "U+0070",
+    "U+02C8",
+    "U+0251",
+    "U+006E",
+    "U+0073",
+    "U+0020",
+    "U+0259",
+    "U+006C",
+    "U+02C8",
+    "U+0057",
+    "U+0064",
+    "U+002E"
+  ],
+  "input_ids": [
+    0,
+    123,
+    156,
+    51,
+    46,
+    16,
+    81,
+    102,
+    61,
+    16,
+    83,
+    61,
+    156,
+    102,
+    61,
+    62,
+    42,
+    56,
+    62,
+    16,
+    123,
+    83,
+    61,
+    58,
+    156,
+    69,
+    56,
+    61,
+    16,
+    83,
+    54,
+    156,
+    39,
+    46,
+    4,
+    0
+  ],
+  "tensors": {
+    "voice_style": {
+      "file": "voice_style.npy",
+      "shape": [
+        1,
+        256
+      ],
+      "dtype": "float32",
+      "sha256": "24121fda6731e2241f70b3d908fe9cfc1a4c93c7dc8e935b8eca5532199af5cb"
+    },
+    "decoder_style": {
+      "file": "decoder_style.npy",
+      "shape": [
+        1,
+        128
+      ],
+      "dtype": "float32",
+      "sha256": "64b7bd32bdbe96ddfa68adc2adc67bbac60a6aba4bfcc6d71245815010d5487b"
+    },
+    "predictor_style": {
+      "file": "predictor_style.npy",
+      "shape": [
+        1,
+        128
+      ],
+      "dtype": "float32",
+      "sha256": "8662a8fe8789aceeb09086c6985dc14b01458cdc1224ce9a88bbfc15bad7db17"
+    },
+    "bert": {
+      "file": "bert.npy",
+      "shape": [
+        1,
+        36,
+        768
+      ],
+      "dtype": "float32",
+      "sha256": "d5782376355cd6521a9e8caa1c14f832888b1c62e455e1a63adce9fee4a2953a"
+    },
+    "bert_encoder": {
+      "file": "bert_encoder.npy",
+      "shape": [
+        1,
+        36,
+        512
+      ],
+      "dtype": "float32",
+      "sha256": "a92bbd557245175ccbe0c6d917b20c79eddf66741912d0c5cd2560f1a78d0f5b"
+    },
+    "predictor_text_encoder": {
+      "file": "predictor_text_encoder.npy",
+      "shape": [
+        1,
+        36,
+        640
+      ],
+      "dtype": "float32",
+      "sha256": "e8b10171a0daedb2eadb53617435f620e1f90da4cb6b1ddfe27390c56bd12bad"
+    },
+    "predictor_lstm_0": {
+      "file": "predictor_lstm_0.npy",
+      "shape": [
+        1,
+        36,
+        512
+      ],
+      "dtype": "float32",
+      "sha256": "45ef38a9bbb30695b982cb417195e3a49410b3c375c4a0beffda2de9eea20f5c"
+    },
+    "predictor_lstm_1_0": {
+      "file": "predictor_lstm_1_0.npy",
+      "shape": [
+        2,
+        1,
+        256
+      ],
+      "dtype": "float32",
+      "sha256": "d2e6f95a1d1b9040fad913a99310807cc2d28c025d98426f2afa2a76bed75a3a"
+    },
+    "predictor_lstm_1_1": {
+      "file": "predictor_lstm_1_1.npy",
+      "shape": [
+        2,
+        1,
+        256
+      ],
+      "dtype": "float32",
+      "sha256": "0d750e09eb05df250fce5757040e78d5ae5e39dfe357d1acdca7d137b66ea2bb"
+    },
+    "predictor_duration_proj": {
+      "file": "predictor_duration_proj.npy",
+      "shape": [
+        1,
+        36,
+        50
+      ],
+      "dtype": "float32",
+      "sha256": "5f442023f70969eb2b775ed0e00da4c4d6d681acb2d43d8be605ed670107e2ca"
+    },
+    "predictor_shared_0": {
+      "file": "predictor_shared_0.npy",
+      "shape": [
+        1,
+        103,
+        512
+      ],
+      "dtype": "float32",
+      "sha256": "2d5653524a4905404fe26ad85270b09d320610c20b9b64dd68a9c1cd0a50c70c"
+    },
+    "predictor_shared_1_0": {
+      "file": "predictor_shared_1_0.npy",
+      "shape": [
+        2,
+        1,
+        256
+      ],
+      "dtype": "float32",
+      "sha256": "ed26ce12aef64c90ac4c5cfb6538f4364e549d49fc22991556dcbcc921312983"
+    },
+    "predictor_shared_1_1": {
+      "file": "predictor_shared_1_1.npy",
+      "shape": [
+        2,
+        1,
+        256
+      ],
+      "dtype": "float32",
+      "sha256": "0e50b9723610199eb0f1a968c889de7395bbc222169e7a6a96187c1d30566534"
+    },
+    "predictor_F0_proj": {
+      "file": "predictor_F0_proj.npy",
+      "shape": [
+        1,
+        1,
+        206
+      ],
+      "dtype": "float32",
+      "sha256": "f9ec0475c4cf0beda307042eb458671390b12071277445ce081660c9d48df8fe"
+    },
+    "predictor_N_proj": {
+      "file": "predictor_N_proj.npy",
+      "shape": [
+        1,
+        1,
+        206
+      ],
+      "dtype": "float32",
+      "sha256": "6d9758811fdc43205ceda74c9b60d1e0ca48a927901cfdf1bfbfad7e9dc521b3"
+    },
+    "text_encoder": {
+      "file": "text_encoder.npy",
+      "shape": [
+        1,
+        512,
+        36
+      ],
+      "dtype": "float32",
+      "sha256": "8e0445112ae7218e18ca6f63f59a0568d1f943278f4bc5a713ac57d05c221380"
+    },
+    "decoder_generator_conv_post": {
+      "file": "decoder_generator_conv_post.npy",
+      "shape": [
+        1,
+        22,
+        12361
+      ],
+      "dtype": "float32",
+      "sha256": "d0efb4998b0d2ebad8a341bbc65b40263ed48f4eb1f2497cf75524783b756d7f"
+    },
+    "istft_magnitude": {
+      "file": "istft_magnitude.npy",
+      "shape": [
+        1,
+        11,
+        12361
+      ],
+      "dtype": "float32",
+      "sha256": "c947d85f87bf67333c8eca68b2de64025d46d5da14b23442e69a31325d03c35e"
+    },
+    "istft_phase": {
+      "file": "istft_phase.npy",
+      "shape": [
+        1,
+        11,
+        12361
+      ],
+      "dtype": "float32",
+      "sha256": "2b99667b190e268b35214ac710c1c47ea4e68a4dea207149564f18eac6121f9d"
+    },
+    "decoder_generator": {
+      "file": "decoder_generator.npy",
+      "shape": [
+        1,
+        1,
+        61800
+      ],
+      "dtype": "float32",
+      "sha256": "5d2e0b22f37bd1fa77bbfc09d6c6231c4ef3c4de8c0b701df3bb354bf8f0ba82"
+    },
+    "decoder": {
+      "file": "decoder.npy",
+      "shape": [
+        1,
+        1,
+        61800
+      ],
+      "dtype": "float32",
+      "sha256": "5d2e0b22f37bd1fa77bbfc09d6c6231c4ef3c4de8c0b701df3bb354bf8f0ba82"
+    },
+    "predicted_duration": {
+      "file": "predicted_duration.npy",
+      "shape": [
+        36
+      ],
+      "dtype": "int64",
+      "sha256": "4a5e0e8763f8da9a29e836123b6802e0843564de60281c568a2b41f1c32889ad"
+    },
+    "frame_to_token": {
+      "file": "frame_to_token.npy",
+      "shape": [
+        103
+      ],
+      "dtype": "int64",
+      "sha256": "a85eabdda9460b434062b63d20dd41f943e576745010b0606bbbcc2f47985022"
+    },
+    "waveform_f32": {
+      "file": "waveform_f32.npy",
+      "shape": [
+        61800
+      ],
+      "dtype": "float32",
+      "sha256": "6c651c788bb7cc71969d2f2b9b710d6a08cd0c32e4ee3f3161388e9f78f9c48a"
+    }
+  },
+  "evidence": {
+    "upstream_preprocessing": "CAPTURED",
+    "upstream_waveform": "CAPTURED",
+    "native_primitive_parity": "NOT_TESTED",
+    "native_full_waveform_parity": "NOT_TESTED",
+    "human_listening": "NOT_TESTED",
+    "application_playback": "NOT_TESTED"
+  },
+  "voice_row_index": 33,
+  "waveform": {
+    "frames": 61800,
+    "seconds": 2.575,
+    "min": -0.3097117841243744,
+    "max": 0.2742038667201996,
+    "pcm16_file": "waveform_pcm16.wav",
+    "pcm16_sha256": "28a43f85088e921bc8f4d9e29c45a752dd2b9b5f98403505590bd2fc13526f0c"
+  }
+}

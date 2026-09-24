@@ -1,0 +1,50 @@
+name: TTS kernel numerical contracts
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/tts-kernels.yml'
+      - 'include/ckernel_tts.h'
+      - 'src/kernels/audio_duration_expand.c'
+      - 'src/kernels/audio_istft_mag_phase.c'
+      - 'src/kernels/kokoro_shape_bounds.c'
+      - 'tests/test_v8_kokoro_shape_bounds.c'
+      - 'tests/test_v8_kokoro_shape_bounds.py'
+      - 'tests/test_v8_audio_istft_oracle.py'
+      - 'tests/test_v8_audio_duration_expand_oracle.py'
+      - 'tests/test_v8_tts_live_torch_oracles.py'
+      - 'tests/fixtures/tts/**'
+      - 'version/v8/kernel_maps/audio_duration_expand_channel_major_f32.json'
+      - 'version/v8/kernel_maps/audio_istft_mag_phase_f32.json'
+      - 'version/v8/contracts/numerical_execution.json'
+      - 'version/v8/schemas/numerical_execution_contract_registry.schema.json'
+  push:
+    branches: [main]
+    paths:
+      - 'include/ckernel_tts.h'
+      - 'src/kernels/audio_duration_expand.c'
+      - 'src/kernels/audio_istft_mag_phase.c'
+      - 'src/kernels/kokoro_shape_bounds.c'
+      - 'tests/test_v8_kokoro_shape_bounds.c'
+      - 'tests/test_v8_kokoro_shape_bounds.py'
+      - 'tests/test_v8_audio_istft_oracle.py'
+      - 'tests/test_v8_audio_duration_expand_oracle.py'
+      - 'tests/test_v8_tts_live_torch_oracles.py'
+      - 'tests/fixtures/tts/**'
+      - 'version/v8/kernel_maps/audio_duration_expand_channel_major_f32.json'
+      - 'version/v8/kernel_maps/audio_istft_mag_phase_f32.json'
+      - 'version/v8/contracts/numerical_execution.json'
+      - 'version/v8/schemas/numerical_execution_contract_registry.schema.json'
+
+jobs:
+  numerical:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and verify portable scalar kernels
+        run: |
+          python3 -m unittest \
+            tests.test_v8_kokoro_shape_bounds \
+            tests.test_v8_audio_duration_expand_oracle.AudioDurationExpandOracleTest.test_committed_torch_fixture \
+            tests.test_v8_audio_istft_oracle.AudioIstftOracleTest.test_committed_torch_fixture

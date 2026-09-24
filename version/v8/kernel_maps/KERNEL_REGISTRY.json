@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 381,
+      "total": 383,
       "by_op": {
         "add_backward": 1,
         "add_stream": 2,
@@ -20,12 +20,14 @@
         "audio_batch_norm": 1,
         "audio_conv1d": 2,
         "audio_conv2d": 1,
+        "audio_duration_expand": 1,
         "audio_fastconformer_block": 1,
         "audio_fastconformer_subsampling": 1,
         "audio_feature_normalize": 1,
         "audio_feature_window": 1,
         "audio_glu": 1,
         "audio_hann_window": 1,
+        "audio_istft_mag_phase": 1,
         "audio_log_mel": 4,
         "audio_lstm": 1,
         "audio_mel_filters": 1,
@@ -13108,6 +13110,188 @@
       "_source_file": "audio_conv2d_whc_grouped_f32.json"
     },
     {
+      "id": "audio_duration_expand_channel_major_f32",
+      "op": "audio_duration_expand",
+      "operation_interface": "audio.duration_expand.channel_major.valid_extent.fp32.v1",
+      "variant": "checked_i32_durations_strided_channel_major_fp32",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "equivalence_group": "audio_duration_expand_channel_major_fp32",
+        "phases": [
+          "prefill"
+        ]
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "features",
+          "dtype": "fp32",
+          "shape": [
+            "C",
+            "T"
+          ],
+          "layout": "channel_major_input_stride",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "durations",
+          "dtype": "i32",
+          "shape": [
+            "T"
+          ],
+          "layout": "token_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "C",
+            "A_capacity"
+          ],
+          "layout": "channel_major_output_stride",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "input_elements",
+        "channels",
+        "phoneme_count",
+        "input_stride",
+        "expanded_frames",
+        "output_elements",
+        "output_stride"
+      ],
+      "impl": {
+        "function": "audio_duration_expand_channel_major_f32",
+        "c_declaration": "int audio_duration_expand_channel_major_f32(const float *features, size_t input_elements, size_t channels, size_t phoneme_count, size_t input_stride, const int32_t *durations, size_t expanded_frames, float *output, size_t output_elements, size_t output_stride);",
+        "sources": [
+          "src/kernels/audio_duration_expand.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "audio_duration_expand_checked_strided_copy_fp32",
+          "status": "validated",
+          "phases": [
+            "prefill"
+          ],
+          "function": "audio_duration_expand_channel_major_f32",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "none",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "independent_outputs"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "features",
+            "source": "activation:features",
+            "cast": "const float*",
+            "ports": [
+              "input:features"
+            ]
+          },
+          {
+            "name": "input_elements",
+            "source": "runtime:input_elements"
+          },
+          {
+            "name": "channels",
+            "source": "dim:channels"
+          },
+          {
+            "name": "phoneme_count",
+            "source": "runtime:phoneme_count"
+          },
+          {
+            "name": "input_stride",
+            "source": "runtime:input_stride"
+          },
+          {
+            "name": "durations",
+            "source": "activation:durations",
+            "cast": "const int32_t*",
+            "ports": [
+              "input:durations"
+            ]
+          },
+          {
+            "name": "expanded_frames",
+            "source": "runtime:expanded_frames"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements"
+          },
+          {
+            "name": "output_stride",
+            "source": "runtime:output_stride"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_kokoro_shape_bounds.py",
+          "tests/test_v8_audio_duration_expand_oracle.py"
+        ],
+        "oracle": "PyTorch torch.repeat_interleave FP32; committed fixture and live dependency check"
+      },
+      "notes": "Caller-owned buffers. Check nonpositive durations, sum, capacities and byte arithmetic before writes. Only valid A columns are written; physical row stride may be A_capacity. Unsupported backward is explicit.",
+      "name": "audio_duration_expand_channel_major_f32",
+      "_source_file": "audio_duration_expand_channel_major_f32.json"
+    },
+    {
       "id": "audio_fastconformer_block_f32",
       "op": "audio_fastconformer_block",
       "operation_interface": "audio_fastconformer_block.macaron_relative_conv.fp32.v1",
@@ -14882,6 +15066,202 @@
       },
       "name": "audio_hann_window_f32",
       "_source_file": "audio_hann_window_f32.json"
+    },
+    {
+      "id": "audio_istft_mag_phase_f32",
+      "op": "audio_istft_mag_phase",
+      "operation_interface": "audio.istft.magnitude_phase.centered_hann.fp32.v1",
+      "variant": "direct_idft_centered_periodic_hann_ola_fp32",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "equivalence_group": "audio_istft_mag_phase_centered_hann_fp32",
+        "phases": [
+          "prefill"
+        ]
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "magnitude",
+          "dtype": "fp32",
+          "shape": [
+            "F",
+            "N_fft/2+1"
+          ],
+          "layout": "frame_bin_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "phase",
+          "dtype": "fp32",
+          "shape": [
+            "F",
+            "N_fft/2+1"
+          ],
+          "layout": "frame_bin_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "(F-1)*H"
+          ],
+          "layout": "sample_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "overlap_window",
+          "dtype": "fp32",
+          "shape": [
+            "2*((F-1)*H+N_fft)+N_fft"
+          ],
+          "size_bytes": "4 * (2 * ((frames - 1) * hop + n_fft) + n_fft)",
+          "size_resolution": "required",
+          "lifetime": "kernel_call",
+          "alignment": 64,
+          "layout": "contiguous",
+          "access": "read_write",
+          "storage_class": "scratch",
+          "consumption": "required"
+        }
+      ],
+      "dims": [
+        "spectral_elements",
+        "frames",
+        "n_fft",
+        "hop",
+        "output_capacity"
+      ],
+      "impl": {
+        "function": "audio_istft_mag_phase_f32",
+        "c_declaration": "int audio_istft_mag_phase_f32(const float *magnitude, const float *phase, size_t spectral_elements, size_t frames, size_t n_fft, size_t hop, float *output, size_t output_capacity, float *scratch, size_t scratch_elements);",
+        "sources": [
+          "src/kernels/audio_istft_mag_phase.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "audio_istft_mag_phase_centered_hann_ola_fp32",
+          "status": "validated",
+          "phases": [
+            "prefill"
+          ],
+          "function": "audio_istft_mag_phase_f32",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "contract_defined"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp32",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "serial"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "magnitude",
+            "source": "activation:magnitude",
+            "cast": "const float*",
+            "ports": [
+              "input:magnitude"
+            ]
+          },
+          {
+            "name": "phase",
+            "source": "activation:phase",
+            "cast": "const float*",
+            "ports": [
+              "input:phase"
+            ]
+          },
+          {
+            "name": "spectral_elements",
+            "source": "runtime:spectral_elements"
+          },
+          {
+            "name": "frames",
+            "source": "runtime:frames"
+          },
+          {
+            "name": "n_fft",
+            "source": "dim:n_fft"
+          },
+          {
+            "name": "hop",
+            "source": "dim:hop"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_capacity",
+            "source": "runtime:output_capacity"
+          },
+          {
+            "name": "scratch",
+            "source": "scratch:overlap_window",
+            "cast": "float*"
+          },
+          {
+            "name": "scratch_elements",
+            "source": "runtime:scratch_elements"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_audio_istft_oracle.py"
+        ],
+        "oracle": "torch.istft centered periodic-Hann FP32; Kokoro pinned magnitude/phase primitive capture"
+      },
+      "notes": "Caller owns disjoint output and scratch. Rejects nonfinite/negative magnitude and nonfinite phase before output writes. Scratch query is audio_istft_mag_phase_plan_f32. PCM conversion and playback are separate.",
+      "name": "audio_istft_mag_phase_f32",
+      "_source_file": "audio_istft_mag_phase_f32.json"
     },
     {
       "id": "audio_log_mel_time_major_f32",

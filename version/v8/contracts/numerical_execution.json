@@ -3,6 +3,28 @@
   "schema_version": 1,
   "engine_contract_version": "8",
   "contracts": {
+    "audio_duration_expand_checked_strided_copy_fp32": {
+      "operator_family": "audio_duration_expand",
+      "status": "validated",
+      "storage": {"input": "fp32", "weight": "none", "output": "fp32"},
+      "compute": {"input": "fp32", "weight": "none", "accumulator": "fp32", "contraction": "disabled", "evaluation_order": "validate_i32_duration_sum_then_ascending_channel_token_frame_exact_copy"},
+      "rounding": {"mode": "none", "points": ["input_load", "output_store"]},
+      "reduction": {"kind": "none", "order": "none", "partial_accumulator": "none", "merge_order": "none"},
+      "threading": {"work_partition": "serial", "split_strategy": "independent_outputs", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Checks positive int32 durations and exact bounded extent before copying channel-major FP32 features to strided expanded rows; padding is untouched."
+    },
+    "audio_istft_mag_phase_centered_hann_ola_fp32": {
+      "operator_family": "audio_istft_mag_phase",
+      "status": "validated",
+      "storage": {"input": "fp32", "weight": "none", "output": "fp32"},
+      "compute": {"input": "fp32", "weight": "none", "accumulator": "fp32", "contraction": "enabled", "evaluation_order": "ascending_frame_sample_bin_direct_idft_then_periodic_hann_overlap_add_then_window_square_normalize_and_center_trim"},
+      "rounding": {"mode": "rne", "points": ["fft_projection", "weighted_product", "reduction_update", "output_divide", "output_store"]},
+      "reduction": {"kind": "composite", "order": "stage_ordered", "partial_accumulator": "fp32", "merge_order": "none"},
+      "threading": {"work_partition": "serial", "split_strategy": "serial", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Reconstructs a real signal from frame-major one-sided magnitude and phase with ascending-bin direct IDFT, periodic Hann overlap-add, window-square normalization, and centered trim."
+    },
     "hyper_stream_expand_exact_fp32": {
       "operator_family": "hyper_stream_expand",
       "status": "validated",
