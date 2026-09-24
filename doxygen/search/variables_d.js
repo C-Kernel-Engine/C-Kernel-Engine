@@ -14,5 +14,6 @@ var searchData=
   ['out_5findex_11',['out_index',['../structCKInputRef.html#ae1ae7d92ed1362d599e30bf5aff958e3',1,'CKInputRef']]],
   ['out_5flen_12',['out_len',['../tokenizer_8h.html#afcd8f560b02b3c7a2bc2b3effa325fcf',1,'tokenizer.h']]],
   ['output_13',['output',['../structCKLayerForwardParams.html#a61d1bcef2bcffd12c7a49d243a6c51d1',1,'CKLayerForwardParams::output'],['../structCKLayerForwardParamsQ4K.html#a2532f454e8565aafe5bc975e518e90e2',1,'CKLayerForwardParamsQ4K::output'],['../structCKLayerOffsets.html#a253ebe103830f66006e992c1942359c6',1,'CKLayerOffsets::output'],['../structQWEN2__0__5B__DECODELayerOffsets.html#aa901fee3b15422d052e90e6f11aac70c',1,'QWEN2_0_5B_DECODELayerOffsets::output']]],
-  ['outputs_14',['outputs',['../structCKIRV2Node.html#ab853f000478eff6cb0e5f76d2b50efa1',1,'CKIRV2Node']]]
+  ['output_5fsamples_5fupper_5fbound_14',['output_samples_upper_bound',['../structCKKokoroShapeV8.html#a3dd5f3215bcf6411a5a191d29bf574f3',1,'CKKokoroShapeV8']]],
+  ['outputs_15',['outputs',['../structCKIRV2Node.html#ab853f000478eff6cb0e5f76d2b50efa1',1,'CKIRV2Node']]]
 ];

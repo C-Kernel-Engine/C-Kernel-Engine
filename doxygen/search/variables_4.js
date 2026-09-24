@@ -19,5 +19,6 @@ var searchData=
   ['eos_16',['eos',['../tokenizer_8h.html#ae2ac59d55593a1262747f8e0c4b575d9',1,'eos:&#160;tokenizer.h'],['../true__bpe_8h.html#ae2ac59d55593a1262747f8e0c4b575d9',1,'eos:&#160;true_bpe.h']]],
   ['eos_5fid_17',['eos_id',['../structCKTokenizer.html#a70622f7babd13c77a93825497fdf2c5f',1,'CKTokenizer']]],
   ['eps_18',['eps',['../structCKLayerForwardParams.html#a63e37652b3bb5e0d394ea70af0895595',1,'CKLayerForwardParams::eps'],['../structCKLayerBackwardParams.html#ab6c8a9964ea61d631737361e490766c7',1,'CKLayerBackwardParams::eps'],['../structCKLayerForwardParamsQ4K.html#a002187e74b3fa26e39bd17a965c72f8b',1,'CKLayerForwardParamsQ4K::eps']]],
-  ['estimated_5fchannels_19',['estimated_channels',['../structMemoryInfo.html#a58d128299366a3bbd1bef1b86180d2c9',1,'MemoryInfo']]]
+  ['estimated_5fchannels_19',['estimated_channels',['../structMemoryInfo.html#a58d128299366a3bbd1bef1b86180d2c9',1,'MemoryInfo']]],
+  ['expanded_5fframes_20',['expanded_frames',['../structCKKokoroShapeV8.html#a80bb32ace7694678728349c1391ba66c',1,'CKKokoroShapeV8']]]
 ];

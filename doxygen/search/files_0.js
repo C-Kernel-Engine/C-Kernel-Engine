@@ -8,6 +8,8 @@ var searchData=
   ['attention_5fmlp_5ffused_2ec_5',['attention_mlp_fused.c',['../attention__mlp__fused_8c.html',1,'']]],
   ['attention_5foracle_5fggml_2ec_6',['attention_oracle_ggml.c',['../attention__oracle__ggml_8c.html',1,'']]],
   ['attention_5foracle_5fggml_2eh_7',['attention_oracle_ggml.h',['../attention__oracle__ggml_8h.html',1,'']]],
-  ['audio_5fkernels_2ec_8',['audio_kernels.c',['../audio__kernels_8c.html',1,'']]],
-  ['axpy_5fkernels_2ec_9',['axpy_kernels.c',['../axpy__kernels_8c.html',1,'']]]
+  ['audio_5fduration_5fexpand_2ec_8',['audio_duration_expand.c',['../audio__duration__expand_8c.html',1,'']]],
+  ['audio_5fistft_5fmag_5fphase_2ec_9',['audio_istft_mag_phase.c',['../audio__istft__mag__phase_8c.html',1,'']]],
+  ['audio_5fkernels_2ec_10',['audio_kernels.c',['../audio__kernels_8c.html',1,'']]],
+  ['axpy_5fkernels_2ec_11',['axpy_kernels.c',['../axpy__kernels_8c.html',1,'']]]
 ];

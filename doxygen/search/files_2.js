@@ -73,6 +73,7 @@ var searchData=
   ['ckernel_5fregistry_2eh_70',['ckernel_registry.h',['../ckernel__registry_8h.html',1,'']]],
   ['ckernel_5fsection_5flayout_2eh_71',['ckernel_section_layout.h',['../ckernel__section__layout_8h.html',1,'']]],
   ['ckernel_5fstrict_2ec_72',['ckernel_strict.c',['../ckernel__strict_8c.html',1,'']]],
-  ['cpu_5ffeatures_2ec_73',['cpu_features.c',['../cpu__features_8c.html',1,'']]],
-  ['cpu_5ffeatures_2eh_74',['cpu_features.h',['../cpu__features_8h.html',1,'']]]
+  ['ckernel_5ftts_2eh_73',['ckernel_tts.h',['../ckernel__tts_8h.html',1,'']]],
+  ['cpu_5ffeatures_2ec_74',['cpu_features.c',['../cpu__features_8c.html',1,'']]],
+  ['cpu_5ffeatures_2eh_75',['cpu_features.h',['../cpu__features_8h.html',1,'']]]
 ];

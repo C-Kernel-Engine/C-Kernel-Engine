@@ -33,6 +33,8 @@ var annotated_dup =
     [ "CKIRV2Node", "structCKIRV2Node.html", "structCKIRV2Node" ],
     [ "CKKernelId", "structCKKernelId.html", "structCKKernelId" ],
     [ "CKKernelSpec", "structCKKernelSpec.html", "structCKKernelSpec" ],
+    [ "CKKokoroShapeLimitsV8", "structCKKokoroShapeLimitsV8.html", "structCKKokoroShapeLimitsV8" ],
+    [ "CKKokoroShapeV8", "structCKKokoroShapeV8.html", "structCKKokoroShapeV8" ],
     [ "CKLayerBackwardParams", "structCKLayerBackwardParams.html", "structCKLayerBackwardParams" ],
     [ "CKLayerForwardParams", "structCKLayerForwardParams.html", "structCKLayerForwardParams" ],
     [ "CKLayerForwardParamsQ4K", "structCKLayerForwardParamsQ4K.html", "structCKLayerForwardParamsQ4K" ],
