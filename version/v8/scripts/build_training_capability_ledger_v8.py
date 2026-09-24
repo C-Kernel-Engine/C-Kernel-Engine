@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
 import html
 import json
@@ -15,6 +16,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[3]
 MAPS = ROOT / "version/v8/kernel_maps"
+AUTHORING = ROOT / "version/v7/ckernel_engine/python_authoring/nn.py"
 DEFAULT_OUT = ROOT / "docs/site/_pages/v8-training-capability-ledger.html"
 QUANTIZED = re.compile(r"(?:^|[_-])(?:q[2-8](?:[_-]|$)|int[248](?:[_-]|$)|nf4(?:[_-]|$)|nvfp4(?:[_-]|$)|fp8(?:[_-]|$))")
 
@@ -32,6 +34,22 @@ def _family(document: dict[str, Any], path: Path) -> str:
     if "fp32" in terms or "f32" in terms:
         return "fp32-tagged"
     return "unspecified"
+
+
+def _authoring_modules() -> tuple[str, list[dict[str, str]]]:
+    """Inventory public cke.nn classes without inferring compiler support."""
+    raw = AUTHORING.read_bytes()
+    tree = ast.parse(raw, filename=str(AUTHORING))
+    modules = []
+    for node in tree.body:
+        if not isinstance(node, ast.ClassDef) or node.name.startswith("_") or node.name == "Module":
+            continue
+        if not any(isinstance(base, ast.Name) and base.id == "Module" for base in node.bases):
+            continue
+        modules.append({"name": node.name, "source": str(AUTHORING.relative_to(ROOT)),
+                        "lowering_evidence": "NOT_ASSESSED_BY_MAP_INVENTORY",
+                        "backward_evidence": "NOT_ASSESSED_BY_MAP_INVENTORY"})
+    return hashlib.sha256(raw).hexdigest(), modules
 
 
 def inventory() -> dict[str, Any]:
@@ -61,9 +79,24 @@ def inventory() -> dict[str, Any]:
             "declared_training_forward": modes.get("training") is True and not declared_backward,
             "registered_tests": bool(tests.get("parity") or tests.get("unit")),
         })
+    authoring_hash, authoring_modules = _authoring_modules()
+    operations: list[dict[str, Any]] = []
+    by_operation: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
+    for row in providers:
+        by_operation[(row["family"], row["op"])].append(row)
+    for (family, op), rows in sorted(by_operation.items()):
+        operations.append({"family": family, "map_op": op,
+                           "provider_ids": [row["id"] for row in rows],
+                           "declared_backward_ids": [row["id"] for row in rows if row["declared_backward"]],
+                           "registered_test_ids": [row["id"] for row in rows if row["registered_tests"]],
+                           "semantic_operation": "NOT_MAPPED_BY_MAP_INVENTORY",
+                           "authoring_module": "NOT_MAPPED_BY_MAP_INVENTORY",
+                           "generated_training_evidence": "NOT_MEASURED_BY_MAP_INVENTORY"})
     return {"schema": "cke.v8.training_capability_ledger.v1",
             "source_sha256": source_hash.hexdigest(), "provider_count": len(providers),
-            "execution_evidence": "NOT_MEASURED_BY_MAP_INVENTORY", "providers": providers}
+            "execution_evidence": "NOT_MEASURED_BY_MAP_INVENTORY", "providers": providers,
+            "authoring_source_sha256": authoring_hash, "authoring_modules": authoring_modules,
+            "operations": operations}
 
 
 def render_html(ledger: dict[str, Any]) -> str:
@@ -80,6 +113,10 @@ def render_html(ledger: dict[str, Any]) -> str:
              'circuit, or executed PyTorch parity. BF16-tagged includes storage or arithmetic tags. Quantized '
              'forward maps do not imply quantized-base gradients or QLoRA support. Direct executed evidence: '
              '<code>NOT_MEASURED_BY_MAP_INVENTORY</code>.</p>',
+             '<p><strong>Authoring, lowering, and execution are separate.</strong> The public '
+             '<code>cke.nn</code> module list below comes from its Python source. A class existing there does '
+             'not establish that v8 can lower it, select a backward provider, or certify a generated training '
+             'run. Exact kernel-map operation names are not automatically equivalent to Python modules.</p>',
              '<table class="table"><thead><tr><th>Dtype family</th><th>Provider maps</th>'
              '<th>Forward or unspecified</th><th>Declared training forward</th><th>Declared backward</th>'
              '<th>Backward-named without mode</th><th>Maps with registered tests</th></tr></thead><tbody>']
@@ -89,7 +126,18 @@ def render_html(ledger: dict[str, Any]) -> str:
                   sum(r['declared_training_forward'] for r in rows), sum(r['declared_backward'] for r in rows),
                   sum(r['backward_named_without_mode'] for r in rows), sum(r['registered_tests'] for r in rows))
         lines.append('<tr>' + ''.join(f'<td>{html.escape(str(value))}</td>' for value in values) + '</tr>')
-    lines += ['</tbody></table>', '<h2>Operation inventory</h2>',
+    lines += ['</tbody></table>', '<h2>Python authoring modules</h2>',
+              '<p>Source digest: <code>' + html.escape(ledger["authoring_source_sha256"]) + '</code>. '
+              'Compiler and backward linkage: <code>NOT_ASSESSED_BY_MAP_INVENTORY</code>.</p>',
+              '<table class="table"><thead><tr><th>Module</th><th>Authoring source</th>'
+              '<th>Lowering evidence</th><th>Backward evidence</th></tr></thead><tbody>']
+    for row in ledger["authoring_modules"]:
+        source = html.escape(row["source"])
+        link = f'<a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/{source}">{source}</a>'
+        lines.append('<tr><td>' + html.escape(row["name"]) + '</td><td>' + link + '</td><td>' +
+                     html.escape(row["lowering_evidence"]) + '</td><td>' +
+                     html.escape(row["backward_evidence"]) + '</td></tr>')
+    lines += ['</tbody></table>', '<h2>Exact map operation inventory</h2>',
               '<table class="table"><thead><tr><th>Dtype family</th><th>Exact map operation</th><th>Maps</th>'
               '<th>Declared backward providers</th><th>Backward-named without mode</th></tr></thead><tbody>']
     for (family, op), rows in sorted(groups.items()):
