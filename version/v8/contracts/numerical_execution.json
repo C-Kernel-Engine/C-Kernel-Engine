@@ -3,6 +3,28 @@
   "schema_version": 1,
   "engine_contract_version": "8",
   "contracts": {
+    "runtime_extent_sum_checked_i32": {
+      "operator_family": "runtime_extent_sum",
+      "status": "validated",
+      "storage": {"input": "int32", "weight": "none", "output": "int32"},
+      "compute": {"input": "int32", "weight": "none", "accumulator": "int32", "contraction": "disabled", "evaluation_order": "validate_metadata_then_ascending_checked_integer_sum_then_single_output_write"},
+      "rounding": {"mode": "none", "points": ["input_load", "output_store"]},
+      "reduction": {"kind": "sum", "order": "left_to_right", "partial_accumulator": "int32", "merge_order": "none"},
+      "threading": {"work_partition": "serial", "split_strategy": "serial", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Checks nonnegative integer durations and capacity before publishing a valid extent; output remains untouched on failure."
+    },
+    "runtime_copy_valid_exact_fp32": {
+      "operator_family": "runtime_copy_valid",
+      "status": "validated",
+      "storage": {"input": "fp32", "weight": "none", "output": "fp32"},
+      "compute": {"input": "fp32", "weight": "none", "accumulator": "fp32", "contraction": "disabled", "evaluation_order": "validate_layout_and_capacity_then_ascending_channel_frame_exact_copy"},
+      "rounding": {"mode": "none", "points": ["input_load", "output_store"]},
+      "reduction": {"kind": "none", "order": "none", "partial_accumulator": "none", "merge_order": "none"},
+      "threading": {"work_partition": "serial", "split_strategy": "independent_outputs", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Copies only valid FP32 columns across channel-major rows with independent physical strides and untouched padding."
+    },
     "audio_duration_expand_checked_strided_copy_fp32": {
       "operator_family": "audio_duration_expand",
       "status": "validated",

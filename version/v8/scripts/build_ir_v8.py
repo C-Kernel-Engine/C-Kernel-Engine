@@ -84,6 +84,7 @@ from validate_circuit_interfaces_v8 import (
     validate_graph_slots,
 )
 from resolve_layout_chain_v8 import rank_layout_routes
+from runtime_extent_contract_v8 import normalize_runtime_extents
 
 
 class BuildDiagnosticError(RuntimeError):
@@ -1810,6 +1811,22 @@ def _validate_segmented_prefill_contract(
 # ═══════════════════════════════════════════════════════════════════════════════
 
 OP_DATAFLOW = {
+    "runtime_extent_sum": {
+        "inputs": {"values": "external:runtime_values"},
+        "outputs": {"valid_extent": {"slot": "runtime_valid_extent", "dtype": "i32"}},
+    },
+    "audio_duration_expand": {
+        "inputs": {"features": "external:audio_features", "durations": "external:runtime_values"},
+        "outputs": {"output": {"slot": "audio_expanded", "dtype": "fp32"}},
+    },
+    "runtime_copy_valid": {
+        "inputs": {"input": "audio_expanded"},
+        "outputs": {"output": {"slot": "runtime_valid_copy", "dtype": "fp32"}},
+    },
+    "audio_istft_mag_phase": {
+        "inputs": {"magnitude": "external:audio_magnitude", "phase": "external:audio_phase"},
+        "outputs": {"output": {"slot": "audio_waveform", "dtype": "fp32"}},
+    },
     # Header ops
     "audio_wav_decode": {
         "inputs": {"wav_bytes": "external:audio_wav_bytes"},
@@ -3852,7 +3869,10 @@ def _template_activation_buffer_specs(
             _resolve_activation_extent(expr, config, f"activation_buffers.{name}.shape[{index}]")
             for index, expr in enumerate(shape_expr)
         ]
-        dtype = str(declaration.get("dtype", "fp32") or "fp32").strip().lower()
+        dtype_overrides = config.get("activation_buffer_dtypes", {})
+        if not isinstance(dtype_overrides, dict):
+            raise RuntimeError("HARD CIRCUIT BUFFER FAULT: activation_buffer_dtypes must be an object")
+        dtype = str(dtype_overrides.get(name, declaration.get("dtype", "fp32")) or "fp32").strip().lower()
         supported_dtypes = {"fp32", "f32", "bf16", "fp16", "f16", "i32", "int32", "q8_0", "q8_k"}
         if dtype not in supported_dtypes:
             raise RuntimeError(
@@ -4344,6 +4364,10 @@ def _validated_kernel_codegen_capability(kernel_id: str, kernel_map: Dict) -> Op
 # source model is dense, recurrent, DeepStack-style, MoE, SSM, or something else.
 # Note: "matmul" is a logical op that maps to gemv (decode) or gemm (prefill) based on mode
 TEMPLATE_TO_KERNEL_OP = {
+    "runtime_extent_sum": "runtime_extent_sum",
+    "audio_duration_expand": "audio_duration_expand",
+    "runtime_copy_valid": "runtime_copy_valid",
+    "audio_istft_mag_phase": "audio_istft_mag_phase",
     # Header ops
     "audio_wav_decode": "audio_wav_decode",
     "audio_pcm_decode": "audio_pcm_decode",
@@ -4705,6 +4729,13 @@ def _template_graph_slots(op_item: Dict[str, Any]) -> Dict[str, Any]:
         if isinstance(value, dict) and value:
             out[section] = copy.deepcopy(value)
     return out
+
+
+def _copy_template_runtime_annotations(op_item: Dict[str, Any], arranged: Dict[str, Any]) -> None:
+    """Preserve model-neutral checked-length edges declared by a circuit op."""
+    for key in ("produces_runtime_lengths", "consumes_runtime_lengths", "returns_status"):
+        if key in op_item:
+            arranged[key] = copy.deepcopy(op_item[key])
 
 
 def _canonical_graph_slot_overrides(
@@ -5203,7 +5234,13 @@ def _kernel_port_size_bytes(
     if not isinstance(shape, list) or not shape:
         return None
 
+    extent_contract = config.get("runtime_extent_contract", {})
+    runtime_constants = (
+        extent_contract.get("runtime_constants", {})
+        if isinstance(extent_contract, dict) else {}
+    )
     values = dict(config)
+    values.update(runtime_constants)
     values.update(params)
     symbols = {
         **values,
@@ -5541,7 +5578,13 @@ def _kernel_scratch_size_bytes(
     scratch: Dict[str, Any], params: Dict[str, Any], config: Dict[str, Any]
 ) -> Optional[int]:
     """Resolve a kernel-map scratch shape using the operation's concrete dimensions."""
+    extent_contract = config.get("runtime_extent_contract", {})
+    runtime_constants = (
+        extent_contract.get("runtime_constants", {})
+        if isinstance(extent_contract, dict) else {}
+    )
     values = dict(config)
+    values.update(runtime_constants)
     values.update(params)
 
     size_expression = scratch.get("size_bytes")
@@ -8852,6 +8895,10 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
     # Op → Weight mapping (which weights each op uses for quant lookup)
     # ═══════════════════════════════════════════════════════════
     OP_TO_WEIGHT_KEYS = {
+        "runtime_extent_sum": None,
+        "audio_duration_expand": None,
+        "runtime_copy_valid": None,
+        "audio_istft_mag_phase": None,
         # Ops with quantized weights - look up in quant_summary
         "patch_proj": ["patch_emb"],
         "patch_proj_aux": ["patch_emb_aux"],
@@ -9650,6 +9697,7 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                     }
                     if graph_slots:
                         arranged["graph_slots"] = graph_slots
+                    _copy_template_runtime_annotations(producer_item, arranged)
                     if output_view is not None and output_name == output_view.get("output"):
                         arranged["output_view"] = copy.deepcopy(output_view)
                     arranged_kernels.append(arranged)
@@ -9900,6 +9948,7 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                             graph_slots = _template_graph_slots(op_item)
                             if graph_slots:
                                 arranged["graph_slots"] = graph_slots
+                            _copy_template_runtime_annotations(op_item, arranged)
                             if isinstance(op_item.get("weight_refs"), dict):
                                 arranged["template_weight_refs"] = copy.deepcopy(
                                     op_item["weight_refs"]
@@ -10103,6 +10152,7 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                         graph_slots = _template_graph_slots(op_item)
                         if graph_slots:
                             arranged["graph_slots"] = graph_slots
+                        _copy_template_runtime_annotations(op_item, arranged)
                         if isinstance(op_item.get("weight_refs"), dict):
                             arranged["template_weight_refs"] = copy.deepcopy(
                                 op_item["weight_refs"]
@@ -10494,6 +10544,30 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
     # ==========================================================================
     _check_ir1_completeness(manifest, arranged_kernels)
     _validate_resolved_kernels_are_emitted(numerical_contract_plans, arranged_kernels)
+
+    if template.get("runtime_lengths") or template.get("runtime_views"):
+        declared_producers = {
+            spec.get("producer")
+            for spec in template.get("runtime_lengths", {}).values()
+            if isinstance(spec, dict)
+        }
+        tagged = [
+            op for op in arranged_kernels
+            if op.get("template_op_id") in declared_producers
+            or op.get("produces_runtime_lengths")
+            or op.get("consumes_runtime_lengths")
+        ]
+        normalized = normalize_runtime_extents(
+            template,
+            [{"op_id": str(op.get("template_op_id") or ""),
+              "produces_runtime_lengths": op.get("produces_runtime_lengths", {}),
+              "consumes_runtime_lengths": op.get("consumes_runtime_lengths", []),
+              "returns_status": op.get("returns_status", False)}
+             for op in tagged],
+        )
+        manifest["config"]["runtime_extent_contract"] = normalized
+        for op in arranged_kernels:
+            op["runtime_extent_contract"] = copy.deepcopy(normalized)
 
     return arranged_kernels
 
@@ -11200,6 +11274,10 @@ def generate_ir_lower_1(
             )
         if isinstance(ir_op.get("graph_slots"), dict):
             lowered_op["graph_slots"] = copy.deepcopy(ir_op["graph_slots"])
+        for key in ("runtime_extent_contract", "produces_runtime_lengths",
+                    "consumes_runtime_lengths", "returns_status"):
+            if key in ir_op:
+                lowered_op[key] = copy.deepcopy(ir_op[key])
         if ir_op.get("resolved_contract") is not None:
             lowered_op["resolved_contract"] = copy.deepcopy(ir_op["resolved_contract"])
             if lowered_op["resolved_contract"].get("kernel_id") != kernel_id:
@@ -12124,6 +12202,10 @@ WEIGHT_PATTERNS = {
 # Template op → weight refs it uses
 # This tells us which weights each template op needs
 TEMPLATE_OP_WEIGHTS = {
+    "runtime_extent_sum": [],
+    "audio_duration_expand": [],
+    "runtime_copy_valid": [],
+    "audio_istft_mag_phase": [],
     # Header (tokenizer is metadata, not model weights)
     "audio_wav_decode": [],
     "audio_pcm_decode": [],
@@ -12369,10 +12451,12 @@ def generate_memory_layout(
     # STEP 1: Build weight index from manifest entries
     # ═══════════════════════════════════════════════════════════
 
-    if not entries:
+    if "entries" not in manifest or (
+        not entries and any(op.get("weights") for op in ir_lower_1_ops)
+    ):
         raise RuntimeError(
-            "HARD FAULT: Manifest has no 'entries' field!\n"
-            "  The manifest must contain weight tensor entries.\n"
+            "HARD FAULT: Manifest has no entries for required weights!\n"
+            "  Weighted operations require weight tensor entries.\n"
             "  Re-run converter with --bump-version=5"
         )
 
@@ -13435,6 +13519,16 @@ def generate_ir_lower_2(
     for buf in memory.get("activations", {}).get("buffers", []):
         activation_buffers[buf["name"]] = buf
 
+    runtime_extent_contract = config.get("runtime_extent_contract", {})
+    if runtime_extent_contract:
+        for view_name, view in runtime_extent_contract.get("runtime_views", {}).items():
+            buffer = activation_buffers.get(view["buffer"])
+            if buffer is None or int(buffer.get("size", 0) or 0) < int(view["required_bytes"]):
+                raise RuntimeError(
+                    f"HARD RUNTIME EXTENT FAULT: view {view_name!r} requires "
+                    f"{view['required_bytes']} bytes in planner buffer {view['buffer']!r}"
+                )
+
     activation_bindings = _template_activation_bindings(template_doc)
     missing_binding_targets = sorted(
         {target for target in activation_bindings.values() if target not in activation_buffers}
@@ -13598,6 +13692,10 @@ def generate_ir_lower_2(
             )
         if isinstance(ir_op.get("graph_slots"), dict):
             lowered_op["graph_slots"] = copy.deepcopy(ir_op["graph_slots"])
+        for key in ("runtime_extent_contract", "produces_runtime_lengths",
+                    "consumes_runtime_lengths", "returns_status"):
+            if key in ir_op:
+                lowered_op[key] = copy.deepcopy(ir_op[key])
         if ir_op.get("resolved_contract") is not None:
             lowered_op["resolved_contract"] = copy.deepcopy(ir_op["resolved_contract"])
             if lowered_op["resolved_contract"].get("kernel_id") != ir_op["kernel"]:
@@ -16227,8 +16325,21 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
 
             elif src.startswith("output:"):
                 key = src.split(":", 1)[1]
+                runtime_result_names = [
+                    length_name
+                    for length_name, result_name in
+                    op.get("produces_runtime_lengths", {}).items()
+                    if result_name == key
+                ]
                 info = select_from_dict(key, outputs, out_aliases)
-                if not info:
+                if len(runtime_result_names) > 1:
+                    op_errors.append(f"{func}.{name}: ambiguous runtime length output '{key}'")
+                    expr = "NULL"
+                elif len(runtime_result_names) == 1:
+                    if not info:
+                        op_errors.append(f"{func}.{name}: missing declared output '{key}'")
+                    expr = f"&runtime_extents.{runtime_result_names[0]}"
+                elif not info:
                     op_errors.append(f"{func}.{name}: missing output '{key}'")
                     expr = "NULL"
                 else:
@@ -16414,7 +16525,14 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
                     "hidden_state": "audio_tdt_hidden_state",
                     "cell_state": "audio_tdt_cell_state",
                 }
-                if key in audio_runtime_exprs:
+                extent_contract = op.get("runtime_extent_contract", {})
+                declared_lengths = extent_contract.get("runtime_lengths", {}) if isinstance(extent_contract, dict) else {}
+                declared_constants = extent_contract.get("runtime_constants", {}) if isinstance(extent_contract, dict) else {}
+                if key in declared_lengths:
+                    expr = f"runtime_extents.{key}"
+                elif key in declared_constants:
+                    expr = str(declared_constants[key])
+                elif key in audio_runtime_exprs:
                     expr = audio_runtime_exprs[key]
                 elif key in ("kv_cache_k_layer", "kv_k"):
                     if compact_kv_layout and not valid_compact_kv_layer:
@@ -16557,7 +16675,9 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
                 if src.startswith("activation:"):
                     info = select_from_dict(src.split(":", 1)[1], activations, act_aliases)
                 elif src.startswith("output:"):
-                    info = select_from_dict(src.split(":", 1)[1], outputs, out_aliases)
+                    output_key = src.split(":", 1)[1]
+                    if output_key not in op.get("produces_runtime_lengths", {}).values():
+                        info = select_from_dict(output_key, outputs, out_aliases)
                 elif src.startswith("scratch:"):
                     info = scratch.get(src.split(":", 1)[1]) or (next(iter(scratch.values())) if len(scratch) == 1 else None)
                 if isinstance(info, dict):
@@ -16605,6 +16725,10 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
         }
         if op.get("template_op_id") is not None:
             call_op["template_op_id"] = str(op["template_op_id"])
+        for key in ("runtime_extent_contract", "produces_runtime_lengths",
+                    "consumes_runtime_lengths", "returns_status"):
+            if key in op:
+                call_op[key] = copy.deepcopy(op[key])
         if op.get("instance") is not None:
             call_op["instance"] = int(op["instance"])
         weight_preparation = kernel_weight_preparations.get(kernel_id)

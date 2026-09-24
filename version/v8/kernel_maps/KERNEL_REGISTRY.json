@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 383,
+      "total": 385,
       "by_op": {
         "add_backward": 1,
         "add_stream": 2,
@@ -128,6 +128,8 @@
         "rope_backward": 2,
         "rope_init": 3,
         "rowwise_bias_add": 1,
+        "runtime_copy_valid": 1,
+        "runtime_extent_sum": 1,
         "shared_relu2_expert_mlp": 1,
         "shared_swiglu_expert_mlp": 6,
         "softmax": 1,
@@ -65551,6 +65553,322 @@
       "notes": "Apply a single bias vector across each row of a token-major activation matrix.",
       "name": "rowwise_bias_add",
       "_source_file": "rowwise_bias_add.json"
+    },
+    {
+      "id": "runtime_copy_valid_f32",
+      "op": "runtime_copy_valid",
+      "operation_interface": "runtime.copy_valid.strided_channel_major.fp32.v1",
+      "variant": "scalar_checked_strided_fp32",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "equivalence_group": "runtime_copy_valid_f32",
+        "phases": [
+          "prefill"
+        ]
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            "C",
+            "A_capacity"
+          ],
+          "layout": "channel_major_input_stride",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "C",
+            "A_capacity"
+          ],
+          "layout": "channel_major_output_stride",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "input_elements",
+        "channels",
+        "valid_frames",
+        "input_stride",
+        "output_elements",
+        "output_stride"
+      ],
+      "impl": {
+        "function": "ck_runtime_copy_valid_f32",
+        "c_declaration": "int ck_runtime_copy_valid_f32(const float *input, size_t input_elements, size_t channels, size_t valid_frames, size_t input_stride, float *output, size_t output_elements, size_t output_stride);",
+        "sources": [
+          "src/kernels/runtime_extent.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "runtime_copy_valid_exact_fp32",
+          "status": "validated",
+          "phases": [
+            "prefill"
+          ],
+          "function": "ck_runtime_copy_valid_f32",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "none",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "independent_outputs"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const float*",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "input_elements",
+            "source": "runtime:expanded_elements"
+          },
+          {
+            "name": "channels",
+            "source": "runtime:channels"
+          },
+          {
+            "name": "valid_frames",
+            "source": "runtime:expanded_frames"
+          },
+          {
+            "name": "input_stride",
+            "source": "runtime:expanded_stride"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements"
+          },
+          {
+            "name": "output_stride",
+            "source": "runtime:output_stride"
+          }
+        ]
+      },
+      "constraints": {
+        "notes": "Only valid columns are read and written. Input/output are disjoint. Zero valid length is a no-write success."
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_runtime_extent_kernel.py"
+        ],
+        "oracle": "Python exact strided-copy construction with untouched padding and invalid-capacity cases"
+      },
+      "notes": "No allocation or hidden stack workspace. Inference only.",
+      "name": "runtime_copy_valid_f32",
+      "_source_file": "runtime_copy_valid_f32.json"
+    },
+    {
+      "id": "runtime_extent_sum_i32",
+      "op": "runtime_extent_sum",
+      "operation_interface": "runtime.extent.sum_checked.i32.v1",
+      "variant": "scalar_checked_i32",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "equivalence_group": "runtime_extent_sum_i32",
+        "phases": [
+          "prefill"
+        ]
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "i32",
+        "output": "i32"
+      },
+      "inputs": [
+        {
+          "name": "values",
+          "dtype": "i32",
+          "shape": [
+            "T"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "valid_extent",
+          "dtype": "i32",
+          "shape": [
+            1
+          ],
+          "layout": "scalar",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "value_elements",
+        "count",
+        "min_value",
+        "max_value",
+        "initial_extent",
+        "capacity"
+      ],
+      "impl": {
+        "function": "ck_runtime_sum_i32_checked",
+        "c_declaration": "int ck_runtime_sum_i32_checked(const int32_t *values, size_t value_elements, size_t count, int32_t min_value, int32_t max_value, size_t initial_extent, size_t capacity, int32_t *valid_extent);",
+        "sources": [
+          "src/kernels/runtime_extent.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "runtime_extent_sum_checked_i32",
+          "status": "validated",
+          "phases": [
+            "prefill"
+          ],
+          "function": "ck_runtime_sum_i32_checked",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "int32",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "serial"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "values",
+            "source": "activation:values",
+            "cast": "const int32_t*",
+            "ports": [
+              "input:values"
+            ]
+          },
+          {
+            "name": "value_elements",
+            "source": "runtime:value_elements"
+          },
+          {
+            "name": "count",
+            "source": "runtime:phoneme_count"
+          },
+          {
+            "name": "min_value",
+            "source": "const:0"
+          },
+          {
+            "name": "max_value",
+            "source": "runtime:max_duration"
+          },
+          {
+            "name": "initial_extent",
+            "source": "const:0"
+          },
+          {
+            "name": "capacity",
+            "source": "runtime:expanded_capacity"
+          },
+          {
+            "name": "valid_extent",
+            "source": "output:valid_extent",
+            "cast": "int32_t*",
+            "ports": [
+              "output:valid_extent"
+            ]
+          }
+        ]
+      },
+      "constraints": {
+        "notes": "Capacity is bounded by INT32_MAX. Zero count and zero result are supported. Return status must be checked before any consumer executes."
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_runtime_extent_kernel.py"
+        ],
+        "oracle": "Python arbitrary-precision integer sum and checked boundary cases"
+      },
+      "notes": "Caller-owned scalar output is untouched on failure. No allocation. Inference only.",
+      "name": "runtime_extent_sum_i32",
+      "_source_file": "runtime_extent_sum_i32.json"
     },
     {
       "id": "softmax_cross_entropy_loss",

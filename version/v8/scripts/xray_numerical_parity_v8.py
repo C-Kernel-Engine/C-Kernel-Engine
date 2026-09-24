@@ -66,6 +66,15 @@ def _load_tensor(entry: Dict[str, Any]) -> np.ndarray:
     else:
         raise XRayError(f"unsupported exported dtype {dtype!r}")
     physical_shape = tuple(int(value) for value in entry["physical_shape"])
+    if "physical_strides" in entry:
+        strides = tuple(int(value) for value in entry["physical_strides"])
+        expected = tuple(math.prod(physical_shape[index + 1:])
+                         for index in range(len(physical_shape)))
+        if strides != expected:
+            raise XRayError(
+                f"{entry['checkpoint_id']}: physical_strides {strides} "
+                f"do not describe the captured contiguous storage {expected}"
+            )
     if math.prod(physical_shape) != values.size:
         raise XRayError(
             f"{entry['checkpoint_id']}: file has {values.size} values, "
@@ -81,6 +90,31 @@ def _load_tensor(entry: Dict[str, Any]) -> np.ndarray:
     permutation = [physical_axes.index(axis) for axis in logical_axes]
     tensor = np.transpose(tensor, axes=permutation) if permutation != list(range(len(permutation))) else tensor
     logical_shape = tuple(int(value) for value in entry["logical_shape"])
+    if "capacity_shape" in entry:
+        capacity_shape = tuple(int(value) for value in entry["capacity_shape"])
+        if len(capacity_shape) != tensor.ndim or any(
+            capacity > physical for capacity, physical in zip(capacity_shape, tensor.shape)
+        ):
+            raise XRayError(
+                f"{entry['checkpoint_id']}: capacity exceeds physical shape"
+            )
+        if any(valid > capacity for valid, capacity in zip(logical_shape, capacity_shape)):
+            raise XRayError(
+                f"{entry['checkpoint_id']}: valid extent exceeds capacity"
+            )
+    if "valid_shape" in entry:
+        valid_shape = tuple(int(value) for value in entry["valid_shape"])
+        if valid_shape != logical_shape:
+            raise XRayError(
+                f"{entry['checkpoint_id']}: valid_shape {valid_shape} != logical_shape {logical_shape}"
+            )
+        if len(valid_shape) != tensor.ndim or any(
+            valid > physical for valid, physical in zip(valid_shape, tensor.shape)
+        ):
+            raise XRayError(
+                f"{entry['checkpoint_id']}: valid extent exceeds physical shape"
+            )
+        tensor = tensor[tuple(slice(0, valid) for valid in valid_shape)]
     if tensor.shape != logical_shape:
         raise XRayError(
             f"{entry['checkpoint_id']}: canonical shape {tensor.shape} != declared {logical_shape}"
@@ -90,6 +124,11 @@ def _load_tensor(entry: Dict[str, Any]) -> np.ndarray:
 
 def _index_manifest(manifest: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
     validate(manifest, MANIFEST_SCHEMA, f"{manifest.get('backend', 'backend')} checkpoint manifest")
+    loaded_library = manifest.get("run", {}).get("loaded_library")
+    if loaded_library:
+        library_path = Path(loaded_library["path"])
+        if not library_path.is_file() or sha256_file(library_path) != loaded_library["sha256"]:
+            raise XRayError(f"loaded library identity changed: {library_path}")
     indexed: Dict[str, Dict[str, Any]] = {}
     for entry in manifest["checkpoints"]:
         checkpoint_id = entry["checkpoint_id"]

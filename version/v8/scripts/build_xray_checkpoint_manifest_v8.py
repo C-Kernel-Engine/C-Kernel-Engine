@@ -63,6 +63,7 @@ def build_manifest(
     phase: str,
     storage_dtype_override: str | None = None,
     requested: set[str] | None = None,
+    loaded_library: Path | None = None,
 ) -> Dict[str, Any]:
     checkpoints = []
     torch_tensors = ((tensor_report.get("torch") or {}).get("tensors") or {})
@@ -95,7 +96,10 @@ def build_manifest(
             raise ValueError(
                 f"checkpoint {checkpoint_id} axes {axes} do not match shape {logical_shape}"
             )
-        checkpoints.append({
+        physical_shape = [int(value) for value in source_meta.get("physical_shape", logical_shape)]
+        valid_shape = [int(value) for value in source_meta.get("valid_shape", logical_shape)]
+        physical_axes = list(source_meta.get("physical_axis_names", axes))
+        checkpoint_entry = {
             "checkpoint_id": checkpoint_id,
             "producer": checkpoint["producer"],
             "phase": checkpoint["phase"],
@@ -104,15 +108,21 @@ def build_manifest(
             "storage_dtype": storage_dtype_override or checkpoint["storage_dtype"],
             "exported_dtype": "fp32",
             "logical_shape": logical_shape,
-            "physical_shape": logical_shape,
+            "physical_shape": physical_shape,
             "logical_layout": checkpoint["logical_layout"],
             "axis_names": axes,
-            "physical_axis_names": axes,
+            "physical_axis_names": physical_axes,
             "resolved_contract_id": checkpoint["resolved_contract_id"],
             "kernel_id": checkpoint["kernel_id"],
             "function": checkpoint["function"],
             "sha256": sha256(path),
-        })
+        }
+        if physical_shape != logical_shape or "valid_shape" in source_meta:
+            checkpoint_entry["valid_shape"] = valid_shape
+        for key in ("capacity_shape", "physical_strides"):
+            if key in source_meta:
+                checkpoint_entry[key] = [int(value) for value in source_meta[key]]
+        checkpoints.append(checkpoint_entry)
     if not checkpoints:
         raise ValueError(f"no {backend} tensors matched call-IR checkpoints")
     result = {
@@ -122,6 +132,11 @@ def build_manifest(
         "run": {"model": model, "phase": phase, "source": source},
         "checkpoints": checkpoints,
     }
+    if loaded_library is not None:
+        library = loaded_library.resolve()
+        if not library.is_file():
+            raise ValueError(f"loaded library does not exist: {library}")
+        result["run"]["loaded_library"] = {"path": str(library), "sha256": sha256(library)}
     schema = load(SCHEMA)
     errors = list(Draft202012Validator(schema).iter_errors(result))
     if errors:
@@ -138,6 +153,7 @@ def main() -> None:
     parser.add_argument("--source", required=True)
     parser.add_argument("--phase", choices=("prefill", "decode", "mixed_prefill", "teacher_forced"), default="prefill")
     parser.add_argument("--storage-dtype", choices=("fp32", "fp16", "bf16", "q8_0", "q8_k"))
+    parser.add_argument("--loaded-library", type=Path)
     parser.add_argument("--checkpoint", action="append", default=[])
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
@@ -150,6 +166,7 @@ def main() -> None:
         phase=args.phase,
         storage_dtype_override=args.storage_dtype,
         requested=set(args.checkpoint) if args.checkpoint else None,
+        loaded_library=args.loaded_library,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")

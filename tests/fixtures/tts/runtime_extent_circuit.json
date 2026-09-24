@@ -1,0 +1,115 @@
+{
+  "version": 3,
+  "name": "runtime_extent_synthetic",
+  "family": "bounded_graph",
+  "contract": {
+    "runtime_invariants": {
+      "inference_only": true,
+      "production_kernel_heap_allocation": false,
+      "valid_extent": "checked_duration_sum_before_any_expansion_write"
+    }
+  },
+  "activation_buffers": {
+    "runtime_values": {"shape": [3]},
+    "audio_features": {"shape": [2, 4]},
+    "runtime_valid_extent": {"shape": [1]},
+    "audio_expanded": {"shape": [2, 8]},
+    "runtime_valid_copy": {"shape": [2, 8]},
+    "audio_magnitude": {"shape": [7, 11]},
+    "audio_phase": {"shape": [7, 11]},
+    "audio_waveform": {"shape": [30]}
+  },
+  "activation_bindings": {
+    "runtime_values": "runtime_values",
+    "audio_features": "audio_features",
+    "runtime_valid_extent": "runtime_valid_extent",
+    "audio_expanded": "audio_expanded",
+    "runtime_valid_copy": "runtime_valid_copy",
+    "audio_magnitude": "audio_magnitude",
+    "audio_phase": "audio_phase",
+    "audio_waveform": "audio_waveform"
+  },
+  "runtime_lengths": {
+    "expanded_frames": {
+      "producer": "checked_sum", "result": "valid_extent",
+      "capacity": 6, "allow_zero": false
+    }
+  },
+  "runtime_views": {
+    "expanded": {
+      "buffer": "audio_expanded", "length": "expanded_frames",
+      "channels": 2, "physical_stride": 8, "element_bytes": 4,
+      "buffer_bytes": 64
+    }
+  },
+  "runtime_constants": {
+    "value_elements": 3,
+    "phoneme_count": 3,
+    "max_duration": 6,
+    "expanded_capacity": 6,
+    "input_elements": 8,
+    "input_stride": 4,
+    "expanded_elements": 16,
+    "expanded_stride": 8,
+    "output_elements": 16,
+    "output_stride": 8,
+    "channels": 2,
+    "spectral_elements": 77,
+    "frames": 7,
+    "output_capacity": 30,
+    "scratch_elements": 120
+  },
+  "sequence": ["bounded_graph"],
+  "block_types": {
+    "bounded_graph": {
+      "sequence": ["header", "body", "footer"],
+      "header": [
+        {
+          "id": "checked_sum", "op": "runtime_extent_sum",
+          "kernel": "runtime_extent_sum_i32", "returns_status": true,
+          "produces_runtime_lengths": {"expanded_frames": "valid_extent"},
+          "graph_slots": {
+            "inputs": {"values": "external:runtime_values"},
+            "outputs": {"valid_extent": "runtime_valid_extent"}
+          }
+        }
+      ],
+      "body": {
+        "type": "dense",
+        "ops": [
+          {
+            "id": "expand", "op": "audio_duration_expand",
+            "kernel": "audio_duration_expand_channel_major_f32",
+            "returns_status": true,
+            "params": {"channels": 2},
+            "consumes_runtime_lengths": ["expanded_frames"],
+            "graph_slots": {
+              "inputs": {"features": "external:audio_features", "durations": "external:runtime_values"},
+              "outputs": {"output": "audio_expanded"}
+            }
+          },
+          {
+            "id": "consume", "op": "runtime_copy_valid",
+            "kernel": "runtime_copy_valid_f32", "returns_status": true,
+            "consumes_runtime_lengths": ["expanded_frames"],
+            "graph_slots": {
+              "inputs": {"input": "audio_expanded"},
+              "outputs": {"output": "runtime_valid_copy"}
+            }
+          }
+        ]
+      },
+      "footer": [
+        {
+          "id": "reconstruct", "op": "audio_istft_mag_phase",
+          "kernel": "audio_istft_mag_phase_f32", "returns_status": true,
+          "params": {"n_fft": 20, "hop": 5},
+          "graph_slots": {
+            "inputs": {"magnitude": "external:audio_magnitude", "phase": "external:audio_phase"},
+            "outputs": {"output": "audio_waveform"}
+          }
+        }
+      ]
+    }
+  }
+}

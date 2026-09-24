@@ -6,6 +6,8 @@ import hashlib
 import importlib.util
 import json
 import tempfile
+import ctypes
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -243,6 +245,84 @@ class XRayNumericalParityTests(unittest.TestCase):
         right = self.manifest("pytorch", [self.entry("vision.layer.0.output", b)])
         self.assertEqual(xray.compare_manifests(left, right, self.profile, checkpoint_order=["vision.layer.0.output"])["status"], "pass")
 
+    def test_runtime_valid_extent_ignores_padded_physical_columns(self):
+        a = self.root / "padded.f32"; b = self.root / "valid.f32"
+        np.array([[0, 1, 2, 900, 901], [3, 4, 5, 902, 903]], np.float32).tofile(a)
+        np.arange(6, dtype=np.float32).reshape(2, 3).tofile(b)
+        candidate = self.entry("vision.layer.0.output", a)
+        candidate.update(physical_shape=[2, 5], capacity_shape=[2, 4],
+                         valid_shape=[2, 3], physical_strides=[5, 1])
+        left = self.manifest("ck", [candidate])
+        right = self.manifest("pytorch", [self.entry("vision.layer.0.output", b)])
+        self.assertEqual(xray.compare_manifests(
+            left, right, self.profile, checkpoint_order=["vision.layer.0.output"])["status"], "pass")
+        bad = copy.deepcopy(candidate)
+        bad["capacity_shape"] = [2, 2]
+        with self.assertRaisesRegex(xray.XRayError, "valid extent exceeds capacity"):
+            xray._load_tensor(bad)
+        bad = copy.deepcopy(candidate)
+        bad["physical_strides"] = [3, 1]
+        with self.assertRaisesRegex(xray.XRayError, "physical_strides"):
+            xray._load_tensor(bad)
+
+    def test_generated_duration_graph_matches_independent_oracle_capture(self):
+        from tests.test_v8_checked_call_codegen import _fixture, codegen
+
+        source = self.root / "generated.c"
+        source.write_text(codegen.emit_checked_calls(_fixture(), ROOT))
+        library = self.root / "generated.so"
+        subprocess.run([
+            "cc", "-std=c11", "-shared", "-fPIC", str(source),
+            str(ROOT / "src/kernels/runtime_extent.c"),
+            str(ROOT / "src/kernels/audio_duration_expand.c"),
+            "-I", str(ROOT / "include"), "-o", str(library),
+        ], check=True)
+        function = ctypes.CDLL(str(library)).ck_test_expansion_graph
+        function.argtypes = [ctypes.POINTER(ctypes.c_int32), ctypes.c_size_t,
+                             ctypes.c_size_t, ctypes.POINTER(ctypes.c_float),
+                             ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float),
+                             ctypes.POINTER(ctypes.c_int32)]
+        function.restype = ctypes.c_int
+        durations = (ctypes.c_int32 * 3)(1, 2, 1)
+        features = (ctypes.c_float * 8)(10, 20, 30, -777, 40, 50, 60, -777)
+        expanded = (ctypes.c_float * 16)(*([-99] * 16))
+        consumed = (ctypes.c_float * 16)(*([-88] * 16))
+        out_frames = ctypes.c_int32(-1)
+        self.assertEqual(function(durations, 3, 3, features, expanded, consumed,
+                                  ctypes.byref(out_frames)), 0)
+        self.assertEqual(out_frames.value, 4)
+        candidate_path = self.root / "generated-expanded.f32"
+        np.asarray(expanded, dtype=np.float32).tofile(candidate_path)
+        oracle = np.array([[10, 20, 20, 30], [40, 50, 50, 60]], np.float32)
+        oracle_path = self.root / "python-oracle.f32"
+        oracle.tofile(oracle_path)
+        candidate = self.entry("runtime.expanded", candidate_path)
+        candidate.update(logical_shape=[2, 4], physical_shape=[2, 8],
+                         capacity_shape=[2, 6], valid_shape=[2, 4],
+                         physical_strides=[8, 1],
+                         producer="audio_duration_expand",
+                         kernel_id="audio_duration_expand_channel_major_f32",
+                         function="audio_duration_expand_channel_major_f32",
+                         resolved_contract_id="audio_duration_expand_checked_strided_copy_fp32")
+        expected = copy.deepcopy(candidate)
+        expected.update(tensor_path=str(oracle_path), sha256=digest(oracle_path),
+                        physical_shape=[2, 4], capacity_shape=[2, 4],
+                        physical_strides=[4, 1])
+        candidate_manifest = self.manifest("ck", [candidate])
+        candidate_manifest["run"]["loaded_library"] = {
+            "path": str(library), "sha256": digest(library),
+        }
+        result = xray.compare_manifests(
+            candidate_manifest, self.manifest("python", [expected]),
+            self.profile, checkpoint_order=["runtime.expanded"],
+        )
+        self.assertEqual(result["status"], "pass")
+        self.assertEqual(result["comparisons"][0]["metrics"]["max_abs"], 0.0)
+        stale = copy.deepcopy(candidate_manifest)
+        stale["run"]["loaded_library"]["sha256"] = "0" * 64
+        with self.assertRaisesRegex(xray.XRayError, "loaded library identity changed"):
+            xray._index_manifest(stale)
+
     def test_storage_mismatch_is_classified_before_value_comparison(self):
         a = self.root / "a.f32"; b = self.root / "b.f32"
         np.zeros(6, np.float32).tofile(a); np.zeros(6, np.float32).tofile(b)
@@ -310,6 +390,32 @@ class XRayNumericalParityTests(unittest.TestCase):
         self.assertEqual(manifest["checkpoints"][0]["producer"], "mlp_residual")
         self.assertEqual(manifest["checkpoints"][0]["kernel_id"], "residual")
         self.assertEqual(manifest["checkpoints"][0]["storage_dtype"], "bf16")
+
+    def test_builder_preserves_runtime_capture_geometry(self):
+        tensor = self.root / "padded.f32"
+        np.arange(10, dtype=np.float32).tofile(tensor)
+        checkpoint = {
+            "id": "audio.expanded", "producer": "duration_expand", "tensor": "expanded",
+            "logical_layout": "channel_major", "axis_names": ["channel", "frame"],
+            "storage_dtype": "fp32", "phase": "prefill", "layer": -1,
+            "kernel_id": "audio_duration_expand_channel_major_f32",
+            "function": "audio_duration_expand_channel_major_f32",
+            "resolved_contract_id": "audio_duration_expand_checked_strided_copy_fp32",
+        }
+        report = {"comparisons": {"expanded": {
+            "ck_path": str(tensor), "shape": [2, 3],
+            "physical_shape": [2, 5], "capacity_shape": [2, 4],
+            "valid_shape": [2, 3], "physical_strides": [5, 1],
+        }}}
+        manifest = builder.build_manifest(
+            backend="ck", call_ir={"operations": [{"semantic_checkpoints": [checkpoint]}]},
+            tensor_report=report, model="fixture", source="unit", phase="prefill",
+        )
+        entry = manifest["checkpoints"][0]
+        self.assertEqual(entry["physical_shape"], [2, 5])
+        self.assertEqual(entry["capacity_shape"], [2, 4])
+        self.assertEqual(entry["valid_shape"], [2, 3])
+        self.assertEqual(entry["physical_strides"], [5, 1])
 
     def test_requested_missing_checkpoint_is_a_diagnostic_failure(self):
         a = self.root / "a.f32"; np.zeros(6, np.float32).tofile(a)

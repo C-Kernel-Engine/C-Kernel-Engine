@@ -14,7 +14,15 @@
       "properties": {
         "model": {"type": "string", "minLength": 1},
         "phase": {"enum": ["prefill", "decode", "mixed_prefill", "teacher_forced"]},
-        "source": {"type": "string", "minLength": 1}
+        "source": {"type": "string", "minLength": 1},
+        "loaded_library": {
+          "type": "object", "additionalProperties": false,
+          "required": ["path", "sha256"],
+          "properties": {
+            "path": {"type": "string", "minLength": 1},
+            "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+          }
+        }
       }
     },
     "checkpoints": {
@@ -31,7 +39,10 @@
           "storage_dtype": {"enum": ["fp32", "fp16", "bf16", "q8_0", "q8_k"]},
           "exported_dtype": {"enum": ["fp32", "fp16", "bf16"]},
           "logical_shape": {"type": "array", "minItems": 1, "items": {"type": "integer", "minimum": 1}},
-          "physical_shape": {"type": "array", "minItems": 1, "items": {"type": "integer", "minimum": 1}},
+        "physical_shape": {"type": "array", "minItems": 1, "items": {"type": "integer", "minimum": 1}},
+        "capacity_shape": {"description": "Allocated tensor capacity in logical axis order, excluding any physical row padding.", "type": "array", "minItems": 1, "items": {"type": "integer", "minimum": 1}},
+        "valid_shape": {"description": "Invocation-valid extent in logical axis order; must equal logical_shape.", "type": "array", "minItems": 1, "items": {"type": "integer", "minimum": 1}},
+        "physical_strides": {"description": "Element strides for the captured contiguous physical storage in physical axis order.", "type": "array", "minItems": 1, "items": {"type": "integer", "minimum": 1}},
           "logical_layout": {"type": "string", "minLength": 1},
           "axis_names": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
           "physical_axis_names": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
