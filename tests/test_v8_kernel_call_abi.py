@@ -367,6 +367,52 @@ class V8KernelCallABITests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "unsupported source"):
                 build_ir_v8.load_kernel_call_abis(root, legacy_bindings={})
 
+    def test_rope_frequency_factors_allow_neutral_null_and_bound_weights(self) -> None:
+        operation = {
+            "idx": 0,
+            "kernel": "rope_forward_q_gemma4",
+            "function": "rope_forward_q_split_direct_f32",
+            "op": "rope_q",
+            "layer": 0,
+            "section": "body",
+            "activations": {},
+            "outputs": {},
+            "weights": {},
+            "scratch": [{"name": "q_scratch", "scratch_offset": 0, "size": 4096}],
+            "params": {
+                "num_heads": 2,
+                "seq_len": 1,
+                "head_dim": 4,
+                "rotary_dim": 4,
+                "rope_freq_base": 1000000.0,
+                "use_rope_freq_factors": 1,
+            },
+        }
+        lowered = {"config": {}, "operations": [operation]}
+        missing = build_ir_v8.generate_ir_lower_3(lowered, "decode")["operations"][0]
+        self.assertEqual(missing["errors"], [])
+        factor = next(arg for arg in missing["args"] if arg["name"] == "freq_factors")
+        self.assertEqual(factor["expr"], "NULL")
+
+        without_factors = dict(operation)
+        without_factors["params"] = {**operation["params"], "use_rope_freq_factors": 0}
+        disabled = build_ir_v8.generate_ir_lower_3(
+            {"config": {}, "operations": [without_factors]}, "decode"
+        )["operations"][0]
+        self.assertEqual(disabled["errors"], [])
+
+        with_weight = dict(operation)
+        with_weight["weights"] = {
+            "rope_freqs": {"name": "rope_freqs", "bump_offset": 64, "dtype": "fp32"}
+        }
+        resolved = build_ir_v8.generate_ir_lower_3(
+            {"config": {}, "operations": [with_weight]}, "decode"
+        )["operations"][0]
+        self.assertEqual(resolved["errors"], [])
+        factor = next(arg for arg in resolved["args"] if arg["name"] == "freq_factors")
+        self.assertEqual(factor["weight_ref"], "rope_freqs")
+        self.assertNotEqual(factor["expr"], "NULL")
+
     def test_resolved_selector_requires_resolved_contract_metadata(self) -> None:
         lowered = {
             "config": {},

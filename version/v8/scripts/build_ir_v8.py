@@ -1406,9 +1406,9 @@ def _ignored_manifest_weights(
     return ignored
 
 
-def _circuit_op_weight_keys(
+def _circuit_op_weight_binding(
     template: Dict[str, Any], section: str, op: str
-) -> Optional[List[str]]:
+) -> Optional[Dict[str, Any]]:
     policy = _validated_circuit_weight_policy(template)
     if policy is None:
         return None
@@ -1421,7 +1421,27 @@ def _circuit_op_weight_keys(
         raise RuntimeError(
             f"HARD CIRCUIT WEIGHT POLICY FAULT: multiple bindings for {section}.{op}."
         )
-    return list(matches[0]["weights"]) if matches else None
+    return matches[0] if matches else None
+
+
+def _circuit_op_weight_keys(
+    template: Dict[str, Any], section: str, op: str
+) -> Optional[List[str]]:
+    binding = _circuit_op_weight_binding(template, section, op)
+    return list(binding["weights"]) if binding else None
+
+
+def _require_circuit_op_weights(
+    binding: Optional[Dict[str, Any]], bound: Dict[str, Any], section: str, op: str, layer: int
+) -> None:
+    if binding is None or not binding.get("required"):
+        return
+    missing = sorted(set(binding["weights"]) - set(bound))
+    if missing:
+        raise RuntimeError(
+            f"HARD CIRCUIT WEIGHT POLICY FAULT: {section}.{op} layer {layer} "
+            f"is missing required weights: {', '.join(missing)}"
+        )
 
 
 def _collect_forbidden_template_metadata(
@@ -10369,6 +10389,7 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
         op = ir_op["op"]
         layer = ir_op["layer"]
         section = ir_op["section"]
+        circuit_weight_binding = _circuit_op_weight_binding(template, section, op)
 
         # Use instance from PASS 1 (already computed with data flow)
         instance_idx = ir_op.get("instance", 0)
@@ -10391,8 +10412,8 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                 weight_keys = list(explicit_refs.keys())
         elif explicit_refs:
             weight_keys = list(explicit_refs.keys())
-        elif _circuit_op_weight_keys(template, section, op) is not None:
-            weight_keys = _circuit_op_weight_keys(template, section, op) or []
+        elif circuit_weight_binding is not None:
+            weight_keys = list(circuit_weight_binding["weights"])
         elif section == "body" and (op, instance_idx) in REPEATED_OP_WEIGHTS:
             weight_keys = REPEATED_OP_WEIGHTS[(op, instance_idx)]
         elif section == "header":
@@ -10424,6 +10445,11 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
             else:
                 # Weight not found - might be optional (biases)
                 pass
+
+        _require_circuit_op_weights(
+            circuit_weight_binding,
+            ir_op["weights"], section, op, int(layer),
+        )
 
     # Count weights bound
     total_weights = sum(len(op["weights"]) for op in arranged_kernels)
