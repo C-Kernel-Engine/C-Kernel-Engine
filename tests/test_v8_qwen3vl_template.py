@@ -941,9 +941,14 @@ class V8Qwen3VLTemplateTests(unittest.TestCase):
             "vision_activation_storage_boundary": "bf16",
         })
         for entry in manifest["entries"]:
-            if ".attn_qkv." in entry["name"] or ".attn_out." in entry["name"]:
-                if entry["name"].endswith(".weight"):
-                    entry["dtype"] = "bf16"
+            if entry["name"].endswith(".weight") and any(
+                name in entry["name"]
+                for name in (".attn_qkv.", ".attn_out.", ".ffn_up.", ".ffn_down.")
+            ):
+                entry["dtype"] = "bf16"
+        manifest["quant_summary"]["layer.0"].update({
+            "attn_qkv": "bf16", "wo": "bf16", "w3": "bf16", "w2": "bf16",
+        })
 
         legacy = build_ir_v8._resolve_manifest_numerical_contracts(manifest, "prefill")
         execution = build_ir_v8._resolve_manifest_execution_contracts(manifest, "prefill")
@@ -1021,6 +1026,49 @@ class V8Qwen3VLTemplateTests(unittest.TestCase):
             attention_call["resolved_physical_execution"]["function"],
             "attention_forward_full_head_major_gqa_pytorch_cpu_flash_bf16_storage_token_output",
         )
+
+    def test_bf16_mlp_down_weight_never_uses_fp16_provider(self) -> None:
+        manifest = _make_qwen3vl_manifest()
+        down = next(
+            entry for entry in manifest["entries"]
+            if entry["name"] == "v.blk.0.ffn_down.weight"
+        )
+        down["dtype"] = "bf16"
+        manifest["quant_summary"]["layer.0"]["w2"] = "bf16"
+        self.assertEqual(
+            build_ir_v8._manifest_contract_config(manifest)["layer_weight_dtypes"]["w2"],
+            "bf16",
+        )
+        ops = build_ir_v8.build_ir1_direct(
+            manifest,
+            ROOT / "tests" / "qwen3_vl_vision_manifest.synthetic.json",
+            mode="prefill",
+        )
+        down_op = next(op for op in ops if op.get("layer") == 0 and op.get("op") == "mlp_down")
+        self.assertEqual(down_op["kernel"], "gemm_nt_bf16")
+        self.assertEqual(
+            down_op["resolved_contract"]["contract_id"],
+            "bf16_weight_bf16_input_fp32_dot_fp32_output",
+        )
+
+        registry = build_ir_v8.load_kernel_registry()
+        lowered_ir1 = build_ir_v8.generate_ir_lower_1(ops, registry, manifest, "prefill")
+        layout = build_ir_v8.generate_memory_layout(
+            lowered_ir1, manifest, registry, mode="prefill",
+            context_len=manifest["config"]["context_length"],
+        )
+        lowered_ir2 = build_ir_v8.generate_ir_lower_2(
+            lowered_ir1, layout, manifest, registry, mode="prefill"
+        )
+        bad_ir = dict(lowered_ir2)
+        bad_ir["operations"] = [dict(op) for op in lowered_ir2["operations"]]
+        bad_down = next(
+            op for op in bad_ir["operations"]
+            if op.get("layer") == 0 and op.get("op") == "mlp_down"
+        )
+        bad_down["kernel"] = "gemm_nt_f16"
+        with self.assertRaisesRegex(RuntimeError, "Weight/kernel dtype mismatch"):
+            build_ir_v8.validate_weight_kernel_dtypes(bad_ir)
 
     def test_default_attention_contract_retains_legacy_owner(self) -> None:
         manifest = _make_qwen3vl_manifest()
