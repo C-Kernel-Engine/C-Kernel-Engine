@@ -2659,8 +2659,11 @@ def main(argv: list[str] | None = None) -> int:
         elif (
             supplied_prefill_obj is not None
             and not uses_generated_batched_prefill
-            and isinstance((ir_obj.get("config") or {}).get("multimodal_bridge_contract"), dict)
+            and "multimodal_bridge_contract" in (ir_obj.get("config") or {})
         ):
+            contract = (ir_obj.get("config") or {}).get("multimodal_bridge_contract")
+            if not isinstance(contract, dict) or not contract:
+                raise RuntimeError("sequential multimodal decode has an invalid bridge contract")
             bridge_api = codegen_prefill_v8.emit_multimodal_bridge_api(
                 ir_obj.get("operations") or [], ir_obj.get("config") or {}
             )
