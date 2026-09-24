@@ -2655,6 +2655,19 @@ def main(argv: list[str] | None = None) -> int:
             code = code + "\n\n" + prefill_code
             if args.prefill_layout is None:
                 code = _inject_decode_runtime_multimodal_fallback(code, layout_obj, ir_obj)
+        elif (
+            supplied_prefill_obj is not None
+            and not uses_generated_batched_prefill
+            and isinstance((ir_obj.get("config") or {}).get("multimodal_bridge_contract"), dict)
+        ):
+            bridge_api = codegen_prefill_v8.emit_multimodal_bridge_api(
+                ir_obj.get("operations") or [], ir_obj.get("config") or {}
+            )
+            if not bridge_api:
+                raise RuntimeError("sequential multimodal decode has no resolved bridge API")
+            code = _inject_decode_runtime_multimodal_fallback(
+                code + "\n\n" + bridge_api, layout_obj, ir_obj
+            )
         elif str(layout_obj.get("mode", "")).lower() == "prefill":
             code = _inject_prefill_multimodal_bridge(
                 code,

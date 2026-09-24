@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 
 
@@ -278,6 +280,53 @@ class V8CodegenBridgeTests(unittest.TestCase):
             decode_total = int(decode_layout["memory"]["arena"]["total_size"])
             self.assertNotIn("#define CK_HAS_PREFILL 1", text)
             self.assertIn(f"#define BUMP_TOTAL_SIZE {decode_total}ULL", text)
+
+    def test_sequential_multimodal_decoder_exports_mixed_prefix_api(self) -> None:
+        manifest = _make_qwen3vl_decoder_manifest()
+        manifest["config"]["prefill_policy"] = "sequential_decode"
+
+        with tempfile.TemporaryDirectory(prefix="v8_codegen_sequential_multimodal_") as tmpdir:
+            tmp = Path(tmpdir)
+            manifest_path = tmp / "weights_manifest.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            paths = {}
+            for mode in ("prefill", "decode"):
+                paths[mode] = {
+                    name: tmp / f"{name}_{mode}.json"
+                    for name in ("ir1", "layout", "lowered", "call")
+                }
+                with redirect_stdout(io.StringIO()):
+                    rc = build_ir_v8.main([
+                        "--manifest", str(manifest_path),
+                        "--mode", mode,
+                        "--output", str(paths[mode]["ir1"]),
+                        "--layout-output", str(paths[mode]["layout"]),
+                        "--lowered-output", str(paths[mode]["lowered"]),
+                        "--call-output", str(paths[mode]["call"]),
+                    ])
+                self.assertEqual(rc, 0, msg=f"build_ir_v8 failed for {mode}")
+
+            c_path = tmp / "decoder_sequential_multimodal.c"
+            generated = subprocess.run([
+                sys.executable, str(V8_CODEGEN_PATH),
+                "--ir", str(paths["decode"]["call"]),
+                "--prefill", str(paths["prefill"]["call"]),
+                "--prefill-layout", str(paths["prefill"]["layout"]),
+                "--layout", str(paths["decode"]["layout"]),
+                "--output", str(c_path),
+            ], cwd=str(ROOT), capture_output=True, text=True)
+            self.assertEqual(generated.returncode, 0, msg=generated.stderr)
+            code = c_path.read_text(encoding="utf-8")
+            self.assertNotIn("#define CK_HAS_PREFILL 1", code)
+            self.assertIn("CK_EXPORT int ck_model_forward_segments_grid_ex", code)
+            self.assertIn("CK_EXPORT int ck_model_forward_mixed_grid_ex", code)
+            self.assertIn("static void ck_decode_embedded(CKModel *model)", code)
+            self.assertIn("static int ck_bridge_forward_staged", code)
+            compiled = subprocess.run([
+                "cc", "-fsyntax-only", "-fopenmp", "-Iinclude", "-Iversion/v8/src",
+                str(c_path),
+            ], cwd=str(ROOT), capture_output=True, text=True)
+            self.assertEqual(compiled.returncode, 0, msg=compiled.stderr)
 
     def test_named_activation_api_uses_aligned_arena_base(self) -> None:
         layout = {
