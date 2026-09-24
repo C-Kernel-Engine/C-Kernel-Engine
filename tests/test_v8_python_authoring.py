@@ -377,8 +377,9 @@ class V8PythonAuthoringTests(unittest.TestCase):
                 experiment.run()
 
     def test_unsupported_depth_and_module_fail_before_execution(self) -> None:
-        with self.assertRaisesRegex(ValueError, "exactly 4, 5, 6, or 10"):
-            cke.v8.compile(_model(layers=2), run_name="bad-depth")
+        with self.assertRaisesRegex(ValueError, "exactly 2, 4, 5, 6, or 10"):
+            cke.v8.compile(_model(layers=3), run_name="bad-depth")
+        self.assertEqual(cke.v8.compile(_model(layers=2), run_name="two-layer").contract["layers"], 2)
 
         model = _model()
         model.extra = cke.nn.Linear(32, 32)

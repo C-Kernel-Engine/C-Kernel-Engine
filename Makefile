@@ -6395,7 +6395,7 @@ V7_STABILIZATION_HISTORY ?= $(V7_REPORT_DIR)/training_stabilization_history.json
 	v7-ctop v7-ctop-demo
 
 .PHONY: v8-init v8-doctor v8-capture-artifacts v8-capture-artifacts-run v8-profile-dashboard v8-profile-dashboard-run \
-	v8-compile-train-runtime v8-training-certify-fp32 v8-training-workflow-fp32 v8-training-matrix-fp32 v8-training-matrix-nightly v8-training-python-authoring-smoke v8-regression-fast v8-regression-full v8-regression-family
+	v8-compile-train-runtime v8-training-certify-fp32 v8-training-workflow-fp32 v8-training-matrix-fp32 v8-training-matrix-nightly v8-training-composition-fp32 v8-training-composition-nightly v8-training-capability-ledger-check v8-training-python-authoring-smoke v8-regression-fast v8-regression-full v8-regression-family
 
 v7-help:
 	@echo "=== v7 Training Foundation (fp32 correctness-first) ==="
@@ -6703,9 +6703,28 @@ V8_TRAIN_PYTHON_RUN_DIR ?= version/v8/.cache/python_authoring/english_fixture
 
 v8-training-python-authoring-smoke:
 	@$(PYTHON) -m unittest tests.test_v8_python_authoring
+	@$(PYTHON) -m unittest tests.test_v8_training_capability_ledger
+	@$(PYTHON) -m unittest tests.test_v8_training_composition
 	@node --test tests/test_v8_training_visualizer_identity.mjs
 	@$(PYTHON) version/v8/examples/python_authoring_tiny_lm_v8.py \
 		--run-dir "$(V8_TRAIN_PYTHON_RUN_DIR)"
+	@$(PYTHON) version/v8/scripts/run_training_composition_v8.py --preflight-only \
+		--run-root "$(V8_TRAIN_PYTHON_RUN_DIR)/composition-preflight" \
+		--json-out "$(V8_TRAIN_PYTHON_RUN_DIR)/composition-preflight.json"
+
+V8_TRAIN_COMPOSITION_RUN_ROOT ?= version/v8/.cache/training_composition
+V8_TRAIN_COMPOSITION_REPORT ?= version/v8/.cache/reports/training_composition_latest.json
+
+v8-training-composition-fp32:
+	@$(PYTHON) version/v8/scripts/run_training_composition_v8.py \
+		--run-root "$(V8_TRAIN_COMPOSITION_RUN_ROOT)" --json-out "$(V8_TRAIN_COMPOSITION_REPORT)"
+
+v8-training-composition-nightly:
+	@$(PYTHON) version/v8/scripts/run_training_composition_v8.py --case 2l_gqa_tail \
+		--run-root "$(V8_TRAIN_COMPOSITION_RUN_ROOT)/nightly" --json-out "$(V8_TRAIN_COMPOSITION_REPORT)"
+
+v8-training-capability-ledger-check:
+	@$(PYTHON) version/v8/scripts/build_training_capability_ledger_v8.py --check
 
 V8_TRAIN_MATRIX_REPORT ?= version/v8/.cache/reports/training_matrix_latest.json
 V8_TRAIN_MATRIX_RUN_ROOT ?= version/v8/.cache/training_matrix

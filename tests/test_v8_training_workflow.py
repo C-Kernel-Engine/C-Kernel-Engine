@@ -37,6 +37,25 @@ class V8TrainingWorkflowTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.workflow = _load()
 
+    def test_named_update_comparison_reports_gradient_ownership_and_rejects_routing(self) -> None:
+        expected = np.array([1000.0, 0.0, 2.0], dtype=np.float32)
+        actual = np.array([1000.0, 1.0, 2.0], dtype=np.float32)
+        result = self.workflow._compare_named_snapshot(
+            actual, expected, ["layer.0.weight", "layer.1.weight"], [2, 1], atol=0.005)
+        self.assertFalse(result["passed"])
+        self.assertEqual(result["failed_tensors"], ["layer.0.weight"])
+        self.assertEqual((result["worst_tensor"], result["worst_index"]), ("layer.0.weight", 1))
+        self.assertEqual(result["tensor_count"], 2)
+        self.assertTrue(self.workflow._gradient_routing_negative_control(
+            ["layer.0.weight", "layer.1.weight"], [2, 1])["passed"])
+        nonfinite = self.workflow._compare_named_snapshot(
+            np.array([np.nan, 0.0, 2.0], dtype=np.float32), expected,
+            ["layer.0.weight", "layer.1.weight"], [2, 1], atol=0.005)
+        self.assertFalse(nonfinite["passed"])
+        self.assertEqual(nonfinite["tensors"][0]["status"], "NONFINITE")
+        with self.assertRaisesRegex(RuntimeError, "unique named tensor slots"):
+            self.workflow._compare_named_snapshot(actual, expected, ["same", "same"], [2, 1], atol=0.005)
+
     def test_svg_sample_quality_is_separate_from_training_certification(self) -> None:
         complete = '<svg xmlns="http://www.w3.org/2000/svg"><rect width="2" height="3"/></svg>'
         self.assertTrue(self.workflow._svg_sample_quality(complete)["well_formed_svg"])
