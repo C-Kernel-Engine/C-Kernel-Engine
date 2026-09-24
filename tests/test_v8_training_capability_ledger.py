@@ -36,6 +36,26 @@ class TrainingCapabilityLedgerTests(unittest.TestCase):
         self.assertTrue(uncertain)
         self.assertTrue(all(not row["declared_backward"] for row in uncertain))
 
+    def test_authoring_and_map_operations_do_not_infer_compiler_certification(self) -> None:
+        document = self.ledger.inventory()
+        modules = {row["name"]: row for row in document["authoring_modules"]}
+        self.assertIn("Linear", modules)
+        self.assertIn("RMSNorm", modules)
+        self.assertIn("TransformerBlock", modules)
+        self.assertEqual(modules["Linear"]["lowering_evidence"], "NOT_ASSESSED_BY_MAP_INVENTORY")
+        self.assertEqual(modules["Linear"]["backward_evidence"], "NOT_ASSESSED_BY_MAP_INVENTORY")
+        self.assertTrue(document["authoring_source_sha256"])
+        self.assertTrue(document["operations"])
+        for operation in document["operations"]:
+            self.assertEqual(operation["semantic_operation"], "NOT_MAPPED_BY_MAP_INVENTORY")
+            self.assertEqual(operation["authoring_module"], "NOT_MAPPED_BY_MAP_INVENTORY")
+            self.assertEqual(operation["generated_training_evidence"], "NOT_MEASURED_BY_MAP_INVENTORY")
+            matching = [row for row in document["providers"]
+                        if (row["family"], row["op"]) == (operation["family"], operation["map_op"])]
+            self.assertEqual(operation["provider_ids"], [row["id"] for row in matching])
+            self.assertEqual(operation["declared_backward_ids"],
+                             [row["id"] for row in matching if row["declared_backward"]])
+
 
 if __name__ == "__main__":
     unittest.main()
