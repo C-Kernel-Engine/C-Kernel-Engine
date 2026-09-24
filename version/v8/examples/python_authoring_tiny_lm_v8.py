@@ -18,8 +18,9 @@ import ckernel_engine as cke  # noqa: E402
 
 def build_experiment(run_dir: Path):
     model = cke.models.qwen3_tiny(
-        vocab=384, dim=32, layers=4, hidden=64, heads=4, kv_heads=2,
-        context_len=32, init="normal_0p02", dtype="float32", name="v8_python_english_fixture",
+        vocab=384, dim=32, layers=5, hidden=64, heads=4, kv_heads=2,
+        context_len=32, rope_theta=10_000.0, init="normal_0p02", dtype="float32",
+        name="v8_python_english_fixture",
     )
     return cke.v8.compile(
         model, run_name="v8-python-english-fixture", run_dir=run_dir,
@@ -28,7 +29,7 @@ def build_experiment(run_dir: Path):
             max_train_tokens=320, max_validation_tokens=64,
         ),
         tokenizer=cke.v8.TokenizerConfig(kind="bpe", vocab_size=384),
-        training=cke.v8.TrainingConfig(epochs=2, grad_accum=2),
+        training=cke.v8.TrainingConfig(epochs=10, grad_accum=4),
     )
 
 
@@ -48,6 +49,7 @@ def main() -> int:
         f"can_launch={preflight['can_launch_generated_workflow']} artifact={experiment.preflight_path}"
     )
     print(f"experiment={experiment.experiment_path}")
+    print(f"semantic_model={experiment.semantic_model_path}")
     print("command=" + " ".join(experiment.command()))
     if args.execute:
         report = experiment.run()

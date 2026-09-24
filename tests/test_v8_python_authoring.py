@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+import importlib.util
 import io
 import math
 import os
@@ -12,6 +13,7 @@ import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
 from unittest import mock
+from types import SimpleNamespace
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -20,6 +22,16 @@ if str(V7_PACKAGE_ROOT) not in sys.path:
     sys.path.insert(0, str(V7_PACKAGE_ROOT))
 
 import ckernel_engine as cke  # noqa: E402
+
+
+def _load_workflow_module():
+    path = ROOT / "version" / "v8" / "scripts" / "run_training_workflow_v8.py"
+    spec = importlib.util.spec_from_file_location("v8_training_workflow_authoring_test", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot import {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def _model(*, layers: int = 4, vocab: int = 384):
@@ -34,17 +46,20 @@ def _arg(command: list[str], name: str) -> str:
 
 
 def _passing_report(command: list[str]) -> dict:
+    semantic = json.loads(Path(_arg(command, "--semantic-model")).read_text())
+    model = semantic["model_contract"]
     configuration = {
         "architecture": "qwen3_style_dense_reduced", "dtype": "fp32",
-        "layers": int(_arg(command, "--layers")), "d_model": int(_arg(command, "--d-model")),
-        "hidden": int(_arg(command, "--hidden")), "heads": int(_arg(command, "--num-heads")),
-        "kv_heads": int(_arg(command, "--num-kv-heads")),
+        "layers": model["layers"], "d_model": model["d_model"],
+        "hidden": model["hidden"], "heads": model["heads"],
+        "kv_heads": model["kv_heads"], "rope_theta": model["rope_theta"],
         "vocab_size": int(_arg(command, "--vocab-size")), "tokenizer": _arg(command, "--tokenizer"),
-        "seq_len": int(_arg(command, "--seq-len")), "epochs": int(_arg(command, "--epochs")),
+        "seq_len": model["seq_len"], "epochs": int(_arg(command, "--epochs")),
         "grad_accum": int(_arg(command, "--grad-accum")), "optimizer": "generated_c_adamw",
         "lr": float(_arg(command, "--lr")), "beta1": float(_arg(command, "--beta1")),
         "beta2": float(_arg(command, "--beta2")), "eps": float(_arg(command, "--eps")),
         "weight_decay": float(_arg(command, "--weight-decay")),
+        "semantic_model_sha256": _arg(command, "--semantic-model-sha256"),
     }
     encoded = json.dumps(configuration, sort_keys=True, separators=(",", ":")).encode()
     configuration["training_config_sha256"] = hashlib.sha256(encoded).hexdigest()
@@ -74,8 +89,10 @@ class V8PythonAuthoringTests(unittest.TestCase):
             command = experiment.command()
             self.assertIsInstance(experiment.model, cke.nn.Module)
             self.assertTrue(command[1].endswith("version/v8/scripts/run_training_workflow_v8.py"))
-            self.assertEqual(command[command.index("--layers") + 1], "4")
-            self.assertEqual(command[command.index("--num-kv-heads") + 1], "2")
+            self.assertNotIn("--layers", command)
+            semantic = json.loads(Path(_arg(command, "--semantic-model")).read_text()) if Path(_arg(command, "--semantic-model")).exists() else experiment.semantic_model_document()
+            self.assertEqual(semantic["model_contract"]["layers"], 4)
+            self.assertEqual(semantic["model_contract"]["kv_heads"], 2)
             self.assertNotIn("torch", " ".join(command).lower())
 
     def test_preflight_derives_providers_and_tests_from_kernel_maps(self) -> None:
@@ -110,6 +127,108 @@ class V8PythonAuthoringTests(unittest.TestCase):
             )
             self.assertFalse(document["deployment"]["python_required_by_generated_runtime"])
             self.assertEqual(document["deployment"]["standalone_native_executable"], "NOT_CERTIFIED")
+
+    def test_five_layer_graph_lowers_authored_semantics_and_parameters(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            experiment = cke.v8.compile(
+                _model(layers=5), run_name="five-layer-semantic", run_dir=Path(td),
+            )
+            preflight = experiment.preflight()
+            semantic = json.loads(experiment.semantic_model_path.read_text())
+            self.assertEqual(semantic["model_contract"]["layers"], 5)
+            self.assertEqual(semantic["model_contract"]["rope_theta"], 1_000_000.0)
+            self.assertEqual(len(semantic["operation_trace"]["layers"]), 5)
+            self.assertEqual(len(semantic["parameter_contract"]), 53)
+            self.assertEqual(preflight["semantic_model_sha256"], hashlib.sha256(
+                experiment.semantic_model_path.read_bytes()
+            ).hexdigest())
+            command = experiment.command()
+            self.assertNotIn("--layers", command)
+            self.assertEqual(_arg(command, "--semantic-model"), str(experiment.semantic_model_path))
+
+    def test_allowed_rope_change_changes_lowering_and_layer_order_is_preserved(self) -> None:
+        base = _model(layers=5)
+        changed = cke.models.qwen3_tiny(
+            vocab=384, dim=32, layers=5, hidden=64, heads=4, kv_heads=2,
+            context_len=32, rope_theta=10_000.0, init="normal_0p02", dtype="float32",
+            name="v8_python_authoring_test",
+        )
+        base_doc = cke.v8.compile(base, run_name="base-rope").semantic_model_document()
+        changed_doc = cke.v8.compile(changed, run_name="changed-rope").semantic_model_document()
+        self.assertNotEqual(base_doc["model_contract"]["rope_theta"], changed_doc["model_contract"]["rope_theta"])
+        self.assertNotEqual(
+            base_doc["operation_trace"]["layers"][0]["rope_theta"],
+            changed_doc["operation_trace"]["layers"][0]["rope_theta"],
+        )
+        self.assertNotEqual(
+            base_doc["template"]["python_semantic_lowering"]["layers"][0]["rope_theta"],
+            changed_doc["template"]["python_semantic_lowering"]["layers"][0]["rope_theta"],
+        )
+        self.assertNotEqual(
+            hashlib.sha256(json.dumps(base_doc, sort_keys=True).encode()).hexdigest(),
+            hashlib.sha256(json.dumps(changed_doc, sort_keys=True).encode()).hexdigest(),
+        )
+
+        first, second = base._modules["1"], base._modules["2"]
+        first._name = "distinguishable_alpha"
+        second._name = "distinguishable_beta"
+        ordered = cke.v8.compile(base, run_name="ordered-blocks").semantic_model_document()
+        base._modules["1"], base._modules["2"] = second, first
+        reordered = cke.v8.compile(base, run_name="reordered-blocks").semantic_model_document()
+        self.assertEqual(
+            [row["block_label"] for row in ordered["operation_trace"]["layers"][:2]],
+            ["distinguishable_alpha", "distinguishable_beta"],
+        )
+        self.assertEqual(
+            [row["block_label"] for row in reordered["operation_trace"]["layers"][:2]],
+            ["distinguishable_beta", "distinguishable_alpha"],
+        )
+
+    def test_allowed_rope_change_reaches_generated_ir_and_independent_torch_math(self) -> None:
+        try:
+            import torch
+        except ImportError:
+            self.skipTest("PyTorch is unavailable")
+        with tempfile.TemporaryDirectory() as td:
+            run_dir = Path(td)
+            model = cke.models.qwen3_tiny(
+                vocab=384, dim=32, layers=5, hidden=64, heads=4, kv_heads=2,
+                context_len=32, rope_theta=10_000.0, init="normal_0p02", dtype="float32",
+            )
+            experiment = cke.v8.compile(model, run_name="rope-ir", run_dir=run_dir)
+            experiment.preflight()
+            workflow = _load_workflow_module()
+            args = SimpleNamespace(
+                semantic_model=experiment.semantic_model_path,
+                semantic_model_sha256=_arg(experiment.command(), "--semantic-model-sha256"),
+                run_dir=run_dir, vocab_size=384,
+            )
+            _document, template_path = workflow._apply_semantic_model(args)
+            subprocess.run([
+                sys.executable, str(ROOT / "version/v7/scripts/ck_run_v7.py"), "init",
+                "--run", str(run_dir), "--allow-non-cache-run-dir", "--train-seed", "42",
+                "--init", "normal_0p02", "--layers", "5", "--vocab-size", "384",
+                "--embed-dim", "32", "--hidden-dim", "64", "--num-heads", "4",
+                "--num-kv-heads", "2", "--context-len", "32", "--rope-theta", "10000",
+                "--template", "qwen3", "--template-file", str(template_path),
+                "--omit-linear-biases", "--generate-ir", "--train-bridge-lowering", "explicit",
+            ], cwd=ROOT, check=True, stdout=subprocess.DEVNULL)
+            ir1 = json.loads((run_dir / "ir1_train_forward.json").read_text())
+            rope_ops = [row for row in ir1["ops"] if row.get("op") == "rope_qk"]
+            self.assertEqual(
+                [row["authored_semantic_properties"]["rope_theta"] for row in rope_ops],
+                [10_000.0] * 5,
+            )
+
+            oracle_path = ROOT / "version/v7/scripts/oracle_snapshot_torch_v7.py"
+            spec = importlib.util.spec_from_file_location("v8_rope_oracle_test", oracle_path)
+            assert spec is not None and spec.loader is not None
+            oracle = importlib.util.module_from_spec(spec); spec.loader.exec_module(oracle)
+            q = torch.arange(32, dtype=torch.float32).reshape(1, 1, 4, 8)
+            k = q.flip(-1)
+            q_10k, _ = oracle._apply_rope(q, k, 10_000.0, "split")
+            q_1m, _ = oracle._apply_rope(q, k, 1_000_000.0, "split")
+            self.assertGreater(float(torch.max(torch.abs(q_10k - q_1m))), 0.0)
 
     def test_run_preflights_then_reads_generated_workflow_report(self) -> None:
         calls: list[tuple[list[str], Path]] = []
@@ -148,7 +267,7 @@ class V8PythonAuthoringTests(unittest.TestCase):
                 experiment.run()
 
     def test_unsupported_depth_and_module_fail_before_execution(self) -> None:
-        with self.assertRaisesRegex(ValueError, "exactly 4, 6, or 10"):
+        with self.assertRaisesRegex(ValueError, "exactly 4, 5, 6, or 10"):
             cke.v8.compile(_model(layers=2), run_name="bad-depth")
 
         model = _model()
@@ -158,10 +277,6 @@ class V8PythonAuthoringTests(unittest.TestCase):
 
     def test_unsupported_authored_semantics_fail_closed(self) -> None:
         variants = {}
-        variants["rope_theta"] = cke.models.qwen3_tiny(
-            vocab=384, dim=32, layers=4, hidden=64, heads=4, kv_heads=2,
-            context_len=32, rope_theta=10_000.0, init="normal_0p02", dtype="float32",
-        )
         variants["initialization"] = cke.models.qwen3_tiny(
             vocab=384, dim=32, layers=4, hidden=64, heads=4, kv_heads=2,
             context_len=32, init="xavier_uniform", dtype="float32",
@@ -190,6 +305,20 @@ class V8PythonAuthoringTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "did not publish"):
                 experiment.run()
             self.assertFalse(stale.exists())
+
+    def test_semantic_model_identity_mismatch_fails_before_lowering(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            experiment = cke.v8.compile(_model(layers=5), run_name="semantic-tamper", run_dir=Path(td))
+            experiment.preflight()
+            workflow = _load_workflow_module()
+            args = SimpleNamespace(
+                semantic_model=experiment.semantic_model_path,
+                semantic_model_sha256="0" * 64,
+                run_dir=Path(td), vocab_size=384,
+            )
+            with self.assertRaisesRegex(RuntimeError, "identity mismatch"):
+                workflow._apply_semantic_model(args)
+            self.assertFalse((Path(td) / "python_training_lowered_template.json").exists())
 
     def test_historical_inspection_is_read_only_and_identity_bound(self) -> None:
         with tempfile.TemporaryDirectory() as td:

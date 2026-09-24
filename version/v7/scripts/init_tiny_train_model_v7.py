@@ -158,6 +158,7 @@ def build_tiny_model(
     adamw_beta2: float,
     adamw_eps: float,
     adamw_weight_decay: float,
+    omit_linear_biases: bool = False,
 ) -> None:
     if embed_dim % num_heads != 0:
         raise ValueError("embed_dim must be divisible by num_heads")
@@ -227,10 +228,11 @@ def build_tiny_model(
             _append_tensor(blob, entries, f"{prefix}.wk", _init_weight(rng, (num_kv_heads * head_dim, embed_dim), init))
             _append_tensor(blob, entries, f"{prefix}.wv", _init_weight(rng, (num_kv_heads * head_dim, embed_dim), init))
             _append_tensor(blob, entries, f"{prefix}.wo", _init_weight(rng, (embed_dim, embed_dim), init))
-            _append_tensor(blob, entries, f"{prefix}.bq", np.zeros((embed_dim,), dtype=np.float32))
-            _append_tensor(blob, entries, f"{prefix}.bk", np.zeros((num_kv_heads * head_dim,), dtype=np.float32))
-            _append_tensor(blob, entries, f"{prefix}.bv", np.zeros((num_kv_heads * head_dim,), dtype=np.float32))
-            _append_tensor(blob, entries, f"{prefix}.bo", np.zeros((embed_dim,), dtype=np.float32))
+            if not omit_linear_biases:
+                _append_tensor(blob, entries, f"{prefix}.bq", np.zeros((embed_dim,), dtype=np.float32))
+                _append_tensor(blob, entries, f"{prefix}.bk", np.zeros((num_kv_heads * head_dim,), dtype=np.float32))
+                _append_tensor(blob, entries, f"{prefix}.bv", np.zeros((num_kv_heads * head_dim,), dtype=np.float32))
+                _append_tensor(blob, entries, f"{prefix}.bo", np.zeros((embed_dim,), dtype=np.float32))
 
             _append_tensor(blob, entries, f"{prefix}.q_norm", np.ones((head_dim,), dtype=np.float32))
             _append_tensor(blob, entries, f"{prefix}.k_norm", np.ones((head_dim,), dtype=np.float32))
@@ -238,8 +240,9 @@ def build_tiny_model(
             # SwiGLU path: w1 emits 2*hidden, w2 projects hidden -> embed
             _append_tensor(blob, entries, f"{prefix}.w1", _init_weight(rng, (2 * hidden_dim, embed_dim), init))
             _append_tensor(blob, entries, f"{prefix}.w2", _init_weight(rng, (embed_dim, hidden_dim), init))
-            _append_tensor(blob, entries, f"{prefix}.b1", np.zeros((2 * hidden_dim,), dtype=np.float32))
-            _append_tensor(blob, entries, f"{prefix}.b2", np.zeros((embed_dim,), dtype=np.float32))
+            if not omit_linear_biases:
+                _append_tensor(blob, entries, f"{prefix}.b1", np.zeros((2 * hidden_dim,), dtype=np.float32))
+                _append_tensor(blob, entries, f"{prefix}.b2", np.zeros((embed_dim,), dtype=np.float32))
 
     cfg = {
         "model": str(template_name or "qwen3"),
@@ -432,6 +435,7 @@ def main() -> int:
         default=None,
         help="Optional custom template JSON path. When set, template is embedded into weights_manifest.json.",
     )
+    ap.add_argument("--omit-linear-biases", action="store_true")
     args = ap.parse_args()
 
     if not (0.0 <= float(args.adamw_beta1) < 1.0):
@@ -477,6 +481,7 @@ def main() -> int:
         adamw_beta2=float(args.adamw_beta2),
         adamw_eps=float(args.adamw_eps),
         adamw_weight_decay=float(args.adamw_weight_decay),
+        omit_linear_biases=bool(args.omit_linear_biases),
     )
     return 0
 

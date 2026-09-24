@@ -1159,6 +1159,26 @@ def synthesize_ir2_backward(
     backward_kernel_ops = [o for o in backward_ops if o.get("op") != "grad_accumulate"]
     accumulate_ops = [o for o in backward_ops if o.get("op") == "grad_accumulate"]
 
+    # Backward operations retain the authored Python identity of the forward
+    # operation whose derivative they implement. This makes the executed IR
+    # traceable without teaching the backward synthesizer a second graph model.
+    semantic_by_forward_id = {
+        int(op.get("op_id", -1)): op.get("authored_semantic_id")
+        for op in forward_ops if op.get("authored_semantic_id")
+    }
+    semantic_properties_by_forward_id = {
+        int(op.get("op_id", -1)): deepcopy(op.get("authored_semantic_properties"))
+        for op in forward_ops if isinstance(op.get("authored_semantic_properties"), dict)
+    }
+    for op in backward_ops:
+        forward_ref = int(op.get("forward_ref", -1))
+        semantic_id = semantic_by_forward_id.get(forward_ref)
+        if semantic_id:
+            op["authored_semantic_id"] = semantic_id
+        semantic_properties = semantic_properties_by_forward_id.get(forward_ref)
+        if semantic_properties:
+            op["authored_semantic_properties"] = semantic_properties
+
     if strict and issues:
         raise RuntimeError("IR2 backward synthesis failed:\n- " + "\n- ".join(issues))
 
@@ -1169,6 +1189,7 @@ def synthesize_ir2_backward(
         "checkpoint_policy": checkpoint_policy,
         "config": config,
         "template_name": ir1.get("template_name"),
+        "python_semantic_lowering": ir1.get("python_semantic_lowering"),
         "num_layers": ir1.get("num_layers"),
         "forward": forward_ops,
         "backward": backward_ops,
