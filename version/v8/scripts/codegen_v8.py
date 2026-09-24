@@ -2644,6 +2644,7 @@ def main(argv: list[str] | None = None) -> int:
             dump=emit_parity_dumps,
             strict_contracts=args.strict_contracts,
         )
+        sequential_mixed_bridge_emitted = False
         if prefill_code:
             insert_marker = "#include <math.h>"
             if insert_marker in code:
@@ -2655,6 +2656,23 @@ def main(argv: list[str] | None = None) -> int:
             code = code + "\n\n" + prefill_code
             if args.prefill_layout is None:
                 code = _inject_decode_runtime_multimodal_fallback(code, layout_obj, ir_obj)
+        elif (
+            supplied_prefill_obj is not None
+            and not uses_generated_batched_prefill
+            and "multimodal_bridge_contract" in (ir_obj.get("config") or {})
+        ):
+            contract = (ir_obj.get("config") or {}).get("multimodal_bridge_contract")
+            if not isinstance(contract, dict) or not contract:
+                raise RuntimeError("sequential multimodal decode has an invalid bridge contract")
+            bridge_api = codegen_prefill_v8.emit_multimodal_bridge_api(
+                ir_obj.get("operations") or [], ir_obj.get("config") or {}
+            )
+            if not bridge_api:
+                raise RuntimeError("sequential multimodal decode has no resolved bridge API")
+            code = _inject_decode_runtime_multimodal_fallback(
+                code + "\n\n" + bridge_api, layout_obj, ir_obj
+            )
+            sequential_mixed_bridge_emitted = True
         elif str(layout_obj.get("mode", "")).lower() == "prefill":
             code = _inject_prefill_multimodal_bridge(
                 code,
@@ -2696,7 +2714,7 @@ def main(argv: list[str] | None = None) -> int:
             layout_obj,
             init_call_obj,
             generation_config_obj,
-            has_mixed_prefill=bool(prefill_code) or
+            has_mixed_prefill=bool(prefill_code) or sequential_mixed_bridge_emitted or
             str(layout_obj.get("mode", "")).lower() == "prefill",
         )
         generation_policy_api = ""

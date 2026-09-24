@@ -2,11 +2,14 @@
 from __future__ import annotations
 
 import importlib.util
+import ctypes
+import io
 import json
 import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 
 
@@ -278,6 +281,135 @@ class V8CodegenBridgeTests(unittest.TestCase):
             decode_total = int(decode_layout["memory"]["arena"]["total_size"])
             self.assertNotIn("#define CK_HAS_PREFILL 1", text)
             self.assertIn(f"#define BUMP_TOTAL_SIZE {decode_total}ULL", text)
+
+    def test_sequential_multimodal_decoder_exports_mixed_prefix_api(self) -> None:
+        manifest = _make_qwen3vl_decoder_manifest()
+        manifest["config"]["prefill_policy"] = "sequential_decode"
+
+        with tempfile.TemporaryDirectory(prefix="v8_codegen_sequential_multimodal_") as tmpdir:
+            tmp = Path(tmpdir)
+            manifest_path = tmp / "weights_manifest.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            paths = {}
+            for mode in ("prefill", "decode"):
+                paths[mode] = {
+                    name: tmp / f"{name}_{mode}.json"
+                    for name in ("ir1", "layout", "lowered", "call")
+                }
+                with redirect_stdout(io.StringIO()):
+                    rc = build_ir_v8.main([
+                        "--manifest", str(manifest_path),
+                        "--mode", mode,
+                        "--output", str(paths[mode]["ir1"]),
+                        "--layout-output", str(paths[mode]["layout"]),
+                        "--lowered-output", str(paths[mode]["lowered"]),
+                        "--call-output", str(paths[mode]["call"]),
+                    ])
+                self.assertEqual(rc, 0, msg=f"build_ir_v8 failed for {mode}")
+
+            c_path = tmp / "decoder_sequential_multimodal.c"
+            generated = subprocess.run([
+                sys.executable, str(V8_CODEGEN_PATH),
+                "--ir", str(paths["decode"]["call"]),
+                "--prefill", str(paths["prefill"]["call"]),
+                "--prefill-layout", str(paths["prefill"]["layout"]),
+                "--layout", str(paths["decode"]["layout"]),
+                "--output", str(c_path),
+            ], cwd=str(ROOT), capture_output=True, text=True)
+            self.assertEqual(generated.returncode, 0, msg=generated.stderr)
+            code = c_path.read_text(encoding="utf-8")
+            self.assertNotIn("#define CK_HAS_PREFILL 1", code)
+            self.assertIn("CK_EXPORT int ck_model_forward_segments_grid_ex", code)
+            self.assertIn("CK_EXPORT int ck_model_forward_mixed_grid_ex", code)
+            self.assertIn("CK_MODEL_CAP_MIXED_EMBEDDING_PREFILL", code)
+            self.assertIn("static void ck_decode_embedded(CKModel *model)", code)
+            self.assertIn("static int ck_bridge_forward_staged", code)
+            compiled = subprocess.run([
+                "cc", "-fsyntax-only", "-fopenmp", "-Iinclude", "-Iversion/v8/src",
+                str(c_path),
+            ], cwd=str(ROOT), capture_output=True, text=True)
+            self.assertEqual(compiled.returncode, 0, msg=compiled.stderr)
+
+            engine = subprocess.run([
+                "make", "build/libckernel_engine.so",
+                "AVX_FLAGS=-mavx2 -mfma -mf16c -mssse3",
+            ], cwd=str(ROOT), capture_output=True, text=True)
+            self.assertEqual(engine.returncode, 0, msg=engine.stderr)
+            so_path = tmp / "decoder_sequential_multimodal.so"
+            linked = subprocess.run([
+                "cc", "-shared", "-fPIC", "-O2", "-fopenmp",
+                "-Iinclude", "-Iversion/v8/src", str(c_path),
+                "version/v8/src/ckernel_model_load_v8.c",
+                "version/v8/src/ck_parallel_decode_v8.c",
+                "version/v8/src/ck_parallel_prefill_v8.c",
+                "-Lbuild", "-lckernel_engine", f"-Wl,-rpath,{BUILD_DIR}",
+                "-o", str(so_path), "-lm", "-lpthread",
+            ], cwd=str(ROOT), capture_output=True, text=True)
+            self.assertEqual(linked.returncode, 0, msg=linked.stderr)
+            runtime = ctypes.CDLL(str(so_path))
+            class RuntimeDescriptor(ctypes.Structure):
+                _fields_ = [
+                    ("struct_size", ctypes.c_uint32),
+                    ("abi_version", ctypes.c_uint32),
+                    ("capabilities", ctypes.c_uint64),
+                    ("artifact_role", ctypes.c_uint32),
+                    ("reserved0", ctypes.c_uint32),
+                    ("context_length", ctypes.c_int32),
+                    ("vocab_size", ctypes.c_int32),
+                    ("encoder_memory_tokens", ctypes.c_int32),
+                    ("encoder_memory_dim", ctypes.c_int32),
+                    ("primary_input_tokens", ctypes.c_int32),
+                    ("primary_input_dim", ctypes.c_int32),
+                    ("reserved", ctypes.c_uint64 * 8),
+                ]
+
+            runtime.ck_model_get_capabilities.restype = ctypes.c_uint64
+            capabilities = runtime.ck_model_get_capabilities()
+            self.assertNotEqual(capabilities & (1 << 6), 0)
+            runtime.ck_model_get_runtime_descriptor.argtypes = [
+                ctypes.POINTER(RuntimeDescriptor), ctypes.c_size_t,
+            ]
+            runtime.ck_model_get_runtime_descriptor.restype = ctypes.c_int
+            descriptor = RuntimeDescriptor()
+            self.assertEqual(runtime.ck_model_get_runtime_descriptor(
+                ctypes.byref(descriptor), ctypes.sizeof(descriptor)
+            ), 0)
+            self.assertEqual(descriptor.abi_version, 1)
+            self.assertEqual(descriptor.capabilities, capabilities)
+            runtime.ck_model_forward_mixed.argtypes = [
+                ctypes.POINTER(ctypes.c_float), ctypes.c_int,
+                ctypes.POINTER(ctypes.c_int32), ctypes.c_int,
+                ctypes.POINTER(ctypes.c_float),
+            ]
+            runtime.ck_model_forward_mixed.restype = ctypes.c_int
+            self.assertEqual(runtime.ck_model_forward_mixed(None, 0, None, 0, None), -1)
+
+            decode_only_path = tmp / "decoder_without_prefill.c"
+            decode_only = subprocess.run([
+                sys.executable, str(V8_CODEGEN_PATH),
+                "--ir", str(paths["decode"]["call"]),
+                "--layout", str(paths["decode"]["layout"]),
+                "--output", str(decode_only_path),
+            ], cwd=str(ROOT), capture_output=True, text=True)
+            self.assertEqual(decode_only.returncode, 0, msg=decode_only.stderr)
+            decode_only_code = decode_only_path.read_text(encoding="utf-8")
+            self.assertNotIn("CK_EXPORT int ck_model_forward_mixed(", decode_only_code)
+            self.assertNotIn("CK_MODEL_CAP_MIXED_EMBEDDING_PREFILL", decode_only_code)
+
+            malformed_ir = json.loads(paths["decode"]["call"].read_text(encoding="utf-8"))
+            malformed_ir["config"]["multimodal_bridge_contract"] = "invalid"
+            malformed_path = tmp / "malformed_call.json"
+            malformed_path.write_text(json.dumps(malformed_ir), encoding="utf-8")
+            malformed = subprocess.run([
+                sys.executable, str(V8_CODEGEN_PATH),
+                "--ir", str(malformed_path),
+                "--prefill", str(paths["prefill"]["call"]),
+                "--prefill-layout", str(paths["prefill"]["layout"]),
+                "--layout", str(paths["decode"]["layout"]),
+                "--output", str(tmp / "malformed.c"),
+            ], cwd=str(ROOT), capture_output=True, text=True)
+            self.assertNotEqual(malformed.returncode, 0)
+            self.assertIn("invalid bridge contract", malformed.stderr)
 
     def test_named_activation_api_uses_aligned_arena_base(self) -> None:
         layout = {
