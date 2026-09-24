@@ -1,5 +1,14 @@
 var NAVTREEINDEX12 =
 {
+"gemm__kernels__nvfp4_8c.html#a52e90797a5b21714db55592f2faebb0a":[2,0,1,1,28,4],
+"gemm__kernels__nvfp4_8c.html#a6c551d0a5eae42038317fc836d78aa60":[2,0,1,1,28,12],
+"gemm__kernels__nvfp4_8c.html#a6fd8fa9c6f9e61f63ab68c4927d4fce8":[2,0,1,1,28,9],
+"gemm__kernels__nvfp4_8c.html#a76964e34f9297e53f7e73963b7ad7908":[2,0,1,1,28,7],
+"gemm__kernels__nvfp4_8c.html#ac7214a0e2db5b14b8da6f13d99ee8605":[2,0,1,1,28,2],
+"gemm__kernels__nvfp4_8c.html#aedc9eb1ae7fe9c543d0aa2d8860c5255":[2,0,1,1,28,11],
+"gemm__kernels__nvfp4_8c.html#af3f29c11bc7575b8d3c3d88433875d3b":[2,0,1,1,28,5],
+"gemm__kernels__nvfp4_8c_source.html":[2,0,1,1,28],
+"gemm__kernels__q4__0_8c.html":[2,0,1,1,29],
 "gemm__kernels__q4__0_8c.html#a001c2346f83b345676e8c54a27cf7bb1":[2,0,1,1,29,1],
 "gemm__kernels__q4__0_8c.html#a423cd6b7c6ef81dab2446e07fad37d15":[2,0,1,1,29,5],
 "gemm__kernels__q4__0_8c.html#a5922964b94d53325488493e8aeeb9a9b":[2,0,1,1,29,3],
@@ -240,14 +249,5 @@ var NAVTREEINDEX12 =
 "gemm__kernels__q6k_8c.html":[2,0,1,1,43],
 "gemm__kernels__q6k_8c.html#a07fcd594f867f5c6afb487ab989213e1":[2,0,1,1,43,3],
 "gemm__kernels__q6k_8c.html#a3c98619f74662804d8551efbd4d02b52":[2,0,1,1,43,4],
-"gemm__kernels__q6k_8c.html#a69a759de291fac064cd027839afb4bce":[2,0,1,1,43,2],
-"gemm__kernels__q6k_8c.html#a7568db3d490c7a7372a5236d8b2fe207":[2,0,1,1,43,1],
-"gemm__kernels__q6k_8c.html#ab62992893fe8543ddcb7159102136a0a":[2,0,1,1,43,0],
-"gemm__kernels__q6k_8c_source.html":[2,0,1,1,43],
-"gemm__kernels__q6k__q8k_8c.html":[2,0,1,1,44],
-"gemm__kernels__q6k__q8k_8c.html#a0486ad5eb531ba02427e9765bab1d146":[2,0,1,1,44,13],
-"gemm__kernels__q6k__q8k_8c.html#a06c7e59ac3d04a760a5bcc83921ac9a9":[2,0,1,1,44,23],
-"gemm__kernels__q6k__q8k_8c.html#a1dc45962cc0ed3df6427421935a4754f":[2,0,1,1,44,24],
-"gemm__kernels__q6k__q8k_8c.html#a1de6254b03ccbfe59c9d291f01324460":[2,0,1,1,44,2],
-"gemm__kernels__q6k__q8k_8c.html#a2267ad482f0cda1249db2f6d5273b5da":[2,0,1,1,44,17]
+"gemm__kernels__q6k_8c.html#a69a759de291fac064cd027839afb4bce":[2,0,1,1,43,2]
 };

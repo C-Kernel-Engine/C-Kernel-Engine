@@ -88,6 +88,7 @@ var dir_40856f0cdd4bcafd28810d9265a200f7 =
     [ "rmsnorm_kernels_int8.c", "rmsnorm__kernels__int8_8c.html", "rmsnorm__kernels__int8_8c" ],
     [ "rope_kernels.c", "rope__kernels_8c.html", "rope__kernels_8c" ],
     [ "rope_kernels_bf16.c", "rope__kernels__bf16_8c.html", "rope__kernels__bf16_8c" ],
+    [ "runtime_extent.c", "runtime__extent_8c.html", "runtime__extent_8c" ],
     [ "sigmoid_kernels.c", "sigmoid__kernels_8c.html", "sigmoid__kernels_8c" ],
     [ "sigmoid_kernels_bf16.c", "sigmoid__kernels__bf16_8c.html", "sigmoid__kernels__bf16_8c" ],
     [ "softmax_kernels.c", "softmax__kernels_8c.html", "softmax__kernels_8c" ],
