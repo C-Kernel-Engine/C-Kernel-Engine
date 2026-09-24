@@ -1068,6 +1068,12 @@ MAKE_TARGETS = {
         "target": "test-v8-qwen38-dense-contracts",
         "timeout_sec": 300,
     },
+    "v8_multimodal_ocr_contracts": {
+        "name": "Multimodal OCR Generated-Execution Evidence Contracts",
+        "category": "inference",
+        "target": "test-v8-multimodal-ocr-contracts",
+        "timeout_sec": 120,
+    },
     "v8_routed_moe_contracts": {
         "name": "Qwen3.5 Routed-MoE Storage and Execution Contracts",
         "category": "parity",
@@ -1349,6 +1355,7 @@ NIGHTLY_PROFILES = {
         "v8_artifact_compile_matrix",
         "v8_muse_glimmer_contracts",
         "v8_qwen38_dense_contracts",
+        "v8_multimodal_ocr_contracts",
         "v8_command_a_plus_nvfp4",
         "v8_dsl_policy",
         "v8_template_circuit_audit",

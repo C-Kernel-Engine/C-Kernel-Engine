@@ -1744,6 +1744,10 @@ test-v8-qwen38-dense-contracts:
 		tests/test_v8_qwen36_contract.py \
 		tests/test_ck_chat_runtime_contract.py
 
+.PHONY: test-v8-multimodal-ocr-contracts
+test-v8-multimodal-ocr-contracts:
+	@$(PYTHON) -m unittest -q tests.test_v8_multimodal_ocr_corpus_certification
+
 .PHONY: test-v8-routed-moe-contracts
 test-v8-routed-moe-contracts:
 	@$(PYTHON) -m pytest -q \

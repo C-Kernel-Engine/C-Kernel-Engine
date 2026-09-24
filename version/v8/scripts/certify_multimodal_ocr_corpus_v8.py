@@ -213,18 +213,76 @@ def _score(expected: dict[str, Any], actual: dict[str, Any] | None) -> dict[str,
     }
 
 
-def _runtime_identity(path: Path) -> dict[str, Any]:
+def _runtime_identity(path: Path, role: str) -> dict[str, Any]:
     path = path.resolve()
     if not path.is_dir():
         raise FileNotFoundError(path)
+    if role == "encoder":
+        libraries = sorted(path.glob("lib*encoder*.so"))
+        if len(libraries) != 1:
+            raise ValueError(f"encoder runtime requires exactly one model library: {path}")
+        model_library = libraries[0]
+    elif role == "decoder":
+        model_library = path / "libmodel.so"
+    else:
+        raise ValueError(f"unknown runtime role: {role}")
+    engine = path / "libckernel_engine.so"
+    if not model_library.is_file() or not engine.is_file():
+        raise FileNotFoundError(f"{role} runtime requires model and engine libraries: {path}")
     files: dict[str, str] = {}
-    for name in ("weights.bump", "weights_manifest.map", "libmodel.so", "libcohere_encoder.so", "libckernel_engine.so"):
+    for name in ("weights.bump", "weights_manifest.map"):
         candidate = path / name
         if candidate.is_file():
             files[name] = _sha256_file(candidate)
-    if not files:
-        raise ValueError(f"runtime has no recognized provenance files: {path}")
-    return {"path": str(path), "files": files}
+    return {
+        "path": str(path),
+        "model_library": {"path": str(model_library.resolve()), "sha256": _sha256_file(model_library)},
+        "engine_library": {"path": str(engine.resolve()), "sha256": _sha256_file(engine)},
+        "files": files,
+    }
+
+
+def _verify_bridge_execution(
+    report: dict[str, Any], sample: dict[str, Any], config: dict[str, Any]
+) -> dict[str, Any]:
+    if report.get("status") != "ok" or report.get("prefix_source") != "encoder":
+        raise ValueError("OCR requires a successful image-fed encoder prefix")
+    encoder = report.get("encoder_report")
+    if not isinstance(encoder, dict) or encoder.get("image_source") != "file":
+        raise ValueError("OCR requires an encoder report from an image file")
+    if Path(str(encoder.get("image_path") or "")).resolve() != sample["image"].resolve():
+        raise ValueError("encoder image path does not match the corpus case")
+    if _sha256_file(sample["image"]) != sample["image_sha256"]:
+        raise ValueError("encoder image bytes changed during OCR execution")
+    prefix_tokens = report.get("prefix_tokens")
+    if (not isinstance(prefix_tokens, int) or isinstance(prefix_tokens, bool)
+            or prefix_tokens <= 0 or encoder.get("prefix_tokens") != prefix_tokens):
+        raise ValueError("encoder prefix token count is missing or inconsistent")
+    libraries: dict[str, str] = {}
+    for role in ("encoder", "decoder"):
+        expected = config[f"{role}_runtime"]
+        observed = report.get(f"{role}_runtime")
+        if not isinstance(observed, dict) or observed.get("source") != "prebuilt":
+            raise ValueError(f"OCR requires the declared prebuilt {role} runtime")
+        if Path(str(observed.get("workdir") or "")).resolve() != Path(expected["path"]):
+            raise ValueError(f"{role} runtime directory differs from the pinned runtime")
+        library = expected["model_library"]
+        if Path(str(observed.get("so_path") or "")).resolve() != Path(library["path"]):
+            raise ValueError(f"{role} model library differs from the pinned runtime")
+        if _sha256_file(Path(library["path"])) != library["sha256"]:
+            raise ValueError(f"{role} model library changed during OCR execution")
+        engine = expected["engine_library"]
+        if _sha256_file(Path(engine["path"])) != engine["sha256"]:
+            raise ValueError(f"{role} engine library changed during OCR execution")
+        libraries[role] = library["sha256"]
+    # The bridge reports selected paths; these hashes do not prove which engine ELF was loaded.
+    return {
+        "evidence_kind": "bridge_reported_paths_and_artifact_hashes",
+        "loaded_engine_verified": False,
+        "prefix_source": "encoder",
+        "prefix_tokens": prefix_tokens,
+        "model_library_sha256": libraries,
+    }
 
 
 def _build_prompt(
@@ -328,11 +386,33 @@ def _case_config(
     }
 
 
-def _load_resumed(path: Path, expected: dict[str, Any]) -> dict[str, Any] | None:
+def _load_resumed(
+    path: Path, expected: dict[str, Any], config: dict[str, Any]
+) -> dict[str, Any] | None:
     if not path.is_file():
         return None
-    value = json.loads(path.read_text(encoding="utf-8"))
-    if value.get("case_config") != expected or value.get("status") != "complete":
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return None
+    if not isinstance(value, dict):
+        return None
+    evidence = value.get("execution_evidence")
+    if not isinstance(evidence, dict):
+        return None
+    hashes = evidence.get("model_library_sha256")
+    prefix_tokens = evidence.get("prefix_tokens")
+    if (value.get("case_config") != expected or value.get("status") != "complete"
+            or value.get("image_index") != expected["image_index"]
+            or value.get("image_sha256") != expected["image_sha256"]
+            or value.get("truth_sha256") != expected["truth_sha256"]
+            or evidence.get("evidence_kind") != "bridge_reported_paths_and_artifact_hashes"
+            or evidence.get("loaded_engine_verified") is not False
+            or evidence.get("prefix_source") != "encoder"
+            or not isinstance(prefix_tokens, int) or isinstance(prefix_tokens, bool)
+            or prefix_tokens <= 0 or not isinstance(hashes, dict)
+            or any(hashes.get(role) != config[f"{role}_runtime"]["model_library"]["sha256"]
+                   for role in ("encoder", "decoder"))):
         return None
     return value
 
@@ -352,6 +432,7 @@ def _public_row(case: dict[str, Any]) -> dict[str, Any]:
             "timings",
             "metrics",
             "repeatability",
+            "execution_evidence",
         )
         if key in case
     }
@@ -434,8 +515,8 @@ def main(argv: list[str] | None = None) -> int:
         "adapter_id": args.adapter_id,
         "model_label": args.model_label,
         "manifest_sha256": _sha256_file(args.manifest.resolve()),
-        "decoder_runtime": _runtime_identity(args.decoder_runtime),
-        "encoder_runtime": _runtime_identity(args.encoder_runtime),
+        "decoder_runtime": _runtime_identity(args.decoder_runtime, "decoder"),
+        "encoder_runtime": _runtime_identity(args.encoder_runtime, "encoder"),
         "composition_circuit": args.composition_circuit,
         "chat_template": args.chat_template,
         "thinking_mode": args.thinking_mode,
@@ -458,6 +539,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.threads > 0:
         env["CK_THREADS"] = str(args.threads)
     rows: list[dict[str, Any]] = []
+    stop_after_failure = False
     for completed, sample in enumerate(selected, start=1):
         case_dir = output_dir / f"image{sample['index']:02d}"
         case_dir.mkdir(parents=True, exist_ok=True)
@@ -466,7 +548,7 @@ def main(argv: list[str] | None = None) -> int:
         max_new_tokens = _max_new_tokens(args.max_new_tokens, sample)
         case_config = _case_config(global_hash, sample, prompt, max_new_tokens)
         case_result = case_dir / "case_result.json"
-        resumed = None if args.force_rerun else _load_resumed(case_result, case_config)
+        resumed = None if args.force_rerun else _load_resumed(case_result, case_config, config)
         if resumed is not None:
             rows.append(resumed)
             print(f"[{completed}/{len(selected)}] image {sample['index']:02d}: resumed")
@@ -475,9 +557,11 @@ def main(argv: list[str] | None = None) -> int:
             print(shlex.join(_bridge_command(args, sample, case_dir, prompt)))
             continue
         try:
-            wall_sec = _run(_bridge_command(args, sample, case_dir, prompt), case_dir / "bridge.log", env)
             bridge_path = case_dir / "runtime" / "bridge_report.json"
+            bridge_path.unlink(missing_ok=True)
+            wall_sec = _run(_bridge_command(args, sample, case_dir, prompt), case_dir / "bridge.log", env)
             report = json.loads(bridge_path.read_text(encoding="utf-8"))
+            execution_evidence = _verify_bridge_execution(report, sample, config)
             generated_text = str(report.get("generated_text", ""))
             generated_tokens = [int(value) for value in report.get("generated_token_ids") or []]
             parsed = _extract_json_object(generated_text)
@@ -495,6 +579,7 @@ def main(argv: list[str] | None = None) -> int:
                 "truth_path": str(sample["truth_path"]),
                 "truth_sha256": sample["truth_sha256"],
                 "status": "complete",
+                "execution_evidence": execution_evidence,
                 "prompt": prompt,
                 "generated_text": generated_text,
                 "parsed_output": parsed,
@@ -528,7 +613,7 @@ def main(argv: list[str] | None = None) -> int:
             rows.append(row)
             print(f"[{completed}/{len(selected)}] image {sample['index']:02d}: ERROR {exc}")
             if not args.continue_on_failure:
-                break
+                stop_after_failure = True
 
         public_rows = [_public_row(row) for row in rows if row.get("status") == "complete"]
         aggregate = _aggregate(rows, len(selected))
@@ -547,6 +632,8 @@ def main(argv: list[str] | None = None) -> int:
                 "rows": public_rows,
             },
         )
+        if stop_after_failure:
+            break
 
     if args.dry_run:
         return 0
