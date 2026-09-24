@@ -133,6 +133,7 @@ int audio_lstm_step_f32(
     int hidden_size);
 
 /* Packed direction-major weights: [2, 4*H, I] and [2, 4*H, H].
+ * H must be at most INT_MAX/4 because the IFGO step uses signed gate indices.
  * Output rows are [forward H, reverse H]. State is reset at each call.
  * Returns -1 for null pointers, -2 for invalid/overflowing geometry,
  * and -3 for insufficient input, weight, output, state or scratch capacity.

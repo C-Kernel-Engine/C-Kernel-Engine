@@ -3457,7 +3457,7 @@
       "reduction": {"kind": "dot_product", "order": "ascending_k", "partial_accumulator": "fp32", "merge_order": "none"},
       "threading": {"work_partition": "serial", "split_strategy": "serial", "deterministic": true, "thread_count_changes_arithmetic_order": false},
       "position_transform": null,
-      "description": "One stateful PyTorch-order LSTM layer step using caller-owned 4H gate scratch and caller/session-owned hidden and cell state."
+      "description": "One stateful PyTorch-order LSTM layer step using caller-owned 4H gate scratch and caller/session-owned hidden and cell state; requires 0 < H <= INT_MAX/4 for signed gate indexing."
     },
     "audio_lstm_bidirectional_scan_pytorch_ifgo_fp32": {
       "operator_family": "audio_lstm",
@@ -3498,7 +3498,7 @@
         "thread_count_changes_arithmetic_order": false
       },
       "position_transform": null,
-      "description": "Batch-one bidirectional PyTorch IFGO LSTM over token-major input, zero initial state per call, direction-major weights, caller-owned state and gate scratch, forward and reverse feature concatenation."
+      "description": "Batch-one bidirectional PyTorch IFGO LSTM over token-major input, zero initial state per call, direction-major weights, caller-owned state and gate scratch, forward and reverse feature concatenation; requires 0 < H <= INT_MAX/4."
     },
     "audio_scaled_residual_add_separate_fp32": {
       "operator_family": "audio_scaled_residual_add",

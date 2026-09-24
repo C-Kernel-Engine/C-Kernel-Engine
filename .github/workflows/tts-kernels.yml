@@ -6,6 +6,7 @@ on:
       - '.github/workflows/tts-kernels.yml'
       - 'include/ckernel_tts.h'
       - 'include/ckernel_audio.h'
+      - 'src/kernels/audio_kernels.c'
       - 'src/kernels/audio_lstm_scan.c'
       - 'tests/test_v8_audio_lstm_scan_oracle.py'
       - 'version/v8/kernel_maps/audio_lstm_bidirectional_scan_f32.json'
@@ -43,6 +44,7 @@ on:
     paths:
       - 'include/ckernel_tts.h'
       - 'include/ckernel_audio.h'
+      - 'src/kernels/audio_kernels.c'
       - 'src/kernels/audio_lstm_scan.c'
       - 'tests/test_v8_audio_lstm_scan_oracle.py'
       - 'version/v8/kernel_maps/audio_lstm_bidirectional_scan_f32.json'
@@ -100,7 +102,8 @@ jobs:
             tests.test_v8_audio_istft_oracle.AudioIstftSafetyTest \
             tests.test_v8_audio_lstm_scan_oracle.AudioLstmScanOracleTest.test_committed_torch_fixture \
             tests.test_v8_audio_lstm_scan_oracle.AudioLstmScanOracleTest.test_rejection_preserves_output \
-            tests.test_v8_audio_lstm_scan_oracle.AudioLstmScanOracleTest.test_exact_capacity_and_null_pointer
+            tests.test_v8_audio_lstm_scan_oracle.AudioLstmScanOracleTest.test_exact_capacity_and_null_pointer \
+            tests.test_v8_audio_lstm_scan_oracle.AudioLstmScanOracleTest.test_hostile_hidden_size_rejected_before_buffer_access
       - name: Verify generated graph X-Ray capture against independent oracle
         run: |
           python3 -m unittest \

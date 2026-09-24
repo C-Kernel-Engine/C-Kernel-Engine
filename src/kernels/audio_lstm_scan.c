@@ -47,7 +47,7 @@ int audio_lstm_bidirectional_scan_f32(
         return -1;
     }
     if (tokens <= 0 || input_size <= 0 || hidden_size <= 0 ||
-        hidden_size > INT_MAX / 2) {
+        hidden_size > INT_MAX / 4) {
         return -2;
     }
 

@@ -15932,7 +15932,7 @@
         ],
         "oracle": "torch.nn.LSTM bidirectional FP32 CPU; committed reference outputs plus live PyTorch reconstruction"
       },
-      "notes": "Batch-one bidirectional zero-state IFGO scan. Input/output physical row strides are explicit. State and gates are caller-owned scratch reset per invocation. Inputs, weights, output, and scratch must not alias; valid capacity is checked before writing. Serial forward then reverse recurrence; output concatenates forward and reverse hidden features. Inference only; backward unsupported.",
+      "notes": "Batch-one bidirectional zero-state IFGO scan. Requires 0 < H <= INT_MAX/4 for signed IFGO gate indexing. Input/output physical row strides are explicit. State and gates are caller-owned scratch reset per invocation. Inputs, weights, output, and scratch must not alias; valid capacity is checked before writing. Serial forward then reverse recurrence; output concatenates forward and reverse hidden features. Inference only; backward unsupported.",
       "name": "audio_lstm_bidirectional_scan_f32",
       "_source_file": "audio_lstm_bidirectional_scan_f32.json"
     },

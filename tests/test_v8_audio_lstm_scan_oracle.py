@@ -27,7 +27,8 @@ class AudioLstmScanOracleTest(unittest.TestCase):
         cls.temp = tempfile.TemporaryDirectory()
         library = Path(cls.temp.name) / "libaudio_lstm_scan.so"
         exports = Path(cls.temp.name) / "exports.map"
-        exports.write_text("{ global: audio_lstm_bidirectional_scan_f32; local: *; };\n")
+        exports.write_text("{ global: audio_lstm_bidirectional_scan_f32; "
+                           "audio_lstm_step_f32; local: *; };\n")
         subprocess.run([
             "cc", "-std=c11", "-O0", "-Wall", "-Wextra", "-Werror",
             "-ffunction-sections", "-fdata-sections",
@@ -37,12 +38,17 @@ class AudioLstmScanOracleTest(unittest.TestCase):
             "-o", str(library), "-Wl,--gc-sections",
             f"-Wl,--version-script={exports}", "-lm",
         ], check=True)
-        cls.fn = ctypes.CDLL(str(library)).audio_lstm_bidirectional_scan_f32
+        native = ctypes.CDLL(str(library))
+        cls.fn = native.audio_lstm_bidirectional_scan_f32
         cls.fn.argtypes = [POINTER, ctypes.c_size_t] * 9 + [
             ctypes.c_int, ctypes.c_int, ctypes.c_int,
             ctypes.c_size_t, ctypes.c_size_t,
         ]
         cls.fn.restype = ctypes.c_int
+        cls.step = native.audio_lstm_step_f32
+        cls.step.argtypes = [POINTER] * 9 + [ctypes.c_size_t,
+                                            ctypes.c_int, ctypes.c_int]
+        cls.step.restype = ctypes.c_int
 
     @classmethod
     def tearDownClass(cls):
@@ -120,6 +126,24 @@ class AudioLstmScanOracleTest(unittest.TestCase):
         args[0] = None
         self.assertEqual(self.fn(*args), -1)
         self.assertEqual(list(args[10]), [-999.0] * len(args[10]))
+
+    def test_hostile_hidden_size_rejected_before_buffer_access(self):
+        case = json.loads(FIXTURE.read_text())["cases"][0]
+        args = self.buffers(case)
+        max_int = (1 << (ctypes.sizeof(ctypes.c_int) * 8 - 1)) - 1
+        args[20] = max_int // 4 + 1
+        before_output = list(args[10])
+        before_hidden = list(args[12])
+        before_cell = list(args[14])
+        self.assertEqual(self.fn(*args), -2)
+        self.assertEqual(list(args[10]), before_output)
+        self.assertEqual(list(args[12]), before_hidden)
+        self.assertEqual(list(args[14]), before_cell)
+
+        tiny = (FLOAT * 1)(123.0)
+        self.assertEqual(self.step(*(tiny for _ in range(9)),
+                                   ctypes.sizeof(tiny), 1, max_int // 4 + 1), -2)
+        self.assertEqual(list(tiny), [123.0])
 
     def test_live_torch_oracle(self):
         try:
