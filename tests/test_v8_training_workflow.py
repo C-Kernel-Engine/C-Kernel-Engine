@@ -42,6 +42,11 @@ class V8TrainingWorkflowTests(unittest.TestCase):
         self.assertTrue(self.workflow._svg_sample_quality(complete)["well_formed_svg"])
         self.assertFalse(self.workflow._svg_sample_quality("<svg")["well_formed_svg"])
         self.assertFalse(self.workflow._svg_sample_quality("\x00")["well_formed_svg"])
+        probe = {"new_tokens_requested": 48, "new_tokens_generated": 48,
+                 "budget_exhausted": True, "stop_reason": "token_budget_exhausted"}
+        quality = self.workflow._svg_sample_quality("<svg", probe)
+        self.assertFalse(quality["well_formed_svg"])
+        self.assertTrue(quality["budget_exhausted"])
 
     def test_corpus_sources_are_pinned_and_split_before_tokenization(self) -> None:
         spec = json.loads(self.workflow.CORPUS_SPEC.read_text(encoding="utf-8"))
@@ -68,7 +73,19 @@ class V8TrainingWorkflowTests(unittest.TestCase):
             self.assertEqual(len(train), spec["train"]["token_count"])
             self.assertEqual(len(validation), spec["validation"]["token_count"])
             self.assertNotEqual(corpus["splits"]["train"]["git_blob"], corpus["splits"]["validation"]["git_blob"])
-            self.assertTrue(all(row["complete_document"] for row in corpus["svg_documents"].values()))
+            self.assertTrue(all(row["source_complete_document"] and row["consumed_complete_document"]
+                                and row["tokenized_tokens"] == row["consumed_tokens"]
+                                for row in corpus["svg_documents"].values()))
+            for split, field in (("train", "max_train_tokens"), ("validation", "max_validation_tokens")):
+                setattr(args, field, 16)
+                with self.assertRaisesRegex(RuntimeError, f"{split} SVG token limit 16 truncates"):
+                    self.workflow._load_corpus(args, root / f"{split}_limited_tokens", "python3")
+                setattr(args, field, int(spec[split]["token_count"]))
+                _, _, exact_corpus = self.workflow._load_corpus(
+                    args, root / f"{split}_exact_tokens", "python3"
+                )
+                self.assertTrue(exact_corpus["svg_documents"][split]["consumed_complete_document"])
+                setattr(args, field, 0)
 
             duplicate = copy.deepcopy(spec)
             duplicate["validation"]["git_blob"] = duplicate["train"]["git_blob"]

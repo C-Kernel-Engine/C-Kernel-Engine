@@ -292,7 +292,7 @@ make v8-training-python-authoring-smoke
   --fixture svg --run-dir version/v8/.cache/python_authoring/svg_fixture --execute
 
 .venv/bin/jupyter lab version/v8/notebooks/02_frozen_svg_training_fixture.ipynb</pre>
-    <p>The corpus is pinned in <code>version/v8/training/svg_single_document_v1.json</code>. Its train and validation sources are separate, complete SVG files. The current target policy is cyclic causal next-token prediction within each document, including a last-to-first token transition. This fixture checks the training machinery and a small overfit task. The report separately marks whether each short generated sample is well-formed SVG; that diagnostic does not change the numerical certification verdict. Broader SVG quality needs a separate evaluation set.</p>
+    <p>The corpus is pinned in <code>version/v8/training/svg_single_document_v1.json</code>. Its train and validation sources are separate, complete SVG files. Token limits that would truncate either tokenized document are rejected before weight initialization. The current target policy is cyclic causal next-token prediction within each document, including a last-to-first token transition. Validation repeats almost all training geometry and changes only colors, so falling validation loss tests the machinery rather than generalization. The report separately marks whether each 48-token generated sample is well-formed SVG and whether it exhausted the probe budget; that diagnostic does not change the numerical certification verdict. Broader SVG quality needs a separate evaluation set.</p>
     <table class="table">
         <thead><tr><th>Next milestone</th><th>Acceptance evidence</th></tr></thead>
         <tbody>

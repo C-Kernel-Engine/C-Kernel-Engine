@@ -22266,11 +22266,15 @@ function buildTrainingSvgFixtureSection(files) {
         <div style="font-size:0.73rem;color:var(--text-muted);margin-bottom:0.55rem;">
             ${htmlEscape(fixture.document_policy || '—')} · ${htmlEscape(fixture.label_policy || '—')}
         </div>
+        <div style="font-size:0.73rem;color:var(--text-muted);margin-bottom:0.55rem;">
+            Validation relationship: ${htmlEscape(fixture.validation_relationship || 'not declared')}
+        </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:0.7rem;">
             ${['train', 'validation'].map((split) => {
                 const doc = documents[split] && typeof documents[split] === 'object' ? documents[split] : {};
                 return `<div><strong>${htmlEscape(split)}</strong> · <code>${htmlEscape(doc.sha256 || 'missing hash')}</code>
-                    ${certified && doc.complete_document === true && typeof doc.xml === 'string'
+                    <div>Source complete: ${htmlEscape(doc.source_complete_document === true ? 'yes' : 'no')} · Consumed complete: ${htmlEscape(doc.consumed_complete_document === true ? 'yes' : 'no')} · Tokens: ${htmlEscape(doc.consumed_tokens ?? '—')} / ${htmlEscape(doc.tokenized_tokens ?? '—')}</div>
+                    ${certified && doc.source_complete_document === true && doc.consumed_complete_document === true && typeof doc.xml === 'string'
                         ? `<div style="margin:0.45rem 0;"><img alt="${htmlEscape(split)} SVG document" src="data:image/svg+xml;charset=utf-8,${encodeURIComponent(doc.xml)}" style="max-width:160px;max-height:160px;background:white;border-radius:8px;"></div>`
                         : ''}
                     <pre style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:250px;overflow:auto;">${htmlEscape(doc.xml || 'missing source')}</pre>
@@ -22282,6 +22286,7 @@ function buildTrainingSvgFixtureSection(files) {
             ${['before', 'after'].map((stage) => {
                 const sample = certified && samples[stage] && typeof samples[stage] === 'object' ? samples[stage] : null;
                 return `<div><strong>${htmlEscape(stage)}</strong> · ${sample ? (sample.well_formed_svg === true ? 'well-formed SVG' : 'not well-formed SVG') : 'unverified'}
+                    <div>${sample ? `${htmlEscape(sample.new_tokens_generated ?? '—')} / ${htmlEscape(sample.new_tokens_requested ?? '—')} new tokens · ${htmlEscape(sample.stop_reason || 'unknown stop reason')}` : 'No current-run probe status'}</div>
                     <pre style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:180px;overflow:auto;">${htmlEscape(sample && typeof sample.text === 'string' ? sample.text : 'No current-run sample evidence')}</pre>
                 </div>`;
             }).join('')}
