@@ -226,7 +226,7 @@ make v8-training-composition-fp32</pre>
 
 <div class="card" id="training-capability-ledger">
     <h3 style="margin-top:0;">Training kernel capability ledger</h3>
-    <p>The <a href="v8-training-capability-ledger.html">map-derived ledger</a> groups v8 provider maps by FP32, BF16, quantized, and unspecified dtype tags. It lists declared backward providers separately from backward-named maps missing a mode contract, and from maps with registered tests. These are inventory facts, not executed numerical certification. In particular, a BF16 or quantized forward map does not establish a trainable backward path or QLoRA support.</p>
+    <p>The <a href="v8-training-capability-ledger.html">capability ledger</a> lists public <code>cke.nn</code> authoring modules separately from exact v8 provider-map operations. It groups maps by FP32, BF16, quantized, and unspecified dtype tags and distinguishes declared backward providers from registered tests. These inventories do not establish that an authored module lowers to those providers or that generated training passed numerical certification. In particular, a BF16 or quantized forward map does not establish a trainable backward path or QLoRA support.</p>
     <pre>python3 version/v8/scripts/build_training_capability_ledger_v8.py
 make v8-training-capability-ledger-check</pre>
     <p>For executed evidence, open the current run's <code>training_workflow.json</code> and identity-bound <code>ir_report.html</code>; the ledger does not turn a registered provider into a PASS.</p>

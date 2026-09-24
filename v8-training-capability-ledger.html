@@ -1027,15 +1027,27 @@
     </header>
     <main>
 <h1>v8 training kernel capability ledger</h1>
-<p>Generated from <code>version/v8/kernel_maps/*.json</code> by <code>version/v8/scripts/build_training_capability_ledger_v8.py</code>. Source digest: <code>0850ceb2a324d6c742ba62c072df45e6734649138c3fb604f210be1cebe65927</code>; provider maps: 383.</p>
+<p>Generated from <code>version/v8/kernel_maps/*.json</code> by <code>version/v8/scripts/build_training_capability_ledger_v8.py</code>. Source digest: <code>ec5b24b64046637214d0b56d033106ebdd71353bbda7c90016cdddadf29571d5</code>; provider maps: 385.</p>
 <p>This is a <strong>map inventory, not a training PASS</strong>. A backward declaration means a backward provider is registered; it does not prove matching geometry, selection by a generated circuit, or executed PyTorch parity. BF16-tagged includes storage or arithmetic tags. Quantized forward maps do not imply quantized-base gradients or QLoRA support. Direct executed evidence: <code>NOT_MEASURED_BY_MAP_INVENTORY</code>.</p>
+<p><strong>Authoring, lowering, and execution are separate.</strong> The public <code>cke.nn</code> module list below comes from its Python source. A class existing there does not establish that v8 can lower it, select a backward provider, or certify a generated training run. Exact kernel-map operation names are not automatically equivalent to Python modules.</p>
 <table class="table"><thead><tr><th>Dtype family</th><th>Provider maps</th><th>Forward or unspecified</th><th>Declared training forward</th><th>Declared backward</th><th>Backward-named without mode</th><th>Maps with registered tests</th></tr></thead><tbody>
-<tr><td>fp32-tagged</td><td>229</td><td>205</td><td>15</td><td>24</td><td>5</td><td>188</td></tr>
+<tr><td>fp32-tagged</td><td>230</td><td>206</td><td>15</td><td>24</td><td>5</td><td>189</td></tr>
 <tr><td>bf16-tagged</td><td>78</td><td>78</td><td>0</td><td>0</td><td>0</td><td>62</td></tr>
 <tr><td>quantized</td><td>62</td><td>62</td><td>0</td><td>0</td><td>0</td><td>41</td></tr>
-<tr><td>unspecified</td><td>14</td><td>14</td><td>0</td><td>0</td><td>0</td><td>7</td></tr>
+<tr><td>unspecified</td><td>15</td><td>15</td><td>0</td><td>0</td><td>0</td><td>8</td></tr>
 </tbody></table>
-<h2>Operation inventory</h2>
+<h2>Python authoring modules</h2>
+<p>Source digest: <code>3308bfeffc395b157306feabd2b5ab57055940ed4ceba2bab3f56207f4e3e506</code>. Compiler and backward linkage: <code>NOT_ASSESSED_BY_MAP_INVENTORY</code>.</p>
+<table class="table"><thead><tr><th>Module</th><th>Authoring source</th><th>Lowering evidence</th><th>Backward evidence</th></tr></thead><tbody>
+<tr><td>Sequential</td><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v7/ckernel_engine/python_authoring/nn.py">version/v7/ckernel_engine/python_authoring/nn.py</a></td><td>NOT_ASSESSED_BY_MAP_INVENTORY</td><td>NOT_ASSESSED_BY_MAP_INVENTORY</td></tr>
+<tr><td>Embedding</td><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v7/ckernel_engine/python_authoring/nn.py">version/v7/ckernel_engine/python_authoring/nn.py</a></td><td>NOT_ASSESSED_BY_MAP_INVENTORY</td><td>NOT_ASSESSED_BY_MAP_INVENTORY</td></tr>
+<tr><td>RMSNorm</td><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v7/ckernel_engine/python_authoring/nn.py">version/v7/ckernel_engine/python_authoring/nn.py</a></td><td>NOT_ASSESSED_BY_MAP_INVENTORY</td><td>NOT_ASSESSED_BY_MAP_INVENTORY</td></tr>
+<tr><td>Linear</td><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v7/ckernel_engine/python_authoring/nn.py">version/v7/ckernel_engine/python_authoring/nn.py</a></td><td>NOT_ASSESSED_BY_MAP_INVENTORY</td><td>NOT_ASSESSED_BY_MAP_INVENTORY</td></tr>
+<tr><td>Attention</td><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v7/ckernel_engine/python_authoring/nn.py">version/v7/ckernel_engine/python_authoring/nn.py</a></td><td>NOT_ASSESSED_BY_MAP_INVENTORY</td><td>NOT_ASSESSED_BY_MAP_INVENTORY</td></tr>
+<tr><td>FeedForward</td><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v7/ckernel_engine/python_authoring/nn.py">version/v7/ckernel_engine/python_authoring/nn.py</a></td><td>NOT_ASSESSED_BY_MAP_INVENTORY</td><td>NOT_ASSESSED_BY_MAP_INVENTORY</td></tr>
+<tr><td>TransformerBlock</td><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v7/ckernel_engine/python_authoring/nn.py">version/v7/ckernel_engine/python_authoring/nn.py</a></td><td>NOT_ASSESSED_BY_MAP_INVENTORY</td><td>NOT_ASSESSED_BY_MAP_INVENTORY</td></tr>
+</tbody></table>
+<h2>Exact map operation inventory</h2>
 <table class="table"><thead><tr><th>Dtype family</th><th>Exact map operation</th><th>Maps</th><th>Declared backward providers</th><th>Backward-named without mode</th></tr></thead><tbody>
 <tr><td>bf16-tagged</td><td>attention</td><td>9</td><td>—</td><td>—</td></tr>
 <tr><td>bf16-tagged</td><td>attention_sliding</td><td>2</td><td>—</td><td>—</td></tr>
@@ -1182,6 +1194,7 @@
 <tr><td>fp32-tagged</td><td>rope_backward</td><td>2</td><td>rope_backward_qk_f32, rope_backward_qk_pairwise_f32</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>rope_init</td><td>3</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>rowwise_bias_add</td><td>1</td><td>—</td><td>—</td></tr>
+<tr><td>fp32-tagged</td><td>runtime_copy_valid</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>shared_swiglu_expert_mlp</td><td>2</td><td>moe_swiglu_shared_backward_f32</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>softmax</td><td>1</td><td>softmax_cross_entropy_loss</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>spatial_merge</td><td>3</td><td>—</td><td>—</td></tr>
@@ -1220,10 +1233,11 @@
 <tr><td>unspecified</td><td>multimodal_position_builder</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>unspecified</td><td>position_embeddings</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>unspecified</td><td>position_ids</td><td>1</td><td>—</td><td>—</td></tr>
+<tr><td>unspecified</td><td>runtime_extent_sum</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>unspecified</td><td>speculative_commit_or_reject</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>unspecified</td><td>tokenizer</td><td>1</td><td>—</td><td>—</td></tr>
 </tbody></table>
-<details><summary>All 383 provider maps</summary>
+<details><summary>All 385 provider maps</summary>
 <table class="table"><thead><tr><th>Map</th><th>Provider ID</th><th>Operation</th><th>Dtype family</th><th>Backward mode</th><th>Registered test</th></tr></thead><tbody>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/adamw_update_f32.json">version/v8/kernel_maps/adamw_update_f32.json</a></td><td>adamw_update_f32</td><td>optimizer</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/add_stream_inplace.json">version/v8/kernel_maps/add_stream_inplace.json</a></td><td>add_stream_inplace</td><td>add_stream</td><td>fp32-tagged</td><td>not declared</td><td>not registered</td></tr>
@@ -1584,6 +1598,8 @@
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/rope_precompute_cache_llama_cpu.json">version/v8/kernel_maps/rope_precompute_cache_llama_cpu.json</a></td><td>rope_precompute_cache_llama_cpu</td><td>rope_init</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/rope_precompute_cache_split.json">version/v8/kernel_maps/rope_precompute_cache_split.json</a></td><td>rope_precompute_cache_split</td><td>rope_init</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/rowwise_bias_add.json">version/v8/kernel_maps/rowwise_bias_add.json</a></td><td>rowwise_bias_add</td><td>rowwise_bias_add</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/runtime_copy_valid_f32.json">version/v8/kernel_maps/runtime_copy_valid_f32.json</a></td><td>runtime_copy_valid_f32</td><td>runtime_copy_valid</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/runtime_extent_sum_i32.json">version/v8/kernel_maps/runtime_extent_sum_i32.json</a></td><td>runtime_extent_sum_i32</td><td>runtime_extent_sum</td><td>unspecified</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/softmax_cross_entropy_loss.json">version/v8/kernel_maps/softmax_cross_entropy_loss.json</a></td><td>softmax_cross_entropy_loss</td><td>softmax</td><td>fp32-tagged</td><td>declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/spatial_average_pool_contiguous.json">version/v8/kernel_maps/spatial_average_pool_contiguous.json</a></td><td>spatial_average_pool_contiguous</td><td>spatial_merge</td><td>fp32-tagged</td><td>not declared</td><td>not registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/spatial_merge_2x2.json">version/v8/kernel_maps/spatial_merge_2x2.json</a></td><td>spatial_merge_2x2</td><td>spatial_merge</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
