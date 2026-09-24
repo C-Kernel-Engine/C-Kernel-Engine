@@ -1,0 +1,65 @@
+{
+  "id": "audio_istft_mag_phase_f32",
+  "op": "audio_istft_mag_phase",
+  "operation_interface": "audio.istft.magnitude_phase.centered_hann.fp32.v1",
+  "variant": "direct_idft_centered_periodic_hann_ola_fp32",
+  "selection": {
+    "status": "candidate",
+    "priority": 100,
+    "equivalence_group": "audio_istft_mag_phase_centered_hann_fp32",
+    "phases": ["prefill"]
+  },
+  "quant": {"weight": "none", "activation": "fp32", "output": "fp32"},
+  "inputs": [
+    {"name": "magnitude", "dtype": "fp32", "shape": ["F", "N_fft/2+1"], "layout": "frame_bin_contiguous", "placement": "local", "access": "read", "storage_class": "activation", "consumption": "required"},
+    {"name": "phase", "dtype": "fp32", "shape": ["F", "N_fft/2+1"], "layout": "frame_bin_contiguous", "placement": "local", "access": "read", "storage_class": "activation", "consumption": "required"}
+  ],
+  "weights": [],
+  "outputs": [
+    {"name": "output", "dtype": "fp32", "shape": ["(F-1)*H"], "layout": "sample_contiguous", "placement": "local", "access": "write", "storage_class": "activation", "consumption": "required"}
+  ],
+  "scratch": [{
+    "name": "overlap_window",
+    "dtype": "fp32",
+    "shape": ["2*((F-1)*H+N_fft)+N_fft"],
+    "size_bytes": "4 * (2 * ((frames - 1) * hop + n_fft) + n_fft)",
+    "size_resolution": "required",
+    "lifetime": "kernel_call",
+    "alignment": 64,
+    "layout": "contiguous",
+    "access": "read_write",
+    "storage_class": "scratch",
+    "consumption": "required"
+  }],
+  "dims": ["spectral_elements", "frames", "n_fft", "hop", "output_capacity"],
+  "constraints": {"notes": "Supported geometry: frames >= 2, even n_fft >= 2, 1 <= hop <= n_fft/2, checked size arithmetic, finite nonnegative magnitude and finite phase. The raw scalar provider validates the domain before writes."},
+  "impl": {
+    "function": "audio_istft_mag_phase_f32",
+    "c_declaration": "int audio_istft_mag_phase_f32(const float *magnitude, const float *phase, size_t spectral_elements, size_t frames, size_t n_fft, size_t hop, float *output, size_t output_capacity, float *scratch, size_t scratch_elements);",
+    "sources": ["src/kernels/audio_istft_mag_phase.c"]
+  },
+  "modes": {"inference": true, "training": false, "backward": false},
+  "numerical_capabilities": [{
+    "contract_id": "audio_istft_mag_phase_centered_hann_ola_fp32",
+    "status": "validated",
+    "phases": ["prefill"],
+    "function": "audio_istft_mag_phase_f32",
+    "explicit_selector": true,
+    "implementation": {"isa_dispatch": "scalar", "threading": {"runtime": "serial", "work_partition": ["serial"], "dispatch": ["inline"], "reduction_order_effect": "contract_defined"}},
+    "arithmetic": {"partial_accumulator": "fp32", "merge_order": "none", "deterministic": true, "thread_count_changes_arithmetic_order": false, "split_strategy": "serial"}
+  }],
+  "call_abi": {"version": 1, "params": [
+    {"name": "magnitude", "source": "activation:magnitude", "cast": "const float*", "ports": ["input:magnitude"]},
+    {"name": "phase", "source": "activation:phase", "cast": "const float*", "ports": ["input:phase"]},
+    {"name": "spectral_elements", "source": "runtime:spectral_elements"},
+    {"name": "frames", "source": "runtime:frames"},
+    {"name": "n_fft", "source": "dim:n_fft"},
+    {"name": "hop", "source": "dim:hop"},
+    {"name": "output", "source": "output:output", "cast": "float*", "ports": ["output:output"]},
+    {"name": "output_capacity", "source": "runtime:output_capacity"},
+    {"name": "scratch", "source": "scratch:overlap_window", "cast": "float*"},
+    {"name": "scratch_elements", "source": "runtime:scratch_elements"}
+  ]},
+  "tests": {"unit": ["tests/test_v8_audio_istft_oracle.py"], "oracle": "torch.istft centered periodic-Hann FP32; Kokoro pinned magnitude/phase primitive capture"},
+  "notes": "Caller owns disjoint output and scratch. Rejects nonfinite/negative magnitude and nonfinite phase before output writes. Scratch query is audio_istft_mag_phase_plan_f32. PCM conversion and playback are separate."
+}

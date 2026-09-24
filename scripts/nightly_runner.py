@@ -698,6 +698,22 @@ TEST_SUITES = {
     "audio_transformer_primitives": TestSuite(
         "Audio Transformer Primitives", "kernels", UNITTEST_DIR / "test_audio_encoder.py"
     ),
+    "tts_kokoro_shape_bounds": TestSuite(
+        "TTS Kokoro Extent and Duration Expansion", "kernels",
+        ROOT / "tests" / "test_v8_kokoro_shape_bounds.py",
+    ),
+    "tts_istft_oracle": TestSuite(
+        "TTS Inverse STFT PyTorch Oracle", "kernels",
+        ROOT / "tests" / "test_v8_audio_istft_oracle.py",
+    ),
+    "tts_duration_expand_oracle": TestSuite(
+        "TTS Duration Expansion PyTorch Oracle", "kernels",
+        ROOT / "tests" / "test_v8_audio_duration_expand_oracle.py",
+    ),
+    "tts_live_torch_oracles": TestSuite(
+        "TTS Live PyTorch Oracles", "kernels",
+        ROOT / "tests" / "test_v8_tts_live_torch_oracles.py",
+    ),
     "nightly_runner_hardware": TestSuite(
         "Nightly Runner Hardware Capture",
         "inference",
@@ -1295,6 +1311,8 @@ QUICK_TESTS = [
     "deltanet_backward", "v8_generated_layout_bridges",
     "relu_bf16", "rmsnorm_bf16",
     "q4k_kernels", "idle_nightly_coordinator",
+    "tts_kokoro_shape_bounds", "tts_istft_oracle", "tts_duration_expand_oracle",
+    "tts_live_torch_oracles",
 ]
 
 NIGHTLY_PROFILES = {

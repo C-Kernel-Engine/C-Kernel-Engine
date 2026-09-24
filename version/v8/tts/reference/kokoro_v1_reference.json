@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "status": "reference_captured",
+  "model": {
+    "repository": "hexgrad/Kokoro-82M",
+    "revision": "e8a90b41091c3c5b70375c47cc959799920fa4d6",
+    "files": ["config.json", "kokoro-v1_0.pth", "voices/af_heart.pt"],
+    "license": "Apache-2.0"
+  },
+  "reference_code": {
+    "kokoro": "dfb907a02bba8152ca444717ca5d78747ccb4bec",
+    "misaki": "fba1236595f2d2bf21d414ba6e57d25256afada3"
+  },
+  "fixture": {
+    "text": "Read this assistant response aloud.",
+    "language": "a",
+    "voice": "af_heart",
+    "speed": 1.0,
+    "torch_seed": 0,
+    "sample_rate_hz": 24000,
+    "channels": 1,
+    "pcm_reference_dtype": "float32",
+    "condition_selection": "voice_pack[len(phonemes)-1]; predictor style is columns 128:256, decoder style is columns 0:128"
+  },
+  "dependencies": {
+    "oracle": "Kokoro 0.9.4 and Misaki 0.9.4 source pins above; record actual Python packages in generated manifest",
+    "g2p": "Misaki English trf=False; upstream Kokoro pipeline attempts espeak-ng fallback for out-of-dictionary words",
+    "unresolved": [
+      "resolved Python package versions and wheel hashes",
+      "spaCy model/data revision and espeak-ng binary/data version if selected by the environment",
+      "local weight and voice file SHA-256 until artifacts are acquired"
+    ]
+  },
+  "sources": [
+    "https://huggingface.co/hexgrad/Kokoro-82M/tree/e8a90b41091c3c5b70375c47cc959799920fa4d6",
+    "https://github.com/hexgrad/kokoro/blob/dfb907a02bba8152ca444717ca5d78747ccb4bec/kokoro/model.py",
+    "https://github.com/hexgrad/kokoro/blob/dfb907a02bba8152ca444717ca5d78747ccb4bec/kokoro/pipeline.py",
+    "https://github.com/hexgrad/misaki/tree/fba1236595f2d2bf21d414ba6e57d25256afada3"
+  ]
+}
