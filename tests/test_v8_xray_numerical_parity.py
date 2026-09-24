@@ -277,7 +277,8 @@ class XRayNumericalParityTests(unittest.TestCase):
             str(ROOT / "src/kernels/audio_duration_expand.c"),
             "-I", str(ROOT / "include"), "-o", str(library),
         ], check=True)
-        function = ctypes.CDLL(str(library)).ck_test_expansion_graph
+        loaded = ctypes.CDLL(str(library))
+        function = loaded.ck_test_expansion_graph
         function.argtypes = [ctypes.POINTER(ctypes.c_int32), ctypes.c_size_t,
                              ctypes.c_size_t, ctypes.POINTER(ctypes.c_float),
                              ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float),
@@ -309,9 +310,13 @@ class XRayNumericalParityTests(unittest.TestCase):
                         physical_shape=[2, 4], capacity_shape=[2, 4],
                         physical_strides=[4, 1])
         candidate_manifest = self.manifest("ck", [candidate])
-        candidate_manifest["run"]["loaded_library"] = {
+        candidate_manifest["run"]["artifact_library"] = {
             "path": str(library), "sha256": digest(library),
         }
+        candidate_manifest["run"]["runtime_library"] = (
+            builder.capture_runtime_library_identity(loaded, "ck_test_expansion_graph"))
+        self.assertEqual(candidate_manifest["run"]["runtime_library"]["path"],
+                         str(library.resolve()))
         result = xray.compare_manifests(
             candidate_manifest, self.manifest("python", [expected]),
             self.profile, checkpoint_order=["runtime.expanded"],
@@ -319,8 +324,12 @@ class XRayNumericalParityTests(unittest.TestCase):
         self.assertEqual(result["status"], "pass")
         self.assertEqual(result["comparisons"][0]["metrics"]["max_abs"], 0.0)
         stale = copy.deepcopy(candidate_manifest)
-        stale["run"]["loaded_library"]["sha256"] = "0" * 64
-        with self.assertRaisesRegex(xray.XRayError, "loaded library identity changed"):
+        stale["run"]["artifact_library"]["sha256"] = "0" * 64
+        with self.assertRaisesRegex(xray.XRayError, "artifact_library hash changed"):
+            xray._index_manifest(stale)
+        stale = copy.deepcopy(candidate_manifest)
+        stale["run"]["runtime_library"]["sha256"] = "0" * 64
+        with self.assertRaisesRegex(xray.XRayError, "runtime_library hash changed"):
             xray._index_manifest(stale)
 
     def test_storage_mismatch_is_classified_before_value_comparison(self):

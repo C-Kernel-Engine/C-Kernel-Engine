@@ -94,7 +94,9 @@ class RuntimeExtentLoweringTest(unittest.TestCase):
         return (element_type * length).from_buffer(arena, offset)
 
     def _arena(self, durations):
-        arena = (ctypes.c_uint8 * self.arena_size)()
+        raw = (ctypes.c_uint8 * (self.arena_size + 63))()
+        offset = (-ctypes.addressof(raw)) & 63
+        arena = (ctypes.c_uint8 * self.arena_size).from_buffer(raw, offset)
         self._array(arena, "runtime_values", ctypes.c_int32, 3)[:] = durations
         self._array(arena, "audio_features", ctypes.c_float, 8)[:] = (
             10, 20, 30, -777, 40, 50, 60, -777)
@@ -171,6 +173,30 @@ class RuntimeExtentLoweringTest(unittest.TestCase):
         self.assertEqual(out_frames.value, -1)
         self.assertEqual(list(self._array(arena, "audio_expanded", ctypes.c_float, 16)),
                          [-99] * 16)
+
+    def test_misaligned_arena_is_rejected_before_provider_write(self):
+        arena = self._arena((1, 2, 1))
+        raw = (ctypes.c_uint8 * (self.arena_size + 1))()
+        ctypes.memmove(ctypes.addressof(raw) + 1, arena, self.arena_size)
+        misaligned = (ctypes.c_uint8 * self.arena_size).from_buffer(raw, 1)
+        if ctypes.addressof(misaligned) % 64 == 0:
+            misaligned = (ctypes.c_uint8 * self.arena_size).from_buffer(raw, 0)
+        out_frames = ctypes.c_int32(-1)
+        before = bytes(misaligned)
+        self.assertEqual(self.function(misaligned, self.arena_size,
+                                       ctypes.byref(out_frames)), -2)
+        self.assertEqual(out_frames.value, -1)
+        self.assertEqual(bytes(misaligned), before)
+
+    def test_declared_stronger_arena_alignment_is_emitted(self):
+        call_ir = json.loads(json.dumps(self.call_ir))
+        call_ir["memory"]["arena"]["alignment"] = 128
+        source = codegen_checked_calls_v8.emit_checked_calls(call_ir, ROOT)
+        self.assertIn("(uintptr_t)arena & 127u", source)
+        call_ir["memory"]["arena"]["alignment"] = 96
+        with self.assertRaisesRegex(codegen_checked_calls_v8.CheckedCallCodegenError,
+                                    "alignment must be a positive power of two"):
+            codegen_checked_calls_v8.emit_checked_calls(call_ir, ROOT)
 
 
 if __name__ == "__main__":

@@ -109,6 +109,21 @@ def emit_checked_calls(call_ir: dict, root: Path) -> str:
         total = arena.get("total_size") if isinstance(arena, dict) else None
         if not isinstance(total, int) or total <= 0:
             raise CheckedCallCodegenError("call IR lacks a positive planned arena size")
+        # Offsets are relative to the caller's base. Keep the base aligned to
+        # the strongest selected provider requirement, including scratch.
+        alignment = arena.get("alignment", 64)
+        if not isinstance(alignment, int) or alignment < 1:
+            raise CheckedCallCodegenError("arena alignment must be a positive power of two")
+        for op in ops:
+            kernel = _kernel_map(root, (op.get("call_abi") or {}).get("kernel_id"))
+            for port_kind in ("inputs", "outputs", "weights", "scratch"):
+                for port in kernel.get(port_kind, []):
+                    port_alignment = port.get("alignment", 1)
+                    if not isinstance(port_alignment, int) or port_alignment < 1 or port_alignment & (port_alignment - 1):
+                        raise CheckedCallCodegenError("provider alignment must be a positive power of two")
+                    alignment = max(alignment, port_alignment)
+        if not isinstance(alignment, int) or alignment < 1 or alignment & (alignment - 1):
+            raise CheckedCallCodegenError("arena alignment must be a positive power of two")
         buffers = memory.get("activations", {}).get("buffers", [])
         if not isinstance(buffers, list):
             raise CheckedCallCodegenError("call IR lacks planned activation buffers")
@@ -126,6 +141,7 @@ def emit_checked_calls(call_ir: dict, root: Path) -> str:
         lines.append("typedef struct CKCheckedArenaModel { uint8_t *bump; } CKCheckedArenaModel;")
         arena_check = [
             f"    if (!{pointer} || {capacity} < {total}u) return -2;",
+            f"    if (((uintptr_t){pointer} & {alignment - 1}u) != 0u) return -2;",
             f"    CKCheckedArenaModel model_storage = {{{pointer}}};",
             "    CKCheckedArenaModel *model = &model_storage;",
         ]

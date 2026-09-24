@@ -124,11 +124,16 @@ def _load_tensor(entry: Dict[str, Any]) -> np.ndarray:
 
 def _index_manifest(manifest: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
     validate(manifest, MANIFEST_SCHEMA, f"{manifest.get('backend', 'backend')} checkpoint manifest")
-    loaded_library = manifest.get("run", {}).get("loaded_library")
-    if loaded_library:
-        library_path = Path(loaded_library["path"])
-        if not library_path.is_file() or sha256_file(library_path) != loaded_library["sha256"]:
-            raise XRayError(f"loaded library identity changed: {library_path}")
+    run = manifest.get("run", {})
+    for identity_name in ("artifact_library", "runtime_library"):
+        identity = run.get(identity_name)
+        if identity:
+            library_path = Path(identity["path"])
+            if not library_path.is_file() or sha256_file(library_path) != identity["sha256"]:
+                raise XRayError(f"{identity_name} hash changed: {library_path}")
+    if run.get("runtime_library") and run.get("artifact_library"):
+        if Path(run["runtime_library"]["path"]).resolve() != Path(run["artifact_library"]["path"]).resolve():
+            raise XRayError("runtime symbol and artifact library paths differ")
     indexed: Dict[str, Dict[str, Any]] = {}
     for entry in manifest["checkpoints"]:
         checkpoint_id = entry["checkpoint_id"]

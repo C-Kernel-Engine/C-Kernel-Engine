@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import ctypes
 import hashlib
 import json
 from pathlib import Path
@@ -30,6 +31,28 @@ def sha256(path: Path) -> str:
         for block in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
+
+
+def capture_runtime_library_identity(library: ctypes.CDLL, symbol: str) -> Dict[str, str]:
+    """Resolve an executed library's symbol in the capture process via dladdr.
+
+    Call this after invoking the symbol and store the result alongside tensors.
+    The same symbol resolution is used by native model certification.
+    """
+    class DlInfo(ctypes.Structure):
+        _fields_ = [("dli_fname", ctypes.c_char_p), ("dli_fbase", ctypes.c_void_p),
+                    ("dli_sname", ctypes.c_char_p), ("dli_saddr", ctypes.c_void_p)]
+
+    function = getattr(library, symbol)
+    dladdr = ctypes.CDLL(None).dladdr
+    dladdr.argtypes = [ctypes.c_void_p, ctypes.POINTER(DlInfo)]
+    dladdr.restype = ctypes.c_int
+    info = DlInfo()
+    if dladdr(ctypes.cast(function, ctypes.c_void_p), ctypes.byref(info)) == 0 or not info.dli_fname:
+        raise ValueError(f"cannot resolve loaded runtime symbol {symbol}")
+    path = Path(info.dli_fname.decode()).resolve()
+    return {"method": "dladdr_symbol", "symbol": symbol,
+            "path": str(path), "sha256": sha256(path)}
 
 
 def _flatten_call_checkpoints(call_ir: Dict[str, Any]) -> list[Dict[str, Any]]:
@@ -64,6 +87,7 @@ def build_manifest(
     storage_dtype_override: str | None = None,
     requested: set[str] | None = None,
     loaded_library: Path | None = None,
+    runtime_library: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     checkpoints = []
     torch_tensors = ((tensor_report.get("torch") or {}).get("tensors") or {})
@@ -135,8 +159,22 @@ def build_manifest(
     if loaded_library is not None:
         library = loaded_library.resolve()
         if not library.is_file():
-            raise ValueError(f"loaded library does not exist: {library}")
-        result["run"]["loaded_library"] = {"path": str(library), "sha256": sha256(library)}
+            raise ValueError(f"library artifact does not exist: {library}")
+        result["run"]["artifact_library"] = {"path": str(library), "sha256": sha256(library)}
+    if runtime_library is not None:
+        if runtime_library.get("method") != "dladdr_symbol" or not runtime_library.get("symbol"):
+            raise ValueError("runtime library identity requires a resolved symbol")
+        library = Path(runtime_library["path"]).resolve()
+        if not library.is_file():
+            raise ValueError(f"runtime library does not exist: {library}")
+        if sha256(library) != runtime_library.get("sha256"):
+            raise ValueError("runtime-reported library hash differs from artifact")
+        if loaded_library is not None and library != loaded_library.resolve():
+            raise ValueError("runtime symbol resolved to a different library artifact")
+        result["run"]["runtime_library"] = {
+            "method": "dladdr_symbol", "symbol": runtime_library["symbol"],
+            "path": str(library), "sha256": sha256(library),
+        }
     schema = load(SCHEMA)
     errors = list(Draft202012Validator(schema).iter_errors(result))
     if errors:
@@ -153,7 +191,10 @@ def main() -> None:
     parser.add_argument("--source", required=True)
     parser.add_argument("--phase", choices=("prefill", "decode", "mixed_prefill", "teacher_forced"), default="prefill")
     parser.add_argument("--storage-dtype", choices=("fp32", "fp16", "bf16", "q8_0", "q8_k"))
-    parser.add_argument("--loaded-library", type=Path)
+    parser.add_argument("--loaded-library", type=Path,
+                        help="Library artifact to hash; this alone does not verify the loaded runtime")
+    parser.add_argument("--runtime-identity", type=Path,
+                        help="Capture-time JSON identity reported from the executed runtime symbol")
     parser.add_argument("--checkpoint", action="append", default=[])
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
@@ -167,6 +208,7 @@ def main() -> None:
         storage_dtype_override=args.storage_dtype,
         requested=set(args.checkpoint) if args.checkpoint else None,
         loaded_library=args.loaded_library,
+        runtime_library=load(args.runtime_identity) if args.runtime_identity else None,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")

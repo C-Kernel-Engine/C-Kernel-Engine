@@ -15,10 +15,20 @@
         "model": {"type": "string", "minLength": 1},
         "phase": {"enum": ["prefill", "decode", "mixed_prefill", "teacher_forced"]},
         "source": {"type": "string", "minLength": 1},
-        "loaded_library": {
+        "artifact_library": {
           "type": "object", "additionalProperties": false,
           "required": ["path", "sha256"],
           "properties": {
+            "path": {"type": "string", "minLength": 1},
+            "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+          }
+        },
+        "runtime_library": {
+          "type": "object", "additionalProperties": false,
+          "required": ["method", "symbol", "path", "sha256"],
+          "properties": {
+            "method": {"const": "dladdr_symbol"},
+            "symbol": {"type": "string", "minLength": 1},
             "path": {"type": "string", "minLength": 1},
             "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
           }
