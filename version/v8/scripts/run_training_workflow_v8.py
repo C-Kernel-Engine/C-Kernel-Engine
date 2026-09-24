@@ -119,10 +119,44 @@ def _apply_semantic_model(args: argparse.Namespace) -> tuple[dict[str, Any] | No
 def _validate_semantic_parameter_contract(
     semantic_model: Mapping[str, Any], expected: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
+    trace = semantic_model.get("operation_trace")
+    layers = trace.get("layers") if isinstance(trace, Mapping) else None
+    if not isinstance(trace, Mapping) or not isinstance(layers, list) or not layers:
+        raise RuntimeError("semantic model has no operation trace for parameter ownership")
+    layer_owners = {
+        int(row["index"]): row for row in layers
+        if isinstance(row, Mapping) and "index" in row
+    }
+
+    def expected_owner(name: str) -> str:
+        if name == "token_emb":
+            return str(trace["embedding"])
+        if name == "final_ln_weight":
+            return str(trace["final_norm"])
+        if name == "output.weight":
+            return str(trace["lm_head"])
+        parts = name.split(".")
+        if len(parts) != 3 or parts[0] != "layer":
+            raise RuntimeError(f"semantic parameter ownership has no rule for {name}")
+        layer = layer_owners.get(int(parts[1]))
+        if layer is None:
+            raise RuntimeError(f"semantic parameter refers to unknown layer {parts[1]}")
+        field = parts[2]
+        if field == "ln1_gamma":
+            return str(layer["attn_norm"])
+        if field == "ln2_gamma":
+            return str(layer["ffn_norm"])
+        if field in {"wq", "wk", "wv", "wo", "q_norm", "k_norm"}:
+            return str(layer["attention"])
+        if field in {"w1", "w2"}:
+            return str(layer["feed_forward"])
+        raise RuntimeError(f"semantic parameter ownership has no rule for {name}")
+
     rows = semantic_model.get("parameter_contract")
     if not isinstance(rows, list) or not rows:
         raise RuntimeError("semantic model has no parameter contract")
     declared: dict[str, list[int]] = {}
+    ownership_errors = []
     for row in rows:
         if not isinstance(row, Mapping) or not row.get("authored_semantic_id"):
             raise RuntimeError("semantic parameter lacks an authored identity")
@@ -131,6 +165,12 @@ def _validate_semantic_parameter_contract(
         if not name or not isinstance(shape, list) or name in declared:
             raise RuntimeError("semantic parameter contract contains an invalid or duplicate runtime parameter")
         declared[name] = [int(value) for value in shape]
+        owner = str(row["authored_semantic_id"])
+        required_owner = expected_owner(name)
+        if owner != required_owner:
+            ownership_errors.append({"parameter": name, "expected": required_owner, "observed": owner})
+    if ownership_errors:
+        raise RuntimeError(f"semantic parameter ownership mismatch: {ownership_errors[:8]}")
     generated = {str(row["name"]): [int(value) for value in row["shape"]] for row in expected}
     if declared != generated:
         missing = sorted(set(declared) - set(generated))
@@ -140,7 +180,10 @@ def _validate_semantic_parameter_contract(
             "authored/generated parameter contract mismatch: "
             f"missing={missing}, unexpected={unexpected}, wrong_shape={wrong_shape}"
         )
-    return {"passed": True, "count": len(declared), "source": "python_semantic_model.parameter_contract"}
+    return {
+        "passed": True, "count": len(declared), "ownership_count": len(declared),
+        "source": "python_semantic_model.parameter_contract",
+    }
 
 
 def _validate_semantic_operation_trace(run_dir: Path, semantic_model: Mapping[str, Any]) -> dict[str, Any]:
@@ -150,26 +193,138 @@ def _validate_semantic_operation_trace(run_dir: Path, semantic_model: Mapping[st
         str(row.get("id")) for row in nodes or []
         if isinstance(row, Mapping) and row.get("id")
     }
+    trace = semantic_model.get("operation_trace")
+    trace_layers = trace.get("layers") if isinstance(trace, Mapping) else None
+    if not isinstance(trace, Mapping) or not isinstance(trace_layers, list) or not trace_layers:
+        raise RuntimeError("semantic model has no operation trace")
+    layer_owners = {
+        int(row["index"]): row for row in trace_layers
+        if isinstance(row, Mapping) and "index" in row
+    }
+
+    def forward_owner(op: Mapping[str, Any]) -> str:
+        layer_index = int(op.get("layer", -1))
+        op_name = str(op.get("op") or "")
+        if layer_index == -1:
+            if op_name in {"bpe_tokenizer", "dense_embedding_lookup"}:
+                return str(trace["embedding"])
+            if op_name == "rmsnorm":
+                return str(trace["final_norm"])
+            if op_name in {"lm_head", "logits"}:
+                return str(trace["lm_head"])
+            raise RuntimeError(f"semantic trace has no owner rule for global forward operation {op_name}")
+        layer = layer_owners.get(layer_index)
+        if layer is None:
+            raise RuntimeError(f"semantic trace refers to unknown layer {layer_index}")
+        if op_name == "rmsnorm":
+            instance = int(op.get("instance", -1))
+            if instance == 0:
+                return str(layer["attn_norm"])
+            if instance == 1:
+                return str(layer["ffn_norm"])
+            raise RuntimeError(f"semantic trace has invalid RMSNorm instance {instance} in layer {layer_index}")
+        if op_name in {
+            "q_proj", "k_proj", "v_proj", "qk_norm", "rope_qk", "attn", "out_proj",
+            "bridge_token_to_head_major", "bridge_head_to_token_major",
+        }:
+            return str(layer["attention"])
+        if op_name in {"mlp_gate_up", "silu_mul", "geglu", "mlp_down"}:
+            return str(layer["feed_forward"])
+        if op_name == "residual_add":
+            return str(layer["block"])
+        raise RuntimeError(f"semantic trace has no owner rule for forward operation {op_name}")
+
     ir2 = json.loads((run_dir / "ir2_train_backward.json").read_text(encoding="utf-8"))
+    phases = {phase: ir2.get(phase) for phase in ("forward", "backward")}
+    for phase, operations in phases.items():
+        if not isinstance(operations, list) or not operations:
+            raise RuntimeError(f"generated semantic trace has no {phase} operation inventory")
+
+    forward_by_id: dict[int, Mapping[str, Any]] = {}
     checked = []
-    missing = []
-    invalid = []
-    for phase in ("forward", "backward"):
-        for op in ir2.get(phase, []):
-            if not isinstance(op, Mapping) or not op.get("kernel_id"):
-                continue
-            row = {"phase": phase, "op_id": op.get("op_id"), "op": op.get("op"),
-                   "authored_semantic_id": op.get("authored_semantic_id")}
-            checked.append(row)
-            if not row["authored_semantic_id"]:
-                missing.append(row)
-            elif str(row["authored_semantic_id"]) not in valid_ids:
-                invalid.append(row)
-    if missing or invalid:
+    ownership_errors = []
+    covered_ids: set[str] = set()
+    for op in phases["forward"]:
+        if not isinstance(op, Mapping) or "op_id" not in op:
+            raise RuntimeError("generated forward operation inventory contains an invalid row")
+        op_id = int(op["op_id"])
+        if op_id in forward_by_id:
+            raise RuntimeError(f"generated forward operation inventory duplicates op_id {op_id}")
+        forward_by_id[op_id] = op
+        required_owner = forward_owner(op)
+        observed_owner = str(op.get("authored_semantic_id") or "")
+        if observed_owner != required_owner:
+            ownership_errors.append({
+                "phase": "forward", "op_id": op_id, "op": op.get("op"),
+                "expected": required_owner, "observed": observed_owner,
+            })
+        covered_ids.add(observed_owner)
+        if op.get("kernel_id"):
+            checked.append({
+                "phase": "forward", "op_id": op_id, "op": op.get("op"),
+                "authored_semantic_id": observed_owner,
+            })
+
+    expected_covered_ids = {
+        str(trace["embedding"]), str(trace["final_norm"]), str(trace["lm_head"]),
+        *(str(row[field]) for row in trace_layers for field in (
+            "block", "attn_norm", "attention", "ffn_norm", "feed_forward"
+        )),
+    }
+    missing_operations = sorted(expected_covered_ids - covered_ids)
+
+    lineage_errors = []
+    for op in phases["backward"]:
+        if not isinstance(op, Mapping) or not op.get("kernel_id") or "op_id" not in op:
+            raise RuntimeError("generated backward kernel operation inventory contains an invalid row")
+        forward_ref = op.get("forward_ref")
+        forward_op = forward_by_id.get(int(forward_ref)) if forward_ref is not None else None
+        observed_owner = str(op.get("authored_semantic_id") or "")
+        if forward_op is None:
+            lineage_errors.append({"op_id": op.get("op_id"), "forward_ref": forward_ref, "reason": "missing_forward"})
+        else:
+            forward_semantic_id = str(forward_op.get("authored_semantic_id") or "")
+            if observed_owner != forward_semantic_id:
+                lineage_errors.append({
+                    "op_id": op.get("op_id"), "forward_ref": forward_ref,
+                    "expected": forward_semantic_id, "observed": observed_owner,
+                })
+            if int(op.get("layer", -1)) != int(forward_op.get("layer", -1)):
+                lineage_errors.append({
+                    "op_id": op.get("op_id"), "forward_ref": forward_ref,
+                    "reason": "layer_mismatch", "expected": forward_op.get("layer"),
+                    "observed": op.get("layer"),
+                })
+            backward_name = str(op.get("op") or "")
+            if backward_name != "grad_accumulate":
+                expected_forward_name = (
+                    "logits" if backward_name == "loss_backward"
+                    else backward_name.removesuffix("_backward_core")
+                )
+                if str(forward_op.get("op") or "") != expected_forward_name:
+                    lineage_errors.append({
+                        "op_id": op.get("op_id"), "forward_ref": forward_ref,
+                        "reason": "operation_mismatch", "expected": expected_forward_name,
+                        "observed": forward_op.get("op"),
+                    })
+        checked.append({
+            "phase": "backward", "op_id": op.get("op_id"), "op": op.get("op"),
+            "forward_ref": forward_ref, "authored_semantic_id": observed_owner,
+        })
+
+    invalid_ids = sorted(owner for owner in covered_ids if owner and owner not in valid_ids)
+    if ownership_errors or missing_operations or lineage_errors or invalid_ids:
         raise RuntimeError(
-            f"generated operation trace is incomplete: missing={missing[:8]}, invalid={invalid[:8]}"
+            "generated semantic operation trace mismatch: "
+            f"ownership={ownership_errors[:8]}, missing_operations={missing_operations[:8]}, "
+            f"lineage={lineage_errors[:8]}, invalid_ids={invalid_ids[:8]}"
         )
-    return {"passed": True, "executed_kernel_operations": len(checked), "operations": checked}
+    return {
+        "passed": True, "lowered_kernel_operations": len(checked),
+        "lowered_forward_kernel_operations": sum(row["phase"] == "forward" for row in checked),
+        "lowered_backward_kernel_operations": sum(row["phase"] == "backward" for row in checked),
+        "operations": checked,
+    }
 
 
 def _write_json(path: Path, value: Mapping[str, Any]) -> None:
@@ -945,18 +1100,51 @@ def _relative_artifact(run_dir: Path, path: Path, *, role: str, required: bool =
     }
 
 
+def _resolve_authored_manifest_source(
+    *, run_dir: Path, identity: Mapping[str, Any], semantic_model_path: Path | None,
+    semantic_model_sha256: str | None, semantic_template_path: Path | None,
+) -> tuple[Path, str, list[tuple[str, Path, bool]]]:
+    if semantic_model_path is not None:
+        active_model = semantic_model_path.resolve()
+        if not semantic_model_sha256 or not active_model.is_file():
+            raise RuntimeError("active semantic invocation is missing its authored model artifact")
+        if _sha256(active_model) != semantic_model_sha256:
+            raise RuntimeError("active semantic invocation model identity mismatch")
+        if semantic_template_path is None or not semantic_template_path.resolve().is_file():
+            raise RuntimeError("active semantic invocation is missing its lowered template artifact")
+        active_template = semantic_template_path.resolve()
+        return active_model, "cke.nn_semantic_model", [
+            ("authored_semantic_model", active_model, True),
+            ("lowered_semantic_template", active_template, True),
+        ]
+
+    python_experiment = run_dir / "python_training_experiment.json"
+    expected_sha = identity.get("python_experiment_sha256")
+    if python_experiment.is_file() and expected_sha and _sha256(python_experiment) == expected_sha:
+        return python_experiment, "cke.nn", []
+    return run_dir / "template_train.json", "workflow_configuration", []
+
+
 def _write_experiment_manifest(
     *, run_dir: Path, identity: Mapping[str, Any], checks: Mapping[str, Any],
     summary: Mapping[str, Any], corpus: Mapping[str, Any], checkpoint_path: Path,
-    visualizer_artifacts: Mapping[str, Any],
+    visualizer_artifacts: Mapping[str, Any], semantic_model_path: Path | None = None,
+    semantic_model_sha256: str | None = None, semantic_template_path: Path | None = None,
 ) -> Path:
-    semantic_model_path = run_dir / "python_training_semantic_model.json"
-    semantic_template_path = run_dir / "python_training_lowered_template.json"
-    semantic_required = semantic_model_path.is_file()
-    artifact_specs = (
+    authored_path, authored_source, semantic_artifacts = _resolve_authored_manifest_source(
+        run_dir=run_dir, identity=identity, semantic_model_path=semantic_model_path,
+        semantic_model_sha256=semantic_model_sha256, semantic_template_path=semantic_template_path,
+    )
+    python_experiment = run_dir / "python_training_experiment.json"
+    expected_python_experiment_sha = identity.get("python_experiment_sha256")
+    active_python_experiment = bool(
+        python_experiment.is_file()
+        and expected_python_experiment_sha
+        and _sha256(python_experiment) == expected_python_experiment_sha
+    )
+
+    artifact_specs = [
         ("authored_experiment", run_dir / "python_training_experiment.json", False),
-        ("authored_semantic_model", semantic_model_path, semantic_required),
-        ("lowered_semantic_template", semantic_template_path, semantic_required),
         ("tokenizer", run_dir / "tokenizer.json", True),
         ("serialized_train_tokens", Path(str(corpus["splits"]["train"]["token_ids"])), True),
         ("serialized_validation_tokens", Path(str(corpus["splits"]["validation"]["token_ids"])), True),
@@ -979,7 +1167,8 @@ def _write_experiment_manifest(
         ("generation_logits", run_dir / "v8_generation_logits.f32", True),
         ("generated_inference_source", run_dir / "v8_inference_runtime" / "model_v8.c", True),
         ("generated_inference_library", run_dir / "v8_inference_runtime" / "libmodel.so", True),
-    )
+    ]
+    artifact_specs[1:1] = semantic_artifacts
     artifacts = [
         _relative_artifact(run_dir, path, role=role, required=required)
         for role, path, required in artifact_specs
@@ -989,11 +1178,10 @@ def _write_experiment_manifest(
         str(row.get("kernel_id")) for row in train_plan.get("ops", [])
         if isinstance(row, Mapping) and row.get("kernel_id")
     })
-    python_experiment = run_dir / "python_training_experiment.json"
-    semantic_model = semantic_model_path
-    authored_path = semantic_model if semantic_model.is_file() else (
-        python_experiment if python_experiment.is_file() else run_dir / "template_train.json"
-    )
+    try:
+        authored_manifest_path = str(authored_path.resolve().relative_to(run_dir.resolve()))
+    except ValueError:
+        authored_manifest_path = str(authored_path.resolve())
     forward_raw = summary.get("forward_op_count", summary.get("forward_ops", 0))
     backward_raw = summary.get("backward_op_count", summary.get("backward_ops", 0))
     forward_count = len(forward_raw) if isinstance(forward_raw, list) else int(forward_raw or 0)
@@ -1008,11 +1196,9 @@ def _write_experiment_manifest(
         },
         "graph_evidence": {
             "authored": {
-                "status": "RECORDED", "path": str(authored_path.relative_to(run_dir)),
+                "status": "RECORDED", "path": authored_manifest_path,
                 "sha256": _sha256(authored_path),
-                "source": "cke.nn_semantic_model" if semantic_model.is_file() else (
-                    "cke.nn" if python_experiment.is_file() else "workflow_configuration"
-                ),
+                "source": authored_source,
             },
             "lowered": {
                 "status": "GENERATED", "forward_ops": forward_count,
@@ -1035,7 +1221,9 @@ def _write_experiment_manifest(
             "tokenizer_sha256": corpus["tokenizer"].get("tokenizer_json_sha256"),
         },
         "navigation": {
-            "experiment_summary": "python_training_experiment.json" if python_experiment.is_file() else "template_train.json",
+            "experiment_summary": (
+                "python_training_experiment.json" if active_python_experiment else authored_manifest_path
+            ),
             "dataset_and_tokens": "training_batch_preview.json",
             "forward_ir": "ir1_train_forward.json", "backward_ir": "ir2_train_backward.json",
             "parity": "training_parity_latest.json", "checkpoint": "training_checkpoint_policy_latest.json",
@@ -1552,6 +1740,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             run_dir=args.run_dir, identity=experiment_identity, checks=checks, summary=summary,
             corpus=corpus, checkpoint_path=checkpoint_path,
             visualizer_artifacts=visualizer_artifacts,
+            semantic_model_path=args.semantic_model if semantic_model is not None else None,
+            semantic_model_sha256=str(args.semantic_model_sha256) if semantic_model is not None else None,
+            semantic_template_path=semantic_template,
         )
         visualizer = _generate_identity_bound_visualizer(
             run_dir=args.run_dir, python=python, manifest_path=manifest_path,

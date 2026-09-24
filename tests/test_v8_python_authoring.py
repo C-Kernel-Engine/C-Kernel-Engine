@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 import hashlib
 import importlib.util
@@ -146,7 +147,7 @@ class V8PythonAuthoringTests(unittest.TestCase):
             self.assertNotIn("--layers", command)
             self.assertEqual(_arg(command, "--semantic-model"), str(experiment.semantic_model_path))
 
-    def test_allowed_rope_change_changes_lowering_and_layer_order_is_preserved(self) -> None:
+    def test_allowed_rope_change_changes_lowering_and_ordered_authored_identities_are_preserved(self) -> None:
         base = _model(layers=5)
         changed = cke.models.qwen3_tiny(
             vocab=384, dim=32, layers=5, hidden=64, heads=4, kv_heads=2,
@@ -183,6 +184,115 @@ class V8PythonAuthoringTests(unittest.TestCase):
             [row["block_label"] for row in reordered["operation_trace"]["layers"][:2]],
             ["distinguishable_beta", "distinguishable_alpha"],
         )
+
+    def test_semantic_trace_rejects_wrong_ownership_missing_phases_and_bad_lineage(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            run_dir = Path(td)
+            experiment = cke.v8.compile(_model(layers=5), run_name="trace-negative", run_dir=run_dir)
+            experiment.preflight()
+            workflow = _load_workflow_module()
+            args = SimpleNamespace(
+                semantic_model=experiment.semantic_model_path,
+                semantic_model_sha256=_arg(experiment.command(), "--semantic-model-sha256"),
+                run_dir=run_dir, vocab_size=384,
+            )
+            semantic, template_path = workflow._apply_semantic_model(args)
+            subprocess.run([
+                sys.executable, str(ROOT / "version/v7/scripts/ck_run_v7.py"), "init",
+                "--run", str(run_dir), "--allow-non-cache-run-dir", "--train-seed", "42",
+                "--init", "normal_0p02", "--layers", "5", "--vocab-size", "384",
+                "--embed-dim", "32", "--hidden-dim", "64", "--num-heads", "4",
+                "--num-kv-heads", "2", "--context-len", "32", "--rope-theta", "1000000",
+                "--template", "qwen3", "--template-file", str(template_path),
+                "--omit-linear-biases", "--generate-ir", "--train-bridge-lowering", "explicit",
+            ], cwd=ROOT, check=True, stdout=subprocess.DEVNULL)
+            assert semantic is not None
+            evidence = workflow._validate_semantic_operation_trace(run_dir, semantic)
+            self.assertEqual(evidence["lowered_kernel_operations"], 302)
+            self.assertNotIn("executed_kernel_operations", evidence)
+
+            ir_path = run_dir / "ir2_train_backward.json"
+            original = json.loads(ir_path.read_text())
+
+            wrong_owner = copy.deepcopy(original)
+            q_proj = next(row for row in wrong_owner["forward"] if row.get("op") == "q_proj")
+            q_proj["authored_semantic_id"] = semantic["operation_trace"]["layers"][0]["feed_forward"]
+            ir_path.write_text(json.dumps(wrong_owner))
+            with self.assertRaisesRegex(RuntimeError, "ownership"):
+                workflow._validate_semantic_operation_trace(run_dir, semantic)
+
+            for phase in ("forward", "backward"):
+                missing_phase = copy.deepcopy(original)
+                missing_phase[phase] = []
+                ir_path.write_text(json.dumps(missing_phase))
+                with self.subTest(phase=phase), self.assertRaisesRegex(RuntimeError, f"no {phase}"):
+                    workflow._validate_semantic_operation_trace(run_dir, semantic)
+
+            missing_operation = copy.deepcopy(original)
+            embedding_id = semantic["operation_trace"]["embedding"]
+            missing_operation["forward"] = [
+                row for row in missing_operation["forward"]
+                if row.get("authored_semantic_id") != embedding_id
+            ]
+            ir_path.write_text(json.dumps(missing_operation))
+            with self.assertRaisesRegex(RuntimeError, "missing_operations"):
+                workflow._validate_semantic_operation_trace(run_dir, semantic)
+
+            bad_lineage = copy.deepcopy(original)
+            bad_lineage["backward"][0]["authored_semantic_id"] = embedding_id
+            ir_path.write_text(json.dumps(bad_lineage))
+            with self.assertRaisesRegex(RuntimeError, "lineage"):
+                workflow._validate_semantic_operation_trace(run_dir, semantic)
+
+            wrong_forward_operation = copy.deepcopy(original)
+            q_backward = next(
+                row for row in wrong_forward_operation["backward"]
+                if row.get("op") == "q_proj_backward_core"
+            )
+            k_forward = next(
+                row for row in wrong_forward_operation["forward"]
+                if row.get("op") == "k_proj" and row.get("layer") == q_backward.get("layer")
+            )
+            q_backward["forward_ref"] = k_forward["op_id"]
+            ir_path.write_text(json.dumps(wrong_forward_operation))
+            with self.assertRaisesRegex(RuntimeError, "operation_mismatch"):
+                workflow._validate_semantic_operation_trace(run_dir, semantic)
+            ir_path.write_text(json.dumps(original))
+
+    def test_semantic_parameter_contract_rejects_wrong_valid_owner(self) -> None:
+        experiment = cke.v8.compile(_model(layers=5), run_name="parameter-owner")
+        semantic = experiment.semantic_model_document()
+        expected = [
+            {"name": row["runtime_parameter"], "shape": row["shape"]}
+            for row in semantic["parameter_contract"]
+        ]
+        bad = copy.deepcopy(semantic)
+        q_weight = next(row for row in bad["parameter_contract"] if row["runtime_parameter"] == "layer.0.wq")
+        q_weight["authored_semantic_id"] = bad["operation_trace"]["layers"][0]["feed_forward"]
+        workflow = _load_workflow_module()
+        with self.assertRaisesRegex(RuntimeError, "parameter ownership mismatch"):
+            workflow._validate_semantic_parameter_contract(bad, expected)
+
+    def test_manifest_source_ignores_stale_semantic_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            run_dir = Path(td)
+            stale_semantic = run_dir / "python_training_semantic_model.json"
+            stale_template = run_dir / "python_training_lowered_template.json"
+            stale_semantic.write_text('{"stale": true}\n')
+            stale_template.write_text('{"stale": true}\n')
+            workflow = _load_workflow_module()
+            authored, source, artifacts = workflow._resolve_authored_manifest_source(
+                run_dir=run_dir, identity={}, semantic_model_path=None,
+                semantic_model_sha256=None, semantic_template_path=None,
+            )
+            self.assertEqual(authored, run_dir / "template_train.json")
+            self.assertEqual(source, "workflow_configuration")
+            self.assertEqual(artifacts, [])
+            with self.assertRaisesRegex(RuntimeError, "identity mismatch"):
+                workflow._resolve_authored_manifest_source(
+                    run_dir=run_dir, identity={}, semantic_model_path=stale_semantic,
+                    semantic_model_sha256="0" * 64, semantic_template_path=stale_template,
+                )
 
     def test_allowed_rope_change_reaches_generated_ir_and_independent_torch_math(self) -> None:
         try:
