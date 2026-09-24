@@ -320,6 +320,7 @@ class V8CodegenBridgeTests(unittest.TestCase):
             self.assertNotIn("#define CK_HAS_PREFILL 1", code)
             self.assertIn("CK_EXPORT int ck_model_forward_segments_grid_ex", code)
             self.assertIn("CK_EXPORT int ck_model_forward_mixed_grid_ex", code)
+            self.assertIn("CK_MODEL_CAP_MIXED_EMBEDDING_PREFILL", code)
             self.assertIn("static void ck_decode_embedded(CKModel *model)", code)
             self.assertIn("static int ck_bridge_forward_staged", code)
             compiled = subprocess.run([

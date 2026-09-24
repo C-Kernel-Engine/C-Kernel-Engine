@@ -2644,6 +2644,7 @@ def main(argv: list[str] | None = None) -> int:
             dump=emit_parity_dumps,
             strict_contracts=args.strict_contracts,
         )
+        sequential_mixed_bridge_emitted = False
         if prefill_code:
             insert_marker = "#include <math.h>"
             if insert_marker in code:
@@ -2668,6 +2669,7 @@ def main(argv: list[str] | None = None) -> int:
             code = _inject_decode_runtime_multimodal_fallback(
                 code + "\n\n" + bridge_api, layout_obj, ir_obj
             )
+            sequential_mixed_bridge_emitted = True
         elif str(layout_obj.get("mode", "")).lower() == "prefill":
             code = _inject_prefill_multimodal_bridge(
                 code,
@@ -2709,7 +2711,7 @@ def main(argv: list[str] | None = None) -> int:
             layout_obj,
             init_call_obj,
             generation_config_obj,
-            has_mixed_prefill=bool(prefill_code) or
+            has_mixed_prefill=bool(prefill_code) or sequential_mixed_bridge_emitted or
             str(layout_obj.get("mode", "")).lower() == "prefill",
         )
         generation_policy_api = ""
