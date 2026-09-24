@@ -69,8 +69,9 @@ int audio_duration_expand_channel_major_f32(
     size_t output_stride);
 
 /* Centered inverse STFT from frame-major [frame, fft/2+1] magnitude/phase.
- * Periodic Hann, unnormalized inverse DFT, overlap-add normalization, then
- * removal of n_fft/2 samples at each end. n_fft must be even. The output is
+ * Periodic Hann, inverse DFT scaled by 1/n_fft, overlap-add normalization, then
+ * removal of n_fft/2 samples at each end. Supported geometry is frames >= 2,
+ * even n_fft >= 2, and 1 <= hop <= n_fft/2. The output is
  * (frames-1)*hop samples. Scratch is two padded sample arrays plus one Hann
  * window, all caller-owned and disjoint from input/output. The planner rejects
  * overflow before any write. */

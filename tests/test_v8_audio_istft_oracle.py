@@ -2,6 +2,7 @@
 
 import ctypes
 import json
+import math
 from pathlib import Path
 import subprocess
 import tempfile
@@ -44,8 +45,13 @@ class AudioIstftOracleTest(unittest.TestCase):
                 mag, phase, frames * bins, frames, n_fft, hop,
                 output, len(expected), scratch, len(scratch))
             self.assertEqual(status, 0)
-            self.assertLessEqual(max(abs(a - b) for a, b in zip(output, expected)),
-                                 fixture["atol"])
+            self.assertTrue(all(math.isfinite(value) for value in output))
+            self.assertTrue(all(math.isfinite(value) for value in expected))
+            errors = [abs(a - b) for a, b in zip(output, expected)]
+            worst = max(range(len(errors)), key=errors.__getitem__)
+            self.assertLessEqual(errors[worst], fixture["atol"],
+                                 f"worst sample {worst}: native={output[worst]}, "
+                                 f"oracle={expected[worst]}, error={errors[worst]}")
 
     def test_centered_hann_against_torch(self):
         try:
@@ -104,7 +110,13 @@ class AudioIstftOracleTest(unittest.TestCase):
                     frames, n_fft, hop, ptr(output), output.size,
                     ptr(scratch), scratch.size)
             self.assertEqual(native.audio_istft_mag_phase_f32(*args), 0)
-            np.testing.assert_allclose(output, expected, rtol=2e-5, atol=2e-5)
+            self.assertTrue(np.isfinite(output).all())
+            self.assertTrue(np.isfinite(expected).all())
+            errors = np.abs(output - expected)
+            worst = int(np.argmax(errors))
+            self.assertLessEqual(float(errors[worst]), 2e-5,
+                                 f"worst sample {worst}: native={output[worst]}, "
+                                 f"oracle={expected[worst]}, error={errors[worst]}")
 
             output.fill(-999.0)
             too_small = args[:-1] + (scratch.size - 1,)
@@ -113,6 +125,124 @@ class AudioIstftOracleTest(unittest.TestCase):
             self.assertEqual(native.audio_istft_mag_phase_f32(
                 *args[:7], output.size - 1, *args[8:]), -2)
             self.assertTrue(np.all(output == -999.0))
+
+
+class AudioIstftSafetyTest(unittest.TestCase):
+    """Portable geometry and rejection checks; PyTorch is not required at test time."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.temp_dir = tempfile.TemporaryDirectory()
+        library = Path(cls.temp_dir.name) / "libaudio_istft_safety.so"
+        subprocess.run([
+            "cc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic",
+            "-shared", "-fPIC", "-I", str(ROOT / "include"),
+            str(ROOT / "src" / "kernels" / "audio_istft_mag_phase.c"),
+            "-lm", "-o", str(library),
+        ], check=True)
+        native = ctypes.CDLL(str(library))
+        size = ctypes.c_size_t
+        fptr = ctypes.POINTER(ctypes.c_float)
+        native.audio_istft_mag_phase_plan_f32.argtypes = [
+            size, size, size, ctypes.POINTER(size), ctypes.POINTER(size), ctypes.POINTER(size)]
+        native.audio_istft_mag_phase_plan_f32.restype = ctypes.c_int
+        native.audio_istft_mag_phase_f32.argtypes = [
+            fptr, fptr, size, size, size, size, fptr, size, fptr, size]
+        native.audio_istft_mag_phase_f32.restype = ctypes.c_int
+        cls.native = native
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.temp_dir.cleanup()
+
+    def _buffers(self, frames=4, n_fft=8, hop=2):
+        bins = n_fft // 2 + 1
+        spectrum = frames * bins
+        samples = (frames - 1) * hop
+        scratch_count = 2 * (samples + n_fft) + n_fft
+        magnitude = (ctypes.c_float * spectrum)(*([0.5] * spectrum))
+        phase = (ctypes.c_float * spectrum)(*([0.0] * spectrum))
+        output = (ctypes.c_float * samples)(*([-777.0] * samples))
+        scratch = (ctypes.c_float * scratch_count)()
+        args = [magnitude, phase, spectrum, frames, n_fft, hop,
+                output, samples, scratch, scratch_count]
+        return args
+
+    def test_checked_rejection_preserves_output(self):
+        baseline = self._buffers()
+        spectrum, samples, scratch_count = baseline[2], baseline[7], baseline[9]
+        size_max = ctypes.c_size_t(-1).value
+        cases = [
+            ("short_spectrum", {2: spectrum - 1}, -2),
+            ("short_output", {7: samples - 1}, -2),
+            ("short_scratch", {9: scratch_count - 1}, -2),
+            ("zero_frames", {3: 0}, -1),
+            ("one_frame", {3: 1}, -1),
+            ("zero_fft", {4: 0}, -1),
+            ("odd_fft", {4: 7}, -1),
+            ("zero_hop", {5: 0}, -1),
+            ("excess_hop", {5: 5}, -1),
+            ("spectrum_overflow", {3: size_max}, -3),
+            ("output_overflow", {3: size_max // 5 + 1, 5: 4}, -3),
+        ]
+        for name, replacements, expected_status in cases:
+            with self.subTest(name=name):
+                args = self._buffers()
+                for index, value in replacements.items():
+                    args[index] = value
+                self.assertEqual(self.native.audio_istft_mag_phase_f32(*args),
+                                 expected_status)
+                self.assertEqual(list(args[6]), [-777.0] * samples)
+
+        for name, array_index, value in [
+            ("negative_magnitude", 0, -0.1),
+            ("nan_magnitude", 0, float("nan")),
+            ("infinite_magnitude", 0, float("inf")),
+            ("nan_phase", 1, float("nan")),
+            ("infinite_phase", 1, float("inf")),
+        ]:
+            with self.subTest(name=name):
+                args = self._buffers()
+                args[array_index][-1] = value
+                self.assertEqual(self.native.audio_istft_mag_phase_f32(*args), -1)
+                self.assertEqual(list(args[6]), [-777.0] * samples)
+
+    def test_planner_rejects_invalid_and_overflow(self):
+        size = ctypes.c_size_t
+        for frames, n_fft, hop, status in [
+            (1, 8, 2, -1), (2, 7, 2, -1), (2, 8, 0, -1),
+            (2, 8, 5, -1), (size(-1).value, 8, 2, -3),
+        ]:
+            with self.subTest(frames=frames, n_fft=n_fft, hop=hop):
+                a, b, c = size(91), size(92), size(93)
+                self.assertEqual(self.native.audio_istft_mag_phase_plan_f32(
+                    frames, n_fft, hop, ctypes.byref(a), ctypes.byref(b),
+                    ctypes.byref(c)), status)
+                self.assertEqual((a.value, b.value, c.value), (91, 92, 93))
+
+    def test_committed_torch_geometry_fixtures(self):
+        fixture = json.loads((ROOT / "tests" / "fixtures" / "tts" /
+                              "istft_geometry_torch.json").read_text())
+        for case in fixture["cases"]:
+            with self.subTest(case=case["name"]):
+                frames, n_fft, hop = case["frames"], case["n_fft"], case["hop"]
+                bins = n_fft // 2 + 1
+                args = self._buffers(frames, n_fft, hop)
+                args[0][:] = [v for row in case["magnitude"] for v in row]
+                args[1][:] = [v for row in case["phase"] for v in row]
+                self.assertEqual(len(args[0]), frames * bins)
+                self.assertEqual(self.native.audio_istft_mag_phase_f32(*args), 0)
+                actual = list(args[6])
+                expected = case["waveform"]
+                self.assertEqual(len(actual), len(expected))
+                self.assertTrue(all(math.isfinite(v) for v in actual))
+                self.assertTrue(all(math.isfinite(v) for v in expected))
+                errors = [abs(a - b) for a, b in zip(actual, expected)]
+                worst = max(range(len(errors)), key=errors.__getitem__)
+                self.assertLessEqual(errors[worst], case["atol"],
+                                     f"{case['name']} worst sample {worst}: "
+                                     f"native={actual[worst]}, oracle={expected[worst]}, "
+                                     f"error={errors[worst]}")
 
 
 if __name__ == "__main__":

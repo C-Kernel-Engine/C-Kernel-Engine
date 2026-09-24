@@ -32,6 +32,7 @@
     "consumption": "required"
   }],
   "dims": ["spectral_elements", "frames", "n_fft", "hop", "output_capacity"],
+  "constraints": {"notes": "Supported geometry: frames >= 2, even n_fft >= 2, 1 <= hop <= n_fft/2, checked size arithmetic, finite nonnegative magnitude and finite phase. The raw scalar provider validates the domain before writes."},
   "impl": {
     "function": "audio_istft_mag_phase_f32",
     "c_declaration": "int audio_istft_mag_phase_f32(const float *magnitude, const float *phase, size_t spectral_elements, size_t frames, size_t n_fft, size_t hop, float *output, size_t output_capacity, float *scratch, size_t scratch_elements);",

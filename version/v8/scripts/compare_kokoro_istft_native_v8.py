@@ -46,6 +46,8 @@ def compare(capture_dir: Path, atol: float) -> dict:
     mag = load_tensor(capture_dir, manifest, "istft_magnitude")
     phase = load_tensor(capture_dir, manifest, "istft_phase")
     expected = load_tensor(capture_dir, manifest, "waveform_f32").reshape(-1)
+    if not np.isfinite(expected).all():
+        raise ValueError("oracle waveform contains nonfinite samples")
     if mag.shape != phase.shape or mag.ndim != 3 or mag.shape[0] != 1:
         raise ValueError("unexpected oracle magnitude/phase shape")
     mag = np.ascontiguousarray(mag[0].T, dtype=np.float32)
@@ -88,23 +90,36 @@ def compare(capture_dir: Path, atol: float) -> dict:
         )
         if status != 0:
             raise ValueError(f"native inverse STFT failed: {status}")
-        difference = np.abs(output - expected)
-        max_abs = float(difference.max())
-        mean_abs = float(difference.mean())
-        passed = bool(np.isfinite(output).all() and max_abs <= atol)
-        return {
+        base_report = {
             "schema": "cke.v8.tts_primitive_oracle.v1",
             "primitive": "audio_istft_mag_phase_f32",
-            "status": "passed" if passed else "failed",
             "generated_model": False,
             "oracle_manifest_sha256": sha256(manifest_path),
             "source_sha256": sha256(SOURCE),
             "native_library_sha256": sha256(library),
             "frames": frames,
             "output_samples": output.size,
+            "absolute_tolerance": atol,
+        }
+        nonfinite = np.flatnonzero(~np.isfinite(output))
+        if nonfinite.size:
+            worst = int(nonfinite[0])
+            return {**base_report, "status": "failed",
+                    "reason": "native waveform contains nonfinite samples",
+                    "first_nonfinite_sample": worst,
+                    "first_nonfinite_value": str(output[worst]),
+                    "max_abs_error": None, "mean_abs_error": None}
+        difference = np.abs(output - expected)
+        worst = int(np.argmax(difference))
+        max_abs = float(difference.max())
+        mean_abs = float(difference.mean())
+        return {**base_report,
+            "status": "passed" if max_abs <= atol else "failed",
             "max_abs_error": max_abs,
             "mean_abs_error": mean_abs,
-            "absolute_tolerance": atol,
+            "worst_sample": worst,
+            "worst_native_value": float(output[worst]),
+            "worst_oracle_value": float(expected[worst]),
         }
 
 
