@@ -726,6 +726,10 @@ TEST_SUITES = {
         "TTS Duration Expansion PyTorch Oracle", "kernels",
         ROOT / "tests" / "test_v8_audio_duration_expand_oracle.py",
     ),
+    "tts_lstm_scan_oracle": TestSuite(
+        "TTS Bidirectional LSTM Scan PyTorch Oracle", "kernels",
+        ROOT / "tests" / "test_v8_audio_lstm_scan_oracle.py",
+    ),
     "tts_live_torch_oracles": TestSuite(
         "TTS Live PyTorch Oracles", "kernels",
         ROOT / "tests" / "test_v8_tts_live_torch_oracles.py",
@@ -1340,6 +1344,7 @@ QUICK_TESTS = [
     "relu_bf16", "rmsnorm_bf16",
     "q4k_kernels", "idle_nightly_coordinator",
     "tts_kokoro_shape_bounds", "tts_istft_oracle", "tts_duration_expand_oracle",
+    "tts_lstm_scan_oracle",
     "tts_runtime_extent", "tts_runtime_extent_contract", "tts_checked_call_codegen",
     "tts_runtime_extent_lowering",
     "tts_live_torch_oracles",

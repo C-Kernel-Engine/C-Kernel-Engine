@@ -521,7 +521,9 @@ int audio_lstm_step_f32(
         cell_state == NULL || output == NULL || gates_scratch == NULL) {
         return -1;
     }
+    /* The IFGO update indexes gates[3 * hidden_size + index] with signed int. */
     if (input_size <= 0 || hidden_size <= 0 ||
+        hidden_size > INT_MAX / 4 ||
         (size_t)hidden_size > SIZE_MAX / 4u) {
         return -2;
     }

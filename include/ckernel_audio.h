@@ -132,6 +132,25 @@ int audio_lstm_step_f32(
     int input_size,
     int hidden_size);
 
+/* Packed direction-major weights: [2, 4*H, I] and [2, 4*H, H].
+ * H must be at most INT_MAX/4 because the IFGO step uses signed gate indices.
+ * Output rows are [forward H, reverse H]. State is reset at each call.
+ * Returns -1 for null pointers, -2 for invalid/overflowing geometry,
+ * and -3 for insufficient input, weight, output, state or scratch capacity.
+ */
+int audio_lstm_bidirectional_scan_f32(
+    const float *input, size_t input_elements,
+    const float *weight_ih, size_t weight_ih_elements,
+    const float *weight_hh, size_t weight_hh_elements,
+    const float *bias_ih, size_t bias_ih_elements,
+    const float *bias_hh, size_t bias_hh_elements,
+    float *output, size_t output_elements,
+    float *hidden_state, size_t hidden_state_elements,
+    float *cell_state, size_t cell_state_elements,
+    float *gates_scratch, size_t gates_scratch_bytes,
+    int tokens, int input_size, int hidden_size,
+    size_t input_stride, size_t output_stride);
+
 int audio_stft_precompute_tables_f32(
     int n_fft,
     float *window,
