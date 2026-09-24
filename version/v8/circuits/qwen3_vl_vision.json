@@ -663,7 +663,8 @@
       ],
       "selector": {
         "config_not_equals": {
-          "vision_projection_storage_boundary": "bf16"
+          "vision_projection_storage_boundary": "bf16",
+          "layer_weight_dtypes.w2": "bf16"
         }
       },
       "phases": {
@@ -681,6 +682,33 @@
           "token",
           "channel"
         ]
+      }
+    },
+    "vision.layer.mlp_down.bf16_fp32_output": {
+      "op": "gemm",
+      "template_ops": [
+        "mlp_down"
+      ],
+      "selector": {
+        "config_equals": {
+          "layer_weight_dtypes.w2": "bf16"
+        },
+        "config_not_equals": {
+          "vision_projection_storage_boundary": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "bf16_weight_bf16_input_fp32_dot_fp32_output",
+          "validation": "observed",
+          "evidence": "gemm_nt_bf16 map and Qwen3.6-VL BF16 manifest dtype; independent vision parity remains pending"
+        }
+      },
+      "checkpoint": {
+        "id": "vision.layer.{layer}.mlp.down",
+        "producer": "mlp_down",
+        "logical_layout": "token_major",
+        "axis_names": ["token", "channel"]
       }
     },
     "vision.layer.mlp_projection": {

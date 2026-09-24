@@ -528,10 +528,41 @@ def _contract_selector_matches(selector: Any, config: Dict[str, Any], operation:
 def _manifest_contract_config(manifest: Dict[str, Any]) -> Dict[str, Any]:
     config = dict(manifest.get("config") or {})
     dtypes: Dict[str, set] = {}
+    summary = manifest.get("quant_summary") or {}
+    if not isinstance(summary, dict):
+        raise RuntimeError("quant_summary must be an object")
+
+    def normalized_dtype(value: Any) -> str:
+        dtype = str(value or "").lower()
+        return {"f16": "fp16", "f32": "fp32"}.get(dtype, dtype)
+
+    vision_weight_aliases = {
+        "attn_qkv": "attn_qkv", "attn_out": "wo",
+        "ffn_up": "w3", "ffn_down": "w2",
+    }
     for entry in manifest.get("entries", []):
-        parts = str(entry.get("name", "")).split(".", 2)
+        name = str(entry.get("name", ""))
+        parts = name.split(".", 2)
         if len(parts) == 3 and parts[0] == "layer" and parts[1].isdigit():
-            dtypes.setdefault(parts[2], set()).add(str(entry.get("dtype", "")).lower())
+            dtypes.setdefault(parts[2], set()).add(normalized_dtype(entry.get("dtype")))
+        vision_match = re.fullmatch(r"v\.blk\.(\d+)\.(attn_qkv|attn_out|ffn_up|ffn_down)\.weight", name)
+        if vision_match:
+            layer_key = f"layer.{vision_match.group(1)}"
+            weight_key = vision_weight_aliases[vision_match.group(2)]
+            layer_summary = summary.get(layer_key)
+            if isinstance(layer_summary, dict) and weight_key in layer_summary:
+                actual = normalized_dtype(entry.get("dtype"))
+                declared = normalized_dtype(layer_summary[weight_key])
+                if actual != declared:
+                    raise RuntimeError(
+                        f"Conflicting weight dtype for {name}: entry={actual} "
+                        f"quant_summary.{layer_key}.{weight_key}={declared}"
+                    )
+    for layer, weights in summary.items():
+        if not isinstance(layer, str) or not re.fullmatch(r"layer\.\d+", layer) or not isinstance(weights, dict):
+            continue
+        for name, dtype in weights.items():
+            dtypes.setdefault(str(name), set()).add(normalized_dtype(dtype))
     # Only uniform, manifest-proven storage types can select a global contract.
     config["layer_weight_dtypes"] = {
         key: next(iter(values)) for key, values in dtypes.items()
@@ -15238,10 +15269,48 @@ def generate_ir_lower_2(
     # This catches silent mis-routing bugs where kernel I/O names aren't mapped
     # to dataflow names, causing operations to read/write wrong buffers.
     # ==========================================================================
+    validate_weight_kernel_dtypes(lowered_ir)
     if mode == "decode":
         validate_buffer_assignments(lowered_ir)
 
     return lowered_ir
+
+
+def validate_weight_kernel_dtypes(lowered_ir: Dict) -> None:
+    registry = load_kernel_registry()
+    kernel_quant = {
+        k.get("id"): k.get("quant", {})
+        for k in registry.get("kernels", []) if k.get("id")
+    }
+    kernel_weight_contract = {
+        k.get("id"): {
+            str(w.get("name", "")): str(w.get("dtype", "")).lower()
+            for w in k.get("weights", []) if isinstance(w, dict) and w.get("name")
+        }
+        for k in registry.get("kernels", []) if k.get("id") and isinstance(k.get("weights", []), list)
+    }
+    for op in lowered_ir.get("operations", []):
+        kernel_id = op.get("kernel", "")
+        if not kernel_id:
+            continue
+        kernel_weight_dtype = str(kernel_quant.get(kernel_id, {}).get("weight", "")).lower()
+        per_weight_contract = kernel_weight_contract.get(kernel_id, {})
+        for weight_name, weight_info in op.get("weights", {}).items():
+            weight_dtype = str(weight_info.get("dtype", "")).lower()
+            expected_weight_dtype = str(per_weight_contract.get(weight_name, kernel_weight_dtype)).lower()
+            if weight_dtype.startswith(("q", "iq", "nvfp", "mxfp")) and expected_weight_dtype in {"fp32", "f32", "fp16", "f16", "bf16"}:
+                raise RuntimeError(
+                    "HARD FAULT: Weight/kernel dtype mismatch: "
+                    f"op={op.get('op')} layer={op.get('layer')} kernel={kernel_id} "
+                    f"weight={weight_name} dtype={weight_dtype} "
+                    f"provider expects {expected_weight_dtype}; packed weights cannot be read as floats"
+                )
+            if weight_dtype == "bf16" and expected_weight_dtype != "bf16":
+                raise RuntimeError(
+                    "HARD FAULT: Weight/kernel dtype mismatch: "
+                    f"op={op.get('op')} layer={op.get('layer')} kernel={kernel_id} "
+                    f"weight={weight_name} dtype=bf16 provider expects {expected_weight_dtype or '<missing>'}"
+                )
 
 
 def validate_buffer_assignments(lowered_ir: Dict) -> None:
@@ -15276,19 +15345,6 @@ def validate_buffer_assignments(lowered_ir: Dict) -> None:
         for buf in activation_layout
         if isinstance(buf, dict) and buf.get("name")
     }
-    kernel_weight_contract = {}
-    for k in registry.get("kernels", []):
-        kid = k.get("id")
-        if not kid:
-            continue
-        weights = k.get("weights", [])
-        if isinstance(weights, list):
-            kernel_weight_contract[kid] = {
-                str(w.get("name", "")): str(w.get("dtype", "")).lower()
-                for w in weights
-                if isinstance(w, dict) and w.get("name")
-            }
-
     body_projection_ops = {
         "q_proj",
         "q_gate_proj",
@@ -15305,32 +15361,6 @@ def validate_buffer_assignments(lowered_ir: Dict) -> None:
         op_name = op.get("op", op.get("kernel", "unknown"))
         layer = op.get("layer", -1)
         kernel_id = op.get("kernel", "")
-
-        # ===== WEIGHT/KERNEL DTYPE CONTRACT =====
-        # Safetensors/BUMP BF16 weights must not silently fall through to FP32
-        # matmul kernels. That produces finite output but corrupts the graph by
-        # interpreting BF16 payload bytes as FP32 values.
-        if kernel_id:
-            kernel_weight_dtype = str(kernel_quant.get(kernel_id, {}).get("weight", "")).lower()
-            per_weight_contract = kernel_weight_contract.get(kernel_id, {})
-            for weight_name, weight_info in op.get("weights", {}).items():
-                weight_dtype = str(weight_info.get("dtype", "")).lower()
-                expected_weight_dtype = str(per_weight_contract.get(weight_name, kernel_weight_dtype)).lower()
-                if weight_dtype.startswith(("q", "iq", "nvfp", "mxfp")) and expected_weight_dtype in {"fp32", "f32", "fp16", "f16", "bf16"}:
-                    raise RuntimeError(
-                        "HARD FAULT: Weight/kernel dtype mismatch: "
-                        f"op={op_name} layer={layer} kernel={kernel_id} "
-                        f"weight={weight_name} dtype={weight_dtype} "
-                        f"provider expects {expected_weight_dtype}; packed weights cannot be read as floats"
-                    )
-                if weight_dtype == "bf16" and expected_weight_dtype != "bf16":
-                    raise RuntimeError(
-                        f"\n❌ HARD FAULT: Weight/kernel dtype mismatch\n"
-                        f"   op={op_name} layer={layer} kernel={kernel_id}\n"
-                        f"   weight={weight_name} dtype=bf16\n"
-                        f"   kernel weight dtype: {expected_weight_dtype or '<missing>'}\n"
-                        f"   Fix: ensure quant_summary aliases select BF16 kernels for safetensors/BUMP weights\n"
-                    )
 
         # A provider's activation storage is a physical ABI, not a semantic
         # hint. Without this gate, generated C can interpret FP32 bytes as
