@@ -1311,6 +1311,27 @@ make v8-training-python-authoring-smoke
     </p>
 </div>
 
+<div class="card" id="frozen-svg-training-fixture">
+    <h3 style="margin-top: 0;">Frozen SVG training fixture</h3>
+    <p>The second notebook uses the same <code>cke.v8.compile</code> workflow with one complete SVG document in each split. It uses exact byte token IDs, a five-layer FP32 dense/GQA graph, generated-C AdamW, PyTorch parity, fresh-process resume, and independently generated v8 inference. The source XML is checked before weight initialization and appears beside token IDs and loss curves in the identity-bound IR report.</p>
+    <pre> .venv/bin/python version/v8/examples/python_authoring_tiny_lm_v8.py \
+  --fixture svg --run-dir version/v8/.cache/python_authoring/svg_fixture --execute
+
+.venv/bin/jupyter lab version/v8/notebooks/02_frozen_svg_training_fixture.ipynb</pre>
+    <p>The corpus is pinned in <code>version/v8/training/svg_single_document_v1.json</code>. Its train and validation sources are separate, complete SVG files. Token limits that would truncate either tokenized document are rejected before weight initialization. The current target policy is cyclic causal next-token prediction within each document, including a last-to-first token transition. Validation repeats almost all training geometry and changes only colors, so falling validation loss tests the machinery rather than generalization. The report separately marks whether each 48-token generated sample is well-formed SVG and whether it exhausted the probe budget; that diagnostic does not change the numerical certification verdict. Broader SVG quality needs a separate evaluation set.</p>
+    <table class="table">
+        <thead><tr><th>Next milestone</th><th>Acceptance evidence</th></tr></thead>
+        <tbody>
+            <tr><td>Frozen SVG fixture</td><td>Pinned complete documents, validated XML, exact byte IDs, generated-C/PyTorch parity, falling train and held-out loss, exact resume, inference export, and one manifest-bound SVG panel.</td></tr>
+            <tr><td>Document-aware data path</td><td>Explicit EOS, attention boundaries, label masks, token-weighted accumulation, partial batches, and exact fresh-process restart at a document or shard boundary. Cross-document attention leakage must be an injected failure.</td></tr>
+            <tr><td>Tiny code fixture</td><td>Separate source projects, pinned tokenizer/data, a compile-and-run evaluation in a sandbox, and the same numerical training-to-export gates. Compilation success and hidden functional tests are reported separately.</td></tr>
+            <tr><td>Qwen3.5 recurrent contract</td><td>One specified DeltaNet operation first: independent forward and backward checks, state reset and gradient checks across chunk boundaries, saved-state ownership, and explicit full or truncated backpropagation. Then a mixed five-layer graph, followed by ten layers.</td></tr>
+            <tr><td>Precision and scale</td><td>BF16 provider execution and numerical contracts on Ryzen, representative-shape training throughput, then LoRA and quantized-base LoRA as separate certified extensions.</td></tr>
+        </tbody>
+    </table>
+    <p>Each additional supported graph inherits optimizer, checkpoint, parity, and exported-inference gates. The Python surface builds certified CKE graphs; it does not yet compile arbitrary <code>torch.nn</code> programs. RWKV remains outside this workstream.</p>
+</div>
+
 <div class="card">
     <h3 style="margin-top: 0;">Artifacts and visual inspection</h3>
     <p>The full workflow writes its current run under <code>version/v8/.cache/training_workflow/qwen3_4layer_fp32/</code>.</p>
