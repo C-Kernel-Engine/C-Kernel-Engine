@@ -72,11 +72,15 @@ def validate_case(case: str, experiment, report: dict[str, Any]) -> list[str]:
         if checks.get(name, {}).get("passed") is not True:
             errors.append(f"checks.{name}")
     trajectory = checks.get("pytorch_trajectory", {}).get("trajectory", [])
+    if checks.get("pytorch_trajectory", {}).get("first_failed_microstep") is not None:
+        errors.append("trajectory.first_failed_microstep")
     if len(trajectory) != 10:
         errors.append("trajectory.update_count")
     for index, row in enumerate(trajectory, 1):
         if row.get("step") != index or row.get("passed") is not True:
             errors.append(f"trajectory.update_{index}")
+        if row.get("microstep_window", {}).get("passed") is not True:
+            errors.append(f"trajectory.update_{index}.microstep_window")
         for kind, count in (("forward_logits", 1), ("gradients", 23),
                             ("weights", 23), ("optimizer_moments", 46)):
             comparison = row.get(kind, {})
@@ -86,6 +90,8 @@ def validate_case(case: str, experiment, report: dict[str, Any]) -> list[str]:
         errors.append("final_partial_update.missing")
     if checks.get("negative_control_detection", {}).get("gradient_routing", {}).get("passed") is not True:
         errors.append("gradient_routing_control")
+    if checks.get("negative_control_detection", {}).get("microstep_sticky", {}).get("passed") is not True:
+        errors.append("microstep_sticky_control")
     manifest_path = experiment.manifest_path
     if not manifest_path.is_file():
         errors.append("manifest.missing")

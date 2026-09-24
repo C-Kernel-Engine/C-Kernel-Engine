@@ -56,6 +56,45 @@ class V8TrainingWorkflowTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "unique named tensor slots"):
             self.workflow._compare_named_snapshot(actual, expected, ["same", "same"], [2, 1], atol=0.005)
 
+    def test_nonboundary_nonfinite_logits_remain_failed_at_finite_update_boundary(self) -> None:
+        state = self.workflow._new_microstep_parity_state()
+        good = self.workflow._compare_named_snapshot(
+            np.array([1.0], dtype=np.float32), np.array([1.0], dtype=np.float32),
+            ["logits"], [1], atol=0.0)
+        bad = self.workflow._compare_named_snapshot(
+            np.array([np.nan], dtype=np.float32), np.array([1.0], dtype=np.float32),
+            ["logits"], [1], atol=0.0)
+        for microstep, comparison in ((1, good), (2, bad), (3, good), (4, good)):
+            self.workflow._observe_microstep_parity(
+                state, microstep, comparison, 1.0, 1.0, loss_tol=0.0)
+        window = self.workflow._close_microstep_parity_window(state)
+        for microstep in range(5, 9):
+            self.workflow._observe_microstep_parity(
+                state, microstep, good, 1.0, 1.0, loss_tol=0.0)
+        next_window = self.workflow._close_microstep_parity_window(state)
+        self.assertTrue(good["passed"])
+        self.assertFalse(window["passed"])
+        self.assertTrue(next_window["passed"])
+        self.assertFalse(state["passed"])
+        self.assertFalse(self.workflow._trajectory_passed(
+            state, [{"passed": True}, {"passed": True}], {"passed": True}))
+        self.assertIsNone(state["max_logits_abs_diff"])
+        self.assertEqual(state["first_failed_microstep"]["microstep"], 2)
+        self.assertEqual(window["first_failed_microstep"]["logits"]["tensors"][0]["status"], "NONFINITE")
+        self.assertTrue(self.workflow._microstep_sticky_negative_control()["passed"])
+
+    def test_nonfinite_loss_is_recorded_without_zero_error(self) -> None:
+        state = self.workflow._new_microstep_parity_state()
+        good = self.workflow._compare_named_snapshot(
+            np.array([1.0], dtype=np.float32), np.array([1.0], dtype=np.float32),
+            ["logits"], [1], atol=0.0)
+        result = self.workflow._observe_microstep_parity(
+            state, 1, good, float("nan"), 1.0, loss_tol=0.0)
+        self.assertFalse(result["passed"])
+        self.assertIsNone(result["loss_abs_diff"])
+        self.assertIsNone(state["max_loss_abs_diff"])
+        self.assertEqual(state["first_failed_microstep"]["loss_status"], "NONFINITE")
+
     def test_svg_sample_quality_is_separate_from_training_certification(self) -> None:
         complete = '<svg xmlns="http://www.w3.org/2000/svg"><rect width="2" height="3"/></svg>'
         self.assertTrue(self.workflow._svg_sample_quality(complete)["well_formed_svg"])
