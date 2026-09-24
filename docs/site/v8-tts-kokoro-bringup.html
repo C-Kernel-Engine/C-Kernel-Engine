@@ -1,0 +1,425 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Kokoro TTS bring-up | C-Kernel-Engine</title><meta name="description" content="Pinned Kokoro reference, generated-graph plan, numerical kernel coverage, and explicit TTS certification status."><link rel="canonical" href="https://c-kernel-engine.github.io/C-Kernel-Engine/v8-tts-kokoro-bringup.html"><link rel="icon" type="image/svg+xml" href="assets/favicon.svg"><style>:root{color-scheme:dark}body{font:16px/1.65 system-ui,sans-serif;background:#232323;color:#f3f3f3;max-width:1100px;margin:auto;padding:2rem}a{color:#ffca50}nav{display:flex;flex-wrap:wrap;gap:1rem;padding:1rem;background:#303030;border-radius:.5rem}section{border-top:2px solid #ffb400;padding-top:1rem;margin-top:3rem}h1,h2,h3{line-height:1.25}h1{color:#ffca50}pre,code{font-family:ui-monospace,monospace}pre{background:#171717;overflow:auto;padding:1rem;border-radius:.4rem}code{overflow-wrap:anywhere}table{border-collapse:collapse;display:block;overflow-x:auto}th,td{border:1px solid #666;padding:.5rem;text-align:left;vertical-align:top}th{background:#333}blockquote{border-left:3px solid #ffb400;padding-left:1rem;color:#ccc}strong{color:#fff}</style></head><body><p><a href="index.html">C-Kernel-Engine</a> / TTS bring-up</p><h1>Kokoro TTS bring-up</h1><p>This page records the first bounded phoneme-to-waveform groundwork. Generated Kokoro waveform, native text preparation, listening, playback, and P3/Ryzen performance remain <strong>NOT_TESTED</strong>.</p><nav><a href="#plan">Implementation plan</a><a href="#graph">Kokoro graph inventory</a><a href="#coverage">Numerical coverage</a><a href="#reference">Pinned reference capture</a></nav><section id="plan"><h2>Implementation plan</h2><h1>CKE native TTS bring-up</h1>
+<p>Status: architecture and interface proposal. No CKE TTS model, speech session,
+quality result, or CPU speed is certified by this document.</p>
+<h2>Scope and ordering</h2>
+<p>The first implementation milestone is <strong>phoneme IDs plus one fixed voice to a
+generated FP32 waveform</strong>. This isolates model arithmetic from text normalization
+and G2P; it is phoneme-to-waveform, not complete native text-to-speech. The first
+product milestone is one repeatable path from a local assistant response to audible
+PCM. Keep Kokoro as the first generated-C model and fallback candidate;
+evaluate Chatterbox Turbo for interaction and Qwen3-TTS 1.7B for capability only
+after their exact upstream revisions, preprocessing, and numerical contracts are
+recorded. The accessibility application may use an existing local speech runtime
+until native Kokoro passes the complete gate. Kokoro implementation can proceed
+in parallel with bounded generated-audio optimization and Gemma vision work;
+reserve P3 or Ryzen for uncontended numerical and performance certification.</p>
+<p>The accessibility design is in <code>docs/notes/ACCESSIBLE_AGENT_MEMORY_PALACE.md</code> in
+the active accessibility checkout. Its application owns speech queuing, playback,
+policy, emergency stop, and sentence navigation. Generated model code owns only
+mathematical execution. The host owns text preparation, model state, scheduling,
+PCM conversion, and cancellation.</p>
+<h2>Current CKE boundary</h2>
+<p><code>include/ck_session_v8.h</code> describes a text token session. The current
+<code>version/v8/src/ck_cli_v8.c</code> implementation requires autoregressive decode,
+text encode, and token decode capabilities at open. It uses process-global
+generation variables and generated-model entry points without a session handle.
+Its cancellation flag is checked between text generation steps. Reusing that ABI
+unchanged would fail the requirements for independent speech requests, PCM
+metadata, explicit model scratch, and bounded output. A speech ABI should be
+separate and versioned; it can reuse descriptor/error conventions.</p>
+<p>The v8 audio circuit and kernel maps primarily implement inbound audio and ASR:
+PCM decode, resampling, STFT, Mel, Conv1D, Conformer, and Whisper encoder/decoder
+work. This is useful for input conversion and selected forward primitives, but it
+does not constitute a TTS decoder or a waveform oracle. Any shared kernel must
+retain the target model's exact layout, padding, rounding, and operation order.
+The current tree also has an <code>audio_lstm_step_f32</code> map; Kokoro's bidirectional
+and stacked LSTM paths still need shape and numerical checks before reuse.
+CKE's C implementations belong in <code>src/kernels</code>; v8 circuits and kernel maps
+describe selection and lowering. TTS reference capture lives separately from
+deployed arithmetic.</p>
+<h3>DSL fit and compiler boundary</h3>
+<p>CKE already supports declarative <code>sequence</code>, <code>block_types</code> with
+<code>header</code>/<code>body</code>/<code>footer</code>, component circuits with explicit <code>stitch</code> edges,
+<code>graph_slots</code>, <code>weight_refs</code>, required numerical contracts, and circuit-owned
+activation buffers. Kokoro's fixed arithmetic graph should be decomposed into
+phoneme embedding/ALBERT, duration and alignment, prosody/text encoding,
+decoder/generator, and inverse-STFT components. Repeated ALBERT and residual
+blocks belong in circuit bodies; fixed voice selection and duration policy
+belong in declared operations and the native host, not a <code>kokoro</code> branch in the
+lowerer. New mathematical providers belong in <code>src/kernels</code> with kernel-map
+contracts and oracle tests.</p>
+<p>Current <code>build_ir_v8.py</code> still uses static <code>OP_DATAFLOW</code>,
+<code>TEMPLATE_TO_KERNEL_OP</code>, and <code>TEMPLATE_OP_WEIGHTS</code> tables. Its circuit
+activation-buffer expressions resolve from configuration at build time; they
+cannot by themselves bind a live predicted duration sum. A fixed oracle
+utterance can specialize those extents for numerical bring-up. General speech
+requests need a generic checked runtime-extent/buffer-binding capability, or
+bounded maximum buffers with live lengths passed through ordinary operation
+parameters. The compiler must reject an unknown TTS operation or unresolved
+extent; adding family-specific branches would hide missing DSL capability.
+Ownership of shared codegen and registry changes must be agreed with agents
+working in those files before implementation.</p>
+<h2>Target architecture inventory</h2>
+<p>These are <strong>candidate</strong> upstream pins for an import audit, not compatible CKE
+artifacts. Recheck licenses for every packaged dependency and voice asset
+independently of the model repository's top-level license. The Kokoro oracle
+environment still needs resolved wheel, spaCy model, and optional eSpeak data
+versions and hashes; the selected voice ID and asset hash are also open.</p>
+<table>
+<thead>
+<tr>
+<th>Target</th>
+<th>Candidate model snapshot and license</th>
+<th>Preparation, generation, output</th>
+<th>State and missing CKE contracts</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Kokoro v1.0</td>
+<td><a href="https://huggingface.co/hexgrad/Kokoro-82M/tree/e8a90b41091c3c5b70375c47cc959799920fa4d6"><code>hexgrad/Kokoro-82M@e8a90b41091c3c5b70375c47cc959799920fa4d6</code></a>, Apache 2.0</td>
+<td>Normalization and <a href="https://github.com/hexgrad/misaki/commit/fba1236595f2d2bf21d414ba6e57d25256afada3">Misaki G2P at <code>fba1236</code></a> produce phoneme IDs. <a href="https://github.com/hexgrad/kokoro/commit/dfb907a02bba8152ca444717ca5d78747ccb4bec">Kokoro code at <code>dfb907a</code></a> applies ALBERT, duration LSTM and length regulation, prosody and text encoding, then AdaIN/ISTFTNet waveform decoding. One exported voice table can supply fixed style conditioning.</td>
+<td>Deterministic whole-utterance synthesis; cap symbols and predicted frames. Need exact LSTM, duration expansion, adaptive/instance norm, upsampling, inverse STFT, waveform and native G2P contracts. Lock resolved G2P packages and data before oracle capture.</td>
+</tr>
+<tr>
+<td>Chatterbox Turbo</td>
+<td><a href="https://huggingface.co/ResembleAI/chatterbox-turbo/commit/749d1c1a46eb10492095d68fbcf55691ccf137cd"><code>ResembleAI/chatterbox-turbo@749d1c1a46eb10492095d68fbcf55691ccf137cd</code></a>, MIT model/repo; review reused component notices</td>
+<td><a href="https://github.com/resemble-ai/chatterbox/commit/5de7a54aa4e5e2baadb0182dde554908b48b85c2">Code at <code>5de7a54</code></a> normalizes text, uses the tokenizer files in the model snapshot and stored conditioning, generates T3 speech tokens autoregressively, then S3Gen converts tokens to waveform via conditional flow and HiFTGAN/F0 stages.</td>
+<td>Sampling seed, EOS/max-token caps, flow state and vocoder scratch must be explicit. Need model-specific token, flow, F0 and vocoder operations. Reference returns a whole waveform; audio streaming is unverified.</td>
+</tr>
+<tr>
+<td>Qwen3-TTS 1.7B CustomVoice, 12 Hz</td>
+<td><a href="https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice/tree/0a272c2df2ee9be6b850d1df75bcf673541e523a"><code>Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice@0a272c2df2ee9be6b850d1df75bcf673541e523a</code></a>, Apache 2.0</td>
+<td><a href="https://github.com/QwenLM/Qwen3-TTS/commit/022e286b98fbec7e1e916cb940cdf532cd9f488e">Code at <code>022e286</code></a> formats text using the model snapshot's tokenizer files and built-in speaker/language condition, generates codec tokens with talker and code predictor, then calls the separate neural speech tokenizer decoder for waveform.</td>
+<td>Sampling, EOS, token and frame caps, code-predictor cache and codec state must be explicit. Need exact codec decoder operations and numerical contracts. Voice cloning applies to a different variant. Upstream input simulation does not establish waveform streaming.</td>
+</tr>
+</tbody>
+</table>
+<p>Existing CKE GEMM, embedding, attention, normalization, and selected audio Conv1D
+maps are candidates for reuse after shape and numerical checks. The inbound
+FFT-400 power map is not an inverse STFT. Model size does not determine porting
+effort or CPU speed; each target must be measured as a full text-to-PCM path.</p>
+<p>The first isolated C additions are <code>src/kernels/kokoro_shape_bounds.c</code> and
+<code>src/kernels/audio_duration_expand.c</code>, declared in <code>include/ckernel_tts.h</code>.
+The planner validates duration sums, alignment extent, decoder and generator
+upsampling, inverse-STFT extent, and a conservative output-frame bound before
+writing. The duration-expansion primitive accepts caller-owned output storage.
+<code>tests/test_v8_kokoro_shape_bounds.py</code> compiles and exercises both. Neither
+file is a generated Kokoro graph or waveform evidence.</p>
+<h2>Proposed native speech session contract</h2>
+<p>Open a read-only model object once with pinned model artifact and manifest hashes.
+Each session has its own generation state and a predeclared workspace. A model
+descriptor reports supported voice IDs, language IDs, PCM sample rate, channels,
+format, maximum UTF-8 bytes, maximum normalized symbols, maximum audio frames,
+maximum synthesis step duration, and whether genuine incremental waveform output
+is supported. No Python process participates after export.</p>
+<p>The request includes UTF-8 text and byte length, voice ID, supported model-specific
+settings, a reproducible seed if sampling exists, and explicit maximum input/output
+limits. Unsupported settings fail before generation. Empty text has a defined
+completed-with-zero-frames result. Oversized input fails before allocating a
+request workspace. Speech rate belongs in the model request only if the pinned
+model defines it; playback rate belongs to the application.</p>
+<p>The output format for the first Kokoro path is interleaved signed PCM16, one
+channel, with the sample rate read from the pinned artifact manifest. The model
+math may produce FP32 waveform internally. Conversion to PCM16 is an explicit
+native host operation with clipping and nonfinite-sample rejection. Each audio
+callback receives a borrowed buffer, frame count, sample rate, channel count,
+format, monotonic utterance/frame offsets, and a request ID. The buffer remains
+valid only until the callback returns. The application copies or consumes it
+before returning; ownership never crosses the ABI silently.</p>
+<p>Events are <code>STARTED</code>, <code>AUDIO</code>, and exactly one terminal event: <code>COMPLETED</code>,
+<code>CANCELLED</code>, or <code>ERROR</code>. <code>STARTED</code> occurs only after validation and workspace
+reservation. <code>COMPLETED</code> reports the exact frame count and whether output was
+sentence-batched or genuinely incremental. An error includes a stable code and
+message. A callback that cannot accept audio returns a backpressure result;
+generation blocks only while its bounded queue has capacity, or the request
+returns a typed backpressure error. No unbounded buffering or silent dropping is
+allowed. The first implementation may choose synchronous callbacks and no host
+output queue; application queue limits still apply.</p>
+<p>Cancellation is callable from another thread, sets a session-private atomic flag,
+and wakes any backpressure wait. Generated execution checks it at bounded model
+operation boundaries, including long acoustic and vocoder stages; a single large
+noninterruptible forward call must be split before responsiveness is claimed.
+The terminal event follows cancellation, and no further audio events follow it.
+Playback stop and queued-text removal are separate application actions and must
+occur immediately even while generation unwinds. Do not claim a cancellation
+latency until it is measured on P3 and Ryzen.</p>
+<p>Start with one session and one active request. Before enabling concurrent
+sessions, verify generated-model globals and the global thread pool permit
+concurrent calls; private scratch alone is insufficient. A later concurrent
+implementation may share immutable weights but must never share mutable caches,
+scratch, random state, or output buffers. Predeclare and cap every model
+workspace, tokenizer buffer, vocoder workspace, and output chunk. No allocator
+calls are allowed in generated hot paths. The host may allocate the full bounded
+workspace at session creation.</p>
+<h2>First Kokoro proof</h2>
+<ol>
+<li>Pin a complete upstream revision set: model weights, config, voices, model
+   code, phonemizer and lexicon, tokenizer if any, and dependency licenses. Save
+   checksums and a fixture manifest. Include a phoneme fixture so text-front-end
+   drift cannot be confused with model arithmetic drift.</li>
+<li>Export one voice and one short fixed utterance. Save oracle inputs and named
+   intermediate tensors at every new numerical operation. Record waveform FP32
+   and PCM16 reference hashes, tolerances, and listening sample.</li>
+<li>Build the phoneme-to-waveform path through a circuit, operation contracts,
+   kernel maps, generated C, a native phoneme host, and explicit scratch. Python
+   is only an import and oracle tool. Native text preparation is a separate
+   work package, and its uncertainty does not block this arithmetic gate.</li>
+<li>Run the same fixed utterance twice in fresh and persistent sessions. Require
+   deterministic outputs under a fixed seed or document model nondeterminism.
+   Inspect silence, clipping, nonfinite samples, truncation, and repetitions.</li>
+<li>After a native frontend is certified, connect <code>assistant text -&gt; bounded
+   sentence queue -&gt; native speech session -&gt;
+   PCM player</code> with immediate queue clear and playback interruption on a new
+   request. Buffer incomplete assistant fragments until a sentence boundary or
+   explicit final flush; avoid speaking the same fragment twice.</li>
+</ol>
+<p>Sentence-by-sentence synthesis is useful for application responsiveness but is
+not model streaming. Publish time to first playable audio and chunk-gap results
+before labeling any path streaming.</p>
+<h2>Work packages and acceptance gates</h2>
+<ol>
+<li><strong>Artifact and oracle lock:</strong> select one Kokoro voice and utterance, lock the
+   model/code/G2P environment and licenses, publish phoneme IDs, style vector,
+   named tensors, waveform, and manifest hashes. This gate is currently
+   <code>missing evidence</code> until captures exist. The style row depends on the raw
+   phoneme count including the reference's pad-wrap behavior; pin and test that
+   selection, rather than treating the voice as one static vector.</li>
+<li><strong>Primitive and circuit bring-up:</strong> implement only the missing operations
+   reached by the pinned Kokoro graph, each with shape, stride, padding,
+   precision, scratch, and oracle tests. Lower the complete graph to generated
+   C and verify every exported weight and operation map. This gate is
+   <code>unsupported</code> until a generated waveform path runs.</li>
+<li><strong>Native text frontend:</strong> determine whether native preprocessing reproduces
+   the pinned reference phoneme IDs. A native eSpeak-backed alternative needs
+   its own license and pronunciation contract; differing phonemes cannot count
+   as Misaki parity. This gate is <code>missing evidence</code> until tested.</li>
+<li><strong>Speech session and host:</strong> add a versioned native speech ABI with independent
+   state, bounded PCM callbacks, and responsive cancellation. Test failed open,
+   empty input, buffer limits, backpressure, and repeated requests in one
+   session. Verify global model and thread-pool safety before adding concurrent
+   sessions. Measure the longest noninterruptible operation; a descriptor cannot
+   promise a cancellation bound across CPUs. This gate is <code>unsupported</code> until
+   the ABI has an implementation and tests.</li>
+<li><strong>Accessibility workflow:</strong> connect bounded sentence buffering, native
+   synthesis, playback, interruption, and the working fallback. Confirm the
+   application can stop output immediately while model cancellation unwinds.
+   This gate is <code>unsupported</code> until the full text-to-speaker path is exercised.</li>
+<li><strong>Evidence and expansion:</strong> run quality and speed certification on P3 and
+   Ryzen, then apply the same ABI and reporting to Chatterbox Turbo and
+   Qwen3-TTS. Neither model is claimed compatible today.</li>
+</ol>
+<h2>Certification and reports</h2>
+<p>Keep numerical, intelligibility, and listening gates separate. Numerical gates
+compare pinned preprocessing, intermediate tensors, FP32 waveform, and PCM16
+conversion. Speech fixtures cover ordinary and long text, numbers, dates,
+abbreviations, technical terms, CKE/kernel names, file paths, code explanations,
+empty and punctuation-only input, unsupported symbols, oversized requests,
+cancellation, repeated sessions, and interrupted playback. Listening review
+checks pronunciation, omissions, repetitions, and naturalness; ASR transcripts
+are diagnostic evidence only.</p>
+<p>On both P3 and Ryzen, publish cold load, warm execution, first playable audio,
+whole-utterance latency, audio seconds per wall second, chunk gaps, cancellation
+latency, CPU use, and peak memory. Mark every result <code>passed</code>, <code>failed</code>,
+<code>unsupported</code>, or <code>missing evidence</code>. PR CI should run cheap primitive oracle,
+PCM conversion, and session state tests. Nightly should run bounded generated
+speech; idle-host certification should run long text, listening fixtures, and
+performance. Reuse existing report and visualizer conventions rather than
+inferring support from a circuit file alone.</p>
+<h2>Training lane</h2>
+<p>Inference does not wait for TTS backward coverage. V8 has a bounded FP32
+generated-training certification and training -&gt; checkpoint -&gt; v8 inference
+export workflow that selectively reuses v7 training IR/codegen. This does not
+certify TTS-specific backward or composition-level training. Once the exact
+TTS graph is pinned, inventory every new backward operation. Later work can
+certify a small frozen-vocoder acoustic predictor, then generated training -&gt;
+checkpoint -&gt; inference export; voice adaptation requires voice consent and
+dataset provenance.</p></section><section id="graph"><h2>Kokoro graph inventory</h2><h1>Kokoro v1 phoneme-to-waveform graph inventory</h1>
+<p>Status: source-traced design inventory, <strong>not</strong> generated-waveform certification. Scope is batch one, pinned <code>af_heart</code>, speed 1, and the fixed phoneme fixture in <code>version/v8/tts/reference/kokoro_v1_reference.json</code>. The model/code pins and asset hashes belong to its capture manifest. The deployed graph starts with already prepared phoneme IDs; G2P is a separate contract.</p>
+<h2>Pinned execution and symbols</h2>
+<p>Sources: <a href="https://github.com/hexgrad/kokoro/blob/dfb907a02bba8152ca444717ca5d78747ccb4bec/kokoro/model.py">Kokoro <code>model.py</code> at <code>dfb907a</code></a>, <a href="https://github.com/hexgrad/kokoro/blob/dfb907a02bba8152ca444717ca5d78747ccb4bec/kokoro/modules.py"><code>modules.py</code></a>, <a href="https://github.com/hexgrad/kokoro/blob/dfb907a02bba8152ca444717ca5d78747ccb4bec/kokoro/istftnet.py"><code>istftnet.py</code></a>, and the <a href="https://huggingface.co/hexgrad/Kokoro-82M/blob/e8a90b41091c3c5b70375c47cc959799920fa4d6/config.json">pinned model config</a>. Default <code>disable_complex=False</code> selects <code>TorchSTFT</code>, <strong>not</strong> <code>CustomSTFT</code> (<code>istftnet.py:293-297</code>).</p>
+<p>Let <code>T = phoneme_count + 2</code> include the two zero IDs; <code>A = sum(round(sum(sigmoid(duration_logits), last_dim) / speed).clamp(min=1))</code>; batch <code>B=1</code>. Input IDs are <code>[1,T]</code>, int64 in PyTorch. The upstream model drops unknown phoneme characters in <code>model.py:128</code>, which the native phoneme fixture must never silently emulate: validate every ID. The voice row is <code>af_heart[len(phonemes)-1]</code>, <code>[1,256]</code> FP32, selected <strong>before</strong> model execution (<code>capture_kokoro_v1.py:128-137</code>). Decoder style is <code>[:,0:128]</code>; predictor style is <code>[:,128:256]</code>. Pin the exact row and its hash, not just the voice name.</p>
+<p>The config gives vocabulary 178, ALBERT hidden 768, 12 nominal transformer layers and 12 heads, projection/encoder width 512, 3 duration-encoder pairs, max-duration projection width 50, and ISTFTNet upsample factors <code>[10,6]</code> with FFT 20/hop 5. Verify ALBERT <em>parameter sharing and grouping</em> from the resolved Transformers version and checkpoint; twelve layer executions do not imply twelve independent parameter sets. All named activations and learned weights are FP32 in the intended first path; record actual imported dtypes and layouts.</p>
+<table>
+<thead>
+<tr>
+<th>Stage and source</th>
+<th>Reached math and logical shape</th>
+<th>Required contract / state</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ALBERT, <code>model.py:100-103</code>, <code>modules.py:180-183</code></td>
+<td>Token/position/type embedding, layer norm, shared/grouped attention and FFN, attention softmax/mask: <code>[1,T,768]</code>; dense projection and transpose to <code>[1,512,T]</code>.</td>
+<td>Exact Transformers ALBERT parameter sharing, embedding projection, GELU variant, layer-norm epsilon, mask additive semantics, softmax and GEMM order. No autoregressive KV state. Existing CKE attention/GEMM/embedding are candidates only after this contract check.</td>
+</tr>
+<tr>
+<td>Duration encoder, <code>modules.py:137-176</code></td>
+<td>Append predictor style to every token (<code>[1,T,640]</code>), mask, three bidirectional LSTM + adaptive layer-norm pairs. AdaLN computes <code>LN(x, eps=1e-5)*(1+gamma)+beta</code>, with <code>[gamma,beta]=linear(style)</code>. Each pair reappends style. Output <code>[1,T,640]</code>.</td>
+<td>PyTorch IFGO LSTM, forward/backward scans, zero initial hidden/cell, style broadcast, masks. Eval disables dropout. <code>audio_lstm_step_f32</code> only implements <strong>one</strong> single-direction step; a declared scan and bidirectional composition are still needed.</td>
+</tr>
+<tr>
+<td>Duration predictor, <code>model.py:106-114</code></td>
+<td>Bidirectional LSTM <code>[1,T,640]→[1,T,512]</code>; linear <code>[1,T,50]</code>, elementwise sigmoid, ascending sum over 50, divide by speed, PyTorch round-to-even, clamp minimum 1, cast to integer. Repeat token indices and one-hot alignment <code>[1,T,A]</code>; multiply duration-encoder features <code>[1,640,T] @ [1,T,A] → [1,640,A]</code>.</td>
+<td>Keep reduction/rounding explicit. Check each finite duration, <code>T</code>, <code>A</code>, and every downstream capacity before expansion. One-hot matrix need not be materialized if a verified duration expansion exactly matches the matmul's copy semantics.</td>
+</tr>
+<tr>
+<td>Prosody, <code>modules.py:124-134</code></td>
+<td>Shared bidirectional LSTM on expanded duration features <code>[1,A,640]→[1,A,512]</code>. Independent F0/N branches, each three AdaIN residual blocks, middle block nearest-upsample ×2, then 1×1 conv: <code>F0,N=[1,2A]</code>.</td>
+<td>AdaIN is <code>InstanceNorm1d(affine=True, eps=1e-5)</code> followed by style <code>(1+gamma)*norm+beta</code>; preserve stored affine parameters. Residual block has nearest upsample, optional depthwise transposed conv and shortcut, two weighted convs, leaky ReLU, and <code>1/sqrt(2)</code> (<code>istftnet.py:340-381</code>).</td>
+</tr>
+<tr>
+<td>Text encoder, <code>modules.py:35-69</code></td>
+<td>Embedding <code>[1,T,512]</code>, three weight-normalized Conv1D(k5,p2) + layer norm + leaky ReLU, then bidirectional LSTM, output <code>[1,512,T]</code>; expand by alignment to ASR features <code>[1,512,A]</code>.</td>
+<td>PyTorch convolution padding and weight normalization; dropout disabled. Pack/pad is identity on the single full-length fixture but must be declared if batching is added. <code>audio_conv1d_channel_major_f32</code> is a candidate only after exact bias, stride, dilation, reduction and layout checks.</td>
+</tr>
+<tr>
+<td>Decoder, <code>istftnet.py:384-421</code></td>
+<td>Stride-2 Conv1D of F0/N: <code>[1,A]</code>; concatenate with ASR, AdaIN residual encode to <code>[1,1024,A]</code>. Three decoder residual blocks consume concatenated <code>[x, asr_res, F0, N]</code>; fourth also concatenates, then upsamples ×2 to <code>[1,512,2A]</code>.</td>
+<td>Explicit multi-producer edges; first three stages use A, last emits 2A. Preserve concat order, reflection/nearest/depthwise transposed conv contracts, and style split.</td>
+</tr>
+<tr>
+<td>Source and waveform generator, <code>istftnet.py:108-325</code></td>
+<td>Upsample F0 from <code>2A</code> by <code>10*6*5=300</code> to <code>600A</code> samples; make 9 harmonic sines plus stochastic noise, voiced/unvoiced mask, linear+tanh excitation, STFT magnitude/phase concatenation. Two stages: ConvTranspose1D strides 10 and 6; noise conv and AdaIN residual branch; sum three Snake residual blocks per stage. Post conv yields 22 channels; magnitude <code>exp(first 11)</code>, phase <code>sin(last 11)</code>; inverse STFT emits waveform approximately <code>600A</code> samples (derive exact edge length from PyTorch).</td>
+<td><strong>Stochastic source is reached even with fixed text/voice</strong>: <code>torch.rand</code> initial harmonic phases and <code>torch.randn_like</code> excitation (<code>istftnet.py:149-209,241-254</code>). Pin RNG implementation/state or capture source tensors as oracle inputs to isolate deterministic arithmetic; report which mode is compared. Snake is <code>x+sin(alpha*x)^2/alpha</code>, not SiLU. <code>TorchSTFT</code> uses periodic Hann, centered STFT, complex magnitude/angle, and <code>torch.istft</code> overlap-add/window normalization (<code>istftnet.py:80-100</code>). The newly added <code>audio_istft_mag_phase.c</code> is only a candidate until its independent oracle establishes exact behavior.</td>
+</tr>
+</tbody>
+</table>
+<p>Convolution summation order, BLAS/oneDNN selection, transcendental implementation, normalization statistics, and STFT accumulation order must be captured in numerical contracts. A provider with the right operation name is not automatically bitwise equivalent to PyTorch; compare at intermediate checkpoints with stated tolerances before waveform comparison. Instance normalization reduces over time per batch/channel; layer normalization reduces over channels per token. Weight-normalized convs should be exported as effective FP32 weights with the transformation and hash recorded, or have a separately verified runtime operation.</p>
+<h2>Buffer and state boundaries</h2>
+<p><code>T</code> is known at request validation. <code>A</code> becomes known only after the duration head. Validate finite logits, round/cast, checked sum, and a configured <code>A_max</code> <strong>before</strong> writing alignment/expanded features. Derived maximums include <code>2A</code> prosody/decoder frames, <code>20A</code> then <code>120A</code> generator frames, <code>600A</code> source samples, STFT frame capacity, inverse-STFT overlap workspace, and final waveform capacity. Exact STFT frame and waveform formulas must come from the pinned PyTorch center/padding behavior and be tested at short and boundary lengths; do not infer them from nominal audio duration. Return a typed capacity error rather than truncate or allocate. The scratch planner must account for forward/backward LSTM hidden+cell/gates, norm reductions, all branch lifetimes, convolution workspaces, RNG state/source, STFT complex buffers, and overlap/window envelope. Session initialization can reserve the maximum; compute kernels take explicit pointers, strides, capacities, and valid lengths. No variable-length stack arrays or hidden heap allocations.</p>
+<p>The <strong>first</strong> data-dependent tensor is <code>indices</code> in <code>model.py:110</code>, a frame-to-token map with valid length <code>A</code>, produced by repeat-interleaving the <code>T</code> rounded durations. The next is dense alignment <code>[T,A]</code> (<code>:111-113</code>), then <code>en=[640,A]</code> and <code>asr=[512,A]</code> (<code>:114-117</code>). These feed the prosody shared LSTM and text-to-decoder path. If alignment is elided, the two expansion outputs are still the first data-dependent feature tensors. A generic tensor descriptor must distinguish allocated <code>capacity=[T,A_max]</code> or <code>[C,A_max]</code>, per-request <code>valid_extent=[T,A]</code> or <code>[C,A]</code>, and <strong>physical strides</strong>, e.g. <code>[A_max,1]</code> for a channel-major aligned buffer. Passing <code>A</code> as both loop extent and row stride would overlap channels when the backing buffer is padded to <code>A_max</code>. The producer publishes <code>A</code> after a checked extent barrier; downstream nodes consume the same validated symbol. Kernel maps must specify which ABI arguments receive each capacity, valid extent, and stride; planner computes physical bytes from capacity and liveness, while runtime loops use valid extents. Buffer views may alias only under declared nonoverlap/lifetime rules.</p>
+<p>State is per request: LSTM states reset to zero for each scan, source RNG state is explicit, and all activations/scratch are private. Check global generated-model and threadpool behavior before concurrent sessions. For the first deterministic arithmetic oracle, captured source excitation (and optionally STFT output) may be an explicit input at a declared graph edge; a complete production waveform graph must generate it natively from a documented seeded RNG contract.</p>
+<h2>Circuit decomposition and provider fit</h2>
+<p>Use the v8 <code>sequence</code> plus component <code>stitch</code> and named <code>graph_slots</code> contracts (<code>version/v8/circuits/README.md:200-245</code>; <code>PIPELINE.md:100-159</code>). Proposed components, <strong>not</strong> separate Python-driven C entry points:</p>
+<ol>
+<li><code>phoneme_encoder</code>: header validates IDs/style, ALBERT embedding; body expands declared ALBERT shared-layer schedule; footer projects <code>[T,512]</code>. A parallel declared <code>text_encoder</code> path consumes the same IDs and emits <code>[512,T]</code>.</li>
+<li><code>duration</code>: header concatenates style; body is three explicitly ordered bidirectional-scan/AdaLN pairs; footer runs predictor LSTM/head, validates <code>A</code>, and emits the duration vector and expansion map. The runtime shape-validation boundary is here.</li>
+<li><code>prosody</code>: header expands duration features to valid <code>A</code>; body runs shared bidirectional scan and independent F0/N branches; footer emits <code>F0,N=[2A]</code>. Stitch also sends the expansion map to the text-encoder output path.</li>
+<li><code>waveform_decoder</code>: header expands text features and combines ASR/F0/N/style; body declares four decoder residual stages, two generator stages, and each branch/merge; footer post-conv, magnitude/phase, inverse STFT, and FP32 waveform valid length.</li>
+</ol>
+<p>Do not encode the entire schedule as one provider or a model-name branch. Nonrepeated operations and branch fan-in must be explicit circuit operations with declared ports. A single generated native entry point must execute the connected graph. PCM16 conversion and playback remain host/application steps.</p>
+<p>CKE's <code>audio_conv1d_channel_major_f32</code> map has channel-major contiguous FP32 input, bias, stride, padding and ascending accumulation; it lacks dilation/group semantics in that ABI. <code>audio_lstm_step_f32</code> is a stateful IFGO single step with caller-owned gates scratch; scan and backward direction are not provided by the map. Existing STFT power maps are forward spectrogram <strong>power</strong> operations and do not provide Kokoro complex STFT, phase, or inverse. New <code>src/kernels/audio_duration_expand.c</code> and <code>audio_istft_mag_phase.c</code> in this worktree are still unregistered/uncertified candidates, not evidence of a complete generated graph. Likely missing provider contracts include adaptive instance/layer normalization, nearest interpolation, grouped/dilated/transpose convolution, Snake, exact phase/STFT/ISTFT, stochastic excitation, checked duration/extent, and bidirectional scan. Place reusable C math in <code>src/kernels/</code>; maps declare ABI, layouts, ordered arguments, scratch size/alignment/lifetime/aliasing, state reset, numeric order, sources, tests, and unsupported backward status.</p>
+<p>The current <code>build_ir_v8.py</code> enforces explicit stitch edges for multicomponent circuits (<code>:1235-1277</code>) and reads <code>graph_slots</code> (<code>:4649-4688</code>). However it still uses static <code>OP_DATAFLOW</code> (<code>:1761</code>), <code>TEMPLATE_TO_KERNEL_OP</code> (<code>:4295</code>) and op-weight tables. Circuit <code>activation_buffers</code> extents resolve only integer/config/mul/max expressions <strong>at build time</strong> (<code>:3733-3818</code>), so they cannot yet bind <code>A=sum(pred_dur)</code> at execution. A bounded capacity with a separate checked runtime valid extent is the needed model-neutral compiler primitive. A fixed fixture can specialize A for the first oracle, but cannot count as general dynamic-length support. Every new compiler semantic needs a tiny model-independent fixture before Kokoro uses it. No shared compiler or kernel-map edits are authorized by this inventory.</p>
+<p>For a separate generic runtime-length PR, use a tiny circuit with fixed <code>T=3</code>: an integer-duration producer emits <code>[1,2,1]</code>; a checked sum publishes <code>A=4</code> against <code>A_max=8</code>; an expansion node writes <code>[C=2,A]</code> into caller-owned <code>[2,8]</code> with physical row stride 8; a pointwise consumer reads only four valid columns and reports <code>[2,4]</code>. Assert untouched padding, a deliberately undersized capacity error, overflow/negative duration rejection, and correct reuse with a second duration set <code>A=7</code> in the same storage. Link the resulting graph and named <code>A</code> edge into IR/X-Ray. Only after that generic fixture passes should Kokoro's duration head and expansion use the new representation in a separate model PR.</p>
+<h2>Evidence still required</h2>
+<p>Capture the actual phonemes/IDs, selected voice row, imported effective weights and per-op checkpoint shapes/dtypes/hashes, duration vector, source RNG inputs, STFT outputs, decoder intermediate tensors, and full FP32 waveform. The current capture script hooks only coarse modules and inverse inputs; augment it before claiming per-primitive parity. Verify the exact output length, repeated calls, undersized workspace, malformed duration/state, finite outputs, clipping/silence, and a human listening fixture. Keep numerical parity, candidate-versus-baseline equality, and listening results separate. Until the generated C entry point produces and verifies the waveform, status remains <strong>unsupported / missing evidence</strong>.</p></section><section id="coverage"><h2>Numerical coverage</h2><h1>TTS kernel numerical coverage, 2026-09-24</h1>
+<p>This report concerns two scalar inference providers and a Kokoro-specific extent
+preflight. It does <strong>not</strong> certify a generated Kokoro waveform or native text-to-speech.
+The provider maps declare backward and training unsupported.</p>
+<table>
+<thead>
+<tr>
+<th>Provider</th>
+<th>Dtype / direction</th>
+<th>Independent oracle</th>
+<th>Executable test</th>
+<th>PR / nightly registration</th>
+<th>Observed result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>audio_duration_expand_channel_major_f32</code></td>
+<td>FP32 + int32 durations / forward only</td>
+<td>PyTorch <code>torch.repeat_interleave</code>; committed PyTorch fixture</td>
+<td><code>tests/test_v8_audio_duration_expand_oracle.py</code>; invalid extent and stride checks in <code>tests/test_v8_kokoro_shape_bounds.py</code></td>
+<td><code>.github/workflows/tts-kernels.yml</code>; <code>scripts/nightly_runner.py</code> key <code>tts_duration_expand_oracle</code></td>
+<td>PASS: exact values on the fixed fixture, untouched padding, repeated call, and capacity rejection. Live PyTorch fixture check PASS in the local CKE venv.</td>
+</tr>
+<tr>
+<td><code>audio_istft_mag_phase_f32</code></td>
+<td>FP32 / forward only</td>
+<td>PyTorch <code>torch.istft</code> with centered periodic Hann; pinned Kokoro magnitude/phase capture</td>
+<td><code>tests/test_v8_audio_istft_oracle.py</code>; <code>version/v8/scripts/compare_kokoro_istft_native_v8.py</code></td>
+<td><code>.github/workflows/tts-kernels.yml</code>; <code>scripts/nightly_runner.py</code> key <code>tts_istft_oracle</code></td>
+<td>PASS: synthetic PyTorch fixture and live oracle locally. Pinned Kokoro primitive capture: 61,800 samples, max absolute error 8.4564e-7, mean absolute error 7.2885e-8.</td>
+</tr>
+<tr>
+<td><code>kokoro_shape_bounds</code> host preflight</td>
+<td>Size arithmetic / inference</td>
+<td>Independent mathematical boundary cases</td>
+<td><code>tests/test_v8_kokoro_shape_bounds.c</code> via <code>tests/test_v8_kokoro_shape_bounds.py</code></td>
+<td><code>.github/workflows/tts-kernels.yml</code>; <code>scripts/nightly_runner.py</code> key <code>tts_kokoro_shape_bounds</code></td>
+<td>PASS: checked limits and overflow cases locally.</td>
+</tr>
+<tr>
+<td>Generated producer → length validation → consumer</td>
+<td>FP32 / forward</td>
+<td>Synthetic independent reference</td>
+<td>Pending PR A</td>
+<td>NOT_TESTED</td>
+<td>No generated graph exists yet.</td>
+</tr>
+<tr>
+<td>Generated Kokoro phoneme → waveform</td>
+<td>FP32 / forward</td>
+<td>Pinned Kokoro reference capture</td>
+<td>Pending PR B</td>
+<td>NOT_TESTED</td>
+<td>No generated waveform exists yet.</td>
+</tr>
+<tr>
+<td>TTS backward</td>
+<td>FP32 / backward</td>
+<td>PyTorch autograd and finite differences</td>
+<td>Pending training work</td>
+<td>NOT_TESTED</td>
+<td>Inference-only provider maps.</td>
+</tr>
+</tbody>
+</table>
+<p>The committed fixtures make cheap PR tests independent of a PyTorch installation.
+The nightly runner runs live PyTorch checks when available; if the dependency is
+missing, those individual checks are SKIP with a reason. A skipped oracle is not
+evidence of parity. The scalar providers have no multithread execution mode, so
+single-versus-multithread numerical comparison is not applicable. Performance and
+P3/Ryzen certification have not been run.</p>
+<p>Reproduce the cheap PR checks:</p>
+<pre><code class="language-sh">python3 -m unittest \
+  tests.test_v8_kokoro_shape_bounds \
+  tests.test_v8_audio_duration_expand_oracle.AudioDurationExpandOracleTest.test_committed_torch_fixture \
+  tests.test_v8_audio_istft_oracle.AudioIstftOracleTest.test_committed_torch_fixture
+</code></pre>
+<p>Reproduce live PyTorch checks in an environment with PyTorch and NumPy:</p>
+<pre><code class="language-sh">python3 -m unittest tests.test_v8_audio_duration_expand_oracle tests.test_v8_audio_istft_oracle
+</code></pre>
+<p>The pinned-capture comparison requires the reference artifact path described in
+<code>this page, “Pinned reference capture”</code>.</p></section><section id="reference"><h2>Pinned reference capture</h2><h1>Kokoro v1.0 reference capture</h1>
+<p>This directory contains a single-utterance PyTorch oracle for native CKE Kokoro
+bring-up. The pinned model snapshot, source revisions, voice, text, seed, and
+conditioning rule are in <code>kokoro_v1_reference.json</code>. <code>fixture_manifest.json</code>
+records observed assets, dependency versions, phonemes, token IDs, tensor shapes,
+and file hashes from the canonical capture. The full <code>.npy</code> and WAV artifacts are
+currently in <code>/tmp/cke-kokoro-v1-af-heart-reference</code>. The script refuses network
+access.</p>
+<p>Run with an environment containing the pinned Kokoro and Misaki source checkouts
+and their resolved Python dependencies. Supply the three files from the pinned
+Hugging Face snapshot at the paths listed in the pin manifest:</p>
+<pre><code class="language-sh">python version/v8/tts/reference/capture_kokoro_v1.py \
+  --model-dir /path/to/Kokoro-82M-snapshot \
+  --output-dir /tmp/cke-kokoro-v1-af-heart-reference
+</code></pre>
+<p><code>--preprocess-only</code> needs just <code>config.json</code> and captures segmentation, G2P, and
+token IDs. Full capture also emits selected style, ALBERT and duration stages,
+F0/noise projections, text encoder, decoder, frame-to-token indices, float32
+waveform, final ISTFT magnitude and phase, and a 24 kHz mono PCM16 WAV for listening. The <code>.npy</code> waveform is the
+numerical oracle; the WAV is a playable derivative. Both are checked for finite
+samples. Keep the captured fixture beside its generated manifest and check the
+source/dependency pins before comparing CKE output.</p>
+<p>The first full capture took 5.51 seconds wall time and peaked at 1,134,048 KiB
+RSS on this host with one PyTorch thread. A second process produced identical
+tensor and WAV hashes with seed 0. Reconstructing from captured ISTFT magnitude
+and phase with PyTorch <code>istft</code> (<code>n_fft=20</code>, <code>hop=5</code>, periodic Hann) reproduced the
+float32 waveform exactly. <code>oracle-requirements.lock</code> records the 89 installed
+package versions and source URLs. It does not contain wheel hashes; the asset
+SHA-256 hashes are in <code>fixture_manifest.json</code>.</p>
+<p>The fixture is upstream reference evidence only. Its <code>evidence</code> object leaves
+native primitive parity, native full waveform parity, human listening, and
+application playback as <code>NOT_TESTED</code>. Missing dependencies or assets stop capture
+with an error; they never count as passing evidence. Each production kernel needs
+its own oracle comparison and CI registration outside this reference directory.</p>
+<p>The selected style row is <code>af_heart[len(phonemes)-1]</code>; the predictor receives its
+last 128 columns and the decoder receives its first 128. The generated manifest
+marks any missing hook explicitly.</p></section></body></html>
