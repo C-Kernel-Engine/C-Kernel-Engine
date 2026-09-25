@@ -1126,6 +1126,7 @@ def _prepare_runtime_dir_from_local_artifacts(model_dir: Path, work_dir: Path) -
         shutil.copy2(src_config, dst_config)
         _copy_optional(model_dir / "weights_manifest.map", work_dir / "weights_manifest.map")
         _copy_optional(model_dir / "tokenizer.json", work_dir / "tokenizer.json")
+        _copy_optional(model_dir / "chat_template.jinja", work_dir / "chat_template.jinja")
         if (model_dir / "tokenizer_bin").is_dir() and not (work_dir / "tokenizer_bin").exists():
             shutil.copytree(model_dir / "tokenizer_bin", work_dir / "tokenizer_bin")
     else:
@@ -1216,6 +1217,12 @@ def step_convert_gguf(
     manifest_path = output_dir / "weights_manifest.json"
     if weights_path.exists() and config_path.exists() and manifest_path.exists() and not force:
         log(f"  Using cached weights at {weights_path}", C_DIM)
+        if not (output_dir / "chat_template.jinja").is_file():
+            log(
+                "  Warning: chat_template.jinja missing in cached run dir; "
+                "rebuild with --force-convert to emit the GGUF-native sidecar",
+                C_DIM,
+            )
         return weights_path, config_path, manifest_path
     output_dir.mkdir(parents=True, exist_ok=True)
     cmd = [

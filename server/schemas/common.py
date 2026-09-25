@@ -189,7 +189,6 @@ class ToolType(StrEnum):
     computer = "computer"
     computer_use_preview = "computer_use_preview"
     web_search = "web_search"
-    web_search_2025_08_26 = "web_search_2025_08_26"
     mcp = "mcp"
     code_interpreter = "code_interpreter"
     programmatic_tool_calling = "programmatic_tool_calling"

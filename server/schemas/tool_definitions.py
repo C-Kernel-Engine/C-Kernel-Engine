@@ -1,4 +1,13 @@
-"""Tool-definition shapes; no tool execution is connected."""
+"""Tool-definition shapes; no tool execution is connected.
+
+Server policy (ck_serve_v8): all types validate and are echoed verbatim, and
+all are passed into the Jinja ``tools`` context for model visibility. The
+server never executes any tool server-side. Only function-like tools
+(function/mcp) are parsed back into ``function_call`` items for the client to
+execute (e.g. weather get_weather). file_search / computer(_use_preview) /
+web_search(_2025_08_26) / code_interpreter / image_generation are accepted +
+prompt-visible but never emitted as output items (plain text fallback).
+"""
 
 from __future__ import annotations
 
@@ -48,7 +57,7 @@ class WebSearchUserLocation(BaseModel):
 
 
 class WebSearchTool(BaseModel):
-    type: Literal["web_search", "web_search_2025_08_26"]
+    type: Literal["web_search"]
     external_web_access: bool | None = None
     filters: dict[str, list[str]] | None = None
     search_context_size: Literal["low", "medium", "high"] | None = None
@@ -103,16 +112,19 @@ class McpTool(BaseModel):
     allowed_callers: list[Literal["direct", "programmatic"]] | None = None
     allowed_tools: list[str] | McpToolFilter | None = None
     authorization: str | None = None
-    connector_id: Literal[
-        "connector_dropbox",
-        "connector_gmail",
-        "connector_googlecalendar",
-        "connector_googledrive",
-        "connector_microsoftteams",
-        "connector_outlookcalendar",
-        "connector_outlookemail",
-        "connector_sharepoint",
-    ] | None = None
+    connector_id: (
+        Literal[
+            "connector_dropbox",
+            "connector_gmail",
+            "connector_googlecalendar",
+            "connector_googledrive",
+            "connector_microsoftteams",
+            "connector_outlookcalendar",
+            "connector_outlookemail",
+            "connector_sharepoint",
+        ]
+        | None
+    ) = None
     defer_loading: bool | None = None
     headers: dict[str, str] | None = None
     require_approval: McpToolApprovalFilter | Literal["always", "never"] | None = None

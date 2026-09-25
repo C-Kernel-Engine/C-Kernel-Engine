@@ -322,29 +322,25 @@ async def _chat_stream(
         elif event_type == "response.output_item.added":
             item = event.get("item") or {}
             if item.get("type") == "function_call":
+                # Record the index mapping only; the parsed name/arguments
+                # flush below at output_item.done. The Responses layer may
+                # stream provisional/raw function deltas live, but the Chat
+                # contract pins name-on-first-chunk plus arguments that
+                # concatenate to the parsed arguments object.
                 output_index = int(event.get("output_index") or 0)
-                tool_index = len(tool_indexes)
-                tool_indexes[output_index] = tool_index
-                yield _chat_chunk(
-                    completion_id,
-                    body.model,
-                    created,
-                    delta={
-                        "tool_calls": [
-                            {
-                                "index": tool_index,
-                                "id": item.get("call_id"),
-                                "type": "function",
-                                "function": {
-                                    "name": item.get("name"),
-                                    "arguments": "",
-                                },
-                            }
-                        ]
-                    },
-                )
+                if output_index not in tool_indexes:
+                    tool_indexes[output_index] = len(tool_indexes)
         elif event_type == "response.function_call_arguments.delta":
+            # Buffered (see output_item.done): raw live deltas may carry
+            # unparsed generation text, not pure arguments.
+            continue
+        elif event_type == "response.output_item.done":
+            item = event.get("item") or {}
+            if item.get("type") != "function_call":
+                continue
             output_index = int(event.get("output_index") or 0)
+            tool_index = tool_indexes.get(output_index, len(tool_indexes))
+            tool_indexes.setdefault(output_index, tool_index)
             yield _chat_chunk(
                 completion_id,
                 body.model,
@@ -352,8 +348,26 @@ async def _chat_stream(
                 delta={
                     "tool_calls": [
                         {
-                            "index": tool_indexes[output_index],
-                            "function": {"arguments": event.get("delta") or ""},
+                            "index": tool_index,
+                            "id": item.get("call_id"),
+                            "type": "function",
+                            "function": {
+                                "name": item.get("name"),
+                                "arguments": "",
+                            },
+                        }
+                    ]
+                },
+            )
+            yield _chat_chunk(
+                completion_id,
+                body.model,
+                created,
+                delta={
+                    "tool_calls": [
+                        {
+                            "index": tool_index,
+                            "function": {"arguments": item.get("arguments") or ""},
                         }
                     ]
                 },

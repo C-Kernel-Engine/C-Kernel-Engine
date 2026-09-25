@@ -1,9 +1,12 @@
 """Experimental schema server with mocked responses and no model execution.
 
-FastAPI is used only to validate the initial HTTP and Pydantic contract. The
-intended production design is a dedicated C or Rust server that owns a loaded
-CKE runtime, bounded scheduling, cancellation, and streaming without Python in
-the token-generation path.
+FastAPI is used only to validate the initial HTTP and Pydantic contract. For
+generic OpenAI Responses + tools with real inference, build the live app via
+``server.live.create_app(session, ...)`` or
+``server.live.create_live_app_from_run_dir(run_dir, ...)`` backed by
+``server.session_v8.SessionV8``; that factory ports the single-flight native
+lifecycle (history, function/mcp tool calls, SSE streaming, cancel) into the
+server boundary.
 """
 
 from __future__ import annotations

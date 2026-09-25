@@ -117,13 +117,14 @@ def test_tool_call_single_non_stream():
     assert json.loads(fc["arguments"]) == {"location": "Paris"}
 
 
-def test_qwen_tagged_tool_call_non_stream():
+NATIVE_TOOL_TEMPLATE = """{% for message in messages %}{{ message.role }}: {{ message.content }}
+{% endfor %}{% if tools %}<tools>{{ tools | tojson }}</tools>{% endif %}<tool_call>{"name": "probe"}</tool_call>"""
+
+
+def test_native_tagged_tool_call_non_stream():
     session = FakeSession(
         chunks=(
-            "<tool_call>\n<function=read_file>\n"
-            "<parameter=path>\nserver/README.md\n</parameter>\n"
-            "<parameter=line_end>\n20\n</parameter>\n"
-            "</function>\n</tool_call>",
+            '<tool_call>\n{"name": "read_file", "arguments": {"path": "server/README.md", "line_end": 20}}\n</tool_call>',
         )
     )
     client = TestClient(
@@ -131,7 +132,7 @@ def test_qwen_tagged_tool_call_non_stream():
             session,
             model="fake-model",
             chat_contract=QWEN3_CONTRACT,
-            chat_templates=DUMMY_CHAT_TEMPLATES,
+            chat_templates={"tool_use": NATIVE_TOOL_TEMPLATE},
         )
     )
     response = client.post(
@@ -156,7 +157,7 @@ def test_qwen_tagged_tool_call_non_stream():
     }
 
 
-def test_qwen_tagged_tool_call_rejects_duplicate_parameters():
+def test_legacy_qwen_xml_tags_rejected_as_malformed():
     session = FakeSession(
         chunks=(
             "<tool_call><function=read_file>"
@@ -169,7 +170,7 @@ def test_qwen_tagged_tool_call_rejects_duplicate_parameters():
             session,
             model="fake-model",
             chat_contract=QWEN3_CONTRACT,
-            chat_templates=DUMMY_CHAT_TEMPLATES,
+            chat_templates={"tool_use": NATIVE_TOOL_TEMPLATE},
         )
     )
     response = client.post(
@@ -184,7 +185,22 @@ def test_qwen_tagged_tool_call_rejects_duplicate_parameters():
     )
 
     assert response.json()["status"] == "failed"
-    assert "duplicate tool-call parameter" in response.json()["error"]["message"]
+    assert "malformed tool call" in response.json()["error"]["message"]
+
+
+def test_detect_template_tool_syntax():
+    from server.live import _detect_template_tool_syntax
+
+    assert (
+        _detect_template_tool_syntax("<tool_call>{\"a\": 1}</tool_call>", None)
+        == "tool_call_json"
+    )
+    assert (
+        _detect_template_tool_syntax(None, {"tool_use": "x <TOOL_CALL> y"})
+        == "tool_call_json"
+    )
+    assert _detect_template_tool_syntax("plain {{ messages }}", None) == "json"
+    assert _detect_template_tool_syntax(None, None) == "json"
 
 
 def test_tool_call_single_stream():
@@ -200,14 +216,21 @@ def test_tool_call_single_stream():
     events = iter_sse(resp.text)
     assert_valid_stream(events)
     assert not any(ev == "response.output_text.delta" for ev, _ in events)
-    deltas = [p["delta"] for ev, p in events if ev == "response.function_call_arguments.delta"]
+    # Raw chunks stream live (single chunk here): the delta carries raw text,
+    # the done event carries the parsed arguments.
+    deltas = [(ev, p) for ev, p in events if ev == "response.function_call_arguments.delta"]
     assert len(deltas) == 1
-    assert json.loads(deltas[0]) == {"location": "Paris"}
+    assert json.loads(deltas[0][1]["delta"])["name"] == "get_weather"
     done = [p for ev, p in events if ev == "response.function_call_arguments.done"]
-    assert done[0]["arguments"] == deltas[0]
+    assert json.loads(done[0]["arguments"]) == {"location": "Paris"}
+    # added -> delta -> done reference the same item.
+    added = [p for ev, p in events if ev == "response.output_item.added"]
+    assert len(added) == 1
+    assert added[0]["item"]["id"] == deltas[0][1]["item_id"] == done[0]["item_id"]
     completed = next(p["response"] for ev, p in events if ev == "response.completed")
     fc = next(i for i in completed["output"] if i["type"] == "function_call")
     assert fc["name"] == "get_weather"
+    assert fc["id"] == added[0]["item"]["id"]
 
 
 def test_tool_call_malformed_failed():
@@ -279,6 +302,71 @@ def test_tool_call_parallel_false_incomplete():
     assert any(ev == "response.incomplete" for ev, _ in events)
     completed = next(p["response"] for ev, p in events if ev == "response.incomplete")
     assert len([i for i in completed["output"] if i["type"] == "function_call"]) == 1
+
+
+def test_assistant_message_without_tool_calls_renders():
+    # Regression: a plain assistant-role message in `input` must not 422.
+    # Native templates read `message.tool_calls` unguarded, which raised
+    # under StrictUndefined when the key was missing.
+    session = FakeSession(chunks=("done",))
+    client = TestClient(
+        create_app(
+            session,
+            model="fake-model",
+            chat_contract=QWEN3_CONTRACT,
+            chat_templates={"tool_use": NATIVE_TOOL_TEMPLATE},
+        )
+    )
+    resp = client.post(
+        "/v1/responses",
+        json={
+            "model": "fake-model",
+            "input": [
+                {"type": "message", "role": "assistant", "content": "thinking..."},
+                {"type": "message", "role": "user", "content": "hi"},
+            ],
+            "tools": [
+                {"type": "function", "name": "get_weather", "parameters": {}}
+            ],
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "completed"
+
+
+def test_plain_text_history_renders_followup_turn():
+    # Regression: a stored assistant turn without tool calls must render
+    # on the follow-up turn (previous_response_id path).
+    session = FakeSession(chunks=("plain answer",))
+    client = TestClient(
+        create_app(
+            session,
+            model="fake-model",
+            chat_contract=QWEN3_CONTRACT,
+            chat_templates={"tool_use": NATIVE_TOOL_TEMPLATE},
+        )
+    )
+    tools = [{"type": "function", "name": "get_weather", "parameters": {}}]
+    first = client.post(
+        "/v1/responses",
+        json={"model": "fake-model", "input": "hi", "tools": tools},
+    ).json()
+    assert first["status"] == "completed"
+    assert "function_call" not in [
+        i["type"] for i in first["output"]
+    ]
+    session.chunks = ("follow-up answer",)
+    second = client.post(
+        "/v1/responses",
+        json={
+            "model": "fake-model",
+            "previous_response_id": first["id"],
+            "input": "and then?",
+            "tools": tools,
+        },
+    )
+    assert second.status_code == 200
+    assert second.json()["status"] == "completed"
 
 
 def test_function_output_continues_stored_tool_history():

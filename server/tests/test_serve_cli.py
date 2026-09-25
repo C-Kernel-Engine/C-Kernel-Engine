@@ -304,27 +304,30 @@ def test_runtime_context_rejects_missing_or_invalid_layout(tmp_path, payload):
 
 
 def test_manifest_loader_reads_chat_template_and_contract(tmp_path):
+    from ck_serve_runtime_v8 import load_manifest_templates
+
+    (tmp_path / "chat_template.jinja").write_text("my-jinja", encoding="utf-8")
+    variants = tmp_path / "additional_chat_templates"
+    variants.mkdir()
+    (variants / "tool_use.jinja").write_text("tool-jinja", encoding="utf-8")
+    ct, cts, cc = load_manifest_templates(tmp_path)
+    assert ct == "my-jinja"
+    assert cts == {"tool_use": "tool-jinja"}
+    assert cc is None
+
+
+def test_manifest_loader_ignores_embedded_template_without_sidecar(tmp_path):
     import json
 
     from ck_serve_runtime_v8 import load_manifest_templates
 
-    contract = {
-        "name": "qwen3",
-        "turn_prefix": "<|im_start|>{role}\n",
-        "turn_suffix": "<|im_end|>\n",
-        "assistant_generation_prefix": "<|im_start|>assistant\n",
-        "thinking_mode_default": "visible",
-        "assistant_generation_prefix_by_thinking_mode": {
-            "visible": "<|im_start|>assistant\n",
-            "suppressed": "<|im_start|>assistant\n<think>\n\n</think>\n\n",
-        },
-        "last_user_prefix_by_thinking_mode": {"visible": "", "suppressed": "/no_think\n"},
-    }
     (tmp_path / "weights_manifest.json").write_text(
-        json.dumps({"config": {"chat_template": "my-jinja", "chat_templates": {"tool_use": "tool-jinja"}, "chat_contract": contract}}),
+        json.dumps({"config": {"chat_template": "stale-embed"}}),
         encoding="utf-8",
     )
-    ct, cts, cc = load_manifest_templates(tmp_path)
-    assert ct == "my-jinja"
-    assert cts == {"tool_use": "tool-jinja"}
-    assert cc == contract
+    (tmp_path / "config.json").write_text(
+        json.dumps({"chat_template": "stale-config"}),
+        encoding="utf-8",
+    )
+    ct, _, _ = load_manifest_templates(tmp_path)
+    assert ct is None

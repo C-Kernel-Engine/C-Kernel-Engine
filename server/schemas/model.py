@@ -14,6 +14,8 @@ class Model(BaseModel):
     object: Literal["model"] = "model"
     created: int
     owned_by: str = "cke"
+    cke_context_length: int | None = None
+    cke_default_max_output_tokens: int | None = None
 
 
 class ModelList(BaseModel):

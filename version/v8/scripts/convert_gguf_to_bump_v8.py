@@ -758,13 +758,94 @@ def _apply_special_tokenizer_overrides(
     return patched
 
 
+def _normalize_gguf_chat_template(raw: object) -> Optional[str]:
+    """Return the full GGUF-native Jinja template, or None when absent.
+
+    GGUF stores ``tokenizer.chat_template`` as a string, but tolerate
+    ``bytes`` and sequence forms so a present template is never silently
+    dropped. The returned string is verbatim (no truncation).
+    """
+    if raw is None:
+        return None
+    if isinstance(raw, bytes):
+        try:
+            raw = raw.decode("utf-8")
+        except UnicodeDecodeError:
+            raw = raw.decode("utf-8", errors="replace")
+    if isinstance(raw, (list, tuple)):
+        parts: list[str] = []
+        for item in raw:
+            if isinstance(item, bytes):
+                try:
+                    parts.append(item.decode("utf-8"))
+                except UnicodeDecodeError:
+                    parts.append(item.decode("utf-8", errors="replace"))
+            elif isinstance(item, str):
+                parts.append(item)
+        if not parts:
+            return None
+        print(
+            "[chat_template] Note: tokenizer.chat_template is an array "
+            f"({len(parts)} entries); joining entries verbatim"
+        )
+        raw = "\n".join(parts)
+    if not isinstance(raw, str):
+        return None
+    if not raw.strip():
+        return None
+    return raw
+
+
+def _write_native_chat_template_sidecar(
+    native_template: Optional[str],
+    *,
+    gguf_path: object,
+    manifest_out: object,
+    config_out: object,
+    output: object,
+) -> Optional[str]:
+    """Emit the canonical ``chat_template.jinja`` sidecar (GGUF-only).
+
+    The sidecar is the single source of truth for the server's native
+    template. Returns the written path, or None when there is no native
+    template (logs the missing-template line instead of failing silently).
+    """
+    if native_template is None or not str(native_template).strip():
+        print(
+            "[chat_template] missing: tokenizer.chat_template absent in "
+            f"{gguf_path}; no chat_template.jinja emitted"
+        )
+        return None
+    text = str(native_template)
+    anchor: Optional[str] = None
+    for candidate in (manifest_out, config_out, output):
+        if isinstance(candidate, str) and candidate.strip():
+            anchor = candidate
+            break
+    if anchor is None:
+        print("[chat_template] missing: no output anchor for chat_template.jinja")
+        return None
+    sidecar_dir = os.path.dirname(os.path.abspath(anchor)) or "."
+    os.makedirs(sidecar_dir, exist_ok=True)
+    sidecar_path = os.path.join(sidecar_dir, "chat_template.jinja")
+    with open(sidecar_path, "w", encoding="utf-8") as sf:
+        sf.write(text)
+        if not text.endswith("\n"):
+            sf.write("\n")
+    digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
+    print(
+        f"[chat_template] source=gguf-native len={len(text)} sha={digest} -> {sidecar_path}"
+    )
+    return sidecar_path
+
+
 def _extract_chat_contract(
     template_data: Optional[dict],
     meta: dict,
 ) -> Optional[dict]:
     return build_chat_contract(
         template_data=template_data,
-        chat_template=meta.get("tokenizer.chat_template"),
+        chat_template=_normalize_gguf_chat_template(meta.get("tokenizer.chat_template")),
         finetune=meta.get("general.finetune"),
         model_name=meta.get("general.name"),
         model_type=meta.get("general.architecture") or meta.get("general.type"),
@@ -5296,8 +5377,8 @@ def main() -> None:
             }, "qwen4_exp")
             if tokenizer_contract:
                 qwen4_config["tokenizer_contract"] = tokenizer_contract
-            chat_template = meta.get("tokenizer.chat_template")
-            if isinstance(chat_template, str) and chat_template.strip():
+            chat_template = _normalize_gguf_chat_template(meta.get("tokenizer.chat_template"))
+            if chat_template is not None:
                 qwen4_config["chat_template"] = chat_template
 
             if template_data is None:
@@ -5457,6 +5538,13 @@ def main() -> None:
                 with open(args.manifest_out, "w", encoding="utf-8") as manifest_file:
                     json.dump(manifest_dict, manifest_file, indent=2)
                     manifest_file.write("\n")
+                _write_native_chat_template_sidecar(
+                    _normalize_gguf_chat_template(meta.get("tokenizer.chat_template")),
+                    gguf_path=args.gguf,
+                    manifest_out=args.manifest_out,
+                    config_out=args.config_out,
+                    output=args.output,
+                )
             print(
                 f"[gguf->bump] version={args.bump_version} arch=qwen4_exp layers={num_layers} "
                 f"hidden={embed_dim} heads={num_heads}/{num_kv_heads} experts={n_experts}/{experts_per_tok} "
@@ -5820,8 +5908,8 @@ def main() -> None:
                 cfg.update(qwen35_config)
                 cfg["num_merges"] = num_merges
                 cfg["total_vocab_bytes"] = total_vocab_bytes
-                chat_template = meta.get("tokenizer.chat_template")
-                if isinstance(chat_template, str) and chat_template.strip():
+                chat_template = _normalize_gguf_chat_template(meta.get("tokenizer.chat_template"))
+                if chat_template is not None:
                     cfg["chat_template"] = chat_template
                 if rope_layout:
                     cfg["rope_layout"] = rope_layout
@@ -6040,6 +6128,13 @@ def main() -> None:
                     json.dump(manifest, mf, indent=2)
                     mf.write("\n")
                 print(f"[manifest] Written: {args.manifest_out} ({len(manifest_entries)} entries)")
+                _write_native_chat_template_sidecar(
+                    _normalize_gguf_chat_template(meta.get("tokenizer.chat_template")),
+                    gguf_path=args.gguf,
+                    manifest_out=args.manifest_out,
+                    config_out=args.config_out,
+                    output=args.output,
+                )
             return
 
         if arch == "gemma4":
@@ -6582,8 +6677,8 @@ def main() -> None:
                 }, runtime_arch)
             if tokenizer_contract:
                 nemotron_config["tokenizer_contract"] = tokenizer_contract
-            chat_template = meta.get("tokenizer.chat_template")
-            if isinstance(chat_template, str) and chat_template.strip():
+            chat_template = _normalize_gguf_chat_template(meta.get("tokenizer.chat_template"))
+            if chat_template is not None:
                 nemotron_config["chat_template"] = chat_template
             if template_data is None:
                 template_data = load_template_for_arch(runtime_arch)
@@ -6748,6 +6843,13 @@ def main() -> None:
                     json.dump(manifest_dict, mf, indent=2)
                     mf.write("\n")
                 print(f"[manifest] Written: {args.manifest_out} ({len(manifest_entries)} entries)")
+                _write_native_chat_template_sidecar(
+                    _normalize_gguf_chat_template(meta.get("tokenizer.chat_template")),
+                    gguf_path=args.gguf,
+                    manifest_out=args.manifest_out,
+                    config_out=args.config_out,
+                    output=args.output,
+                )
 
             print(
                 f"[gguf->bump] version={args.bump_version} arch={arch}->{runtime_arch} layers={num_layers} "
@@ -7363,8 +7465,8 @@ def main() -> None:
                         "per_layer_dim": int(gemma4_per_layer_dim),
                         "final_logit_softcapping": float(meta.get("gemma4.final_logit_softcapping", 0.0) or 0.0),
                     })
-                chat_template = meta.get("tokenizer.chat_template")
-                if isinstance(chat_template, str) and chat_template.strip():
+                chat_template = _normalize_gguf_chat_template(meta.get("tokenizer.chat_template"))
+                if chat_template is not None:
                     config["chat_template"] = chat_template
                 if rope_layout:
                     config["rope_layout"] = rope_layout
@@ -7588,8 +7690,8 @@ def main() -> None:
             cfg["rope_layout"] = rope_layout
         if arch == "gemma3":
             cfg["prefill_policy"] = "batched"
-        chat_template = meta.get("tokenizer.chat_template")
-        if isinstance(chat_template, str) and chat_template.strip():
+        chat_template = _normalize_gguf_chat_template(meta.get("tokenizer.chat_template"))
+        if chat_template is not None:
             cfg["chat_template"] = chat_template
         finetune = meta.get("general.finetune")
         if isinstance(finetune, str) and finetune.strip():
@@ -7690,6 +7792,23 @@ def main() -> None:
             json.dump(manifest, mf, indent=2)
             mf.write("\n")
         print(f"[manifest] Written: {args.manifest_out} ({len(manifest_entries)} entries)")
+        _write_native_chat_template_sidecar(
+            _normalize_gguf_chat_template(meta.get("tokenizer.chat_template")),
+            gguf_path=args.gguf,
+            manifest_out=args.manifest_out,
+            config_out=args.config_out,
+            output=args.output,
+        )
+    elif args.config_out:
+        # Standalone --config-out without --manifest-out: still emit the
+        # native sidecar next to the config so the server can find it.
+        _write_native_chat_template_sidecar(
+            _normalize_gguf_chat_template(meta.get("tokenizer.chat_template")),
+            gguf_path=args.gguf,
+            manifest_out=args.manifest_out,
+            config_out=args.config_out,
+            output=args.output,
+        )
 
     # Run parity verification if requested
     if args.verify:
