@@ -1349,6 +1349,8 @@ python version/v8/scripts/compare_whisper_encoder_pytorch_v8.py \
 
 <div class="card">
     <h3 style="margin-top: 0;">Native Server And FFI Boundary</h3>
+    <p>See the <a href="v8-serving-coverage.html">circuit-derived serving coverage inventory</a>
+        for declared profiles and the artifact-level evidence still missing for each circuit.</p>
     <p>
         External Python, Rust, or C hosts should bind <code>include/ck_session_v8.h</code> through
         <code>build/libck_session_v8.so</code>. The session loads the generated model once and exposes native
@@ -1602,6 +1604,13 @@ qwen --bare \
         compatibility template at request time. Tool-bearing streams publish parsed calls
         only after validation. A complete bundle can serve with <code>--no-build</code> without
         the source GGUF or a server-owned template copy.
+        Publisher special-token variables such as <code>bos_token</code> come from the
+        bundle's hashed tokenizer metadata. Missing variables remain undefined and
+        conflicting metadata fails; the renderer does not invent model delimiters.
+        The standard <code>strftime_now</code> helper uses the host's current date
+        when a publisher template requests it.
+        This supports publisher text-chat rendering, but does not certify Gemma4 or Muse
+        tool parsing, native token IDs, or generated-model harness tasks.
     </p>
     <h4>Bounded local Qwen Code acceptance</h4>
     <p>Use the same Qwen Code client as a real contributor task in a new disposable directory.
