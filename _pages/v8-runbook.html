@@ -1617,16 +1617,35 @@ qwen --bare \
 <pre>python3 server/qwen_harness_acceptance.py \
   --endpoint http://127.0.0.1:8080/v1 \
   --model qwen38-27b-q4km \
+  --expected-serving-identity &lt;serving.json identity&gt; \
+  --expected-session-library-sha256 &lt;libck_session_v8.so SHA-256&gt; \
   --settings server/qwen-code/interactive.settings.json \
   --run-dir /tmp/cke-qwen-acceptance-001</pre>
     </div>
     <p class="mini-note">The runner requires an empty run directory and writes
         <code>events.jsonl</code>, <code>stderr.log</code>, the edited fixture and
         <code>report.json</code>. A PASS proves this bounded harness task on the named
-        endpoint. The report marks loaded artifact identity as unverified because
-        <code>/v1/models</code> exposes a model ID and context capacity, not the loaded
-        library/template hashes. Bind those identities separately before promoting a
-        result as current-artifact certification. A cached <code>191335eba</code> Qwen3.8 27B Q4_K_M
+        endpoint. For a resolved bundle, read the intended <code>identity</code> field from
+        its <code>serving.json</code> and pass it with
+        <code>--expected-serving-identity</code>. The runner checks
+        <code>GET /v1/cke/loaded-identity</code> before launching Qwen Code and again after
+        the task. That endpoint reports the verified bundle identity, asset hashes,
+        native session-library hash and server-instance ID without filesystem paths.
+        The session hash comes from the backing file of the loaded native session symbol;
+        deleted, replaced or ambiguous mappings are rejected at startup. Supply the
+        expected session-library hash to certify that runtime ABI as well. Every
+        supplied hash is checked independently: a mismatch prevents task launch or
+        fails certification, while an absent expectation leaves certification incomplete.
+        The endpoint reports <code>effective_serving</code> separately from the bundle:
+        configured raw or templated mode, selected output protocol, active context limit,
+        default output allowance, and stop behavior. The runner requires that snapshot
+        to remain stable across its task.
+        A legacy endpoint with no
+        loaded identity, or a run without both expected hashes, remains
+        <code>INCOMPLETE</code> even if its bounded task passes. The acceptance command exits
+        successfully only when both the task and artifact certification report <code>PASS</code>.
+        The endpoint is a startup verification snapshot, not continuous file-integrity
+        monitoring. A cached <code>191335eba</code> Qwen3.8 27B Q4_K_M
         run completed read → edit → test → summary on Ryzen at 16K compiled capacity;
         it does not establish 256K-input execution or other model-family tool support.</p>
     <p style="margin-bottom: 0;" class="mini-note">
