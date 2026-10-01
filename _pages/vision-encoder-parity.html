@@ -17,8 +17,8 @@ permalink: /vision-encoder-parity/
     llama.cpp on the inspected 1008 x 16384 prefixes. Fresh, source-fingerprinted production
     runs pass 128 generated tokens for the second OCR fixture and the public Fake 2 fixture.
     The first OCR fixture reproducibly diverges at decoder step 20. Full replay fails at the same
-    step, isolating shared decoder arithmetic rather than persistent cache state. The 5-, 10-,
-    and 40-image gates are intentionally paused until that defect is fixed.
+    step, isolating shared decoder arithmetic rather than persistent cache state. The private
+    corpus gates are intentionally paused until that defect is fixed.
   </div>
 
   <h2>Evidence, Not A Single Parity Label</h2>
@@ -46,7 +46,7 @@ permalink: /vision-encoder-parity/
       <tr><td>OCR fixture 1</td><td>28 x 36, 1008 rows</td><td>Inspected prefix exact</td><td>First top-1 mismatch at step 20; full replay also fails</td></tr>
       <tr><td>OCR fixture 2</td><td>36 x 28, 1008 rows</td><td>Inspected prefix exact</td><td>128 / 128 top-1 tokens</td></tr>
       <tr><td>Public Fake 2 fixture</td><td>36 x 28, 1008 rows</td><td>Inspected prefix exact</td><td>128 / 128 top-1 tokens</td></tr>
-      <tr><td>Remaining OCR corpus</td><td>Varied</td><td>Not promoted</td><td>5-, 10-, and 40-image gates pending</td></tr>
+      <tr><td>Remaining OCR corpus</td><td>Varied</td><td>Not promoted</td><td>Private corpus gates pending</td></tr>
     </tbody>
   </table>
   <p>
@@ -182,7 +182,7 @@ permalink: /vision-encoder-parity/
     <tbody>
       <tr><td>AVX2 GGUF</td><td>llama.cpp</td><td>Q8 quantization, AVX2 reduction order, FP16 cache attention, persistent state</td><td>Encoder exact on tested fixtures; decoder sweep still open</td></tr>
       <tr><td>AVX-512 GGUF</td><td>llama.cpp</td><td>ISA dispatch, VNNI/non-VNNI routing, reduction and cache contracts</td><td>Separate Xeon validation is required; results are not inferred from AVX2</td></tr>
-      <tr><td>BF16 / AMX</td><td>PyTorch</td><td>BF16 storage boundaries, SDPA tiling, LayerNorm/GEMM rounding, M-RoPE</td><td>40/40 visual prefixes are byte-exact; 30/40 images pass all 64 teacher-forced ranking steps, with ten late decoder flips still under attribution</td></tr>
+      <tr><td>BF16 / AMX</td><td>PyTorch</td><td>BF16 storage boundaries, SDPA tiling, LayerNorm/GEMM rounding, M-RoPE</td><td>Visual prefixes in the private corpus are byte-exact; some images still have late decoder ranking flips under attribution</td></tr>
     </tbody>
   </table>
 
@@ -289,7 +289,7 @@ make llamacpp-parity-full</code></pre>
     <li>Run decoder X-ray at the earliest BF16 ranking failure, preserving the exact PyTorch token history.</li>
     <li>Compare sparse decoder layers, then expand the measured interval with the largest accumulated drift.</li>
     <li>Register or fix only the responsible numerical provider and preserve it with a real-shape PyTorch oracle.</li>
-    <li>Rerun the ten failed BF16 images, followed by the full 40-image teacher-forced sweep.</li>
+    <li>Rerun the failed BF16 images, followed by the full private teacher-forced sweep.</li>
     <li>Continue the separate GGUF AVX2 and native AVX-512 llama.cpp certification lanes.</li>
     <li>Publish exact artifacts, negative results, compiler and ISA identity, and application accuracy.</li>
     <li>Resume performance tuning only after correctness remains green.</li>

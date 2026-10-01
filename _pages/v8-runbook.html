@@ -467,7 +467,7 @@ rm /srv/cke/nightly-state/PAUSE</pre>
         </thead>
         <tbody>
             <tr><td>Text</td><td>At least three fixed real prompts that exercise every declared layer kind; layer and state checkpoints through the full graph; complete first-step logits; and 128 deterministic decode steps against PyTorch or llama.cpp.</td><td>2K, 8K, and 32K are progression points. A model advertised for 64K, 128K, or 256K is not production-certified until matched runs reach that boundary with identical input IDs, checkpoint logits, KV/recurrent-state evidence, and stop reason. Code and SVG prompts measure application quality separately.</td></tr>
-            <tr><td>Vision</td><td>Official image processor and token IDs; encoder-layer checkpoints; projector/bridge output; decoder-layer and logit trajectory; at least one small, one native-resolution, and one multi-image X-Ray case.</td><td>The resumable 40-image corpus covers OCR, forms, tables, charts, handwriting, natural images, and varied geometry. Exact fields and visual-question outputs are quality gates, not substitutes for PyTorch numerical comparison.</td></tr>
+            <tr><td>Vision</td><td>Official image processor and token IDs; encoder-layer checkpoints; projector/bridge output; decoder-layer and logit trajectory; at least one small, one native-resolution, and one multi-image X-Ray case.</td><td>The private resumable corpus covers OCR, forms, tables, charts, handwriting, natural images, and varied geometry. Exact fields and visual-question outputs are quality gates, not substitutes for PyTorch numerical comparison.</td></tr>
             <tr><td>Audio</td><td>Waveform decode/resample, frontend features, every encoder block, cross-attention context, decoder state/logits, and transcript tokens compared with an independent implementation.</td><td>Short and long public fixtures, silence/noise boundaries, and every claimed language/task mode. Real-time factor, peak memory, and core occupancy are recorded independently.</td></tr>
         </tbody>
     </table>
@@ -520,27 +520,30 @@ make test-gemma4-private-corpus-parity-auto</pre>
         Redacted console output is not a publishable report. The independent
         Qwen3-VL encoder suite redacts image paths and IDs by default; use
         <code>--show-private-details</code> only in a trusted local terminal.
-        The 40-image targets require 40 selected, distinct image hashes.
+        Private corpus targets require their configured number of selected,
+        distinct image hashes; partial selections cannot satisfy full coverage.
     </p>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
 <pre>python version/v8/scripts/export_vision_public_summary_v8.py \
   --private-summary /data/cke/vision-certification/RUN/summary.json \
   --public-summary /data/cke/vision-certification/RUN/public-summary.json \
-  --corpus-alias ocr40-v1</pre>
+  --count-free</pre>
     </div>
     <p class="v8-note">
         Publish only the exported file, never its containing private run directory.
-        Its allowlist contains selected/completed/passing counts, aggregate
-        errors or timings, source revisions, and bridge-reported artifact hashes.
-        It excludes per-image rows and image hashes. Bridge-reported hashes do
-        not independently attest which libraries were loaded.
+        The count-free exporter accepts encoder-prefix, shared-prefix decoder,
+        and image-fed OCR task-quality summaries. It publishes only the scoped
+        lane and verdict, omitting corpus identity, counts, percentages, timing,
+        sample identities, paths, text, and artifact hashes. Full counts and
+        provenance remain in private reports. OCR quality remains separate from
+        execution completion and does not certify numerical parity.
     </p>
     <p class="v8-note">
-        At source commit <code>352108874</code>, the Qwen3-VL profile passed all
-        40 corpus images across P3 AVX2 and Ryzen AVX-512: 640/640 generated
-        full-vocabulary decoder rows were bit-exact to llama.cpp, with 40
-        distinct image and prefix hashes. This is shared-prefix decoder parity,
+        At source commit <code>352108874</code>, the Qwen3-VL profile passed
+        its selected private corpus across P3 AVX2 and Ryzen AVX-512; all
+        generated full-vocabulary decoder rows were bit-exact to llama.cpp.
+        This is shared-prefix decoder parity,
         not independent vision-encoder parity or OCR-quality certification.
     </p>
 </div>
@@ -591,7 +594,7 @@ make certify-v8-engineering-quality</pre>
 make certify-v8-engineering-quality</pre>
     </div>
     <p class="v8-note" style="margin-bottom: 0;">
-        Configure local checkpoints with <code>V8_QWEN36_MODEL</code>, <code>V8_QWEN38_MODEL</code>, <code>V8_QWEN35_MOE_MODEL</code>, <code>V8_GEMMA4_MODEL</code>, <code>V8_GLM4_MODEL</code>, <code>V8_NEMOTRON9_MODEL</code>, <code>V8_INSTELLA_MODEL</code>, <code>V8_KIMI_MODEL</code>, <code>V8_LAGUNA_MODEL</code>, and <code>V8_COHERE2_MODEL</code>. The corresponding <code>V8_*_GGUF</code> variables may identify a separate llama.cpp oracle. Reports are written incrementally to <code>build/v8-long-context-certification/summary.md</code> and <code>summary.json</code>, so an interrupted multi-day run resumes completed rows. Qwen3.6-VL is intentionally excluded from this text matrix and remains covered by <code>make test-qwen36vl-private-corpus-parity-auto</code>, which exercises its encoder, bridge, decoder, and 40-image OCR corpus.
+        Configure local checkpoints with <code>V8_QWEN36_MODEL</code>, <code>V8_QWEN38_MODEL</code>, <code>V8_QWEN35_MOE_MODEL</code>, <code>V8_GEMMA4_MODEL</code>, <code>V8_GLM4_MODEL</code>, <code>V8_NEMOTRON9_MODEL</code>, <code>V8_INSTELLA_MODEL</code>, <code>V8_KIMI_MODEL</code>, <code>V8_LAGUNA_MODEL</code>, and <code>V8_COHERE2_MODEL</code>. The corresponding <code>V8_*_GGUF</code> variables may identify a separate llama.cpp oracle. Reports are written incrementally to <code>build/v8-long-context-certification/summary.md</code> and <code>summary.json</code>, so an interrupted multi-day run resumes completed rows. Qwen3.6-VL is intentionally excluded from this text matrix and remains covered by <code>make test-qwen36vl-private-corpus-parity-auto</code>, which exercises its encoder, bridge, decoder, and private OCR corpus.
     </p>
     <p class="mini-note">The capacity matrix uses a deterministic fixed-token sequence so exact consumption, hashes, timing, and oracle comparisons remain reproducible. It does not claim that normal prompts should fill every supported context window. The standalone engineering command writes to <code>build/v8-engineering-quality/quality/</code>: open <code>index.html</code> for the readable gallery, or inspect each model's exact prompt, raw response, clean <code>.c</code>/<code>.svg</code> artifact, compiler logs, trace, and validation JSON. Repository, documentation, retrieval, and multi-turn application corpora are the next certification layer.</p>
 </div>
@@ -663,7 +666,7 @@ make test-v8-arm-model-smoke CK_ARM_MODEL_DIR=/path/to/generated-v8-model</pre><
             <tr><td>Laguna-XS 2.1 Q4_K_M</td><td>Coherent text E2E; all 684 mapped entries converted</td><td>Embedding and layer-0 RMSNorm are bit-exact; identical-input router replay preserves selected experts and routing weights within one ULP</td><td>The current llama.cpp Laguna loader omits the GGUF YaRN beta metadata; after oracle alignment, small attention/projection drift still changes a near-tied MoE route</td></tr>
             <tr><td>Cohere2 Command R Q4_K_M</td><td>GGUF Q4_K_M bring-up — 8-token llama.cpp replay agreement on Command R7B; long-trajectory parity pending</td><td>Tokenizer-free replay matches llama.cpp for the first 8 greedy positions</td><td>Long-trajectory parity and matched performance sweeps</td></tr>
             <tr><td>Cohere North Mini Code 30B-A3B Q4_K_M</td><td>Coherent and repeatable text; two complete 131,072-token capacity runs</td><td>Identical input, first-logit, and output-token hashes across both CKE runs</td><td>Matched full-model oracle parity and practical long-code quality</td></tr>
-            <tr><td>Cohere North Micro Vision 2.4B</td><td>Real-image encoder, bridge, and decoder bring-up</td><td>Portable BF16 provider contracts; official PyTorch layer X-Ray remains follow-up work</td><td>Complete encoder/bridge/decoder parity and 40-image OCR quality</td></tr>
+            <tr><td>Cohere North Micro Vision 2.4B</td><td>Real-image encoder, bridge, and decoder bring-up</td><td>Portable BF16 provider contracts; official PyTorch layer X-Ray remains follow-up work</td><td>Complete encoder/bridge/decoder parity and private OCR quality</td></tr>
             <tr><td>Cohere Transcribe 2B</td><td>Provider and exact 2,104-tensor inventory foundation; CKE conversion fails closed</td><td>Independent oracle exports frontend, all 48 encoder blocks, cross-attention, and decoder checkpoints</td><td>Assemble and certify the complete CKE audio trajectory</td></tr>
             <tr><td>Cohere Command A+ 218B/25B-active W4A4</td><td>Experimental native NVFP4 real-weight text runtime; coherent short answer</td><td>675/675 required weights mapped, packed-row and leaf parity, bounded X-Ray</td><td>Full-model and long-context parity, vision, quality, and matched performance</td></tr>
         </tbody>
