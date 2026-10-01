@@ -1402,12 +1402,23 @@ make test-native-session-v8</pre>
         A busy response uses a positive <code>Retry-After</code>; a cancellation
         timeout means native execution may still own the session. These checks
         establish request ownership, not completed Qwen Code tasks.</p>
+    <p>Streaming responses send bounded keep-alive comments during silent prefill,
+        including requests without tools. This lets the HTTP transport detect a
+        disconnected reader before a long native call finishes. The native worker
+        records a cancelled or failed stored response only after it returns, then
+        releases the session lease. The socket regression closes a stream during
+        active silent prefill, checks its stored status, and serves another request.</p>
     <p>
         Bounded localhost integration for <code>ck_serve_v8.py</code> serves Qwen3-0.6B with Q8_0 quantizations 
         on context length of 1024 on an ephemeral <code>127.0.0.1</code> port, waits for
         <code>GET /v1/health</code> under one monotonic deadline, streams one
         <code>POST /v1/responses</code> request, validates every event against the
         Responses schema, and requires streamed, terminal, and stored text to agree.
+        A budget-limited greeting is reported as <code>response.incomplete</code>,
+        not as a completed answer. A separate one-token request must explicitly
+        report <code>max_output_tokens</code>. The model-generated tool round trip
+        is an opt-in diagnostic with <code>--require-model-tool-roundtrip</code>;
+        passing the required smoke does not certify Qwen3-0.6B tool-use quality.
         Process-group shutdown and port cleanup complete before the lane reports success.
         Failures preserve the server log and partial SSE transcript.
     </p>
