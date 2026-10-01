@@ -1574,11 +1574,14 @@ version/v8/scripts/ck_serve_v8.py "$RUN_DIR" --run "$RUN_DIR" \
         claiming bounded latency for a deployed bundle.</p>
     <h4>Black-box HTTP lifecycle acceptance</h4>
     <p>Run this probe against the intended live endpoint after deployment. It uses only HTTP:
-        cancel during prefill and decode, close a stream, close a client after its read deadline,
+        cancel a long-input request after its in-progress event and a decoding request after
+        observing an output delta, close a stream, close a client after its read deadline,
         then serve a follow-up request after each case. It checks the loaded bundle, native
         session library and server instance before and after the run. A mismatched identity
         fails before generation; a missing run leaves no PASS report. The JSON records whether
-        follow-up generation completed or exhausted its output allowance.</p>
+        follow-up generation completed or exhausted its output allowance. The long-input
+        cancellation is a timing inference, not native prefill-phase proof; the report labels
+        its trigger and phase evidence explicitly.</p>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
 <pre>python3 server/http_lifecycle_acceptance.py \
@@ -1591,7 +1594,9 @@ version/v8/scripts/ck_serve_v8.py "$RUN_DIR" --run "$RUN_DIR" \
     <p class="mini-note">The probe is a transport and ownership check, not a tool-use or
         answer-quality certification. It requires a generated runtime with the cancellation
         hook and a local plain-HTTP endpoint; use the separate Qwen Code acceptance runner
-        to test model-generated tool calls and task completion.</p>
+        to test model-generated tool calls and task completion. Schedule the two on a local
+        runner at separate times so the single-flight endpoint is not deliberately contended;
+        retain each dated report and show a missing run as <code>NOT_TESTED</code>, never PASS.</p>
     <p class="mini-note">The versioned native session ABI borrows request buffers and callback
         data only while a synchronous call is active. Cancellation requests a stop; generation
         returning acknowledges that native work has stopped. The current generated-model state
