@@ -248,15 +248,14 @@
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71 3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       </div>
       <div style="min-width: 0;">
-        <strong>Status honesty.</strong> Cohere now has native short- and bounded long-audio correctness paths. The declared
-        <code>cohere_transcribe</code> circuit composes the frontend providers below with CKE dense, normalization,
-        activation, relative-attention, causal-attention, cross-attention, residual, and argmax kernels. On the
-        pinned 7.435-second fixture it emits the same 32 generated token IDs and transcript as CrispASR. On the
-        retained five-minute recording, two runs over the same 13 VAD speech slices reproduce every token and
-        DTW timestamp and match CrispASR's 686-word transcript with zero word edits. The Python session driver
-        reads a complete mixed FP16/FP32 BUMP bundle and its tokenizer sidecar. Speech detection is an explicit
-        external preprocessing contract; CKE performs all ASR model execution. Multilingual quality, native VAD,
-        generated-circuit execution, quantization, and optimized execution remain open.
+        <strong>Execution status.</strong> The <code>cohere_transcribe</code> circuit lowers the frontend and 48-layer
+        encoder into generated C; the 8-layer decoder also executes from a generated model library. A native C
+        host connects these components, manages segment iteration and greedy decoding, and calls native token
+        decoding. The Python native-kernel session remains a diagnostic reference, not a deployment dependency.
+        Its earlier 7.435-second, five-minute, and 42-minute results below are reference-path evidence, not
+        generated-runtime benchmarks. Long audio still requires an externally supplied speech-segment plan.
+        Native VAD, independent timestamp accuracy, multilingual quality, concurrency, and quantized execution
+        remain open or artifact-specific certification gates.
       </div>
     </div>
     <p style="color: var(--text-secondary);">
@@ -265,6 +264,8 @@
       F16 artifact for this correctness lane. The official CohereLabs repository is gated; the public GGUF keeps
       the native smoke reproducible without making private credentials part of the runner.
     </p>
+    <p><strong>Historical Python reference path:</strong> the following commands reproduce the native-kernel
+      reference session, not the generated-C host.</p>
     <pre><code>huggingface-cli download cstr/cohere-transcribe-03-2026-GGUF cohere-transcribe.gguf \
   --local-dir cohere-transcribe-source
 
@@ -276,7 +277,7 @@ python version/v8/scripts/run_cohere_transcribe_native_v8.py \
   --model cohere-transcribe-bump \
   --audio recording.wav --decode --language en</code></pre>
     <p style="color: var(--text-secondary);">
-      Long recordings require validated speech slices because this model fabricates text on silence. Export
+      In the historical reference path, long recordings require validated speech slices because this model fabricates text on silence. Export
       versioned slices with Silero VAD, then run bounded CKE inference. Each completed slice is atomically retained,
       so <code>--resume</code> restarts at a slice boundary. The runner emits the raw JSON trajectory, plain text,
       and SRT captions without hiding decoder loops.
@@ -288,8 +289,28 @@ python version/v8/scripts/run_cohere_transcribe_long_audio_v8.py \
   --model cohere-transcribe-bump --audio recording.wav \
   --speech-segments speech-slices.json --language en \
   --output cohere-long.json --text-output transcript.txt --srt-output transcript.srt</code></pre>
+    <p><strong>Generated-C path:</strong> after building the circuit-lowered encoder and decoder runtime bundles,
+      compile the native host and invoke both generated libraries. Each bundle must provide its own
+      <code>libmodel.so</code>, <code>weights.bump</code>, <code>weights_manifest.map</code>, and declared native
+      dependencies. The optional segment plan is a validated native frame-range file; no VAD is performed by the
+      host. Without the plan, the entire WAV is treated as one segment.</p>
+    <pre><code>make ck-audio-encoder-decoder-transcribe-v8
+./build/ck-audio-encoder-decoder-transcribe-v8 \
+  /path/to/cohere-encoder/libmodel.so \
+  /path/to/cohere-encoder/weights.bump \
+  /path/to/cohere-encoder/weights_manifest.map \
+  /path/to/cohere-decoder/libmodel.so \
+  /path/to/cohere-decoder/weights.bump \
+  /path/to/cohere-decoder/weights_manifest.map \
+  recording.wav segments.txt</code></pre>
+    <p>Use <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/scripts/export_audio_segment_plan_v8.py"><code>export_audio_segment_plan_v8.py</code></a>
+      to convert an externally produced VAD report into a native segment plan. The generated-path short fixture is
+      checked by <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/scripts/certify_cohere_generated_standalone_v8.py"><code>certify_cohere_generated_standalone_v8.py</code></a>;
+      <code>make test-cohere-transcribe-generated-long-audio-auto</code> checks the bounded long-audio path when its
+      runtime, audio, segment, and reference variables are supplied. These do not establish native VAD,
+      independent timestamps, multilingual quality, or general concurrency.</p>
     <p style="color: var(--text-secondary);">
-      The five-minute certification used a Ryzen 9 9950X3D with 16 threads. The two native runs completed in
+      These <strong>Python reference-path measurements are not generated-runtime timings</strong>. The five-minute certification used a Ryzen 9 9950X3D with 16 threads. The two native runs completed in
       67.36 and 66.03 seconds (0.225 and 0.220 real-time factor) with about 8.51 GB peak RSS. The certifier requires
       the actual engine and audio libraries to appear in the process map, identical artifact/runtime/input/VAD
       identities, exact repeated token and timestamp trajectories, finite outputs, no repeated multi-word phrase
@@ -345,7 +366,7 @@ python version/v8/scripts/run_cohere_transcribe_long_audio_v8.py \
 
     <div class="svg-expand">
     <svg viewBox="0 0 1180 420" width="100%" role="img" tabindex="0" data-svg-title="Transcribe frontend pipeline with status badges"
-         aria-label="Cohere Transcribe native short-audio pipeline: waveform preprocessing feeds a 48-layer Conformer encoder and an 8-layer causal cross-attention decoder from a complete BUMP bundle. The pinned short fixture matches all 32 CrispASR generated token IDs. Long audio, timestamps, resampling, multilingual coverage, quantization, and performance remain open."
+         aria-label="Cohere Transcribe pipeline: generated C frontend and 48-layer encoder feed a generated 8-layer decoder through a native C transcription host. Historical Python-reference results include 32 matching short-fixture tokens and bounded long-audio execution. Native VAD, independent timestamps, multilingual coverage, quantization, and generated-path performance require separate evidence."
          style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
       <defs>
         <marker id="ck-arrow2" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
@@ -414,8 +435,8 @@ python version/v8/scripts/run_cohere_transcribe_long_audio_v8.py \
 
       <path d="M764,196 C900,196 250,260 300,288" fill="none" stroke="#8aa0b4" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#ck-arrow2)"/>
 
-      <text x="24" y="392" class="ck-cap">Evidence: real GGUF inventory 2104/2104; 48 encoder X-Ray blocks; exact 32-token greedy trajectory and transcript on the 7.435-second public fixture.</text>
-      <text x="24" y="412" class="ck-cap">Caveats: correctness-oriented Python session driver; long audio, timestamps, resampling, multilingual coverage, quantization, and tuned performance remain open.</text>
+      <text x="24" y="392" class="ck-cap">Generated C: frontend/encoder + decoder libraries, native C host. Historical reference: 2104/2104 weights and 32 matching short-fixture tokens.</text>
+      <text x="24" y="412" class="ck-cap">Caveats: external VAD plan; timestamp, multilingual, concurrency, quantization, and generated-path speed need separate evidence.</text>
     </svg>
     <div class="svg-expand-hint">click / tap the diagram to expand</div>
     </div>
@@ -539,8 +560,8 @@ python version/v8/scripts/run_cohere_transcribe_long_audio_v8.py \
       <text x="44" y="564" class="ck-sub">self-attention kv is f16-rounded on append (_f16_cache_round) - the persistent-cache storage contract, not an optimization</text>
       <text x="44" y="588" class="ck-sub">cross kv is computed once and never recomputed  |  context budget 1024 tokens  |  last-layer cross-attention weights retained per step</text>
 
-      <text x="24" y="646" class="ck-cap">Evidence: 32/32 generated token IDs and transcript exact vs CrispASR (7.435 s fixture); two five-minute runs identical, zero word edits.</text>
-      <text x="24" y="668" class="ck-cap">Caveat: correctness-oriented Python session driver; generated-circuit lowering, quantization, multilingual quality, and tuned performance remain open.</text>
+      <text x="24" y="646" class="ck-cap">Generated decoder and native host execute tokens; historical Python reference: 32/32 short tokens, two matching five-minute runs.</text>
+      <text x="24" y="668" class="ck-cap">Caveat: external segment plan; quantization, multilingual quality, and generated-path performance need separate evidence.</text>
     </svg>
     <div class="svg-expand-hint">click / tap the diagram to expand</div>
     </div>
