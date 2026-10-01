@@ -1,12 +1,12 @@
 {
   "chat_scope_counts": {
     "component": 19,
-    "linked_chat_declaration": 2,
-    "text_decoder_candidate": 16,
+    "linked_chat_declaration": 3,
+    "text_decoder_candidate": 15,
     "unassessed": 4
   },
   "circuit_count": 41,
-  "circuit_linked_count": 2,
+  "circuit_linked_count": 3,
   "rows": [
     {
       "artifact": {
@@ -397,11 +397,11 @@
         "revision": null,
         "tokenizer_sha256": null
       },
-      "chat_scope": "text_decoder_candidate",
-      "chat_scope_reason": "text decoder and token/logit contracts; serving unlinked",
+      "chat_scope": "linked_chat_declaration",
+      "chat_scope_reason": "circuit references a resolved serving profile",
       "circuit": "gemma4",
       "circuit_path": "version/v8/circuits/gemma4.json",
-      "circuit_sha256": "43a67101196a79ddde214c322f05a71113b436e03daa16124dfba1141d117273",
+      "circuit_sha256": "14717521207c8dc745729074c08c1d556b63e8f8fab54b0be4cf2b6ccbb55f6d",
       "evidence": {
         "cancellation_recovery": "not_assessed",
         "exact_token_ids": "not_assessed",
@@ -413,18 +413,26 @@
         "tool_round_trip": "not_assessed"
       },
       "family": "gemma4",
-      "input_modalities": null,
-      "output_protocol": null,
-      "profile_id": null,
-      "profile_ref": null,
-      "profile_sha256": null,
-      "publisher_template": null,
+      "input_modalities": [
+        "text"
+      ],
+      "output_protocol": "none",
+      "profile_id": "publisher-chat-v1",
+      "profile_ref": "serving_profiles/publisher_chat_v1.json",
+      "profile_sha256": "200fc72933f240c3cd58f936e5d793c87020828561fd0a8669bb8bbc520eb092",
+      "publisher_template": {
+        "source": "publisher",
+        "variant": "default"
+      },
       "reasoning_protocol": null,
-      "renderer": null,
-      "serving_declaration": "missing",
+      "renderer": "jinja-chat-v1",
+      "serving_declaration": "circuit_linked",
       "stop_policy": null,
-      "tool_template": null,
-      "variant": null
+      "tool_template": {
+        "source": "publisher",
+        "variant": "default"
+      },
+      "variant": "publisher"
     },
     {
       "artifact": {

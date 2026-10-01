@@ -1687,6 +1687,14 @@ qwen --bare \
         This supports publisher text-chat rendering, but does not certify Gemma4 or Muse
         tool parsing, native token IDs, or generated-model harness tasks.
     </p>
+    <p class="mini-note">Gemma4 now references the shared <code>publisher-chat-v1</code>
+        profile. Its declared output protocol is <code>none</code>: ordinary text chat can
+        resolve the publisher Jinja asset, while tool-bearing requests fail before generation.
+        When HF token sidecars are absent, verified GGUF special-token IDs are matched to
+        bundled <code>tokenizer.json</code> text; conflicting definitions fail at startup.
+        This is a declaration, not a Gemma4 serving certification. Exact rendered bytes,
+        native token IDs, generated-runtime chat, and a Gemma tool protocol still need
+        artifact-specific tests.</p>
     <h4>Bounded local Qwen Code acceptance</h4>
     <p>Use the same Qwen Code client as a real contributor task in a new disposable directory.
         This command reads a small HTML file, edits one heading, runs its Python validator and
