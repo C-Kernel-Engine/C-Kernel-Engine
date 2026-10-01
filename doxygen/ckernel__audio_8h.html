@@ -155,6 +155,8 @@ Macros</h2></td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="func-members" name="func-members"></a>
 Functions</h2></td></tr>
+<tr class="memitem:a52ab76c3f3ce966f70b7773816bbaf7b" id="r_a52ab76c3f3ce966f70b7773816bbaf7b"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__audio_8h.html#a52ab76c3f3ce966f70b7773816bbaf7b">audio_adain_instance_norm_f32</a> (const float *input, size_t input_elements, size_t input_stride, const float *norm_weight, size_t norm_weight_elements, const float *norm_bias, size_t norm_bias_elements, const float *style_affine, size_t style_affine_elements, float *output, size_t output_elements, size_t output_stride, size_t channels, size_t frames, float epsilon)</td></tr>
+<tr class="separator:a52ab76c3f3ce966f70b7773816bbaf7b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a4d0553f661e1a8e403ee7f78d18f6307" id="r_a4d0553f661e1a8e403ee7f78d18f6307"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__audio_8h.html#a4d0553f661e1a8e403ee7f78d18f6307">audio_adaptive_layer_norm_f32</a> (const float *input, size_t input_elements, const float *<a class="el" href="tokenizer_8h.html#aebee6a319ed22559d77672c8b7663346">style</a>, size_t style_elements, const float *projection_weight, size_t projection_weight_elements, const float *projection_bias, size_t projection_bias_elements, float *output, size_t output_elements, float *projection_scratch, size_t projection_scratch_bytes, int tokens, int channels, int style_dim, size_t input_stride, size_t output_stride, float epsilon)</td></tr>
 <tr class="separator:a4d0553f661e1a8e403ee7f78d18f6307"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a6a5776244c3c4f843a9cca21633a2a31" id="r_a6a5776244c3c4f843a9cca21633a2a31"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__audio_8h.html#a6a5776244c3c4f843a9cca21633a2a31">audio_argmax_first_f32</a> (const float *values, int elements, int *selected)</td></tr>
@@ -302,6 +304,165 @@ Functions</h2></td></tr>
 </div>
 </div>
 <h2 class="groupheader">Function Documentation</h2>
+<a id="a52ab76c3f3ce966f70b7773816bbaf7b" name="a52ab76c3f3ce966f70b7773816bbaf7b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a52ab76c3f3ce966f70b7773816bbaf7b">&#9670;&#160;</a></span>audio_adain_instance_norm_f32()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int audio_adain_instance_norm_f32 </td>
+          <td>(</td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>input</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>input_elements</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>input_stride</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>norm_weight</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>norm_weight_elements</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>norm_bias</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>norm_bias_elements</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>style_affine</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>style_affine_elements</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>output</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>output_elements</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>output_stride</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>channels</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>frames</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float&#160;</td>
+          <td class="paramname"><em>epsilon</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="audio__adain__instance__norm_8c_source.html#l00038">38</a> of file <a class="el" href="audio__adain__instance__norm_8c_source.html">audio_adain_instance_norm.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   45</span>{</div>
+<div class="line"><span class="lineno">   46</span>    <span class="keywordflow">if</span> (input == NULL || norm_weight == NULL || norm_bias == NULL ||</div>
+<div class="line"><span class="lineno">   47</span>        style_affine == NULL || output == NULL ||</div>
+<div class="line"><span class="lineno">   48</span>        !isfinite(epsilon) || epsilon &lt;= 0.0f ||</div>
+<div class="line"><span class="lineno">   49</span>        channels == 0u || channels &gt; SIZE_MAX / 2u) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">   50</span>    <span class="keywordtype">size_t</span> input_required, output_required;</div>
+<div class="line"><span class="lineno">   51</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="audio__adain__instance__norm_8c.html#a3224db7e29b245ecc7259e74a9cf41ce">checked_span</a>(channels, input_stride, frames, &amp;input_required) ||</div>
+<div class="line"><span class="lineno">   52</span>        !<a class="code hl_function" href="audio__adain__instance__norm_8c.html#a3224db7e29b245ecc7259e74a9cf41ce">checked_span</a>(channels, output_stride, frames, &amp;output_required))</div>
+<div class="line"><span class="lineno">   53</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">   54</span>    <span class="keywordflow">if</span> (input_elements &lt; input_required || output_elements &lt; output_required ||</div>
+<div class="line"><span class="lineno">   55</span>        norm_weight_elements &lt; channels || norm_bias_elements &lt; channels ||</div>
+<div class="line"><span class="lineno">   56</span>        style_affine_elements &lt; 2u * channels) <span class="keywordflow">return</span> -2;</div>
+<div class="line"><span class="lineno">   57</span> </div>
+<div class="line"><span class="lineno">   58</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> channel = 0u; channel &lt; channels; ++channel) {</div>
+<div class="line"><span class="lineno">   59</span>        <span class="keywordflow">if</span> (!isfinite(norm_weight[channel]) || !isfinite(norm_bias[channel]) ||</div>
+<div class="line"><span class="lineno">   60</span>            !isfinite(style_affine[channel]) ||</div>
+<div class="line"><span class="lineno">   61</span>            !isfinite(style_affine[channels + channel])) <span class="keywordflow">return</span> -3;</div>
+<div class="line"><span class="lineno">   62</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *row = input + channel * input_stride;</div>
+<div class="line"><span class="lineno">   63</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> frame = 0u; frame &lt; frames; ++frame)</div>
+<div class="line"><span class="lineno">   64</span>            <span class="keywordflow">if</span> (!isfinite(row[frame])) <span class="keywordflow">return</span> -3;</div>
+<div class="line"><span class="lineno">   65</span>    }</div>
+<div class="line"><span class="lineno">   66</span> </div>
+<div class="line"><span class="lineno">   67</span>    <span class="comment">/* Dry-run every result before the first output write. The repeated scalar</span></div>
+<div class="line"><span class="lineno">   68</span><span class="comment">     * pass trades throughput for a small, allocation-free reference kernel. */</span></div>
+<div class="line"><span class="lineno">   69</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> pass = 0; pass &lt; 2; ++pass) {</div>
+<div class="line"><span class="lineno">   70</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> channel = 0u; channel &lt; channels; ++channel) {</div>
+<div class="line"><span class="lineno">   71</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *row = input + channel * input_stride;</div>
+<div class="line"><span class="lineno">   72</span>            <span class="keywordtype">float</span> *output_row = output + channel * output_stride;</div>
+<div class="line"><span class="lineno">   73</span>            <span class="keywordtype">double</span> mean, inverse_std;</div>
+<div class="line"><span class="lineno">   74</span>            <span class="keywordflow">if</span> (!<a class="code hl_function" href="audio__adain__instance__norm_8c.html#a74c0acb4dd0428aa4a28db663946d2c7">channel_stats</a>(row, frames, epsilon, &amp;mean, &amp;inverse_std))</div>
+<div class="line"><span class="lineno">   75</span>                <span class="keywordflow">return</span> -3;</div>
+<div class="line"><span class="lineno">   76</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> weight = norm_weight[channel];</div>
+<div class="line"><span class="lineno">   77</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> bias = norm_bias[channel];</div>
+<div class="line"><span class="lineno">   78</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> gamma = style_affine[channel];</div>
+<div class="line"><span class="lineno">   79</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> beta = style_affine[channels + channel];</div>
+<div class="line"><span class="lineno">   80</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> frame = 0u; frame &lt; frames; ++frame) {</div>
+<div class="line"><span class="lineno">   81</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> normalized = (float)(</div>
+<div class="line"><span class="lineno">   82</span>                    ((<span class="keywordtype">double</span>)row[frame] - mean) * inverse_std);</div>
+<div class="line"><span class="lineno">   83</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> affine = normalized * weight + bias;</div>
+<div class="line"><span class="lineno">   84</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> value = (1.0f + gamma) * affine + beta;</div>
+<div class="line"><span class="lineno">   85</span>                <span class="keywordflow">if</span> (!isfinite(value)) <span class="keywordflow">return</span> -3;</div>
+<div class="line"><span class="lineno">   86</span>                <span class="keywordflow">if</span> (pass != 0) output_row[frame] = value;</div>
+<div class="line"><span class="lineno">   87</span>            }</div>
+<div class="line"><span class="lineno">   88</span>        }</div>
+<div class="line"><span class="lineno">   89</span>    }</div>
+<div class="line"><span class="lineno">   90</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">   91</span>}</div>
+<div class="ttc" id="aaudio__adain__instance__norm_8c_html_a3224db7e29b245ecc7259e74a9cf41ce"><div class="ttname"><a href="audio__adain__instance__norm_8c.html#a3224db7e29b245ecc7259e74a9cf41ce">checked_span</a></div><div class="ttdeci">static int checked_span(size_t channels, size_t stride, size_t frames, size_t *result)</div><div class="ttdef"><b>Definition</b> <a href="audio__adain__instance__norm_8c_source.html#l00013">audio_adain_instance_norm.c:13</a></div></div>
+<div class="ttc" id="aaudio__adain__instance__norm_8c_html_a74c0acb4dd0428aa4a28db663946d2c7"><div class="ttname"><a href="audio__adain__instance__norm_8c.html#a74c0acb4dd0428aa4a28db663946d2c7">channel_stats</a></div><div class="ttdeci">static int channel_stats(const float *row, size_t frames, float epsilon, double *mean, double *inverse_std)</div><div class="ttdef"><b>Definition</b> <a href="audio__adain__instance__norm_8c_source.html#l00022">audio_adain_instance_norm.c:22</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="audio__adain__instance__norm_8c_source.html#l00022">channel_stats()</a>, and <a class="el" href="audio__adain__instance__norm_8c_source.html#l00013">checked_span()</a>.</p>
+
+</div>
+</div>
 <a id="a4d0553f661e1a8e403ee7f78d18f6307" name="a4d0553f661e1a8e403ee7f78d18f6307"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a4d0553f661e1a8e403ee7f78d18f6307">&#9670;&#160;</a></span>audio_adaptive_layer_norm_f32()</h2>
 

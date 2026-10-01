@@ -515,6 +515,28 @@ make test-gemma4-private-corpus-parity-auto</pre>
         satisfy their declared numerical and corpus gates.
     </p>
     <p class="v8-note">
+        Keep private manifests, images, raw reports, hashes, prompts, token IDs,
+        and tensor captures outside the checkout and nightly upload paths.
+        Redacted console output is not a publishable report. The independent
+        Qwen3-VL encoder suite redacts image paths and IDs by default; use
+        <code>--show-private-details</code> only in a trusted local terminal.
+        The 40-image targets require 40 selected, distinct image hashes.
+    </p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>python version/v8/scripts/export_vision_public_summary_v8.py \
+  --private-summary /data/cke/vision-certification/RUN/summary.json \
+  --public-summary /data/cke/vision-certification/RUN/public-summary.json \
+  --corpus-alias ocr40-v1</pre>
+    </div>
+    <p class="v8-note">
+        Publish only the exported file, never its containing private run directory.
+        Its allowlist contains selected/completed/passing counts, aggregate
+        errors or timings, source revisions, and bridge-reported artifact hashes.
+        It excludes per-image rows and image hashes. Bridge-reported hashes do
+        not independently attest which libraries were loaded.
+    </p>
+    <p class="v8-note">
         At source commit <code>352108874</code>, the Qwen3-VL profile passed all
         40 corpus images across P3 AVX2 and Ryzen AVX-512: 640/640 generated
         full-vocabulary decoder rows were bit-exact to llama.cpp, with 40
@@ -1530,6 +1552,19 @@ version/v8/scripts/ck_serve_v8.py "$RUN_DIR" --run "$RUN_DIR" \
         response cannot cancel a newer request. A legitimate active request can still produce 429.
         Long-prefill cancellation may exceed its acknowledgement deadline: a cancellation timeout
         must not release buffers still in use or be described as successful bounded cancellation.</p>
+    <p>Newly generated text runtimes can accept a request-owned cancellation flag and poll it
+        between lowered prefill operations or sequential prompt tokens. The native session
+        reports cancellation before sampling and resets partial model state before reuse.
+        Older generated libraries do not have this hook. A slow individual kernel can still
+        delay acknowledgement, so a real-model prefill cancellation result is required before
+        claiming bounded latency for a deployed bundle.</p>
+    <p>In an isolated Ryzen native-session probe on 2026-09-30, regenerated Qwen3.8-27B
+        Q4_K_M code acknowledged a long-prefill cancellation in 0.55 seconds and completed
+        a one-token follow-up in 3.24 seconds without reopening the session. Its uncancelled
+        64-token logits matched the previous generated library byte-for-byte. The retained
+        report is <code>/srv/cke/profiles/qwen38-prefill-cancel-20260930/probe.json</code>.
+        This probe does not certify HTTP disconnect timing, all prompt lengths, or other
+        model/provider combinations.</p>
     <p>The 2026-09-28 Qwen3.8 overnight documentation trial failed after approximately five hours
         and eighteen successful inspection calls with repeated busy responses. It produced no
         HTML/SVG outputs. This is retained failure evidence; short read/edit acceptance does not

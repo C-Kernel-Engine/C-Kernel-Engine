@@ -5,6 +5,7 @@ var ckernel__audio_8h =
     [ "CK_AUDIO_WHISPER_N_FFT", "ckernel__audio_8h.html#a8104385637cb3f91a6e39939e0db5761", null ],
     [ "CK_AUDIO_WHISPER_POWER_BINS", "ckernel__audio_8h.html#afb106d375720b93e8d92279d2f9d4661", null ],
     [ "CK_AUDIO_WHISPER_SAMPLE_RATE", "ckernel__audio_8h.html#af1c758eba3f2e41f26558e4d9662aefa", null ],
+    [ "audio_adain_instance_norm_f32", "ckernel__audio_8h.html#a52ab76c3f3ce966f70b7773816bbaf7b", null ],
     [ "audio_adaptive_layer_norm_f32", "ckernel__audio_8h.html#a4d0553f661e1a8e403ee7f78d18f6307", null ],
     [ "audio_argmax_first_f32", "ckernel__audio_8h.html#a6a5776244c3c4f843a9cca21633a2a31", null ],
     [ "audio_batch_norm_inference_channel_major_f32", "ckernel__audio_8h.html#a3dabaffd1650f760ba18262ddcf76317", null ],
