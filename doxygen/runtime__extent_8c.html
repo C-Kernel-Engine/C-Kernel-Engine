@@ -139,6 +139,8 @@ $(document).ready(function(){initNavTree('runtime__extent_8c.html',''); initResi
 Functions</h2></td></tr>
 <tr class="memitem:aafb5911cb55ad85cb3102bb703a77e74" id="r_aafb5911cb55ad85cb3102bb703a77e74"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="runtime__extent_8c.html#aafb5911cb55ad85cb3102bb703a77e74">ck_runtime_copy_valid_f32</a> (const float *input, size_t input_elements, size_t channels, size_t valid_frames, size_t input_stride, float *output, size_t output_elements, size_t output_stride)</td></tr>
 <tr class="separator:aafb5911cb55ad85cb3102bb703a77e74"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a2e3491878be5e3941b8adf4406550db7" id="r_a2e3491878be5e3941b8adf4406550db7"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="runtime__extent_8c.html#a2e3491878be5e3941b8adf4406550db7">ck_runtime_scale_i32_checked</a> (size_t source_extent, size_t factor, size_t capacity, int32_t *valid_extent)</td></tr>
+<tr class="separator:a2e3491878be5e3941b8adf4406550db7"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a313dfde74e1135de3ab52d2f74a47a19" id="r_a313dfde74e1135de3ab52d2f74a47a19"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="runtime__extent_8c.html#a313dfde74e1135de3ab52d2f74a47a19">ck_runtime_sum_i32_checked</a> (const int32_t *values, size_t value_elements, size_t <a class="el" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a>, int32_t min_value, int32_t max_value, size_t initial_extent, size_t capacity, int32_t *valid_extent)</td></tr>
 <tr class="separator:a313dfde74e1135de3ab52d2f74a47a19"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
@@ -205,34 +207,90 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="runtime__extent_8c_source.html#l00038">38</a> of file <a class="el" href="runtime__extent_8c_source.html">runtime_extent.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   46</span>                          {</div>
-<div class="line"><span class="lineno">   47</span>    <span class="keywordflow">if</span> (!channels || (valid_frames &amp;&amp; (!input || !output)) ||</div>
-<div class="line"><span class="lineno">   48</span>        input_stride &lt; valid_frames || output_stride &lt; valid_frames)</div>
-<div class="line"><span class="lineno">   49</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__runtime__extent_8h.html#ad39f18be80eabe57825e99ed25ec67e8a4bb2ba30d488bdb1bd480b8e8e9eec1c">CK_RUNTIME_EXTENT_INVALID</a>;</div>
-<div class="line"><span class="lineno">   50</span>    <span class="keywordflow">if</span> (!valid_frames) <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__runtime__extent_8h.html#ad39f18be80eabe57825e99ed25ec67e8a931070cdf2b664e377a13587b297f99d">CK_RUNTIME_EXTENT_OK</a>;</div>
-<div class="line"><span class="lineno">   51</span>    <span class="keywordflow">if</span> (channels - 1 &gt; (SIZE_MAX - valid_frames) / input_stride ||</div>
-<div class="line"><span class="lineno">   52</span>        channels - 1 &gt; (SIZE_MAX - valid_frames) / output_stride)</div>
-<div class="line"><span class="lineno">   53</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__runtime__extent_8h.html#ad39f18be80eabe57825e99ed25ec67e8ad0412ae4ca299d6512919de8707dc162">CK_RUNTIME_EXTENT_OVERFLOW</a>;</div>
-<div class="line"><span class="lineno">   54</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> input_required = (channels - 1) * input_stride + valid_frames;</div>
-<div class="line"><span class="lineno">   55</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> output_required = (channels - 1) * output_stride + valid_frames;</div>
-<div class="line"><span class="lineno">   56</span>    <span class="keywordflow">if</span> (input_required &gt; SIZE_MAX / <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>) ||</div>
-<div class="line"><span class="lineno">   57</span>        output_required &gt; SIZE_MAX / <span class="keyword">sizeof</span>(float))</div>
-<div class="line"><span class="lineno">   58</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__runtime__extent_8h.html#ad39f18be80eabe57825e99ed25ec67e8ad0412ae4ca299d6512919de8707dc162">CK_RUNTIME_EXTENT_OVERFLOW</a>;</div>
-<div class="line"><span class="lineno">   59</span>    <span class="keywordflow">if</span> (input_elements &lt; input_required || output_elements &lt; output_required)</div>
-<div class="line"><span class="lineno">   60</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__runtime__extent_8h.html#ad39f18be80eabe57825e99ed25ec67e8a115b22d4cd4dd9df67c8013c18005510">CK_RUNTIME_EXTENT_LIMIT</a>;</div>
-<div class="line"><span class="lineno">   61</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> channel = 0; channel &lt; channels; ++channel) {</div>
-<div class="line"><span class="lineno">   62</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> frame = 0; frame &lt; valid_frames; ++frame) {</div>
-<div class="line"><span class="lineno">   63</span>            output[channel * output_stride + frame] =</div>
-<div class="line"><span class="lineno">   64</span>                input[channel * input_stride + frame];</div>
-<div class="line"><span class="lineno">   65</span>        }</div>
-<div class="line"><span class="lineno">   66</span>    }</div>
-<div class="line"><span class="lineno">   67</span>    <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__runtime__extent_8h.html#ad39f18be80eabe57825e99ed25ec67e8a931070cdf2b664e377a13587b297f99d">CK_RUNTIME_EXTENT_OK</a>;</div>
-<div class="line"><span class="lineno">   68</span>}</div>
+<p class="definition">Definition at line <a class="el" href="runtime__extent_8c_source.html#l00055">55</a> of file <a class="el" href="runtime__extent_8c_source.html">runtime_extent.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   63</span>                          {</div>
+<div class="line"><span class="lineno">   64</span>    <span class="keywordflow">if</span> (!channels || (valid_frames &amp;&amp; (!input || !output)) ||</div>
+<div class="line"><span class="lineno">   65</span>        input_stride &lt; valid_frames || output_stride &lt; valid_frames)</div>
+<div class="line"><span class="lineno">   66</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__runtime__extent_8h.html#ad39f18be80eabe57825e99ed25ec67e8a4bb2ba30d488bdb1bd480b8e8e9eec1c">CK_RUNTIME_EXTENT_INVALID</a>;</div>
+<div class="line"><span class="lineno">   67</span>    <span class="keywordflow">if</span> (!valid_frames) <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__runtime__extent_8h.html#ad39f18be80eabe57825e99ed25ec67e8a931070cdf2b664e377a13587b297f99d">CK_RUNTIME_EXTENT_OK</a>;</div>
+<div class="line"><span class="lineno">   68</span>    <span class="keywordflow">if</span> (channels - 1 &gt; (SIZE_MAX - valid_frames) / input_stride ||</div>
+<div class="line"><span class="lineno">   69</span>        channels - 1 &gt; (SIZE_MAX - valid_frames) / output_stride)</div>
+<div class="line"><span class="lineno">   70</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__runtime__extent_8h.html#ad39f18be80eabe57825e99ed25ec67e8ad0412ae4ca299d6512919de8707dc162">CK_RUNTIME_EXTENT_OVERFLOW</a>;</div>
+<div class="line"><span class="lineno">   71</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> input_required = (channels - 1) * input_stride + valid_frames;</div>
+<div class="line"><span class="lineno">   72</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> output_required = (channels - 1) * output_stride + valid_frames;</div>
+<div class="line"><span class="lineno">   73</span>    <span class="keywordflow">if</span> (input_required &gt; SIZE_MAX / <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>) ||</div>
+<div class="line"><span class="lineno">   74</span>        output_required &gt; SIZE_MAX / <span class="keyword">sizeof</span>(float))</div>
+<div class="line"><span class="lineno">   75</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__runtime__extent_8h.html#ad39f18be80eabe57825e99ed25ec67e8ad0412ae4ca299d6512919de8707dc162">CK_RUNTIME_EXTENT_OVERFLOW</a>;</div>
+<div class="line"><span class="lineno">   76</span>    <span class="keywordflow">if</span> (input_elements &lt; input_required || output_elements &lt; output_required)</div>
+<div class="line"><span class="lineno">   77</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__runtime__extent_8h.html#ad39f18be80eabe57825e99ed25ec67e8a115b22d4cd4dd9df67c8013c18005510">CK_RUNTIME_EXTENT_LIMIT</a>;</div>
+<div class="line"><span class="lineno">   78</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> channel = 0; channel &lt; channels; ++channel) {</div>
+<div class="line"><span class="lineno">   79</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> frame = 0; frame &lt; valid_frames; ++frame) {</div>
+<div class="line"><span class="lineno">   80</span>            output[channel * output_stride + frame] =</div>
+<div class="line"><span class="lineno">   81</span>                input[channel * input_stride + frame];</div>
+<div class="line"><span class="lineno">   82</span>        }</div>
+<div class="line"><span class="lineno">   83</span>    }</div>
+<div class="line"><span class="lineno">   84</span>    <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__runtime__extent_8h.html#ad39f18be80eabe57825e99ed25ec67e8a931070cdf2b664e377a13587b297f99d">CK_RUNTIME_EXTENT_OK</a>;</div>
+<div class="line"><span class="lineno">   85</span>}</div>
 <div class="ttc" id="ackernel__runtime__extent_8h_html_ad39f18be80eabe57825e99ed25ec67e8a115b22d4cd4dd9df67c8013c18005510"><div class="ttname"><a href="ckernel__runtime__extent_8h.html#ad39f18be80eabe57825e99ed25ec67e8a115b22d4cd4dd9df67c8013c18005510">CK_RUNTIME_EXTENT_LIMIT</a></div><div class="ttdeci">@ CK_RUNTIME_EXTENT_LIMIT</div><div class="ttdef"><b>Definition</b> <a href="ckernel__runtime__extent_8h_source.html#l00014">ckernel_runtime_extent.h:14</a></div></div>
 <div class="ttc" id="ackernel__runtime__extent_8h_html_ad39f18be80eabe57825e99ed25ec67e8a4bb2ba30d488bdb1bd480b8e8e9eec1c"><div class="ttname"><a href="ckernel__runtime__extent_8h.html#ad39f18be80eabe57825e99ed25ec67e8a4bb2ba30d488bdb1bd480b8e8e9eec1c">CK_RUNTIME_EXTENT_INVALID</a></div><div class="ttdeci">@ CK_RUNTIME_EXTENT_INVALID</div><div class="ttdef"><b>Definition</b> <a href="ckernel__runtime__extent_8h_source.html#l00013">ckernel_runtime_extent.h:13</a></div></div>
 <div class="ttc" id="ackernel__runtime__extent_8h_html_ad39f18be80eabe57825e99ed25ec67e8a931070cdf2b664e377a13587b297f99d"><div class="ttname"><a href="ckernel__runtime__extent_8h.html#ad39f18be80eabe57825e99ed25ec67e8a931070cdf2b664e377a13587b297f99d">CK_RUNTIME_EXTENT_OK</a></div><div class="ttdeci">@ CK_RUNTIME_EXTENT_OK</div><div class="ttdef"><b>Definition</b> <a href="ckernel__runtime__extent_8h_source.html#l00012">ckernel_runtime_extent.h:12</a></div></div>
 <div class="ttc" id="ackernel__runtime__extent_8h_html_ad39f18be80eabe57825e99ed25ec67e8ad0412ae4ca299d6512919de8707dc162"><div class="ttname"><a href="ckernel__runtime__extent_8h.html#ad39f18be80eabe57825e99ed25ec67e8ad0412ae4ca299d6512919de8707dc162">CK_RUNTIME_EXTENT_OVERFLOW</a></div><div class="ttdeci">@ CK_RUNTIME_EXTENT_OVERFLOW</div><div class="ttdef"><b>Definition</b> <a href="ckernel__runtime__extent_8h_source.html#l00016">ckernel_runtime_extent.h:15</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="ckernel__runtime__extent_8h_source.html#l00013">CK_RUNTIME_EXTENT_INVALID</a>, <a class="el" href="ckernel__runtime__extent_8h_source.html#l00014">CK_RUNTIME_EXTENT_LIMIT</a>, <a class="el" href="ckernel__runtime__extent_8h_source.html#l00012">CK_RUNTIME_EXTENT_OK</a>, and <a class="el" href="ckernel__runtime__extent_8h_source.html#l00015">CK_RUNTIME_EXTENT_OVERFLOW</a>.</p>
+
+</div>
+</div>
+<a id="a2e3491878be5e3941b8adf4406550db7" name="a2e3491878be5e3941b8adf4406550db7"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a2e3491878be5e3941b8adf4406550db7">&#9670;&#160;</a></span>ck_runtime_scale_i32_checked()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int ck_runtime_scale_i32_checked </td>
+          <td>(</td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>source_extent</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>factor</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>capacity</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int32_t *&#160;</td>
+          <td class="paramname"><em>valid_extent</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="runtime__extent_8c_source.html#l00038">38</a> of file <a class="el" href="runtime__extent_8c_source.html">runtime_extent.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   42</span>                           {</div>
+<div class="line"><span class="lineno">   43</span>    <span class="keywordflow">if</span> (!valid_extent || !factor)</div>
+<div class="line"><span class="lineno">   44</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__runtime__extent_8h.html#ad39f18be80eabe57825e99ed25ec67e8a4bb2ba30d488bdb1bd480b8e8e9eec1c">CK_RUNTIME_EXTENT_INVALID</a>;</div>
+<div class="line"><span class="lineno">   45</span>    <span class="keywordflow">if</span> (capacity &gt; INT32_MAX || factor &gt; INT32_MAX ||</div>
+<div class="line"><span class="lineno">   46</span>        source_extent &gt; (<span class="keywordtype">size_t</span>)INT32_MAX / factor)</div>
+<div class="line"><span class="lineno">   47</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__runtime__extent_8h.html#ad39f18be80eabe57825e99ed25ec67e8ad0412ae4ca299d6512919de8707dc162">CK_RUNTIME_EXTENT_OVERFLOW</a>;</div>
+<div class="line"><span class="lineno">   48</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> result = source_extent * factor;</div>
+<div class="line"><span class="lineno">   49</span>    <span class="keywordflow">if</span> (result &gt; capacity)</div>
+<div class="line"><span class="lineno">   50</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__runtime__extent_8h.html#ad39f18be80eabe57825e99ed25ec67e8a115b22d4cd4dd9df67c8013c18005510">CK_RUNTIME_EXTENT_LIMIT</a>;</div>
+<div class="line"><span class="lineno">   51</span>    *valid_extent = (int32_t)result;</div>
+<div class="line"><span class="lineno">   52</span>    <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__runtime__extent_8h.html#ad39f18be80eabe57825e99ed25ec67e8a931070cdf2b664e377a13587b297f99d">CK_RUNTIME_EXTENT_OK</a>;</div>
+<div class="line"><span class="lineno">   53</span>}</div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="ckernel__runtime__extent_8h_source.html#l00013">CK_RUNTIME_EXTENT_INVALID</a>, <a class="el" href="ckernel__runtime__extent_8h_source.html#l00014">CK_RUNTIME_EXTENT_LIMIT</a>, <a class="el" href="ckernel__runtime__extent_8h_source.html#l00012">CK_RUNTIME_EXTENT_OK</a>, and <a class="el" href="ckernel__runtime__extent_8h_source.html#l00015">CK_RUNTIME_EXTENT_OVERFLOW</a>.</p>
 

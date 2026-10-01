@@ -1,13 +1,13 @@
 <!-- TITLE: v8 Training Kernel Capability Ledger -->
 <h1>v8 training kernel capability ledger</h1>
-<p>Generated from <code>version/v8/kernel_maps/*.json</code> by <code>version/v8/scripts/build_training_capability_ledger_v8.py</code>. Source digest: <code>6b55034b54626fb5769b2c9bb7fff523798837f1f9de7743ddfdcc60e812e940</code>; provider maps: 402.</p>
+<p>Generated from <code>version/v8/kernel_maps/*.json</code> by <code>version/v8/scripts/build_training_capability_ledger_v8.py</code>. Source digest: <code>38c8e6550b018c00ec9af667824eccc802b3c4ffc7b8da4e53b2e2a87d289c66</code>; provider maps: 405.</p>
 <p>This is a <strong>map inventory, not a training PASS</strong>. A backward declaration means a backward provider is registered; it does not prove matching geometry, selection by a generated circuit, or executed PyTorch parity. BF16-tagged includes storage or arithmetic tags. Quantized forward maps do not imply quantized-base gradients or QLoRA support. Direct executed evidence: <code>NOT_MEASURED_BY_MAP_INVENTORY</code>.</p>
 <p><strong>Authoring, lowering, and execution are separate.</strong> The public <code>cke.nn</code> module list below comes from its Python source. A class existing there does not establish that v8 can lower it, select a backward provider, or certify a generated training run. Exact kernel-map operation names are not automatically equivalent to Python modules.</p>
 <table class="table"><thead><tr><th>Dtype family</th><th>Provider maps</th><th>Forward or unspecified</th><th>Declared training forward</th><th>Declared backward</th><th>Backward-named without mode</th><th>Maps with registered tests</th></tr></thead><tbody>
-<tr><td>fp32-tagged</td><td>247</td><td>223</td><td>15</td><td>24</td><td>5</td><td>206</td></tr>
+<tr><td>fp32-tagged</td><td>249</td><td>225</td><td>15</td><td>24</td><td>5</td><td>208</td></tr>
 <tr><td>bf16-tagged</td><td>78</td><td>78</td><td>0</td><td>0</td><td>0</td><td>62</td></tr>
 <tr><td>quantized</td><td>62</td><td>62</td><td>0</td><td>0</td><td>0</td><td>41</td></tr>
-<tr><td>unspecified</td><td>15</td><td>15</td><td>0</td><td>0</td><td>0</td><td>8</td></tr>
+<tr><td>unspecified</td><td>16</td><td>16</td><td>0</td><td>0</td><td>0</td><td>9</td></tr>
 </tbody></table>
 <h2>Python authoring modules</h2>
 <p>Source digest: <code>3308bfeffc395b157306feabd2b5ab57055940ed4ceba2bab3f56207f4e3e506</code>. Compiler and backward linkage: <code>NOT_ASSESSED_BY_MAP_INVENTORY</code>.</p>
@@ -83,6 +83,7 @@
 <tr><td>fp32-tagged</td><td>audio_conv1d</td><td>2</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>audio_conv1d_checked</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>audio_conv2d</td><td>1</td><td>—</td><td>—</td></tr>
+<tr><td>fp32-tagged</td><td>audio_conv_transpose1d_depthwise_checked</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>audio_duration_expand</td><td>2</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>audio_duration_logits_to_frames</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>audio_fastconformer_block</td><td>1</td><td>—</td><td>—</td></tr>
@@ -107,6 +108,7 @@
 <tr><td>fp32-tagged</td><td>audio_scaled_sum_strided_checked</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>audio_stft</td><td>4</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>audio_stft_tables</td><td>1</td><td>—</td><td>—</td></tr>
+<tr><td>fp32-tagged</td><td>audio_upsample_nearest_checked</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>audio_wav_decode</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>bias_add</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>copy_last_logits</td><td>1</td><td>—</td><td>—</td></tr>
@@ -218,11 +220,12 @@
 <tr><td>unspecified</td><td>multimodal_position_builder</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>unspecified</td><td>position_embeddings</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>unspecified</td><td>position_ids</td><td>1</td><td>—</td><td>—</td></tr>
+<tr><td>unspecified</td><td>runtime_extent_scale</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>unspecified</td><td>runtime_extent_sum</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>unspecified</td><td>speculative_commit_or_reject</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>unspecified</td><td>tokenizer</td><td>1</td><td>—</td><td>—</td></tr>
 </tbody></table>
-<details><summary>All 402 provider maps</summary>
+<details><summary>All 405 provider maps</summary>
 <table class="table"><thead><tr><th>Map</th><th>Provider ID</th><th>Operation</th><th>Dtype family</th><th>Backward mode</th><th>Registered test</th></tr></thead><tbody>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/adamw_update_f32.json">version/v8/kernel_maps/adamw_update_f32.json</a></td><td>adamw_update_f32</td><td>optimizer</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/add_stream_inplace.json">version/v8/kernel_maps/add_stream_inplace.json</a></td><td>add_stream_inplace</td><td>add_stream</td><td>fp32-tagged</td><td>not declared</td><td>not registered</td></tr>
@@ -293,6 +296,7 @@
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/audio_conv1d_channel_major_grouped_f32.json">version/v8/kernel_maps/audio_conv1d_channel_major_grouped_f32.json</a></td><td>audio_conv1d_channel_major_grouped_f32</td><td>audio_conv1d</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/audio_conv1d_checked_channel_major_f32.json">version/v8/kernel_maps/audio_conv1d_checked_channel_major_f32.json</a></td><td>audio_conv1d_checked_channel_major_f32</td><td>audio_conv1d_checked</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/audio_conv2d_whc_grouped_f32.json">version/v8/kernel_maps/audio_conv2d_whc_grouped_f32.json</a></td><td>audio_conv2d_whc_grouped_f32</td><td>audio_conv2d</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/audio_conv_transpose1d_depthwise_channel_major_f32_checked.json">version/v8/kernel_maps/audio_conv_transpose1d_depthwise_channel_major_f32_checked.json</a></td><td>audio_conv_transpose1d_depthwise_channel_major_f32_checked</td><td>audio_conv_transpose1d_depthwise_checked</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/audio_duration_expand_channel_major_f32.json">version/v8/kernel_maps/audio_duration_expand_channel_major_f32.json</a></td><td>audio_duration_expand_channel_major_f32</td><td>audio_duration_expand</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/audio_duration_expand_token_major_f32.json">version/v8/kernel_maps/audio_duration_expand_token_major_f32.json</a></td><td>audio_duration_expand_token_major_f32</td><td>audio_duration_expand</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/audio_duration_logits_to_frames_f32.json">version/v8/kernel_maps/audio_duration_logits_to_frames_f32.json</a></td><td>audio_duration_logits_to_frames_f32</td><td>audio_duration_logits_to_frames</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
@@ -323,6 +327,7 @@
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/audio_stft_precompute_tables_f32.json">version/v8/kernel_maps/audio_stft_precompute_tables_f32.json</a></td><td>audio_stft_precompute_tables_f32</td><td>audio_stft_tables</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/audio_text_embedding_channel_major_f32.json">version/v8/kernel_maps/audio_text_embedding_channel_major_f32.json</a></td><td>audio_text_embedding_channel_major_f32</td><td>embedding_lookup_checked</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/audio_transpose_channel_to_token_f32.json">version/v8/kernel_maps/audio_transpose_channel_to_token_f32.json</a></td><td>audio_transpose_channel_to_token_f32</td><td>layout_transform</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/audio_upsample_nearest_channel_major_f32_checked.json">version/v8/kernel_maps/audio_upsample_nearest_channel_major_f32_checked.json</a></td><td>audio_upsample_nearest_channel_major_f32_checked</td><td>audio_upsample_nearest_checked</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/audio_wav_decode_memory_pcm16_mono_window_f32.json">version/v8/kernel_maps/audio_wav_decode_memory_pcm16_mono_window_f32.json</a></td><td>audio_wav_decode_memory_pcm16_mono_window_f32</td><td>audio_wav_decode</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/audio_whisper_log_mel_from_power_f32.json">version/v8/kernel_maps/audio_whisper_log_mel_from_power_f32.json</a></td><td>audio_whisper_log_mel_from_power_f32</td><td>audio_log_mel</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/audio_whisper_log_mel_reference_f32.json">version/v8/kernel_maps/audio_whisper_log_mel_reference_f32.json</a></td><td>audio_whisper_log_mel_reference_f32</td><td>audio_log_mel</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
@@ -600,6 +605,7 @@
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/rope_precompute_cache_split.json">version/v8/kernel_maps/rope_precompute_cache_split.json</a></td><td>rope_precompute_cache_split</td><td>rope_init</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/rowwise_bias_add.json">version/v8/kernel_maps/rowwise_bias_add.json</a></td><td>rowwise_bias_add</td><td>rowwise_bias_add</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/runtime_copy_valid_f32.json">version/v8/kernel_maps/runtime_copy_valid_f32.json</a></td><td>runtime_copy_valid_f32</td><td>runtime_copy_valid</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/runtime_extent_scale_i32.json">version/v8/kernel_maps/runtime_extent_scale_i32.json</a></td><td>runtime_extent_scale_i32</td><td>runtime_extent_scale</td><td>unspecified</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/runtime_extent_sum_i32.json">version/v8/kernel_maps/runtime_extent_sum_i32.json</a></td><td>runtime_extent_sum_i32</td><td>runtime_extent_sum</td><td>unspecified</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/softmax_cross_entropy_loss.json">version/v8/kernel_maps/softmax_cross_entropy_loss.json</a></td><td>softmax_cross_entropy_loss</td><td>softmax</td><td>fp32-tagged</td><td>declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/spatial_average_pool_contiguous.json">version/v8/kernel_maps/spatial_average_pool_contiguous.json</a></td><td>spatial_average_pool_contiguous</td><td>spatial_merge</td><td>fp32-tagged</td><td>not declared</td><td>not registered</td></tr>
