@@ -1572,6 +1572,32 @@ version/v8/scripts/ck_serve_v8.py "$RUN_DIR" --run "$RUN_DIR" \
         Older generated libraries do not have this hook. A slow individual kernel can still
         delay acknowledgement, so a real-model prefill cancellation result is required before
         claiming bounded latency for a deployed bundle.</p>
+    <h4>Black-box HTTP lifecycle acceptance</h4>
+    <p>Run this probe against the intended live endpoint after deployment. It uses only HTTP:
+        cancel during prefill and decode, close a stream, close a client after its read deadline,
+        then serve a follow-up request after each case. It checks the loaded bundle, native
+        session library and server instance before and after the run. A mismatched identity
+        fails before generation; a missing run leaves no PASS report. The JSON records whether
+        follow-up generation completed or exhausted its output allowance.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>python3 server/http_lifecycle_acceptance.py \
+  --endpoint http://127.0.0.1:8080/v1 \
+  --model &lt;advertised-model-id&gt; \
+  --expected-serving-identity &lt;serving.json identity&gt; \
+  --expected-session-library-sha256 &lt;loaded session-library SHA-256&gt; \
+  --output /path/to/new-http-lifecycle-report.json</pre>
+    </div>
+    <p class="mini-note">The probe is a transport and ownership check, not a tool-use or
+        answer-quality certification. It requires a generated runtime with the cancellation
+        hook and a local plain-HTTP endpoint; use the separate Qwen Code acceptance runner
+        to test model-generated tool calls and task completion.</p>
+    <p class="mini-note">The versioned native session ABI borrows request buffers and callback
+        data only while a synchronous call is active. Cancellation requests a stop; generation
+        returning acknowledges that native work has stopped. The current generated-model state
+        is not certified for concurrent sessions in one process, so another HTTP host must
+        preserve single-flight ownership until a separate sequence-state contract is proven.
+        See <code>include/ck_session_v8.h</code> for the buffer and thread rules.</p>
     <p>In an isolated Ryzen native-session probe on 2026-09-30, regenerated Qwen3.8-27B
         Q4_K_M code acknowledged a long-prefill cancellation in 0.55 seconds and completed
         a one-token follow-up in 3.24 seconds without reopening the session. Its uncancelled
