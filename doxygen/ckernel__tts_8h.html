@@ -163,6 +163,10 @@ Functions</h2></td></tr>
 <tr class="separator:a4c7380c2b59352b52e4769687a32a888"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a5d20ffbb3739001f22b58f8e23526d50" id="r_a5d20ffbb3739001f22b58f8e23526d50"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__tts_8h.html#a5d20ffbb3739001f22b58f8e23526d50">audio_istft_mag_phase_plan_f32</a> (size_t frames, size_t n_fft, size_t hop, size_t *spectral_elements, size_t *output_samples, size_t *scratch_elements)</td></tr>
 <tr class="separator:a5d20ffbb3739001f22b58f8e23526d50"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a02be866ef4fb9eaccb9f74f7b79d193d" id="r_a02be866ef4fb9eaccb9f74f7b79d193d"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__tts_8h.html#a02be866ef4fb9eaccb9f74f7b79d193d">audio_stft_mag_phase_checked_f32</a> (const float *samples, size_t samples_capacity, const float *window, size_t window_capacity, const float *cos_table, const float *sin_table, size_t table_capacity, float *output, size_t output_capacity, size_t output_stride, float *scratch, size_t scratch_capacity, size_t samples_count, size_t n_fft, size_t hop, size_t frames)</td></tr>
+<tr class="separator:a02be866ef4fb9eaccb9f74f7b79d193d"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a260ec8d60648e11d37636b70afc492b7" id="r_a260ec8d60648e11d37636b70afc492b7"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__tts_8h.html#a260ec8d60648e11d37636b70afc492b7">audio_stft_mag_phase_plan_f32</a> (size_t samples, size_t n_fft, size_t hop, size_t *frames, size_t *spectral_elements)</td></tr>
+<tr class="separator:a260ec8d60648e11d37636b70afc492b7"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a665733e67504d5412730d8733bceb0a4" id="r_a665733e67504d5412730d8733bceb0a4"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__tts_8h.html#a665733e67504d5412730d8733bceb0a4">ck_kokoro_plan_shape_v8</a> (const int32_t *durations, size_t phoneme_count, const <a class="el" href="structCKKokoroShapeLimitsV8.html">CKKokoroShapeLimitsV8</a> *limits, <a class="el" href="structCKKokoroShapeV8.html">CKKokoroShapeV8</a> *shape)</td></tr>
 <tr class="separator:a665733e67504d5412730d8733bceb0a4"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
@@ -662,6 +666,263 @@ Functions</h2></td></tr>
 <p class="reference">References <a class="el" href="audio__istft__mag__phase_8c_source.html#l00007">add_size()</a>, <a class="el" href="ckernel__tts_8h_source.html#l00042">CK_AUDIO_EXTENT_INVALID</a>, <a class="el" href="ckernel__tts_8h_source.html#l00041">CK_AUDIO_EXTENT_OK</a>, <a class="el" href="ckernel__tts_8h_source.html#l00044">CK_AUDIO_EXTENT_OVERFLOW</a>, and <a class="el" href="audio__istft__mag__phase_8c_source.html#l00013">mul_size()</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="audio__istft__mag__phase_8c_source.html#l00050">audio_istft_mag_phase_f32()</a>.</p>
+
+</div>
+</div>
+<a id="a02be866ef4fb9eaccb9f74f7b79d193d" name="a02be866ef4fb9eaccb9f74f7b79d193d"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a02be866ef4fb9eaccb9f74f7b79d193d">&#9670;&#160;</a></span>audio_stft_mag_phase_checked_f32()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int audio_stft_mag_phase_checked_f32 </td>
+          <td>(</td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>samples</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>samples_capacity</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>window</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>window_capacity</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>cos_table</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>sin_table</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>table_capacity</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>output</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>output_capacity</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>output_stride</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>scratch</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>scratch_capacity</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>samples_count</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>n_fft</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>hop</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>frames</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="audio__stft__mag__phase__checked_8c_source.html#l00028">28</a> of file <a class="el" href="audio__stft__mag__phase__checked_8c_source.html">audio_stft_mag_phase_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   33</span>                                                                   {</div>
+<div class="line"><span class="lineno">   34</span>    <span class="keywordtype">size_t</span> required_frames, spectral_elements, span, bins, table_need;</div>
+<div class="line"><span class="lineno">   35</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> planned = <a class="code hl_function" href="audio__stft__mag__phase__checked_8c.html#a260ec8d60648e11d37636b70afc492b7">audio_stft_mag_phase_plan_f32</a>(samples_count, n_fft,</div>
+<div class="line"><span class="lineno">   36</span>        hop, &amp;required_frames, &amp;spectral_elements);</div>
+<div class="line"><span class="lineno">   37</span>    <span class="keywordflow">if</span> (planned != <a class="code hl_enumvalue" href="ckernel__tts_8h.html#ac33d7dced18028940945c35c42dadf91ace4d803def1b18836a5cbd7fbd659af1">CK_AUDIO_EXTENT_OK</a>) <span class="keywordflow">return</span> planned;</div>
+<div class="line"><span class="lineno">   38</span>    <span class="keywordflow">if</span> (frames != required_frames || output_stride &lt; frames ||</div>
+<div class="line"><span class="lineno">   39</span>        n_fft &gt; SIZE_MAX / (n_fft / 2 + 1)) <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__tts_8h.html#ac33d7dced18028940945c35c42dadf91a69b700acd95d7ca6a720a4d885ab53a4">CK_AUDIO_EXTENT_INVALID</a>;</div>
+<div class="line"><span class="lineno">   40</span>    bins = n_fft / 2 + 1;</div>
+<div class="line"><span class="lineno">   41</span>    table_need = bins * n_fft;</div>
+<div class="line"><span class="lineno">   42</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="checked__float__buffer_8h.html#a80fa111d42598d70e6c6728193a1f8dc">ck_checked_span</a>(2 * bins, frames, output_stride, &amp;span))</div>
+<div class="line"><span class="lineno">   43</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__tts_8h.html#ac33d7dced18028940945c35c42dadf91a8f6a6820e4008381db57e8e8960fb671">CK_AUDIO_EXTENT_OVERFLOW</a>;</div>
+<div class="line"><span class="lineno">   44</span>    <span class="keywordflow">if</span> (samples_capacity &lt; samples_count || window_capacity &lt; n_fft ||</div>
+<div class="line"><span class="lineno">   45</span>        table_capacity &lt; table_need || output_capacity &lt; span ||</div>
+<div class="line"><span class="lineno">   46</span>        scratch_capacity &lt; spectral_elements) <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__tts_8h.html#ac33d7dced18028940945c35c42dadf91a6a53055c5ccb0c65933840f461664959">CK_AUDIO_EXTENT_LIMIT</a>;</div>
+<div class="line"><span class="lineno">   47</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(samples, samples_count) ||</div>
+<div class="line"><span class="lineno">   48</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(window, n_fft) ||</div>
+<div class="line"><span class="lineno">   49</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(cos_table, table_need) ||</div>
+<div class="line"><span class="lineno">   50</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(sin_table, table_need) ||</div>
+<div class="line"><span class="lineno">   51</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(output, span) ||</div>
+<div class="line"><span class="lineno">   52</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(scratch, spectral_elements) ||</div>
+<div class="line"><span class="lineno">   53</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(output, span, samples, samples_count) ||</div>
+<div class="line"><span class="lineno">   54</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(output, span, window, n_fft) ||</div>
+<div class="line"><span class="lineno">   55</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(output, span, cos_table, table_need) ||</div>
+<div class="line"><span class="lineno">   56</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(output, span, sin_table, table_need) ||</div>
+<div class="line"><span class="lineno">   57</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(output, span, scratch, spectral_elements) ||</div>
+<div class="line"><span class="lineno">   58</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(scratch, spectral_elements, samples, samples_count) ||</div>
+<div class="line"><span class="lineno">   59</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(scratch, spectral_elements, window, n_fft) ||</div>
+<div class="line"><span class="lineno">   60</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(scratch, spectral_elements, cos_table, table_need) ||</div>
+<div class="line"><span class="lineno">   61</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(scratch, spectral_elements, sin_table, table_need))</div>
+<div class="line"><span class="lineno">   62</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__tts_8h.html#ac33d7dced18028940945c35c42dadf91a69b700acd95d7ca6a720a4d885ab53a4">CK_AUDIO_EXTENT_INVALID</a>;</div>
+<div class="line"><span class="lineno">   63</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a>(samples, samples_count) ||</div>
+<div class="line"><span class="lineno">   64</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a>(window, n_fft) ||</div>
+<div class="line"><span class="lineno">   65</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a>(cos_table, table_need) ||</div>
+<div class="line"><span class="lineno">   66</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a>(sin_table, table_need))</div>
+<div class="line"><span class="lineno">   67</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__tts_8h.html#ac33d7dced18028940945c35c42dadf91a69b700acd95d7ca6a720a4d885ab53a4">CK_AUDIO_EXTENT_INVALID</a>;</div>
+<div class="line"><span class="lineno">   68</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> center = n_fft / 2;</div>
+<div class="line"><span class="lineno">   69</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> frame = 0; frame &lt; frames; ++frame) {</div>
+<div class="line"><span class="lineno">   70</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> bin = 0; bin &lt; bins; ++bin) {</div>
+<div class="line"><span class="lineno">   71</span>            <span class="keywordtype">double</span> real = 0.0, imag = 0.0;</div>
+<div class="line"><span class="lineno">   72</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> tap = 0; tap &lt; n_fft; ++tap) {</div>
+<div class="line"><span class="lineno">   73</span>                <span class="comment">/* samples_count &gt; center guarantees one reflection suffices. */</span></div>
+<div class="line"><span class="lineno">   74</span>                <span class="keyword">const</span> int64_t unreflected = (int64_t)(frame * hop + tap) -</div>
+<div class="line"><span class="lineno">   75</span>                    (int64_t)center;</div>
+<div class="line"><span class="lineno">   76</span>                <span class="keywordtype">size_t</span> source;</div>
+<div class="line"><span class="lineno">   77</span>                <span class="keywordflow">if</span> (unreflected &lt; 0) source = (size_t)(-unreflected);</div>
+<div class="line"><span class="lineno">   78</span>                <span class="keywordflow">else</span> <span class="keywordflow">if</span> ((uint64_t)unreflected &gt;= samples_count)</div>
+<div class="line"><span class="lineno">   79</span>                    source = 2 * (samples_count - 1) - (size_t)unreflected;</div>
+<div class="line"><span class="lineno">   80</span>                <span class="keywordflow">else</span> source = (size_t)unreflected;</div>
+<div class="line"><span class="lineno">   81</span>                <span class="keyword">const</span> <span class="keywordtype">double</span> value = (double)samples[source] * window[tap];</div>
+<div class="line"><span class="lineno">   82</span>                real += value * cos_table[bin * n_fft + tap];</div>
+<div class="line"><span class="lineno">   83</span>                imag += value * sin_table[bin * n_fft + tap];</div>
+<div class="line"><span class="lineno">   84</span>            }</div>
+<div class="line"><span class="lineno">   85</span>            <span class="comment">/* The Nyquist bin of a real-input even FFT has exactly zero</span></div>
+<div class="line"><span class="lineno">   86</span><span class="comment">             * imaginary part. Trig-table roundoff otherwise flips +pi to</span></div>
+<div class="line"><span class="lineno">   87</span><span class="comment">             * -pi, which is not interchangeable for downstream convolutions. */</span></div>
+<div class="line"><span class="lineno">   88</span>            <span class="keywordflow">if</span> (bin == bins - 1) imag = 0.0;</div>
+<div class="line"><span class="lineno">   89</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> magnitude = (float)hypot(real, imag);</div>
+<div class="line"><span class="lineno">   90</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> phase = (float)atan2(imag, real);</div>
+<div class="line"><span class="lineno">   91</span>            <span class="keywordflow">if</span> (!isfinite(magnitude) || !isfinite(phase))</div>
+<div class="line"><span class="lineno">   92</span>                <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__tts_8h.html#ac33d7dced18028940945c35c42dadf91a69b700acd95d7ca6a720a4d885ab53a4">CK_AUDIO_EXTENT_INVALID</a>;</div>
+<div class="line"><span class="lineno">   93</span>            scratch[bin * frames + frame] = magnitude;</div>
+<div class="line"><span class="lineno">   94</span>            scratch[(bins + bin) * frames + frame] = phase;</div>
+<div class="line"><span class="lineno">   95</span>        }</div>
+<div class="line"><span class="lineno">   96</span>    }</div>
+<div class="line"><span class="lineno">   97</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> row = 0; row &lt; 2 * bins; ++row)</div>
+<div class="line"><span class="lineno">   98</span>        memcpy(output + row * output_stride, scratch + row * frames,</div>
+<div class="line"><span class="lineno">   99</span>            frames * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  100</span>    <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__tts_8h.html#ac33d7dced18028940945c35c42dadf91ace4d803def1b18836a5cbd7fbd659af1">CK_AUDIO_EXTENT_OK</a>;</div>
+<div class="line"><span class="lineno">  101</span>}</div>
+<div class="ttc" id="aaudio__stft__mag__phase__checked_8c_html_a260ec8d60648e11d37636b70afc492b7"><div class="ttname"><a href="audio__stft__mag__phase__checked_8c.html#a260ec8d60648e11d37636b70afc492b7">audio_stft_mag_phase_plan_f32</a></div><div class="ttdeci">int audio_stft_mag_phase_plan_f32(size_t samples, size_t n_fft, size_t hop, size_t *frames, size_t *spectral_elements)</div><div class="ttdef"><b>Definition</b> <a href="audio__stft__mag__phase__checked_8c_source.html#l00008">audio_stft_mag_phase_checked.c:8</a></div></div>
+<div class="ttc" id="achecked__float__buffer_8h_html_a1b266161b71bde9ca8d45c2fb5ac889a"><div class="ttname"><a href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a></div><div class="ttdeci">static int ck_checked_finite(const float *ptr, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00019">checked_float_buffer.h:19</a></div></div>
+<div class="ttc" id="achecked__float__buffer_8h_html_a80fa111d42598d70e6c6728193a1f8dc"><div class="ttname"><a href="checked__float__buffer_8h.html#a80fa111d42598d70e6c6728193a1f8dc">ck_checked_span</a></div><div class="ttdeci">static int ck_checked_span(size_t rows, size_t width, size_t stride, size_t *span)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00006">checked_float_buffer.h:6</a></div></div>
+<div class="ttc" id="achecked__float__buffer_8h_html_ada07e31487d86edb37408386003ac841"><div class="ttname"><a href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a></div><div class="ttdeci">static int ck_checked_region(const float *ptr, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00011">checked_float_buffer.h:11</a></div></div>
+<div class="ttc" id="achecked__float__buffer_8h_html_af87b7012571dc9a40b8e31c52e773abe"><div class="ttname"><a href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a></div><div class="ttdeci">static int ck_checked_overlap(const float *a, size_t na, const float *b, size_t nb)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00015">checked_float_buffer.h:15</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="audio__stft__mag__phase__checked_8c_source.html#l00008">audio_stft_mag_phase_plan_f32()</a>, <a class="el" href="ckernel__tts_8h_source.html#l00042">CK_AUDIO_EXTENT_INVALID</a>, <a class="el" href="ckernel__tts_8h_source.html#l00043">CK_AUDIO_EXTENT_LIMIT</a>, <a class="el" href="ckernel__tts_8h_source.html#l00041">CK_AUDIO_EXTENT_OK</a>, <a class="el" href="ckernel__tts_8h_source.html#l00044">CK_AUDIO_EXTENT_OVERFLOW</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00019">ck_checked_finite()</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00015">ck_checked_overlap()</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00011">ck_checked_region()</a>, and <a class="el" href="checked__float__buffer_8h_source.html#l00006">ck_checked_span()</a>.</p>
+
+</div>
+</div>
+<a id="a260ec8d60648e11d37636b70afc492b7" name="a260ec8d60648e11d37636b70afc492b7"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a260ec8d60648e11d37636b70afc492b7">&#9670;&#160;</a></span>audio_stft_mag_phase_plan_f32()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int audio_stft_mag_phase_plan_f32 </td>
+          <td>(</td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>samples</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>n_fft</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>hop</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t *&#160;</td>
+          <td class="paramname"><em>frames</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t *&#160;</td>
+          <td class="paramname"><em>spectral_elements</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="audio__stft__mag__phase__checked_8c_source.html#l00008">8</a> of file <a class="el" href="audio__stft__mag__phase__checked_8c_source.html">audio_stft_mag_phase_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">    9</span>                                               {</div>
+<div class="line"><span class="lineno">   10</span>    <span class="keywordflow">if</span> (!frames || !spectral_elements || n_fft &lt; 2 || (n_fft &amp; 1) ||</div>
+<div class="line"><span class="lineno">   11</span>        !hop || samples &lt;= n_fft / 2 || samples &gt; INT64_MAX / 2 ||</div>
+<div class="line"><span class="lineno">   12</span>        n_fft &gt; INT64_MAX / 2 || samples &gt; SIZE_MAX / <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>) ||</div>
+<div class="line"><span class="lineno">   13</span>        n_fft &gt; SIZE_MAX / <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>)) <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__tts_8h.html#ac33d7dced18028940945c35c42dadf91a69b700acd95d7ca6a720a4d885ab53a4">CK_AUDIO_EXTENT_INVALID</a>;</div>
+<div class="line"><span class="lineno">   14</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> <a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a> = samples / hop + 1;</div>
+<div class="line"><span class="lineno">   15</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> bins = n_fft / 2 + 1;</div>
+<div class="line"><span class="lineno">   16</span>    <span class="keywordflow">if</span> (<a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a> &gt; SIZE_MAX / (2 * bins) ||</div>
+<div class="line"><span class="lineno">   17</span>        <a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a> * (2 * bins) &gt; SIZE_MAX / <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>))</div>
+<div class="line"><span class="lineno">   18</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__tts_8h.html#ac33d7dced18028940945c35c42dadf91a8f6a6820e4008381db57e8e8960fb671">CK_AUDIO_EXTENT_OVERFLOW</a>;</div>
+<div class="line"><span class="lineno">   19</span>    *frames = <a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a>;</div>
+<div class="line"><span class="lineno">   20</span>    *spectral_elements = <a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a> * 2 * bins;</div>
+<div class="line"><span class="lineno">   21</span>    <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__tts_8h.html#ac33d7dced18028940945c35c42dadf91ace4d803def1b18836a5cbd7fbd659af1">CK_AUDIO_EXTENT_OK</a>;</div>
+<div class="line"><span class="lineno">   22</span>}</div>
+<div class="ttc" id="atrue__bpe_8h_html_ac7f5fd4f55df36920bf0583c3516e72f"><div class="ttname"><a href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a></div><div class="ttdeci">const uint8_t size_t count</div><div class="ttdef"><b>Definition</b> <a href="true__bpe_8h_source.html#l00209">true_bpe.h:209</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="ckernel__tts_8h_source.html#l00042">CK_AUDIO_EXTENT_INVALID</a>, <a class="el" href="ckernel__tts_8h_source.html#l00041">CK_AUDIO_EXTENT_OK</a>, <a class="el" href="ckernel__tts_8h_source.html#l00044">CK_AUDIO_EXTENT_OVERFLOW</a>, and <a class="el" href="true__bpe_8h_source.html#l00209">count</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="audio__stft__mag__phase__checked_8c_source.html#l00028">audio_stft_mag_phase_checked_f32()</a>.</p>
 
 </div>
 </div>

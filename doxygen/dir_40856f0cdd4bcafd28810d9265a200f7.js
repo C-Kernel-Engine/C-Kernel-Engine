@@ -22,6 +22,7 @@ var dir_40856f0cdd4bcafd28810d9265a200f7 =
     [ "audio_lstm_scan.c", "audio__lstm__scan_8c.html", "audio__lstm__scan_8c" ],
     [ "audio_prosody_upsample_checked.c", "audio__prosody__upsample__checked_8c.html", "audio__prosody__upsample__checked_8c" ],
     [ "audio_scaled_sum_strided.c", "audio__scaled__sum__strided_8c.html", "audio__scaled__sum__strided_8c" ],
+    [ "audio_stft_mag_phase_checked.c", "audio__stft__mag__phase__checked_8c.html", "audio__stft__mag__phase__checked_8c" ],
     [ "audio_text_embedding.c", "audio__text__embedding_8c.html", "audio__text__embedding_8c" ],
     [ "axpy_kernels.c", "axpy__kernels_8c.html", "axpy__kernels_8c" ],
     [ "checked_float_buffer.h", "checked__float__buffer_8h.html", "checked__float__buffer_8h" ],

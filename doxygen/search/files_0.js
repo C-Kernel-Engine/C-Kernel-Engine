@@ -22,6 +22,7 @@ var searchData=
   ['audio_5flstm_5fscan_2ec_19',['audio_lstm_scan.c',['../audio__lstm__scan_8c.html',1,'']]],
   ['audio_5fprosody_5fupsample_5fchecked_2ec_20',['audio_prosody_upsample_checked.c',['../audio__prosody__upsample__checked_8c.html',1,'']]],
   ['audio_5fscaled_5fsum_5fstrided_2ec_21',['audio_scaled_sum_strided.c',['../audio__scaled__sum__strided_8c.html',1,'']]],
-  ['audio_5ftext_5fembedding_2ec_22',['audio_text_embedding.c',['../audio__text__embedding_8c.html',1,'']]],
-  ['axpy_5fkernels_2ec_23',['axpy_kernels.c',['../axpy__kernels_8c.html',1,'']]]
+  ['audio_5fstft_5fmag_5fphase_5fchecked_2ec_22',['audio_stft_mag_phase_checked.c',['../audio__stft__mag__phase__checked_8c.html',1,'']]],
+  ['audio_5ftext_5fembedding_2ec_23',['audio_text_embedding.c',['../audio__text__embedding_8c.html',1,'']]],
+  ['axpy_5fkernels_2ec_24',['axpy_kernels.c',['../axpy__kernels_8c.html',1,'']]]
 ];

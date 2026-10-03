@@ -12,5 +12,7 @@ var ckernel__tts_8h =
     [ "audio_duration_logits_to_frames_f32", "ckernel__tts_8h.html#a67439167b590e67fa58513f30f86cfac", null ],
     [ "audio_istft_mag_phase_f32", "ckernel__tts_8h.html#a4c7380c2b59352b52e4769687a32a888", null ],
     [ "audio_istft_mag_phase_plan_f32", "ckernel__tts_8h.html#a5d20ffbb3739001f22b58f8e23526d50", null ],
+    [ "audio_stft_mag_phase_checked_f32", "ckernel__tts_8h.html#a02be866ef4fb9eaccb9f74f7b79d193d", null ],
+    [ "audio_stft_mag_phase_plan_f32", "ckernel__tts_8h.html#a260ec8d60648e11d37636b70afc492b7", null ],
     [ "ck_kokoro_plan_shape_v8", "ckernel__tts_8h.html#a665733e67504d5412730d8733bceb0a4", null ]
 ];
