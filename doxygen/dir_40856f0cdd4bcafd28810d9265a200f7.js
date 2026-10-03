@@ -17,6 +17,7 @@ var dir_40856f0cdd4bcafd28810d9265a200f7 =
     [ "audio_duration_expand.c", "audio__duration__expand_8c.html", "audio__duration__expand_8c" ],
     [ "audio_duration_expand_token_major.c", "audio__duration__expand__token__major_8c.html", "audio__duration__expand__token__major_8c" ],
     [ "audio_duration_logits.c", "audio__duration__logits_8c.html", "audio__duration__logits_8c" ],
+    [ "audio_harmonic_source_checked.c", "audio__harmonic__source__checked_8c.html", "audio__harmonic__source__checked_8c" ],
     [ "audio_istft_mag_phase.c", "audio__istft__mag__phase_8c.html", "audio__istft__mag__phase_8c" ],
     [ "audio_kernels.c", "audio__kernels_8c.html", "audio__kernels_8c" ],
     [ "audio_lstm_scan.c", "audio__lstm__scan_8c.html", "audio__lstm__scan_8c" ],

@@ -17,12 +17,13 @@ var searchData=
   ['audio_5fduration_5fexpand_2ec_14',['audio_duration_expand.c',['../audio__duration__expand_8c.html',1,'']]],
   ['audio_5fduration_5fexpand_5ftoken_5fmajor_2ec_15',['audio_duration_expand_token_major.c',['../audio__duration__expand__token__major_8c.html',1,'']]],
   ['audio_5fduration_5flogits_2ec_16',['audio_duration_logits.c',['../audio__duration__logits_8c.html',1,'']]],
-  ['audio_5fistft_5fmag_5fphase_2ec_17',['audio_istft_mag_phase.c',['../audio__istft__mag__phase_8c.html',1,'']]],
-  ['audio_5fkernels_2ec_18',['audio_kernels.c',['../audio__kernels_8c.html',1,'']]],
-  ['audio_5flstm_5fscan_2ec_19',['audio_lstm_scan.c',['../audio__lstm__scan_8c.html',1,'']]],
-  ['audio_5fprosody_5fupsample_5fchecked_2ec_20',['audio_prosody_upsample_checked.c',['../audio__prosody__upsample__checked_8c.html',1,'']]],
-  ['audio_5fscaled_5fsum_5fstrided_2ec_21',['audio_scaled_sum_strided.c',['../audio__scaled__sum__strided_8c.html',1,'']]],
-  ['audio_5fstft_5fmag_5fphase_5fchecked_2ec_22',['audio_stft_mag_phase_checked.c',['../audio__stft__mag__phase__checked_8c.html',1,'']]],
-  ['audio_5ftext_5fembedding_2ec_23',['audio_text_embedding.c',['../audio__text__embedding_8c.html',1,'']]],
-  ['axpy_5fkernels_2ec_24',['axpy_kernels.c',['../axpy__kernels_8c.html',1,'']]]
+  ['audio_5fharmonic_5fsource_5fchecked_2ec_17',['audio_harmonic_source_checked.c',['../audio__harmonic__source__checked_8c.html',1,'']]],
+  ['audio_5fistft_5fmag_5fphase_2ec_18',['audio_istft_mag_phase.c',['../audio__istft__mag__phase_8c.html',1,'']]],
+  ['audio_5fkernels_2ec_19',['audio_kernels.c',['../audio__kernels_8c.html',1,'']]],
+  ['audio_5flstm_5fscan_2ec_20',['audio_lstm_scan.c',['../audio__lstm__scan_8c.html',1,'']]],
+  ['audio_5fprosody_5fupsample_5fchecked_2ec_21',['audio_prosody_upsample_checked.c',['../audio__prosody__upsample__checked_8c.html',1,'']]],
+  ['audio_5fscaled_5fsum_5fstrided_2ec_22',['audio_scaled_sum_strided.c',['../audio__scaled__sum__strided_8c.html',1,'']]],
+  ['audio_5fstft_5fmag_5fphase_5fchecked_2ec_23',['audio_stft_mag_phase_checked.c',['../audio__stft__mag__phase__checked_8c.html',1,'']]],
+  ['audio_5ftext_5fembedding_2ec_24',['audio_text_embedding.c',['../audio__text__embedding_8c.html',1,'']]],
+  ['axpy_5fkernels_2ec_25',['axpy_kernels.c',['../axpy__kernels_8c.html',1,'']]]
 ];

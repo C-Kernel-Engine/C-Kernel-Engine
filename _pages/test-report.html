@@ -2565,6 +2565,8 @@ function renderSubTest(st) {
   const statusClass = st.status === 'pass' ? 'pass' : (st.status === 'fail' ? 'fail' : 'not-tested');
   const statusIcon = st.status === 'pass' ? '✓' : (st.status === 'fail' ? '✗' : '○');
   const iconClass = st.status === 'pass' ? 'test-pass' : (st.status === 'fail' ? 'test-fail' : 'test-skip');
+  const diagnosticLabel = st.status === 'fail' && st.metadata?.gate === 'diagnostic' && st.metadata?.blocking === false
+    ? ' <small>Known mismatch · non-blocking diagnostic</small>' : '';
 
   let metrics = '';
   if (st.max_diff !== null && st.max_diff !== undefined) {
@@ -2581,7 +2583,7 @@ function renderSubTest(st) {
   return `
     <div class="sub-test-item ${statusClass}">
       <span class="${iconClass}">${statusIcon}</span>
-      <span class="sub-test-name">${escapeHtml(st.name)}${st.configuration ? ` <small>${escapeHtml(st.configuration)}</small>` : ''}</span>
+      <span class="sub-test-name">${escapeHtml(st.name)}${diagnosticLabel}${st.configuration ? ` <small>${escapeHtml(st.configuration)}</small>` : ''}</span>
       <span class="sub-test-metrics">${metrics}</span>
       ${evidence}
     </div>

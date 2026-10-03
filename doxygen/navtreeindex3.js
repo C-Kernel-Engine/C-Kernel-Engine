@@ -1,5 +1,9 @@
 var NAVTREEINDEX3 =
 {
+"ck__metrics_8h.html#ab3c67455fd428dcd14b4c04ace7c1174":[2,0,0,4,18],
+"ck__metrics_8h.html#ac30f30752eb75d43390e7b09afef3229":[2,0,0,4,21],
+"ck__metrics_8h.html#acc478377df2fad263f5ca72c43e7f780":[2,0,0,4,6],
+"ck__metrics_8h.html#acc478377df2fad263f5ca72c43e7f780a36b52029112b5beb67d9db58241ae629":[2,0,0,4,6,2],
 "ck__metrics_8h.html#acc478377df2fad263f5ca72c43e7f780a43841140f69811bab002486ba7110ffc":[2,0,0,4,6,1],
 "ck__metrics_8h.html#acc478377df2fad263f5ca72c43e7f780aba55ebdc32977b7db877fa0b357b03f7":[2,0,0,4,6,0],
 "ck__metrics_8h.html#acc478377df2fad263f5ca72c43e7f780aeef65e64a889b61f3b511a2b4b6438fe":[2,0,0,4,6,3],
@@ -245,9 +249,5 @@ var NAVTREEINDEX3 =
 "ck__speed__profiles_8h_source.html":[2,0,0,10],
 "ck__threadpool_8c.html":[2,0,1,12],
 "ck__threadpool_8c.html#a001490b08bc5ba893488e49d4b10d3bf":[2,0,1,12,23],
-"ck__threadpool_8c.html#a17a05693c8d126bffd74de2d8c22bd16":[2,0,1,12,13],
-"ck__threadpool_8c.html#a19111881b2bff4a1ddd3bfb5f8074686":[2,0,1,12,2],
-"ck__threadpool_8c.html#a1dcf1b7c2fd4bc9276f0aa642333db2a":[2,0,1,12,3],
-"ck__threadpool_8c.html#a201c68c915e80d824c95721b55c5ab83":[2,0,1,12,22],
-"ck__threadpool_8c.html#a20acab131a0e931d50e567b3161de51b":[2,0,1,12,24]
+"ck__threadpool_8c.html#a17a05693c8d126bffd74de2d8c22bd16":[2,0,1,12,13]
 };

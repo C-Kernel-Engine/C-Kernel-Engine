@@ -159,6 +159,8 @@ Functions</h2></td></tr>
 <tr class="separator:ac24cccf1fbd382d1067650282f3c3ed3"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a67439167b590e67fa58513f30f86cfac" id="r_a67439167b590e67fa58513f30f86cfac"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__tts_8h.html#a67439167b590e67fa58513f30f86cfac">audio_duration_logits_to_frames_f32</a> (const float *logits, size_t input_elements, size_t tokens, size_t bins, size_t input_stride, float speed, int32_t *durations, size_t duration_capacity, size_t max_duration_per_token, size_t max_expanded_frames, int32_t *expanded_frames)</td></tr>
 <tr class="separator:a67439167b590e67fa58513f30f86cfac"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aefe8b35c00236310bd648f3f8386ec39" id="r_aefe8b35c00236310bd648f3f8386ec39"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__tts_8h.html#aefe8b35c00236310bd648f3f8386ec39">audio_harmonic_source_checked_f32</a> (const float *f0, size_t f0_capacity, const float *gaussian, size_t gaussian_capacity, float *output, size_t output_capacity, float *phase_scratch, size_t scratch_capacity, size_t frames, size_t upsample, size_t harmonics, float sample_rate, float voiced_threshold, float sine_amp, float noise_std)</td></tr>
+<tr class="separator:aefe8b35c00236310bd648f3f8386ec39"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a4c7380c2b59352b52e4769687a32a888" id="r_a4c7380c2b59352b52e4769687a32a888"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__tts_8h.html#a4c7380c2b59352b52e4769687a32a888">audio_istft_mag_phase_f32</a> (const float *magnitude, const float *phase, size_t spectral_elements, size_t frames, size_t n_fft, size_t hop, float *output, size_t output_capacity, float *scratch, size_t scratch_elements)</td></tr>
 <tr class="separator:a4c7380c2b59352b52e4769687a32a888"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a5d20ffbb3739001f22b58f8e23526d50" id="r_a5d20ffbb3739001f22b58f8e23526d50"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__tts_8h.html#a5d20ffbb3739001f22b58f8e23526d50">audio_istft_mag_phase_plan_f32</a> (size_t frames, size_t n_fft, size_t hop, size_t *spectral_elements, size_t *output_samples, size_t *scratch_elements)</td></tr>
@@ -439,6 +441,199 @@ Functions</h2></td></tr>
 <div class="ttc" id="aaudio__duration__logits_8c_html_a8fcb2529c968eec57175f3334a442d7a"><div class="ttname"><a href="audio__duration__logits_8c.html#a8fcb2529c968eec57175f3334a442d7a">token_frames</a></div><div class="ttdeci">static int token_frames(const float *logits, size_t bins, float speed, size_t max_duration_per_token, int32_t *frames)</div><div class="ttdef"><b>Definition</b> <a href="audio__duration__logits_8c_source.html#l00013">audio_duration_logits.c:13</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="ckernel__tts_8h_source.html#l00042">CK_AUDIO_EXTENT_INVALID</a>, <a class="el" href="ckernel__tts_8h_source.html#l00043">CK_AUDIO_EXTENT_LIMIT</a>, <a class="el" href="ckernel__tts_8h_source.html#l00041">CK_AUDIO_EXTENT_OK</a>, <a class="el" href="ckernel__tts_8h_source.html#l00044">CK_AUDIO_EXTENT_OVERFLOW</a>, <a class="el" href="tokenizer_8h_source.html#l00307">token</a>, and <a class="el" href="audio__duration__logits_8c_source.html#l00013">token_frames()</a>.</p>
+
+</div>
+</div>
+<a id="aefe8b35c00236310bd648f3f8386ec39" name="aefe8b35c00236310bd648f3f8386ec39"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aefe8b35c00236310bd648f3f8386ec39">&#9670;&#160;</a></span>audio_harmonic_source_checked_f32()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int audio_harmonic_source_checked_f32 </td>
+          <td>(</td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>f0</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>f0_capacity</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>gaussian</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>gaussian_capacity</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>output</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>output_capacity</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>phase_scratch</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>scratch_capacity</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>frames</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>upsample</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>harmonics</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float&#160;</td>
+          <td class="paramname"><em>sample_rate</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float&#160;</td>
+          <td class="paramname"><em>voiced_threshold</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float&#160;</td>
+          <td class="paramname"><em>sine_amp</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float&#160;</td>
+          <td class="paramname"><em>noise_std</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="audio__harmonic__source__checked_8c_source.html#l00015">15</a> of file <a class="el" href="audio__harmonic__source__checked_8c_source.html">audio_harmonic_source_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   22</span>                                     {</div>
+<div class="line"><span class="lineno">   23</span>    <span class="keywordflow">if</span> (!frames || upsample &lt; 4 || !harmonics || !isfinite(sample_rate) ||</div>
+<div class="line"><span class="lineno">   24</span>        !isfinite(voiced_threshold) || !isfinite(sine_amp) ||</div>
+<div class="line"><span class="lineno">   25</span>        !isfinite(noise_std) || sample_rate &lt;= 0.0f || sine_amp &lt; 0.0f ||</div>
+<div class="line"><span class="lineno">   26</span>        noise_std &lt; 0.0f || frames &gt; SIZE_MAX / upsample)</div>
+<div class="line"><span class="lineno">   27</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__tts_8h.html#ac33d7dced18028940945c35c42dadf91a69b700acd95d7ca6a720a4d885ab53a4">CK_AUDIO_EXTENT_INVALID</a>;</div>
+<div class="line"><span class="lineno">   28</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> samples = frames * upsample;</div>
+<div class="line"><span class="lineno">   29</span>    <span class="keywordflow">if</span> (samples &gt; SIZE_MAX / harmonics ||</div>
+<div class="line"><span class="lineno">   30</span>        frames &gt; SIZE_MAX / harmonics)</div>
+<div class="line"><span class="lineno">   31</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__tts_8h.html#ac33d7dced18028940945c35c42dadf91a8f6a6820e4008381db57e8e8960fb671">CK_AUDIO_EXTENT_OVERFLOW</a>;</div>
+<div class="line"><span class="lineno">   32</span>    <span class="keywordflow">if</span> (samples &gt; (1u &lt;&lt; 24)) <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__tts_8h.html#ac33d7dced18028940945c35c42dadf91a6a53055c5ccb0c65933840f461664959">CK_AUDIO_EXTENT_LIMIT</a>;</div>
+<div class="line"><span class="lineno">   33</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> output_need = samples * harmonics;</div>
+<div class="line"><span class="lineno">   34</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> phase_need = frames * harmonics;</div>
+<div class="line"><span class="lineno">   35</span>    <span class="keywordflow">if</span> (phase_need &gt; SIZE_MAX - output_need)</div>
+<div class="line"><span class="lineno">   36</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__tts_8h.html#ac33d7dced18028940945c35c42dadf91a8f6a6820e4008381db57e8e8960fb671">CK_AUDIO_EXTENT_OVERFLOW</a>;</div>
+<div class="line"><span class="lineno">   37</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> scratch_need = phase_need + output_need;</div>
+<div class="line"><span class="lineno">   38</span>    <span class="keywordflow">if</span> (f0_capacity &lt; frames || gaussian_capacity &lt; output_need ||</div>
+<div class="line"><span class="lineno">   39</span>        output_capacity &lt; output_need || scratch_capacity &lt; scratch_need)</div>
+<div class="line"><span class="lineno">   40</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__tts_8h.html#ac33d7dced18028940945c35c42dadf91a6a53055c5ccb0c65933840f461664959">CK_AUDIO_EXTENT_LIMIT</a>;</div>
+<div class="line"><span class="lineno">   41</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(f0, frames) ||</div>
+<div class="line"><span class="lineno">   42</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(gaussian, output_need) ||</div>
+<div class="line"><span class="lineno">   43</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(output, output_need) ||</div>
+<div class="line"><span class="lineno">   44</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(phase_scratch, scratch_need) ||</div>
+<div class="line"><span class="lineno">   45</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(output, output_need, f0, frames) ||</div>
+<div class="line"><span class="lineno">   46</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(output, output_need, gaussian, output_need) ||</div>
+<div class="line"><span class="lineno">   47</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(output, output_need, phase_scratch, scratch_need) ||</div>
+<div class="line"><span class="lineno">   48</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(phase_scratch, scratch_need, f0, frames) ||</div>
+<div class="line"><span class="lineno">   49</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(phase_scratch, scratch_need, gaussian, output_need) ||</div>
+<div class="line"><span class="lineno">   50</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a>(f0, frames) ||</div>
+<div class="line"><span class="lineno">   51</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a>(gaussian, output_need))</div>
+<div class="line"><span class="lineno">   52</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__tts_8h.html#ac33d7dced18028940945c35c42dadf91a69b700acd95d7ca6a720a4d885ab53a4">CK_AUDIO_EXTENT_INVALID</a>;</div>
+<div class="line"><span class="lineno">   53</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> harmonic = 0; harmonic &lt; harmonics; ++harmonic) {</div>
+<div class="line"><span class="lineno">   54</span>        <span class="comment">/* The pinned CPU oracle widens FP32 cumsum&#39;s accumulator before</span></div>
+<div class="line"><span class="lineno">   55</span><span class="comment">         * storing each FP32 prefix result. */</span></div>
+<div class="line"><span class="lineno">   56</span>        <span class="keywordtype">double</span> running = 0.0;</div>
+<div class="line"><span class="lineno">   57</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> frame = 0; frame &lt; frames; ++frame) {</div>
+<div class="line"><span class="lineno">   58</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> hz = f0[frame] * (float)(harmonic + 1);</div>
+<div class="line"><span class="lineno">   59</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> radians = hz / sample_rate;</div>
+<div class="line"><span class="lineno">   60</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> fraction = radians - floorf(radians);</div>
+<div class="line"><span class="lineno">   61</span>            running += fraction;</div>
+<div class="line"><span class="lineno">   62</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> phase = (float)running * (2.0f * <a class="code hl_define" href="audio__harmonic__source__checked_8c.html#a0d1153503f6c93066c77cb9a37ecf1c7">CK_SOURCE_PI_F</a>);</div>
+<div class="line"><span class="lineno">   63</span>            phase_scratch[frame * harmonics + harmonic] =</div>
+<div class="line"><span class="lineno">   64</span>                phase * (float)upsample;</div>
+<div class="line"><span class="lineno">   65</span>            <span class="keywordflow">if</span> (!isfinite(phase_scratch[frame * harmonics + harmonic]))</div>
+<div class="line"><span class="lineno">   66</span>                <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__tts_8h.html#ac33d7dced18028940945c35c42dadf91a69b700acd95d7ca6a720a4d885ab53a4">CK_AUDIO_EXTENT_INVALID</a>;</div>
+<div class="line"><span class="lineno">   67</span>        }</div>
+<div class="line"><span class="lineno">   68</span>    }</div>
+<div class="line"><span class="lineno">   69</span>    <span class="keywordtype">float</span> *staged = phase_scratch + phase_need;</div>
+<div class="line"><span class="lineno">   70</span>    <span class="comment">/* Stage the entire output so a late arithmetic failure preserves the</span></div>
+<div class="line"><span class="lineno">   71</span><span class="comment">     * caller&#39;s output buffer. */</span></div>
+<div class="line"><span class="lineno">   72</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> sample = 0; sample &lt; samples; ++sample) {</div>
+<div class="line"><span class="lineno">   73</span>        <span class="keyword">const</span> <span class="keywordtype">size_t</span> frame = sample / upsample;</div>
+<div class="line"><span class="lineno">   74</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> uv = f0[frame] &gt; voiced_threshold ? 1.0f : 0.0f;</div>
+<div class="line"><span class="lineno">   75</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> amplitude = uv * noise_std +</div>
+<div class="line"><span class="lineno">   76</span>            (1.0f - uv) * (sine_amp / 3.0f);</div>
+<div class="line"><span class="lineno">   77</span>        <span class="comment">/* PyTorch&#39;s align_corners=false interpolation multiplies by a</span></div>
+<div class="line"><span class="lineno">   78</span><span class="comment">         * pre-rounded FP32 reciprocal; division changes long-phase samples. */</span></div>
+<div class="line"><span class="lineno">   79</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> inverse_scale = 1.0f / (float)upsample;</div>
+<div class="line"><span class="lineno">   80</span>        <span class="keywordtype">float</span> position = inverse_scale * ((float)sample + 0.5f) - 0.5f;</div>
+<div class="line"><span class="lineno">   81</span>        <span class="keywordflow">if</span> (position &lt; 0.0f) position = 0.0f;</div>
+<div class="line"><span class="lineno">   82</span>        <span class="keywordflow">if</span> (position &gt; (<span class="keywordtype">float</span>)(frames - 1)) position = (float)(frames - 1);</div>
+<div class="line"><span class="lineno">   83</span>        <span class="keyword">const</span> <span class="keywordtype">size_t</span> <a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a> = (size_t)position;</div>
+<div class="line"><span class="lineno">   84</span>        <span class="keyword">const</span> <span class="keywordtype">size_t</span> <a class="code hl_variable" href="true__bpe_8h.html#afb60251d57a9ee3324fbc011e4be71e9">right</a> = <a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a> + 1 &lt; frames ? <a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a> + 1 : <a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a>;</div>
+<div class="line"><span class="lineno">   85</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> right_weight = position - (float)<a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a>;</div>
+<div class="line"><span class="lineno">   86</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> harmonic = 0; harmonic &lt; harmonics; ++harmonic) {</div>
+<div class="line"><span class="lineno">   87</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> a = phase_scratch[<a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a> * harmonics + harmonic];</div>
+<div class="line"><span class="lineno">   88</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> b = phase_scratch[<a class="code hl_variable" href="true__bpe_8h.html#afb60251d57a9ee3324fbc011e4be71e9">right</a> * harmonics + harmonic];</div>
+<div class="line"><span class="lineno">   89</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> phase = a + (b - a) * right_weight;</div>
+<div class="line"><span class="lineno">   90</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> value = sinf(phase) * sine_amp * uv +</div>
+<div class="line"><span class="lineno">   91</span>                amplitude * gaussian[sample * harmonics + harmonic];</div>
+<div class="line"><span class="lineno">   92</span>            <span class="keywordflow">if</span> (!isfinite(value)) <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__tts_8h.html#ac33d7dced18028940945c35c42dadf91a69b700acd95d7ca6a720a4d885ab53a4">CK_AUDIO_EXTENT_INVALID</a>;</div>
+<div class="line"><span class="lineno">   93</span>            staged[sample * harmonics + harmonic] = value;</div>
+<div class="line"><span class="lineno">   94</span>        }</div>
+<div class="line"><span class="lineno">   95</span>    }</div>
+<div class="line"><span class="lineno">   96</span>    memcpy(output, staged, output_need * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">   97</span>    <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__tts_8h.html#ac33d7dced18028940945c35c42dadf91ace4d803def1b18836a5cbd7fbd659af1">CK_AUDIO_EXTENT_OK</a>;</div>
+<div class="line"><span class="lineno">   98</span>}</div>
+<div class="ttc" id="aaudio__harmonic__source__checked_8c_html_a0d1153503f6c93066c77cb9a37ecf1c7"><div class="ttname"><a href="audio__harmonic__source__checked_8c.html#a0d1153503f6c93066c77cb9a37ecf1c7">CK_SOURCE_PI_F</a></div><div class="ttdeci">#define CK_SOURCE_PI_F</div><div class="ttdef"><b>Definition</b> <a href="audio__harmonic__source__checked_8c_source.html#l00008">audio_harmonic_source_checked.c:8</a></div></div>
+<div class="ttc" id="achecked__float__buffer_8h_html_a1b266161b71bde9ca8d45c2fb5ac889a"><div class="ttname"><a href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a></div><div class="ttdeci">static int ck_checked_finite(const float *ptr, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00019">checked_float_buffer.h:19</a></div></div>
+<div class="ttc" id="achecked__float__buffer_8h_html_ada07e31487d86edb37408386003ac841"><div class="ttname"><a href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a></div><div class="ttdeci">static int ck_checked_region(const float *ptr, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00011">checked_float_buffer.h:11</a></div></div>
+<div class="ttc" id="achecked__float__buffer_8h_html_af87b7012571dc9a40b8e31c52e773abe"><div class="ttname"><a href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a></div><div class="ttdeci">static int ck_checked_overlap(const float *a, size_t na, const float *b, size_t nb)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00015">checked_float_buffer.h:15</a></div></div>
+<div class="ttc" id="atrue__bpe_8h_html_abf33d3f8e74eb48d5a4394c67ac4f1cd"><div class="ttname"><a href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a></div><div class="ttdeci">const char * left</div><div class="ttdef"><b>Definition</b> <a href="true__bpe_8h_source.html#l00138">true_bpe.h:138</a></div></div>
+<div class="ttc" id="atrue__bpe_8h_html_afb60251d57a9ee3324fbc011e4be71e9"><div class="ttname"><a href="true__bpe_8h.html#afb60251d57a9ee3324fbc011e4be71e9">right</a></div><div class="ttdeci">const char const char * right</div><div class="ttdef"><b>Definition</b> <a href="true__bpe_8h_source.html#l00139">true_bpe.h:139</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="ckernel__tts_8h_source.html#l00042">CK_AUDIO_EXTENT_INVALID</a>, <a class="el" href="ckernel__tts_8h_source.html#l00043">CK_AUDIO_EXTENT_LIMIT</a>, <a class="el" href="ckernel__tts_8h_source.html#l00041">CK_AUDIO_EXTENT_OK</a>, <a class="el" href="ckernel__tts_8h_source.html#l00044">CK_AUDIO_EXTENT_OVERFLOW</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00019">ck_checked_finite()</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00015">ck_checked_overlap()</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00011">ck_checked_region()</a>, <a class="el" href="audio__harmonic__source__checked_8c_source.html#l00008">CK_SOURCE_PI_F</a>, <a class="el" href="true__bpe_8h_source.html#l00138">left</a>, and <a class="el" href="true__bpe_8h_source.html#l00139">right</a>.</p>
 
 </div>
 </div>
@@ -850,10 +1045,7 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">  100</span>    <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__tts_8h.html#ac33d7dced18028940945c35c42dadf91ace4d803def1b18836a5cbd7fbd659af1">CK_AUDIO_EXTENT_OK</a>;</div>
 <div class="line"><span class="lineno">  101</span>}</div>
 <div class="ttc" id="aaudio__stft__mag__phase__checked_8c_html_a260ec8d60648e11d37636b70afc492b7"><div class="ttname"><a href="audio__stft__mag__phase__checked_8c.html#a260ec8d60648e11d37636b70afc492b7">audio_stft_mag_phase_plan_f32</a></div><div class="ttdeci">int audio_stft_mag_phase_plan_f32(size_t samples, size_t n_fft, size_t hop, size_t *frames, size_t *spectral_elements)</div><div class="ttdef"><b>Definition</b> <a href="audio__stft__mag__phase__checked_8c_source.html#l00008">audio_stft_mag_phase_checked.c:8</a></div></div>
-<div class="ttc" id="achecked__float__buffer_8h_html_a1b266161b71bde9ca8d45c2fb5ac889a"><div class="ttname"><a href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a></div><div class="ttdeci">static int ck_checked_finite(const float *ptr, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00019">checked_float_buffer.h:19</a></div></div>
 <div class="ttc" id="achecked__float__buffer_8h_html_a80fa111d42598d70e6c6728193a1f8dc"><div class="ttname"><a href="checked__float__buffer_8h.html#a80fa111d42598d70e6c6728193a1f8dc">ck_checked_span</a></div><div class="ttdeci">static int ck_checked_span(size_t rows, size_t width, size_t stride, size_t *span)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00006">checked_float_buffer.h:6</a></div></div>
-<div class="ttc" id="achecked__float__buffer_8h_html_ada07e31487d86edb37408386003ac841"><div class="ttname"><a href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a></div><div class="ttdeci">static int ck_checked_region(const float *ptr, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00011">checked_float_buffer.h:11</a></div></div>
-<div class="ttc" id="achecked__float__buffer_8h_html_af87b7012571dc9a40b8e31c52e773abe"><div class="ttname"><a href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a></div><div class="ttdeci">static int ck_checked_overlap(const float *a, size_t na, const float *b, size_t nb)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00015">checked_float_buffer.h:15</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="audio__stft__mag__phase__checked_8c_source.html#l00008">audio_stft_mag_phase_plan_f32()</a>, <a class="el" href="ckernel__tts_8h_source.html#l00042">CK_AUDIO_EXTENT_INVALID</a>, <a class="el" href="ckernel__tts_8h_source.html#l00043">CK_AUDIO_EXTENT_LIMIT</a>, <a class="el" href="ckernel__tts_8h_source.html#l00041">CK_AUDIO_EXTENT_OK</a>, <a class="el" href="ckernel__tts_8h_source.html#l00044">CK_AUDIO_EXTENT_OVERFLOW</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00019">ck_checked_finite()</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00015">ck_checked_overlap()</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00011">ck_checked_region()</a>, and <a class="el" href="checked__float__buffer_8h_source.html#l00006">ck_checked_span()</a>.</p>
 
