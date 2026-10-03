@@ -11,6 +11,7 @@ var dir_40856f0cdd4bcafd28810d9265a200f7 =
     [ "attention_oracle_ggml.h", "attention__oracle__ggml_8h.html", "attention__oracle__ggml_8h" ],
     [ "audio_adain_instance_norm.c", "audio__adain__instance__norm_8c.html", "audio__adain__instance__norm_8c" ],
     [ "audio_adaptive_layer_norm.c", "audio__adaptive__layer__norm_8c.html", "audio__adaptive__layer__norm_8c" ],
+    [ "audio_concat_channels_checked.c", "audio__concat__channels__checked_8c.html", "audio__concat__channels__checked_8c" ],
     [ "audio_conv1d_checked.c", "audio__conv1d__checked_8c.html", "audio__conv1d__checked_8c" ],
     [ "audio_duration_expand.c", "audio__duration__expand_8c.html", "audio__duration__expand_8c" ],
     [ "audio_duration_expand_token_major.c", "audio__duration__expand__token__major_8c.html", "audio__duration__expand__token__major_8c" ],

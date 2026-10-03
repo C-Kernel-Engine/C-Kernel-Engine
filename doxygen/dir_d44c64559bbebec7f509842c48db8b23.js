@@ -16,6 +16,7 @@ var dir_d44c64559bbebec7f509842c48db8b23 =
     [ "ckernel_alloc.h", "ckernel__alloc_8h.html", "ckernel__alloc_8h" ],
     [ "ckernel_attention_full_token_major.h", "ckernel__attention__full__token__major_8h.html", "ckernel__attention__full__token__major_8h" ],
     [ "ckernel_audio.h", "ckernel__audio_8h.html", "ckernel__audio_8h" ],
+    [ "ckernel_audio_concat_checked.h", "ckernel__audio__concat__checked_8h.html", "ckernel__audio__concat__checked_8h" ],
     [ "ckernel_audio_conv_checked.h", "ckernel__audio__conv__checked_8h.html", "ckernel__audio__conv__checked_8h" ],
     [ "ckernel_audio_duration_expand_token_major.h", "ckernel__audio__duration__expand__token__major_8h.html", "ckernel__audio__duration__expand__token__major_8h" ],
     [ "ckernel_audio_prosody_upsample_checked.h", "ckernel__audio__prosody__upsample__checked_8h.html", "ckernel__audio__prosody__upsample__checked_8h" ],

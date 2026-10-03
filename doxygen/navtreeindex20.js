@@ -1,5 +1,11 @@
 var NAVTREEINDEX20 =
 {
+"structCKPlanStepV2.html#acaaa916701cbcf1e9a5d35ff79e7c5bf":[1,0,54,0],
+"structCKPoolBlock.html":[1,0,55],
+"structCKPoolBlock.html#a28b34d622ad98214bd709675b430f459":[1,0,55,1],
+"structCKPoolBlock.html#a39f197d57191d7ab700d17ad918d03c5":[1,0,55,2],
+"structCKPoolBlock.html#ad15144404362a0676f0c46a5b5a8d0ba":[1,0,55,3],
+"structCKPoolBlock.html#ae3840902acd7df911c6273760f3c63d5":[1,0,55,0],
 "structCKSection.html":[1,0,56],
 "structCKSection.html#a0651f7c9b1f55618e1ed1285fc803eab":[1,0,56,15],
 "structCKSection.html#a09e2a195e9cfb48f0256523565e73fe7":[1,0,56,20],
@@ -243,11 +249,5 @@ var NAVTREEINDEX20 =
 "structMemorySlot.html#a5c71e7350e86f396ab2912410be1a162":[1,0,74,4],
 "structMemorySlot.html#a6173783f7bdc94d89af5a150e3fdc7b3":[1,0,74,1],
 "structMemorySlot.html#a8db087de44e502b76946628000b9ce14":[1,0,74,2],
-"structMemorySlot.html#a9ac221e5878a5d6ce26d7c711fced364":[1,0,74,3],
-"structMemorySlot.html#af95b0bc9c39a80072ba71c88506125d3":[1,0,74,0],
-"structMemorySlot.html#afed85487a039a8b26e3e1b92453c6f59":[1,0,74,6],
-"structNUMANode.html":[1,0,77],
-"structNUMANode.html#a0c71fe04154d6a80d08829e547f5145d":[1,0,77,0],
-"structNUMANode.html#a11cae96c43efc187a78bb509aa86355b":[1,0,77,3],
-"structNUMANode.html#aad2dccb35d57507ce243031012618337":[1,0,77,4]
+"structMemorySlot.html#a9ac221e5878a5d6ce26d7c711fced364":[1,0,74,3]
 };
