@@ -1692,8 +1692,9 @@ qwen --bare \
         This supports publisher text-chat rendering, but does not certify Gemma4 or Muse
         tool parsing, native token IDs, or generated-model harness tasks.
     </p>
-    <p class="mini-note">Gemma4 now references the shared <code>publisher-chat-v1</code>
-        profile. Its declared output protocol is <code>none</code>: ordinary text chat can
+    <p class="mini-note">Gemma4 references <code>gemma4-v1</code>, with a chat-only
+        default variant and an explicit <code>tools</code> variant. The default output
+        protocol is <code>none</code>: ordinary text chat can
         resolve the publisher Jinja asset, while tool-bearing requests fail before generation.
         When HF token sidecars are absent, verified GGUF special-token IDs are matched to
         bundled <code>tokenizer.json</code> text; conflicting definitions fail at startup.
@@ -1719,10 +1720,35 @@ qwen --bare \
         <code>&lt;|tool_call&gt;</code>, <code>&lt;tool_call|&gt;</code> and
         <code>&lt;|tool_response&gt;</code> syntax, as described in
         <a href="https://ai.google.dev/gemma/docs/core/prompt-formatting-gemma4">Google's Gemma4 prompt format</a>.
-        The current profile intentionally declares <code>output_protocol: none</code>
-        because the server has not certified a parser or a generated-model tool/result
-        round trip for this artifact. A Jinja tool declaration alone must not advertise
-        tool capability.</p>
+        The optional <code>gemma4_dsl_v1</code> variant selects a strict parser,
+        adapts function declarations to the publisher's nested Jinja input,
+        and declares <code>&lt;|tool_response&gt;</code> and <code>&lt;eos&gt;</code>
+        output stops in the resolved bundle. One isolated Gemma4 E4B Q4_K_M
+        artifact completed real generated tool-call/result continuations through
+        both HTTP routes. The circuit default remains chat-only; selecting the
+        tools variant and testing one artifact does not certify every Gemma4 build.</p>
+    <p class="mini-note">For clients such as the pinned Antigravity SDK 0.1.20 that
+        send a very large <code>max_completion_tokens</code> upper bound, an operator
+        may explicitly start this bounded Gemma server with
+        <code>--request-output-cap 256</code>. The normal policy still rejects
+        requests whose declared allowance exceeds the loaded context. With the
+        cap enabled, the effective allowance is recorded in the response and
+        <code>/v1/cke/loaded-identity</code>; exhausting it remains an incomplete
+        response. The SDK's external OpenAI-compatible configuration must name
+        this local endpoint and the loaded model. No cloud fallback or model-name
+        substitution is part of this test.</p>
+    <p class="mini-note">On the isolated 2,048-token tools bundle, Antigravity SDK
+        0.1.20 connected directly to CKE with <code>--request-output-cap 256</code>
+        and completed a file read, two-file answer, exact HTML edit plus validator,
+        and retry after a transient tool error in two consecutive four-case runs.
+        Both reports and disposable workspace archives are retained under
+        <code>/srv/cke/profiles/gemma4-tools-20261003/</code>. Two earlier runs
+        failed the single-file answer despite a correct tool call and result;
+        those failed reports are retained too. The passing runs used a more
+        specific task prompt. This establishes a bounded successful workflow,
+        not repeated overnight reliability or larger-context capacity.
+        The HTTP cancellation/disconnect suite passed on the same server instance;
+        a fresh SDK read then succeeded without restart.</p>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
 <pre># Read both SHA-256 values from /v1/cke/loaded-identity first.
@@ -1741,6 +1767,19 @@ python3 server/http_lifecycle_acceptance.py \
   --expected-serving-identity "$SERVING_SHA" \
   --expected-session-library-sha256 "$SESSION_SHA" \
   --output /path/to/new-lifecycle-report.json</pre>
+    </div>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre># Against the explicit Gemma tools variant, with the endpoint's output cap set to 256.
+# Install google-antigravity==0.1.20 in an isolated environment on the client.
+python3 server/gemma_antigravity_acceptance.py \
+  --endpoint http://127.0.0.1:18215/v1 \
+  --model gemma4-e4b-q4km-tools \
+  --expected-serving-identity "$SERVING_SHA" \
+  --expected-session-library-sha256 "$SESSION_SHA" \
+  --case-timeout-seconds 300 \
+  --workspace /path/to/new-disposable-workspace \
+  --output /path/to/new-gemma-antigravity-report.json</pre>
     </div>
     <h4>Bounded local Qwen Code acceptance</h4>
     <p>Use the same Qwen Code client as a real contributor task in a new disposable directory.
