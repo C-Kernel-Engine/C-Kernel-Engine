@@ -1,5 +1,8 @@
 var NAVTREEINDEX17 =
 {
+"rmsnorm__kernels__int8_8c.html#a45fe3ed3025a14b8ff912b887963cf4b":[2,0,1,1,106,2],
+"rmsnorm__kernels__int8_8c.html#a8bcb792646f1c21869164c8394c76bf1":[2,0,1,1,106,3],
+"rmsnorm__kernels__int8_8c.html#aa0f94daa3cbcf5611313ea3211874b55":[2,0,1,1,106,1],
 "rmsnorm__kernels__int8_8c_source.html":[2,0,1,1,106],
 "rmsnorm__q8__k__fused_8c.html":[2,0,1,1,0,10],
 "rmsnorm__q8__k__fused_8c.html#a92b59a0fe356901c8aaabfe548a4add6":[2,0,1,1,0,10,0],
@@ -246,8 +249,5 @@ var NAVTREEINDEX17 =
 "structCKBumpHeaderV5.html#ab651af5f16a75f2103c2279da33b1834":[1,0,18,14],
 "structCKBumpHeaderV5.html#ac9d9d27ee6b660da40e40517b5cc6a36":[1,0,18,17],
 "structCKBumpHeaderV5.html#ad0b6a32b8d1ed0f867e9c16c2d87d410":[1,0,18,7],
-"structCKBumpHeaderV5.html#ad4442506feb0743741ccc07af81a049d":[1,0,18,16],
-"structCKBumpHeaderV5.html#addaed139241f58dc329c9227aeb21cbb":[1,0,18,4],
-"structCKBumpHeaderV5.html#af48d4003b64b150726f101a8e1136285":[1,0,18,10],
-"structCKBumpHeaderV5.html#af4bdac04a2bdcef7589256ef352321ee":[1,0,18,0]
+"structCKBumpHeaderV5.html#ad4442506feb0743741ccc07af81a049d":[1,0,18,16]
 };
