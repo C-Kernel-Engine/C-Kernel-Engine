@@ -6,6 +6,11 @@ var ck__model__abi__v8_8h =
     [ "ck_model_get_abi_version_v8_fn", "ck__model__abi__v8_8h.html#a5385b6e9bc0a739d8b8edd12cf376521", null ],
     [ "ck_model_get_capabilities_v8_fn", "ck__model__abi__v8_8h.html#a36dc8190afb9f8678f05368dcad38cee", null ],
     [ "ck_model_get_runtime_descriptor_v8_fn", "ck__model__abi__v8_8h.html#a0b7c6d803b4d3ae2a169e5fd8e1e448c", null ],
+    [ "ck_model_sequence_state_activate_v8_fn", "ck__model__abi__v8_8h.html#abd277ac1eddb5bfaad518b71188a7215", null ],
+    [ "ck_model_sequence_state_create_v8_fn", "ck__model__abi__v8_8h.html#ae01134bc51a046ff070b58637504ef14", null ],
+    [ "ck_model_sequence_state_default_v8_fn", "ck__model__abi__v8_8h.html#aa854217b2dd9c2039b1794c29981c618", null ],
+    [ "ck_model_sequence_state_destroy_v8_fn", "ck__model__abi__v8_8h.html#a6bbd69a654325d3a83f9cfb4066fbec7", null ],
+    [ "ck_model_sequence_state_requirements_v8_fn", "ck__model__abi__v8_8h.html#ae8f6dcc28cf3cd36c48b038f06a7365b", null ],
     [ "CKGenerationFlagsV8", "ck__model__abi__v8_8h.html#aa1482c31b77314279565e29da84cba14", [
       [ "CK_GENERATION_FLAG_TIMESTAMPS", "ck__model__abi__v8_8h.html#aa1482c31b77314279565e29da84cba14a5f5e8f3e5f1bdc3b3139de885f509f8b", null ]
     ] ],
@@ -31,6 +36,7 @@ var ck__model__abi__v8_8h =
       [ "CK_MODEL_CAP_NAMED_ACTIVATIONS", "ck__model__abi__v8_8h.html#a66bda251a7af012335928df3e1b04626ab8dd8208c82592d08689b60edd24aebb", null ],
       [ "CK_MODEL_CAP_PROFILE", "ck__model__abi__v8_8h.html#a66bda251a7af012335928df3e1b04626ab38865d601f67bbe132d19c84d56ca72", null ],
       [ "CK_MODEL_CAP_XRAY_KV", "ck__model__abi__v8_8h.html#a66bda251a7af012335928df3e1b04626aaf964bb8f9a9c27a607c6ee0859e6d32", null ],
-      [ "CK_MODEL_CAP_GENERATION_POLICY", "ck__model__abi__v8_8h.html#a66bda251a7af012335928df3e1b04626a7e46bfc030a4667f90cde12b5da608f5", null ]
+      [ "CK_MODEL_CAP_GENERATION_POLICY", "ck__model__abi__v8_8h.html#a66bda251a7af012335928df3e1b04626a7e46bfc030a4667f90cde12b5da608f5", null ],
+      [ "CK_MODEL_CAP_SEQUENCE_STATE_SWITCH", "ck__model__abi__v8_8h.html#a66bda251a7af012335928df3e1b04626a36650a9bcdebf503e0b11eac602e28fd", null ]
     ] ]
 ];

@@ -1,5 +1,11 @@
 var NAVTREEINDEX21 =
 {
+"structCacheTopology.html#aad6fb272149cb50628325bed91adfa37":[1,0,11,0],
+"structGEMMParams.html":[1,0,71],
+"structGEMMParams.html#a2956e1497d1e97174d5d17e872707769":[1,0,71,1],
+"structGEMMParams.html#a450121a9c76be4c90fe5326b1808eb1a":[1,0,71,3],
+"structGEMMParams.html#a6b0b003d129e3c027928ac6ad089e110":[1,0,71,2],
+"structGEMMParams.html#aa84a148f54c8ec49fec73e7b2354761c":[1,0,71,0],
 "structGEMMParams.html#adc0714de30284b4b62ecfac446979251":[1,0,71,4],
 "structMemoryInfo.html":[1,0,73],
 "structMemoryInfo.html#a0ff8aa8993baa2138de40490c4545fff":[1,0,73,10],
@@ -243,11 +249,5 @@ var NAVTREEINDEX21 =
 "swiglu__kernels__bf16_8c_source.html":[2,0,1,1,116],
 "system__topology_8c.html":[2,0,1,28],
 "system__topology_8c.html#a089e974347ad9291cc98080f85392a57":[2,0,1,28,19],
-"system__topology_8c.html#a314b4992493c6b32bcb3258fca5f5eca":[2,0,1,28,9],
-"system__topology_8c.html#a349f2755a1cb7361bbbe5c729985136d":[2,0,1,28,15],
-"system__topology_8c.html#a34a4d2fcf0318c8d64e4ff73e1f2e6e5":[2,0,1,28,1],
-"system__topology_8c.html#a369266c24eacffb87046522897a570d5":[2,0,1,28,0],
-"system__topology_8c.html#a3e80c10682d58f63c4fa70b98e6a7dfb":[2,0,1,28,18],
-"system__topology_8c.html#a3fd4135ab056f548986d55e3864316f2":[2,0,1,28,11],
-"system__topology_8c.html#a4367943c7d4c62e0865d1171252a6b84":[2,0,1,28,14]
+"system__topology_8c.html#a314b4992493c6b32bcb3258fca5f5eca":[2,0,1,28,9]
 };
