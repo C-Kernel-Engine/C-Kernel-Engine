@@ -1699,17 +1699,49 @@ qwen --bare \
         bundled <code>tokenizer.json</code> text; conflicting definitions fail at startup.
         GGUF configs may carry <code>model_type</code> and <code>model_name</code> without a
         <code>model</code> key; bundle resolution then checks the stamped manifest's circuit identity.
-        This is a declaration, not a Gemma4 serving certification. Exact rendered bytes,
-        native token IDs, generated-runtime chat, and a Gemma tool protocol still need
-        artifact-specific tests.</p>
+        This declaration alone does not certify a Gemma4 artifact. Keep rendered-byte
+        parity, token-ID parity, generated chat, tool protocol and recovery as separate
+        artifact-specific results.</p>
     <p class="mini-note">A fresh isolated Gemma4 E4B GGUF build exposed two native BPE
         differences from the bundled publisher tokenizer: its Jinja prompt already contains
         <code>&lt;bos&gt;</code>, and its tokenizer declares
         <code>add_space_prefix=false</code>. Generated tokenization now honors both contracts.
         Exact IDs matched the bundled <code>tokenizer.json</code> for single-turn,
         multi-turn, and Unicode/multiline rendered prompts in the isolated Ryzen run.
-        This tokenization result does not certify generated chat quality or Gemma tool use;
-        the profile still declares no tool-output protocol.</p>
+        The same isolated artifact passed short generated chat through Chat Completions
+        and streaming Responses. The repeatable HTTP probe also checks multi-turn recall,
+        a deliberately exhausted one-token output budget, undeclared-tool rejection and
+        a successful request afterward. The existing lifecycle probe passed cancellation,
+        disconnect, client timeout and follow-up recovery against this 2,048-token build.
+        The timing-only prefill trigger proves an in-progress request, not the exact native
+        phase at cancellation. These are bounded text-serving checks, not a harness task.</p>
+    <p class="mini-note">The imported publisher template contains Gemma4's
+        <code>&lt;|tool_call&gt;</code>, <code>&lt;tool_call|&gt;</code> and
+        <code>&lt;|tool_response&gt;</code> syntax, as described in
+        <a href="https://ai.google.dev/gemma/docs/core/prompt-formatting-gemma4">Google's Gemma4 prompt format</a>.
+        The current profile intentionally declares <code>output_protocol: none</code>
+        because the server has not certified a parser or a generated-model tool/result
+        round trip for this artifact. A Jinja tool declaration alone must not advertise
+        tool capability.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre># Read both SHA-256 values from /v1/cke/loaded-identity first.
+python3 server/http_lifecycle_acceptance.py \
+  --suite plain-chat --endpoint http://127.0.0.1:18204/v1 \
+  --model gemma4-e4b-q4km-test \
+  --expected-serving-identity "$SERVING_SHA" \
+  --expected-session-library-sha256 "$SESSION_SHA" \
+  --output /path/to/new-plain-chat-report.json
+
+# The same artifact can run the existing cancellation/recovery suite.
+python3 server/http_lifecycle_acceptance.py \
+  --suite lifecycle --prefill-lines 100 \
+  --endpoint http://127.0.0.1:18204/v1 \
+  --model gemma4-e4b-q4km-test \
+  --expected-serving-identity "$SERVING_SHA" \
+  --expected-session-library-sha256 "$SESSION_SHA" \
+  --output /path/to/new-lifecycle-report.json</pre>
+    </div>
     <h4>Bounded local Qwen Code acceptance</h4>
     <p>Use the same Qwen Code client as a real contributor task in a new disposable directory.
         This command reads a small HTML file, edits one heading, runs its Python validator and
