@@ -1,5 +1,6 @@
 var NAVTREEINDEX11 =
 {
+"deltanet__kernels_8c.html#a369266c24eacffb87046522897a570d5":[2,0,1,1,28,0],
 "deltanet__kernels_8c.html#a3b5f0bf210ec71d6ea26f424fabbbd40":[2,0,1,1,28,37],
 "deltanet__kernels_8c.html#a3ec61d4c0579fc5e4b8d4d8b311da427":[2,0,1,1,28,9],
 "deltanet__kernels_8c.html#a431bcc7aab0408e02818e1640dadf02e":[2,0,1,1,28,31],
@@ -248,6 +249,5 @@ var NAVTREEINDEX11 =
 "gemm__fused__kernels_8c_source.html":[2,0,1,1,40],
 "gemm__head__major__output_8c.html":[2,0,1,1,41],
 "gemm__head__major__output_8c.html#a083471cd407d1f7ece23be4340e640bb":[2,0,1,1,41,1],
-"gemm__head__major__output_8c.html#a22c4a007b8fe9fe8a1a9e4c3f4c3e04a":[2,0,1,1,41,2],
-"gemm__head__major__output_8c.html#a30955da0f71b6a46475df846ee7ef144":[2,0,1,1,41,0]
+"gemm__head__major__output_8c.html#a22c4a007b8fe9fe8a1a9e4c3f4c3e04a":[2,0,1,1,41,2]
 };

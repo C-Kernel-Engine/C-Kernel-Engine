@@ -1,5 +1,6 @@
 var NAVTREEINDEX17 =
 {
+"rope__kernels_8c.html#a04bb3dcf0c06d694ed3461ca159b572d":[2,0,1,1,106,77],
 "rope__kernels_8c.html#a06e917de04762ee5e682d44a2f858c4b":[2,0,1,1,106,25],
 "rope__kernels_8c.html#a0ad5b7fb9a1ca5657f3c0922ba82e62c":[2,0,1,1,106,63],
 "rope__kernels_8c.html#a0c3b8a23b665607b44ca3100ad11f09d":[2,0,1,1,106,64],
@@ -180,7 +181,8 @@ var NAVTREEINDEX17 =
 "ssm__kernels_8c_source.html":[2,0,1,1,113],
 "strided__unary__checked_8c.html":[2,0,1,1,114],
 "strided__unary__checked_8c.html#a3c0fd86ed630b0a6a585f8d2303017b7":[2,0,1,1,114,0],
-"strided__unary__checked_8c.html#a5dabfe24b21bfc21d152299db89e093d":[2,0,1,1,114,1],
+"strided__unary__checked_8c.html#a5dabfe24b21bfc21d152299db89e093d":[2,0,1,1,114,2],
+"strided__unary__checked_8c.html#ab48429adec8e00c200e6545217fa4496":[2,0,1,1,114,1],
 "strided__unary__checked_8c_source.html":[2,0,1,1,114],
 "structAffinityInfo.html":[1,0,0],
 "structAffinityInfo.html#a335a14b8b3b93f722ef8e2b6455122f5":[1,0,0,3],
@@ -247,7 +249,5 @@ var NAVTREEINDEX17 =
 "structCKFooterGradOffsets.html#a9275fe493cec58474de57a572d4867f4":[1,0,21,4],
 "structCKFooterGradOffsets.html#ab1ee7c4f660361ce5072f1c9183fa74f":[1,0,21,7],
 "structCKFooterGradOffsets.html#ac3f2b08b2785cf1fa039bb3c0e6e2197":[1,0,21,8],
-"structCKFooterGradOffsets.html#ada3b948a5b678ac0f01d74bf7ab3a8c8":[1,0,21,3],
-"structCKFooterGradOffsets.html#ae2a60b057eaa172d1132474349ad5d40":[1,0,21,5],
-"structCKFooterGradOffsets.html#ae30e8699e5a492c5ecfd6bd6644e775b":[1,0,21,2]
+"structCKFooterGradOffsets.html#ada3b948a5b678ac0f01d74bf7ab3a8c8":[1,0,21,3]
 };
