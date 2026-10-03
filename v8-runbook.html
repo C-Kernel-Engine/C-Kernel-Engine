@@ -2723,9 +2723,19 @@ qwen --bare \
         resolve the publisher Jinja asset, while tool-bearing requests fail before generation.
         When HF token sidecars are absent, verified GGUF special-token IDs are matched to
         bundled <code>tokenizer.json</code> text; conflicting definitions fail at startup.
+        GGUF configs may carry <code>model_type</code> and <code>model_name</code> without a
+        <code>model</code> key; bundle resolution then checks the stamped manifest's circuit identity.
         This is a declaration, not a Gemma4 serving certification. Exact rendered bytes,
         native token IDs, generated-runtime chat, and a Gemma tool protocol still need
         artifact-specific tests.</p>
+    <p class="mini-note">A fresh isolated Gemma4 E4B GGUF build exposed two native BPE
+        differences from the bundled publisher tokenizer: its Jinja prompt already contains
+        <code>&lt;bos&gt;</code>, and its tokenizer declares
+        <code>add_space_prefix=false</code>. Generated tokenization now honors both contracts.
+        Exact IDs matched the bundled <code>tokenizer.json</code> for single-turn,
+        multi-turn, and Unicode/multiline rendered prompts in the isolated Ryzen run.
+        This tokenization result does not certify generated chat quality or Gemma tool use;
+        the profile still declares no tool-output protocol.</p>
     <h4>Bounded local Qwen Code acceptance</h4>
     <p>Use the same Qwen Code client as a real contributor task in a new disposable directory.
         This command reads a small HTML file, edits one heading, runs its Python validator and

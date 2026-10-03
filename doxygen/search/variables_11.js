@@ -44,6 +44,7 @@ var searchData=
   ['style_41',['style',['../tokenizer_8h.html#aebee6a319ed22559d77672c8b7663346',1,'tokenizer.h']]],
   ['supports_5frdma_42',['supports_rdma',['../structNetworkInterface.html#a3a7b2f85e17f8e861ea160f94ade4a46',1,'NetworkInterface']]],
   ['supports_5froce_43',['supports_roce',['../structNetworkInterface.html#a943270da345cf36912ed3ec3a957e15c',1,'NetworkInterface']]],
-  ['swiglu_5fout_44',['swiglu_out',['../structCKLayerForwardParams.html#a64b3c9bf08573696fe23f773e0af3f4a',1,'CKLayerForwardParams::swiglu_out'],['../structCKLayerBackwardParams.html#aa82d1124a56c3e119f2bb9336bfb364b',1,'CKLayerBackwardParams::swiglu_out'],['../structCKLayerForwardParamsQ4K.html#a976fb97749625cdc0f8e16e690c5e5a0',1,'CKLayerForwardParamsQ4K::swiglu_out']]],
-  ['system_5ftext_45',['system_text',['../structCKSessionGenerateRequestV8.html#a28007ad9705b62600399c839451ff85c',1,'CKSessionGenerateRequestV8']]]
+  ['suppress_44',['suppress',['../true__bpe_8h.html#a5e34b37233a3cb1ea0c006b56ec10d2e',1,'true_bpe.h']]],
+  ['swiglu_5fout_45',['swiglu_out',['../structCKLayerForwardParams.html#a64b3c9bf08573696fe23f773e0af3f4a',1,'CKLayerForwardParams::swiglu_out'],['../structCKLayerBackwardParams.html#aa82d1124a56c3e119f2bb9336bfb364b',1,'CKLayerBackwardParams::swiglu_out'],['../structCKLayerForwardParamsQ4K.html#a976fb97749625cdc0f8e16e690c5e5a0',1,'CKLayerForwardParamsQ4K::swiglu_out']]],
+  ['system_5ftext_46',['system_text',['../structCKSessionGenerateRequestV8.html#a28007ad9705b62600399c839451ff85c',1,'CKSessionGenerateRequestV8']]]
 ];

@@ -34,6 +34,7 @@ var true__bpe_8h =
     [ "right_id", "true__bpe_8h.html#aa50e5dfadaeded74c9ed39708c06737b", null ],
     [ "score", "true__bpe_8h.html#a396a22fb293f339694f80705521d0dfa", null ],
     [ "strings", "true__bpe_8h.html#a24d810ef07e5196cf41374aba53c3021", null ],
+    [ "suppress", "true__bpe_8h.html#a5e34b37233a3cb1ea0c006b56ec10d2e", null ],
     [ "text", "true__bpe_8h.html#a66c43cd207a5a3d05689fa20dd19ef66", null ],
     [ "text_len", "true__bpe_8h.html#a888f9023ee38c1b409b124b34c084f55", null ],
     [ "token", "true__bpe_8h.html#a1b07b985c8c5b1d267df858fb9d378e1", null ],
