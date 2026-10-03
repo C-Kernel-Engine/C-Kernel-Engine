@@ -1442,6 +1442,8 @@ def step_codegen(output_dir: Path, ir_paths: dict[str, Path], *, force: bool = F
                 SCRIPTS_DIR / "codegen_v8.py",
                 SCRIPTS_DIR / "codegen_core_v8.py",
                 SCRIPTS_DIR / "codegen_prefill_v8.py",
+                SCRIPTS_DIR / "batch_decode_contract_v8.py",
+                SCRIPTS_DIR / "batch_decode_codegen_v8.py",
                 SCRIPTS_DIR / "sequence_state_contract_v8.py",
                 SCRIPTS_DIR / "sequence_state_codegen_v8.py",
                 PROJECT_ROOT / "include" / "ck_model_abi_v8.h",

@@ -28,24 +28,132 @@ def _writes(op: dict[str, Any]) -> set[str]:
             and isinstance(arg.get("buffer_ref"), str)}
 
 
-def _crossing_values(ops: list[dict[str, Any]]) -> set[str]:
+def _crossing_values(ops: list[dict[str, Any]], buffers: dict[str, dict[str, Any]]) -> set[str]:
     """Find prefix-produced call buffers read before the suffix overwrites them."""
-    return _crossing_at(ops, 5)
+    return _crossing_at(ops, 5, _certified_full_writes(ops, buffers))
 
 
-def _crossing_at(ops: list[dict[str, Any]], cut: int) -> set[str]:
-    """Find call values live across a generated execution cutpoint."""
+def _unaliased(ref: str, buffers: dict[str, dict[str, Any]]) -> bool:
+    row = buffers.get(ref)
+    if not row or not isinstance(row.get("abs_offset"), int) or not isinstance(row.get("size"), int):
+        return False
+    start, end = row["abs_offset"], row["abs_offset"] + row["size"]
+    return all(
+        other == ref or item.get("lifetime") != "call" or
+        (isinstance(item.get("abs_offset"), int) and isinstance(item.get("size"), int)
+         and (end <= item["abs_offset"] or item["abs_offset"] + item["size"] <= start))
+        for other, item in buffers.items()
+    )
+
+
+def _certified_full_writes(
+    ops: list[dict[str, Any]], buffers: dict[str, dict[str, Any]],
+) -> frozenset[tuple[int, str]]:
+    """Recognize exact-base writes covering the complete decode-row value.
+
+    A hybrid prefill/decode arena can reserve much more than one decode row.
+    Match the operation's declared row extent, never the arena capacity.
+    """
+    spans: dict[str, int] = {}
+    conflicting: set[str] = set()
+
+    def record(ref: Any, size: int) -> None:
+        if not isinstance(ref, str) or size <= 0:
+            return
+        if ref in spans and spans[ref] != size:
+            conflicting.add(ref)
+        else:
+            spans[ref] = size
+
+    # The first Q projection consumes the decoder hidden row. Projection
+    # outputs and attention output have explicit per-row dimensions.
+    for op in ops:
+        name, args = op.get("op"), _args(op)
+        try:
+            if name == "q_proj":
+                record(args["x"].get("buffer_ref"), int(args["K"]["expr"]) * 4)
+            if name in {"q_proj", "k_proj", "v_proj"}:
+                record(args["y"].get("buffer_ref"), int(args["M"]["expr"]) * 4)
+            elif name == "residual_save":
+                record(args["dst"].get("buffer_ref"), int(args["size"]["expr"]))
+            elif name == "out_proj":
+                record(args["x"].get("buffer_ref"), int(args["K"]["expr"]) * 4)
+        except (KeyError, TypeError, ValueError):
+            continue
+    complete: set[tuple[int, str]] = set()
+    for index, op in enumerate(ops):
+        name = op.get("op")
+        args = _args(op)
+        output_name = (
+            "y" if name in {"q_proj", "k_proj", "v_proj", "out_proj", "mlp_down"}
+            else "dst" if name == "residual_save" else None
+        )
+        if output_name is None or output_name not in args:
+            continue
+        output = args[output_name]
+        ref = output.get("buffer_ref")
+        row = buffers.get(ref)
+        if (not row or ref in conflicting or row.get("lifetime") != "call"
+                or not _unaliased(ref, buffers)):
+            continue
+        try:
+            written = int(args["size"]["expr"]) if name == "residual_save" else int(args["M"]["expr"]) * 4
+        except (KeyError, TypeError, ValueError):
+            continue
+        if (written == spans.get(ref) and isinstance(row.get("size"), int)
+                and row["size"] >= written and _exact_base(output, row)):
+            complete.add((index, ref))
+    # Attention's complete output extent is proved by the next projection's
+    # input width. Its scratch ports do not themselves prove an overwrite.
+    for index, op in enumerate(ops[:-1]):
+        if op.get("op") != "attn_sliding" or ops[index + 1].get("op") != "out_proj":
+            continue
+        out = _args(op).get("output", {})
+        following = _args(ops[index + 1])
+        ref = out.get("buffer_ref")
+        row = buffers.get(ref)
+        try:
+            width = int(following["K"]["expr"]) * 4
+        except (KeyError, TypeError, ValueError):
+            continue
+        if (row and ref not in conflicting and row.get("lifetime") == "call"
+                and spans.get(ref) == width and isinstance(row.get("size"), int)
+                and row["size"] >= width
+                and following.get("x", {}).get("buffer_ref") == ref
+                and _exact_base(out, row) and _exact_base(following["x"], row)
+                and _unaliased(ref, buffers)):
+            complete.add((index, ref))
+    return frozenset(complete)
+
+
+def _crossing_at(
+    ops: list[dict[str, Any]], cut: int,
+    full_replacements: frozenset[tuple[int, str]] = frozenset(),
+) -> set[str]:
+    """Find call values live across a cut, independent of argument order.
+
+    An output port alone does not prove a full write. Only a separately
+    validated replacement may kill an incoming value; unknown and partial
+    writes conservatively leave it live and therefore prevent admission.
+    """
     produced = set().union(*(_writes(op) for op in ops[:cut])) | {"token_ids"}
     overwritten: set[str] = set()
     crossing: set[str] = set()
-    for op in ops[cut:]:
+    for index, op in enumerate(ops[cut:], cut):
+        reads: set[str] = set()
+        writes: set[str] = set()
         for arg in op.get("args", []):
             if not isinstance(arg, dict) or arg.get("buffer_ref") not in produced:
                 continue
             ref = arg["buffer_ref"]
-            if not str(arg.get("source", "")).startswith("output:") and ref not in overwritten:
-                crossing.add(ref)
-            elif str(arg.get("source", "")).startswith("output:"):
+            source = str(arg.get("source", ""))
+            if source.startswith("output:"):
+                writes.add(ref)
+            else:
+                reads.add(ref)
+        crossing.update(reads - overwritten)
+        for ref in writes:
+            if (index, ref) in full_replacements:
                 overwritten.add(ref)
     return crossing
 
@@ -109,11 +217,16 @@ def _layer_extension(
             or not _exact_base(consumer_args["x"], output)
             or not _exact_base(consumer_args["out"], output)):
         return None
-    if (_crossing_at(ops, index) != {refs["input"], refs["residual"]}
-            or _crossing_at(ops, index + 1) != {output_ref, refs["residual"]}):
+    # The admitted gate/up kernel writes the exact contiguous span consumed by
+    # the immediately following GeGLU. Other output ports remain unknown
+    # writes for crossing analysis, including partial/in-place operations.
+    replacements = _certified_full_writes(ops, buffers) | {(index, output_ref)}
+    if (_crossing_at(ops, index, replacements) != {refs["input"], refs["residual"]}
+            or _crossing_at(ops, index + 1, replacements) != {output_ref, refs["residual"]}):
         return None
-    for ref in refs.values():
-        row = buffers[ref]
+    for ref, row in buffers.items():
+        if ref == output_ref or row.get("lifetime") != "call":
+            continue
         if (int(row["abs_offset"]) < int(output["abs_offset"]) + int(output["size"])
                 and int(output["abs_offset"]) < int(row["abs_offset"]) + int(row["size"])):
             return None
@@ -192,7 +305,7 @@ def resolve_two_row_batch_contract(
             or norm["output"].get("buffer_ref") != refs["input"]
             or emb["token_count"].get("expr") != "1"):
         return None
-    if _crossing_values(ops) != set(refs.values()):
+    if _crossing_values(ops, buffers) != set(refs.values()):
         return None
     try:
         saved_bytes = int(save["size"].get("expr", -1))
