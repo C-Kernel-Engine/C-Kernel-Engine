@@ -17,8 +17,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "version/v8/scripts"))
-from batch_decode_contract_v8 import resolve_two_row_batch_contract  # noqa: E402
+from batch_decode_contract_v8 import _crossing_at, resolve_two_row_batch_contract  # noqa: E402
 from batch_decode_codegen_v8 import emit_two_row_batch_api  # noqa: E402
+from certify_batch_decode_v8 import _require_projection_groups  # noqa: E402
+from codegen_core_v8 import emit_decode_function  # noqa: E402
 from server.serving_bundle import verified_loaded_symbol_backing  # noqa: E402
 
 
@@ -72,6 +74,39 @@ def _fixture() -> tuple[list[dict], dict, dict]:
     return ops, layout, {"vocab_size": 64}
 
 
+def _layer_fixture() -> tuple[list[dict], dict, dict]:
+    ops, layout, config = _fixture()
+    def arg(name: str, expr: str, ref: str | None = None, source: str = "dim:test") -> dict:
+        item = {"name": name, "expr": expr, "source": source}
+        if ref is not None:
+            item["buffer_ref"] = ref
+        return item
+    layout["memory"]["arena"]["total_size"] = 1280
+    layout["memory"]["activations"]["buffers"].append(
+        {"name": "mlp_scratch", "size": 256, "abs_offset": 800,
+         "define": "A_MLP_SCRATCH", "lifetime": "call", "mutable": True})
+    ops[5]["layer"] = 0
+    ops[5]["args"].append(arg("output", "(float*)(model->bump + A_EMBEDDED_INPUT)",
+                              "embedded_input", "output:output"))
+    ops.extend([
+        {"op": "mlp_gate_up", "layer": 0, "function": "gemv_q5_1_q8_1",
+         "call_abi": {"kernel_id": "gemv_q5_1"}, "args": [
+             arg("y", "(float*)(model->bump + A_MLP_SCRATCH)", "mlp_scratch", "output:y"),
+             arg("W", "(const void*)(model->bump + W_LAYER_0_W1)"),
+             arg("x", "(const float*)(model->bump + A_EMBEDDED_INPUT)", "embedded_input", "activation:x"),
+             arg("M", "64"), arg("K", "32")]},
+        {"op": "geglu", "layer": 0, "args": [
+            arg("x", "(const float*)(model->bump + A_MLP_SCRATCH)", "mlp_scratch", "activation:input"),
+            arg("out", "(float*)(model->bump + A_MLP_SCRATCH)", "mlp_scratch", "output:output"),
+            arg("tokens", "1"), arg("dim", "32")]},
+        {"op": "finish", "layer": 0, "args": [
+            arg("residual", "(const float*)(model->bump + A_RESIDUAL)", "residual", "activation:residual"),
+            arg("input", "(const float*)(model->bump + A_MLP_SCRATCH)", "mlp_scratch", "activation:input"),
+            arg("output", "(float*)(model->bump + A_EMBEDDED_INPUT)", "embedded_input", "output:output")]},
+    ])
+    return ops, layout, config
+
+
 def _avx2_available() -> bool:
     if platform.machine().lower() not in {"x86_64", "amd64"}:
         return False
@@ -85,9 +120,251 @@ def _avx2_available() -> bool:
 
 
 class BatchContractTests(unittest.TestCase):
-    def test_compiled_generated_entry_and_nonparticipating_arena(self) -> None:
-        contract = resolve_two_row_batch_contract(*_fixture())
+    def test_in_place_liveness_ignores_argument_order(self) -> None:
+        produced = {"args": [{"source": "output:x", "buffer_ref": "extra"}]}
+        read = {"source": "activation:x", "buffer_ref": "extra"}
+        write = {"source": "output:x", "buffer_ref": "extra"}
+        for args in ([read, write], [write, read]):
+            with self.subTest(args=args):
+                self.assertEqual(_crossing_at([produced, {"args": args}], 1), {"extra"})
+                self.assertEqual(
+                    _crossing_at([produced, {"args": args}], 1,
+                                 frozenset({(1, "extra")})), {"extra"})
+
+    def test_milestone_requires_two_projection_groups(self) -> None:
+        _require_projection_groups(1, None)
+        _require_projection_groups(2, 2)
+        with self.assertRaisesRegex(AssertionError, "expected 2 shared projection groups"):
+            _require_projection_groups(1, 2)
+
+    def test_hybrid_arena_capacity_does_not_change_decode_row_liveness(self) -> None:
+        ops, layout, config = _layer_fixture()
+        offset = 128
+        for row in layout["memory"]["activations"]["buffers"]:
+            if row["lifetime"] != "call":
+                continue
+            if row["name"] != "logits":
+                row["size"] *= 4
+            row["abs_offset"] = offset
+            offset += row["size"] + 64
+        layout["memory"]["arena"]["total_size"] = offset + 64
+        contract = resolve_two_row_batch_contract(ops, layout, config)
         self.assertIsNotNone(contract)
+        self.assertIn("layer_extension", contract)
+
+    def test_layer_extension_is_liveness_and_provider_bound(self) -> None:
+        ops, layout, config = _layer_fixture()
+        contract = resolve_two_row_batch_contract(ops, layout, config)
+        self.assertEqual(contract["layer_extension"]["cut"], 6)
+        self.assertEqual(contract["layer_extension"]["output_dim"], 64)
+        for change in ("offset_input", "offset_output", "wrong_provider", "bad_geglu",
+                       "extra_mid_live", "partial_write_live", "aliased_output", "other_layer"):
+            bad_ops, bad_layout = copy.deepcopy(ops), copy.deepcopy(layout)
+            if change == "offset_input":
+                bad_ops[6]["args"][2]["expr"] += " + 4"
+            elif change == "offset_output":
+                bad_ops[6]["args"][0]["expr"] += " + 4"
+            elif change == "wrong_provider":
+                bad_ops[6]["call_abi"]["kernel_id"] = "gemv_q5_0"
+            elif change == "bad_geglu":
+                bad_ops[7]["args"][-1]["expr"] = "16"
+            elif change == "other_layer":
+                bad_ops[5]["layer"] = 1
+            elif change == "aliased_output":
+                bad_layout["memory"]["activations"]["buffers"].append(
+                    {"name": "alias", "size": 16, "abs_offset": 812,
+                     "define": "A_ALIAS", "lifetime": "call", "mutable": True})
+            else:
+                bad_layout["memory"]["activations"]["buffers"].append(
+                    {"name": "extra", "size": 16, "abs_offset": 1100,
+                     "define": "A_EXTRA", "lifetime": "call", "mutable": True})
+                bad_ops[5]["args"].append(
+                    {"name": "extra", "expr": "(float*)(model->bump + A_EXTRA)",
+                     "source": "output:extra", "buffer_ref": "extra"})
+                bad_ops[8]["args"].append(
+                    {"name": "extra", "expr": "(const float*)(model->bump + A_EXTRA)",
+                     "source": "activation:extra", "buffer_ref": "extra"})
+                if change == "partial_write_live":
+                    bad_ops.insert(6, {"op": "partial_write", "layer": 0, "args": [
+                        {"name": "out", "expr": "(float*)(model->bump + A_EXTRA)",
+                         "source": "output:out", "buffer_ref": "extra"}]})
+            with self.subTest(change=change):
+                fallback = resolve_two_row_batch_contract(bad_ops, bad_layout, config)
+                if change == "offset_input":
+                    self.assertIsNone(fallback)
+                else:
+                    self.assertIsNotNone(fallback)
+                    self.assertNotIn("layer_extension", fallback)
+
+    def test_real_emitter_split_matches_isolated_execution(self) -> None:
+        prelude = r'''
+#include <stdint.h>
+#include <stddef.h>
+#include <stdlib.h>
+#include <string.h>
+#define CK_EXPORT
+#define VOCAB_SIZE 64
+#define MAX_SEQ_LEN 16
+#define KV_CACHE_SIZE 64
+#define EMBED_DIM 32
+#define A_TOKEN_IDS 0
+#define A_EMBEDDED_INPUT 128
+#define A_RESIDUAL 256
+#define A_Q_SCRATCH 384
+#define A_K_SCRATCH 448
+#define A_MLP_SCRATCH 800
+#define W_LAYER_0_WQ 600
+#define W_LAYER_0_WK 608
+#define W_LAYER_0_W1 616
+typedef struct { uint64_t sequence_handle; int token, position; size_t row_offset, token_count; float *logits; } CKModelBatchDecodeRowV8;
+typedef struct { int occupied, pos, rope_pos; uint64_t handle; unsigned char *kv; } CKSequenceStateV8;
+typedef struct { unsigned char bump[1280]; unsigned char *activations; size_t bump_size; int pos, rope_pos, bridge_has_explicit_positions; float logits[64]; } CKModel;
+static CKModel object = {.bump_size = 1280};
+static CKModel *g_model = &object;
+static CKSequenceStateV8 g_sequence_states[3];
+static CKSequenceStateV8 *g_active_sequence;
+static int g_ck_skip_decode_logits;
+static CKSequenceStateV8 *ck_sequence_find(uint64_t handle) {
+    for (int i=0;i<3;i++) if (g_sequence_states[i].occupied && g_sequence_states[i].handle == handle) return &g_sequence_states[i];
+    return NULL;
+}
+static int ck_model_sequence_state_activate(uint64_t handle) {
+    CKSequenceStateV8 *next = ck_sequence_find(handle);
+    if (!next) return -1;
+    if (g_active_sequence && g_active_sequence != next) {
+        g_active_sequence->pos = g_model->pos;
+        g_active_sequence->rope_pos = g_model->rope_pos;
+    }
+    if (g_active_sequence != next) {
+        g_model->pos = next->pos;
+        g_model->rope_pos = next->rope_pos;
+        g_active_sequence = next;
+    }
+    return 0;
+}
+static int ck_model_cancel_requested(void) { return 0; }
+static void ck_debug_export_hidden(CKModel *m, int l, const char *n, const float *v, size_t c) { (void)m;(void)l;(void)n;(void)v;(void)c; }
+static void ck_debug_import_checkpoint(CKModel *m, int l, const char *n, float *v, size_t c) { (void)m;(void)l;(void)n;(void)v;(void)c; }
+static void fixture_dense_embedding_lookup(const int32_t *tokens, int count, float *out) {
+    (void)count; for (int i=0;i<32;i++) out[i]=(float)(tokens[0]+i);
+}
+static void fixture_residual_save(void *dst, const void *src, size_t bytes) { memcpy(dst,src,bytes); }
+static void fixture_attn_norm(const float *src, float *dst) { (void)src;(void)dst; }
+static float weight_tag(const void *weight) {
+    return weight == (void *)(g_model->bump + W_LAYER_0_WQ) ? 1.0f :
+           weight == (void *)(g_model->bump + W_LAYER_0_WK) ? 2.0f : 3.0f;
+}
+static void gemv_q5_1_q8_1(const float *input, float *output, const void *weight, int channels, int width) {
+    (void)width; for (int c=0;c<channels;c++) output[c]=input[0]+weight_tag(weight);
+}
+static void fixture_mlp_gate_up(float *output, const void *weight, const float *input, int channels, int width) {
+    gemv_q5_1_q8_1(input,output,weight,channels,width);
+}
+static void gemm_nt_q5_1_q8_1_m2(const float *input, const void *weight, const float *bias,
+                                  float *output, int rows, int channels, int width) {
+    (void)bias; for (int row=0;row<rows;row++) for (int c=0;c<channels;c++)
+        output[row*channels+c]=input[row*width]+weight_tag(weight);
+}
+static void fixture_attention_terminal(const float *input, const float *residual, const float *q, const float *k) {
+    (void)input;(void)residual;
+    g_model->logits[0]=q[0];g_model->logits[1]=k[0];g_model->logits[2]=q[0]+k[0];
+    g_active_sequence->kv[g_model->pos]=(unsigned char)q[0];
+}
+static void fixture_attention(const float *input, const float *residual, const float *q,
+                              const float *k, float *output) {
+    output[0]=input[0]+q[0]+k[0];
+    ((float *)residual)[0]+=q[0];
+    g_active_sequence->kv[g_model->pos]=(unsigned char)q[0];
+}
+static void fixture_geglu(const float *input, float *output, int tokens, int dim) {
+    (void)tokens;(void)dim;output[0]=input[0]+1.0f;
+}
+static void fixture_finish(const float *residual, const float *input, float *output) {
+    (void)output;g_model->logits[0]=input[0];g_model->logits[1]=residual[0];
+    g_model->logits[2]=input[0]+residual[0];
+}
+'''
+        postlude = r'''
+int main(void) {
+    unsigned char kv[2][64]={{0}};
+    float isolated[2][64]={{0}}, batched[2][64]={{0}};
+    int positions[2], ropes[2];
+    unsigned char expected_kv[2][64];
+    for (int i=0;i<2;i++) g_sequence_states[i]=(CKSequenceStateV8){.occupied=1,.handle=(uint64_t)(i+1),.kv=kv[i]};
+    ck_model_sequence_state_activate(1);
+    for (int i=0;i<2;i++) {
+        ck_model_sequence_state_activate(i+1);
+        ck_decode(g_model,i?7:3);
+        memcpy(isolated[i],g_model->logits,sizeof(isolated[i]));
+        positions[i]=g_model->pos;ropes[i]=g_model->rope_pos;
+        memcpy(expected_kv[i],kv[i],64);
+    }
+    memset(g_model->bump,0,sizeof(g_model->bump));
+    memset(g_model->logits,0,sizeof(g_model->logits));
+    memset(kv,0,sizeof(kv));
+    for (int i=0;i<2;i++) {g_sequence_states[i].pos=0;g_sequence_states[i].rope_pos=0;}
+    g_active_sequence=NULL;g_model->pos=0;g_model->rope_pos=0;
+    ck_model_sequence_state_activate(1);
+    CKModelBatchDecodeRowV8 rows[2]={
+        {.sequence_handle=1,.token=3,.position=0,.row_offset=0,.token_count=1,.logits=batched[0]},
+        {.sequence_handle=2,.token=7,.position=0,.row_offset=1,.token_count=1,.logits=batched[1]}
+    };
+    size_t bytes=0, alignment=0;
+    if (ck_model_batch_decode_workspace(&bytes,&alignment) || alignment!=64) return 1;
+    void *workspace=aligned_alloc(alignment,(bytes+alignment-1)/alignment*alignment);
+    if (!workspace || ck_model_decode_batch2(rows,2,workspace,bytes)) return 2;
+    for (int i=0;i<2;i++) {
+        ck_model_sequence_state_activate(i+1);
+        if (memcmp(isolated[i],batched[i],sizeof(isolated[i])) ||
+            memcmp(expected_kv[i],kv[i],64) ||
+            g_model->pos!=positions[i] || g_model->rope_pos!=ropes[i]) return 3+i;
+    }
+    free(workspace);
+    return 0;
+}
+'''
+        for extended, fixture in ((False, _fixture()), (True, _layer_fixture())):
+            with self.subTest(extended=extended), tempfile.TemporaryDirectory() as directory:
+                ops, layout, config = fixture
+                contract = resolve_two_row_batch_contract(ops, layout, config)
+                self.assertIsNotNone(contract)
+                self.assertEqual("layer_extension" in contract, extended)
+                ops = copy.deepcopy(ops)
+                for op in ops:
+                    op["function"] = "fixture_" + op["op"]
+                for op in ops[3:5]:
+                    op["function"] = "gemv_q5_1_q8_1"
+                if not extended:
+                    ops[5]["function"] = "fixture_attention_terminal"
+                emission = [emit_decode_function(ops, 0, "model->bump", config=config)]
+                emission.append(emit_decode_function(
+                    ops[:contract["prefix_len"]], 0, "model->bump", config=config,
+                    function_name="ck_batch_decode_prefix", advance_position=False))
+                extension = contract.get("layer_extension")
+                if extension:
+                    emission.append(emit_decode_function(
+                        ops[contract["suffix_start"]:extension["cut"]], 0,
+                        "model->bump", config=config,
+                        function_name="ck_batch_decode_before_gateup",
+                        store_token=False, advance_position=False))
+                    emission.append(emit_decode_function(
+                        ops[extension["post_cut"]:], 0, "model->bump", config=config,
+                        function_name="ck_batch_decode_after_gateup", store_token=False))
+                else:
+                    emission.append(emit_decode_function(
+                        ops[contract["suffix_start"]:], 0, "model->bump", config=config,
+                        function_name="ck_batch_decode_suffix", store_token=False))
+                source = Path(directory) / "emitted.c"
+                binary = Path(directory) / "emitted"
+                source.write_text(prelude + "\n".join(emission) +
+                                  emit_two_row_batch_api(contract) + postlude)
+                subprocess.run(["cc", "-std=c11", "-O0", "-Wall", "-Werror",
+                                "-Wno-unused-function", "-Wno-unused-variable",
+                                str(source), "-o", str(binary)],
+                               check=True, capture_output=True, text=True)
+                subprocess.run([str(binary)], check=True, capture_output=True, text=True)
+
+    def test_compiled_generated_entry_and_nonparticipating_arena(self) -> None:
         prelude = r'''
 #include <stdint.h>
 #include <stddef.h>
@@ -101,12 +378,14 @@ class BatchContractTests(unittest.TestCase):
 #define A_RESIDUAL 256
 #define A_Q_SCRATCH 384
 #define A_K_SCRATCH 448
+#define A_MLP_SCRATCH 800
 #define W_LAYER_0_WQ 600
 #define W_LAYER_0_WK 608
+#define W_LAYER_0_W1 616
 typedef struct { uint64_t sequence_handle; int token, position; size_t row_offset, token_count; float *logits; } CKModelBatchDecodeRowV8;
 typedef struct { int occupied, pos; uint64_t handle; unsigned char *kv; } CKSequenceStateV8;
-typedef struct { unsigned char bump[1024]; size_t bump_size; int pos; float logits[64]; } Model;
-static Model object = {.bump_size = 1024};
+typedef struct { unsigned char bump[1280]; size_t bump_size; int pos; float logits[64]; } Model;
+static Model object = {.bump_size = 1280};
 static Model *g_model = &object;
 static CKSequenceStateV8 g_sequence_states[3];
 static CKSequenceStateV8 *g_active_sequence;
@@ -130,7 +409,8 @@ static void ck_batch_decode_prefix(Model *model, int token) {
 static void gemm_nt_q5_1_q8_1_m2(const float *input, const void *weight, const float *bias,
                                   float *output, int rows, int channels, int width) {
     (void)bias;
-    float tag = weight == (void *)(g_model->bump + W_LAYER_0_WQ) ? 1.0f : 2.0f;
+    float tag = weight == (void *)(g_model->bump + W_LAYER_0_WQ) ? 1.0f :
+                weight == (void *)(g_model->bump + W_LAYER_0_WK) ? 2.0f : 3.0f;
     for (int row=0;row<rows;row++) for (int c=0;c<channels;c++) output[row*channels+c] = input[row*width] + tag;
 }
 static void ck_batch_decode_suffix(Model *model, int token) {
@@ -138,6 +418,22 @@ static void ck_batch_decode_suffix(Model *model, int token) {
     float *k = (float *)(model->bump + A_K_SCRATCH);
     model->logits[0] = q[0]; model->logits[1] = k[0]; model->logits[2] = (float)token;
     g_active_sequence->kv[0] = (unsigned char)token;
+    g_active_sequence->pos++; model->pos++;
+}
+static void ck_batch_decode_before_gateup(Model *model, int token) {
+    float *input = (float *)(model->bump + A_EMBEDDED_INPUT);
+    float *residual = (float *)(model->bump + A_RESIDUAL);
+    float *q = (float *)(model->bump + A_Q_SCRATCH);
+    float *k = (float *)(model->bump + A_K_SCRATCH);
+    input[0] += q[0] + k[0];
+    residual[0] += (float)token;
+    g_active_sequence->kv[0] = (unsigned char)token;
+}
+static void ck_batch_decode_after_gateup(Model *model, int token) {
+    float *residual = (float *)(model->bump + A_RESIDUAL);
+    float *gateup = (float *)(model->bump + A_MLP_SCRATCH);
+    model->logits[0] = gateup[0]; model->logits[1] = residual[0];
+    model->logits[2] = (float)token;
     g_active_sequence->pos++; model->pos++;
 }
 '''
@@ -161,20 +457,32 @@ int main(void) {
     if (ck_model_decode_batch2(rows,2,third_arena,bytes) != -2) return 3;
     if (((unsigned char *)third_arena)[0] != 0x5a) return 4;
     if (ck_model_decode_batch2(rows,2,workspace,bytes)) return 5;
-    if (logits[0][0] != 4 || logits[0][1] != 5 || logits[1][0] != 8 || logits[1][1] != 9) return 6;
+    if (EXTENDED) {
+        if (logits[0][0] != 15 || logits[0][1] != 6 ||
+            logits[1][0] != 27 || logits[1][1] != 14) return 6;
+    } else {
+        if (logits[0][0] != 4 || logits[0][1] != 5 ||
+            logits[1][0] != 8 || logits[1][1] != 9) return 6;
+    }
     if (kv[0][0] != 3 || kv[1][0] != 7 || ((unsigned char *)third_arena)[0] != 0x5a) return 7;
     free(third_arena);
     free(workspace);
     return 0;
 }
 '''
-        with tempfile.TemporaryDirectory() as directory:
-            source = Path(directory) / "entry.c"
-            binary = Path(directory) / "entry"
-            source.write_text(prelude + emit_two_row_batch_api(contract) + postlude)
-            subprocess.run(["cc", "-std=c11", "-O0", "-Wall", "-Werror", str(source), "-o", str(binary)],
-                           check=True, capture_output=True, text=True)
-            subprocess.run([str(binary)], check=True, capture_output=True, text=True)
+        for extended, fixture in ((False, _fixture()), (True, _layer_fixture())):
+            with self.subTest(extended=extended), tempfile.TemporaryDirectory() as directory:
+                contract = resolve_two_row_batch_contract(*fixture)
+                self.assertIsNotNone(contract)
+                self.assertEqual("layer_extension" in contract, extended)
+                source = Path(directory) / "entry.c"
+                binary = Path(directory) / "entry"
+                source.write_text(f"#define EXTENDED {int(extended)}\n" + prelude +
+                                  emit_two_row_batch_api(contract) + postlude)
+                subprocess.run(["cc", "-std=c11", "-O0", "-Wall", "-Werror",
+                                "-Wno-unused-function", str(source), "-o", str(binary)],
+                               check=True, capture_output=True, text=True)
+                subprocess.run([str(binary)], check=True, capture_output=True, text=True)
 
     def test_loaded_symbol_rejects_replaced_library(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

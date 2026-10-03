@@ -4378,11 +4378,25 @@ static void _ck_profile_dump(void) {
                 config=config, scale_embeddings_sqrt_dim=scale_embeddings_sqrt_dim,
                 function_name="ck_batch_decode_prefix", advance_position=False,
             ))
-            parts.append(emit_decode_function(
-                ops[batch_contract["suffix_start"]:], token_offset, token_base,
-                config=config, function_name="ck_batch_decode_suffix",
-                store_token=False,
-            ))
+            extension = batch_contract.get("layer_extension")
+            if extension:
+                parts.append(emit_decode_function(
+                    ops[batch_contract["suffix_start"]:extension["cut"]],
+                    token_offset, token_base, config=config,
+                    function_name="ck_batch_decode_before_gateup",
+                    store_token=False, advance_position=False,
+                ))
+                parts.append(emit_decode_function(
+                    ops[extension["post_cut"]:], token_offset, token_base,
+                    config=config, function_name="ck_batch_decode_after_gateup",
+                    store_token=False,
+                ))
+            else:
+                parts.append(emit_decode_function(
+                    ops[batch_contract["suffix_start"]:], token_offset, token_base,
+                    config=config, function_name="ck_batch_decode_suffix",
+                    store_token=False,
+                ))
             parts.append(emit_two_row_batch_api(batch_contract))
 
     return "\n".join(parts)

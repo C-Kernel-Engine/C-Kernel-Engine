@@ -28,21 +28,217 @@ def _writes(op: dict[str, Any]) -> set[str]:
             and isinstance(arg.get("buffer_ref"), str)}
 
 
-def _crossing_values(ops: list[dict[str, Any]]) -> set[str]:
+def _crossing_values(ops: list[dict[str, Any]], buffers: dict[str, dict[str, Any]]) -> set[str]:
     """Find prefix-produced call buffers read before the suffix overwrites them."""
-    produced = set().union(*(_writes(op) for op in ops[:5])) | {"token_ids"}
+    return _crossing_at(ops, 5, _certified_full_writes(ops, buffers))
+
+
+def _unaliased(ref: str, buffers: dict[str, dict[str, Any]]) -> bool:
+    row = buffers.get(ref)
+    if not row or not isinstance(row.get("abs_offset"), int) or not isinstance(row.get("size"), int):
+        return False
+    start, end = row["abs_offset"], row["abs_offset"] + row["size"]
+    return all(
+        other == ref or item.get("lifetime") != "call" or
+        (isinstance(item.get("abs_offset"), int) and isinstance(item.get("size"), int)
+         and (end <= item["abs_offset"] or item["abs_offset"] + item["size"] <= start))
+        for other, item in buffers.items()
+    )
+
+
+def _certified_full_writes(
+    ops: list[dict[str, Any]], buffers: dict[str, dict[str, Any]],
+) -> frozenset[tuple[int, str]]:
+    """Recognize exact-base writes covering the complete decode-row value.
+
+    A hybrid prefill/decode arena can reserve much more than one decode row.
+    Match the operation's declared row extent, never the arena capacity.
+    """
+    spans: dict[str, int] = {}
+    conflicting: set[str] = set()
+
+    def record(ref: Any, size: int) -> None:
+        if not isinstance(ref, str) or size <= 0:
+            return
+        if ref in spans and spans[ref] != size:
+            conflicting.add(ref)
+        else:
+            spans[ref] = size
+
+    # The first Q projection consumes the decoder hidden row. Projection
+    # outputs and attention output have explicit per-row dimensions.
+    for op in ops:
+        name, args = op.get("op"), _args(op)
+        try:
+            if name == "q_proj":
+                record(args["x"].get("buffer_ref"), int(args["K"]["expr"]) * 4)
+            if name in {"q_proj", "k_proj", "v_proj"}:
+                record(args["y"].get("buffer_ref"), int(args["M"]["expr"]) * 4)
+            elif name == "residual_save":
+                record(args["dst"].get("buffer_ref"), int(args["size"]["expr"]))
+            elif name == "out_proj":
+                record(args["x"].get("buffer_ref"), int(args["K"]["expr"]) * 4)
+        except (KeyError, TypeError, ValueError):
+            continue
+    complete: set[tuple[int, str]] = set()
+    for index, op in enumerate(ops):
+        name = op.get("op")
+        args = _args(op)
+        output_name = (
+            "y" if name in {"q_proj", "k_proj", "v_proj", "out_proj", "mlp_down"}
+            else "dst" if name == "residual_save" else None
+        )
+        if output_name is None or output_name not in args:
+            continue
+        output = args[output_name]
+        ref = output.get("buffer_ref")
+        row = buffers.get(ref)
+        if (not row or ref in conflicting or row.get("lifetime") != "call"
+                or not _unaliased(ref, buffers)):
+            continue
+        try:
+            written = int(args["size"]["expr"]) if name == "residual_save" else int(args["M"]["expr"]) * 4
+        except (KeyError, TypeError, ValueError):
+            continue
+        if (written == spans.get(ref) and isinstance(row.get("size"), int)
+                and row["size"] >= written and _exact_base(output, row)):
+            complete.add((index, ref))
+    # Attention's complete output extent is proved by the next projection's
+    # input width. Its scratch ports do not themselves prove an overwrite.
+    for index, op in enumerate(ops[:-1]):
+        if op.get("op") != "attn_sliding" or ops[index + 1].get("op") != "out_proj":
+            continue
+        out = _args(op).get("output", {})
+        following = _args(ops[index + 1])
+        ref = out.get("buffer_ref")
+        row = buffers.get(ref)
+        try:
+            width = int(following["K"]["expr"]) * 4
+        except (KeyError, TypeError, ValueError):
+            continue
+        if (row and ref not in conflicting and row.get("lifetime") == "call"
+                and spans.get(ref) == width and isinstance(row.get("size"), int)
+                and row["size"] >= width
+                and following.get("x", {}).get("buffer_ref") == ref
+                and _exact_base(out, row) and _exact_base(following["x"], row)
+                and _unaliased(ref, buffers)):
+            complete.add((index, ref))
+    return frozenset(complete)
+
+
+def _crossing_at(
+    ops: list[dict[str, Any]], cut: int,
+    full_replacements: frozenset[tuple[int, str]] = frozenset(),
+) -> set[str]:
+    """Find call values live across a cut, independent of argument order.
+
+    An output port alone does not prove a full write. Only a separately
+    validated replacement may kill an incoming value; unknown and partial
+    writes conservatively leave it live and therefore prevent admission.
+    """
+    produced = set().union(*(_writes(op) for op in ops[:cut])) | {"token_ids"}
     overwritten: set[str] = set()
     crossing: set[str] = set()
-    for op in ops[5:]:
+    for index, op in enumerate(ops[cut:], cut):
+        reads: set[str] = set()
+        writes: set[str] = set()
         for arg in op.get("args", []):
             if not isinstance(arg, dict) or arg.get("buffer_ref") not in produced:
                 continue
             ref = arg["buffer_ref"]
-            if not str(arg.get("source", "")).startswith("output:") and ref not in overwritten:
-                crossing.add(ref)
-            elif str(arg.get("source", "")).startswith("output:"):
+            source = str(arg.get("source", ""))
+            if source.startswith("output:"):
+                writes.add(ref)
+            else:
+                reads.add(ref)
+        crossing.update(reads - overwritten)
+        for ref in writes:
+            if (index, ref) in full_replacements:
                 overwritten.add(ref)
     return crossing
+
+
+def _layer_extension(
+    ops: list[dict[str, Any]], buffers: dict[str, dict[str, Any]],
+    refs: dict[str, str], input_dim: int, saved_bytes: int,
+    selected: str, batch_function: str, max_input_dim: int,
+) -> dict[str, Any] | None:
+    """Admit a second shared projection after sequence-local attention.
+
+    Cutpoints and live values come from the lowered graph. The supported
+    arithmetic remains selected by the same map as Q/K; no model name chooses
+    the schedule. Unknown uses retain the original Q/K-only batch entry.
+    """
+    layer = ops[3].get("layer")
+    candidates = [(index, op) for index, op in enumerate(ops[5:], 5)
+                  if op.get("op") == "mlp_gate_up" and op.get("layer") == layer]
+    if len(candidates) != 1:
+        return None
+    index, op = candidates[0]
+    if index <= 5 or any(item.get("layer") != layer for item in ops[5:index + 1]):
+        return None
+    args = _args(op)
+    if set(args) != {"x", "y", "W", "M", "K"}:
+        return None
+    if args["x"].get("buffer_ref") != refs["input"]:
+        return None
+    try:
+        output_dim, width = int(args["M"]["expr"]), int(args["K"]["expr"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if width != input_dim or width > max_input_dim or output_dim <= 0 or output_dim % 2:
+        return None
+    if ((op.get("call_abi") or {}).get("kernel_id") != selected
+            or op.get("function") != ops[3].get("function")):
+        return None
+    output_ref = args["y"].get("buffer_ref")
+    output = buffers.get(output_ref)
+    if (not output or output_ref in refs.values()
+            or output.get("lifetime") != "call" or output.get("mutable") is not True
+            or int(output.get("size", 0)) < output_dim * 4
+            or not re.fullmatch(r"A_[A-Z0-9_]+", str(output.get("define", "")))
+            or not _exact_base(args["x"], buffers[refs["input"]])
+            or not _exact_base(args["y"], output)):
+        return None
+    weight = _WEIGHT.fullmatch(str(args["W"].get("expr", "")))
+    if not weight or index + 1 >= len(ops):
+        return None
+    consumer = ops[index + 1]
+    consumer_args = _args(consumer)
+    try:
+        consumer_dim = int(consumer_args["dim"]["expr"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if (consumer.get("op") != "geglu" or consumer.get("layer") != layer
+            or consumer_dim * 2 != output_dim
+            or consumer_args.get("tokens", {}).get("expr") != "1"
+            or consumer_args.get("x", {}).get("buffer_ref") != output_ref
+            or consumer_args.get("out", {}).get("buffer_ref") != output_ref
+            or not _exact_base(consumer_args["x"], output)
+            or not _exact_base(consumer_args["out"], output)):
+        return None
+    # The admitted gate/up kernel writes the exact contiguous span consumed by
+    # the immediately following GeGLU. Other output ports remain unknown
+    # writes for crossing analysis, including partial/in-place operations.
+    replacements = _certified_full_writes(ops, buffers) | {(index, output_ref)}
+    if (_crossing_at(ops, index, replacements) != {refs["input"], refs["residual"]}
+            or _crossing_at(ops, index + 1, replacements) != {output_ref, refs["residual"]}):
+        return None
+    for ref, row in buffers.items():
+        if ref == output_ref or row.get("lifetime") != "call":
+            continue
+        if (int(row["abs_offset"]) < int(output["abs_offset"]) + int(output["size"])
+                and int(output["abs_offset"]) < int(row["abs_offset"]) + int(row["size"])):
+            return None
+    return {
+        "cut": index, "post_cut": index + 1,
+        "input_define": buffers[refs["input"]]["define"],
+        "residual_define": buffers[refs["residual"]]["define"],
+        "output_define": output["define"],
+        "input_bytes": input_dim * 4, "residual_bytes": saved_bytes,
+        "output_bytes": output_dim * 4, "output_dim": output_dim,
+        "weight": weight.group(1), "gemm_function": batch_function,
+    }
 
 
 def _exact_base(arg: dict[str, Any], buffer: dict[str, Any]) -> bool:
@@ -53,12 +249,13 @@ def _exact_base(arg: dict[str, Any], buffer: dict[str, Any]) -> bool:
 def resolve_two_row_batch_contract(
     ops: list[dict[str, Any]], layout: dict[str, Any], config: dict[str, Any]
 ) -> dict[str, Any] | None:
-    """Admit only a KV-only decoder with two equivalent first-layer projections.
+    """Admit a KV-only decoder with two equivalent first-layer projections.
 
     The initial split is intentionally exact: embedding, residual save, norm,
     Q/K projections, then the rest of the normal generated decode. The two
     projections must have the same input and the same map-declared M=2 provider.
-    This leaves all attention and cache writes sequence-local.
+    A second map-compatible gate/up projection can be shared after a checked
+    sequence-local attention interval. Cache writes remain sequence-local.
     """
     if resolve_sequence_state_contract(layout, config) is None or len(ops) < 6:
         return None
@@ -108,7 +305,7 @@ def resolve_two_row_batch_contract(
             or norm["output"].get("buffer_ref") != refs["input"]
             or emb["token_count"].get("expr") != "1"):
         return None
-    if _crossing_values(ops) != set(refs.values()):
+    if _crossing_values(ops, buffers) != set(refs.values()):
         return None
     try:
         saved_bytes = int(save["size"].get("expr", -1))
@@ -175,7 +372,7 @@ def resolve_two_row_batch_contract(
     max_input_dim = binding.get("max_input_dim")
     if not isinstance(max_input_dim, int) or max_input_dim <= 0 or input_dim > max_input_dim:
         return None
-    return {
+    contract = {
         "prefix_len": 3,
         "suffix_start": 5,
         "input_dim": input_dim,
@@ -186,3 +383,10 @@ def resolve_two_row_batch_contract(
         "weights": weights,
         "gemm_function": function,
     }
+    extension = _layer_extension(
+        ops, buffers, refs, input_dim, saved_bytes, selected, function,
+        max_input_dim,
+    )
+    if extension:
+        contract["layer_extension"] = extension
+    return contract

@@ -82,6 +82,8 @@ def _bind(model: ctypes.CDLL) -> None:
     model.ck_model_batch_decode_workspace.argtypes = [
         ctypes.POINTER(ctypes.c_size_t), ctypes.POINTER(ctypes.c_size_t)]
     model.ck_model_batch_decode_workspace.restype = ctypes.c_int
+    if hasattr(model, "ck_model_batch_decode_projection_groups"):
+        model.ck_model_batch_decode_projection_groups.restype = ctypes.c_int
     model.ck_model_decode_batch2.argtypes = [
         ctypes.POINTER(BatchRow), ctypes.c_size_t, ctypes.c_void_p, ctypes.c_size_t]
     model.ck_model_decode_batch2.restype = ctypes.c_int
@@ -89,7 +91,17 @@ def _bind(model: ctypes.CDLL) -> None:
     model.ck_model_generated_source_sha256.restype = ctypes.c_char_p
 
 
-def certify(bundle: Path, generated_source: Path) -> dict:
+def _require_projection_groups(actual: int, expected: int | None) -> None:
+    if actual not in (1, 2):
+        raise AssertionError("invalid generated batch projection-group count")
+    if expected is not None and actual != expected:
+        raise AssertionError(
+            f"expected {expected} shared projection groups, loaded runtime has {actual}"
+        )
+
+
+def certify(bundle: Path, generated_source: Path,
+            expected_projection_groups: int | None = None) -> dict:
     assets = {name: bundle / name for name in (
         "libmodel.so", "libckernel_engine.so", "libckernel_tokenizer.so",
         "weights.bump", "layout_decode.json", "config.json")}
@@ -100,6 +112,11 @@ def certify(bundle: Path, generated_source: Path) -> dict:
     if model.ck_model_init(str(assets["weights.bump"]).encode()) != 0:
         raise RuntimeError("generated model initialization failed")
     try:
+        projection_groups = (
+            int(model.ck_model_batch_decode_projection_groups())
+            if hasattr(model, "ck_model_batch_decode_projection_groups") else 1
+        )
+        _require_projection_groups(projection_groups, expected_projection_groups)
         loaded = {}
         for name, symbol in (("libmodel.so", "ck_model_decode_batch2"),
                              ("libckernel_engine.so", "gemm_nt_q5_1_q8_1_m2"),
@@ -321,7 +338,11 @@ def certify(bundle: Path, generated_source: Path) -> dict:
     return {
         "schema": "cke.generated-batch-decode-v1",
         "status": "pass",
-        "scope": "two_rows_shared_first_layer_qk_kv_only_not_continuous_batching",
+        "scope": ("two_rows_shared_first_layer_qk_and_gateup_kv_only_not_continuous_batching"
+                  if projection_groups == 2 else
+                  "two_rows_shared_first_layer_qk_kv_only_not_continuous_batching"),
+        "shared_projection_groups": projection_groups,
+        "expected_projection_groups": expected_projection_groups,
         "capabilities": capabilities,
         "compiled_context_length": context,
         "vocab_size": vocab,
@@ -343,8 +364,11 @@ def main() -> int:
     parser.add_argument("--report", type=Path)
     parser.add_argument("--generated-source", type=Path, required=True,
                         help="C source whose prefix digest must match the loaded generated-library symbol")
+    parser.add_argument("--expected-projection-groups", type=int, choices=(1, 2),
+                        help="fail certification unless the loaded generated entry has this many shared groups")
     args = parser.parse_args()
-    result = certify(args.bundle.resolve(), args.generated_source.resolve())
+    result = certify(args.bundle.resolve(), args.generated_source.resolve(),
+                     args.expected_projection_groups)
     result["generated_source_sha256"] = _sha256(args.generated_source.resolve())
     body = json.dumps(result, indent=2) + "\n"
     if args.report:
