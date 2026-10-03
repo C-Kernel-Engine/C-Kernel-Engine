@@ -1077,9 +1077,9 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">  763</span>        state_dim,</div>
 <div class="line"><span class="lineno">  764</span>        norm_eps);</div>
 <div class="line"><span class="lineno">  765</span>}</div>
-<div class="ttc" id="ack__parity__api_8c_html_ab058f3491df124f04213732b3ae76fce"><div class="ttname"><a href="ck__parity__api_8c.html#ab058f3491df124f04213732b3ae76fce">gated_deltanet_autoregressive_forward</a></div><div class="ttdeci">void gated_deltanet_autoregressive_forward(const float *q, const float *k, const float *v, const float *g, const float *beta, const float *state_in, float *state_out, float *out, int num_heads, int state_dim, float norm_eps)</div><div class="ttdef"><b>Definition</b> <a href="deltanet__kernels_8c_source.html#l01910">deltanet_kernels.c:1910</a></div></div>
+<div class="ttc" id="ack__parity__api_8c_html_ab058f3491df124f04213732b3ae76fce"><div class="ttname"><a href="ck__parity__api_8c.html#ab058f3491df124f04213732b3ae76fce">gated_deltanet_autoregressive_forward</a></div><div class="ttdeci">void gated_deltanet_autoregressive_forward(const float *q, const float *k, const float *v, const float *g, const float *beta, const float *state_in, float *state_out, float *out, int num_heads, int state_dim, float norm_eps)</div><div class="ttdef"><b>Definition</b> <a href="deltanet__kernels_8c_source.html#l01956">deltanet_kernels.c:1956</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="deltanet__kernels_8c_source.html#l01910">gated_deltanet_autoregressive_forward()</a>.</p>
+<p class="reference">References <a class="el" href="deltanet__kernels_8c_source.html#l01956">gated_deltanet_autoregressive_forward()</a>.</p>
 
 </div>
 </div>
@@ -3763,43 +3763,43 @@ Functions</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l01910">1910</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 1921</span>{</div>
-<div class="line"><span class="lineno"> 1922</span>    <span class="keywordflow">if</span> (!q || !k || !v || !g || !beta || !state_in || !state_out || !out) {</div>
-<div class="line"><span class="lineno"> 1923</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 1924</span>    }</div>
-<div class="line"><span class="lineno"> 1925</span>    <span class="keywordflow">if</span> (num_heads &lt;= 0 || state_dim &lt;= 0) {</div>
-<div class="line"><span class="lineno"> 1926</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 1927</span>    }</div>
-<div class="line"><span class="lineno"> 1928</span> </div>
-<div class="line"><span class="lineno"> 1929</span>    <span class="comment">/*</span></div>
-<div class="line"><span class="lineno"> 1930</span><span class="comment">     * q and k arrive pre-normalized by recurrent_qk_l2_norm, so the</span></div>
-<div class="line"><span class="lineno"> 1931</span><span class="comment">     * ISA-specialized kernels can follow the same contract as the scalar ref.</span></div>
-<div class="line"><span class="lineno"> 1932</span><span class="comment">     */</span></div>
-<div class="line"><span class="lineno"> 1933</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a>() || <a class="code hl_function" href="deltanet__kernels_8c.html#acda3ae2323f03f9d92026026443d75e8">ck_deltanet_force_ref</a>()) {</div>
-<div class="line"><span class="lineno"> 1934</span>        <a class="code hl_function" href="deltanet__kernels_8c.html#a357c0e1f9059fc199d845a50214ba0ac">gated_deltanet_autoregressive_forward_ref</a>(</div>
-<div class="line"><span class="lineno"> 1935</span>            q, k, v, g, beta, state_in, state_out, out, num_heads, state_dim, norm_eps);</div>
-<div class="line"><span class="lineno"> 1936</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 1937</span>    }</div>
-<div class="line"><span class="lineno"> 1938</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
-<div class="line"><span class="lineno"> 1939</span>    gated_deltanet_autoregressive_forward_avx512(</div>
-<div class="line"><span class="lineno"> 1940</span>        q, k, v, g, beta, state_in, state_out, out, num_heads, state_dim, norm_eps);</div>
-<div class="line"><span class="lineno"> 1941</span><span class="preprocessor">#elif defined(__AVX2__)</span></div>
-<div class="line"><span class="lineno"> 1942</span>    gated_deltanet_autoregressive_forward_avx2(</div>
-<div class="line"><span class="lineno"> 1943</span>        q, k, v, g, beta, state_in, state_out, out, num_heads, state_dim, norm_eps);</div>
-<div class="line"><span class="lineno"> 1944</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
-<div class="line"><span class="lineno"> 1945</span>    gated_deltanet_autoregressive_forward_avx(</div>
-<div class="line"><span class="lineno"> 1946</span>        q, k, v, g, beta, state_in, state_out, out, num_heads, state_dim, norm_eps);</div>
-<div class="line"><span class="lineno"> 1947</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno"> 1948</span>    <a class="code hl_function" href="deltanet__kernels_8c.html#a357c0e1f9059fc199d845a50214ba0ac">gated_deltanet_autoregressive_forward_ref</a>(</div>
-<div class="line"><span class="lineno"> 1949</span>        q, k, v, g, beta, state_in, state_out, out, num_heads, state_dim, norm_eps);</div>
-<div class="line"><span class="lineno"> 1950</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno"> 1951</span>}</div>
+<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l01956">1956</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 1967</span>{</div>
+<div class="line"><span class="lineno"> 1968</span>    <span class="keywordflow">if</span> (!q || !k || !v || !g || !beta || !state_in || !state_out || !out) {</div>
+<div class="line"><span class="lineno"> 1969</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1970</span>    }</div>
+<div class="line"><span class="lineno"> 1971</span>    <span class="keywordflow">if</span> (num_heads &lt;= 0 || state_dim &lt;= 0) {</div>
+<div class="line"><span class="lineno"> 1972</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1973</span>    }</div>
+<div class="line"><span class="lineno"> 1974</span> </div>
+<div class="line"><span class="lineno"> 1975</span>    <span class="comment">/*</span></div>
+<div class="line"><span class="lineno"> 1976</span><span class="comment">     * q and k arrive pre-normalized by recurrent_qk_l2_norm, so the</span></div>
+<div class="line"><span class="lineno"> 1977</span><span class="comment">     * ISA-specialized kernels can follow the same contract as the scalar ref.</span></div>
+<div class="line"><span class="lineno"> 1978</span><span class="comment">     */</span></div>
+<div class="line"><span class="lineno"> 1979</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a>() || <a class="code hl_function" href="deltanet__kernels_8c.html#acda3ae2323f03f9d92026026443d75e8">ck_deltanet_force_ref</a>()) {</div>
+<div class="line"><span class="lineno"> 1980</span>        <a class="code hl_function" href="deltanet__kernels_8c.html#a357c0e1f9059fc199d845a50214ba0ac">gated_deltanet_autoregressive_forward_ref</a>(</div>
+<div class="line"><span class="lineno"> 1981</span>            q, k, v, g, beta, state_in, state_out, out, num_heads, state_dim, norm_eps);</div>
+<div class="line"><span class="lineno"> 1982</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1983</span>    }</div>
+<div class="line"><span class="lineno"> 1984</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
+<div class="line"><span class="lineno"> 1985</span>    gated_deltanet_autoregressive_forward_avx512(</div>
+<div class="line"><span class="lineno"> 1986</span>        q, k, v, g, beta, state_in, state_out, out, num_heads, state_dim, norm_eps);</div>
+<div class="line"><span class="lineno"> 1987</span><span class="preprocessor">#elif defined(__AVX2__)</span></div>
+<div class="line"><span class="lineno"> 1988</span>    gated_deltanet_autoregressive_forward_avx2(</div>
+<div class="line"><span class="lineno"> 1989</span>        q, k, v, g, beta, state_in, state_out, out, num_heads, state_dim, norm_eps);</div>
+<div class="line"><span class="lineno"> 1990</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
+<div class="line"><span class="lineno"> 1991</span>    gated_deltanet_autoregressive_forward_avx(</div>
+<div class="line"><span class="lineno"> 1992</span>        q, k, v, g, beta, state_in, state_out, out, num_heads, state_dim, norm_eps);</div>
+<div class="line"><span class="lineno"> 1993</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno"> 1994</span>    <a class="code hl_function" href="deltanet__kernels_8c.html#a357c0e1f9059fc199d845a50214ba0ac">gated_deltanet_autoregressive_forward_ref</a>(</div>
+<div class="line"><span class="lineno"> 1995</span>        q, k, v, g, beta, state_in, state_out, out, num_heads, state_dim, norm_eps);</div>
+<div class="line"><span class="lineno"> 1996</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno"> 1997</span>}</div>
 <div class="ttc" id="ackernel__engine_8h_html_aef8c9a331116ff9c2d77b03152aa8004"><div class="ttname"><a href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a></div><div class="ttdeci">int ck_strict_parity_enabled(void)</div><div class="ttdef"><b>Definition</b> <a href="ckernel__strict_8c_source.html#l00043">ckernel_strict.c:43</a></div></div>
-<div class="ttc" id="adeltanet__kernels_8c_html_a357c0e1f9059fc199d845a50214ba0ac"><div class="ttname"><a href="deltanet__kernels_8c.html#a357c0e1f9059fc199d845a50214ba0ac">gated_deltanet_autoregressive_forward_ref</a></div><div class="ttdeci">void gated_deltanet_autoregressive_forward_ref(const float *q, const float *k, const float *v, const float *g, const float *beta, const float *state_in, float *state_out, float *out, int num_heads, int state_dim, float norm_eps)</div><div class="ttdef"><b>Definition</b> <a href="deltanet__kernels_8c_source.html#l01284">deltanet_kernels.c:1284</a></div></div>
-<div class="ttc" id="adeltanet__kernels_8c_html_acda3ae2323f03f9d92026026443d75e8"><div class="ttname"><a href="deltanet__kernels_8c.html#acda3ae2323f03f9d92026026443d75e8">ck_deltanet_force_ref</a></div><div class="ttdeci">static int ck_deltanet_force_ref(void)</div><div class="ttdef"><b>Definition</b> <a href="deltanet__kernels_8c_source.html#l01888">deltanet_kernels.c:1888</a></div></div>
+<div class="ttc" id="adeltanet__kernels_8c_html_a357c0e1f9059fc199d845a50214ba0ac"><div class="ttname"><a href="deltanet__kernels_8c.html#a357c0e1f9059fc199d845a50214ba0ac">gated_deltanet_autoregressive_forward_ref</a></div><div class="ttdeci">void gated_deltanet_autoregressive_forward_ref(const float *q, const float *k, const float *v, const float *g, const float *beta, const float *state_in, float *state_out, float *out, int num_heads, int state_dim, float norm_eps)</div><div class="ttdef"><b>Definition</b> <a href="deltanet__kernels_8c_source.html#l01330">deltanet_kernels.c:1330</a></div></div>
+<div class="ttc" id="adeltanet__kernels_8c_html_acda3ae2323f03f9d92026026443d75e8"><div class="ttname"><a href="deltanet__kernels_8c.html#acda3ae2323f03f9d92026026443d75e8">ck_deltanet_force_ref</a></div><div class="ttdeci">static int ck_deltanet_force_ref(void)</div><div class="ttdef"><b>Definition</b> <a href="deltanet__kernels_8c_source.html#l01934">deltanet_kernels.c:1934</a></div></div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="ck__parity__api_8c_source.html#l00741">ck_test_gated_deltanet_autoregressive()</a>, and <a class="el" href="deltanet__kernels_8c_source.html#l01953">gated_deltanet_prefill_forward()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ck__parity__api_8c_source.html#l00741">ck_test_gated_deltanet_autoregressive()</a>, and <a class="el" href="deltanet__kernels_8c_source.html#l01999">gated_deltanet_prefill_forward()</a>.</p>
 
 </div>
 </div>
