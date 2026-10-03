@@ -344,6 +344,9 @@ extern void rmsnorm_forward(
 extern void rmsnorm_forward_no_weight(
     const float *input, float *output, float *rstd_cache,
     int tokens, int d_model, int aligned_embed_dim, float eps);
+extern void rmsnorm_forward_no_weight_llama_production(
+    const float *input, float *output, float *rstd_cache,
+    int tokens, int d_model, int aligned_embed_dim, float eps);
 extern void gemma4_v_norm_forward(
     const float *input, float *output, float *rstd_cache,
     int tokens, int num_kv_heads, int head_dim, float eps);
@@ -930,7 +933,7 @@ static void work_rmsnorm_no_weight_rows(int begin, int end, void *userdata)
     rmsnorm_no_weight_args_t *args =
         (rmsnorm_no_weight_args_t *)userdata;
     const size_t offset = (size_t)begin * (size_t)args->head_dim;
-    rmsnorm_forward_no_weight(
+    rmsnorm_forward_no_weight_llama_production(
         args->input + offset, args->output + offset,
         args->rstd_cache ? args->rstd_cache + begin : NULL,
         end - begin, args->head_dim, args->head_dim, args->eps);
