@@ -1550,9 +1550,13 @@ version/v8/scripts/ck_serve_v8.py "$RUN_DIR" --run "$RUN_DIR" \
         caller-owned, 64-byte-aligned KV arenas. The ABI reports the exact bytes required;
         the caller budgets and retains each arena through retirement. KV contents and
         positions survive switches. Recurrent, encoder, and multimodal layouts do not advertise this
-        capability. The server does not use these handles yet, and this is not batched decode
-        or continuous batching. The next gate is a single generated step that processes
-        both rows through shared compatible projections while preserving sequence-local state.
+        capability. The server does not use these handles yet. An additional generated
+        <code>ck_model_decode_batch2</code> entry now admits two one-token rows only when
+        the KV-only compiled layout and kernel map declare compatible Q5_1/Q8_1
+        projections. The first layer's Q and K projections share one M=2 weight traversal;
+        the remaining layers and attention execute with separate sequence state. This is
+        actual shared generated projection work, but not a full-layer batched decoder,
+        a server scheduler, mixed prefill/decode, or continuous batching.
         For a non-default handle, named KV pointer lookup resolves to that handle; a bump-arena
         offset is unavailable and returns <code>-1</code>.
         Run <code>python3 version/v8/scripts/certify_sequence_state_v8.py --run RUN_DIR</code>
@@ -1560,6 +1564,21 @@ version/v8/scripts/ck_serve_v8.py "$RUN_DIR" --run "$RUN_DIR" \
         passed eight exact finite-logit comparisons, including reset isolation and slot reuse; the retained JSON
         report records the library, weights, layout, and config hashes. This bounded result
         does not cover concurrent calls, recurrent models, cancellation, or throughput.
+    </p>
+    <p>
+        Run <code>python3 version/v8/scripts/certify_batch_decode_v8.py --bundle BUNDLE --generated-source MODEL_C</code>
+        against a freshly generated eligible bundle. The retained Gemma3-270M Q5_K_M
+        report compares full finite logits and complete KV bytes with isolated prefill/decode:
+        seven continuations matched exactly across unequal prompts, swapped row order,
+        one-row continuation, retired-slot reuse, pre-step cancellation, capacity rejection,
+        and rejected buffer aliases, including a third live sequence arena. Admission now checks
+        the split's crossing values and exact base-pointer expressions, and binds the M=2 provider
+        to the selected decode kernel map. The report identifies actual loaded model, engine, and
+        tokenizer mappings and checks the generated source against the loaded model's source digest.
+        CI compiles and executes a tiny generated-entry fixture and tests rejection after a loaded
+        library pathname is replaced. Its timings are diagnostic workloads, not a speedup measurement. Recurrent
+        Qwen, larger artifacts, simultaneous API calls, and HTTP request scheduling remain
+        uncertified for this batch entry.
     </p>
 </div>
 

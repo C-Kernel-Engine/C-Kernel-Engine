@@ -1,5 +1,10 @@
 var NAVTREEINDEX17 =
 {
+"rmsnorm__qkv_8c.html#a41c5bd2062976d70a866ceddab8c5aaa":[2,0,1,1,0,11,6],
+"rmsnorm__qkv_8c.html#a4db47e25b31ee405e47bd65bbfb04d64":[2,0,1,1,0,11,3],
+"rmsnorm__qkv_8c.html#a8566c7b232739c7dac0a3ea3d5666e99":[2,0,1,1,0,11,2],
+"rmsnorm__qkv_8c.html#a9a068ed02d809a81a23f09e61b820baf":[2,0,1,1,0,11,1],
+"rmsnorm__qkv_8c.html#ace29bafba9f9aac796d14e6670fed9b9":[2,0,1,1,0,11,5],
 "rmsnorm__qkv_8c_source.html":[2,0,1,1,0,11],
 "rope__kernels_8c.html":[2,0,1,1,106],
 "rope__kernels_8c.html#a0384ecc7d877033fb902b9906e7ff00a":[2,0,1,1,106,51],
@@ -244,10 +249,5 @@ var NAVTREEINDEX17 =
 "structCKBumpMetaFooterV5.html#abfa91da71ba88c4f26b60f2a945aca03":[1,0,19,0],
 "structCKDimToken.html":[1,0,20],
 "structCKDimToken.html#a39ef233b6095ec24fa1374c9f6cd93d3":[1,0,20,0],
-"structCKDimToken.html#a64516b544f8812fc3b3c24ddb472bcb7":[1,0,20,1],
-"structCKDimToken.html#a984c6bca0fce2bd1893a21834837fc7f":[1,0,20,2],
-"structCKFooterGradOffsets.html":[1,0,21],
-"structCKFooterGradOffsets.html#a1033308e389797d86251b87a79781bae":[1,0,21,9],
-"structCKFooterGradOffsets.html#a39e8fc85fe6bcd5c1a1fbd7ced054879":[1,0,21,0],
-"structCKFooterGradOffsets.html#a6b4894e65e79da4ec83a9b2b535ef519":[1,0,21,6]
+"structCKDimToken.html#a64516b544f8812fc3b3c24ddb472bcb7":[1,0,20,1]
 };

@@ -50,6 +50,7 @@ var annotated_dup =
     [ "CKMetric", "structCKMetric.html", "structCKMetric" ],
     [ "CKMetricsContext", "structCKMetricsContext.html", "structCKMetricsContext" ],
     [ "CKModel", "structCKModel.html", "structCKModel" ],
+    [ "CKModelBatchDecodeRowV8", "structCKModelBatchDecodeRowV8.html", "structCKModelBatchDecodeRowV8" ],
     [ "CKModelConfig", "structCKModelConfig.html", "structCKModelConfig" ],
     [ "CKModelRuntimeDescriptorV8", "structCKModelRuntimeDescriptorV8.html", "structCKModelRuntimeDescriptorV8" ],
     [ "CKPlanBinding", "structCKPlanBinding.html", "structCKPlanBinding" ],

@@ -1,5 +1,8 @@
 var NAVTREEINDEX5 =
 {
+"ckernel__audio__conv__transpose__dense_8h.html":[2,0,0,18],
+"ckernel__audio__conv__transpose__dense_8h.html#a208e97df27cc82830c83f353a9b4084a":[2,0,0,18,2],
+"ckernel__audio__conv__transpose__dense_8h.html#aa19e48715196ed7d826480b39a650db8":[2,0,0,18,1],
 "ckernel__audio__conv__transpose__dense_8h.html#aa5e1c878ae2734c1855db8c8c94a7c87":[2,0,0,18,0],
 "ckernel__audio__conv__transpose__dense_8h.html#aa5e1c878ae2734c1855db8c8c94a7c87a277fbb88aad2cbc8d4ab346d7b82a35f":[2,0,0,18,0,2],
 "ckernel__audio__conv__transpose__dense_8h.html#aa5e1c878ae2734c1855db8c8c94a7c87a9a84947034b8ac4880beeb36e477b8a5":[2,0,0,18,0,1],
@@ -239,15 +242,12 @@ var NAVTREEINDEX5 =
 "ckernel__embedding__checked_8h.html#a94ab7bf421a7020acd0b5607d5b7e0fe":[2,0,0,26,0],
 "ckernel__embedding__checked_8h_source.html":[2,0,0,26],
 "ckernel__engine_8h.html":[2,0,0,27],
-"ckernel__engine_8h.html#a001a6d60734a214538c2f8ba85d8bde5":[2,0,0,27,340],
+"ckernel__engine_8h.html#a001a6d60734a214538c2f8ba85d8bde5":[2,0,0,27,341],
 "ckernel__engine_8h.html#a001c2346f83b345676e8c54a27cf7bb1":[2,0,0,27,269],
-"ckernel__engine_8h.html#a0020e0bc4bd80b2f2499bb960a5b4365":[2,0,0,27,300],
+"ckernel__engine_8h.html#a0020e0bc4bd80b2f2499bb960a5b4365":[2,0,0,27,301],
 "ckernel__engine_8h.html#a013a2d1a5679f2c8151fa7a4d87cc9ae":[2,0,0,27,15],
 "ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36":[2,0,0,27,1],
 "ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36a14c0b15894aa11e4c64d8f05e6510fef":[2,0,0,27,1,2],
 "ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36a1ea78a01558752ab59bdf4355fd4fe33":[2,0,0,27,1,0],
-"ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36a2c30b4152a1d3817a2e5a75bdf9f40e1":[2,0,0,27,1,1],
-"ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36ab2b762c82a789d6b6eecc727a35c42b4":[2,0,0,27,1,4],
-"ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36ae18681cb01afb607335d062840e36851":[2,0,0,27,1,3],
-"ckernel__engine_8h.html#a0384ecc7d877033fb902b9906e7ff00a":[2,0,0,27,539]
+"ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36a2c30b4152a1d3817a2e5a75bdf9f40e1":[2,0,0,27,1,1]
 };

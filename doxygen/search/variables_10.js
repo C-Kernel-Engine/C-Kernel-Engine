@@ -21,5 +21,6 @@ var searchData=
   ['rope_5fsin_5fcache_18',['rope_sin_cache',['../structQWEN2__0__5B__DECODEGlobalOffsets.html#a927654a893e08df5673da7123577a3b9',1,'QWEN2_0_5B_DECODEGlobalOffsets']]],
   ['rope_5ftheta_19',['rope_theta',['../structCKModelConfig.html#ae7ab37061b5249887af28ef7eb481377',1,'CKModelConfig']]],
   ['rotary_5fdim_20',['rotary_dim',['../structCKModelConfig.html#a4ee532eb7546fdf393220affe68d6e64',1,'CKModelConfig']]],
-  ['run_5fid_21',['run_id',['../structCKMetricsContext.html#a8bfcc20a51c505a5c520dc804a689977',1,'CKMetricsContext']]]
+  ['row_5foffset_21',['row_offset',['../structCKModelBatchDecodeRowV8.html#aa397806519d5d2b71e64924e4be667c0',1,'CKModelBatchDecodeRowV8']]],
+  ['run_5fid_22',['run_id',['../structCKMetricsContext.html#a8bfcc20a51c505a5c520dc804a689977',1,'CKMetricsContext']]]
 ];

@@ -1,8 +1,11 @@
 var ck__model__abi__v8_8h =
 [
+    [ "CKModelBatchDecodeRowV8", "structCKModelBatchDecodeRowV8.html", "structCKModelBatchDecodeRowV8" ],
     [ "CKModelRuntimeDescriptorV8", "structCKModelRuntimeDescriptorV8.html", "structCKModelRuntimeDescriptorV8" ],
     [ "CK_MODEL_ABI_V8_VERSION", "ck__model__abi__v8_8h.html#a990b94b15df12f072518424b042900fd", null ],
     [ "CK_MODEL_CAP_V8_KNOWN_MASK", "ck__model__abi__v8_8h.html#ae6406bd82615f1cb06671610e2f90b07", null ],
+    [ "ck_model_batch_decode_workspace_v8_fn", "ck__model__abi__v8_8h.html#a9a757cf609837314eeb3119e2b63eb2e", null ],
+    [ "ck_model_decode_batch2_v8_fn", "ck__model__abi__v8_8h.html#a4e9c3db4e47490dbca36761726a25ad8", null ],
     [ "ck_model_get_abi_version_v8_fn", "ck__model__abi__v8_8h.html#a5385b6e9bc0a739d8b8edd12cf376521", null ],
     [ "ck_model_get_capabilities_v8_fn", "ck__model__abi__v8_8h.html#a36dc8190afb9f8678f05368dcad38cee", null ],
     [ "ck_model_get_runtime_descriptor_v8_fn", "ck__model__abi__v8_8h.html#a0b7c6d803b4d3ae2a169e5fd8e1e448c", null ],
@@ -37,6 +40,7 @@ var ck__model__abi__v8_8h =
       [ "CK_MODEL_CAP_PROFILE", "ck__model__abi__v8_8h.html#a66bda251a7af012335928df3e1b04626ab38865d601f67bbe132d19c84d56ca72", null ],
       [ "CK_MODEL_CAP_XRAY_KV", "ck__model__abi__v8_8h.html#a66bda251a7af012335928df3e1b04626aaf964bb8f9a9c27a607c6ee0859e6d32", null ],
       [ "CK_MODEL_CAP_GENERATION_POLICY", "ck__model__abi__v8_8h.html#a66bda251a7af012335928df3e1b04626a7e46bfc030a4667f90cde12b5da608f5", null ],
-      [ "CK_MODEL_CAP_SEQUENCE_STATE_SWITCH", "ck__model__abi__v8_8h.html#a66bda251a7af012335928df3e1b04626a36650a9bcdebf503e0b11eac602e28fd", null ]
+      [ "CK_MODEL_CAP_SEQUENCE_STATE_SWITCH", "ck__model__abi__v8_8h.html#a66bda251a7af012335928df3e1b04626a36650a9bcdebf503e0b11eac602e28fd", null ],
+      [ "CK_MODEL_CAP_BATCH_DECODE_TWO_ROWS", "ck__model__abi__v8_8h.html#a66bda251a7af012335928df3e1b04626afbac4fd18b46ca874448256c93d5a82e", null ]
     ] ]
 ];
