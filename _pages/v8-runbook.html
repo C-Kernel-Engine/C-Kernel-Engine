@@ -1737,6 +1737,22 @@ qwen --bare \
         response. The SDK's external OpenAI-compatible configuration must name
         this local endpoint and the loaded model. No cloud fallback or model-name
         substitution is part of this test.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre># Run an already resolved, self-contained Gemma tools bundle on Ryzen.
+# Verify serving.json selects the tools variant before starting; do not
+# silently replace the publisher template at request time.
+GEMMA_RUN_DIR=/path/to/identified/gemma4-tools-bundle
+python3 version/v8/scripts/ck_serve_v8.py "$GEMMA_RUN_DIR" \
+  --run "$GEMMA_RUN_DIR" --no-build --model-name gemma4-e4b-q4km-tools \
+  --host 127.0.0.1 --port 18205 --request-output-cap 256 \
+  --request-prompt-byte-cap 32768
+
+# On the harness machine, tunnel the localhost-only endpoint from Ryzen.
+ssh -N -L 127.0.0.1:18215:127.0.0.1:18205 ryzen
+# GET http://127.0.0.1:18215/v1/cke/loaded-identity and confirm the expected
+# model, gemma4_dsl_v1 protocol, effective cap and artifact hashes.</pre>
+    </div>
     <p class="mini-note">On the isolated 2,048-token tools bundle, Antigravity SDK
         0.1.20 connected directly to CKE with <code>--request-output-cap 256</code>
         and completed a file read, two-file answer, exact HTML edit plus validator,
@@ -1837,6 +1853,86 @@ python3 server/gemma_antigravity_acceptance.py \
         environment value in these examples; the older settings profile alone did not
         constrain its output request in a bounded local probe.
     </p>
+    <h4>Repeated Qwen and Gemma harness acceptance</h4>
+    <p>Run <code>server/harness_repeatability.py</code> from a client machine that can
+        reach both endpoints through localhost tunnels. It invokes the existing
+        black-box HTTP suites, Qwen Code runner, and Antigravity SDK runner; it
+        does not select templates or execute model arithmetic. Pin each entry to
+        the intended loaded serving and session-library SHA-256 values. Use a Python
+        environment with the server test dependencies for the coordinator, and name
+        a separate Python environment containing <code>google-antigravity==0.1.20</code>
+        for the Gemma client. The Qwen executable must report version 0.24.6.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>{
+  "schema": "cke.harness_repeatability.v1",
+  "attempts": 3,
+  "clients": [
+    {
+      "name": "qwen-control", "adapter": "qwen_code",
+      "endpoint": "http://127.0.0.1:18103/v1",
+      "model": "qwen38-27b-q4km-262k",
+      "serving_identity": "&lt;64 lowercase hex characters&gt;",
+      "session_library_sha256": "&lt;64 lowercase hex characters&gt;",
+      "qwen_bin": "qwen", "qwen_version": "0.24.6",
+      "task_timeout_seconds": 1800, "prefill_lines": 100
+    },
+    {
+      "name": "gemma-control", "adapter": "antigravity_gemma",
+      "endpoint": "http://127.0.0.1:18215/v1",
+      "model": "gemma4-e4b-q4km-tools",
+      "serving_identity": "&lt;64 lowercase hex characters&gt;",
+      "session_library_sha256": "&lt;64 lowercase hex characters&gt;",
+      "python": "/path/to/pinned-antigravity-venv/bin/python",
+      "case_timeout_seconds": 300, "prefill_lines": 100
+    }
+  ]
+}</pre>
+    </div>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre># Save the JSON above as /path/to/local-serving-matrix.json and replace both
+# placeholder hashes with the intended bundle/session identities.
+python3 server/harness_repeatability.py \
+  --config /path/to/local-serving-matrix.json \
+  --output-dir /path/to/new-matrix-run
+
+# If reporting logic changes, reassess completed retained reports without
+# repeating any harness tool or native generation:
+python3 server/harness_repeatability.py \
+  --reassess-dir /path/to/completed-matrix-run</pre>
+    </div>
+    <p class="mini-note">The output directory must be new. It retains the exact
+        configuration, stdout/stderr, every individual HTTP and harness report,
+        disposable workspaces, and an incrementally written summary. A failed
+        task remains failed even when the loaded identity matched; a passed task
+        does not inherit a missing protocol or recovery result. The matrix also
+        rejects a changed server-instance ID between attempts, even if the same
+        bundle is reloaded. The HTTP suites
+        test multi-turn and output-limit behavior, bounded-input rejection with
+        a successful follow-up, cancellation, disconnect, and timeout recovery.
+        For an uncapped runtime, the context probe tests an oversized output
+        reservation. The 2,048-token Gemma deployment also declares an explicit
+        32,768-byte rendered-input cap; its probe tests that separate byte limit
+        and a successful follow-up. It does not infer a token count from the
+        input's byte length. Native tokenization failures without a proven
+        capacity cause remain structured server errors, while native busy
+        responses remain HTTP 429.
+        The probe records whether an exact token-count exceedance was proven.
+        It records which boundary was exercised and does not claim that
+        the Qwen probe consumed 262K input. After a runner
+        timeout, the matrix stops submitting work to that endpoint because native
+        completion is not yet proven. The suite records failures without silently
+        retrying edits or commands. It checks outcomes after execution; a fresh
+        directory alone does not sandbox the client. Use a restricted account or
+        container when tool execution needs isolation. Reassessment writes a separate immutable
+        <code>reassessment.json</code>, pins the original summary and each child
+        report hash, and never replays a task. Older reports without child hashes
+        remain integrity-unverified. The small Gemma artifact has only 2,048 tokens
+        of compiled context and uses an explicit 256-token output cap; this matrix
+        is bounded workflow evidence, not a larger-context or unattended-reliability
+        claim. Repeat with a separately built and identified larger-context artifact
+        before advertising practical prompt/tool-schema capacity.</p>
     <p class="mini-note">
         <code>GET /v1/models/{model}</code> reports the loaded CKE context capacity. The server uses
         the native tokenizer to validate the fully rendered prompt plus requested output before
