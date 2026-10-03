@@ -101,9 +101,10 @@ var NAVTREEINDEX10 =
 "ckernel__registry_8h.html#a4178dea993cf3973166fd2dc9d1f2223":[2,0,0,41,1],
 "ckernel__registry_8h_source.html":[2,0,0,41],
 "ckernel__runtime__extent_8h.html":[2,0,0,42],
-"ckernel__runtime__extent_8h.html#a2e3491878be5e3941b8adf4406550db7":[2,0,0,42,2],
-"ckernel__runtime__extent_8h.html#a313dfde74e1135de3ab52d2f74a47a19":[2,0,0,42,3],
-"ckernel__runtime__extent_8h.html#aafb5911cb55ad85cb3102bb703a77e74":[2,0,0,42,1],
+"ckernel__runtime__extent_8h.html#a2e3491878be5e3941b8adf4406550db7":[2,0,0,42,3],
+"ckernel__runtime__extent_8h.html#a313dfde74e1135de3ab52d2f74a47a19":[2,0,0,42,4],
+"ckernel__runtime__extent_8h.html#a826f3c5fb3ee31dbbd7bd26e2898a6dd":[2,0,0,42,1],
+"ckernel__runtime__extent_8h.html#aafb5911cb55ad85cb3102bb703a77e74":[2,0,0,42,2],
 "ckernel__runtime__extent_8h.html#ad39f18be80eabe57825e99ed25ec67e8":[2,0,0,42,0],
 "ckernel__runtime__extent_8h.html#ad39f18be80eabe57825e99ed25ec67e8a115b22d4cd4dd9df67c8013c18005510":[2,0,0,42,0,2],
 "ckernel__runtime__extent_8h.html#ad39f18be80eabe57825e99ed25ec67e8a4bb2ba30d488bdb1bd480b8e8e9eec1c":[2,0,0,42,0,1],
@@ -248,6 +249,5 @@ var NAVTREEINDEX10 =
 "deltanet__kernels_8c.html#a228b91b9c7bdbc392e07fb1dab25b9e3":[2,0,1,1,28,28],
 "deltanet__kernels_8c.html#a2ab7f77a19bf56b4aa0c5f4371bd21bf":[2,0,1,1,28,13],
 "deltanet__kernels_8c.html#a2ba1a0d6e20b00483bafa8031651f53b":[2,0,1,1,28,30],
-"deltanet__kernels_8c.html#a32db3b35b2cfa9c041a8e6bd33e1c415":[2,0,1,1,28,8],
-"deltanet__kernels_8c.html#a357c0e1f9059fc199d845a50214ba0ac":[2,0,1,1,28,18]
+"deltanet__kernels_8c.html#a32db3b35b2cfa9c041a8e6bd33e1c415":[2,0,1,1,28,8]
 };

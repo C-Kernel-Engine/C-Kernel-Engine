@@ -1,5 +1,7 @@
 var NAVTREEINDEX21 =
 {
+"structCacheInfo.html#af0d7fd2b3b6d58a409f2e91419970a87":[1,0,10,3],
+"structCacheTopology.html":[1,0,11],
 "structCacheTopology.html#a312d10896e318962d7a948eb04aaddd0":[1,0,11,1],
 "structCacheTopology.html#a7d8f011d2962b633861d25e320df4d7b":[1,0,11,2],
 "structCacheTopology.html#aad6fb272149cb50628325bed91adfa37":[1,0,11,0],
@@ -247,7 +249,5 @@ var NAVTREEINDEX21 =
 "swiglu__kernels_8c_source.html":[2,0,1,1,115],
 "swiglu__kernels__bf16_8c.html":[2,0,1,1,116],
 "swiglu__kernels__bf16_8c.html#a41a1dfc5976b7c2e2539a2811dc0b07f":[2,0,1,1,116,1],
-"swiglu__kernels__bf16_8c.html#a77fb89fc5fa2dcc73d9d37ccf9c50322":[2,0,1,1,116,0],
-"swiglu__kernels__bf16_8c_source.html":[2,0,1,1,116],
-"system__topology_8c.html":[2,0,1,28]
+"swiglu__kernels__bf16_8c.html#a77fb89fc5fa2dcc73d9d37ccf9c50322":[2,0,1,1,116,0]
 };
