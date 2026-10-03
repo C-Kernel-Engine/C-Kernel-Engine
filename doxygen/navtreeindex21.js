@@ -1,5 +1,12 @@
 var NAVTREEINDEX21 =
 {
+"structCPUInfo.html#aabf53af233c0f5d4692beb98fa2c2434":[1,0,71,21],
+"structCPUInfo.html#aaf14c11cad59d839d69e7fa7e367dd05":[1,0,71,41],
+"structCPUInfo.html#ac02376e5e445112e00ec31ff39f0bd17":[1,0,71,11],
+"structCPUInfo.html#ac41947b54c3a9b315338aee3113b5714":[1,0,71,3],
+"structCPUInfo.html#ac60a906dc4aaa71a6ca5453d6628fa2e":[1,0,71,23],
+"structCPUInfo.html#acb466a15f99116d3c9b88f2d35be4b93":[1,0,71,22],
+"structCPUInfo.html#accaf39347e29f639b10e0d99825a0ca5":[1,0,71,29],
 "structCPUInfo.html#acfedda3a3d92c0fd6dde00f5757fdf92":[1,0,71,0],
 "structCPUInfo.html#ad3efc23f84451ced9b6085cb036ceb7d":[1,0,71,25],
 "structCPUInfo.html#ad5a579994982f5cee575bb9674abd238":[1,0,71,9],
@@ -242,12 +249,5 @@ var NAVTREEINDEX21 =
 "structck__threadpool__profile__t.html#abe00d835b6f0d89c4d809d32921c4f7b":[1,0,14,2],
 "structck__threadpool__profile__t.html#ad41c003f93d8a0942620e09d199b185b":[1,0,14,3],
 "structggml__init__params.html":[1,0,73],
-"structggml__init__params.html#a5b4bf877ba8af2df9bb60e82d7c1cf01":[1,0,73,2],
-"structggml__init__params.html#a5ede508e399874a98eeca731d71a7e0b":[1,0,73,1],
-"structggml__init__params.html#abe8bc32cccaebad17a238bd3055eac68":[1,0,73,0],
-"swiglu__kernels_8c.html":[2,0,1,1,115],
-"swiglu__kernels_8c.html#a0bf1546bf3001e047de6a2e40461fdc2":[2,0,1,1,115,1],
-"swiglu__kernels_8c.html#a102617ea5d170076dc9e1d6ac167617c":[2,0,1,1,115,9],
-"swiglu__kernels_8c.html#a18063a61725eeeeb371d7c9f1e0d410d":[2,0,1,1,115,12],
-"swiglu__kernels_8c.html#a26369aa07808fb6aae4502d54a1ba650":[2,0,1,1,115,8]
+"structggml__init__params.html#a5b4bf877ba8af2df9bb60e82d7c1cf01":[1,0,73,2]
 };
