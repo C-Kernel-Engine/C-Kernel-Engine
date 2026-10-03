@@ -82,6 +82,8 @@ def _bind(model: ctypes.CDLL) -> None:
     model.ck_model_batch_decode_workspace.argtypes = [
         ctypes.POINTER(ctypes.c_size_t), ctypes.POINTER(ctypes.c_size_t)]
     model.ck_model_batch_decode_workspace.restype = ctypes.c_int
+    if hasattr(model, "ck_model_batch_decode_projection_groups"):
+        model.ck_model_batch_decode_projection_groups.restype = ctypes.c_int
     model.ck_model_decode_batch2.argtypes = [
         ctypes.POINTER(BatchRow), ctypes.c_size_t, ctypes.c_void_p, ctypes.c_size_t]
     model.ck_model_decode_batch2.restype = ctypes.c_int
@@ -100,6 +102,12 @@ def certify(bundle: Path, generated_source: Path) -> dict:
     if model.ck_model_init(str(assets["weights.bump"]).encode()) != 0:
         raise RuntimeError("generated model initialization failed")
     try:
+        projection_groups = (
+            int(model.ck_model_batch_decode_projection_groups())
+            if hasattr(model, "ck_model_batch_decode_projection_groups") else 1
+        )
+        if projection_groups not in (1, 2):
+            raise AssertionError("invalid generated batch projection-group count")
         loaded = {}
         for name, symbol in (("libmodel.so", "ck_model_decode_batch2"),
                              ("libckernel_engine.so", "gemm_nt_q5_1_q8_1_m2"),
@@ -321,7 +329,10 @@ def certify(bundle: Path, generated_source: Path) -> dict:
     return {
         "schema": "cke.generated-batch-decode-v1",
         "status": "pass",
-        "scope": "two_rows_shared_first_layer_qk_kv_only_not_continuous_batching",
+        "scope": ("two_rows_shared_first_layer_qk_and_gateup_kv_only_not_continuous_batching"
+                  if projection_groups == 2 else
+                  "two_rows_shared_first_layer_qk_kv_only_not_continuous_batching"),
+        "shared_projection_groups": projection_groups,
         "capabilities": capabilities,
         "compiled_context_length": context,
         "vocab_size": vocab,

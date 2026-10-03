@@ -1580,6 +1580,17 @@ version/v8/scripts/ck_serve_v8.py "$RUN_DIR" --run "$RUN_DIR" \
         Qwen, larger artifacts, simultaneous API calls, and HTTP request scheduling remain
         uncertified for this batch entry.
     </p>
+    <p>
+        The next generated step shares the first layer's MLP gate/up Q5_1 projection as a
+        second two-row weight traversal after sequence-local attention and KV writes. The
+        compiler derives both cutpoints' live values from lowered IR, checks the gate/up
+        provider and GeGLU consumption contract, and retains the Q/K-only entry for layouts
+        that do not qualify. The separate
+        <code>batch_decode_gemma3_270m_two_row_layer_20261003.json</code> report records
+        seven exact full-logit and KV comparisons from a frozen local bundle and identifies
+        both shared projection groups. V, attention, output and down projections remain
+        sequence-local. This is still not a full-layer weight-reuse or throughput claim.
+    </p>
 </div>
 
 <div class="card">
