@@ -7,6 +7,7 @@
 #include "cpu_features.h"
 #include "ckernel_quant.h"  /* INT8 block types (block_q8_0, block_q8_K, etc.) */
 #include "mega_fused_attention.h"
+#include "ckernel_rwkv7_decode.h"
 
 #ifdef __cplusplus
 extern "C" {

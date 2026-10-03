@@ -466,6 +466,7 @@ SRCS    := src/backend_native.c \
 	           src/kernels/recurrent_norm_kernels.c \
 	           src/kernels/mamba2_kernels.c \
 	           src/kernels/deltanet_kernels.c \
+	           src/kernels/rwkv7_decode.c \
 	           src/kernels/deepseek_kernels.c \
 	           src/kernels/gemma4_per_layer_embed.c \
 	           src/kernels/logit_kernels.c \
