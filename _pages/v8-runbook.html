@@ -715,8 +715,11 @@ make test-v8-arm-model-smoke CK_ARM_MODEL_DIR=/path/to/generated-v8-model</pre><
 <pre>version/v8/scripts/cks-v8-run run \
   hf://unsloth/gemma-3-270m-it-GGUF/gemma-3-270m-it-Q5_K_M.gguf \
   --context-len 1024 --force-compile --force-convert --chat-template=auto \
+  --prompt "Give me a concise example of C code." \
+  --max-tokens 64 --temperature 0.0 \
   --generate-visualizer</pre>
     </div>
+    <p class="mini-note">The smallest promoted text model. <code>--prompt</code> with <code>--max-tokens</code> makes the run non-interactive and bounded; <code>--temperature 0.0</code> selects deterministic greedy decoding (the default is 0.7). Omit <code>--prompt</code> for an interactive chat session.</p>
 
     <h3>Gemma 4 E4B IT</h3>
     <div class="cmd-block">

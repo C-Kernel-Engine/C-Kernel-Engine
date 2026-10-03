@@ -141,11 +141,15 @@ make v7-demo-runtime \
 <div class="card card-accent">
     <h3 style="margin-top: 0;">Text Bring-Up</h3>
     <pre>version/v8/scripts/cks-v8-run run \
-  hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf \
+  hf://unsloth/gemma-3-270m-it-GGUF/gemma-3-270m-it-Q5_K_M.gguf \
   --context-len 1024 \
   --force-convert --force-compile \
+  --chat-template auto \
+  --prompt "Give me a concise example of C code." \
+  --max-tokens 64 \
+  --temperature 0.0 \
   --generate-visualizer</pre>
-    <p style="margin-bottom: 0;">This is the short text-family <code>v8</code> path. The same runner surface now covers the promoted <code>qwen2</code>, <code>qwen3</code>, <code>qwen3.5</code>, <code>gemma3</code>, and <code>NanBeige</code> command shapes, with family-specific chat-template notes in the full runbook.</p>
+    <p style="margin-bottom: 0;">This is the shortest text-family <code>v8</code> path: Gemma 3 270M is the smallest promoted model, and one command downloads, converts, compiles, and runs it. <code>--prompt</code> with <code>--max-tokens</code> makes the run non-interactive and bounded, and <code>--temperature 0.0</code> selects deterministic greedy decoding (the default is 0.7); omit <code>--prompt</code> for an interactive chat session. The same runner surface covers the promoted <code>qwen2</code>, <code>qwen3</code>, <code>qwen3.5</code>, <code>gemma3</code>, and <code>NanBeige</code> command shapes, with family-specific chat-template notes in the full runbook.</p>
 </div>
 
 <div class="card card-accent">
