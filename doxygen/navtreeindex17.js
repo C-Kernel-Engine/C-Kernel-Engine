@@ -1,5 +1,7 @@
 var NAVTREEINDEX17 =
 {
+"rmsnorm__qkv_8c_source.html":[2,0,1,1,0,11],
+"rope__kernels_8c.html":[2,0,1,1,106],
 "rope__kernels_8c.html#a0384ecc7d877033fb902b9906e7ff00a":[2,0,1,1,106,51],
 "rope__kernels_8c.html#a04bb3dcf0c06d694ed3461ca159b572d":[2,0,1,1,106,77],
 "rope__kernels_8c.html#a06e917de04762ee5e682d44a2f858c4b":[2,0,1,1,106,25],
@@ -247,7 +249,5 @@ var NAVTREEINDEX17 =
 "structCKFooterGradOffsets.html":[1,0,21],
 "structCKFooterGradOffsets.html#a1033308e389797d86251b87a79781bae":[1,0,21,9],
 "structCKFooterGradOffsets.html#a39e8fc85fe6bcd5c1a1fbd7ced054879":[1,0,21,0],
-"structCKFooterGradOffsets.html#a6b4894e65e79da4ec83a9b2b535ef519":[1,0,21,6],
-"structCKFooterGradOffsets.html#a9275fe493cec58474de57a572d4867f4":[1,0,21,4],
-"structCKFooterGradOffsets.html#ab1ee7c4f660361ce5072f1c9183fa74f":[1,0,21,7]
+"structCKFooterGradOffsets.html#a6b4894e65e79da4ec83a9b2b535ef519":[1,0,21,6]
 };

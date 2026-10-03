@@ -157,6 +157,8 @@ Functions</h2></td></tr>
 <tr class="separator:a80b1ec81e751b153977f05a3e44b4fda"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a90c720d31b619809ed5e2cc723019b7b" id="r_a90c720d31b619809ed5e2cc723019b7b"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="geglu__kernels_8c.html#a90c720d31b619809ed5e2cc723019b7b">geglu_forward_ggml_native</a> (const float *x, float *out, int tokens, int dim)</td></tr>
 <tr class="separator:a90c720d31b619809ed5e2cc723019b7b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac64c09951a9619da235ba9cef4ae857b" id="r_ac64c09951a9619da235ba9cef4ae857b"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="geglu__kernels_8c.html#ac64c09951a9619da235ba9cef4ae857b">geglu_forward_quick</a> (const float *x, float *out, int tokens, int dim)</td></tr>
+<tr class="separator:ac64c09951a9619da235ba9cef4ae857b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:abc5977fca1e95c2406a779657c4d2365" id="r_abc5977fca1e95c2406a779657c4d2365"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="geglu__kernels_8c.html#abc5977fca1e95c2406a779657c4d2365">gelu_fast_inplace</a> (float *data, size_t n)</td></tr>
 <tr class="separator:abc5977fca1e95c2406a779657c4d2365"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ab48a772c053be8dd3cc0f5e4ea1a1223" id="r_ab48a772c053be8dd3cc0f5e4ea1a1223"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="geglu__kernels_8c.html#ab48a772c053be8dd3cc0f5e4ea1a1223">gelu_ggml_native_inplace</a> (float *data, size_t n)</td></tr>
@@ -248,41 +250,41 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="geglu__kernels_8c_source.html#l00139">139</a> of file <a class="el" href="geglu__kernels_8c_source.html">geglu_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  144</span>{</div>
-<div class="line"><span class="lineno">  145</span>    <span class="keywordflow">if</span> (!x || !d_out || !d_x || tokens &lt;= 0 || dim &lt;= 0) {</div>
-<div class="line"><span class="lineno">  146</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  147</span>    }</div>
-<div class="line"><span class="lineno">  148</span> </div>
-<div class="line"><span class="lineno">  149</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> sqrt_2_over_pi = 0.7978845608f;</div>
-<div class="line"><span class="lineno">  150</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> coeff = 0.044715f;</div>
-<div class="line"><span class="lineno">  151</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> inner_dim = dim * 2;</div>
-<div class="line"><span class="lineno">  152</span> </div>
-<div class="line"><span class="lineno">  153</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; tokens; ++t) {</div>
-<div class="line"><span class="lineno">  154</span>        <span class="keyword">const</span> uint16_t *x_ptr = x + (size_t)t * (<span class="keywordtype">size_t</span>)inner_dim;</div>
-<div class="line"><span class="lineno">  155</span>        <span class="keyword">const</span> uint16_t *d_out_ptr = d_out + (size_t)t * (<span class="keywordtype">size_t</span>)dim;</div>
-<div class="line"><span class="lineno">  156</span>        <span class="keywordtype">float</span> *d_x_ptr = d_x + (size_t)t * (<span class="keywordtype">size_t</span>)inner_dim;</div>
-<div class="line"><span class="lineno">  157</span> </div>
-<div class="line"><span class="lineno">  158</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; dim; ++d) {</div>
-<div class="line"><span class="lineno">  159</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> a = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(x_ptr[d]);</div>
-<div class="line"><span class="lineno">  160</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> b = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(x_ptr[dim + d]);</div>
-<div class="line"><span class="lineno">  161</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> dout = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(d_out_ptr[d]);</div>
-<div class="line"><span class="lineno">  162</span> </div>
-<div class="line"><span class="lineno">  163</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> a2 = a * a;</div>
-<div class="line"><span class="lineno">  164</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> a3 = a2 * a;</div>
-<div class="line"><span class="lineno">  165</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> g = sqrt_2_over_pi * (a + coeff * a3);</div>
-<div class="line"><span class="lineno">  166</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> tanh_g = tanhf(g);</div>
-<div class="line"><span class="lineno">  167</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> sech2_g = 1.0f - tanh_g * tanh_g;</div>
-<div class="line"><span class="lineno">  168</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> g_prime = sqrt_2_over_pi * (1.0f + 3.0f * coeff * a2);</div>
-<div class="line"><span class="lineno">  169</span> </div>
-<div class="line"><span class="lineno">  170</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> d_gelu = 0.5f * (1.0f + tanh_g) + 0.5f * a * sech2_g * g_prime;</div>
-<div class="line"><span class="lineno">  171</span>            d_x_ptr[d] = dout * d_gelu * b;</div>
+<p class="definition">Definition at line <a class="el" href="geglu__kernels_8c_source.html#l00154">154</a> of file <a class="el" href="geglu__kernels_8c_source.html">geglu_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  159</span>{</div>
+<div class="line"><span class="lineno">  160</span>    <span class="keywordflow">if</span> (!x || !d_out || !d_x || tokens &lt;= 0 || dim &lt;= 0) {</div>
+<div class="line"><span class="lineno">  161</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  162</span>    }</div>
+<div class="line"><span class="lineno">  163</span> </div>
+<div class="line"><span class="lineno">  164</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> sqrt_2_over_pi = 0.7978845608f;</div>
+<div class="line"><span class="lineno">  165</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> coeff = 0.044715f;</div>
+<div class="line"><span class="lineno">  166</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> inner_dim = dim * 2;</div>
+<div class="line"><span class="lineno">  167</span> </div>
+<div class="line"><span class="lineno">  168</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; tokens; ++t) {</div>
+<div class="line"><span class="lineno">  169</span>        <span class="keyword">const</span> uint16_t *x_ptr = x + (size_t)t * (<span class="keywordtype">size_t</span>)inner_dim;</div>
+<div class="line"><span class="lineno">  170</span>        <span class="keyword">const</span> uint16_t *d_out_ptr = d_out + (size_t)t * (<span class="keywordtype">size_t</span>)dim;</div>
+<div class="line"><span class="lineno">  171</span>        <span class="keywordtype">float</span> *d_x_ptr = d_x + (size_t)t * (<span class="keywordtype">size_t</span>)inner_dim;</div>
 <div class="line"><span class="lineno">  172</span> </div>
-<div class="line"><span class="lineno">  173</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> gelu_a = 0.5f * a * (1.0f + tanh_g);</div>
-<div class="line"><span class="lineno">  174</span>            d_x_ptr[dim + d] = dout * gelu_a;</div>
-<div class="line"><span class="lineno">  175</span>        }</div>
-<div class="line"><span class="lineno">  176</span>    }</div>
-<div class="line"><span class="lineno">  177</span>}</div>
+<div class="line"><span class="lineno">  173</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; dim; ++d) {</div>
+<div class="line"><span class="lineno">  174</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> a = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(x_ptr[d]);</div>
+<div class="line"><span class="lineno">  175</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> b = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(x_ptr[dim + d]);</div>
+<div class="line"><span class="lineno">  176</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> dout = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(d_out_ptr[d]);</div>
+<div class="line"><span class="lineno">  177</span> </div>
+<div class="line"><span class="lineno">  178</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> a2 = a * a;</div>
+<div class="line"><span class="lineno">  179</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> a3 = a2 * a;</div>
+<div class="line"><span class="lineno">  180</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> g = sqrt_2_over_pi * (a + coeff * a3);</div>
+<div class="line"><span class="lineno">  181</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> tanh_g = tanhf(g);</div>
+<div class="line"><span class="lineno">  182</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> sech2_g = 1.0f - tanh_g * tanh_g;</div>
+<div class="line"><span class="lineno">  183</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> g_prime = sqrt_2_over_pi * (1.0f + 3.0f * coeff * a2);</div>
+<div class="line"><span class="lineno">  184</span> </div>
+<div class="line"><span class="lineno">  185</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> d_gelu = 0.5f * (1.0f + tanh_g) + 0.5f * a * sech2_g * g_prime;</div>
+<div class="line"><span class="lineno">  186</span>            d_x_ptr[d] = dout * d_gelu * b;</div>
+<div class="line"><span class="lineno">  187</span> </div>
+<div class="line"><span class="lineno">  188</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> gelu_a = 0.5f * a * (1.0f + tanh_g);</div>
+<div class="line"><span class="lineno">  189</span>            d_x_ptr[dim + d] = dout * gelu_a;</div>
+<div class="line"><span class="lineno">  190</span>        }</div>
+<div class="line"><span class="lineno">  191</span>    }</div>
+<div class="line"><span class="lineno">  192</span>}</div>
 <div class="ttc" id="abf16__utils_8h_html_a314c3970fd5e2770d19b1bb49aefcf94"><div class="ttname"><a href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a></div><div class="ttdeci">static float bf16_to_float(uint16_t v)</div><div class="ttdef"><b>Definition</b> <a href="bf16__utils_8h_source.html#l00038">bf16_utils.h:38</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>.</p>
@@ -333,41 +335,41 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="geglu__kernels_8c_source.html#l00099">99</a> of file <a class="el" href="geglu__kernels_8c_source.html">geglu_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  104</span>{</div>
-<div class="line"><span class="lineno">  105</span>    <span class="keywordflow">if</span> (!x || !d_out || !d_x || tokens &lt;= 0 || dim &lt;= 0) {</div>
-<div class="line"><span class="lineno">  106</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  107</span>    }</div>
-<div class="line"><span class="lineno">  108</span> </div>
-<div class="line"><span class="lineno">  109</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> sqrt_2_over_pi = 0.7978845608f;</div>
-<div class="line"><span class="lineno">  110</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> coeff = 0.044715f;</div>
-<div class="line"><span class="lineno">  111</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> inner_dim = dim * 2;</div>
-<div class="line"><span class="lineno">  112</span> </div>
-<div class="line"><span class="lineno">  113</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; tokens; ++t) {</div>
-<div class="line"><span class="lineno">  114</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *x_ptr = x + (size_t)t * (<span class="keywordtype">size_t</span>)inner_dim;</div>
-<div class="line"><span class="lineno">  115</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *d_out_ptr = d_out + (size_t)t * (<span class="keywordtype">size_t</span>)dim;</div>
-<div class="line"><span class="lineno">  116</span>        <span class="keywordtype">float</span> *d_x_ptr = d_x + (size_t)t * (<span class="keywordtype">size_t</span>)inner_dim;</div>
-<div class="line"><span class="lineno">  117</span> </div>
-<div class="line"><span class="lineno">  118</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; dim; ++d) {</div>
-<div class="line"><span class="lineno">  119</span>            <span class="keywordtype">float</span> a = x_ptr[d];</div>
-<div class="line"><span class="lineno">  120</span>            <span class="keywordtype">float</span> b = x_ptr[dim + d];</div>
-<div class="line"><span class="lineno">  121</span>            <span class="keywordtype">float</span> dout = d_out_ptr[d];</div>
-<div class="line"><span class="lineno">  122</span> </div>
-<div class="line"><span class="lineno">  123</span>            <span class="keywordtype">float</span> a2 = a * a;</div>
-<div class="line"><span class="lineno">  124</span>            <span class="keywordtype">float</span> a3 = a2 * a;</div>
-<div class="line"><span class="lineno">  125</span>            <span class="keywordtype">float</span> g = sqrt_2_over_pi * (a + coeff * a3);</div>
-<div class="line"><span class="lineno">  126</span>            <span class="keywordtype">float</span> tanh_g = tanhf(g);</div>
-<div class="line"><span class="lineno">  127</span>            <span class="keywordtype">float</span> sech2_g = 1.0f - tanh_g * tanh_g;</div>
-<div class="line"><span class="lineno">  128</span>            <span class="keywordtype">float</span> g_prime = sqrt_2_over_pi * (1.0f + 3.0f * coeff * a2);</div>
-<div class="line"><span class="lineno">  129</span> </div>
-<div class="line"><span class="lineno">  130</span>            <span class="keywordtype">float</span> d_gelu = 0.5f * (1.0f + tanh_g) + 0.5f * a * sech2_g * g_prime;</div>
-<div class="line"><span class="lineno">  131</span>            d_x_ptr[d] = dout * d_gelu * b;</div>
+<p class="definition">Definition at line <a class="el" href="geglu__kernels_8c_source.html#l00114">114</a> of file <a class="el" href="geglu__kernels_8c_source.html">geglu_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  119</span>{</div>
+<div class="line"><span class="lineno">  120</span>    <span class="keywordflow">if</span> (!x || !d_out || !d_x || tokens &lt;= 0 || dim &lt;= 0) {</div>
+<div class="line"><span class="lineno">  121</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  122</span>    }</div>
+<div class="line"><span class="lineno">  123</span> </div>
+<div class="line"><span class="lineno">  124</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> sqrt_2_over_pi = 0.7978845608f;</div>
+<div class="line"><span class="lineno">  125</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> coeff = 0.044715f;</div>
+<div class="line"><span class="lineno">  126</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> inner_dim = dim * 2;</div>
+<div class="line"><span class="lineno">  127</span> </div>
+<div class="line"><span class="lineno">  128</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; tokens; ++t) {</div>
+<div class="line"><span class="lineno">  129</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *x_ptr = x + (size_t)t * (<span class="keywordtype">size_t</span>)inner_dim;</div>
+<div class="line"><span class="lineno">  130</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *d_out_ptr = d_out + (size_t)t * (<span class="keywordtype">size_t</span>)dim;</div>
+<div class="line"><span class="lineno">  131</span>        <span class="keywordtype">float</span> *d_x_ptr = d_x + (size_t)t * (<span class="keywordtype">size_t</span>)inner_dim;</div>
 <div class="line"><span class="lineno">  132</span> </div>
-<div class="line"><span class="lineno">  133</span>            <span class="keywordtype">float</span> gelu_a = 0.5f * a * (1.0f + tanh_g);</div>
-<div class="line"><span class="lineno">  134</span>            d_x_ptr[dim + d] = dout * gelu_a;</div>
-<div class="line"><span class="lineno">  135</span>        }</div>
-<div class="line"><span class="lineno">  136</span>    }</div>
-<div class="line"><span class="lineno">  137</span>}</div>
+<div class="line"><span class="lineno">  133</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; dim; ++d) {</div>
+<div class="line"><span class="lineno">  134</span>            <span class="keywordtype">float</span> a = x_ptr[d];</div>
+<div class="line"><span class="lineno">  135</span>            <span class="keywordtype">float</span> b = x_ptr[dim + d];</div>
+<div class="line"><span class="lineno">  136</span>            <span class="keywordtype">float</span> dout = d_out_ptr[d];</div>
+<div class="line"><span class="lineno">  137</span> </div>
+<div class="line"><span class="lineno">  138</span>            <span class="keywordtype">float</span> a2 = a * a;</div>
+<div class="line"><span class="lineno">  139</span>            <span class="keywordtype">float</span> a3 = a2 * a;</div>
+<div class="line"><span class="lineno">  140</span>            <span class="keywordtype">float</span> g = sqrt_2_over_pi * (a + coeff * a3);</div>
+<div class="line"><span class="lineno">  141</span>            <span class="keywordtype">float</span> tanh_g = tanhf(g);</div>
+<div class="line"><span class="lineno">  142</span>            <span class="keywordtype">float</span> sech2_g = 1.0f - tanh_g * tanh_g;</div>
+<div class="line"><span class="lineno">  143</span>            <span class="keywordtype">float</span> g_prime = sqrt_2_over_pi * (1.0f + 3.0f * coeff * a2);</div>
+<div class="line"><span class="lineno">  144</span> </div>
+<div class="line"><span class="lineno">  145</span>            <span class="keywordtype">float</span> d_gelu = 0.5f * (1.0f + tanh_g) + 0.5f * a * sech2_g * g_prime;</div>
+<div class="line"><span class="lineno">  146</span>            d_x_ptr[d] = dout * d_gelu * b;</div>
+<div class="line"><span class="lineno">  147</span> </div>
+<div class="line"><span class="lineno">  148</span>            <span class="keywordtype">float</span> gelu_a = 0.5f * a * (1.0f + tanh_g);</div>
+<div class="line"><span class="lineno">  149</span>            d_x_ptr[dim + d] = dout * gelu_a;</div>
+<div class="line"><span class="lineno">  150</span>        }</div>
+<div class="line"><span class="lineno">  151</span>    }</div>
+<div class="line"><span class="lineno">  152</span>}</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -415,26 +417,26 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="geglu__kernels_8c_source.html#l00083">83</a> of file <a class="el" href="geglu__kernels_8c_source.html">geglu_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   84</span>{</div>
-<div class="line"><span class="lineno">   85</span>    <span class="keywordflow">if</span> (!x || !out || !scratch || tokens &lt;= 0 || dim &lt;= 0) {</div>
-<div class="line"><span class="lineno">   86</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">   87</span>    }</div>
-<div class="line"><span class="lineno">   88</span> </div>
-<div class="line"><span class="lineno">   89</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> fp32_size = (size_t)tokens * (<span class="keywordtype">size_t</span>)dim;</div>
-<div class="line"><span class="lineno">   90</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> input_size = fp32_size * 2;</div>
-<div class="line"><span class="lineno">   91</span>    <span class="keywordtype">float</span> *fp32_input = scratch;</div>
-<div class="line"><span class="lineno">   92</span>    <span class="keywordtype">float</span> *fp32_output = scratch + input_size;</div>
-<div class="line"><span class="lineno">   93</span> </div>
-<div class="line"><span class="lineno">   94</span>    <a class="code hl_function" href="bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333">bf16_tensor_to_float</a>(x, fp32_input, input_size);</div>
-<div class="line"><span class="lineno">   95</span>    <a class="code hl_function" href="geglu__kernels_8c.html#a80b1ec81e751b153977f05a3e44b4fda">geglu_forward_fp32</a>(fp32_input, fp32_output, tokens, dim);</div>
-<div class="line"><span class="lineno">   96</span>    <a class="code hl_function" href="bf16__utils_8h.html#a027b5c4dd4c6ce7f656e922fc694e52a">float_tensor_to_bf16</a>(fp32_output, out, fp32_size);</div>
-<div class="line"><span class="lineno">   97</span>}</div>
+<p class="definition">Definition at line <a class="el" href="geglu__kernels_8c_source.html#l00098">98</a> of file <a class="el" href="geglu__kernels_8c_source.html">geglu_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   99</span>{</div>
+<div class="line"><span class="lineno">  100</span>    <span class="keywordflow">if</span> (!x || !out || !scratch || tokens &lt;= 0 || dim &lt;= 0) {</div>
+<div class="line"><span class="lineno">  101</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  102</span>    }</div>
+<div class="line"><span class="lineno">  103</span> </div>
+<div class="line"><span class="lineno">  104</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> fp32_size = (size_t)tokens * (<span class="keywordtype">size_t</span>)dim;</div>
+<div class="line"><span class="lineno">  105</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> input_size = fp32_size * 2;</div>
+<div class="line"><span class="lineno">  106</span>    <span class="keywordtype">float</span> *fp32_input = scratch;</div>
+<div class="line"><span class="lineno">  107</span>    <span class="keywordtype">float</span> *fp32_output = scratch + input_size;</div>
+<div class="line"><span class="lineno">  108</span> </div>
+<div class="line"><span class="lineno">  109</span>    <a class="code hl_function" href="bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333">bf16_tensor_to_float</a>(x, fp32_input, input_size);</div>
+<div class="line"><span class="lineno">  110</span>    <a class="code hl_function" href="geglu__kernels_8c.html#a80b1ec81e751b153977f05a3e44b4fda">geglu_forward_fp32</a>(fp32_input, fp32_output, tokens, dim);</div>
+<div class="line"><span class="lineno">  111</span>    <a class="code hl_function" href="bf16__utils_8h.html#a027b5c4dd4c6ce7f656e922fc694e52a">float_tensor_to_bf16</a>(fp32_output, out, fp32_size);</div>
+<div class="line"><span class="lineno">  112</span>}</div>
 <div class="ttc" id="abf16__utils_8h_html_a027b5c4dd4c6ce7f656e922fc694e52a"><div class="ttname"><a href="bf16__utils_8h.html#a027b5c4dd4c6ce7f656e922fc694e52a">float_tensor_to_bf16</a></div><div class="ttdeci">static void float_tensor_to_bf16(const float *src, uint16_t *dst, size_t count)</div><div class="ttdef"><b>Definition</b> <a href="bf16__utils_8h_source.html#l00271">bf16_utils.h:271</a></div></div>
 <div class="ttc" id="abf16__utils_8h_html_a94c0b1e3b43eb46dcce37900ed5c1333"><div class="ttname"><a href="bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333">bf16_tensor_to_float</a></div><div class="ttdeci">static void bf16_tensor_to_float(const uint16_t *src, float *dst, size_t count)</div><div class="ttdef"><b>Definition</b> <a href="bf16__utils_8h_source.html#l00250">bf16_utils.h:250</a></div></div>
-<div class="ttc" id="ageglu__kernels_8c_html_a80b1ec81e751b153977f05a3e44b4fda"><div class="ttname"><a href="geglu__kernels_8c.html#a80b1ec81e751b153977f05a3e44b4fda">geglu_forward_fp32</a></div><div class="ttdeci">void geglu_forward_fp32(const float *x, float *out, int tokens, int dim)</div><div class="ttdef"><b>Definition</b> <a href="geglu__kernels_8c_source.html#l00055">geglu_kernels.c:55</a></div></div>
+<div class="ttc" id="ageglu__kernels_8c_html_a80b1ec81e751b153977f05a3e44b4fda"><div class="ttname"><a href="geglu__kernels_8c.html#a80b1ec81e751b153977f05a3e44b4fda">geglu_forward_fp32</a></div><div class="ttdeci">void geglu_forward_fp32(const float *x, float *out, int tokens, int dim)</div><div class="ttdef"><b>Definition</b> <a href="geglu__kernels_8c_source.html#l00070">geglu_kernels.c:70</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00250">bf16_tensor_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00271">float_tensor_to_bf16()</a>, and <a class="el" href="geglu__kernels_8c_source.html#l00055">geglu_forward_fp32()</a>.</p>
+<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00250">bf16_tensor_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00271">float_tensor_to_bf16()</a>, and <a class="el" href="geglu__kernels_8c_source.html#l00070">geglu_forward_fp32()</a>.</p>
 
 </div>
 </div>
@@ -492,7 +494,7 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="geglu__kernels_8c_source.html#l00033">ck_gelu_tanh_parity_f32()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="geglu__kernels_8c_source.html#l00055">geglu_forward_fp32()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="geglu__kernels_8c_source.html#l00070">geglu_forward_fp32()</a>.</p>
 
 </div>
 </div>
@@ -534,40 +536,40 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="geglu__kernels_8c_source.html#l00055">55</a> of file <a class="el" href="geglu__kernels_8c_source.html">geglu_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   56</span>{</div>
-<div class="line"><span class="lineno">   57</span>    <span class="keywordflow">if</span> (!x || !out || tokens &lt;= 0 || dim &lt;= 0) {</div>
-<div class="line"><span class="lineno">   58</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">   59</span>    }</div>
-<div class="line"><span class="lineno">   60</span> </div>
-<div class="line"><span class="lineno">   61</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a>()) {</div>
-<div class="line"><span class="lineno">   62</span>        <a class="code hl_function" href="geglu__kernels_8c.html#a2a12d04e9c4613505f7519864d4afda5">geglu_forward_exact</a>(x, out, tokens, dim);</div>
-<div class="line"><span class="lineno">   63</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">   64</span>    }</div>
-<div class="line"><span class="lineno">   65</span> </div>
-<div class="line"><span class="lineno">   66</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> inner_dim = dim * 2;</div>
-<div class="line"><span class="lineno">   67</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; tokens; ++t) {</div>
-<div class="line"><span class="lineno">   68</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *x_ptr = x + (size_t)t * (<span class="keywordtype">size_t</span>)inner_dim;</div>
-<div class="line"><span class="lineno">   69</span>        <span class="keywordtype">float</span> *out_ptr = out + (size_t)t * (<span class="keywordtype">size_t</span>)dim;</div>
-<div class="line"><span class="lineno">   70</span> </div>
-<div class="line"><span class="lineno">   71</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; dim; ++d) {</div>
-<div class="line"><span class="lineno">   72</span>            out_ptr[d] = x_ptr[d];</div>
-<div class="line"><span class="lineno">   73</span>        }</div>
-<div class="line"><span class="lineno">   74</span> </div>
-<div class="line"><span class="lineno">   75</span>        <a class="code hl_function" href="geglu__kernels_8c.html#abc5977fca1e95c2406a779657c4d2365">gelu_fast_inplace</a>(out_ptr, (<span class="keywordtype">size_t</span>)dim);</div>
-<div class="line"><span class="lineno">   76</span> </div>
-<div class="line"><span class="lineno">   77</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; dim; ++d) {</div>
-<div class="line"><span class="lineno">   78</span>            out_ptr[d] *= x_ptr[dim + d];</div>
-<div class="line"><span class="lineno">   79</span>        }</div>
-<div class="line"><span class="lineno">   80</span>    }</div>
-<div class="line"><span class="lineno">   81</span>}</div>
+<p class="definition">Definition at line <a class="el" href="geglu__kernels_8c_source.html#l00070">70</a> of file <a class="el" href="geglu__kernels_8c_source.html">geglu_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   71</span>{</div>
+<div class="line"><span class="lineno">   72</span>    <span class="keywordflow">if</span> (!x || !out || tokens &lt;= 0 || dim &lt;= 0) {</div>
+<div class="line"><span class="lineno">   73</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">   74</span>    }</div>
+<div class="line"><span class="lineno">   75</span> </div>
+<div class="line"><span class="lineno">   76</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a>()) {</div>
+<div class="line"><span class="lineno">   77</span>        <a class="code hl_function" href="geglu__kernels_8c.html#a2a12d04e9c4613505f7519864d4afda5">geglu_forward_exact</a>(x, out, tokens, dim);</div>
+<div class="line"><span class="lineno">   78</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">   79</span>    }</div>
+<div class="line"><span class="lineno">   80</span> </div>
+<div class="line"><span class="lineno">   81</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> inner_dim = dim * 2;</div>
+<div class="line"><span class="lineno">   82</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; tokens; ++t) {</div>
+<div class="line"><span class="lineno">   83</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *x_ptr = x + (size_t)t * (<span class="keywordtype">size_t</span>)inner_dim;</div>
+<div class="line"><span class="lineno">   84</span>        <span class="keywordtype">float</span> *out_ptr = out + (size_t)t * (<span class="keywordtype">size_t</span>)dim;</div>
+<div class="line"><span class="lineno">   85</span> </div>
+<div class="line"><span class="lineno">   86</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; dim; ++d) {</div>
+<div class="line"><span class="lineno">   87</span>            out_ptr[d] = x_ptr[d];</div>
+<div class="line"><span class="lineno">   88</span>        }</div>
+<div class="line"><span class="lineno">   89</span> </div>
+<div class="line"><span class="lineno">   90</span>        <a class="code hl_function" href="geglu__kernels_8c.html#abc5977fca1e95c2406a779657c4d2365">gelu_fast_inplace</a>(out_ptr, (<span class="keywordtype">size_t</span>)dim);</div>
+<div class="line"><span class="lineno">   91</span> </div>
+<div class="line"><span class="lineno">   92</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; dim; ++d) {</div>
+<div class="line"><span class="lineno">   93</span>            out_ptr[d] *= x_ptr[dim + d];</div>
+<div class="line"><span class="lineno">   94</span>        }</div>
+<div class="line"><span class="lineno">   95</span>    }</div>
+<div class="line"><span class="lineno">   96</span>}</div>
 <div class="ttc" id="ackernel__engine_8h_html_aef8c9a331116ff9c2d77b03152aa8004"><div class="ttname"><a href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a></div><div class="ttdeci">int ck_strict_parity_enabled(void)</div><div class="ttdef"><b>Definition</b> <a href="ckernel__strict_8c_source.html#l00043">ckernel_strict.c:43</a></div></div>
 <div class="ttc" id="ageglu__kernels_8c_html_a2a12d04e9c4613505f7519864d4afda5"><div class="ttname"><a href="geglu__kernels_8c.html#a2a12d04e9c4613505f7519864d4afda5">geglu_forward_exact</a></div><div class="ttdeci">void geglu_forward_exact(const float *x, float *out, int tokens, int dim)</div><div class="ttdef"><b>Definition</b> <a href="geglu__kernels_8c_source.html#l00042">geglu_kernels.c:42</a></div></div>
 <div class="ttc" id="ageglu__kernels_8c_html_abc5977fca1e95c2406a779657c4d2365"><div class="ttname"><a href="geglu__kernels_8c.html#abc5977fca1e95c2406a779657c4d2365">gelu_fast_inplace</a></div><div class="ttdeci">void gelu_fast_inplace(float *data, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="gelu__kernels_8c_source.html#l00244">gelu_kernels.c:244</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="ckernel__strict_8c_source.html#l00043">ck_strict_parity_enabled()</a>, <a class="el" href="geglu__kernels_8c_source.html#l00042">geglu_forward_exact()</a>, and <a class="el" href="gelu__kernels_8c_source.html#l00244">gelu_fast_inplace()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="geglu__kernels_8c_source.html#l00083">geglu_forward_bf16()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="geglu__kernels_8c_source.html#l00098">geglu_forward_bf16()</a>.</p>
 
 </div>
 </div>
@@ -628,6 +630,61 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="gelu__kernels_8c_source.html#l00793">gelu_ggml_native_inplace()</a>.</p>
 
+</div>
+</div>
+<a id="ac64c09951a9619da235ba9cef4ae857b" name="ac64c09951a9619da235ba9cef4ae857b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ac64c09951a9619da235ba9cef4ae857b">&#9670;&#160;</a></span>geglu_forward_quick()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void geglu_forward_quick </td>
+          <td>(</td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>x</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>out</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>tokens</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>dim</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="geglu__kernels_8c_source.html#l00055">55</a> of file <a class="el" href="geglu__kernels_8c_source.html">geglu_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   56</span>{</div>
+<div class="line"><span class="lineno">   57</span>    <span class="keywordflow">if</span> (!x || !out || tokens &lt;= 0 || dim &lt;= 0) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">   58</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> inner_dim = (size_t)dim * 2u;</div>
+<div class="line"><span class="lineno">   59</span>    <span class="comment">/* Ascending compaction also permits input and output to alias. */</span></div>
+<div class="line"><span class="lineno">   60</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; tokens; ++t) {</div>
+<div class="line"><span class="lineno">   61</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *row = x + (size_t)t * inner_dim;</div>
+<div class="line"><span class="lineno">   62</span>        <span class="keywordtype">float</span> *dst = out + (size_t)t * (<span class="keywordtype">size_t</span>)dim;</div>
+<div class="line"><span class="lineno">   63</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; dim; ++d) {</div>
+<div class="line"><span class="lineno">   64</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> gate = row[d];</div>
+<div class="line"><span class="lineno">   65</span>            dst[d] = (gate * (1.0f / (1.0f + expf(-1.702f * gate)))) * row[dim + d];</div>
+<div class="line"><span class="lineno">   66</span>        }</div>
+<div class="line"><span class="lineno">   67</span>    }</div>
+<div class="line"><span class="lineno">   68</span>}</div>
+</div><!-- fragment -->
 </div>
 </div>
 <a id="abc5977fca1e95c2406a779657c4d2365" name="abc5977fca1e95c2406a779657c4d2365"></a>
@@ -790,7 +847,7 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">  361</span>}</div>
 <div class="ttc" id="atokenizer_8h_html_a42cef42021e2391865cfbed2c2ee5278"><div class="ttname"><a href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__</a></div><div class="ttdeci">__attribute__((visibility(&quot;default&quot;))) CKTokenizer *ck_tokenizer_create(CKTokenizerType type)</div></div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="geglu__kernels_8c_source.html#l00055">geglu_forward_fp32()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="geglu__kernels_8c_source.html#l00070">geglu_forward_fp32()</a>.</p>
 
 </div>
 </div>
