@@ -1,7 +1,7 @@
 {
   "id": "v_norm",
   "op": "v_norm",
-  "variant": "fp32_no_gamma",
+  "variant": "llama_cpu_production_fp32_no_gamma",
   "quant": {"activation": "fp32", "output": "fp32"},
   "inputs": [
     {"name": "input", "dtype": "fp32", "shape": ["T", "D"], "desc": "Input [tokens, dim]"}
@@ -40,5 +40,5 @@
     {"name": "head_dim", "source": "dim:head_dim"},
     {"name": "eps", "source": "dim:rms_eps"}
   ]},
-  "notes": "Gemma4 V RMSNorm without gamma. Normalizes each [head_dim] V head independently, matching llama.cpp ggml_rms_norm after reshape."
+  "notes": "Unweighted V RMSNorm uses llama.cpp CPU production square/reduction/sqrt order on each independent head row; the existing no-weight ABI and caller-owned scratch are unchanged."
 }

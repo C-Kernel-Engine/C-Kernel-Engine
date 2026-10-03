@@ -454,30 +454,44 @@ class PrefillIndependentRowParallelTests(unittest.TestCase):
                     np.testing.assert_array_equal(k_actual, k_expected)
 
     def test_v_norm_rows_are_bit_exact_in_place(self) -> None:
-        tokens, kv_heads, head_dim = 131, 2, 256
+        kv_heads, head_dim = 2, 256
         rng = np.random.default_rng(61)
-        source = rng.standard_normal(
-            (tokens, kv_heads, head_dim), dtype=np.float32
-        )
-        serial, parallel = source.copy(), source.copy()
-        serial_rstd = np.empty(tokens * kv_heads, dtype=np.float32)
-        parallel_rstd = np.empty_like(serial_rstd)
-        suffix = (tokens, kv_heads, head_dim, ctypes.c_float(1e-6))
+        gamma = np.ones(head_dim, dtype=np.float32)
+        for tokens in (1, 5, 17, 131):
+            with self.subTest(tokens=tokens):
+                source = rng.standard_normal(
+                    (tokens, kv_heads, head_dim), dtype=np.float32
+                )
+                serial, parallel = source.copy(), source.copy()
+                weighted = np.empty_like(source)
+                serial_rstd = np.empty(tokens * kv_heads, dtype=np.float32)
+                parallel_rstd = np.empty_like(serial_rstd)
+                weighted_rstd = np.empty_like(serial_rstd)
+                suffix = (tokens, kv_heads, head_dim, ctypes.c_float(1e-6))
 
-        self.v_norm_serial(
-            serial.ctypes.data_as(FLOAT_PTR),
-            serial.ctypes.data_as(FLOAT_PTR),
-            serial_rstd.ctypes.data_as(FLOAT_PTR),
-            *suffix,
-        )
-        self.v_norm_parallel(
-            parallel.ctypes.data_as(FLOAT_PTR),
-            parallel.ctypes.data_as(FLOAT_PTR),
-            parallel_rstd.ctypes.data_as(FLOAT_PTR),
-            *suffix,
-        )
-        np.testing.assert_array_equal(parallel, serial)
-        np.testing.assert_array_equal(parallel_rstd, serial_rstd)
+                self.v_norm_serial(
+                    serial.ctypes.data_as(FLOAT_PTR),
+                    serial.ctypes.data_as(FLOAT_PTR),
+                    serial_rstd.ctypes.data_as(FLOAT_PTR),
+                    *suffix,
+                )
+                self.v_norm_parallel(
+                    parallel.ctypes.data_as(FLOAT_PTR),
+                    parallel.ctypes.data_as(FLOAT_PTR),
+                    parallel_rstd.ctypes.data_as(FLOAT_PTR),
+                    *suffix,
+                )
+                self.rms_serial(
+                    source.ctypes.data_as(FLOAT_PTR),
+                    gamma.ctypes.data_as(FLOAT_PTR),
+                    weighted.ctypes.data_as(FLOAT_PTR),
+                    weighted_rstd.ctypes.data_as(FLOAT_PTR),
+                    tokens * kv_heads, head_dim, head_dim, ctypes.c_float(1e-6),
+                )
+                np.testing.assert_array_equal(parallel.view(np.uint32), serial.view(np.uint32))
+                np.testing.assert_array_equal(serial.view(np.uint32), weighted.view(np.uint32))
+                np.testing.assert_array_equal(parallel_rstd.view(np.uint32), serial_rstd.view(np.uint32))
+                np.testing.assert_array_equal(serial_rstd.view(np.uint32), weighted_rstd.view(np.uint32))
 
     def test_residual_add_rows_are_bit_exact_in_place(self) -> None:
         rows, width = 131, 2560

@@ -742,6 +742,44 @@ void rmsnorm_forward_no_weight(const float *input,
     }
 }
 
+#if defined(__clang__)
+__attribute__((optnone, noinline))
+#elif defined(__GNUC__)
+__attribute__((optimize("O1,no-tree-vectorize,no-tree-slp-vectorize"), noinline))
+#endif
+void rmsnorm_forward_no_weight_llama_production(const float *input,
+                                                 float *output,
+                                                 float *rstd_cache,
+                                                 int tokens,
+                                                 int d_model,
+                                                 int aligned_embed_dim,
+                                                 float eps)
+{
+    if (!input || !output || tokens <= 0 || d_model <= 0 || aligned_embed_dim < d_model) {
+        return;
+    }
+    for (int t = 0; t < tokens; ++t) {
+        const float *x = input + (size_t)t * (size_t)aligned_embed_dim;
+        float *y = output + (size_t)t * (size_t)aligned_embed_dim;
+        volatile double sum_sq = 0.0;
+        for (int d = 0; d < d_model; ++d) {
+            const float square = x[d] * x[d];
+            sum_sq = sum_sq + (double)square;
+        }
+        const float mean_sq = (float)(sum_sq / (double)d_model);
+        const float rstd = rmsnorm_llama_production_rstd(mean_sq + eps);
+        if (rstd_cache) {
+            rstd_cache[t] = rstd;
+        }
+        for (int d = 0; d < d_model; ++d) {
+            y[d] = x[d] * rstd;
+        }
+        for (int d = d_model; d < aligned_embed_dim; ++d) {
+            y[d] = 0.0f;
+        }
+    }
+}
+
 void gemma4_v_norm_forward(const float *input,
                            float *output,
                            float *rstd_cache,
@@ -753,8 +791,9 @@ void gemma4_v_norm_forward(const float *input,
     if (!input || !output || tokens <= 0 || num_kv_heads <= 0 || head_dim <= 0) {
         return;
     }
-    rmsnorm_forward_no_weight(input, output, rstd_cache,
-                              tokens * num_kv_heads, head_dim, head_dim, eps);
+    rmsnorm_forward_no_weight_llama_production(
+        input, output, rstd_cache,
+        tokens * num_kv_heads, head_dim, head_dim, eps);
 }
 
 

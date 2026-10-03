@@ -1348,6 +1348,13 @@ void rmsnorm_forward_no_weight(const float *input,
                                int d_model,
                                int aligned_embed_dim,
                                float eps);
+void rmsnorm_forward_no_weight_llama_production(const float *input,
+                                                 float *output,
+                                                 float *rstd_cache,
+                                                 int tokens,
+                                                 int d_model,
+                                                 int aligned_embed_dim,
+                                                 float eps);
 void gemma4_v_norm_forward(const float *input,
                            float *output,
                            float *rstd_cache,
