@@ -11,6 +11,7 @@ var rmsnorm__kernels_8c =
     [ "rmsnorm_forward_muse_unweighted_pytorch_bf16_storage", "rmsnorm__kernels_8c.html#a4e1414553e8a37bf8a3be4a2ab9c8ad3", null ],
     [ "rmsnorm_forward_muse_weighted_pytorch_bf16_storage", "rmsnorm__kernels_8c.html#a3ed85e6cb48f05b59f8eb24d5310bc0a", null ],
     [ "rmsnorm_forward_no_weight", "rmsnorm__kernels_8c.html#a15bad3d2cc858e8f44ec48f7aa045b59", null ],
+    [ "rmsnorm_forward_no_weight_llama_production", "rmsnorm__kernels_8c.html#ae5ef54068be675ad755537dbcf9f5018", null ],
     [ "rmsnorm_forward_pytorch_bf16_storage", "rmsnorm__kernels_8c.html#a84e08713e6234a99c0559a1538fa7a0c", null ],
     [ "rmsnorm_forward_pytorch_bf16_storage_impl", "rmsnorm__kernels_8c.html#accc4a3419798ce8ce3780b0f366f080a", null ],
     [ "rmsnorm_forward_qwen3next_pytorch_bf16_storage", "rmsnorm__kernels_8c.html#a1eac561e5f84ca18385a9489e1a6d01b", null ],

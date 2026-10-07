@@ -1,5 +1,6 @@
 var NAVTREEINDEX15 =
 {
+"hybrid__attention__kernels_8c_source.html":[2,0,1,1,72],
 "hyper__connection__kernels_8c.html":[2,0,1,1,73],
 "hyper__connection__kernels_8c.html#a001a6d60734a214538c2f8ba85d8bde5":[2,0,1,1,73,8],
 "hyper__connection__kernels_8c.html#a01609ec0952da9be3347459e153d2859":[2,0,1,1,73,2],
@@ -248,6 +249,5 @@ var NAVTREEINDEX15 =
 "murmurhash3_8h.html#a194d2225ffa04b60cde649beaf1a85e6":[2,0,0,1,2,4],
 "murmurhash3_8h.html#a85422d9b050958858d7d0dcbdaeba4a4":[2,0,0,1,2,2],
 "murmurhash3_8h.html#ad42ad343330899419c8db70f45263979":[2,0,0,1,2,1],
-"murmurhash3_8h.html#ade6144552507c82df209f93a2543f85e":[2,0,0,1,2,0],
-"murmurhash3_8h.html#ae8f90f9cebde2f057d0eb50592af0c94":[2,0,0,1,2,3]
+"murmurhash3_8h.html#ade6144552507c82df209f93a2543f85e":[2,0,0,1,2,0]
 };

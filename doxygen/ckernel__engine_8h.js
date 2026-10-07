@@ -547,6 +547,7 @@ var ckernel__engine_8h =
     [ "rmsnorm_forward_muse_unweighted_pytorch_bf16_storage", "ckernel__engine_8h.html#a4e1414553e8a37bf8a3be4a2ab9c8ad3", null ],
     [ "rmsnorm_forward_muse_weighted_pytorch_bf16_storage", "ckernel__engine_8h.html#a3ed85e6cb48f05b59f8eb24d5310bc0a", null ],
     [ "rmsnorm_forward_no_weight", "ckernel__engine_8h.html#a15bad3d2cc858e8f44ec48f7aa045b59", null ],
+    [ "rmsnorm_forward_no_weight_llama_production", "ckernel__engine_8h.html#ae5ef54068be675ad755537dbcf9f5018", null ],
     [ "rmsnorm_forward_parallel_dispatch", "ckernel__engine_8h.html#a77423238eed0520aaf36b412aa2d8c55", null ],
     [ "rmsnorm_forward_pytorch_bf16_storage", "ckernel__engine_8h.html#a84e08713e6234a99c0559a1538fa7a0c", null ],
     [ "rmsnorm_forward_qwen3next_pytorch_bf16_storage", "ckernel__engine_8h.html#a1eac561e5f84ca18385a9489e1a6d01b", null ],

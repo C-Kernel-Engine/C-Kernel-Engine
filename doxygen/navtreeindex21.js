@@ -1,5 +1,7 @@
 var NAVTREEINDEX21 =
 {
+"structCPUInfo.html#a7fed58e4df275a215e37074b900e0f96":[1,0,71,19],
+"structCPUInfo.html#a934706fb3c631457a24c2616c293b20e":[1,0,71,33],
 "structCPUInfo.html#a943858d53173dca145611d8cb192f0ca":[1,0,71,2],
 "structCPUInfo.html#aa4bcdef1bf48fa3860742a28a7d57d6d":[1,0,71,35],
 "structCPUInfo.html#aa67080f78191b764515728bdabf55924":[1,0,71,37],
@@ -247,7 +249,5 @@ var NAVTREEINDEX21 =
 "structck__capability__t.html#a9f5f0f74c73143705dc702efbee3a8d3":[1,0,13,1],
 "structck__capability__t.html#abe5ee8f28c062c14b0f243dfd0546068":[1,0,13,3],
 "structck__threadpool__profile__t.html":[1,0,14],
-"structck__threadpool__profile__t.html#a1e9f03ad82fa44b22da1b260206b70ee":[1,0,14,1],
-"structck__threadpool__profile__t.html#a4176b2cc910fa5598fb925c423f2c3b1":[1,0,14,0],
-"structck__threadpool__profile__t.html#abe00d835b6f0d89c4d809d32921c4f7b":[1,0,14,2]
+"structck__threadpool__profile__t.html#a1e9f03ad82fa44b22da1b260206b70ee":[1,0,14,1]
 };
