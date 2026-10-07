@@ -85,10 +85,11 @@ var searchData=
   ['ckernel_5fregistry_2ec_82',['ckernel_registry.c',['../ckernel__registry_8c.html',1,'']]],
   ['ckernel_5fregistry_2eh_83',['ckernel_registry.h',['../ckernel__registry_8h.html',1,'']]],
   ['ckernel_5fruntime_5fextent_2eh_84',['ckernel_runtime_extent.h',['../ckernel__runtime__extent_8h.html',1,'']]],
-  ['ckernel_5fsection_5flayout_2eh_85',['ckernel_section_layout.h',['../ckernel__section__layout_8h.html',1,'']]],
-  ['ckernel_5fstrict_2ec_86',['ckernel_strict.c',['../ckernel__strict_8c.html',1,'']]],
-  ['ckernel_5fstrided_5funary_5fchecked_2eh_87',['ckernel_strided_unary_checked.h',['../ckernel__strided__unary__checked_8h.html',1,'']]],
-  ['ckernel_5ftts_2eh_88',['ckernel_tts.h',['../ckernel__tts_8h.html',1,'']]],
-  ['cpu_5ffeatures_2ec_89',['cpu_features.c',['../cpu__features_8c.html',1,'']]],
-  ['cpu_5ffeatures_2eh_90',['cpu_features.h',['../cpu__features_8h.html',1,'']]]
+  ['ckernel_5frwkv7_5fdecode_2eh_85',['ckernel_rwkv7_decode.h',['../ckernel__rwkv7__decode_8h.html',1,'']]],
+  ['ckernel_5fsection_5flayout_2eh_86',['ckernel_section_layout.h',['../ckernel__section__layout_8h.html',1,'']]],
+  ['ckernel_5fstrict_2ec_87',['ckernel_strict.c',['../ckernel__strict_8c.html',1,'']]],
+  ['ckernel_5fstrided_5funary_5fchecked_2eh_88',['ckernel_strided_unary_checked.h',['../ckernel__strided__unary__checked_8h.html',1,'']]],
+  ['ckernel_5ftts_2eh_89',['ckernel_tts.h',['../ckernel__tts_8h.html',1,'']]],
+  ['cpu_5ffeatures_2ec_90',['cpu_features.c',['../cpu__features_8c.html',1,'']]],
+  ['cpu_5ffeatures_2eh_91',['cpu_features.h',['../cpu__features_8h.html',1,'']]]
 ];

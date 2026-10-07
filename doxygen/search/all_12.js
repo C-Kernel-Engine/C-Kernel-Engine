@@ -27,5 +27,6 @@ var searchData=
   ['output_5fsamples_5fupper_5fbound_24',['output_samples_upper_bound',['../structCKKokoroShapeV8.html#a3dd5f3215bcf6411a5a191d29bf574f3',1,'CKKokoroShapeV8']]],
   ['output_5ftile_5fsize_25',['OUTPUT_TILE_SIZE',['../mlp__fused__decode_8c.html#ac530c6f483bbeb9bd8758030aa2857b4',1,'mlp_fused_decode.c']]],
   ['output_5ftoken_26',['output_token',['../ck__cli__v6_85_8c.html#ae8721327a1165b10c8a2e8ca65a30cf9',1,'output_token(char *buf, size_t *len, const char *token):&#160;ck_cli_v6.5.c'],['../ck__cli__v6_86_8c.html#ae8721327a1165b10c8a2e8ca65a30cf9',1,'output_token(char *buf, size_t *len, const char *token):&#160;ck_cli_v6.6.c']]],
-  ['outputs_27',['outputs',['../structCKIRV2Node.html#ab853f000478eff6cb0e5f76d2b50efa1',1,'CKIRV2Node']]]
+  ['outputs_27',['outputs',['../structCKIRV2Node.html#ab853f000478eff6cb0e5f76d2b50efa1',1,'CKIRV2Node']]],
+  ['overlaps_28',['overlaps',['../rwkv7__decode_8c.html#a123d0108a84d9bfbe954606dcb79b5d4',1,'rwkv7_decode.c']]]
 ];
