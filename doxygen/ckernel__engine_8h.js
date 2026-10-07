@@ -69,6 +69,8 @@ var ckernel__engine_8h =
     [ "attention_forward_causal_head_major_gqa_prefill_append_f16cache_sliding_gemma4_workspace", "ckernel__engine_8h.html#a04c4bd46b60e6f9eb8671aea1a0610e2", null ],
     [ "attention_forward_causal_head_major_gqa_prefill_full_bf16cache_pytorch_contract", "ckernel__engine_8h.html#a6fadecb99c59f6d83845510bd60f862a", null ],
     [ "attention_forward_causal_head_major_gqa_prefill_segmented_f16cache_contract_workspace", "ckernel__engine_8h.html#add5e8b95245fbfa279c6828d4a91bb7c", null ],
+    [ "attention_forward_causal_head_major_gqa_prefill_segmented_f16cache_gemma4_workspace", "ckernel__engine_8h.html#a6c2f32ce9409a66eaec4b51e7dae6b7e", null ],
+    [ "attention_forward_causal_head_major_gqa_prefill_segmented_f16cache_sliding_gemma4_workspace", "ckernel__engine_8h.html#a01a7301c69aa8a85bf690694288a6931", null ],
     [ "attention_forward_causal_head_major_shared_kv_gemma4", "ckernel__engine_8h.html#a658a1295a31fdb0f9e6bf87dd8a941cf", null ],
     [ "attention_forward_causal_head_major_shared_kv_sliding_gemma4", "ckernel__engine_8h.html#ad1c1ad639ac24461da3ffe45cb260e51", null ],
     [ "attention_forward_chunk_head_major_gqa_flash_gemma4", "ckernel__engine_8h.html#a55d297a433dfc0178b9df84151a1c6b0", null ],

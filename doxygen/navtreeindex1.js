@@ -1,5 +1,7 @@
 var NAVTREEINDEX1 =
 {
+"attention__oracle__ggml_8c.html#a007570b2486b4a2c15723d7f03be44f8":[2,0,1,1,7,40],
+"attention__oracle__ggml_8c.html#a01253c2163754ab4d4cc0cf8583cce68":[2,0,1,1,7,49],
 "attention__oracle__ggml_8c.html#a0132ff72f5044597068b8b7f3e7f3038":[2,0,1,1,7,51],
 "attention__oracle__ggml_8c.html#a029c7b9ee702010683dc9bfd98ea2e82":[2,0,1,1,7,37],
 "attention__oracle__ggml_8c.html#a0366ad7dddb271c0116ec59b777c0e27":[2,0,1,1,7,36],
@@ -247,7 +249,5 @@ var NAVTREEINDEX1 =
 "axpy__kernels_8c.html#a699f6dd54c706d77667704edecb7a8a4":[2,0,1,1,26,91],
 "axpy__kernels_8c.html#a6a6e4191adb59c517737d7034b98ce49":[2,0,1,1,26,27],
 "axpy__kernels_8c.html#a6f443ad72c4490505c11c15765e4bc0b":[2,0,1,1,26,41],
-"axpy__kernels_8c.html#a791182eaf5b9a6f691fd0ec4525fe4f6":[2,0,1,1,26,55],
-"axpy__kernels_8c.html#a7e4b929e7ed0dde71ed550585fcd72fe":[2,0,1,1,26,75],
-"axpy__kernels_8c.html#a8156ade9e48b2eb2aef905e184f026fc":[2,0,1,1,26,9]
+"axpy__kernels_8c.html#a791182eaf5b9a6f691fd0ec4525fe4f6":[2,0,1,1,26,55]
 };
