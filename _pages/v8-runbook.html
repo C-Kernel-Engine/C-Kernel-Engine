@@ -1591,8 +1591,32 @@ version/v8/scripts/ck_serve_v8.py "$RUN_DIR" --run "$RUN_DIR" \
         <code>batch_decode_gemma3_270m_two_row_layer_20261003.json</code> report records
         seven exact full-logit and KV comparisons from a freshly rebuilt local bundle and
         requires both shared projection groups. A compiled fixture also compares the actual
-        emitted split functions with isolated execution. V, attention, output and down projections remain
-        sequence-local. This is still not a full-layer weight-reuse or throughput claim.
+        emitted split functions with isolated execution. In that earlier two-group build,
+        V, output and down projections remained sequence-local; it made no full-layer or
+        throughput claim.
+    </p>
+    <p>
+        The next bounded generated entry derives four projection groups and their
+        crossing tensors from the first layer's lowered graph. Q/K/V, attention
+        output, gate/up and MLP down use map-selected two-row providers; attention,
+        KV writes, normalization and all later layers remain sequence-local. The
+        planner rejects unsupported provider bindings, pointer offsets, new live
+        values and persistent state outside the declared KV contract. The generated
+        batch entry validates both handles, positions, capacity, cancellation and
+        buffer ownership before work starts; a rejected step advances neither
+        sequence. Once admitted, both rows finish the forward pass. Cancellation
+        is observed at the next step boundary, not inside a running kernel. The retained
+        <code>batch_decode_gemma3_270m_full_layer_20261007.json</code> report requires
+        four groups and records seven exact full-vocabulary logit and complete-KV
+        comparisons on a newly generated Gemma3-270M Q5_K_M bundle. On the local
+        i7-14700T, three artifact-identical diagnostic repetitions of six matched
+        decode tokens took 183.1–184.3 ms as isolated sequential calls and
+        57.8–65.5 ms in three two-row steps. The base report and its
+        <code>_run2</code> and <code>_run3</code> siblings preserve each attempt.
+        These tiny samples are not an overnight-task or generalized
+        speedup claim. The server still uses
+        single-flight execution; later layers, recurrent Qwen state, dynamic
+        admission and mixed prefill/decode remain separate milestones.
     </p>
 </div>
 

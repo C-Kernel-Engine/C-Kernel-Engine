@@ -164,6 +164,8 @@ Functions</h2></td></tr>
 <tr class="memitem:ac912d4edc9cd1c7de9f1697ae510fbff" id="r_ac912d4edc9cd1c7de9f1697ae510fbff"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="gemm__kernels__q6k__q8k_8c.html#ac912d4edc9cd1c7de9f1697ae510fbff">gemm_nt_q6_k_q8_k</a> (const void *A_q8, const void *B, const float *bias, float *<a class="el" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, int M, int N, int K)</td></tr>
 <tr class="memdesc:ac912d4edc9cd1c7de9f1697ae510fbff"><td class="mdescLeft">&#160;</td><td class="mdescRight">NT GEMM: C = A @ B^T where A is Q8_K and B is Q6_K.  <br /></td></tr>
 <tr class="separator:ac912d4edc9cd1c7de9f1697ae510fbff"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:acc1a56d72cc9abd87c1c973ce909cd57" id="r_acc1a56d72cc9abd87c1c973ce909cd57"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="gemm__kernels__q6k__q8k_8c.html#acc1a56d72cc9abd87c1c973ce909cd57">gemm_nt_q6_k_q8_k_m2</a> (const void *A_q8, const void *B, const float *bias, float *<a class="el" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, int M, int N, int K)</td></tr>
+<tr class="separator:acc1a56d72cc9abd87c1c973ce909cd57"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a5f2da3b1403501ba959104c826a70a7e" id="r_a5f2da3b1403501ba959104c826a70a7e"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="gemm__kernels__q6k__q8k_8c.html#a5f2da3b1403501ba959104c826a70a7e">gemm_nt_q6_k_q8_k_m4_tile</a> (const void *A_q8, const void *B, const float *bias, float *<a class="el" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, int M, int N, int K, int m0, int m1, int n0, int n1)</td></tr>
 <tr class="separator:a5f2da3b1403501ba959104c826a70a7e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a8fca59c475583af0f5f27317a09f8fd0" id="r_a8fca59c475583af0f5f27317a09f8fd0"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="gemm__kernels__q6k__q8k_8c.html#a8fca59c475583af0f5f27317a09f8fd0">gemm_nt_q6_k_q8_k_prepared</a> (const void *A_q8, const void *B_prepared, const float *bias, float *<a class="el" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, int M, int N, int K)</td></tr>
@@ -730,6 +732,75 @@ CK-ENGINE KERNEL RULES:</h1>
 
 </div>
 </div>
+<a id="acc1a56d72cc9abd87c1c973ce909cd57" name="acc1a56d72cc9abd87c1c973ce909cd57"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#acc1a56d72cc9abd87c1c973ce909cd57">&#9670;&#160;</a></span>gemm_nt_q6_k_q8_k_m2()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void gemm_nt_q6_k_q8_k_m2 </td>
+          <td>(</td>
+          <td class="paramtype">const void *&#160;</td>
+          <td class="paramname"><em>A_q8</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const void *&#160;</td>
+          <td class="paramname"><em>B</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>bias</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>C</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>M</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>N</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>K</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01759">1759</a> of file <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html">gemm_kernels_q6k_q8k.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 1762</span>{</div>
+<div class="line"><span class="lineno"> 1763</span>    <span class="keywordflow">if</span> (!A_q8 || !B || !<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a> || M != 2 || N &lt;= 0 || K &lt;= 0 ||</div>
+<div class="line"><span class="lineno"> 1764</span>        (K % <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>) != 0) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1765</span>    <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#a5f2da3b1403501ba959104c826a70a7e">gemm_nt_q6_k_q8_k_m4_tile</a>(A_q8, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K,</div>
+<div class="line"><span class="lineno"> 1766</span>                                0, M, 0, N);</div>
+<div class="line"><span class="lineno"> 1767</span>}</div>
+<div class="ttc" id="agemm__kernels__q6k__q8k_8c_html_a5f2da3b1403501ba959104c826a70a7e"><div class="ttname"><a href="gemm__kernels__q6k__q8k_8c.html#a5f2da3b1403501ba959104c826a70a7e">gemm_nt_q6_k_q8_k_m4_tile</a></div><div class="ttdeci">void gemm_nt_q6_k_q8_k_m4_tile(const void *A_q8, const void *B, const float *bias, float *C, int M, int N, int K, int m0, int m1, int n0, int n1)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q6k__q8k_8c_source.html#l01702">gemm_kernels_q6k_q8k.c:1702</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01702">gemm_nt_q6_k_q8_k_m4_tile()</a>, and <a class="el" href="ckernel__quant_8h_source.html#l00175">QK_K</a>.</p>
+
+</div>
+</div>
 <a id="a5f2da3b1403501ba959104c826a70a7e" name="a5f2da3b1403501ba959104c826a70a7e"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a5f2da3b1403501ba959104c826a70a7e">&#9670;&#160;</a></span>gemm_nt_q6_k_q8_k_m4_tile()</h2>
 
@@ -861,6 +932,8 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="ttc" id="agemm__kernels__q6k__q8k_8c_html_a0486ad5eb531ba02427e9765bab1d146"><div class="ttname"><a href="gemm__kernels__q6k__q8k_8c.html#a0486ad5eb531ba02427e9765bab1d146">gemm_nt_q6_k_q8_k_tile</a></div><div class="ttdeci">void gemm_nt_q6_k_q8_k_tile(const void *A_q8, const void *B, const float *bias, float *C, int M, int N, int K, int m0, int m1, int n0, int n1)</div><div class="ttdoc">Compute one C[m0:m1, n0:n1] tile for Q8_K activations x Q6_K weights.</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q6k__q8k_8c_source.html#l01665">gemm_kernels_q6k_q8k.c:1665</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l00108">ck_q6k_q8k_force_ref()</a>, <a class="el" href="ckernel__strict_8c_source.html#l00043">ck_strict_parity_enabled()</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01665">gemm_nt_q6_k_q8_k_tile()</a>, and <a class="el" href="ckernel__quant_8h_source.html#l00175">QK_K</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01759">gemm_nt_q6_k_q8_k_m2()</a>.</p>
 
 </div>
 </div>
@@ -1358,7 +1431,7 @@ CK-ENGINE KERNEL RULES:</h1>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01641">ck_dot_q6_k_q8_k_fast_or_ref()</a>, and <a class="el" href="ckernel__quant_8h_source.html#l00175">QK_K</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01702">gemm_nt_q6_k_q8_k_m4_tile()</a>, and <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01763">gemm_nt_q6_k_q8_k_tiled()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01702">gemm_nt_q6_k_q8_k_m4_tile()</a>, and <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01775">gemm_nt_q6_k_q8_k_tiled()</a>.</p>
 
 </div>
 </div>
@@ -1421,17 +1494,17 @@ CK-ENGINE KERNEL RULES:</h1>
 <p>Experimental single-thread tiled NT GEMM wrapper. </p>
 <p>Kept as a separate symbol from gemm_nt_q6_k_q8_k for benchmarks and parity. Production prefill should prefer the v8 2D tile scheduler when enabled. </p>
 
-<p class="definition">Definition at line <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01763">1763</a> of file <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html">gemm_kernels_q6k_q8k.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 1768</span>{</div>
-<div class="line"><span class="lineno"> 1769</span>    <span class="keyword">enum</span> { TILE_M = 8, TILE_N = 16 };</div>
-<div class="line"><span class="lineno"> 1770</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n0 = 0; n0 &lt; N; n0 += TILE_N) {</div>
-<div class="line"><span class="lineno"> 1771</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> n1 = (n0 + TILE_N &lt; N) ? (n0 + TILE_N) : N;</div>
-<div class="line"><span class="lineno"> 1772</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m0 = 0; m0 &lt; M; m0 += TILE_M) {</div>
-<div class="line"><span class="lineno"> 1773</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> m1 = (m0 + TILE_M &lt; M) ? (m0 + TILE_M) : M;</div>
-<div class="line"><span class="lineno"> 1774</span>            <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#a0486ad5eb531ba02427e9765bab1d146">gemm_nt_q6_k_q8_k_tile</a>(A_q8, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K, m0, m1, n0, n1);</div>
-<div class="line"><span class="lineno"> 1775</span>        }</div>
-<div class="line"><span class="lineno"> 1776</span>    }</div>
-<div class="line"><span class="lineno"> 1777</span>}</div>
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01775">1775</a> of file <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html">gemm_kernels_q6k_q8k.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 1780</span>{</div>
+<div class="line"><span class="lineno"> 1781</span>    <span class="keyword">enum</span> { TILE_M = 8, TILE_N = 16 };</div>
+<div class="line"><span class="lineno"> 1782</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n0 = 0; n0 &lt; N; n0 += TILE_N) {</div>
+<div class="line"><span class="lineno"> 1783</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> n1 = (n0 + TILE_N &lt; N) ? (n0 + TILE_N) : N;</div>
+<div class="line"><span class="lineno"> 1784</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m0 = 0; m0 &lt; M; m0 += TILE_M) {</div>
+<div class="line"><span class="lineno"> 1785</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> m1 = (m0 + TILE_M &lt; M) ? (m0 + TILE_M) : M;</div>
+<div class="line"><span class="lineno"> 1786</span>            <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#a0486ad5eb531ba02427e9765bab1d146">gemm_nt_q6_k_q8_k_tile</a>(A_q8, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K, m0, m1, n0, n1);</div>
+<div class="line"><span class="lineno"> 1787</span>        }</div>
+<div class="line"><span class="lineno"> 1788</span>    }</div>
+<div class="line"><span class="lineno"> 1789</span>}</div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, and <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01665">gemm_nt_q6_k_q8_k_tile()</a>.</p>
 

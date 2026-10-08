@@ -12,6 +12,7 @@ var gemm__kernels__q5__k_8c =
     [ "gemm_nt_q5_k_prepared_m4", "gemm__kernels__q5__k_8c.html#a624942249ce60cd1067badff49addf0d", null ],
     [ "gemm_nt_q5_k_prepared_q8_m4_nrange", "gemm__kernels__q5__k_8c.html#ae35b341df2c29c2ffd3d6312ad0efccf", null ],
     [ "gemm_nt_q5_k_q8_k", "gemm__kernels__q5__k_8c.html#aa42d4abdad51556e030da79dd53fb5f0", null ],
+    [ "gemm_nt_q5_k_q8_k_m2", "gemm__kernels__q5__k_8c.html#a239b8b97259e792be99ae39958109006", null ],
     [ "gemm_nt_q5_k_q8_k_ref", "gemm__kernels__q5__k_8c.html#aab121e92f0792fcfc1de07cea6cd5e0d", null ],
     [ "gemm_nt_q5_k_ref", "gemm__kernels__q5__k_8c.html#aa165bcff171b4bc4877ac5d604ddb698", null ],
     [ "gemm_nt_q5_k_ref_fp32", "gemm__kernels__q5__k_8c.html#a037305c0ba58ea1cae37e0f5e7f04de2", null ],

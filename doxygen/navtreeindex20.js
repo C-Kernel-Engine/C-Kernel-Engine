@@ -1,5 +1,12 @@
 var NAVTREEINDEX20 =
 {
+"structCKMemSpan.html#a818835e50806e8d1fd141cf97b4ea806":[1,0,45,0],
+"structCKMemSpan.html#af281883bfadbea82697819bbf12aa759":[1,0,45,2],
+"structCKMergeRule.html":[1,0,46],
+"structCKMergeRule.html#a2f4fb999c8ad7581926948836ad96949":[1,0,46,0],
+"structCKMergeRule.html#ad429814a773c9faa0526991078347e4f":[1,0,46,3],
+"structCKMergeRule.html#adacd50b760f95bfe3bd04d8618fb4c19":[1,0,46,1],
+"structCKMergeRule.html#af89e288682de3079e22683c57b629d4c":[1,0,46,2],
 "structCKMetric.html":[1,0,47],
 "structCKMetric.html#a040a7d8ed259051d66391388ba7f3d56":[1,0,47,3],
 "structCKMetric.html#a113674774faddfa6441f1da3a19ffe92":[1,0,47,2],
@@ -242,12 +249,5 @@ var NAVTREEINDEX20 =
 "structCKTokenizerMemPool.html#a390bbe0c2c3c9c2dcc7f5fc14d8c587f":[1,0,66,3],
 "structCKTokenizerMemPool.html#a7126722d51826b28f178cf9e441d289c":[1,0,66,0],
 "structCKTokenizerMemPool.html#a8a2ca8e09bc485f1600935ec73697294":[1,0,66,1],
-"structCKTokenizerMemPool.html#a8fbf4d3abd94543c4609336fc9762239":[1,0,66,2],
-"structCKTokenizerToken.html":[1,0,67],
-"structCKTokenizerToken.html#a5bf0bdab214c61d97fd591ee62d3e682":[1,0,67,1],
-"structCKTokenizerToken.html#a61f5a516313b0da2c937842311e30701":[1,0,67,0],
-"structCKTokenizerToken.html#aae2b4c7e571d73b96714ef0dc715ee84":[1,0,67,2],
-"structCKTrie.html":[1,0,68],
-"structCKTrie.html#a82ef124b5228ed534e3b9d861c12ad21":[1,0,68,0],
-"structCKTrie.html#a83868dcb850147794f7cb150568cece0":[1,0,68,1]
+"structCKTokenizerMemPool.html#a8fbf4d3abd94543c4609336fc9762239":[1,0,66,2]
 };

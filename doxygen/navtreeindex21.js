@@ -1,5 +1,12 @@
 var NAVTREEINDEX21 =
 {
+"structCKTokenizerToken.html":[1,0,67],
+"structCKTokenizerToken.html#a5bf0bdab214c61d97fd591ee62d3e682":[1,0,67,1],
+"structCKTokenizerToken.html#a61f5a516313b0da2c937842311e30701":[1,0,67,0],
+"structCKTokenizerToken.html#aae2b4c7e571d73b96714ef0dc715ee84":[1,0,67,2],
+"structCKTrie.html":[1,0,68],
+"structCKTrie.html#a82ef124b5228ed534e3b9d861c12ad21":[1,0,68,0],
+"structCKTrie.html#a83868dcb850147794f7cb150568cece0":[1,0,68,1],
 "structCKTrie.html#a8684910b0e136ebc6be4bd48d57f3ce1":[1,0,68,2],
 "structCKTrieNode.html":[1,0,69],
 "structCKTrieNode.html#a316472d591daedc90299616e28bda4da":[1,0,69,1],
@@ -242,12 +249,5 @@ var NAVTREEINDEX21 =
 "structblock__q4__1.html":[1,0,3],
 "structblock__q4__1.html#a309238988f8aa38d1e0c6d5ca613544d":[1,0,3,1],
 "structblock__q4__1.html#aa1e4ad6c9296718818841ceca0d5e579":[1,0,3,0],
-"structblock__q4__1.html#aeb92b2e6f95f7d40848e1783459e6dc7":[1,0,3,2],
-"structblock__q4__K.html":[1,0,4],
-"structblock__q4__K.html#a37fe013be58ed82df03c3362450590d3":[1,0,4,0],
-"structblock__q4__K.html#a3a603ea5f9ee6a3732d96a244cb6a3b5":[1,0,4,3],
-"structblock__q4__K.html#a74d5a6318849909fb1c19248961d7ac9":[1,0,4,2],
-"structblock__q4__K.html#a86e4a2173d9a1def4939ccb248a1bc49":[1,0,4,1],
-"structblock__q5__0.html":[1,0,5],
-"structblock__q5__0.html#a4c5238d5b9b5e8406ca30b40302a15ce":[1,0,5,0]
+"structblock__q4__1.html#aeb92b2e6f95f7d40848e1783459e6dc7":[1,0,3,2]
 };
