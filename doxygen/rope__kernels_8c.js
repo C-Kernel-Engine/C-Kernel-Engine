@@ -55,6 +55,7 @@ var rope__kernels_8c =
     [ "rope_forward", "rope__kernels_8c.html#a371dd522b2b7ce9064f35215f1551c28", null ],
     [ "rope_forward_gemma4v_vision_xy_one", "rope__kernels_8c.html#a2e2d5e747d442ac2b6e5b33dd0adea87", null ],
     [ "rope_forward_q_split_direct_f32", "rope__kernels_8c.html#ab8364ed2b48ccd9e11d533165303c0df", null ],
+    [ "rope_forward_q_split_llama_f32", "rope__kernels_8c.html#abb859bac3c436ddc240da2ca78b8cc8e", null ],
     [ "rope_forward_qk", "rope__kernels_8c.html#ab18869516e9a6ab5998038716ac8a179", null ],
     [ "rope_forward_qk_gemma4_direct", "rope__kernels_8c.html#ae679aa53249bd57adf55193c82b1b79f", null ],
     [ "rope_forward_qk_gemma4v_vision_xy", "rope__kernels_8c.html#a1577edbd58900005438bf93ae0395cf7", null ],

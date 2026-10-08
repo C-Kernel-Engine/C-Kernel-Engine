@@ -568,6 +568,7 @@ var ckernel__engine_8h =
     [ "rope_forward_bf16", "ckernel__engine_8h.html#aa0dd19a90e07b0190fefaccbb39412cc", null ],
     [ "rope_forward_bf16_with_rotary_dim", "ckernel__engine_8h.html#aa78ff3e5ee18285ce8c1d28f9957eed0", null ],
     [ "rope_forward_q_split_direct_f32", "ckernel__engine_8h.html#ab8364ed2b48ccd9e11d533165303c0df", null ],
+    [ "rope_forward_q_split_llama_f32", "ckernel__engine_8h.html#abb859bac3c436ddc240da2ca78b8cc8e", null ],
     [ "rope_forward_qk", "ckernel__engine_8h.html#ab18869516e9a6ab5998038716ac8a179", null ],
     [ "rope_forward_qk_bf16", "ckernel__engine_8h.html#adb1b1464a7e234c8743347c430044623", null ],
     [ "rope_forward_qk_bf16_with_rotary_dim", "ckernel__engine_8h.html#ae4433c52cd7bdc8e4900e0a738fb9baf", null ],

@@ -1325,6 +1325,8 @@ Functions</h2></td></tr>
 <tr class="separator:aa78ff3e5ee18285ce8c1d28f9957eed0"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ab8364ed2b48ccd9e11d533165303c0df" id="r_ab8364ed2b48ccd9e11d533165303c0df"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#ab8364ed2b48ccd9e11d533165303c0df">rope_forward_q_split_direct_f32</a> (float *q, const float *freq_factors, int use_freq_factors, int num_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int rotary_dim, float freq_base)</td></tr>
 <tr class="separator:ab8364ed2b48ccd9e11d533165303c0df"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:abb859bac3c436ddc240da2ca78b8cc8e" id="r_abb859bac3c436ddc240da2ca78b8cc8e"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#abb859bac3c436ddc240da2ca78b8cc8e">rope_forward_q_split_llama_f32</a> (float *q, const float *freq_factors, int use_freq_factors, int num_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int rotary_dim, float freq_base)</td></tr>
+<tr class="separator:abb859bac3c436ddc240da2ca78b8cc8e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ab18869516e9a6ab5998038716ac8a179" id="r_ab18869516e9a6ab5998038716ac8a179"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#ab18869516e9a6ab5998038716ac8a179">rope_forward_qk</a> (float *q, float *k, const float *cos_cache, const float *sin_cache, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset)</td></tr>
 <tr class="separator:ab18869516e9a6ab5998038716ac8a179"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:adb1b1464a7e234c8743347c430044623" id="r_adb1b1464a7e234c8743347c430044623"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#adb1b1464a7e234c8743347c430044623">rope_forward_qk_bf16</a> (uint16_t *q, uint16_t *k, const float *cos_cache, const float *sin_cache, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, float *scratch_q, float *scratch_k)</td></tr>
@@ -14485,48 +14487,48 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l02965">2965</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 2973</span>{</div>
-<div class="line"><span class="lineno"> 2974</span>    <span class="keywordflow">if</span> (!positions || total_tokens &lt;= 0 || prefix_tokens &lt;= 0) {</div>
-<div class="line"><span class="lineno"> 2975</span>        <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno"> 2976</span>    }</div>
-<div class="line"><span class="lineno"> 2977</span>    <span class="keywordflow">if</span> (grid_x &lt;= 0 || grid_y &lt;= 0 || grid_x * grid_y != prefix_tokens) {</div>
-<div class="line"><span class="lineno"> 2978</span>        <span class="keywordflow">return</span> -2;</div>
-<div class="line"><span class="lineno"> 2979</span>    }</div>
-<div class="line"><span class="lineno"> 2980</span>    <span class="keywordflow">if</span> (prefix_start &lt; 0 || prefix_start &gt; total_tokens) {</div>
-<div class="line"><span class="lineno"> 2981</span>        <span class="keywordflow">return</span> -3;</div>
-<div class="line"><span class="lineno"> 2982</span>    }</div>
-<div class="line"><span class="lineno"> 2983</span>    <span class="keywordflow">if</span> (prefix_tokens &gt; total_tokens - prefix_start) {</div>
-<div class="line"><span class="lineno"> 2984</span>        <span class="keywordflow">return</span> -4;</div>
-<div class="line"><span class="lineno"> 2985</span>    }</div>
-<div class="line"><span class="lineno"> 2986</span> </div>
-<div class="line"><span class="lineno"> 2987</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> prefix_end = prefix_start + prefix_tokens;</div>
-<div class="line"><span class="lineno"> 2988</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> grid_extent = grid_x &gt; grid_y ? grid_x : grid_y;</div>
-<div class="line"><span class="lineno"> 2989</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> resolved_text_pos = text_pos &gt; 0</div>
-<div class="line"><span class="lineno"> 2990</span>        ? text_pos</div>
-<div class="line"><span class="lineno"> 2991</span>        : prefix_start + grid_extent;</div>
-<div class="line"><span class="lineno"> 2992</span> </div>
-<div class="line"><span class="lineno"> 2993</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> <a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a> = 0; <a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a> &lt; total_tokens; ++<a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a>) {</div>
-<div class="line"><span class="lineno"> 2994</span>        int32_t pos0;</div>
-<div class="line"><span class="lineno"> 2995</span>        int32_t pos1;</div>
-<div class="line"><span class="lineno"> 2996</span>        int32_t pos2;</div>
-<div class="line"><span class="lineno"> 2997</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a> &lt; prefix_start) {</div>
-<div class="line"><span class="lineno"> 2998</span>            pos0 = pos1 = pos2 = (int32_t)<a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a>;</div>
-<div class="line"><span class="lineno"> 2999</span>        } <span class="keywordflow">else</span> <span class="keywordflow">if</span> (<a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a> &lt; prefix_end) {</div>
-<div class="line"><span class="lineno"> 3000</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> local_token = <a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a> - prefix_start;</div>
-<div class="line"><span class="lineno"> 3001</span>            pos0 = (int32_t)position_base;</div>
-<div class="line"><span class="lineno"> 3002</span>            pos1 = (int32_t)(position_base + local_token / grid_x);</div>
-<div class="line"><span class="lineno"> 3003</span>            pos2 = (int32_t)(position_base + local_token % grid_x);</div>
-<div class="line"><span class="lineno"> 3004</span>        } <span class="keywordflow">else</span> {</div>
-<div class="line"><span class="lineno"> 3005</span>            pos0 = pos1 = pos2 = (int32_t)(resolved_text_pos + <a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a> - prefix_end);</div>
-<div class="line"><span class="lineno"> 3006</span>        }</div>
-<div class="line"><span class="lineno"> 3007</span>        positions[<a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a>] = pos0;</div>
-<div class="line"><span class="lineno"> 3008</span>        positions[<a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a> + total_tokens] = pos1;</div>
-<div class="line"><span class="lineno"> 3009</span>        positions[<a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a> + 2 * total_tokens] = pos2;</div>
-<div class="line"><span class="lineno"> 3010</span>        positions[<a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a> + 3 * total_tokens] = 0;</div>
-<div class="line"><span class="lineno"> 3011</span>    }</div>
-<div class="line"><span class="lineno"> 3012</span>    <span class="keywordflow">return</span> resolved_text_pos;</div>
-<div class="line"><span class="lineno"> 3013</span>}</div>
+<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l02982">2982</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 2990</span>{</div>
+<div class="line"><span class="lineno"> 2991</span>    <span class="keywordflow">if</span> (!positions || total_tokens &lt;= 0 || prefix_tokens &lt;= 0) {</div>
+<div class="line"><span class="lineno"> 2992</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno"> 2993</span>    }</div>
+<div class="line"><span class="lineno"> 2994</span>    <span class="keywordflow">if</span> (grid_x &lt;= 0 || grid_y &lt;= 0 || grid_x * grid_y != prefix_tokens) {</div>
+<div class="line"><span class="lineno"> 2995</span>        <span class="keywordflow">return</span> -2;</div>
+<div class="line"><span class="lineno"> 2996</span>    }</div>
+<div class="line"><span class="lineno"> 2997</span>    <span class="keywordflow">if</span> (prefix_start &lt; 0 || prefix_start &gt; total_tokens) {</div>
+<div class="line"><span class="lineno"> 2998</span>        <span class="keywordflow">return</span> -3;</div>
+<div class="line"><span class="lineno"> 2999</span>    }</div>
+<div class="line"><span class="lineno"> 3000</span>    <span class="keywordflow">if</span> (prefix_tokens &gt; total_tokens - prefix_start) {</div>
+<div class="line"><span class="lineno"> 3001</span>        <span class="keywordflow">return</span> -4;</div>
+<div class="line"><span class="lineno"> 3002</span>    }</div>
+<div class="line"><span class="lineno"> 3003</span> </div>
+<div class="line"><span class="lineno"> 3004</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> prefix_end = prefix_start + prefix_tokens;</div>
+<div class="line"><span class="lineno"> 3005</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> grid_extent = grid_x &gt; grid_y ? grid_x : grid_y;</div>
+<div class="line"><span class="lineno"> 3006</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> resolved_text_pos = text_pos &gt; 0</div>
+<div class="line"><span class="lineno"> 3007</span>        ? text_pos</div>
+<div class="line"><span class="lineno"> 3008</span>        : prefix_start + grid_extent;</div>
+<div class="line"><span class="lineno"> 3009</span> </div>
+<div class="line"><span class="lineno"> 3010</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> <a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a> = 0; <a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a> &lt; total_tokens; ++<a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a>) {</div>
+<div class="line"><span class="lineno"> 3011</span>        int32_t pos0;</div>
+<div class="line"><span class="lineno"> 3012</span>        int32_t pos1;</div>
+<div class="line"><span class="lineno"> 3013</span>        int32_t pos2;</div>
+<div class="line"><span class="lineno"> 3014</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a> &lt; prefix_start) {</div>
+<div class="line"><span class="lineno"> 3015</span>            pos0 = pos1 = pos2 = (int32_t)<a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a>;</div>
+<div class="line"><span class="lineno"> 3016</span>        } <span class="keywordflow">else</span> <span class="keywordflow">if</span> (<a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a> &lt; prefix_end) {</div>
+<div class="line"><span class="lineno"> 3017</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> local_token = <a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a> - prefix_start;</div>
+<div class="line"><span class="lineno"> 3018</span>            pos0 = (int32_t)position_base;</div>
+<div class="line"><span class="lineno"> 3019</span>            pos1 = (int32_t)(position_base + local_token / grid_x);</div>
+<div class="line"><span class="lineno"> 3020</span>            pos2 = (int32_t)(position_base + local_token % grid_x);</div>
+<div class="line"><span class="lineno"> 3021</span>        } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno"> 3022</span>            pos0 = pos1 = pos2 = (int32_t)(resolved_text_pos + <a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a> - prefix_end);</div>
+<div class="line"><span class="lineno"> 3023</span>        }</div>
+<div class="line"><span class="lineno"> 3024</span>        positions[<a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a>] = pos0;</div>
+<div class="line"><span class="lineno"> 3025</span>        positions[<a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a> + total_tokens] = pos1;</div>
+<div class="line"><span class="lineno"> 3026</span>        positions[<a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a> + 2 * total_tokens] = pos2;</div>
+<div class="line"><span class="lineno"> 3027</span>        positions[<a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a> + 3 * total_tokens] = 0;</div>
+<div class="line"><span class="lineno"> 3028</span>    }</div>
+<div class="line"><span class="lineno"> 3029</span>    <span class="keywordflow">return</span> resolved_text_pos;</div>
+<div class="line"><span class="lineno"> 3030</span>}</div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="tokenizer_8h_source.html#l00307">token</a>.</p>
 
@@ -15173,7 +15175,7 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="ckernel__strict_8c_source.html#l00022">ck_strict_parity</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="optimizer__kernels_8c_source.html#l00355">adamw_update_f32_impl()</a>, <a class="el" href="attention__kernels_8c_source.html#l09541">attention_forward_decode_head_major_gqa_regular()</a>, <a class="el" href="attention__kernels_8c_source.html#l05446">attention_forward_full_head_major_gqa_exact_strided()</a>, <a class="el" href="attention__kernels_8c_source.html#l05523">attention_forward_full_head_major_gqa_ggml_strided_workspace()</a>, <a class="el" href="attention__kernels_8c_source.html#l04183">attention_forward_head_major_gqa_flash_impl()</a>, <a class="el" href="attention__kernels_8c_source.html#l05182">attention_forward_mixed_visual_chunk_head_major_gqa_flash_strided_gemma4_impl()</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01641">ck_dot_q6_k_q8_k_fast_or_ref()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01004">ck_layer_forward_rmsnorm_swiglu()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01126">ck_layer_forward_rmsnorm_swiglu_ref()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00952">ck_mlp_swiglu_forward()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00978">ck_mlp_swiglu_forward_ref()</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01367">ck_q6_k_q8_k_provider_name()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00314">ck_q8k_activations_enabled()</a>, <a class="el" href="deltanet__kernels_8c_source.html#l01956">gated_deltanet_autoregressive_forward()</a>, <a class="el" href="deltanet__kernels_8c_source.html#l01940">gated_deltanet_impl_name()</a>, <a class="el" href="geglu__kernels_8c_source.html#l00070">geglu_forward_fp32()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00230">gemm_avx512_parallel()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00849">gemm_blocked_serial()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00286">gemm_fine_grained_parallel()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00206">gemm_naive_parallel()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00420">gemm_nn_avx512()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00493">gemm_nn_avx512_probe()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00590">gemm_nn_blocked()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00398">gemm_nn_parallel()</a>, <a class="el" href="gemm__kernels__f16_8c_source.html#l00970">gemm_nt_f16()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00179">gemm_nt_fp32_exact_parallel_dispatch()</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01702">gemm_nt_q6_k_q8_k_m4_tile()</a>, <a class="el" href="gemm__kernels__q8__0__q8__0__contract_8c_source.html#l00447">gemm_nt_q8_0_q8_0_contract()</a>, <a class="el" href="gemm__kernels__q8__0__q8__0__contract_8c_source.html#l00418">gemm_nt_q8_0_q8_0_contract_m2()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00709">gemm_tn_avx512()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00769">gemm_tn_blocked()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00687">gemm_tn_parallel()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03540">gemv_q4_k_q8_k_vnni()</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01341">gemv_q6_k_q8_k()</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01430">gemv_q6_k_q8_k_parallel_simd()</a>, <a class="el" href="gemm__kernels__q8__0__q8__0__contract_8c_source.html#l00385">gemv_q8_0_q8_0_contract()</a>, <a class="el" href="layernorm__kernels_8c_source.html#l00398">layernorm_forward_rolled_slice()</a>, <a class="el" href="layernorm__kernels_8c_source.html#l00730">layernorm_forward_unrolled_slice()</a>, <a class="el" href="rope__kernels_8c_source.html#l02759">mrope_qk_imrope_positions()</a>, <a class="el" href="rope__kernels_8c_source.html#l02607">mrope_qk_vision()</a>, <a class="el" href="rmsnorm__kernels_8c_source.html#l00812">rmsnorm_backward()</a>, <a class="el" href="rmsnorm__kernels_8c_source.html#l00550">rmsnorm_forward_strided_f32()</a>, <a class="el" href="loss__kernels_8c_source.html#l00064">softmax_cross_entropy_loss_index_mean_impl()</a>, <a class="el" href="loss__kernels_8c_source.html#l00169">softmax_cross_entropy_loss_legacy_mean_impl()</a>, <a class="el" href="swiglu__kernels_8c_source.html#l00387">swiglu_backward()</a>, <a class="el" href="swiglu__kernels_8c_source.html#l00238">swiglu_forward()</a>, and <a class="el" href="swiglu__kernels_8c_source.html#l00320">swiglu_forward_q8_k()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="optimizer__kernels_8c_source.html#l00355">adamw_update_f32_impl()</a>, <a class="el" href="attention__kernels_8c_source.html#l09541">attention_forward_decode_head_major_gqa_regular()</a>, <a class="el" href="attention__kernels_8c_source.html#l05446">attention_forward_full_head_major_gqa_exact_strided()</a>, <a class="el" href="attention__kernels_8c_source.html#l05523">attention_forward_full_head_major_gqa_ggml_strided_workspace()</a>, <a class="el" href="attention__kernels_8c_source.html#l04183">attention_forward_head_major_gqa_flash_impl()</a>, <a class="el" href="attention__kernels_8c_source.html#l05182">attention_forward_mixed_visual_chunk_head_major_gqa_flash_strided_gemma4_impl()</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01641">ck_dot_q6_k_q8_k_fast_or_ref()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01004">ck_layer_forward_rmsnorm_swiglu()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01126">ck_layer_forward_rmsnorm_swiglu_ref()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00952">ck_mlp_swiglu_forward()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00978">ck_mlp_swiglu_forward_ref()</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01367">ck_q6_k_q8_k_provider_name()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00314">ck_q8k_activations_enabled()</a>, <a class="el" href="deltanet__kernels_8c_source.html#l01956">gated_deltanet_autoregressive_forward()</a>, <a class="el" href="deltanet__kernels_8c_source.html#l01940">gated_deltanet_impl_name()</a>, <a class="el" href="geglu__kernels_8c_source.html#l00070">geglu_forward_fp32()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00230">gemm_avx512_parallel()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00849">gemm_blocked_serial()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00286">gemm_fine_grained_parallel()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00206">gemm_naive_parallel()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00420">gemm_nn_avx512()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00493">gemm_nn_avx512_probe()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00590">gemm_nn_blocked()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00398">gemm_nn_parallel()</a>, <a class="el" href="gemm__kernels__f16_8c_source.html#l00970">gemm_nt_f16()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00179">gemm_nt_fp32_exact_parallel_dispatch()</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01702">gemm_nt_q6_k_q8_k_m4_tile()</a>, <a class="el" href="gemm__kernels__q8__0__q8__0__contract_8c_source.html#l00447">gemm_nt_q8_0_q8_0_contract()</a>, <a class="el" href="gemm__kernels__q8__0__q8__0__contract_8c_source.html#l00418">gemm_nt_q8_0_q8_0_contract_m2()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00709">gemm_tn_avx512()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00769">gemm_tn_blocked()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00687">gemm_tn_parallel()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03540">gemv_q4_k_q8_k_vnni()</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01341">gemv_q6_k_q8_k()</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01430">gemv_q6_k_q8_k_parallel_simd()</a>, <a class="el" href="gemm__kernels__q8__0__q8__0__contract_8c_source.html#l00385">gemv_q8_0_q8_0_contract()</a>, <a class="el" href="layernorm__kernels_8c_source.html#l00398">layernorm_forward_rolled_slice()</a>, <a class="el" href="layernorm__kernels_8c_source.html#l00730">layernorm_forward_unrolled_slice()</a>, <a class="el" href="rope__kernels_8c_source.html#l02776">mrope_qk_imrope_positions()</a>, <a class="el" href="rope__kernels_8c_source.html#l02624">mrope_qk_vision()</a>, <a class="el" href="rmsnorm__kernels_8c_source.html#l00812">rmsnorm_backward()</a>, <a class="el" href="rmsnorm__kernels_8c_source.html#l00550">rmsnorm_forward_strided_f32()</a>, <a class="el" href="loss__kernels_8c_source.html#l00064">softmax_cross_entropy_loss_index_mean_impl()</a>, <a class="el" href="loss__kernels_8c_source.html#l00169">softmax_cross_entropy_loss_legacy_mean_impl()</a>, <a class="el" href="swiglu__kernels_8c_source.html#l00387">swiglu_backward()</a>, <a class="el" href="swiglu__kernels_8c_source.html#l00238">swiglu_forward()</a>, and <a class="el" href="swiglu__kernels_8c_source.html#l00320">swiglu_forward_q8_k()</a>.</p>
 
 </div>
 </div>
@@ -45713,74 +45715,74 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l02759">2759</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 2779</span>{</div>
-<div class="line"><span class="lineno"> 2780</span>    <span class="keywordflow">if</span> (!q || !k || !positions || num_heads &lt;= 0 || num_kv_heads &lt;= 0 || num_tokens &lt;= 0) {</div>
-<div class="line"><span class="lineno"> 2781</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 2782</span>    }</div>
-<div class="line"><span class="lineno"> 2783</span> </div>
-<div class="line"><span class="lineno"> 2784</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> sections[4] = {section_0, section_1, section_2, section_3};</div>
-<div class="line"><span class="lineno"> 2785</span> </div>
-<div class="line"><span class="lineno"> 2786</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a>()) {</div>
-<div class="line"><span class="lineno"> 2787</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> q_ok = <a class="code hl_function" href="rope__kernels_8c.html#a120d7d23796d5864335badbb717c594d">explicit_mrope_apply_ggml_exact</a>(</div>
-<div class="line"><span class="lineno"> 2788</span>            q, positions, num_heads, num_tokens, head_dim, aligned_head_dim, n_dims, sections,</div>
-<div class="line"><span class="lineno"> 2789</span>            n_ctx_orig, freq_base, freq_scale, ext_factor, attn_factor, beta_fast, beta_slow, <a class="code hl_define" href="ggml__runtime__compat_8h.html#a1e1b82250cb90231ee164367d2171684">GGML_ROPE_TYPE_IMROPE</a>);</div>
-<div class="line"><span class="lineno"> 2790</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> k_ok = <a class="code hl_function" href="rope__kernels_8c.html#a120d7d23796d5864335badbb717c594d">explicit_mrope_apply_ggml_exact</a>(</div>
-<div class="line"><span class="lineno"> 2791</span>            k, positions, num_kv_heads, num_tokens, head_dim, aligned_head_dim, n_dims, sections,</div>
-<div class="line"><span class="lineno"> 2792</span>            n_ctx_orig, freq_base, freq_scale, ext_factor, attn_factor, beta_fast, beta_slow, <a class="code hl_define" href="ggml__runtime__compat_8h.html#a1e1b82250cb90231ee164367d2171684">GGML_ROPE_TYPE_IMROPE</a>);</div>
-<div class="line"><span class="lineno"> 2793</span>        <span class="keywordflow">if</span> (q_ok &amp;&amp; k_ok) {</div>
-<div class="line"><span class="lineno"> 2794</span>            <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 2795</span>        }</div>
-<div class="line"><span class="lineno"> 2796</span>    }</div>
-<div class="line"><span class="lineno"> 2797</span> </div>
-<div class="line"><span class="lineno"> 2798</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> q_head_stride = (size_t) num_tokens * (<span class="keywordtype">size_t</span>) aligned_head_dim;</div>
-<div class="line"><span class="lineno"> 2799</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> k_head_stride = (size_t) num_tokens * (<span class="keywordtype">size_t</span>) aligned_head_dim;</div>
+<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l02776">2776</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 2796</span>{</div>
+<div class="line"><span class="lineno"> 2797</span>    <span class="keywordflow">if</span> (!q || !k || !positions || num_heads &lt;= 0 || num_kv_heads &lt;= 0 || num_tokens &lt;= 0) {</div>
+<div class="line"><span class="lineno"> 2798</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 2799</span>    }</div>
 <div class="line"><span class="lineno"> 2800</span> </div>
-<div class="line"><span class="lineno"> 2801</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
-<div class="line"><span class="lineno"> 2802</span>        <a class="code hl_function" href="rope__kernels_8c.html#a2a1b1783ea95630d700e8858205bbcbc">explicit_mrope_apply_head</a>(</div>
-<div class="line"><span class="lineno"> 2803</span>            q + (<span class="keywordtype">size_t</span>) h * q_head_stride,</div>
-<div class="line"><span class="lineno"> 2804</span>            positions,</div>
-<div class="line"><span class="lineno"> 2805</span>            num_tokens,</div>
-<div class="line"><span class="lineno"> 2806</span>            head_dim,</div>
-<div class="line"><span class="lineno"> 2807</span>            aligned_head_dim,</div>
-<div class="line"><span class="lineno"> 2808</span>            n_dims,</div>
-<div class="line"><span class="lineno"> 2809</span>            sections,</div>
-<div class="line"><span class="lineno"> 2810</span>            n_ctx_orig,</div>
-<div class="line"><span class="lineno"> 2811</span>            freq_base,</div>
-<div class="line"><span class="lineno"> 2812</span>            freq_scale,</div>
-<div class="line"><span class="lineno"> 2813</span>            ext_factor,</div>
-<div class="line"><span class="lineno"> 2814</span>            attn_factor,</div>
-<div class="line"><span class="lineno"> 2815</span>            beta_fast,</div>
-<div class="line"><span class="lineno"> 2816</span>            beta_slow,</div>
-<div class="line"><span class="lineno"> 2817</span>            1</div>
-<div class="line"><span class="lineno"> 2818</span>        );</div>
-<div class="line"><span class="lineno"> 2819</span>    }</div>
-<div class="line"><span class="lineno"> 2820</span> </div>
-<div class="line"><span class="lineno"> 2821</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_kv_heads; ++h) {</div>
-<div class="line"><span class="lineno"> 2822</span>        <a class="code hl_function" href="rope__kernels_8c.html#a2a1b1783ea95630d700e8858205bbcbc">explicit_mrope_apply_head</a>(</div>
-<div class="line"><span class="lineno"> 2823</span>            k + (<span class="keywordtype">size_t</span>) h * k_head_stride,</div>
-<div class="line"><span class="lineno"> 2824</span>            positions,</div>
-<div class="line"><span class="lineno"> 2825</span>            num_tokens,</div>
-<div class="line"><span class="lineno"> 2826</span>            head_dim,</div>
-<div class="line"><span class="lineno"> 2827</span>            aligned_head_dim,</div>
-<div class="line"><span class="lineno"> 2828</span>            n_dims,</div>
-<div class="line"><span class="lineno"> 2829</span>            sections,</div>
-<div class="line"><span class="lineno"> 2830</span>            n_ctx_orig,</div>
-<div class="line"><span class="lineno"> 2831</span>            freq_base,</div>
-<div class="line"><span class="lineno"> 2832</span>            freq_scale,</div>
-<div class="line"><span class="lineno"> 2833</span>            ext_factor,</div>
-<div class="line"><span class="lineno"> 2834</span>            attn_factor,</div>
-<div class="line"><span class="lineno"> 2835</span>            beta_fast,</div>
-<div class="line"><span class="lineno"> 2836</span>            beta_slow,</div>
-<div class="line"><span class="lineno"> 2837</span>            1</div>
-<div class="line"><span class="lineno"> 2838</span>        );</div>
-<div class="line"><span class="lineno"> 2839</span>    }</div>
-<div class="line"><span class="lineno"> 2840</span>}</div>
+<div class="line"><span class="lineno"> 2801</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> sections[4] = {section_0, section_1, section_2, section_3};</div>
+<div class="line"><span class="lineno"> 2802</span> </div>
+<div class="line"><span class="lineno"> 2803</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a>()) {</div>
+<div class="line"><span class="lineno"> 2804</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> q_ok = <a class="code hl_function" href="rope__kernels_8c.html#a120d7d23796d5864335badbb717c594d">explicit_mrope_apply_ggml_exact</a>(</div>
+<div class="line"><span class="lineno"> 2805</span>            q, positions, num_heads, num_tokens, head_dim, aligned_head_dim, n_dims, sections,</div>
+<div class="line"><span class="lineno"> 2806</span>            n_ctx_orig, freq_base, freq_scale, ext_factor, attn_factor, beta_fast, beta_slow, <a class="code hl_define" href="ggml__runtime__compat_8h.html#a1e1b82250cb90231ee164367d2171684">GGML_ROPE_TYPE_IMROPE</a>);</div>
+<div class="line"><span class="lineno"> 2807</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> k_ok = <a class="code hl_function" href="rope__kernels_8c.html#a120d7d23796d5864335badbb717c594d">explicit_mrope_apply_ggml_exact</a>(</div>
+<div class="line"><span class="lineno"> 2808</span>            k, positions, num_kv_heads, num_tokens, head_dim, aligned_head_dim, n_dims, sections,</div>
+<div class="line"><span class="lineno"> 2809</span>            n_ctx_orig, freq_base, freq_scale, ext_factor, attn_factor, beta_fast, beta_slow, <a class="code hl_define" href="ggml__runtime__compat_8h.html#a1e1b82250cb90231ee164367d2171684">GGML_ROPE_TYPE_IMROPE</a>);</div>
+<div class="line"><span class="lineno"> 2810</span>        <span class="keywordflow">if</span> (q_ok &amp;&amp; k_ok) {</div>
+<div class="line"><span class="lineno"> 2811</span>            <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 2812</span>        }</div>
+<div class="line"><span class="lineno"> 2813</span>    }</div>
+<div class="line"><span class="lineno"> 2814</span> </div>
+<div class="line"><span class="lineno"> 2815</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> q_head_stride = (size_t) num_tokens * (<span class="keywordtype">size_t</span>) aligned_head_dim;</div>
+<div class="line"><span class="lineno"> 2816</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> k_head_stride = (size_t) num_tokens * (<span class="keywordtype">size_t</span>) aligned_head_dim;</div>
+<div class="line"><span class="lineno"> 2817</span> </div>
+<div class="line"><span class="lineno"> 2818</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
+<div class="line"><span class="lineno"> 2819</span>        <a class="code hl_function" href="rope__kernels_8c.html#a2a1b1783ea95630d700e8858205bbcbc">explicit_mrope_apply_head</a>(</div>
+<div class="line"><span class="lineno"> 2820</span>            q + (<span class="keywordtype">size_t</span>) h * q_head_stride,</div>
+<div class="line"><span class="lineno"> 2821</span>            positions,</div>
+<div class="line"><span class="lineno"> 2822</span>            num_tokens,</div>
+<div class="line"><span class="lineno"> 2823</span>            head_dim,</div>
+<div class="line"><span class="lineno"> 2824</span>            aligned_head_dim,</div>
+<div class="line"><span class="lineno"> 2825</span>            n_dims,</div>
+<div class="line"><span class="lineno"> 2826</span>            sections,</div>
+<div class="line"><span class="lineno"> 2827</span>            n_ctx_orig,</div>
+<div class="line"><span class="lineno"> 2828</span>            freq_base,</div>
+<div class="line"><span class="lineno"> 2829</span>            freq_scale,</div>
+<div class="line"><span class="lineno"> 2830</span>            ext_factor,</div>
+<div class="line"><span class="lineno"> 2831</span>            attn_factor,</div>
+<div class="line"><span class="lineno"> 2832</span>            beta_fast,</div>
+<div class="line"><span class="lineno"> 2833</span>            beta_slow,</div>
+<div class="line"><span class="lineno"> 2834</span>            1</div>
+<div class="line"><span class="lineno"> 2835</span>        );</div>
+<div class="line"><span class="lineno"> 2836</span>    }</div>
+<div class="line"><span class="lineno"> 2837</span> </div>
+<div class="line"><span class="lineno"> 2838</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_kv_heads; ++h) {</div>
+<div class="line"><span class="lineno"> 2839</span>        <a class="code hl_function" href="rope__kernels_8c.html#a2a1b1783ea95630d700e8858205bbcbc">explicit_mrope_apply_head</a>(</div>
+<div class="line"><span class="lineno"> 2840</span>            k + (<span class="keywordtype">size_t</span>) h * k_head_stride,</div>
+<div class="line"><span class="lineno"> 2841</span>            positions,</div>
+<div class="line"><span class="lineno"> 2842</span>            num_tokens,</div>
+<div class="line"><span class="lineno"> 2843</span>            head_dim,</div>
+<div class="line"><span class="lineno"> 2844</span>            aligned_head_dim,</div>
+<div class="line"><span class="lineno"> 2845</span>            n_dims,</div>
+<div class="line"><span class="lineno"> 2846</span>            sections,</div>
+<div class="line"><span class="lineno"> 2847</span>            n_ctx_orig,</div>
+<div class="line"><span class="lineno"> 2848</span>            freq_base,</div>
+<div class="line"><span class="lineno"> 2849</span>            freq_scale,</div>
+<div class="line"><span class="lineno"> 2850</span>            ext_factor,</div>
+<div class="line"><span class="lineno"> 2851</span>            attn_factor,</div>
+<div class="line"><span class="lineno"> 2852</span>            beta_fast,</div>
+<div class="line"><span class="lineno"> 2853</span>            beta_slow,</div>
+<div class="line"><span class="lineno"> 2854</span>            1</div>
+<div class="line"><span class="lineno"> 2855</span>        );</div>
+<div class="line"><span class="lineno"> 2856</span>    }</div>
+<div class="line"><span class="lineno"> 2857</span>}</div>
 <div class="ttc" id="aggml__runtime__compat_8h_html_a1e1b82250cb90231ee164367d2171684"><div class="ttname"><a href="ggml__runtime__compat_8h.html#a1e1b82250cb90231ee164367d2171684">GGML_ROPE_TYPE_IMROPE</a></div><div class="ttdeci">#define GGML_ROPE_TYPE_IMROPE</div><div class="ttdef"><b>Definition</b> <a href="ggml__runtime__compat_8h_source.html#l00043">ggml_runtime_compat.h:43</a></div></div>
-<div class="ttc" id="arope__kernels_8c_html_a120d7d23796d5864335badbb717c594d"><div class="ttname"><a href="rope__kernels_8c.html#a120d7d23796d5864335badbb717c594d">explicit_mrope_apply_ggml_exact</a></div><div class="ttdeci">static int explicit_mrope_apply_ggml_exact(float *x, const int32_t *positions, int num_heads, int num_tokens, int head_dim, int aligned_head_dim, int n_dims, const int sections[4], int n_ctx_orig, float freq_base, float freq_scale, float ext_factor, float attn_factor, float beta_fast, float beta_slow, int rope_type)</div><div class="ttdef"><b>Definition</b> <a href="rope__kernels_8c_source.html#l01930">rope_kernels.c:1930</a></div></div>
-<div class="ttc" id="arope__kernels_8c_html_a2a1b1783ea95630d700e8858205bbcbc"><div class="ttname"><a href="rope__kernels_8c.html#a2a1b1783ea95630d700e8858205bbcbc">explicit_mrope_apply_head</a></div><div class="ttdeci">static void explicit_mrope_apply_head(float *x, const int32_t *positions, int num_tokens, int head_dim, int aligned_head_dim, int n_dims, const int sections[4], int n_ctx_orig, float freq_base, float freq_scale, float ext_factor, float attn_factor, float beta_fast, float beta_slow, int is_imrope)</div><div class="ttdef"><b>Definition</b> <a href="rope__kernels_8c_source.html#l02067">rope_kernels.c:2067</a></div></div>
+<div class="ttc" id="arope__kernels_8c_html_a120d7d23796d5864335badbb717c594d"><div class="ttname"><a href="rope__kernels_8c.html#a120d7d23796d5864335badbb717c594d">explicit_mrope_apply_ggml_exact</a></div><div class="ttdeci">static int explicit_mrope_apply_ggml_exact(float *x, const int32_t *positions, int num_heads, int num_tokens, int head_dim, int aligned_head_dim, int n_dims, const int sections[4], int n_ctx_orig, float freq_base, float freq_scale, float ext_factor, float attn_factor, float beta_fast, float beta_slow, int rope_type)</div><div class="ttdef"><b>Definition</b> <a href="rope__kernels_8c_source.html#l01947">rope_kernels.c:1947</a></div></div>
+<div class="ttc" id="arope__kernels_8c_html_a2a1b1783ea95630d700e8858205bbcbc"><div class="ttname"><a href="rope__kernels_8c.html#a2a1b1783ea95630d700e8858205bbcbc">explicit_mrope_apply_head</a></div><div class="ttdeci">static void explicit_mrope_apply_head(float *x, const int32_t *positions, int num_tokens, int head_dim, int aligned_head_dim, int n_dims, const int sections[4], int n_ctx_orig, float freq_base, float freq_scale, float ext_factor, float attn_factor, float beta_fast, float beta_slow, int is_imrope)</div><div class="ttdef"><b>Definition</b> <a href="rope__kernels_8c_source.html#l02084">rope_kernels.c:2084</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="ckernel__strict_8c_source.html#l00043">ck_strict_parity_enabled()</a>, <a class="el" href="rope__kernels_8c_source.html#l01930">explicit_mrope_apply_ggml_exact()</a>, <a class="el" href="rope__kernels_8c_source.html#l02067">explicit_mrope_apply_head()</a>, and <a class="el" href="ggml__runtime__compat_8h_source.html#l00043">GGML_ROPE_TYPE_IMROPE</a>.</p>
+<p class="reference">References <a class="el" href="ckernel__strict_8c_source.html#l00043">ck_strict_parity_enabled()</a>, <a class="el" href="rope__kernels_8c_source.html#l01947">explicit_mrope_apply_ggml_exact()</a>, <a class="el" href="rope__kernels_8c_source.html#l02084">explicit_mrope_apply_head()</a>, and <a class="el" href="ggml__runtime__compat_8h_source.html#l00043">GGML_ROPE_TYPE_IMROPE</a>.</p>
 
 </div>
 </div>
@@ -45918,59 +45920,59 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l02276">2276</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 2296</span>{</div>
-<div class="line"><span class="lineno"> 2297</span>    <span class="keywordflow">if</span> (!q || !k || num_heads &lt;= 0 || num_kv_heads &lt;= 0 || num_tokens &lt;= 0) {</div>
-<div class="line"><span class="lineno"> 2298</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 2299</span>    }</div>
-<div class="line"><span class="lineno"> 2300</span> </div>
-<div class="line"><span class="lineno"> 2301</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> sections[4] = {section_0, section_1, section_2, section_3};</div>
-<div class="line"><span class="lineno"> 2302</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> q_head_stride = (size_t) num_tokens * (<span class="keywordtype">size_t</span>) aligned_head_dim;</div>
-<div class="line"><span class="lineno"> 2303</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> k_head_stride = (size_t) num_tokens * (<span class="keywordtype">size_t</span>) aligned_head_dim;</div>
-<div class="line"><span class="lineno"> 2304</span> </div>
-<div class="line"><span class="lineno"> 2305</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
-<div class="line"><span class="lineno"> 2306</span>        <a class="code hl_function" href="rope__kernels_8c.html#a36ba8b67927d38c0b201c033fef3d51c">text_mrope_apply_head</a>(</div>
-<div class="line"><span class="lineno"> 2307</span>            q + (<span class="keywordtype">size_t</span>) h * q_head_stride,</div>
-<div class="line"><span class="lineno"> 2308</span>            num_tokens,</div>
-<div class="line"><span class="lineno"> 2309</span>            head_dim,</div>
-<div class="line"><span class="lineno"> 2310</span>            aligned_head_dim,</div>
-<div class="line"><span class="lineno"> 2311</span>            pos_offset,</div>
-<div class="line"><span class="lineno"> 2312</span>            n_dims,</div>
-<div class="line"><span class="lineno"> 2313</span>            sections,</div>
-<div class="line"><span class="lineno"> 2314</span>            n_ctx_orig,</div>
-<div class="line"><span class="lineno"> 2315</span>            freq_base,</div>
-<div class="line"><span class="lineno"> 2316</span>            freq_scale,</div>
-<div class="line"><span class="lineno"> 2317</span>            ext_factor,</div>
-<div class="line"><span class="lineno"> 2318</span>            attn_factor,</div>
-<div class="line"><span class="lineno"> 2319</span>            beta_fast,</div>
-<div class="line"><span class="lineno"> 2320</span>            beta_slow,</div>
-<div class="line"><span class="lineno"> 2321</span>            0</div>
-<div class="line"><span class="lineno"> 2322</span>        );</div>
-<div class="line"><span class="lineno"> 2323</span>    }</div>
-<div class="line"><span class="lineno"> 2324</span> </div>
-<div class="line"><span class="lineno"> 2325</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_kv_heads; ++h) {</div>
-<div class="line"><span class="lineno"> 2326</span>        <a class="code hl_function" href="rope__kernels_8c.html#a36ba8b67927d38c0b201c033fef3d51c">text_mrope_apply_head</a>(</div>
-<div class="line"><span class="lineno"> 2327</span>            k + (<span class="keywordtype">size_t</span>) h * k_head_stride,</div>
-<div class="line"><span class="lineno"> 2328</span>            num_tokens,</div>
-<div class="line"><span class="lineno"> 2329</span>            head_dim,</div>
-<div class="line"><span class="lineno"> 2330</span>            aligned_head_dim,</div>
-<div class="line"><span class="lineno"> 2331</span>            pos_offset,</div>
-<div class="line"><span class="lineno"> 2332</span>            n_dims,</div>
-<div class="line"><span class="lineno"> 2333</span>            sections,</div>
-<div class="line"><span class="lineno"> 2334</span>            n_ctx_orig,</div>
-<div class="line"><span class="lineno"> 2335</span>            freq_base,</div>
-<div class="line"><span class="lineno"> 2336</span>            freq_scale,</div>
-<div class="line"><span class="lineno"> 2337</span>            ext_factor,</div>
-<div class="line"><span class="lineno"> 2338</span>            attn_factor,</div>
-<div class="line"><span class="lineno"> 2339</span>            beta_fast,</div>
-<div class="line"><span class="lineno"> 2340</span>            beta_slow,</div>
-<div class="line"><span class="lineno"> 2341</span>            0</div>
-<div class="line"><span class="lineno"> 2342</span>        );</div>
-<div class="line"><span class="lineno"> 2343</span>    }</div>
-<div class="line"><span class="lineno"> 2344</span>}</div>
-<div class="ttc" id="arope__kernels_8c_html_a36ba8b67927d38c0b201c033fef3d51c"><div class="ttname"><a href="rope__kernels_8c.html#a36ba8b67927d38c0b201c033fef3d51c">text_mrope_apply_head</a></div><div class="ttdeci">static void text_mrope_apply_head(float *x, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int n_dims, const int sections[4], int n_ctx_orig, float freq_base, float freq_scale, float ext_factor, float attn_factor, float beta_fast, float beta_slow, int is_imrope)</div><div class="ttdef"><b>Definition</b> <a href="rope__kernels_8c_source.html#l02179">rope_kernels.c:2179</a></div></div>
+<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l02293">2293</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 2313</span>{</div>
+<div class="line"><span class="lineno"> 2314</span>    <span class="keywordflow">if</span> (!q || !k || num_heads &lt;= 0 || num_kv_heads &lt;= 0 || num_tokens &lt;= 0) {</div>
+<div class="line"><span class="lineno"> 2315</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 2316</span>    }</div>
+<div class="line"><span class="lineno"> 2317</span> </div>
+<div class="line"><span class="lineno"> 2318</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> sections[4] = {section_0, section_1, section_2, section_3};</div>
+<div class="line"><span class="lineno"> 2319</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> q_head_stride = (size_t) num_tokens * (<span class="keywordtype">size_t</span>) aligned_head_dim;</div>
+<div class="line"><span class="lineno"> 2320</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> k_head_stride = (size_t) num_tokens * (<span class="keywordtype">size_t</span>) aligned_head_dim;</div>
+<div class="line"><span class="lineno"> 2321</span> </div>
+<div class="line"><span class="lineno"> 2322</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
+<div class="line"><span class="lineno"> 2323</span>        <a class="code hl_function" href="rope__kernels_8c.html#a36ba8b67927d38c0b201c033fef3d51c">text_mrope_apply_head</a>(</div>
+<div class="line"><span class="lineno"> 2324</span>            q + (<span class="keywordtype">size_t</span>) h * q_head_stride,</div>
+<div class="line"><span class="lineno"> 2325</span>            num_tokens,</div>
+<div class="line"><span class="lineno"> 2326</span>            head_dim,</div>
+<div class="line"><span class="lineno"> 2327</span>            aligned_head_dim,</div>
+<div class="line"><span class="lineno"> 2328</span>            pos_offset,</div>
+<div class="line"><span class="lineno"> 2329</span>            n_dims,</div>
+<div class="line"><span class="lineno"> 2330</span>            sections,</div>
+<div class="line"><span class="lineno"> 2331</span>            n_ctx_orig,</div>
+<div class="line"><span class="lineno"> 2332</span>            freq_base,</div>
+<div class="line"><span class="lineno"> 2333</span>            freq_scale,</div>
+<div class="line"><span class="lineno"> 2334</span>            ext_factor,</div>
+<div class="line"><span class="lineno"> 2335</span>            attn_factor,</div>
+<div class="line"><span class="lineno"> 2336</span>            beta_fast,</div>
+<div class="line"><span class="lineno"> 2337</span>            beta_slow,</div>
+<div class="line"><span class="lineno"> 2338</span>            0</div>
+<div class="line"><span class="lineno"> 2339</span>        );</div>
+<div class="line"><span class="lineno"> 2340</span>    }</div>
+<div class="line"><span class="lineno"> 2341</span> </div>
+<div class="line"><span class="lineno"> 2342</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_kv_heads; ++h) {</div>
+<div class="line"><span class="lineno"> 2343</span>        <a class="code hl_function" href="rope__kernels_8c.html#a36ba8b67927d38c0b201c033fef3d51c">text_mrope_apply_head</a>(</div>
+<div class="line"><span class="lineno"> 2344</span>            k + (<span class="keywordtype">size_t</span>) h * k_head_stride,</div>
+<div class="line"><span class="lineno"> 2345</span>            num_tokens,</div>
+<div class="line"><span class="lineno"> 2346</span>            head_dim,</div>
+<div class="line"><span class="lineno"> 2347</span>            aligned_head_dim,</div>
+<div class="line"><span class="lineno"> 2348</span>            pos_offset,</div>
+<div class="line"><span class="lineno"> 2349</span>            n_dims,</div>
+<div class="line"><span class="lineno"> 2350</span>            sections,</div>
+<div class="line"><span class="lineno"> 2351</span>            n_ctx_orig,</div>
+<div class="line"><span class="lineno"> 2352</span>            freq_base,</div>
+<div class="line"><span class="lineno"> 2353</span>            freq_scale,</div>
+<div class="line"><span class="lineno"> 2354</span>            ext_factor,</div>
+<div class="line"><span class="lineno"> 2355</span>            attn_factor,</div>
+<div class="line"><span class="lineno"> 2356</span>            beta_fast,</div>
+<div class="line"><span class="lineno"> 2357</span>            beta_slow,</div>
+<div class="line"><span class="lineno"> 2358</span>            0</div>
+<div class="line"><span class="lineno"> 2359</span>        );</div>
+<div class="line"><span class="lineno"> 2360</span>    }</div>
+<div class="line"><span class="lineno"> 2361</span>}</div>
+<div class="ttc" id="arope__kernels_8c_html_a36ba8b67927d38c0b201c033fef3d51c"><div class="ttname"><a href="rope__kernels_8c.html#a36ba8b67927d38c0b201c033fef3d51c">text_mrope_apply_head</a></div><div class="ttdeci">static void text_mrope_apply_head(float *x, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int n_dims, const int sections[4], int n_ctx_orig, float freq_base, float freq_scale, float ext_factor, float attn_factor, float beta_fast, float beta_slow, int is_imrope)</div><div class="ttdef"><b>Definition</b> <a href="rope__kernels_8c_source.html#l02196">rope_kernels.c:2196</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="rope__kernels_8c_source.html#l02179">text_mrope_apply_head()</a>.</p>
+<p class="reference">References <a class="el" href="rope__kernels_8c_source.html#l02196">text_mrope_apply_head()</a>.</p>
 
 </div>
 </div>
@@ -46108,58 +46110,58 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l02346">2346</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 2366</span>{</div>
-<div class="line"><span class="lineno"> 2367</span>    <span class="keywordflow">if</span> (!q || !k || num_heads &lt;= 0 || num_kv_heads &lt;= 0 || num_tokens &lt;= 0) {</div>
-<div class="line"><span class="lineno"> 2368</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 2369</span>    }</div>
-<div class="line"><span class="lineno"> 2370</span> </div>
-<div class="line"><span class="lineno"> 2371</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> sections[4] = {section_0, section_1, section_2, section_3};</div>
-<div class="line"><span class="lineno"> 2372</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> q_head_stride = (size_t) num_tokens * (<span class="keywordtype">size_t</span>) aligned_head_dim;</div>
-<div class="line"><span class="lineno"> 2373</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> k_head_stride = (size_t) num_tokens * (<span class="keywordtype">size_t</span>) aligned_head_dim;</div>
-<div class="line"><span class="lineno"> 2374</span> </div>
-<div class="line"><span class="lineno"> 2375</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
-<div class="line"><span class="lineno"> 2376</span>        <a class="code hl_function" href="rope__kernels_8c.html#a36ba8b67927d38c0b201c033fef3d51c">text_mrope_apply_head</a>(</div>
-<div class="line"><span class="lineno"> 2377</span>            q + (<span class="keywordtype">size_t</span>) h * q_head_stride,</div>
-<div class="line"><span class="lineno"> 2378</span>            num_tokens,</div>
-<div class="line"><span class="lineno"> 2379</span>            head_dim,</div>
-<div class="line"><span class="lineno"> 2380</span>            aligned_head_dim,</div>
-<div class="line"><span class="lineno"> 2381</span>            pos_offset,</div>
-<div class="line"><span class="lineno"> 2382</span>            n_dims,</div>
-<div class="line"><span class="lineno"> 2383</span>            sections,</div>
-<div class="line"><span class="lineno"> 2384</span>            n_ctx_orig,</div>
-<div class="line"><span class="lineno"> 2385</span>            freq_base,</div>
-<div class="line"><span class="lineno"> 2386</span>            freq_scale,</div>
-<div class="line"><span class="lineno"> 2387</span>            ext_factor,</div>
-<div class="line"><span class="lineno"> 2388</span>            attn_factor,</div>
-<div class="line"><span class="lineno"> 2389</span>            beta_fast,</div>
-<div class="line"><span class="lineno"> 2390</span>            beta_slow,</div>
-<div class="line"><span class="lineno"> 2391</span>            1</div>
-<div class="line"><span class="lineno"> 2392</span>        );</div>
-<div class="line"><span class="lineno"> 2393</span>    }</div>
-<div class="line"><span class="lineno"> 2394</span> </div>
-<div class="line"><span class="lineno"> 2395</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_kv_heads; ++h) {</div>
-<div class="line"><span class="lineno"> 2396</span>        <a class="code hl_function" href="rope__kernels_8c.html#a36ba8b67927d38c0b201c033fef3d51c">text_mrope_apply_head</a>(</div>
-<div class="line"><span class="lineno"> 2397</span>            k + (<span class="keywordtype">size_t</span>) h * k_head_stride,</div>
-<div class="line"><span class="lineno"> 2398</span>            num_tokens,</div>
-<div class="line"><span class="lineno"> 2399</span>            head_dim,</div>
-<div class="line"><span class="lineno"> 2400</span>            aligned_head_dim,</div>
-<div class="line"><span class="lineno"> 2401</span>            pos_offset,</div>
-<div class="line"><span class="lineno"> 2402</span>            n_dims,</div>
-<div class="line"><span class="lineno"> 2403</span>            sections,</div>
-<div class="line"><span class="lineno"> 2404</span>            n_ctx_orig,</div>
-<div class="line"><span class="lineno"> 2405</span>            freq_base,</div>
-<div class="line"><span class="lineno"> 2406</span>            freq_scale,</div>
-<div class="line"><span class="lineno"> 2407</span>            ext_factor,</div>
-<div class="line"><span class="lineno"> 2408</span>            attn_factor,</div>
-<div class="line"><span class="lineno"> 2409</span>            beta_fast,</div>
-<div class="line"><span class="lineno"> 2410</span>            beta_slow,</div>
-<div class="line"><span class="lineno"> 2411</span>            1</div>
-<div class="line"><span class="lineno"> 2412</span>        );</div>
-<div class="line"><span class="lineno"> 2413</span>    }</div>
-<div class="line"><span class="lineno"> 2414</span>}</div>
+<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l02363">2363</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 2383</span>{</div>
+<div class="line"><span class="lineno"> 2384</span>    <span class="keywordflow">if</span> (!q || !k || num_heads &lt;= 0 || num_kv_heads &lt;= 0 || num_tokens &lt;= 0) {</div>
+<div class="line"><span class="lineno"> 2385</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 2386</span>    }</div>
+<div class="line"><span class="lineno"> 2387</span> </div>
+<div class="line"><span class="lineno"> 2388</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> sections[4] = {section_0, section_1, section_2, section_3};</div>
+<div class="line"><span class="lineno"> 2389</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> q_head_stride = (size_t) num_tokens * (<span class="keywordtype">size_t</span>) aligned_head_dim;</div>
+<div class="line"><span class="lineno"> 2390</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> k_head_stride = (size_t) num_tokens * (<span class="keywordtype">size_t</span>) aligned_head_dim;</div>
+<div class="line"><span class="lineno"> 2391</span> </div>
+<div class="line"><span class="lineno"> 2392</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
+<div class="line"><span class="lineno"> 2393</span>        <a class="code hl_function" href="rope__kernels_8c.html#a36ba8b67927d38c0b201c033fef3d51c">text_mrope_apply_head</a>(</div>
+<div class="line"><span class="lineno"> 2394</span>            q + (<span class="keywordtype">size_t</span>) h * q_head_stride,</div>
+<div class="line"><span class="lineno"> 2395</span>            num_tokens,</div>
+<div class="line"><span class="lineno"> 2396</span>            head_dim,</div>
+<div class="line"><span class="lineno"> 2397</span>            aligned_head_dim,</div>
+<div class="line"><span class="lineno"> 2398</span>            pos_offset,</div>
+<div class="line"><span class="lineno"> 2399</span>            n_dims,</div>
+<div class="line"><span class="lineno"> 2400</span>            sections,</div>
+<div class="line"><span class="lineno"> 2401</span>            n_ctx_orig,</div>
+<div class="line"><span class="lineno"> 2402</span>            freq_base,</div>
+<div class="line"><span class="lineno"> 2403</span>            freq_scale,</div>
+<div class="line"><span class="lineno"> 2404</span>            ext_factor,</div>
+<div class="line"><span class="lineno"> 2405</span>            attn_factor,</div>
+<div class="line"><span class="lineno"> 2406</span>            beta_fast,</div>
+<div class="line"><span class="lineno"> 2407</span>            beta_slow,</div>
+<div class="line"><span class="lineno"> 2408</span>            1</div>
+<div class="line"><span class="lineno"> 2409</span>        );</div>
+<div class="line"><span class="lineno"> 2410</span>    }</div>
+<div class="line"><span class="lineno"> 2411</span> </div>
+<div class="line"><span class="lineno"> 2412</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_kv_heads; ++h) {</div>
+<div class="line"><span class="lineno"> 2413</span>        <a class="code hl_function" href="rope__kernels_8c.html#a36ba8b67927d38c0b201c033fef3d51c">text_mrope_apply_head</a>(</div>
+<div class="line"><span class="lineno"> 2414</span>            k + (<span class="keywordtype">size_t</span>) h * k_head_stride,</div>
+<div class="line"><span class="lineno"> 2415</span>            num_tokens,</div>
+<div class="line"><span class="lineno"> 2416</span>            head_dim,</div>
+<div class="line"><span class="lineno"> 2417</span>            aligned_head_dim,</div>
+<div class="line"><span class="lineno"> 2418</span>            pos_offset,</div>
+<div class="line"><span class="lineno"> 2419</span>            n_dims,</div>
+<div class="line"><span class="lineno"> 2420</span>            sections,</div>
+<div class="line"><span class="lineno"> 2421</span>            n_ctx_orig,</div>
+<div class="line"><span class="lineno"> 2422</span>            freq_base,</div>
+<div class="line"><span class="lineno"> 2423</span>            freq_scale,</div>
+<div class="line"><span class="lineno"> 2424</span>            ext_factor,</div>
+<div class="line"><span class="lineno"> 2425</span>            attn_factor,</div>
+<div class="line"><span class="lineno"> 2426</span>            beta_fast,</div>
+<div class="line"><span class="lineno"> 2427</span>            beta_slow,</div>
+<div class="line"><span class="lineno"> 2428</span>            1</div>
+<div class="line"><span class="lineno"> 2429</span>        );</div>
+<div class="line"><span class="lineno"> 2430</span>    }</div>
+<div class="line"><span class="lineno"> 2431</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="rope__kernels_8c_source.html#l02179">text_mrope_apply_head()</a>.</p>
+<p class="reference">References <a class="el" href="rope__kernels_8c_source.html#l02196">text_mrope_apply_head()</a>.</p>
 
 </div>
 </div>
@@ -46297,27 +46299,27 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l02569">2569</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 2589</span>{</div>
-<div class="line"><span class="lineno"> 2590</span>    (void)section_0;</div>
-<div class="line"><span class="lineno"> 2591</span>    (void)section_1;</div>
-<div class="line"><span class="lineno"> 2592</span>    (void)section_2;</div>
-<div class="line"><span class="lineno"> 2593</span>    (void)section_3;</div>
-<div class="line"><span class="lineno"> 2594</span>    (void)n_ctx_orig;</div>
-<div class="line"><span class="lineno"> 2595</span>    (void)ext_factor;</div>
-<div class="line"><span class="lineno"> 2596</span>    (void)attn_factor;</div>
-<div class="line"><span class="lineno"> 2597</span>    (void)beta_fast;</div>
-<div class="line"><span class="lineno"> 2598</span>    (void)beta_slow;</div>
-<div class="line"><span class="lineno"> 2599</span>    <a class="code hl_function" href="rope__kernels_8c.html#aae05413f635323ee9c9b11b1c166ef74">text_mrope_apply_pytorch_bf16_storage</a>(q, num_heads, num_tokens, head_dim,</div>
-<div class="line"><span class="lineno"> 2600</span>                                           aligned_head_dim, pos_offset, n_dims,</div>
-<div class="line"><span class="lineno"> 2601</span>                                           freq_base, freq_scale);</div>
-<div class="line"><span class="lineno"> 2602</span>    <a class="code hl_function" href="rope__kernels_8c.html#aae05413f635323ee9c9b11b1c166ef74">text_mrope_apply_pytorch_bf16_storage</a>(k, num_kv_heads, num_tokens, head_dim,</div>
-<div class="line"><span class="lineno"> 2603</span>                                           aligned_head_dim, pos_offset, n_dims,</div>
-<div class="line"><span class="lineno"> 2604</span>                                           freq_base, freq_scale);</div>
-<div class="line"><span class="lineno"> 2605</span>}</div>
-<div class="ttc" id="arope__kernels_8c_html_aae05413f635323ee9c9b11b1c166ef74"><div class="ttname"><a href="rope__kernels_8c.html#aae05413f635323ee9c9b11b1c166ef74">text_mrope_apply_pytorch_bf16_storage</a></div><div class="ttdeci">static void text_mrope_apply_pytorch_bf16_storage(float *x, int num_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int n_dims, float freq_base, float freq_scale)</div><div class="ttdef"><b>Definition</b> <a href="rope__kernels_8c_source.html#l02416">rope_kernels.c:2416</a></div></div>
+<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l02586">2586</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 2606</span>{</div>
+<div class="line"><span class="lineno"> 2607</span>    (void)section_0;</div>
+<div class="line"><span class="lineno"> 2608</span>    (void)section_1;</div>
+<div class="line"><span class="lineno"> 2609</span>    (void)section_2;</div>
+<div class="line"><span class="lineno"> 2610</span>    (void)section_3;</div>
+<div class="line"><span class="lineno"> 2611</span>    (void)n_ctx_orig;</div>
+<div class="line"><span class="lineno"> 2612</span>    (void)ext_factor;</div>
+<div class="line"><span class="lineno"> 2613</span>    (void)attn_factor;</div>
+<div class="line"><span class="lineno"> 2614</span>    (void)beta_fast;</div>
+<div class="line"><span class="lineno"> 2615</span>    (void)beta_slow;</div>
+<div class="line"><span class="lineno"> 2616</span>    <a class="code hl_function" href="rope__kernels_8c.html#aae05413f635323ee9c9b11b1c166ef74">text_mrope_apply_pytorch_bf16_storage</a>(q, num_heads, num_tokens, head_dim,</div>
+<div class="line"><span class="lineno"> 2617</span>                                           aligned_head_dim, pos_offset, n_dims,</div>
+<div class="line"><span class="lineno"> 2618</span>                                           freq_base, freq_scale);</div>
+<div class="line"><span class="lineno"> 2619</span>    <a class="code hl_function" href="rope__kernels_8c.html#aae05413f635323ee9c9b11b1c166ef74">text_mrope_apply_pytorch_bf16_storage</a>(k, num_kv_heads, num_tokens, head_dim,</div>
+<div class="line"><span class="lineno"> 2620</span>                                           aligned_head_dim, pos_offset, n_dims,</div>
+<div class="line"><span class="lineno"> 2621</span>                                           freq_base, freq_scale);</div>
+<div class="line"><span class="lineno"> 2622</span>}</div>
+<div class="ttc" id="arope__kernels_8c_html_aae05413f635323ee9c9b11b1c166ef74"><div class="ttname"><a href="rope__kernels_8c.html#aae05413f635323ee9c9b11b1c166ef74">text_mrope_apply_pytorch_bf16_storage</a></div><div class="ttdeci">static void text_mrope_apply_pytorch_bf16_storage(float *x, int num_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int n_dims, float freq_base, float freq_scale)</div><div class="ttdef"><b>Definition</b> <a href="rope__kernels_8c_source.html#l02433">rope_kernels.c:2433</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="rope__kernels_8c_source.html#l02416">text_mrope_apply_pytorch_bf16_storage()</a>.</p>
+<p class="reference">References <a class="el" href="rope__kernels_8c_source.html#l02433">text_mrope_apply_pytorch_bf16_storage()</a>.</p>
 
 </div>
 </div>
@@ -46455,24 +46457,24 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l02533">2533</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 2554</span>{</div>
-<div class="line"><span class="lineno"> 2555</span>    (void)n_ctx_orig;</div>
-<div class="line"><span class="lineno"> 2556</span>    (void)ext_factor;</div>
-<div class="line"><span class="lineno"> 2557</span>    (void)attn_factor;</div>
-<div class="line"><span class="lineno"> 2558</span>    (void)beta_fast;</div>
-<div class="line"><span class="lineno"> 2559</span>    (void)beta_slow;</div>
-<div class="line"><span class="lineno"> 2560</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> sections[4] = {section_0, section_1, section_2, section_3};</div>
-<div class="line"><span class="lineno"> 2561</span>    <a class="code hl_function" href="rope__kernels_8c.html#a04bb3dcf0c06d694ed3461ca159b572d">text_mrope_apply_positions_pytorch_bf16_storage</a>(</div>
-<div class="line"><span class="lineno"> 2562</span>        q, positions, num_heads, num_tokens, head_dim, aligned_head_dim, n_dims,</div>
-<div class="line"><span class="lineno"> 2563</span>        sections, freq_base, freq_scale);</div>
-<div class="line"><span class="lineno"> 2564</span>    <a class="code hl_function" href="rope__kernels_8c.html#a04bb3dcf0c06d694ed3461ca159b572d">text_mrope_apply_positions_pytorch_bf16_storage</a>(</div>
-<div class="line"><span class="lineno"> 2565</span>        k, positions, num_kv_heads, num_tokens, head_dim, aligned_head_dim, n_dims,</div>
-<div class="line"><span class="lineno"> 2566</span>        sections, freq_base, freq_scale);</div>
-<div class="line"><span class="lineno"> 2567</span>}</div>
-<div class="ttc" id="arope__kernels_8c_html_a04bb3dcf0c06d694ed3461ca159b572d"><div class="ttname"><a href="rope__kernels_8c.html#a04bb3dcf0c06d694ed3461ca159b572d">text_mrope_apply_positions_pytorch_bf16_storage</a></div><div class="ttdeci">static void text_mrope_apply_positions_pytorch_bf16_storage(float *x, const int32_t *positions, int num_heads, int num_tokens, int head_dim, int aligned_head_dim, int n_dims, const int sections[4], float freq_base, float freq_scale)</div><div class="ttdef"><b>Definition</b> <a href="rope__kernels_8c_source.html#l02470">rope_kernels.c:2470</a></div></div>
+<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l02550">2550</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 2571</span>{</div>
+<div class="line"><span class="lineno"> 2572</span>    (void)n_ctx_orig;</div>
+<div class="line"><span class="lineno"> 2573</span>    (void)ext_factor;</div>
+<div class="line"><span class="lineno"> 2574</span>    (void)attn_factor;</div>
+<div class="line"><span class="lineno"> 2575</span>    (void)beta_fast;</div>
+<div class="line"><span class="lineno"> 2576</span>    (void)beta_slow;</div>
+<div class="line"><span class="lineno"> 2577</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> sections[4] = {section_0, section_1, section_2, section_3};</div>
+<div class="line"><span class="lineno"> 2578</span>    <a class="code hl_function" href="rope__kernels_8c.html#a04bb3dcf0c06d694ed3461ca159b572d">text_mrope_apply_positions_pytorch_bf16_storage</a>(</div>
+<div class="line"><span class="lineno"> 2579</span>        q, positions, num_heads, num_tokens, head_dim, aligned_head_dim, n_dims,</div>
+<div class="line"><span class="lineno"> 2580</span>        sections, freq_base, freq_scale);</div>
+<div class="line"><span class="lineno"> 2581</span>    <a class="code hl_function" href="rope__kernels_8c.html#a04bb3dcf0c06d694ed3461ca159b572d">text_mrope_apply_positions_pytorch_bf16_storage</a>(</div>
+<div class="line"><span class="lineno"> 2582</span>        k, positions, num_kv_heads, num_tokens, head_dim, aligned_head_dim, n_dims,</div>
+<div class="line"><span class="lineno"> 2583</span>        sections, freq_base, freq_scale);</div>
+<div class="line"><span class="lineno"> 2584</span>}</div>
+<div class="ttc" id="arope__kernels_8c_html_a04bb3dcf0c06d694ed3461ca159b572d"><div class="ttname"><a href="rope__kernels_8c.html#a04bb3dcf0c06d694ed3461ca159b572d">text_mrope_apply_positions_pytorch_bf16_storage</a></div><div class="ttdeci">static void text_mrope_apply_positions_pytorch_bf16_storage(float *x, const int32_t *positions, int num_heads, int num_tokens, int head_dim, int aligned_head_dim, int n_dims, const int sections[4], float freq_base, float freq_scale)</div><div class="ttdef"><b>Definition</b> <a href="rope__kernels_8c_source.html#l02487">rope_kernels.c:2487</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="rope__kernels_8c_source.html#l02470">text_mrope_apply_positions_pytorch_bf16_storage()</a>.</p>
+<p class="reference">References <a class="el" href="rope__kernels_8c_source.html#l02487">text_mrope_apply_positions_pytorch_bf16_storage()</a>.</p>
 
 </div>
 </div>
@@ -46610,70 +46612,70 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l02607">2607</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 2627</span>{</div>
-<div class="line"><span class="lineno"> 2628</span>    <span class="keywordflow">if</span> (!q || !k || !positions || num_heads &lt;= 0 || num_kv_heads &lt;= 0 || num_tokens &lt;= 0) {</div>
-<div class="line"><span class="lineno"> 2629</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 2630</span>    }</div>
-<div class="line"><span class="lineno"> 2631</span> </div>
-<div class="line"><span class="lineno"> 2632</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> sections[4] = {section_0, section_1, section_2, section_3};</div>
-<div class="line"><span class="lineno"> 2633</span> </div>
-<div class="line"><span class="lineno"> 2634</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a>()) {</div>
-<div class="line"><span class="lineno"> 2635</span>        <span class="keywordflow">if</span> (<a class="code hl_function" href="rope__kernels_8c.html#a120d7d23796d5864335badbb717c594d">explicit_mrope_apply_ggml_exact</a>(</div>
-<div class="line"><span class="lineno"> 2636</span>                q, positions, num_heads, num_tokens, head_dim, aligned_head_dim, n_dims, sections,</div>
-<div class="line"><span class="lineno"> 2637</span>                n_ctx_orig, freq_base, freq_scale, ext_factor, attn_factor, beta_fast, beta_slow, <a class="code hl_define" href="ggml__runtime__compat_8h.html#aed82669845c3d2180182458027fc03b6">GGML_ROPE_TYPE_VISION</a>) &amp;&amp;</div>
-<div class="line"><span class="lineno"> 2638</span>            <a class="code hl_function" href="rope__kernels_8c.html#a120d7d23796d5864335badbb717c594d">explicit_mrope_apply_ggml_exact</a>(</div>
-<div class="line"><span class="lineno"> 2639</span>                k, positions, num_kv_heads, num_tokens, head_dim, aligned_head_dim, n_dims, sections,</div>
-<div class="line"><span class="lineno"> 2640</span>                n_ctx_orig, freq_base, freq_scale, ext_factor, attn_factor, beta_fast, beta_slow, <a class="code hl_define" href="ggml__runtime__compat_8h.html#aed82669845c3d2180182458027fc03b6">GGML_ROPE_TYPE_VISION</a>)) {</div>
-<div class="line"><span class="lineno"> 2641</span>            <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 2642</span>        }</div>
-<div class="line"><span class="lineno"> 2643</span>    }</div>
-<div class="line"><span class="lineno"> 2644</span> </div>
-<div class="line"><span class="lineno"> 2645</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> q_head_stride = (size_t) num_tokens * (<span class="keywordtype">size_t</span>) aligned_head_dim;</div>
-<div class="line"><span class="lineno"> 2646</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> k_head_stride = (size_t) num_tokens * (<span class="keywordtype">size_t</span>) aligned_head_dim;</div>
-<div class="line"><span class="lineno"> 2647</span> </div>
-<div class="line"><span class="lineno"> 2648</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
-<div class="line"><span class="lineno"> 2649</span>        <a class="code hl_function" href="rope__kernels_8c.html#a70370c9b014f5ed855a291319817ab9c">vision_mrope_apply_head</a>(</div>
-<div class="line"><span class="lineno"> 2650</span>            q + (<span class="keywordtype">size_t</span>) h * q_head_stride,</div>
-<div class="line"><span class="lineno"> 2651</span>            positions,</div>
-<div class="line"><span class="lineno"> 2652</span>            num_tokens,</div>
-<div class="line"><span class="lineno"> 2653</span>            head_dim,</div>
-<div class="line"><span class="lineno"> 2654</span>            aligned_head_dim,</div>
-<div class="line"><span class="lineno"> 2655</span>            n_dims,</div>
-<div class="line"><span class="lineno"> 2656</span>            sections,</div>
-<div class="line"><span class="lineno"> 2657</span>            n_ctx_orig,</div>
-<div class="line"><span class="lineno"> 2658</span>            freq_base,</div>
-<div class="line"><span class="lineno"> 2659</span>            freq_scale,</div>
-<div class="line"><span class="lineno"> 2660</span>            ext_factor,</div>
-<div class="line"><span class="lineno"> 2661</span>            attn_factor,</div>
-<div class="line"><span class="lineno"> 2662</span>            beta_fast,</div>
-<div class="line"><span class="lineno"> 2663</span>            beta_slow</div>
-<div class="line"><span class="lineno"> 2664</span>        );</div>
-<div class="line"><span class="lineno"> 2665</span>    }</div>
-<div class="line"><span class="lineno"> 2666</span> </div>
-<div class="line"><span class="lineno"> 2667</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_kv_heads; ++h) {</div>
-<div class="line"><span class="lineno"> 2668</span>        <a class="code hl_function" href="rope__kernels_8c.html#a70370c9b014f5ed855a291319817ab9c">vision_mrope_apply_head</a>(</div>
-<div class="line"><span class="lineno"> 2669</span>            k + (<span class="keywordtype">size_t</span>) h * k_head_stride,</div>
-<div class="line"><span class="lineno"> 2670</span>            positions,</div>
-<div class="line"><span class="lineno"> 2671</span>            num_tokens,</div>
-<div class="line"><span class="lineno"> 2672</span>            head_dim,</div>
-<div class="line"><span class="lineno"> 2673</span>            aligned_head_dim,</div>
-<div class="line"><span class="lineno"> 2674</span>            n_dims,</div>
-<div class="line"><span class="lineno"> 2675</span>            sections,</div>
-<div class="line"><span class="lineno"> 2676</span>            n_ctx_orig,</div>
-<div class="line"><span class="lineno"> 2677</span>            freq_base,</div>
-<div class="line"><span class="lineno"> 2678</span>            freq_scale,</div>
-<div class="line"><span class="lineno"> 2679</span>            ext_factor,</div>
-<div class="line"><span class="lineno"> 2680</span>            attn_factor,</div>
-<div class="line"><span class="lineno"> 2681</span>            beta_fast,</div>
-<div class="line"><span class="lineno"> 2682</span>            beta_slow</div>
-<div class="line"><span class="lineno"> 2683</span>        );</div>
-<div class="line"><span class="lineno"> 2684</span>    }</div>
-<div class="line"><span class="lineno"> 2685</span>}</div>
+<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l02624">2624</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 2644</span>{</div>
+<div class="line"><span class="lineno"> 2645</span>    <span class="keywordflow">if</span> (!q || !k || !positions || num_heads &lt;= 0 || num_kv_heads &lt;= 0 || num_tokens &lt;= 0) {</div>
+<div class="line"><span class="lineno"> 2646</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 2647</span>    }</div>
+<div class="line"><span class="lineno"> 2648</span> </div>
+<div class="line"><span class="lineno"> 2649</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> sections[4] = {section_0, section_1, section_2, section_3};</div>
+<div class="line"><span class="lineno"> 2650</span> </div>
+<div class="line"><span class="lineno"> 2651</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a>()) {</div>
+<div class="line"><span class="lineno"> 2652</span>        <span class="keywordflow">if</span> (<a class="code hl_function" href="rope__kernels_8c.html#a120d7d23796d5864335badbb717c594d">explicit_mrope_apply_ggml_exact</a>(</div>
+<div class="line"><span class="lineno"> 2653</span>                q, positions, num_heads, num_tokens, head_dim, aligned_head_dim, n_dims, sections,</div>
+<div class="line"><span class="lineno"> 2654</span>                n_ctx_orig, freq_base, freq_scale, ext_factor, attn_factor, beta_fast, beta_slow, <a class="code hl_define" href="ggml__runtime__compat_8h.html#aed82669845c3d2180182458027fc03b6">GGML_ROPE_TYPE_VISION</a>) &amp;&amp;</div>
+<div class="line"><span class="lineno"> 2655</span>            <a class="code hl_function" href="rope__kernels_8c.html#a120d7d23796d5864335badbb717c594d">explicit_mrope_apply_ggml_exact</a>(</div>
+<div class="line"><span class="lineno"> 2656</span>                k, positions, num_kv_heads, num_tokens, head_dim, aligned_head_dim, n_dims, sections,</div>
+<div class="line"><span class="lineno"> 2657</span>                n_ctx_orig, freq_base, freq_scale, ext_factor, attn_factor, beta_fast, beta_slow, <a class="code hl_define" href="ggml__runtime__compat_8h.html#aed82669845c3d2180182458027fc03b6">GGML_ROPE_TYPE_VISION</a>)) {</div>
+<div class="line"><span class="lineno"> 2658</span>            <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 2659</span>        }</div>
+<div class="line"><span class="lineno"> 2660</span>    }</div>
+<div class="line"><span class="lineno"> 2661</span> </div>
+<div class="line"><span class="lineno"> 2662</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> q_head_stride = (size_t) num_tokens * (<span class="keywordtype">size_t</span>) aligned_head_dim;</div>
+<div class="line"><span class="lineno"> 2663</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> k_head_stride = (size_t) num_tokens * (<span class="keywordtype">size_t</span>) aligned_head_dim;</div>
+<div class="line"><span class="lineno"> 2664</span> </div>
+<div class="line"><span class="lineno"> 2665</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
+<div class="line"><span class="lineno"> 2666</span>        <a class="code hl_function" href="rope__kernels_8c.html#a70370c9b014f5ed855a291319817ab9c">vision_mrope_apply_head</a>(</div>
+<div class="line"><span class="lineno"> 2667</span>            q + (<span class="keywordtype">size_t</span>) h * q_head_stride,</div>
+<div class="line"><span class="lineno"> 2668</span>            positions,</div>
+<div class="line"><span class="lineno"> 2669</span>            num_tokens,</div>
+<div class="line"><span class="lineno"> 2670</span>            head_dim,</div>
+<div class="line"><span class="lineno"> 2671</span>            aligned_head_dim,</div>
+<div class="line"><span class="lineno"> 2672</span>            n_dims,</div>
+<div class="line"><span class="lineno"> 2673</span>            sections,</div>
+<div class="line"><span class="lineno"> 2674</span>            n_ctx_orig,</div>
+<div class="line"><span class="lineno"> 2675</span>            freq_base,</div>
+<div class="line"><span class="lineno"> 2676</span>            freq_scale,</div>
+<div class="line"><span class="lineno"> 2677</span>            ext_factor,</div>
+<div class="line"><span class="lineno"> 2678</span>            attn_factor,</div>
+<div class="line"><span class="lineno"> 2679</span>            beta_fast,</div>
+<div class="line"><span class="lineno"> 2680</span>            beta_slow</div>
+<div class="line"><span class="lineno"> 2681</span>        );</div>
+<div class="line"><span class="lineno"> 2682</span>    }</div>
+<div class="line"><span class="lineno"> 2683</span> </div>
+<div class="line"><span class="lineno"> 2684</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_kv_heads; ++h) {</div>
+<div class="line"><span class="lineno"> 2685</span>        <a class="code hl_function" href="rope__kernels_8c.html#a70370c9b014f5ed855a291319817ab9c">vision_mrope_apply_head</a>(</div>
+<div class="line"><span class="lineno"> 2686</span>            k + (<span class="keywordtype">size_t</span>) h * k_head_stride,</div>
+<div class="line"><span class="lineno"> 2687</span>            positions,</div>
+<div class="line"><span class="lineno"> 2688</span>            num_tokens,</div>
+<div class="line"><span class="lineno"> 2689</span>            head_dim,</div>
+<div class="line"><span class="lineno"> 2690</span>            aligned_head_dim,</div>
+<div class="line"><span class="lineno"> 2691</span>            n_dims,</div>
+<div class="line"><span class="lineno"> 2692</span>            sections,</div>
+<div class="line"><span class="lineno"> 2693</span>            n_ctx_orig,</div>
+<div class="line"><span class="lineno"> 2694</span>            freq_base,</div>
+<div class="line"><span class="lineno"> 2695</span>            freq_scale,</div>
+<div class="line"><span class="lineno"> 2696</span>            ext_factor,</div>
+<div class="line"><span class="lineno"> 2697</span>            attn_factor,</div>
+<div class="line"><span class="lineno"> 2698</span>            beta_fast,</div>
+<div class="line"><span class="lineno"> 2699</span>            beta_slow</div>
+<div class="line"><span class="lineno"> 2700</span>        );</div>
+<div class="line"><span class="lineno"> 2701</span>    }</div>
+<div class="line"><span class="lineno"> 2702</span>}</div>
 <div class="ttc" id="aggml__runtime__compat_8h_html_aed82669845c3d2180182458027fc03b6"><div class="ttname"><a href="ggml__runtime__compat_8h.html#aed82669845c3d2180182458027fc03b6">GGML_ROPE_TYPE_VISION</a></div><div class="ttdeci">#define GGML_ROPE_TYPE_VISION</div><div class="ttdef"><b>Definition</b> <a href="ggml__runtime__compat_8h_source.html#l00039">ggml_runtime_compat.h:39</a></div></div>
-<div class="ttc" id="arope__kernels_8c_html_a70370c9b014f5ed855a291319817ab9c"><div class="ttname"><a href="rope__kernels_8c.html#a70370c9b014f5ed855a291319817ab9c">vision_mrope_apply_head</a></div><div class="ttdeci">static void vision_mrope_apply_head(float *x, const int32_t *positions, int num_tokens, int head_dim, int aligned_head_dim, int n_dims, const int sections[4], int n_ctx_orig, float freq_base, float freq_scale, float ext_factor, float attn_factor, float beta_fast, float beta_slow)</div><div class="ttdef"><b>Definition</b> <a href="rope__kernels_8c_source.html#l01760">rope_kernels.c:1760</a></div></div>
+<div class="ttc" id="arope__kernels_8c_html_a70370c9b014f5ed855a291319817ab9c"><div class="ttname"><a href="rope__kernels_8c.html#a70370c9b014f5ed855a291319817ab9c">vision_mrope_apply_head</a></div><div class="ttdeci">static void vision_mrope_apply_head(float *x, const int32_t *positions, int num_tokens, int head_dim, int aligned_head_dim, int n_dims, const int sections[4], int n_ctx_orig, float freq_base, float freq_scale, float ext_factor, float attn_factor, float beta_fast, float beta_slow)</div><div class="ttdef"><b>Definition</b> <a href="rope__kernels_8c_source.html#l01777">rope_kernels.c:1777</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="ckernel__strict_8c_source.html#l00043">ck_strict_parity_enabled()</a>, <a class="el" href="rope__kernels_8c_source.html#l01930">explicit_mrope_apply_ggml_exact()</a>, <a class="el" href="ggml__runtime__compat_8h_source.html#l00039">GGML_ROPE_TYPE_VISION</a>, and <a class="el" href="rope__kernels_8c_source.html#l01760">vision_mrope_apply_head()</a>.</p>
+<p class="reference">References <a class="el" href="ckernel__strict_8c_source.html#l00043">ck_strict_parity_enabled()</a>, <a class="el" href="rope__kernels_8c_source.html#l01947">explicit_mrope_apply_ggml_exact()</a>, <a class="el" href="ggml__runtime__compat_8h_source.html#l00039">GGML_ROPE_TYPE_VISION</a>, and <a class="el" href="rope__kernels_8c_source.html#l01777">vision_mrope_apply_head()</a>.</p>
 
 </div>
 </div>
@@ -46947,7 +46949,7 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l02718">2718</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
+<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l02735">2735</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
 
 </div>
 </div>
@@ -47085,7 +47087,7 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l02719">2719</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
+<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l02736">2736</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
 
 </div>
 </div>
@@ -56486,7 +56488,7 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">  979</span>    }</div>
 <div class="line"><span class="lineno">  980</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="rope__kernels__bf16_8c_source.html#l00067">rope_backward_bf16()</a>, and <a class="el" href="rope__kernels_8c_source.html#l02899">rope_backward_qk()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="rope__kernels__bf16_8c_source.html#l00067">rope_backward_bf16()</a>, and <a class="el" href="rope__kernels_8c_source.html#l02916">rope_backward_qk()</a>.</p>
 
 </div>
 </div>
@@ -56829,11 +56831,11 @@ Functions</h2></td></tr>
 <p>Combined RoPE backward for both dQ and dK gradients.</p>
 <p>After changes: make test </p>
 
-<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l02899">2899</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 2911</span>{</div>
-<div class="line"><span class="lineno"> 2912</span>    <a class="code hl_function" href="rope__kernels_8c.html#af248ca325f0a6837ed9bfd3d34552c00">rope_backward</a>(d_q_out, d_q, cos_cache, sin_cache, num_heads, num_tokens, head_dim, aligned_head_dim, pos_offset);</div>
-<div class="line"><span class="lineno"> 2913</span>    <a class="code hl_function" href="rope__kernels_8c.html#af248ca325f0a6837ed9bfd3d34552c00">rope_backward</a>(d_k_out, d_k, cos_cache, sin_cache, num_kv_heads, num_tokens, head_dim, aligned_head_dim, pos_offset);</div>
-<div class="line"><span class="lineno"> 2914</span>}</div>
+<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l02916">2916</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 2928</span>{</div>
+<div class="line"><span class="lineno"> 2929</span>    <a class="code hl_function" href="rope__kernels_8c.html#af248ca325f0a6837ed9bfd3d34552c00">rope_backward</a>(d_q_out, d_q, cos_cache, sin_cache, num_heads, num_tokens, head_dim, aligned_head_dim, pos_offset);</div>
+<div class="line"><span class="lineno"> 2930</span>    <a class="code hl_function" href="rope__kernels_8c.html#af248ca325f0a6837ed9bfd3d34552c00">rope_backward</a>(d_k_out, d_k, cos_cache, sin_cache, num_kv_heads, num_tokens, head_dim, aligned_head_dim, pos_offset);</div>
+<div class="line"><span class="lineno"> 2931</span>}</div>
 <div class="ttc" id="arope__kernels_8c_html_af248ca325f0a6837ed9bfd3d34552c00"><div class="ttname"><a href="rope__kernels_8c.html#af248ca325f0a6837ed9bfd3d34552c00">rope_backward</a></div><div class="ttdeci">void rope_backward(const float *d_out, float *d_x, const float *cos_cache, const float *sin_cache, int num_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset)</div><div class="ttdef"><b>Definition</b> <a href="rope__kernels_8c_source.html#l00884">rope_kernels.c:884</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="rope__kernels_8c_source.html#l00884">rope_backward()</a>.</p>
@@ -57061,39 +57063,39 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l02916">2916</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 2929</span>{</div>
-<div class="line"><span class="lineno"> 2930</span>    <span class="keywordtype">size_t</span> q_head_stride = (size_t)num_tokens * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
-<div class="line"><span class="lineno"> 2931</span>    <span class="keywordtype">size_t</span> k_head_stride = (size_t)num_tokens * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
-<div class="line"><span class="lineno"> 2932</span> </div>
-<div class="line"><span class="lineno"> 2933</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
-<div class="line"><span class="lineno"> 2934</span>        <a class="code hl_function" href="rope__kernels_8c.html#a2e7396a382587d601b508f8c3ec2e608">rope_backward_apply_head_pairwise</a>(</div>
-<div class="line"><span class="lineno"> 2935</span>            d_q_out + (<span class="keywordtype">size_t</span>)h * q_head_stride,</div>
-<div class="line"><span class="lineno"> 2936</span>            d_q + (<span class="keywordtype">size_t</span>)h * q_head_stride,</div>
-<div class="line"><span class="lineno"> 2937</span>            cos_cache,</div>
-<div class="line"><span class="lineno"> 2938</span>            sin_cache,</div>
-<div class="line"><span class="lineno"> 2939</span>            num_tokens,</div>
-<div class="line"><span class="lineno"> 2940</span>            head_dim,</div>
-<div class="line"><span class="lineno"> 2941</span>            aligned_head_dim,</div>
-<div class="line"><span class="lineno"> 2942</span>            pos_offset,</div>
-<div class="line"><span class="lineno"> 2943</span>            rotary_dim</div>
-<div class="line"><span class="lineno"> 2944</span>        );</div>
-<div class="line"><span class="lineno"> 2945</span>    }</div>
-<div class="line"><span class="lineno"> 2946</span> </div>
-<div class="line"><span class="lineno"> 2947</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_kv_heads; ++h) {</div>
-<div class="line"><span class="lineno"> 2948</span>        <a class="code hl_function" href="rope__kernels_8c.html#a2e7396a382587d601b508f8c3ec2e608">rope_backward_apply_head_pairwise</a>(</div>
-<div class="line"><span class="lineno"> 2949</span>            d_k_out + (<span class="keywordtype">size_t</span>)h * k_head_stride,</div>
-<div class="line"><span class="lineno"> 2950</span>            d_k + (<span class="keywordtype">size_t</span>)h * k_head_stride,</div>
-<div class="line"><span class="lineno"> 2951</span>            cos_cache,</div>
-<div class="line"><span class="lineno"> 2952</span>            sin_cache,</div>
-<div class="line"><span class="lineno"> 2953</span>            num_tokens,</div>
-<div class="line"><span class="lineno"> 2954</span>            head_dim,</div>
-<div class="line"><span class="lineno"> 2955</span>            aligned_head_dim,</div>
-<div class="line"><span class="lineno"> 2956</span>            pos_offset,</div>
-<div class="line"><span class="lineno"> 2957</span>            rotary_dim</div>
-<div class="line"><span class="lineno"> 2958</span>        );</div>
-<div class="line"><span class="lineno"> 2959</span>    }</div>
-<div class="line"><span class="lineno"> 2960</span>}</div>
+<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l02933">2933</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 2946</span>{</div>
+<div class="line"><span class="lineno"> 2947</span>    <span class="keywordtype">size_t</span> q_head_stride = (size_t)num_tokens * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
+<div class="line"><span class="lineno"> 2948</span>    <span class="keywordtype">size_t</span> k_head_stride = (size_t)num_tokens * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
+<div class="line"><span class="lineno"> 2949</span> </div>
+<div class="line"><span class="lineno"> 2950</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
+<div class="line"><span class="lineno"> 2951</span>        <a class="code hl_function" href="rope__kernels_8c.html#a2e7396a382587d601b508f8c3ec2e608">rope_backward_apply_head_pairwise</a>(</div>
+<div class="line"><span class="lineno"> 2952</span>            d_q_out + (<span class="keywordtype">size_t</span>)h * q_head_stride,</div>
+<div class="line"><span class="lineno"> 2953</span>            d_q + (<span class="keywordtype">size_t</span>)h * q_head_stride,</div>
+<div class="line"><span class="lineno"> 2954</span>            cos_cache,</div>
+<div class="line"><span class="lineno"> 2955</span>            sin_cache,</div>
+<div class="line"><span class="lineno"> 2956</span>            num_tokens,</div>
+<div class="line"><span class="lineno"> 2957</span>            head_dim,</div>
+<div class="line"><span class="lineno"> 2958</span>            aligned_head_dim,</div>
+<div class="line"><span class="lineno"> 2959</span>            pos_offset,</div>
+<div class="line"><span class="lineno"> 2960</span>            rotary_dim</div>
+<div class="line"><span class="lineno"> 2961</span>        );</div>
+<div class="line"><span class="lineno"> 2962</span>    }</div>
+<div class="line"><span class="lineno"> 2963</span> </div>
+<div class="line"><span class="lineno"> 2964</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_kv_heads; ++h) {</div>
+<div class="line"><span class="lineno"> 2965</span>        <a class="code hl_function" href="rope__kernels_8c.html#a2e7396a382587d601b508f8c3ec2e608">rope_backward_apply_head_pairwise</a>(</div>
+<div class="line"><span class="lineno"> 2966</span>            d_k_out + (<span class="keywordtype">size_t</span>)h * k_head_stride,</div>
+<div class="line"><span class="lineno"> 2967</span>            d_k + (<span class="keywordtype">size_t</span>)h * k_head_stride,</div>
+<div class="line"><span class="lineno"> 2968</span>            cos_cache,</div>
+<div class="line"><span class="lineno"> 2969</span>            sin_cache,</div>
+<div class="line"><span class="lineno"> 2970</span>            num_tokens,</div>
+<div class="line"><span class="lineno"> 2971</span>            head_dim,</div>
+<div class="line"><span class="lineno"> 2972</span>            aligned_head_dim,</div>
+<div class="line"><span class="lineno"> 2973</span>            pos_offset,</div>
+<div class="line"><span class="lineno"> 2974</span>            rotary_dim</div>
+<div class="line"><span class="lineno"> 2975</span>        );</div>
+<div class="line"><span class="lineno"> 2976</span>    }</div>
+<div class="line"><span class="lineno"> 2977</span>}</div>
 <div class="ttc" id="arope__kernels_8c_html_a2e7396a382587d601b508f8c3ec2e608"><div class="ttname"><a href="rope__kernels_8c.html#a2e7396a382587d601b508f8c3ec2e608">rope_backward_apply_head_pairwise</a></div><div class="ttdeci">static void rope_backward_apply_head_pairwise(const float *d_out, float *d_x, const float *cos_cache, const float *sin_cache, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int rotary_dim)</div><div class="ttdef"><b>Definition</b> <a href="rope__kernels_8c_source.html#l00741">rope_kernels.c:741</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="rope__kernels_8c_source.html#l00741">rope_backward_apply_head_pairwise()</a>.</p>
@@ -57436,6 +57438,93 @@ Functions</h2></td></tr>
 <div class="ttc" id="arope__kernels_8c_html_a37fb61a75cc498bdd892b61f1c6367c0"><div class="ttname"><a href="rope__kernels_8c.html#a37fb61a75cc498bdd892b61f1c6367c0">rope_forward_split_direct_one</a></div><div class="ttdeci">static void rope_forward_split_direct_one(float *x, const float *freq_factors, int use_freq_factors, int num_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int rotary_dim, float freq_base)</div><div class="ttdef"><b>Definition</b> <a href="rope__kernels_8c_source.html#l01128">rope_kernels.c:1128</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="rope__kernels_8c_source.html#l01128">rope_forward_split_direct_one()</a>.</p>
+
+</div>
+</div>
+<a id="abb859bac3c436ddc240da2ca78b8cc8e" name="abb859bac3c436ddc240da2ca78b8cc8e"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#abb859bac3c436ddc240da2ca78b8cc8e">&#9670;&#160;</a></span>rope_forward_q_split_llama_f32()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void rope_forward_q_split_llama_f32 </td>
+          <td>(</td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>q</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>freq_factors</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>use_freq_factors</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_heads</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_tokens</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>head_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>aligned_head_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>pos_offset</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>rotary_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float&#160;</td>
+          <td class="paramname"><em>freq_base</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l01390">1390</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 1400</span>{</div>
+<div class="line"><span class="lineno"> 1401</span>    <a class="code hl_function" href="rope__kernels_8c.html#a0ad5b7fb9a1ca5657f3c0922ba82e62c">rope_forward_qk_split_llama_token_range_f32</a>(</div>
+<div class="line"><span class="lineno"> 1402</span>        q, NULL, freq_factors, use_freq_factors,</div>
+<div class="line"><span class="lineno"> 1403</span>        num_heads, 0, num_tokens, head_dim, aligned_head_dim,</div>
+<div class="line"><span class="lineno"> 1404</span>        pos_offset, rotary_dim, freq_base, 0, num_tokens);</div>
+<div class="line"><span class="lineno"> 1405</span>}</div>
+<div class="ttc" id="arope__kernels_8c_html_a0ad5b7fb9a1ca5657f3c0922ba82e62c"><div class="ttname"><a href="rope__kernels_8c.html#a0ad5b7fb9a1ca5657f3c0922ba82e62c">rope_forward_qk_split_llama_token_range_f32</a></div><div class="ttdeci">void rope_forward_qk_split_llama_token_range_f32(float *q, float *k, const float *freq_factors, int use_freq_factors, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int rotary_dim, float freq_base, int token_begin, int token_end)</div><div class="ttdef"><b>Definition</b> <a href="rope__kernels_8c_source.html#l01338">rope_kernels.c:1338</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="rope__kernels_8c_source.html#l01338">rope_forward_qk_split_llama_token_range_f32()</a>.</p>
 
 </div>
 </div>
@@ -57826,13 +57915,13 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l01390">1390</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 1402</span>{</div>
-<div class="line"><span class="lineno"> 1403</span>    <a class="code hl_function" href="rope__kernels_8c.html#ad6b670bd710a898edf4af57914eaca9d">rope_forward_qk_split_direct_f32</a>(q, k, freq_factors, use_freq_factors,</div>
-<div class="line"><span class="lineno"> 1404</span>                                    num_heads, num_kv_heads, num_tokens,</div>
-<div class="line"><span class="lineno"> 1405</span>                                    head_dim, aligned_head_dim, pos_offset,</div>
-<div class="line"><span class="lineno"> 1406</span>                                    rotary_dim, freq_base);</div>
-<div class="line"><span class="lineno"> 1407</span>}</div>
+<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l01407">1407</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 1419</span>{</div>
+<div class="line"><span class="lineno"> 1420</span>    <a class="code hl_function" href="rope__kernels_8c.html#ad6b670bd710a898edf4af57914eaca9d">rope_forward_qk_split_direct_f32</a>(q, k, freq_factors, use_freq_factors,</div>
+<div class="line"><span class="lineno"> 1421</span>                                    num_heads, num_kv_heads, num_tokens,</div>
+<div class="line"><span class="lineno"> 1422</span>                                    head_dim, aligned_head_dim, pos_offset,</div>
+<div class="line"><span class="lineno"> 1423</span>                                    rotary_dim, freq_base);</div>
+<div class="line"><span class="lineno"> 1424</span>}</div>
 <div class="ttc" id="arope__kernels_8c_html_ad6b670bd710a898edf4af57914eaca9d"><div class="ttname"><a href="rope__kernels_8c.html#ad6b670bd710a898edf4af57914eaca9d">rope_forward_qk_split_direct_f32</a></div><div class="ttdeci">void rope_forward_qk_split_direct_f32(float *q, float *k, const float *freq_factors, int use_freq_factors, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int rotary_dim, float freq_base)</div><div class="ttdef"><b>Definition</b> <a href="rope__kernels_8c_source.html#l01180">rope_kernels.c:1180</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="rope__kernels_8c_source.html#l01180">rope_forward_qk_split_direct_f32()</a>.</p>
@@ -57913,14 +58002,14 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l01477">1477</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 1487</span>{</div>
-<div class="line"><span class="lineno"> 1488</span>    <a class="code hl_function" href="rope__kernels_8c.html#a2e2d5e747d442ac2b6e5b33dd0adea87">rope_forward_gemma4v_vision_xy_one</a>(q, num_heads, num_tokens, head_dim, aligned_head_dim, grid_w, rotary_dim, freq_base);</div>
-<div class="line"><span class="lineno"> 1489</span>    <a class="code hl_function" href="rope__kernels_8c.html#a2e2d5e747d442ac2b6e5b33dd0adea87">rope_forward_gemma4v_vision_xy_one</a>(k, num_kv_heads, num_tokens, head_dim, aligned_head_dim, grid_w, rotary_dim, freq_base);</div>
-<div class="line"><span class="lineno"> 1490</span>}</div>
-<div class="ttc" id="arope__kernels_8c_html_a2e2d5e747d442ac2b6e5b33dd0adea87"><div class="ttname"><a href="rope__kernels_8c.html#a2e2d5e747d442ac2b6e5b33dd0adea87">rope_forward_gemma4v_vision_xy_one</a></div><div class="ttdeci">static void rope_forward_gemma4v_vision_xy_one(float *x, int num_heads, int num_tokens, int head_dim, int aligned_head_dim, int grid_w, int rotary_dim, float freq_base)</div><div class="ttdef"><b>Definition</b> <a href="rope__kernels_8c_source.html#l01410">rope_kernels.c:1410</a></div></div>
+<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l01494">1494</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 1504</span>{</div>
+<div class="line"><span class="lineno"> 1505</span>    <a class="code hl_function" href="rope__kernels_8c.html#a2e2d5e747d442ac2b6e5b33dd0adea87">rope_forward_gemma4v_vision_xy_one</a>(q, num_heads, num_tokens, head_dim, aligned_head_dim, grid_w, rotary_dim, freq_base);</div>
+<div class="line"><span class="lineno"> 1506</span>    <a class="code hl_function" href="rope__kernels_8c.html#a2e2d5e747d442ac2b6e5b33dd0adea87">rope_forward_gemma4v_vision_xy_one</a>(k, num_kv_heads, num_tokens, head_dim, aligned_head_dim, grid_w, rotary_dim, freq_base);</div>
+<div class="line"><span class="lineno"> 1507</span>}</div>
+<div class="ttc" id="arope__kernels_8c_html_a2e2d5e747d442ac2b6e5b33dd0adea87"><div class="ttname"><a href="rope__kernels_8c.html#a2e2d5e747d442ac2b6e5b33dd0adea87">rope_forward_gemma4v_vision_xy_one</a></div><div class="ttdeci">static void rope_forward_gemma4v_vision_xy_one(float *x, int num_heads, int num_tokens, int head_dim, int aligned_head_dim, int grid_w, int rotary_dim, float freq_base)</div><div class="ttdef"><b>Definition</b> <a href="rope__kernels_8c_source.html#l01427">rope_kernels.c:1427</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="rope__kernels_8c_source.html#l01410">rope_forward_gemma4v_vision_xy_one()</a>.</p>
+<p class="reference">References <a class="el" href="rope__kernels_8c_source.html#l01427">rope_forward_gemma4v_vision_xy_one()</a>.</p>
 
 </div>
 </div>
@@ -58004,59 +58093,59 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l01613">1613</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 1624</span>{</div>
-<div class="line"><span class="lineno"> 1625</span>    <span class="keywordflow">if</span> (!q || !k || !cos_cache || !sin_cache || num_tokens &lt;= 0) {</div>
-<div class="line"><span class="lineno"> 1626</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 1627</span>    }</div>
-<div class="line"><span class="lineno"> 1628</span>    <span class="keywordflow">if</span> (rotary_dim &lt;= 0 || rotary_dim &gt; head_dim) {</div>
-<div class="line"><span class="lineno"> 1629</span>        rotary_dim = head_dim;</div>
-<div class="line"><span class="lineno"> 1630</span>    }</div>
-<div class="line"><span class="lineno"> 1631</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> cache_half = rotary_dim / 2;</div>
-<div class="line"><span class="lineno"> 1632</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> head_stride =</div>
-<div class="line"><span class="lineno"> 1633</span>        (size_t)num_tokens * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
-<div class="line"><span class="lineno"> 1634</span>    <span class="keywordflow">if</span> (num_tokens == 1) {</div>
-<div class="line"><span class="lineno"> 1635</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *cos_row =</div>
-<div class="line"><span class="lineno"> 1636</span>            cos_cache + (size_t)pos_offset * (<span class="keywordtype">size_t</span>)cache_half;</div>
-<div class="line"><span class="lineno"> 1637</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *sin_row =</div>
-<div class="line"><span class="lineno"> 1638</span>            sin_cache + (size_t)pos_offset * (<span class="keywordtype">size_t</span>)cache_half;</div>
-<div class="line"><span class="lineno"> 1639</span>        <a class="code hl_function" href="rope__kernels_8c.html#ab00d0c82cae48c5b6e7a263af202d995">rope_apply_decode_pairwise_llama_cpu</a>(</div>
-<div class="line"><span class="lineno"> 1640</span>            q, cos_row, sin_row, num_heads, aligned_head_dim, rotary_dim);</div>
-<div class="line"><span class="lineno"> 1641</span>        <a class="code hl_function" href="rope__kernels_8c.html#ab00d0c82cae48c5b6e7a263af202d995">rope_apply_decode_pairwise_llama_cpu</a>(</div>
-<div class="line"><span class="lineno"> 1642</span>            k, cos_row, sin_row, num_kv_heads, aligned_head_dim, rotary_dim);</div>
+<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l01630">1630</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 1641</span>{</div>
+<div class="line"><span class="lineno"> 1642</span>    <span class="keywordflow">if</span> (!q || !k || !cos_cache || !sin_cache || num_tokens &lt;= 0) {</div>
 <div class="line"><span class="lineno"> 1643</span>        <span class="keywordflow">return</span>;</div>
 <div class="line"><span class="lineno"> 1644</span>    }</div>
-<div class="line"><span class="lineno"> 1645</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> <a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a> = 0; <a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a> &lt; num_tokens; ++<a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a>) {</div>
-<div class="line"><span class="lineno"> 1646</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> pos = pos_offset + <a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a>;</div>
-<div class="line"><span class="lineno"> 1647</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *cos_row =</div>
-<div class="line"><span class="lineno"> 1648</span>            cos_cache + (size_t)pos * (<span class="keywordtype">size_t</span>)cache_half;</div>
-<div class="line"><span class="lineno"> 1649</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *sin_row =</div>
-<div class="line"><span class="lineno"> 1650</span>            sin_cache + (size_t)pos * (<span class="keywordtype">size_t</span>)cache_half;</div>
-<div class="line"><span class="lineno"> 1651</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> head = 0; head &lt; num_heads; ++head) {</div>
-<div class="line"><span class="lineno"> 1652</span>            <a class="code hl_function" href="rope__kernels_8c.html#ab00d0c82cae48c5b6e7a263af202d995">rope_apply_decode_pairwise_llama_cpu</a>(</div>
-<div class="line"><span class="lineno"> 1653</span>                q + (<span class="keywordtype">size_t</span>)head * head_stride</div>
-<div class="line"><span class="lineno"> 1654</span>                  + (<span class="keywordtype">size_t</span>)<a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a> * (<span class="keywordtype">size_t</span>)aligned_head_dim,</div>
-<div class="line"><span class="lineno"> 1655</span>                cos_row,</div>
-<div class="line"><span class="lineno"> 1656</span>                sin_row,</div>
-<div class="line"><span class="lineno"> 1657</span>                1,</div>
-<div class="line"><span class="lineno"> 1658</span>                aligned_head_dim,</div>
-<div class="line"><span class="lineno"> 1659</span>                rotary_dim);</div>
-<div class="line"><span class="lineno"> 1660</span>        }</div>
-<div class="line"><span class="lineno"> 1661</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> head = 0; head &lt; num_kv_heads; ++head) {</div>
-<div class="line"><span class="lineno"> 1662</span>            <a class="code hl_function" href="rope__kernels_8c.html#ab00d0c82cae48c5b6e7a263af202d995">rope_apply_decode_pairwise_llama_cpu</a>(</div>
-<div class="line"><span class="lineno"> 1663</span>                k + (<span class="keywordtype">size_t</span>)head * head_stride</div>
-<div class="line"><span class="lineno"> 1664</span>                  + (<span class="keywordtype">size_t</span>)<a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a> * (<span class="keywordtype">size_t</span>)aligned_head_dim,</div>
-<div class="line"><span class="lineno"> 1665</span>                cos_row,</div>
-<div class="line"><span class="lineno"> 1666</span>                sin_row,</div>
-<div class="line"><span class="lineno"> 1667</span>                1,</div>
-<div class="line"><span class="lineno"> 1668</span>                aligned_head_dim,</div>
-<div class="line"><span class="lineno"> 1669</span>                rotary_dim);</div>
-<div class="line"><span class="lineno"> 1670</span>        }</div>
-<div class="line"><span class="lineno"> 1671</span>    }</div>
-<div class="line"><span class="lineno"> 1672</span>}</div>
-<div class="ttc" id="arope__kernels_8c_html_ab00d0c82cae48c5b6e7a263af202d995"><div class="ttname"><a href="rope__kernels_8c.html#ab00d0c82cae48c5b6e7a263af202d995">rope_apply_decode_pairwise_llama_cpu</a></div><div class="ttdeci">static void rope_apply_decode_pairwise_llama_cpu(float *rows, const float *cos_row, const float *sin_row, int num_heads, int aligned_head_dim, int rotary_dim)</div><div class="ttdef"><b>Definition</b> <a href="rope__kernels_8c_source.html#l01592">rope_kernels.c:1592</a></div></div>
+<div class="line"><span class="lineno"> 1645</span>    <span class="keywordflow">if</span> (rotary_dim &lt;= 0 || rotary_dim &gt; head_dim) {</div>
+<div class="line"><span class="lineno"> 1646</span>        rotary_dim = head_dim;</div>
+<div class="line"><span class="lineno"> 1647</span>    }</div>
+<div class="line"><span class="lineno"> 1648</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> cache_half = rotary_dim / 2;</div>
+<div class="line"><span class="lineno"> 1649</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> head_stride =</div>
+<div class="line"><span class="lineno"> 1650</span>        (size_t)num_tokens * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
+<div class="line"><span class="lineno"> 1651</span>    <span class="keywordflow">if</span> (num_tokens == 1) {</div>
+<div class="line"><span class="lineno"> 1652</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *cos_row =</div>
+<div class="line"><span class="lineno"> 1653</span>            cos_cache + (size_t)pos_offset * (<span class="keywordtype">size_t</span>)cache_half;</div>
+<div class="line"><span class="lineno"> 1654</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *sin_row =</div>
+<div class="line"><span class="lineno"> 1655</span>            sin_cache + (size_t)pos_offset * (<span class="keywordtype">size_t</span>)cache_half;</div>
+<div class="line"><span class="lineno"> 1656</span>        <a class="code hl_function" href="rope__kernels_8c.html#ab00d0c82cae48c5b6e7a263af202d995">rope_apply_decode_pairwise_llama_cpu</a>(</div>
+<div class="line"><span class="lineno"> 1657</span>            q, cos_row, sin_row, num_heads, aligned_head_dim, rotary_dim);</div>
+<div class="line"><span class="lineno"> 1658</span>        <a class="code hl_function" href="rope__kernels_8c.html#ab00d0c82cae48c5b6e7a263af202d995">rope_apply_decode_pairwise_llama_cpu</a>(</div>
+<div class="line"><span class="lineno"> 1659</span>            k, cos_row, sin_row, num_kv_heads, aligned_head_dim, rotary_dim);</div>
+<div class="line"><span class="lineno"> 1660</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1661</span>    }</div>
+<div class="line"><span class="lineno"> 1662</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> <a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a> = 0; <a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a> &lt; num_tokens; ++<a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a>) {</div>
+<div class="line"><span class="lineno"> 1663</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> pos = pos_offset + <a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a>;</div>
+<div class="line"><span class="lineno"> 1664</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *cos_row =</div>
+<div class="line"><span class="lineno"> 1665</span>            cos_cache + (size_t)pos * (<span class="keywordtype">size_t</span>)cache_half;</div>
+<div class="line"><span class="lineno"> 1666</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *sin_row =</div>
+<div class="line"><span class="lineno"> 1667</span>            sin_cache + (size_t)pos * (<span class="keywordtype">size_t</span>)cache_half;</div>
+<div class="line"><span class="lineno"> 1668</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> head = 0; head &lt; num_heads; ++head) {</div>
+<div class="line"><span class="lineno"> 1669</span>            <a class="code hl_function" href="rope__kernels_8c.html#ab00d0c82cae48c5b6e7a263af202d995">rope_apply_decode_pairwise_llama_cpu</a>(</div>
+<div class="line"><span class="lineno"> 1670</span>                q + (<span class="keywordtype">size_t</span>)head * head_stride</div>
+<div class="line"><span class="lineno"> 1671</span>                  + (<span class="keywordtype">size_t</span>)<a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a> * (<span class="keywordtype">size_t</span>)aligned_head_dim,</div>
+<div class="line"><span class="lineno"> 1672</span>                cos_row,</div>
+<div class="line"><span class="lineno"> 1673</span>                sin_row,</div>
+<div class="line"><span class="lineno"> 1674</span>                1,</div>
+<div class="line"><span class="lineno"> 1675</span>                aligned_head_dim,</div>
+<div class="line"><span class="lineno"> 1676</span>                rotary_dim);</div>
+<div class="line"><span class="lineno"> 1677</span>        }</div>
+<div class="line"><span class="lineno"> 1678</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> head = 0; head &lt; num_kv_heads; ++head) {</div>
+<div class="line"><span class="lineno"> 1679</span>            <a class="code hl_function" href="rope__kernels_8c.html#ab00d0c82cae48c5b6e7a263af202d995">rope_apply_decode_pairwise_llama_cpu</a>(</div>
+<div class="line"><span class="lineno"> 1680</span>                k + (<span class="keywordtype">size_t</span>)head * head_stride</div>
+<div class="line"><span class="lineno"> 1681</span>                  + (<span class="keywordtype">size_t</span>)<a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a> * (<span class="keywordtype">size_t</span>)aligned_head_dim,</div>
+<div class="line"><span class="lineno"> 1682</span>                cos_row,</div>
+<div class="line"><span class="lineno"> 1683</span>                sin_row,</div>
+<div class="line"><span class="lineno"> 1684</span>                1,</div>
+<div class="line"><span class="lineno"> 1685</span>                aligned_head_dim,</div>
+<div class="line"><span class="lineno"> 1686</span>                rotary_dim);</div>
+<div class="line"><span class="lineno"> 1687</span>        }</div>
+<div class="line"><span class="lineno"> 1688</span>    }</div>
+<div class="line"><span class="lineno"> 1689</span>}</div>
+<div class="ttc" id="arope__kernels_8c_html_ab00d0c82cae48c5b6e7a263af202d995"><div class="ttname"><a href="rope__kernels_8c.html#ab00d0c82cae48c5b6e7a263af202d995">rope_apply_decode_pairwise_llama_cpu</a></div><div class="ttdeci">static void rope_apply_decode_pairwise_llama_cpu(float *rows, const float *cos_row, const float *sin_row, int num_heads, int aligned_head_dim, int rotary_dim)</div><div class="ttdef"><b>Definition</b> <a href="rope__kernels_8c_source.html#l01609">rope_kernels.c:1609</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="rope__kernels_8c_source.html#l01592">rope_apply_decode_pairwise_llama_cpu()</a>, and <a class="el" href="tokenizer_8h_source.html#l00307">token</a>.</p>
+<p class="reference">References <a class="el" href="rope__kernels_8c_source.html#l01609">rope_apply_decode_pairwise_llama_cpu()</a>, and <a class="el" href="tokenizer_8h_source.html#l00307">token</a>.</p>
 
 </div>
 </div>
@@ -58140,23 +58229,23 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l01556">1556</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 1567</span>{</div>
-<div class="line"><span class="lineno"> 1568</span>    <span class="keywordtype">size_t</span> q_head_stride = (size_t)num_tokens * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
-<div class="line"><span class="lineno"> 1569</span>    <span class="keywordtype">size_t</span> k_head_stride = (size_t)num_tokens * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
-<div class="line"><span class="lineno"> 1570</span> </div>
-<div class="line"><span class="lineno"> 1571</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
-<div class="line"><span class="lineno"> 1572</span>        <a class="code hl_function" href="rope__kernels_8c.html#a2ec35bba368786079155a0f5d81d637c">rope_apply_head_pairwise</a>(q + (<span class="keywordtype">size_t</span>) h * q_head_stride,</div>
-<div class="line"><span class="lineno"> 1573</span>                                 cos_cache, sin_cache,</div>
-<div class="line"><span class="lineno"> 1574</span>                                 num_tokens, head_dim, aligned_head_dim, pos_offset, rotary_dim);</div>
-<div class="line"><span class="lineno"> 1575</span>    }</div>
-<div class="line"><span class="lineno"> 1576</span> </div>
-<div class="line"><span class="lineno"> 1577</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_kv_heads; ++h) {</div>
-<div class="line"><span class="lineno"> 1578</span>        <a class="code hl_function" href="rope__kernels_8c.html#a2ec35bba368786079155a0f5d81d637c">rope_apply_head_pairwise</a>(k + (<span class="keywordtype">size_t</span>) h * k_head_stride,</div>
-<div class="line"><span class="lineno"> 1579</span>                                 cos_cache, sin_cache,</div>
-<div class="line"><span class="lineno"> 1580</span>                                 num_tokens, head_dim, aligned_head_dim, pos_offset, rotary_dim);</div>
-<div class="line"><span class="lineno"> 1581</span>    }</div>
-<div class="line"><span class="lineno"> 1582</span>}</div>
+<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l01573">1573</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 1584</span>{</div>
+<div class="line"><span class="lineno"> 1585</span>    <span class="keywordtype">size_t</span> q_head_stride = (size_t)num_tokens * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
+<div class="line"><span class="lineno"> 1586</span>    <span class="keywordtype">size_t</span> k_head_stride = (size_t)num_tokens * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
+<div class="line"><span class="lineno"> 1587</span> </div>
+<div class="line"><span class="lineno"> 1588</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
+<div class="line"><span class="lineno"> 1589</span>        <a class="code hl_function" href="rope__kernels_8c.html#a2ec35bba368786079155a0f5d81d637c">rope_apply_head_pairwise</a>(q + (<span class="keywordtype">size_t</span>) h * q_head_stride,</div>
+<div class="line"><span class="lineno"> 1590</span>                                 cos_cache, sin_cache,</div>
+<div class="line"><span class="lineno"> 1591</span>                                 num_tokens, head_dim, aligned_head_dim, pos_offset, rotary_dim);</div>
+<div class="line"><span class="lineno"> 1592</span>    }</div>
+<div class="line"><span class="lineno"> 1593</span> </div>
+<div class="line"><span class="lineno"> 1594</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_kv_heads; ++h) {</div>
+<div class="line"><span class="lineno"> 1595</span>        <a class="code hl_function" href="rope__kernels_8c.html#a2ec35bba368786079155a0f5d81d637c">rope_apply_head_pairwise</a>(k + (<span class="keywordtype">size_t</span>) h * k_head_stride,</div>
+<div class="line"><span class="lineno"> 1596</span>                                 cos_cache, sin_cache,</div>
+<div class="line"><span class="lineno"> 1597</span>                                 num_tokens, head_dim, aligned_head_dim, pos_offset, rotary_dim);</div>
+<div class="line"><span class="lineno"> 1598</span>    }</div>
+<div class="line"><span class="lineno"> 1599</span>}</div>
 <div class="ttc" id="arope__kernels_8c_html_a2ec35bba368786079155a0f5d81d637c"><div class="ttname"><a href="rope__kernels_8c.html#a2ec35bba368786079155a0f5d81d637c">rope_apply_head_pairwise</a></div><div class="ttdeci">static void rope_apply_head_pairwise(float *x, const float *cos_cache, const float *sin_cache, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int rotary_dim)</div><div class="ttdef"><b>Definition</b> <a href="rope__kernels_8c_source.html#l00707">rope_kernels.c:707</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="rope__kernels_8c_source.html#l00707">rope_apply_head_pairwise()</a>.</p>
@@ -58261,7 +58350,7 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="rope__kernels_8c_source.html#l01128">rope_forward_split_direct_one()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="rope__kernels_8c_source.html#l01390">rope_forward_qk_gemma4_direct()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="rope__kernels_8c_source.html#l01407">rope_forward_qk_gemma4_direct()</a>.</p>
 
 </div>
 </div>
@@ -58653,6 +58742,8 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="rope__kernels_8c_source.html#l00108">ck_rope_reference_cosf()</a>, <a class="el" href="rope__kernels_8c_source.html#l00126">ck_rope_reference_powf()</a>, and <a class="el" href="rope__kernels_8c_source.html#l00117">ck_rope_reference_sinf()</a>.</p>
 
+<p class="reference">Referenced by <a class="el" href="rope__kernels_8c_source.html#l01390">rope_forward_q_split_llama_f32()</a>.</p>
+
 </div>
 </div>
 <a id="a0c3b8a23b665607b44ca3100ad11f09d" name="a0c3b8a23b665607b44ca3100ad11f09d"></a>
@@ -58746,15 +58837,15 @@ Functions</h2></td></tr>
 <p>Combined QK RoPE with configurable strides for KV cache layouts.</p>
 <p>After changes: make test </p>
 
-<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l02851">2851</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 2863</span>{</div>
-<div class="line"><span class="lineno"> 2864</span>    <a class="code hl_function" href="rope__kernels_8c.html#a4756a1d3ed09d64c10f09ccea44ad8bb">rope_forward_qk_strided_with_rotary_dim</a>(q, k, cos_cache, sin_cache, num_heads, num_kv_heads,</div>
-<div class="line"><span class="lineno"> 2865</span>                                           num_tokens, head_dim, aligned_head_dim, pos_offset,</div>
-<div class="line"><span class="lineno"> 2866</span>                                           q_stride_tokens, k_stride_tokens, head_dim);</div>
-<div class="line"><span class="lineno"> 2867</span>}</div>
-<div class="ttc" id="arope__kernels_8c_html_a4756a1d3ed09d64c10f09ccea44ad8bb"><div class="ttname"><a href="rope__kernels_8c.html#a4756a1d3ed09d64c10f09ccea44ad8bb">rope_forward_qk_strided_with_rotary_dim</a></div><div class="ttdeci">void rope_forward_qk_strided_with_rotary_dim(float *q, float *k, const float *cos_cache, const float *sin_cache, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int q_stride_tokens, int k_stride_tokens, int rotary_dim)</div><div class="ttdef"><b>Definition</b> <a href="rope__kernels_8c_source.html#l02869">rope_kernels.c:2869</a></div></div>
+<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l02868">2868</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 2880</span>{</div>
+<div class="line"><span class="lineno"> 2881</span>    <a class="code hl_function" href="rope__kernels_8c.html#a4756a1d3ed09d64c10f09ccea44ad8bb">rope_forward_qk_strided_with_rotary_dim</a>(q, k, cos_cache, sin_cache, num_heads, num_kv_heads,</div>
+<div class="line"><span class="lineno"> 2882</span>                                           num_tokens, head_dim, aligned_head_dim, pos_offset,</div>
+<div class="line"><span class="lineno"> 2883</span>                                           q_stride_tokens, k_stride_tokens, head_dim);</div>
+<div class="line"><span class="lineno"> 2884</span>}</div>
+<div class="ttc" id="arope__kernels_8c_html_a4756a1d3ed09d64c10f09ccea44ad8bb"><div class="ttname"><a href="rope__kernels_8c.html#a4756a1d3ed09d64c10f09ccea44ad8bb">rope_forward_qk_strided_with_rotary_dim</a></div><div class="ttdeci">void rope_forward_qk_strided_with_rotary_dim(float *q, float *k, const float *cos_cache, const float *sin_cache, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int q_stride_tokens, int k_stride_tokens, int rotary_dim)</div><div class="ttdef"><b>Definition</b> <a href="rope__kernels_8c_source.html#l02886">rope_kernels.c:2886</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="rope__kernels_8c_source.html#l02869">rope_forward_qk_strided_with_rotary_dim()</a>.</p>
+<p class="reference">References <a class="el" href="rope__kernels_8c_source.html#l02886">rope_forward_qk_strided_with_rotary_dim()</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="mega__fused__attention__prefill_8c_source.html#l00160">mega_fused_attention_prefill()</a>, <a class="el" href="mega__fused__attention__prefill__q8__0_8c_source.html#l00105">mega_fused_attention_prefill_q8_0()</a>, <a class="el" href="v6_85_2test__generated_2generic__api__test_8c_source.html#l00211">model_layer_0_prefill()</a>, <a class="el" href="v6_85_2test__generated_2int8__q4k__test_8c_source.html#l00211">model_layer_0_prefill()</a>, <a class="el" href="v6_86_2test__generated_2generic__api__test_8c_source.html#l00211">model_layer_0_prefill()</a>, <a class="el" href="v6_86_2test__generated_2int8__q4k__test_8c_source.html#l00211">model_layer_0_prefill()</a>, <a class="el" href="v6_85_2test__generated_2generic__api__test_8c_source.html#l01851">model_layer_10_prefill()</a>, <a class="el" href="v6_85_2test__generated_2int8__q4k__test_8c_source.html#l01851">model_layer_10_prefill()</a>, <a class="el" href="v6_86_2test__generated_2generic__api__test_8c_source.html#l01851">model_layer_10_prefill()</a>, <a class="el" href="v6_86_2test__generated_2int8__q4k__test_8c_source.html#l01851">model_layer_10_prefill()</a>, <a class="el" href="v6_85_2test__generated_2generic__api__test_8c_source.html#l02015">model_layer_11_prefill()</a>, <a class="el" href="v6_85_2test__generated_2int8__q4k__test_8c_source.html#l02015">model_layer_11_prefill()</a>, <a class="el" href="v6_86_2test__generated_2generic__api__test_8c_source.html#l02015">model_layer_11_prefill()</a>, <a class="el" href="v6_86_2test__generated_2int8__q4k__test_8c_source.html#l02015">model_layer_11_prefill()</a>, <a class="el" href="v6_85_2test__generated_2generic__api__test_8c_source.html#l02179">model_layer_12_prefill()</a>, <a class="el" href="v6_85_2test__generated_2int8__q4k__test_8c_source.html#l02179">model_layer_12_prefill()</a>, <a class="el" href="v6_86_2test__generated_2generic__api__test_8c_source.html#l02179">model_layer_12_prefill()</a>, <a class="el" href="v6_86_2test__generated_2int8__q4k__test_8c_source.html#l02179">model_layer_12_prefill()</a>, <a class="el" href="v6_85_2test__generated_2generic__api__test_8c_source.html#l02343">model_layer_13_prefill()</a>, <a class="el" href="v6_85_2test__generated_2int8__q4k__test_8c_source.html#l02343">model_layer_13_prefill()</a>, <a class="el" href="v6_86_2test__generated_2generic__api__test_8c_source.html#l02343">model_layer_13_prefill()</a>, <a class="el" href="v6_86_2test__generated_2int8__q4k__test_8c_source.html#l02343">model_layer_13_prefill()</a>, <a class="el" href="v6_85_2test__generated_2generic__api__test_8c_source.html#l02507">model_layer_14_prefill()</a>, <a class="el" href="v6_85_2test__generated_2int8__q4k__test_8c_source.html#l02507">model_layer_14_prefill()</a>, <a class="el" href="v6_86_2test__generated_2generic__api__test_8c_source.html#l02507">model_layer_14_prefill()</a>, <a class="el" href="v6_86_2test__generated_2int8__q4k__test_8c_source.html#l02507">model_layer_14_prefill()</a>, <a class="el" href="v6_85_2test__generated_2generic__api__test_8c_source.html#l02671">model_layer_15_prefill()</a>, <a class="el" href="v6_85_2test__generated_2int8__q4k__test_8c_source.html#l02671">model_layer_15_prefill()</a>, <a class="el" href="v6_86_2test__generated_2generic__api__test_8c_source.html#l02671">model_layer_15_prefill()</a>, <a class="el" href="v6_86_2test__generated_2int8__q4k__test_8c_source.html#l02671">model_layer_15_prefill()</a>, <a class="el" href="v6_85_2test__generated_2generic__api__test_8c_source.html#l02835">model_layer_16_prefill()</a>, <a class="el" href="v6_85_2test__generated_2int8__q4k__test_8c_source.html#l02835">model_layer_16_prefill()</a>, <a class="el" href="v6_86_2test__generated_2generic__api__test_8c_source.html#l02835">model_layer_16_prefill()</a>, <a class="el" href="v6_86_2test__generated_2int8__q4k__test_8c_source.html#l02835">model_layer_16_prefill()</a>, <a class="el" href="v6_85_2test__generated_2generic__api__test_8c_source.html#l02999">model_layer_17_prefill()</a>, <a class="el" href="v6_85_2test__generated_2int8__q4k__test_8c_source.html#l02999">model_layer_17_prefill()</a>, <a class="el" href="v6_86_2test__generated_2generic__api__test_8c_source.html#l02999">model_layer_17_prefill()</a>, <a class="el" href="v6_86_2test__generated_2int8__q4k__test_8c_source.html#l02999">model_layer_17_prefill()</a>, <a class="el" href="v6_85_2test__generated_2generic__api__test_8c_source.html#l03163">model_layer_18_prefill()</a>, <a class="el" href="v6_85_2test__generated_2int8__q4k__test_8c_source.html#l03163">model_layer_18_prefill()</a>, <a class="el" href="v6_86_2test__generated_2generic__api__test_8c_source.html#l03163">model_layer_18_prefill()</a>, <a class="el" href="v6_86_2test__generated_2int8__q4k__test_8c_source.html#l03163">model_layer_18_prefill()</a>, <a class="el" href="v6_85_2test__generated_2generic__api__test_8c_source.html#l03327">model_layer_19_prefill()</a>, <a class="el" href="v6_85_2test__generated_2int8__q4k__test_8c_source.html#l03327">model_layer_19_prefill()</a>, <a class="el" href="v6_86_2test__generated_2generic__api__test_8c_source.html#l03327">model_layer_19_prefill()</a>, <a class="el" href="v6_86_2test__generated_2int8__q4k__test_8c_source.html#l03327">model_layer_19_prefill()</a>, <a class="el" href="v6_85_2test__generated_2generic__api__test_8c_source.html#l00375">model_layer_1_prefill()</a>, <a class="el" href="v6_85_2test__generated_2int8__q4k__test_8c_source.html#l00375">model_layer_1_prefill()</a>, <a class="el" href="v6_86_2test__generated_2generic__api__test_8c_source.html#l00375">model_layer_1_prefill()</a>, <a class="el" href="v6_86_2test__generated_2int8__q4k__test_8c_source.html#l00375">model_layer_1_prefill()</a>, <a class="el" href="v6_85_2test__generated_2generic__api__test_8c_source.html#l03491">model_layer_20_prefill()</a>, <a class="el" href="v6_85_2test__generated_2int8__q4k__test_8c_source.html#l03491">model_layer_20_prefill()</a>, <a class="el" href="v6_86_2test__generated_2generic__api__test_8c_source.html#l03491">model_layer_20_prefill()</a>, <a class="el" href="v6_86_2test__generated_2int8__q4k__test_8c_source.html#l03491">model_layer_20_prefill()</a>, <a class="el" href="v6_85_2test__generated_2generic__api__test_8c_source.html#l03655">model_layer_21_prefill()</a>, <a class="el" href="v6_85_2test__generated_2int8__q4k__test_8c_source.html#l03655">model_layer_21_prefill()</a>, <a class="el" href="v6_86_2test__generated_2generic__api__test_8c_source.html#l03655">model_layer_21_prefill()</a>, <a class="el" href="v6_86_2test__generated_2int8__q4k__test_8c_source.html#l03655">model_layer_21_prefill()</a>, <a class="el" href="v6_85_2test__generated_2generic__api__test_8c_source.html#l03819">model_layer_22_prefill()</a>, <a class="el" href="v6_85_2test__generated_2int8__q4k__test_8c_source.html#l03819">model_layer_22_prefill()</a>, <a class="el" href="v6_86_2test__generated_2generic__api__test_8c_source.html#l03819">model_layer_22_prefill()</a>, <a class="el" href="v6_86_2test__generated_2int8__q4k__test_8c_source.html#l03819">model_layer_22_prefill()</a>, <a class="el" href="v6_85_2test__generated_2generic__api__test_8c_source.html#l03983">model_layer_23_prefill()</a>, <a class="el" href="v6_85_2test__generated_2int8__q4k__test_8c_source.html#l03983">model_layer_23_prefill()</a>, <a class="el" href="v6_86_2test__generated_2generic__api__test_8c_source.html#l03983">model_layer_23_prefill()</a>, <a class="el" href="v6_86_2test__generated_2int8__q4k__test_8c_source.html#l03983">model_layer_23_prefill()</a>, <a class="el" href="v6_85_2test__generated_2generic__api__test_8c_source.html#l00539">model_layer_2_prefill()</a>, <a class="el" href="v6_85_2test__generated_2int8__q4k__test_8c_source.html#l00539">model_layer_2_prefill()</a>, <a class="el" href="v6_86_2test__generated_2generic__api__test_8c_source.html#l00539">model_layer_2_prefill()</a>, <a class="el" href="v6_86_2test__generated_2int8__q4k__test_8c_source.html#l00539">model_layer_2_prefill()</a>, <a class="el" href="v6_85_2test__generated_2generic__api__test_8c_source.html#l00703">model_layer_3_prefill()</a>, <a class="el" href="v6_85_2test__generated_2int8__q4k__test_8c_source.html#l00703">model_layer_3_prefill()</a>, <a class="el" href="v6_86_2test__generated_2generic__api__test_8c_source.html#l00703">model_layer_3_prefill()</a>, <a class="el" href="v6_86_2test__generated_2int8__q4k__test_8c_source.html#l00703">model_layer_3_prefill()</a>, <a class="el" href="v6_85_2test__generated_2generic__api__test_8c_source.html#l00867">model_layer_4_prefill()</a>, <a class="el" href="v6_85_2test__generated_2int8__q4k__test_8c_source.html#l00867">model_layer_4_prefill()</a>, <a class="el" href="v6_86_2test__generated_2generic__api__test_8c_source.html#l00867">model_layer_4_prefill()</a>, <a class="el" href="v6_86_2test__generated_2int8__q4k__test_8c_source.html#l00867">model_layer_4_prefill()</a>, <a class="el" href="v6_85_2test__generated_2generic__api__test_8c_source.html#l01031">model_layer_5_prefill()</a>, <a class="el" href="v6_85_2test__generated_2int8__q4k__test_8c_source.html#l01031">model_layer_5_prefill()</a>, <a class="el" href="v6_86_2test__generated_2generic__api__test_8c_source.html#l01031">model_layer_5_prefill()</a>, <a class="el" href="v6_86_2test__generated_2int8__q4k__test_8c_source.html#l01031">model_layer_5_prefill()</a>, <a class="el" href="v6_85_2test__generated_2generic__api__test_8c_source.html#l01195">model_layer_6_prefill()</a>, <a class="el" href="v6_85_2test__generated_2int8__q4k__test_8c_source.html#l01195">model_layer_6_prefill()</a>, <a class="el" href="v6_86_2test__generated_2generic__api__test_8c_source.html#l01195">model_layer_6_prefill()</a>, <a class="el" href="v6_86_2test__generated_2int8__q4k__test_8c_source.html#l01195">model_layer_6_prefill()</a>, <a class="el" href="v6_85_2test__generated_2generic__api__test_8c_source.html#l01359">model_layer_7_prefill()</a>, <a class="el" href="v6_85_2test__generated_2int8__q4k__test_8c_source.html#l01359">model_layer_7_prefill()</a>, <a class="el" href="v6_86_2test__generated_2generic__api__test_8c_source.html#l01359">model_layer_7_prefill()</a>, <a class="el" href="v6_86_2test__generated_2int8__q4k__test_8c_source.html#l01359">model_layer_7_prefill()</a>, <a class="el" href="v6_85_2test__generated_2generic__api__test_8c_source.html#l01523">model_layer_8_prefill()</a>, <a class="el" href="v6_85_2test__generated_2int8__q4k__test_8c_source.html#l01523">model_layer_8_prefill()</a>, <a class="el" href="v6_86_2test__generated_2generic__api__test_8c_source.html#l01523">model_layer_8_prefill()</a>, <a class="el" href="v6_86_2test__generated_2int8__q4k__test_8c_source.html#l01523">model_layer_8_prefill()</a>, <a class="el" href="v6_85_2test__generated_2generic__api__test_8c_source.html#l01687">model_layer_9_prefill()</a>, <a class="el" href="v6_85_2test__generated_2int8__q4k__test_8c_source.html#l01687">model_layer_9_prefill()</a>, <a class="el" href="v6_86_2test__generated_2generic__api__test_8c_source.html#l01687">model_layer_9_prefill()</a>, <a class="el" href="v6_86_2test__generated_2int8__q4k__test_8c_source.html#l01687">model_layer_9_prefill()</a>, <a class="el" href="v6_85_2test__generated_2qwen2__int8_8c_source.html#l00211">qwen2_0_5b_decode_layer_0_prefill()</a>, <a class="el" href="v6_86_2test__generated_2qwen2__int8_8c_source.html#l00211">qwen2_0_5b_decode_layer_0_prefill()</a>, <a class="el" href="v6_85_2test__generated_2qwen2__int8_8c_source.html#l01851">qwen2_0_5b_decode_layer_10_prefill()</a>, <a class="el" href="v6_86_2test__generated_2qwen2__int8_8c_source.html#l01851">qwen2_0_5b_decode_layer_10_prefill()</a>, <a class="el" href="v6_85_2test__generated_2qwen2__int8_8c_source.html#l02015">qwen2_0_5b_decode_layer_11_prefill()</a>, <a class="el" href="v6_86_2test__generated_2qwen2__int8_8c_source.html#l02015">qwen2_0_5b_decode_layer_11_prefill()</a>, <a class="el" href="v6_85_2test__generated_2qwen2__int8_8c_source.html#l02179">qwen2_0_5b_decode_layer_12_prefill()</a>, <a class="el" href="v6_86_2test__generated_2qwen2__int8_8c_source.html#l02179">qwen2_0_5b_decode_layer_12_prefill()</a>, <a class="el" href="v6_85_2test__generated_2qwen2__int8_8c_source.html#l02343">qwen2_0_5b_decode_layer_13_prefill()</a>, <a class="el" href="v6_86_2test__generated_2qwen2__int8_8c_source.html#l02343">qwen2_0_5b_decode_layer_13_prefill()</a>, <a class="el" href="v6_85_2test__generated_2qwen2__int8_8c_source.html#l02507">qwen2_0_5b_decode_layer_14_prefill()</a>, <a class="el" href="v6_86_2test__generated_2qwen2__int8_8c_source.html#l02507">qwen2_0_5b_decode_layer_14_prefill()</a>, <a class="el" href="v6_85_2test__generated_2qwen2__int8_8c_source.html#l02671">qwen2_0_5b_decode_layer_15_prefill()</a>, <a class="el" href="v6_86_2test__generated_2qwen2__int8_8c_source.html#l02671">qwen2_0_5b_decode_layer_15_prefill()</a>, <a class="el" href="v6_85_2test__generated_2qwen2__int8_8c_source.html#l02835">qwen2_0_5b_decode_layer_16_prefill()</a>, <a class="el" href="v6_86_2test__generated_2qwen2__int8_8c_source.html#l02835">qwen2_0_5b_decode_layer_16_prefill()</a>, <a class="el" href="v6_85_2test__generated_2qwen2__int8_8c_source.html#l02999">qwen2_0_5b_decode_layer_17_prefill()</a>, <a class="el" href="v6_86_2test__generated_2qwen2__int8_8c_source.html#l02999">qwen2_0_5b_decode_layer_17_prefill()</a>, <a class="el" href="v6_85_2test__generated_2qwen2__int8_8c_source.html#l03163">qwen2_0_5b_decode_layer_18_prefill()</a>, <a class="el" href="v6_86_2test__generated_2qwen2__int8_8c_source.html#l03163">qwen2_0_5b_decode_layer_18_prefill()</a>, <a class="el" href="v6_85_2test__generated_2qwen2__int8_8c_source.html#l03327">qwen2_0_5b_decode_layer_19_prefill()</a>, <a class="el" href="v6_86_2test__generated_2qwen2__int8_8c_source.html#l03327">qwen2_0_5b_decode_layer_19_prefill()</a>, <a class="el" href="v6_85_2test__generated_2qwen2__int8_8c_source.html#l00375">qwen2_0_5b_decode_layer_1_prefill()</a>, <a class="el" href="v6_86_2test__generated_2qwen2__int8_8c_source.html#l00375">qwen2_0_5b_decode_layer_1_prefill()</a>, <a class="el" href="v6_85_2test__generated_2qwen2__int8_8c_source.html#l03491">qwen2_0_5b_decode_layer_20_prefill()</a>, <a class="el" href="v6_86_2test__generated_2qwen2__int8_8c_source.html#l03491">qwen2_0_5b_decode_layer_20_prefill()</a>, <a class="el" href="v6_85_2test__generated_2qwen2__int8_8c_source.html#l03655">qwen2_0_5b_decode_layer_21_prefill()</a>, <a class="el" href="v6_86_2test__generated_2qwen2__int8_8c_source.html#l03655">qwen2_0_5b_decode_layer_21_prefill()</a>, <a class="el" href="v6_85_2test__generated_2qwen2__int8_8c_source.html#l03819">qwen2_0_5b_decode_layer_22_prefill()</a>, <a class="el" href="v6_86_2test__generated_2qwen2__int8_8c_source.html#l03819">qwen2_0_5b_decode_layer_22_prefill()</a>, <a class="el" href="v6_85_2test__generated_2qwen2__int8_8c_source.html#l03983">qwen2_0_5b_decode_layer_23_prefill()</a>, <a class="el" href="v6_86_2test__generated_2qwen2__int8_8c_source.html#l03983">qwen2_0_5b_decode_layer_23_prefill()</a>, <a class="el" href="v6_85_2test__generated_2qwen2__int8_8c_source.html#l00539">qwen2_0_5b_decode_layer_2_prefill()</a>, <a class="el" href="v6_86_2test__generated_2qwen2__int8_8c_source.html#l00539">qwen2_0_5b_decode_layer_2_prefill()</a>, <a class="el" href="v6_85_2test__generated_2qwen2__int8_8c_source.html#l00703">qwen2_0_5b_decode_layer_3_prefill()</a>, <a class="el" href="v6_86_2test__generated_2qwen2__int8_8c_source.html#l00703">qwen2_0_5b_decode_layer_3_prefill()</a>, <a class="el" href="v6_85_2test__generated_2qwen2__int8_8c_source.html#l00867">qwen2_0_5b_decode_layer_4_prefill()</a>, <a class="el" href="v6_86_2test__generated_2qwen2__int8_8c_source.html#l00867">qwen2_0_5b_decode_layer_4_prefill()</a>, <a class="el" href="v6_85_2test__generated_2qwen2__int8_8c_source.html#l01031">qwen2_0_5b_decode_layer_5_prefill()</a>, <a class="el" href="v6_86_2test__generated_2qwen2__int8_8c_source.html#l01031">qwen2_0_5b_decode_layer_5_prefill()</a>, <a class="el" href="v6_85_2test__generated_2qwen2__int8_8c_source.html#l01195">qwen2_0_5b_decode_layer_6_prefill()</a>, <a class="el" href="v6_86_2test__generated_2qwen2__int8_8c_source.html#l01195">qwen2_0_5b_decode_layer_6_prefill()</a>, <a class="el" href="v6_85_2test__generated_2qwen2__int8_8c_source.html#l01359">qwen2_0_5b_decode_layer_7_prefill()</a>, <a class="el" href="v6_86_2test__generated_2qwen2__int8_8c_source.html#l01359">qwen2_0_5b_decode_layer_7_prefill()</a>, <a class="el" href="v6_85_2test__generated_2qwen2__int8_8c_source.html#l01523">qwen2_0_5b_decode_layer_8_prefill()</a>, <a class="el" href="v6_86_2test__generated_2qwen2__int8_8c_source.html#l01523">qwen2_0_5b_decode_layer_8_prefill()</a>, <a class="el" href="v6_85_2test__generated_2qwen2__int8_8c_source.html#l01687">qwen2_0_5b_decode_layer_9_prefill()</a>, and <a class="el" href="v6_86_2test__generated_2qwen2__int8_8c_source.html#l01687">qwen2_0_5b_decode_layer_9_prefill()</a>.</p>
 
@@ -58852,20 +58943,20 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l02869">2869</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 2882</span>{</div>
-<div class="line"><span class="lineno"> 2883</span>    <a class="code hl_function" href="rope__kernels_8c.html#a3e09e39adf83d1ca84b875e4c8a179d8">rope_forward_strided_with_rotary_dim</a>(q, cos_cache, sin_cache, num_heads, num_tokens,</div>
-<div class="line"><span class="lineno"> 2884</span>                                       head_dim, aligned_head_dim, pos_offset,</div>
-<div class="line"><span class="lineno"> 2885</span>                                       q_stride_tokens, rotary_dim);</div>
-<div class="line"><span class="lineno"> 2886</span>    <a class="code hl_function" href="rope__kernels_8c.html#a3e09e39adf83d1ca84b875e4c8a179d8">rope_forward_strided_with_rotary_dim</a>(k, cos_cache, sin_cache, num_kv_heads, num_tokens,</div>
-<div class="line"><span class="lineno"> 2887</span>                                       head_dim, aligned_head_dim, pos_offset,</div>
-<div class="line"><span class="lineno"> 2888</span>                                       k_stride_tokens, rotary_dim);</div>
-<div class="line"><span class="lineno"> 2889</span>}</div>
+<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l02886">2886</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 2899</span>{</div>
+<div class="line"><span class="lineno"> 2900</span>    <a class="code hl_function" href="rope__kernels_8c.html#a3e09e39adf83d1ca84b875e4c8a179d8">rope_forward_strided_with_rotary_dim</a>(q, cos_cache, sin_cache, num_heads, num_tokens,</div>
+<div class="line"><span class="lineno"> 2901</span>                                       head_dim, aligned_head_dim, pos_offset,</div>
+<div class="line"><span class="lineno"> 2902</span>                                       q_stride_tokens, rotary_dim);</div>
+<div class="line"><span class="lineno"> 2903</span>    <a class="code hl_function" href="rope__kernels_8c.html#a3e09e39adf83d1ca84b875e4c8a179d8">rope_forward_strided_with_rotary_dim</a>(k, cos_cache, sin_cache, num_kv_heads, num_tokens,</div>
+<div class="line"><span class="lineno"> 2904</span>                                       head_dim, aligned_head_dim, pos_offset,</div>
+<div class="line"><span class="lineno"> 2905</span>                                       k_stride_tokens, rotary_dim);</div>
+<div class="line"><span class="lineno"> 2906</span>}</div>
 <div class="ttc" id="arope__kernels_8c_html_a3e09e39adf83d1ca84b875e4c8a179d8"><div class="ttname"><a href="rope__kernels_8c.html#a3e09e39adf83d1ca84b875e4c8a179d8">rope_forward_strided_with_rotary_dim</a></div><div class="ttdeci">void rope_forward_strided_with_rotary_dim(float *x, const float *cos_cache, const float *sin_cache, int num_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int head_stride_tokens, int rotary_dim)</div><div class="ttdef"><b>Definition</b> <a href="rope__kernels_8c_source.html#l00852">rope_kernels.c:852</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="rope__kernels_8c_source.html#l00852">rope_forward_strided_with_rotary_dim()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="rope__kernels_8c_source.html#l02851">rope_forward_qk_strided()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="rope__kernels_8c_source.html#l02868">rope_forward_qk_strided()</a>.</p>
 
 </div>
 </div>
@@ -59049,58 +59140,58 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l01492">1492</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 1504</span>{</div>
-<div class="line"><span class="lineno"> 1505</span>    <span class="keywordflow">if</span> (rotary_dim &lt;= 0 || rotary_dim &gt; head_dim) {</div>
-<div class="line"><span class="lineno"> 1506</span>        rotary_dim = head_dim;</div>
-<div class="line"><span class="lineno"> 1507</span>    }</div>
-<div class="line"><span class="lineno"> 1508</span>    <span class="keywordflow">if</span> (cache_rotary_dim &lt; rotary_dim) {</div>
-<div class="line"><span class="lineno"> 1509</span>        cache_rotary_dim = rotary_dim;</div>
-<div class="line"><span class="lineno"> 1510</span>    }</div>
-<div class="line"><span class="lineno"> 1511</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> rotary_half = rotary_dim / 2;</div>
-<div class="line"><span class="lineno"> 1512</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> cache_half = cache_rotary_dim / 2;</div>
-<div class="line"><span class="lineno"> 1513</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> head_stride = (size_t)num_tokens * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
-<div class="line"><span class="lineno"> 1514</span> </div>
-<div class="line"><span class="lineno"> 1515</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
-<div class="line"><span class="lineno"> 1516</span>        <span class="keywordtype">float</span> *head = q + (size_t)h * head_stride;</div>
-<div class="line"><span class="lineno"> 1517</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; num_tokens; ++t) {</div>
-<div class="line"><span class="lineno"> 1518</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> pos = pos_offset + t;</div>
-<div class="line"><span class="lineno"> 1519</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *cos_row = cos_cache + (size_t)pos * (<span class="keywordtype">size_t</span>)cache_half;</div>
-<div class="line"><span class="lineno"> 1520</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *sin_row = sin_cache + (size_t)pos * (<span class="keywordtype">size_t</span>)cache_half;</div>
-<div class="line"><span class="lineno"> 1521</span>            <span class="keywordtype">float</span> *x_row = head + (size_t)t * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
-<div class="line"><span class="lineno"> 1522</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; rotary_half; ++i) {</div>
-<div class="line"><span class="lineno"> 1523</span>                <span class="keyword">const</span> <span class="keywordtype">int</span> idx0 = 2 * i;</div>
-<div class="line"><span class="lineno"> 1524</span>                <span class="keyword">const</span> <span class="keywordtype">int</span> idx1 = idx0 + 1;</div>
-<div class="line"><span class="lineno"> 1525</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> x0 = x_row[idx0];</div>
-<div class="line"><span class="lineno"> 1526</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> x1 = x_row[idx1];</div>
-<div class="line"><span class="lineno"> 1527</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> c = cos_row[i];</div>
-<div class="line"><span class="lineno"> 1528</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> sv = sin_row[i];</div>
-<div class="line"><span class="lineno"> 1529</span>                x_row[idx0] = x0 * c - x1 * sv;</div>
-<div class="line"><span class="lineno"> 1530</span>                x_row[idx1] = x0 * sv + x1 * c;</div>
-<div class="line"><span class="lineno"> 1531</span>            }</div>
-<div class="line"><span class="lineno"> 1532</span>        }</div>
-<div class="line"><span class="lineno"> 1533</span>    }</div>
-<div class="line"><span class="lineno"> 1534</span> </div>
-<div class="line"><span class="lineno"> 1535</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_kv_heads; ++h) {</div>
-<div class="line"><span class="lineno"> 1536</span>        <span class="keywordtype">float</span> *head = k + (size_t)h * head_stride;</div>
-<div class="line"><span class="lineno"> 1537</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; num_tokens; ++t) {</div>
-<div class="line"><span class="lineno"> 1538</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> pos = pos_offset + t;</div>
-<div class="line"><span class="lineno"> 1539</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *cos_row = cos_cache + (size_t)pos * (<span class="keywordtype">size_t</span>)cache_half;</div>
-<div class="line"><span class="lineno"> 1540</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *sin_row = sin_cache + (size_t)pos * (<span class="keywordtype">size_t</span>)cache_half;</div>
-<div class="line"><span class="lineno"> 1541</span>            <span class="keywordtype">float</span> *x_row = head + (size_t)t * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
-<div class="line"><span class="lineno"> 1542</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; rotary_half; ++i) {</div>
-<div class="line"><span class="lineno"> 1543</span>                <span class="keyword">const</span> <span class="keywordtype">int</span> idx0 = 2 * i;</div>
-<div class="line"><span class="lineno"> 1544</span>                <span class="keyword">const</span> <span class="keywordtype">int</span> idx1 = idx0 + 1;</div>
-<div class="line"><span class="lineno"> 1545</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> x0 = x_row[idx0];</div>
-<div class="line"><span class="lineno"> 1546</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> x1 = x_row[idx1];</div>
-<div class="line"><span class="lineno"> 1547</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> c = cos_row[i];</div>
-<div class="line"><span class="lineno"> 1548</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> sv = sin_row[i];</div>
-<div class="line"><span class="lineno"> 1549</span>                x_row[idx0] = x0 * c - x1 * sv;</div>
-<div class="line"><span class="lineno"> 1550</span>                x_row[idx1] = x0 * sv + x1 * c;</div>
-<div class="line"><span class="lineno"> 1551</span>            }</div>
-<div class="line"><span class="lineno"> 1552</span>        }</div>
-<div class="line"><span class="lineno"> 1553</span>    }</div>
-<div class="line"><span class="lineno"> 1554</span>}</div>
+<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l01509">1509</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 1521</span>{</div>
+<div class="line"><span class="lineno"> 1522</span>    <span class="keywordflow">if</span> (rotary_dim &lt;= 0 || rotary_dim &gt; head_dim) {</div>
+<div class="line"><span class="lineno"> 1523</span>        rotary_dim = head_dim;</div>
+<div class="line"><span class="lineno"> 1524</span>    }</div>
+<div class="line"><span class="lineno"> 1525</span>    <span class="keywordflow">if</span> (cache_rotary_dim &lt; rotary_dim) {</div>
+<div class="line"><span class="lineno"> 1526</span>        cache_rotary_dim = rotary_dim;</div>
+<div class="line"><span class="lineno"> 1527</span>    }</div>
+<div class="line"><span class="lineno"> 1528</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> rotary_half = rotary_dim / 2;</div>
+<div class="line"><span class="lineno"> 1529</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> cache_half = cache_rotary_dim / 2;</div>
+<div class="line"><span class="lineno"> 1530</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> head_stride = (size_t)num_tokens * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
+<div class="line"><span class="lineno"> 1531</span> </div>
+<div class="line"><span class="lineno"> 1532</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
+<div class="line"><span class="lineno"> 1533</span>        <span class="keywordtype">float</span> *head = q + (size_t)h * head_stride;</div>
+<div class="line"><span class="lineno"> 1534</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; num_tokens; ++t) {</div>
+<div class="line"><span class="lineno"> 1535</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> pos = pos_offset + t;</div>
+<div class="line"><span class="lineno"> 1536</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *cos_row = cos_cache + (size_t)pos * (<span class="keywordtype">size_t</span>)cache_half;</div>
+<div class="line"><span class="lineno"> 1537</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *sin_row = sin_cache + (size_t)pos * (<span class="keywordtype">size_t</span>)cache_half;</div>
+<div class="line"><span class="lineno"> 1538</span>            <span class="keywordtype">float</span> *x_row = head + (size_t)t * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
+<div class="line"><span class="lineno"> 1539</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; rotary_half; ++i) {</div>
+<div class="line"><span class="lineno"> 1540</span>                <span class="keyword">const</span> <span class="keywordtype">int</span> idx0 = 2 * i;</div>
+<div class="line"><span class="lineno"> 1541</span>                <span class="keyword">const</span> <span class="keywordtype">int</span> idx1 = idx0 + 1;</div>
+<div class="line"><span class="lineno"> 1542</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> x0 = x_row[idx0];</div>
+<div class="line"><span class="lineno"> 1543</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> x1 = x_row[idx1];</div>
+<div class="line"><span class="lineno"> 1544</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> c = cos_row[i];</div>
+<div class="line"><span class="lineno"> 1545</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> sv = sin_row[i];</div>
+<div class="line"><span class="lineno"> 1546</span>                x_row[idx0] = x0 * c - x1 * sv;</div>
+<div class="line"><span class="lineno"> 1547</span>                x_row[idx1] = x0 * sv + x1 * c;</div>
+<div class="line"><span class="lineno"> 1548</span>            }</div>
+<div class="line"><span class="lineno"> 1549</span>        }</div>
+<div class="line"><span class="lineno"> 1550</span>    }</div>
+<div class="line"><span class="lineno"> 1551</span> </div>
+<div class="line"><span class="lineno"> 1552</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_kv_heads; ++h) {</div>
+<div class="line"><span class="lineno"> 1553</span>        <span class="keywordtype">float</span> *head = k + (size_t)h * head_stride;</div>
+<div class="line"><span class="lineno"> 1554</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; num_tokens; ++t) {</div>
+<div class="line"><span class="lineno"> 1555</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> pos = pos_offset + t;</div>
+<div class="line"><span class="lineno"> 1556</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *cos_row = cos_cache + (size_t)pos * (<span class="keywordtype">size_t</span>)cache_half;</div>
+<div class="line"><span class="lineno"> 1557</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *sin_row = sin_cache + (size_t)pos * (<span class="keywordtype">size_t</span>)cache_half;</div>
+<div class="line"><span class="lineno"> 1558</span>            <span class="keywordtype">float</span> *x_row = head + (size_t)t * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
+<div class="line"><span class="lineno"> 1559</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; rotary_half; ++i) {</div>
+<div class="line"><span class="lineno"> 1560</span>                <span class="keyword">const</span> <span class="keywordtype">int</span> idx0 = 2 * i;</div>
+<div class="line"><span class="lineno"> 1561</span>                <span class="keyword">const</span> <span class="keywordtype">int</span> idx1 = idx0 + 1;</div>
+<div class="line"><span class="lineno"> 1562</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> x0 = x_row[idx0];</div>
+<div class="line"><span class="lineno"> 1563</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> x1 = x_row[idx1];</div>
+<div class="line"><span class="lineno"> 1564</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> c = cos_row[i];</div>
+<div class="line"><span class="lineno"> 1565</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> sv = sin_row[i];</div>
+<div class="line"><span class="lineno"> 1566</span>                x_row[idx0] = x0 * c - x1 * sv;</div>
+<div class="line"><span class="lineno"> 1567</span>                x_row[idx1] = x0 * sv + x1 * c;</div>
+<div class="line"><span class="lineno"> 1568</span>            }</div>
+<div class="line"><span class="lineno"> 1569</span>        }</div>
+<div class="line"><span class="lineno"> 1570</span>    }</div>
+<div class="line"><span class="lineno"> 1571</span>}</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -59276,7 +59367,7 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="rope__kernels_8c_source.html#l00608">rope_apply_head()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="rope__kernels_8c_source.html#l02869">rope_forward_qk_strided_with_rotary_dim()</a>, and <a class="el" href="rope__kernels_8c_source.html#l00837">rope_forward_strided()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="rope__kernels_8c_source.html#l02886">rope_forward_qk_strided_with_rotary_dim()</a>, and <a class="el" href="rope__kernels_8c_source.html#l00837">rope_forward_strided()</a>.</p>
 
 </div>
 </div>
