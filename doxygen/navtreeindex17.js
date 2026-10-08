@@ -1,5 +1,10 @@
 var NAVTREEINDEX17 =
 {
+"rmsnorm__kernels_8c.html#ac429025594088a6caf98de6d42095692":[2,0,1,1,103,2],
+"rmsnorm__kernels_8c.html#ac7fcb3a53a8ee217dc90001f3d4e049e":[2,0,1,1,103,17],
+"rmsnorm__kernels_8c.html#aca68d7dda1a7de9ff926920804751db0":[2,0,1,1,103,1],
+"rmsnorm__kernels_8c.html#accc4a3419798ce8ce3780b0f366f080a":[2,0,1,1,103,13],
+"rmsnorm__kernels_8c.html#adc6b003cb5d9f1c2977a6b9b209b84b7":[2,0,1,1,103,18],
 "rmsnorm__kernels_8c.html#ae1a6abc49e4fb2e3e65f0f105e357e1f":[2,0,1,1,103,7],
 "rmsnorm__kernels_8c.html#ae5ef54068be675ad755537dbcf9f5018":[2,0,1,1,103,11],
 "rmsnorm__kernels_8c_source.html":[2,0,1,1,103],
@@ -244,10 +249,5 @@ var NAVTREEINDEX17 =
 "structAffinityInfo.html#aed549054fb9376cc874f3d8d710d1e89":[1,0,0,5],
 "structCKAudioWavInfo.html":[1,0,15],
 "structCKAudioWavInfo.html#a028e31e0ebfd2ddaa941c841b5a4df90":[1,0,15,5],
-"structCKAudioWavInfo.html#a056e487f230f8cd625dec984e79711dd":[1,0,15,6],
-"structCKAudioWavInfo.html#a5977de925aa541e28ce598ac6005dc19":[1,0,15,1],
-"structCKAudioWavInfo.html#a7f03c9c155c83eadf60a4bf620d62ebd":[1,0,15,3],
-"structCKAudioWavInfo.html#abb73452bfec57f0df42413bf289b49e7":[1,0,15,4],
-"structCKAudioWavInfo.html#ad270c19780c360f69c9276cb9e89cff9":[1,0,15,0],
-"structCKAudioWavInfo.html#ad5701d8a252c6d90e2658d18638b8eb0":[1,0,15,2]
+"structCKAudioWavInfo.html#a056e487f230f8cd625dec984e79711dd":[1,0,15,6]
 };

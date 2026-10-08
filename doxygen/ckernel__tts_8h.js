@@ -15,5 +15,6 @@ var ckernel__tts_8h =
     [ "audio_istft_mag_phase_plan_f32", "ckernel__tts_8h.html#a5d20ffbb3739001f22b58f8e23526d50", null ],
     [ "audio_stft_mag_phase_checked_f32", "ckernel__tts_8h.html#a02be866ef4fb9eaccb9f74f7b79d193d", null ],
     [ "audio_stft_mag_phase_plan_f32", "ckernel__tts_8h.html#a260ec8d60648e11d37636b70afc492b7", null ],
+    [ "audio_stft_mag_phase_trace_checked_f32", "ckernel__tts_8h.html#a0680b129f58febba72fb4e5182090019", null ],
     [ "ck_kokoro_plan_shape_v8", "ckernel__tts_8h.html#a665733e67504d5412730d8733bceb0a4", null ]
 ];

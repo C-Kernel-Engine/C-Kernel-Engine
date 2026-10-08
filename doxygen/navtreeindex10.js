@@ -1,5 +1,9 @@
 var NAVTREEINDEX10 =
 {
+"ckernel__orchestration_8c.html#a2afc01d06448f40b94c48a51a6951dc5":[2,0,1,23,2],
+"ckernel__orchestration_8c.html#a2e894b79792aaf694427446c1d89fab8":[2,0,1,23,22],
+"ckernel__orchestration_8c.html#a34e3e4ce864cbfd383097bcf417124ad":[2,0,1,23,7],
+"ckernel__orchestration_8c.html#a35426895690beefd7b84cf090639b169":[2,0,1,23,40],
 "ckernel__orchestration_8c.html#a3754c7725e77065577179096b396c075":[2,0,1,23,28],
 "ckernel__orchestration_8c.html#a3a2f1ed53c42b0003b637f0020c419f9":[2,0,1,23,38],
 "ckernel__orchestration_8c.html#a4369f2c106b80c1888b99fe709b07f6c":[2,0,1,23,4],
@@ -203,10 +207,11 @@ var NAVTREEINDEX10 =
 "ckernel__strided__unary__checked_8h_source.html":[2,0,0,46],
 "ckernel__tts_8h.html":[2,0,0,47],
 "ckernel__tts_8h.html#a02be866ef4fb9eaccb9f74f7b79d193d":[2,0,0,47,8],
+"ckernel__tts_8h.html#a0680b129f58febba72fb4e5182090019":[2,0,0,47,10],
 "ckernel__tts_8h.html#a260ec8d60648e11d37636b70afc492b7":[2,0,0,47,9],
 "ckernel__tts_8h.html#a4c7380c2b59352b52e4769687a32a888":[2,0,0,47,6],
 "ckernel__tts_8h.html#a5d20ffbb3739001f22b58f8e23526d50":[2,0,0,47,7],
-"ckernel__tts_8h.html#a665733e67504d5412730d8733bceb0a4":[2,0,0,47,10],
+"ckernel__tts_8h.html#a665733e67504d5412730d8733bceb0a4":[2,0,0,47,11],
 "ckernel__tts_8h.html#a67439167b590e67fa58513f30f86cfac":[2,0,0,47,4],
 "ckernel__tts_8h.html#ac24cccf1fbd382d1067650282f3c3ed3":[2,0,0,47,3],
 "ckernel__tts_8h.html#ac33d7dced18028940945c35c42dadf91":[2,0,0,47,2],
@@ -244,10 +249,5 @@ var NAVTREEINDEX10 =
 "deepseek__kernels_8c.html#a3625048a020bc0685ef19a2e65b3874f":[2,0,1,1,28,11],
 "deepseek__kernels_8c.html#a42069d74cf9da1df1e67b745cc299e11":[2,0,1,1,28,21],
 "deepseek__kernels_8c.html#a47f29d3282fe91bd35a7fbf682cbcd10":[2,0,1,1,28,1],
-"deepseek__kernels_8c.html#a4882861ab445aaffa944b4b8ce3c633d":[2,0,1,1,28,32],
-"deepseek__kernels_8c.html#a56a3b28ef641f0c78cfbbb7a20b8e86d":[2,0,1,1,28,8],
-"deepseek__kernels_8c.html#a5cf609c6189f831fd35aebb7b18d14da":[2,0,1,1,28,6],
-"deepseek__kernels_8c.html#a5f3cd25acd6882deffb633effd2e7560":[2,0,1,1,28,14],
-"deepseek__kernels_8c.html#a616166a7b2d278032964e9120d2b1be9":[2,0,1,1,28,17],
-"deepseek__kernels_8c.html#a66957d98f0155057099dfe060c13c55f":[2,0,1,1,28,26]
+"deepseek__kernels_8c.html#a4882861ab445aaffa944b4b8ce3c633d":[2,0,1,1,28,32]
 };
