@@ -148,6 +148,10 @@ Macros</h2></td></tr>
 Functions</h2></td></tr>
 <tr class="memitem:aefe8b35c00236310bd648f3f8386ec39" id="r_aefe8b35c00236310bd648f3f8386ec39"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="audio__harmonic__source__checked_8c.html#aefe8b35c00236310bd648f3f8386ec39">audio_harmonic_source_checked_f32</a> (const float *f0, size_t f0_capacity, const float *gaussian, size_t gaussian_capacity, float *output, size_t output_capacity, float *phase_scratch, size_t scratch_capacity, size_t frames, size_t upsample, size_t harmonics, float sample_rate, float voiced_threshold, float sine_amp, float noise_std)</td></tr>
 <tr class="separator:aefe8b35c00236310bd648f3f8386ec39"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:acbd42e4966a4b046e748487aebf259e2" id="r_acbd42e4966a4b046e748487aebf259e2"><td class="memItemLeft" align="right" valign="top">static int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="audio__harmonic__source__checked_8c.html#acbd42e4966a4b046e748487aebf259e2">audio_harmonic_source_impl_f32</a> (const float *f0, size_t f0_capacity, const float *gaussian, size_t gaussian_capacity, float *output, size_t output_capacity, float *phase_scratch, size_t scratch_capacity, size_t frames, size_t upsample, size_t harmonics, float sample_rate, float voiced_threshold, float sine_amp, float noise_std, int weighted_fma_interpolation)</td></tr>
+<tr class="separator:acbd42e4966a4b046e748487aebf259e2"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:acbd9566690cd68610009c26351e74fc2" id="r_acbd9566690cd68610009c26351e74fc2"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="audio__harmonic__source__checked_8c.html#acbd9566690cd68610009c26351e74fc2">audio_harmonic_source_weighted_fma_checked_f32</a> (const float *f0, size_t f0_capacity, const float *gaussian, size_t gaussian_capacity, float *output, size_t output_capacity, float *phase_scratch, size_t scratch_capacity, size_t frames, size_t upsample, size_t harmonics, float sample_rate, float voiced_threshold, float sine_amp, float noise_std)</td></tr>
+<tr class="separator:acbd9566690cd68610009c26351e74fc2"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <h2 class="groupheader">Macro Definition Documentation</h2>
 <a id="a0d1153503f6c93066c77cb9a37ecf1c7" name="a0d1153503f6c93066c77cb9a37ecf1c7"></a>
@@ -271,8 +275,139 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
+<p class="definition">Definition at line <a class="el" href="audio__harmonic__source__checked_8c_source.html#l00106">106</a> of file <a class="el" href="audio__harmonic__source__checked_8c_source.html">audio_harmonic_source_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  113</span>                                     {</div>
+<div class="line"><span class="lineno">  114</span>    <span class="keywordflow">return</span> <a class="code hl_function" href="audio__harmonic__source__checked_8c.html#acbd42e4966a4b046e748487aebf259e2">audio_harmonic_source_impl_f32</a>(f0, f0_capacity, gaussian,</div>
+<div class="line"><span class="lineno">  115</span>        gaussian_capacity, output, output_capacity, phase_scratch,</div>
+<div class="line"><span class="lineno">  116</span>        scratch_capacity, frames, upsample, harmonics, sample_rate,</div>
+<div class="line"><span class="lineno">  117</span>        voiced_threshold, sine_amp, noise_std, 0);</div>
+<div class="line"><span class="lineno">  118</span>}</div>
+<div class="ttc" id="aaudio__harmonic__source__checked_8c_html_acbd42e4966a4b046e748487aebf259e2"><div class="ttname"><a href="audio__harmonic__source__checked_8c.html#acbd42e4966a4b046e748487aebf259e2">audio_harmonic_source_impl_f32</a></div><div class="ttdeci">static int audio_harmonic_source_impl_f32(const float *f0, size_t f0_capacity, const float *gaussian, size_t gaussian_capacity, float *output, size_t output_capacity, float *phase_scratch, size_t scratch_capacity, size_t frames, size_t upsample, size_t harmonics, float sample_rate, float voiced_threshold, float sine_amp, float noise_std, int weighted_fma_interpolation)</div><div class="ttdef"><b>Definition</b> <a href="audio__harmonic__source__checked_8c_source.html#l00015">audio_harmonic_source_checked.c:15</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="audio__harmonic__source__checked_8c_source.html#l00015">audio_harmonic_source_impl_f32()</a>.</p>
+
+</div>
+</div>
+<a id="acbd42e4966a4b046e748487aebf259e2" name="acbd42e4966a4b046e748487aebf259e2"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#acbd42e4966a4b046e748487aebf259e2">&#9670;&#160;</a></span>audio_harmonic_source_impl_f32()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">static int audio_harmonic_source_impl_f32 </td>
+          <td>(</td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>f0</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>f0_capacity</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>gaussian</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>gaussian_capacity</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>output</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>output_capacity</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>phase_scratch</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>scratch_capacity</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>frames</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>upsample</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>harmonics</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float&#160;</td>
+          <td class="paramname"><em>sample_rate</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float&#160;</td>
+          <td class="paramname"><em>voiced_threshold</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float&#160;</td>
+          <td class="paramname"><em>sine_amp</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float&#160;</td>
+          <td class="paramname"><em>noise_std</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>weighted_fma_interpolation</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
 <p class="definition">Definition at line <a class="el" href="audio__harmonic__source__checked_8c_source.html#l00015">15</a> of file <a class="el" href="audio__harmonic__source__checked_8c_source.html">audio_harmonic_source_checked.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   22</span>                                     {</div>
+<div class="fragment"><div class="line"><span class="lineno">   22</span>                                                                     {</div>
 <div class="line"><span class="lineno">   23</span>    <span class="keywordflow">if</span> (!frames || upsample &lt; 4 || !harmonics || !isfinite(sample_rate) ||</div>
 <div class="line"><span class="lineno">   24</span>        !isfinite(voiced_threshold) || !isfinite(sine_amp) ||</div>
 <div class="line"><span class="lineno">   25</span>        !isfinite(noise_std) || sample_rate &lt;= 0.0f || sine_amp &lt; 0.0f ||</div>
@@ -339,16 +474,22 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">   86</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> harmonic = 0; harmonic &lt; harmonics; ++harmonic) {</div>
 <div class="line"><span class="lineno">   87</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> a = phase_scratch[<a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a> * harmonics + harmonic];</div>
 <div class="line"><span class="lineno">   88</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> b = phase_scratch[<a class="code hl_variable" href="true__bpe_8h.html#afb60251d57a9ee3324fbc011e4be71e9">right</a> * harmonics + harmonic];</div>
-<div class="line"><span class="lineno">   89</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> phase = a + (b - a) * right_weight;</div>
-<div class="line"><span class="lineno">   90</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> value = sinf(phase) * sine_amp * uv +</div>
-<div class="line"><span class="lineno">   91</span>                amplitude * gaussian[sample * harmonics + harmonic];</div>
-<div class="line"><span class="lineno">   92</span>            <span class="keywordflow">if</span> (!isfinite(value)) <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__tts_8h.html#ac33d7dced18028940945c35c42dadf91a69b700acd95d7ca6a720a4d885ab53a4">CK_AUDIO_EXTENT_INVALID</a>;</div>
-<div class="line"><span class="lineno">   93</span>            staged[sample * harmonics + harmonic] = value;</div>
-<div class="line"><span class="lineno">   94</span>        }</div>
-<div class="line"><span class="lineno">   95</span>    }</div>
-<div class="line"><span class="lineno">   96</span>    memcpy(output, staged, output_need * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">   97</span>    <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__tts_8h.html#ac33d7dced18028940945c35c42dadf91ace4d803def1b18836a5cbd7fbd659af1">CK_AUDIO_EXTENT_OK</a>;</div>
-<div class="line"><span class="lineno">   98</span>}</div>
+<div class="line"><span class="lineno">   89</span>            <span class="comment">/* Keep the two numerical contracts distinct. The pinned</span></div>
+<div class="line"><span class="lineno">   90</span><span class="comment">             * PyTorch 2.8 CPU linear-upsample path evaluates the weighted</span></div>
+<div class="line"><span class="lineno">   91</span><span class="comment">             * terms as fmaf(a, 1-w, b*w), whereas the original provider</span></div>
+<div class="line"><span class="lineno">   92</span><span class="comment">             * evaluates a + (b-a)*w. */</span></div>
+<div class="line"><span class="lineno">   93</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> phase = weighted_fma_interpolation</div>
+<div class="line"><span class="lineno">   94</span>                ? fmaf(a, 1.0f - right_weight, b * right_weight)</div>
+<div class="line"><span class="lineno">   95</span>                : a + (b - a) * right_weight;</div>
+<div class="line"><span class="lineno">   96</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> value = sinf(phase) * sine_amp * uv +</div>
+<div class="line"><span class="lineno">   97</span>                amplitude * gaussian[sample * harmonics + harmonic];</div>
+<div class="line"><span class="lineno">   98</span>            <span class="keywordflow">if</span> (!isfinite(value)) <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__tts_8h.html#ac33d7dced18028940945c35c42dadf91a69b700acd95d7ca6a720a4d885ab53a4">CK_AUDIO_EXTENT_INVALID</a>;</div>
+<div class="line"><span class="lineno">   99</span>            staged[sample * harmonics + harmonic] = value;</div>
+<div class="line"><span class="lineno">  100</span>        }</div>
+<div class="line"><span class="lineno">  101</span>    }</div>
+<div class="line"><span class="lineno">  102</span>    memcpy(output, staged, output_need * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  103</span>    <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__tts_8h.html#ac33d7dced18028940945c35c42dadf91ace4d803def1b18836a5cbd7fbd659af1">CK_AUDIO_EXTENT_OK</a>;</div>
+<div class="line"><span class="lineno">  104</span>}</div>
 <div class="ttc" id="aaudio__harmonic__source__checked_8c_html_a0d1153503f6c93066c77cb9a37ecf1c7"><div class="ttname"><a href="audio__harmonic__source__checked_8c.html#a0d1153503f6c93066c77cb9a37ecf1c7">CK_SOURCE_PI_F</a></div><div class="ttdeci">#define CK_SOURCE_PI_F</div><div class="ttdef"><b>Definition</b> <a href="audio__harmonic__source__checked_8c_source.html#l00008">audio_harmonic_source_checked.c:8</a></div></div>
 <div class="ttc" id="achecked__float__buffer_8h_html_a1b266161b71bde9ca8d45c2fb5ac889a"><div class="ttname"><a href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a></div><div class="ttdeci">static int ck_checked_finite(const float *ptr, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00019">checked_float_buffer.h:19</a></div></div>
 <div class="ttc" id="achecked__float__buffer_8h_html_ada07e31487d86edb37408386003ac841"><div class="ttname"><a href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a></div><div class="ttdeci">static int ck_checked_region(const float *ptr, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00011">checked_float_buffer.h:11</a></div></div>
@@ -361,6 +502,124 @@ Functions</h2></td></tr>
 <div class="ttc" id="atrue__bpe_8h_html_afb60251d57a9ee3324fbc011e4be71e9"><div class="ttname"><a href="true__bpe_8h.html#afb60251d57a9ee3324fbc011e4be71e9">right</a></div><div class="ttdeci">const char const char * right</div><div class="ttdef"><b>Definition</b> <a href="true__bpe_8h_source.html#l00139">true_bpe.h:139</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="ckernel__tts_8h_source.html#l00042">CK_AUDIO_EXTENT_INVALID</a>, <a class="el" href="ckernel__tts_8h_source.html#l00043">CK_AUDIO_EXTENT_LIMIT</a>, <a class="el" href="ckernel__tts_8h_source.html#l00041">CK_AUDIO_EXTENT_OK</a>, <a class="el" href="ckernel__tts_8h_source.html#l00044">CK_AUDIO_EXTENT_OVERFLOW</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00019">ck_checked_finite()</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00015">ck_checked_overlap()</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00011">ck_checked_region()</a>, <a class="el" href="audio__harmonic__source__checked_8c_source.html#l00008">CK_SOURCE_PI_F</a>, <a class="el" href="true__bpe_8h_source.html#l00138">left</a>, and <a class="el" href="true__bpe_8h_source.html#l00139">right</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="audio__harmonic__source__checked_8c_source.html#l00106">audio_harmonic_source_checked_f32()</a>, and <a class="el" href="audio__harmonic__source__checked_8c_source.html#l00120">audio_harmonic_source_weighted_fma_checked_f32()</a>.</p>
+
+</div>
+</div>
+<a id="acbd9566690cd68610009c26351e74fc2" name="acbd9566690cd68610009c26351e74fc2"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#acbd9566690cd68610009c26351e74fc2">&#9670;&#160;</a></span>audio_harmonic_source_weighted_fma_checked_f32()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int audio_harmonic_source_weighted_fma_checked_f32 </td>
+          <td>(</td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>f0</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>f0_capacity</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>gaussian</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>gaussian_capacity</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>output</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>output_capacity</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>phase_scratch</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>scratch_capacity</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>frames</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>upsample</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>harmonics</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float&#160;</td>
+          <td class="paramname"><em>sample_rate</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float&#160;</td>
+          <td class="paramname"><em>voiced_threshold</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float&#160;</td>
+          <td class="paramname"><em>sine_amp</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float&#160;</td>
+          <td class="paramname"><em>noise_std</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="audio__harmonic__source__checked_8c_source.html#l00120">120</a> of file <a class="el" href="audio__harmonic__source__checked_8c_source.html">audio_harmonic_source_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  127</span>                                     {</div>
+<div class="line"><span class="lineno">  128</span>    <span class="keywordflow">return</span> <a class="code hl_function" href="audio__harmonic__source__checked_8c.html#acbd42e4966a4b046e748487aebf259e2">audio_harmonic_source_impl_f32</a>(f0, f0_capacity, gaussian,</div>
+<div class="line"><span class="lineno">  129</span>        gaussian_capacity, output, output_capacity, phase_scratch,</div>
+<div class="line"><span class="lineno">  130</span>        scratch_capacity, frames, upsample, harmonics, sample_rate,</div>
+<div class="line"><span class="lineno">  131</span>        voiced_threshold, sine_amp, noise_std, 1);</div>
+<div class="line"><span class="lineno">  132</span>}</div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="audio__harmonic__source__checked_8c_source.html#l00015">audio_harmonic_source_impl_f32()</a>.</p>
 
 </div>
 </div>

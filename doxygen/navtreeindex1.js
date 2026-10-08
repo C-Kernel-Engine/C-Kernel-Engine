@@ -112,6 +112,8 @@ var NAVTREEINDEX1 =
 "audio__duration__logits_8c_source.html":[2,0,1,1,16],
 "audio__harmonic__source__checked_8c.html":[2,0,1,1,17],
 "audio__harmonic__source__checked_8c.html#a0d1153503f6c93066c77cb9a37ecf1c7":[2,0,1,1,17,0],
+"audio__harmonic__source__checked_8c.html#acbd42e4966a4b046e748487aebf259e2":[2,0,1,1,17,2],
+"audio__harmonic__source__checked_8c.html#acbd9566690cd68610009c26351e74fc2":[2,0,1,1,17,3],
 "audio__harmonic__source__checked_8c.html#aefe8b35c00236310bd648f3f8386ec39":[2,0,1,1,17,1],
 "audio__harmonic__source__checked_8c_source.html":[2,0,1,1,17],
 "audio__istft__mag__phase_8c.html":[2,0,1,1,18],
@@ -247,7 +249,5 @@ var NAVTREEINDEX1 =
 "axpy__kernels_8c.html#a5e66fc2ca414e903095148eb8b8e274d":[2,0,1,1,26,62],
 "axpy__kernels_8c.html#a5ea49d1893860ab3abf3af98a093f84a":[2,0,1,1,26,74],
 "axpy__kernels_8c.html#a61a81e4029a3cc37bea14e7ee7017979":[2,0,1,1,26,47],
-"axpy__kernels_8c.html#a64251c6521b989ba693a28da1c174857":[2,0,1,1,26,43],
-"axpy__kernels_8c.html#a6787acbc0bea7a04bd9a9e63b6d6aff8":[2,0,1,1,26,19],
-"axpy__kernels_8c.html#a6923864d9edb216c4938436cd74a4823":[2,0,1,1,26,94]
+"axpy__kernels_8c.html#a64251c6521b989ba693a28da1c174857":[2,0,1,1,26,43]
 };

@@ -1,5 +1,7 @@
 var NAVTREEINDEX2 =
 {
+"axpy__kernels_8c.html#a6787acbc0bea7a04bd9a9e63b6d6aff8":[2,0,1,1,26,19],
+"axpy__kernels_8c.html#a6923864d9edb216c4938436cd74a4823":[2,0,1,1,26,94],
 "axpy__kernels_8c.html#a699f6dd54c706d77667704edecb7a8a4":[2,0,1,1,26,91],
 "axpy__kernels_8c.html#a6a6e4191adb59c517737d7034b98ce49":[2,0,1,1,26,27],
 "axpy__kernels_8c.html#a6f443ad72c4490505c11c15765e4bc0b":[2,0,1,1,26,41],
@@ -247,7 +249,5 @@ var NAVTREEINDEX2 =
 "ck__metrics_8h.html#a11f7b15f57f635ce706d4907a786a048":[2,0,0,4,14],
 "ck__metrics_8h.html#a13bda17865c16027ce312cdbdf01c67f":[2,0,0,4,2],
 "ck__metrics_8h.html#a448a7bf26685a19952547689ceb2eec3":[2,0,0,4,16],
-"ck__metrics_8h.html#a55f0a27b29cd93e3be9e04ba62a4574c":[2,0,0,4,17],
-"ck__metrics_8h.html#a59407fff30154c14cf57f8d62bc508ed":[2,0,0,4,12],
-"ck__metrics_8h.html#a5bc3ff05f8bb6b04d321a560d8e59253":[2,0,0,4,8]
+"ck__metrics_8h.html#a55f0a27b29cd93e3be9e04ba62a4574c":[2,0,0,4,17]
 };

@@ -1,5 +1,8 @@
 var NAVTREEINDEX20 =
 {
+"structCKMemPool.html#ac7919cceb17dccce7584f443a2f9eb4e":[1,0,44,1],
+"structCKMemPool.html#ac7e607885b7d68b849240ab7cd91ddac":[1,0,44,2],
+"structCKMemSpan.html":[1,0,45],
 "structCKMemSpan.html#a0d967f0eca56cf7113b4552d67b208e5":[1,0,45,1],
 "structCKMemSpan.html#a1a8d564452e900aa6e0978ac20b63c5e":[1,0,45,3],
 "structCKMemSpan.html#a818835e50806e8d1fd141cf97b4ea806":[1,0,45,0],
@@ -246,8 +249,5 @@ var NAVTREEINDEX20 =
 "structCKTokenizerHashTable.html#a152ddc4a230c3f1c98073cd3c3b48d58":[1,0,65,2],
 "structCKTokenizerHashTable.html#a47467c22f88499e6d80e3ce5679d1cc7":[1,0,65,0],
 "structCKTokenizerHashTable.html#a825039346d859bfce1ac75437ee17463":[1,0,65,3],
-"structCKTokenizerHashTable.html#a94372200d57fbd18f5d6d758c7f20462":[1,0,65,1],
-"structCKTokenizerMemPool.html":[1,0,66],
-"structCKTokenizerMemPool.html#a390bbe0c2c3c9c2dcc7f5fc14d8c587f":[1,0,66,3],
-"structCKTokenizerMemPool.html#a7126722d51826b28f178cf9e441d289c":[1,0,66,0]
+"structCKTokenizerHashTable.html#a94372200d57fbd18f5d6d758c7f20462":[1,0,65,1]
 };
