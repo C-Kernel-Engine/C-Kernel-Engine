@@ -586,6 +586,20 @@ def _comparison_status(
     return "pass" if numerical_match else "fail"
 
 
+def _capture_aware_status(logit_status: str, dump_report: dict[str, Any] | None) -> str:
+    if dump_report is None:
+        return logit_status
+    summary = dict(dump_report.get("summary") or {})
+    if int(summary.get("fail", 0)) > 0:
+        return "fail"
+    if (
+        str(dump_report.get("status")) != "ok"
+        or any(int(summary.get(key, 0)) > 0 for key in ("error", "missing", "warn"))
+    ):
+        return "incomplete" if logit_status == "pass" else logit_status
+    return logit_status
+
+
 def _load_llama_dump_dir(
     dump_dir: Path, *, post_layer_embedding_layers: frozenset[int] = frozenset()
 ) -> list[Any]:
@@ -1037,6 +1051,12 @@ def _ck_dump_filter_names(
             )
         if canonical_name == "kqv_wo":
             candidates.append(f"attn_out-{layer_id}" if layer_id >= 0 else "attn_out")
+        if canonical_name == "post_attn_norm":
+            candidates.append(
+                f"attn_post_norm-{layer_id}" if layer_id >= 0 else "attn_post_norm"
+            )
+        if canonical_name == "mlp_down":
+            candidates.append(f"down_proj-{layer_id}" if layer_id >= 0 else "down_proj")
         if canonical_name == "after_attn":
             candidates.extend(
                 (
@@ -1773,7 +1793,7 @@ def _coalesce_multimodal_prefill_segments(
 
         ordered: list[Any] = []
         cursor = 0
-        for _, segment_rows, _ in segments:
+        for _, segment_rows, segment_start in segments:
             match_idx = next(
                 (
                     idx
@@ -1783,12 +1803,21 @@ def _coalesce_multimodal_prefill_segments(
                 ),
                 None,
             )
-            if match_idx is None:
+            if match_idx is not None:
+                ordered.append(candidates[match_idx])
+                cursor = match_idx + 1
+                continue
+            token_rows = candidates[cursor:cursor + int(segment_rows)]
+            if len(token_rows) != int(segment_rows) or any(
+                int(np.asarray(row.data).size) != int(row_elems)
+                or int(row.token_id) != int(segment_start) + offset
+                for offset, row in enumerate(token_rows)
+            ):
                 ordered = []
                 break
-            ordered.append(candidates[match_idx])
-            cursor = match_idx + 1
-        if len(ordered) != len(segments):
+            ordered.extend(token_rows)
+            cursor += int(segment_rows)
+        if not ordered or sum(int(np.asarray(row.data).size) for row in ordered) != int(row_elems) * int(total_rows):
             coalesced.extend(candidates)
             continue
 
@@ -2359,16 +2388,18 @@ def main(argv: list[str] | None = None) -> int:
     rmse_ok = args.max_rmse_threshold is None or cmp["rmse"] <= float(args.max_rmse_threshold)
     passed = bool(top1_ok and overlap_ok and max_abs_ok and rmse_ok)
     numerical_contract_declared = args.max_abs_threshold is not None and args.max_rmse_threshold is not None
-    status = _comparison_status(
+    logit_status = _comparison_status(
         separate_prefixes=separate_prefixes,
         producers_verified=prefix_provenance is not None,
         numerical_contract_declared=numerical_contract_declared,
         numerical_match=passed,
     )
+    status = _capture_aware_status(logit_status, dump_report)
 
     report = {
         "status": status,
         "pass": status == "pass",
+        "logit_status": logit_status,
         "diagnostic_comparison_pass": passed if separate_prefixes else None,
         "comparison_scope": "independent_image_to_first_logit" if separate_prefixes else "shared_prefix_decoder_first_logit",
         "gguf_path": str(gguf_path),

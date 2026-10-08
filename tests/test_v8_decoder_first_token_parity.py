@@ -37,6 +37,22 @@ decoder_parity_v8 = _load_module("decoder_first_token_parity_v8_tests", V8_DECOD
 
 
 class V8DecoderFirstTokenParityTests(unittest.TestCase):
+    def test_capture_numerical_failure_cannot_be_hidden_by_logit_pass(self) -> None:
+        status = decoder_parity_v8._capture_aware_status
+        self.assertEqual(status("pass", None), "pass")
+        self.assertEqual(
+            status("pass", {"status": "fail", "summary": {"fail": 1}}), "fail"
+        )
+        self.assertEqual(
+            status("pass", {"status": "fail", "summary": {"error": 1}}), "incomplete"
+        )
+        self.assertEqual(
+            status("pass", {"status": "ok", "summary": {"missing": 1}}), "incomplete"
+        )
+        self.assertEqual(
+            status("incomplete", {"status": "fail", "summary": {"fail": 1}}), "fail"
+        )
+
     def test_failed_replay_removes_stale_pass_without_overwriting_inputs(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
@@ -394,6 +410,10 @@ class V8DecoderFirstTokenParityTests(unittest.TestCase):
             decoder_parity_v8._ck_dump_filter_names("result_norm,result_output"),
             "result_norm,final_norm,final_hidden,final_hidden_last,"
             "result_output,logits",
+        )
+        self.assertEqual(
+            decoder_parity_v8._ck_dump_filter_names("post_attn_norm-0,mlp_down-0"),
+            "post_attn_norm-0,attn_post_norm-0,mlp_down-0,down_proj-0",
         )
 
     def test_resolve_llama_dump_names_expands_semantic_boundaries(self) -> None:
@@ -2142,6 +2162,33 @@ class V8DecoderFirstTokenParityTests(unittest.TestCase):
             merged[0].data,
             np.arange(12, dtype=np.float32).reshape(3, 2, 2),
         )
+
+    def test_coalesce_multimodal_prefill_with_sequential_text_tokens(self) -> None:
+        dump = decoder_parity_v8.parity_test_v7.ParityDump
+        captures = [
+            dump(0, "mlp_down", np.arange(10, dtype=np.float32), 4, "fp32"),
+            dump(0, "mlp_down", np.arange(10, 154, dtype=np.float32), 76, "fp32"),
+        ]
+        captures.extend(
+            dump(0, "mlp_down", np.arange(154 + 2 * i, 156 + 2 * i, dtype=np.float32), 77 + i, "fp32")
+            for i in range(15)
+        )
+        segments = [("text_before", 5, 0), ("visual", 72, 5), ("text_after", 15, 77)]
+        row_specs = {(0, "mlp_down"): (2, (2,))}
+
+        merged = decoder_parity_v8._coalesce_multimodal_prefill_segments(
+            captures, row_specs, segments
+        )
+        self.assertEqual(len(merged), 1)
+        np.testing.assert_array_equal(
+            merged[0].data, np.arange(184, dtype=np.float32).reshape(92, 2)
+        )
+
+        captures[4].token_id = 99
+        unresolved = decoder_parity_v8._coalesce_multimodal_prefill_segments(
+            captures, row_specs, segments
+        )
+        self.assertEqual(len(unresolved), len(captures))
 
     def test_coalesce_multimodal_prefill_segments_uses_state_endpoints(self) -> None:
         dump = decoder_parity_v8.parity_test_v7.ParityDump
