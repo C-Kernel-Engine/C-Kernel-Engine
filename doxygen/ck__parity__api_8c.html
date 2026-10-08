@@ -282,7 +282,6 @@ Functions</h2></td></tr>
 <tr class="memdesc:ab58c945a0911101ac318f093dfce1770"><td class="mdescLeft">&#160;</td><td class="mdescRight">Batch GEMM with Q5_0 weights and Q8_0 activations for prefill.  <br /></td></tr>
 <tr class="separator:ab58c945a0911101ac318f093dfce1770"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ac912d4edc9cd1c7de9f1697ae510fbff" id="r_ac912d4edc9cd1c7de9f1697ae510fbff"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ck__parity__api_8c.html#ac912d4edc9cd1c7de9f1697ae510fbff">gemm_nt_q6_k_q8_k</a> (const void *A_q8, const void *B, const float *bias, float *<a class="el" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, int M, int N, int K)</td></tr>
-<tr class="memdesc:ac912d4edc9cd1c7de9f1697ae510fbff"><td class="mdescLeft">&#160;</td><td class="mdescRight">NT GEMM: C = A @ B^T where A is Q8_K and B is Q6_K.  <br /></td></tr>
 <tr class="separator:ac912d4edc9cd1c7de9f1697ae510fbff"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aa90624e7e78519324b65d6a45b346bfe" id="r_aa90624e7e78519324b65d6a45b346bfe"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ck__parity__api_8c.html#aa90624e7e78519324b65d6a45b346bfe">gemm_nt_q8_0_q8_0</a> (const void *A_q8, const void *B_q8, const float *bias, float *<a class="el" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, int M, int N, int K)</td></tr>
 <tr class="memdesc:aa90624e7e78519324b65d6a45b346bfe"><td class="mdescLeft">&#160;</td><td class="mdescRight">gemm_nt_q8_0_q8_0 with optional bias (matches header signature)  <br /></td></tr>
@@ -1344,9 +1343,9 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">  491</span> </div>
 <div class="line"><span class="lineno">  492</span>    free(q8_data);</div>
 <div class="line"><span class="lineno">  493</span>}</div>
-<div class="ttc" id="ack__parity__api_8c_html_ac912d4edc9cd1c7de9f1697ae510fbff"><div class="ttname"><a href="ck__parity__api_8c.html#ac912d4edc9cd1c7de9f1697ae510fbff">gemm_nt_q6_k_q8_k</a></div><div class="ttdeci">void gemm_nt_q6_k_q8_k(const void *A_q8, const void *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdoc">NT GEMM: C = A @ B^T where A is Q8_K and B is Q6_K.</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q6k__q8k_8c_source.html#l01515">gemm_kernels_q6k_q8k.c:1515</a></div></div>
+<div class="ttc" id="ack__parity__api_8c_html_ac912d4edc9cd1c7de9f1697ae510fbff"><div class="ttname"><a href="ck__parity__api_8c.html#ac912d4edc9cd1c7de9f1697ae510fbff">gemm_nt_q6_k_q8_k</a></div><div class="ttdeci">void gemm_nt_q6_k_q8_k(const void *A_q8, const void *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q6k__q8k_8c_source.html#l01521">gemm_kernels_q6k_q8k.c:1521</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="ck__parity__api_8h_source.html#l00028">CK_QK_K</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01515">gemm_nt_q6_k_q8_k()</a>, and <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00123">quantize_row_q8_k()</a>.</p>
+<p class="reference">References <a class="el" href="ck__parity__api_8h_source.html#l00028">CK_QK_K</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01521">gemm_nt_q6_k_q8_k()</a>, and <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00123">quantize_row_q8_k()</a>.</p>
 
 </div>
 </div>
@@ -4070,54 +4069,42 @@ Functions</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p>NT GEMM: C = A @ B^T where A is Q8_K and B is Q6_K. </p>
-<p>This is the typical inference pattern:</p><ul>
-<li>A: Activations in Q8_K format [M x K]</li>
-<li>B: Weights in Q6_K format [N x K]</li>
-<li>C: Output [M x N]</li>
-</ul>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramname">A_q8</td><td>Input activations in Q8_K format </td></tr>
-    <tr><td class="paramname">B</td><td>Weight matrix in Q6_K format </td></tr>
-    <tr><td class="paramname">bias</td><td>Optional bias vector [N] </td></tr>
-    <tr><td class="paramname">C</td><td>Output matrix </td></tr>
-    <tr><td class="paramname">M</td><td>Batch size (number of tokens) </td></tr>
-    <tr><td class="paramname">N</td><td>Output dimension </td></tr>
-    <tr><td class="paramname">K</td><td>Input dimension </td></tr>
-  </table>
-  </dd>
-</dl>
-
-<p class="definition">Definition at line <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01515">1515</a> of file <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html">gemm_kernels_q6k_q8k.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 1520</span>{</div>
-<div class="line"><span class="lineno"> 1521</span>    <span class="keywordflow">if</span> (!A_q8 || !B || !<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>) {</div>
-<div class="line"><span class="lineno"> 1522</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 1523</span>    }</div>
-<div class="line"><span class="lineno"> 1524</span>    <span class="keywordflow">if</span> (M &lt;= 0 || N &lt;= 0 || K &lt;= 0) {</div>
-<div class="line"><span class="lineno"> 1525</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 1526</span>    }</div>
-<div class="line"><span class="lineno"> 1527</span> </div>
-<div class="line"><span class="lineno"> 1528</span>    <span class="comment">/* Prefill GEMM is the hot Qwen2/Qwen3.5 MLP-down path. Keep decode</span></div>
-<div class="line"><span class="lineno"> 1529</span><span class="comment">     * gemv_q6_k_q8_k() conservative, but allow GEMM/prefill to use the</span></div>
-<div class="line"><span class="lineno"> 1530</span><span class="comment">     * parity-gated SIMD dot helper by default. CK strict parity and</span></div>
-<div class="line"><span class="lineno"> 1531</span><span class="comment">     * CK_DEBUG_Q6K_Q8K_REF=1 still force the scalar reference reduction. */</span></div>
-<div class="line"><span class="lineno"> 1532</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *A = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *)A_q8;</div>
-<div class="line"><span class="lineno"> 1533</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *W = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *)B;</div>
-<div class="line"><span class="lineno"> 1534</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_vec = K / <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
-<div class="line"><span class="lineno"> 1535</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_row = K / <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
-<div class="line"><span class="lineno"> 1536</span> </div>
-<div class="line"><span class="lineno"> 1537</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m = 0; m &lt; M; ++m) {</div>
-<div class="line"><span class="lineno"> 1538</span>        <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *a_row = A + (size_t)m * (<span class="keywordtype">size_t</span>)blocks_per_vec;</div>
-<div class="line"><span class="lineno"> 1539</span>        <span class="keywordtype">float</span> *c_row = <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a> + (size_t)m * (<span class="keywordtype">size_t</span>)N;</div>
-<div class="line"><span class="lineno"> 1540</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = 0; n &lt; N; ++n) {</div>
-<div class="line"><span class="lineno"> 1541</span>            <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *w_row = W + (size_t)n * (<span class="keywordtype">size_t</span>)blocks_per_row;</div>
-<div class="line"><span class="lineno"> 1542</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> b = bias ? bias[n] : 0.0f;</div>
-<div class="line"><span class="lineno"> 1543</span>            c_row[n] = <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#a65fa62c32264072d07f5ff8a00ded586">ck_dot_q6_k_q8_k_fast_or_ref</a>(w_row, a_row, K) + b;</div>
-<div class="line"><span class="lineno"> 1544</span>        }</div>
-<div class="line"><span class="lineno"> 1545</span>    }</div>
-<div class="line"><span class="lineno"> 1546</span>}</div>
-<div class="ttc" id="agemm__kernels__q6k__q8k_8c_html_a65fa62c32264072d07f5ff8a00ded586"><div class="ttname"><a href="gemm__kernels__q6k__q8k_8c.html#a65fa62c32264072d07f5ff8a00ded586">ck_dot_q6_k_q8_k_fast_or_ref</a></div><div class="ttdeci">static float ck_dot_q6_k_q8_k_fast_or_ref(const block_q6_K *w, const block_q8_K *x, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q6k__q8k_8c_source.html#l01641">gemm_kernels_q6k_q8k.c:1641</a></div></div>
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01521">1521</a> of file <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html">gemm_kernels_q6k_q8k.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 1526</span>{</div>
+<div class="line"><span class="lineno"> 1527</span>    <span class="keywordflow">if</span> (!A_q8 || !B || !<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>) {</div>
+<div class="line"><span class="lineno"> 1528</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1529</span>    }</div>
+<div class="line"><span class="lineno"> 1530</span>    <span class="keywordflow">if</span> (M &lt;= 0 || N &lt;= 0 || K &lt;= 0) {</div>
+<div class="line"><span class="lineno"> 1531</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1532</span>    }</div>
+<div class="line"><span class="lineno"> 1533</span><span class="preprocessor">#if defined(__AVX2__) &amp;&amp; defined(__FMA__)</span></div>
+<div class="line"><span class="lineno"> 1534</span>    <span class="keywordflow">if</span> (M &gt;= 8 &amp;&amp; <a class="code hl_function" href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a>()) {</div>
+<div class="line"><span class="lineno"> 1535</span>        <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#a4b5f491082fe215fdae989bf35ba38be">gemm_nt_q6_k_q8_k_tiled_parity</a>(A_q8, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
+<div class="line"><span class="lineno"> 1536</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1537</span>    }</div>
+<div class="line"><span class="lineno"> 1538</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno"> 1539</span> </div>
+<div class="line"><span class="lineno"> 1540</span>    <span class="comment">/* Prefill GEMM is the hot Qwen2/Qwen3.5 MLP-down path. Keep decode</span></div>
+<div class="line"><span class="lineno"> 1541</span><span class="comment">     * gemv_q6_k_q8_k() conservative, but allow GEMM/prefill to use the</span></div>
+<div class="line"><span class="lineno"> 1542</span><span class="comment">     * parity-gated SIMD dot helper by default. CK strict parity and</span></div>
+<div class="line"><span class="lineno"> 1543</span><span class="comment">     * CK_DEBUG_Q6K_Q8K_REF=1 still force the scalar reference reduction. */</span></div>
+<div class="line"><span class="lineno"> 1544</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *A = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *)A_q8;</div>
+<div class="line"><span class="lineno"> 1545</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *W = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *)B;</div>
+<div class="line"><span class="lineno"> 1546</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_vec = K / <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
+<div class="line"><span class="lineno"> 1547</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_row = K / <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
+<div class="line"><span class="lineno"> 1548</span> </div>
+<div class="line"><span class="lineno"> 1549</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m = 0; m &lt; M; ++m) {</div>
+<div class="line"><span class="lineno"> 1550</span>        <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *a_row = A + (size_t)m * (<span class="keywordtype">size_t</span>)blocks_per_vec;</div>
+<div class="line"><span class="lineno"> 1551</span>        <span class="keywordtype">float</span> *c_row = <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a> + (size_t)m * (<span class="keywordtype">size_t</span>)N;</div>
+<div class="line"><span class="lineno"> 1552</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = 0; n &lt; N; ++n) {</div>
+<div class="line"><span class="lineno"> 1553</span>            <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *w_row = W + (size_t)n * (<span class="keywordtype">size_t</span>)blocks_per_row;</div>
+<div class="line"><span class="lineno"> 1554</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> b = bias ? bias[n] : 0.0f;</div>
+<div class="line"><span class="lineno"> 1555</span>            c_row[n] = <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#a65fa62c32264072d07f5ff8a00ded586">ck_dot_q6_k_q8_k_fast_or_ref</a>(w_row, a_row, K) + b;</div>
+<div class="line"><span class="lineno"> 1556</span>        }</div>
+<div class="line"><span class="lineno"> 1557</span>    }</div>
+<div class="line"><span class="lineno"> 1558</span>}</div>
+<div class="ttc" id="agemm__kernels__q6k__q8k_8c_html_a4b5f491082fe215fdae989bf35ba38be"><div class="ttname"><a href="gemm__kernels__q6k__q8k_8c.html#a4b5f491082fe215fdae989bf35ba38be">gemm_nt_q6_k_q8_k_tiled_parity</a></div><div class="ttdeci">void gemm_nt_q6_k_q8_k_tiled_parity(const void *A_q8, const void *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdoc">NT GEMM: C = A @ B^T where A is Q8_K and B is Q6_K.</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q6k__q8k_8c_source.html#l01600">gemm_kernels_q6k_q8k.c:1600</a></div></div>
+<div class="ttc" id="agemm__kernels__q6k__q8k_8c_html_a65fa62c32264072d07f5ff8a00ded586"><div class="ttname"><a href="gemm__kernels__q6k__q8k_8c.html#a65fa62c32264072d07f5ff8a00ded586">ck_dot_q6_k_q8_k_fast_or_ref</a></div><div class="ttdeci">static float ck_dot_q6_k_q8_k_fast_or_ref(const block_q6_K *w, const block_q8_K *x, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q6k__q8k_8c_source.html#l01703">gemm_kernels_q6k_q8k.c:1703</a></div></div>
 </div><!-- fragment -->
 <p class="reference">Referenced by <a class="el" href="ck__parity__api_8c_source.html#l00467">ck_test_gemm_q6_k()</a>.</p>
 

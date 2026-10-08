@@ -16,6 +16,8 @@ var gemm__kernels__q6k__q8k_8c =
     [ "gemm_nt_q6_k_q8_k_prepared_tile_impl", "gemm__kernels__q6k__q8k_8c.html#a7b53e9b678098295f502c2275890c0f1", null ],
     [ "gemm_nt_q6_k_q8_k_tile", "gemm__kernels__q6k__q8k_8c.html#a0486ad5eb531ba02427e9765bab1d146", null ],
     [ "gemm_nt_q6_k_q8_k_tiled", "gemm__kernels__q6k__q8k_8c.html#a930bfa3a27195fd66e4af6c6d617907e", null ],
+    [ "gemm_nt_q6_k_q8_k_tiled_parity", "gemm__kernels__q6k__q8k_8c.html#a4b5f491082fe215fdae989bf35ba38be", null ],
+    [ "gemm_nt_q6_k_q8_k_tiled_parity_tile", "gemm__kernels__q6k__q8k_8c.html#a9e0903be920ed35eb17fca5396ad54e8", null ],
     [ "gemm_q6_k_q8_k", "gemm__kernels__q6k__q8k_8c.html#a6f8eb04ad56d34cf1d38d49ea19a7639", null ],
     [ "gemv_q6_k_q8_k", "gemm__kernels__q6k__q8k_8c.html#a7b78875a957c11b30c9f7170b6c87c45", null ],
     [ "gemv_q6_k_q8_k_avx", "gemm__kernels__q6k__q8k_8c.html#a2267ad482f0cda1249db2f6d5273b5da", null ],
