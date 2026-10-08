@@ -1,5 +1,17 @@
 var NAVTREEINDEX20 =
 {
+"structCKLayerOptimizerOffsets.html#a921f17f301a5fefcd8eec05f43374b24":[1,0,41,11],
+"structCKLayerOptimizerOffsets.html#a9dec06808a0e417685225e98d95ff37a":[1,0,41,12],
+"structCKLayerOptimizerOffsets.html#aa562f5efd6173858cf43d57551e53a34":[1,0,41,1],
+"structCKLayerOptimizerOffsets.html#aa94d07c14ed486b3784ca75ec9b1de27":[1,0,41,22],
+"structCKLayerOptimizerOffsets.html#aaed37ef9a87c641294a6598ba1166f7f":[1,0,41,31],
+"structCKLayerOptimizerOffsets.html#abb647ae7c60c93c7ee61deeabc9d8562":[1,0,41,25],
+"structCKLayerOptimizerOffsets.html#abeb389a924018bda89771dc56a70c2c0":[1,0,41,33],
+"structCKLayerOptimizerOffsets.html#ac4940fcc8708472a83f4622f033ebbb6":[1,0,41,18],
+"structCKLayerOptimizerOffsets.html#acc3a91921a8d0090974ece0cffbd375c":[1,0,41,17],
+"structCKLayerOptimizerOffsets.html#acd7cb9443cff2872dc2fa0c6b6b159a6":[1,0,41,24],
+"structCKLayerOptimizerOffsets.html#addd369afe39373aa6c3faf98cf3e7756":[1,0,41,13],
+"structCKLayerOptimizerOffsets.html#ae52782e743a205ddc4638286e0828993":[1,0,41,16],
 "structCKLayerOptimizerOffsets.html#af930f5e076e326272b26fb52cc4162d4":[1,0,41,37],
 "structCKMathBackend.html":[1,0,42],
 "structCKMathBackend.html#a7e59ba4baa9c776241287338a219d9c4":[1,0,42,0],
@@ -237,17 +249,5 @@ var NAVTREEINDEX20 =
 "structCKTokenizer.html#ada5e95a402ab1abb0295df8e1ecccc04":[1,0,62,31],
 "structCKTokenizer.html#ae31c798891c023a15b286fb5c6432fd1":[1,0,62,4],
 "structCKTokenizer.html#ae92078c4ca97a78a2fcce8d3193d4cd1":[1,0,62,10],
-"structCKTokenizer.html#af13d7f81c356bfb82e80d6742352a376":[1,0,62,0],
-"structCKTokenizer.html#af683cca99ab7ca70c6b680c4a276277b":[1,0,62,19],
-"structCKTokenizerConfig.html":[1,0,63],
-"structCKTokenizerConfig.html#a1c6c52e64b87d70be97a2e9547f950e5":[1,0,63,0],
-"structCKTokenizerConfig.html#a25de8175fe44fc209d958136ce3c669e":[1,0,63,9],
-"structCKTokenizerConfig.html#a61cf1a1974d46e1da99c1c86f43fad4b":[1,0,63,7],
-"structCKTokenizerConfig.html#a6318844b8b3efb4e6e5e352f1967c4a9":[1,0,63,2],
-"structCKTokenizerConfig.html#a6a4c7a490b1e83f6dfc73b351b3826ec":[1,0,63,10],
-"structCKTokenizerConfig.html#ad33c5d657dea175cb8c1ae9fdff33816":[1,0,63,3],
-"structCKTokenizerConfig.html#adeee37aac61b482ef54dc4262852a035":[1,0,63,8],
-"structCKTokenizerConfig.html#adf662a4222984144966097373043a51f":[1,0,63,1],
-"structCKTokenizerConfig.html#ae2fe2d16420d6118bc884b3f0ef17e4d":[1,0,63,6],
-"structCKTokenizerConfig.html#af82fde6580003dff44ed719380e61673":[1,0,63,4]
+"structCKTokenizer.html#af13d7f81c356bfb82e80d6742352a376":[1,0,62,0]
 };

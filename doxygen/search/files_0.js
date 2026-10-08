@@ -22,9 +22,10 @@ var searchData=
   ['audio_5fkernels_2ec_19',['audio_kernels.c',['../audio__kernels_8c.html',1,'']]],
   ['audio_5flstm_5fscan_2ec_20',['audio_lstm_scan.c',['../audio__lstm__scan_8c.html',1,'']]],
   ['audio_5fprosody_5fupsample_5fchecked_2ec_21',['audio_prosody_upsample_checked.c',['../audio__prosody__upsample__checked_8c.html',1,'']]],
-  ['audio_5fscaled_5fsum_5fstrided_2ec_22',['audio_scaled_sum_strided.c',['../audio__scaled__sum__strided_8c.html',1,'']]],
-  ['audio_5fsnake_5fchecked_2ec_23',['audio_snake_checked.c',['../audio__snake__checked_8c.html',1,'']]],
-  ['audio_5fstft_5fmag_5fphase_5fchecked_2ec_24',['audio_stft_mag_phase_checked.c',['../audio__stft__mag__phase__checked_8c.html',1,'']]],
-  ['audio_5ftext_5fembedding_2ec_25',['audio_text_embedding.c',['../audio__text__embedding_8c.html',1,'']]],
-  ['axpy_5fkernels_2ec_26',['axpy_kernels.c',['../axpy__kernels_8c.html',1,'']]]
+  ['audio_5freflect_5fpad_5fchecked_2ec_22',['audio_reflect_pad_checked.c',['../audio__reflect__pad__checked_8c.html',1,'']]],
+  ['audio_5fscaled_5fsum_5fstrided_2ec_23',['audio_scaled_sum_strided.c',['../audio__scaled__sum__strided_8c.html',1,'']]],
+  ['audio_5fsnake_5fchecked_2ec_24',['audio_snake_checked.c',['../audio__snake__checked_8c.html',1,'']]],
+  ['audio_5fstft_5fmag_5fphase_5fchecked_2ec_25',['audio_stft_mag_phase_checked.c',['../audio__stft__mag__phase__checked_8c.html',1,'']]],
+  ['audio_5ftext_5fembedding_2ec_26',['audio_text_embedding.c',['../audio__text__embedding_8c.html',1,'']]],
+  ['axpy_5fkernels_2ec_27',['axpy_kernels.c',['../axpy__kernels_8c.html',1,'']]]
 ];
