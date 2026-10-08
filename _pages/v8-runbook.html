@@ -1618,6 +1618,39 @@ version/v8/scripts/ck_serve_v8.py "$RUN_DIR" --run "$RUN_DIR" \
         single-flight execution; later layers, recurrent Qwen state, dynamic
         admission and mixed prefill/decode remain separate milestones.
     </p>
+    <p>
+        The subsequent two-row generated entry extends the checked graph-derived
+        plan across consecutive complete decoder layers. On the identified
+        Gemma3-270M Q5_K_M artifact, all 18 supported layers execute four
+        shared map-selected projection groups per layer (72 total); attention,
+        KV writes and positions remain sequence-local. The plan checks values
+        live across every split against the complete remaining graph. It rejects
+        an unsupported layer and leaves the rest of the decode path local rather
+        than assuming an unproven buffer extent or provider binding. Compact
+        row packing is required where a selected provider stride differs from
+        the live activation extent.
+    </p>
+    <p>
+        Run <code>certify_batch_decode_v8.py</code> with
+        <code>--expected-shared-layers 18 --expected-projection-groups 72</code>
+        against the identified local bundle and matching generated source. The retained
+        <code>batch_decode_gemma3_270m_multi_layer_20261008.json</code> report
+        compares complete finite logits, KV bytes and positions after each of
+        seven continuations: unequal prefixes, swapped rows, retirement and
+        slot reuse, cancellation, capacity rejection and recovery. A small
+        compiled two-layer regression runs in the standard test suite and
+        includes deliberately broken restoration and cache-ownership controls.
+        On the local i7-14700T, three artifact-identical repetitions measured
+        six isolated native decode calls at 59.4–62.1 ms versus three two-row
+        native calls at 70.6–76.8 ms. Python validation and output copying are
+        outside both timing boundaries. Thus this small-artifact batch path was
+        slower on the matched workload; it is a correctness milestone, not a
+        speedup claim. The reports record workspace and copy volume. An optional
+        monotonic-clock copy profile measured 0.748 ms of copying across three
+        instrumented steps; its instrumentation perturbs full-step timing.
+        HTTP remains single-flight; recurrent Qwen state, request
+        scheduling and mixed prefill/decode still need their own contracts.
+    </p>
 </div>
 
 <div class="card">

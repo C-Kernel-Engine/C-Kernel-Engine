@@ -1,5 +1,7 @@
 var NAVTREEINDEX10 =
 {
+"ckernel__normalization__checked_8h.html#ada75ccba3f692924bba36d5aca4f73b9":[2,0,0,39,2],
+"ckernel__normalization__checked_8h_source.html":[2,0,0,39],
 "ckernel__orchestration_8c.html":[2,0,1,23],
 "ckernel__orchestration_8c.html#a0020aef4ce512b3840b824a46e206dca":[2,0,1,23,0],
 "ckernel__orchestration_8c.html#a0f6602053e2855ed22e1fbc45e999a8a":[2,0,1,23,35],
@@ -247,7 +249,5 @@ var NAVTREEINDEX10 =
 "cpu__features_8h.html#a87e02c44ce8117ceb227f928980a175a":[2,0,0,48,6],
 "cpu__features_8h.html#a9f67b8a4e1c74de8b6f0d8b535e44877":[2,0,0,48,7],
 "cpu__features_8h.html#ab051fa0f4c2fc0723066eab07401fed6":[2,0,0,48,2],
-"cpu__features_8h.html#add9495a8b0827ace67807e0826a890d1":[2,0,0,48,8],
-"cpu__features_8h_source.html":[2,0,0,48],
-"deepseek__kernels_8c.html":[2,0,1,1,28]
+"cpu__features_8h.html#add9495a8b0827ace67807e0826a890d1":[2,0,0,48,8]
 };

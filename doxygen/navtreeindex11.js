@@ -1,5 +1,7 @@
 var NAVTREEINDEX11 =
 {
+"cpu__features_8h_source.html":[2,0,0,48],
+"deepseek__kernels_8c.html":[2,0,1,1,28],
 "deepseek__kernels_8c.html#a055589c2ea54c496e37add9646657afc":[2,0,1,1,28,22],
 "deepseek__kernels_8c.html#a0682ad34fba6fad7f8d57eb75e7be390":[2,0,1,1,28,18],
 "deepseek__kernels_8c.html#a0d2105645ed8d3c361c54d8bc14bc285":[2,0,1,1,28,25],
@@ -247,7 +249,5 @@ var NAVTREEINDEX11 =
 "gelu__kernels_8c.html#aa998c45037468b03c5fd465c640f0646":[2,0,1,1,37,9],
 "gelu__kernels_8c.html#ab02e6492df3fa0c77460a903b9b03fcc":[2,0,1,1,37,26],
 "gelu__kernels_8c.html#ab2ab62212a2b2e21b12d60f9977b31b0":[2,0,1,1,37,8],
-"gelu__kernels_8c.html#ab3debc2a69f7f85c072ab78453ec5565":[2,0,1,1,37,29],
-"gelu__kernels_8c.html#ab48a772c053be8dd3cc0f5e4ea1a1223":[2,0,1,1,37,24],
-"gelu__kernels_8c.html#abc5977fca1e95c2406a779657c4d2365":[2,0,1,1,37,22]
+"gelu__kernels_8c.html#ab3debc2a69f7f85c072ab78453ec5565":[2,0,1,1,37,29]
 };
