@@ -31,6 +31,12 @@ var ck__session__v8_8h =
       [ "CK_SESSION_STOP_CALLBACK", "ck__session__v8_8h.html#a99c0690a6129f5be6fe2adeb628fb083abb5bd1ca77db28e6acace009f2bb0589", null ],
       [ "CK_SESSION_STOP_RUNTIME_ERROR", "ck__session__v8_8h.html#a99c0690a6129f5be6fe2adeb628fb083aa1ecd3c98353aa88ee07b82032fa9191", null ]
     ] ],
+    [ "ck_session_v8_batch2_enable", "ck__session__v8_8h.html#a59d1445dc1d62694869bc7f92aef0f76", null ],
+    [ "ck_session_v8_batch2_position", "ck__session__v8_8h.html#a104bbe7060e0fbb54bbc4068e5591254", null ],
+    [ "ck_session_v8_batch2_prefill", "ck__session__v8_8h.html#a92b6b52e7a4dd1bb884c4da19a3b5015", null ],
+    [ "ck_session_v8_batch2_request_cancel", "ck__session__v8_8h.html#a5e8ba280e02e3bbbefc9e476ec60c62c", null ],
+    [ "ck_session_v8_batch2_reset_slot", "ck__session__v8_8h.html#a2bef83704381df6dd48ef00c404b0e1a", null ],
+    [ "ck_session_v8_batch2_step", "ck__session__v8_8h.html#acb9a36b7e815e71d85c9aa1ce705f45c", null ],
     [ "ck_session_v8_cancel", "ck__session__v8_8h.html#a736aca1c8f8b56040646ae69087c8f70", null ],
     [ "ck_session_v8_close", "ck__session__v8_8h.html#a16e047c4ebd2738c7bfaaee4c1434c06", null ],
     [ "ck_session_v8_decode", "ck__session__v8_8h.html#a1b94f8066481ddb1fe895c08d2e49b08", null ],
