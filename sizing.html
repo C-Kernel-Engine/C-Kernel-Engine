@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Model Sizing Lab | C-Kernel-Engine</title>
+  <meta name="description" content="Estimate model weight, KV cache, recurrent state, six-GPU placement, and an optimistic memory-bandwidth decode ceiling.">
+  <link rel="canonical" href="https://c-kernel-engine.github.io/C-Kernel-Engine/sizing.html">
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <style>
+    :root { --bg:#13191d; --surface:#1d262b; --raised:#263239; --line:#3b5057; --ink:#f3f2e9; --muted:#b6c4c3; --orange:#ffb400; --blue:#74c5e8; --green:#82d9a0; --red:#ffa19a; --font: 'Trebuchet MS', 'Avenir Next', sans-serif; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:radial-gradient(circle at 80% -10%, #29505a 0, transparent 34rem),var(--bg); color:var(--ink); font:16px/1.55 var(--font); }
+    a { color:var(--blue); }
+    button, input, select { font:inherit; }
+    button, select, input { accent-color:var(--orange); }
+    button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible { outline:3px solid var(--orange); outline-offset:2px; }
+    .mast { border-bottom:1px solid var(--line); background:#11191ccf; }
+    .mast-inner { max-width:1240px; margin:auto; padding:1rem 1.3rem; display:flex; align-items:center; justify-content:space-between; gap:1rem; }
+    .brand { color:var(--ink); text-decoration:none; font-weight:900; letter-spacing:.08em; }
+    .brand b { display:inline-grid; place-items:center; width:2.2rem; height:2.2rem; margin-right:.65rem; color:#161c1e; background:var(--orange); border-radius:.3rem; }
+    .mast nav { display:flex; flex-wrap:wrap; gap:1rem; font-size:.85rem; }
+    .mast nav a { color:var(--muted); text-decoration:none; }
+    .mast nav a[aria-current] { color:var(--orange); }
+    main { max-width:1240px; margin:auto; padding:2.3rem 1.3rem 5rem; }
+    .eyebrow { color:var(--orange); text-transform:uppercase; letter-spacing:.15em; font:bold .78rem var(--font); }
+    h1 { margin:.4rem 0; font-size:clamp(2.4rem,6vw,5.5rem); line-height:1.02; letter-spacing:-.05em; }
+    h2 { margin:0 0 .5rem; font-size:1.42rem; }
+    h3 { margin:.1rem 0 .45rem; font-size:1.02rem; }
+    p { margin:.45rem 0 .9rem; }
+    .lede { max-width:780px; font-size:1.16rem; color:var(--muted); }
+    .flag { display:inline-block; padding:.35rem .65rem; border:1px solid #a68734; color:#ffdf83; background:#322a19; border-radius:99px; font-size:.8rem; font-weight:bold; }
+    .hero { display:grid; grid-template-columns:1.3fr 1fr; gap:1.5rem; align-items:center; margin-bottom:2rem; }
+    .hero > *, .grid > *, .panel { min-width:0; }
+    .hero svg { display:block; width:100%; max-width:100%; height:auto; max-height:245px; min-width:0; }
+    .grid { display:grid; grid-template-columns:minmax(290px,410px) minmax(0,1fr); gap:1.2rem; align-items:start; }
+    .panel { border:1px solid var(--line); background:linear-gradient(145deg,var(--surface),#192226); border-radius:14px; padding:1.2rem; box-shadow:0 12px 30px #0002; margin-bottom:1.2rem; }
+    .panel p, .helper { color:var(--muted); font-size:.88rem; }
+    .stack { display:grid; gap:.8rem; }
+    label { display:block; color:var(--muted); font-size:.82rem; font-weight:700; }
+    input, select { display:block; width:100%; margin-top:.22rem; padding:.55rem .6rem; border:1px solid var(--line); border-radius:6px; background:#10181c; color:var(--ink); min-width:0; }
+    input[type=number] { font-variant-numeric:tabular-nums; }
+    .pair { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.75rem; }
+    .triple { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.65rem; }
+    .controls { display:flex; flex-wrap:wrap; gap:.55rem; margin:.8rem 0; }
+    button { background:var(--orange); color:#152025; border:0; border-radius:6px; padding:.55rem .9rem; font-weight:800; cursor:pointer; }
+    button.secondary { background:var(--raised); color:var(--ink); border:1px solid var(--line); }
+    button:hover { filter:brightness(1.12); }
+    fieldset { border:1px solid var(--line); border-radius:9px; padding:.85rem; margin:1rem 0 0; }
+    legend { color:var(--orange); font-weight:bold; padding:0 .3rem; }
+    .results { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.65rem; }
+    .metric { padding:.8rem; background:var(--raised); border-radius:8px; border:1px solid var(--line); }
+    .metric strong { display:block; font-size:1.35rem; line-height:1.2; color:var(--ink); font-variant-numeric:tabular-nums; }
+    .metric span { color:var(--muted); font-size:.78rem; }
+    .metric.ok strong { color:var(--green); } .metric.no strong { color:var(--red); }
+    .memory-svg { width:100%; height:auto; margin:.7rem 0; }
+    .legend { display:flex; flex-wrap:wrap; gap:.75rem; color:var(--muted); font-size:.78rem; }
+    .legend i { display:inline-block; width:.7rem; height:.7rem; margin-right:.28rem; border-radius:2px; }
+    .fleet { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.6rem; }
+    .gpu { background:#10191d; border:1px solid var(--line); border-radius:8px; padding:.65rem; }
+    .gpu strong { color:var(--orange); }
+    .gpu select { font-size:.8rem; }
+    .fine { font-size:.81rem; color:var(--muted); }
+    .status { min-height:1.4rem; color:var(--blue); }
+    .status.error { color:var(--red); }
+    .file-list { max-height:9rem; overflow:auto; border:1px solid var(--line); border-radius:7px; padding:.5rem; }
+    .file-list label { display:flex; align-items:flex-start; gap:.45rem; padding:.25rem; overflow-wrap:anywhere; }
+    .file-list input { width:auto; flex:none; margin:.25rem 0 0; }
+    details { margin:.7rem 0; } summary { color:var(--orange); cursor:pointer; font-weight:bold; }
+    code { color:#a5e0f5; overflow-wrap:anywhere; }
+    .formula { background:#10181c; padding:.7rem; border-left:3px solid var(--orange); font: .8rem/1.6 ui-monospace,monospace; overflow-wrap:anywhere; }
+    @media(max-width:850px) { .hero,.grid { grid-template-columns:minmax(0,1fr); } .results { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+    @media(max-width:560px) { .fleet,.triple { grid-template-columns:repeat(2,1fr); } .results { grid-template-columns:1fr 1fr; } .mast-inner { align-items:flex-start; flex-direction:column; } }
+  </style>
+</head>
+<body>
+  <header class="mast"><div class="mast-inner"><a class="brand" href="index.html"><b>CK</b>C-KERNEL-ENGINE</a><nav aria-label="Documentation"><a href="index.html">Home</a><a href="v8-runbook.html">v8 runbook</a><a href="kernel-maps.html#memory-planning">Memory planning</a><a href="sizing.html" aria-current="page">Sizing lab</a></nav></div></header>
+  <main>
+    <div class="hero"><div><span class="eyebrow">Architecture / Service planning</span><h1>Model Sizing Lab</h1><p class="lede">Six GPUs do not form one large memory pool. Place a model, choose its active contexts, and see where weights, KV cache and recurrent state consume capacity.</p><span class="flag">Estimator, not a benchmark or service guarantee</span></div>
+      <svg viewBox="0 0 520 230" role="img" aria-label="Illustration: six separate GPU memory banks, with weights and request state sharing each bank" xmlns="http://www.w3.org/2000/svg">
+        <rect x="12" y="12" width="496" height="206" rx="15" fill="#1c292e" stroke="#4b6266"/><text x="30" y="39" fill="#ffb400" font-size="13" font-weight="bold">SIX INDEPENDENT MEMORY BANKS</text>
+        <g fill="#293940" stroke="#67818a"><rect x="29" y="59" width="145" height="58" rx="7"/><rect x="188" y="59" width="145" height="58" rx="7"/><rect x="347" y="59" width="145" height="58" rx="7"/><rect x="29" y="134" width="145" height="58" rx="7"/><rect x="188" y="134" width="145" height="58" rx="7"/><rect x="347" y="134" width="145" height="58" rx="7"/></g>
+        <g fill="#ffb400"><rect x="40" y="81" width="70" height="18" rx="2"/><rect x="199" y="81" width="70" height="18" rx="2"/><rect x="358" y="81" width="70" height="18" rx="2"/><rect x="40" y="156" width="70" height="18" rx="2"/><rect x="199" y="156" width="70" height="18" rx="2"/><rect x="358" y="156" width="70" height="18" rx="2"/></g>
+        <g fill="#74c5e8"><rect x="112" y="81" width="35" height="18" rx="2"/><rect x="271" y="81" width="35" height="18" rx="2"/><rect x="430" y="81" width="35" height="18" rx="2"/><rect x="112" y="156" width="35" height="18" rx="2"/><rect x="271" y="156" width="35" height="18" rx="2"/><rect x="430" y="156" width="35" height="18" rx="2"/></g>
+        <g fill="#f3f2e9" font-size="10" font-family="sans-serif"><text x="40" y="76">GPU 1</text><text x="199" y="76">GPU 2</text><text x="358" y="76">GPU 3</text><text x="40" y="151">GPU 4</text><text x="199" y="151">GPU 5</text><text x="358" y="151">GPU 6</text></g>
+      </svg></div>
+    <div class="grid"><div>
+      <section class="panel"><h2>1. Choose a model</h2><p>Hugging Face lookup reads repository metadata only. Select the exact GGUF or safetensors files; no weight download occurs.</p><label for="hf-url">Hugging Face model URL</label><input id="hf-url" type="url" placeholder="https://huggingface.co/owner/model"><div class="controls"><button id="hf-load" type="button">Read metadata</button><button id="preset-qwen" class="secondary" type="button">Qwen pattern</button><button id="preset-gemma" class="secondary" type="button">Gemma pattern</button><button id="preset-nemotron" class="secondary" type="button">Nemotron pattern</button></div><div id="hf-status" class="status" role="status" aria-live="polite"></div><div id="hf-files" class="file-list" hidden></div><p class="fine" id="hf-source">Preset patterns are illustrations, not verified checkpoint configurations. Inspect and correct every field.</p><label for="weight-gib">Selected model weights in GiB</label><input id="weight-gib" type="number" min="0" step="0.01" value="24"><p class="fine">Disk bytes are a first approximation to loaded GPU weight bytes. Conversion, repacking, scales and padding can change this.</p></section>
+      <section class="panel"><h2>2. Declare the cache</h2><p>Enter <em>distinct KV storage owners</em>, not just the number of attention layers. A layer reusing another layer's cache does not own another copy.</p><div class="pair"><label>Full-context KV owners<input id="full-owners" type="number" min="0" step="1" value="8"></label><label>Sliding KV owners<input id="local-owners" type="number" min="0" step="1" value="0"></label><label>Recurrent layers<input id="recurrent-layers" type="number" min="0" step="1" value="24"></label><label>State MiB / recurrent layer<input id="state-mib" type="number" min="0" step="0.1" value="1"></label><label>Global KV heads<input id="kv-heads" type="number" min="1" step="1" value="2"></label><label>Global K dimension<input id="k-dim" type="number" min="1" step="1" value="256"></label><label>Global V dimension<input id="v-dim" type="number" min="1" step="1" value="256"></label><label>Local KV heads<input id="local-kv-heads" type="number" min="1" step="1" value="2"></label><label>Local K dimension<input id="local-k-dim" type="number" min="1" step="1" value="256"></label><label>Local V dimension<input id="local-v-dim" type="number" min="1" step="1" value="256"></label><label>KV bytes / element<select id="kv-bytes"><option value="2">BF16 / FP16 (2)</option><option value="1">INT8 / FP8 (1)</option><option value="4">FP32 (4)</option></select></label><label>Sliding window tokens<input id="window" type="number" min="0" step="1" value="1024"></label><label>Local cache storage<select id="local-storage"><option value="full">Full-context allocation</option><option value="evict">Evict outside window</option></select></label></div><p class="fine">Eviction is a serving implementation choice, not guaranteed by sliding attention. CKE currently plans full-context Gemma 4 KV even where its kernel reads only the window.</p></section>
+      <section class="panel"><h2>3. Workload &amp; GPU</h2><div class="pair"><label>Resident tokens / request<input id="tokens" type="number" min="0" step="1" value="32768"></label><label>Active requests / replica<input id="requests" type="number" min="1" step="1" value="5"></label><label>GPU capacity GiB<input id="capacity-gib" type="number" min="1" step="0.1" value="89.41"></label><label>Peak bandwidth GB/s<input id="bandwidth-gbs" type="number" min="1" step="1" value="1597"></label><label>Runtime/headroom %<input id="reserve-pct" type="number" min="0" max="90" step="1" value="10"></label><label>Bandwidth efficiency %<input id="efficiency-pct" type="number" min="1" max="100" step="1" value="50"></label></div><p class="fine">Capacity defaults to 96 GB expressed as 89.41 GiB. Bandwidth defaults to the published RTX PRO 6000 Blackwell Server Edition peak; neither value is an achieved benchmark.</p></section>
+    </div><div>
+      <section class="panel"><h2>Fit on one GPU</h2><div id="error" class="status error" role="alert"></div><div class="results"><div class="metric"><strong id="fit">-</strong><span>At chosen concurrency</span></div><div class="metric"><strong id="used">-</strong><span>Estimated used memory</span></div><div class="metric"><strong id="free">-</strong><span>Headroom / deficit</span></div><div class="metric"><strong id="weight">-</strong><span>Selected weight bytes</span></div><div class="metric"><strong id="per-request">-</strong><span>KV + state / request</span></div><div class="metric"><strong id="max-requests">-</strong><span>Approx. max active requests</span></div></div>
+        <svg id="memory-svg" class="memory-svg" viewBox="0 0 640 72" role="img" aria-label="Memory allocation chart" xmlns="http://www.w3.org/2000/svg"></svg><div class="legend"><span><i style="background:#ffb400"></i>Weights</span><span><i style="background:#74c5e8"></i>KV</span><span><i style="background:#a894e6"></i>Recurrent state</span><span><i style="background:#738c90"></i>Reserve</span><span><i style="background:#33454b"></i>Free</span></div><p id="breakdown" class="fine" aria-live="polite"></p></section>
+      <section class="panel"><h2>Decode bandwidth ceiling</h2><p><span class="flag">Optimistic thought experiment</span></p><div class="results"><div class="metric"><strong id="per-user-speed">-</strong><span>Upper bound, tokens/s per active request</span></div><div class="metric"><strong id="aggregate-speed">-</strong><span>Upper bound, tokens/s per GPU</span></div><div class="metric"><strong id="fleet-speed">-</strong><span>Upper bound across selected replicas</span></div></div><p class="formula">batch bytes ≈ weights + active requests × (live KV read + recurrent state read)<br>aggregate token/s ≤ active requests × effective bandwidth ÷ batch bytes</p><p class="fine">Assumes one shared weight read per batch step, perfect scheduling, and all modeled state read once. It excludes compute, dequantization, PCIe, network, prefill, queueing and many kernel costs. A number here is <strong>not</strong> expected throughput. It is not valid when the request does not fit.</p></section>
+      <section class="panel"><h2>Six-GPU placement</h2><p>Mark GPUs serving replicas of this model; reserve the others for OCR, ASR or different models. Each replica carries its own weights and request state.</p><div id="fleet" class="fleet"></div><p id="fleet-summary" class="fine"></p></section>
+      <section class="panel"><h2>Inspect the assumptions</h2><details><summary>What this page cannot infer</summary><p>File bytes do not identify attention geometry, loaded weight precision, engine workspace or real utilization. Model-family presets are patterns only. Hugging Face metadata may be missing, gated, incomplete or ambiguous. Preprocessing and vision/audio towers need their own model memory and latency budgets.</p></details><details><summary>How to move from bound to service envelope</summary><p>Benchmark the exact checkpoint, serving backend, context distribution and mixed workload. Measure p95 first-token time, per-user token rate, queue time, and aggregate throughput. Compare observed allocated memory with this worksheet and with CKE's <a href="kernel-maps.html#memory-planning">memory plan</a>. See the <a href="q6-prefill-roofline.html">CKE roofline discussion</a> for why prefill and decode differ.</p></details><div class="controls"><button id="share" class="secondary" type="button">Copy scenario link</button><button id="export" class="secondary" type="button">Download JSON report</button></div><p id="export-status" class="status" role="status" aria-live="polite"></p></section>
+    </div></div>
+    <p class="fine">Hardware reference: <a href="https://www.nvidia.com/en-us/data-center/rtx-pro-6000-blackwell-server-edition/">NVIDIA RTX PRO 6000 Blackwell Server Edition</a>. Hugging Face metadata source: <a href="https://huggingface.co/docs/hub/en/api">Hub API</a>. This page runs in your browser and does not send your scenario to CKE.</p>
+  </main>
+  <script src="assets/model-sizing.js"></script>
+  <script src="assets/model-sizing-page.js"></script>
+</body>
+</html>
