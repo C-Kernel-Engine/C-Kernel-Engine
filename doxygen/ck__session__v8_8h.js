@@ -45,6 +45,7 @@ var ck__session__v8_8h =
     [ "ck_session_v8_generate", "ck__session__v8_8h.html#a974e5fe465942fb57e6ac6e6216af5a9", null ],
     [ "ck_session_v8_get_abi_version", "ck__session__v8_8h.html#a89aaf5e7382ca7e2c6c3caa2ec65bf45", null ],
     [ "ck_session_v8_get_model_descriptor", "ck__session__v8_8h.html#a6a5e68996841153114998d3c3f4aa3da", null ],
+    [ "ck_session_v8_get_stop_token_ids", "ck__session__v8_8h.html#acd07860df80d445702c7f0bdab1e06c2", null ],
     [ "ck_session_v8_last_error", "ck__session__v8_8h.html#a0d8e657d40221ddc9e6eebb26d3058b0", null ],
     [ "ck_session_v8_open", "ck__session__v8_8h.html#a1135a4513592770a326eaf0bd2d8a2ca", null ],
     [ "ck_session_v8_reset", "ck__session__v8_8h.html#a8ea23a67d215065ed8fe1cf4386f86f1", null ]

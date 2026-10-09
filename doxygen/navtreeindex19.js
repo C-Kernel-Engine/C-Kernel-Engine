@@ -1,5 +1,6 @@
 var NAVTREEINDEX19 =
 {
+"structCKLayerBackwardParams.html#ac9983bf5c0f086d19bce3889e2abfbe8":[1,0,35,56],
 "structCKLayerBackwardParams.html#acc46e12c5045c68eeabc8798ecde0bc0":[1,0,35,63],
 "structCKLayerBackwardParams.html#acc77ca9763e3208a7cfb1c5484da23a7":[1,0,35,8],
 "structCKLayerBackwardParams.html#acdca6a8b98874d780004cf7c2649a15b":[1,0,35,26],
@@ -248,6 +249,5 @@ var NAVTREEINDEX19 =
 "structCKLayerOptimizerOffsets.html#a7cd21b2bb571c27da41ab7cd5c452b7f":[1,0,41,28],
 "structCKLayerOptimizerOffsets.html#a81a1fb827541ffdfe7096eb1bbc9595e":[1,0,41,7],
 "structCKLayerOptimizerOffsets.html#a8204947d283c11186d8b38a0a6971e5a":[1,0,41,29],
-"structCKLayerOptimizerOffsets.html#a821ddf375173a7d11f8694c177a63d93":[1,0,41,6],
-"structCKLayerOptimizerOffsets.html#a83172b4b805ba80fb3e5807329912d25":[1,0,41,9]
+"structCKLayerOptimizerOffsets.html#a821ddf375173a7d11f8694c177a63d93":[1,0,41,6]
 };

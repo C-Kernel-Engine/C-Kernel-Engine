@@ -1,5 +1,6 @@
 var NAVTREEINDEX5 =
 {
+"ckernel__audio_8h.html#a96aaf9c1b604b056eaca65a7c329a239":[2,0,0,15,24],
 "ckernel__audio_8h.html#a9ec41be78d0845bf19362d4f5c66918d":[2,0,0,15,36],
 "ckernel__audio_8h.html#aae15c48212bb495557101834d21bc0d9":[2,0,0,15,15],
 "ckernel__audio_8h.html#ab16ee955749f4f39bba1dad4b0c651e0":[2,0,0,15,41],
@@ -248,6 +249,5 @@ var NAVTREEINDEX5 =
 "ckernel__codegen__v6_8c.html#ad53c5f6500036f0c3b7a0c864f077521":[2,0,1,5,3,25],
 "ckernel__codegen__v6_8c.html#ae8a84ea0f2073de536933e596c0de7df":[2,0,1,5,3,10],
 "ckernel__codegen__v6_8c.html#af35d2ef997b4de84524dddc75ee16265":[2,0,1,5,3,12],
-"ckernel__codegen__v6_8c_source.html":[2,0,1,5,3],
-"ckernel__dtype_8h.html":[2,0,0,27]
+"ckernel__codegen__v6_8c_source.html":[2,0,1,5,3]
 };

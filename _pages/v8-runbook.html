@@ -1616,7 +1616,7 @@ version/v8/scripts/ck_serve_v8.py "$RUN_DIR" --run "$RUN_DIR" \
         57.8–65.5 ms in three two-row steps. The base report and its
         <code>_run2</code> and <code>_run3</code> siblings preserve each attempt.
         These tiny samples are not an overnight-task or generalized
-        speedup claim. The server still uses
+        speedup claim. The ordinary server path still uses
         single-flight execution; later layers, recurrent Qwen state, dynamic
         admission and mixed prefill/decode remain separate milestones.
     </p>
@@ -1650,8 +1650,46 @@ version/v8/scripts/ck_serve_v8.py "$RUN_DIR" --run "$RUN_DIR" \
         speedup claim. The reports record workspace and copy volume. An optional
         monotonic-clock copy profile measured 0.748 ms of copying across three
         instrumented steps; its instrumentation perturbs full-step timing.
-        HTTP remains single-flight; recurrent Qwen state, request
+        Ordinary HTTP serving remains single-flight; recurrent Qwen state, request
         scheduling and mixed prefill/decode still need their own contracts.
+    </p>
+    <h4 id="experimental-batch-http">Experimental two-request HTTP decode</h4>
+    <p>
+        <code>--batch-http-extra-bytes BYTES --batch-http-prompt-cap TOKENS
+        --request-output-cap TOKENS</code> opts into a separate two-slot Responses
+        path for a generated KV-only batch-capable model. It uses the loaded
+        bundle's selected Jinja, tokenizer and declared tool parser. One worker
+        owns native prefill and decode while each request has separate
+        cancellation, detokenization, events and output. A third active slot
+        receives HTTP 429; the ordinary single-flight path remains the default.
+    </p>
+    <p>
+        Native slot budgeting does not bound HTTP delivery by itself. The
+        opt-in path also limits undelivered response consumers (default 4),
+        output token events (default 4096),
+        decoded output bytes per response (default 1 MiB), and time for each
+        stream write (default 30 seconds). Configure these with
+        <code>--batch-http-delivery-consumers</code>,
+        <code>--batch-http-output-token-cap</code>,
+        <code>--batch-http-output-byte-cap</code> and
+        <code>--batch-http-delivery-timeout</code>. A stalled stream is cancelled
+        without blocking the shared native owner; an exceeded output-byte cap
+        fails that response. Token event queues are bounded and terminal
+        failure notification cannot wait behind a full queue. An owner failure
+        poisons the owner, wakes active
+        and queued consumers, and rejects new submissions rather than leaving
+        a request waiting forever.
+    </p>
+    <p>
+        This is a bounded experimental integration, not certified overnight
+        concurrency. Prefill remains synchronous and cannot be interrupted
+        inside one slow native operation; a prompt-token cap is not a time
+        bound. Native per-request phase timing is reported unavailable.
+        A local generated Gemma3-270M diagnostic matched isolated and concurrent
+        output with 11 shared decode steps, but it did not use a resolved
+        deployment bundle or an external harness. Certify two real harness
+        tasks and add bounded cancellable prefill before promoting this path.
+        Recurrent Qwen state is outside this KV-only capability.
     </p>
 </div>
 
