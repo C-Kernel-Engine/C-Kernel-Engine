@@ -1,0 +1,196 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 660">
+  <title>v8 HTTP serving: serialized single-flight request lifecycle</title>
+  <desc>How an HTTP request flows through the v8 serving stack today: bounded FIFO admission, one process-wide SessionV8 over a generated libmodel.so, synchronous prefill, per-token decode with cancellation, SSE streaming, and KV reset on release.</desc>
+  <defs>
+    <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#ffb400"/>
+      <stop offset="100%" style="stop-color:#ffc933"/>
+    </linearGradient>
+    <linearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#47b475"/>
+      <stop offset="100%" style="stop-color:#5cc98a"/>
+    </linearGradient>
+    <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#07adf8"/>
+      <stop offset="100%" style="stop-color:#38bdf8"/>
+    </linearGradient>
+    <linearGradient id="redGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#e05555"/>
+      <stop offset="100%" style="stop-color:#f07575"/>
+    </linearGradient>
+    <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#9b6dff"/>
+      <stop offset="100%" style="stop-color:#b48fff"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="2" dy="2" stdDeviation="3" flood-opacity="0.3"/>
+    </filter>
+    <marker id="arr" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#ffb400"/>
+    </marker>
+    <marker id="arrBlue" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#38bdf8"/>
+    </marker>
+    <marker id="arrRed" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#f07575"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="660" fill="#232323"/>
+
+  <!-- Title -->
+  <text x="600" y="32" font-family="Inter, sans-serif" font-size="20" font-weight="700" fill="#ffb400" text-anchor="middle">v8 HTTP Serving Today — Serialized Single-Flight Execution</text>
+  <text x="600" y="52" font-family="Inter, sans-serif" font-size="11" fill="#707070" text-anchor="middle">One request owns the loaded model end-to-end; concurrent requests queue. Verified against server/live.py · server/session_v8.py · version/v8/src/ck_cli_v8.c</text>
+
+  <!-- ═══ Card 1: HTTP Clients ═══ -->
+  <g transform="translate(24,78)">
+    <rect width="200" height="168" rx="8" fill="#2a2a2a" stroke="#454545" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect width="200" height="28" rx="8" fill="url(#blueGrad)"/>
+    <text x="100" y="19" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#0d1b26" text-anchor="middle">HTTP Clients</text>
+    <text x="100" y="50" font-family="monospace" font-size="9.5" fill="#9ed6ff" text-anchor="middle">POST /responses</text>
+    <text x="100" y="68" font-family="Inter, sans-serif" font-size="9" fill="#909090" text-anchor="middle">OpenAI-style API · SSE stream</text>
+    <text x="100" y="88" font-family="monospace" font-size="9.5" fill="#9ed6ff" text-anchor="middle">DELETE /responses/{id}</text>
+    <text x="100" y="106" font-family="Inter, sans-serif" font-size="9" fill="#909090" text-anchor="middle">explicit cancellation</text>
+    <text x="100" y="130" font-family="Inter, sans-serif" font-size="9" fill="#909090" text-anchor="middle">client disconnect detected</text>
+    <text x="100" y="144" font-family="Inter, sans-serif" font-size="9" fill="#909090" text-anchor="middle">by watcher thread</text>
+    <text x="100" y="162" font-family="Inter, sans-serif" font-size="7.5" fill="#505050" text-anchor="middle">server/live.py:2790 · 2866</text>
+  </g>
+
+  <!-- Arrow 1→2 -->
+  <line x1="224" y1="162" x2="240" y2="162" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ═══ Card 2: Admission ═══ -->
+  <g transform="translate(244,78)">
+    <rect width="200" height="168" rx="8" fill="#2a2a2a" stroke="#454545" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect width="200" height="28" rx="8" fill="url(#headerGrad)"/>
+    <text x="100" y="19" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#1d1d1d" text-anchor="middle">Admission Control</text>
+    <text x="100" y="50" font-family="monospace" font-size="9.5" fill="#ffd97a" text-anchor="middle">_FlightAdmission</text>
+    <text x="100" y="68" font-family="Inter, sans-serif" font-size="9" fill="#909090" text-anchor="middle">single-flight lock — one active</text>
+    <text x="100" y="88" font-family="Inter, sans-serif" font-size="9" fill="#909090" text-anchor="middle">FIFO queue, max 8 waiters</text>
+    <text x="100" y="106" font-family="Inter, sans-serif" font-size="9" fill="#909090" text-anchor="middle">wait timeout 30 s</text>
+    <text x="100" y="130" font-family="Inter, sans-serif" font-size="9" fill="#f07575" text-anchor="middle">overflow / timeout → HTTP 429</text>
+    <text x="100" y="148" font-family="Inter, sans-serif" font-size="8.5" fill="#707070" text-anchor="middle" font-style="italic">"does not add batched execution"</text>
+    <text x="100" y="162" font-family="Inter, sans-serif" font-size="7.5" fill="#505050" text-anchor="middle">server/live.py:82 · 1414 · 2767</text>
+  </g>
+
+  <!-- Arrow 2→3 -->
+  <line x1="444" y1="162" x2="460" y2="162" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ═══ Card 3: SessionV8 ═══ -->
+  <g transform="translate(464,78)">
+    <rect width="200" height="168" rx="8" fill="#2a2a2a" stroke="#454545" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect width="200" height="28" rx="8" fill="url(#greenGrad)"/>
+    <text x="100" y="19" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#0d2618" text-anchor="middle">SessionV8 (1 / process)</text>
+    <text x="100" y="50" font-family="monospace" font-size="9.5" fill="#8fe0b3" text-anchor="middle">ctypes → libck_session_v8.so</text>
+    <text x="100" y="68" font-family="Inter, sans-serif" font-size="9" fill="#909090" text-anchor="middle">dlopen libmodel.so once</text>
+    <text x="100" y="88" font-family="Inter, sans-serif" font-size="9" fill="#909090" text-anchor="middle">weights mapped + shared</text>
+    <text x="100" y="106" font-family="Inter, sans-serif" font-size="9" fill="#909090" text-anchor="middle">KV state in model arena</text>
+    <text x="100" y="130" font-family="Inter, sans-serif" font-size="9" fill="#909090" text-anchor="middle">one global threadpool</text>
+    <text x="100" y="144" font-family="monospace" font-size="9" fill="#8fe0b3" text-anchor="middle">CK_NUM_THREADS</text>
+    <text x="100" y="162" font-family="Inter, sans-serif" font-size="7.5" fill="#505050" text-anchor="middle">session_v8.py:404 · ck_cli_v8.c:5664</text>
+  </g>
+
+  <!-- Arrow 3→4 -->
+  <line x1="664" y1="162" x2="680" y2="162" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ═══ Card 4: Generated runtime ═══ -->
+  <g transform="translate(684,78)">
+    <rect width="200" height="168" rx="8" fill="#2a2a2a" stroke="#454545" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect width="200" height="28" rx="8" fill="url(#purpleGrad)"/>
+    <text x="100" y="19" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#1a1030" text-anchor="middle">Generated libmodel.so</text>
+    <text x="100" y="50" font-family="monospace" font-size="9.5" fill="#cdb3ff" text-anchor="middle">ck_model_embed + forward</text>
+    <text x="100" y="68" font-family="Inter, sans-serif" font-size="9" fill="#909090" text-anchor="middle">synchronous prefill</text>
+    <text x="100" y="88" font-family="monospace" font-size="9.5" fill="#cdb3ff" text-anchor="middle">ck_model_decode (1 token)</text>
+    <text x="100" y="106" font-family="Inter, sans-serif" font-size="9" fill="#909090" text-anchor="middle">per-token decode loop</text>
+    <text x="100" y="130" font-family="Inter, sans-serif" font-size="9" fill="#909090" text-anchor="middle">whole-threadpool kernels —</text>
+    <text x="100" y="144" font-family="Inter, sans-serif" font-size="9" fill="#909090" text-anchor="middle">no second request runs</text>
+    <text x="100" y="162" font-family="Inter, sans-serif" font-size="7.5" fill="#505050" text-anchor="middle">ck_cli_v8.c:2350 · 3155</text>
+  </g>
+
+  <!-- Arrow 4→5 -->
+  <line x1="884" y1="162" x2="900" y2="162" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ═══ Card 5: Streaming / release ═══ -->
+  <g transform="translate(904,78)">
+    <rect width="200" height="168" rx="8" fill="#2a2a2a" stroke="#454545" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect width="200" height="28" rx="8" fill="url(#blueGrad)"/>
+    <text x="100" y="19" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#0d1b26" text-anchor="middle">Stream + Release</text>
+    <text x="100" y="50" font-family="monospace" font-size="9.5" fill="#9ed6ff" text-anchor="middle">text/event-stream (SSE)</text>
+    <text x="100" y="68" font-family="Inter, sans-serif" font-size="9" fill="#909090" text-anchor="middle">token deltas via queue</text>
+    <text x="100" y="88" font-family="Inter, sans-serif" font-size="9" fill="#909090" text-anchor="middle">disconnect → cancel flag →</text>
+    <text x="100" y="102" font-family="Inter, sans-serif" font-size="9" fill="#909090" text-anchor="middle">native loop exits at token</text>
+    <text x="100" y="126" font-family="monospace" font-size="9.5" fill="#9ed6ff" text-anchor="middle">kv_reset on release</text>
+    <text x="100" y="144" font-family="Inter, sans-serif" font-size="9" fill="#909090" text-anchor="middle">next waiter admitted (FIFO)</text>
+    <text x="100" y="162" font-family="Inter, sans-serif" font-size="7.5" fill="#505050" text-anchor="middle">live.py:2062 · ck_cli_v8.c:5863</text>
+  </g>
+
+  <!-- ═══ Lifecycle band ═══ -->
+  <text x="600" y="292" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#c8c8c8" text-anchor="middle">Request lifecycle — every transition exists in the HTTP path today</text>
+
+  <!-- chevrons -->
+  <g transform="translate(24,308)">
+    <polygon points="0,0 190,0 210,32 190,64 0,64 20,32" fill="#2a2a2a" stroke="#38bdf8" stroke-width="1.5"/>
+    <text x="108" y="28" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#9ed6ff" text-anchor="middle">ADMIT</text>
+    <text x="108" y="46" font-family="Inter, sans-serif" font-size="8.5" fill="#707070" text-anchor="middle">lock free or FIFO ticket</text>
+  </g>
+  <g transform="translate(252,308)">
+    <polygon points="0,0 190,0 210,32 190,64 0,64 20,32" fill="#2a2a2a" stroke="#ffc933" stroke-width="1.5"/>
+    <text x="108" y="28" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#ffd97a" text-anchor="middle">PREFILL</text>
+    <text x="108" y="46" font-family="Inter, sans-serif" font-size="8.5" fill="#707070" text-anchor="middle">synchronous · cancel at phase edge</text>
+  </g>
+  <g transform="translate(480,308)">
+    <polygon points="0,0 190,0 210,32 190,64 0,64 20,32" fill="#2a2a2a" stroke="#b48fff" stroke-width="1.5"/>
+    <text x="108" y="28" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#cdb3ff" text-anchor="middle">DECODE</text>
+    <text x="108" y="46" font-family="Inter, sans-serif" font-size="8.5" fill="#707070" text-anchor="middle">1 token / iter · cancel per token</text>
+  </g>
+  <g transform="translate(708,308)">
+    <polygon points="0,0 190,0 210,32 190,64 0,64 20,32" fill="#2a2a2a" stroke="#5cc98a" stroke-width="1.5"/>
+    <text x="108" y="28" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#8fe0b3" text-anchor="middle">COMPLETE / CANCEL</text>
+    <text x="108" y="46" font-family="Inter, sans-serif" font-size="8.5" fill="#707070" text-anchor="middle">EOS · budget · disconnect · DELETE</text>
+  </g>
+  <g transform="translate(936,308)">
+    <polygon points="0,0 190,0 210,32 190,64 0,64 20,32" fill="#2a2a2a" stroke="#f07575" stroke-width="1.5"/>
+    <text x="108" y="28" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#f0a0a0" text-anchor="middle">RESET + RELEASE</text>
+    <text x="108" y="46" font-family="Inter, sans-serif" font-size="8.5" fill="#707070" text-anchor="middle">kv_reset · flight lease freed</text>
+  </g>
+
+  <!-- ═══ Two-request timeline: what concurrency looks like ═══ -->
+  <text x="600" y="420" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#c8c8c8" text-anchor="middle">Two concurrent HTTP requests — time runs left to right</text>
+
+  <!-- Request A bar -->
+  <text x="30" y="452" font-family="Inter, sans-serif" font-size="10" fill="#9ed6ff">Request A</text>
+  <rect x="110" y="440" width="120" height="20" rx="4" fill="#ffc933" opacity="0.85"/>
+  <text x="170" y="454" font-family="Inter, sans-serif" font-size="9" fill="#1d1d1d" text-anchor="middle">prefill</text>
+  <rect x="230" y="440" width="400" height="20" rx="4" fill="#b48fff" opacity="0.85"/>
+  <text x="430" y="454" font-family="Inter, sans-serif" font-size="9" fill="#1a1030" text-anchor="middle">decode — owns the whole threadpool</text>
+  <rect x="630" y="440" width="60" height="20" rx="4" fill="#f07575" opacity="0.85"/>
+  <text x="660" y="454" font-family="Inter, sans-serif" font-size="9" fill="#2a0d0d" text-anchor="middle">reset</text>
+
+  <!-- Request B bar -->
+  <text x="30" y="492" font-family="Inter, sans-serif" font-size="10" fill="#9ed6ff">Request B</text>
+  <rect x="110" y="480" width="580" height="20" rx="4" fill="#2a2a2a" stroke="#454545" stroke-width="1" stroke-dasharray="4 3"/>
+  <text x="400" y="494" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">queued in FIFO admission (waiting on single-flight lock)</text>
+  <rect x="690" y="480" width="120" height="20" rx="4" fill="#ffc933" opacity="0.85"/>
+  <text x="750" y="494" font-family="Inter, sans-serif" font-size="9" fill="#1d1d1d" text-anchor="middle">prefill</text>
+  <rect x="810" y="480" width="300" height="20" rx="4" fill="#b48fff" opacity="0.85"/>
+  <text x="960" y="494" font-family="Inter, sans-serif" font-size="9" fill="#1a1030" text-anchor="middle">decode starts only after A releases</text>
+
+  <!-- axis -->
+  <line x1="110" y1="518" x2="1140" y2="518" stroke="#454545" stroke-width="1"/>
+  <polygon points="1140,514 1152,518 1140,522" fill="#454545"/>
+  <text x="1140" y="534" font-family="Inter, sans-serif" font-size="8.5" fill="#606060" text-anchor="end">time</text>
+
+  <!-- ═══ Status footer ═══ -->
+  <g transform="translate(24,556)">
+    <rect width="560" height="76" rx="8" fill="#1f2a1f" stroke="#47b475" stroke-width="1.5"/>
+    <text x="16" y="24" font-family="Inter, sans-serif" font-size="10.5" font-weight="700" fill="#5cc98a">STATUS: SHIPPED — default HTTP path, verified behavior</text>
+    <text x="16" y="44" font-family="Inter, sans-serif" font-size="9.5" fill="#909090">Request concurrency ≠ batched execution. Interleaving ≠ continuous batching.</text>
+    <text x="16" y="62" font-family="Inter, sans-serif" font-size="9.5" fill="#909090">An experimental two-slot batch mode exists: --batch-http-extra-bytes (PR #715).</text>
+  </g>
+  <g transform="translate(616,556)">
+    <rect width="560" height="76" rx="8" fill="#2a2a2a" stroke="#454545" stroke-width="1.5"/>
+    <text x="16" y="24" font-family="Inter, sans-serif" font-size="10.5" font-weight="700" fill="#c8c8c8">WHY IT IS BUILT THIS WAY</text>
+    <text x="16" y="44" font-family="Inter, sans-serif" font-size="9.5" fill="#909090">Each in-flight request dispatches kernels across the whole threadpool; a second</text>
+    <text x="16" y="62" font-family="Inter, sans-serif" font-size="9.5" fill="#909090">concurrent generation would oversubscribe cores and contend for DRAM bandwidth.</text>
+  </g>
+</svg>

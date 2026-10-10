@@ -1,0 +1,195 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720">
+  <title>batch2: two request-owned decode streams (PR #709)</title>
+  <desc>The opt-in two-slot batch decode loop (PR #709) and its experimental HTTP wiring (PR #715): a host-side Batch2RequestLoop coordinates two independent requests and makes one generated-C ck_model_decode_batch2 call per tick when both slots are active — M=2 batched projection GEMMs with per-row sequential attention and KV.</desc>
+  <defs>
+    <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#ffb400"/>
+      <stop offset="100%" style="stop-color:#ffc933"/>
+    </linearGradient>
+    <linearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#47b475"/>
+      <stop offset="100%" style="stop-color:#5cc98a"/>
+    </linearGradient>
+    <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#07adf8"/>
+      <stop offset="100%" style="stop-color:#38bdf8"/>
+    </linearGradient>
+    <linearGradient id="redGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#e05555"/>
+      <stop offset="100%" style="stop-color:#f07575"/>
+    </linearGradient>
+    <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#9b6dff"/>
+      <stop offset="100%" style="stop-color:#b48fff"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="2" dy="2" stdDeviation="3" flood-opacity="0.3"/>
+    </filter>
+    <marker id="arr" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#ffb400"/>
+    </marker>
+    <marker id="arrBlue" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#38bdf8"/>
+    </marker>
+    <marker id="arrPurple" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#b48fff"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="720" fill="#232323"/>
+
+  <!-- Title -->
+  <text x="600" y="32" font-family="Inter, sans-serif" font-size="20" font-weight="700" fill="#ffb400" text-anchor="middle">batch2 — Two Request-Owned Decode Streams (PR #709 + HTTP wiring #715)</text>
+  <text x="600" y="52" font-family="Inter, sans-serif" font-size="11" fill="#707070" text-anchor="middle">server/batch_decode.py · version/v8/src/ck_cli_v8.c:6071 · batch_decode_codegen_v8.py · include/ck_model_abi_v8.h</text>
+
+  <!-- ═══ Left: host-side loop ═══ -->
+  <g transform="translate(24,76)">
+    <rect width="330" height="400" rx="10" fill="#262626" stroke="#454545" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect width="330" height="30" rx="10" fill="url(#blueGrad)"/>
+    <text x="165" y="20" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#0d1b26" text-anchor="middle">Batch2RequestLoop (host, Python)</text>
+    <text x="165" y="48" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">driven by Batch2HTTPOwner when HTTP batch mode is enabled</text>
+
+    <!-- Slot A -->
+    <g transform="translate(16,60)">
+      <rect width="298" height="118" rx="8" fill="#2a2a2a" stroke="#38bdf8" stroke-width="1.5"/>
+      <text x="14" y="22" font-family="Inter, sans-serif" font-size="11" font-weight="700" fill="#9ed6ff">Slot A — request-owned</text>
+      <text x="14" y="42" font-family="Inter, sans-serif" font-size="9" fill="#909090">own ticket · position · token budget</text>
+      <text x="14" y="58" font-family="Inter, sans-serif" font-size="9" fill="#909090">own RNG + stop-token set</text>
+      <text x="14" y="74" font-family="monospace" font-size="9" fill="#9ed6ff">ck_sample_top_p_v8 (per request)</text>
+      <text x="14" y="94" font-family="Inter, sans-serif" font-size="9" fill="#909090">dedicated KV arena (caller-owned,</text>
+      <text x="14" y="108" font-family="Inter, sans-serif" font-size="9" fill="#909090">aligned, reused via kv_reset)</text>
+    </g>
+
+    <!-- Slot B -->
+    <g transform="translate(16,190)">
+      <rect width="298" height="118" rx="8" fill="#2a2a2a" stroke="#5cc98a" stroke-width="1.5"/>
+      <text x="14" y="22" font-family="Inter, sans-serif" font-size="11" font-weight="700" fill="#8fe0b3">Slot B — request-owned</text>
+      <text x="14" y="42" font-family="Inter, sans-serif" font-size="9" fill="#909090">identical policy, independent state</text>
+      <text x="14" y="58" font-family="Inter, sans-serif" font-size="9" fill="#909090">EOS leaves; next request reuses slot</text>
+      <text x="14" y="74" font-family="Inter, sans-serif" font-size="9" fill="#909090">cancellation effective at step edge</text>
+      <text x="14" y="94" font-family="Inter, sans-serif" font-size="9" fill="#909090">native failure → "unknown advancement"</text>
+      <text x="14" y="108" font-family="Inter, sans-serif" font-size="9" fill="#909090">→ explicit recover() before reuse</text>
+    </g>
+
+    <!-- per-tick sampling -->
+    <g transform="translate(16,322)">
+      <rect width="298" height="62" rx="8" fill="#2a2a2a" stroke="#454545" stroke-width="1.5"/>
+      <text x="149" y="22" font-family="Inter, sans-serif" font-size="10" font-weight="600" fill="#c8c8c8" text-anchor="middle">each tick: sample 1 token per active slot</text>
+      <text x="149" y="40" font-family="Inter, sans-serif" font-size="9" fill="#909090" text-anchor="middle">stop ids / budgets checked on the host</text>
+      <text x="149" y="55" font-family="Inter, sans-serif" font-size="7.5" fill="#505050" text-anchor="middle">batch_decode.py:148–183</text>
+    </g>
+  </g>
+
+  <!-- Arrow loop → native -->
+  <line x1="354" y1="276" x2="386" y2="276" stroke="#ffb400" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="370" y="264" font-family="Inter, sans-serif" font-size="9" fill="#ffd97a" text-anchor="middle">one call / tick</text>
+
+  <!-- ═══ Middle: native dispatch ═══ -->
+  <g transform="translate(390,76)">
+    <rect width="290" height="400" rx="10" fill="#262626" stroke="#454545" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect width="290" height="30" rx="10" fill="url(#headerGrad)"/>
+    <text x="145" y="20" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#1d1d1d" text-anchor="middle">Native dispatch (ck_cli_v8.c)</text>
+
+    <g transform="translate(16,48)">
+      <rect width="258" height="66" rx="8" fill="#2a2a2a" stroke="#454545" stroke-width="1.5"/>
+      <text x="129" y="22" font-family="monospace" font-size="9.5" fill="#ffd97a" text-anchor="middle">ck_session_v8_batch2_step</text>
+      <text x="129" y="40" font-family="Inter, sans-serif" font-size="9" fill="#909090" text-anchor="middle">holds generation_lock (trylock)</text>
+      <text x="129" y="55" font-family="Inter, sans-serif" font-size="7.5" fill="#505050" text-anchor="middle">ck_cli_v8.c:6071</text>
+    </g>
+
+    <!-- both eligible -->
+    <g transform="translate(16,128)">
+      <rect width="258" height="96" rx="8" fill="#2a2a2a" stroke="#b48fff" stroke-width="1.5"/>
+      <text x="129" y="22" font-family="Inter, sans-serif" font-size="10" font-weight="700" fill="#cdb3ff" text-anchor="middle">both slots eligible</text>
+      <text x="129" y="42" font-family="monospace" font-size="9" fill="#cdb3ff" text-anchor="middle">decode_batch2(rows, 2, …)</text>
+      <text x="129" y="60" font-family="Inter, sans-serif" font-size="9" fill="#909090" text-anchor="middle">ONE generated-C call per tick —</text>
+      <text x="129" y="74" font-family="Inter, sans-serif" font-size="9" fill="#909090" text-anchor="middle">a real batched entry point</text>
+      <text x="129" y="89" font-family="Inter, sans-serif" font-size="7.5" fill="#505050" text-anchor="middle">ck_cli_v8.c:6095–6112</text>
+    </g>
+
+    <!-- one eligible -->
+    <g transform="translate(16,238)">
+      <rect width="258" height="72" rx="8" fill="#2a2a2a" stroke="#454545" stroke-width="1.5"/>
+      <text x="129" y="22" font-family="Inter, sans-serif" font-size="10" font-weight="700" fill="#909090" text-anchor="middle">one slot eligible</text>
+      <text x="129" y="42" font-family="monospace" font-size="9" fill="#909090" text-anchor="middle">decode(token, logits) — single row</text>
+      <text x="129" y="58" font-family="Inter, sans-serif" font-size="7.5" fill="#505050" text-anchor="middle">ck_cli_v8.c:6128</text>
+    </g>
+
+    <!-- arenas -->
+    <g transform="translate(16,324)">
+      <rect width="258" height="60" rx="8" fill="#2a2a2a" stroke="#454545" stroke-width="1.5"/>
+      <text x="129" y="20" font-family="Inter, sans-serif" font-size="9.5" font-weight="600" fill="#c8c8c8" text-anchor="middle">enable: 2 × state_bytes KV arenas</text>
+      <text x="129" y="36" font-family="Inter, sans-serif" font-size="9" fill="#909090" text-anchor="middle">+ one shared batch workspace, allocated once</text>
+      <text x="129" y="51" font-family="Inter, sans-serif" font-size="7.5" fill="#505050" text-anchor="middle">ck_cli_v8.c:5932–6001</text>
+    </g>
+  </g>
+
+  <!-- Arrow native → generated C -->
+  <line x1="680" y1="276" x2="712" y2="276" stroke="#ffb400" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- ═══ Right: generated C internals ═══ -->
+  <g transform="translate(716,76)">
+    <rect width="460" height="400" rx="10" fill="#262626" stroke="#454545" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect width="460" height="30" rx="10" fill="url(#purpleGrad)"/>
+    <text x="230" y="20" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#1a1030" text-anchor="middle">Inside ck_model_decode_batch2 (generated C)</text>
+
+    <!-- shared stages -->
+    <g transform="translate(16,46)">
+      <rect width="428" height="140" rx="8" fill="#2a2a2a" stroke="#5cc98a" stroke-width="1.5"/>
+      <text x="14" y="24" font-family="Inter, sans-serif" font-size="11" font-weight="700" fill="#8fe0b3">SHARED stages — batched M=2 GEMM</text>
+      <text x="14" y="44" font-family="Inter, sans-serif" font-size="9" fill="#909090">admitted projection groups only (QKV / o / gate-up / down)</text>
+      <text x="14" y="64" font-family="monospace" font-size="9" fill="#8fe0b3">gemm_nt_q8_0_q8_0_contract_m2</text>
+      <text x="14" y="80" font-family="monospace" font-size="9" fill="#8fe0b3">gemm_nt_q5_k_q8_k_m2 · gemm_nt_q6_k_q8_k_m2</text>
+      <text x="14" y="100" font-family="Inter, sans-serif" font-size="9" fill="#909090">weights loaded once per layer, both rows in flight →</text>
+      <text x="14" y="114" font-family="Inter, sans-serif" font-size="9" fill="#909090">weight traffic amortized ×2 (the CPU payoff)</text>
+      <text x="14" y="132" font-family="Inter, sans-serif" font-size="7.5" fill="#505050">contract asserted: tests/test_v8_two_row_batch_decode.py:215</text>
+    </g>
+
+    <!-- local stages -->
+    <g transform="translate(16,200)">
+      <rect width="428" height="140" rx="8" fill="#2a2a2a" stroke="#38bdf8" stroke-width="1.5"/>
+      <text x="14" y="24" font-family="Inter, sans-serif" font-size="11" font-weight="700" fill="#9ed6ff">LOCAL stages — per-row sequential</text>
+      <text x="14" y="46" font-family="monospace" font-size="9" fill="#9ed6ff">for (i = 0; i &lt; 2; ++i) {</text>
+      <text x="30" y="62" font-family="monospace" font-size="9" fill="#9ed6ff">sequence_state_activate(rows[i])</text>
+      <text x="30" y="78" font-family="monospace" font-size="9" fill="#9ed6ff">attention / KV append / norms / sampling state</text>
+      <text x="30" y="94" font-family="monospace" font-size="9" fill="#9ed6ff">snapshot ↔ restore row state</text>
+      <text x="14" y="116" font-family="monospace" font-size="9" fill="#9ed6ff">}</text>
+      <text x="14" y="132" font-family="Inter, sans-serif" font-size="7.5" fill="#505050">batch_decode_codegen_v8.py:36–56</text>
+    </g>
+
+    <!-- ABI note -->
+    <g transform="translate(16,354)">
+      <rect width="428" height="34" rx="8" fill="#2a2a2a" stroke="#454545" stroke-width="1.5"/>
+      <text x="214" y="15" font-family="Inter, sans-serif" font-size="8.5" fill="#909090" text-anchor="middle" font-style="italic">ABI: "Generated M=2 projection work with sequence-local attention/KV."</text>
+      <text x="214" y="29" font-family="Inter, sans-serif" font-size="7.5" fill="#505050" text-anchor="middle">include/ck_model_abi_v8.h:88–92</text>
+    </g>
+  </g>
+
+  <!-- ═══ Bottom band: caveats + status ═══ -->
+  <g transform="translate(24,500)">
+    <rect width="656" height="196" rx="10" fill="#2a241f" stroke="#ffb400" stroke-width="1.5"/>
+    <text x="16" y="26" font-family="Inter, sans-serif" font-size="11.5" font-weight="700" fill="#ffd97a">WHAT batch2 IS — AND IS NOT</text>
+    <text x="16" y="50" font-family="Inter, sans-serif" font-size="9.5" fill="#c8c8c8">✓  one generated-C call decodes two sequences per tick</text>
+    <text x="16" y="68" font-family="Inter, sans-serif" font-size="9.5" fill="#c8c8c8">✓  projection weight traffic shared across both rows</text>
+    <text x="16" y="86" font-family="Inter, sans-serif" font-size="9.5" fill="#c8c8c8">✓  strict per-request state isolation, cancellation, recovery</text>
+    <text x="16" y="104" font-family="Inter, sans-serif" font-size="9.5" fill="#8fe0b3">✓  experimental HTTP wiring (PR #715): one owner thread admits</text>
+    <text x="28" y="119" font-family="Inter, sans-serif" font-size="9.5" fill="#8fe0b3">one pending request per tick; a third request → HTTP 429</text>
+    <text x="16" y="141" font-family="Inter, sans-serif" font-size="9.5" fill="#f07575">✗  prefill is per-slot and synchronous; a joining request's</text>
+    <text x="28" y="156" font-family="Inter, sans-serif" font-size="9.5" fill="#f07575">prefill pauses the other slot for its duration</text>
+    <text x="16" y="174" font-family="Inter, sans-serif" font-size="9.5" fill="#f07575">✗  fixed at 2 slots; attention and KV are not batched</text>
+    <text x="16" y="192" font-family="Inter, sans-serif" font-size="8.5" fill="#707070" font-style="italic">runbook: "not a full-layer batched decoder … or continuous batching"</text>
+  </g>
+
+  <g transform="translate(712,500)">
+    <rect width="464" height="196" rx="10" fill="#1f2a1f" stroke="#47b475" stroke-width="1.5"/>
+    <text x="16" y="26" font-family="Inter, sans-serif" font-size="11.5" font-weight="700" fill="#5cc98a">STATUS: MERGED — EXPERIMENTAL OPT-IN OVER HTTP</text>
+    <text x="16" y="48" font-family="Inter, sans-serif" font-size="9.5" fill="#909090">enable: cks-v8-serve --batch-http-extra-bytes BYTES</text>
+    <text x="16" y="64" font-family="Inter, sans-serif" font-size="9.5" fill="#909090">(+ prompt / output / delivery caps) — KV-only generated models</text>
+    <text x="16" y="86" font-family="Inter, sans-serif" font-size="9.5" fill="#909090">test_batch_decode_loop.py — coordination, mid-step cancel,</text>
+    <text x="16" y="102" font-family="Inter, sans-serif" font-size="9.5" fill="#909090">A→B→A slot reuse, request-local RNG, explicit recovery</text>
+    <text x="16" y="122" font-family="Inter, sans-serif" font-size="9.5" fill="#909090">test_batch_http.py (19 tests) — shared steps asserted, 429</text>
+    <text x="16" y="138" font-family="Inter, sans-serif" font-size="9.5" fill="#909090">overflow, per-consumer isolation, SSE disconnect, owner failure</text>
+    <text x="16" y="158" font-family="Inter, sans-serif" font-size="9.5" fill="#909090">test_v8_two_row_batch_decode.py — M=2 GEMM codegen contract</text>
+    <text x="16" y="182" font-family="Inter, sans-serif" font-size="8.5" fill="#707070" font-style="italic">Not yet certified for overnight concurrency; see roadmap diagram</text>
+  </g>
+</svg>

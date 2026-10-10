@@ -1,0 +1,171 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720">
+  <title>From serialized serving to continuous batching: v8 roadmap</title>
+  <desc>Three-lane roadmap: what is shipped (single-flight HTTP serving with bounded admission), what is built but not wired (batch2 two-slot decode), and what continuous batching requires (iteration-level scheduler, dynamic join and leave, memory-aware admission, batched prefill and attention).</desc>
+  <defs>
+    <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#ffb400"/>
+      <stop offset="100%" style="stop-color:#ffc933"/>
+    </linearGradient>
+    <linearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#47b475"/>
+      <stop offset="100%" style="stop-color:#5cc98a"/>
+    </linearGradient>
+    <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#07adf8"/>
+      <stop offset="100%" style="stop-color:#38bdf8"/>
+    </linearGradient>
+    <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#9b6dff"/>
+      <stop offset="100%" style="stop-color:#b48fff"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="2" dy="2" stdDeviation="3" flood-opacity="0.3"/>
+    </filter>
+    <marker id="arr" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#ffb400"/>
+    </marker>
+    <marker id="arrGhost" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#707070"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="720" fill="#232323"/>
+
+  <!-- Title -->
+  <text x="600" y="32" font-family="Inter, sans-serif" font-size="20" font-weight="700" fill="#ffb400" text-anchor="middle">From Serialized Serving to Continuous Batching — v8 Roadmap</text>
+  <text x="600" y="52" font-family="Inter, sans-serif" font-size="11" fill="#707070" text-anchor="middle">Green = default HTTP path · Amber = merged, experimental opt-in · Grey = design direction, no implementation claims</text>
+
+  <!-- ═══ Lane 1: SHIPPED ═══ -->
+  <g transform="translate(24,76)">
+    <rect width="360" height="300" rx="10" fill="#1f2a1f" stroke="#47b475" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect width="360" height="30" rx="10" fill="url(#greenGrad)"/>
+    <text x="180" y="20" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#0d2618" text-anchor="middle">SHIPPED — HTTP serving</text>
+
+    <text x="18" y="54" font-family="Inter, sans-serif" font-size="9.5" fill="#c8c8c8">•  OpenAI-style POST /responses + SSE streaming</text>
+    <text x="18" y="72" font-family="Inter, sans-serif" font-size="9.5" fill="#c8c8c8">•  Single-flight execution + bounded FIFO admission</text>
+    <text x="30" y="87" font-family="Inter, sans-serif" font-size="9" fill="#909090">(8 waiters, 30 s timeout, HTTP 429 overflow)</text>
+    <text x="18" y="105" font-family="Inter, sans-serif" font-size="9.5" fill="#c8c8c8">•  Cancellation: DELETE, disconnect watcher,</text>
+    <text x="30" y="120" font-family="Inter, sans-serif" font-size="9" fill="#909090">per-token native cancel flag</text>
+    <text x="18" y="138" font-family="Inter, sans-serif" font-size="9.5" fill="#c8c8c8">•  Per-request KV reset; weights shared process-wide</text>
+    <text x="18" y="156" font-family="Inter, sans-serif" font-size="9.5" fill="#c8c8c8">•  Context-length rejection; session stays usable</text>
+    <text x="18" y="174" font-family="Inter, sans-serif" font-size="9.5" fill="#c8c8c8">•  Lifecycle hardening tests (FIFO, stale-owner,</text>
+    <text x="30" y="189" font-family="Inter, sans-serif" font-size="9" fill="#909090">native-failure release, disconnect-before-start)</text>
+
+    <text x="18" y="216" font-family="Inter, sans-serif" font-size="9.5" font-weight="600" fill="#8fe0b3">Execution model:</text>
+    <text x="18" y="234" font-family="Inter, sans-serif" font-size="9" fill="#909090">one request owns session + whole threadpool;</text>
+    <text x="18" y="249" font-family="Inter, sans-serif" font-size="9" fill="#909090">requests are serialized, never interleaved</text>
+
+    <text x="18" y="276" font-family="Inter, sans-serif" font-size="8" fill="#505050">server/live.py · server/session_v8.py · ck_cli_v8.c</text>
+    <text x="18" y="290" font-family="Inter, sans-serif" font-size="8" fill="#505050">server/README.md · test_serving_lifecycle_hardening.py</text>
+  </g>
+
+  <!-- ═══ Lane 2: BUILT, NOT WIRED ═══ -->
+  <g transform="translate(420,76)">
+    <rect width="360" height="300" rx="10" fill="#2a241f" stroke="#ffb400" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect width="360" height="30" rx="10" fill="url(#headerGrad)"/>
+    <text x="180" y="20" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#1d1d1d" text-anchor="middle">MERGED — batch2 (#709 + #715)</text>
+
+    <text x="18" y="54" font-family="Inter, sans-serif" font-size="9.5" fill="#c8c8c8">•  Batch2RequestLoop: two request-owned slots,</text>
+    <text x="30" y="69" font-family="Inter, sans-serif" font-size="9" fill="#909090">host-side sampling / stop / budget per request</text>
+    <text x="18" y="87" font-family="Inter, sans-serif" font-size="9.5" fill="#c8c8c8">•  One ck_model_decode_batch2 call per tick</text>
+    <text x="30" y="102" font-family="Inter, sans-serif" font-size="9" fill="#909090">when both slots are eligible</text>
+    <text x="18" y="120" font-family="Inter, sans-serif" font-size="9.5" fill="#c8c8c8">•  M=2 batched projection GEMMs (weights shared);</text>
+    <text x="30" y="135" font-family="Inter, sans-serif" font-size="9" fill="#909090">attention / KV stay per-row sequential</text>
+    <text x="18" y="153" font-family="Inter, sans-serif" font-size="9.5" fill="#c8c8c8">•  Experimental opt-in HTTP path: one owner thread,</text>
+    <text x="30" y="168" font-family="Inter, sans-serif" font-size="9" fill="#909090">bounded admission; third request → HTTP 429</text>
+
+    <text x="18" y="196" font-family="Inter, sans-serif" font-size="9.5" font-weight="600" fill="#ffd97a">Remaining gaps:</text>
+    <text x="18" y="214" font-family="Inter, sans-serif" font-size="9" fill="#f0a0a0">prefill synchronous — a joining request pauses decode</text>
+    <text x="18" y="229" font-family="Inter, sans-serif" font-size="9" fill="#f0a0a0">fixed 2 slots · attention not batched · KV-only models</text>
+    <text x="18" y="244" font-family="Inter, sans-serif" font-size="9" fill="#f0a0a0">not yet certified for sustained concurrency</text>
+
+    <text x="18" y="276" font-family="Inter, sans-serif" font-size="8" fill="#505050">server/batch_decode.py · batch_decode_codegen_v8.py</text>
+    <text x="18" y="290" font-family="Inter, sans-serif" font-size="8" fill="#505050">ck_model_abi_v8.h · test_batch_decode_loop.py</text>
+  </g>
+
+  <!-- ═══ Lane 3: PLANNED ═══ -->
+  <g transform="translate(816,76)">
+    <rect width="360" height="300" rx="10" fill="#262626" stroke="#555555" stroke-width="1.5" stroke-dasharray="6 4" filter="url(#shadow)"/>
+    <rect width="360" height="30" rx="10" fill="#3a3a3a"/>
+    <text x="180" y="20" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#909090" text-anchor="middle">PLANNED — continuous batching</text>
+
+    <text x="18" y="54" font-family="Inter, sans-serif" font-size="9.5" fill="#909090">•  Iteration-level scheduler: active-set membership</text>
+    <text x="30" y="69" font-family="Inter, sans-serif" font-size="9" fill="#707070">changes at every decode boundary</text>
+    <text x="18" y="87" font-family="Inter, sans-serif" font-size="9.5" fill="#909090">•  Requests join and leave without waiting for the</text>
+    <text x="30" y="102" font-family="Inter, sans-serif" font-size="9" fill="#707070">longest sequence (no head-of-line blocking)</text>
+    <text x="18" y="120" font-family="Inter, sans-serif" font-size="9.5" fill="#909090">•  Memory-aware admission: KV budget per request</text>
+    <text x="30" y="135" font-family="Inter, sans-serif" font-size="9" fill="#707070">checked against a shared cache pool</text>
+    <text x="18" y="153" font-family="Inter, sans-serif" font-size="9.5" fill="#909090">•  Mixed iteration: chunked prefill of new requests</text>
+    <text x="30" y="168" font-family="Inter, sans-serif" font-size="9" fill="#707070">shares a step with in-flight decode</text>
+    <text x="18" y="186" font-family="Inter, sans-serif" font-size="9.5" fill="#909090">•  Batched attention + KV across N rows; paged or</text>
+    <text x="30" y="201" font-family="Inter, sans-serif" font-size="9" fill="#707070">segmented cache layout for variable lengths</text>
+    <text x="18" y="219" font-family="Inter, sans-serif" font-size="9.5" fill="#909090">•  Batch dimension N (not 2) in generated-C ABI,</text>
+    <text x="30" y="234" font-family="Inter, sans-serif" font-size="9" fill="#707070">with provider contracts for batched kernels</text>
+    <text x="18" y="252" font-family="Inter, sans-serif" font-size="9.5" font-weight="600" fill="#909090">Open question: CPU throughput optimum — weight</text>
+    <text x="18" y="267" font-family="Inter, sans-serif" font-size="9" fill="#707070">reuse vs DRAM bandwidth vs per-request latency</text>
+    <text x="18" y="290" font-family="Inter, sans-serif" font-size="8" fill="#555555" font-style="italic">must be benchmarked, not assumed</text>
+  </g>
+
+  <!-- ═══ Arrows between lanes ═══ -->
+  <line x1="384" y1="226" x2="414" y2="226" stroke="#ffb400" stroke-width="2" marker-end="url(#arr)"/>
+  <line x1="780" y1="226" x2="810" y2="226" stroke="#707070" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrGhost)"/>
+
+  <!-- ═══ Target scheduler sketch ═══ -->
+  <text x="600" y="420" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#c8c8c8" text-anchor="middle">Target shape — iteration-level scheduling over the generated runtime</text>
+
+  <!-- waiting queue -->
+  <g transform="translate(24,440)">
+    <rect width="220" height="120" rx="8" fill="#262626" stroke="#555555" stroke-width="1.5" stroke-dasharray="6 4"/>
+    <text x="110" y="24" font-family="Inter, sans-serif" font-size="11" font-weight="700" fill="#909090" text-anchor="middle">Waiting queue</text>
+    <text x="110" y="46" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">admitted when KV budget</text>
+    <text x="110" y="60" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">+ slot available</text>
+    <text x="110" y="86" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">chunked prefill mixed into</text>
+    <text x="110" y="100" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">the next decode iteration</text>
+  </g>
+
+  <line x1="244" y1="500" x2="270" y2="500" stroke="#707070" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrGhost)"/>
+
+  <!-- active set -->
+  <g transform="translate(274,440)">
+    <rect width="300" height="120" rx="8" fill="#262626" stroke="#555555" stroke-width="1.5" stroke-dasharray="6 4"/>
+    <text x="150" y="24" font-family="Inter, sans-serif" font-size="11" font-weight="700" fill="#909090" text-anchor="middle">Active set (dynamic)</text>
+    <text x="150" y="46" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">seq 1 · seq 2 · … · seq N</text>
+    <text x="150" y="64" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">finished / cancelled sequences leave</text>
+    <text x="150" y="78" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">at the iteration boundary</text>
+    <text x="150" y="100" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">per-sequence positions, stop rules,</text>
+    <text x="150" y="112" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">RNG — the batch2 policy model, generalized</text>
+  </g>
+
+  <line x1="574" y1="500" x2="600" y2="500" stroke="#707070" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrGhost)"/>
+
+  <!-- one batched step -->
+  <g transform="translate(604,440)">
+    <rect width="300" height="120" rx="8" fill="#262626" stroke="#555555" stroke-width="1.5" stroke-dasharray="6 4"/>
+    <text x="150" y="24" font-family="Inter, sans-serif" font-size="11" font-weight="700" fill="#909090" text-anchor="middle">One generated-C step</text>
+    <text x="150" y="46" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">decode_batchN over the active set:</text>
+    <text x="150" y="64" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">M=N projection GEMMs (weights shared)</text>
+    <text x="150" y="82" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">batched attention over N KV views</text>
+    <text x="150" y="100" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">batch2 is the N=2 proof of this ABI</text>
+  </g>
+
+  <line x1="904" y1="500" x2="930" y2="500" stroke="#707070" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrGhost)"/>
+
+  <!-- KV pool -->
+  <g transform="translate(934,440)">
+    <rect width="242" height="120" rx="8" fill="#262626" stroke="#555555" stroke-width="1.5" stroke-dasharray="6 4"/>
+    <text x="121" y="24" font-family="Inter, sans-serif" font-size="11" font-weight="700" fill="#909090" text-anchor="middle">Shared KV pool</text>
+    <text x="121" y="46" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">paged / segmented rows,</text>
+    <text x="121" y="60" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">variable sequence lengths</text>
+    <text x="121" y="82" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">freed rows reused at once —</text>
+    <text x="121" y="96" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">arena reuse model already proven</text>
+  </g>
+
+  <!-- ═══ Definitions strip ═══ -->
+  <g transform="translate(24,592)">
+    <rect width="1152" height="104" rx="10" fill="#2a2a2a" stroke="#454545" stroke-width="1.5"/>
+    <text x="16" y="26" font-family="Inter, sans-serif" font-size="11" font-weight="700" fill="#c8c8c8">TERMS THAT MUST NOT BE CONFLATED</text>
+    <text x="16" y="50" font-family="Inter, sans-serif" font-size="9.5" fill="#909090">Request concurrency — many HTTP requests in flight (queued or active).   Scheduling / interleaving — a host loop picks which request advances.</text>
+    <text x="16" y="68" font-family="Inter, sans-serif" font-size="9.5" fill="#909090">Batched execution — one kernel call computes several sequences.   Continuous batching — the active set changes at every iteration boundary.</text>
+    <text x="16" y="90" font-family="Inter, sans-serif" font-size="9" fill="#707070" font-style="italic">Today CKE ships the first, ships an experimental two-row form of the second and third, and designs toward the fourth. Docs must say exactly that.</text>
+  </g>
+</svg>

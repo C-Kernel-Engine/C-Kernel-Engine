@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>v7 Grad Accum Windows  | C-Kernel-Engine</title>
-    <meta name="description" content="C-Kernel-Engine documentation for a CPU-native AI runtime, kernels, code generation, training, and inference on Linux systems.">
+    <title>Serving and Batching | C-Kernel-Engine</title>
+    <meta name="description" content="How CKE serves generated models over HTTP today: serialized single-flight execution, the experimental two-slot batch decode path, and the roadmap toward continuous batching.">
     <meta name="robots" content="index,follow">
-    <link rel="canonical" href="https://c-kernel-engine.github.io/C-Kernel-Engine/v7-grad-accum-windows.html">
-    <meta property="og:title" content="v7 Grad Accum Windows  | C-Kernel-Engine">
-    <meta property="og:description" content="C-Kernel-Engine documentation for a CPU-native AI runtime, kernels, code generation, training, and inference on Linux systems.">
+    <link rel="canonical" href="https://c-kernel-engine.github.io/C-Kernel-Engine/serving.html">
+    <meta property="og:title" content="Serving and Batching | C-Kernel-Engine">
+    <meta property="og:description" content="How CKE serves generated models over HTTP today: serialized single-flight execution, the experimental two-slot batch decode path, and the roadmap toward continuous batching.">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://c-kernel-engine.github.io/C-Kernel-Engine/v7-grad-accum-windows.html">
+    <meta property="og:url" content="https://c-kernel-engine.github.io/C-Kernel-Engine/serving.html">
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <style>
         :root {
@@ -1029,160 +1029,232 @@
     </header>
     <main>
 
-<h1>v7 Gradient Accumulation Windows on CPU</h1>
+<style>
+.sv-flags { margin: 0.4rem 0 1.2rem; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.sv-diagram { margin: 1.2rem 0 2rem; }
+.sv-diagram figcaption { color: var(--text-muted); font-size: 0.8rem; margin-top: 0.5rem; }
+.sv-table td, .sv-table th { vertical-align: top; }
+</style>
 
-<p>This page explains one of the most common training confusions in v7: CE token normalization (<code>/N</code>) versus gradient-accumulation window normalization (<code>/K</code>), and how they combine to set the true optimizer update scale.</p>
+<h1>Serving &amp; Batching</h1>
 
-<div class="alert alert-info">
-  <div class="alert-icon">
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-  </div>
-  <div>
-    <strong>Key Point</strong><br>
-    <code>N</code> and <code>K</code> are different: <code>N</code> is valid targets inside one micro-step; <code>K</code> is the number of micro-steps accumulated before one optimizer update.
-  </div>
+<p style="max-width: 820px; font-size: 1.05rem; color: var(--text-muted);">CKE is a C-first compiler,
+kernel library and runtime; serving is a layer on top of the generated model, not a redefinition
+of the project. This page documents how HTTP serving actually executes today, what the merged
+two-slot batch decode does and does not do, and what true continuous batching still requires.</p>
+
+<div class="sv-flags">
+    <span class="badge badge-green">Default path: shipped, verified</span>
+    <span class="badge badge-orange">batch2: merged, experimental opt-in</span>
+    <span class="badge badge-grey">Continuous batching: planned, not implemented</span>
 </div>
-
-<div class="img-container svg-viewer" data-title="v7 Grad-Accum Window">
-  <img src="assets/v7-grad-accum-window.svg" alt="Gradient accumulation window and optimizer boundary in v7">
-</div>
-
-<h2>Terminology</h2>
-
-<table>
-  <tr>
-    <th>Term</th>
-    <th>Meaning</th>
-    <th>Typical v7 knob</th>
-  </tr>
-  <tr>
-    <td><strong>Micro-batch</strong></td>
-    <td>One forward+backward pass worth of tokens</td>
-    <td><code>seq_len</code> (and token stream chunking)</td>
-  </tr>
-  <tr>
-    <td><strong><code>N</code> (CE denominator)</strong></td>
-    <td>Valid targets in one micro-step (ignore rows excluded)</td>
-    <td>Derived at runtime</td>
-  </tr>
-  <tr>
-    <td><strong><code>K</code> (accumulation window)</strong></td>
-    <td>Micro-steps before one optimizer update</td>
-    <td><code>--train-grad-accum</code></td>
-  </tr>
-  <tr>
-    <td><strong>Effective tokens per optimizer update</strong></td>
-    <td>Total tokens represented by one update</td>
-    <td><code>micro_tokens * K</code></td>
-  </tr>
-</table>
-
-<h2>The Two Normalizations You Need</h2>
-
-<p>Per micro-step CE with mean reduction gives:</p>
-
-<p>\[
-\nabla z = \frac{p - \text{one\_hot}}{N}
-\]</p>
-
-<p>After accumulating <code>K</code> micro-steps, the optimizer must consume the <em>average</em> gradient:</p>
-
-<p>\[
-g_{\text{step}} = \frac{1}{K}\sum_{m=1}^{K} g_m
-\]</p>
-
-<p>If each micro-step has similar <code>N</code>, update scale is effectively proportional to <code>1 / (N * K)</code>.</p>
-
-<div class="card card-accent">
-  <h3 style="margin-top: 0;">What Was Missing in the Drift Repro</h3>
-  <p style="margin: 0;">CE <code>/N</code> was already present. The missing piece was window averaging <code>/K</code> before AdamW in generated runtime when <code>grad_accum &gt; 1</code>.</p>
-</div>
-
-<h2>Concrete CPU Examples</h2>
-
-<table>
-  <tr>
-    <th>Micro tokens</th>
-    <th><code>K</code> (<code>grad_accum</code>)</th>
-    <th>Effective tokens / optimizer step</th>
-  </tr>
-  <tr>
-    <td>8</td>
-    <td>4</td>
-    <td>32</td>
-  </tr>
-  <tr>
-    <td>8</td>
-    <td>8</td>
-    <td>64</td>
-  </tr>
-  <tr>
-    <td>16</td>
-    <td>8</td>
-    <td>128</td>
-  </tr>
-</table>
-
-<pre># Example: simulate larger batch on CPU memory budget
-# micro-step tokens = 8
-# grad_accum K      = 4
-# effective tokens/update = 32
-
-for each micro-step:
-    forward()
-    backward()                 # accumulate gradients
-
-at accumulation boundary:
-    grad *= 1/K               # or equivalently, backward(loss/K) each micro-step
-    adamw_step()
-    zero_grad()</pre>
-
-<h2>Why This Mattered at lr = 1e-3</h2>
-
-<p>If accumulated gradients are not divided by <code>K</code>, optimizer input is approximately <code>K</code> times too large.</p>
-
-<ul>
-  <li><code>K=8</code> with <code>lr=1e-3</code> behaves closer to an effective step size like <code>~8e-3</code> in magnitude.</li>
-  <li>This can look fine early, then destabilize later as AdamW moments integrate the oversized updates.</li>
-  <li>Restoring <code>/K</code> moved the long-horizon run from late blow-up to stable descent in the same repro setup.</li>
-</ul>
-
-<h2>Where It Lives in v7</h2>
-
-<ul>
-  <li>Train runtime codegen source: <code>version/v7/scripts/codegen_train_runtime_v7.py</code></li>
-  <li>Generated optimizer boundary in run-dir: <code>generated_train_runtime_v7.c</code></li>
-  <li>Related deep dives:
-    <a href="v7-backprop-ir.html"><code>v7-backprop-ir.html</code></a>,
-    <a href="v7-cross-entropy-parity.html"><code>v7-cross-entropy-parity.html</code></a>
-  </li>
-</ul>
-
-<h2>Variable Context Length Caveat (Important on CPU)</h2>
-
-<p>When sequence lengths vary per micro-step, <code>N</code> can vary too. That means naive fixed scaling can bias updates.</p>
 
 <div class="card">
-  <h3 style="margin-top: 0;">Robust Strategy for Variable-Length Windows</h3>
-  <ul style="margin-bottom: 0;">
-    <li>Track valid-token counts per micro-step (post-ignore filtering).</li>
-    <li>Accumulate gradients in numerator form or keep per-step weighted scaling.</li>
-    <li>Normalize by total valid targets in the full accumulation window, not a fixed constant.</li>
-  </ul>
+    <h2 style="margin-top: 0;">Terms that must not be conflated</h2>
+    <p>Four related but distinct capabilities. Claims about CKE serving should name exactly which
+    one is meant:</p>
+    <ul>
+        <li><strong>Request concurrency</strong> — many HTTP requests in flight (queued or active).</li>
+        <li><strong>Scheduling / interleaving</strong> — a host loop picks which request advances at each step.</li>
+        <li><strong>Batched execution</strong> — one kernel call computes several sequences in the same pass.</li>
+        <li><strong>Continuous batching</strong> — the active set changes at every iteration boundary:
+        requests join and leave without waiting for the longest sequence.</li>
+    </ul>
+    <p>Today CKE ships the first, ships an experimental two-row form of the second and third, and
+    designs toward the fourth. Concurrent HTTP requests, multi-threaded kernels and serial request
+    multiplexing are not, by themselves, batched decode.</p>
 </div>
 
-<h2>Operator Checklist</h2>
+<div class="card">
+    <h2 style="margin-top: 0;">Capability status</h2>
+    <table class="table sv-table">
+        <thead><tr><th>Capability</th><th>Status</th><th>Source evidence</th><th>Test evidence</th></tr></thead>
+        <tbody>
+            <tr><td>HTTP serving (OpenAI-style <code>/responses</code>, SSE streaming)</td>
+                <td><span class="badge badge-green">Shipped</span></td>
+                <td><code>server/live.py</code>, <code>version/v8/scripts/ck_serve_v8.py</code></td>
+                <td><code>test_live_streaming.py</code>, lifecycle hardening tests</td></tr>
+            <tr><td>Bounded admission (single-flight + FIFO queue, HTTP 429 overflow)</td>
+                <td><span class="badge badge-green">Shipped</span></td>
+                <td><code>server/live.py</code> <code>_FlightAdmission</code> (8 waiters, 30&nbsp;s)</td>
+                <td><code>test_serving_lifecycle_hardening.py</code></td></tr>
+            <tr><td>Cancellation &amp; cleanup (DELETE, disconnect watcher, per-token cancel)</td>
+                <td><span class="badge badge-green">Shipped</span></td>
+                <td><code>server/live.py</code>, <code>ck_cli_v8.c</code> cancel flag</td>
+                <td>lifecycle hardening + streaming socket tests</td></tr>
+            <tr><td>Per-request KV isolation in default mode (reset per request, shared weights)</td>
+                <td><span class="badge badge-green">Shipped</span></td>
+                <td><code>ck_session_v8_generate</code> → <code>kv_reset</code>; one process-wide <code>libmodel.so</code></td>
+                <td>serving lifecycle tests; A→B→A smoke runs</td></tr>
+            <tr><td>Two-slot batched decode (<code>ck_model_decode_batch2</code>, M=2 projection GEMMs)</td>
+                <td><span class="badge badge-orange">Experimental</span></td>
+                <td><code>server/batch_decode.py</code>, <code>batch_decode_codegen_v8.py</code>, <code>ck_model_abi_v8.h</code></td>
+                <td><code>test_batch_decode_loop.py</code>, <code>test_v8_two_row_batch_decode.py</code></td></tr>
+            <tr><td>Two-slot HTTP decode (opt-in <code>--batch-http-extra-bytes</code>)</td>
+                <td><span class="badge badge-orange">Experimental</span></td>
+                <td><code>server/batch_http.py</code>, <code>ck_serve_v8.py</code></td>
+                <td><code>test_batch_http.py</code> (19 tests, incl. real-socket SSE)</td></tr>
+            <tr><td>Iteration-level continuous batching (dynamic join/leave, N&gt;2)</td>
+                <td><span class="badge badge-grey">Planned</span></td><td>—</td><td>—</td></tr>
+            <tr><td>Mixed / interruptible prefill inside a decode step</td>
+                <td><span class="badge badge-grey">Planned</span></td><td>—</td><td>—</td></tr>
+            <tr><td>Batched attention / KV across rows</td>
+                <td><span class="badge badge-grey">Planned</span></td><td>—</td><td>—</td></tr>
+            <tr><td>Continuous-batching performance benchmarks</td>
+                <td><span class="badge badge-grey">Planned</span></td><td>—</td><td>—</td></tr>
+        </tbody>
+    </table>
+    <p style="color: var(--text-muted); font-size: 0.85rem;">Passing scheduler unit tests are not
+    proof of batched model execution or end-to-end serving throughput; those require separate
+    evidence. This table is the claim boundary for the whole page.</p>
+</div>
 
-<ol>
-  <li>Set <code>grad_accum</code> from memory budget and desired effective batch.</li>
-  <li>Confirm one optimizer update per full window.</li>
-  <li>Confirm accumulated gradient averaging (<code>/K</code>) before AdamW.</li>
-  <li>Use long-horizon parity checks with fixed token stream for drift triage.</li>
-</ol>
+<div class="card">
+    <h2 style="margin-top: 0;">Who owns what — where scheduling ends and generated C begins</h2>
+    <table class="table sv-table">
+        <thead><tr><th>Component</th><th>Owns</th></tr></thead>
+        <tbody>
+            <tr><td>Model compiler + code generation</td><td>Circuit lowering, provider resolution, memory plan, emitted C</td></tr>
+            <tr><td>Generated model runtime (<code>libmodel.so</code>)</td><td>Actual model execution: prefill, decode steps, KV/state storage inside its arena</td></tr>
+            <tr><td>Kernel execution</td><td>Arithmetic over supplied pointers; one process-global threadpool</td></tr>
+            <tr><td>Serving layer (<code>server/live.py</code>, <code>batch_http.py</code>)</td><td>HTTP, admission, request lifecycle, streaming, cancellation, slot policy</td></tr>
+            <tr><td>Session bridge (<code>session_v8.py</code> / <code>ck_cli_v8.c</code>)</td><td>ctypes/native boundary, session state, batch2 slot ownership</td></tr>
+        </tbody>
+    </table>
+    <p>The serving layer never computes logits, and the generated runtime never sees HTTP. The
+    boundary is the session ABI: the host passes token ids in and receives logits (or decode steps)
+    out. One process loads the model once; every request shares the mapped weights, while
+    per-request state lives in request-owned arenas.</p>
+</div>
 
-<div class="card card-green">
-  <h3 style="margin-top: 0;">Bottom Line</h3>
-  <p style="margin: 0;">CE math correctness (<code>p - one_hot</code>, <code>/N</code>) is necessary but not sufficient. Production-stable backprop also requires window-correct optimizer scaling (<code>/K</code>) so CPU batch simulation behaves like true larger-batch training.</p>
+<h2 id="default-path">Default: serialized single-flight serving</h2>
+<p>Without batch flags, one request owns the loaded model end to end. A bounded FIFO queue
+(8 waiters, 30&nbsp;s timeout) absorbs bursts and returns HTTP 429 beyond that. This is deliberate:
+each in-flight request already dispatches kernels across the whole threadpool, so a second
+concurrent generation would oversubscribe cores and contend for DRAM bandwidth rather than speed
+anyone up.</p>
+
+<figure class="img-container sv-diagram">
+    <img src="assets/serving-request-lifecycle-v8.svg" alt="Diagram of the v8 HTTP serving path: clients, bounded FIFO admission, one SessionV8 over a generated libmodel.so, synchronous prefill, per-token decode, SSE streaming, and KV reset on release. A timeline shows a second request queued until the first finishes.">
+    <figcaption>Request lifecycle and two-request timeline for the default path. Every transition shown exists in code today; sources in the diagram footer.</figcaption>
+</figure>
+
+<h2 id="batch2">Experimental: two-slot batched decode (batch2)</h2>
+<p>Merged in PR&nbsp;#709 (native/host loop) and PR&nbsp;#715 (HTTP wiring). When enabled, two
+requests can share one generated-C decode call per tick: projection GEMMs run batched at M=2 with
+weights loaded once, while attention, KV writes and positions stay sequence-local. A host-side
+loop keeps sampling, stop rules and budgets strictly per request.</p>
+
+<pre># master switch plus required caps (see runbook for the exact, current invocation)
+cks-v8-serve … --batch-http-extra-bytes BYTES \
+               --batch-http-prompt-cap TOKENS \
+               --request-output-cap TOKENS</pre>
+
+<figure class="img-container sv-diagram">
+    <img src="assets/batch2-decode-loop-v8.svg" alt="Diagram of the batch2 decode loop: two request-owned slots with per-request sampling feed one ck_model_decode_batch2 call per tick. Inside the generated C, shared stages run M=2 batched projection GEMMs and local stages run per-row sequential attention and KV with sequence-state switching.">
+    <figcaption>batch2 internals. Enablement, limits and the exact claim boundary are in the
+    <a href="v8-runbook.html#experimental-batch-http">v8 runbook, Experimental batch HTTP</a>.</figcaption>
+</figure>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">What you get</h3>
+        <ul>
+            <li>Two requests decoded per generated-C step when both slots are active — counted by
+            the owner as <em>shared steps</em> and asserted by tests.</li>
+            <li>Projection weight traffic amortized across both rows — the real CPU payoff.</li>
+            <li>Per-request isolation: separate KV arenas, RNG, stop rules, output caps,
+            cancellation and failure recovery.</li>
+            <li>Bounded admission: a third concurrent request receives HTTP 429; delivery queues
+            are bounded so a slow consumer cannot stall the owner.</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">What you do not get</h3>
+        <ul>
+            <li>Not a full-layer batched decoder: attention and KV are per-row sequential inside
+            the call.</li>
+            <li>Prefill stays synchronous and per-slot — a joining request's prefill pauses the
+            other slot for its duration; the prompt cap bounds tokens, not time.</li>
+            <li>Fixed at two slots, KV-cache-only generated models (recurrent-state models are
+            outside this capability).</li>
+            <li>Not yet certified for sustained/overnight concurrency — treat as experimental.</li>
+        </ul>
+    </div>
+</div>
+
+<h2 id="roadmap">Planned: continuous batching</h2>
+<p>The design direction is iteration-level scheduling over the generated runtime: an active set
+whose membership changes at every decode boundary, memory-aware admission against a shared KV
+pool, mixed/chunked prefill, and batched attention across N rows. batch2 is the N=2 proof of the
+ABI shape — the per-request policy model, arena reuse and recovery discipline generalize; the
+scheduler, batch-N codegen and paged KV do not exist yet.</p>
+
+<figure class="img-container sv-diagram">
+    <img src="assets/continuous-batching-roadmap-v8.svg" alt="Three-lane roadmap: shipped serialized HTTP serving, merged experimental two-slot batch decode, and planned continuous batching with an iteration-level scheduler, dynamic active set, memory-aware admission and shared KV pool.">
+    <figcaption>Roadmap and target scheduler shape. Grey elements are design direction with no
+    implementation claims.</figcaption>
+</figure>
+
+<div class="card card-blue">
+    <h2 style="margin-top: 0;">Memory behavior under concurrency</h2>
+    <p>Weights are mapped once per server process and shared by every request. Per-request cost is
+    KV cache (and, for hybrid models, recurrent state) plus delivery buffers:</p>
+    <p><code>KV bytes ≈ 2 × KV-owning layers × KV heads × head dim × tokens × bytes/element</code></p>
+    <p>That approximation hides important detail: <em>distinct KV storage owners</em> (not layer
+    count), grouped-query geometry, sliding-window layers, hybrid/recurrent state, alignment and
+    cache layout. Use the <a href="sizing.html">Model Sizing Lab</a> for an architecture-aware
+    estimate. Also distinguish four different limits: maximum resident requests by memory, maximum
+    active decode slots (2 in batch mode), queue capacity, and the sustainable concurrent
+    workload — they are not interchangeable.</p>
+</div>
+
+<div class="card">
+    <h2 style="margin-top: 0;">Performance: what to expect, and what not to claim</h2>
+    <p>On CPUs, decode is usually memory-bandwidth-bound. Batching two rows shares each weight
+    read across both sequences, so aggregate tokens/s can rise — while per-request rate can fall,
+    and prefill interference adds latency for a joining request. Whether batch2 helps a given
+    deployment depends on model size, quantization, context distribution and thread count. There
+    are no published continuous-batching benchmarks for CKE yet; do not cite throughput claims
+    without them. Measure prefill and decode separately, at fixed threads, with warm-up, and
+    report aggregate throughput and per-request latency as distinct numbers.</p>
+</div>
+
+<div class="card">
+    <h2 style="margin-top: 0;">Model-specific boundaries</h2>
+    <p>Serving behavior is per generated artifact, not per server. The batch2 path currently
+    requires a generated KV-only batch-capable model layout, and <code>enable_batch2</code> fails
+    at startup otherwise — the server refuses to boot in batch mode rather than silently
+    degrading. Recurrent-state models (e.g. DeltaNet-style layers), vision-language bridges and
+    audio pipelines have different state ownership and are outside the batch2 capability today;
+    their single-flight serving follows the default path. For the per-circuit record of which
+    models carry serving declarations and certification evidence, see the
+    <a href="v8-serving-coverage.html">v8 Serving Coverage Inventory</a>.</p>
+</div>
+
+<div class="card">
+    <h2 style="margin-top: 0;">Evidence and sources</h2>
+    <ul>
+        <li>Serving layer: <code>server/live.py</code> · <code>server/batch_http.py</code> ·
+        <code>server/batch_decode.py</code> · <code>server/session_v8.py</code> ·
+        <code>server/README.md</code></li>
+        <li>Native bridge: <code>version/v8/src/ck_cli_v8.c</code> (session, batch2 step, KV
+        arenas, cancel) · <code>include/ck_model_abi_v8.h</code> · <code>include/ck_session_v8.h</code></li>
+        <li>Codegen: <code>version/v8/scripts/batch_decode_codegen_v8.py</code> (shared M=2 GEMM
+        stages vs per-row local stages)</li>
+        <li>Tests: <code>server/tests/test_batch_http.py</code> ·
+        <code>server/tests/test_batch_decode_loop.py</code> ·
+        <code>server/tests/test_serving_lifecycle_hardening.py</code> ·
+        <code>tests/test_v8_two_row_batch_decode.py</code></li>
+        <li>Operator docs: <a href="v8-runbook.html">v8 runbook</a> (incl.
+        <a href="v8-runbook.html#experimental-batch-http">Experimental batch HTTP</a>) ·
+        <a href="sizing.html">Model Sizing Lab</a> ·
+        <a href="v8-serving-coverage.html">v8 Serving Coverage Inventory</a> (per-circuit
+        certification evidence)</li>
+    </ul>
+    <p style="color: var(--text-muted); font-size: 0.8rem;">Page authored against origin/main
+    ce70528cd (post PR&nbsp;#709/#715) by source inspection; runtime claims rest on the cited
+    tests, not on new benchmarks run for this page.</p>
 </div>
     </main>
 
