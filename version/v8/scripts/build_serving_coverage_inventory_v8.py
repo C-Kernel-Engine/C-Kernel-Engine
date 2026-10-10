@@ -141,6 +141,9 @@ and separate evidence fields. Repository revision, quantization, tokenizer ident
 reasoning behavior, and task results remain unassessed until an exact resolved bundle and run
 report supply them. Missing declarations are visible; legacy imported sidecars may still allow
 chat but are not circuit-linked certification.</p>
+<p>For the execution model behind these declarations — admission, lifecycle, the experimental
+two-slot batch decode, and the continuous-batching roadmap — see
+<a href="serving.html">Serving &amp; Batching</a>.</p>
 <table class="table"><thead><tr><th>Circuit</th><th>Family</th><th>Chat scope</th><th>Profile</th>
 <th>Chat asset source</th><th>Declared output protocol</th><th>Input modalities</th></tr></thead>
 <tbody>

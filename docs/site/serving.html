@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{PAGE_TITLE}} | C-Kernel-Engine</title>
-    <meta name="description" content="{{META_DESCRIPTION}}">
-    <meta name="robots" content="{{META_ROBOTS}}">
-    <link rel="canonical" href="{{CANONICAL_URL}}">
-    <meta property="og:title" content="{{PAGE_TITLE}} | C-Kernel-Engine">
-    <meta property="og:description" content="{{META_DESCRIPTION}}">
+    <title>Serving and Batching | C-Kernel-Engine</title>
+    <meta name="description" content="How CKE serves generated models over HTTP today: serialized single-flight execution, the experimental two-slot batch decode path, and the roadmap toward continuous batching.">
+    <meta name="robots" content="index,follow">
+    <link rel="canonical" href="https://c-kernel-engine.github.io/C-Kernel-Engine/serving.html">
+    <meta property="og:title" content="Serving and Batching | C-Kernel-Engine">
+    <meta property="og:description" content="How CKE serves generated models over HTTP today: serialized single-flight execution, the experimental two-slot batch decode path, and the roadmap toward continuous batching.">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="{{CANONICAL_URL}}">
+    <meta property="og:url" content="https://c-kernel-engine.github.io/C-Kernel-Engine/serving.html">
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <style>
         :root {
@@ -944,16 +944,16 @@
             <input type="search" name="q" id="site-search-input" aria-label="Search documentation" placeholder="Search docs ( / )" autocomplete="off">
         </form>
         <nav class="site-nav">
-            <a href="index.html" class="{{NAV_INDEX}}">Home</a>
-            <a href="spectrum.html" class="{{NAV_SPECTRUM}}" style="color:var(--orange)">⚡ Spectrum</a>
-            <a href="quickstart.html" class="{{NAV_QUICKSTART}}">Getting Started</a>
-            <a href="developer-guide.html" class="{{NAV_DEVGUIDE}}">Developer Guide</a>
-            <a href="contributing.html" class="{{NAV_CONTRIBUTING}}">Contribute</a>
-            <a href="scaling.html" class="{{NAV_SCALING}}">Scaling</a>
-            <a href="support-hardware.html" class="{{NAV_SUPPORT}}" style="color:var(--green)">Support Lab</a>
-            <a href="cke-throughput-unit.html" class="{{NAV_CKU}}" style="color:var(--orange)">CKU</a>
+            <a href="index.html" class="">Home</a>
+            <a href="spectrum.html" class="" style="color:var(--orange)">⚡ Spectrum</a>
+            <a href="quickstart.html" class="">Getting Started</a>
+            <a href="developer-guide.html" class="">Developer Guide</a>
+            <a href="contributing.html" class="">Contribute</a>
+            <a href="scaling.html" class="">Scaling</a>
+            <a href="support-hardware.html" class="" style="color:var(--green)">Support Lab</a>
+            <a href="cke-throughput-unit.html" class="" style="color:var(--orange)">CKU</a>
             <div class="nav-dropdown">
-                <span class="nav-trigger {{NAV_ARCHITECTURE}}">Architecture</span>
+                <span class="nav-trigger active">Architecture</span>
                 <div class="nav-dropdown-menu mega-menu">
                     <!-- Architecture Home Link -->
                     <div class="menu-section" style="grid-column: 1 / -1; border-bottom: 1px solid var(--grey); padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
@@ -1004,7 +1004,7 @@
                         <a href="v8-mla-kimi.html">v8 MLA / Kimi<small>Explicit decode cache contract</small></a>
                         <a href="v8-whisper-tiny.html">Whisper Tiny E2E<small>Audio encoder/decoder circuits</small></a>
                         <a href="simd-architecture.html">SIMD Architecture<small>AVX-512, VNNI, AMX</small></a>
-                        <a href="flash_attention.html" class="{{NAV_FLASH_ATTENTION}}">Flash Attention Analysis<small>Why llama.cpp is faster</small></a>
+                        <a href="flash_attention.html" class="">Flash Attention Analysis<small>Why llama.cpp is faster</small></a>
                     </div>
                     <div class="menu-section">
                         <div class="menu-heading">Infrastructure</div>
@@ -1023,8 +1023,491 @@
                     </div>
                 </div>
             </div>
-            <a href="test-report.html" class="{{NAV_NIGHTLY}}">Test Report</a>
-            <a href="version-history.html" class="{{NAV_VERSION}}">Versions</a>
+            <a href="test-report.html" class="">Test Report</a>
+            <a href="version-history.html" class="">Versions</a>
         </nav>
     </header>
     <main>
+
+<style>
+.sv-flags { margin: 0.4rem 0 1.2rem; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.sv-diagram { margin: 1.2rem 0 2rem; }
+.sv-diagram figcaption { color: var(--text-muted); font-size: 0.8rem; margin-top: 0.5rem; }
+.sv-table td, .sv-table th { vertical-align: top; }
+</style>
+
+<h1>Serving &amp; Batching</h1>
+
+<p style="max-width: 820px; font-size: 1.05rem; color: var(--text-muted);">CKE is a C-first compiler,
+kernel library and runtime; serving is a layer on top of the generated model, not a redefinition
+of the project. This page documents how HTTP serving actually executes today, what the merged
+two-slot batch decode does and does not do, and what true continuous batching still requires.</p>
+
+<div class="sv-flags">
+    <span class="badge badge-green">Default path: shipped, verified</span>
+    <span class="badge badge-orange">batch2: merged, experimental opt-in</span>
+    <span class="badge badge-grey">Continuous batching: planned, not implemented</span>
+</div>
+
+<div class="card">
+    <h2 style="margin-top: 0;">Terms that must not be conflated</h2>
+    <p>Four related but distinct capabilities. Claims about CKE serving should name exactly which
+    one is meant:</p>
+    <ul>
+        <li><strong>Request concurrency</strong> — many HTTP requests in flight (queued or active).</li>
+        <li><strong>Scheduling / interleaving</strong> — a host loop picks which request advances at each step.</li>
+        <li><strong>Batched execution</strong> — one kernel call computes several sequences in the same pass.</li>
+        <li><strong>Continuous batching</strong> — the active set changes at every iteration boundary:
+        requests join and leave without waiting for the longest sequence.</li>
+    </ul>
+    <p>Today CKE ships the first, ships an experimental two-row form of the second and third, and
+    designs toward the fourth. Concurrent HTTP requests, multi-threaded kernels and serial request
+    multiplexing are not, by themselves, batched decode.</p>
+</div>
+
+<div class="card">
+    <h2 style="margin-top: 0;">Capability status</h2>
+    <table class="table sv-table">
+        <thead><tr><th>Capability</th><th>Status</th><th>Source evidence</th><th>Test evidence</th></tr></thead>
+        <tbody>
+            <tr><td>HTTP serving (OpenAI-style <code>/responses</code>, SSE streaming)</td>
+                <td><span class="badge badge-green">Shipped</span></td>
+                <td><code>server/live.py</code>, <code>version/v8/scripts/ck_serve_v8.py</code></td>
+                <td><code>test_live_streaming.py</code>, lifecycle hardening tests</td></tr>
+            <tr><td>Bounded admission (single-flight + FIFO queue, HTTP 429 overflow)</td>
+                <td><span class="badge badge-green">Shipped</span></td>
+                <td><code>server/live.py</code> <code>_FlightAdmission</code> (8 waiters, 30&nbsp;s)</td>
+                <td><code>test_serving_lifecycle_hardening.py</code></td></tr>
+            <tr><td>Cancellation &amp; cleanup (DELETE, disconnect watcher, per-token cancel)</td>
+                <td><span class="badge badge-green">Shipped</span></td>
+                <td><code>server/live.py</code>, <code>ck_cli_v8.c</code> cancel flag</td>
+                <td>lifecycle hardening + streaming socket tests</td></tr>
+            <tr><td>Per-request KV isolation in default mode (reset per request, shared weights)</td>
+                <td><span class="badge badge-green">Shipped</span></td>
+                <td><code>ck_session_v8_generate</code> → <code>kv_reset</code>; one process-wide <code>libmodel.so</code></td>
+                <td>serving lifecycle tests; A→B→A smoke runs</td></tr>
+            <tr><td>Two-slot batched decode (<code>ck_model_decode_batch2</code>, M=2 projection GEMMs)</td>
+                <td><span class="badge badge-orange">Experimental</span></td>
+                <td><code>server/batch_decode.py</code>, <code>batch_decode_codegen_v8.py</code>, <code>ck_model_abi_v8.h</code></td>
+                <td><code>test_batch_decode_loop.py</code>, <code>test_v8_two_row_batch_decode.py</code></td></tr>
+            <tr><td>Two-slot HTTP decode (opt-in <code>--batch-http-extra-bytes</code>)</td>
+                <td><span class="badge badge-orange">Experimental</span></td>
+                <td><code>server/batch_http.py</code>, <code>ck_serve_v8.py</code></td>
+                <td><code>test_batch_http.py</code> (19 tests, incl. real-socket SSE)</td></tr>
+            <tr><td>Iteration-level continuous batching (dynamic join/leave, N&gt;2)</td>
+                <td><span class="badge badge-grey">Planned</span></td><td>—</td><td>—</td></tr>
+            <tr><td>Mixed / interruptible prefill inside a decode step</td>
+                <td><span class="badge badge-grey">Planned</span></td><td>—</td><td>—</td></tr>
+            <tr><td>Batched attention / KV across rows</td>
+                <td><span class="badge badge-grey">Planned</span></td><td>—</td><td>—</td></tr>
+            <tr><td>Continuous-batching performance benchmarks</td>
+                <td><span class="badge badge-grey">Planned</span></td><td>—</td><td>—</td></tr>
+        </tbody>
+    </table>
+    <p style="color: var(--text-muted); font-size: 0.85rem;">Passing scheduler unit tests are not
+    proof of batched model execution or end-to-end serving throughput; those require separate
+    evidence. This table is the claim boundary for the whole page.</p>
+</div>
+
+<div class="card">
+    <h2 style="margin-top: 0;">Who owns what — where scheduling ends and generated C begins</h2>
+    <table class="table sv-table">
+        <thead><tr><th>Component</th><th>Owns</th></tr></thead>
+        <tbody>
+            <tr><td>Model compiler + code generation</td><td>Circuit lowering, provider resolution, memory plan, emitted C</td></tr>
+            <tr><td>Generated model runtime (<code>libmodel.so</code>)</td><td>Actual model execution: prefill, decode steps, KV/state storage inside its arena</td></tr>
+            <tr><td>Kernel execution</td><td>Arithmetic over supplied pointers; one process-global threadpool</td></tr>
+            <tr><td>Serving layer (<code>server/live.py</code>, <code>batch_http.py</code>)</td><td>HTTP, admission, request lifecycle, streaming, cancellation, slot policy</td></tr>
+            <tr><td>Session bridge (<code>session_v8.py</code> / <code>ck_cli_v8.c</code>)</td><td>ctypes/native boundary, session state, batch2 slot ownership</td></tr>
+        </tbody>
+    </table>
+    <p>The serving layer never computes logits, and the generated runtime never sees HTTP. The
+    boundary is the session ABI: the host passes token ids in and receives logits (or decode steps)
+    out. One process loads the model once; every request shares the mapped weights, while
+    per-request state lives in request-owned arenas.</p>
+</div>
+
+<h2 id="default-path">Default: serialized single-flight serving</h2>
+<p>Without batch flags, one request owns the loaded model end to end. A bounded FIFO queue
+(8 waiters, 30&nbsp;s timeout) absorbs bursts and returns HTTP 429 beyond that. This is deliberate:
+each in-flight request already dispatches kernels across the whole threadpool, so a second
+concurrent generation would oversubscribe cores and contend for DRAM bandwidth rather than speed
+anyone up.</p>
+
+<figure class="img-container sv-diagram">
+    <img src="assets/serving-request-lifecycle-v8.svg" alt="Diagram of the v8 HTTP serving path: clients, bounded FIFO admission, one SessionV8 over a generated libmodel.so, synchronous prefill, per-token decode, SSE streaming, and KV reset on release. A timeline shows a second request queued until the first finishes.">
+    <figcaption>Request lifecycle and two-request timeline for the default path. Every transition shown exists in code today; sources in the diagram footer.</figcaption>
+</figure>
+
+<h2 id="batch2">Experimental: two-slot batched decode (batch2)</h2>
+<p>Merged in PR&nbsp;#709 (native/host loop) and PR&nbsp;#715 (HTTP wiring). When enabled, two
+requests can share one generated-C decode call per tick: projection GEMMs run batched at M=2 with
+weights loaded once, while attention, KV writes and positions stay sequence-local. A host-side
+loop keeps sampling, stop rules and budgets strictly per request.</p>
+
+<pre># master switch plus required caps (see runbook for the exact, current invocation)
+cks-v8-serve … --batch-http-extra-bytes BYTES \
+               --batch-http-prompt-cap TOKENS \
+               --request-output-cap TOKENS</pre>
+
+<figure class="img-container sv-diagram">
+    <img src="assets/batch2-decode-loop-v8.svg" alt="Diagram of the batch2 decode loop: two request-owned slots with per-request sampling feed one ck_model_decode_batch2 call per tick. Inside the generated C, shared stages run M=2 batched projection GEMMs and local stages run per-row sequential attention and KV with sequence-state switching.">
+    <figcaption>batch2 internals. Enablement, limits and the exact claim boundary are in the
+    <a href="v8-runbook.html#experimental-batch-http">v8 runbook, Experimental batch HTTP</a>.</figcaption>
+</figure>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">What you get</h3>
+        <ul>
+            <li>Two requests decoded per generated-C step when both slots are active — counted by
+            the owner as <em>shared steps</em> and asserted by tests.</li>
+            <li>Projection weight traffic amortized across both rows — the real CPU payoff.</li>
+            <li>Per-request isolation: separate KV arenas, RNG, stop rules, output caps,
+            cancellation and failure recovery.</li>
+            <li>Bounded admission: a third concurrent request receives HTTP 429; delivery queues
+            are bounded so a slow consumer cannot stall the owner.</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">What you do not get</h3>
+        <ul>
+            <li>Not a full-layer batched decoder: attention and KV are per-row sequential inside
+            the call.</li>
+            <li>Prefill stays synchronous and per-slot — a joining request's prefill pauses the
+            other slot for its duration; the prompt cap bounds tokens, not time.</li>
+            <li>Fixed at two slots, KV-cache-only generated models (recurrent-state models are
+            outside this capability).</li>
+            <li>Not yet certified for sustained/overnight concurrency — treat as experimental.</li>
+        </ul>
+    </div>
+</div>
+
+<h2 id="roadmap">Planned: continuous batching</h2>
+<p>The design direction is iteration-level scheduling over the generated runtime: an active set
+whose membership changes at every decode boundary, memory-aware admission against a shared KV
+pool, mixed/chunked prefill, and batched attention across N rows. batch2 is the N=2 proof of the
+ABI shape — the per-request policy model, arena reuse and recovery discipline generalize; the
+scheduler, batch-N codegen and paged KV do not exist yet.</p>
+
+<figure class="img-container sv-diagram">
+    <img src="assets/continuous-batching-roadmap-v8.svg" alt="Three-lane roadmap: shipped serialized HTTP serving, merged experimental two-slot batch decode, and planned continuous batching with an iteration-level scheduler, dynamic active set, memory-aware admission and shared KV pool.">
+    <figcaption>Roadmap and target scheduler shape. Grey elements are design direction with no
+    implementation claims.</figcaption>
+</figure>
+
+<div class="card card-blue">
+    <h2 style="margin-top: 0;">Memory behavior under concurrency</h2>
+    <p>Weights are mapped once per server process and shared by every request. Per-request cost is
+    KV cache (and, for hybrid models, recurrent state) plus delivery buffers:</p>
+    <p><code>KV bytes ≈ 2 × KV-owning layers × KV heads × head dim × tokens × bytes/element</code></p>
+    <p>That approximation hides important detail: <em>distinct KV storage owners</em> (not layer
+    count), grouped-query geometry, sliding-window layers, hybrid/recurrent state, alignment and
+    cache layout. Use the <a href="sizing.html">Model Sizing Lab</a> for an architecture-aware
+    estimate. Also distinguish four different limits: maximum resident requests by memory, maximum
+    active decode slots (2 in batch mode), queue capacity, and the sustainable concurrent
+    workload — they are not interchangeable.</p>
+</div>
+
+<div class="card">
+    <h2 style="margin-top: 0;">Performance: what to expect, and what not to claim</h2>
+    <p>On CPUs, decode is usually memory-bandwidth-bound. Batching two rows shares each weight
+    read across both sequences, so aggregate tokens/s can rise — while per-request rate can fall,
+    and prefill interference adds latency for a joining request. Whether batch2 helps a given
+    deployment depends on model size, quantization, context distribution and thread count. There
+    are no published continuous-batching benchmarks for CKE yet; do not cite throughput claims
+    without them. Measure prefill and decode separately, at fixed threads, with warm-up, and
+    report aggregate throughput and per-request latency as distinct numbers.</p>
+</div>
+
+<div class="card">
+    <h2 style="margin-top: 0;">Model-specific boundaries</h2>
+    <p>Serving behavior is per generated artifact, not per server. The batch2 path currently
+    requires a generated KV-only batch-capable model layout, and <code>enable_batch2</code> fails
+    at startup otherwise — the server refuses to boot in batch mode rather than silently
+    degrading. Recurrent-state models (e.g. DeltaNet-style layers), vision-language bridges and
+    audio pipelines have different state ownership and are outside the batch2 capability today;
+    their single-flight serving follows the default path. For the per-circuit record of which
+    models carry serving declarations and certification evidence, see the
+    <a href="v8-serving-coverage.html">v8 Serving Coverage Inventory</a>.</p>
+</div>
+
+<div class="card">
+    <h2 style="margin-top: 0;">Evidence and sources</h2>
+    <ul>
+        <li>Serving layer: <code>server/live.py</code> · <code>server/batch_http.py</code> ·
+        <code>server/batch_decode.py</code> · <code>server/session_v8.py</code> ·
+        <code>server/README.md</code></li>
+        <li>Native bridge: <code>version/v8/src/ck_cli_v8.c</code> (session, batch2 step, KV
+        arenas, cancel) · <code>include/ck_model_abi_v8.h</code> · <code>include/ck_session_v8.h</code></li>
+        <li>Codegen: <code>version/v8/scripts/batch_decode_codegen_v8.py</code> (shared M=2 GEMM
+        stages vs per-row local stages)</li>
+        <li>Tests: <code>server/tests/test_batch_http.py</code> ·
+        <code>server/tests/test_batch_decode_loop.py</code> ·
+        <code>server/tests/test_serving_lifecycle_hardening.py</code> ·
+        <code>tests/test_v8_two_row_batch_decode.py</code></li>
+        <li>Operator docs: <a href="v8-runbook.html">v8 runbook</a> (incl.
+        <a href="v8-runbook.html#experimental-batch-http">Experimental batch HTTP</a>) ·
+        <a href="sizing.html">Model Sizing Lab</a> ·
+        <a href="v8-serving-coverage.html">v8 Serving Coverage Inventory</a> (per-circuit
+        certification evidence)</li>
+    </ul>
+    <p style="color: var(--text-muted); font-size: 0.8rem;">Page authored against origin/main
+    ce70528cd (post PR&nbsp;#709/#715) by source inspection; runtime claims rest on the cited
+    tests, not on new benchmarks run for this page.</p>
+</div>
+    </main>
+
+    <!-- SVG Viewer Overlay (shared across all pages) -->
+    <style>
+    .svg-viewer { cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+    .svg-viewer:hover { transform: scale(1.01); box-shadow: 0 8px 32px rgba(255, 180, 0, 0.3); }
+    #svg-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.95); z-index: 999999; }
+    #svg-overlay .toolbar { position: fixed; top: 0; left: 0; right: 0; padding: 10px 20px; background: rgba(0,0,0,0.9); display: flex; justify-content: space-between; align-items: center; z-index: 1000000; border-bottom: 1px solid #333; }
+    #svg-overlay .toolbar .title { color: #ccc; font-size: 14px; }
+    #svg-overlay .toolbar .controls { display: flex; gap: 8px; align-items: center; }
+    #svg-overlay .toolbar button { background: #333; color: #ffb400; border: 1px solid #555; padding: 8px 14px; cursor: pointer; border-radius: 4px; font-size: 14px; }
+    #svg-overlay .toolbar button:hover { background: #444; border-color: #ffb400; }
+    #svg-overlay .toolbar .close-btn { font-size: 20px; padding: 4px 12px; }
+    #svg-overlay .toolbar .zoom-display { color: #888; font-size: 12px; min-width: 45px; text-align: center; }
+    #svg-overlay .toolbar .separator { color: #444; }
+    #svg-overlay .image-container { display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 60px 20px 20px; cursor: grab; }
+    #svg-overlay .image-container:active { cursor: grabbing; }
+    #svg-overlay .image-container img { max-width: 95%; max-height: 90vh; transform-origin: center center; }
+    #svg-overlay .nav-btn { position: fixed; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.7); color: #ffb400; border: 1px solid #555; font-size: 30px; padding: 20px 15px; cursor: pointer; z-index: 1000000; border-radius: 4px; }
+    #svg-overlay .nav-btn:hover { background: rgba(255,180,0,0.2); border-color: #ffb400; }
+    #svg-overlay .nav-prev { left: 10px; }
+    #svg-overlay .nav-next { right: 10px; }
+    #svg-overlay .hint { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); color: #666; font-size: 12px; background: rgba(0,0,0,0.8); padding: 8px 20px; border-radius: 20px; }
+    </style>
+
+    <div id="svg-overlay">
+        <div class="toolbar">
+            <span class="title" id="svg-title">Image</span>
+            <div class="controls">
+                <button onclick="svgViewer.zoomOut()" title="Zoom Out (-)">-</button>
+                <span class="zoom-display" id="zoom-display">100%</span>
+                <button onclick="svgViewer.zoomIn()" title="Zoom In (+)">+</button>
+                <span class="separator">|</span>
+                <button onclick="svgViewer.fitWidth()" title="Fit Width (W)">Width</button>
+                <button onclick="svgViewer.fitHeight()" title="Fit Height (H)">Height</button>
+                <button onclick="svgViewer.resetZoom()" title="Reset (0)">Reset</button>
+                <span class="separator">|</span>
+                <button class="close-btn" onclick="svgViewer.close()" title="Close (ESC)">&times;</button>
+            </div>
+        </div>
+        <button class="nav-btn nav-prev" onclick="svgViewer.prev()" title="Previous">&larr;</button>
+        <button class="nav-btn nav-next" onclick="svgViewer.next()" title="Next">&rarr;</button>
+        <div class="image-container" id="svg-container">
+            <img id="svg-image" src="" alt="">
+        </div>
+        <div class="hint">Scroll to zoom | Drag to pan | W/H to fit | 0 to reset | ESC to close</div>
+    </div>
+
+    <script>
+    var svgViewer = (function() {
+        var overlay, img, titleEl, container;
+        var images = [];
+        var currentIndex = 0;
+        var scale = 1, panX = 0, panY = 0;
+        var isDragging = false, dragStartX, dragStartY, panStartX, panStartY;
+
+        function init() {
+            overlay = document.getElementById('svg-overlay');
+            img = document.getElementById('svg-image');
+            titleEl = document.getElementById('svg-title');
+            container = document.getElementById('svg-container');
+            if (!overlay || !img) return;
+
+            document.querySelectorAll('.svg-viewer').forEach(function(viewer, index) {
+                var viewerImg = viewer.querySelector('img');
+                if (viewerImg) {
+                    images.push({ src: viewerImg.src, title: viewer.getAttribute('data-title') || viewerImg.alt || 'Diagram' });
+                    viewer.onclick = function(e) { e.preventDefault(); open(index); };
+                }
+            });
+
+            container.addEventListener('wheel', function(e) {
+                e.preventDefault();
+                scale = Math.max(0.5, Math.min(10, scale + (e.deltaY > 0 ? -0.2 : 0.2)));
+                updateTransform();
+            });
+
+            container.addEventListener('mousedown', function(e) { isDragging = true; dragStartX = e.clientX; dragStartY = e.clientY; panStartX = panX; panStartY = panY; });
+            document.addEventListener('mousemove', function(e) { if (!isDragging) return; panX = panStartX + (e.clientX - dragStartX); panY = panStartY + (e.clientY - dragStartY); updateTransform(); });
+            document.addEventListener('mouseup', function() { isDragging = false; });
+
+            document.addEventListener('keydown', function(e) {
+                if (overlay.style.display !== 'block') return;
+                if (e.key === 'Escape') close();
+                if (e.key === 'ArrowLeft') prev();
+                if (e.key === 'ArrowRight') next();
+                if (e.key === '+' || e.key === '=') zoomIn();
+                if (e.key === '-') zoomOut();
+                if (e.key === '0') resetZoom();
+                if (e.key === 'w' || e.key === 'W') fitWidth();
+                if (e.key === 'h' || e.key === 'H') fitHeight();
+            });
+
+            overlay.addEventListener('click', function(e) { if (e.target === overlay || e.target === container) close(); });
+        }
+
+        function updateTransform() {
+            img.style.transform = 'translate(' + panX + 'px, ' + panY + 'px) scale(' + scale + ')';
+            var zd = document.getElementById('zoom-display');
+            if (zd) zd.textContent = Math.round(scale * 100) + '%';
+        }
+
+        function open(index) {
+            if (!images[index]) return;
+            currentIndex = index; scale = 1; panX = 0; panY = 0;
+            img.src = images[index].src;
+            titleEl.textContent = images[index].title + ' (' + (index + 1) + '/' + images.length + ')';
+            updateTransform();
+            overlay.style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function close() { overlay.style.display = 'none'; document.body.style.overflow = ''; }
+        function prev() { open((currentIndex - 1 + images.length) % images.length); }
+        function next() { open((currentIndex + 1) % images.length); }
+        function zoomIn() { scale = Math.min(10, scale + 0.25); updateTransform(); }
+        function zoomOut() { scale = Math.max(0.5, scale - 0.25); updateTransform(); }
+        function resetZoom() { scale = 1; panX = 0; panY = 0; updateTransform(); }
+
+        function fitWidth() {
+            if (!img.naturalWidth || !img.complete) { img.onload = fitWidth; return; }
+            scale = Math.max(0.1, Math.min(10, (window.innerWidth - 150) / img.naturalWidth));
+            panX = 0; panY = 0; updateTransform();
+        }
+
+        function fitHeight() {
+            if (!img.naturalHeight || !img.complete) { img.onload = fitHeight; return; }
+            scale = Math.max(0.1, Math.min(10, (window.innerHeight - 120) / img.naturalHeight));
+            panX = 0; panY = 0; updateTransform();
+        }
+
+        if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); } else { init(); }
+
+        return { open: open, close: close, prev: prev, next: next, zoomIn: zoomIn, zoomOut: zoomOut, resetZoom: resetZoom, fitWidth: fitWidth, fitHeight: fitHeight };
+    })();
+
+    // Mobile navigation
+    (function() {
+        var navToggle = document.querySelector('.nav-toggle');
+        var siteNav = document.querySelector('.site-nav');
+        var dropdowns = document.querySelectorAll('.nav-dropdown');
+
+        if (navToggle && siteNav) {
+            navToggle.addEventListener('click', function() {
+                navToggle.classList.toggle('active');
+                siteNav.classList.toggle('open');
+                navToggle.setAttribute('aria-expanded', siteNav.classList.contains('open'));
+            });
+
+            // Close menu when clicking a non-dropdown link
+            siteNav.querySelectorAll('a:not(.nav-dropdown-menu a)').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.innerWidth <= 768) {
+                        navToggle.classList.remove('active');
+                        siteNav.classList.remove('open');
+                    }
+                });
+            });
+        }
+
+        // Handle dropdowns on mobile
+        dropdowns.forEach(function(dropdown) {
+            var trigger = dropdown.querySelector('.nav-trigger');
+            if (trigger) {
+                trigger.addEventListener('click', function(e) {
+                    if (window.innerWidth <= 768) {
+                        e.preventDefault();
+                        // Close other dropdowns
+                        dropdowns.forEach(function(d) {
+                            if (d !== dropdown) d.classList.remove('open');
+                        });
+                        dropdown.classList.toggle('open');
+                    }
+                });
+            }
+        });
+
+        // Close dropdowns when clicking outside on mobile
+        document.addEventListener('click', function(e) {
+            if (window.innerWidth <= 768 && !e.target.closest('.nav-dropdown')) {
+                dropdowns.forEach(function(d) { d.classList.remove('open'); });
+            }
+        });
+    })();
+
+    // Site search keyboard shortcuts: "/" or Ctrl+K / Cmd+K focuses the header search box.
+    (function() {
+        var searchInput = document.getElementById('site-search-input');
+        if (!searchInput) return;
+        document.addEventListener('keydown', function(e) {
+            var target = e.target;
+            var tag = (target.tagName || '').toLowerCase();
+            var typing = tag === 'input' || tag === 'textarea' || tag === 'select' || target.isContentEditable;
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+                e.preventDefault();
+                searchInput.focus();
+                searchInput.select();
+            } else if (e.key === '/' && !typing) {
+                e.preventDefault();
+                searchInput.focus();
+            }
+        });
+    })();
+    </script>
+
+    <!-- MathJax for LaTeX equations across docs pages -->
+    <script>
+    window.MathJax = {
+        tex: {
+            inlineMath: [['\\(', '\\)'], ['$', '$']],
+            displayMath: [['\\[', '\\]'], ['$$', '$$']],
+            processEscapes: true,
+            processEnvironments: true
+        },
+        options: {
+            skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+        },
+        svg: {
+            fontCache: 'global'
+        }
+    };
+    </script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+
+    <footer style="background: #2a2a2a; border-top: 1px solid #454545; color: #b0b0b0; padding: 3rem 2rem; margin-top: auto;">
+        <div style="max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 2rem;">
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">C-Kernel-Engine</h4>
+                <p style="color: #707070; font-size: 0.875rem; margin: 0;">High-performance ML kernels with full PyTorch parity.</p>
+            </div>
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Resources</h4>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    <li style="margin-bottom: 0.5rem;"><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine" style="color: #909090; text-decoration: none; font-size: 0.875rem;">GitHub</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="contributing.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Contributor Path</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="architecture.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Architecture</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="api.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">API Reference</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Related</h4>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    <li style="margin-bottom: 0.5rem;"><a href="https://www.shivasnotes.com/" style="color: #909090; text-decoration: none; font-size: 0.875rem;">ShivasNotes</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://www.shivasnotes.com/work-with-us" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Work With Us</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://antshiv.com/" style="color: #909090; text-decoration: none; font-size: 0.875rem;">antshiv.com</a></li>
+                </ul>
+            </div>
+            <div style="text-align: right;">
+                <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-10-10</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>
