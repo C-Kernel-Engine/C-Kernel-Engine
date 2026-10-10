@@ -164,7 +164,7 @@ cks-v8-serve … --batch-http-extra-bytes BYTES \
 
     <section class="panel">
       <h2>Model-specific boundaries</h2>
-      <p class="helper">Serving behavior is per generated artifact, not per server. The batch2 path currently requires a generated KV-only batch-capable model layout, and <code>enable_batch2</code> fails at startup otherwise — the server refuses to boot in batch mode rather than silently degrading. Recurrent-state models (e.g. DeltaNet-style layers), vision-language bridges and audio pipelines have different state ownership and are outside the batch2 capability today; their single-flight serving follows the default path.</p>
+      <p class="helper">Serving behavior is per generated artifact, not per server. The batch2 path currently requires a generated KV-only batch-capable model layout, and <code>enable_batch2</code> fails at startup otherwise — the server refuses to boot in batch mode rather than silently degrading. Recurrent-state models (e.g. DeltaNet-style layers), vision-language bridges and audio pipelines have different state ownership and are outside the batch2 capability today; their single-flight serving follows the default path. For the per-circuit record of which models carry serving declarations and certification evidence, see the <a href="v8-serving-coverage.html">v8 Serving Coverage Inventory</a>.</p>
     </section>
 
     <section class="panel">
@@ -174,7 +174,7 @@ cks-v8-serve … --batch-http-extra-bytes BYTES \
         <li>Native bridge: <code>version/v8/src/ck_cli_v8.c</code> (session, batch2 step, KV arenas, cancel) · <code>include/ck_model_abi_v8.h</code> · <code>include/ck_session_v8.h</code></li>
         <li>Codegen: <code>version/v8/scripts/batch_decode_codegen_v8.py</code> (shared M=2 GEMM stages vs per-row local stages)</li>
         <li>Tests: <code>server/tests/test_batch_http.py</code> · <code>server/tests/test_batch_decode_loop.py</code> · <code>server/tests/test_serving_lifecycle_hardening.py</code> · <code>tests/test_v8_two_row_batch_decode.py</code></li>
-        <li>Operator docs: <a href="v8-runbook.html">v8 runbook</a> (incl. <a href="v8-runbook.html#experimental-batch-http">Experimental batch HTTP</a>) · <a href="sizing.html">Model Sizing Lab</a></li>
+        <li>Operator docs: <a href="v8-runbook.html">v8 runbook</a> (incl. <a href="v8-runbook.html#experimental-batch-http">Experimental batch HTTP</a>) · <a href="sizing.html">Model Sizing Lab</a> · <a href="v8-serving-coverage.html">v8 Serving Coverage Inventory</a> (per-circuit certification evidence)</li>
       </ul>
       <p class="fine">Page authored against origin/main ce70528cd (post PR&nbsp;#709/#715) by source inspection; runtime claims rest on the cited tests, not on new benchmarks run for this page.</p>
     </section>
