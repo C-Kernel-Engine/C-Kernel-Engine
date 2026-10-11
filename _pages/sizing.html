@@ -1,0 +1,217 @@
+<!-- TITLE: Model Sizing Lab -->
+<!-- NAV: architecture -->
+
+<style>
+.ms-root { --ms-green:#82d9a0; --ms-red:#ffa19a; --ms-blue:#74c5e8; --ms-purple:#a894e6; }
+.ms-root .ms-lede { max-width:820px; font-size:1.05rem; color:var(--text-secondary); }
+.ms-root .ms-flags { margin:0.4rem 0 1.2rem; display:flex; flex-wrap:wrap; gap:0.5rem; }
+.ms-root .ms-grid { display:grid; grid-template-columns:minmax(290px,430px) minmax(0,1fr); gap:1.2rem; align-items:start; }
+@media (max-width: 900px) { .ms-root .ms-grid { grid-template-columns:1fr; } }
+.ms-root .card p { color:var(--text-secondary); font-size:0.88rem; }
+.ms-root label { display:block; color:var(--text-muted); font-size:0.82rem; font-weight:700; }
+.ms-root input, .ms-root select { display:block; width:100%; margin-top:0.22rem; padding:0.55rem 0.6rem; border:1px solid var(--grey); border-radius:6px; background:#10181c; color:var(--text-primary); min-width:0; font:inherit; }
+.ms-root input[type=number] { font-variant-numeric:tabular-nums; }
+.ms-root input:focus-visible, .ms-root select:focus-visible, .ms-root button:focus-visible { outline:3px solid var(--orange); outline-offset:2px; }
+.ms-root .ms-pair { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0.75rem; }
+.ms-root .ms-controls { display:flex; flex-wrap:wrap; gap:0.55rem; margin:0.8rem 0; }
+.ms-root button { background:var(--orange); color:#152025; border:0; border-radius:6px; padding:0.55rem 0.9rem; font-weight:800; cursor:pointer; font:inherit; }
+.ms-root button.ms-secondary { background:var(--dark-lighter); color:var(--text-primary); border:1px solid var(--grey); }
+.ms-root button:hover { filter:brightness(1.12); }
+.ms-root .ms-results { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:0.65rem; }
+.ms-root .ms-metric { padding:0.8rem; background:var(--dark-lighter); border-radius:8px; border:1px solid var(--grey); }
+.ms-root .ms-metric strong { display:block; font-size:1.35rem; line-height:1.2; color:var(--text-primary); font-variant-numeric:tabular-nums; }
+.ms-root .ms-metric span { color:var(--text-muted); font-size:0.78rem; }
+.ms-root .ms-metric.ok strong { color:var(--ms-green); }
+.ms-root .ms-metric.no strong { color:var(--ms-red); }
+.ms-root .ms-memory { width:100%; height:auto; margin:0.7rem 0; }
+.ms-root .ms-legend { display:flex; flex-wrap:wrap; gap:0.75rem; color:var(--text-muted); font-size:0.78rem; }
+.ms-root .ms-legend i { display:inline-block; width:0.7rem; height:0.7rem; margin-right:0.28rem; border-radius:2px; }
+.ms-root .ms-fleet { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:0.6rem; }
+.ms-root .ms-node { background:#10181c; border:1px solid var(--grey); border-radius:8px; padding:0.65rem; }
+.ms-root .ms-node strong { display:block; margin-bottom:0.3rem; font-size:0.85rem; }
+.ms-root .ms-status { min-height:1.2rem; font-size:0.82rem; color:var(--ms-green); }
+.ms-root .ms-status.error { color:var(--ms-red); }
+.ms-root .ms-filelist { max-height:220px; overflow:auto; border:1px solid var(--grey); border-radius:8px; padding:0.6rem; margin-top:0.6rem; }
+.ms-root .ms-filelist label { display:block; font-weight:400; color:var(--text-secondary); font-size:0.8rem; padding:0.18rem 0; }
+.ms-root .ms-filelist input { display:inline-block; width:auto; margin-right:0.4rem; }
+.ms-root .fine { color:var(--text-muted); font-size:0.78rem; }
+.ms-root .ms-formula { font-family:'JetBrains Mono',monospace; font-size:0.82rem; color:var(--text-secondary); background:#10181c; border:1px solid var(--grey); border-radius:8px; padding:0.7rem 0.9rem; }
+.ms-root details { margin:0.4rem 0; }
+.ms-root summary { cursor:pointer; color:var(--ms-blue); font-size:0.88rem; }
+.ms-root .ms-hero { display:block; width:100%; max-width:640px; height:auto; margin:0.6rem 0 0; }
+</style>
+
+<div class="ms-root">
+
+<h1>Model Sizing Lab</h1>
+<p class="ms-lede">Six accelerators do not form one large memory pool — and neither do six CPU
+sockets. Place a model, choose its active contexts, and see where weights, KV cache and recurrent
+state consume capacity on GPUs or CPUs.</p>
+<div class="ms-flags">
+    <span class="badge badge-orange">Estimator, not a benchmark or service guarantee</span>
+    <span class="badge badge-grey">Theoretical bandwidth ceilings only</span>
+</div>
+
+<svg class="ms-hero" viewBox="0 0 520 230" role="img" aria-label="Illustration: six separate memory banks, with weights and request state sharing each bank" xmlns="http://www.w3.org/2000/svg">
+    <rect x="12" y="12" width="496" height="206" rx="15" fill="#1c292e" stroke="#4b6266"/>
+    <text x="30" y="39" fill="#ffb400" font-size="13" font-weight="bold">SIX INDEPENDENT MEMORY BANKS</text>
+    <g fill="#293940" stroke="#67818a"><rect x="29" y="59" width="145" height="58" rx="7"/><rect x="188" y="59" width="145" height="58" rx="7"/><rect x="347" y="59" width="145" height="58" rx="7"/><rect x="29" y="134" width="145" height="58" rx="7"/><rect x="188" y="134" width="145" height="58" rx="7"/><rect x="347" y="134" width="145" height="58" rx="7"/></g>
+    <g fill="#ffb400"><rect x="40" y="81" width="70" height="18" rx="2"/><rect x="199" y="81" width="70" height="18" rx="2"/><rect x="358" y="81" width="70" height="18" rx="2"/><rect x="40" y="156" width="70" height="18" rx="2"/><rect x="199" y="156" width="70" height="18" rx="2"/><rect x="358" y="156" width="70" height="18" rx="2"/></g>
+    <g fill="#74c5e8"><rect x="112" y="81" width="35" height="18" rx="2"/><rect x="271" y="81" width="35" height="18" rx="2"/><rect x="430" y="81" width="35" height="18" rx="2"/><rect x="112" y="156" width="35" height="18" rx="2"/><rect x="271" y="156" width="35" height="18" rx="2"/><rect x="430" y="156" width="35" height="18" rx="2"/></g>
+    <g fill="#f3f2e9" font-size="10" font-family="sans-serif"><text x="40" y="76">BANK 1</text><text x="199" y="76">BANK 2</text><text x="358" y="76">BANK 3</text><text x="40" y="151">BANK 4</text><text x="199" y="151">BANK 5</text><text x="358" y="151">BANK 6</text></g>
+</svg>
+
+<div class="ms-grid" style="margin-top:1.2rem;">
+<div>
+    <div class="card">
+        <h2 style="margin-top:0;">1. Choose a model</h2>
+        <p>Hugging Face lookup reads repository metadata only. Select the exact GGUF or
+        safetensors files; no weight download occurs.</p>
+        <label for="hf-url">Hugging Face model URL</label>
+        <input id="hf-url" type="url" placeholder="https://huggingface.co/owner/model">
+        <div class="ms-controls">
+            <button id="hf-load" type="button">Read metadata</button>
+            <button id="preset-qwen" class="ms-secondary" type="button">Qwen pattern</button>
+            <button id="preset-gemma" class="ms-secondary" type="button">Gemma pattern</button>
+            <button id="preset-nemotron" class="ms-secondary" type="button">Nemotron pattern</button>
+        </div>
+        <div id="hf-status" class="ms-status" role="status" aria-live="polite"></div>
+        <div id="hf-files" class="ms-filelist" hidden></div>
+        <p class="fine" id="hf-source">Preset patterns are illustrations, not verified checkpoint
+        configurations. Inspect and correct every field.</p>
+        <label for="cke-circuit">CKE circuit (optional topology source)</label>
+        <select id="cke-circuit"><option value="">None — manual topology</option></select>
+        <p class="fine" id="circuit-note">Loading CKE's serving coverage inventory…</p>
+        <label for="weight-gib">Selected model weights in GiB</label>
+        <input id="weight-gib" type="number" min="0" step="0.01" value="24">
+        <p class="fine">Disk bytes are a first approximation to loaded weight bytes. Conversion,
+        repacking, scales and padding can change this.</p>
+    </div>
+
+    <div class="card">
+        <h2 style="margin-top:0;">2. Declare the cache</h2>
+        <p>Enter <em>distinct KV storage owners</em>, not just the number of attention layers. A
+        layer reusing another layer's cache does not own another copy.</p>
+        <div class="ms-pair">
+            <label>Full-context KV owners<input id="full-owners" type="number" min="0" step="1" value="8"></label>
+            <label>Sliding KV owners<input id="local-owners" type="number" min="0" step="1" value="0"></label>
+            <label>Recurrent layers<input id="recurrent-layers" type="number" min="0" step="1" value="24"></label>
+            <label>State MiB / recurrent layer<input id="state-mib" type="number" min="0" step="0.1" value="1"></label>
+            <label>Global KV heads<input id="kv-heads" type="number" min="1" step="1" value="2"></label>
+            <label>Global K dimension<input id="k-dim" type="number" min="1" step="1" value="256"></label>
+            <label>Global V dimension<input id="v-dim" type="number" min="1" step="1" value="256"></label>
+            <label>Local KV heads<input id="local-kv-heads" type="number" min="1" step="1" value="2"></label>
+            <label>Local K dimension<input id="local-k-dim" type="number" min="1" step="1" value="256"></label>
+            <label>Local V dimension<input id="local-v-dim" type="number" min="1" step="1" value="256"></label>
+            <label>KV bytes / element<select id="kv-bytes"><option value="2">BF16 / FP16 (2)</option><option value="1">INT8 / FP8 (1)</option><option value="4">FP32 (4)</option></select></label>
+            <label>Sliding window tokens<input id="window" type="number" min="0" step="1" value="1024"></label>
+            <label>Local cache storage<select id="local-storage"><option value="full">Full-context allocation</option><option value="evict">Evict outside window</option></select></label>
+        </div>
+        <p class="fine">Eviction is a serving implementation choice, not guaranteed by sliding
+        attention. CKE currently plans full-context Gemma 4 KV even where its kernel reads only
+        the window.</p>
+    </div>
+
+    <div class="card">
+        <h2 style="margin-top:0;">3. Workload &amp; hardware</h2>
+        <div class="ms-pair">
+            <label>Target kind<select id="target-kind"><option value="gpu">GPU</option><option value="cpu">CPU</option></select></label>
+            <label>Hardware preset<select id="hw-preset"></select></label>
+        </div>
+        <p class="fine" id="hw-note"></p>
+        <div class="ms-pair">
+            <label>Resident tokens / request<input id="tokens" type="number" min="0" step="1" value="32768"></label>
+            <label>Active requests / replica<input id="requests" type="number" min="1" step="1" value="5"></label>
+            <label>Capacity GiB<input id="capacity-gib" type="number" min="1" step="0.1" value="89.41"></label>
+            <label>Peak bandwidth GB/s<input id="bandwidth-gbs" type="number" min="1" step="1" value="1597"></label>
+            <label>Runtime/headroom %<input id="reserve-pct" type="number" min="0" max="90" step="1" value="10"></label>
+            <label>Bandwidth efficiency %<input id="efficiency-pct" type="number" min="1" max="100" step="1" value="50"></label>
+        </div>
+        <p class="fine">CPU capacity is system RAM usable by the process; GPU capacity is device
+        memory. All preset bandwidths are theoretical peaks — derate with the efficiency input.
+        On a CPU, one socket's weights are shared by all its requests; sockets still do not pool.</p>
+    </div>
+</div>
+
+<div>
+    <div class="card">
+        <h2 style="margin-top:0;">Fit on one replica</h2>
+        <div id="error" class="ms-status error" role="alert"></div>
+        <div class="ms-results">
+            <div class="ms-metric"><strong id="fit">-</strong><span>At chosen concurrency</span></div>
+            <div class="ms-metric"><strong id="used">-</strong><span>Estimated used memory</span></div>
+            <div class="ms-metric"><strong id="free">-</strong><span>Headroom / deficit</span></div>
+            <div class="ms-metric"><strong id="weight">-</strong><span>Selected weight bytes</span></div>
+            <div class="ms-metric"><strong id="per-request">-</strong><span>KV + state / request</span></div>
+            <div class="ms-metric"><strong id="max-requests">-</strong><span>Approx. max active requests</span></div>
+        </div>
+        <svg id="memory-svg" class="ms-memory" viewBox="0 0 640 72" role="img" aria-label="Memory allocation chart" xmlns="http://www.w3.org/2000/svg"></svg>
+        <div class="ms-legend"><span><i style="background:#ffb400"></i>Weights</span><span><i style="background:#74c5e8"></i>KV</span><span><i style="background:#a894e6"></i>Recurrent state</span><span><i style="background:#738c90"></i>Reserve</span><span><i style="background:#33454b"></i>Free</span></div>
+        <p id="breakdown" class="fine" aria-live="polite"></p>
+    </div>
+
+    <div class="card">
+        <h2 style="margin-top:0;">Decode bandwidth ceiling</h2>
+        <p><span class="badge badge-orange">Optimistic thought experiment</span></p>
+        <div class="ms-results">
+            <div class="ms-metric"><strong id="per-user-speed">-</strong><span>Upper bound, tokens/s per active request</span></div>
+            <div class="ms-metric"><strong id="aggregate-speed">-</strong><span>Upper bound, tokens/s per replica</span></div>
+            <div class="ms-metric"><strong id="fleet-speed">-</strong><span>Upper bound across selected replicas</span></div>
+        </div>
+        <p class="ms-formula">batch bytes ≈ weights + active requests × (live KV read + recurrent state read)<br>aggregate token/s ≤ active requests × effective bandwidth ÷ batch bytes</p>
+        <p class="fine">Assumes one shared weight read per batch step, perfect scheduling, and all
+        modeled state read once. It excludes compute, dequantization, interconnect, network,
+        prefill, queueing and many kernel costs. A number here is <strong>not</strong> expected
+        throughput. It is not valid when the request does not fit. On CPUs this bound is usually
+        dominated by DRAM bandwidth — see
+        <a href="serving.html">Serving &amp; Batching</a> for what concurrency CKE actually
+        executes today.</p>
+    </div>
+
+    <div class="card">
+        <h2 style="margin-top:0;">Replica placement</h2>
+        <p>Mark GPUs or CPU nodes serving replicas of this model; reserve the others for OCR, ASR
+        or different models. Each replica carries its own weights and request state.</p>
+        <div id="fleet" class="ms-fleet"></div>
+        <p id="fleet-summary" class="fine"></p>
+    </div>
+
+    <div class="card">
+        <h2 style="margin-top:0;">Inspect the assumptions</h2>
+        <details><summary>What this page cannot infer</summary><p>File bytes do not identify
+        attention geometry, loaded weight precision, engine workspace or real utilization.
+        Model-family presets are patterns only. Hugging Face metadata may be missing, gated,
+        incomplete or ambiguous. Preprocessing and vision/audio towers need their own model
+        memory and latency budgets.</p></details>
+        <details><summary>What the CKE circuit picker knows</summary><p>The picker reads CKE's
+        generated serving coverage inventory. A circuit can declare a topology pattern (for
+        example a 3:1 recurrent-to-full-attention hybrid block structure); it never declares
+        numeric dimensions. Where a ratio pattern exists, a total layer count from Hugging Face
+        metadata is split into full-attention owners and recurrent layers automatically — labeled
+        as an estimate, not a certification.</p></details>
+        <details><summary>How to move from bound to service envelope</summary><p>Benchmark the
+        exact checkpoint, serving backend, context distribution and mixed workload. Measure p95
+        first-token time, per-user token rate, queue time, and aggregate throughput. Compare
+        observed allocated memory with this worksheet and with CKE's
+        <a href="kernel-maps.html#memory-planning">memory plan</a>. See the
+        <a href="q6-prefill-roofline.html">CKE roofline discussion</a> for why prefill and decode
+        differ.</p></details>
+        <div class="ms-controls">
+            <button id="share" class="ms-secondary" type="button">Copy scenario link</button>
+            <button id="export" class="ms-secondary" type="button">Download JSON report</button>
+        </div>
+        <p id="export-status" class="ms-status" role="status" aria-live="polite"></p>
+    </div>
+</div>
+</div>
+
+<p class="fine" style="margin-top:1.5rem;">Hardware references:
+<a href="https://www.nvidia.com/en-us/data-center/rtx-pro-6000-blackwell-server-edition/">NVIDIA RTX PRO 6000 Blackwell Server Edition</a>.
+Hugging Face metadata source: <a href="https://huggingface.co/docs/hub/en/api">Hub API</a>.
+CKE circuit inventory: <a href="v8-serving-coverage.html">v8 Serving Coverage</a>.
+This page runs in your browser and does not send your scenario to CKE.</p>
+
+</div>
+
+<script src="assets/model-sizing.js"></script>
+<script src="assets/model-sizing-page.js"></script>
