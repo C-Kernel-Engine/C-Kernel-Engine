@@ -181,6 +181,7 @@ Enumerations</h2></td></tr>
 , <a class="el" href="ck__session__v8_8h.html#a7b2292e66074bb6a2f4d7b04efd3c603aad3515d5606d104bf6b6aa9980846bf7">CK_SESSION_V8_ERROR_RUNTIME</a> = -7
 , <br />
 &#160;&#160;<a class="el" href="ck__session__v8_8h.html#a7b2292e66074bb6a2f4d7b04efd3c603a862dbc25b951a732ab5e3c60465be9e9">CK_SESSION_V8_ERROR_BUFFER_TOO_SMALL</a> = -8
+, <a class="el" href="ck__session__v8_8h.html#a7b2292e66074bb6a2f4d7b04efd3c603a9b1b80f32a5025f456f226ec1525e78a">CK_SESSION_V8_ERROR_CANCELLED</a> = -9
 <br />
  }</td></tr>
 <tr class="separator:a7b2292e66074bb6a2f4d7b04efd3c603"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -204,6 +205,10 @@ Functions</h2></td></tr>
 <tr class="separator:a104bbe7060e0fbb54bbc4068e5591254"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a92b6b52e7a4dd1bb884c4da19a3b5015" id="r_a92b6b52e7a4dd1bb884c4da19a3b5015"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ck__session__v8_8h.html#a92b6b52e7a4dd1bb884c4da19a3b5015">ck_session_v8_batch2_prefill</a> (<a class="el" href="ck__session__v8_8h.html#a662ce370d189b1138dd8d10af00872c2">CKSessionV8</a> *session, uint32_t slot, const int32_t *tokens, int32_t <a class="el" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a>, float *logits, uint64_t *ticket_out)</td></tr>
 <tr class="separator:a92b6b52e7a4dd1bb884c4da19a3b5015"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a446ae4dc0227071eaf89db61cb492438" id="r_a446ae4dc0227071eaf89db61cb492438"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ck__session__v8_8h.html#a446ae4dc0227071eaf89db61cb492438">ck_session_v8_batch2_prefill_append</a> (<a class="el" href="ck__session__v8_8h.html#a662ce370d189b1138dd8d10af00872c2">CKSessionV8</a> *session, uint32_t slot, uint64_t ticket, const int32_t *tokens, int32_t <a class="el" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a>, float *scratch_logits, int32_t *consumed_out)</td></tr>
+<tr class="separator:a446ae4dc0227071eaf89db61cb492438"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a50d2214d4bef25f8745da186c014061b" id="r_a50d2214d4bef25f8745da186c014061b"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ck__session__v8_8h.html#a50d2214d4bef25f8745da186c014061b">ck_session_v8_batch2_prefill_begin</a> (<a class="el" href="ck__session__v8_8h.html#a662ce370d189b1138dd8d10af00872c2">CKSessionV8</a> *session, uint32_t slot, int32_t total_tokens, uint64_t *ticket_out)</td></tr>
+<tr class="separator:a50d2214d4bef25f8745da186c014061b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a5e8ba280e02e3bbbefc9e476ec60c62c" id="r_a5e8ba280e02e3bbbefc9e476ec60c62c"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ck__session__v8_8h.html#a5e8ba280e02e3bbbefc9e476ec60c62c">ck_session_v8_batch2_request_cancel</a> (<a class="el" href="ck__session__v8_8h.html#a662ce370d189b1138dd8d10af00872c2">CKSessionV8</a> *session, uint64_t ticket)</td></tr>
 <tr class="separator:a5e8ba280e02e3bbbefc9e476ec60c62c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a2bef83704381df6dd48ef00c404b0e1a" id="r_a2bef83704381df6dd48ef00c404b0e1a"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ck__session__v8_8h.html#a2bef83704381df6dd48ef00c404b0e1a">ck_session_v8_batch2_reset_slot</a> (<a class="el" href="ck__session__v8_8h.html#a662ce370d189b1138dd8d10af00872c2">CKSessionV8</a> *session, uint32_t slot)</td></tr>
@@ -265,7 +270,7 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="ck__session__v8_8h_source.html#l00104">104</a> of file <a class="el" href="ck__session__v8_8h_source.html">ck_session_v8.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="ck__session__v8_8h_source.html#l00105">105</a> of file <a class="el" href="ck__session__v8_8h_source.html">ck_session_v8.h</a>.</p>
 
 </div>
 </div>
@@ -304,19 +309,19 @@ Functions</h2></td></tr>
 <tr><td class="fieldname"><a id="ab6d219efed8902e9110785e6d9920fcfa11881a1ddb44d8eab6ea353870a77a0b" name="ab6d219efed8902e9110785e6d9920fcfa11881a1ddb44d8eab6ea353870a77a0b"></a>CK_SESSION_REQUEST_CONTINUE_STATE&#160;</td><td class="fielddoc"></td></tr>
 </table>
 
-<p class="definition">Definition at line <a class="el" href="ck__session__v8_8h_source.html#l00055">55</a> of file <a class="el" href="ck__session__v8_8h_source.html">ck_session_v8.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   55</span>                             {</div>
-<div class="line"><span class="lineno">   56</span>    <a class="code hl_enumvalue" href="ck__session__v8_8h.html#ab6d219efed8902e9110785e6d9920fcfa6de345e4efea7b9d129744ffb60481f4">CK_SESSION_REQUEST_RAW_PROMPT</a> = UINT32_C(1) &lt;&lt; 0,</div>
-<div class="line"><span class="lineno">   57</span>    <a class="code hl_enumvalue" href="ck__session__v8_8h.html#ab6d219efed8902e9110785e6d9920fcfaa347fe050bae06c4265ab683b3b19ca6">CK_SESSION_REQUEST_IGNORE_EOS</a> = UINT32_C(1) &lt;&lt; 1,</div>
-<div class="line"><span class="lineno">   58</span>    <a class="code hl_enumvalue" href="ck__session__v8_8h.html#ab6d219efed8902e9110785e6d9920fcfa14f586ed52449d7e703f5d5ed84b9c2b">CK_SESSION_REQUEST_TIMESTAMPS</a> = UINT32_C(1) &lt;&lt; 2,</div>
-<div class="line"><span class="lineno">   59</span>    <span class="comment">/* Requests reset generated recurrent/KV state by default. Set this only</span></div>
-<div class="line"><span class="lineno">   60</span><span class="comment">     * when the caller deliberately continues the preceding request. */</span></div>
-<div class="line"><span class="lineno">   61</span>    <a class="code hl_enumvalue" href="ck__session__v8_8h.html#ab6d219efed8902e9110785e6d9920fcfa11881a1ddb44d8eab6ea353870a77a0b">CK_SESSION_REQUEST_CONTINUE_STATE</a> = UINT32_C(1) &lt;&lt; 3</div>
-<div class="line"><span class="lineno">   62</span>};</div>
-<div class="ttc" id="ack__session__v8_8h_html_ab6d219efed8902e9110785e6d9920fcfa11881a1ddb44d8eab6ea353870a77a0b"><div class="ttname"><a href="ck__session__v8_8h.html#ab6d219efed8902e9110785e6d9920fcfa11881a1ddb44d8eab6ea353870a77a0b">CK_SESSION_REQUEST_CONTINUE_STATE</a></div><div class="ttdeci">@ CK_SESSION_REQUEST_CONTINUE_STATE</div><div class="ttdef"><b>Definition</b> <a href="ck__session__v8_8h_source.html#l00062">ck_session_v8.h:61</a></div></div>
-<div class="ttc" id="ack__session__v8_8h_html_ab6d219efed8902e9110785e6d9920fcfa14f586ed52449d7e703f5d5ed84b9c2b"><div class="ttname"><a href="ck__session__v8_8h.html#ab6d219efed8902e9110785e6d9920fcfa14f586ed52449d7e703f5d5ed84b9c2b">CK_SESSION_REQUEST_TIMESTAMPS</a></div><div class="ttdeci">@ CK_SESSION_REQUEST_TIMESTAMPS</div><div class="ttdef"><b>Definition</b> <a href="ck__session__v8_8h_source.html#l00058">ck_session_v8.h:58</a></div></div>
-<div class="ttc" id="ack__session__v8_8h_html_ab6d219efed8902e9110785e6d9920fcfa6de345e4efea7b9d129744ffb60481f4"><div class="ttname"><a href="ck__session__v8_8h.html#ab6d219efed8902e9110785e6d9920fcfa6de345e4efea7b9d129744ffb60481f4">CK_SESSION_REQUEST_RAW_PROMPT</a></div><div class="ttdeci">@ CK_SESSION_REQUEST_RAW_PROMPT</div><div class="ttdef"><b>Definition</b> <a href="ck__session__v8_8h_source.html#l00056">ck_session_v8.h:56</a></div></div>
-<div class="ttc" id="ack__session__v8_8h_html_ab6d219efed8902e9110785e6d9920fcfaa347fe050bae06c4265ab683b3b19ca6"><div class="ttname"><a href="ck__session__v8_8h.html#ab6d219efed8902e9110785e6d9920fcfaa347fe050bae06c4265ab683b3b19ca6">CK_SESSION_REQUEST_IGNORE_EOS</a></div><div class="ttdeci">@ CK_SESSION_REQUEST_IGNORE_EOS</div><div class="ttdef"><b>Definition</b> <a href="ck__session__v8_8h_source.html#l00057">ck_session_v8.h:57</a></div></div>
+<p class="definition">Definition at line <a class="el" href="ck__session__v8_8h_source.html#l00056">56</a> of file <a class="el" href="ck__session__v8_8h_source.html">ck_session_v8.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   56</span>                             {</div>
+<div class="line"><span class="lineno">   57</span>    <a class="code hl_enumvalue" href="ck__session__v8_8h.html#ab6d219efed8902e9110785e6d9920fcfa6de345e4efea7b9d129744ffb60481f4">CK_SESSION_REQUEST_RAW_PROMPT</a> = UINT32_C(1) &lt;&lt; 0,</div>
+<div class="line"><span class="lineno">   58</span>    <a class="code hl_enumvalue" href="ck__session__v8_8h.html#ab6d219efed8902e9110785e6d9920fcfaa347fe050bae06c4265ab683b3b19ca6">CK_SESSION_REQUEST_IGNORE_EOS</a> = UINT32_C(1) &lt;&lt; 1,</div>
+<div class="line"><span class="lineno">   59</span>    <a class="code hl_enumvalue" href="ck__session__v8_8h.html#ab6d219efed8902e9110785e6d9920fcfa14f586ed52449d7e703f5d5ed84b9c2b">CK_SESSION_REQUEST_TIMESTAMPS</a> = UINT32_C(1) &lt;&lt; 2,</div>
+<div class="line"><span class="lineno">   60</span>    <span class="comment">/* Requests reset generated recurrent/KV state by default. Set this only</span></div>
+<div class="line"><span class="lineno">   61</span><span class="comment">     * when the caller deliberately continues the preceding request. */</span></div>
+<div class="line"><span class="lineno">   62</span>    <a class="code hl_enumvalue" href="ck__session__v8_8h.html#ab6d219efed8902e9110785e6d9920fcfa11881a1ddb44d8eab6ea353870a77a0b">CK_SESSION_REQUEST_CONTINUE_STATE</a> = UINT32_C(1) &lt;&lt; 3</div>
+<div class="line"><span class="lineno">   63</span>};</div>
+<div class="ttc" id="ack__session__v8_8h_html_ab6d219efed8902e9110785e6d9920fcfa11881a1ddb44d8eab6ea353870a77a0b"><div class="ttname"><a href="ck__session__v8_8h.html#ab6d219efed8902e9110785e6d9920fcfa11881a1ddb44d8eab6ea353870a77a0b">CK_SESSION_REQUEST_CONTINUE_STATE</a></div><div class="ttdeci">@ CK_SESSION_REQUEST_CONTINUE_STATE</div><div class="ttdef"><b>Definition</b> <a href="ck__session__v8_8h_source.html#l00063">ck_session_v8.h:62</a></div></div>
+<div class="ttc" id="ack__session__v8_8h_html_ab6d219efed8902e9110785e6d9920fcfa14f586ed52449d7e703f5d5ed84b9c2b"><div class="ttname"><a href="ck__session__v8_8h.html#ab6d219efed8902e9110785e6d9920fcfa14f586ed52449d7e703f5d5ed84b9c2b">CK_SESSION_REQUEST_TIMESTAMPS</a></div><div class="ttdeci">@ CK_SESSION_REQUEST_TIMESTAMPS</div><div class="ttdef"><b>Definition</b> <a href="ck__session__v8_8h_source.html#l00059">ck_session_v8.h:59</a></div></div>
+<div class="ttc" id="ack__session__v8_8h_html_ab6d219efed8902e9110785e6d9920fcfa6de345e4efea7b9d129744ffb60481f4"><div class="ttname"><a href="ck__session__v8_8h.html#ab6d219efed8902e9110785e6d9920fcfa6de345e4efea7b9d129744ffb60481f4">CK_SESSION_REQUEST_RAW_PROMPT</a></div><div class="ttdeci">@ CK_SESSION_REQUEST_RAW_PROMPT</div><div class="ttdef"><b>Definition</b> <a href="ck__session__v8_8h_source.html#l00057">ck_session_v8.h:57</a></div></div>
+<div class="ttc" id="ack__session__v8_8h_html_ab6d219efed8902e9110785e6d9920fcfaa347fe050bae06c4265ab683b3b19ca6"><div class="ttname"><a href="ck__session__v8_8h.html#ab6d219efed8902e9110785e6d9920fcfaa347fe050bae06c4265ab683b3b19ca6">CK_SESSION_REQUEST_IGNORE_EOS</a></div><div class="ttdeci">@ CK_SESSION_REQUEST_IGNORE_EOS</div><div class="ttdef"><b>Definition</b> <a href="ck__session__v8_8h_source.html#l00058">ck_session_v8.h:58</a></div></div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -341,6 +346,7 @@ Functions</h2></td></tr>
 <tr><td class="fieldname"><a id="a7b2292e66074bb6a2f4d7b04efd3c603afa1facecdc1bd9f283413db23c09ddaa" name="a7b2292e66074bb6a2f4d7b04efd3c603afa1facecdc1bd9f283413db23c09ddaa"></a>CK_SESSION_V8_ERROR_BUSY&#160;</td><td class="fielddoc"></td></tr>
 <tr><td class="fieldname"><a id="a7b2292e66074bb6a2f4d7b04efd3c603aad3515d5606d104bf6b6aa9980846bf7" name="a7b2292e66074bb6a2f4d7b04efd3c603aad3515d5606d104bf6b6aa9980846bf7"></a>CK_SESSION_V8_ERROR_RUNTIME&#160;</td><td class="fielddoc"></td></tr>
 <tr><td class="fieldname"><a id="a7b2292e66074bb6a2f4d7b04efd3c603a862dbc25b951a732ab5e3c60465be9e9" name="a7b2292e66074bb6a2f4d7b04efd3c603a862dbc25b951a732ab5e3c60465be9e9"></a>CK_SESSION_V8_ERROR_BUFFER_TOO_SMALL&#160;</td><td class="fielddoc"></td></tr>
+<tr><td class="fieldname"><a id="a7b2292e66074bb6a2f4d7b04efd3c603a9b1b80f32a5025f456f226ec1525e78a" name="a7b2292e66074bb6a2f4d7b04efd3c603a9b1b80f32a5025f456f226ec1525e78a"></a>CK_SESSION_V8_ERROR_CANCELLED&#160;</td><td class="fielddoc"></td></tr>
 </table>
 
 <p class="definition">Definition at line <a class="el" href="ck__session__v8_8h_source.html#l00034">34</a> of file <a class="el" href="ck__session__v8_8h_source.html">ck_session_v8.h</a>.</p>
@@ -353,11 +359,13 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">   40</span>    <a class="code hl_enumvalue" href="ck__session__v8_8h.html#a7b2292e66074bb6a2f4d7b04efd3c603aa0a4d67bec376a02312b2d47d791c5f3">CK_SESSION_V8_ERROR_CAPABILITY</a> = -5,</div>
 <div class="line"><span class="lineno">   41</span>    <a class="code hl_enumvalue" href="ck__session__v8_8h.html#a7b2292e66074bb6a2f4d7b04efd3c603afa1facecdc1bd9f283413db23c09ddaa">CK_SESSION_V8_ERROR_BUSY</a> = -6,</div>
 <div class="line"><span class="lineno">   42</span>    <a class="code hl_enumvalue" href="ck__session__v8_8h.html#a7b2292e66074bb6a2f4d7b04efd3c603aad3515d5606d104bf6b6aa9980846bf7">CK_SESSION_V8_ERROR_RUNTIME</a> = -7,</div>
-<div class="line"><span class="lineno">   43</span>    <a class="code hl_enumvalue" href="ck__session__v8_8h.html#a7b2292e66074bb6a2f4d7b04efd3c603a862dbc25b951a732ab5e3c60465be9e9">CK_SESSION_V8_ERROR_BUFFER_TOO_SMALL</a> = -8</div>
-<div class="line"><span class="lineno">   44</span>};</div>
+<div class="line"><span class="lineno">   43</span>    <a class="code hl_enumvalue" href="ck__session__v8_8h.html#a7b2292e66074bb6a2f4d7b04efd3c603a862dbc25b951a732ab5e3c60465be9e9">CK_SESSION_V8_ERROR_BUFFER_TOO_SMALL</a> = -8,</div>
+<div class="line"><span class="lineno">   44</span>    <a class="code hl_enumvalue" href="ck__session__v8_8h.html#a7b2292e66074bb6a2f4d7b04efd3c603a9b1b80f32a5025f456f226ec1525e78a">CK_SESSION_V8_ERROR_CANCELLED</a> = -9</div>
+<div class="line"><span class="lineno">   45</span>};</div>
 <div class="ttc" id="ack__session__v8_8h_html_a7b2292e66074bb6a2f4d7b04efd3c603a2096614599041f47b25ac930bbb07075"><div class="ttname"><a href="ck__session__v8_8h.html#a7b2292e66074bb6a2f4d7b04efd3c603a2096614599041f47b25ac930bbb07075">CK_SESSION_V8_ERROR_LOAD</a></div><div class="ttdeci">@ CK_SESSION_V8_ERROR_LOAD</div><div class="ttdef"><b>Definition</b> <a href="ck__session__v8_8h_source.html#l00038">ck_session_v8.h:38</a></div></div>
 <div class="ttc" id="ack__session__v8_8h_html_a7b2292e66074bb6a2f4d7b04efd3c603a6137a90b7bc764a7b0dd126f83729ee9"><div class="ttname"><a href="ck__session__v8_8h.html#a7b2292e66074bb6a2f4d7b04efd3c603a6137a90b7bc764a7b0dd126f83729ee9">CK_SESSION_V8_OK</a></div><div class="ttdeci">@ CK_SESSION_V8_OK</div><div class="ttdef"><b>Definition</b> <a href="ck__session__v8_8h_source.html#l00035">ck_session_v8.h:35</a></div></div>
-<div class="ttc" id="ack__session__v8_8h_html_a7b2292e66074bb6a2f4d7b04efd3c603a862dbc25b951a732ab5e3c60465be9e9"><div class="ttname"><a href="ck__session__v8_8h.html#a7b2292e66074bb6a2f4d7b04efd3c603a862dbc25b951a732ab5e3c60465be9e9">CK_SESSION_V8_ERROR_BUFFER_TOO_SMALL</a></div><div class="ttdeci">@ CK_SESSION_V8_ERROR_BUFFER_TOO_SMALL</div><div class="ttdef"><b>Definition</b> <a href="ck__session__v8_8h_source.html#l00044">ck_session_v8.h:43</a></div></div>
+<div class="ttc" id="ack__session__v8_8h_html_a7b2292e66074bb6a2f4d7b04efd3c603a862dbc25b951a732ab5e3c60465be9e9"><div class="ttname"><a href="ck__session__v8_8h.html#a7b2292e66074bb6a2f4d7b04efd3c603a862dbc25b951a732ab5e3c60465be9e9">CK_SESSION_V8_ERROR_BUFFER_TOO_SMALL</a></div><div class="ttdeci">@ CK_SESSION_V8_ERROR_BUFFER_TOO_SMALL</div><div class="ttdef"><b>Definition</b> <a href="ck__session__v8_8h_source.html#l00043">ck_session_v8.h:43</a></div></div>
+<div class="ttc" id="ack__session__v8_8h_html_a7b2292e66074bb6a2f4d7b04efd3c603a9b1b80f32a5025f456f226ec1525e78a"><div class="ttname"><a href="ck__session__v8_8h.html#a7b2292e66074bb6a2f4d7b04efd3c603a9b1b80f32a5025f456f226ec1525e78a">CK_SESSION_V8_ERROR_CANCELLED</a></div><div class="ttdeci">@ CK_SESSION_V8_ERROR_CANCELLED</div><div class="ttdef"><b>Definition</b> <a href="ck__session__v8_8h_source.html#l00045">ck_session_v8.h:44</a></div></div>
 <div class="ttc" id="ack__session__v8_8h_html_a7b2292e66074bb6a2f4d7b04efd3c603a9eaf08a1c1d8da8e675f8c4ea6d58640"><div class="ttname"><a href="ck__session__v8_8h.html#a7b2292e66074bb6a2f4d7b04efd3c603a9eaf08a1c1d8da8e675f8c4ea6d58640">CK_SESSION_V8_ERROR_INIT</a></div><div class="ttdeci">@ CK_SESSION_V8_ERROR_INIT</div><div class="ttdef"><b>Definition</b> <a href="ck__session__v8_8h_source.html#l00039">ck_session_v8.h:39</a></div></div>
 <div class="ttc" id="ack__session__v8_8h_html_a7b2292e66074bb6a2f4d7b04efd3c603aa0a4d67bec376a02312b2d47d791c5f3"><div class="ttname"><a href="ck__session__v8_8h.html#a7b2292e66074bb6a2f4d7b04efd3c603aa0a4d67bec376a02312b2d47d791c5f3">CK_SESSION_V8_ERROR_CAPABILITY</a></div><div class="ttdeci">@ CK_SESSION_V8_ERROR_CAPABILITY</div><div class="ttdef"><b>Definition</b> <a href="ck__session__v8_8h_source.html#l00040">ck_session_v8.h:40</a></div></div>
 <div class="ttc" id="ack__session__v8_8h_html_a7b2292e66074bb6a2f4d7b04efd3c603aa31ebb8127c66d3c0a98779dcea97aa5"><div class="ttname"><a href="ck__session__v8_8h.html#a7b2292e66074bb6a2f4d7b04efd3c603aa31ebb8127c66d3c0a98779dcea97aa5">CK_SESSION_V8_ERROR_ABI</a></div><div class="ttdeci">@ CK_SESSION_V8_ERROR_ABI</div><div class="ttdef"><b>Definition</b> <a href="ck__session__v8_8h_source.html#l00037">ck_session_v8.h:37</a></div></div>
@@ -387,21 +395,21 @@ Functions</h2></td></tr>
 <tr><td class="fieldname"><a id="a99c0690a6129f5be6fe2adeb628fb083aa1ecd3c98353aa88ee07b82032fa9191" name="a99c0690a6129f5be6fe2adeb628fb083aa1ecd3c98353aa88ee07b82032fa9191"></a>CK_SESSION_STOP_RUNTIME_ERROR&#160;</td><td class="fielddoc"></td></tr>
 </table>
 
-<p class="definition">Definition at line <a class="el" href="ck__session__v8_8h_source.html#l00046">46</a> of file <a class="el" href="ck__session__v8_8h_source.html">ck_session_v8.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   46</span>                           {</div>
-<div class="line"><span class="lineno">   47</span>    <a class="code hl_enumvalue" href="ck__session__v8_8h.html#a99c0690a6129f5be6fe2adeb628fb083ae2ed59e58f162250aadeecaacf562281">CK_SESSION_STOP_NONE</a> = 0,</div>
-<div class="line"><span class="lineno">   48</span>    <a class="code hl_enumvalue" href="ck__session__v8_8h.html#a99c0690a6129f5be6fe2adeb628fb083aced3e70e4043e0e2a487fa6a780bd77b">CK_SESSION_STOP_EOS</a> = 1,</div>
-<div class="line"><span class="lineno">   49</span>    <a class="code hl_enumvalue" href="ck__session__v8_8h.html#a99c0690a6129f5be6fe2adeb628fb083aea15463252d26684aeee57c86a11e876">CK_SESSION_STOP_TOKEN_LIMIT</a> = 2,</div>
-<div class="line"><span class="lineno">   50</span>    <a class="code hl_enumvalue" href="ck__session__v8_8h.html#a99c0690a6129f5be6fe2adeb628fb083a9f4a6088b37f0170b85b61905e9ccac3">CK_SESSION_STOP_CANCELLED</a> = 3,</div>
-<div class="line"><span class="lineno">   51</span>    <a class="code hl_enumvalue" href="ck__session__v8_8h.html#a99c0690a6129f5be6fe2adeb628fb083abb5bd1ca77db28e6acace009f2bb0589">CK_SESSION_STOP_CALLBACK</a> = 4,</div>
-<div class="line"><span class="lineno">   52</span>    <a class="code hl_enumvalue" href="ck__session__v8_8h.html#a99c0690a6129f5be6fe2adeb628fb083aa1ecd3c98353aa88ee07b82032fa9191">CK_SESSION_STOP_RUNTIME_ERROR</a> = 5</div>
-<div class="line"><span class="lineno">   53</span>};</div>
-<div class="ttc" id="ack__session__v8_8h_html_a99c0690a6129f5be6fe2adeb628fb083a9f4a6088b37f0170b85b61905e9ccac3"><div class="ttname"><a href="ck__session__v8_8h.html#a99c0690a6129f5be6fe2adeb628fb083a9f4a6088b37f0170b85b61905e9ccac3">CK_SESSION_STOP_CANCELLED</a></div><div class="ttdeci">@ CK_SESSION_STOP_CANCELLED</div><div class="ttdef"><b>Definition</b> <a href="ck__session__v8_8h_source.html#l00050">ck_session_v8.h:50</a></div></div>
-<div class="ttc" id="ack__session__v8_8h_html_a99c0690a6129f5be6fe2adeb628fb083aa1ecd3c98353aa88ee07b82032fa9191"><div class="ttname"><a href="ck__session__v8_8h.html#a99c0690a6129f5be6fe2adeb628fb083aa1ecd3c98353aa88ee07b82032fa9191">CK_SESSION_STOP_RUNTIME_ERROR</a></div><div class="ttdeci">@ CK_SESSION_STOP_RUNTIME_ERROR</div><div class="ttdef"><b>Definition</b> <a href="ck__session__v8_8h_source.html#l00053">ck_session_v8.h:52</a></div></div>
-<div class="ttc" id="ack__session__v8_8h_html_a99c0690a6129f5be6fe2adeb628fb083abb5bd1ca77db28e6acace009f2bb0589"><div class="ttname"><a href="ck__session__v8_8h.html#a99c0690a6129f5be6fe2adeb628fb083abb5bd1ca77db28e6acace009f2bb0589">CK_SESSION_STOP_CALLBACK</a></div><div class="ttdeci">@ CK_SESSION_STOP_CALLBACK</div><div class="ttdef"><b>Definition</b> <a href="ck__session__v8_8h_source.html#l00051">ck_session_v8.h:51</a></div></div>
-<div class="ttc" id="ack__session__v8_8h_html_a99c0690a6129f5be6fe2adeb628fb083aced3e70e4043e0e2a487fa6a780bd77b"><div class="ttname"><a href="ck__session__v8_8h.html#a99c0690a6129f5be6fe2adeb628fb083aced3e70e4043e0e2a487fa6a780bd77b">CK_SESSION_STOP_EOS</a></div><div class="ttdeci">@ CK_SESSION_STOP_EOS</div><div class="ttdef"><b>Definition</b> <a href="ck__session__v8_8h_source.html#l00048">ck_session_v8.h:48</a></div></div>
-<div class="ttc" id="ack__session__v8_8h_html_a99c0690a6129f5be6fe2adeb628fb083ae2ed59e58f162250aadeecaacf562281"><div class="ttname"><a href="ck__session__v8_8h.html#a99c0690a6129f5be6fe2adeb628fb083ae2ed59e58f162250aadeecaacf562281">CK_SESSION_STOP_NONE</a></div><div class="ttdeci">@ CK_SESSION_STOP_NONE</div><div class="ttdef"><b>Definition</b> <a href="ck__session__v8_8h_source.html#l00047">ck_session_v8.h:47</a></div></div>
-<div class="ttc" id="ack__session__v8_8h_html_a99c0690a6129f5be6fe2adeb628fb083aea15463252d26684aeee57c86a11e876"><div class="ttname"><a href="ck__session__v8_8h.html#a99c0690a6129f5be6fe2adeb628fb083aea15463252d26684aeee57c86a11e876">CK_SESSION_STOP_TOKEN_LIMIT</a></div><div class="ttdeci">@ CK_SESSION_STOP_TOKEN_LIMIT</div><div class="ttdef"><b>Definition</b> <a href="ck__session__v8_8h_source.html#l00049">ck_session_v8.h:49</a></div></div>
+<p class="definition">Definition at line <a class="el" href="ck__session__v8_8h_source.html#l00047">47</a> of file <a class="el" href="ck__session__v8_8h_source.html">ck_session_v8.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   47</span>                           {</div>
+<div class="line"><span class="lineno">   48</span>    <a class="code hl_enumvalue" href="ck__session__v8_8h.html#a99c0690a6129f5be6fe2adeb628fb083ae2ed59e58f162250aadeecaacf562281">CK_SESSION_STOP_NONE</a> = 0,</div>
+<div class="line"><span class="lineno">   49</span>    <a class="code hl_enumvalue" href="ck__session__v8_8h.html#a99c0690a6129f5be6fe2adeb628fb083aced3e70e4043e0e2a487fa6a780bd77b">CK_SESSION_STOP_EOS</a> = 1,</div>
+<div class="line"><span class="lineno">   50</span>    <a class="code hl_enumvalue" href="ck__session__v8_8h.html#a99c0690a6129f5be6fe2adeb628fb083aea15463252d26684aeee57c86a11e876">CK_SESSION_STOP_TOKEN_LIMIT</a> = 2,</div>
+<div class="line"><span class="lineno">   51</span>    <a class="code hl_enumvalue" href="ck__session__v8_8h.html#a99c0690a6129f5be6fe2adeb628fb083a9f4a6088b37f0170b85b61905e9ccac3">CK_SESSION_STOP_CANCELLED</a> = 3,</div>
+<div class="line"><span class="lineno">   52</span>    <a class="code hl_enumvalue" href="ck__session__v8_8h.html#a99c0690a6129f5be6fe2adeb628fb083abb5bd1ca77db28e6acace009f2bb0589">CK_SESSION_STOP_CALLBACK</a> = 4,</div>
+<div class="line"><span class="lineno">   53</span>    <a class="code hl_enumvalue" href="ck__session__v8_8h.html#a99c0690a6129f5be6fe2adeb628fb083aa1ecd3c98353aa88ee07b82032fa9191">CK_SESSION_STOP_RUNTIME_ERROR</a> = 5</div>
+<div class="line"><span class="lineno">   54</span>};</div>
+<div class="ttc" id="ack__session__v8_8h_html_a99c0690a6129f5be6fe2adeb628fb083a9f4a6088b37f0170b85b61905e9ccac3"><div class="ttname"><a href="ck__session__v8_8h.html#a99c0690a6129f5be6fe2adeb628fb083a9f4a6088b37f0170b85b61905e9ccac3">CK_SESSION_STOP_CANCELLED</a></div><div class="ttdeci">@ CK_SESSION_STOP_CANCELLED</div><div class="ttdef"><b>Definition</b> <a href="ck__session__v8_8h_source.html#l00051">ck_session_v8.h:51</a></div></div>
+<div class="ttc" id="ack__session__v8_8h_html_a99c0690a6129f5be6fe2adeb628fb083aa1ecd3c98353aa88ee07b82032fa9191"><div class="ttname"><a href="ck__session__v8_8h.html#a99c0690a6129f5be6fe2adeb628fb083aa1ecd3c98353aa88ee07b82032fa9191">CK_SESSION_STOP_RUNTIME_ERROR</a></div><div class="ttdeci">@ CK_SESSION_STOP_RUNTIME_ERROR</div><div class="ttdef"><b>Definition</b> <a href="ck__session__v8_8h_source.html#l00054">ck_session_v8.h:53</a></div></div>
+<div class="ttc" id="ack__session__v8_8h_html_a99c0690a6129f5be6fe2adeb628fb083abb5bd1ca77db28e6acace009f2bb0589"><div class="ttname"><a href="ck__session__v8_8h.html#a99c0690a6129f5be6fe2adeb628fb083abb5bd1ca77db28e6acace009f2bb0589">CK_SESSION_STOP_CALLBACK</a></div><div class="ttdeci">@ CK_SESSION_STOP_CALLBACK</div><div class="ttdef"><b>Definition</b> <a href="ck__session__v8_8h_source.html#l00052">ck_session_v8.h:52</a></div></div>
+<div class="ttc" id="ack__session__v8_8h_html_a99c0690a6129f5be6fe2adeb628fb083aced3e70e4043e0e2a487fa6a780bd77b"><div class="ttname"><a href="ck__session__v8_8h.html#a99c0690a6129f5be6fe2adeb628fb083aced3e70e4043e0e2a487fa6a780bd77b">CK_SESSION_STOP_EOS</a></div><div class="ttdeci">@ CK_SESSION_STOP_EOS</div><div class="ttdef"><b>Definition</b> <a href="ck__session__v8_8h_source.html#l00049">ck_session_v8.h:49</a></div></div>
+<div class="ttc" id="ack__session__v8_8h_html_a99c0690a6129f5be6fe2adeb628fb083ae2ed59e58f162250aadeecaacf562281"><div class="ttname"><a href="ck__session__v8_8h.html#a99c0690a6129f5be6fe2adeb628fb083ae2ed59e58f162250aadeecaacf562281">CK_SESSION_STOP_NONE</a></div><div class="ttdeci">@ CK_SESSION_STOP_NONE</div><div class="ttdef"><b>Definition</b> <a href="ck__session__v8_8h_source.html#l00048">ck_session_v8.h:48</a></div></div>
+<div class="ttc" id="ack__session__v8_8h_html_a99c0690a6129f5be6fe2adeb628fb083aea15463252d26684aeee57c86a11e876"><div class="ttname"><a href="ck__session__v8_8h.html#a99c0690a6129f5be6fe2adeb628fb083aea15463252d26684aeee57c86a11e876">CK_SESSION_STOP_TOKEN_LIMIT</a></div><div class="ttdeci">@ CK_SESSION_STOP_TOKEN_LIMIT</div><div class="ttdef"><b>Definition</b> <a href="ck__session__v8_8h_source.html#l00050">ck_session_v8.h:50</a></div></div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -509,6 +517,104 @@ Functions</h2></td></tr>
           <td></td>
           <td class="paramtype">float *&#160;</td>
           <td class="paramname"><em>logits</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">uint64_t *&#160;</td>
+          <td class="paramname"><em>ticket_out</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="a446ae4dc0227071eaf89db61cb492438" name="a446ae4dc0227071eaf89db61cb492438"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a446ae4dc0227071eaf89db61cb492438">&#9670;&#160;</a></span>ck_session_v8_batch2_prefill_append()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int ck_session_v8_batch2_prefill_append </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="ck__session__v8_8h.html#a662ce370d189b1138dd8d10af00872c2">CKSessionV8</a> *&#160;</td>
+          <td class="paramname"><em>session</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">uint32_t&#160;</td>
+          <td class="paramname"><em>slot</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">uint64_t&#160;</td>
+          <td class="paramname"><em>ticket</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const int32_t *&#160;</td>
+          <td class="paramname"><em>tokens</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int32_t&#160;</td>
+          <td class="paramname"><em>count</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>scratch_logits</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int32_t *&#160;</td>
+          <td class="paramname"><em>consumed_out</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="a50d2214d4bef25f8745da186c014061b" name="a50d2214d4bef25f8745da186c014061b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a50d2214d4bef25f8745da186c014061b">&#9670;&#160;</a></span>ck_session_v8_batch2_prefill_begin()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int ck_session_v8_batch2_prefill_begin </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="ck__session__v8_8h.html#a662ce370d189b1138dd8d10af00872c2">CKSessionV8</a> *&#160;</td>
+          <td class="paramname"><em>session</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">uint32_t&#160;</td>
+          <td class="paramname"><em>slot</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int32_t&#160;</td>
+          <td class="paramname"><em>total_tokens</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>

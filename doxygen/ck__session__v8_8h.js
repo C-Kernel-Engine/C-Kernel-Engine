@@ -21,7 +21,8 @@ var ck__session__v8_8h =
       [ "CK_SESSION_V8_ERROR_CAPABILITY", "ck__session__v8_8h.html#a7b2292e66074bb6a2f4d7b04efd3c603aa0a4d67bec376a02312b2d47d791c5f3", null ],
       [ "CK_SESSION_V8_ERROR_BUSY", "ck__session__v8_8h.html#a7b2292e66074bb6a2f4d7b04efd3c603afa1facecdc1bd9f283413db23c09ddaa", null ],
       [ "CK_SESSION_V8_ERROR_RUNTIME", "ck__session__v8_8h.html#a7b2292e66074bb6a2f4d7b04efd3c603aad3515d5606d104bf6b6aa9980846bf7", null ],
-      [ "CK_SESSION_V8_ERROR_BUFFER_TOO_SMALL", "ck__session__v8_8h.html#a7b2292e66074bb6a2f4d7b04efd3c603a862dbc25b951a732ab5e3c60465be9e9", null ]
+      [ "CK_SESSION_V8_ERROR_BUFFER_TOO_SMALL", "ck__session__v8_8h.html#a7b2292e66074bb6a2f4d7b04efd3c603a862dbc25b951a732ab5e3c60465be9e9", null ],
+      [ "CK_SESSION_V8_ERROR_CANCELLED", "ck__session__v8_8h.html#a7b2292e66074bb6a2f4d7b04efd3c603a9b1b80f32a5025f456f226ec1525e78a", null ]
     ] ],
     [ "CKSessionStopReasonV8", "ck__session__v8_8h.html#a99c0690a6129f5be6fe2adeb628fb083", [
       [ "CK_SESSION_STOP_NONE", "ck__session__v8_8h.html#a99c0690a6129f5be6fe2adeb628fb083ae2ed59e58f162250aadeecaacf562281", null ],
@@ -34,6 +35,8 @@ var ck__session__v8_8h =
     [ "ck_session_v8_batch2_enable", "ck__session__v8_8h.html#a59d1445dc1d62694869bc7f92aef0f76", null ],
     [ "ck_session_v8_batch2_position", "ck__session__v8_8h.html#a104bbe7060e0fbb54bbc4068e5591254", null ],
     [ "ck_session_v8_batch2_prefill", "ck__session__v8_8h.html#a92b6b52e7a4dd1bb884c4da19a3b5015", null ],
+    [ "ck_session_v8_batch2_prefill_append", "ck__session__v8_8h.html#a446ae4dc0227071eaf89db61cb492438", null ],
+    [ "ck_session_v8_batch2_prefill_begin", "ck__session__v8_8h.html#a50d2214d4bef25f8745da186c014061b", null ],
     [ "ck_session_v8_batch2_request_cancel", "ck__session__v8_8h.html#a5e8ba280e02e3bbbefc9e476ec60c62c", null ],
     [ "ck_session_v8_batch2_reset_slot", "ck__session__v8_8h.html#a2bef83704381df6dd48ef00c404b0e1a", null ],
     [ "ck_session_v8_batch2_step", "ck__session__v8_8h.html#acb9a36b7e815e71d85c9aa1ce705f45c", null ],
