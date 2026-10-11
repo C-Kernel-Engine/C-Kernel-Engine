@@ -1,5 +1,6 @@
 var NAVTREEINDEX18 =
 {
+"sigmoid__kernels_8c.html#aad3b3666d63fcbaa243ad4a988e187d8":[2,0,1,1,114,0],
 "sigmoid__kernels_8c.html#af621782be75fb6a9acf541f7935b87d5":[2,0,1,1,114,1],
 "sigmoid__kernels_8c_source.html":[2,0,1,1,114],
 "sigmoid__kernels__bf16_8c.html":[2,0,1,1,115],
@@ -248,6 +249,5 @@ var NAVTREEINDEX18 =
 "structCKLayerBackwardParams.html#aa9203c2951372bedee83fd38e3ef57fb":[1,0,35,47],
 "structCKLayerBackwardParams.html#aab3a0f3828a687d937a07f74131b2a3f":[1,0,35,54],
 "structCKLayerBackwardParams.html#aabe923efab694bfed90a3d86084c9be9":[1,0,35,25],
-"structCKLayerBackwardParams.html#aae3da518cc5f67a49d2d1d332f6fb620":[1,0,35,46],
-"structCKLayerBackwardParams.html#ab177ccef441842dede3cb9717e4deff5":[1,0,35,57]
+"structCKLayerBackwardParams.html#aae3da518cc5f67a49d2d1d332f6fb620":[1,0,35,46]
 };

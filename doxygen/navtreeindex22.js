@@ -1,5 +1,6 @@
 var NAVTREEINDEX22 =
 {
+"structRecommendation.html#a2dea715a398d739605559094647c11eb":[1,0,88,3],
 "structRecommendation.html#aa8cbf25679d19f8407ac276b25c1b1bf":[1,0,88,1],
 "structRecommendation.html#ab10fd7bc5c1c6eee44e39a537f53cc51":[1,0,88,4],
 "structRecommendation.html#ac691a32118bd2279bf9536d183329119":[1,0,88,2],
@@ -248,6 +249,5 @@ var NAVTREEINDEX22 =
 "tokenizer_8h.html#a7b861b5a4ce2546abb39e12cedd14cb2":[2,0,0,1,3,6],
 "tokenizer_8h.html#a7cc51ec584feb41327c453e546740e7c":[2,0,0,1,3,28],
 "tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6":[2,0,0,1,3,44],
-"tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741":[2,0,0,1,3,40],
-"tokenizer_8h.html#a8a61458f294240972a499c24a5a47488":[2,0,0,1,3,8]
+"tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741":[2,0,0,1,3,40]
 };

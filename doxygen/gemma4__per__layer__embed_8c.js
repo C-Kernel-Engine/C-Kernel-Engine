@@ -3,6 +3,7 @@ var gemma4__per__layer__embed_8c =
     [ "CK_GEMMA4_MAX_EMBED_DIM", "gemma4__per__layer__embed_8c.html#a0f2251e860e038855b37b4f6cb135cce", null ],
     [ "assistant_layer_scale_forward", "gemma4__per__layer__embed_8c.html#a93be87f3d867edd2bfecc967ef7d677f", null ],
     [ "ck_bf16_to_f32", "gemma4__per__layer__embed_8c.html#a86d5ed3bc2576b6c5b7c824aa1d6ef8e", null ],
+    [ "ck_gemma4_bf16_dot", "gemma4__per__layer__embed_8c.html#a97d42409795897cef50e90f5fadb95e2", null ],
     [ "ck_gemma4_dequant_q5_k_block", "gemma4__per__layer__embed_8c.html#a2aa87174026cb74a26c93cba1b96ba10", null ],
     [ "ck_gemma4_embed_range", "gemma4__per__layer__embed_8c.html#a44ec1cbc9e8de0e2cad3dc725c59fdd9", null ],
     [ "ck_gemma4_gelu", "gemma4__per__layer__embed_8c.html#a8df789062851b1738820b4eeecd5fded", null ],
