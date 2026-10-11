@@ -14,6 +14,7 @@ var ckernel__tts_8h =
     [ "audio_harmonic_source_weighted_fma_checked_f32", "ckernel__tts_8h.html#acbd9566690cd68610009c26351e74fc2", null ],
     [ "audio_istft_mag_phase_f32", "ckernel__tts_8h.html#a4c7380c2b59352b52e4769687a32a888", null ],
     [ "audio_istft_mag_phase_plan_f32", "ckernel__tts_8h.html#a5d20ffbb3739001f22b58f8e23526d50", null ],
+    [ "audio_spectral_head_mag_phase_f32", "ckernel__tts_8h.html#ad7861db2c2bff2b0e1b4bb851e99e907", null ],
     [ "audio_stft_mag_phase_checked_f32", "ckernel__tts_8h.html#a02be866ef4fb9eaccb9f74f7b79d193d", null ],
     [ "audio_stft_mag_phase_plan_f32", "ckernel__tts_8h.html#a260ec8d60648e11d37636b70afc492b7", null ],
     [ "audio_stft_mag_phase_trace_checked_f32", "ckernel__tts_8h.html#a0680b129f58febba72fb4e5182090019", null ],

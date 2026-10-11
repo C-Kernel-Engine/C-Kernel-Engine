@@ -390,8 +390,8 @@ $(document).ready(function(){initNavTree('qwen4__exp__kernels_8c_source.html',''
 <div class="line"><a id="l00236" name="l00236"></a><span class="lineno">  236</span>    <span class="comment">/* ggml materializes the FP32 multiply, then folds SUM_ROWS in ggml_float. */</span></div>
 <div class="line"><a id="l00237" name="l00237"></a><span class="lineno">  237</span>    <span class="keyword">volatile</span> <span class="keywordtype">double</span> sum = 0.0;</div>
 <div class="line"><a id="l00238" name="l00238"></a><span class="lineno">  238</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; dim; ++col) {</div>
-<div class="line"><a id="l00239" name="l00239"></a><span class="lineno">  239</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> product = <a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a>[col] * <a class="code hl_variable" href="true__bpe_8h.html#afb60251d57a9ee3324fbc011e4be71e9">right</a>[col];</div>
-<div class="line"><a id="l00240" name="l00240"></a><span class="lineno">  240</span>        sum = sum + (double)product;</div>
+<div class="line"><a id="l00239" name="l00239"></a><span class="lineno">  239</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> <a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a> = <a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a>[col] * <a class="code hl_variable" href="true__bpe_8h.html#afb60251d57a9ee3324fbc011e4be71e9">right</a>[col];</div>
+<div class="line"><a id="l00240" name="l00240"></a><span class="lineno">  240</span>        sum = sum + (double)<a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a>;</div>
 <div class="line"><a id="l00241" name="l00241"></a><span class="lineno">  241</span>    }</div>
 <div class="line"><a id="l00242" name="l00242"></a><span class="lineno">  242</span>    <span class="keywordflow">return</span> (<span class="keywordtype">float</span>)sum;</div>
 <div class="line"><a id="l00243" name="l00243"></a><span class="lineno">  243</span>}</div>
@@ -469,10 +469,10 @@ $(document).ready(function(){initNavTree('qwen4__exp__kernels_8c_source.html',''
 <div class="line"><a id="l00313" name="l00313"></a><span class="lineno">  313</span>                ? sigmoid</div>
 <div class="line"><a id="l00314" name="l00314"></a><span class="lineno">  314</span>                : <a class="code hl_function" href="qwen4__exp__kernels_8c.html#a24d0656a0cee28105fa21c8c09ddff12">qwen4_bf16_round</a>(sigmoid);</div>
 <div class="line"><a id="l00315" name="l00315"></a><span class="lineno">  315</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; hidden_dim; ++col) {</div>
-<div class="line"><a id="l00316" name="l00316"></a><span class="lineno">  316</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> product = sigmoid_gate * value_row[col];</div>
+<div class="line"><a id="l00316" name="l00316"></a><span class="lineno">  316</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> <a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a> = sigmoid_gate * value_row[col];</div>
 <div class="line"><a id="l00317" name="l00317"></a><span class="lineno">  317</span>                gated[base + col] = llama_fp32_arithmetic</div>
-<div class="line"><a id="l00318" name="l00318"></a><span class="lineno">  318</span>                    ? product</div>
-<div class="line"><a id="l00319" name="l00319"></a><span class="lineno">  319</span>                    : <a class="code hl_function" href="qwen4__exp__kernels_8c.html#a24d0656a0cee28105fa21c8c09ddff12">qwen4_bf16_round</a>(product);</div>
+<div class="line"><a id="l00318" name="l00318"></a><span class="lineno">  318</span>                    ? <a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a></div>
+<div class="line"><a id="l00319" name="l00319"></a><span class="lineno">  319</span>                    : <a class="code hl_function" href="qwen4__exp__kernels_8c.html#a24d0656a0cee28105fa21c8c09ddff12">qwen4_bf16_round</a>(<a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a>);</div>
 <div class="line"><a id="l00320" name="l00320"></a><span class="lineno">  320</span>            }</div>
 <div class="line"><a id="l00321" name="l00321"></a><span class="lineno">  321</span>        }</div>
 <div class="line"><a id="l00322" name="l00322"></a><span class="lineno">  322</span>        <span class="keywordflow">if</span> (llama_fp32_arithmetic) {</div>
@@ -511,8 +511,8 @@ $(document).ready(function(){initNavTree('qwen4__exp__kernels_8c_source.html',''
 <div class="line"><a id="l00355" name="l00355"></a><span class="lineno">  355</span>                            ((<span class="keyword">const</span> uint16_t *)conv_weight)[weight_index])</div>
 <div class="line"><a id="l00356" name="l00356"></a><span class="lineno">  356</span>                        : <a class="code hl_function" href="qwen4__exp__kernels_8c.html#a098582529cbb73ca7a8ac36ac0fddec9">qwen4_bf16_load</a>(</div>
 <div class="line"><a id="l00357" name="l00357"></a><span class="lineno">  357</span>                            ((<span class="keyword">const</span> uint16_t *)conv_weight) + weight_index);</div>
-<div class="line"><a id="l00358" name="l00358"></a><span class="lineno">  358</span>                    <span class="keyword">volatile</span> <span class="keywordtype">float</span> product = source * weight;</div>
-<div class="line"><a id="l00359" name="l00359"></a><span class="lineno">  359</span>                    sum = sum + product;</div>
+<div class="line"><a id="l00358" name="l00358"></a><span class="lineno">  358</span>                    <span class="keyword">volatile</span> <span class="keywordtype">float</span> <a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a> = source * weight;</div>
+<div class="line"><a id="l00359" name="l00359"></a><span class="lineno">  359</span>                    sum = sum + <a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a>;</div>
 <div class="line"><a id="l00360" name="l00360"></a><span class="lineno">  360</span>                }</div>
 <div class="line"><a id="l00361" name="l00361"></a><span class="lineno">  361</span>                conv_tile[lane] = llama_fp32_arithmetic</div>
 <div class="line"><a id="l00362" name="l00362"></a><span class="lineno">  362</span>                    ? sum</div>
@@ -772,6 +772,7 @@ $(document).ready(function(){initNavTree('qwen4__exp__kernels_8c_source.html',''
 <div class="line"><a id="l00604" name="l00604"></a><span class="lineno">  604</span>    }</div>
 <div class="line"><a id="l00605" name="l00605"></a><span class="lineno">  605</span>}</div>
 </div>
+<div class="ttc" id="aaudio__spectral__head_8c_html_a6cbb018b1e755f86de9d2dd05d164a53"><div class="ttname"><a href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a></div><div class="ttdeci">static int product(size_t a, size_t b, size_t *out)</div><div class="ttdef"><b>Definition</b> <a href="audio__spectral__head_8c_source.html#l00006">audio_spectral_head.c:6</a></div></div>
 <div class="ttc" id="ackernel__dtype_8h_html_a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226"><div class="ttname"><a href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a></div><div class="ttdeci">@ CK_DT_Q5_0</div><div class="ttdef"><b>Definition</b> <a href="ckernel__dtype_8h_source.html#l00045">ckernel_dtype.h:45</a></div></div>
 <div class="ttc" id="ackernel__dtype_8h_html_afb7fc50f1a3ed20ee55989027c744c8f"><div class="ttname"><a href="ckernel__dtype_8h.html#afb7fc50f1a3ed20ee55989027c744c8f">ck_dtype_row_bytes</a></div><div class="ttdeci">static size_t ck_dtype_row_bytes(CKDataType dt, size_t n_elements)</div><div class="ttdoc">Calculate total bytes for n_elements of given dtype.</div><div class="ttdef"><b>Definition</b> <a href="ckernel__dtype_8h_source.html#l00145">ckernel_dtype.h:145</a></div></div>
 <div class="ttc" id="ackernel__engine_8h_html"><div class="ttname"><a href="ckernel__engine_8h.html">ckernel_engine.h</a></div></div>

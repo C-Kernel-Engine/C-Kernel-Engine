@@ -1061,9 +1061,9 @@ $(document).ready(function(){initNavTree('deltanet__kernels_8c_source.html','');
 <div class="line"><a id="l00903" name="l00903"></a><span class="lineno">  903</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> *row = matrix + (size_t)i * (<span class="keywordtype">size_t</span>)state_dim + col;</div>
 <div class="line"><a id="l00904" name="l00904"></a><span class="lineno">  904</span>                <span class="keyword">const</span> __m512 weight = _mm512_set1_ps(row_weights[i]);</div>
 <div class="line"><a id="l00905" name="l00905"></a><span class="lineno">  905</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> block = 0; block &lt; 4; ++block) {</div>
-<div class="line"><a id="l00906" name="l00906"></a><span class="lineno">  906</span>                    <span class="keyword">const</span> __m512 product = _mm512_mul_ps(</div>
+<div class="line"><a id="l00906" name="l00906"></a><span class="lineno">  906</span>                    <span class="keyword">const</span> __m512 <a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a> = _mm512_mul_ps(</div>
 <div class="line"><a id="l00907" name="l00907"></a><span class="lineno">  907</span>                        _mm512_loadu_ps(row + block * 16), weight);</div>
-<div class="line"><a id="l00908" name="l00908"></a><span class="lineno">  908</span>                    acc[0][block] = _mm512_add_ps(acc[0][block], product);</div>
+<div class="line"><a id="l00908" name="l00908"></a><span class="lineno">  908</span>                    acc[0][block] = _mm512_add_ps(acc[0][block], <a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a>);</div>
 <div class="line"><a id="l00909" name="l00909"></a><span class="lineno">  909</span>                }</div>
 <div class="line"><a id="l00910" name="l00910"></a><span class="lineno">  910</span>            }</div>
 <div class="line"><a id="l00911" name="l00911"></a><span class="lineno">  911</span> </div>
@@ -1084,9 +1084,9 @@ $(document).ready(function(){initNavTree('deltanet__kernels_8c_source.html','');
 <div class="line"><a id="l00926" name="l00926"></a><span class="lineno">  926</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *row = matrix + (size_t)i * (<span class="keywordtype">size_t</span>)state_dim + col;</div>
 <div class="line"><a id="l00927" name="l00927"></a><span class="lineno">  927</span>            <span class="keyword">const</span> __m512 weight = _mm512_set1_ps(row_weights[i]);</div>
 <div class="line"><a id="l00928" name="l00928"></a><span class="lineno">  928</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> block = 0; block &lt; 4; ++block) {</div>
-<div class="line"><a id="l00929" name="l00929"></a><span class="lineno">  929</span>                <span class="keyword">const</span> __m512 product = _mm512_mul_ps(</div>
+<div class="line"><a id="l00929" name="l00929"></a><span class="lineno">  929</span>                <span class="keyword">const</span> __m512 <a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a> = _mm512_mul_ps(</div>
 <div class="line"><a id="l00930" name="l00930"></a><span class="lineno">  930</span>                    _mm512_loadu_ps(row + block * 16), weight);</div>
-<div class="line"><a id="l00931" name="l00931"></a><span class="lineno">  931</span>                acc[0][block] = _mm512_add_ps(acc[0][block], product);</div>
+<div class="line"><a id="l00931" name="l00931"></a><span class="lineno">  931</span>                acc[0][block] = _mm512_add_ps(acc[0][block], <a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a>);</div>
 <div class="line"><a id="l00932" name="l00932"></a><span class="lineno">  932</span>            }</div>
 <div class="line"><a id="l00933" name="l00933"></a><span class="lineno">  933</span>        }</div>
 <div class="line"><a id="l00934" name="l00934"></a><span class="lineno">  934</span> </div>
@@ -1115,9 +1115,9 @@ $(document).ready(function(){initNavTree('deltanet__kernels_8c_source.html','');
 <div class="line"><a id="l00957" name="l00957"></a><span class="lineno">  957</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> *row = matrix + (size_t)i * (<span class="keywordtype">size_t</span>)state_dim + col;</div>
 <div class="line"><a id="l00958" name="l00958"></a><span class="lineno">  958</span>                <span class="keyword">const</span> __m256 weight = _mm256_set1_ps(row_weights[i]);</div>
 <div class="line"><a id="l00959" name="l00959"></a><span class="lineno">  959</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> block = 0; block &lt; 4; ++block) {</div>
-<div class="line"><a id="l00960" name="l00960"></a><span class="lineno">  960</span>                    <span class="keyword">const</span> __m256 product = _mm256_mul_ps(</div>
+<div class="line"><a id="l00960" name="l00960"></a><span class="lineno">  960</span>                    <span class="keyword">const</span> __m256 <a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a> = _mm256_mul_ps(</div>
 <div class="line"><a id="l00961" name="l00961"></a><span class="lineno">  961</span>                        _mm256_loadu_ps(row + block * 8), weight);</div>
-<div class="line"><a id="l00962" name="l00962"></a><span class="lineno">  962</span>                    acc[0][block] = _mm256_add_ps(acc[0][block], product);</div>
+<div class="line"><a id="l00962" name="l00962"></a><span class="lineno">  962</span>                    acc[0][block] = _mm256_add_ps(acc[0][block], <a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a>);</div>
 <div class="line"><a id="l00963" name="l00963"></a><span class="lineno">  963</span>                }</div>
 <div class="line"><a id="l00964" name="l00964"></a><span class="lineno">  964</span>            }</div>
 <div class="line"><a id="l00965" name="l00965"></a><span class="lineno">  965</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> level = 1; level &lt; num_levels; ++level) {</div>
@@ -1136,9 +1136,9 @@ $(document).ready(function(){initNavTree('deltanet__kernels_8c_source.html','');
 <div class="line"><a id="l00978" name="l00978"></a><span class="lineno">  978</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *row = matrix + (size_t)i * (<span class="keywordtype">size_t</span>)state_dim + col;</div>
 <div class="line"><a id="l00979" name="l00979"></a><span class="lineno">  979</span>            <span class="keyword">const</span> __m256 weight = _mm256_set1_ps(row_weights[i]);</div>
 <div class="line"><a id="l00980" name="l00980"></a><span class="lineno">  980</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> block = 0; block &lt; 4; ++block) {</div>
-<div class="line"><a id="l00981" name="l00981"></a><span class="lineno">  981</span>                <span class="keyword">const</span> __m256 product = _mm256_mul_ps(</div>
+<div class="line"><a id="l00981" name="l00981"></a><span class="lineno">  981</span>                <span class="keyword">const</span> __m256 <a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a> = _mm256_mul_ps(</div>
 <div class="line"><a id="l00982" name="l00982"></a><span class="lineno">  982</span>                    _mm256_loadu_ps(row + block * 8), weight);</div>
-<div class="line"><a id="l00983" name="l00983"></a><span class="lineno">  983</span>                acc[0][block] = _mm256_add_ps(acc[0][block], product);</div>
+<div class="line"><a id="l00983" name="l00983"></a><span class="lineno">  983</span>                acc[0][block] = _mm256_add_ps(acc[0][block], <a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a>);</div>
 <div class="line"><a id="l00984" name="l00984"></a><span class="lineno">  984</span>            }</div>
 <div class="line"><a id="l00985" name="l00985"></a><span class="lineno">  985</span>        }</div>
 <div class="line"><a id="l00986" name="l00986"></a><span class="lineno">  986</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> level = 1; level &lt; num_levels; ++level) {</div>
@@ -2270,6 +2270,7 @@ $(document).ready(function(){initNavTree('deltanet__kernels_8c_source.html','');
 <div class="line"><a id="l02084" name="l02084"></a><span class="lineno"> 2084</span>}</div>
 </div>
 <div class="ttc" id="aattention__kernels_8c_html_a58d13c5dcabbb85848fa97b446086247"><div class="ttname"><a href="attention__kernels_8c.html#a58d13c5dcabbb85848fa97b446086247">RTLD_DEFAULT</a></div><div class="ttdeci">#define RTLD_DEFAULT</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l00032">attention_kernels.c:32</a></div></div>
+<div class="ttc" id="aaudio__spectral__head_8c_html_a6cbb018b1e755f86de9d2dd05d164a53"><div class="ttname"><a href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a></div><div class="ttdeci">static int product(size_t a, size_t b, size_t *out)</div><div class="ttdef"><b>Definition</b> <a href="audio__spectral__head_8c_source.html#l00006">audio_spectral_head.c:6</a></div></div>
 <div class="ttc" id="abf16__utils_8h_html"><div class="ttname"><a href="bf16__utils_8h.html">bf16_utils.h</a></div></div>
 <div class="ttc" id="abf16__utils_8h_html_a174b16a92b3a5972230d7519fc0c5aa3"><div class="ttname"><a href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a></div><div class="ttdeci">static uint16_t float_to_bf16(float f)</div><div class="ttdef"><b>Definition</b> <a href="bf16__utils_8h_source.html#l00090">bf16_utils.h:90</a></div></div>
 <div class="ttc" id="abf16__utils_8h_html_a314c3970fd5e2770d19b1bb49aefcf94"><div class="ttname"><a href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a></div><div class="ttdeci">static float bf16_to_float(uint16_t v)</div><div class="ttdef"><b>Definition</b> <a href="bf16__utils_8h_source.html#l00038">bf16_utils.h:38</a></div></div>

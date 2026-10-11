@@ -280,9 +280,9 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">   81</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> d = 0; d &lt; head_dim; ++d) {</div>
 <div class="line"><span class="lineno">   82</span>                <span class="keywordtype">double</span> weighted = 0.0;</div>
 <div class="line"><span class="lineno">   83</span>                <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> k = 0; k &lt; tokens; ++k) {</div>
-<div class="line"><span class="lineno">   84</span>                    <span class="keyword">volatile</span> <span class="keywordtype">double</span> product = (double)scratch[k] *</div>
+<div class="line"><span class="lineno">   84</span>                    <span class="keyword">volatile</span> <span class="keywordtype">double</span> <a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a> = (double)scratch[k] *</div>
 <div class="line"><span class="lineno">   85</span>                        (<span class="keywordtype">double</span>)value[k * width + h * head_dim + d];</div>
-<div class="line"><span class="lineno">   86</span>                    weighted += product;</div>
+<div class="line"><span class="lineno">   86</span>                    weighted += <a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a>;</div>
 <div class="line"><span class="lineno">   87</span>                }</div>
 <div class="line"><span class="lineno">   88</span>                output[t * width + h * head_dim + d] = (float)(weighted / denominator);</div>
 <div class="line"><span class="lineno">   89</span>            }</div>
@@ -291,9 +291,10 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">   92</span>    <span class="keywordflow">return</span> 0;</div>
 <div class="line"><span class="lineno">   93</span>}</div>
 <div class="ttc" id="aattention__full__token__major_8c_html_a0dc7d6130a8a8a3b4c6dea583138c301"><div class="ttname"><a href="attention__full__token__major_8c.html#a0dc7d6130a8a8a3b4c6dea583138c301">checked_geometry</a></div><div class="ttdeci">static int checked_geometry(size_t tokens, size_t heads, size_t head_dim, size_t *width, size_t *elements)</div><div class="ttdef"><b>Definition</b> <a href="attention__full__token__major_8c_source.html#l00007">attention_full_token_major.c:7</a></div></div>
+<div class="ttc" id="aaudio__spectral__head_8c_html_a6cbb018b1e755f86de9d2dd05d164a53"><div class="ttname"><a href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a></div><div class="ttdeci">static int product(size_t a, size_t b, size_t *out)</div><div class="ttdef"><b>Definition</b> <a href="audio__spectral__head_8c_source.html#l00006">audio_spectral_head.c:6</a></div></div>
 <div class="ttc" id="atokenizer_8h_html_a86dbad16ac00b8aa3c450398e4f8b741"><div class="ttname"><a href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a></div><div class="ttdeci">int32_t float * score</div><div class="ttdef"><b>Definition</b> <a href="tokenizer_8h_source.html#l00328">tokenizer.h:328</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__full__token__major_8c_source.html#l00007">checked_geometry()</a>, and <a class="el" href="tokenizer_8h_source.html#l00328">score</a>.</p>
+<p class="reference">References <a class="el" href="attention__full__token__major_8c_source.html#l00007">checked_geometry()</a>, <a class="el" href="audio__spectral__head_8c_source.html#l00006">product()</a>, and <a class="el" href="tokenizer_8h_source.html#l00328">score</a>.</p>
 
 </div>
 </div>

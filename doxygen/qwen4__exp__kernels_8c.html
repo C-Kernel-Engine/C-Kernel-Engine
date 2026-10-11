@@ -527,15 +527,16 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">  236</span>    <span class="comment">/* ggml materializes the FP32 multiply, then folds SUM_ROWS in ggml_float. */</span></div>
 <div class="line"><span class="lineno">  237</span>    <span class="keyword">volatile</span> <span class="keywordtype">double</span> sum = 0.0;</div>
 <div class="line"><span class="lineno">  238</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; dim; ++col) {</div>
-<div class="line"><span class="lineno">  239</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> product = <a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a>[col] * <a class="code hl_variable" href="true__bpe_8h.html#afb60251d57a9ee3324fbc011e4be71e9">right</a>[col];</div>
-<div class="line"><span class="lineno">  240</span>        sum = sum + (double)product;</div>
+<div class="line"><span class="lineno">  239</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> <a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a> = <a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a>[col] * <a class="code hl_variable" href="true__bpe_8h.html#afb60251d57a9ee3324fbc011e4be71e9">right</a>[col];</div>
+<div class="line"><span class="lineno">  240</span>        sum = sum + (double)<a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a>;</div>
 <div class="line"><span class="lineno">  241</span>    }</div>
 <div class="line"><span class="lineno">  242</span>    <span class="keywordflow">return</span> (<span class="keywordtype">float</span>)sum;</div>
 <div class="line"><span class="lineno">  243</span>}</div>
+<div class="ttc" id="aaudio__spectral__head_8c_html_a6cbb018b1e755f86de9d2dd05d164a53"><div class="ttname"><a href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a></div><div class="ttdeci">static int product(size_t a, size_t b, size_t *out)</div><div class="ttdef"><b>Definition</b> <a href="audio__spectral__head_8c_source.html#l00006">audio_spectral_head.c:6</a></div></div>
 <div class="ttc" id="atrue__bpe_8h_html_abf33d3f8e74eb48d5a4394c67ac4f1cd"><div class="ttname"><a href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a></div><div class="ttdeci">const char * left</div><div class="ttdef"><b>Definition</b> <a href="true__bpe_8h_source.html#l00138">true_bpe.h:138</a></div></div>
 <div class="ttc" id="atrue__bpe_8h_html_afb60251d57a9ee3324fbc011e4be71e9"><div class="ttname"><a href="true__bpe_8h.html#afb60251d57a9ee3324fbc011e4be71e9">right</a></div><div class="ttdeci">const char const char * right</div><div class="ttdef"><b>Definition</b> <a href="true__bpe_8h_source.html#l00139">true_bpe.h:139</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="true__bpe_8h_source.html#l00138">left</a>, and <a class="el" href="true__bpe_8h_source.html#l00139">right</a>.</p>
+<p class="reference">References <a class="el" href="true__bpe_8h_source.html#l00138">left</a>, <a class="el" href="audio__spectral__head_8c_source.html#l00006">product()</a>, and <a class="el" href="true__bpe_8h_source.html#l00139">right</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="qwen4__exp__kernels_8c_source.html#l00245">qwen4_ple_gate_conv_inject_impl()</a>.</p>
 
@@ -1042,10 +1043,10 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">  313</span>                ? sigmoid</div>
 <div class="line"><span class="lineno">  314</span>                : <a class="code hl_function" href="qwen4__exp__kernels_8c.html#a24d0656a0cee28105fa21c8c09ddff12">qwen4_bf16_round</a>(sigmoid);</div>
 <div class="line"><span class="lineno">  315</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; hidden_dim; ++col) {</div>
-<div class="line"><span class="lineno">  316</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> product = sigmoid_gate * value_row[col];</div>
+<div class="line"><span class="lineno">  316</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> <a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a> = sigmoid_gate * value_row[col];</div>
 <div class="line"><span class="lineno">  317</span>                gated[base + col] = llama_fp32_arithmetic</div>
-<div class="line"><span class="lineno">  318</span>                    ? product</div>
-<div class="line"><span class="lineno">  319</span>                    : <a class="code hl_function" href="qwen4__exp__kernels_8c.html#a24d0656a0cee28105fa21c8c09ddff12">qwen4_bf16_round</a>(product);</div>
+<div class="line"><span class="lineno">  318</span>                    ? <a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a></div>
+<div class="line"><span class="lineno">  319</span>                    : <a class="code hl_function" href="qwen4__exp__kernels_8c.html#a24d0656a0cee28105fa21c8c09ddff12">qwen4_bf16_round</a>(<a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a>);</div>
 <div class="line"><span class="lineno">  320</span>            }</div>
 <div class="line"><span class="lineno">  321</span>        }</div>
 <div class="line"><span class="lineno">  322</span>        <span class="keywordflow">if</span> (llama_fp32_arithmetic) {</div>
@@ -1084,8 +1085,8 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">  355</span>                            ((<span class="keyword">const</span> uint16_t *)conv_weight)[weight_index])</div>
 <div class="line"><span class="lineno">  356</span>                        : <a class="code hl_function" href="qwen4__exp__kernels_8c.html#a098582529cbb73ca7a8ac36ac0fddec9">qwen4_bf16_load</a>(</div>
 <div class="line"><span class="lineno">  357</span>                            ((const uint16_t *)conv_weight) + weight_index);</div>
-<div class="line"><span class="lineno">  358</span>                    <span class="keyword">volatile</span> <span class="keywordtype">float</span> product = source * weight;</div>
-<div class="line"><span class="lineno">  359</span>                    sum = sum + product;</div>
+<div class="line"><span class="lineno">  358</span>                    <span class="keyword">volatile</span> <span class="keywordtype">float</span> <a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a> = source * weight;</div>
+<div class="line"><span class="lineno">  359</span>                    sum = sum + <a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a>;</div>
 <div class="line"><span class="lineno">  360</span>                }</div>
 <div class="line"><span class="lineno">  361</span>                conv_tile[lane] = llama_fp32_arithmetic</div>
 <div class="line"><span class="lineno">  362</span>                    ? sum</div>
@@ -1137,7 +1138,7 @@ Functions</h2></td></tr>
 <div class="ttc" id="aqwen4__exp__kernels_8c_html_ad81cf3528088084d07fe46014e4477fd"><div class="ttname"><a href="qwen4__exp__kernels_8c.html#ad81cf3528088084d07fe46014e4477fd">qwen4_pytorch_bf16_dot</a></div><div class="ttdeci">static float qwen4_pytorch_bf16_dot(const float *left, const float *right, int dim)</div><div class="ttdef"><b>Definition</b> <a href="qwen4__exp__kernels_8c_source.html#l00191">qwen4_exp_kernels.c:191</a></div></div>
 <div class="ttc" id="av6_85__simple_8c_html_a49cac1d218fc2817ed1f679a37f25f41"><div class="ttname"><a href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a></div><div class="ttdeci">static void silu(float *x, int n)</div><div class="ttdef"><b>Definition</b> <a href="v6_85__simple_8c_source.html#l00159">v6.5_simple.c:159</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="ckernel__quant_8h_source.html#l00423">ck_fp16_to_fp32()</a>, <a class="el" href="qwen4__exp__kernels_8c_source.html#l00019">qwen4_bf16_load()</a>, <a class="el" href="qwen4__exp__kernels_8c_source.html#l00012">qwen4_bf16_round()</a>, <a class="el" href="qwen4__exp__kernels_8c_source.html#l00176">qwen4_group_rmsnorm_llama()</a>, <a class="el" href="qwen4__exp__kernels_8c_source.html#l00161">qwen4_group_rmsnorm_pytorch_bf16()</a>, <a class="el" href="qwen4__exp__kernels_8c_source.html#l00233">qwen4_llama_mul_sum_rows()</a>, <a class="el" href="qwen4__exp__kernels_8c_source.html#l00191">qwen4_pytorch_bf16_dot()</a>, <a class="el" href="recurrent__gate__kernels_8c_source.html#l00510">recurrent_silu_forward_ggml()</a>, and <a class="el" href="v6_85__simple_8c_source.html#l00159">silu()</a>.</p>
+<p class="reference">References <a class="el" href="ckernel__quant_8h_source.html#l00423">ck_fp16_to_fp32()</a>, <a class="el" href="audio__spectral__head_8c_source.html#l00006">product()</a>, <a class="el" href="qwen4__exp__kernels_8c_source.html#l00019">qwen4_bf16_load()</a>, <a class="el" href="qwen4__exp__kernels_8c_source.html#l00012">qwen4_bf16_round()</a>, <a class="el" href="qwen4__exp__kernels_8c_source.html#l00176">qwen4_group_rmsnorm_llama()</a>, <a class="el" href="qwen4__exp__kernels_8c_source.html#l00161">qwen4_group_rmsnorm_pytorch_bf16()</a>, <a class="el" href="qwen4__exp__kernels_8c_source.html#l00233">qwen4_llama_mul_sum_rows()</a>, <a class="el" href="qwen4__exp__kernels_8c_source.html#l00191">qwen4_pytorch_bf16_dot()</a>, <a class="el" href="recurrent__gate__kernels_8c_source.html#l00510">recurrent_silu_forward_ggml()</a>, and <a class="el" href="v6_85__simple_8c_source.html#l00159">silu()</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="qwen4__exp__kernels_8c_source.html#l00402">qwen4_ple_gate_conv_inject_bf16()</a>, <a class="el" href="qwen4__exp__kernels_8c_source.html#l00419">qwen4_ple_gate_conv_inject_fp16()</a>, and <a class="el" href="qwen4__exp__kernels_8c_source.html#l00436">qwen4_ple_gate_conv_inject_llama_fp16()</a>.</p>
 

@@ -245,8 +245,8 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno">  176</span>                    conv_channel + (size_t)tok;</div>
 <div class="line"><span class="lineno">  177</span>                <span class="keywordtype">float</span> sum = 0.0f;</div>
 <div class="line"><span class="lineno">  178</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> k = 0; k &lt; kernel_size; ++k) {</div>
-<div class="line"><span class="lineno">  179</span>                    <span class="keyword">volatile</span> <span class="keywordtype">float</span> product = conv_row[k] * kernel_row[k];</div>
-<div class="line"><span class="lineno">  180</span>                    <span class="keyword">volatile</span> <span class="keywordtype">float</span> next = sum + product;</div>
+<div class="line"><span class="lineno">  179</span>                    <span class="keyword">volatile</span> <span class="keywordtype">float</span> <a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a> = conv_row[k] * kernel_row[k];</div>
+<div class="line"><span class="lineno">  180</span>                    <span class="keyword">volatile</span> <span class="keywordtype">float</span> next = sum + <a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a>;</div>
 <div class="line"><span class="lineno">  181</span>                    sum = next;</div>
 <div class="line"><span class="lineno">  182</span>                }</div>
 <div class="line"><span class="lineno">  183</span>                out_seq[(size_t)tok * (<span class="keywordtype">size_t</span>)num_channels + (size_t)ch] = sum;</div>
@@ -254,9 +254,10 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno">  185</span>        }</div>
 <div class="line"><span class="lineno">  186</span>    }</div>
 <div class="line"><span class="lineno">  187</span>}</div>
+<div class="ttc" id="aaudio__spectral__head_8c_html_a6cbb018b1e755f86de9d2dd05d164a53"><div class="ttname"><a href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a></div><div class="ttdeci">static int product(size_t a, size_t b, size_t *out)</div><div class="ttdef"><b>Definition</b> <a href="audio__spectral__head_8c_source.html#l00006">audio_spectral_head.c:6</a></div></div>
 <div class="ttc" id="autf8_8c_html_a204a3f4fa39b9c007f9784d3e4af4667"><div class="ttname"><a href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a></div><div class="ttdeci">uint32_t end</div><div class="ttdef"><b>Definition</b> <a href="utf8_8c_source.html#l00215">utf8.c:215</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="utf8_8c_source.html#l00215">end</a>.</p>
+<p class="reference">References <a class="el" href="utf8_8c_source.html#l00215">end</a>, and <a class="el" href="audio__spectral__head_8c_source.html#l00006">product()</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="ssm__kernels_8c_source.html#l00207">ssm_conv1d_forward_llama_production()</a>, and <a class="el" href="ssm__kernels_8c_source.html#l00189">ssm_conv1d_forward_llama_production_serial()</a>.</p>
 

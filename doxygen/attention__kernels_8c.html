@@ -11584,13 +11584,14 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno"> 6500</span><span class="comment">     * AVX-512 and padded D=80). */</span></div>
 <div class="line"><span class="lineno"> 6501</span>    <span class="keywordtype">double</span> result = (double) vector_result;</div>
 <div class="line"><span class="lineno"> 6502</span>    <span class="keywordflow">for</span> (; i &lt; n; ++i) {</div>
-<div class="line"><span class="lineno"> 6503</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> product = <a class="code hl_define" href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a>(x[i]) * <a class="code hl_define" href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a>(y[i]);</div>
-<div class="line"><span class="lineno"> 6504</span>        result += (double) product;</div>
+<div class="line"><span class="lineno"> 6503</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> <a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a> = <a class="code hl_define" href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a>(x[i]) * <a class="code hl_define" href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a>(y[i]);</div>
+<div class="line"><span class="lineno"> 6504</span>        result += (double) <a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a>;</div>
 <div class="line"><span class="lineno"> 6505</span>    }</div>
 <div class="line"><span class="lineno"> 6506</span>    <span class="keywordflow">return</span> (<span class="keywordtype">float</span>) result;</div>
 <div class="line"><span class="lineno"> 6507</span>}</div>
+<div class="ttc" id="aaudio__spectral__head_8c_html_a6cbb018b1e755f86de9d2dd05d164a53"><div class="ttname"><a href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a></div><div class="ttdeci">static int product(size_t a, size_t b, size_t *out)</div><div class="ttdef"><b>Definition</b> <a href="audio__spectral__head_8c_source.html#l00006">audio_spectral_head.c:6</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="ckernel__quant_8h_source.html#l00440">CK_FP16_TO_FP32</a>.</p>
+<p class="reference">References <a class="el" href="ckernel__quant_8h_source.html#l00440">CK_FP16_TO_FP32</a>, and <a class="el" href="audio__spectral__head_8c_source.html#l00006">product()</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="attention__kernels_8c_source.html#l06589">ck_attention_f16_split_work()</a>.</p>
 
@@ -14854,13 +14855,13 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno"> 6580</span>    }</div>
 <div class="line"><span class="lineno"> 6581</span><span class="preprocessor">#endif</span></div>
 <div class="line"><span class="lineno"> 6582</span>    <span class="keywordflow">for</span> (; i &lt; n; ++i) {</div>
-<div class="line"><span class="lineno"> 6583</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> product = <a class="code hl_define" href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a>(x[i]) * scale;</div>
-<div class="line"><span class="lineno"> 6584</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> updated = <a class="code hl_define" href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a>(y[i]) + product;</div>
+<div class="line"><span class="lineno"> 6583</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> <a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a> = <a class="code hl_define" href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a>(x[i]) * scale;</div>
+<div class="line"><span class="lineno"> 6584</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> updated = <a class="code hl_define" href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a>(y[i]) + <a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a>;</div>
 <div class="line"><span class="lineno"> 6585</span>        y[i] = <a class="code hl_define" href="ckernel__quant_8h.html#aa217c07d43400999fb76ccfcdda2a47d">CK_FP32_TO_FP16</a>(updated);</div>
 <div class="line"><span class="lineno"> 6586</span>    }</div>
 <div class="line"><span class="lineno"> 6587</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="ckernel__quant_8h_source.html#l00440">CK_FP16_TO_FP32</a>, and <a class="el" href="ckernel__quant_8h_source.html#l00441">CK_FP32_TO_FP16</a>.</p>
+<p class="reference">References <a class="el" href="ckernel__quant_8h_source.html#l00440">CK_FP16_TO_FP32</a>, <a class="el" href="ckernel__quant_8h_source.html#l00441">CK_FP32_TO_FP16</a>, and <a class="el" href="audio__spectral__head_8c_source.html#l00006">product()</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="attention__kernels_8c_source.html#l06589">ck_attention_f16_split_work()</a>.</p>
 

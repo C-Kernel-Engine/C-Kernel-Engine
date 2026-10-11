@@ -25,6 +25,7 @@ var dir_40856f0cdd4bcafd28810d9265a200f7 =
     [ "audio_reflect_pad_checked.c", "audio__reflect__pad__checked_8c.html", "audio__reflect__pad__checked_8c" ],
     [ "audio_scaled_sum_strided.c", "audio__scaled__sum__strided_8c.html", "audio__scaled__sum__strided_8c" ],
     [ "audio_snake_checked.c", "audio__snake__checked_8c.html", "audio__snake__checked_8c" ],
+    [ "audio_spectral_head.c", "audio__spectral__head_8c.html", "audio__spectral__head_8c" ],
     [ "audio_stft_mag_phase_checked.c", "audio__stft__mag__phase__checked_8c.html", "audio__stft__mag__phase__checked_8c" ],
     [ "audio_text_embedding.c", "audio__text__embedding_8c.html", "audio__text__embedding_8c" ],
     [ "axpy_kernels.c", "axpy__kernels_8c.html", "axpy__kernels_8c" ],

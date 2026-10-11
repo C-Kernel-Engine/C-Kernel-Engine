@@ -32,9 +32,11 @@ two-slot batch decode does and does not do, and what true continuous batching st
         <li><strong>Continuous batching</strong> — the active set changes at every iteration boundary:
         requests join and leave without waiting for the longest sequence.</li>
     </ul>
-    <p>Today CKE ships the first, ships an experimental two-row form of the second and third, and
-    designs toward the fourth. Concurrent HTTP requests, multi-threaded kernels and serial request
-    multiplexing are not, by themselves, batched decode.</p>
+    <p>Today CKE ships the first and an experimental two-row form of the second and third.
+    The opt-in owner can admit and retire a request at a decode boundary, but a joining
+    request's synchronous prefill stalls the other stream. Bounded, fair prefill and
+    broader batch capacity remain planned. Concurrent HTTP requests, multi-threaded
+    kernels and serial request multiplexing are not, by themselves, batched decode.</p>
 </div>
 
 <div class="card">
@@ -50,7 +52,7 @@ two-slot batch decode does and does not do, and what true continuous batching st
                 <td><span class="badge badge-green">Shipped</span></td>
                 <td><code>server/live.py</code> <code>_FlightAdmission</code> (8 waiters, 30&nbsp;s)</td>
                 <td><code>test_serving_lifecycle_hardening.py</code></td></tr>
-            <tr><td>Cancellation &amp; cleanup (DELETE, disconnect watcher, per-token cancel)</td>
+            <tr><td>Cancellation &amp; cleanup (<code>POST /v1/responses/{id}/cancel</code>, disconnect watcher, step-boundary cancel)</td>
                 <td><span class="badge badge-green">Shipped</span></td>
                 <td><code>server/live.py</code>, <code>ck_cli_v8.c</code> cancel flag</td>
                 <td>lifecycle hardening + streaming socket tests</td></tr>
@@ -66,7 +68,7 @@ two-slot batch decode does and does not do, and what true continuous batching st
                 <td><span class="badge badge-orange">Experimental</span></td>
                 <td><code>server/batch_http.py</code>, <code>ck_serve_v8.py</code></td>
                 <td><code>test_batch_http.py</code> (19 tests, incl. real-socket SSE)</td></tr>
-            <tr><td>Iteration-level continuous batching (dynamic join/leave, N&gt;2)</td>
+            <tr><td>Scalable continuous batching (bounded prefill, fair admission, N&gt;2)</td>
                 <td><span class="badge badge-grey">Planned</span></td><td>—</td><td>—</td></tr>
             <tr><td>Mixed / interruptible prefill inside a decode step</td>
                 <td><span class="badge badge-grey">Planned</span></td><td>—</td><td>—</td></tr>
@@ -96,7 +98,7 @@ two-slot batch decode does and does not do, and what true continuous batching st
     <p>The serving layer never computes logits, and the generated runtime never sees HTTP. The
     boundary is the session ABI: the host passes token ids in and receives logits (or decode steps)
     out. One process loads the model once; every request shares the mapped weights, while
-    per-request state lives in request-owned arenas.</p>
+    per-request state occupies separate native-session-owned slot arenas.</p>
 </div>
 
 <h2 id="default-path">Default: serialized single-flight serving</h2>
@@ -134,7 +136,8 @@ cks-v8-serve … --batch-http-extra-bytes BYTES \
         <ul>
             <li>Two requests decoded per generated-C step when both slots are active — counted by
             the owner as <em>shared steps</em> and asserted by tests.</li>
-            <li>Projection weight traffic amortized across both rows — the real CPU payoff.</li>
+            <li>Compatible projections reuse weight tiles across both rows; a throughput
+            benefit must be measured for the loaded artifact.</li>
             <li>Per-request isolation: separate KV arenas, RNG, stop rules, output caps,
             cancellation and failure recovery.</li>
             <li>Bounded admission: a third concurrent request receives HTTP 429; delivery queues
@@ -144,8 +147,8 @@ cks-v8-serve … --batch-http-extra-bytes BYTES \
     <div class="card">
         <h3 style="margin-top: 0;">What you do not get</h3>
         <ul>
-            <li>Not a full-layer batched decoder: attention and KV are per-row sequential inside
-            the call.</li>
+            <li>Not every layer operation is batched: attention and KV updates remain
+            sequence-local inside the call.</li>
             <li>Prefill stays synchronous and per-slot — a joining request's prefill pauses the
             other slot for its duration; the prompt cap bounds tokens, not time.</li>
             <li>Fixed at two slots, KV-cache-only generated models (recurrent-state models are
@@ -156,14 +159,15 @@ cks-v8-serve … --batch-http-extra-bytes BYTES \
 </div>
 
 <h2 id="roadmap">Planned: continuous batching</h2>
-<p>The design direction is iteration-level scheduling over the generated runtime: an active set
-whose membership changes at every decode boundary, memory-aware admission against a shared KV
-pool, mixed/chunked prefill, and batched attention across N rows. batch2 is the N=2 proof of the
-ABI shape — the per-request policy model, arena reuse and recovery discipline generalize; the
-scheduler, batch-N codegen and paged KV do not exist yet.</p>
+<p>Batch2 already admits and retires requests at decode boundaries within two fixed slots.
+The next practical milestone is bounded, cancellable prefill so a new prompt cannot pause an
+existing decode stream indefinitely. Fair admission, measured expansion beyond two slots and
+mixed prefill/decode follow. Batched attention and paged KV may improve later scaling, but
+neither is required to establish the first correct continuous-admission scheduler. A general
+batch-N ABI, memory pool and paged KV do not exist yet.</p>
 
 <figure class="img-container sv-diagram">
-    <img src="assets/continuous-batching-roadmap-v8.svg" alt="Three-lane roadmap: shipped serialized HTTP serving, merged experimental two-slot batch decode, and planned continuous batching with an iteration-level scheduler, dynamic active set, memory-aware admission and shared KV pool.">
+    <img src="assets/continuous-batching-roadmap-v8.svg" alt="Three-lane roadmap: shipped serialized HTTP serving, experimental two-slot decode with limited dynamic admission, and a planned scheduler with bounded prefill, fair admission and broader batch capacity.">
     <figcaption>Roadmap and target scheduler shape. Grey elements are design direction with no
     implementation claims.</figcaption>
 </figure>
@@ -224,7 +228,7 @@ scheduler, batch-N codegen and paged KV do not exist yet.</p>
         <a href="v8-serving-coverage.html">v8 Serving Coverage Inventory</a> (per-circuit
         certification evidence)</li>
     </ul>
-    <p style="color: var(--text-muted); font-size: 0.8rem;">Page authored against origin/main
-    ce70528cd (post PR&nbsp;#709/#715) by source inspection; runtime claims rest on the cited
-    tests, not on new benchmarks run for this page.</p>
+    <p style="color: var(--text-muted); font-size: 0.8rem;">Page audited against origin/main
+    4a4be7279 by source inspection; runtime claims rest on the cited tests, not on new
+    benchmarks run for this page.</p>
 </div>
