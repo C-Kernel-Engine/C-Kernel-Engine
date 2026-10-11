@@ -39,6 +39,18 @@
 .ms-root details { margin:0.4rem 0; }
 .ms-root summary { cursor:pointer; color:var(--ms-blue); font-size:0.88rem; }
 .ms-root .ms-hero { display:block; width:100%; max-width:640px; height:auto; margin:0.6rem 0 0; }
+.ms-root .ms-concurrency { border:1px solid var(--orange); border-radius:10px; padding:1rem 1.2rem; background:var(--dark-card); margin:1.2rem 0; }
+.ms-root .ms-concurrency input { max-width:180px; border:2px solid var(--orange); font-size:1.5rem; font-weight:800; }
+.ms-root .ms-sweep { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0.7rem; }
+.ms-root .ms-chart { min-width:0; padding:0.7rem; border:1px solid var(--grey); border-radius:8px; background:var(--dark-lighter); }
+.ms-root .ms-chart svg { display:block; width:100%; height:auto; }
+.ms-root .ms-table-wrap { max-width:100%; overflow-x:auto; }
+.ms-root .ms-table { width:100%; border-collapse:collapse; margin-top:0.8rem; font-size:0.82rem; }
+.ms-root .ms-table th, .ms-root .ms-table td { padding:0.45rem; text-align:left; white-space:nowrap; border-bottom:1px solid var(--grey); }
+.ms-root .ms-table th { color:var(--orange); }
+@media (max-width:900px) { .ms-root .ms-grid { grid-template-columns:minmax(0,1fr); } .ms-root .ms-grid > div { min-width:0; } }
+@media (max-width:600px) { .ms-root .ms-sweep { grid-template-columns:minmax(0,1fr); } }
+@media print { .site-header, footer, .ms-root .ms-controls, .ms-root #hf-files { display:none !important; } .ms-root .ms-grid { display:block; } .ms-root .card, .ms-root .ms-concurrency { break-inside:avoid; } }
 </style>
 
 <div class="ms-root">
@@ -60,6 +72,13 @@ state consume capacity on GPUs or CPUs.</p>
     <g fill="#74c5e8"><rect x="112" y="81" width="35" height="18" rx="2"/><rect x="271" y="81" width="35" height="18" rx="2"/><rect x="430" y="81" width="35" height="18" rx="2"/><rect x="112" y="156" width="35" height="18" rx="2"/><rect x="271" y="156" width="35" height="18" rx="2"/><rect x="430" y="156" width="35" height="18" rx="2"/></g>
     <g fill="#f3f2e9" font-size="10" font-family="sans-serif"><text x="40" y="76">BANK 1</text><text x="199" y="76">BANK 2</text><text x="358" y="76">BANK 3</text><text x="40" y="151">BANK 4</text><text x="199" y="151">BANK 5</text><text x="358" y="151">BANK 6</text></g>
 </svg>
+
+<section class="ms-concurrency" aria-labelledby="concurrency-title">
+    <h2 id="concurrency-title">Start with total concurrent users</h2>
+    <label for="total-users">Active users across this model's selected replicas</label>
+    <input id="total-users" type="number" min="1" max="10000" step="1" value="20">
+    <p class="fine">Enter 10, 20, 50 or 100 here. Users are spread across the replicas marked “This model” below; the busiest replica is used for the memory-fit display. This is not a latency forecast.</p>
+</section>
 
 <div class="ms-grid" style="margin-top:1.2rem;">
 <div>
@@ -121,7 +140,7 @@ state consume capacity on GPUs or CPUs.</p>
         <p class="fine" id="hw-note"></p>
         <div class="ms-pair">
             <label>Resident tokens / request<input id="tokens" type="number" min="0" step="1" value="32768"></label>
-            <label>Active requests / replica<input id="requests" type="number" min="1" step="1" value="5"></label>
+            <label for="requests">Busiest replica requests (calculated)<input id="requests" type="number" min="1" step="1" value="20" readonly></label>
             <label>Capacity GiB<input id="capacity-gib" type="number" min="1" step="0.1" value="89.41"></label>
             <label>Peak bandwidth GB/s<input id="bandwidth-gbs" type="number" min="1" step="1" value="1597"></label>
             <label>Runtime/headroom %<input id="reserve-pct" type="number" min="0" max="90" step="1" value="10"></label>
@@ -169,6 +188,16 @@ state consume capacity on GPUs or CPUs.</p>
     </div>
 
     <div class="card">
+        <h2 style="margin-top:0;">Compare concurrency</h2>
+        <p>Compare 10, 20, 50 and 100 active users, plus your chosen value. Memory is the busiest replica's allocation. Decode rates are optimistic bounds, never measured service throughput; over-capacity scenarios show no rate.</p>
+        <div class="ms-sweep">
+            <div class="ms-chart"><strong>Memory used on busiest replica</strong><svg id="memory-sweep-svg" viewBox="0 0 440 240" role="img" aria-label="Memory used versus concurrent users"></svg></div>
+            <div class="ms-chart"><strong>Per-user decode upper bound</strong><svg id="rate-sweep-svg" viewBox="0 0 440 240" role="img" aria-label="Theoretical tokens per second per user versus concurrent users"></svg></div>
+        </div>
+        <div class="ms-table-wrap"><table class="ms-table"><thead><tr><th>Users</th><th>Busiest replica</th><th>Memory / replica</th><th>Fit</th><th>Upper bound / user</th></tr></thead><tbody id="sweep-table"></tbody></table></div>
+    </div>
+
+    <div class="card">
         <h2 style="margin-top:0;">Replica placement</h2>
         <p>Mark GPUs or CPU nodes serving replicas of this model; reserve the others for OCR, ASR
         or different models. Each replica carries its own weights and request state.</p>
@@ -199,6 +228,7 @@ state consume capacity on GPUs or CPUs.</p>
         <div class="ms-controls">
             <button id="share" class="ms-secondary" type="button">Copy scenario link</button>
             <button id="export" class="ms-secondary" type="button">Download JSON report</button>
+            <button id="print-report" class="ms-secondary" type="button">Print / save PDF</button>
         </div>
         <p id="export-status" class="ms-status" role="status" aria-live="polite"></p>
     </div>

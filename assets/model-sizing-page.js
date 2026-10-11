@@ -2,7 +2,7 @@
   "use strict";
   const calc = window.CkeModelSizing;
   const $ = (id) => document.getElementById(id);
-  const ids = ["target-kind", "hw-preset", "cke-circuit", "weight-gib", "full-owners", "local-owners", "recurrent-layers", "state-mib", "kv-heads", "k-dim", "v-dim", "local-kv-heads", "local-k-dim", "local-v-dim", "kv-bytes", "window", "local-storage", "tokens", "requests", "capacity-gib", "bandwidth-gbs", "reserve-pct", "efficiency-pct"];
+  const ids = ["target-kind", "hw-preset", "cke-circuit", "weight-gib", "full-owners", "local-owners", "recurrent-layers", "state-mib", "kv-heads", "k-dim", "v-dim", "local-kv-heads", "local-k-dim", "local-v-dim", "kv-bytes", "window", "local-storage", "tokens", "total-users", "requests", "capacity-gib", "bandwidth-gbs", "reserve-pct", "efficiency-pct"];
   const NS = "http://www.w3.org/2000/svg";
   let source = { kind: "manual" };
   let last = null;
@@ -25,6 +25,8 @@
   }
 
   function scenario() {
+    const totalUsers = Number(value("total-users"));
+    const replicas = replicaCount();
     return {
       weightBytes: bytes(value("weight-gib")), capacityBytes: bytes(value("capacity-gib")),
       bandwidthBytesPerSecond: Number(value("bandwidth-gbs")) * 1e9,
@@ -33,9 +35,59 @@
       kvHeads: value("kv-heads"), kDim: value("k-dim"), vDim: value("v-dim"),
       localKvHeads: value("local-kv-heads"), localKDim: value("local-k-dim"), localVDim: value("local-v-dim"), kvBytes: value("kv-bytes"),
       window: value("window"), localStorage: value("local-storage"), tokens: value("tokens"),
-      requests: value("requests"), reserveFraction: Number(value("reserve-pct")) / 100,
-      efficiency: Number(value("efficiency-pct")) / 100, replicas: replicaCount(),
+      requests: replicas ? Math.ceil(totalUsers / replicas) : 0, totalUsers,
+      reserveFraction: Number(value("reserve-pct")) / 100,
+      efficiency: Number(value("efficiency-pct")) / 100, replicas,
     };
+  }
+
+  function svgElement(name, attrs, content) {
+    const node = document.createElementNS(NS, name);
+    for (const [key, entry] of Object.entries(attrs)) node.setAttribute(key, String(entry));
+    if (content !== undefined) node.textContent = content;
+    return node;
+  }
+
+  function memoryMetric(row) { return row.usedBytes / row.capacityBytes * 100; }
+  function rateMetric(row) { return row.fits ? row.upperPerUserTokensPerSecond : NaN; }
+
+  function drawSweep(svg, rows, metric, color, unit) {
+    svg.replaceChildren();
+    const values = rows.map(metric);
+    const max = Math.max(1, ...values.filter(Number.isFinite));
+    const width = 360 / rows.length;
+    svg.appendChild(svgElement("line", { x1:45, y1:195, x2:425, y2:195, stroke:"#777" }));
+    rows.forEach((row, index) => {
+      const value = values[index];
+      const x = 52 + index * width;
+      const height = Number.isFinite(value) ? Math.max(0, value / max * 150) : 0;
+      svg.appendChild(svgElement("rect", { x, y:195 - height, width:Math.max(20, width - 16), height, fill:row.fits ? color : "#ffa19a" }));
+      svg.appendChild(svgElement("text", { x:x + (width - 16) / 2, y:211, fill:"#ddd", "text-anchor":"middle", "font-size":13 }, String(row.totalUsers)));
+      svg.appendChild(svgElement("text", { x:x + (width - 16) / 2, y:Math.max(18, 187 - height), fill:"#fff", "text-anchor":"middle", "font-size":11 }, Number.isFinite(value) ? value.toFixed(unit === "%" ? 0 : 1) + unit : "N/A"));
+    });
+    svg.appendChild(svgElement("text", { x:12, y:226, fill:"#bbb", "font-size":11 }, "Users"));
+  }
+
+  function renderSweep(input) {
+    const counts = [...new Set([10, 20, 50, 100, input.totalUsers])].sort((a, b) => a - b);
+    const rows = counts.map((totalUsers) => {
+      const fleet = calc.estimateFleet(input, totalUsers);
+      const busiest = fleet.devices[0];
+      return { totalUsers, requestsPerReplica:busiest.requests, usedBytes:busiest.result.usedBytes,
+        capacityBytes:input.capacityBytes, fits:fleet.fits, upperPerUserTokensPerSecond:fleet.upperPerUserTokensPerSecond };
+    });
+    drawSweep($("memory-sweep-svg"), rows, memoryMetric, "#ffb400", "%");
+    drawSweep($("rate-sweep-svg"), rows, rateMetric, "#74c5e8", "");
+    const table = $("sweep-table");
+    table.replaceChildren();
+    for (const row of rows) {
+      const tr = document.createElement("tr");
+      for (const entry of [row.totalUsers, row.requestsPerReplica, calc.formatBytes(row.usedBytes), row.fits ? "Fits" : "Exceeds", row.fits ? prettyRate(row.upperPerUserTokensPerSecond) + " tok/s" : "N/A"]) {
+        const td = document.createElement("td"); td.textContent = String(entry); tr.appendChild(td);
+      }
+      table.appendChild(tr);
+    }
+    return rows;
   }
 
   function rect(svg, x, width, color) {
@@ -74,29 +126,35 @@
   function render() {
     try {
       const input = scenario();
-      const result = calc.estimate(input);
-      last = { input, result, source, targetKind: targetKind(), hardwarePreset: value("hw-preset") || null, circuit: value("cke-circuit") || null };
+      const fleet = calc.estimateFleet(input, input.totalUsers);
+      const result = fleet.devices[0].result;
+      const sweep = renderSweep(input);
+      set("requests", input.requests);
+      last = { input, result, fleet, sweep, source, targetKind: targetKind(), hardwarePreset: value("hw-preset") || null, circuit: value("cke-circuit") || null };
       $("error").textContent = "";
-      $("fit").textContent = result.fits ? "Fits" : "Exceeds";
-      $("fit").parentElement.className = "ms-metric " + (result.fits ? "ok" : "no");
+      $("fit").textContent = fleet.fits ? "Fits" : "Exceeds";
+      $("fit").parentElement.className = "ms-metric " + (fleet.fits ? "ok" : "no");
       $("used").textContent = calc.formatBytes(result.usedBytes);
       $("free").textContent = (result.freeBytes < 0 ? "−" : "") + calc.formatBytes(Math.abs(result.freeBytes));
-      $("free").parentElement.className = "ms-metric " + (result.fits ? "ok" : "no");
+      $("free").parentElement.className = "ms-metric " + (fleet.fits ? "ok" : "no");
       $("weight").textContent = calc.formatBytes(result.weightBytes);
       $("per-request").textContent = calc.formatBytes(result.perRequestBytes);
       $("max-requests").textContent = result.maxRequests === null ? "Not KV-limited" : result.maxRequests.toLocaleString();
-      $("per-user-speed").textContent = result.fits ? prettyRate(result.upperPerRequestTokensPerSecond) : "N/A";
-      $("aggregate-speed").textContent = result.fits ? prettyRate(result.upperAggregateTokensPerSecond) : "N/A";
-      $("fleet-speed").textContent = result.fits ? prettyRate(result.replicaUpperAggregateTokensPerSecond) : "N/A";
+      $("per-user-speed").textContent = fleet.fits ? prettyRate(fleet.upperPerUserTokensPerSecond) : "N/A";
+      $("aggregate-speed").textContent = fleet.fits ? prettyRate(result.upperAggregateTokensPerSecond) : "N/A";
+      $("fleet-speed").textContent = fleet.fits ? prettyRate(fleet.upperAggregateTokensPerSecond) : "N/A";
       $("breakdown").textContent = "Per request: full KV " + calc.formatBytes(result.fullKvBytes) + "; local KV " + calc.formatBytes(result.localKvBytes) + "; recurrent state " + calc.formatBytes(result.stateTotalBytes) + ". Runtime reserve: " + calc.formatBytes(result.runtimeReserveBytes) + ".";
-      const unit = unitName() + "s";
-      $("fleet-summary").textContent = input.replicas + " of 6 " + unit + " hold independent replicas of this model. " + (result.fits ? "Estimated maximum active requests across those replicas: " + (result.maxRequests === null ? "not limited by modeled state" : (result.maxRequests * input.replicas).toLocaleString()) + "." : "The model does not fit the selected concurrency on a replica; no fleet speed is reported.");
+      const unit = unitName() + (input.replicas === 1 ? "" : "s");
+      $("fleet-summary").textContent = fleet.activeReplicas + " active of " + input.replicas + " selected " + unit + " serving " + fleet.totalUsers + " users. Busiest replica: " + input.requests + " requests. " + (fleet.fits ? "Replicas do not pool memory." : "A replica exceeds capacity; no fleet speed is reported.");
       drawMemory(result, input);
     } catch (error) {
       last = null;
       $("error").textContent = error.message;
       for (const id of ["fit", "used", "free", "weight", "per-request", "max-requests", "per-user-speed", "aggregate-speed", "fleet-speed"]) $(id).textContent = "-";
       $("memory-svg").replaceChildren();
+      $("memory-sweep-svg").replaceChildren();
+      $("rate-sweep-svg").replaceChildren();
+      $("sweep-table").replaceChildren();
     }
   }
 
@@ -281,11 +339,14 @@
     for (const id of ids) if (params.has(id)) set(id, params.get(id));
     const fleet = params.get("fleet");
     if (fleet && /^[roi]{6}$/.test(fleet)) Array.from($("fleet").querySelectorAll("select")).forEach((select, i) => { select.value = {r:"replica",o:"other",i:"idle"}[fleet[i]]; });
+    if (!params.has("total-users") && params.has("requests")) {
+      set("total-users", Number(params.get("requests")) * Math.max(1, replicaCount()));
+    }
   }
 
   function exportReport() {
     if (!last) { $("export-status").textContent = "Fix invalid inputs before exporting."; return; }
-    const blob = new Blob([JSON.stringify({ schema:"cke.docs.model_sizing.v2", warning:"Theoretical estimate, not measured throughput", ...last }, null, 2)], { type:"application/json" });
+    const blob = new Blob([JSON.stringify({ schema:"cke.docs.model_sizing.v3", warning:"Theoretical estimate, not measured throughput", ...last }, null, 2)], { type:"application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url; a.download = "cke-model-sizing.json"; a.click();
     setTimeout(() => URL.revokeObjectURL(url), 30000);
@@ -305,5 +366,6 @@
   for (const name of ["qwen", "gemma", "nemotron"]) $("preset-" + name).addEventListener("click", () => applyPattern(name));
   $("share").addEventListener("click", share);
   $("export").addEventListener("click", exportReport);
+  $("print-report").addEventListener("click", () => window.print());
   render();
 })();

@@ -75,6 +75,30 @@
     };
   }
 
+  function estimateFleet(raw, totalUsers) {
+    const users = number(totalUsers, "Total concurrent users", limits.requests, true);
+    const replicas = number(raw.replicas, "Replicas", 6, true);
+    if (!users || !replicas) throw new Error("Total concurrent users and selected replicas must be positive");
+    const activeReplicas = Math.min(users, replicas);
+    const base = Math.floor(users / activeReplicas);
+    const extra = users % activeReplicas;
+    const devices = Array.from({ length: activeReplicas }, (_, index) => {
+      const requests = base + (index < extra ? 1 : 0);
+      return { requests, result: estimate({ ...raw, requests, replicas: 1 }) };
+    });
+    const fits = devices.every((device) => device.result.fits);
+    return {
+      totalUsers: users,
+      activeReplicas,
+      devices,
+      fits,
+      upperAggregateTokensPerSecond: fits
+        ? devices.reduce((sum, device) => sum + device.result.upperAggregateTokensPerSecond, 0) : null,
+      upperPerUserTokensPerSecond: fits
+        ? Math.min(...devices.map((device) => device.result.upperPerRequestTokensPerSecond)) : null,
+    };
+  }
+
   function formatBytes(value) {
     return (value / GIB).toFixed(value < GIB ? 2 : 1) + " GiB";
   }
@@ -177,5 +201,5 @@
     return { fields, warnings };
   }
 
-  return { estimate, formatBytes, parseHfUrl, parseModelConfig, circuitTopology, patternRatios, splitHybridLayers, HARDWARE_PRESETS, CIRCUIT_TOPOLOGY, GIB };
+  return { estimate, estimateFleet, formatBytes, parseHfUrl, parseModelConfig, circuitTopology, patternRatios, splitHybridLayers, HARDWARE_PRESETS, CIRCUIT_TOPOLOGY, GIB };
 });
