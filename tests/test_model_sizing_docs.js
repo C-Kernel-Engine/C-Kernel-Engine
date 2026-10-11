@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { estimate, parseHfUrl, parseModelConfig, GIB } = require('../docs/site/assets/model-sizing.js');
+const { estimate, parseHfUrl, parseModelConfig, circuitTopology, splitHybridLayers, HARDWARE_PRESETS, GIB } = require('../docs/site/assets/model-sizing.js');
 
 const base = {
   weightBytes: 24 * GIB,
@@ -103,4 +103,39 @@ test('shared KV is not double-counted from a layer list', () => {
   } });
   assert.equal(parsed.fields.fullOwners, undefined);
   assert.match(parsed.warnings.join(' '), /owner map/);
+});
+
+test('hardware presets are positive and cover CPU and GPU', () => {
+  const { HARDWARE_PRESETS: presets } = require('../docs/site/assets/model-sizing.js');
+  const ids = new Set();
+  for (const preset of presets) {
+    assert.ok(preset.capacityGiB > 0 && preset.bandwidthGBs > 0, preset.id);
+    assert.ok(preset.note.length > 0, preset.id);
+    assert.ok(!ids.has(preset.id), 'duplicate preset id ' + preset.id);
+    ids.add(preset.id);
+  }
+  assert.ok(presets.some((p) => p.kind === 'cpu'));
+  assert.ok(presets.some((p) => p.kind === 'gpu'));
+});
+
+test('circuit topology comes only from declared circuit flags', () => {
+  const { CIRCUIT_TOPOLOGY } = require('../docs/site/assets/model-sizing.js');
+  assert.equal(circuitTopology('qwen38').pattern, '3x_recurrent_then_1x_full_attention');
+  assert.equal(circuitTopology('nemotron_h').pattern, 'config.hybrid_override_pattern');
+  assert.equal(circuitTopology('does_not_exist'), null);
+  for (const [name, entry] of Object.entries(CIRCUIT_TOPOLOGY)) {
+    assert.ok(entry.source.endsWith('circuits/' + name + '.json'), name);
+  }
+});
+
+test('hybrid layer split follows the declared block pattern', () => {
+  assert.deepEqual(splitHybridLayers(32, '3x_recurrent_then_1x_full_attention'), { fullOwners: 8, recurrentLayers: 24 });
+  assert.deepEqual(splitHybridLayers(30, '3x_recurrent_then_1x_full_attention'), { fullOwners: 8, recurrentLayers: 22 });
+  assert.equal(splitHybridLayers(32, 'config.layer_kinds'), null);
+  assert.equal(splitHybridLayers(0, '3x_recurrent_then_1x_full_attention'), null);
+});
+
+test('model config exposes total layer count for pattern splits', () => {
+  const parsed = parseModelConfig({ text_config: { num_hidden_layers: 32, num_key_value_heads: 2, head_dim: 128 } });
+  assert.equal(parsed.fields.totalLayers, 32);
 });

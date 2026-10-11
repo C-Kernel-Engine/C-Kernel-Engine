@@ -1,103 +1,1500 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Model Sizing Lab | C-Kernel-Engine</title>
-  <meta name="description" content="Estimate model weight, KV cache, recurrent state, six-GPU placement, and an optimistic memory-bandwidth decode ceiling.">
-  <link rel="canonical" href="https://c-kernel-engine.github.io/C-Kernel-Engine/sizing.html">
-  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
-  <style>
-    :root { --bg:#13191d; --surface:#1d262b; --raised:#263239; --line:#3b5057; --ink:#f3f2e9; --muted:#b6c4c3; --orange:#ffb400; --blue:#74c5e8; --green:#82d9a0; --red:#ffa19a; --font: 'Trebuchet MS', 'Avenir Next', sans-serif; }
-    * { box-sizing:border-box; }
-    body { margin:0; background:radial-gradient(circle at 80% -10%, #29505a 0, transparent 34rem),var(--bg); color:var(--ink); font:16px/1.55 var(--font); }
-    a { color:var(--blue); }
-    button, input, select { font:inherit; }
-    button, select, input { accent-color:var(--orange); }
-    button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible { outline:3px solid var(--orange); outline-offset:2px; }
-    .mast { border-bottom:1px solid var(--line); background:#11191ccf; }
-    .mast-inner { max-width:1240px; margin:auto; padding:1rem 1.3rem; display:flex; align-items:center; justify-content:space-between; gap:1rem; }
-    .brand { color:var(--ink); text-decoration:none; font-weight:900; letter-spacing:.08em; }
-    .brand b { display:inline-grid; place-items:center; width:2.2rem; height:2.2rem; margin-right:.65rem; color:#161c1e; background:var(--orange); border-radius:.3rem; }
-    .mast nav { display:flex; flex-wrap:wrap; gap:1rem; font-size:.85rem; }
-    .mast nav a { color:var(--muted); text-decoration:none; }
-    .mast nav a[aria-current] { color:var(--orange); }
-    main { max-width:1240px; margin:auto; padding:2.3rem 1.3rem 5rem; }
-    .eyebrow { color:var(--orange); text-transform:uppercase; letter-spacing:.15em; font:bold .78rem var(--font); }
-    h1 { margin:.4rem 0; font-size:clamp(2.4rem,6vw,5.5rem); line-height:1.02; letter-spacing:-.05em; }
-    h2 { margin:0 0 .5rem; font-size:1.42rem; }
-    h3 { margin:.1rem 0 .45rem; font-size:1.02rem; }
-    p { margin:.45rem 0 .9rem; }
-    .lede { max-width:780px; font-size:1.16rem; color:var(--muted); }
-    .flag { display:inline-block; padding:.35rem .65rem; border:1px solid #a68734; color:#ffdf83; background:#322a19; border-radius:99px; font-size:.8rem; font-weight:bold; }
-    .hero { display:grid; grid-template-columns:1.3fr 1fr; gap:1.5rem; align-items:center; margin-bottom:2rem; }
-    .hero > *, .grid > *, .panel { min-width:0; }
-    .hero svg { display:block; width:100%; max-width:100%; height:auto; max-height:245px; min-width:0; }
-    .grid { display:grid; grid-template-columns:minmax(290px,410px) minmax(0,1fr); gap:1.2rem; align-items:start; }
-    .panel { border:1px solid var(--line); background:linear-gradient(145deg,var(--surface),#192226); border-radius:14px; padding:1.2rem; box-shadow:0 12px 30px #0002; margin-bottom:1.2rem; }
-    .panel p, .helper { color:var(--muted); font-size:.88rem; }
-    .stack { display:grid; gap:.8rem; }
-    label { display:block; color:var(--muted); font-size:.82rem; font-weight:700; }
-    input, select { display:block; width:100%; margin-top:.22rem; padding:.55rem .6rem; border:1px solid var(--line); border-radius:6px; background:#10181c; color:var(--ink); min-width:0; }
-    input[type=number] { font-variant-numeric:tabular-nums; }
-    .pair { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.75rem; }
-    .triple { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.65rem; }
-    .controls { display:flex; flex-wrap:wrap; gap:.55rem; margin:.8rem 0; }
-    button { background:var(--orange); color:#152025; border:0; border-radius:6px; padding:.55rem .9rem; font-weight:800; cursor:pointer; }
-    button.secondary { background:var(--raised); color:var(--ink); border:1px solid var(--line); }
-    button:hover { filter:brightness(1.12); }
-    fieldset { border:1px solid var(--line); border-radius:9px; padding:.85rem; margin:1rem 0 0; }
-    legend { color:var(--orange); font-weight:bold; padding:0 .3rem; }
-    .results { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.65rem; }
-    .metric { padding:.8rem; background:var(--raised); border-radius:8px; border:1px solid var(--line); }
-    .metric strong { display:block; font-size:1.35rem; line-height:1.2; color:var(--ink); font-variant-numeric:tabular-nums; }
-    .metric span { color:var(--muted); font-size:.78rem; }
-    .metric.ok strong { color:var(--green); } .metric.no strong { color:var(--red); }
-    .memory-svg { width:100%; height:auto; margin:.7rem 0; }
-    .legend { display:flex; flex-wrap:wrap; gap:.75rem; color:var(--muted); font-size:.78rem; }
-    .legend i { display:inline-block; width:.7rem; height:.7rem; margin-right:.28rem; border-radius:2px; }
-    .fleet { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.6rem; }
-    .gpu { background:#10191d; border:1px solid var(--line); border-radius:8px; padding:.65rem; }
-    .gpu strong { color:var(--orange); }
-    .gpu select { font-size:.8rem; }
-    .fine { font-size:.81rem; color:var(--muted); }
-    .status { min-height:1.4rem; color:var(--blue); }
-    .status.error { color:var(--red); }
-    .file-list { max-height:9rem; overflow:auto; border:1px solid var(--line); border-radius:7px; padding:.5rem; }
-    .file-list label { display:flex; align-items:flex-start; gap:.45rem; padding:.25rem; overflow-wrap:anywhere; }
-    .file-list input { width:auto; flex:none; margin:.25rem 0 0; }
-    details { margin:.7rem 0; } summary { color:var(--orange); cursor:pointer; font-weight:bold; }
-    code { color:#a5e0f5; overflow-wrap:anywhere; }
-    .formula { background:#10181c; padding:.7rem; border-left:3px solid var(--orange); font: .8rem/1.6 ui-monospace,monospace; overflow-wrap:anywhere; }
-    @media(max-width:850px) { .hero,.grid { grid-template-columns:minmax(0,1fr); } .results { grid-template-columns:repeat(2,minmax(0,1fr)); } }
-    @media(max-width:560px) { .fleet,.triple { grid-template-columns:repeat(2,1fr); } .results { grid-template-columns:1fr 1fr; } .mast-inner { align-items:flex-start; flex-direction:column; } }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Model Sizing Lab | C-Kernel-Engine</title>
+    <meta name="description" content="Estimate model weight, KV cache, recurrent state, replica placement on GPUs or CPUs, and an optimistic memory-bandwidth decode ceiling, with topology from CKE's own circuit inventory.">
+    <meta name="robots" content="index,follow">
+    <link rel="canonical" href="https://c-kernel-engine.github.io/C-Kernel-Engine/sizing.html">
+    <meta property="og:title" content="Model Sizing Lab | C-Kernel-Engine">
+    <meta property="og:description" content="Estimate model weight, KV cache, recurrent state, replica placement on GPUs or CPUs, and an optimistic memory-bandwidth decode ceiling, with topology from CKE's own circuit inventory.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://c-kernel-engine.github.io/C-Kernel-Engine/sizing.html">
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+    <style>
+        :root {
+            /* Antsand Brand Colors - Lightened */
+            --orange: #ffb400;
+            --orange-dark: #e5a200;
+            --orange-light: #ffc933;
+            --dark: #2a2a2a;
+            --dark-lighter: #363636;
+            --dark-card: #323232;
+            --grey: #454545;
+            --grey-light: #555555;
+            --text-primary: #f5f5f5;
+            --text-secondary: #b0b0b0;
+            --text-muted: #808080;
+            --bg-dark: #232323;
+            --white: #ffffff;
+            --code-bg: #1a1a1a;
+            --green: #47b475;
+            --blue: #07adf8;
+            --gradient-header: linear-gradient(135deg, #2a2a2a 0%, #363636 50%, #2a2a2a 100%);
+            --shadow-sm: 0 2px 4px rgba(0,0,0,0.3);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+            --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--text-primary);
+            background: var(--bg-dark);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .site-header {
+            background: var(--gradient-header);
+            border-bottom: 3px solid var(--orange);
+            padding: 0.5rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: var(--shadow-md);
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            text-decoration: none;
+        }
+
+        .header-logo {
+            width: 40px;
+            height: 40px;
+            background: var(--orange);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: var(--dark);
+            font-size: 1.1rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .header-title {
+            color: var(--white);
+            font-size: 1.4rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .header-subtitle {
+            color: var(--orange);
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        /* Navigation */
+        .site-nav {
+            display: flex;
+            gap: 0.25rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .site-nav > a,
+        .nav-dropdown > .nav-trigger {
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 0.6rem 1rem;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: var(--transition);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            border: none;
+            background: transparent;
+            font-family: inherit;
+        }
+
+        .site-nav > a:hover,
+        .nav-dropdown:hover > .nav-trigger {
+            color: var(--white);
+            background: var(--grey);
+        }
+
+        .site-nav > a.active,
+        .nav-dropdown > .nav-trigger.active {
+            background: var(--orange);
+            color: var(--dark);
+            font-weight: 600;
+        }
+
+        /* Dropdown */
+        .nav-dropdown {
+            position: relative;
+        }
+
+        .nav-trigger::after {
+            content: '';
+            border: solid currentColor;
+            border-width: 0 2px 2px 0;
+            display: inline-block;
+            padding: 3px;
+            transform: rotate(45deg);
+            margin-top: -3px;
+            transition: transform 0.2s;
+        }
+
+        .nav-dropdown:hover .nav-trigger::after {
+            transform: rotate(-135deg);
+            margin-top: 3px;
+        }
+
+        .nav-dropdown-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: var(--dark-card);
+            border-radius: 8px;
+            box-shadow: var(--shadow-lg);
+            min-width: 220px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: var(--transition);
+            overflow: hidden;
+            margin-top: 0.5rem;
+            border: 1px solid var(--grey);
+        }
+
+        .nav-dropdown:hover .nav-dropdown-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .nav-dropdown-menu a {
+            display: block;
+            padding: 0.75rem 1rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: var(--transition);
+            border-left: 3px solid transparent;
+        }
+
+        .nav-dropdown-menu a:hover {
+            background: var(--grey);
+            border-left-color: var(--orange);
+            color: var(--white);
+        }
+
+        .nav-dropdown-menu a small {
+            display: block;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            margin-top: 0.2rem;
+        }
+
+        /* Last dropdown aligns to the right edge */
+        .nav-dropdown:last-child .nav-dropdown-menu {
+            left: auto;
+            right: 0;
+        }
+
+        /* Mega menu for Architecture dropdown */
+        .nav-dropdown-menu.mega-menu {
+            width: min(1180px, calc(100vw - 2rem));
+            min-width: 0;
+            max-height: calc(100vh - 90px);
+            padding: 1.25rem 1.5rem;
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.75rem 1.25rem;
+            left: auto;
+            right: 0;
+            overflow-y: auto;
+            transform: translateY(-10px);
+        }
+
+        .nav-dropdown:hover .nav-dropdown-menu.mega-menu {
+            transform: translateY(0);
+        }
+
+        .mega-menu .menu-section {
+            margin-bottom: 0.75rem;
+        }
+
+        .mega-menu .menu-shortcuts {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+        }
+
+        .mega-menu .menu-shortcuts a {
+            padding: 0.55rem 0.75rem;
+            background: rgba(255, 180, 0, 0.055);
+            border: 1px solid rgba(255, 180, 0, 0.18);
+        }
+
+        .mega-menu .menu-heading {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--orange);
+            padding: 0.5rem 0.75rem 0.35rem;
+            border-bottom: 1px solid var(--grey);
+            margin-bottom: 0.35rem;
+        }
+
+        .mega-menu a {
+            padding: 0.6rem 0.75rem;
+            font-size: 0.9rem;
+            border-radius: 4px;
+            border-left: none;
+            line-height: 1.3;
+        }
+
+        .mega-menu a:hover {
+            border-left: none;
+            background: var(--grey);
+        }
+
+        .mega-menu a small {
+            font-size: 0.75rem;
+            margin-top: 0.15rem;
+        }
+
+        /* Main Content */
+        main {
+            box-sizing: border-box;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            flex: 1;
+            width: 100%;
+        }
+
+        /* Hero Section */
+        .hero {
+            background: var(--gradient-header);
+            border: 1px solid var(--grey);
+            color: var(--white);
+            padding: 3rem 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            text-align: center;
+            box-shadow: var(--shadow-lg);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--orange), var(--orange-light), var(--orange));
+        }
+
+        .hero h1 {
+            color: var(--white);
+            border: none;
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .hero p {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        /* Typography */
+        h1 {
+            color: var(--white);
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid var(--orange);
+            padding-bottom: 0.5rem;
+        }
+
+        h2 {
+            color: var(--white);
+            font-size: 1.4rem;
+            margin: 2rem 0 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        h2::before {
+            content: '';
+            width: 4px;
+            height: 1.4rem;
+            background: var(--orange);
+            border-radius: 2px;
+        }
+
+        h3 {
+            color: var(--orange);
+            font-size: 1.15rem;
+            margin: 1.5rem 0 0.75rem;
+        }
+
+        p {
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+        }
+
+        /* Cards */
+        .card {
+            background: var(--dark-card);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: var(--shadow-sm);
+            border-left: 3px solid var(--grey-light);
+            transition: var(--transition);
+            border: 1px solid var(--grey);
+        }
+
+        .card:hover {
+            box-shadow: var(--shadow-md);
+            border-left-color: var(--orange);
+        }
+
+        .card-accent {
+            border-left-color: var(--orange);
+        }
+
+        .card-green {
+            border-left-color: var(--green);
+        }
+
+        .card-blue {
+            border-left-color: var(--blue);
+        }
+
+        .card h3 {
+            margin-top: 0;
+        }
+
+        /* Clickable Cards */
+        a.card-link {
+            display: block;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        a.card-link .card {
+            cursor: pointer;
+        }
+
+        a.card-link .card:hover {
+            border-left-width: 5px;
+        }
+
+        .card-arrow {
+            color: var(--orange);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            transition: var(--transition);
+        }
+
+        a.card-link:hover .card-arrow {
+            gap: 0.75rem;
+        }
+
+        /* Feature Icons */
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .feature-icon.orange { background: rgba(255, 180, 0, 0.15); color: var(--orange); }
+        .feature-icon.green { background: rgba(71, 180, 117, 0.15); color: var(--green); }
+        .feature-icon.blue { background: rgba(7, 173, 248, 0.15); color: var(--blue); }
+        .feature-icon.grey { background: rgba(255, 255, 255, 0.1); color: var(--text-secondary); }
+
+        /* Stats */
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--orange);
+            line-height: 1;
+        }
+
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        /* Code blocks */
+        pre {
+            background: var(--code-bg);
+            color: #e0e0e0;
+            padding: 1.25rem;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 1rem 0;
+            font-family: 'JetBrains Mono', 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 0.85rem;
+            border: 1px solid var(--grey);
+        }
+
+        code {
+            font-family: 'JetBrains Mono', 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            background: var(--grey);
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-size: 0.85rem;
+            color: var(--orange);
+        }
+
+        pre code {
+            background: none;
+            padding: 0;
+            color: #e0e0e0;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            background: var(--dark-card);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--grey);
+        }
+
+        th {
+            background: var(--dark);
+            color: var(--orange);
+            padding: 0.875rem 1rem;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 0.875rem 1rem;
+            border-bottom: 1px solid var(--grey);
+            color: var(--text-secondary);
+        }
+
+        tr:hover {
+            background: var(--grey);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Lists */
+        ul, ol {
+            margin: 1rem 0;
+            padding-left: 1.5rem;
+            color: var(--text-secondary);
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+        }
+
+        /* Links */
+        a {
+            color: var(--orange);
+            transition: var(--transition);
+        }
+
+        a:hover {
+            color: var(--orange-light);
+        }
+
+        /* Grid */
+        .grid {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .grid-2 {
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        }
+
+        .grid-3 {
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        }
+
+        .grid-4 {
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        }
+
+        /* Alerts */
+        .alert {
+            padding: 1rem 1.25rem;
+            border-radius: 6px;
+            margin: 1rem 0;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            border: 1px solid;
+        }
+
+        .alert-icon {
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+
+        .alert-info {
+            background: rgba(7, 173, 248, 0.1);
+            border-color: var(--blue);
+            color: var(--blue);
+        }
+
+        .alert-warning {
+            background: rgba(255, 180, 0, 0.1);
+            border-color: var(--orange);
+            color: var(--orange);
+        }
+
+        .alert-success {
+            background: rgba(71, 180, 117, 0.1);
+            border-color: var(--green);
+            color: var(--green);
+        }
+
+        /* Image containers */
+        .img-container {
+            margin: 1.5rem 0;
+            text-align: center;
+        }
+
+        .img-container img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--grey);
+        }
+
+        /* Badge */
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-orange {
+            background: var(--orange);
+            color: var(--dark);
+        }
+
+        .badge-green {
+            background: var(--green);
+            color: white;
+        }
+
+        .badge-grey {
+            background: var(--grey);
+            color: var(--text-secondary);
+        }
+
+        /* Diagram blocks (monospace pre with colored spans) */
+        .diagram {
+            background: var(--code-bg);
+            border: 1px solid var(--grey);
+            border-radius: 6px;
+            padding: 1.25rem;
+            margin: 1rem 0;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', 'SF Mono', Monaco, monospace;
+            font-size: 0.8rem;
+            line-height: 1.55;
+            white-space: pre;
+            color: var(--text-muted);
+        }
+        .diagram .hl     { color: var(--blue); font-weight: 700; }
+        .diagram .grn    { color: var(--green); }
+        .diagram .wrn    { color: var(--orange); }
+        .diagram .err    { color: #f85149; }
+        .diagram .purple { color: #bc8cff; }
+        .diagram .dim    { color: #484f58; }
+
+        /* Inline status colors */
+        .good { color: var(--green); font-weight: 600; }
+        .bad  { color: #f85149; font-weight: 600; }
+        .meh  { color: var(--orange); font-weight: 600; }
+
+        /* Section numbering */
+        .section-num {
+            color: var(--orange);
+            font-weight: 400;
+            margin-right: 0.25rem;
+        }
+
+        /* Accordion */
+        details {
+            background: var(--dark-card);
+            border-radius: 6px;
+            margin-bottom: 0.75rem;
+            border: 1px solid var(--grey);
+            border-left: 3px solid var(--grey-light);
+            overflow: hidden;
+            transition: var(--transition);
+        }
+
+        details:hover {
+            border-left-color: var(--orange);
+        }
+
+        details[open] {
+            border-left-color: var(--orange);
+        }
+
+        summary {
+            padding: 1rem 1.25rem;
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--white);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            list-style: none;
+            user-select: none;
+            transition: var(--transition);
+        }
+
+        summary::-webkit-details-marker {
+            display: none;
+        }
+
+        summary::after {
+            content: '';
+            border: solid var(--orange);
+            border-width: 0 2px 2px 0;
+            display: inline-block;
+            padding: 4px;
+            transform: rotate(-45deg);
+            transition: transform 0.2s ease;
+            flex-shrink: 0;
+            margin-left: 1rem;
+        }
+
+        details[open] summary::after {
+            transform: rotate(45deg);
+        }
+
+        summary:hover {
+            background: var(--grey);
+        }
+
+        details[open] summary {
+            border-bottom: 1px solid var(--grey);
+        }
+
+        .accordion-content {
+            padding: 1rem 1.25rem;
+        }
+
+        /* Site search */
+        .site-search {
+            display: flex;
+            align-items: center;
+            flex: 0 1 240px;
+            min-width: 140px;
+        }
+
+        .site-search input {
+            width: 100%;
+            background: var(--code-bg);
+            border: 1px solid var(--grey);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.85rem;
+            padding: 0.5rem 0.75rem;
+            transition: var(--transition);
+        }
+
+        .site-search input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .site-search input:focus {
+            outline: 2px solid var(--orange);
+            outline-offset: 1px;
+            border-color: var(--orange);
+        }
+
+        /* Mobile hamburger button */
+        .nav-toggle {
+            display: none;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 0.5rem;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .nav-toggle span {
+            display: block;
+            width: 24px;
+            height: 3px;
+            background: var(--orange);
+            border-radius: 2px;
+            transition: var(--transition);
+        }
+
+        .nav-toggle.active span:nth-child(1) {
+            transform: rotate(45deg) translate(5px, 5px);
+        }
+
+        .nav-toggle.active span:nth-child(2) {
+            opacity: 0;
+        }
+
+        .nav-toggle.active span:nth-child(3) {
+            transform: rotate(-45deg) translate(6px, -6px);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .site-header {
+                flex-direction: row;
+                justify-content: space-between;
+                padding: 0.75rem 1rem;
+            }
+
+            .nav-toggle {
+                display: flex;
+            }
+
+            .site-search {
+                order: 3;
+                flex: 1 1 100%;
+                min-width: 0;
+            }
+
+            .site-search input {
+                font-size: 1rem;
+            }
+
+            .site-nav {
+                position: fixed;
+                top: 60px;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: var(--dark);
+                flex-direction: column;
+                flex-wrap: nowrap;
+                align-items: stretch;
+                padding: 1rem;
+                gap: 0.5rem;
+                overflow-y: auto;
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+                z-index: 999;
+            }
+
+            .site-nav.open {
+                transform: translateX(0);
+            }
+
+            .site-nav > a,
+            .nav-dropdown > .nav-trigger {
+                width: 100%;
+                padding: 1rem;
+                font-size: 1rem;
+            }
+
+            .nav-dropdown {
+                width: 100%;
+            }
+
+            .nav-dropdown-menu {
+                position: static;
+                opacity: 1;
+                visibility: hidden;
+                max-height: 0;
+                overflow: hidden;
+                transform: none;
+                margin-top: 0;
+                transition: max-height 0.3s ease, visibility 0.3s ease;
+                background: var(--dark-lighter);
+                border-radius: 0;
+                border: none;
+                box-shadow: none;
+            }
+
+            .nav-dropdown.open .nav-dropdown-menu {
+                visibility: visible;
+                max-height: 500px;
+            }
+
+            .nav-dropdown-menu a {
+                padding: 0.75rem 1.5rem;
+            }
+
+            /* Disable hover on mobile */
+            .nav-dropdown:hover .nav-dropdown-menu {
+                opacity: 1;
+                visibility: hidden;
+                max-height: 0;
+            }
+
+            .nav-dropdown.open .nav-dropdown-menu,
+            .nav-dropdown.open:hover .nav-dropdown-menu {
+                visibility: visible;
+                max-height: 500px;
+            }
+
+            .nav-dropdown-menu.mega-menu {
+                display: block;
+                width: 100%;
+                min-width: 0;
+                max-height: 0;
+                padding: 0.5rem;
+                left: auto;
+                right: auto;
+                overflow: hidden;
+                transform: none;
+            }
+
+            .nav-dropdown.open .nav-dropdown-menu.mega-menu,
+            .nav-dropdown.open:hover .nav-dropdown-menu.mega-menu {
+                max-height: 70vh;
+                overflow-y: auto;
+                transform: none;
+            }
+
+            .mega-menu .menu-shortcuts {
+                grid-template-columns: 1fr;
+            }
+
+            main {
+                padding: 1rem;
+            }
+
+            h1 {
+                font-size: 1.75rem;
+            }
+
+            .hero {
+                padding: 2rem 1rem;
+            }
+
+            .hero h1 {
+                font-size: 1.75rem;
+            }
+        }
+    </style>
 </head>
 <body>
-  <header class="mast"><div class="mast-inner"><a class="brand" href="index.html"><b>CK</b>C-KERNEL-ENGINE</a><nav aria-label="Documentation"><a href="index.html">Home</a><a href="v8-runbook.html">v8 runbook</a><a href="kernel-maps.html#memory-planning">Memory planning</a><a href="sizing.html" aria-current="page">Sizing lab</a></nav></div></header>
-  <main>
-    <div class="hero"><div><span class="eyebrow">Architecture / Service planning</span><h1>Model Sizing Lab</h1><p class="lede">Six GPUs do not form one large memory pool. Place a model, choose its active contexts, and see where weights, KV cache and recurrent state consume capacity.</p><span class="flag">Estimator, not a benchmark or service guarantee</span></div>
-      <svg viewBox="0 0 520 230" role="img" aria-label="Illustration: six separate GPU memory banks, with weights and request state sharing each bank" xmlns="http://www.w3.org/2000/svg">
-        <rect x="12" y="12" width="496" height="206" rx="15" fill="#1c292e" stroke="#4b6266"/><text x="30" y="39" fill="#ffb400" font-size="13" font-weight="bold">SIX INDEPENDENT MEMORY BANKS</text>
-        <g fill="#293940" stroke="#67818a"><rect x="29" y="59" width="145" height="58" rx="7"/><rect x="188" y="59" width="145" height="58" rx="7"/><rect x="347" y="59" width="145" height="58" rx="7"/><rect x="29" y="134" width="145" height="58" rx="7"/><rect x="188" y="134" width="145" height="58" rx="7"/><rect x="347" y="134" width="145" height="58" rx="7"/></g>
-        <g fill="#ffb400"><rect x="40" y="81" width="70" height="18" rx="2"/><rect x="199" y="81" width="70" height="18" rx="2"/><rect x="358" y="81" width="70" height="18" rx="2"/><rect x="40" y="156" width="70" height="18" rx="2"/><rect x="199" y="156" width="70" height="18" rx="2"/><rect x="358" y="156" width="70" height="18" rx="2"/></g>
-        <g fill="#74c5e8"><rect x="112" y="81" width="35" height="18" rx="2"/><rect x="271" y="81" width="35" height="18" rx="2"/><rect x="430" y="81" width="35" height="18" rx="2"/><rect x="112" y="156" width="35" height="18" rx="2"/><rect x="271" y="156" width="35" height="18" rx="2"/><rect x="430" y="156" width="35" height="18" rx="2"/></g>
-        <g fill="#f3f2e9" font-size="10" font-family="sans-serif"><text x="40" y="76">GPU 1</text><text x="199" y="76">GPU 2</text><text x="358" y="76">GPU 3</text><text x="40" y="151">GPU 4</text><text x="199" y="151">GPU 5</text><text x="358" y="151">GPU 6</text></g>
-      </svg></div>
-    <div class="grid"><div>
-      <section class="panel"><h2>1. Choose a model</h2><p>Hugging Face lookup reads repository metadata only. Select the exact GGUF or safetensors files; no weight download occurs.</p><label for="hf-url">Hugging Face model URL</label><input id="hf-url" type="url" placeholder="https://huggingface.co/owner/model"><div class="controls"><button id="hf-load" type="button">Read metadata</button><button id="preset-qwen" class="secondary" type="button">Qwen pattern</button><button id="preset-gemma" class="secondary" type="button">Gemma pattern</button><button id="preset-nemotron" class="secondary" type="button">Nemotron pattern</button></div><div id="hf-status" class="status" role="status" aria-live="polite"></div><div id="hf-files" class="file-list" hidden></div><p class="fine" id="hf-source">Preset patterns are illustrations, not verified checkpoint configurations. Inspect and correct every field.</p><label for="weight-gib">Selected model weights in GiB</label><input id="weight-gib" type="number" min="0" step="0.01" value="24"><p class="fine">Disk bytes are a first approximation to loaded GPU weight bytes. Conversion, repacking, scales and padding can change this.</p></section>
-      <section class="panel"><h2>2. Declare the cache</h2><p>Enter <em>distinct KV storage owners</em>, not just the number of attention layers. A layer reusing another layer's cache does not own another copy.</p><div class="pair"><label>Full-context KV owners<input id="full-owners" type="number" min="0" step="1" value="8"></label><label>Sliding KV owners<input id="local-owners" type="number" min="0" step="1" value="0"></label><label>Recurrent layers<input id="recurrent-layers" type="number" min="0" step="1" value="24"></label><label>State MiB / recurrent layer<input id="state-mib" type="number" min="0" step="0.1" value="1"></label><label>Global KV heads<input id="kv-heads" type="number" min="1" step="1" value="2"></label><label>Global K dimension<input id="k-dim" type="number" min="1" step="1" value="256"></label><label>Global V dimension<input id="v-dim" type="number" min="1" step="1" value="256"></label><label>Local KV heads<input id="local-kv-heads" type="number" min="1" step="1" value="2"></label><label>Local K dimension<input id="local-k-dim" type="number" min="1" step="1" value="256"></label><label>Local V dimension<input id="local-v-dim" type="number" min="1" step="1" value="256"></label><label>KV bytes / element<select id="kv-bytes"><option value="2">BF16 / FP16 (2)</option><option value="1">INT8 / FP8 (1)</option><option value="4">FP32 (4)</option></select></label><label>Sliding window tokens<input id="window" type="number" min="0" step="1" value="1024"></label><label>Local cache storage<select id="local-storage"><option value="full">Full-context allocation</option><option value="evict">Evict outside window</option></select></label></div><p class="fine">Eviction is a serving implementation choice, not guaranteed by sliding attention. CKE currently plans full-context Gemma 4 KV even where its kernel reads only the window.</p></section>
-      <section class="panel"><h2>3. Workload &amp; GPU</h2><div class="pair"><label>Resident tokens / request<input id="tokens" type="number" min="0" step="1" value="32768"></label><label>Active requests / replica<input id="requests" type="number" min="1" step="1" value="5"></label><label>GPU capacity GiB<input id="capacity-gib" type="number" min="1" step="0.1" value="89.41"></label><label>Peak bandwidth GB/s<input id="bandwidth-gbs" type="number" min="1" step="1" value="1597"></label><label>Runtime/headroom %<input id="reserve-pct" type="number" min="0" max="90" step="1" value="10"></label><label>Bandwidth efficiency %<input id="efficiency-pct" type="number" min="1" max="100" step="1" value="50"></label></div><p class="fine">Capacity defaults to 96 GB expressed as 89.41 GiB. Bandwidth defaults to the published RTX PRO 6000 Blackwell Server Edition peak; neither value is an achieved benchmark.</p></section>
-    </div><div>
-      <section class="panel"><h2>Fit on one GPU</h2><div id="error" class="status error" role="alert"></div><div class="results"><div class="metric"><strong id="fit">-</strong><span>At chosen concurrency</span></div><div class="metric"><strong id="used">-</strong><span>Estimated used memory</span></div><div class="metric"><strong id="free">-</strong><span>Headroom / deficit</span></div><div class="metric"><strong id="weight">-</strong><span>Selected weight bytes</span></div><div class="metric"><strong id="per-request">-</strong><span>KV + state / request</span></div><div class="metric"><strong id="max-requests">-</strong><span>Approx. max active requests</span></div></div>
-        <svg id="memory-svg" class="memory-svg" viewBox="0 0 640 72" role="img" aria-label="Memory allocation chart" xmlns="http://www.w3.org/2000/svg"></svg><div class="legend"><span><i style="background:#ffb400"></i>Weights</span><span><i style="background:#74c5e8"></i>KV</span><span><i style="background:#a894e6"></i>Recurrent state</span><span><i style="background:#738c90"></i>Reserve</span><span><i style="background:#33454b"></i>Free</span></div><p id="breakdown" class="fine" aria-live="polite"></p></section>
-      <section class="panel"><h2>Decode bandwidth ceiling</h2><p><span class="flag">Optimistic thought experiment</span></p><div class="results"><div class="metric"><strong id="per-user-speed">-</strong><span>Upper bound, tokens/s per active request</span></div><div class="metric"><strong id="aggregate-speed">-</strong><span>Upper bound, tokens/s per GPU</span></div><div class="metric"><strong id="fleet-speed">-</strong><span>Upper bound across selected replicas</span></div></div><p class="formula">batch bytes ≈ weights + active requests × (live KV read + recurrent state read)<br>aggregate token/s ≤ active requests × effective bandwidth ÷ batch bytes</p><p class="fine">Assumes one shared weight read per batch step, perfect scheduling, and all modeled state read once. It excludes compute, dequantization, PCIe, network, prefill, queueing and many kernel costs. A number here is <strong>not</strong> expected throughput. It is not valid when the request does not fit.</p></section>
-      <section class="panel"><h2>Six-GPU placement</h2><p>Mark GPUs serving replicas of this model; reserve the others for OCR, ASR or different models. Each replica carries its own weights and request state.</p><div id="fleet" class="fleet"></div><p id="fleet-summary" class="fine"></p></section>
-      <section class="panel"><h2>Inspect the assumptions</h2><details><summary>What this page cannot infer</summary><p>File bytes do not identify attention geometry, loaded weight precision, engine workspace or real utilization. Model-family presets are patterns only. Hugging Face metadata may be missing, gated, incomplete or ambiguous. Preprocessing and vision/audio towers need their own model memory and latency budgets.</p></details><details><summary>How to move from bound to service envelope</summary><p>Benchmark the exact checkpoint, serving backend, context distribution and mixed workload. Measure p95 first-token time, per-user token rate, queue time, and aggregate throughput. Compare observed allocated memory with this worksheet and with CKE's <a href="kernel-maps.html#memory-planning">memory plan</a>. See the <a href="q6-prefill-roofline.html">CKE roofline discussion</a> for why prefill and decode differ.</p></details><div class="controls"><button id="share" class="secondary" type="button">Copy scenario link</button><button id="export" class="secondary" type="button">Download JSON report</button></div><p id="export-status" class="status" role="status" aria-live="polite"></p></section>
-    </div></div>
-    <p class="fine">Hardware reference: <a href="https://www.nvidia.com/en-us/data-center/rtx-pro-6000-blackwell-server-edition/">NVIDIA RTX PRO 6000 Blackwell Server Edition</a>. Hugging Face metadata source: <a href="https://huggingface.co/docs/hub/en/api">Hub API</a>. This page runs in your browser and does not send your scenario to CKE.</p>
-  </main>
-  <script src="assets/model-sizing.js"></script>
-  <script src="assets/model-sizing-page.js"></script>
+    <header class="site-header">
+        <a href="index.html" class="header-brand">
+            <div class="header-logo">CK</div>
+            <div>
+                <div class="header-title">C-Kernel-Engine</div>
+                <div class="header-subtitle">High-Performance ML Kernels</div>
+            </div>
+        </a>
+        <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <form class="site-search" role="search" action="search.html" method="get" data-test="site-search">
+            <input type="search" name="q" id="site-search-input" aria-label="Search documentation" placeholder="Search docs ( / )" autocomplete="off">
+        </form>
+        <nav class="site-nav">
+            <a href="index.html" class="">Home</a>
+            <a href="spectrum.html" class="" style="color:var(--orange)">⚡ Spectrum</a>
+            <a href="quickstart.html" class="">Getting Started</a>
+            <a href="developer-guide.html" class="">Developer Guide</a>
+            <a href="contributing.html" class="">Contribute</a>
+            <a href="scaling.html" class="">Scaling</a>
+            <a href="support-hardware.html" class="" style="color:var(--green)">Support Lab</a>
+            <a href="cke-throughput-unit.html" class="" style="color:var(--orange)">CKU</a>
+            <div class="nav-dropdown">
+                <span class="nav-trigger active">Architecture</span>
+                <div class="nav-dropdown-menu mega-menu">
+                    <!-- Architecture Home Link -->
+                    <div class="menu-section" style="grid-column: 1 / -1; border-bottom: 1px solid var(--grey); padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
+                        <a href="architecture-links.html" style="font-weight: 600; color: var(--orange);">
+                            View All Architecture Docs
+                            <small>Complete documentation index</small>
+                        </a>
+                        <div class="menu-shortcuts">
+                            <a href="pytorch-parity.html">PyTorch Parity<small>Numerical evidence</small></a>
+                            <a href="research.html">Research<small>Current investigations</small></a>
+                            <a href="decisions.html">Architecture Decisions<small>ADRs and tradeoffs</small></a>
+                            <a href="api.html">API &amp; Source Docs<small>Reference and Doxygen</small></a>
+                        </div>
+                    </div>
+                    <!-- Left Column -->
+                    <div class="menu-section">
+                        <div class="menu-heading">Core</div>
+                        <a href="architecture.html">System Overview<small>IR, Codegen, Kernels</small></a>
+                        <a href="tokenizer.html">Tokenizer<small>BPE, WordPiece, Trie</small></a>
+                        <a href="sentencepiece.html">SentencePiece<small>Viterbi DP, byte fallback</small></a>
+                        <a href="kernels.html">Kernel Reference<small>Forward/backward ops</small></a>
+                        <a href="codegen.html">Code Generation<small>IR to C compilation</small></a>
+                        <a href="iteration-philosophy.html">Iteration Philosophy<small>Why v1→v6 matters</small></a>
+                        <a href="ir-v2.html">IR v2 Format<small>Case study: symbolic dimensions</small></a>
+                        <a href="v7-backprop-ir.html">v7 Backprop IR<small>IR1/IR2 + layout/codegen flow</small></a>
+                        <a href="v7-cross-entropy-parity.html">v7 Cross-Entropy Parity<small>p - one_hot, reduction semantics, drift fixes</small></a>
+                        <a href="concepts.html">Deep Dive Concepts<small>RoPE, Flash Attention, GQA</small></a>
+                        <a href="kernel-maps.html">Kernel Maps<small>Provider selection, ABI, migration</small></a>
+                        <a href="kernel-architecture.html">v8 Kernel Architecture<small>Registry by op family, math</small></a>
+                        <a href="architecture-variants.html">Architecture Variants<small>Laguna, Cohere2, Instella, Nemotron</small></a>
+                        <a href="v8-moe-expert-kernels.html">MoE Expert Kernels<small>Bucketed prefill, mixed-quant experts</small></a>
+                        <a href="v8-cohere-kernels.html">Cohere Kernel Story<small>Reuse, BF16 vision, Transcribe audio</small></a>
+                    </div>
+                    <div class="menu-section">
+                        <div class="menu-heading">Quantization</div>
+                        <a href="quantization.html">Quant Fundamentals<small>Block formats, grouping</small></a>
+                        <a href="gguf-bump.html">GGUF to Bump<small>Weight conversion</small></a>
+                        <a href="gguf-conversion.html">GGUF Parsing<small>Byte-level guide</small></a>
+                    </div>
+                    <!-- Right Column -->
+                    <div class="menu-section">
+                        <div class="menu-heading">Optimization</div>
+                        <a href="gemm-memory-layout.html">GEMM Memory Layout<small>NN/NT layouts, offsets</small></a>
+                        <a href="gemm-optimization.html">GEMM Optimization<small>AVX, MKL, blocking</small></a>
+                        <a href="kernel-tuning-methodology.html">Kernel Tuning Methodology<small>VTune, Advisor, roofline, parity gates</small></a>
+                        <a href="cke-throughput-unit.html">CKE Throughput Unit<small>PB/s active-byte target</small></a>
+                        <a href="gemma4-speculative-pair.html">Gemma4 Speculative Pair<small>Backbone + MTP drafter circuit</small></a>
+                        <a href="v8-mla-kimi.html">v8 MLA / Kimi<small>Explicit decode cache contract</small></a>
+                        <a href="v8-whisper-tiny.html">Whisper Tiny E2E<small>Audio encoder/decoder circuits</small></a>
+                        <a href="simd-architecture.html">SIMD Architecture<small>AVX-512, VNNI, AMX</small></a>
+                        <a href="flash_attention.html" class="">Flash Attention Analysis<small>Why llama.cpp is faster</small></a>
+                    </div>
+                    <div class="menu-section">
+                        <div class="menu-heading">Infrastructure</div>
+                        <a href="memory-safety.html">Memory Safety<small>Bump allocator, canaries</small></a>
+                        <a href="deterministic-memory.html">Deterministic Memory<small>RDMA, interpretability</small></a>
+                        <a href="profiling.html">Profiling Guide<small>Valgrind, perf, flamegraphs</small></a>
+                        <a href="kernel-tuning-methodology.html">Kernel Tuning Methodology<small>CPU-node performance runbook</small></a>
+                        <a href="v7-profiling.html">v7 Profiling Runbook<small>Train kernels: VTune, Advisor, perf</small></a>
+                        <a href="v7-runbook.html">v7 Inference + Training Runbook<small>Copy/paste train + infer workflow</small></a>
+                        <a href="sizing.html">Model Sizing Lab<small>KV, state, concurrency, six-GPU placement</small></a>
+                        <a href="serving.html">Serving &amp; Batching<small>Single-flight, batch2, continuous-batching roadmap</small></a>
+                        <a href="v7-svg-dataset-runbook.html">v7 SVG Dataset Runbook<small>Pretrain + midtrain data generation</small></a>
+                        <a href="testing.html">Testing<small>Numerical parity verification</small></a>
+                        <a href="divergence-harness.html">Stitched Divergence Harness<small>llama.cpp/PyTorch tensor attribution</small></a>
+                        <a href="threadpool.html">Thread Pool<small>Persistent pthreads, dispatch</small></a>
+                    </div>
+                </div>
+            </div>
+            <a href="test-report.html" class="">Test Report</a>
+            <a href="version-history.html" class="">Versions</a>
+        </nav>
+    </header>
+    <main>
+
+<style>
+.ms-root { --ms-green:#82d9a0; --ms-red:#ffa19a; --ms-blue:#74c5e8; --ms-purple:#a894e6; }
+.ms-root .ms-lede { max-width:820px; font-size:1.05rem; color:var(--text-secondary); }
+.ms-root .ms-flags { margin:0.4rem 0 1.2rem; display:flex; flex-wrap:wrap; gap:0.5rem; }
+.ms-root .ms-grid { display:grid; grid-template-columns:minmax(290px,430px) minmax(0,1fr); gap:1.2rem; align-items:start; }
+@media (max-width: 900px) { .ms-root .ms-grid { grid-template-columns:1fr; } }
+.ms-root .card p { color:var(--text-secondary); font-size:0.88rem; }
+.ms-root label { display:block; color:var(--text-muted); font-size:0.82rem; font-weight:700; }
+.ms-root input, .ms-root select { display:block; width:100%; margin-top:0.22rem; padding:0.55rem 0.6rem; border:1px solid var(--grey); border-radius:6px; background:#10181c; color:var(--text-primary); min-width:0; font:inherit; }
+.ms-root input[type=number] { font-variant-numeric:tabular-nums; }
+.ms-root input:focus-visible, .ms-root select:focus-visible, .ms-root button:focus-visible { outline:3px solid var(--orange); outline-offset:2px; }
+.ms-root .ms-pair { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0.75rem; }
+.ms-root .ms-controls { display:flex; flex-wrap:wrap; gap:0.55rem; margin:0.8rem 0; }
+.ms-root button { background:var(--orange); color:#152025; border:0; border-radius:6px; padding:0.55rem 0.9rem; font-weight:800; cursor:pointer; font:inherit; }
+.ms-root button.ms-secondary { background:var(--dark-lighter); color:var(--text-primary); border:1px solid var(--grey); }
+.ms-root button:hover { filter:brightness(1.12); }
+.ms-root .ms-results { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:0.65rem; }
+.ms-root .ms-metric { padding:0.8rem; background:var(--dark-lighter); border-radius:8px; border:1px solid var(--grey); }
+.ms-root .ms-metric strong { display:block; font-size:1.35rem; line-height:1.2; color:var(--text-primary); font-variant-numeric:tabular-nums; }
+.ms-root .ms-metric span { color:var(--text-muted); font-size:0.78rem; }
+.ms-root .ms-metric.ok strong { color:var(--ms-green); }
+.ms-root .ms-metric.no strong { color:var(--ms-red); }
+.ms-root .ms-memory { width:100%; height:auto; margin:0.7rem 0; }
+.ms-root .ms-legend { display:flex; flex-wrap:wrap; gap:0.75rem; color:var(--text-muted); font-size:0.78rem; }
+.ms-root .ms-legend i { display:inline-block; width:0.7rem; height:0.7rem; margin-right:0.28rem; border-radius:2px; }
+.ms-root .ms-fleet { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:0.6rem; }
+.ms-root .ms-node { background:#10181c; border:1px solid var(--grey); border-radius:8px; padding:0.65rem; }
+.ms-root .ms-node strong { display:block; margin-bottom:0.3rem; font-size:0.85rem; }
+.ms-root .ms-status { min-height:1.2rem; font-size:0.82rem; color:var(--ms-green); }
+.ms-root .ms-status.error { color:var(--ms-red); }
+.ms-root .ms-filelist { max-height:220px; overflow:auto; border:1px solid var(--grey); border-radius:8px; padding:0.6rem; margin-top:0.6rem; }
+.ms-root .ms-filelist label { display:block; font-weight:400; color:var(--text-secondary); font-size:0.8rem; padding:0.18rem 0; }
+.ms-root .ms-filelist input { display:inline-block; width:auto; margin-right:0.4rem; }
+.ms-root .fine { color:var(--text-muted); font-size:0.78rem; }
+.ms-root .ms-formula { font-family:'JetBrains Mono',monospace; font-size:0.82rem; color:var(--text-secondary); background:#10181c; border:1px solid var(--grey); border-radius:8px; padding:0.7rem 0.9rem; }
+.ms-root details { margin:0.4rem 0; }
+.ms-root summary { cursor:pointer; color:var(--ms-blue); font-size:0.88rem; }
+.ms-root .ms-hero { display:block; width:100%; max-width:640px; height:auto; margin:0.6rem 0 0; }
+</style>
+
+<div class="ms-root">
+
+<h1>Model Sizing Lab</h1>
+<p class="ms-lede">Six accelerators do not form one large memory pool — and neither do six CPU
+sockets. Place a model, choose its active contexts, and see where weights, KV cache and recurrent
+state consume capacity on GPUs or CPUs.</p>
+<div class="ms-flags">
+    <span class="badge badge-orange">Estimator, not a benchmark or service guarantee</span>
+    <span class="badge badge-grey">Theoretical bandwidth ceilings only</span>
+</div>
+
+<svg class="ms-hero" viewBox="0 0 520 230" role="img" aria-label="Illustration: six separate memory banks, with weights and request state sharing each bank" xmlns="http://www.w3.org/2000/svg">
+    <rect x="12" y="12" width="496" height="206" rx="15" fill="#1c292e" stroke="#4b6266"/>
+    <text x="30" y="39" fill="#ffb400" font-size="13" font-weight="bold">SIX INDEPENDENT MEMORY BANKS</text>
+    <g fill="#293940" stroke="#67818a"><rect x="29" y="59" width="145" height="58" rx="7"/><rect x="188" y="59" width="145" height="58" rx="7"/><rect x="347" y="59" width="145" height="58" rx="7"/><rect x="29" y="134" width="145" height="58" rx="7"/><rect x="188" y="134" width="145" height="58" rx="7"/><rect x="347" y="134" width="145" height="58" rx="7"/></g>
+    <g fill="#ffb400"><rect x="40" y="81" width="70" height="18" rx="2"/><rect x="199" y="81" width="70" height="18" rx="2"/><rect x="358" y="81" width="70" height="18" rx="2"/><rect x="40" y="156" width="70" height="18" rx="2"/><rect x="199" y="156" width="70" height="18" rx="2"/><rect x="358" y="156" width="70" height="18" rx="2"/></g>
+    <g fill="#74c5e8"><rect x="112" y="81" width="35" height="18" rx="2"/><rect x="271" y="81" width="35" height="18" rx="2"/><rect x="430" y="81" width="35" height="18" rx="2"/><rect x="112" y="156" width="35" height="18" rx="2"/><rect x="271" y="156" width="35" height="18" rx="2"/><rect x="430" y="156" width="35" height="18" rx="2"/></g>
+    <g fill="#f3f2e9" font-size="10" font-family="sans-serif"><text x="40" y="76">BANK 1</text><text x="199" y="76">BANK 2</text><text x="358" y="76">BANK 3</text><text x="40" y="151">BANK 4</text><text x="199" y="151">BANK 5</text><text x="358" y="151">BANK 6</text></g>
+</svg>
+
+<div class="ms-grid" style="margin-top:1.2rem;">
+<div>
+    <div class="card">
+        <h2 style="margin-top:0;">1. Choose a model</h2>
+        <p>Hugging Face lookup reads repository metadata only. Select the exact GGUF or
+        safetensors files; no weight download occurs.</p>
+        <label for="hf-url">Hugging Face model URL</label>
+        <input id="hf-url" type="url" placeholder="https://huggingface.co/owner/model">
+        <div class="ms-controls">
+            <button id="hf-load" type="button">Read metadata</button>
+            <button id="preset-qwen" class="ms-secondary" type="button">Qwen pattern</button>
+            <button id="preset-gemma" class="ms-secondary" type="button">Gemma pattern</button>
+            <button id="preset-nemotron" class="ms-secondary" type="button">Nemotron pattern</button>
+        </div>
+        <div id="hf-status" class="ms-status" role="status" aria-live="polite"></div>
+        <div id="hf-files" class="ms-filelist" hidden></div>
+        <p class="fine" id="hf-source">Preset patterns are illustrations, not verified checkpoint
+        configurations. Inspect and correct every field.</p>
+        <label for="cke-circuit">CKE circuit (optional topology source)</label>
+        <select id="cke-circuit"><option value="">None — manual topology</option></select>
+        <p class="fine" id="circuit-note">Loading CKE's serving coverage inventory…</p>
+        <label for="weight-gib">Selected model weights in GiB</label>
+        <input id="weight-gib" type="number" min="0" step="0.01" value="24">
+        <p class="fine">Disk bytes are a first approximation to loaded weight bytes. Conversion,
+        repacking, scales and padding can change this.</p>
+    </div>
+
+    <div class="card">
+        <h2 style="margin-top:0;">2. Declare the cache</h2>
+        <p>Enter <em>distinct KV storage owners</em>, not just the number of attention layers. A
+        layer reusing another layer's cache does not own another copy.</p>
+        <div class="ms-pair">
+            <label>Full-context KV owners<input id="full-owners" type="number" min="0" step="1" value="8"></label>
+            <label>Sliding KV owners<input id="local-owners" type="number" min="0" step="1" value="0"></label>
+            <label>Recurrent layers<input id="recurrent-layers" type="number" min="0" step="1" value="24"></label>
+            <label>State MiB / recurrent layer<input id="state-mib" type="number" min="0" step="0.1" value="1"></label>
+            <label>Global KV heads<input id="kv-heads" type="number" min="1" step="1" value="2"></label>
+            <label>Global K dimension<input id="k-dim" type="number" min="1" step="1" value="256"></label>
+            <label>Global V dimension<input id="v-dim" type="number" min="1" step="1" value="256"></label>
+            <label>Local KV heads<input id="local-kv-heads" type="number" min="1" step="1" value="2"></label>
+            <label>Local K dimension<input id="local-k-dim" type="number" min="1" step="1" value="256"></label>
+            <label>Local V dimension<input id="local-v-dim" type="number" min="1" step="1" value="256"></label>
+            <label>KV bytes / element<select id="kv-bytes"><option value="2">BF16 / FP16 (2)</option><option value="1">INT8 / FP8 (1)</option><option value="4">FP32 (4)</option></select></label>
+            <label>Sliding window tokens<input id="window" type="number" min="0" step="1" value="1024"></label>
+            <label>Local cache storage<select id="local-storage"><option value="full">Full-context allocation</option><option value="evict">Evict outside window</option></select></label>
+        </div>
+        <p class="fine">Eviction is a serving implementation choice, not guaranteed by sliding
+        attention. CKE currently plans full-context Gemma 4 KV even where its kernel reads only
+        the window.</p>
+    </div>
+
+    <div class="card">
+        <h2 style="margin-top:0;">3. Workload &amp; hardware</h2>
+        <div class="ms-pair">
+            <label>Target kind<select id="target-kind"><option value="gpu">GPU</option><option value="cpu">CPU</option></select></label>
+            <label>Hardware preset<select id="hw-preset"></select></label>
+        </div>
+        <p class="fine" id="hw-note"></p>
+        <div class="ms-pair">
+            <label>Resident tokens / request<input id="tokens" type="number" min="0" step="1" value="32768"></label>
+            <label>Active requests / replica<input id="requests" type="number" min="1" step="1" value="5"></label>
+            <label>Capacity GiB<input id="capacity-gib" type="number" min="1" step="0.1" value="89.41"></label>
+            <label>Peak bandwidth GB/s<input id="bandwidth-gbs" type="number" min="1" step="1" value="1597"></label>
+            <label>Runtime/headroom %<input id="reserve-pct" type="number" min="0" max="90" step="1" value="10"></label>
+            <label>Bandwidth efficiency %<input id="efficiency-pct" type="number" min="1" max="100" step="1" value="50"></label>
+        </div>
+        <p class="fine">CPU capacity is system RAM usable by the process; GPU capacity is device
+        memory. All preset bandwidths are theoretical peaks — derate with the efficiency input.
+        On a CPU, one socket's weights are shared by all its requests; sockets still do not pool.</p>
+    </div>
+</div>
+
+<div>
+    <div class="card">
+        <h2 style="margin-top:0;">Fit on one replica</h2>
+        <div id="error" class="ms-status error" role="alert"></div>
+        <div class="ms-results">
+            <div class="ms-metric"><strong id="fit">-</strong><span>At chosen concurrency</span></div>
+            <div class="ms-metric"><strong id="used">-</strong><span>Estimated used memory</span></div>
+            <div class="ms-metric"><strong id="free">-</strong><span>Headroom / deficit</span></div>
+            <div class="ms-metric"><strong id="weight">-</strong><span>Selected weight bytes</span></div>
+            <div class="ms-metric"><strong id="per-request">-</strong><span>KV + state / request</span></div>
+            <div class="ms-metric"><strong id="max-requests">-</strong><span>Approx. max active requests</span></div>
+        </div>
+        <svg id="memory-svg" class="ms-memory" viewBox="0 0 640 72" role="img" aria-label="Memory allocation chart" xmlns="http://www.w3.org/2000/svg"></svg>
+        <div class="ms-legend"><span><i style="background:#ffb400"></i>Weights</span><span><i style="background:#74c5e8"></i>KV</span><span><i style="background:#a894e6"></i>Recurrent state</span><span><i style="background:#738c90"></i>Reserve</span><span><i style="background:#33454b"></i>Free</span></div>
+        <p id="breakdown" class="fine" aria-live="polite"></p>
+    </div>
+
+    <div class="card">
+        <h2 style="margin-top:0;">Decode bandwidth ceiling</h2>
+        <p><span class="badge badge-orange">Optimistic thought experiment</span></p>
+        <div class="ms-results">
+            <div class="ms-metric"><strong id="per-user-speed">-</strong><span>Upper bound, tokens/s per active request</span></div>
+            <div class="ms-metric"><strong id="aggregate-speed">-</strong><span>Upper bound, tokens/s per replica</span></div>
+            <div class="ms-metric"><strong id="fleet-speed">-</strong><span>Upper bound across selected replicas</span></div>
+        </div>
+        <p class="ms-formula">batch bytes ≈ weights + active requests × (live KV read + recurrent state read)<br>aggregate token/s ≤ active requests × effective bandwidth ÷ batch bytes</p>
+        <p class="fine">Assumes one shared weight read per batch step, perfect scheduling, and all
+        modeled state read once. It excludes compute, dequantization, interconnect, network,
+        prefill, queueing and many kernel costs. A number here is <strong>not</strong> expected
+        throughput. It is not valid when the request does not fit. On CPUs this bound is usually
+        dominated by DRAM bandwidth — see
+        <a href="serving.html">Serving &amp; Batching</a> for what concurrency CKE actually
+        executes today.</p>
+    </div>
+
+    <div class="card">
+        <h2 style="margin-top:0;">Replica placement</h2>
+        <p>Mark GPUs or CPU nodes serving replicas of this model; reserve the others for OCR, ASR
+        or different models. Each replica carries its own weights and request state.</p>
+        <div id="fleet" class="ms-fleet"></div>
+        <p id="fleet-summary" class="fine"></p>
+    </div>
+
+    <div class="card">
+        <h2 style="margin-top:0;">Inspect the assumptions</h2>
+        <details><summary>What this page cannot infer</summary><p>File bytes do not identify
+        attention geometry, loaded weight precision, engine workspace or real utilization.
+        Model-family presets are patterns only. Hugging Face metadata may be missing, gated,
+        incomplete or ambiguous. Preprocessing and vision/audio towers need their own model
+        memory and latency budgets.</p></details>
+        <details><summary>What the CKE circuit picker knows</summary><p>The picker reads CKE's
+        generated serving coverage inventory. A circuit can declare a topology pattern (for
+        example a 3:1 recurrent-to-full-attention hybrid block structure); it never declares
+        numeric dimensions. Where a ratio pattern exists, a total layer count from Hugging Face
+        metadata is split into full-attention owners and recurrent layers automatically — labeled
+        as an estimate, not a certification.</p></details>
+        <details><summary>How to move from bound to service envelope</summary><p>Benchmark the
+        exact checkpoint, serving backend, context distribution and mixed workload. Measure p95
+        first-token time, per-user token rate, queue time, and aggregate throughput. Compare
+        observed allocated memory with this worksheet and with CKE's
+        <a href="kernel-maps.html#memory-planning">memory plan</a>. See the
+        <a href="q6-prefill-roofline.html">CKE roofline discussion</a> for why prefill and decode
+        differ.</p></details>
+        <div class="ms-controls">
+            <button id="share" class="ms-secondary" type="button">Copy scenario link</button>
+            <button id="export" class="ms-secondary" type="button">Download JSON report</button>
+        </div>
+        <p id="export-status" class="ms-status" role="status" aria-live="polite"></p>
+    </div>
+</div>
+</div>
+
+<p class="fine" style="margin-top:1.5rem;">Hardware references:
+<a href="https://www.nvidia.com/en-us/data-center/rtx-pro-6000-blackwell-server-edition/">NVIDIA RTX PRO 6000 Blackwell Server Edition</a>.
+Hugging Face metadata source: <a href="https://huggingface.co/docs/hub/en/api">Hub API</a>.
+CKE circuit inventory: <a href="v8-serving-coverage.html">v8 Serving Coverage</a>.
+This page runs in your browser and does not send your scenario to CKE.</p>
+
+</div>
+
+<script src="assets/model-sizing.js"></script>
+<script src="assets/model-sizing-page.js"></script>
+    </main>
+
+    <!-- SVG Viewer Overlay (shared across all pages) -->
+    <style>
+    .svg-viewer { cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+    .svg-viewer:hover { transform: scale(1.01); box-shadow: 0 8px 32px rgba(255, 180, 0, 0.3); }
+    #svg-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.95); z-index: 999999; }
+    #svg-overlay .toolbar { position: fixed; top: 0; left: 0; right: 0; padding: 10px 20px; background: rgba(0,0,0,0.9); display: flex; justify-content: space-between; align-items: center; z-index: 1000000; border-bottom: 1px solid #333; }
+    #svg-overlay .toolbar .title { color: #ccc; font-size: 14px; }
+    #svg-overlay .toolbar .controls { display: flex; gap: 8px; align-items: center; }
+    #svg-overlay .toolbar button { background: #333; color: #ffb400; border: 1px solid #555; padding: 8px 14px; cursor: pointer; border-radius: 4px; font-size: 14px; }
+    #svg-overlay .toolbar button:hover { background: #444; border-color: #ffb400; }
+    #svg-overlay .toolbar .close-btn { font-size: 20px; padding: 4px 12px; }
+    #svg-overlay .toolbar .zoom-display { color: #888; font-size: 12px; min-width: 45px; text-align: center; }
+    #svg-overlay .toolbar .separator { color: #444; }
+    #svg-overlay .image-container { display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 60px 20px 20px; cursor: grab; }
+    #svg-overlay .image-container:active { cursor: grabbing; }
+    #svg-overlay .image-container img { max-width: 95%; max-height: 90vh; transform-origin: center center; }
+    #svg-overlay .nav-btn { position: fixed; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.7); color: #ffb400; border: 1px solid #555; font-size: 30px; padding: 20px 15px; cursor: pointer; z-index: 1000000; border-radius: 4px; }
+    #svg-overlay .nav-btn:hover { background: rgba(255,180,0,0.2); border-color: #ffb400; }
+    #svg-overlay .nav-prev { left: 10px; }
+    #svg-overlay .nav-next { right: 10px; }
+    #svg-overlay .hint { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); color: #666; font-size: 12px; background: rgba(0,0,0,0.8); padding: 8px 20px; border-radius: 20px; }
+    </style>
+
+    <div id="svg-overlay">
+        <div class="toolbar">
+            <span class="title" id="svg-title">Image</span>
+            <div class="controls">
+                <button onclick="svgViewer.zoomOut()" title="Zoom Out (-)">-</button>
+                <span class="zoom-display" id="zoom-display">100%</span>
+                <button onclick="svgViewer.zoomIn()" title="Zoom In (+)">+</button>
+                <span class="separator">|</span>
+                <button onclick="svgViewer.fitWidth()" title="Fit Width (W)">Width</button>
+                <button onclick="svgViewer.fitHeight()" title="Fit Height (H)">Height</button>
+                <button onclick="svgViewer.resetZoom()" title="Reset (0)">Reset</button>
+                <span class="separator">|</span>
+                <button class="close-btn" onclick="svgViewer.close()" title="Close (ESC)">&times;</button>
+            </div>
+        </div>
+        <button class="nav-btn nav-prev" onclick="svgViewer.prev()" title="Previous">&larr;</button>
+        <button class="nav-btn nav-next" onclick="svgViewer.next()" title="Next">&rarr;</button>
+        <div class="image-container" id="svg-container">
+            <img id="svg-image" src="" alt="">
+        </div>
+        <div class="hint">Scroll to zoom | Drag to pan | W/H to fit | 0 to reset | ESC to close</div>
+    </div>
+
+    <script>
+    var svgViewer = (function() {
+        var overlay, img, titleEl, container;
+        var images = [];
+        var currentIndex = 0;
+        var scale = 1, panX = 0, panY = 0;
+        var isDragging = false, dragStartX, dragStartY, panStartX, panStartY;
+
+        function init() {
+            overlay = document.getElementById('svg-overlay');
+            img = document.getElementById('svg-image');
+            titleEl = document.getElementById('svg-title');
+            container = document.getElementById('svg-container');
+            if (!overlay || !img) return;
+
+            document.querySelectorAll('.svg-viewer').forEach(function(viewer, index) {
+                var viewerImg = viewer.querySelector('img');
+                if (viewerImg) {
+                    images.push({ src: viewerImg.src, title: viewer.getAttribute('data-title') || viewerImg.alt || 'Diagram' });
+                    viewer.onclick = function(e) { e.preventDefault(); open(index); };
+                }
+            });
+
+            container.addEventListener('wheel', function(e) {
+                e.preventDefault();
+                scale = Math.max(0.5, Math.min(10, scale + (e.deltaY > 0 ? -0.2 : 0.2)));
+                updateTransform();
+            });
+
+            container.addEventListener('mousedown', function(e) { isDragging = true; dragStartX = e.clientX; dragStartY = e.clientY; panStartX = panX; panStartY = panY; });
+            document.addEventListener('mousemove', function(e) { if (!isDragging) return; panX = panStartX + (e.clientX - dragStartX); panY = panStartY + (e.clientY - dragStartY); updateTransform(); });
+            document.addEventListener('mouseup', function() { isDragging = false; });
+
+            document.addEventListener('keydown', function(e) {
+                if (overlay.style.display !== 'block') return;
+                if (e.key === 'Escape') close();
+                if (e.key === 'ArrowLeft') prev();
+                if (e.key === 'ArrowRight') next();
+                if (e.key === '+' || e.key === '=') zoomIn();
+                if (e.key === '-') zoomOut();
+                if (e.key === '0') resetZoom();
+                if (e.key === 'w' || e.key === 'W') fitWidth();
+                if (e.key === 'h' || e.key === 'H') fitHeight();
+            });
+
+            overlay.addEventListener('click', function(e) { if (e.target === overlay || e.target === container) close(); });
+        }
+
+        function updateTransform() {
+            img.style.transform = 'translate(' + panX + 'px, ' + panY + 'px) scale(' + scale + ')';
+            var zd = document.getElementById('zoom-display');
+            if (zd) zd.textContent = Math.round(scale * 100) + '%';
+        }
+
+        function open(index) {
+            if (!images[index]) return;
+            currentIndex = index; scale = 1; panX = 0; panY = 0;
+            img.src = images[index].src;
+            titleEl.textContent = images[index].title + ' (' + (index + 1) + '/' + images.length + ')';
+            updateTransform();
+            overlay.style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function close() { overlay.style.display = 'none'; document.body.style.overflow = ''; }
+        function prev() { open((currentIndex - 1 + images.length) % images.length); }
+        function next() { open((currentIndex + 1) % images.length); }
+        function zoomIn() { scale = Math.min(10, scale + 0.25); updateTransform(); }
+        function zoomOut() { scale = Math.max(0.5, scale - 0.25); updateTransform(); }
+        function resetZoom() { scale = 1; panX = 0; panY = 0; updateTransform(); }
+
+        function fitWidth() {
+            if (!img.naturalWidth || !img.complete) { img.onload = fitWidth; return; }
+            scale = Math.max(0.1, Math.min(10, (window.innerWidth - 150) / img.naturalWidth));
+            panX = 0; panY = 0; updateTransform();
+        }
+
+        function fitHeight() {
+            if (!img.naturalHeight || !img.complete) { img.onload = fitHeight; return; }
+            scale = Math.max(0.1, Math.min(10, (window.innerHeight - 120) / img.naturalHeight));
+            panX = 0; panY = 0; updateTransform();
+        }
+
+        if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); } else { init(); }
+
+        return { open: open, close: close, prev: prev, next: next, zoomIn: zoomIn, zoomOut: zoomOut, resetZoom: resetZoom, fitWidth: fitWidth, fitHeight: fitHeight };
+    })();
+
+    // Mobile navigation
+    (function() {
+        var navToggle = document.querySelector('.nav-toggle');
+        var siteNav = document.querySelector('.site-nav');
+        var dropdowns = document.querySelectorAll('.nav-dropdown');
+
+        if (navToggle && siteNav) {
+            navToggle.addEventListener('click', function() {
+                navToggle.classList.toggle('active');
+                siteNav.classList.toggle('open');
+                navToggle.setAttribute('aria-expanded', siteNav.classList.contains('open'));
+            });
+
+            // Close menu when clicking a non-dropdown link
+            siteNav.querySelectorAll('a:not(.nav-dropdown-menu a)').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.innerWidth <= 768) {
+                        navToggle.classList.remove('active');
+                        siteNav.classList.remove('open');
+                    }
+                });
+            });
+        }
+
+        // Handle dropdowns on mobile
+        dropdowns.forEach(function(dropdown) {
+            var trigger = dropdown.querySelector('.nav-trigger');
+            if (trigger) {
+                trigger.addEventListener('click', function(e) {
+                    if (window.innerWidth <= 768) {
+                        e.preventDefault();
+                        // Close other dropdowns
+                        dropdowns.forEach(function(d) {
+                            if (d !== dropdown) d.classList.remove('open');
+                        });
+                        dropdown.classList.toggle('open');
+                    }
+                });
+            }
+        });
+
+        // Close dropdowns when clicking outside on mobile
+        document.addEventListener('click', function(e) {
+            if (window.innerWidth <= 768 && !e.target.closest('.nav-dropdown')) {
+                dropdowns.forEach(function(d) { d.classList.remove('open'); });
+            }
+        });
+    })();
+
+    // Site search keyboard shortcuts: "/" or Ctrl+K / Cmd+K focuses the header search box.
+    (function() {
+        var searchInput = document.getElementById('site-search-input');
+        if (!searchInput) return;
+        document.addEventListener('keydown', function(e) {
+            var target = e.target;
+            var tag = (target.tagName || '').toLowerCase();
+            var typing = tag === 'input' || tag === 'textarea' || tag === 'select' || target.isContentEditable;
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+                e.preventDefault();
+                searchInput.focus();
+                searchInput.select();
+            } else if (e.key === '/' && !typing) {
+                e.preventDefault();
+                searchInput.focus();
+            }
+        });
+    })();
+    </script>
+
+    <!-- MathJax for LaTeX equations across docs pages -->
+    <script>
+    window.MathJax = {
+        tex: {
+            inlineMath: [['\\(', '\\)'], ['$', '$']],
+            displayMath: [['\\[', '\\]'], ['$$', '$$']],
+            processEscapes: true,
+            processEnvironments: true
+        },
+        options: {
+            skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+        },
+        svg: {
+            fontCache: 'global'
+        }
+    };
+    </script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+
+    <footer style="background: #2a2a2a; border-top: 1px solid #454545; color: #b0b0b0; padding: 3rem 2rem; margin-top: auto;">
+        <div style="max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 2rem;">
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">C-Kernel-Engine</h4>
+                <p style="color: #707070; font-size: 0.875rem; margin: 0;">High-performance ML kernels with full PyTorch parity.</p>
+            </div>
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Resources</h4>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    <li style="margin-bottom: 0.5rem;"><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine" style="color: #909090; text-decoration: none; font-size: 0.875rem;">GitHub</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="contributing.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Contributor Path</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="architecture.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Architecture</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="api.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">API Reference</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Related</h4>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    <li style="margin-bottom: 0.5rem;"><a href="https://www.shivasnotes.com/" style="color: #909090; text-decoration: none; font-size: 0.875rem;">ShivasNotes</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://www.shivasnotes.com/work-with-us" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Work With Us</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://antshiv.com/" style="color: #909090; text-decoration: none; font-size: 0.875rem;">antshiv.com</a></li>
+                </ul>
+            </div>
+            <div style="text-align: right;">
+                <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-10-10</p>
+            </div>
+        </div>
+    </footer>
 </body>
 </html>
