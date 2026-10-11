@@ -1,10 +1,10 @@
 <!-- TITLE: v8 Training Kernel Capability Ledger -->
 <h1>v8 training kernel capability ledger</h1>
-<p>Generated from <code>version/v8/kernel_maps/*.json</code> by <code>version/v8/scripts/build_training_capability_ledger_v8.py</code>. Source digest: <code>d873a0b102013b6d49974fd4739a44f6fb6a431858d6716c0e74d6f8fbc94b27</code>; provider maps: 417.</p>
+<p>Generated from <code>version/v8/kernel_maps/*.json</code> by <code>version/v8/scripts/build_training_capability_ledger_v8.py</code>. Source digest: <code>2ddeb0ced688da8bf4f7c36eabe7f8f0e642c42e366a6a570d15d0088c753764</code>; provider maps: 418.</p>
 <p>This is a <strong>map inventory, not a training PASS</strong>. A backward declaration means a backward provider is registered; it does not prove matching geometry, selection by a generated circuit, or executed PyTorch parity. BF16-tagged includes storage or arithmetic tags. Quantized forward maps do not imply quantized-base gradients or QLoRA support. Direct executed evidence: <code>NOT_MEASURED_BY_MAP_INVENTORY</code>.</p>
 <p><strong>Authoring, lowering, and execution are separate.</strong> The public <code>cke.nn</code> module list below comes from its Python source. A class existing there does not establish that v8 can lower it, select a backward provider, or certify a generated training run. Exact kernel-map operation names are not automatically equivalent to Python modules.</p>
 <table class="table"><thead><tr><th>Dtype family</th><th>Provider maps</th><th>Forward or unspecified</th><th>Declared training forward</th><th>Declared backward</th><th>Backward-named without mode</th><th>Maps with registered tests</th></tr></thead><tbody>
-<tr><td>fp32-tagged</td><td>260</td><td>236</td><td>15</td><td>24</td><td>5</td><td>219</td></tr>
+<tr><td>fp32-tagged</td><td>261</td><td>237</td><td>15</td><td>24</td><td>5</td><td>220</td></tr>
 <tr><td>bf16-tagged</td><td>78</td><td>78</td><td>0</td><td>0</td><td>0</td><td>62</td></tr>
 <tr><td>quantized</td><td>62</td><td>62</td><td>0</td><td>0</td><td>0</td><td>41</td></tr>
 <tr><td>unspecified</td><td>17</td><td>17</td><td>0</td><td>0</td><td>0</td><td>10</td></tr>
@@ -100,6 +100,7 @@
 <tr><td>fp32-tagged</td><td>audio_log_mel</td><td>4</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>audio_lstm</td><td>2</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>audio_mel_filters</td><td>1</td><td>—</td><td>—</td></tr>
+<tr><td>fp32-tagged</td><td>audio_noise_counter_gaussian</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>audio_pad_or_truncate</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>audio_pcm_decode</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>audio_preemphasis</td><td>1</td><td>—</td><td>—</td></tr>
@@ -235,7 +236,7 @@
 <tr><td>unspecified</td><td>speculative_commit_or_reject</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>unspecified</td><td>tokenizer</td><td>1</td><td>—</td><td>—</td></tr>
 </tbody></table>
-<details><summary>All 417 provider maps</summary>
+<details><summary>All 418 provider maps</summary>
 <table class="table"><thead><tr><th>Map</th><th>Provider ID</th><th>Operation</th><th>Dtype family</th><th>Backward mode</th><th>Registered test</th></tr></thead><tbody>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/adamw_update_f32.json">version/v8/kernel_maps/adamw_update_f32.json</a></td><td>adamw_update_f32</td><td>optimizer</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/add_stream_inplace.json">version/v8/kernel_maps/add_stream_inplace.json</a></td><td>add_stream_inplace</td><td>add_stream</td><td>fp32-tagged</td><td>not declared</td><td>not registered</td></tr>
@@ -325,6 +326,7 @@
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/audio_log_mel_time_major_model_filter_f32.json">version/v8/kernel_maps/audio_log_mel_time_major_model_filter_f32.json</a></td><td>audio_log_mel_time_major_model_filter_f32</td><td>audio_log_mel</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/audio_lstm_bidirectional_scan_f32.json">version/v8/kernel_maps/audio_lstm_bidirectional_scan_f32.json</a></td><td>audio_lstm_bidirectional_scan_f32</td><td>audio_lstm</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/audio_lstm_step_f32.json">version/v8/kernel_maps/audio_lstm_step_f32.json</a></td><td>audio_lstm_step_f32</td><td>audio_lstm</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/audio_noise_counter_gaussian_f32.json">version/v8/kernel_maps/audio_noise_counter_gaussian_f32.json</a></td><td>audio_noise_counter_gaussian_f32</td><td>audio_noise_counter_gaussian</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/audio_pad_or_truncate_f32.json">version/v8/kernel_maps/audio_pad_or_truncate_f32.json</a></td><td>audio_pad_or_truncate_f32</td><td>audio_pad_or_truncate</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/audio_pcm_s16_to_mono_f32.json">version/v8/kernel_maps/audio_pcm_s16_to_mono_f32.json</a></td><td>audio_pcm_s16_to_mono_f32</td><td>audio_pcm_decode</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/audio_preemphasis_f32.json">version/v8/kernel_maps/audio_preemphasis_f32.json</a></td><td>audio_preemphasis_f32</td><td>audio_preemphasis</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
