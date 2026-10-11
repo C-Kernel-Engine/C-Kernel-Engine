@@ -1168,8 +1168,9 @@ cks-v8-serve … --batch-http-extra-bytes BYTES \
     <div class="card card-green">
         <h3 style="margin-top: 0;">What you get</h3>
         <ul>
-            <li>Two requests decoded per generated-C step when both slots are active — counted by
-            the owner as <em>shared steps</em> and asserted by tests.</li>
+            <li>Two token rows can enter one generated-C step: either two decode rows or,
+            with the mixed option, one decode and one prompt row. The owner records
+            all such calls as <em>shared steps</em> and tracks mixed calls separately.</li>
             <li>Compatible projections reuse weight tiles across both rows; a throughput
             benefit must be measured for the loaded artifact.</li>
             <li>Per-request isolation: separate KV arenas, RNG, stop rules, output caps,
@@ -1185,8 +1186,10 @@ cks-v8-serve … --batch-http-extra-bytes BYTES \
             sequence-local inside the call.</li>
             <li>Whole-prompt prefill remains the default. The explicit
             <code>--batch-http-decode-replay-chunk-tokens</code> option yields
-            between bounded prompt chunks, but it is not mixed-row execution
-            and one token operation can still be slow.</li>
+            between bounded prompt chunks. The additional experimental
+            <code>--batch-http-mixed-one-row</code> option can pair one prompt
+            token with one decode token in a shared generated call. One token
+            operation can still be slow.</li>
             <li>Fixed at two slots, KV-cache-only generated models (recurrent-state models are
             outside this capability).</li>
             <li>Not yet certified for sustained/overnight concurrency — treat as experimental.</li>
@@ -1196,9 +1199,10 @@ cks-v8-serve … --batch-http-extra-bytes BYTES \
 
 <h2 id="roadmap">Planned: continuous batching</h2>
 <p>Batch2 already admits and retires requests at decode boundaries within two fixed slots.
-The optional staged path can pause between generated decode-replay prompt chunks. Its
-next practical milestone is certification on a resolved model bundle and two real harness
-tasks. Measured expansion beyond two slots and mixed prefill/decode follow. Batched attention and paged KV may improve later scaling, but
+The optional staged path can pause between generated decode-replay prompt chunks.
+An additional one-row mixed step has local generated-model parity evidence; its
+next practical milestone is certification on a resolved serving bundle and two real harness
+tasks. Measured expansion beyond two slots and multirow prompt chunks follow. Batched attention and paged KV may improve later scaling, but
 neither is required to establish the first correct continuous-admission scheduler. A general
 batch-N ABI, memory pool and paged KV do not exist yet.</p>
 
@@ -1216,9 +1220,10 @@ batch-N ABI, memory pool and paged KV do not exist yet.</p>
     <p>That approximation hides important detail: <em>distinct KV storage owners</em> (not layer
     count), grouped-query geometry, sliding-window layers, hybrid/recurrent state, alignment and
     cache layout. Use the <a href="sizing.html">Model Sizing Lab</a> for an architecture-aware
-    estimate. Also distinguish four different limits: maximum resident requests by memory, maximum
-    active decode slots (2 in batch mode), queue capacity, and the sustainable concurrent
-    workload — they are not interchangeable.</p>
+    estimate. Also distinguish maximum resident requests by memory, active sequence slots
+    (2 in batch mode), token rows per generated step (2 in this path), queued responses,
+    and the sustainable concurrent workload. A queued request is not an active sequence;
+    these limits are not interchangeable.</p>
 </div>
 
 <div class="card">

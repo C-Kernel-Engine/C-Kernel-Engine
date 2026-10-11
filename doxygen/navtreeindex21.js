@@ -1,5 +1,6 @@
 var NAVTREEINDEX21 =
 {
+"structCKTokenizer.html#a8c14da1e0de0f92cbea9714f8c42d4cd":[1,0,62,5],
 "structCKTokenizer.html#a9b7a80f60b651e50d40ffb9b1130eccc":[1,0,62,11],
 "structCKTokenizer.html#a9fbb827cf89c461569b0dfc2b8ef5fe9":[1,0,62,16],
 "structCKTokenizer.html#aae750e70d66be065e2c8679036f5b86d":[1,0,62,12],
@@ -248,6 +249,5 @@ var NAVTREEINDEX21 =
 "structQWEN2__0__5B__DECODEModel.html#a60fe84f331aa220d10a5335f16d02fe5":[1,0,87,1],
 "structRecommendation.html":[1,0,88],
 "structRecommendation.html#a2dea715a398d739605559094647c11eb":[1,0,88,3],
-"structRecommendation.html#aa8cbf25679d19f8407ac276b25c1b1bf":[1,0,88,1],
-"structRecommendation.html#ab10fd7bc5c1c6eee44e39a537f53cc51":[1,0,88,4]
+"structRecommendation.html#aa8cbf25679d19f8407ac276b25c1b1bf":[1,0,88,1]
 };

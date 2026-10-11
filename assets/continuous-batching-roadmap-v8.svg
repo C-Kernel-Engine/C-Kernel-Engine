@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720">
   <title>From serialized serving to continuous batching: v8 roadmap</title>
-  <desc>Three-lane roadmap: default single-flight HTTP serving, experimental two-slot HTTP decode with limited dynamic admission, and planned bounded prefill, fair admission and larger batches. Paged KV and batched attention are later optimizations.</desc>
+  <desc>Three-lane roadmap: default single-flight HTTP serving, experimental two-slot decode with optional staged prefill and one prompt row paired with decode, and planned multirow chunks, fair admission and larger batches. Paged KV and batched attention are later optimizations.</desc>
   <defs>
     <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
       <stop offset="0%" style="stop-color:#ffb400"/>
@@ -63,7 +63,7 @@
   <g transform="translate(420,76)">
     <rect width="360" height="300" rx="10" fill="#2a241f" stroke="#ffb400" stroke-width="1.5" filter="url(#shadow)"/>
     <rect width="360" height="30" rx="10" fill="url(#headerGrad)"/>
-    <text x="180" y="20" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#1d1d1d" text-anchor="middle">MERGED — batch2 (#709 + #715)</text>
+    <text x="180" y="20" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#1d1d1d" text-anchor="middle">EXPERIMENTAL — batch2 opt-in</text>
 
     <text x="18" y="54" font-family="Inter, sans-serif" font-size="9.5" fill="#c8c8c8">•  Batch2RequestLoop: two request-owned slots,</text>
     <text x="30" y="69" font-family="Inter, sans-serif" font-size="9" fill="#909090">host-side sampling / stop / budget per request</text>
@@ -75,9 +75,9 @@
     <text x="30" y="168" font-family="Inter, sans-serif" font-size="9" fill="#909090">decode-boundary join/leave; third active → 429</text>
 
     <text x="18" y="196" font-family="Inter, sans-serif" font-size="9.5" font-weight="600" fill="#ffd97a">Remaining gaps:</text>
-    <text x="18" y="214" font-family="Inter, sans-serif" font-size="9" fill="#f0a0a0">prefill synchronous — a joining request pauses decode</text>
+    <text x="18" y="214" font-family="Inter, sans-serif" font-size="9" fill="#f0a0a0">default prefill blocks; staged yields between tokens</text>
     <text x="18" y="229" font-family="Inter, sans-serif" font-size="9" fill="#f0a0a0">fixed 2 slots · attention not batched · KV-only models</text>
-    <text x="18" y="244" font-family="Inter, sans-serif" font-size="9" fill="#f0a0a0">not yet certified for sustained concurrency</text>
+    <text x="18" y="244" font-family="Inter, sans-serif" font-size="9" fill="#f0a0a0">one mixed prompt row; no overnight certification</text>
 
     <text x="18" y="276" font-family="Inter, sans-serif" font-size="8" fill="#505050">server/batch_decode.py · batch_decode_codegen_v8.py</text>
     <text x="18" y="290" font-family="Inter, sans-serif" font-size="8" fill="#505050">ck_model_abi_v8.h · test_batch_decode_loop.py</text>
@@ -89,8 +89,8 @@
     <rect width="360" height="30" rx="10" fill="#3a3a3a"/>
     <text x="180" y="20" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#909090" text-anchor="middle">PLANNED — continuous batching</text>
 
-    <text x="18" y="54" font-family="Inter, sans-serif" font-size="9.5" fill="#909090">•  Bounded, cancellable prompt chunks keep active</text>
-    <text x="30" y="69" font-family="Inter, sans-serif" font-size="9" fill="#707070">decode streams responsive as requests join</text>
+    <text x="18" y="54" font-family="Inter, sans-serif" font-size="9.5" fill="#909090">•  Multiple prompt rows per scheduled iteration,</text>
+    <text x="30" y="69" font-family="Inter, sans-serif" font-size="9" fill="#707070">with bounded work and decode latency</text>
     <text x="18" y="87" font-family="Inter, sans-serif" font-size="9.5" fill="#909090">•  Fair admission and retirement beyond two slots</text>
     <text x="30" y="102" font-family="Inter, sans-serif" font-size="9" fill="#707070">without waiting for the longest sequence</text>
     <text x="18" y="120" font-family="Inter, sans-serif" font-size="9.5" fill="#909090">•  Memory-aware admission: KV budget per request</text>
@@ -166,6 +166,6 @@
     <text x="16" y="26" font-family="Inter, sans-serif" font-size="11" font-weight="700" fill="#c8c8c8">TERMS THAT MUST NOT BE CONFLATED</text>
     <text x="16" y="50" font-family="Inter, sans-serif" font-size="9.5" fill="#909090">Request concurrency — many HTTP requests in flight (queued or active).   Scheduling / interleaving — a host loop picks which request advances.</text>
     <text x="16" y="68" font-family="Inter, sans-serif" font-size="9.5" fill="#909090">Batched execution — one kernel call computes several sequences.   Continuous batching — the active set changes at every iteration boundary.</text>
-    <text x="16" y="90" font-family="Inter, sans-serif" font-size="9" fill="#707070" font-style="italic">Batch2 joins and retires within two slots; bounded prefill and fair scaling are still planned.</text>
+    <text x="16" y="90" font-family="Inter, sans-serif" font-size="9" fill="#707070" font-style="italic">Batch2 has two active slots; staged prefill and one mixed prompt row are opt-in. Batch-N remains planned.</text>
   </g>
 </svg>
