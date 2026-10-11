@@ -34,8 +34,10 @@ two-slot batch decode does and does not do, and what true continuous batching st
     </ul>
     <p>Today CKE ships the first and an experimental two-row form of the second and third.
     The opt-in owner can admit and retire a request at a decode boundary, but a joining
-    request's synchronous prefill stalls the other stream. Bounded, fair prefill and
-    broader batch capacity remain planned. Concurrent HTTP requests, multi-threaded
+    request's synchronous prefill stalls the other stream by default. An explicit
+    decode-replay option now yields after a bounded prompt-token chunk; its
+    numerical behavior needs artifact-specific certification. Mixed-row prefill
+    and broader batch capacity remain planned. Concurrent HTTP requests, multi-threaded
     kernels and serial request multiplexing are not, by themselves, batched decode.</p>
 </div>
 
@@ -68,7 +70,11 @@ two-slot batch decode does and does not do, and what true continuous batching st
                 <td><span class="badge badge-orange">Experimental</span></td>
                 <td><code>server/batch_http.py</code>, <code>ck_serve_v8.py</code></td>
                 <td><code>test_batch_http.py</code> (19 tests, incl. real-socket SSE)</td></tr>
-            <tr><td>Scalable continuous batching (bounded prefill, fair admission, N&gt;2)</td>
+            <tr><td>Opt-in staged decode-replay prefill (two slots)</td>
+                <td><span class="badge badge-orange">Experimental</span></td>
+                <td><code>server/batch_http.py</code>, <code>ck_session_v8_batch2_prefill_append</code></td>
+                <td><code>test_batch_http.py</code>, <code>test_batch_decode_loop.py</code></td></tr>
+            <tr><td>Scalable continuous batching (mixed rows, N&gt;2)</td>
                 <td><span class="badge badge-grey">Planned</span></td><td>—</td><td>—</td></tr>
             <tr><td>Mixed / interruptible prefill inside a decode step</td>
                 <td><span class="badge badge-grey">Planned</span></td><td>—</td><td>—</td></tr>
@@ -149,8 +155,10 @@ cks-v8-serve … --batch-http-extra-bytes BYTES \
         <ul>
             <li>Not every layer operation is batched: attention and KV updates remain
             sequence-local inside the call.</li>
-            <li>Prefill stays synchronous and per-slot — a joining request's prefill pauses the
-            other slot for its duration; the prompt cap bounds tokens, not time.</li>
+            <li>Whole-prompt prefill remains the default. The explicit
+            <code>--batch-http-decode-replay-chunk-tokens</code> option yields
+            between bounded prompt chunks, but it is not mixed-row execution
+            and one token operation can still be slow.</li>
             <li>Fixed at two slots, KV-cache-only generated models (recurrent-state models are
             outside this capability).</li>
             <li>Not yet certified for sustained/overnight concurrency — treat as experimental.</li>
@@ -160,9 +168,9 @@ cks-v8-serve … --batch-http-extra-bytes BYTES \
 
 <h2 id="roadmap">Planned: continuous batching</h2>
 <p>Batch2 already admits and retires requests at decode boundaries within two fixed slots.
-The next practical milestone is bounded, cancellable prefill so a new prompt cannot pause an
-existing decode stream indefinitely. Fair admission, measured expansion beyond two slots and
-mixed prefill/decode follow. Batched attention and paged KV may improve later scaling, but
+The optional staged path can pause between generated decode-replay prompt chunks. Its
+next practical milestone is certification on a resolved model bundle and two real harness
+tasks. Measured expansion beyond two slots and mixed prefill/decode follow. Batched attention and paged KV may improve later scaling, but
 neither is required to establish the first correct continuous-admission scheduler. A general
 batch-N ABI, memory pool and paged KV do not exist yet.</p>
 

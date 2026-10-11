@@ -1666,6 +1666,18 @@ version/v8/scripts/ck_serve_v8.py "$RUN_DIR" --run "$RUN_DIR" \
         receives HTTP 429; the ordinary single-flight path remains the default.
     </p>
     <p>
+        <code>--batch-http-decode-replay-chunk-tokens N</code> additionally opts into
+        staged prefill. The owner computes at most N prompt tokens through
+        generated single-token decode, then gives ready requests a decode turn
+        before the next chunk. Cancellation has a ticket before prompt work
+        starts. This prevents a whole prompt from monopolizing the owner, but
+        one slow token operation still sets the cancellation/latency granularity.
+        Decode replay can differ numerically from the artifact's ordinary
+        batched prefill and requires artifact-specific parity testing. The
+        effective serving record names the selected prefill strategy and chunk
+        budget. This is not mixed-row prefill/decode execution.
+    </p>
+    <p>
         Native slot budgeting does not bound HTTP delivery by itself. The
         opt-in path also limits undelivered response consumers (default 4),
         output token events (default 4096),
@@ -1684,13 +1696,13 @@ version/v8/scripts/ck_serve_v8.py "$RUN_DIR" --run "$RUN_DIR" \
     </p>
     <p>
         This is a bounded experimental integration, not certified overnight
-        concurrency. Prefill remains synchronous and cannot be interrupted
-        inside one slow native operation; a prompt-token cap is not a time
-        bound. Native per-request phase timing is reported unavailable.
+        concurrency. Without the staged flag, prefill remains synchronous and
+        cannot be interrupted inside one slow native operation; a prompt-token
+        cap is not a time bound. Native per-request phase timing is reported unavailable.
         A local generated Gemma3-270M diagnostic matched isolated and concurrent
         output with 11 shared decode steps, but it did not use a resolved
         deployment bundle or an external harness. Certify two real harness
-        tasks and add bounded cancellable prefill before promoting this path.
+        tasks and certify staged prefill on the deployed artifact before promoting this path.
         Recurrent Qwen state is outside this KV-only capability.
     </p>
 </div>
