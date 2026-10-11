@@ -309,9 +309,30 @@ build_staged_snapshot() {
         return 1
     fi
     local llama_cpp_root="${CK_LLAMA_CPP_ROOT:-${LLAMA_CPP_ROOT:-$ROOT_DIR/llama.cpp}}"
+    local expected_llama_rev=""
+    expected_llama_rev="$(git -C "$ROOT_DIR" ls-tree HEAD -- llama.cpp 2>/dev/null | awk '{print $3}')"
+    # A llama.cpp build at a different revision than the pinned gitlink makes
+    # oracle helpers fail to compile against stale headers. Only accept builds
+    # matching the pin; an explicit CK_LLAMA_CPP_ROOT/LLAMA_CPP_ROOT is trusted.
+    if [ -z "${CK_LLAMA_CPP_ROOT:-${LLAMA_CPP_ROOT:-}}" ] && [ -n "$expected_llama_rev" ] && [ -f "$llama_cpp_root/build/bin/libllama.so" ]; then
+        local root_llama_rev=""
+        root_llama_rev="$(env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE git -C "$llama_cpp_root" rev-parse HEAD 2>/dev/null)"
+        if [ -n "$root_llama_rev" ] && [ "$root_llama_rev" != "$expected_llama_rev" ]; then
+            echo -e "${YELLOW}  ↳ ignoring llama.cpp build at ${llama_cpp_root}: revision ${root_llama_rev} != pinned ${expected_llama_rev}${NC}" >&2
+            llama_cpp_root=""
+        fi
+    fi
     if [ -z "$llama_cpp_root" ] || [ ! -f "$llama_cpp_root/build/bin/libllama.so" ]; then
         while IFS= read -r worktree_path; do
             if [ -d "$worktree_path/llama.cpp/include" ] && [ -f "$worktree_path/llama.cpp/build/bin/libllama.so" ]; then
+                if [ -n "$expected_llama_rev" ]; then
+                    local candidate_llama_rev=""
+                    candidate_llama_rev="$(env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE git -C "$worktree_path/llama.cpp" rev-parse HEAD 2>/dev/null)"
+                    if [ "$candidate_llama_rev" != "$expected_llama_rev" ]; then
+                        echo -e "${YELLOW}  ↳ skipping llama.cpp build at ${worktree_path}: revision ${candidate_llama_rev:-unknown} != pinned ${expected_llama_rev}${NC}" >&2
+                        continue
+                    fi
+                fi
                 llama_cpp_root="$worktree_path/llama.cpp"
                 break
             fi
