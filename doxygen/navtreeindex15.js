@@ -1,5 +1,6 @@
 var NAVTREEINDEX15 =
 {
+"globals_vars.html":[2,1,2,0],
 "globals_vars_b.html":[2,1,2,1],
 "globals_vars_c.html":[2,1,2,2],
 "globals_vars_e.html":[2,1,2,3],
@@ -248,6 +249,5 @@ var NAVTREEINDEX15 =
 "mega__fused__attention__prefill__q8__0_8c.html#a00f6e544eff204d7567bfe46076d3533":[2,0,1,1,0,7,2],
 "mega__fused__attention__prefill__q8__0_8c.html#a0404c43ebf752ec2c2f54ead81036f30":[2,0,1,1,0,7,3],
 "mega__fused__attention__prefill__q8__0_8c.html#a2945c133b2cc63cb2f516c55e359ffba":[2,0,1,1,0,7,0],
-"mega__fused__attention__prefill__q8__0_8c.html#a883b9f36dd8db8e37e5df4037f25b86e":[2,0,1,1,0,7,4],
-"mega__fused__attention__prefill__q8__0_8c.html#acdd13869b94d435a14a0ada232c66e71":[2,0,1,1,0,7,1]
+"mega__fused__attention__prefill__q8__0_8c.html#a883b9f36dd8db8e37e5df4037f25b86e":[2,0,1,1,0,7,4]
 };
