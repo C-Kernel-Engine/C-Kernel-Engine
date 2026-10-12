@@ -1696,6 +1696,33 @@ version/v8/scripts/ck_serve_v8.py "$RUN_DIR" --run "$RUN_DIR" \
         ordinary-prefill parity or a resolved serving deployment.
     </p>
     <p>
+        The optional <code>--compare-ordinary --oracle-gguf GGUF_PATH</code>
+        diagnostic compares complete logits using the same token IDs. The
+        retained result is <code>version/v8/reports/batch_prefill_gemma3_oracle_20261012.json</code>.
+        It verifies the helper's actual loaded llama.cpp library mappings,
+        records their backing-file hashes and effective settings, and repeats
+        each llama.cpp mode twice. Seven selected GGUF/BUMP tensors match at
+        beginning, middle and end samples; nine model metadata fields match.
+        Full conversion and build provenance remain unverified.
+    </p>
+    <p>
+        The comparison has an earlier boundary than the CKE prefill split:
+        at one token, CKE and llama.cpp select different top tokens. At 10
+        tokens, llama.cpp batched and sequential evaluation themselves select
+        different top tokens (107 versus 1018), with 1.248 full-logit RMSE;
+        repeated runs of each mode are exact. The one-token llama top token
+        is unchanged with one or four threads and with repacking on or off.
+        The helper requested 64 context tokens but used 256 after runtime
+        adjustment, while CKE's session
+        capacity was 32. These differences prevent treating either llama.cpp
+        mode as a numerical arbiter. CKE ordinary and staged prefill first
+        diverge at 10 tokens; an internal hidden-tensor inspection places that
+        CKE-only difference after matching layer-16 Q/K/V inputs. The
+        cross-runtime one-token mismatch is not explained by that later
+        difference. No numerical path is promoted, and batching remains
+        experimental on this artifact.
+    </p>
+    <p>
         A separate resolved Gemma3-270M Q5_K_M chat-only HTTP acceptance is
         available through <code>server/batch_http_acceptance.py</code>. It
         checks expected serving and loaded session hashes before generation,
