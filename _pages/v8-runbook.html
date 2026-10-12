@@ -1684,8 +1684,16 @@ version/v8/scripts/ck_serve_v8.py "$RUN_DIR" --run "$RUN_DIR" \
         full logits at every step, complete KV bytes and positions against
         serialized decode replay for either prefill slot. It covers consecutive
         mixed steps, continuation after prompt completion and a 32-token
-        session-capacity boundary. It does not establish parity with the
-        ordinary prefill entry or certify a resolved serving deployment.
+        session-capacity boundary. A separate optional comparison against the
+        ordinary generated prefill entry fails on the pinned artifact: 9
+        tokens match exactly, but 10 tokens change both full logits and KV
+        bytes; at 28 tokens, the top predicted token also changes. The
+        <code>--compare-ordinary</code> flag records this as a failing,
+        artifact-bound diagnostic in
+        <code>version/v8/reports/batch_prefill_gemma3_270m_20261011.json</code>.
+        The cause and which path matches the publisher reference remain
+        unverified. Mixed-step parity against decode replay does not certify
+        ordinary-prefill parity or a resolved serving deployment.
     </p>
     <p>
         A separate resolved Gemma3-270M Q5_K_M chat-only HTTP acceptance is
