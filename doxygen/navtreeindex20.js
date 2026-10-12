@@ -1,5 +1,14 @@
 var NAVTREEINDEX20 =
 {
+"structCKLayerOffsets.html#af6000f2aff58810114cbd110c77402e5":[1,0,40,20],
+"structCKLayerOptimizerOffsets.html":[1,0,41],
+"structCKLayerOptimizerOffsets.html#a081f58fcc2e8245a0383d42e7d521177":[1,0,41,2],
+"structCKLayerOptimizerOffsets.html#a142f3597b192e27b22152d7e5e1cca73":[1,0,41,36],
+"structCKLayerOptimizerOffsets.html#a14824d8d69c159d9f82752211c99df8f":[1,0,41,15],
+"structCKLayerOptimizerOffsets.html#a1bea81a97d9e230388a11aa88fcfaab8":[1,0,41,20],
+"structCKLayerOptimizerOffsets.html#a1ff16b8b06509ebee3c34fbe6602a12f":[1,0,41,3],
+"structCKLayerOptimizerOffsets.html#a205ea40a57d44759dce23b92ce8a853f":[1,0,41,26],
+"structCKLayerOptimizerOffsets.html#a2b7d74bd97a70cc3ef67619b1090f5f1":[1,0,41,30],
 "structCKLayerOptimizerOffsets.html#a335d764b0992ead6630474f6b1c0f171":[1,0,41,34],
 "structCKLayerOptimizerOffsets.html#a33e61c51c31c2fa53bbf9f4a42a6acb4":[1,0,41,4],
 "structCKLayerOptimizerOffsets.html#a34a29c9146fdacaa56a6118fa684fa86":[1,0,41,8],
@@ -240,14 +249,5 @@ var NAVTREEINDEX20 =
 "structCKTokenizer.html#a121603ec2a9e2cbd377932d783dde05d":[1,0,62,25],
 "structCKTokenizer.html#a1ef21faeef58ae6154e1f03fe76e3377":[1,0,62,14],
 "structCKTokenizer.html#a2993f4ea714c7d2996caccf32eb9ddef":[1,0,62,32],
-"structCKTokenizer.html#a2c76d620f385ed5352621a9e8a0bfaec":[1,0,62,3],
-"structCKTokenizer.html#a3020b1dc0fb08152293a842448998ca5":[1,0,62,21],
-"structCKTokenizer.html#a32688c8d51853200d766b68f9e27b3e4":[1,0,62,20],
-"structCKTokenizer.html#a35f73551a504361ab117452f40fe81bf":[1,0,62,26],
-"structCKTokenizer.html#a52c39349a30ea0dfb6ab48fa975e6fed":[1,0,62,29],
-"structCKTokenizer.html#a64d0be7dac3d476548e873e3f2d05d50":[1,0,62,18],
-"structCKTokenizer.html#a6ac6c2255e6c5ccf7dfc45ecf2be9456":[1,0,62,33],
-"structCKTokenizer.html#a70622f7babd13c77a93825497fdf2c5f":[1,0,62,7],
-"structCKTokenizer.html#a71ab9d27f84fa6c73736eea530f8a192":[1,0,62,13],
-"structCKTokenizer.html#a8271e0624b9f4efe137f25938204bbcb":[1,0,62,30]
+"structCKTokenizer.html#a2c76d620f385ed5352621a9e8a0bfaec":[1,0,62,3]
 };

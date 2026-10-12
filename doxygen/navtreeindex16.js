@@ -1,5 +1,14 @@
 var NAVTREEINDEX16 =
 {
+"mega__fused__attention__prefill_8c.html#a3c0ac15e87fbf875bd91aad8288b7e7c":[2,0,1,1,0,6,2],
+"mega__fused__attention__prefill_8c.html#a6a5da63aac6821fd65ed403bb1546577":[2,0,1,1,0,6,5],
+"mega__fused__attention__prefill_8c.html#a883b9f36dd8db8e37e5df4037f25b86e":[2,0,1,1,0,6,6],
+"mega__fused__attention__prefill_8c.html#a9fdbcc38d87e3452b8f466ae91e17c5b":[2,0,1,1,0,6,1],
+"mega__fused__attention__prefill_8c_source.html":[2,0,1,1,0,6],
+"mega__fused__attention__prefill__q8__0_8c.html":[2,0,1,1,0,7],
+"mega__fused__attention__prefill__q8__0_8c.html#a00f6e544eff204d7567bfe46076d3533":[2,0,1,1,0,7,2],
+"mega__fused__attention__prefill__q8__0_8c.html#a0404c43ebf752ec2c2f54ead81036f30":[2,0,1,1,0,7,3],
+"mega__fused__attention__prefill__q8__0_8c.html#a2945c133b2cc63cb2f516c55e359ffba":[2,0,1,1,0,7,0],
 "mega__fused__attention__prefill__q8__0_8c.html#a883b9f36dd8db8e37e5df4037f25b86e":[2,0,1,1,0,7,4],
 "mega__fused__attention__prefill__q8__0_8c.html#acdd13869b94d435a14a0ada232c66e71":[2,0,1,1,0,7,1],
 "mega__fused__attention__prefill__q8__0_8c_source.html":[2,0,1,1,0,7],
@@ -240,14 +249,5 @@ var NAVTREEINDEX16 =
 "recurrent__gate__kernels_8c.html#af6f9c6f77b75d2ac115ba325fd0d618b":[2,0,1,1,99,5],
 "recurrent__gate__kernels_8c_source.html":[2,0,1,1,99],
 "recurrent__norm__kernels_8c.html":[2,0,1,1,100],
-"recurrent__norm__kernels_8c.html#a1f3ed08a1c84e576dfaf9b1d80a61567":[2,0,1,1,100,4],
-"recurrent__norm__kernels_8c.html#a328ec4c46eb24655b76a45e5370fd9ae":[2,0,1,1,100,0],
-"recurrent__norm__kernels_8c.html#a6f6f541d6771c72b4e9f00d48e43bb25":[2,0,1,1,100,5],
-"recurrent__norm__kernels_8c.html#aad079560beb20153fff9425727c2cf16":[2,0,1,1,100,6],
-"recurrent__norm__kernels_8c.html#ab3ec906e662a3c9b9a81e931d3c8cd20":[2,0,1,1,100,3],
-"recurrent__norm__kernels_8c.html#ae1de275281122fbf7bc73b947e36a62d":[2,0,1,1,100,2],
-"recurrent__norm__kernels_8c.html#af5e77e21034b56a01b56dc25809fef8a":[2,0,1,1,100,1],
-"recurrent__norm__kernels_8c_source.html":[2,0,1,1,100],
-"recurrent__qk__norm__kernels_8c.html":[2,0,1,1,101],
-"recurrent__qk__norm__kernels_8c.html#a0dd8cd71bd25ed57393abeea5eeec5c4":[2,0,1,1,101,1]
+"recurrent__norm__kernels_8c.html#a1f3ed08a1c84e576dfaf9b1d80a61567":[2,0,1,1,100,4]
 };

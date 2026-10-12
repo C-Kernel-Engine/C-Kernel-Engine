@@ -1,5 +1,14 @@
 var NAVTREEINDEX18 =
 {
+"show__config_8c.html#acfbc006ea433ad708fdee3e82996e721":[2,0,1,27,9],
+"show__config_8c.html#ad243f93c16bc4c1d3e0a13b84421d760":[2,0,1,27,7],
+"show__config_8c.html#adaa69e0d4a8c8c3b9e50adcd45db083b":[2,0,1,27,31],
+"show__config_8c.html#ae2a6ad58442a4e6de7cdfa4aeea1ec02":[2,0,1,27,32],
+"show__config_8c.html#ae982fbde8b0c5efdf8fdbff3afb2267f":[2,0,1,27,18],
+"show__config_8c.html#afbc559e029cc2c0fddd0a1dac9b1be20":[2,0,1,27,24],
+"show__config_8c_source.html":[2,0,1,27],
+"sigmoid__kernels_8c.html":[2,0,1,1,114],
+"sigmoid__kernels_8c.html#aaa76ef661048368434b452a237bc3669":[2,0,1,1,114,2],
 "sigmoid__kernels_8c.html#aad3b3666d63fcbaa243ad4a988e187d8":[2,0,1,1,114,0],
 "sigmoid__kernels_8c.html#af621782be75fb6a9acf541f7935b87d5":[2,0,1,1,114,1],
 "sigmoid__kernels_8c_source.html":[2,0,1,1,114],
@@ -240,14 +249,5 @@ var NAVTREEINDEX18 =
 "structCKLayerBackwardParams.html#a7b75fc7ac1370a2392bd7f2dff2f91f5":[1,0,35,66],
 "structCKLayerBackwardParams.html#a7cf0c367613e3e8b9985c92916c15d7e":[1,0,35,45],
 "structCKLayerBackwardParams.html#a83064b5cc6decef3782fd31cdaee55d0":[1,0,35,9],
-"structCKLayerBackwardParams.html#a85571728b71c401e0dbe808ae585ded8":[1,0,35,13],
-"structCKLayerBackwardParams.html#a888ee7a6df98528c4046b6b59b8c639c":[1,0,35,49],
-"structCKLayerBackwardParams.html#a8b0ad57a979f51ad0b14df175b2c7370":[1,0,35,48],
-"structCKLayerBackwardParams.html#a9e4a1e13e1a03430dfb1d4c35137a0c3":[1,0,35,59],
-"structCKLayerBackwardParams.html#a9ecf421cb2e1e6ade5e1da91a64ab9f7":[1,0,35,16],
-"structCKLayerBackwardParams.html#aa82d1124a56c3e119f2bb9336bfb364b":[1,0,35,60],
-"structCKLayerBackwardParams.html#aa9203c2951372bedee83fd38e3ef57fb":[1,0,35,47],
-"structCKLayerBackwardParams.html#aab3a0f3828a687d937a07f74131b2a3f":[1,0,35,54],
-"structCKLayerBackwardParams.html#aabe923efab694bfed90a3d86084c9be9":[1,0,35,25],
-"structCKLayerBackwardParams.html#aae3da518cc5f67a49d2d1d332f6fb620":[1,0,35,46]
+"structCKLayerBackwardParams.html#a85571728b71c401e0dbe808ae585ded8":[1,0,35,13]
 };

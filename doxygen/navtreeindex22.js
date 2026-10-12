@@ -1,5 +1,14 @@
 var NAVTREEINDEX22 =
 {
+"structQWEN2__0__5B__DECODELayerOffsets.html#aa901fee3b15422d052e90e6f11aac70c":[1,0,86,9],
+"structQWEN2__0__5B__DECODELayerOffsets.html#abf274f36713eab1d1b45a7039dbdfe04":[1,0,86,2],
+"structQWEN2__0__5B__DECODELayerOffsets.html#aec3c1fdb6f46df1440b88a7182693a1d":[1,0,86,10],
+"structQWEN2__0__5B__DECODELayerOffsets.html#af75fc7708796bc7dde15c0129cab826f":[1,0,86,16],
+"structQWEN2__0__5B__DECODELayerOffsets.html#af82d2dc27972b986ee4caf6f54dd16d9":[1,0,86,1],
+"structQWEN2__0__5B__DECODEModel.html":[1,0,87],
+"structQWEN2__0__5B__DECODEModel.html#a07e198cd09baeda89471f687bf5ac3b7":[1,0,87,0],
+"structQWEN2__0__5B__DECODEModel.html#a60fe84f331aa220d10a5335f16d02fe5":[1,0,87,1],
+"structRecommendation.html":[1,0,88],
 "structRecommendation.html#a2dea715a398d739605559094647c11eb":[1,0,88,3],
 "structRecommendation.html#aa8cbf25679d19f8407ac276b25c1b1bf":[1,0,88,1],
 "structRecommendation.html#ab10fd7bc5c1c6eee44e39a537f53cc51":[1,0,88,4],
@@ -240,14 +249,5 @@ var NAVTREEINDEX22 =
 "tokenizer_8h.html#a3fb09ff735a91316e5810e84ce11f3f2":[2,0,0,1,3,24],
 "tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278":[2,0,0,1,3,10],
 "tokenizer_8h.html#a462f1390f421769e5f487370f8f21ee9":[2,0,0,1,3,43],
-"tokenizer_8h.html#a49175a027841adf7e7d66a6061aed7ed":[2,0,0,1,3,29],
-"tokenizer_8h.html#a4ce4bea5b5798ca1aa9a1a3061f3d668":[2,0,0,1,3,30],
-"tokenizer_8h.html#a4de5533c0e1c9f89bfb77bee05cf97fd":[2,0,0,1,3,21],
-"tokenizer_8h.html#a65b78014f5b24adcc90623cfa9ba6123":[2,0,0,1,3,35],
-"tokenizer_8h.html#a6cf5b659a496d344ebd7ae14a0392033":[2,0,0,1,3,41],
-"tokenizer_8h.html#a70e41f10b6806f4f543285d3484da0c3":[2,0,0,1,3,27],
-"tokenizer_8h.html#a7b861b5a4ce2546abb39e12cedd14cb2":[2,0,0,1,3,6],
-"tokenizer_8h.html#a7cc51ec584feb41327c453e546740e7c":[2,0,0,1,3,28],
-"tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6":[2,0,0,1,3,44],
-"tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741":[2,0,0,1,3,40]
+"tokenizer_8h.html#a49175a027841adf7e7d66a6061aed7ed":[2,0,0,1,3,29]
 };
