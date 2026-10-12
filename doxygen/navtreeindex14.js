@@ -1,5 +1,11 @@
 var NAVTREEINDEX14 =
 {
+"gemm__kernels__q6k__q8k_8c.html#a1dc45962cc0ed3df6427421935a4754f":[2,0,1,1,66,27],
+"gemm__kernels__q6k__q8k_8c.html#a1de6254b03ccbfe59c9d291f01324460":[2,0,1,1,66,2],
+"gemm__kernels__q6k__q8k_8c.html#a2267ad482f0cda1249db2f6d5273b5da":[2,0,1,1,66,20],
+"gemm__kernels__q6k__q8k_8c.html#a4add2625b432613d83486a87bdfd5da5":[2,0,1,1,66,4],
+"gemm__kernels__q6k__q8k_8c.html#a4b5f491082fe215fdae989bf35ba38be":[2,0,1,1,66,16],
+"gemm__kernels__q6k__q8k_8c.html#a5f2da3b1403501ba959104c826a70a7e":[2,0,1,1,66,9],
 "gemm__kernels__q6k__q8k_8c.html#a65fa62c32264072d07f5ff8a00ded586":[2,0,1,1,66,0],
 "gemm__kernels__q6k__q8k_8c.html#a6f8eb04ad56d34cf1d38d49ea19a7639":[2,0,1,1,66,18],
 "gemm__kernels__q6k__q8k_8c.html#a7b53e9b678098295f502c2275890c0f1":[2,0,1,1,66,13],
@@ -243,11 +249,5 @@ var NAVTREEINDEX14 =
 "globals_func_y.html":[2,1,1,24],
 "globals_func_z.html":[2,1,1,25],
 "globals_g.html":[2,1,0,7],
-"globals_h.html":[2,1,0,8],
-"globals_i.html":[2,1,0,9],
-"globals_j.html":[2,1,0,10],
-"globals_k.html":[2,1,0,11],
-"globals_l.html":[2,1,0,12],
-"globals_m.html":[2,1,0,13],
-"globals_n.html":[2,1,0,14]
+"globals_h.html":[2,1,0,8]
 };
