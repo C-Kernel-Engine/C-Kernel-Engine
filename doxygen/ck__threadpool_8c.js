@@ -30,7 +30,9 @@ var ck__threadpool_8c =
     [ "ck_threadpool_thread_id", "ck__threadpool_8c.html#ada9a2b22c2eb79fe8834b026a3c7d8b4", null ],
     [ "global_pool_init", "ck__threadpool_8c.html#a5787f410f04801389446b1cf43c79e15", null ],
     [ "monotonic_ns", "ck__threadpool_8c.html#aab1bc9c83bcedc83536e52adcae13bbf", null ],
+    [ "run_work", "ck__threadpool_8c.html#ae7e674ba43db9d6ae54f3540870ba308", null ],
     [ "worker_main", "ck__threadpool_8c.html#ab50c928126740940413626fd7ab7ce72", null ],
+    [ "g_dispatch_context", "ck__threadpool_8c.html#adc7968a68ff56cbb80e01e813b43f512", null ],
     [ "g_gemm_schedule", "ck__threadpool_8c.html#aec3530baf3b6f4c900b29254fc58c1cd", null ],
     [ "g_threadpool", "ck__threadpool_8c.html#a8d24c2ed3aa5c438f5d2e8c7782f32b5", null ],
     [ "g_threadpool_once", "ck__threadpool_8c.html#a3dcd3040ab40fc1c79a7ea042b87b24f", null ]

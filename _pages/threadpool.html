@@ -163,6 +163,7 @@ completely ate the parallelism gains and then some.</p>
     _Alignas(64) atomic_int paused;  // set to 1 for power saving
 
     /* --- Hybrid sleep mechanism --- */
+    pthread_mutex_t dispatch_mutex; // serializes multi-worker descriptors
     pthread_mutex_t mutex;
     pthread_cond_t  cond_dispatch; // workers sleep here
     pthread_cond_t  cond_done;     // main sleeps here
@@ -181,8 +182,20 @@ cache line cause all CPU cores to fight over that cache line.
     struct ck_threadpool *pool; // back-pointer to the pool
 } ck_worker_t;</code></pre>
 
-<p>Thread 0 is <strong>always the main thread</strong> &mdash; the one that calls <code>ck_threadpool_dispatch()</code>.
-It doesn't get a new pthread. It does its share of the work alongside the workers.</p>
+<p>Worker slot 0 is executed by the thread calling <code>ck_threadpool_dispatch()</code>.
+It does not create an extra pthread. When independent host threads call the same
+pool, multi-worker dispatches are serialized so each call retains its own work
+descriptor and completion counter. A single-worker call runs directly without
+publishing a descriptor. A caller must not destroy the pool during a dispatch or
+recursively dispatch the same pool from its work function.</p>
+
+<p>Inside a work callback, <code>ck_threadpool_thread_id(pool)</code> returns
+that callback's logical <code>ith</code>, including slot 0 on a host thread
+that did not create the pool. The explicit barrier uses the callback's active
+dispatch width. It returns immediately for a one-worker callback, even when
+that callback overlaps another caller's multi-worker dispatch. Every participant
+in a multi-worker callback must reach each barrier in the same order. Outside
+a callback, the ID query retains its legacy physical-worker/creator lookup.</p>
 
 <!-- ================================================================== -->
 <!--  4. LIFECYCLE                                                       -->
@@ -198,9 +211,10 @@ It doesn't get a new pthread. It does its share of the work alongside the worker
 
 <div class="card card-accent">
     <h3>2. Dispatch (called ~500x per token) &mdash; <code>ck_threadpool_dispatch(pool, fn, args)</code></h3>
-    <p>Sets the work function + args, bumps <code>n_dispatch</code> (an atomic counter), and
-    signals sleeping workers via condvar. Main thread also runs its share. All threads do their chunk,
-    then main waits for <code>n_complete</code> to hit N&minus;1.</p>
+    <p>Acquires ownership of the multi-worker work descriptor, sets the work
+    function and args, bumps <code>n_dispatch</code> (an atomic counter), and
+    signals sleeping workers via condvar. The calling thread also runs its share.
+    It waits for <code>n_complete</code> to hit N&minus;1 before releasing that ownership.</p>
 </div>
 
 <div class="card card-blue">

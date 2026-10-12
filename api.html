@@ -9234,7 +9234,7 @@ test_rope.py::TestRoPECache::test_cache_values</p>
 
 
 <details open>
-    <summary>Other Functions (1489)</summary>
+    <summary>Other Functions (1490)</summary>
     <div class="accordion-content">
 
 
@@ -15055,7 +15055,7 @@ hugepage_mode
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">ck_threadpool_t * ck_threadpool_create(int n_threads)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Create a thread pool with n_threads total threads. Thread 0 is the calling (main) thread; n_threads-1 workers are spawned.</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Create a thread pool with n_threads total threads. Thread 0 is the calling thread; n_threads-1 workers are spawned.</p>
         </div>
 
 
@@ -15135,7 +15135,7 @@ hugepage_mode
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int ck_threadpool_n_threads(const ck_threadpool_t * pool)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Get the ordinary/default dispatch width (including the main thread).</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Get the ordinary/default dispatch width (including the calling thread).</p>
         </div>
 
 
@@ -15205,7 +15205,7 @@ hugepage_mode
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int ck_threadpool_thread_id(const ck_threadpool_t * pool)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Get thread index for current thread (0 = main, -1 if not in pool)</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Get the current callback&#x27;s ith for this pool. Outside a callback, return the physical worker index (or the pool creator&#x27;s legacy index 0), and -1 for an unrelated thread. The current dispatch caller is always index 0, including callers that did not create the pool.</p>
         </div>
 
 
@@ -23057,6 +23057,16 @@ The IR graph structure (number of layers, op types)</p>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int run_prompt(ModelAPI * api, CKTrueBPE * tokenizer, CLIOptions * opt, const char * input)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">run_work</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void run_work(ck_threadpool_t * pool, ck_work_fn_t fn, int ith, int nth, void * args)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 

@@ -1,5 +1,7 @@
 var NAVTREEINDEX22 =
 {
+"structQWEN2__0__5B__DECODELayerOffsets.html#a3e0685fe07858372ec2aee386632c98c":[1,0,86,20],
+"structQWEN2__0__5B__DECODELayerOffsets.html#a41f09fb02d466ba014d73729ed3aa8cb":[1,0,86,7],
 "structQWEN2__0__5B__DECODELayerOffsets.html#a496fa78e0e3f24abf9b7db907484b263":[1,0,86,4],
 "structQWEN2__0__5B__DECODELayerOffsets.html#a69d1a583c15ddce336cad31f2bb2543c":[1,0,86,13],
 "structQWEN2__0__5B__DECODELayerOffsets.html#a6ab1aaae9a533bac1f99126a77f816d3":[1,0,86,14],
@@ -247,7 +249,5 @@ var NAVTREEINDEX22 =
 "tokenizer_8h.html#a2f30fc798d162629916e2faa69137745":[2,0,0,1,3,37],
 "tokenizer_8h.html#a2fed9709848fc75201063ec8f8f99baa":[2,0,0,1,3,9],
 "tokenizer_8h.html#a2fed9709848fc75201063ec8f8f99baaaacc79f950f4619c0f760920d41453dc0":[2,0,0,1,3,9,0],
-"tokenizer_8h.html#a2fed9709848fc75201063ec8f8f99baaab8c2f7f0dd7dd9db1d814c09a07ce308":[2,0,0,1,3,9,2],
-"tokenizer_8h.html#a2fed9709848fc75201063ec8f8f99baaae3780f9d7b735346810efb8302a88621":[2,0,0,1,3,9,1],
-"tokenizer_8h.html#a3475cdbc43fd39c22e180c04fd8a9218":[2,0,0,1,3,16]
+"tokenizer_8h.html#a2fed9709848fc75201063ec8f8f99baaab8c2f7f0dd7dd9db1d814c09a07ce308":[2,0,0,1,3,9,2]
 };

@@ -1,5 +1,7 @@
 var NAVTREEINDEX10 =
 {
+"ckernel__memory__layout_8h.html":[2,0,0,37],
+"ckernel__memory__layout_8h.html#a27e838b35bf29a1fa749490d9e7fdd38":[2,0,0,37,13],
 "ckernel__memory__layout_8h.html#a35b79f7b661f83a89e63ee704117d053":[2,0,0,37,6],
 "ckernel__memory__layout_8h.html#a452e44b0d33892f36e77c590eba38daf":[2,0,0,37,5],
 "ckernel__memory__layout_8h.html#a73c5439888aa533ee2b15697fac6f8e0":[2,0,0,37,15],
@@ -247,7 +249,5 @@ var NAVTREEINDEX10 =
 "ckernel__strict_8c.html#aa7716e00ef80901ee907044570463320":[2,0,1,25,12],
 "ckernel__strict_8c.html#aac395997a02ce5af108c9a641f822dcc":[2,0,1,25,20],
 "ckernel__strict_8c.html#acc170401c58956da6ceb9f04693e46e7":[2,0,1,25,4],
-"ckernel__strict_8c.html#ad94b76f11ab5b09db24682947452e946":[2,0,1,25,0],
-"ckernel__strict_8c.html#adcc8293c7a06a4f12c2acfccb8d3cac0":[2,0,1,25,23],
-"ckernel__strict_8c.html#ae75bb772cb709184d6f4fad5462c19b1":[2,0,1,25,7]
+"ckernel__strict_8c.html#ad94b76f11ab5b09db24682947452e946":[2,0,1,25,0]
 };
