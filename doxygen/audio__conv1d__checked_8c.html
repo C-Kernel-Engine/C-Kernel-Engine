@@ -133,6 +133,7 @@ $(document).ready(function(){initNavTree('audio__conv1d__checked_8c.html',''); i
 <div class="contents">
 <div class="textblock"><code>#include &quot;<a class="el" href="ckernel__audio__conv__checked_8h_source.html">ckernel_audio_conv_checked.h</a>&quot;</code><br />
 <code>#include &quot;<a class="el" href="checked__float__buffer_8h_source.html">checked_float_buffer.h</a>&quot;</code><br />
+<code>#include &quot;<a class="el" href="audio__conv1d__checked__internal_8h_source.html">audio_conv1d_checked_internal.h</a>&quot;</code><br />
 <code>#include &lt;limits.h&gt;</code><br />
 <code>#include &lt;math.h&gt;</code><br />
 <code>#include &lt;stdint.h&gt;</code><br />
@@ -159,18 +160,18 @@ Functions</h2></td></tr>
 <tr class="separator:a03ab327637bff4f6eb1c0cd98779cecd"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a962f1021b4bcd53028feda52e0ba7721" id="r_a962f1021b4bcd53028feda52e0ba7721"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="audio__conv1d__checked_8c.html#a962f1021b4bcd53028feda52e0ba7721">audio_conv1d_checked_hardware_fma_available</a> (void)</td></tr>
 <tr class="separator:a962f1021b4bcd53028feda52e0ba7721"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab24784a576cfffede7cd1c55075556ce" id="r_ab24784a576cfffede7cd1c55075556ce"><td class="memItemLeft" align="right" valign="top">static int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="audio__conv1d__checked_8c.html#ab24784a576cfffede7cd1c55075556ce">audio_conv1d_checked_impl</a> (const float *input, size_t input_elements, size_t input_stride, const float *weight, size_t weight_elements, const float *bias, size_t bias_elements, float *output, size_t output_elements, size_t output_stride, float *scratch, size_t scratch_elements, size_t input_channels, size_t output_channels, size_t input_frames, size_t kernel_size, size_t stride, size_t padding, size_t dilation, size_t output_frames, void(*compute)(const ck_audio_conv1d_job *))</td></tr>
-<tr class="separator:ab24784a576cfffede7cd1c55075556ce"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ae91944bf63822011bdb675be8667592d" id="r_ae91944bf63822011bdb675be8667592d"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="audio__conv1d__checked_8c.html#ae91944bf63822011bdb675be8667592d">audio_conv1d_checked_workspace</a> (size_t input_channels, size_t output_channels, size_t input_frames, size_t output_frames, size_t *scratch_elements)</td></tr>
 <tr class="separator:ae91944bf63822011bdb675be8667592d"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ada7da9e62d5f12c487027d01dd8e5c13" id="r_ada7da9e62d5f12c487027d01dd8e5c13"><td class="memItemLeft" align="right" valign="top">static void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="audio__conv1d__checked_8c.html#ada7da9e62d5f12c487027d01dd8e5c13">audio_conv1d_compute_scalar</a> (const ck_audio_conv1d_job *job)</td></tr>
-<tr class="separator:ada7da9e62d5f12c487027d01dd8e5c13"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad091b43688140d3a09bd25bd4c93ca9c" id="r_ad091b43688140d3a09bd25bd4c93ca9c"><td class="memItemLeft" align="right" valign="top">static void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="audio__conv1d__checked_8c.html#ad091b43688140d3a09bd25bd4c93ca9c">audio_conv1d_compute_scalar</a> (const <a class="el" href="structck__audio__conv1d__job.html">ck_audio_conv1d_job</a> *job, void *unused)</td></tr>
+<tr class="separator:ad091b43688140d3a09bd25bd4c93ca9c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a52ede2c70a32ab686d69ad6d2f8465da" id="r_a52ede2c70a32ab686d69ad6d2f8465da"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="audio__conv1d__checked_8c.html#a52ede2c70a32ab686d69ad6d2f8465da">audio_conv1d_dilated_checked_channel_major_f32</a> (const float *input, size_t input_elements, size_t input_stride, const float *weight, size_t weight_elements, const float *bias, size_t bias_elements, float *output, size_t output_elements, size_t output_stride, float *scratch, size_t scratch_elements, size_t input_channels, size_t output_channels, size_t input_frames, size_t kernel_size, size_t stride, size_t padding, size_t dilation, size_t output_frames)</td></tr>
 <tr class="separator:a52ede2c70a32ab686d69ad6d2f8465da"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a5d50c99b3b360f69f758d16eb47be03a" id="r_a5d50c99b3b360f69f758d16eb47be03a"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="audio__conv1d__checked_8c.html#a5d50c99b3b360f69f758d16eb47be03a">audio_conv1d_dilated_checked_channel_major_f32_avx2_fma</a> (const float *input, size_t input_elements, size_t input_stride, const float *weight, size_t weight_elements, const float *bias, size_t bias_elements, float *output, size_t output_elements, size_t output_stride, float *scratch, size_t scratch_elements, size_t input_channels, size_t output_channels, size_t input_frames, size_t kernel_size, size_t stride, size_t padding, size_t dilation, size_t output_frames)</td></tr>
 <tr class="separator:a5d50c99b3b360f69f758d16eb47be03a"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a34d160427ce221807e24f448e78fb58c" id="r_a34d160427ce221807e24f448e78fb58c"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="audio__conv1d__checked_8c.html#a34d160427ce221807e24f448e78fb58c">audio_conv1d_dilated_checked_channel_major_f32_hwfma</a> (const float *input, size_t input_elements, size_t input_stride, const float *weight, size_t weight_elements, const float *bias, size_t bias_elements, float *output, size_t output_elements, size_t output_stride, float *scratch, size_t scratch_elements, size_t input_channels, size_t output_channels, size_t input_frames, size_t kernel_size, size_t stride, size_t padding, size_t dilation, size_t output_frames)</td></tr>
 <tr class="separator:a34d160427ce221807e24f448e78fb58c"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a91b21e5ae31557d2f87d32098d1effd4" id="r_a91b21e5ae31557d2f87d32098d1effd4"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="audio__conv1d__checked_8c.html#a91b21e5ae31557d2f87d32098d1effd4">ck_audio_conv1d_checked_execute</a> (const float *input, size_t input_elements, size_t input_stride, const float *weight, size_t weight_elements, const float *bias, size_t bias_elements, float *output, size_t output_elements, size_t output_stride, float *scratch, size_t scratch_elements, size_t input_channels, size_t output_channels, size_t input_frames, size_t kernel_size, size_t stride, size_t padding, size_t dilation, size_t output_frames, <a class="el" href="audio__conv1d__checked__internal_8h.html#a971748c2b2ba6ee6c13e965e221e5872">ck_audio_conv1d_compute_fn</a> compute, void *compute_context)</td></tr>
+<tr class="separator:a91b21e5ae31557d2f87d32098d1effd4"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <h2 class="groupheader">Macro Definition Documentation</h2>
 <a id="a3e40359bbae872177b7e1b53967a7bda" name="a3e40359bbae872177b7e1b53967a7bda"></a>
@@ -184,7 +185,7 @@ Functions</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-<b>Value:</b><div class="fragment"><div class="line">    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> oc = 0; oc &lt; job-&gt;output_channels; ++oc) { \</div>
+<b>Value:</b><div class="fragment"><div class="line">    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> oc = job-&gt;channel_begin; oc &lt; job-&gt;channel_end; ++oc) { \</div>
 <div class="line">        for (<span class="keywordtype">size_t</span> frame = 0; frame &lt; job-&gt;output_frames; ++frame) { \</div>
 <div class="line">            <span class="keywordtype">float</span> sum = job-&gt;bias[oc]; \</div>
 <div class="line">            for (<span class="keywordtype">size_t</span> ic = 0; ic &lt; job-&gt;input_channels; ++ic) { \</div>
@@ -202,24 +203,24 @@ Functions</h2></td></tr>
 <div class="line">        } \</div>
 <div class="line">    }</div>
 </div><!-- fragment -->
-<p class="definition">Definition at line <a class="el" href="audio__conv1d__checked_8c_source.html#l00039">39</a> of file <a class="el" href="audio__conv1d__checked_8c_source.html">audio_conv1d_checked.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   40</span>                                                         { \</div>
-<div class="line"><span class="lineno">   41</span>        for (<span class="keywordtype">size_t</span> frame = 0; frame &lt; job-&gt;output_frames; ++frame) { \</div>
-<div class="line"><span class="lineno">   42</span>            <span class="keywordtype">float</span> sum = job-&gt;bias[oc]; \</div>
-<div class="line"><span class="lineno">   43</span>            for (<span class="keywordtype">size_t</span> ic = 0; ic &lt; job-&gt;input_channels; ++ic) { \</div>
-<div class="line"><span class="lineno">   44</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> *row = job-&gt;weight + \</div>
-<div class="line"><span class="lineno">   45</span>                    (oc * job-&gt;input_channels + ic) * job-&gt;kernel_size; \</div>
-<div class="line"><span class="lineno">   46</span>                for (<span class="keywordtype">size_t</span> tap = 0; tap &lt; job-&gt;kernel_size; ++tap) { \</div>
-<div class="line"><span class="lineno">   47</span>                    int64_t source = (int64_t)frame * job-&gt;stride + \</div>
-<div class="line"><span class="lineno">   48</span>                        (int64_t)tap * job-&gt;dilation - job-&gt;padding; \</div>
-<div class="line"><span class="lineno">   49</span>                    if (source &gt;= 0 &amp;&amp; (<span class="keywordtype">size_t</span>)source &lt; job-&gt;input_frames) \</div>
-<div class="line"><span class="lineno">   50</span>                        sum = fmaf(job-&gt;input[ic * job-&gt;input_stride + \</div>
-<div class="line"><span class="lineno">   51</span>                            (<span class="keywordtype">size_t</span>)source], row[tap], sum); \</div>
-<div class="line"><span class="lineno">   52</span>                } \</div>
-<div class="line"><span class="lineno">   53</span>            } \</div>
-<div class="line"><span class="lineno">   54</span>            job-&gt;staged[oc * job-&gt;output_frames + frame] = sum; \</div>
-<div class="line"><span class="lineno">   55</span>        } \</div>
-<div class="line"><span class="lineno">   56</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="audio__conv1d__checked_8c_source.html#l00024">24</a> of file <a class="el" href="audio__conv1d__checked_8c_source.html">audio_conv1d_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   25</span>                                                                      { \</div>
+<div class="line"><span class="lineno">   26</span>        for (<span class="keywordtype">size_t</span> frame = 0; frame &lt; job-&gt;output_frames; ++frame) { \</div>
+<div class="line"><span class="lineno">   27</span>            <span class="keywordtype">float</span> sum = job-&gt;bias[oc]; \</div>
+<div class="line"><span class="lineno">   28</span>            for (<span class="keywordtype">size_t</span> ic = 0; ic &lt; job-&gt;input_channels; ++ic) { \</div>
+<div class="line"><span class="lineno">   29</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> *row = job-&gt;weight + \</div>
+<div class="line"><span class="lineno">   30</span>                    (oc * job-&gt;input_channels + ic) * job-&gt;kernel_size; \</div>
+<div class="line"><span class="lineno">   31</span>                for (<span class="keywordtype">size_t</span> tap = 0; tap &lt; job-&gt;kernel_size; ++tap) { \</div>
+<div class="line"><span class="lineno">   32</span>                    int64_t source = (int64_t)frame * job-&gt;stride + \</div>
+<div class="line"><span class="lineno">   33</span>                        (int64_t)tap * job-&gt;dilation - job-&gt;padding; \</div>
+<div class="line"><span class="lineno">   34</span>                    if (source &gt;= 0 &amp;&amp; (<span class="keywordtype">size_t</span>)source &lt; job-&gt;input_frames) \</div>
+<div class="line"><span class="lineno">   35</span>                        sum = fmaf(job-&gt;input[ic * job-&gt;input_stride + \</div>
+<div class="line"><span class="lineno">   36</span>                            (<span class="keywordtype">size_t</span>)source], row[tap], sum); \</div>
+<div class="line"><span class="lineno">   37</span>                } \</div>
+<div class="line"><span class="lineno">   38</span>            } \</div>
+<div class="line"><span class="lineno">   39</span>            job-&gt;staged[oc * job-&gt;output_frames + frame] = sum; \</div>
+<div class="line"><span class="lineno">   40</span>        } \</div>
+<div class="line"><span class="lineno">   41</span>    }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -235,7 +236,7 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="audio__conv1d__checked_8c_source.html#l00018">18</a> of file <a class="el" href="audio__conv1d__checked_8c_source.html">audio_conv1d_checked.c</a>.</p>
+<p class="definition">Definition at line <a class="el" href="audio__conv1d__checked_8c_source.html#l00019">19</a> of file <a class="el" href="audio__conv1d__checked_8c_source.html">audio_conv1d_checked.c</a>.</p>
 
 </div>
 </div>
@@ -256,17 +257,17 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="audio__conv1d__checked_8c_source.html#l00130">130</a> of file <a class="el" href="audio__conv1d__checked_8c_source.html">audio_conv1d_checked.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  130</span>                                                  {</div>
-<div class="line"><span class="lineno">  131</span><span class="preprocessor">#if CK_AUDIO_CONV_X86_TARGET_FMA</span></div>
-<div class="line"><span class="lineno">  132</span>    __builtin_cpu_init();</div>
-<div class="line"><span class="lineno">  133</span>    <span class="keywordflow">return</span> __builtin_cpu_supports(<span class="stringliteral">&quot;avx2&quot;</span>) &amp;&amp; __builtin_cpu_supports(<span class="stringliteral">&quot;fma&quot;</span>);</div>
-<div class="line"><span class="lineno">  134</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno">  135</span>    <span class="keywordflow">return</span> 0;</div>
-<div class="line"><span class="lineno">  136</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  137</span>}</div>
+<p class="definition">Definition at line <a class="el" href="audio__conv1d__checked_8c_source.html#l00118">118</a> of file <a class="el" href="audio__conv1d__checked_8c_source.html">audio_conv1d_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  118</span>                                                  {</div>
+<div class="line"><span class="lineno">  119</span><span class="preprocessor">#if CK_AUDIO_CONV_X86_TARGET_FMA</span></div>
+<div class="line"><span class="lineno">  120</span>    __builtin_cpu_init();</div>
+<div class="line"><span class="lineno">  121</span>    <span class="keywordflow">return</span> __builtin_cpu_supports(<span class="stringliteral">&quot;avx2&quot;</span>) &amp;&amp; __builtin_cpu_supports(<span class="stringliteral">&quot;fma&quot;</span>);</div>
+<div class="line"><span class="lineno">  122</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno">  123</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  124</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  125</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="audio__conv1d__checked_8c_source.html#l00316">audio_conv1d_checked_channel_major_f32_avx2_fma()</a>, and <a class="el" href="audio__conv1d__checked_8c_source.html#l00343">audio_conv1d_dilated_checked_channel_major_f32_avx2_fma()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="audio__conv1d__checked_8c_source.html#l00305">audio_conv1d_checked_channel_major_f32_avx2_fma()</a>, <a class="el" href="audio__conv1d__checked_8c_source.html#l00332">audio_conv1d_dilated_checked_channel_major_f32_avx2_fma()</a>, and <a class="el" href="audio__conv1d__parallel_8c_source.html#l00045">audio_conv1d_parallel_checked_impl()</a>.</p>
 
 </div>
 </div>
@@ -398,18 +399,18 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="audio__conv1d__checked_8c_source.html#l00230">230</a> of file <a class="el" href="audio__conv1d__checked_8c_source.html">audio_conv1d_checked.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  237</span>                                                                             {</div>
-<div class="line"><span class="lineno">  238</span>    <span class="keywordflow">return</span> <a class="code hl_function" href="audio__conv1d__checked_8c.html#ab24784a576cfffede7cd1c55075556ce">audio_conv1d_checked_impl</a>(input, input_elements, input_stride,</div>
-<div class="line"><span class="lineno">  239</span>        weight, weight_elements, bias, bias_elements, output, output_elements,</div>
-<div class="line"><span class="lineno">  240</span>        output_stride, scratch, scratch_elements, input_channels,</div>
-<div class="line"><span class="lineno">  241</span>        output_channels, input_frames, kernel_size, stride, padding, 1,</div>
-<div class="line"><span class="lineno">  242</span>        output_frames, <a class="code hl_function" href="audio__conv1d__checked_8c.html#ada7da9e62d5f12c487027d01dd8e5c13">audio_conv1d_compute_scalar</a>);</div>
-<div class="line"><span class="lineno">  243</span>}</div>
-<div class="ttc" id="aaudio__conv1d__checked_8c_html_ab24784a576cfffede7cd1c55075556ce"><div class="ttname"><a href="audio__conv1d__checked_8c.html#ab24784a576cfffede7cd1c55075556ce">audio_conv1d_checked_impl</a></div><div class="ttdeci">static int audio_conv1d_checked_impl(const float *input, size_t input_elements, size_t input_stride, const float *weight, size_t weight_elements, const float *bias, size_t bias_elements, float *output, size_t output_elements, size_t output_stride, float *scratch, size_t scratch_elements, size_t input_channels, size_t output_channels, size_t input_frames, size_t kernel_size, size_t stride, size_t padding, size_t dilation, size_t output_frames, void(*compute)(const ck_audio_conv1d_job *))</div><div class="ttdef"><b>Definition</b> <a href="audio__conv1d__checked_8c_source.html#l00154">audio_conv1d_checked.c:154</a></div></div>
-<div class="ttc" id="aaudio__conv1d__checked_8c_html_ada7da9e62d5f12c487027d01dd8e5c13"><div class="ttname"><a href="audio__conv1d__checked_8c.html#ada7da9e62d5f12c487027d01dd8e5c13">audio_conv1d_compute_scalar</a></div><div class="ttdeci">static void audio_conv1d_compute_scalar(const ck_audio_conv1d_job *job)</div><div class="ttdef"><b>Definition</b> <a href="audio__conv1d__checked_8c_source.html#l00058">audio_conv1d_checked.c:58</a></div></div>
+<p class="definition">Definition at line <a class="el" href="audio__conv1d__checked_8c_source.html#l00219">219</a> of file <a class="el" href="audio__conv1d__checked_8c_source.html">audio_conv1d_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  226</span>                                                                             {</div>
+<div class="line"><span class="lineno">  227</span>    <span class="keywordflow">return</span> <a class="code hl_function" href="audio__conv1d__checked_8c.html#a91b21e5ae31557d2f87d32098d1effd4">ck_audio_conv1d_checked_execute</a>(input, input_elements, input_stride,</div>
+<div class="line"><span class="lineno">  228</span>        weight, weight_elements, bias, bias_elements, output, output_elements,</div>
+<div class="line"><span class="lineno">  229</span>        output_stride, scratch, scratch_elements, input_channels,</div>
+<div class="line"><span class="lineno">  230</span>        output_channels, input_frames, kernel_size, stride, padding, 1,</div>
+<div class="line"><span class="lineno">  231</span>        output_frames, <a class="code hl_function" href="audio__conv1d__checked_8c.html#ad091b43688140d3a09bd25bd4c93ca9c">audio_conv1d_compute_scalar</a>, NULL);</div>
+<div class="line"><span class="lineno">  232</span>}</div>
+<div class="ttc" id="aaudio__conv1d__checked_8c_html_a91b21e5ae31557d2f87d32098d1effd4"><div class="ttname"><a href="audio__conv1d__checked_8c.html#a91b21e5ae31557d2f87d32098d1effd4">ck_audio_conv1d_checked_execute</a></div><div class="ttdeci">int ck_audio_conv1d_checked_execute(const float *input, size_t input_elements, size_t input_stride, const float *weight, size_t weight_elements, const float *bias, size_t bias_elements, float *output, size_t output_elements, size_t output_stride, float *scratch, size_t scratch_elements, size_t input_channels, size_t output_channels, size_t input_frames, size_t kernel_size, size_t stride, size_t padding, size_t dilation, size_t output_frames, ck_audio_conv1d_compute_fn compute, void *compute_context)</div><div class="ttdef"><b>Definition</b> <a href="audio__conv1d__checked_8c_source.html#l00142">audio_conv1d_checked.c:142</a></div></div>
+<div class="ttc" id="aaudio__conv1d__checked_8c_html_ad091b43688140d3a09bd25bd4c93ca9c"><div class="ttname"><a href="audio__conv1d__checked_8c.html#ad091b43688140d3a09bd25bd4c93ca9c">audio_conv1d_compute_scalar</a></div><div class="ttdeci">static void audio_conv1d_compute_scalar(const ck_audio_conv1d_job *job, void *unused)</div><div class="ttdef"><b>Definition</b> <a href="audio__conv1d__checked_8c_source.html#l00043">audio_conv1d_checked.c:43</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="audio__conv1d__checked_8c_source.html#l00154">audio_conv1d_checked_impl()</a>, and <a class="el" href="audio__conv1d__checked_8c_source.html#l00058">audio_conv1d_compute_scalar()</a>.</p>
+<p class="reference">References <a class="el" href="audio__conv1d__checked_8c_source.html#l00043">audio_conv1d_compute_scalar()</a>, and <a class="el" href="audio__conv1d__checked_8c_source.html#l00142">ck_audio_conv1d_checked_execute()</a>.</p>
 
 </div>
 </div>
@@ -541,30 +542,31 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="audio__conv1d__checked_8c_source.html#l00316">316</a> of file <a class="el" href="audio__conv1d__checked_8c_source.html">audio_conv1d_checked.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  323</span>                                                                             {</div>
-<div class="line"><span class="lineno">  324</span><span class="preprocessor">#if CK_AUDIO_CONV_X86_TARGET_FMA</span></div>
-<div class="line"><span class="lineno">  325</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="audio__conv1d__checked_8c.html#a225741208f5c3cbce1cf3acc44c18176">audio_conv1d_checked_avx2_fma_available</a>())</div>
-<div class="line"><span class="lineno">  326</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5a9a25add52b35591b61842824dc72f2c5">CK_AUDIO_CONV_CHECKED_UNSUPPORTED</a>;</div>
-<div class="line"><span class="lineno">  327</span>    <span class="keywordflow">return</span> <a class="code hl_function" href="audio__conv1d__checked_8c.html#ab24784a576cfffede7cd1c55075556ce">audio_conv1d_checked_impl</a>(input, input_elements, input_stride,</div>
-<div class="line"><span class="lineno">  328</span>        weight, weight_elements, bias, bias_elements, output, output_elements,</div>
-<div class="line"><span class="lineno">  329</span>        output_stride, scratch, scratch_elements, input_channels,</div>
-<div class="line"><span class="lineno">  330</span>        output_channels, input_frames, kernel_size, stride, padding, 1,</div>
-<div class="line"><span class="lineno">  331</span>        output_frames, audio_conv1d_compute_avx2);</div>
-<div class="line"><span class="lineno">  332</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno">  333</span>    (void)input; (void)input_elements; (void)input_stride;</div>
-<div class="line"><span class="lineno">  334</span>    (void)weight; (void)weight_elements; (void)bias; (void)bias_elements;</div>
-<div class="line"><span class="lineno">  335</span>    (void)output; (void)output_elements; (void)output_stride;</div>
-<div class="line"><span class="lineno">  336</span>    (void)scratch; (void)scratch_elements; (void)input_channels;</div>
-<div class="line"><span class="lineno">  337</span>    (void)output_channels; (void)input_frames; (void)kernel_size;</div>
-<div class="line"><span class="lineno">  338</span>    (void)stride; (void)padding; (void)output_frames;</div>
-<div class="line"><span class="lineno">  339</span>    <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5a9a25add52b35591b61842824dc72f2c5">CK_AUDIO_CONV_CHECKED_UNSUPPORTED</a>;</div>
-<div class="line"><span class="lineno">  340</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  341</span>}</div>
-<div class="ttc" id="aaudio__conv1d__checked_8c_html_a225741208f5c3cbce1cf3acc44c18176"><div class="ttname"><a href="audio__conv1d__checked_8c.html#a225741208f5c3cbce1cf3acc44c18176">audio_conv1d_checked_avx2_fma_available</a></div><div class="ttdeci">int audio_conv1d_checked_avx2_fma_available(void)</div><div class="ttdef"><b>Definition</b> <a href="audio__conv1d__checked_8c_source.html#l00130">audio_conv1d_checked.c:130</a></div></div>
+<p class="definition">Definition at line <a class="el" href="audio__conv1d__checked_8c_source.html#l00305">305</a> of file <a class="el" href="audio__conv1d__checked_8c_source.html">audio_conv1d_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  312</span>                                                                             {</div>
+<div class="line"><span class="lineno">  313</span><span class="preprocessor">#if CK_AUDIO_CONV_X86_TARGET_FMA</span></div>
+<div class="line"><span class="lineno">  314</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="audio__conv1d__checked_8c.html#a225741208f5c3cbce1cf3acc44c18176">audio_conv1d_checked_avx2_fma_available</a>())</div>
+<div class="line"><span class="lineno">  315</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5a9a25add52b35591b61842824dc72f2c5">CK_AUDIO_CONV_CHECKED_UNSUPPORTED</a>;</div>
+<div class="line"><span class="lineno">  316</span>    <span class="keywordflow">return</span> <a class="code hl_function" href="audio__conv1d__checked_8c.html#a91b21e5ae31557d2f87d32098d1effd4">ck_audio_conv1d_checked_execute</a>(input, input_elements, input_stride,</div>
+<div class="line"><span class="lineno">  317</span>        weight, weight_elements, bias, bias_elements, output, output_elements,</div>
+<div class="line"><span class="lineno">  318</span>        output_stride, scratch, scratch_elements, input_channels,</div>
+<div class="line"><span class="lineno">  319</span>        output_channels, input_frames, kernel_size, stride, padding, 1,</div>
+<div class="line"><span class="lineno">  320</span>        output_frames, <a class="code hl_function" href="audio__conv1d__checked__internal_8h.html#a4cfc036a3b54d205edbc76973a0a9f72">audio_conv1d_compute_avx2</a>, NULL);</div>
+<div class="line"><span class="lineno">  321</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno">  322</span>    (void)input; (void)input_elements; (void)input_stride;</div>
+<div class="line"><span class="lineno">  323</span>    (void)weight; (void)weight_elements; (void)bias; (void)bias_elements;</div>
+<div class="line"><span class="lineno">  324</span>    (void)output; (void)output_elements; (void)output_stride;</div>
+<div class="line"><span class="lineno">  325</span>    (void)scratch; (void)scratch_elements; (void)input_channels;</div>
+<div class="line"><span class="lineno">  326</span>    (void)output_channels; (void)input_frames; (void)kernel_size;</div>
+<div class="line"><span class="lineno">  327</span>    (void)stride; (void)padding; (void)output_frames;</div>
+<div class="line"><span class="lineno">  328</span>    <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5a9a25add52b35591b61842824dc72f2c5">CK_AUDIO_CONV_CHECKED_UNSUPPORTED</a>;</div>
+<div class="line"><span class="lineno">  329</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  330</span>}</div>
+<div class="ttc" id="aaudio__conv1d__checked_8c_html_a225741208f5c3cbce1cf3acc44c18176"><div class="ttname"><a href="audio__conv1d__checked_8c.html#a225741208f5c3cbce1cf3acc44c18176">audio_conv1d_checked_avx2_fma_available</a></div><div class="ttdeci">int audio_conv1d_checked_avx2_fma_available(void)</div><div class="ttdef"><b>Definition</b> <a href="audio__conv1d__checked_8c_source.html#l00118">audio_conv1d_checked.c:118</a></div></div>
+<div class="ttc" id="aaudio__conv1d__checked__internal_8h_html_a4cfc036a3b54d205edbc76973a0a9f72"><div class="ttname"><a href="audio__conv1d__checked__internal_8h.html#a4cfc036a3b54d205edbc76973a0a9f72">audio_conv1d_compute_avx2</a></div><div class="ttdeci">void audio_conv1d_compute_avx2(const ck_audio_conv1d_job *job, void *unused)</div></div>
 <div class="ttc" id="ackernel__audio__conv__checked_8h_html_a99fb83031ce9923c84392b4e92f956b5a9a25add52b35591b61842824dc72f2c5"><div class="ttname"><a href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5a9a25add52b35591b61842824dc72f2c5">CK_AUDIO_CONV_CHECKED_UNSUPPORTED</a></div><div class="ttdeci">@ CK_AUDIO_CONV_CHECKED_UNSUPPORTED</div><div class="ttdef"><b>Definition</b> <a href="ckernel__audio__conv__checked_8h_source.html#l00017">ckernel_audio_conv_checked.h:16</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="audio__conv1d__checked_8c_source.html#l00130">audio_conv1d_checked_avx2_fma_available()</a>, <a class="el" href="audio__conv1d__checked_8c_source.html#l00154">audio_conv1d_checked_impl()</a>, and <a class="el" href="ckernel__audio__conv__checked_8h_source.html#l00016">CK_AUDIO_CONV_CHECKED_UNSUPPORTED</a>.</p>
+<p class="reference">References <a class="el" href="audio__conv1d__checked_8c_source.html#l00118">audio_conv1d_checked_avx2_fma_available()</a>, <a class="el" href="audio__conv1d__checked__internal_8h.html#a4cfc036a3b54d205edbc76973a0a9f72">audio_conv1d_compute_avx2()</a>, <a class="el" href="audio__conv1d__checked_8c_source.html#l00142">ck_audio_conv1d_checked_execute()</a>, and <a class="el" href="ckernel__audio__conv__checked_8h_source.html#l00016">CK_AUDIO_CONV_CHECKED_UNSUPPORTED</a>.</p>
 
 </div>
 </div>
@@ -696,29 +698,29 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="audio__conv1d__checked_8c_source.html#l00261">261</a> of file <a class="el" href="audio__conv1d__checked_8c_source.html">audio_conv1d_checked.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  268</span>                                                                             {</div>
-<div class="line"><span class="lineno">  269</span><span class="preprocessor">#if CK_AUDIO_CONV_X86_TARGET_FMA</span></div>
-<div class="line"><span class="lineno">  270</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="audio__conv1d__checked_8c.html#a962f1021b4bcd53028feda52e0ba7721">audio_conv1d_checked_hardware_fma_available</a>())</div>
-<div class="line"><span class="lineno">  271</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5a9a25add52b35591b61842824dc72f2c5">CK_AUDIO_CONV_CHECKED_UNSUPPORTED</a>;</div>
-<div class="line"><span class="lineno">  272</span>    <span class="keywordflow">return</span> <a class="code hl_function" href="audio__conv1d__checked_8c.html#ab24784a576cfffede7cd1c55075556ce">audio_conv1d_checked_impl</a>(input, input_elements, input_stride,</div>
-<div class="line"><span class="lineno">  273</span>        weight, weight_elements, bias, bias_elements, output, output_elements,</div>
-<div class="line"><span class="lineno">  274</span>        output_stride, scratch, scratch_elements, input_channels,</div>
-<div class="line"><span class="lineno">  275</span>        output_channels, input_frames, kernel_size, stride, padding, 1,</div>
-<div class="line"><span class="lineno">  276</span>        output_frames, audio_conv1d_compute_hwfma);</div>
-<div class="line"><span class="lineno">  277</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno">  278</span>    (void)input; (void)input_elements; (void)input_stride;</div>
-<div class="line"><span class="lineno">  279</span>    (void)weight; (void)weight_elements; (void)bias; (void)bias_elements;</div>
-<div class="line"><span class="lineno">  280</span>    (void)output; (void)output_elements; (void)output_stride;</div>
-<div class="line"><span class="lineno">  281</span>    (void)scratch; (void)scratch_elements; (void)input_channels;</div>
-<div class="line"><span class="lineno">  282</span>    (void)output_channels; (void)input_frames; (void)kernel_size;</div>
-<div class="line"><span class="lineno">  283</span>    (void)stride; (void)padding; (void)output_frames;</div>
-<div class="line"><span class="lineno">  284</span>    <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5a9a25add52b35591b61842824dc72f2c5">CK_AUDIO_CONV_CHECKED_UNSUPPORTED</a>;</div>
-<div class="line"><span class="lineno">  285</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  286</span>}</div>
-<div class="ttc" id="aaudio__conv1d__checked_8c_html_a962f1021b4bcd53028feda52e0ba7721"><div class="ttname"><a href="audio__conv1d__checked_8c.html#a962f1021b4bcd53028feda52e0ba7721">audio_conv1d_checked_hardware_fma_available</a></div><div class="ttdeci">int audio_conv1d_checked_hardware_fma_available(void)</div><div class="ttdef"><b>Definition</b> <a href="audio__conv1d__checked_8c_source.html#l00121">audio_conv1d_checked.c:121</a></div></div>
+<p class="definition">Definition at line <a class="el" href="audio__conv1d__checked_8c_source.html#l00250">250</a> of file <a class="el" href="audio__conv1d__checked_8c_source.html">audio_conv1d_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  257</span>                                                                             {</div>
+<div class="line"><span class="lineno">  258</span><span class="preprocessor">#if CK_AUDIO_CONV_X86_TARGET_FMA</span></div>
+<div class="line"><span class="lineno">  259</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="audio__conv1d__checked_8c.html#a962f1021b4bcd53028feda52e0ba7721">audio_conv1d_checked_hardware_fma_available</a>())</div>
+<div class="line"><span class="lineno">  260</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5a9a25add52b35591b61842824dc72f2c5">CK_AUDIO_CONV_CHECKED_UNSUPPORTED</a>;</div>
+<div class="line"><span class="lineno">  261</span>    <span class="keywordflow">return</span> <a class="code hl_function" href="audio__conv1d__checked_8c.html#a91b21e5ae31557d2f87d32098d1effd4">ck_audio_conv1d_checked_execute</a>(input, input_elements, input_stride,</div>
+<div class="line"><span class="lineno">  262</span>        weight, weight_elements, bias, bias_elements, output, output_elements,</div>
+<div class="line"><span class="lineno">  263</span>        output_stride, scratch, scratch_elements, input_channels,</div>
+<div class="line"><span class="lineno">  264</span>        output_channels, input_frames, kernel_size, stride, padding, 1,</div>
+<div class="line"><span class="lineno">  265</span>        output_frames, audio_conv1d_compute_hwfma, NULL);</div>
+<div class="line"><span class="lineno">  266</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno">  267</span>    (void)input; (void)input_elements; (void)input_stride;</div>
+<div class="line"><span class="lineno">  268</span>    (void)weight; (void)weight_elements; (void)bias; (void)bias_elements;</div>
+<div class="line"><span class="lineno">  269</span>    (void)output; (void)output_elements; (void)output_stride;</div>
+<div class="line"><span class="lineno">  270</span>    (void)scratch; (void)scratch_elements; (void)input_channels;</div>
+<div class="line"><span class="lineno">  271</span>    (void)output_channels; (void)input_frames; (void)kernel_size;</div>
+<div class="line"><span class="lineno">  272</span>    (void)stride; (void)padding; (void)output_frames;</div>
+<div class="line"><span class="lineno">  273</span>    <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5a9a25add52b35591b61842824dc72f2c5">CK_AUDIO_CONV_CHECKED_UNSUPPORTED</a>;</div>
+<div class="line"><span class="lineno">  274</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  275</span>}</div>
+<div class="ttc" id="aaudio__conv1d__checked_8c_html_a962f1021b4bcd53028feda52e0ba7721"><div class="ttname"><a href="audio__conv1d__checked_8c.html#a962f1021b4bcd53028feda52e0ba7721">audio_conv1d_checked_hardware_fma_available</a></div><div class="ttdeci">int audio_conv1d_checked_hardware_fma_available(void)</div><div class="ttdef"><b>Definition</b> <a href="audio__conv1d__checked_8c_source.html#l00109">audio_conv1d_checked.c:109</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="audio__conv1d__checked_8c_source.html#l00121">audio_conv1d_checked_hardware_fma_available()</a>, <a class="el" href="audio__conv1d__checked_8c_source.html#l00154">audio_conv1d_checked_impl()</a>, and <a class="el" href="ckernel__audio__conv__checked_8h_source.html#l00016">CK_AUDIO_CONV_CHECKED_UNSUPPORTED</a>.</p>
+<p class="reference">References <a class="el" href="audio__conv1d__checked_8c_source.html#l00109">audio_conv1d_checked_hardware_fma_available()</a>, <a class="el" href="audio__conv1d__checked_8c_source.html#l00142">ck_audio_conv1d_checked_execute()</a>, and <a class="el" href="ckernel__audio__conv__checked_8h_source.html#l00016">CK_AUDIO_CONV_CHECKED_UNSUPPORTED</a>.</p>
 
 </div>
 </div>
@@ -738,249 +740,17 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="audio__conv1d__checked_8c_source.html#l00121">121</a> of file <a class="el" href="audio__conv1d__checked_8c_source.html">audio_conv1d_checked.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  121</span>                                                      {</div>
-<div class="line"><span class="lineno">  122</span><span class="preprocessor">#if CK_AUDIO_CONV_X86_TARGET_FMA</span></div>
-<div class="line"><span class="lineno">  123</span>    __builtin_cpu_init();</div>
-<div class="line"><span class="lineno">  124</span>    <span class="keywordflow">return</span> __builtin_cpu_supports(<span class="stringliteral">&quot;fma&quot;</span>) != 0;</div>
-<div class="line"><span class="lineno">  125</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno">  126</span>    <span class="keywordflow">return</span> 0;</div>
-<div class="line"><span class="lineno">  127</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  128</span>}</div>
+<p class="definition">Definition at line <a class="el" href="audio__conv1d__checked_8c_source.html#l00109">109</a> of file <a class="el" href="audio__conv1d__checked_8c_source.html">audio_conv1d_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  109</span>                                                      {</div>
+<div class="line"><span class="lineno">  110</span><span class="preprocessor">#if CK_AUDIO_CONV_X86_TARGET_FMA</span></div>
+<div class="line"><span class="lineno">  111</span>    __builtin_cpu_init();</div>
+<div class="line"><span class="lineno">  112</span>    <span class="keywordflow">return</span> __builtin_cpu_supports(<span class="stringliteral">&quot;fma&quot;</span>) != 0;</div>
+<div class="line"><span class="lineno">  113</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno">  114</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  115</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  116</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="audio__conv1d__checked_8c_source.html#l00261">audio_conv1d_checked_channel_major_f32_hwfma()</a>, and <a class="el" href="audio__conv1d__checked_8c_source.html#l00288">audio_conv1d_dilated_checked_channel_major_f32_hwfma()</a>.</p>
-
-</div>
-</div>
-<a id="ab24784a576cfffede7cd1c55075556ce" name="ab24784a576cfffede7cd1c55075556ce"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ab24784a576cfffede7cd1c55075556ce">&#9670;&#160;</a></span>audio_conv1d_checked_impl()</h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">static int audio_conv1d_checked_impl </td>
-          <td>(</td>
-          <td class="paramtype">const float *&#160;</td>
-          <td class="paramname"><em>input</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">size_t&#160;</td>
-          <td class="paramname"><em>input_elements</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">size_t&#160;</td>
-          <td class="paramname"><em>input_stride</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">const float *&#160;</td>
-          <td class="paramname"><em>weight</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">size_t&#160;</td>
-          <td class="paramname"><em>weight_elements</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">const float *&#160;</td>
-          <td class="paramname"><em>bias</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">size_t&#160;</td>
-          <td class="paramname"><em>bias_elements</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">float *&#160;</td>
-          <td class="paramname"><em>output</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">size_t&#160;</td>
-          <td class="paramname"><em>output_elements</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">size_t&#160;</td>
-          <td class="paramname"><em>output_stride</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">float *&#160;</td>
-          <td class="paramname"><em>scratch</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">size_t&#160;</td>
-          <td class="paramname"><em>scratch_elements</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">size_t&#160;</td>
-          <td class="paramname"><em>input_channels</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">size_t&#160;</td>
-          <td class="paramname"><em>output_channels</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">size_t&#160;</td>
-          <td class="paramname"><em>input_frames</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">size_t&#160;</td>
-          <td class="paramname"><em>kernel_size</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">size_t&#160;</td>
-          <td class="paramname"><em>stride</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">size_t&#160;</td>
-          <td class="paramname"><em>padding</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">size_t&#160;</td>
-          <td class="paramname"><em>dilation</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">size_t&#160;</td>
-          <td class="paramname"><em>output_frames</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">void(*)(const ck_audio_conv1d_job *)&#160;</td>
-          <td class="paramname"><em>compute</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">static</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p class="definition">Definition at line <a class="el" href="audio__conv1d__checked_8c_source.html#l00154">154</a> of file <a class="el" href="audio__conv1d__checked_8c_source.html">audio_conv1d_checked.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  163</span>                                                  {</div>
-<div class="line"><span class="lineno">  164</span>    <span class="keywordtype">size_t</span> input_span, output_span, weight_count, scratch_need;</div>
-<div class="line"><span class="lineno">  165</span>    <span class="keywordflow">if</span> (!input_channels || !output_channels || !input_frames ||</div>
-<div class="line"><span class="lineno">  166</span>        !kernel_size || !stride || !dilation || !output_frames ||</div>
-<div class="line"><span class="lineno">  167</span>        input_channels &gt; INT_MAX || output_channels &gt; INT_MAX ||</div>
-<div class="line"><span class="lineno">  168</span>        input_frames &gt; INT_MAX || kernel_size &gt; INT_MAX ||</div>
-<div class="line"><span class="lineno">  169</span>        stride &gt; INT_MAX || padding &gt; INT_MAX || dilation &gt; INT_MAX ||</div>
-<div class="line"><span class="lineno">  170</span>        output_frames &gt; INT_MAX)</div>
-<div class="line"><span class="lineno">  171</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5ac2ace402a8768aa550787f467a8b2388">CK_AUDIO_CONV_CHECKED_INVALID</a>;</div>
-<div class="line"><span class="lineno">  172</span>    <span class="keyword">const</span> int64_t effective_kernel = 1 +</div>
-<div class="line"><span class="lineno">  173</span>        ((int64_t)kernel_size - 1) * (int64_t)dilation;</div>
-<div class="line"><span class="lineno">  174</span>    <span class="keyword">const</span> int64_t padded = (int64_t)input_frames +</div>
-<div class="line"><span class="lineno">  175</span>        2 * (int64_t)padding - effective_kernel;</div>
-<div class="line"><span class="lineno">  176</span>    <span class="keywordflow">if</span> (padded &lt; 0 || padded / stride + 1 != output_frames)</div>
-<div class="line"><span class="lineno">  177</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5ac2ace402a8768aa550787f467a8b2388">CK_AUDIO_CONV_CHECKED_INVALID</a>;</div>
-<div class="line"><span class="lineno">  178</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="checked__float__buffer_8h.html#a80fa111d42598d70e6c6728193a1f8dc">ck_checked_span</a>((<span class="keywordtype">size_t</span>)input_channels, (size_t)input_frames,</div>
-<div class="line"><span class="lineno">  179</span>                         input_stride, &amp;input_span) ||</div>
-<div class="line"><span class="lineno">  180</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#a80fa111d42598d70e6c6728193a1f8dc">ck_checked_span</a>((<span class="keywordtype">size_t</span>)output_channels, (<span class="keywordtype">size_t</span>)output_frames,</div>
-<div class="line"><span class="lineno">  181</span>                         output_stride, &amp;output_span) ||</div>
-<div class="line"><span class="lineno">  182</span>        <a class="code hl_function" href="audio__conv1d__checked_8c.html#ae91944bf63822011bdb675be8667592d">audio_conv1d_checked_workspace</a>((<span class="keywordtype">size_t</span>)input_channels,</div>
-<div class="line"><span class="lineno">  183</span>            (<span class="keywordtype">size_t</span>)output_channels, (<span class="keywordtype">size_t</span>)input_frames,</div>
-<div class="line"><span class="lineno">  184</span>            (<span class="keywordtype">size_t</span>)output_frames, &amp;scratch_need))</div>
-<div class="line"><span class="lineno">  185</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5a26dc87d2b1cbf477880a386a8c1214da">CK_AUDIO_CONV_CHECKED_OVERFLOW</a>;</div>
-<div class="line"><span class="lineno">  186</span>    <span class="keywordflow">if</span> ((<span class="keywordtype">size_t</span>)output_channels &gt; SIZE_MAX / (size_t)input_channels ||</div>
-<div class="line"><span class="lineno">  187</span>        (<span class="keywordtype">size_t</span>)output_channels * (size_t)input_channels &gt; SIZE_MAX / (<span class="keywordtype">size_t</span>)kernel_size)</div>
-<div class="line"><span class="lineno">  188</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5a26dc87d2b1cbf477880a386a8c1214da">CK_AUDIO_CONV_CHECKED_OVERFLOW</a>;</div>
-<div class="line"><span class="lineno">  189</span>    weight_count = (size_t)output_channels * (<span class="keywordtype">size_t</span>)input_channels * (size_t)kernel_size;</div>
-<div class="line"><span class="lineno">  190</span>    <span class="keywordflow">if</span> (weight_count &gt; SIZE_MAX / <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>)) <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5a26dc87d2b1cbf477880a386a8c1214da">CK_AUDIO_CONV_CHECKED_OVERFLOW</a>;</div>
-<div class="line"><span class="lineno">  191</span>    <span class="keywordflow">if</span> (input_elements &lt; input_span || weight_elements &lt; weight_count ||</div>
-<div class="line"><span class="lineno">  192</span>        bias_elements &lt; (<span class="keywordtype">size_t</span>)output_channels || output_elements &lt; output_span ||</div>
-<div class="line"><span class="lineno">  193</span>        scratch_elements &lt; scratch_need)</div>
-<div class="line"><span class="lineno">  194</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5aa5d5f84d5c955429e82bc1dc907edc8f">CK_AUDIO_CONV_CHECKED_CAPACITY</a>;</div>
-<div class="line"><span class="lineno">  195</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(input, input_span) ||</div>
-<div class="line"><span class="lineno">  196</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(weight, weight_count) ||</div>
-<div class="line"><span class="lineno">  197</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(bias, (<span class="keywordtype">size_t</span>)output_channels) ||</div>
-<div class="line"><span class="lineno">  198</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(output, output_span) ||</div>
-<div class="line"><span class="lineno">  199</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(scratch, scratch_need))</div>
-<div class="line"><span class="lineno">  200</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5ac2ace402a8768aa550787f467a8b2388">CK_AUDIO_CONV_CHECKED_INVALID</a>;</div>
-<div class="line"><span class="lineno">  201</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(output, output_span, input, input_span) ||</div>
-<div class="line"><span class="lineno">  202</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(output, output_span, weight, weight_count) ||</div>
-<div class="line"><span class="lineno">  203</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(output, output_span, bias, (<span class="keywordtype">size_t</span>)output_channels) ||</div>
-<div class="line"><span class="lineno">  204</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(output, output_span, scratch, scratch_need) ||</div>
-<div class="line"><span class="lineno">  205</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(scratch, scratch_need, input, input_span) ||</div>
-<div class="line"><span class="lineno">  206</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(scratch, scratch_need, weight, weight_count) ||</div>
-<div class="line"><span class="lineno">  207</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(scratch, scratch_need, bias, (<span class="keywordtype">size_t</span>)output_channels))</div>
-<div class="line"><span class="lineno">  208</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5ac2ace402a8768aa550787f467a8b2388">CK_AUDIO_CONV_CHECKED_INVALID</a>;</div>
-<div class="line"><span class="lineno">  209</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a>(weight, weight_count) ||</div>
-<div class="line"><span class="lineno">  210</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a>(bias, (<span class="keywordtype">size_t</span>)output_channels))</div>
-<div class="line"><span class="lineno">  211</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5aa97387486e6288624e5b271a2c43f37e">CK_AUDIO_CONV_CHECKED_NONFINITE</a>;</div>
-<div class="line"><span class="lineno">  212</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> channel = 0; channel &lt; input_channels; ++channel)</div>
-<div class="line"><span class="lineno">  213</span>        <span class="keywordflow">if</span> (!<a class="code hl_function" href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a>(input + (<span class="keywordtype">size_t</span>)channel * input_stride,</div>
-<div class="line"><span class="lineno">  214</span>                               (<span class="keywordtype">size_t</span>)input_frames))</div>
-<div class="line"><span class="lineno">  215</span>            <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5aa97387486e6288624e5b271a2c43f37e">CK_AUDIO_CONV_CHECKED_NONFINITE</a>;</div>
-<div class="line"><span class="lineno">  216</span>    <span class="comment">/* Validation and staged commit remain shared by both providers. */</span></div>
-<div class="line"><span class="lineno">  217</span>    <span class="keyword">const</span> ck_audio_conv1d_job job = {input, weight, bias, scratch,</div>
-<div class="line"><span class="lineno">  218</span>        input_stride, input_channels, output_channels, input_frames,</div>
-<div class="line"><span class="lineno">  219</span>        kernel_size, stride, padding, dilation, output_frames};</div>
-<div class="line"><span class="lineno">  220</span>    compute(&amp;job);</div>
-<div class="line"><span class="lineno">  221</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a>(scratch, (<span class="keywordtype">size_t</span>)output_channels * (<span class="keywordtype">size_t</span>)output_frames))</div>
-<div class="line"><span class="lineno">  222</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5aa97387486e6288624e5b271a2c43f37e">CK_AUDIO_CONV_CHECKED_NONFINITE</a>;</div>
-<div class="line"><span class="lineno">  223</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> channel = 0; channel &lt; output_channels; ++channel)</div>
-<div class="line"><span class="lineno">  224</span>        memcpy(output + (<span class="keywordtype">size_t</span>)channel * output_stride,</div>
-<div class="line"><span class="lineno">  225</span>               scratch + (<span class="keywordtype">size_t</span>)channel * (<span class="keywordtype">size_t</span>)output_frames,</div>
-<div class="line"><span class="lineno">  226</span>               (<span class="keywordtype">size_t</span>)output_frames * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">  227</span>    <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5a666f97ea5520eb120e9843806f8f478f">CK_AUDIO_CONV_CHECKED_OK</a>;</div>
-<div class="line"><span class="lineno">  228</span>}</div>
-<div class="ttc" id="aaudio__conv1d__checked_8c_html_ae91944bf63822011bdb675be8667592d"><div class="ttname"><a href="audio__conv1d__checked_8c.html#ae91944bf63822011bdb675be8667592d">audio_conv1d_checked_workspace</a></div><div class="ttdeci">int audio_conv1d_checked_workspace(size_t input_channels, size_t output_channels, size_t input_frames, size_t output_frames, size_t *scratch_elements)</div><div class="ttdef"><b>Definition</b> <a href="audio__conv1d__checked_8c_source.html#l00139">audio_conv1d_checked.c:139</a></div></div>
-<div class="ttc" id="achecked__float__buffer_8h_html_a1b266161b71bde9ca8d45c2fb5ac889a"><div class="ttname"><a href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a></div><div class="ttdeci">static int ck_checked_finite(const float *ptr, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00019">checked_float_buffer.h:19</a></div></div>
-<div class="ttc" id="achecked__float__buffer_8h_html_a80fa111d42598d70e6c6728193a1f8dc"><div class="ttname"><a href="checked__float__buffer_8h.html#a80fa111d42598d70e6c6728193a1f8dc">ck_checked_span</a></div><div class="ttdeci">static int ck_checked_span(size_t rows, size_t width, size_t stride, size_t *span)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00006">checked_float_buffer.h:6</a></div></div>
-<div class="ttc" id="achecked__float__buffer_8h_html_ada07e31487d86edb37408386003ac841"><div class="ttname"><a href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a></div><div class="ttdeci">static int ck_checked_region(const float *ptr, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00011">checked_float_buffer.h:11</a></div></div>
-<div class="ttc" id="achecked__float__buffer_8h_html_af87b7012571dc9a40b8e31c52e773abe"><div class="ttname"><a href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a></div><div class="ttdeci">static int ck_checked_overlap(const float *a, size_t na, const float *b, size_t nb)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00015">checked_float_buffer.h:15</a></div></div>
-<div class="ttc" id="ackernel__audio__conv__checked_8h_html_a99fb83031ce9923c84392b4e92f956b5a26dc87d2b1cbf477880a386a8c1214da"><div class="ttname"><a href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5a26dc87d2b1cbf477880a386a8c1214da">CK_AUDIO_CONV_CHECKED_OVERFLOW</a></div><div class="ttdeci">@ CK_AUDIO_CONV_CHECKED_OVERFLOW</div><div class="ttdef"><b>Definition</b> <a href="ckernel__audio__conv__checked_8h_source.html#l00014">ckernel_audio_conv_checked.h:14</a></div></div>
-<div class="ttc" id="ackernel__audio__conv__checked_8h_html_a99fb83031ce9923c84392b4e92f956b5a666f97ea5520eb120e9843806f8f478f"><div class="ttname"><a href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5a666f97ea5520eb120e9843806f8f478f">CK_AUDIO_CONV_CHECKED_OK</a></div><div class="ttdeci">@ CK_AUDIO_CONV_CHECKED_OK</div><div class="ttdef"><b>Definition</b> <a href="ckernel__audio__conv__checked_8h_source.html#l00011">ckernel_audio_conv_checked.h:11</a></div></div>
-<div class="ttc" id="ackernel__audio__conv__checked_8h_html_a99fb83031ce9923c84392b4e92f956b5aa5d5f84d5c955429e82bc1dc907edc8f"><div class="ttname"><a href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5aa5d5f84d5c955429e82bc1dc907edc8f">CK_AUDIO_CONV_CHECKED_CAPACITY</a></div><div class="ttdeci">@ CK_AUDIO_CONV_CHECKED_CAPACITY</div><div class="ttdef"><b>Definition</b> <a href="ckernel__audio__conv__checked_8h_source.html#l00013">ckernel_audio_conv_checked.h:13</a></div></div>
-<div class="ttc" id="ackernel__audio__conv__checked_8h_html_a99fb83031ce9923c84392b4e92f956b5aa97387486e6288624e5b271a2c43f37e"><div class="ttname"><a href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5aa97387486e6288624e5b271a2c43f37e">CK_AUDIO_CONV_CHECKED_NONFINITE</a></div><div class="ttdeci">@ CK_AUDIO_CONV_CHECKED_NONFINITE</div><div class="ttdef"><b>Definition</b> <a href="ckernel__audio__conv__checked_8h_source.html#l00015">ckernel_audio_conv_checked.h:15</a></div></div>
-<div class="ttc" id="ackernel__audio__conv__checked_8h_html_a99fb83031ce9923c84392b4e92f956b5ac2ace402a8768aa550787f467a8b2388"><div class="ttname"><a href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5ac2ace402a8768aa550787f467a8b2388">CK_AUDIO_CONV_CHECKED_INVALID</a></div><div class="ttdeci">@ CK_AUDIO_CONV_CHECKED_INVALID</div><div class="ttdef"><b>Definition</b> <a href="ckernel__audio__conv__checked_8h_source.html#l00012">ckernel_audio_conv_checked.h:12</a></div></div>
-</div><!-- fragment -->
-<p class="reference">References <a class="el" href="audio__conv1d__checked_8c_source.html#l00139">audio_conv1d_checked_workspace()</a>, <a class="el" href="ckernel__audio__conv__checked_8h_source.html#l00013">CK_AUDIO_CONV_CHECKED_CAPACITY</a>, <a class="el" href="ckernel__audio__conv__checked_8h_source.html#l00012">CK_AUDIO_CONV_CHECKED_INVALID</a>, <a class="el" href="ckernel__audio__conv__checked_8h_source.html#l00015">CK_AUDIO_CONV_CHECKED_NONFINITE</a>, <a class="el" href="ckernel__audio__conv__checked_8h_source.html#l00011">CK_AUDIO_CONV_CHECKED_OK</a>, <a class="el" href="ckernel__audio__conv__checked_8h_source.html#l00014">CK_AUDIO_CONV_CHECKED_OVERFLOW</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00019">ck_checked_finite()</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00015">ck_checked_overlap()</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00011">ck_checked_region()</a>, and <a class="el" href="checked__float__buffer_8h_source.html#l00006">ck_checked_span()</a>.</p>
-
-<p class="reference">Referenced by <a class="el" href="audio__conv1d__checked_8c_source.html#l00230">audio_conv1d_checked_channel_major_f32()</a>, <a class="el" href="audio__conv1d__checked_8c_source.html#l00316">audio_conv1d_checked_channel_major_f32_avx2_fma()</a>, <a class="el" href="audio__conv1d__checked_8c_source.html#l00261">audio_conv1d_checked_channel_major_f32_hwfma()</a>, <a class="el" href="audio__conv1d__checked_8c_source.html#l00245">audio_conv1d_dilated_checked_channel_major_f32()</a>, <a class="el" href="audio__conv1d__checked_8c_source.html#l00343">audio_conv1d_dilated_checked_channel_major_f32_avx2_fma()</a>, and <a class="el" href="audio__conv1d__checked_8c_source.html#l00288">audio_conv1d_dilated_checked_channel_major_f32_hwfma()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="audio__conv1d__checked_8c_source.html#l00250">audio_conv1d_checked_channel_major_f32_hwfma()</a>, and <a class="el" href="audio__conv1d__checked_8c_source.html#l00277">audio_conv1d_dilated_checked_channel_major_f32_hwfma()</a>.</p>
 
 </div>
 </div>
@@ -1028,29 +798,31 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="audio__conv1d__checked_8c_source.html#l00139">139</a> of file <a class="el" href="audio__conv1d__checked_8c_source.html">audio_conv1d_checked.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  140</span>                                                                         {</div>
-<div class="line"><span class="lineno">  141</span>    <span class="keywordtype">size_t</span> staged;</div>
-<div class="line"><span class="lineno">  142</span>    <span class="keywordflow">if</span> (!scratch_elements || !input_channels || !output_channels ||</div>
-<div class="line"><span class="lineno">  143</span>        !input_frames || !output_frames ||</div>
-<div class="line"><span class="lineno">  144</span>        input_channels &gt; SIZE_MAX / input_frames ||</div>
-<div class="line"><span class="lineno">  145</span>        output_channels &gt; SIZE_MAX / output_frames)</div>
-<div class="line"><span class="lineno">  146</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5a26dc87d2b1cbf477880a386a8c1214da">CK_AUDIO_CONV_CHECKED_OVERFLOW</a>;</div>
-<div class="line"><span class="lineno">  147</span>    staged = output_channels * output_frames;</div>
-<div class="line"><span class="lineno">  148</span>    <span class="keywordflow">if</span> (staged &gt; SIZE_MAX / <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>))</div>
-<div class="line"><span class="lineno">  149</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5a26dc87d2b1cbf477880a386a8c1214da">CK_AUDIO_CONV_CHECKED_OVERFLOW</a>;</div>
-<div class="line"><span class="lineno">  150</span>    *scratch_elements = staged;</div>
-<div class="line"><span class="lineno">  151</span>    <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5a666f97ea5520eb120e9843806f8f478f">CK_AUDIO_CONV_CHECKED_OK</a>;</div>
-<div class="line"><span class="lineno">  152</span>}</div>
+<p class="definition">Definition at line <a class="el" href="audio__conv1d__checked_8c_source.html#l00127">127</a> of file <a class="el" href="audio__conv1d__checked_8c_source.html">audio_conv1d_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  128</span>                                                                         {</div>
+<div class="line"><span class="lineno">  129</span>    <span class="keywordtype">size_t</span> staged;</div>
+<div class="line"><span class="lineno">  130</span>    <span class="keywordflow">if</span> (!scratch_elements || !input_channels || !output_channels ||</div>
+<div class="line"><span class="lineno">  131</span>        !input_frames || !output_frames ||</div>
+<div class="line"><span class="lineno">  132</span>        input_channels &gt; SIZE_MAX / input_frames ||</div>
+<div class="line"><span class="lineno">  133</span>        output_channels &gt; SIZE_MAX / output_frames)</div>
+<div class="line"><span class="lineno">  134</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5a26dc87d2b1cbf477880a386a8c1214da">CK_AUDIO_CONV_CHECKED_OVERFLOW</a>;</div>
+<div class="line"><span class="lineno">  135</span>    staged = output_channels * output_frames;</div>
+<div class="line"><span class="lineno">  136</span>    <span class="keywordflow">if</span> (staged &gt; SIZE_MAX / <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>))</div>
+<div class="line"><span class="lineno">  137</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5a26dc87d2b1cbf477880a386a8c1214da">CK_AUDIO_CONV_CHECKED_OVERFLOW</a>;</div>
+<div class="line"><span class="lineno">  138</span>    *scratch_elements = staged;</div>
+<div class="line"><span class="lineno">  139</span>    <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5a666f97ea5520eb120e9843806f8f478f">CK_AUDIO_CONV_CHECKED_OK</a>;</div>
+<div class="line"><span class="lineno">  140</span>}</div>
+<div class="ttc" id="ackernel__audio__conv__checked_8h_html_a99fb83031ce9923c84392b4e92f956b5a26dc87d2b1cbf477880a386a8c1214da"><div class="ttname"><a href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5a26dc87d2b1cbf477880a386a8c1214da">CK_AUDIO_CONV_CHECKED_OVERFLOW</a></div><div class="ttdeci">@ CK_AUDIO_CONV_CHECKED_OVERFLOW</div><div class="ttdef"><b>Definition</b> <a href="ckernel__audio__conv__checked_8h_source.html#l00014">ckernel_audio_conv_checked.h:14</a></div></div>
+<div class="ttc" id="ackernel__audio__conv__checked_8h_html_a99fb83031ce9923c84392b4e92f956b5a666f97ea5520eb120e9843806f8f478f"><div class="ttname"><a href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5a666f97ea5520eb120e9843806f8f478f">CK_AUDIO_CONV_CHECKED_OK</a></div><div class="ttdeci">@ CK_AUDIO_CONV_CHECKED_OK</div><div class="ttdef"><b>Definition</b> <a href="ckernel__audio__conv__checked_8h_source.html#l00011">ckernel_audio_conv_checked.h:11</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="ckernel__audio__conv__checked_8h_source.html#l00011">CK_AUDIO_CONV_CHECKED_OK</a>, and <a class="el" href="ckernel__audio__conv__checked_8h_source.html#l00014">CK_AUDIO_CONV_CHECKED_OVERFLOW</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="audio__conv1d__checked_8c_source.html#l00154">audio_conv1d_checked_impl()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="audio__conv1d__checked_8c_source.html#l00142">ck_audio_conv1d_checked_execute()</a>.</p>
 
 </div>
 </div>
-<a id="ada7da9e62d5f12c487027d01dd8e5c13" name="ada7da9e62d5f12c487027d01dd8e5c13"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ada7da9e62d5f12c487027d01dd8e5c13">&#9670;&#160;</a></span>audio_conv1d_compute_scalar()</h2>
+<a id="ad091b43688140d3a09bd25bd4c93ca9c" name="ad091b43688140d3a09bd25bd4c93ca9c"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ad091b43688140d3a09bd25bd4c93ca9c">&#9670;&#160;</a></span>audio_conv1d_compute_scalar()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -1061,9 +833,19 @@ Functions</h2></td></tr>
         <tr>
           <td class="memname">static void audio_conv1d_compute_scalar </td>
           <td>(</td>
-          <td class="paramtype">const ck_audio_conv1d_job *&#160;</td>
-          <td class="paramname"><em>job</em></td><td>)</td>
+          <td class="paramtype">const <a class="el" href="structck__audio__conv1d__job.html">ck_audio_conv1d_job</a> *&#160;</td>
+          <td class="paramname"><em>job</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
           <td></td>
+          <td class="paramtype">void *&#160;</td>
+          <td class="paramname"><em>unused</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
         </tr>
       </table>
   </td>
@@ -1073,15 +855,16 @@ Functions</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="audio__conv1d__checked_8c_source.html#l00058">58</a> of file <a class="el" href="audio__conv1d__checked_8c_source.html">audio_conv1d_checked.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   58</span>                                                                        {</div>
-<div class="line"><span class="lineno">   59</span>    <a class="code hl_define" href="audio__conv1d__checked_8c.html#a3e40359bbae872177b7e1b53967a7bda">CK_AUDIO_CONV1D_COMPUTE_BODY</a></div>
-<div class="line"><span class="lineno">   60</span>}</div>
-<div class="ttc" id="aaudio__conv1d__checked_8c_html_a3e40359bbae872177b7e1b53967a7bda"><div class="ttname"><a href="audio__conv1d__checked_8c.html#a3e40359bbae872177b7e1b53967a7bda">CK_AUDIO_CONV1D_COMPUTE_BODY</a></div><div class="ttdeci">#define CK_AUDIO_CONV1D_COMPUTE_BODY</div><div class="ttdef"><b>Definition</b> <a href="audio__conv1d__checked_8c_source.html#l00039">audio_conv1d_checked.c:39</a></div></div>
+<p class="definition">Definition at line <a class="el" href="audio__conv1d__checked_8c_source.html#l00043">43</a> of file <a class="el" href="audio__conv1d__checked_8c_source.html">audio_conv1d_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   43</span>                                                                                      {</div>
+<div class="line"><span class="lineno">   44</span>    (void)unused;</div>
+<div class="line"><span class="lineno">   45</span>    <a class="code hl_define" href="audio__conv1d__checked_8c.html#a3e40359bbae872177b7e1b53967a7bda">CK_AUDIO_CONV1D_COMPUTE_BODY</a></div>
+<div class="line"><span class="lineno">   46</span>}</div>
+<div class="ttc" id="aaudio__conv1d__checked_8c_html_a3e40359bbae872177b7e1b53967a7bda"><div class="ttname"><a href="audio__conv1d__checked_8c.html#a3e40359bbae872177b7e1b53967a7bda">CK_AUDIO_CONV1D_COMPUTE_BODY</a></div><div class="ttdeci">#define CK_AUDIO_CONV1D_COMPUTE_BODY</div><div class="ttdef"><b>Definition</b> <a href="audio__conv1d__checked_8c_source.html#l00024">audio_conv1d_checked.c:24</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="audio__conv1d__checked_8c_source.html#l00039">CK_AUDIO_CONV1D_COMPUTE_BODY</a>.</p>
+<p class="reference">References <a class="el" href="audio__conv1d__checked_8c_source.html#l00024">CK_AUDIO_CONV1D_COMPUTE_BODY</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="audio__conv1d__checked_8c_source.html#l00230">audio_conv1d_checked_channel_major_f32()</a>, and <a class="el" href="audio__conv1d__checked_8c_source.html#l00245">audio_conv1d_dilated_checked_channel_major_f32()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="audio__conv1d__checked_8c_source.html#l00219">audio_conv1d_checked_channel_major_f32()</a>, and <a class="el" href="audio__conv1d__checked_8c_source.html#l00234">audio_conv1d_dilated_checked_channel_major_f32()</a>.</p>
 
 </div>
 </div>
@@ -1219,16 +1002,16 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="audio__conv1d__checked_8c_source.html#l00245">245</a> of file <a class="el" href="audio__conv1d__checked_8c_source.html">audio_conv1d_checked.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  253</span>                          {</div>
-<div class="line"><span class="lineno">  254</span>    <span class="keywordflow">return</span> <a class="code hl_function" href="audio__conv1d__checked_8c.html#ab24784a576cfffede7cd1c55075556ce">audio_conv1d_checked_impl</a>(input, input_elements, input_stride,</div>
-<div class="line"><span class="lineno">  255</span>        weight, weight_elements, bias, bias_elements, output, output_elements,</div>
-<div class="line"><span class="lineno">  256</span>        output_stride, scratch, scratch_elements, input_channels,</div>
-<div class="line"><span class="lineno">  257</span>        output_channels, input_frames, kernel_size, stride, padding, dilation,</div>
-<div class="line"><span class="lineno">  258</span>        output_frames, <a class="code hl_function" href="audio__conv1d__checked_8c.html#ada7da9e62d5f12c487027d01dd8e5c13">audio_conv1d_compute_scalar</a>);</div>
-<div class="line"><span class="lineno">  259</span>}</div>
+<p class="definition">Definition at line <a class="el" href="audio__conv1d__checked_8c_source.html#l00234">234</a> of file <a class="el" href="audio__conv1d__checked_8c_source.html">audio_conv1d_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  242</span>                          {</div>
+<div class="line"><span class="lineno">  243</span>    <span class="keywordflow">return</span> <a class="code hl_function" href="audio__conv1d__checked_8c.html#a91b21e5ae31557d2f87d32098d1effd4">ck_audio_conv1d_checked_execute</a>(input, input_elements, input_stride,</div>
+<div class="line"><span class="lineno">  244</span>        weight, weight_elements, bias, bias_elements, output, output_elements,</div>
+<div class="line"><span class="lineno">  245</span>        output_stride, scratch, scratch_elements, input_channels,</div>
+<div class="line"><span class="lineno">  246</span>        output_channels, input_frames, kernel_size, stride, padding, dilation,</div>
+<div class="line"><span class="lineno">  247</span>        output_frames, <a class="code hl_function" href="audio__conv1d__checked_8c.html#ad091b43688140d3a09bd25bd4c93ca9c">audio_conv1d_compute_scalar</a>, NULL);</div>
+<div class="line"><span class="lineno">  248</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="audio__conv1d__checked_8c_source.html#l00154">audio_conv1d_checked_impl()</a>, and <a class="el" href="audio__conv1d__checked_8c_source.html#l00058">audio_conv1d_compute_scalar()</a>.</p>
+<p class="reference">References <a class="el" href="audio__conv1d__checked_8c_source.html#l00043">audio_conv1d_compute_scalar()</a>, and <a class="el" href="audio__conv1d__checked_8c_source.html#l00142">ck_audio_conv1d_checked_execute()</a>.</p>
 
 </div>
 </div>
@@ -1366,28 +1149,28 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="audio__conv1d__checked_8c_source.html#l00343">343</a> of file <a class="el" href="audio__conv1d__checked_8c_source.html">audio_conv1d_checked.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  351</span>                          {</div>
-<div class="line"><span class="lineno">  352</span><span class="preprocessor">#if CK_AUDIO_CONV_X86_TARGET_FMA</span></div>
-<div class="line"><span class="lineno">  353</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="audio__conv1d__checked_8c.html#a225741208f5c3cbce1cf3acc44c18176">audio_conv1d_checked_avx2_fma_available</a>())</div>
-<div class="line"><span class="lineno">  354</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5a9a25add52b35591b61842824dc72f2c5">CK_AUDIO_CONV_CHECKED_UNSUPPORTED</a>;</div>
-<div class="line"><span class="lineno">  355</span>    <span class="keywordflow">return</span> <a class="code hl_function" href="audio__conv1d__checked_8c.html#ab24784a576cfffede7cd1c55075556ce">audio_conv1d_checked_impl</a>(input, input_elements, input_stride,</div>
-<div class="line"><span class="lineno">  356</span>        weight, weight_elements, bias, bias_elements, output, output_elements,</div>
-<div class="line"><span class="lineno">  357</span>        output_stride, scratch, scratch_elements, input_channels,</div>
-<div class="line"><span class="lineno">  358</span>        output_channels, input_frames, kernel_size, stride, padding, dilation,</div>
-<div class="line"><span class="lineno">  359</span>        output_frames, audio_conv1d_compute_avx2);</div>
-<div class="line"><span class="lineno">  360</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno">  361</span>    (void)input; (void)input_elements; (void)input_stride;</div>
-<div class="line"><span class="lineno">  362</span>    (void)weight; (void)weight_elements; (void)bias; (void)bias_elements;</div>
-<div class="line"><span class="lineno">  363</span>    (void)output; (void)output_elements; (void)output_stride;</div>
-<div class="line"><span class="lineno">  364</span>    (void)scratch; (void)scratch_elements; (void)input_channels;</div>
-<div class="line"><span class="lineno">  365</span>    (void)output_channels; (void)input_frames; (void)kernel_size;</div>
-<div class="line"><span class="lineno">  366</span>    (void)stride; (void)padding; (void)dilation; (void)output_frames;</div>
-<div class="line"><span class="lineno">  367</span>    <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5a9a25add52b35591b61842824dc72f2c5">CK_AUDIO_CONV_CHECKED_UNSUPPORTED</a>;</div>
-<div class="line"><span class="lineno">  368</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  369</span>}</div>
+<p class="definition">Definition at line <a class="el" href="audio__conv1d__checked_8c_source.html#l00332">332</a> of file <a class="el" href="audio__conv1d__checked_8c_source.html">audio_conv1d_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  340</span>                          {</div>
+<div class="line"><span class="lineno">  341</span><span class="preprocessor">#if CK_AUDIO_CONV_X86_TARGET_FMA</span></div>
+<div class="line"><span class="lineno">  342</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="audio__conv1d__checked_8c.html#a225741208f5c3cbce1cf3acc44c18176">audio_conv1d_checked_avx2_fma_available</a>())</div>
+<div class="line"><span class="lineno">  343</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5a9a25add52b35591b61842824dc72f2c5">CK_AUDIO_CONV_CHECKED_UNSUPPORTED</a>;</div>
+<div class="line"><span class="lineno">  344</span>    <span class="keywordflow">return</span> <a class="code hl_function" href="audio__conv1d__checked_8c.html#a91b21e5ae31557d2f87d32098d1effd4">ck_audio_conv1d_checked_execute</a>(input, input_elements, input_stride,</div>
+<div class="line"><span class="lineno">  345</span>        weight, weight_elements, bias, bias_elements, output, output_elements,</div>
+<div class="line"><span class="lineno">  346</span>        output_stride, scratch, scratch_elements, input_channels,</div>
+<div class="line"><span class="lineno">  347</span>        output_channels, input_frames, kernel_size, stride, padding, dilation,</div>
+<div class="line"><span class="lineno">  348</span>        output_frames, <a class="code hl_function" href="audio__conv1d__checked__internal_8h.html#a4cfc036a3b54d205edbc76973a0a9f72">audio_conv1d_compute_avx2</a>, NULL);</div>
+<div class="line"><span class="lineno">  349</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno">  350</span>    (void)input; (void)input_elements; (void)input_stride;</div>
+<div class="line"><span class="lineno">  351</span>    (void)weight; (void)weight_elements; (void)bias; (void)bias_elements;</div>
+<div class="line"><span class="lineno">  352</span>    (void)output; (void)output_elements; (void)output_stride;</div>
+<div class="line"><span class="lineno">  353</span>    (void)scratch; (void)scratch_elements; (void)input_channels;</div>
+<div class="line"><span class="lineno">  354</span>    (void)output_channels; (void)input_frames; (void)kernel_size;</div>
+<div class="line"><span class="lineno">  355</span>    (void)stride; (void)padding; (void)dilation; (void)output_frames;</div>
+<div class="line"><span class="lineno">  356</span>    <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5a9a25add52b35591b61842824dc72f2c5">CK_AUDIO_CONV_CHECKED_UNSUPPORTED</a>;</div>
+<div class="line"><span class="lineno">  357</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  358</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="audio__conv1d__checked_8c_source.html#l00130">audio_conv1d_checked_avx2_fma_available()</a>, <a class="el" href="audio__conv1d__checked_8c_source.html#l00154">audio_conv1d_checked_impl()</a>, and <a class="el" href="ckernel__audio__conv__checked_8h_source.html#l00016">CK_AUDIO_CONV_CHECKED_UNSUPPORTED</a>.</p>
+<p class="reference">References <a class="el" href="audio__conv1d__checked_8c_source.html#l00118">audio_conv1d_checked_avx2_fma_available()</a>, <a class="el" href="audio__conv1d__checked__internal_8h.html#a4cfc036a3b54d205edbc76973a0a9f72">audio_conv1d_compute_avx2()</a>, <a class="el" href="audio__conv1d__checked_8c_source.html#l00142">ck_audio_conv1d_checked_execute()</a>, and <a class="el" href="ckernel__audio__conv__checked_8h_source.html#l00016">CK_AUDIO_CONV_CHECKED_UNSUPPORTED</a>.</p>
 
 </div>
 </div>
@@ -1525,28 +1308,258 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="audio__conv1d__checked_8c_source.html#l00288">288</a> of file <a class="el" href="audio__conv1d__checked_8c_source.html">audio_conv1d_checked.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  296</span>                          {</div>
-<div class="line"><span class="lineno">  297</span><span class="preprocessor">#if CK_AUDIO_CONV_X86_TARGET_FMA</span></div>
-<div class="line"><span class="lineno">  298</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="audio__conv1d__checked_8c.html#a962f1021b4bcd53028feda52e0ba7721">audio_conv1d_checked_hardware_fma_available</a>())</div>
-<div class="line"><span class="lineno">  299</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5a9a25add52b35591b61842824dc72f2c5">CK_AUDIO_CONV_CHECKED_UNSUPPORTED</a>;</div>
-<div class="line"><span class="lineno">  300</span>    <span class="keywordflow">return</span> <a class="code hl_function" href="audio__conv1d__checked_8c.html#ab24784a576cfffede7cd1c55075556ce">audio_conv1d_checked_impl</a>(input, input_elements, input_stride,</div>
-<div class="line"><span class="lineno">  301</span>        weight, weight_elements, bias, bias_elements, output, output_elements,</div>
-<div class="line"><span class="lineno">  302</span>        output_stride, scratch, scratch_elements, input_channels,</div>
-<div class="line"><span class="lineno">  303</span>        output_channels, input_frames, kernel_size, stride, padding, dilation,</div>
-<div class="line"><span class="lineno">  304</span>        output_frames, audio_conv1d_compute_hwfma);</div>
-<div class="line"><span class="lineno">  305</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno">  306</span>    (void)input; (void)input_elements; (void)input_stride;</div>
-<div class="line"><span class="lineno">  307</span>    (void)weight; (void)weight_elements; (void)bias; (void)bias_elements;</div>
-<div class="line"><span class="lineno">  308</span>    (void)output; (void)output_elements; (void)output_stride;</div>
-<div class="line"><span class="lineno">  309</span>    (void)scratch; (void)scratch_elements; (void)input_channels;</div>
-<div class="line"><span class="lineno">  310</span>    (void)output_channels; (void)input_frames; (void)kernel_size;</div>
-<div class="line"><span class="lineno">  311</span>    (void)stride; (void)padding; (void)dilation; (void)output_frames;</div>
-<div class="line"><span class="lineno">  312</span>    <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5a9a25add52b35591b61842824dc72f2c5">CK_AUDIO_CONV_CHECKED_UNSUPPORTED</a>;</div>
-<div class="line"><span class="lineno">  313</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  314</span>}</div>
+<p class="definition">Definition at line <a class="el" href="audio__conv1d__checked_8c_source.html#l00277">277</a> of file <a class="el" href="audio__conv1d__checked_8c_source.html">audio_conv1d_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  285</span>                          {</div>
+<div class="line"><span class="lineno">  286</span><span class="preprocessor">#if CK_AUDIO_CONV_X86_TARGET_FMA</span></div>
+<div class="line"><span class="lineno">  287</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="audio__conv1d__checked_8c.html#a962f1021b4bcd53028feda52e0ba7721">audio_conv1d_checked_hardware_fma_available</a>())</div>
+<div class="line"><span class="lineno">  288</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5a9a25add52b35591b61842824dc72f2c5">CK_AUDIO_CONV_CHECKED_UNSUPPORTED</a>;</div>
+<div class="line"><span class="lineno">  289</span>    <span class="keywordflow">return</span> <a class="code hl_function" href="audio__conv1d__checked_8c.html#a91b21e5ae31557d2f87d32098d1effd4">ck_audio_conv1d_checked_execute</a>(input, input_elements, input_stride,</div>
+<div class="line"><span class="lineno">  290</span>        weight, weight_elements, bias, bias_elements, output, output_elements,</div>
+<div class="line"><span class="lineno">  291</span>        output_stride, scratch, scratch_elements, input_channels,</div>
+<div class="line"><span class="lineno">  292</span>        output_channels, input_frames, kernel_size, stride, padding, dilation,</div>
+<div class="line"><span class="lineno">  293</span>        output_frames, audio_conv1d_compute_hwfma, NULL);</div>
+<div class="line"><span class="lineno">  294</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno">  295</span>    (void)input; (void)input_elements; (void)input_stride;</div>
+<div class="line"><span class="lineno">  296</span>    (void)weight; (void)weight_elements; (void)bias; (void)bias_elements;</div>
+<div class="line"><span class="lineno">  297</span>    (void)output; (void)output_elements; (void)output_stride;</div>
+<div class="line"><span class="lineno">  298</span>    (void)scratch; (void)scratch_elements; (void)input_channels;</div>
+<div class="line"><span class="lineno">  299</span>    (void)output_channels; (void)input_frames; (void)kernel_size;</div>
+<div class="line"><span class="lineno">  300</span>    (void)stride; (void)padding; (void)dilation; (void)output_frames;</div>
+<div class="line"><span class="lineno">  301</span>    <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5a9a25add52b35591b61842824dc72f2c5">CK_AUDIO_CONV_CHECKED_UNSUPPORTED</a>;</div>
+<div class="line"><span class="lineno">  302</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  303</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="audio__conv1d__checked_8c_source.html#l00121">audio_conv1d_checked_hardware_fma_available()</a>, <a class="el" href="audio__conv1d__checked_8c_source.html#l00154">audio_conv1d_checked_impl()</a>, and <a class="el" href="ckernel__audio__conv__checked_8h_source.html#l00016">CK_AUDIO_CONV_CHECKED_UNSUPPORTED</a>.</p>
+<p class="reference">References <a class="el" href="audio__conv1d__checked_8c_source.html#l00109">audio_conv1d_checked_hardware_fma_available()</a>, <a class="el" href="audio__conv1d__checked_8c_source.html#l00142">ck_audio_conv1d_checked_execute()</a>, and <a class="el" href="ckernel__audio__conv__checked_8h_source.html#l00016">CK_AUDIO_CONV_CHECKED_UNSUPPORTED</a>.</p>
+
+</div>
+</div>
+<a id="a91b21e5ae31557d2f87d32098d1effd4" name="a91b21e5ae31557d2f87d32098d1effd4"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a91b21e5ae31557d2f87d32098d1effd4">&#9670;&#160;</a></span>ck_audio_conv1d_checked_execute()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int ck_audio_conv1d_checked_execute </td>
+          <td>(</td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>input</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>input_elements</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>input_stride</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>weight</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>weight_elements</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>bias</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>bias_elements</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>output</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>output_elements</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>output_stride</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>scratch</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>scratch_elements</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>input_channels</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>output_channels</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>input_frames</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>kernel_size</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>stride</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>padding</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>dilation</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>output_frames</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="audio__conv1d__checked__internal_8h.html#a971748c2b2ba6ee6c13e965e221e5872">ck_audio_conv1d_compute_fn</a>&#160;</td>
+          <td class="paramname"><em>compute</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">void *&#160;</td>
+          <td class="paramname"><em>compute_context</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="audio__conv1d__checked_8c_source.html#l00142">142</a> of file <a class="el" href="audio__conv1d__checked_8c_source.html">audio_conv1d_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  151</span>                                                               {</div>
+<div class="line"><span class="lineno">  152</span>    <span class="keywordtype">size_t</span> input_span, output_span, weight_count, scratch_need;</div>
+<div class="line"><span class="lineno">  153</span>    <span class="keywordflow">if</span> (!input_channels || !output_channels || !input_frames ||</div>
+<div class="line"><span class="lineno">  154</span>        !kernel_size || !stride || !dilation || !output_frames ||</div>
+<div class="line"><span class="lineno">  155</span>        input_channels &gt; INT_MAX || output_channels &gt; INT_MAX ||</div>
+<div class="line"><span class="lineno">  156</span>        input_frames &gt; INT_MAX || kernel_size &gt; INT_MAX ||</div>
+<div class="line"><span class="lineno">  157</span>        stride &gt; INT_MAX || padding &gt; INT_MAX || dilation &gt; INT_MAX ||</div>
+<div class="line"><span class="lineno">  158</span>        output_frames &gt; INT_MAX)</div>
+<div class="line"><span class="lineno">  159</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5ac2ace402a8768aa550787f467a8b2388">CK_AUDIO_CONV_CHECKED_INVALID</a>;</div>
+<div class="line"><span class="lineno">  160</span>    <span class="keyword">const</span> int64_t effective_kernel = 1 +</div>
+<div class="line"><span class="lineno">  161</span>        ((int64_t)kernel_size - 1) * (int64_t)dilation;</div>
+<div class="line"><span class="lineno">  162</span>    <span class="keyword">const</span> int64_t padded = (int64_t)input_frames +</div>
+<div class="line"><span class="lineno">  163</span>        2 * (int64_t)padding - effective_kernel;</div>
+<div class="line"><span class="lineno">  164</span>    <span class="keywordflow">if</span> (padded &lt; 0 || padded / stride + 1 != output_frames)</div>
+<div class="line"><span class="lineno">  165</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5ac2ace402a8768aa550787f467a8b2388">CK_AUDIO_CONV_CHECKED_INVALID</a>;</div>
+<div class="line"><span class="lineno">  166</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="checked__float__buffer_8h.html#a80fa111d42598d70e6c6728193a1f8dc">ck_checked_span</a>((<span class="keywordtype">size_t</span>)input_channels, (size_t)input_frames,</div>
+<div class="line"><span class="lineno">  167</span>                         input_stride, &amp;input_span) ||</div>
+<div class="line"><span class="lineno">  168</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#a80fa111d42598d70e6c6728193a1f8dc">ck_checked_span</a>((<span class="keywordtype">size_t</span>)output_channels, (<span class="keywordtype">size_t</span>)output_frames,</div>
+<div class="line"><span class="lineno">  169</span>                         output_stride, &amp;output_span) ||</div>
+<div class="line"><span class="lineno">  170</span>        <a class="code hl_function" href="audio__conv1d__checked_8c.html#ae91944bf63822011bdb675be8667592d">audio_conv1d_checked_workspace</a>((<span class="keywordtype">size_t</span>)input_channels,</div>
+<div class="line"><span class="lineno">  171</span>            (<span class="keywordtype">size_t</span>)output_channels, (<span class="keywordtype">size_t</span>)input_frames,</div>
+<div class="line"><span class="lineno">  172</span>            (<span class="keywordtype">size_t</span>)output_frames, &amp;scratch_need))</div>
+<div class="line"><span class="lineno">  173</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5a26dc87d2b1cbf477880a386a8c1214da">CK_AUDIO_CONV_CHECKED_OVERFLOW</a>;</div>
+<div class="line"><span class="lineno">  174</span>    <span class="keywordflow">if</span> ((<span class="keywordtype">size_t</span>)output_channels &gt; SIZE_MAX / (size_t)input_channels ||</div>
+<div class="line"><span class="lineno">  175</span>        (<span class="keywordtype">size_t</span>)output_channels * (size_t)input_channels &gt; SIZE_MAX / (<span class="keywordtype">size_t</span>)kernel_size)</div>
+<div class="line"><span class="lineno">  176</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5a26dc87d2b1cbf477880a386a8c1214da">CK_AUDIO_CONV_CHECKED_OVERFLOW</a>;</div>
+<div class="line"><span class="lineno">  177</span>    weight_count = (size_t)output_channels * (<span class="keywordtype">size_t</span>)input_channels * (size_t)kernel_size;</div>
+<div class="line"><span class="lineno">  178</span>    <span class="keywordflow">if</span> (weight_count &gt; SIZE_MAX / <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>)) <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5a26dc87d2b1cbf477880a386a8c1214da">CK_AUDIO_CONV_CHECKED_OVERFLOW</a>;</div>
+<div class="line"><span class="lineno">  179</span>    <span class="keywordflow">if</span> (input_elements &lt; input_span || weight_elements &lt; weight_count ||</div>
+<div class="line"><span class="lineno">  180</span>        bias_elements &lt; (<span class="keywordtype">size_t</span>)output_channels || output_elements &lt; output_span ||</div>
+<div class="line"><span class="lineno">  181</span>        scratch_elements &lt; scratch_need)</div>
+<div class="line"><span class="lineno">  182</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5aa5d5f84d5c955429e82bc1dc907edc8f">CK_AUDIO_CONV_CHECKED_CAPACITY</a>;</div>
+<div class="line"><span class="lineno">  183</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(input, input_span) ||</div>
+<div class="line"><span class="lineno">  184</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(weight, weight_count) ||</div>
+<div class="line"><span class="lineno">  185</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(bias, (<span class="keywordtype">size_t</span>)output_channels) ||</div>
+<div class="line"><span class="lineno">  186</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(output, output_span) ||</div>
+<div class="line"><span class="lineno">  187</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(scratch, scratch_need))</div>
+<div class="line"><span class="lineno">  188</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5ac2ace402a8768aa550787f467a8b2388">CK_AUDIO_CONV_CHECKED_INVALID</a>;</div>
+<div class="line"><span class="lineno">  189</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(output, output_span, input, input_span) ||</div>
+<div class="line"><span class="lineno">  190</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(output, output_span, weight, weight_count) ||</div>
+<div class="line"><span class="lineno">  191</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(output, output_span, bias, (<span class="keywordtype">size_t</span>)output_channels) ||</div>
+<div class="line"><span class="lineno">  192</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(output, output_span, scratch, scratch_need) ||</div>
+<div class="line"><span class="lineno">  193</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(scratch, scratch_need, input, input_span) ||</div>
+<div class="line"><span class="lineno">  194</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(scratch, scratch_need, weight, weight_count) ||</div>
+<div class="line"><span class="lineno">  195</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(scratch, scratch_need, bias, (<span class="keywordtype">size_t</span>)output_channels))</div>
+<div class="line"><span class="lineno">  196</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5ac2ace402a8768aa550787f467a8b2388">CK_AUDIO_CONV_CHECKED_INVALID</a>;</div>
+<div class="line"><span class="lineno">  197</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a>(weight, weight_count) ||</div>
+<div class="line"><span class="lineno">  198</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a>(bias, (<span class="keywordtype">size_t</span>)output_channels))</div>
+<div class="line"><span class="lineno">  199</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5aa97387486e6288624e5b271a2c43f37e">CK_AUDIO_CONV_CHECKED_NONFINITE</a>;</div>
+<div class="line"><span class="lineno">  200</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> channel = 0; channel &lt; input_channels; ++channel)</div>
+<div class="line"><span class="lineno">  201</span>        <span class="keywordflow">if</span> (!<a class="code hl_function" href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a>(input + (<span class="keywordtype">size_t</span>)channel * input_stride,</div>
+<div class="line"><span class="lineno">  202</span>                               (<span class="keywordtype">size_t</span>)input_frames))</div>
+<div class="line"><span class="lineno">  203</span>            <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5aa97387486e6288624e5b271a2c43f37e">CK_AUDIO_CONV_CHECKED_NONFINITE</a>;</div>
+<div class="line"><span class="lineno">  204</span>    <span class="comment">/* Validation and staged commit remain shared by both providers. */</span></div>
+<div class="line"><span class="lineno">  205</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structck__audio__conv1d__job.html">ck_audio_conv1d_job</a> job = {input, weight, bias, scratch,</div>
+<div class="line"><span class="lineno">  206</span>        input_stride, input_channels, output_channels, input_frames,</div>
+<div class="line"><span class="lineno">  207</span>        kernel_size, stride, padding, dilation, output_frames, 0,</div>
+<div class="line"><span class="lineno">  208</span>        output_channels};</div>
+<div class="line"><span class="lineno">  209</span>    compute(&amp;job, compute_context);</div>
+<div class="line"><span class="lineno">  210</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a>(scratch, (<span class="keywordtype">size_t</span>)output_channels * (<span class="keywordtype">size_t</span>)output_frames))</div>
+<div class="line"><span class="lineno">  211</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5aa97387486e6288624e5b271a2c43f37e">CK_AUDIO_CONV_CHECKED_NONFINITE</a>;</div>
+<div class="line"><span class="lineno">  212</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> channel = 0; channel &lt; output_channels; ++channel)</div>
+<div class="line"><span class="lineno">  213</span>        memcpy(output + (<span class="keywordtype">size_t</span>)channel * output_stride,</div>
+<div class="line"><span class="lineno">  214</span>               scratch + (<span class="keywordtype">size_t</span>)channel * (<span class="keywordtype">size_t</span>)output_frames,</div>
+<div class="line"><span class="lineno">  215</span>               (<span class="keywordtype">size_t</span>)output_frames * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  216</span>    <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5a666f97ea5520eb120e9843806f8f478f">CK_AUDIO_CONV_CHECKED_OK</a>;</div>
+<div class="line"><span class="lineno">  217</span>}</div>
+<div class="ttc" id="aaudio__conv1d__checked_8c_html_ae91944bf63822011bdb675be8667592d"><div class="ttname"><a href="audio__conv1d__checked_8c.html#ae91944bf63822011bdb675be8667592d">audio_conv1d_checked_workspace</a></div><div class="ttdeci">int audio_conv1d_checked_workspace(size_t input_channels, size_t output_channels, size_t input_frames, size_t output_frames, size_t *scratch_elements)</div><div class="ttdef"><b>Definition</b> <a href="audio__conv1d__checked_8c_source.html#l00127">audio_conv1d_checked.c:127</a></div></div>
+<div class="ttc" id="achecked__float__buffer_8h_html_a1b266161b71bde9ca8d45c2fb5ac889a"><div class="ttname"><a href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a></div><div class="ttdeci">static int ck_checked_finite(const float *ptr, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00019">checked_float_buffer.h:19</a></div></div>
+<div class="ttc" id="achecked__float__buffer_8h_html_a80fa111d42598d70e6c6728193a1f8dc"><div class="ttname"><a href="checked__float__buffer_8h.html#a80fa111d42598d70e6c6728193a1f8dc">ck_checked_span</a></div><div class="ttdeci">static int ck_checked_span(size_t rows, size_t width, size_t stride, size_t *span)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00006">checked_float_buffer.h:6</a></div></div>
+<div class="ttc" id="achecked__float__buffer_8h_html_ada07e31487d86edb37408386003ac841"><div class="ttname"><a href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a></div><div class="ttdeci">static int ck_checked_region(const float *ptr, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00011">checked_float_buffer.h:11</a></div></div>
+<div class="ttc" id="achecked__float__buffer_8h_html_af87b7012571dc9a40b8e31c52e773abe"><div class="ttname"><a href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a></div><div class="ttdeci">static int ck_checked_overlap(const float *a, size_t na, const float *b, size_t nb)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00015">checked_float_buffer.h:15</a></div></div>
+<div class="ttc" id="ackernel__audio__conv__checked_8h_html_a99fb83031ce9923c84392b4e92f956b5aa5d5f84d5c955429e82bc1dc907edc8f"><div class="ttname"><a href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5aa5d5f84d5c955429e82bc1dc907edc8f">CK_AUDIO_CONV_CHECKED_CAPACITY</a></div><div class="ttdeci">@ CK_AUDIO_CONV_CHECKED_CAPACITY</div><div class="ttdef"><b>Definition</b> <a href="ckernel__audio__conv__checked_8h_source.html#l00013">ckernel_audio_conv_checked.h:13</a></div></div>
+<div class="ttc" id="ackernel__audio__conv__checked_8h_html_a99fb83031ce9923c84392b4e92f956b5aa97387486e6288624e5b271a2c43f37e"><div class="ttname"><a href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5aa97387486e6288624e5b271a2c43f37e">CK_AUDIO_CONV_CHECKED_NONFINITE</a></div><div class="ttdeci">@ CK_AUDIO_CONV_CHECKED_NONFINITE</div><div class="ttdef"><b>Definition</b> <a href="ckernel__audio__conv__checked_8h_source.html#l00015">ckernel_audio_conv_checked.h:15</a></div></div>
+<div class="ttc" id="ackernel__audio__conv__checked_8h_html_a99fb83031ce9923c84392b4e92f956b5ac2ace402a8768aa550787f467a8b2388"><div class="ttname"><a href="ckernel__audio__conv__checked_8h.html#a99fb83031ce9923c84392b4e92f956b5ac2ace402a8768aa550787f467a8b2388">CK_AUDIO_CONV_CHECKED_INVALID</a></div><div class="ttdeci">@ CK_AUDIO_CONV_CHECKED_INVALID</div><div class="ttdef"><b>Definition</b> <a href="ckernel__audio__conv__checked_8h_source.html#l00012">ckernel_audio_conv_checked.h:12</a></div></div>
+<div class="ttc" id="astructck__audio__conv1d__job_html"><div class="ttname"><a href="structck__audio__conv1d__job.html">ck_audio_conv1d_job</a></div><div class="ttdef"><b>Definition</b> <a href="audio__conv1d__checked__internal_8h_source.html#l00006">audio_conv1d_checked_internal.h:6</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="audio__conv1d__checked_8c_source.html#l00127">audio_conv1d_checked_workspace()</a>, <a class="el" href="ckernel__audio__conv__checked_8h_source.html#l00013">CK_AUDIO_CONV_CHECKED_CAPACITY</a>, <a class="el" href="ckernel__audio__conv__checked_8h_source.html#l00012">CK_AUDIO_CONV_CHECKED_INVALID</a>, <a class="el" href="ckernel__audio__conv__checked_8h_source.html#l00015">CK_AUDIO_CONV_CHECKED_NONFINITE</a>, <a class="el" href="ckernel__audio__conv__checked_8h_source.html#l00011">CK_AUDIO_CONV_CHECKED_OK</a>, <a class="el" href="ckernel__audio__conv__checked_8h_source.html#l00014">CK_AUDIO_CONV_CHECKED_OVERFLOW</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00019">ck_checked_finite()</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00015">ck_checked_overlap()</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00011">ck_checked_region()</a>, and <a class="el" href="checked__float__buffer_8h_source.html#l00006">ck_checked_span()</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="audio__conv1d__checked_8c_source.html#l00219">audio_conv1d_checked_channel_major_f32()</a>, <a class="el" href="audio__conv1d__checked_8c_source.html#l00305">audio_conv1d_checked_channel_major_f32_avx2_fma()</a>, <a class="el" href="audio__conv1d__checked_8c_source.html#l00250">audio_conv1d_checked_channel_major_f32_hwfma()</a>, <a class="el" href="audio__conv1d__checked_8c_source.html#l00234">audio_conv1d_dilated_checked_channel_major_f32()</a>, <a class="el" href="audio__conv1d__checked_8c_source.html#l00332">audio_conv1d_dilated_checked_channel_major_f32_avx2_fma()</a>, <a class="el" href="audio__conv1d__checked_8c_source.html#l00277">audio_conv1d_dilated_checked_channel_major_f32_hwfma()</a>, and <a class="el" href="audio__conv1d__parallel_8c_source.html#l00045">audio_conv1d_parallel_checked_impl()</a>.</p>
 
 </div>
 </div>

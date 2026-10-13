@@ -10,10 +10,12 @@ var searchData=
   ['opt_5fbytes_7',['opt_bytes',['../structCKModel.html#a4f3d9a363a8fc7d37556b33e6b20cd69',1,'CKModel']]],
   ['opt_5fend_8',['opt_end',['../structCKLayerOptimizerOffsets.html#ac4940fcc8708472a83f4622f033ebbb6',1,'CKLayerOptimizerOffsets']]],
   ['opt_5fstart_9',['opt_start',['../structCKLayerOptimizerOffsets.html#a768c2644e129903d370b4010d37c74eb',1,'CKLayerOptimizerOffsets']]],
-  ['optional_10',['optional',['../structCKIRV2Buffer.html#a3b28242247696e6624bb2b9773c1e1a1',1,'CKIRV2Buffer::optional'],['../structCKBufferSpec.html#a557043a61f56575dfa44c4f13b31cddb',1,'CKBufferSpec::optional']]],
+  ['optional_10',['optional',['../structCKBufferSpec.html#a557043a61f56575dfa44c4f13b31cddb',1,'CKBufferSpec::optional'],['../structCKIRV2Buffer.html#a3b28242247696e6624bb2b9773c1e1a1',1,'CKIRV2Buffer::optional']]],
   ['out_5findex_11',['out_index',['../structCKInputRef.html#ae1ae7d92ed1362d599e30bf5aff958e3',1,'CKInputRef']]],
   ['out_5flen_12',['out_len',['../tokenizer_8h.html#afcd8f560b02b3c7a2bc2b3effa325fcf',1,'tokenizer.h']]],
   ['output_13',['output',['../structCKLayerForwardParams.html#a61d1bcef2bcffd12c7a49d243a6c51d1',1,'CKLayerForwardParams::output'],['../structCKLayerForwardParamsQ4K.html#a2532f454e8565aafe5bc975e518e90e2',1,'CKLayerForwardParamsQ4K::output'],['../structCKLayerOffsets.html#a253ebe103830f66006e992c1942359c6',1,'CKLayerOffsets::output'],['../structQWEN2__0__5B__DECODELayerOffsets.html#aa901fee3b15422d052e90e6f11aac70c',1,'QWEN2_0_5B_DECODELayerOffsets::output']]],
-  ['output_5fsamples_5fupper_5fbound_14',['output_samples_upper_bound',['../structCKKokoroShapeV8.html#a3dd5f3215bcf6411a5a191d29bf574f3',1,'CKKokoroShapeV8']]],
-  ['outputs_15',['outputs',['../structCKIRV2Node.html#ab853f000478eff6cb0e5f76d2b50efa1',1,'CKIRV2Node']]]
+  ['output_5fchannels_14',['output_channels',['../structck__audio__conv1d__job.html#ae454826123de0dbda577e250711a943c',1,'ck_audio_conv1d_job']]],
+  ['output_5fframes_15',['output_frames',['../structck__audio__conv1d__job.html#aad4e0c1033545acc467d3fc09e635d90',1,'ck_audio_conv1d_job']]],
+  ['output_5fsamples_5fupper_5fbound_16',['output_samples_upper_bound',['../structCKKokoroShapeV8.html#a3dd5f3215bcf6411a5a191d29bf574f3',1,'CKKokoroShapeV8']]],
+  ['outputs_17',['outputs',['../structCKIRV2Node.html#ab853f000478eff6cb0e5f76d2b50efa1',1,'CKIRV2Node']]]
 ];

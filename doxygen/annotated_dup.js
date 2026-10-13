@@ -12,6 +12,7 @@ var annotated_dup =
     [ "block_q8_K", "structblock__q8__K.html", "structblock__q8__K" ],
     [ "CacheInfo", "structCacheInfo.html", "structCacheInfo" ],
     [ "CacheTopology", "structCacheTopology.html", "structCacheTopology" ],
+    [ "ck_audio_conv1d_job", "structck__audio__conv1d__job.html", "structck__audio__conv1d__job" ],
     [ "ck_bump_alloc_t", "structck__bump__alloc__t.html", "structck__bump__alloc__t" ],
     [ "ck_capability_t", "structck__capability__t.html", "structck__capability__t" ],
     [ "ck_threadpool_profile_t", "structck__threadpool__profile__t.html", "structck__threadpool__profile__t" ],

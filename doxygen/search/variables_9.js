@@ -6,7 +6,8 @@ var searchData=
   ['kc_3',['KC',['../structGEMMParams.html#aa84a148f54c8ec49fec73e7b2354761c',1,'GEMMParams']]],
   ['kernel_4',['kernel',['../structCKIRV2Node.html#ae7e891c0c72b3a0c726e416696299de9',1,'CKIRV2Node::kernel'],['../structCKPlanStep.html#a07deae3fde9109078baca99987e58ad1',1,'CKPlanStep::kernel'],['../structCKPlanStepV2.html#a1762220af86b81c437f4290195e928b1',1,'CKPlanStepV2::kernel']]],
   ['kernel_5fdtype_5',['kernel_dtype',['../structCKIRV2Node.html#abd1f5cc6077e8a035d8a2f0d69d30a48',1,'CKIRV2Node']]],
-  ['kernel_5fversion_6',['kernel_version',['../structSystemTopology.html#aea0398c023b6251b7e490f65c74edc73',1,'SystemTopology']]],
-  ['key_7',['key',['../structCKTokenizerHashEntry.html#a577cb4e16aad79410f9255006f494aa4',1,'CKTokenizerHashEntry']]],
-  ['kv_5fcache_5fenabled_8',['kv_cache_enabled',['../structCKModel.html#a30077b979aff326f5c4bd20da8b6d807',1,'CKModel']]]
+  ['kernel_5fsize_6',['kernel_size',['../structck__audio__conv1d__job.html#a5307191c122a1a2c9c9a678c69948060',1,'ck_audio_conv1d_job']]],
+  ['kernel_5fversion_7',['kernel_version',['../structSystemTopology.html#aea0398c023b6251b7e490f65c74edc73',1,'SystemTopology']]],
+  ['key_8',['key',['../structCKTokenizerHashEntry.html#a577cb4e16aad79410f9255006f494aa4',1,'CKTokenizerHashEntry']]],
+  ['kv_5fcache_5fenabled_9',['kv_cache_enabled',['../structCKModel.html#a30077b979aff326f5c4bd20da8b6d807',1,'CKModel']]]
 ];

@@ -7,10 +7,10 @@ var audio__conv1d__checked_8c =
     [ "audio_conv1d_checked_channel_major_f32_avx2_fma", "audio__conv1d__checked_8c.html#adbb7bf337230daf9c5ebb427e92e7b56", null ],
     [ "audio_conv1d_checked_channel_major_f32_hwfma", "audio__conv1d__checked_8c.html#a03ab327637bff4f6eb1c0cd98779cecd", null ],
     [ "audio_conv1d_checked_hardware_fma_available", "audio__conv1d__checked_8c.html#a962f1021b4bcd53028feda52e0ba7721", null ],
-    [ "audio_conv1d_checked_impl", "audio__conv1d__checked_8c.html#ab24784a576cfffede7cd1c55075556ce", null ],
     [ "audio_conv1d_checked_workspace", "audio__conv1d__checked_8c.html#ae91944bf63822011bdb675be8667592d", null ],
-    [ "audio_conv1d_compute_scalar", "audio__conv1d__checked_8c.html#ada7da9e62d5f12c487027d01dd8e5c13", null ],
+    [ "audio_conv1d_compute_scalar", "audio__conv1d__checked_8c.html#ad091b43688140d3a09bd25bd4c93ca9c", null ],
     [ "audio_conv1d_dilated_checked_channel_major_f32", "audio__conv1d__checked_8c.html#a52ede2c70a32ab686d69ad6d2f8465da", null ],
     [ "audio_conv1d_dilated_checked_channel_major_f32_avx2_fma", "audio__conv1d__checked_8c.html#a5d50c99b3b360f69f758d16eb47be03a", null ],
-    [ "audio_conv1d_dilated_checked_channel_major_f32_hwfma", "audio__conv1d__checked_8c.html#a34d160427ce221807e24f448e78fb58c", null ]
+    [ "audio_conv1d_dilated_checked_channel_major_f32_hwfma", "audio__conv1d__checked_8c.html#a34d160427ce221807e24f448e78fb58c", null ],
+    [ "ck_audio_conv1d_checked_execute", "audio__conv1d__checked_8c.html#a91b21e5ae31557d2f87d32098d1effd4", null ]
 ];
