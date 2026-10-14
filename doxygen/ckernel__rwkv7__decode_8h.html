@@ -126,6 +126,7 @@ $(document).ready(function(){initNavTree('ckernel__rwkv7__decode_8h.html',''); i
 
 <div class="header">
   <div class="summary">
+<a href="#typedef-members">Typedefs</a> &#124;
 <a href="#func-members">Functions</a>  </div>
   <div class="headertitle"><div class="title">ckernel_rwkv7_decode.h File Reference</div></div>
 </div><!--header-->
@@ -134,8 +135,17 @@ $(document).ready(function(){initNavTree('ckernel__rwkv7__decode_8h.html',''); i
 </div>
 <p><a href="ckernel__rwkv7__decode_8h_source.html">Go to the source code of this file.</a></p>
 <table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="typedef-members" name="typedef-members"></a>
+Typedefs</h2></td></tr>
+<tr class="memitem:a66dd24edfc16d8ab5316be93c5750c9e" id="r_a66dd24edfc16d8ab5316be93c5750c9e"><td class="memItemLeft" align="right" valign="top">typedef int(*&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__rwkv7__decode_8h.html#a66dd24edfc16d8ab5316be93c5750c9e">ck_rwkv7_gemv_fn</a>) (const float *W, const float *x, float *y, void *ctx)</td></tr>
+<tr class="separator:a66dd24edfc16d8ab5316be93c5750c9e"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a7bc568227c4628e162abf1487acdc241" id="r_a7bc568227c4628e162abf1487acdc241"><td class="memItemLeft" align="right" valign="top">typedef int(*&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__rwkv7__decode_8h.html#a7bc568227c4628e162abf1487acdc241">ck_rwkv7_layer_norm_fn</a>) (const float *x, const float *gamma, const float *beta, float *y, int dim, void *ctx)</td></tr>
+<tr class="separator:a7bc568227c4628e162abf1487acdc241"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="func-members" name="func-members"></a>
 Functions</h2></td></tr>
+<tr class="memitem:a11b2eaaf160fb24734d3b5374a55496c" id="r_a11b2eaaf160fb24734d3b5374a55496c"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__rwkv7__decode_8h.html#a11b2eaaf160fb24734d3b5374a55496c">ck_rwkv7_apply_kk_factor</a> (const float *k, const float *k_k, float *kk_raw, int dim)</td></tr>
+<tr class="separator:a11b2eaaf160fb24734d3b5374a55496c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a64973642226e4f40eb884878288013ab" id="r_a64973642226e4f40eb884878288013ab"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__rwkv7__decode_8h.html#a64973642226e4f40eb884878288013ab">ck_rwkv7_channelmix_decode</a> (const float *x, const float *shift_in, const float *mu, const float *Wk, const float *Wv, float *shift_out, float *out, int dim, int hidden_dim, float *scratch, size_t scratch_elems)</td></tr>
 <tr class="separator:a64973642226e4f40eb884878288013ab"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ab965315ad8f64e7fc5c60b1743feac19" id="r_ab965315ad8f64e7fc5c60b1743feac19"><td class="memItemLeft" align="right" valign="top">size_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__rwkv7__decode_8h.html#ab965315ad8f64e7fc5c60b1743feac19">ck_rwkv7_channelmix_scratch_elems</a> (int dim, int hidden_dim)</td></tr>
@@ -150,6 +160,16 @@ Functions</h2></td></tr>
 <tr class="separator:a8b4df991b381820a28ce0359f5f992a1"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:accc63d21caf6b535bf363db46ba463bb" id="r_accc63d21caf6b535bf363db46ba463bb"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__rwkv7__decode_8h.html#accc63d21caf6b535bf363db46ba463bb">ck_rwkv7_state_step</a> (const float *w_log, const float *k, const float *v, const float *kk, const float *a, const float *state_in, float *state_out, int head_dim)</td></tr>
 <tr class="separator:accc63d21caf6b535bf363db46ba463bb"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:acd563b2c1a2ae964e8e1962500aef3a8" id="r_acd563b2c1a2ae964e8e1962500aef3a8"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__rwkv7__decode_8h.html#acd563b2c1a2ae964e8e1962500aef3a8">ck_rwkv7_time_mix_block</a> (const float *h, const float *att_shift_in, const float *v_first_in, const float *state_in, const float *ln_g, const float *ln_b, const float *mu_r, const float *mu_w, const float *mu_k, const float *mu_v, const float *mu_a, const float *mu_g, const float *Wr, const float *Wk, const float *Wv, const float *Wo, const float *w1, const float *w2, const float *w0, const float *a1, const float *a2, const float *a0, const float *g1, const float *g2, const float *v1, const float *v2, const float *v0, const float *k_k, const float *k_a, const float *rk, const float *gn_w, const float *gn_b, float norm_eps, int dim, int num_heads, int head_dim, int rank_w, int rank_a, int rank_g, int rank_v, int is_layer_zero, <a class="el" href="ckernel__rwkv7__decode_8h.html#a66dd24edfc16d8ab5316be93c5750c9e">ck_rwkv7_gemv_fn</a> gemv, <a class="el" href="ckernel__rwkv7__decode_8h.html#a7bc568227c4628e162abf1487acdc241">ck_rwkv7_layer_norm_fn</a> layer_norm, void *ctx, float *h_out, float *att_shift_out, float *state_out, float *v_first_out, float *scratch, size_t scratch_elems)</td></tr>
+<tr class="separator:acd563b2c1a2ae964e8e1962500aef3a8"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a7d03a1eda3bae5252e748280b310fbfa" id="r_a7d03a1eda3bae5252e748280b310fbfa"><td class="memItemLeft" align="right" valign="top">size_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__rwkv7__decode_8h.html#a7d03a1eda3bae5252e748280b310fbfa">ck_rwkv7_time_mix_block_scratch_elems</a> (int dim)</td></tr>
+<tr class="separator:a7d03a1eda3bae5252e748280b310fbfa"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a6fcc6465e48f60e8023a7f5d0eca7e0c" id="r_a6fcc6465e48f60e8023a7f5d0eca7e0c"><td class="memItemLeft" align="right" valign="top">size_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__rwkv7__decode_8h.html#a6fcc6465e48f60e8023a7f5d0eca7e0c">ck_rwkv7_time_mix_scratch_elems</a> (int dim)</td></tr>
+<tr class="separator:a6fcc6465e48f60e8023a7f5d0eca7e0c"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ab811dc25cfae0abf4b8763a3db4adda7" id="r_ab811dc25cfae0abf4b8763a3db4adda7"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__rwkv7__decode_8h.html#ab811dc25cfae0abf4b8763a3db4adda7">ck_rwkv7_time_mix_shifts</a> (const float *x, const float *shift_in, const float *mu_r, const float *mu_w, const float *mu_k, const float *mu_v, const float *mu_a, const float *mu_g, float *xr, float *xw, float *xk, float *xv, float *xa, float *xg, float *shift_out, int dim)</td></tr>
+<tr class="separator:ab811dc25cfae0abf4b8763a3db4adda7"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af58337839fd5324c8e129bc9b925290c" id="r_af58337839fd5324c8e129bc9b925290c"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__rwkv7__decode_8h.html#af58337839fd5324c8e129bc9b925290c">ck_rwkv7_time_mix_tail</a> (const float *r, const float *k_raw, const float *v_in, const float *v_first_in, const float *xw, const float *xa, const float *xg, const float *xv, const float *w1, const float *w2, const float *w0, const float *a1, const float *a2, const float *a0, const float *g1, const float *g2, const float *v1, const float *v2, const float *v0, const float *k_k, const float *k_a, const float *rk, const float *ln_w, const float *ln_b, float norm_eps, const float *state_in, float *state_out, float *y_preproj, float *v_first_out, int dim, int num_heads, int head_dim, int rank_w, int rank_a, int rank_g, int rank_v, float *scratch, size_t scratch_elems)</td></tr>
+<tr class="separator:af58337839fd5324c8e129bc9b925290c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a9d25e7c22f213f74d5e7b03e1d27c814" id="r_a9d25e7c22f213f74d5e7b03e1d27c814"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__rwkv7__decode_8h.html#a9d25e7c22f213f74d5e7b03e1d27c814">ck_rwkv7_token_shift_lerp</a> (const float *x, const float *shift_in, const float *mu, float *xm, float *shift_out, int dim)</td></tr>
 <tr class="separator:a9d25e7c22f213f74d5e7b03e1d27c814"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a1dff0f15378b76335795df47c4e89b1b" id="r_a1dff0f15378b76335795df47c4e89b1b"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__rwkv7__decode_8h.html#a1dff0f15378b76335795df47c4e89b1b">ck_rwkv7_vgate_vmix</a> (const float *v_in, const float *v_first, const float *xv, const float *v1, const float *v2, const float *v0, int dim, int rank_v, float *v_out, float *v_first_out, float *v_gate)</td></tr>
@@ -157,7 +177,91 @@ Functions</h2></td></tr>
 <tr class="memitem:ae91299ecfbf50dfdee45359952b807a9" id="r_ae91299ecfbf50dfdee45359952b807a9"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__rwkv7__decode_8h.html#ae91299ecfbf50dfdee45359952b807a9">ck_rwkv7_wkv_decode</a> (const float *r, const float *w_log, const float *k, const float *v, const float *kk, const float *a, const float *g, const float *rk, const float *ln_w, const float *ln_b, float norm_eps, const float *state_in, float *state_out, float *y_out, int num_heads, int head_dim)</td></tr>
 <tr class="separator:ae91299ecfbf50dfdee45359952b807a9"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
+<h2 class="groupheader">Typedef Documentation</h2>
+<a id="a66dd24edfc16d8ab5316be93c5750c9e" name="a66dd24edfc16d8ab5316be93c5750c9e"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a66dd24edfc16d8ab5316be93c5750c9e">&#9670;&#160;</a></span>ck_rwkv7_gemv_fn</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">typedef int(* ck_rwkv7_gemv_fn) (const float *W, const float *x, float *y, void *ctx)</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="ckernel__rwkv7__decode_8h_source.html#l00270">270</a> of file <a class="el" href="ckernel__rwkv7__decode_8h_source.html">ckernel_rwkv7_decode.h</a>.</p>
+
+</div>
+</div>
+<a id="a7bc568227c4628e162abf1487acdc241" name="a7bc568227c4628e162abf1487acdc241"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a7bc568227c4628e162abf1487acdc241">&#9670;&#160;</a></span>ck_rwkv7_layer_norm_fn</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">typedef int(* ck_rwkv7_layer_norm_fn) (const float *x, const float *gamma, const float *beta, float *y, int dim, void *ctx)</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="ckernel__rwkv7__decode_8h_source.html#l00274">274</a> of file <a class="el" href="ckernel__rwkv7__decode_8h_source.html">ckernel_rwkv7_decode.h</a>.</p>
+
+</div>
+</div>
 <h2 class="groupheader">Function Documentation</h2>
+<a id="a11b2eaaf160fb24734d3b5374a55496c" name="a11b2eaaf160fb24734d3b5374a55496c"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a11b2eaaf160fb24734d3b5374a55496c">&#9670;&#160;</a></span>ck_rwkv7_apply_kk_factor()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int ck_rwkv7_apply_kk_factor </td>
+          <td>(</td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>k</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>k_k</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>kk_raw</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>dim</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="rwkv7__decode_8c_source.html#l00141">141</a> of file <a class="el" href="rwkv7__decode_8c_source.html">rwkv7_decode.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  144</span>                                      {</div>
+<div class="line"><span class="lineno">  145</span>    <span class="keywordflow">if</span> (!k || !k_k || !kk_raw || dim &lt;= 0) {</div>
+<div class="line"><span class="lineno">  146</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  147</span>    }</div>
+<div class="line"><span class="lineno">  148</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; dim; ++i) {</div>
+<div class="line"><span class="lineno">  149</span>        kk_raw[i] = k[i] * k_k[i];</div>
+<div class="line"><span class="lineno">  150</span>    }</div>
+<div class="line"><span class="lineno">  151</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  152</span>}</div>
+</div><!-- fragment -->
+</div>
+</div>
 <a id="a64973642226e4f40eb884878288013ab" name="a64973642226e4f40eb884878288013ab"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a64973642226e4f40eb884878288013ab">&#9670;&#160;</a></span>ck_rwkv7_channelmix_decode()</h2>
 
@@ -238,69 +342,69 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="rwkv7__decode_8c_source.html#l00361">361</a> of file <a class="el" href="rwkv7__decode_8c_source.html">rwkv7_decode.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  371</span>                                                     {</div>
-<div class="line"><span class="lineno">  372</span>    <span class="keywordflow">if</span> (!x || !shift_in || !mu || !Wk || !Wv || !shift_out || !out || dim &lt;= 0 ||</div>
-<div class="line"><span class="lineno">  373</span>        hidden_dim &lt;= 0 || hidden_dim &gt; 8192) {</div>
-<div class="line"><span class="lineno">  374</span>        <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  375</span>    }</div>
-<div class="line"><span class="lineno">  376</span>    <span class="keywordflow">if</span> (shift_out == shift_in) {</div>
-<div class="line"><span class="lineno">  377</span>        <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  378</span>    }</div>
-<div class="line"><span class="lineno">  379</span>    <span class="keywordflow">if</span> (!scratch ||</div>
-<div class="line"><span class="lineno">  380</span>        scratch_elems &lt; (<span class="keywordtype">size_t</span>)dim + (<span class="keywordtype">size_t</span>)hidden_dim ||</div>
-<div class="line"><span class="lineno">  381</span>        scratch == (<span class="keyword">const</span> <span class="keywordtype">float</span> *)x || scratch == (<span class="keyword">const</span> <span class="keywordtype">float</span> *)shift_in ||</div>
-<div class="line"><span class="lineno">  382</span>        scratch == (<span class="keyword">const</span> <span class="keywordtype">float</span> *)mu || scratch == (<span class="keyword">const</span> <span class="keywordtype">float</span> *)Wk ||</div>
-<div class="line"><span class="lineno">  383</span>        scratch == (<span class="keyword">const</span> <span class="keywordtype">float</span> *)Wv || scratch == (<span class="keyword">const</span> <span class="keywordtype">float</span> *)shift_out ||</div>
-<div class="line"><span class="lineno">  384</span>        scratch == (<span class="keyword">const</span> <span class="keywordtype">float</span> *)out) {</div>
-<div class="line"><span class="lineno">  385</span>        <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  386</span>    }</div>
-<div class="line"><span class="lineno">  387</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> bytes = (size_t)dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>);</div>
-<div class="line"><span class="lineno">  388</span>    <span class="keywordflow">if</span> ((<span class="keywordtype">size_t</span>)hidden_dim &gt; SIZE_MAX / bytes) <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  389</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> weight_bytes = bytes * (size_t)hidden_dim;</div>
-<div class="line"><span class="lineno">  390</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> scratch_bytes = ((size_t)dim + (<span class="keywordtype">size_t</span>)hidden_dim) * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>);</div>
-<div class="line"><span class="lineno">  391</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="rwkv7__decode_8c.html#a123d0108a84d9bfbe954606dcb79b5d4">overlaps</a>(shift_out, bytes, out, bytes)) <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  392</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> *inputs[] = {x, shift_in, mu, Wk, Wv};</div>
-<div class="line"><span class="lineno">  393</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> sizes[] = {bytes, bytes, bytes, weight_bytes, weight_bytes};</div>
-<div class="line"><span class="lineno">  394</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; 5; ++j) {</div>
-<div class="line"><span class="lineno">  395</span>        <span class="keywordflow">if</span> (<a class="code hl_function" href="rwkv7__decode_8c.html#a123d0108a84d9bfbe954606dcb79b5d4">overlaps</a>(scratch, scratch_bytes, inputs[j], sizes[j])) <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  396</span>        <span class="keywordflow">if</span> (!(j == 0 &amp;&amp; shift_out == x) &amp;&amp;</div>
-<div class="line"><span class="lineno">  397</span>            <a class="code hl_function" href="rwkv7__decode_8c.html#a123d0108a84d9bfbe954606dcb79b5d4">overlaps</a>(shift_out, bytes, inputs[j], sizes[j])) <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  398</span>        <span class="keywordflow">if</span> (!(j == 0 &amp;&amp; out == x) &amp;&amp;</div>
-<div class="line"><span class="lineno">  399</span>            <a class="code hl_function" href="rwkv7__decode_8c.html#a123d0108a84d9bfbe954606dcb79b5d4">overlaps</a>(out, bytes, inputs[j], sizes[j])) <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  400</span>    }</div>
-<div class="line"><span class="lineno">  401</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="rwkv7__decode_8c.html#a123d0108a84d9bfbe954606dcb79b5d4">overlaps</a>(scratch, scratch_bytes, out, bytes) ||</div>
-<div class="line"><span class="lineno">  402</span>        <a class="code hl_function" href="rwkv7__decode_8c.html#a123d0108a84d9bfbe954606dcb79b5d4">overlaps</a>(scratch, scratch_bytes, shift_out, bytes)) <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  403</span>    <span class="comment">/* Hoisted token-shift mix; per-index read-before-write keeps</span></div>
-<div class="line"><span class="lineno">  404</span><span class="comment">     * shift_out == x aliasing safe. */</span></div>
-<div class="line"><span class="lineno">  405</span>    <span class="keywordtype">float</span> *xk = scratch;</div>
-<div class="line"><span class="lineno">  406</span>    <span class="keywordtype">float</span> *hidden = scratch + dim;</div>
-<div class="line"><span class="lineno">  407</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; dim; ++i) {</div>
-<div class="line"><span class="lineno">  408</span>        xk[i] = x[i] + mu[i] * (shift_in[i] - x[i]);</div>
-<div class="line"><span class="lineno">  409</span>        shift_out[i] = x[i];</div>
-<div class="line"><span class="lineno">  410</span>    }</div>
-<div class="line"><span class="lineno">  411</span>    <span class="comment">/* hidden[j] = relu(Wk[j,:] @ xk)^2, Wk [K,C] row-major. */</span></div>
-<div class="line"><span class="lineno">  412</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; hidden_dim; ++j) {</div>
-<div class="line"><span class="lineno">  413</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *row = Wk + (size_t)j * (<span class="keywordtype">size_t</span>)dim;</div>
-<div class="line"><span class="lineno">  414</span>        <span class="keywordtype">float</span> acc = 0.0f;</div>
-<div class="line"><span class="lineno">  415</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; dim; ++i) {</div>
-<div class="line"><span class="lineno">  416</span>            acc += row[i] * xk[i];</div>
-<div class="line"><span class="lineno">  417</span>        }</div>
-<div class="line"><span class="lineno">  418</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> rel = acc &gt; 0.0f ? acc : 0.0f;</div>
-<div class="line"><span class="lineno">  419</span>        hidden[j] = rel * rel;</div>
-<div class="line"><span class="lineno">  420</span>    }</div>
-<div class="line"><span class="lineno">  421</span>    <span class="comment">/* out = Wv @ hidden, Wv [C,K] row-major; runs after the last xk read,</span></div>
-<div class="line"><span class="lineno">  422</span><span class="comment">     * so out == x aliasing is safe. */</span></div>
-<div class="line"><span class="lineno">  423</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; dim; ++i) {</div>
-<div class="line"><span class="lineno">  424</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *row = Wv + (size_t)i * (<span class="keywordtype">size_t</span>)hidden_dim;</div>
-<div class="line"><span class="lineno">  425</span>        <span class="keywordtype">float</span> acc = 0.0f;</div>
-<div class="line"><span class="lineno">  426</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; hidden_dim; ++j) {</div>
-<div class="line"><span class="lineno">  427</span>            acc += row[j] * hidden[j];</div>
-<div class="line"><span class="lineno">  428</span>        }</div>
-<div class="line"><span class="lineno">  429</span>        out[i] = acc;</div>
-<div class="line"><span class="lineno">  430</span>    }</div>
-<div class="line"><span class="lineno">  431</span>    <span class="keywordflow">return</span> 0;</div>
-<div class="line"><span class="lineno">  432</span>}</div>
+<p class="definition">Definition at line <a class="el" href="rwkv7__decode_8c_source.html#l00432">432</a> of file <a class="el" href="rwkv7__decode_8c_source.html">rwkv7_decode.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  442</span>                                                     {</div>
+<div class="line"><span class="lineno">  443</span>    <span class="keywordflow">if</span> (!x || !shift_in || !mu || !Wk || !Wv || !shift_out || !out || dim &lt;= 0 ||</div>
+<div class="line"><span class="lineno">  444</span>        hidden_dim &lt;= 0 || hidden_dim &gt; 8192) {</div>
+<div class="line"><span class="lineno">  445</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  446</span>    }</div>
+<div class="line"><span class="lineno">  447</span>    <span class="keywordflow">if</span> (shift_out == shift_in) {</div>
+<div class="line"><span class="lineno">  448</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  449</span>    }</div>
+<div class="line"><span class="lineno">  450</span>    <span class="keywordflow">if</span> (!scratch ||</div>
+<div class="line"><span class="lineno">  451</span>        scratch_elems &lt; (<span class="keywordtype">size_t</span>)dim + (<span class="keywordtype">size_t</span>)hidden_dim ||</div>
+<div class="line"><span class="lineno">  452</span>        scratch == (<span class="keyword">const</span> <span class="keywordtype">float</span> *)x || scratch == (<span class="keyword">const</span> <span class="keywordtype">float</span> *)shift_in ||</div>
+<div class="line"><span class="lineno">  453</span>        scratch == (<span class="keyword">const</span> <span class="keywordtype">float</span> *)mu || scratch == (<span class="keyword">const</span> <span class="keywordtype">float</span> *)Wk ||</div>
+<div class="line"><span class="lineno">  454</span>        scratch == (<span class="keyword">const</span> <span class="keywordtype">float</span> *)Wv || scratch == (<span class="keyword">const</span> <span class="keywordtype">float</span> *)shift_out ||</div>
+<div class="line"><span class="lineno">  455</span>        scratch == (<span class="keyword">const</span> <span class="keywordtype">float</span> *)out) {</div>
+<div class="line"><span class="lineno">  456</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  457</span>    }</div>
+<div class="line"><span class="lineno">  458</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> bytes = (size_t)dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>);</div>
+<div class="line"><span class="lineno">  459</span>    <span class="keywordflow">if</span> ((<span class="keywordtype">size_t</span>)hidden_dim &gt; SIZE_MAX / bytes) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  460</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> weight_bytes = bytes * (size_t)hidden_dim;</div>
+<div class="line"><span class="lineno">  461</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> scratch_bytes = ((size_t)dim + (<span class="keywordtype">size_t</span>)hidden_dim) * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>);</div>
+<div class="line"><span class="lineno">  462</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="rwkv7__decode_8c.html#a123d0108a84d9bfbe954606dcb79b5d4">overlaps</a>(shift_out, bytes, out, bytes)) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  463</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> *inputs[] = {x, shift_in, mu, Wk, Wv};</div>
+<div class="line"><span class="lineno">  464</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> sizes[] = {bytes, bytes, bytes, weight_bytes, weight_bytes};</div>
+<div class="line"><span class="lineno">  465</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; 5; ++j) {</div>
+<div class="line"><span class="lineno">  466</span>        <span class="keywordflow">if</span> (<a class="code hl_function" href="rwkv7__decode_8c.html#a123d0108a84d9bfbe954606dcb79b5d4">overlaps</a>(scratch, scratch_bytes, inputs[j], sizes[j])) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  467</span>        <span class="keywordflow">if</span> (!(j == 0 &amp;&amp; shift_out == x) &amp;&amp;</div>
+<div class="line"><span class="lineno">  468</span>            <a class="code hl_function" href="rwkv7__decode_8c.html#a123d0108a84d9bfbe954606dcb79b5d4">overlaps</a>(shift_out, bytes, inputs[j], sizes[j])) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  469</span>        <span class="keywordflow">if</span> (!(j == 0 &amp;&amp; out == x) &amp;&amp;</div>
+<div class="line"><span class="lineno">  470</span>            <a class="code hl_function" href="rwkv7__decode_8c.html#a123d0108a84d9bfbe954606dcb79b5d4">overlaps</a>(out, bytes, inputs[j], sizes[j])) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  471</span>    }</div>
+<div class="line"><span class="lineno">  472</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="rwkv7__decode_8c.html#a123d0108a84d9bfbe954606dcb79b5d4">overlaps</a>(scratch, scratch_bytes, out, bytes) ||</div>
+<div class="line"><span class="lineno">  473</span>        <a class="code hl_function" href="rwkv7__decode_8c.html#a123d0108a84d9bfbe954606dcb79b5d4">overlaps</a>(scratch, scratch_bytes, shift_out, bytes)) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  474</span>    <span class="comment">/* Hoisted token-shift mix; per-index read-before-write keeps</span></div>
+<div class="line"><span class="lineno">  475</span><span class="comment">     * shift_out == x aliasing safe. */</span></div>
+<div class="line"><span class="lineno">  476</span>    <span class="keywordtype">float</span> *xk = scratch;</div>
+<div class="line"><span class="lineno">  477</span>    <span class="keywordtype">float</span> *hidden = scratch + dim;</div>
+<div class="line"><span class="lineno">  478</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; dim; ++i) {</div>
+<div class="line"><span class="lineno">  479</span>        xk[i] = x[i] + mu[i] * (shift_in[i] - x[i]);</div>
+<div class="line"><span class="lineno">  480</span>        shift_out[i] = x[i];</div>
+<div class="line"><span class="lineno">  481</span>    }</div>
+<div class="line"><span class="lineno">  482</span>    <span class="comment">/* hidden[j] = relu(Wk[j,:] @ xk)^2, Wk [K,C] row-major. */</span></div>
+<div class="line"><span class="lineno">  483</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; hidden_dim; ++j) {</div>
+<div class="line"><span class="lineno">  484</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *row = Wk + (size_t)j * (<span class="keywordtype">size_t</span>)dim;</div>
+<div class="line"><span class="lineno">  485</span>        <span class="keywordtype">float</span> acc = 0.0f;</div>
+<div class="line"><span class="lineno">  486</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; dim; ++i) {</div>
+<div class="line"><span class="lineno">  487</span>            acc += row[i] * xk[i];</div>
+<div class="line"><span class="lineno">  488</span>        }</div>
+<div class="line"><span class="lineno">  489</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> rel = acc &gt; 0.0f ? acc : 0.0f;</div>
+<div class="line"><span class="lineno">  490</span>        hidden[j] = rel * rel;</div>
+<div class="line"><span class="lineno">  491</span>    }</div>
+<div class="line"><span class="lineno">  492</span>    <span class="comment">/* out = Wv @ hidden, Wv [C,K] row-major; runs after the last xk read,</span></div>
+<div class="line"><span class="lineno">  493</span><span class="comment">     * so out == x aliasing is safe. */</span></div>
+<div class="line"><span class="lineno">  494</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; dim; ++i) {</div>
+<div class="line"><span class="lineno">  495</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *row = Wv + (size_t)i * (<span class="keywordtype">size_t</span>)hidden_dim;</div>
+<div class="line"><span class="lineno">  496</span>        <span class="keywordtype">float</span> acc = 0.0f;</div>
+<div class="line"><span class="lineno">  497</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; hidden_dim; ++j) {</div>
+<div class="line"><span class="lineno">  498</span>            acc += row[j] * hidden[j];</div>
+<div class="line"><span class="lineno">  499</span>        }</div>
+<div class="line"><span class="lineno">  500</span>        out[i] = acc;</div>
+<div class="line"><span class="lineno">  501</span>    }</div>
+<div class="line"><span class="lineno">  502</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  503</span>}</div>
 <div class="ttc" id="arwkv7__decode_8c_html_a123d0108a84d9bfbe954606dcb79b5d4"><div class="ttname"><a href="rwkv7__decode_8c.html#a123d0108a84d9bfbe954606dcb79b5d4">overlaps</a></div><div class="ttdeci">static int overlaps(const void *a, size_t an, const void *b, size_t bn)</div><div class="ttdef"><b>Definition</b> <a href="rwkv7__decode_8c_source.html#l00009">rwkv7_decode.c:9</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="rwkv7__decode_8c_source.html#l00009">overlaps()</a>.</p>
@@ -333,13 +437,13 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="rwkv7__decode_8c_source.html#l00354">354</a> of file <a class="el" href="rwkv7__decode_8c_source.html">rwkv7_decode.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  354</span>                                                                  {</div>
-<div class="line"><span class="lineno">  355</span>    <span class="keywordflow">if</span> (dim &lt;= 0 || hidden_dim &lt;= 0 || hidden_dim &gt; 8192) {</div>
-<div class="line"><span class="lineno">  356</span>        <span class="keywordflow">return</span> 0;</div>
-<div class="line"><span class="lineno">  357</span>    }</div>
-<div class="line"><span class="lineno">  358</span>    <span class="keywordflow">return</span> (<span class="keywordtype">size_t</span>)dim + (size_t)hidden_dim;</div>
-<div class="line"><span class="lineno">  359</span>}</div>
+<p class="definition">Definition at line <a class="el" href="rwkv7__decode_8c_source.html#l00425">425</a> of file <a class="el" href="rwkv7__decode_8c_source.html">rwkv7_decode.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  425</span>                                                                  {</div>
+<div class="line"><span class="lineno">  426</span>    <span class="keywordflow">if</span> (dim &lt;= 0 || hidden_dim &lt;= 0 || hidden_dim &gt; 8192) {</div>
+<div class="line"><span class="lineno">  427</span>        <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  428</span>    }</div>
+<div class="line"><span class="lineno">  429</span>    <span class="keywordflow">return</span> (<span class="keywordtype">size_t</span>)dim + (size_t)hidden_dim;</div>
+<div class="line"><span class="lineno">  430</span>}</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -465,73 +569,73 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="rwkv7__decode_8c_source.html#l00087">87</a> of file <a class="el" href="rwkv7__decode_8c_source.html">rwkv7_decode.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  104</span>                                          {</div>
-<div class="line"><span class="lineno">  105</span>    <span class="keywordflow">if</span> (!xw || !xa || !xg || !w1 || !w2 || !w0 || !a1 || !a2 || !a0 || !g1 ||</div>
-<div class="line"><span class="lineno">  106</span>        !g2 || !w_log || !a_out || !g_out || dim &lt;= 0 || rank_w &lt;= 0 ||</div>
-<div class="line"><span class="lineno">  107</span>        rank_a &lt;= 0 || rank_g &lt;= 0 || rank_w &gt; 512 || rank_a &gt; 512 ||</div>
-<div class="line"><span class="lineno">  108</span>        rank_g &gt; 512) {</div>
-<div class="line"><span class="lineno">  109</span>        <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  110</span>    }</div>
-<div class="line"><span class="lineno">  111</span>    <span class="comment">/* w: tanh between factors, sigmoid after (+w0), scaled by -e^-0.5. */</span></div>
-<div class="line"><span class="lineno">  112</span>    {</div>
-<div class="line"><span class="lineno">  113</span>        <span class="keywordtype">float</span> tmp[512];</div>
-<div class="line"><span class="lineno">  114</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; rank_w; ++r) {</div>
-<div class="line"><span class="lineno">  115</span>            <span class="keywordtype">float</span> acc = 0.0f;</div>
-<div class="line"><span class="lineno">  116</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; dim; ++i) {</div>
-<div class="line"><span class="lineno">  117</span>                acc += xw[i] * w1[(size_t)i * (<span class="keywordtype">size_t</span>)rank_w + (size_t)r];</div>
-<div class="line"><span class="lineno">  118</span>            }</div>
-<div class="line"><span class="lineno">  119</span>            tmp[r] = tanhf(acc);</div>
-<div class="line"><span class="lineno">  120</span>        }</div>
-<div class="line"><span class="lineno">  121</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; dim; ++i) {</div>
-<div class="line"><span class="lineno">  122</span>            <span class="keywordtype">float</span> acc = w0[i];</div>
-<div class="line"><span class="lineno">  123</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; rank_w; ++r) {</div>
-<div class="line"><span class="lineno">  124</span>                acc += tmp[r] * w2[(size_t)r * (<span class="keywordtype">size_t</span>)dim + (size_t)i];</div>
-<div class="line"><span class="lineno">  125</span>            }</div>
-<div class="line"><span class="lineno">  126</span>            w_log[i] = -0.6065306597126334f * <a class="code hl_function" href="rwkv7__decode_8c.html#ad77c7818cced45a574f66bb4a94483a0">ck_rwkv7_sigmoid</a>(acc);</div>
-<div class="line"><span class="lineno">  127</span>        }</div>
-<div class="line"><span class="lineno">  128</span>    }</div>
-<div class="line"><span class="lineno">  129</span>    <span class="comment">/* a: no activation between, sigmoid after (+a0). */</span></div>
-<div class="line"><span class="lineno">  130</span>    {</div>
-<div class="line"><span class="lineno">  131</span>        <span class="keywordtype">float</span> tmp[512];</div>
-<div class="line"><span class="lineno">  132</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; rank_a; ++r) {</div>
-<div class="line"><span class="lineno">  133</span>            <span class="keywordtype">float</span> acc = 0.0f;</div>
-<div class="line"><span class="lineno">  134</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; dim; ++i) {</div>
-<div class="line"><span class="lineno">  135</span>                acc += xa[i] * a1[(size_t)i * (<span class="keywordtype">size_t</span>)rank_a + (size_t)r];</div>
-<div class="line"><span class="lineno">  136</span>            }</div>
-<div class="line"><span class="lineno">  137</span>            tmp[r] = acc;</div>
-<div class="line"><span class="lineno">  138</span>        }</div>
-<div class="line"><span class="lineno">  139</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; dim; ++i) {</div>
-<div class="line"><span class="lineno">  140</span>            <span class="keywordtype">float</span> acc = a0[i];</div>
-<div class="line"><span class="lineno">  141</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; rank_a; ++r) {</div>
-<div class="line"><span class="lineno">  142</span>                acc += tmp[r] * a2[(size_t)r * (<span class="keywordtype">size_t</span>)dim + (size_t)i];</div>
-<div class="line"><span class="lineno">  143</span>            }</div>
-<div class="line"><span class="lineno">  144</span>            a_out[i] = <a class="code hl_function" href="rwkv7__decode_8c.html#ad77c7818cced45a574f66bb4a94483a0">ck_rwkv7_sigmoid</a>(acc);</div>
-<div class="line"><span class="lineno">  145</span>        }</div>
-<div class="line"><span class="lineno">  146</span>    }</div>
-<div class="line"><span class="lineno">  147</span>    <span class="comment">/* g: sigmoid between factors, nothing after, no bias. */</span></div>
-<div class="line"><span class="lineno">  148</span>    {</div>
-<div class="line"><span class="lineno">  149</span>        <span class="keywordtype">float</span> tmp[512];</div>
-<div class="line"><span class="lineno">  150</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; rank_g; ++r) {</div>
-<div class="line"><span class="lineno">  151</span>            <span class="keywordtype">float</span> acc = 0.0f;</div>
-<div class="line"><span class="lineno">  152</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; dim; ++i) {</div>
-<div class="line"><span class="lineno">  153</span>                acc += xg[i] * g1[(size_t)i * (<span class="keywordtype">size_t</span>)rank_g + (size_t)r];</div>
-<div class="line"><span class="lineno">  154</span>            }</div>
-<div class="line"><span class="lineno">  155</span>            tmp[r] = <a class="code hl_function" href="rwkv7__decode_8c.html#ad77c7818cced45a574f66bb4a94483a0">ck_rwkv7_sigmoid</a>(acc);</div>
-<div class="line"><span class="lineno">  156</span>        }</div>
-<div class="line"><span class="lineno">  157</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; dim; ++i) {</div>
-<div class="line"><span class="lineno">  158</span>            <span class="keywordtype">float</span> acc = 0.0f;</div>
-<div class="line"><span class="lineno">  159</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; rank_g; ++r) {</div>
-<div class="line"><span class="lineno">  160</span>                acc += tmp[r] * g2[(size_t)r * (<span class="keywordtype">size_t</span>)dim + (size_t)i];</div>
-<div class="line"><span class="lineno">  161</span>            }</div>
-<div class="line"><span class="lineno">  162</span>            g_out[i] = acc;</div>
-<div class="line"><span class="lineno">  163</span>        }</div>
-<div class="line"><span class="lineno">  164</span>    }</div>
-<div class="line"><span class="lineno">  165</span>    <span class="keywordflow">return</span> 0;</div>
-<div class="line"><span class="lineno">  166</span>}</div>
-<div class="ttc" id="arwkv7__decode_8c_html_ad77c7818cced45a574f66bb4a94483a0"><div class="ttname"><a href="rwkv7__decode_8c.html#ad77c7818cced45a574f66bb4a94483a0">ck_rwkv7_sigmoid</a></div><div class="ttdeci">static float ck_rwkv7_sigmoid(float x)</div><div class="ttdef"><b>Definition</b> <a href="rwkv7__decode_8c_source.html#l00083">rwkv7_decode.c:83</a></div></div>
+<p class="definition">Definition at line <a class="el" href="rwkv7__decode_8c_source.html#l00158">158</a> of file <a class="el" href="rwkv7__decode_8c_source.html">rwkv7_decode.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  175</span>                                          {</div>
+<div class="line"><span class="lineno">  176</span>    <span class="keywordflow">if</span> (!xw || !xa || !xg || !w1 || !w2 || !w0 || !a1 || !a2 || !a0 || !g1 ||</div>
+<div class="line"><span class="lineno">  177</span>        !g2 || !w_log || !a_out || !g_out || dim &lt;= 0 || rank_w &lt;= 0 ||</div>
+<div class="line"><span class="lineno">  178</span>        rank_a &lt;= 0 || rank_g &lt;= 0 || rank_w &gt; 512 || rank_a &gt; 512 ||</div>
+<div class="line"><span class="lineno">  179</span>        rank_g &gt; 512) {</div>
+<div class="line"><span class="lineno">  180</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  181</span>    }</div>
+<div class="line"><span class="lineno">  182</span>    <span class="comment">/* w: tanh between factors, sigmoid after (+w0), scaled by -e^-0.5. */</span></div>
+<div class="line"><span class="lineno">  183</span>    {</div>
+<div class="line"><span class="lineno">  184</span>        <span class="keywordtype">float</span> tmp[512];</div>
+<div class="line"><span class="lineno">  185</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; rank_w; ++r) {</div>
+<div class="line"><span class="lineno">  186</span>            <span class="keywordtype">float</span> acc = 0.0f;</div>
+<div class="line"><span class="lineno">  187</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; dim; ++i) {</div>
+<div class="line"><span class="lineno">  188</span>                acc += xw[i] * w1[(size_t)i * (<span class="keywordtype">size_t</span>)rank_w + (size_t)r];</div>
+<div class="line"><span class="lineno">  189</span>            }</div>
+<div class="line"><span class="lineno">  190</span>            tmp[r] = tanhf(acc);</div>
+<div class="line"><span class="lineno">  191</span>        }</div>
+<div class="line"><span class="lineno">  192</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; dim; ++i) {</div>
+<div class="line"><span class="lineno">  193</span>            <span class="keywordtype">float</span> acc = w0[i];</div>
+<div class="line"><span class="lineno">  194</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; rank_w; ++r) {</div>
+<div class="line"><span class="lineno">  195</span>                acc += tmp[r] * w2[(size_t)r * (<span class="keywordtype">size_t</span>)dim + (size_t)i];</div>
+<div class="line"><span class="lineno">  196</span>            }</div>
+<div class="line"><span class="lineno">  197</span>            w_log[i] = -0.6065306597126334f * <a class="code hl_function" href="rwkv7__decode_8c.html#ad77c7818cced45a574f66bb4a94483a0">ck_rwkv7_sigmoid</a>(acc);</div>
+<div class="line"><span class="lineno">  198</span>        }</div>
+<div class="line"><span class="lineno">  199</span>    }</div>
+<div class="line"><span class="lineno">  200</span>    <span class="comment">/* a: no activation between, sigmoid after (+a0). */</span></div>
+<div class="line"><span class="lineno">  201</span>    {</div>
+<div class="line"><span class="lineno">  202</span>        <span class="keywordtype">float</span> tmp[512];</div>
+<div class="line"><span class="lineno">  203</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; rank_a; ++r) {</div>
+<div class="line"><span class="lineno">  204</span>            <span class="keywordtype">float</span> acc = 0.0f;</div>
+<div class="line"><span class="lineno">  205</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; dim; ++i) {</div>
+<div class="line"><span class="lineno">  206</span>                acc += xa[i] * a1[(size_t)i * (<span class="keywordtype">size_t</span>)rank_a + (size_t)r];</div>
+<div class="line"><span class="lineno">  207</span>            }</div>
+<div class="line"><span class="lineno">  208</span>            tmp[r] = acc;</div>
+<div class="line"><span class="lineno">  209</span>        }</div>
+<div class="line"><span class="lineno">  210</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; dim; ++i) {</div>
+<div class="line"><span class="lineno">  211</span>            <span class="keywordtype">float</span> acc = a0[i];</div>
+<div class="line"><span class="lineno">  212</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; rank_a; ++r) {</div>
+<div class="line"><span class="lineno">  213</span>                acc += tmp[r] * a2[(size_t)r * (<span class="keywordtype">size_t</span>)dim + (size_t)i];</div>
+<div class="line"><span class="lineno">  214</span>            }</div>
+<div class="line"><span class="lineno">  215</span>            a_out[i] = <a class="code hl_function" href="rwkv7__decode_8c.html#ad77c7818cced45a574f66bb4a94483a0">ck_rwkv7_sigmoid</a>(acc);</div>
+<div class="line"><span class="lineno">  216</span>        }</div>
+<div class="line"><span class="lineno">  217</span>    }</div>
+<div class="line"><span class="lineno">  218</span>    <span class="comment">/* g: sigmoid between factors, nothing after, no bias. */</span></div>
+<div class="line"><span class="lineno">  219</span>    {</div>
+<div class="line"><span class="lineno">  220</span>        <span class="keywordtype">float</span> tmp[512];</div>
+<div class="line"><span class="lineno">  221</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; rank_g; ++r) {</div>
+<div class="line"><span class="lineno">  222</span>            <span class="keywordtype">float</span> acc = 0.0f;</div>
+<div class="line"><span class="lineno">  223</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; dim; ++i) {</div>
+<div class="line"><span class="lineno">  224</span>                acc += xg[i] * g1[(size_t)i * (<span class="keywordtype">size_t</span>)rank_g + (size_t)r];</div>
+<div class="line"><span class="lineno">  225</span>            }</div>
+<div class="line"><span class="lineno">  226</span>            tmp[r] = <a class="code hl_function" href="rwkv7__decode_8c.html#ad77c7818cced45a574f66bb4a94483a0">ck_rwkv7_sigmoid</a>(acc);</div>
+<div class="line"><span class="lineno">  227</span>        }</div>
+<div class="line"><span class="lineno">  228</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; dim; ++i) {</div>
+<div class="line"><span class="lineno">  229</span>            <span class="keywordtype">float</span> acc = 0.0f;</div>
+<div class="line"><span class="lineno">  230</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; rank_g; ++r) {</div>
+<div class="line"><span class="lineno">  231</span>                acc += tmp[r] * g2[(size_t)r * (<span class="keywordtype">size_t</span>)dim + (size_t)i];</div>
+<div class="line"><span class="lineno">  232</span>            }</div>
+<div class="line"><span class="lineno">  233</span>            g_out[i] = acc;</div>
+<div class="line"><span class="lineno">  234</span>        }</div>
+<div class="line"><span class="lineno">  235</span>    }</div>
+<div class="line"><span class="lineno">  236</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  237</span>}</div>
+<div class="ttc" id="arwkv7__decode_8c_html_ad77c7818cced45a574f66bb4a94483a0"><div class="ttname"><a href="rwkv7__decode_8c.html#ad77c7818cced45a574f66bb4a94483a0">ck_rwkv7_sigmoid</a></div><div class="ttdeci">static float ck_rwkv7_sigmoid(float x)</div><div class="ttdef"><b>Definition</b> <a href="rwkv7__decode_8c_source.html#l00154">rwkv7_decode.c:154</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="rwkv7__decode_8c_source.html#l00083">ck_rwkv7_sigmoid()</a>.</p>
+<p class="reference">References <a class="el" href="rwkv7__decode_8c_source.html#l00154">ck_rwkv7_sigmoid()</a>.</p>
 
 </div>
 </div>
@@ -573,31 +677,31 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="rwkv7__decode_8c_source.html#l00041">41</a> of file <a class="el" href="rwkv7__decode_8c_source.html">rwkv7_decode.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   44</span>                                       {</div>
-<div class="line"><span class="lineno">   45</span>    <span class="keywordflow">if</span> (!kk_in || !kk_out || num_heads &lt;= 0 || head_dim &lt;= 0 ||</div>
-<div class="line"><span class="lineno">   46</span>        num_heads &gt; 256 || head_dim &gt; 512) {</div>
-<div class="line"><span class="lineno">   47</span>        <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">   48</span>    }</div>
-<div class="line"><span class="lineno">   49</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
-<div class="line"><span class="lineno">   50</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *src = kk_in + (size_t)h * (<span class="keywordtype">size_t</span>)head_dim;</div>
-<div class="line"><span class="lineno">   51</span>        <span class="keywordtype">float</span> *dst = kk_out + (size_t)h * (<span class="keywordtype">size_t</span>)head_dim;</div>
-<div class="line"><span class="lineno">   52</span>        <span class="keywordtype">float</span> norm = 0.0f;</div>
-<div class="line"><span class="lineno">   53</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; head_dim; ++i) {</div>
-<div class="line"><span class="lineno">   54</span>            norm += src[i] * src[i];</div>
-<div class="line"><span class="lineno">   55</span>        }</div>
-<div class="line"><span class="lineno">   56</span>        norm = sqrtf(norm);</div>
-<div class="line"><span class="lineno">   57</span>        <span class="comment">/* Divisor max(norm,1e-12); an all-zero row stays zero. */</span></div>
-<div class="line"><span class="lineno">   58</span>        <span class="keywordflow">if</span> (norm &lt; 1e-12f) {</div>
-<div class="line"><span class="lineno">   59</span>            norm = 1e-12f;</div>
-<div class="line"><span class="lineno">   60</span>        }</div>
-<div class="line"><span class="lineno">   61</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> inv = 1.0f / norm;</div>
-<div class="line"><span class="lineno">   62</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; head_dim; ++i) {</div>
-<div class="line"><span class="lineno">   63</span>            dst[i] = src[i] * inv;</div>
-<div class="line"><span class="lineno">   64</span>        }</div>
-<div class="line"><span class="lineno">   65</span>    }</div>
-<div class="line"><span class="lineno">   66</span>    <span class="keywordflow">return</span> 0;</div>
-<div class="line"><span class="lineno">   67</span>}</div>
+<p class="definition">Definition at line <a class="el" href="rwkv7__decode_8c_source.html#l00099">99</a> of file <a class="el" href="rwkv7__decode_8c_source.html">rwkv7_decode.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  102</span>                                       {</div>
+<div class="line"><span class="lineno">  103</span>    <span class="keywordflow">if</span> (!kk_in || !kk_out || num_heads &lt;= 0 || head_dim &lt;= 0 ||</div>
+<div class="line"><span class="lineno">  104</span>        num_heads &gt; 256 || head_dim &gt; 512) {</div>
+<div class="line"><span class="lineno">  105</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  106</span>    }</div>
+<div class="line"><span class="lineno">  107</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
+<div class="line"><span class="lineno">  108</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *src = kk_in + (size_t)h * (<span class="keywordtype">size_t</span>)head_dim;</div>
+<div class="line"><span class="lineno">  109</span>        <span class="keywordtype">float</span> *dst = kk_out + (size_t)h * (<span class="keywordtype">size_t</span>)head_dim;</div>
+<div class="line"><span class="lineno">  110</span>        <span class="keywordtype">float</span> norm = 0.0f;</div>
+<div class="line"><span class="lineno">  111</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; head_dim; ++i) {</div>
+<div class="line"><span class="lineno">  112</span>            norm += src[i] * src[i];</div>
+<div class="line"><span class="lineno">  113</span>        }</div>
+<div class="line"><span class="lineno">  114</span>        norm = sqrtf(norm);</div>
+<div class="line"><span class="lineno">  115</span>        <span class="comment">/* Divisor max(norm,1e-12); an all-zero row stays zero. */</span></div>
+<div class="line"><span class="lineno">  116</span>        <span class="keywordflow">if</span> (norm &lt; 1e-12f) {</div>
+<div class="line"><span class="lineno">  117</span>            norm = 1e-12f;</div>
+<div class="line"><span class="lineno">  118</span>        }</div>
+<div class="line"><span class="lineno">  119</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> inv = 1.0f / norm;</div>
+<div class="line"><span class="lineno">  120</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; head_dim; ++i) {</div>
+<div class="line"><span class="lineno">  121</span>            dst[i] = src[i] * inv;</div>
+<div class="line"><span class="lineno">  122</span>        }</div>
+<div class="line"><span class="lineno">  123</span>    }</div>
+<div class="line"><span class="lineno">  124</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  125</span>}</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -645,16 +749,16 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="rwkv7__decode_8c_source.html#l00069">69</a> of file <a class="el" href="rwkv7__decode_8c_source.html">rwkv7_decode.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   73</span>                                  {</div>
-<div class="line"><span class="lineno">   74</span>    <span class="keywordflow">if</span> (!k_in || !a || !k_a || !k_out || dim &lt;= 0) {</div>
-<div class="line"><span class="lineno">   75</span>        <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">   76</span>    }</div>
-<div class="line"><span class="lineno">   77</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; dim; ++i) {</div>
-<div class="line"><span class="lineno">   78</span>        k_out[i] = k_in[i] * (1.0f + (a[i] - 1.0f) * k_a[i]);</div>
-<div class="line"><span class="lineno">   79</span>    }</div>
-<div class="line"><span class="lineno">   80</span>    <span class="keywordflow">return</span> 0;</div>
-<div class="line"><span class="lineno">   81</span>}</div>
+<p class="definition">Definition at line <a class="el" href="rwkv7__decode_8c_source.html#l00127">127</a> of file <a class="el" href="rwkv7__decode_8c_source.html">rwkv7_decode.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  131</span>                                  {</div>
+<div class="line"><span class="lineno">  132</span>    <span class="keywordflow">if</span> (!k_in || !a || !k_a || !k_out || dim &lt;= 0) {</div>
+<div class="line"><span class="lineno">  133</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  134</span>    }</div>
+<div class="line"><span class="lineno">  135</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; dim; ++i) {</div>
+<div class="line"><span class="lineno">  136</span>        k_out[i] = k_in[i] * (1.0f + (k_a[i] - 1.0f) * a[i]);</div>
+<div class="line"><span class="lineno">  137</span>    }</div>
+<div class="line"><span class="lineno">  138</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  139</span>}</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -696,22 +800,22 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="rwkv7__decode_8c_source.html#l00248">248</a> of file <a class="el" href="rwkv7__decode_8c_source.html">rwkv7_decode.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  251</span>                                         {</div>
-<div class="line"><span class="lineno">  252</span>    <span class="keywordflow">if</span> (!state || !r || !y || head_dim &lt;= 0 || head_dim &gt; 512) {</div>
-<div class="line"><span class="lineno">  253</span>        <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  254</span>    }</div>
-<div class="line"><span class="lineno">  255</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; head_dim; ++i) {</div>
-<div class="line"><span class="lineno">  256</span>        <span class="keywordtype">float</span> acc = 0.0f;</div>
-<div class="line"><span class="lineno">  257</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> l = 0; l &lt; head_dim; ++l) {</div>
-<div class="line"><span class="lineno">  258</span>            acc += state[(size_t)i * (<span class="keywordtype">size_t</span>)head_dim + (size_t)l] * r[l];</div>
-<div class="line"><span class="lineno">  259</span>        }</div>
-<div class="line"><span class="lineno">  260</span>        y[i] = acc;</div>
-<div class="line"><span class="lineno">  261</span>    }</div>
-<div class="line"><span class="lineno">  262</span>    <span class="keywordflow">return</span> 0;</div>
-<div class="line"><span class="lineno">  263</span>}</div>
+<p class="definition">Definition at line <a class="el" href="rwkv7__decode_8c_source.html#l00319">319</a> of file <a class="el" href="rwkv7__decode_8c_source.html">rwkv7_decode.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  322</span>                                         {</div>
+<div class="line"><span class="lineno">  323</span>    <span class="keywordflow">if</span> (!state || !r || !y || head_dim &lt;= 0 || head_dim &gt; 512) {</div>
+<div class="line"><span class="lineno">  324</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  325</span>    }</div>
+<div class="line"><span class="lineno">  326</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; head_dim; ++i) {</div>
+<div class="line"><span class="lineno">  327</span>        <span class="keywordtype">float</span> acc = 0.0f;</div>
+<div class="line"><span class="lineno">  328</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> l = 0; l &lt; head_dim; ++l) {</div>
+<div class="line"><span class="lineno">  329</span>            acc += state[(size_t)i * (<span class="keywordtype">size_t</span>)head_dim + (size_t)l] * r[l];</div>
+<div class="line"><span class="lineno">  330</span>        }</div>
+<div class="line"><span class="lineno">  331</span>        y[i] = acc;</div>
+<div class="line"><span class="lineno">  332</span>    }</div>
+<div class="line"><span class="lineno">  333</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  334</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="rwkv7__decode_8c_source.html#l00265">ck_rwkv7_wkv_decode()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="rwkv7__decode_8c_source.html#l00336">ck_rwkv7_wkv_decode()</a>.</p>
 
 </div>
 </div>
@@ -777,33 +881,1097 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="rwkv7__decode_8c_source.html#l00216">216</a> of file <a class="el" href="rwkv7__decode_8c_source.html">rwkv7_decode.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  223</span>                                      {</div>
-<div class="line"><span class="lineno">  224</span>    <span class="keywordflow">if</span> (!w_log || !k || !v || !kk || !a || !state_in || !state_out ||</div>
-<div class="line"><span class="lineno">  225</span>        head_dim &lt;= 0 || head_dim &gt; 512) {</div>
-<div class="line"><span class="lineno">  226</span>        <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  227</span>    }</div>
-<div class="line"><span class="lineno">  228</span>    <span class="keywordtype">float</span> decay[512];</div>
-<div class="line"><span class="lineno">  229</span>    <span class="keywordtype">float</span> bvec[512];</div>
-<div class="line"><span class="lineno">  230</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; head_dim; ++j) {</div>
-<div class="line"><span class="lineno">  231</span>        decay[j] = expf(w_log[j]);</div>
-<div class="line"><span class="lineno">  232</span>        bvec[j] = kk[j] * a[j];</div>
-<div class="line"><span class="lineno">  233</span>    }</div>
-<div class="line"><span class="lineno">  234</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; head_dim; ++i) {</div>
-<div class="line"><span class="lineno">  235</span>        <span class="keywordtype">float</span> t = 0.0f;</div>
-<div class="line"><span class="lineno">  236</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> l = 0; l &lt; head_dim; ++l) {</div>
-<div class="line"><span class="lineno">  237</span>            t += state_in[(size_t)i * (<span class="keywordtype">size_t</span>)head_dim + (size_t)l] * kk[l];</div>
-<div class="line"><span class="lineno">  238</span>        }</div>
-<div class="line"><span class="lineno">  239</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; head_dim; ++j) {</div>
-<div class="line"><span class="lineno">  240</span>            state_out[(size_t)i * (<span class="keywordtype">size_t</span>)head_dim + (size_t)j] =</div>
-<div class="line"><span class="lineno">  241</span>                state_in[(<span class="keywordtype">size_t</span>)i * (size_t)head_dim + (<span class="keywordtype">size_t</span>)j] * decay[j] -</div>
-<div class="line"><span class="lineno">  242</span>                t * bvec[j] + v[i] * k[j];</div>
-<div class="line"><span class="lineno">  243</span>        }</div>
-<div class="line"><span class="lineno">  244</span>    }</div>
-<div class="line"><span class="lineno">  245</span>    <span class="keywordflow">return</span> 0;</div>
-<div class="line"><span class="lineno">  246</span>}</div>
+<p class="definition">Definition at line <a class="el" href="rwkv7__decode_8c_source.html#l00287">287</a> of file <a class="el" href="rwkv7__decode_8c_source.html">rwkv7_decode.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  294</span>                                      {</div>
+<div class="line"><span class="lineno">  295</span>    <span class="keywordflow">if</span> (!w_log || !k || !v || !kk || !a || !state_in || !state_out ||</div>
+<div class="line"><span class="lineno">  296</span>        head_dim &lt;= 0 || head_dim &gt; 512) {</div>
+<div class="line"><span class="lineno">  297</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  298</span>    }</div>
+<div class="line"><span class="lineno">  299</span>    <span class="keywordtype">float</span> decay[512];</div>
+<div class="line"><span class="lineno">  300</span>    <span class="keywordtype">float</span> bvec[512];</div>
+<div class="line"><span class="lineno">  301</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; head_dim; ++j) {</div>
+<div class="line"><span class="lineno">  302</span>        decay[j] = expf(w_log[j]);</div>
+<div class="line"><span class="lineno">  303</span>        bvec[j] = kk[j] * a[j];</div>
+<div class="line"><span class="lineno">  304</span>    }</div>
+<div class="line"><span class="lineno">  305</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; head_dim; ++i) {</div>
+<div class="line"><span class="lineno">  306</span>        <span class="keywordtype">float</span> t = 0.0f;</div>
+<div class="line"><span class="lineno">  307</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> l = 0; l &lt; head_dim; ++l) {</div>
+<div class="line"><span class="lineno">  308</span>            t += state_in[(size_t)i * (<span class="keywordtype">size_t</span>)head_dim + (size_t)l] * kk[l];</div>
+<div class="line"><span class="lineno">  309</span>        }</div>
+<div class="line"><span class="lineno">  310</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; head_dim; ++j) {</div>
+<div class="line"><span class="lineno">  311</span>            state_out[(size_t)i * (<span class="keywordtype">size_t</span>)head_dim + (size_t)j] =</div>
+<div class="line"><span class="lineno">  312</span>                state_in[(<span class="keywordtype">size_t</span>)i * (size_t)head_dim + (<span class="keywordtype">size_t</span>)j] * decay[j] -</div>
+<div class="line"><span class="lineno">  313</span>                t * bvec[j] + v[i] * k[j];</div>
+<div class="line"><span class="lineno">  314</span>        }</div>
+<div class="line"><span class="lineno">  315</span>    }</div>
+<div class="line"><span class="lineno">  316</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  317</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="rwkv7__decode_8c_source.html#l00265">ck_rwkv7_wkv_decode()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="rwkv7__decode_8c_source.html#l00336">ck_rwkv7_wkv_decode()</a>.</p>
+
+</div>
+</div>
+<a id="acd563b2c1a2ae964e8e1962500aef3a8" name="acd563b2c1a2ae964e8e1962500aef3a8"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#acd563b2c1a2ae964e8e1962500aef3a8">&#9670;&#160;</a></span>ck_rwkv7_time_mix_block()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int ck_rwkv7_time_mix_block </td>
+          <td>(</td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>h</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>att_shift_in</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>v_first_in</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>state_in</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>ln_g</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>ln_b</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>mu_r</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>mu_w</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>mu_k</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>mu_v</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>mu_a</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>mu_g</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>Wr</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>Wk</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>Wv</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>Wo</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>w1</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>w2</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>w0</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>a1</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>a2</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>a0</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>g1</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>g2</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>v1</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>v2</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>v0</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>k_k</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>k_a</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>rk</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>gn_w</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>gn_b</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float&#160;</td>
+          <td class="paramname"><em>norm_eps</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_heads</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>head_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>rank_w</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>rank_a</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>rank_g</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>rank_v</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>is_layer_zero</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="ckernel__rwkv7__decode_8h.html#a66dd24edfc16d8ab5316be93c5750c9e">ck_rwkv7_gemv_fn</a>&#160;</td>
+          <td class="paramname"><em>gemv</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="ckernel__rwkv7__decode_8h.html#a7bc568227c4628e162abf1487acdc241">ck_rwkv7_layer_norm_fn</a>&#160;</td>
+          <td class="paramname"><em>layer_norm</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">void *&#160;</td>
+          <td class="paramname"><em>ctx</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>h_out</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>att_shift_out</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>state_out</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>v_first_out</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>scratch</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>scratch_elems</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="rwkv7__decode_8c_source.html#l00707">707</a> of file <a class="el" href="rwkv7__decode_8c_source.html">rwkv7_decode.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  756</span>                                                  {</div>
+<div class="line"><span class="lineno">  757</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> layer0 = is_layer_zero ? 1 : 0;</div>
+<div class="line"><span class="lineno">  758</span>    <span class="keywordflow">if</span> (!h || !att_shift_in || !ln_g || !ln_b || !mu_r || !mu_w || !mu_k ||</div>
+<div class="line"><span class="lineno">  759</span>        !mu_v || !mu_a || !mu_g || !Wr || !Wk || !Wv || !Wo || !w1 || !w2 ||</div>
+<div class="line"><span class="lineno">  760</span>        !w0 || !a1 || !a2 || !a0 || !g1 || !g2 || !k_k || !k_a || !rk ||</div>
+<div class="line"><span class="lineno">  761</span>        !gn_w || !gn_b || !state_in || !state_out || !h_out ||</div>
+<div class="line"><span class="lineno">  762</span>        !att_shift_out || !v_first_out || !gemv || !layer_norm || !scratch ||</div>
+<div class="line"><span class="lineno">  763</span>        dim &lt;= 0 || num_heads &lt;= 0 || head_dim &lt;= 0 || num_heads &gt; 256 ||</div>
+<div class="line"><span class="lineno">  764</span>        head_dim &gt; 512 || rank_w &lt;= 0 || rank_w &gt; 512 || rank_a &lt;= 0 ||</div>
+<div class="line"><span class="lineno">  765</span>        rank_a &gt; 512 || rank_g &lt;= 0 || rank_g &gt; 512 ||</div>
+<div class="line"><span class="lineno">  766</span>        !(norm_eps &gt; 0.0f) || !isfinite(norm_eps) ||</div>
+<div class="line"><span class="lineno">  767</span>        !isfinite(norm_eps * (<span class="keywordtype">float</span>)head_dim) ||</div>
+<div class="line"><span class="lineno">  768</span>        (is_layer_zero != 0 &amp;&amp; is_layer_zero != 1)) {</div>
+<div class="line"><span class="lineno">  769</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  770</span>    }</div>
+<div class="line"><span class="lineno">  771</span>    <span class="keywordflow">if</span> ((<span class="keywordtype">size_t</span>)dim != (<span class="keywordtype">size_t</span>)num_heads * (<span class="keywordtype">size_t</span>)head_dim) {</div>
+<div class="line"><span class="lineno">  772</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  773</span>    }</div>
+<div class="line"><span class="lineno">  774</span>    <span class="keywordflow">if</span> (layer0) {</div>
+<div class="line"><span class="lineno">  775</span>        <span class="keywordflow">if</span> (v_first_in || v1 || v2 || v0) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  776</span>    } <span class="keywordflow">else</span> <span class="keywordflow">if</span> (!v_first_in || !v1 || !v2 || !v0 || rank_v &lt;= 0 ||</div>
+<div class="line"><span class="lineno">  777</span>               rank_v &gt; 512) {</div>
+<div class="line"><span class="lineno">  778</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  779</span>    }</div>
+<div class="line"><span class="lineno">  780</span>    <span class="keywordflow">if</span> (scratch_elems &lt; (<span class="keywordtype">size_t</span>)dim * 19u) {</div>
+<div class="line"><span class="lineno">  781</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  782</span>    }</div>
+<div class="line"><span class="lineno">  783</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> vec_bytes = (size_t)dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>);</div>
+<div class="line"><span class="lineno">  784</span>    <span class="keywordflow">if</span> ((<span class="keywordtype">size_t</span>)head_dim &gt; SIZE_MAX / vec_bytes) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  785</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> state_bytes = vec_bytes * (size_t)head_dim;</div>
+<div class="line"><span class="lineno">  786</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> scratch_bytes = vec_bytes * 19u;</div>
+<div class="line"><span class="lineno">  787</span> </div>
+<div class="line"><span class="lineno">  788</span>    <span class="comment">/* Output aliasing: each output may exactly alias its own input stream;</span></div>
+<div class="line"><span class="lineno">  789</span><span class="comment">     * the four outputs must otherwise be pairwise disjoint and disjoint</span></div>
+<div class="line"><span class="lineno">  790</span><span class="comment">     * from every input. */</span></div>
+<div class="line"><span class="lineno">  791</span>    <span class="keywordtype">float</span> *outs[] = {h_out, att_shift_out, state_out, v_first_out};</div>
+<div class="line"><span class="lineno">  792</span>    <span class="keyword">const</span> <span class="keywordtype">void</span> *allow[] = {h, att_shift_in, state_in, v_first_in};</div>
+<div class="line"><span class="lineno">  793</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> out_bytes[] = {vec_bytes, vec_bytes, state_bytes, vec_bytes};</div>
+<div class="line"><span class="lineno">  794</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> a = 0; a &lt; 4; ++a) {</div>
+<div class="line"><span class="lineno">  795</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> b = a + 1; b &lt; 4; ++b) {</div>
+<div class="line"><span class="lineno">  796</span>            <span class="keywordflow">if</span> (<a class="code hl_function" href="rwkv7__decode_8c.html#a123d0108a84d9bfbe954606dcb79b5d4">overlaps</a>(outs[a], out_bytes[a], outs[b], out_bytes[b])) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  797</span>        }</div>
+<div class="line"><span class="lineno">  798</span>    }</div>
+<div class="line"><span class="lineno">  799</span>    <span class="keyword">const</span> <span class="keywordtype">void</span> *ro[] = {h, att_shift_in, v_first_in, state_in, ln_g, ln_b,</div>
+<div class="line"><span class="lineno">  800</span>                        mu_r, mu_w, mu_k, mu_v, mu_a, mu_g,</div>
+<div class="line"><span class="lineno">  801</span>                        Wr, Wk, Wv, Wo,</div>
+<div class="line"><span class="lineno">  802</span>                        w1, w2, w0, a1, a2, a0, g1, g2, v1, v2, v0,</div>
+<div class="line"><span class="lineno">  803</span>                        k_k, k_a, rk, gn_w, gn_b};</div>
+<div class="line"><span class="lineno">  804</span>    <span class="keywordtype">size_t</span> ro_e[] = {(size_t)dim, (<span class="keywordtype">size_t</span>)dim, (size_t)dim, 0,</div>
+<div class="line"><span class="lineno">  805</span>                     (<span class="keywordtype">size_t</span>)dim, (size_t)dim,</div>
+<div class="line"><span class="lineno">  806</span>                     (<span class="keywordtype">size_t</span>)dim, (size_t)dim, (<span class="keywordtype">size_t</span>)dim, (size_t)dim,</div>
+<div class="line"><span class="lineno">  807</span>                     (<span class="keywordtype">size_t</span>)dim, (size_t)dim,</div>
+<div class="line"><span class="lineno">  808</span>                     (<span class="keywordtype">size_t</span>)dim * (size_t)dim, (<span class="keywordtype">size_t</span>)dim * (size_t)dim,</div>
+<div class="line"><span class="lineno">  809</span>                     (<span class="keywordtype">size_t</span>)dim * (size_t)dim, (<span class="keywordtype">size_t</span>)dim * (size_t)dim,</div>
+<div class="line"><span class="lineno">  810</span>                     (<span class="keywordtype">size_t</span>)dim * (size_t)rank_w, (<span class="keywordtype">size_t</span>)rank_w * (size_t)dim, (<span class="keywordtype">size_t</span>)dim,</div>
+<div class="line"><span class="lineno">  811</span>                     (size_t)dim * (<span class="keywordtype">size_t</span>)rank_a, (size_t)rank_a * (<span class="keywordtype">size_t</span>)dim, (size_t)dim,</div>
+<div class="line"><span class="lineno">  812</span>                     (<span class="keywordtype">size_t</span>)dim * (size_t)rank_g, (<span class="keywordtype">size_t</span>)rank_g * (size_t)dim,</div>
+<div class="line"><span class="lineno">  813</span>                     0, 0, 0,</div>
+<div class="line"><span class="lineno">  814</span>                     (<span class="keywordtype">size_t</span>)dim, (size_t)dim, (<span class="keywordtype">size_t</span>)dim, (size_t)dim, (<span class="keywordtype">size_t</span>)dim};</div>
+<div class="line"><span class="lineno">  815</span>    ro_e[3] = state_bytes / <span class="keyword">sizeof</span>(float);</div>
+<div class="line"><span class="lineno">  816</span>    <span class="keywordflow">if</span> (!layer0) {</div>
+<div class="line"><span class="lineno">  817</span>        ro_e[24] = (size_t)dim * (<span class="keywordtype">size_t</span>)rank_v;</div>
+<div class="line"><span class="lineno">  818</span>        ro_e[25] = (size_t)rank_v * (<span class="keywordtype">size_t</span>)dim;</div>
+<div class="line"><span class="lineno">  819</span>        ro_e[26] = (size_t)dim;</div>
+<div class="line"><span class="lineno">  820</span>    }</div>
+<div class="line"><span class="lineno">  821</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; 32; ++j) {</div>
+<div class="line"><span class="lineno">  822</span>        <span class="keywordflow">if</span> (!ro[j] || ro_e[j] == 0) <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  823</span>        <span class="keywordflow">if</span> (ro_e[j] &gt; SIZE_MAX / <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>)) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  824</span>        <span class="keyword">const</span> <span class="keywordtype">size_t</span> nbytes = ro_e[j] * <span class="keyword">sizeof</span>(float);</div>
+<div class="line"><span class="lineno">  825</span>        <span class="keywordflow">if</span> (<a class="code hl_function" href="rwkv7__decode_8c.html#a123d0108a84d9bfbe954606dcb79b5d4">overlaps</a>(scratch, scratch_bytes, ro[j], nbytes)) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  826</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> o = 0; o &lt; 4; ++o) {</div>
+<div class="line"><span class="lineno">  827</span>            <span class="keywordflow">if</span> (outs[o] == ro[j] &amp;&amp; ro[j] == allow[o]) <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  828</span>            <span class="keywordflow">if</span> (<a class="code hl_function" href="rwkv7__decode_8c.html#a123d0108a84d9bfbe954606dcb79b5d4">overlaps</a>(outs[o], out_bytes[o], ro[j], nbytes)) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  829</span>        }</div>
+<div class="line"><span class="lineno">  830</span>    }</div>
+<div class="line"><span class="lineno">  831</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> o = 0; o &lt; 4; ++o) {</div>
+<div class="line"><span class="lineno">  832</span>        <span class="keywordflow">if</span> (<a class="code hl_function" href="rwkv7__decode_8c.html#a123d0108a84d9bfbe954606dcb79b5d4">overlaps</a>(scratch, scratch_bytes, outs[o], out_bytes[o])) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  833</span>    }</div>
+<div class="line"><span class="lineno">  834</span> </div>
+<div class="line"><span class="lineno">  835</span>    <span class="keywordtype">float</span> *attn_in = scratch;</div>
+<div class="line"><span class="lineno">  836</span>    <span class="keywordtype">float</span> *xr = scratch + (size_t)dim;</div>
+<div class="line"><span class="lineno">  837</span>    <span class="keywordtype">float</span> *xw = scratch + (size_t)dim * 2u;</div>
+<div class="line"><span class="lineno">  838</span>    <span class="keywordtype">float</span> *xk = scratch + (size_t)dim * 3u;</div>
+<div class="line"><span class="lineno">  839</span>    <span class="keywordtype">float</span> *xvm = scratch + (size_t)dim * 4u;</div>
+<div class="line"><span class="lineno">  840</span>    <span class="keywordtype">float</span> *xa = scratch + (size_t)dim * 5u;</div>
+<div class="line"><span class="lineno">  841</span>    <span class="keywordtype">float</span> *xg = scratch + (size_t)dim * 6u;</div>
+<div class="line"><span class="lineno">  842</span>    <span class="keywordtype">float</span> *r = scratch + (size_t)dim * 7u;</div>
+<div class="line"><span class="lineno">  843</span>    <span class="keywordtype">float</span> *k_raw = scratch + (size_t)dim * 8u;</div>
+<div class="line"><span class="lineno">  844</span>    <span class="keywordtype">float</span> *v_in = scratch + (size_t)dim * 9u;</div>
+<div class="line"><span class="lineno">  845</span>    <span class="keywordtype">float</span> *y_pre = scratch + (size_t)dim * 10u;</div>
+<div class="line"><span class="lineno">  846</span>    <span class="keywordtype">float</span> *attn_out = scratch + (size_t)dim * 11u;</div>
+<div class="line"><span class="lineno">  847</span>    <span class="keywordtype">float</span> *tail_scratch = scratch + (size_t)dim * 12u;</div>
+<div class="line"><span class="lineno">  848</span> </div>
+<div class="line"><span class="lineno">  849</span>    <span class="keywordflow">if</span> (layer_norm(h, ln_g, ln_b, attn_in, dim, ctx) != 0) {</div>
+<div class="line"><span class="lineno">  850</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  851</span>    }</div>
+<div class="line"><span class="lineno">  852</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="rwkv7__decode_8c.html#ab811dc25cfae0abf4b8763a3db4adda7">ck_rwkv7_time_mix_shifts</a>(attn_in, att_shift_in, mu_r, mu_w, mu_k,</div>
+<div class="line"><span class="lineno">  853</span>                                 mu_v, mu_a, mu_g, xr, xw, xk, xvm, xa,</div>
+<div class="line"><span class="lineno">  854</span>                                 xg, att_shift_out, dim) != 0) {</div>
+<div class="line"><span class="lineno">  855</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  856</span>    }</div>
+<div class="line"><span class="lineno">  857</span>    <span class="keywordflow">if</span> (gemv(Wr, xr, r, ctx) != 0 || gemv(Wk, xk, k_raw, ctx) != 0 ||</div>
+<div class="line"><span class="lineno">  858</span>        gemv(Wv, xvm, v_in, ctx) != 0) {</div>
+<div class="line"><span class="lineno">  859</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  860</span>    }</div>
+<div class="line"><span class="lineno">  861</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="rwkv7__decode_8c.html#af58337839fd5324c8e129bc9b925290c">ck_rwkv7_time_mix_tail</a>(r, k_raw, v_in, v_first_in, xw, xa, xg,</div>
+<div class="line"><span class="lineno">  862</span>                               layer0 ? NULL : xvm, w1, w2, w0, a1, a2, a0,</div>
+<div class="line"><span class="lineno">  863</span>                               g1, g2, layer0 ? NULL : v1,</div>
+<div class="line"><span class="lineno">  864</span>                               layer0 ? NULL : v2, layer0 ? NULL : v0, k_k,</div>
+<div class="line"><span class="lineno">  865</span>                               k_a, rk, gn_w, gn_b, norm_eps, state_in,</div>
+<div class="line"><span class="lineno">  866</span>                               state_out, y_pre, v_first_out, dim,</div>
+<div class="line"><span class="lineno">  867</span>                               num_heads, head_dim, rank_w, rank_a, rank_g,</div>
+<div class="line"><span class="lineno">  868</span>                               layer0 ? 1 : rank_v, tail_scratch,</div>
+<div class="line"><span class="lineno">  869</span>                               (size_t)dim * 7u) != 0) {</div>
+<div class="line"><span class="lineno">  870</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  871</span>    }</div>
+<div class="line"><span class="lineno">  872</span>    <span class="keywordflow">if</span> (gemv(Wo, y_pre, attn_out, ctx) != 0) {</div>
+<div class="line"><span class="lineno">  873</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  874</span>    }</div>
+<div class="line"><span class="lineno">  875</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; dim; ++i) {</div>
+<div class="line"><span class="lineno">  876</span>        h_out[i] = h[i] + attn_out[i];</div>
+<div class="line"><span class="lineno">  877</span>    }</div>
+<div class="line"><span class="lineno">  878</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  879</span>}</div>
+<div class="ttc" id="arwkv7__decode_8c_html_ab811dc25cfae0abf4b8763a3db4adda7"><div class="ttname"><a href="rwkv7__decode_8c.html#ab811dc25cfae0abf4b8763a3db4adda7">ck_rwkv7_time_mix_shifts</a></div><div class="ttdeci">int ck_rwkv7_time_mix_shifts(const float *x, const float *shift_in, const float *mu_r, const float *mu_w, const float *mu_k, const float *mu_v, const float *mu_a, const float *mu_g, float *xr, float *xw, float *xk, float *xv, float *xa, float *xg, float *shift_out, int dim)</div><div class="ttdef"><b>Definition</b> <a href="rwkv7__decode_8c_source.html#l00041">rwkv7_decode.c:41</a></div></div>
+<div class="ttc" id="arwkv7__decode_8c_html_af58337839fd5324c8e129bc9b925290c"><div class="ttname"><a href="rwkv7__decode_8c.html#af58337839fd5324c8e129bc9b925290c">ck_rwkv7_time_mix_tail</a></div><div class="ttdeci">int ck_rwkv7_time_mix_tail(const float *r, const float *k_raw, const float *v_in, const float *v_first_in, const float *xw, const float *xa, const float *xg, const float *xv, const float *w1, const float *w2, const float *w0, const float *a1, const float *a2, const float *a0, const float *g1, const float *g2, const float *v1, const float *v2, const float *v0, const float *k_k, const float *k_a, const float *rk, const float *ln_w, const float *ln_b, float norm_eps, const float *state_in, float *state_out, float *y_preproj, float *v_first_out, int dim, int num_heads, int head_dim, int rank_w, int rank_a, int rank_g, int rank_v, float *scratch, size_t scratch_elems)</div><div class="ttdef"><b>Definition</b> <a href="rwkv7__decode_8c_source.html#l00510">rwkv7_decode.c:510</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="rwkv7__decode_8c_source.html#l00041">ck_rwkv7_time_mix_shifts()</a>, <a class="el" href="rwkv7__decode_8c_source.html#l00510">ck_rwkv7_time_mix_tail()</a>, and <a class="el" href="rwkv7__decode_8c_source.html#l00009">overlaps()</a>.</p>
+
+</div>
+</div>
+<a id="a7d03a1eda3bae5252e748280b310fbfa" name="a7d03a1eda3bae5252e748280b310fbfa"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a7d03a1eda3bae5252e748280b310fbfa">&#9670;&#160;</a></span>ck_rwkv7_time_mix_block_scratch_elems()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">size_t ck_rwkv7_time_mix_block_scratch_elems </td>
+          <td>(</td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>dim</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="rwkv7__decode_8c_source.html#l00700">700</a> of file <a class="el" href="rwkv7__decode_8c_source.html">rwkv7_decode.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  700</span>                                                      {</div>
+<div class="line"><span class="lineno">  701</span>    <span class="keywordflow">if</span> (dim &lt;= 0 || (<span class="keywordtype">size_t</span>)dim &gt; SIZE_MAX / (19u * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>))) {</div>
+<div class="line"><span class="lineno">  702</span>        <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  703</span>    }</div>
+<div class="line"><span class="lineno">  704</span>    <span class="keywordflow">return</span> (<span class="keywordtype">size_t</span>)dim * 19u;</div>
+<div class="line"><span class="lineno">  705</span>}</div>
+</div><!-- fragment -->
+</div>
+</div>
+<a id="a6fcc6465e48f60e8023a7f5d0eca7e0c" name="a6fcc6465e48f60e8023a7f5d0eca7e0c"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a6fcc6465e48f60e8023a7f5d0eca7e0c">&#9670;&#160;</a></span>ck_rwkv7_time_mix_scratch_elems()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">size_t ck_rwkv7_time_mix_scratch_elems </td>
+          <td>(</td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>dim</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="rwkv7__decode_8c_source.html#l00505">505</a> of file <a class="el" href="rwkv7__decode_8c_source.html">rwkv7_decode.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  505</span>                                                {</div>
+<div class="line"><span class="lineno">  506</span>    <span class="keywordflow">if</span> (dim &lt;= 0 || (<span class="keywordtype">size_t</span>)dim &gt; SIZE_MAX / (7u * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>))) {</div>
+<div class="line"><span class="lineno">  507</span>        <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  508</span>    }</div>
+<div class="line"><span class="lineno">  509</span>    <span class="keywordflow">return</span> (<span class="keywordtype">size_t</span>)dim * 7u;</div>
+<div class="line"><span class="lineno">  510</span>}<span class="keywordtype">int</span> <a class="code hl_function" href="rwkv7__decode_8c.html#af58337839fd5324c8e129bc9b925290c">ck_rwkv7_time_mix_tail</a>(<span class="keyword">const</span> <span class="keywordtype">float</span> *r,</div>
+</div><!-- fragment -->
+</div>
+</div>
+<a id="ab811dc25cfae0abf4b8763a3db4adda7" name="ab811dc25cfae0abf4b8763a3db4adda7"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ab811dc25cfae0abf4b8763a3db4adda7">&#9670;&#160;</a></span>ck_rwkv7_time_mix_shifts()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int ck_rwkv7_time_mix_shifts </td>
+          <td>(</td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>x</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>shift_in</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>mu_r</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>mu_w</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>mu_k</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>mu_v</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>mu_a</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>mu_g</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>xr</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>xw</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>xk</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>xv</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>xa</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>xg</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>shift_out</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>dim</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="rwkv7__decode_8c_source.html#l00041">41</a> of file <a class="el" href="rwkv7__decode_8c_source.html">rwkv7_decode.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   56</span>                                      {</div>
+<div class="line"><span class="lineno">   57</span>    <span class="keywordflow">if</span> (!x || !shift_in || !mu_r || !mu_w || !mu_k || !mu_v || !mu_a ||</div>
+<div class="line"><span class="lineno">   58</span>        !mu_g || !xr || !xw || !xk || !xv || !xa || !xg || !shift_out ||</div>
+<div class="line"><span class="lineno">   59</span>        dim &lt;= 0) {</div>
+<div class="line"><span class="lineno">   60</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">   61</span>    }</div>
+<div class="line"><span class="lineno">   62</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> bytes = (size_t)dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>);</div>
+<div class="line"><span class="lineno">   63</span>    <span class="keywordtype">float</span> *outs[] = {xr, xw, xk, xv, xa, xg, shift_out};</div>
+<div class="line"><span class="lineno">   64</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> a = 0; a &lt; 7; ++a) {</div>
+<div class="line"><span class="lineno">   65</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> b = a + 1; b &lt; 7; ++b) {</div>
+<div class="line"><span class="lineno">   66</span>            <span class="keywordflow">if</span> (<a class="code hl_function" href="rwkv7__decode_8c.html#a123d0108a84d9bfbe954606dcb79b5d4">overlaps</a>(outs[a], bytes, outs[b], bytes)) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">   67</span>        }</div>
+<div class="line"><span class="lineno">   68</span>    }</div>
+<div class="line"><span class="lineno">   69</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> *inputs[] = {x, shift_in, mu_r, mu_w, mu_k, mu_v, mu_a, mu_g};</div>
+<div class="line"><span class="lineno">   70</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; 8; ++j) {</div>
+<div class="line"><span class="lineno">   71</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> o = 0; o &lt; 7; ++o) {</div>
+<div class="line"><span class="lineno">   72</span>            <span class="keywordflow">if</span> (outs[o] == inputs[j] &amp;&amp;</div>
+<div class="line"><span class="lineno">   73</span>                !(outs[o] == shift_out &amp;&amp; inputs[j] == shift_in)) {</div>
+<div class="line"><span class="lineno">   74</span>                <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">   75</span>            }</div>
+<div class="line"><span class="lineno">   76</span>            <span class="keywordflow">if</span> (outs[o] != inputs[j] &amp;&amp;</div>
+<div class="line"><span class="lineno">   77</span>                <a class="code hl_function" href="rwkv7__decode_8c.html#a123d0108a84d9bfbe954606dcb79b5d4">overlaps</a>(outs[o], bytes, inputs[j], bytes)) {</div>
+<div class="line"><span class="lineno">   78</span>                <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">   79</span>            }</div>
+<div class="line"><span class="lineno">   80</span>        }</div>
+<div class="line"><span class="lineno">   81</span>    }</div>
+<div class="line"><span class="lineno">   82</span>    <span class="comment">/* Fused per-index pass: each lane reads x[i]/shift_in[i] once, so the</span></div>
+<div class="line"><span class="lineno">   83</span><span class="comment">     * shared shift is written exactly once instead of six times. */</span></div>
+<div class="line"><span class="lineno">   84</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; dim; ++i) {</div>
+<div class="line"><span class="lineno">   85</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> current = x[i];</div>
+<div class="line"><span class="lineno">   86</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> previous = shift_in[i];</div>
+<div class="line"><span class="lineno">   87</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> d = previous - current;</div>
+<div class="line"><span class="lineno">   88</span>        xr[i] = current + mu_r[i] * d;</div>
+<div class="line"><span class="lineno">   89</span>        xw[i] = current + mu_w[i] * d;</div>
+<div class="line"><span class="lineno">   90</span>        xk[i] = current + mu_k[i] * d;</div>
+<div class="line"><span class="lineno">   91</span>        xv[i] = current + mu_v[i] * d;</div>
+<div class="line"><span class="lineno">   92</span>        xa[i] = current + mu_a[i] * d;</div>
+<div class="line"><span class="lineno">   93</span>        xg[i] = current + mu_g[i] * d;</div>
+<div class="line"><span class="lineno">   94</span>        shift_out[i] = current;</div>
+<div class="line"><span class="lineno">   95</span>    }</div>
+<div class="line"><span class="lineno">   96</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">   97</span>}</div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="rwkv7__decode_8c_source.html#l00009">overlaps()</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="rwkv7__decode_8c_source.html#l00707">ck_rwkv7_time_mix_block()</a>.</p>
+
+</div>
+</div>
+<a id="af58337839fd5324c8e129bc9b925290c" name="af58337839fd5324c8e129bc9b925290c"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#af58337839fd5324c8e129bc9b925290c">&#9670;&#160;</a></span>ck_rwkv7_time_mix_tail()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int ck_rwkv7_time_mix_tail </td>
+          <td>(</td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>r</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>k_raw</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>v_in</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>v_first_in</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>xw</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>xa</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>xg</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>xv</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>w1</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>w2</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>w0</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>a1</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>a2</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>a0</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>g1</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>g2</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>v1</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>v2</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>v0</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>k_k</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>k_a</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>rk</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>ln_w</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>ln_b</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float&#160;</td>
+          <td class="paramname"><em>norm_eps</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>state_in</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>state_out</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>y_preproj</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>v_first_out</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_heads</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>head_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>rank_w</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>rank_a</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>rank_g</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>rank_v</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>scratch</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>scratch_elems</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="rwkv7__decode_8c_source.html#l00510">510</a> of file <a class="el" href="rwkv7__decode_8c_source.html">rwkv7_decode.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  547</span>                                                 {</div>
+<div class="line"><span class="lineno">  548</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> layer0 = (xv == NULL);</div>
+<div class="line"><span class="lineno">  549</span>    <span class="keywordflow">if</span> (!r || !k_raw || !v_in || !xw || !xa || !xg || !w1 || !w2 || !w0 ||</div>
+<div class="line"><span class="lineno">  550</span>        !a1 || !a2 || !a0 || !g1 || !g2 || !k_k || !k_a || !rk || !ln_w ||</div>
+<div class="line"><span class="lineno">  551</span>        !ln_b || !state_in || !state_out || !y_preproj || !v_first_out ||</div>
+<div class="line"><span class="lineno">  552</span>        !scratch || dim &lt;= 0 || num_heads &lt;= 0 || head_dim &lt;= 0 ||</div>
+<div class="line"><span class="lineno">  553</span>        num_heads &gt; 256 || head_dim &gt; 512 || rank_w &lt;= 0 || rank_w &gt; 512 ||</div>
+<div class="line"><span class="lineno">  554</span>        rank_a &lt;= 0 || rank_a &gt; 512 || rank_g &lt;= 0 || rank_g &gt; 512 ||</div>
+<div class="line"><span class="lineno">  555</span>        !(norm_eps &gt; 0.0f) || !isfinite(norm_eps) ||</div>
+<div class="line"><span class="lineno">  556</span>        !isfinite(norm_eps * (<span class="keywordtype">float</span>)head_dim)) {</div>
+<div class="line"><span class="lineno">  557</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  558</span>    }</div>
+<div class="line"><span class="lineno">  559</span>    <span class="keywordflow">if</span> ((<span class="keywordtype">size_t</span>)dim != (size_t)num_heads * (<span class="keywordtype">size_t</span>)head_dim) {</div>
+<div class="line"><span class="lineno">  560</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  561</span>    }</div>
+<div class="line"><span class="lineno">  562</span>    <span class="keywordflow">if</span> (layer0) {</div>
+<div class="line"><span class="lineno">  563</span>        <span class="comment">/* Layer 0 produces v_first: no residual v state exists yet, so the</span></div>
+<div class="line"><span class="lineno">  564</span><span class="comment">         * residual inputs must be NULL (produce-only path never reads them). */</span></div>
+<div class="line"><span class="lineno">  565</span>        <span class="keywordflow">if</span> (v_first_in || v1 || v2 || v0) {</div>
+<div class="line"><span class="lineno">  566</span>            <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  567</span>        }</div>
+<div class="line"><span class="lineno">  568</span>    } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno">  569</span>        <span class="keywordflow">if</span> (!v_first_in || !v1 || !v2 || !v0 || rank_v &lt;= 0 || rank_v &gt; 512) {</div>
+<div class="line"><span class="lineno">  570</span>            <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  571</span>        }</div>
+<div class="line"><span class="lineno">  572</span>    }</div>
+<div class="line"><span class="lineno">  573</span>    <span class="keywordflow">if</span> (scratch_elems &lt; (<span class="keywordtype">size_t</span>)dim * 7u) {</div>
+<div class="line"><span class="lineno">  574</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  575</span>    }</div>
+<div class="line"><span class="lineno">  576</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> vec_bytes = (size_t)dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>);</div>
+<div class="line"><span class="lineno">  577</span>    <span class="keywordflow">if</span> (vec_bytes / <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>) != (size_t)dim) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  578</span>    <span class="keywordflow">if</span> ((<span class="keywordtype">size_t</span>)head_dim &gt; SIZE_MAX / vec_bytes) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  579</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> state_bytes = vec_bytes * (size_t)head_dim;</div>
+<div class="line"><span class="lineno">  580</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> scratch_bytes = vec_bytes * 7u;</div>
+<div class="line"><span class="lineno">  581</span>    <span class="comment">/* Scratch must be disjoint from every other argument. */</span></div>
+<div class="line"><span class="lineno">  582</span>    <span class="keyword">const</span> <span class="keywordtype">void</span> *ptrs[] = {r, k_raw, v_in, v_first_in, xw, xa, xg, xv,</div>
+<div class="line"><span class="lineno">  583</span>                          w1, w2, w0, a1, a2, a0, g1, g2, v1, v2, v0,</div>
+<div class="line"><span class="lineno">  584</span>                          k_k, k_a, rk, ln_w, ln_b, state_in, state_out,</div>
+<div class="line"><span class="lineno">  585</span>                          y_preproj, v_first_out};</div>
+<div class="line"><span class="lineno">  586</span>    <span class="comment">/* LoRA factor sizes: down [C,R], up [R,C], bias [C]. State is [H,N,N]. */</span></div>
+<div class="line"><span class="lineno">  587</span>    <span class="keywordtype">size_t</span> lens[] = {(size_t)dim, (<span class="keywordtype">size_t</span>)dim, (size_t)dim, (<span class="keywordtype">size_t</span>)dim,</div>
+<div class="line"><span class="lineno">  588</span>                     (size_t)dim, (<span class="keywordtype">size_t</span>)dim, (size_t)dim, (<span class="keywordtype">size_t</span>)dim,</div>
+<div class="line"><span class="lineno">  589</span>                     (size_t)dim * (<span class="keywordtype">size_t</span>)rank_w, (size_t)rank_w * (<span class="keywordtype">size_t</span>)dim, (size_t)dim,</div>
+<div class="line"><span class="lineno">  590</span>                     (<span class="keywordtype">size_t</span>)dim * (size_t)rank_a, (<span class="keywordtype">size_t</span>)rank_a * (size_t)dim, (<span class="keywordtype">size_t</span>)dim,</div>
+<div class="line"><span class="lineno">  591</span>                     (size_t)dim * (<span class="keywordtype">size_t</span>)rank_g, (size_t)rank_g * (<span class="keywordtype">size_t</span>)dim,</div>
+<div class="line"><span class="lineno">  592</span>                     0, 0, 0,</div>
+<div class="line"><span class="lineno">  593</span>                     (size_t)dim, (<span class="keywordtype">size_t</span>)dim,</div>
+<div class="line"><span class="lineno">  594</span>                     (size_t)num_heads * (<span class="keywordtype">size_t</span>)head_dim, (size_t)dim, (<span class="keywordtype">size_t</span>)dim,</div>
+<div class="line"><span class="lineno">  595</span>                     state_bytes / <span class="keyword">sizeof</span>(float), state_bytes / <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>),</div>
+<div class="line"><span class="lineno">  596</span>                     (size_t)dim, (<span class="keywordtype">size_t</span>)dim};</div>
+<div class="line"><span class="lineno">  597</span>    <span class="keywordflow">if</span> (!layer0) {</div>
+<div class="line"><span class="lineno">  598</span>        lens[16] = (size_t)dim * (<span class="keywordtype">size_t</span>)rank_v;</div>
+<div class="line"><span class="lineno">  599</span>        lens[17] = (size_t)rank_v * (<span class="keywordtype">size_t</span>)dim;</div>
+<div class="line"><span class="lineno">  600</span>        lens[18] = (size_t)dim;</div>
+<div class="line"><span class="lineno">  601</span>    }</div>
+<div class="line"><span class="lineno">  602</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; 28; ++j) {</div>
+<div class="line"><span class="lineno">  603</span>        <span class="keywordflow">if</span> (!ptrs[j] || lens[j] == 0) <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  604</span>        <span class="keywordflow">if</span> (lens[j] &gt; SIZE_MAX / <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>)) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  605</span>        <span class="keywordflow">if</span> (<a class="code hl_function" href="rwkv7__decode_8c.html#a123d0108a84d9bfbe954606dcb79b5d4">overlaps</a>(scratch, scratch_bytes, ptrs[j], lens[j] * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>))) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  606</span>    }</div>
+<div class="line"><span class="lineno">  607</span>    <span class="comment">/* Outputs disjoint from each other; state_out may == state_in,</span></div>
+<div class="line"><span class="lineno">  608</span><span class="comment">     * v_first_out may == v_first_in. All other output-input overlaps fail. */</span></div>
+<div class="line"><span class="lineno">  609</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="rwkv7__decode_8c.html#a123d0108a84d9bfbe954606dcb79b5d4">overlaps</a>(state_out, state_bytes, y_preproj, vec_bytes) ||</div>
+<div class="line"><span class="lineno">  610</span>        <a class="code hl_function" href="rwkv7__decode_8c.html#a123d0108a84d9bfbe954606dcb79b5d4">overlaps</a>(state_out, state_bytes, v_first_out, vec_bytes) ||</div>
+<div class="line"><span class="lineno">  611</span>        <a class="code hl_function" href="rwkv7__decode_8c.html#a123d0108a84d9bfbe954606dcb79b5d4">overlaps</a>(y_preproj, vec_bytes, v_first_out, vec_bytes)) {</div>
+<div class="line"><span class="lineno">  612</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  613</span>    }</div>
+<div class="line"><span class="lineno">  614</span>    <span class="keyword">const</span> <span class="keywordtype">void</span> *ro_inputs[] = {r, k_raw, v_in, xw, xa, xg, xv, w1, w2, w0,</div>
+<div class="line"><span class="lineno">  615</span>                               a1, a2, a0, g1, g2, v1, v2, v0, k_k, k_a,</div>
+<div class="line"><span class="lineno">  616</span>                               rk, ln_w, ln_b};</div>
+<div class="line"><span class="lineno">  617</span>    <span class="keywordtype">size_t</span> ro_lens[] = {(size_t)dim, (<span class="keywordtype">size_t</span>)dim, (size_t)dim, (<span class="keywordtype">size_t</span>)dim,</div>
+<div class="line"><span class="lineno">  618</span>                        (size_t)dim, (<span class="keywordtype">size_t</span>)dim, (size_t)dim,</div>
+<div class="line"><span class="lineno">  619</span>                        (<span class="keywordtype">size_t</span>)dim * (size_t)rank_w, (<span class="keywordtype">size_t</span>)rank_w * (size_t)dim, (<span class="keywordtype">size_t</span>)dim,</div>
+<div class="line"><span class="lineno">  620</span>                        (size_t)dim * (<span class="keywordtype">size_t</span>)rank_a, (size_t)rank_a * (<span class="keywordtype">size_t</span>)dim, (size_t)dim,</div>
+<div class="line"><span class="lineno">  621</span>                        (<span class="keywordtype">size_t</span>)dim * (size_t)rank_g, (<span class="keywordtype">size_t</span>)rank_g * (size_t)dim,</div>
+<div class="line"><span class="lineno">  622</span>                        0, 0, 0,</div>
+<div class="line"><span class="lineno">  623</span>                        (<span class="keywordtype">size_t</span>)dim, (size_t)dim, (<span class="keywordtype">size_t</span>)dim, (size_t)dim, (<span class="keywordtype">size_t</span>)dim};</div>
+<div class="line"><span class="lineno">  624</span>    <span class="keywordflow">if</span> (!layer0) {</div>
+<div class="line"><span class="lineno">  625</span>        ro_lens[15] = (size_t)dim * (<span class="keywordtype">size_t</span>)rank_v;</div>
+<div class="line"><span class="lineno">  626</span>        ro_lens[16] = (size_t)rank_v * (<span class="keywordtype">size_t</span>)dim;</div>
+<div class="line"><span class="lineno">  627</span>        ro_lens[17] = (size_t)dim;</div>
+<div class="line"><span class="lineno">  628</span>    }</div>
+<div class="line"><span class="lineno">  629</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; 23; ++j) {</div>
+<div class="line"><span class="lineno">  630</span>        <span class="keywordflow">if</span> (!ro_inputs[j] || ro_lens[j] == 0) <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  631</span>        <span class="keywordtype">size_t</span> n = ro_lens[j];</div>
+<div class="line"><span class="lineno">  632</span>        <span class="keywordflow">if</span> (<a class="code hl_function" href="rwkv7__decode_8c.html#a123d0108a84d9bfbe954606dcb79b5d4">overlaps</a>(y_preproj, vec_bytes, ro_inputs[j], n * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>))) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  633</span>        <span class="keywordflow">if</span> (<a class="code hl_function" href="rwkv7__decode_8c.html#a123d0108a84d9bfbe954606dcb79b5d4">overlaps</a>(v_first_out, vec_bytes, ro_inputs[j], n * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>))) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  634</span>        <span class="comment">/* state_out has no self-match in ro_inputs (state_in is not listed),</span></div>
+<div class="line"><span class="lineno">  635</span><span class="comment">         * so the check always applies; exact state_out==state_in aliasing is</span></div>
+<div class="line"><span class="lineno">  636</span><span class="comment">         * handled by the dedicated state_in comparison below. */</span></div>
+<div class="line"><span class="lineno">  637</span>        <span class="keywordflow">if</span> (<a class="code hl_function" href="rwkv7__decode_8c.html#a123d0108a84d9bfbe954606dcb79b5d4">overlaps</a>(state_out, state_bytes, ro_inputs[j], n * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>))) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  638</span>    }</div>
+<div class="line"><span class="lineno">  639</span>    <span class="comment">/* y/v_first outputs must also be disjoint from the state and v_first</span></div>
+<div class="line"><span class="lineno">  640</span><span class="comment">     * input streams (ro_inputs above covers r..ln_b only). y has no allowed</span></div>
+<div class="line"><span class="lineno">  641</span><span class="comment">     * alias; v_first_out may exactly alias v_first_in (checked below). */</span></div>
+<div class="line"><span class="lineno">  642</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="rwkv7__decode_8c.html#a123d0108a84d9bfbe954606dcb79b5d4">overlaps</a>(y_preproj, vec_bytes, state_in, state_bytes)) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  643</span>    <span class="keywordflow">if</span> (v_first_in &amp;&amp; <a class="code hl_function" href="rwkv7__decode_8c.html#a123d0108a84d9bfbe954606dcb79b5d4">overlaps</a>(y_preproj, vec_bytes, v_first_in, vec_bytes)) {</div>
+<div class="line"><span class="lineno">  644</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  645</span>    }</div>
+<div class="line"><span class="lineno">  646</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="rwkv7__decode_8c.html#a123d0108a84d9bfbe954606dcb79b5d4">overlaps</a>(v_first_out, vec_bytes, state_in, state_bytes)) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  647</span>    <span class="keywordflow">if</span> (v_first_in &amp;&amp; <a class="code hl_function" href="rwkv7__decode_8c.html#a123d0108a84d9bfbe954606dcb79b5d4">overlaps</a>(state_out, state_bytes, v_first_in, vec_bytes)) {</div>
+<div class="line"><span class="lineno">  648</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  649</span>    }</div>
+<div class="line"><span class="lineno">  650</span>    <span class="keywordflow">if</span> (v_first_in &amp;&amp; v_first_out != v_first_in &amp;&amp;</div>
+<div class="line"><span class="lineno">  651</span>        <a class="code hl_function" href="rwkv7__decode_8c.html#a123d0108a84d9bfbe954606dcb79b5d4">overlaps</a>(v_first_out, vec_bytes, v_first_in, vec_bytes)) {</div>
+<div class="line"><span class="lineno">  652</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  653</span>    }</div>
+<div class="line"><span class="lineno">  654</span>    <span class="keywordflow">if</span> (state_out != state_in &amp;&amp;</div>
+<div class="line"><span class="lineno">  655</span>        <a class="code hl_function" href="rwkv7__decode_8c.html#a123d0108a84d9bfbe954606dcb79b5d4">overlaps</a>(state_out, state_bytes, state_in, state_bytes)) {</div>
+<div class="line"><span class="lineno">  656</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  657</span>    }</div>
+<div class="line"><span class="lineno">  658</span> </div>
+<div class="line"><span class="lineno">  659</span>    <span class="keywordtype">float</span> *w_log = scratch;</div>
+<div class="line"><span class="lineno">  660</span>    <span class="keywordtype">float</span> *a_buf = scratch + (size_t)dim;</div>
+<div class="line"><span class="lineno">  661</span>    <span class="keywordtype">float</span> *g_buf = scratch + (size_t)dim * 2u;</div>
+<div class="line"><span class="lineno">  662</span>    <span class="keywordtype">float</span> *v_buf = scratch + (size_t)dim * 3u;</div>
+<div class="line"><span class="lineno">  663</span>    <span class="keywordtype">float</span> *kk_raw = scratch + (size_t)dim * 4u;</div>
+<div class="line"><span class="lineno">  664</span>    <span class="keywordtype">float</span> *kk = scratch + (size_t)dim * 5u;</div>
+<div class="line"><span class="lineno">  665</span>    <span class="keywordtype">float</span> *k_sc = scratch + (size_t)dim * 6u;</div>
+<div class="line"><span class="lineno">  666</span> </div>
+<div class="line"><span class="lineno">  667</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="rwkv7__decode_8c.html#a06cd318c6cd148188cafec9975688063">ck_rwkv7_lora_gates</a>(xw, xa, xg, w1, w2, w0, a1, a2, a0, g1, g2,</div>
+<div class="line"><span class="lineno">  668</span>                            dim, rank_w, rank_a, rank_g,</div>
+<div class="line"><span class="lineno">  669</span>                            w_log, a_buf, g_buf) != 0) {</div>
+<div class="line"><span class="lineno">  670</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  671</span>    }</div>
+<div class="line"><span class="lineno">  672</span>    <span class="keywordflow">if</span> (layer0) {</div>
+<div class="line"><span class="lineno">  673</span>        <span class="keywordflow">if</span> (<a class="code hl_function" href="rwkv7__decode_8c.html#a1dff0f15378b76335795df47c4e89b1b">ck_rwkv7_vgate_vmix</a>(v_in, NULL, NULL, NULL, NULL, NULL,</div>
+<div class="line"><span class="lineno">  674</span>                                dim, 1, v_buf, v_first_out, NULL) != 0) {</div>
+<div class="line"><span class="lineno">  675</span>            <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  676</span>        }</div>
+<div class="line"><span class="lineno">  677</span>    } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno">  678</span>        <span class="keywordflow">if</span> (<a class="code hl_function" href="rwkv7__decode_8c.html#a1dff0f15378b76335795df47c4e89b1b">ck_rwkv7_vgate_vmix</a>(v_in, v_first_in, xv, v1, v2, v0,</div>
+<div class="line"><span class="lineno">  679</span>                                dim, rank_v, v_buf, v_first_out, NULL) != 0) {</div>
+<div class="line"><span class="lineno">  680</span>            <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  681</span>        }</div>
+<div class="line"><span class="lineno">  682</span>    }</div>
+<div class="line"><span class="lineno">  683</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="rwkv7__decode_8c.html#a11b2eaaf160fb24734d3b5374a55496c">ck_rwkv7_apply_kk_factor</a>(k_raw, k_k, kk_raw, dim) != 0) {</div>
+<div class="line"><span class="lineno">  684</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  685</span>    }</div>
+<div class="line"><span class="lineno">  686</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="rwkv7__decode_8c.html#aeee676bb3d2786be1ab4ff5f72d8aae2">ck_rwkv7_norm_kk</a>(kk_raw, kk, num_heads, head_dim) != 0) {</div>
+<div class="line"><span class="lineno">  687</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  688</span>    }</div>
+<div class="line"><span class="lineno">  689</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="rwkv7__decode_8c.html#a8a325bc13c423c3bc047d60f89392cc1">ck_rwkv7_scale_k</a>(k_raw, a_buf, k_a, k_sc, dim) != 0) {</div>
+<div class="line"><span class="lineno">  690</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  691</span>    }</div>
+<div class="line"><span class="lineno">  692</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="rwkv7__decode_8c.html#ae91299ecfbf50dfdee45359952b807a9">ck_rwkv7_wkv_decode</a>(r, w_log, k_sc, v_buf, kk, a_buf, g_buf, rk,</div>
+<div class="line"><span class="lineno">  693</span>                            ln_w, ln_b, norm_eps, state_in, state_out,</div>
+<div class="line"><span class="lineno">  694</span>                            y_preproj, num_heads, head_dim) != 0) {</div>
+<div class="line"><span class="lineno">  695</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  696</span>    }</div>
+<div class="line"><span class="lineno">  697</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  698</span>}</div>
+<div class="ttc" id="arwkv7__decode_8c_html_a06cd318c6cd148188cafec9975688063"><div class="ttname"><a href="rwkv7__decode_8c.html#a06cd318c6cd148188cafec9975688063">ck_rwkv7_lora_gates</a></div><div class="ttdeci">int ck_rwkv7_lora_gates(const float *xw, const float *xa, const float *xg, const float *w1, const float *w2, const float *w0, const float *a1, const float *a2, const float *a0, const float *g1, const float *g2, int dim, int rank_w, int rank_a, int rank_g, float *w_log, float *a_out, float *g_out)</div><div class="ttdef"><b>Definition</b> <a href="rwkv7__decode_8c_source.html#l00158">rwkv7_decode.c:158</a></div></div>
+<div class="ttc" id="arwkv7__decode_8c_html_a11b2eaaf160fb24734d3b5374a55496c"><div class="ttname"><a href="rwkv7__decode_8c.html#a11b2eaaf160fb24734d3b5374a55496c">ck_rwkv7_apply_kk_factor</a></div><div class="ttdeci">int ck_rwkv7_apply_kk_factor(const float *k, const float *k_k, float *kk_raw, int dim)</div><div class="ttdef"><b>Definition</b> <a href="rwkv7__decode_8c_source.html#l00141">rwkv7_decode.c:141</a></div></div>
+<div class="ttc" id="arwkv7__decode_8c_html_a1dff0f15378b76335795df47c4e89b1b"><div class="ttname"><a href="rwkv7__decode_8c.html#a1dff0f15378b76335795df47c4e89b1b">ck_rwkv7_vgate_vmix</a></div><div class="ttdeci">int ck_rwkv7_vgate_vmix(const float *v_in, const float *v_first, const float *xv, const float *v1, const float *v2, const float *v0, int dim, int rank_v, float *v_out, float *v_first_out, float *v_gate)</div><div class="ttdef"><b>Definition</b> <a href="rwkv7__decode_8c_source.html#l00239">rwkv7_decode.c:239</a></div></div>
+<div class="ttc" id="arwkv7__decode_8c_html_a8a325bc13c423c3bc047d60f89392cc1"><div class="ttname"><a href="rwkv7__decode_8c.html#a8a325bc13c423c3bc047d60f89392cc1">ck_rwkv7_scale_k</a></div><div class="ttdeci">int ck_rwkv7_scale_k(const float *k_in, const float *a, const float *k_a, float *k_out, int dim)</div><div class="ttdef"><b>Definition</b> <a href="rwkv7__decode_8c_source.html#l00127">rwkv7_decode.c:127</a></div></div>
+<div class="ttc" id="arwkv7__decode_8c_html_ae91299ecfbf50dfdee45359952b807a9"><div class="ttname"><a href="rwkv7__decode_8c.html#ae91299ecfbf50dfdee45359952b807a9">ck_rwkv7_wkv_decode</a></div><div class="ttdeci">int ck_rwkv7_wkv_decode(const float *r, const float *w_log, const float *k, const float *v, const float *kk, const float *a, const float *g, const float *rk, const float *ln_w, const float *ln_b, float norm_eps, const float *state_in, float *state_out, float *y_out, int num_heads, int head_dim)</div><div class="ttdef"><b>Definition</b> <a href="rwkv7__decode_8c_source.html#l00336">rwkv7_decode.c:336</a></div></div>
+<div class="ttc" id="arwkv7__decode_8c_html_aeee676bb3d2786be1ab4ff5f72d8aae2"><div class="ttname"><a href="rwkv7__decode_8c.html#aeee676bb3d2786be1ab4ff5f72d8aae2">ck_rwkv7_norm_kk</a></div><div class="ttdeci">int ck_rwkv7_norm_kk(const float *kk_in, float *kk_out, int num_heads, int head_dim)</div><div class="ttdef"><b>Definition</b> <a href="rwkv7__decode_8c_source.html#l00099">rwkv7_decode.c:99</a></div></div>
+</div><!-- fragment -->
+<p class="reference">Referenced by <a class="el" href="rwkv7__decode_8c_source.html#l00707">ck_rwkv7_time_mix_block()</a>.</p>
 
 </div>
 </div>
@@ -963,46 +2131,46 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="rwkv7__decode_8c_source.html#l00168">168</a> of file <a class="el" href="rwkv7__decode_8c_source.html">rwkv7_decode.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  178</span>                                           {</div>
-<div class="line"><span class="lineno">  179</span>    <span class="keywordflow">if</span> (!v_in || !v_out || !v_first_out || dim &lt;= 0) {</div>
-<div class="line"><span class="lineno">  180</span>        <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  181</span>    }</div>
-<div class="line"><span class="lineno">  182</span>    <span class="keywordflow">if</span> (xv == NULL) {</div>
-<div class="line"><span class="lineno">  183</span>        <span class="comment">/* Layer 0: produce v_first, no gate read. */</span></div>
-<div class="line"><span class="lineno">  184</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; dim; ++i) {</div>
-<div class="line"><span class="lineno">  185</span>            v_out[i] = v_in[i];</div>
-<div class="line"><span class="lineno">  186</span>            v_first_out[i] = v_in[i];</div>
-<div class="line"><span class="lineno">  187</span>        }</div>
-<div class="line"><span class="lineno">  188</span>        <span class="keywordflow">return</span> 0;</div>
-<div class="line"><span class="lineno">  189</span>    }</div>
-<div class="line"><span class="lineno">  190</span>    <span class="keywordflow">if</span> (!v_first || !v1 || !v2 || !v0 || rank_v &lt;= 0 || rank_v &gt; 512) {</div>
-<div class="line"><span class="lineno">  191</span>        <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  192</span>    }</div>
-<div class="line"><span class="lineno">  193</span>    <span class="keywordtype">float</span> tmp[512];</div>
-<div class="line"><span class="lineno">  194</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; rank_v; ++r) {</div>
-<div class="line"><span class="lineno">  195</span>        <span class="keywordtype">float</span> acc = 0.0f;</div>
-<div class="line"><span class="lineno">  196</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; dim; ++i) {</div>
-<div class="line"><span class="lineno">  197</span>            acc += xv[i] * v1[(size_t)i * (<span class="keywordtype">size_t</span>)rank_v + (size_t)r];</div>
-<div class="line"><span class="lineno">  198</span>        }</div>
-<div class="line"><span class="lineno">  199</span>        tmp[r] = acc;</div>
-<div class="line"><span class="lineno">  200</span>    }</div>
-<div class="line"><span class="lineno">  201</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; dim; ++i) {</div>
-<div class="line"><span class="lineno">  202</span>        <span class="keywordtype">float</span> acc = v0[i];</div>
-<div class="line"><span class="lineno">  203</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; rank_v; ++r) {</div>
-<div class="line"><span class="lineno">  204</span>            acc += tmp[r] * v2[(size_t)r * (<span class="keywordtype">size_t</span>)dim + (size_t)i];</div>
-<div class="line"><span class="lineno">  205</span>        }</div>
-<div class="line"><span class="lineno">  206</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> gate = <a class="code hl_function" href="rwkv7__decode_8c.html#ad77c7818cced45a574f66bb4a94483a0">ck_rwkv7_sigmoid</a>(acc);</div>
-<div class="line"><span class="lineno">  207</span>        <span class="keywordflow">if</span> (v_gate) {</div>
-<div class="line"><span class="lineno">  208</span>            v_gate[i] = gate;</div>
-<div class="line"><span class="lineno">  209</span>        }</div>
-<div class="line"><span class="lineno">  210</span>        v_out[i] = v_in[i] + (v_first[i] - v_in[i]) * gate;</div>
-<div class="line"><span class="lineno">  211</span>        v_first_out[i] = v_first[i];</div>
-<div class="line"><span class="lineno">  212</span>    }</div>
-<div class="line"><span class="lineno">  213</span>    <span class="keywordflow">return</span> 0;</div>
-<div class="line"><span class="lineno">  214</span>}</div>
+<p class="definition">Definition at line <a class="el" href="rwkv7__decode_8c_source.html#l00239">239</a> of file <a class="el" href="rwkv7__decode_8c_source.html">rwkv7_decode.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  249</span>                                           {</div>
+<div class="line"><span class="lineno">  250</span>    <span class="keywordflow">if</span> (!v_in || !v_out || !v_first_out || dim &lt;= 0) {</div>
+<div class="line"><span class="lineno">  251</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  252</span>    }</div>
+<div class="line"><span class="lineno">  253</span>    <span class="keywordflow">if</span> (xv == NULL) {</div>
+<div class="line"><span class="lineno">  254</span>        <span class="comment">/* Layer 0: produce v_first, no gate read. */</span></div>
+<div class="line"><span class="lineno">  255</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; dim; ++i) {</div>
+<div class="line"><span class="lineno">  256</span>            v_out[i] = v_in[i];</div>
+<div class="line"><span class="lineno">  257</span>            v_first_out[i] = v_in[i];</div>
+<div class="line"><span class="lineno">  258</span>        }</div>
+<div class="line"><span class="lineno">  259</span>        <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  260</span>    }</div>
+<div class="line"><span class="lineno">  261</span>    <span class="keywordflow">if</span> (!v_first || !v1 || !v2 || !v0 || rank_v &lt;= 0 || rank_v &gt; 512) {</div>
+<div class="line"><span class="lineno">  262</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  263</span>    }</div>
+<div class="line"><span class="lineno">  264</span>    <span class="keywordtype">float</span> tmp[512];</div>
+<div class="line"><span class="lineno">  265</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; rank_v; ++r) {</div>
+<div class="line"><span class="lineno">  266</span>        <span class="keywordtype">float</span> acc = 0.0f;</div>
+<div class="line"><span class="lineno">  267</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; dim; ++i) {</div>
+<div class="line"><span class="lineno">  268</span>            acc += xv[i] * v1[(size_t)i * (<span class="keywordtype">size_t</span>)rank_v + (size_t)r];</div>
+<div class="line"><span class="lineno">  269</span>        }</div>
+<div class="line"><span class="lineno">  270</span>        tmp[r] = acc;</div>
+<div class="line"><span class="lineno">  271</span>    }</div>
+<div class="line"><span class="lineno">  272</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; dim; ++i) {</div>
+<div class="line"><span class="lineno">  273</span>        <span class="keywordtype">float</span> acc = v0[i];</div>
+<div class="line"><span class="lineno">  274</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; rank_v; ++r) {</div>
+<div class="line"><span class="lineno">  275</span>            acc += tmp[r] * v2[(size_t)r * (<span class="keywordtype">size_t</span>)dim + (size_t)i];</div>
+<div class="line"><span class="lineno">  276</span>        }</div>
+<div class="line"><span class="lineno">  277</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> gate = <a class="code hl_function" href="rwkv7__decode_8c.html#ad77c7818cced45a574f66bb4a94483a0">ck_rwkv7_sigmoid</a>(acc);</div>
+<div class="line"><span class="lineno">  278</span>        <span class="keywordflow">if</span> (v_gate) {</div>
+<div class="line"><span class="lineno">  279</span>            v_gate[i] = gate;</div>
+<div class="line"><span class="lineno">  280</span>        }</div>
+<div class="line"><span class="lineno">  281</span>        v_out[i] = v_in[i] + (v_first[i] - v_in[i]) * gate;</div>
+<div class="line"><span class="lineno">  282</span>        v_first_out[i] = v_first[i];</div>
+<div class="line"><span class="lineno">  283</span>    }</div>
+<div class="line"><span class="lineno">  284</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  285</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="rwkv7__decode_8c_source.html#l00083">ck_rwkv7_sigmoid()</a>.</p>
+<p class="reference">References <a class="el" href="rwkv7__decode_8c_source.html#l00154">ck_rwkv7_sigmoid()</a>.</p>
 
 </div>
 </div>
@@ -1116,84 +2284,84 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="rwkv7__decode_8c_source.html#l00265">265</a> of file <a class="el" href="rwkv7__decode_8c_source.html">rwkv7_decode.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  280</span>                                          {</div>
-<div class="line"><span class="lineno">  281</span>    <span class="keywordflow">if</span> (!r || !w_log || !k || !v || !kk || !a || !g || !rk || !ln_w || !ln_b ||</div>
-<div class="line"><span class="lineno">  282</span>        !state_in || !state_out || !y_out || num_heads &lt;= 0 || head_dim &lt;= 0 ||</div>
-<div class="line"><span class="lineno">  283</span>        !(norm_eps &gt; 0.0f) || !isfinite(norm_eps) ||</div>
-<div class="line"><span class="lineno">  284</span>        !isfinite(norm_eps * (<span class="keywordtype">float</span>)head_dim)) {</div>
-<div class="line"><span class="lineno">  285</span>        <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  286</span>    }</div>
-<div class="line"><span class="lineno">  287</span>    <span class="keywordflow">if</span> (num_heads &gt; 256 || head_dim &gt; 512) {</div>
-<div class="line"><span class="lineno">  288</span>        <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  289</span>    }</div>
-<div class="line"><span class="lineno">  290</span> </div>
-<div class="line"><span class="lineno">  291</span>    <span class="comment">/* Per-head generalised delta-rule step + raw readout (pre-norm). */</span></div>
-<div class="line"><span class="lineno">  292</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
-<div class="line"><span class="lineno">  293</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *rh = r + (size_t)h * (<span class="keywordtype">size_t</span>)head_dim;</div>
-<div class="line"><span class="lineno">  294</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *kh = k + (size_t)h * (<span class="keywordtype">size_t</span>)head_dim;</div>
-<div class="line"><span class="lineno">  295</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *vh = v + (size_t)h * (<span class="keywordtype">size_t</span>)head_dim;</div>
-<div class="line"><span class="lineno">  296</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *wh = w_log + (size_t)h * (<span class="keywordtype">size_t</span>)head_dim;</div>
-<div class="line"><span class="lineno">  297</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *khh = kk + (size_t)h * (<span class="keywordtype">size_t</span>)head_dim;</div>
-<div class="line"><span class="lineno">  298</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *ah = a + (size_t)h * (<span class="keywordtype">size_t</span>)head_dim;</div>
-<div class="line"><span class="lineno">  299</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *sin = state_in + (size_t)h * (<span class="keywordtype">size_t</span>)head_dim * (size_t)head_dim;</div>
-<div class="line"><span class="lineno">  300</span>        <span class="keywordtype">float</span> *sout = state_out + (size_t)h * (<span class="keywordtype">size_t</span>)head_dim * (size_t)head_dim;</div>
-<div class="line"><span class="lineno">  301</span>        <span class="keywordtype">float</span> *yh = y_out + (size_t)h * (<span class="keywordtype">size_t</span>)head_dim;</div>
-<div class="line"><span class="lineno">  302</span> </div>
-<div class="line"><span class="lineno">  303</span>        <span class="keywordflow">if</span> (<a class="code hl_function" href="rwkv7__decode_8c.html#accc63d21caf6b535bf363db46ba463bb">ck_rwkv7_state_step</a>(wh, kh, vh, khh, ah, sin, sout, head_dim) != 0 ||</div>
-<div class="line"><span class="lineno">  304</span>            <a class="code hl_function" href="rwkv7__decode_8c.html#a8b4df991b381820a28ce0359f5f992a1">ck_rwkv7_state_readout</a>(sout, rh, yh, head_dim) != 0) {</div>
-<div class="line"><span class="lineno">  305</span>            <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  306</span>        }</div>
-<div class="line"><span class="lineno">  307</span>    }</div>
-<div class="line"><span class="lineno">  308</span> </div>
-<div class="line"><span class="lineno">  309</span>    <span class="comment">/* GroupNorm over C with H groups, eps = norm_eps*head_dim. */</span></div>
-<div class="line"><span class="lineno">  310</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> eps = norm_eps * (float)head_dim;</div>
-<div class="line"><span class="lineno">  311</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
-<div class="line"><span class="lineno">  312</span>        <span class="keywordtype">float</span> *yh = y_out + (size_t)h * (<span class="keywordtype">size_t</span>)head_dim;</div>
-<div class="line"><span class="lineno">  313</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *lwh = ln_w + (size_t)h * (<span class="keywordtype">size_t</span>)head_dim;</div>
-<div class="line"><span class="lineno">  314</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *lbh = ln_b + (size_t)h * (<span class="keywordtype">size_t</span>)head_dim;</div>
-<div class="line"><span class="lineno">  315</span>        <span class="keywordtype">float</span> mean = 0.0f;</div>
-<div class="line"><span class="lineno">  316</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; head_dim; ++i) {</div>
-<div class="line"><span class="lineno">  317</span>            mean += yh[i];</div>
-<div class="line"><span class="lineno">  318</span>        }</div>
-<div class="line"><span class="lineno">  319</span>        mean /= (float)head_dim;</div>
-<div class="line"><span class="lineno">  320</span>        <span class="keywordtype">float</span> var = 0.0f;</div>
-<div class="line"><span class="lineno">  321</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; head_dim; ++i) {</div>
-<div class="line"><span class="lineno">  322</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> d = yh[i] - mean;</div>
-<div class="line"><span class="lineno">  323</span>            var += d * d;</div>
-<div class="line"><span class="lineno">  324</span>        }</div>
-<div class="line"><span class="lineno">  325</span>        var /= (float)head_dim;</div>
-<div class="line"><span class="lineno">  326</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> inv = 1.0f / sqrtf(var + eps);</div>
-<div class="line"><span class="lineno">  327</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; head_dim; ++i) {</div>
-<div class="line"><span class="lineno">  328</span>            yh[i] = (yh[i] - mean) * inv * lwh[i] + lbh[i];</div>
-<div class="line"><span class="lineno">  329</span>        }</div>
-<div class="line"><span class="lineno">  330</span>    }</div>
-<div class="line"><span class="lineno">  331</span> </div>
-<div class="line"><span class="lineno">  332</span>    <span class="comment">/* Per-head bonus s_h = sum(r_h*k_h*rk_h); y += s_h*v; then y *= g. */</span></div>
-<div class="line"><span class="lineno">  333</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> dim = num_heads * head_dim;</div>
-<div class="line"><span class="lineno">  334</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
-<div class="line"><span class="lineno">  335</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *rh = r + (size_t)h * (<span class="keywordtype">size_t</span>)head_dim;</div>
-<div class="line"><span class="lineno">  336</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *kh = k + (size_t)h * (<span class="keywordtype">size_t</span>)head_dim;</div>
-<div class="line"><span class="lineno">  337</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *vh = v + (size_t)h * (<span class="keywordtype">size_t</span>)head_dim;</div>
-<div class="line"><span class="lineno">  338</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *rkh = rk + (size_t)h * (<span class="keywordtype">size_t</span>)head_dim;</div>
-<div class="line"><span class="lineno">  339</span>        <span class="keywordtype">float</span> *yh = y_out + (size_t)h * (<span class="keywordtype">size_t</span>)head_dim;</div>
-<div class="line"><span class="lineno">  340</span>        <span class="keywordtype">float</span> s = 0.0f;</div>
-<div class="line"><span class="lineno">  341</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; head_dim; ++i) {</div>
-<div class="line"><span class="lineno">  342</span>            s += rh[i] * kh[i] * rkh[i];</div>
-<div class="line"><span class="lineno">  343</span>        }</div>
-<div class="line"><span class="lineno">  344</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; head_dim; ++i) {</div>
-<div class="line"><span class="lineno">  345</span>            yh[i] += s * vh[i];</div>
-<div class="line"><span class="lineno">  346</span>        }</div>
-<div class="line"><span class="lineno">  347</span>    }</div>
-<div class="line"><span class="lineno">  348</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; dim; ++i) {</div>
-<div class="line"><span class="lineno">  349</span>        y_out[i] *= g[i];</div>
-<div class="line"><span class="lineno">  350</span>    }</div>
-<div class="line"><span class="lineno">  351</span>    <span class="keywordflow">return</span> 0;</div>
-<div class="line"><span class="lineno">  352</span>}</div>
-<div class="ttc" id="arwkv7__decode_8c_html_a8b4df991b381820a28ce0359f5f992a1"><div class="ttname"><a href="rwkv7__decode_8c.html#a8b4df991b381820a28ce0359f5f992a1">ck_rwkv7_state_readout</a></div><div class="ttdeci">int ck_rwkv7_state_readout(const float *state, const float *r, float *y, int head_dim)</div><div class="ttdef"><b>Definition</b> <a href="rwkv7__decode_8c_source.html#l00248">rwkv7_decode.c:248</a></div></div>
-<div class="ttc" id="arwkv7__decode_8c_html_accc63d21caf6b535bf363db46ba463bb"><div class="ttname"><a href="rwkv7__decode_8c.html#accc63d21caf6b535bf363db46ba463bb">ck_rwkv7_state_step</a></div><div class="ttdeci">int ck_rwkv7_state_step(const float *w_log, const float *k, const float *v, const float *kk, const float *a, const float *state_in, float *state_out, int head_dim)</div><div class="ttdef"><b>Definition</b> <a href="rwkv7__decode_8c_source.html#l00216">rwkv7_decode.c:216</a></div></div>
+<p class="definition">Definition at line <a class="el" href="rwkv7__decode_8c_source.html#l00336">336</a> of file <a class="el" href="rwkv7__decode_8c_source.html">rwkv7_decode.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  351</span>                                          {</div>
+<div class="line"><span class="lineno">  352</span>    <span class="keywordflow">if</span> (!r || !w_log || !k || !v || !kk || !a || !g || !rk || !ln_w || !ln_b ||</div>
+<div class="line"><span class="lineno">  353</span>        !state_in || !state_out || !y_out || num_heads &lt;= 0 || head_dim &lt;= 0 ||</div>
+<div class="line"><span class="lineno">  354</span>        !(norm_eps &gt; 0.0f) || !isfinite(norm_eps) ||</div>
+<div class="line"><span class="lineno">  355</span>        !isfinite(norm_eps * (<span class="keywordtype">float</span>)head_dim)) {</div>
+<div class="line"><span class="lineno">  356</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  357</span>    }</div>
+<div class="line"><span class="lineno">  358</span>    <span class="keywordflow">if</span> (num_heads &gt; 256 || head_dim &gt; 512) {</div>
+<div class="line"><span class="lineno">  359</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  360</span>    }</div>
+<div class="line"><span class="lineno">  361</span> </div>
+<div class="line"><span class="lineno">  362</span>    <span class="comment">/* Per-head generalised delta-rule step + raw readout (pre-norm). */</span></div>
+<div class="line"><span class="lineno">  363</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
+<div class="line"><span class="lineno">  364</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *rh = r + (size_t)h * (<span class="keywordtype">size_t</span>)head_dim;</div>
+<div class="line"><span class="lineno">  365</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *kh = k + (size_t)h * (<span class="keywordtype">size_t</span>)head_dim;</div>
+<div class="line"><span class="lineno">  366</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *vh = v + (size_t)h * (<span class="keywordtype">size_t</span>)head_dim;</div>
+<div class="line"><span class="lineno">  367</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *wh = w_log + (size_t)h * (<span class="keywordtype">size_t</span>)head_dim;</div>
+<div class="line"><span class="lineno">  368</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *khh = kk + (size_t)h * (<span class="keywordtype">size_t</span>)head_dim;</div>
+<div class="line"><span class="lineno">  369</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *ah = a + (size_t)h * (<span class="keywordtype">size_t</span>)head_dim;</div>
+<div class="line"><span class="lineno">  370</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *sin = state_in + (size_t)h * (<span class="keywordtype">size_t</span>)head_dim * (size_t)head_dim;</div>
+<div class="line"><span class="lineno">  371</span>        <span class="keywordtype">float</span> *sout = state_out + (size_t)h * (<span class="keywordtype">size_t</span>)head_dim * (size_t)head_dim;</div>
+<div class="line"><span class="lineno">  372</span>        <span class="keywordtype">float</span> *yh = y_out + (size_t)h * (<span class="keywordtype">size_t</span>)head_dim;</div>
+<div class="line"><span class="lineno">  373</span> </div>
+<div class="line"><span class="lineno">  374</span>        <span class="keywordflow">if</span> (<a class="code hl_function" href="rwkv7__decode_8c.html#accc63d21caf6b535bf363db46ba463bb">ck_rwkv7_state_step</a>(wh, kh, vh, khh, ah, sin, sout, head_dim) != 0 ||</div>
+<div class="line"><span class="lineno">  375</span>            <a class="code hl_function" href="rwkv7__decode_8c.html#a8b4df991b381820a28ce0359f5f992a1">ck_rwkv7_state_readout</a>(sout, rh, yh, head_dim) != 0) {</div>
+<div class="line"><span class="lineno">  376</span>            <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  377</span>        }</div>
+<div class="line"><span class="lineno">  378</span>    }</div>
+<div class="line"><span class="lineno">  379</span> </div>
+<div class="line"><span class="lineno">  380</span>    <span class="comment">/* GroupNorm over C with H groups, eps = norm_eps*head_dim. */</span></div>
+<div class="line"><span class="lineno">  381</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> eps = norm_eps * (float)head_dim;</div>
+<div class="line"><span class="lineno">  382</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
+<div class="line"><span class="lineno">  383</span>        <span class="keywordtype">float</span> *yh = y_out + (size_t)h * (<span class="keywordtype">size_t</span>)head_dim;</div>
+<div class="line"><span class="lineno">  384</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *lwh = ln_w + (size_t)h * (<span class="keywordtype">size_t</span>)head_dim;</div>
+<div class="line"><span class="lineno">  385</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *lbh = ln_b + (size_t)h * (<span class="keywordtype">size_t</span>)head_dim;</div>
+<div class="line"><span class="lineno">  386</span>        <span class="keywordtype">float</span> mean = 0.0f;</div>
+<div class="line"><span class="lineno">  387</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; head_dim; ++i) {</div>
+<div class="line"><span class="lineno">  388</span>            mean += yh[i];</div>
+<div class="line"><span class="lineno">  389</span>        }</div>
+<div class="line"><span class="lineno">  390</span>        mean /= (float)head_dim;</div>
+<div class="line"><span class="lineno">  391</span>        <span class="keywordtype">float</span> var = 0.0f;</div>
+<div class="line"><span class="lineno">  392</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; head_dim; ++i) {</div>
+<div class="line"><span class="lineno">  393</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> d = yh[i] - mean;</div>
+<div class="line"><span class="lineno">  394</span>            var += d * d;</div>
+<div class="line"><span class="lineno">  395</span>        }</div>
+<div class="line"><span class="lineno">  396</span>        var /= (float)head_dim;</div>
+<div class="line"><span class="lineno">  397</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> inv = 1.0f / sqrtf(var + eps);</div>
+<div class="line"><span class="lineno">  398</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; head_dim; ++i) {</div>
+<div class="line"><span class="lineno">  399</span>            yh[i] = (yh[i] - mean) * inv * lwh[i] + lbh[i];</div>
+<div class="line"><span class="lineno">  400</span>        }</div>
+<div class="line"><span class="lineno">  401</span>    }</div>
+<div class="line"><span class="lineno">  402</span> </div>
+<div class="line"><span class="lineno">  403</span>    <span class="comment">/* Per-head bonus s_h = sum(r_h*k_h*rk_h); y += s_h*v; then y *= g. */</span></div>
+<div class="line"><span class="lineno">  404</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> dim = num_heads * head_dim;</div>
+<div class="line"><span class="lineno">  405</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
+<div class="line"><span class="lineno">  406</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *rh = r + (size_t)h * (<span class="keywordtype">size_t</span>)head_dim;</div>
+<div class="line"><span class="lineno">  407</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *kh = k + (size_t)h * (<span class="keywordtype">size_t</span>)head_dim;</div>
+<div class="line"><span class="lineno">  408</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *vh = v + (size_t)h * (<span class="keywordtype">size_t</span>)head_dim;</div>
+<div class="line"><span class="lineno">  409</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *rkh = rk + (size_t)h * (<span class="keywordtype">size_t</span>)head_dim;</div>
+<div class="line"><span class="lineno">  410</span>        <span class="keywordtype">float</span> *yh = y_out + (size_t)h * (<span class="keywordtype">size_t</span>)head_dim;</div>
+<div class="line"><span class="lineno">  411</span>        <span class="keywordtype">float</span> s = 0.0f;</div>
+<div class="line"><span class="lineno">  412</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; head_dim; ++i) {</div>
+<div class="line"><span class="lineno">  413</span>            s += rh[i] * kh[i] * rkh[i];</div>
+<div class="line"><span class="lineno">  414</span>        }</div>
+<div class="line"><span class="lineno">  415</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; head_dim; ++i) {</div>
+<div class="line"><span class="lineno">  416</span>            yh[i] += s * vh[i];</div>
+<div class="line"><span class="lineno">  417</span>        }</div>
+<div class="line"><span class="lineno">  418</span>    }</div>
+<div class="line"><span class="lineno">  419</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; dim; ++i) {</div>
+<div class="line"><span class="lineno">  420</span>        y_out[i] *= g[i];</div>
+<div class="line"><span class="lineno">  421</span>    }</div>
+<div class="line"><span class="lineno">  422</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  423</span>}</div>
+<div class="ttc" id="arwkv7__decode_8c_html_a8b4df991b381820a28ce0359f5f992a1"><div class="ttname"><a href="rwkv7__decode_8c.html#a8b4df991b381820a28ce0359f5f992a1">ck_rwkv7_state_readout</a></div><div class="ttdeci">int ck_rwkv7_state_readout(const float *state, const float *r, float *y, int head_dim)</div><div class="ttdef"><b>Definition</b> <a href="rwkv7__decode_8c_source.html#l00319">rwkv7_decode.c:319</a></div></div>
+<div class="ttc" id="arwkv7__decode_8c_html_accc63d21caf6b535bf363db46ba463bb"><div class="ttname"><a href="rwkv7__decode_8c.html#accc63d21caf6b535bf363db46ba463bb">ck_rwkv7_state_step</a></div><div class="ttdeci">int ck_rwkv7_state_step(const float *w_log, const float *k, const float *v, const float *kk, const float *a, const float *state_in, float *state_out, int head_dim)</div><div class="ttdef"><b>Definition</b> <a href="rwkv7__decode_8c_source.html#l00287">rwkv7_decode.c:287</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="rwkv7__decode_8c_source.html#l00248">ck_rwkv7_state_readout()</a>, and <a class="el" href="rwkv7__decode_8c_source.html#l00216">ck_rwkv7_state_step()</a>.</p>
+<p class="reference">References <a class="el" href="rwkv7__decode_8c_source.html#l00319">ck_rwkv7_state_readout()</a>, and <a class="el" href="rwkv7__decode_8c_source.html#l00287">ck_rwkv7_state_step()</a>.</p>
 
 </div>
 </div>

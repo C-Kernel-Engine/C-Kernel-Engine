@@ -8142,7 +8142,7 @@ test_rope.py::TestRoPECache::test_cache_values</p>
 
 
 <details open>
-    <summary>Other Functions (1494)</summary>
+    <summary>Other Functions (1500)</summary>
     <div class="accordion-content">
 
 
@@ -13279,6 +13279,16 @@ hugepage_mode
 
         <div class="card" style="margin-bottom: 1rem;">
             <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_rwkv7_apply_kk_factor</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int ck_rwkv7_apply_kk_factor(const float * k, const float * k_k, float * kk_raw, int dim)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_rwkv7_channelmix_decode</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
@@ -13343,6 +13353,56 @@ hugepage_mode
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int ck_rwkv7_state_step(const float * w_log, const float * k, const float * v, const float * kk, const float * a, const float * state_in, float * state_out, int head_dim)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_rwkv7_time_mix_block</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int ck_rwkv7_time_mix_block(const float * h, const float * att_shift_in, const float * v_first_in, const float * state_in, const float * ln_g, const float * ln_b, const float * mu_r, const float * mu_w, const float * mu_k, const float * mu_v, const float * mu_a, const float * mu_g, const float * Wr, const float * Wk, const float * Wv, const float * Wo, const float * w1, const float * w2, const float * w0, const float * a1, const float * a2, const float * a0, const float * g1, const float * g2, const float * v1, const float * v2, const float * v0, const float * k_k, const float * k_a, const float * rk, const float * gn_w, const float * gn_b, float norm_eps, int dim, int num_heads, int head_dim, int rank_w, int rank_a, int rank_g, int rank_v, int is_layer_zero, ck_rwkv7_gemv_fn gemv, ck_rwkv7_layer_norm_fn layer_norm, void * ctx, float * h_out, float * att_shift_out, float * state_out, float * v_first_out, float * scratch, size_t scratch_elems)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_rwkv7_time_mix_block_scratch_elems</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">size_t ck_rwkv7_time_mix_block_scratch_elems(int dim)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_rwkv7_time_mix_scratch_elems</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">size_t ck_rwkv7_time_mix_scratch_elems(int dim)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_rwkv7_time_mix_shifts</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int ck_rwkv7_time_mix_shifts(const float * x, const float * shift_in, const float * mu_r, const float * mu_w, const float * mu_k, const float * mu_v, const float * mu_a, const float * mu_g, float * xr, float * xw, float * xk, float * xv, float * xa, float * xg, float * shift_out, int dim)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_rwkv7_time_mix_tail</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int ck_rwkv7_time_mix_tail(const float * r, const float * k_raw, const float * v_in, const float * v_first_in, const float * xw, const float * xa, const float * xg, const float * xv, const float * w1, const float * w2, const float * w0, const float * a1, const float * a2, const float * a0, const float * g1, const float * g2, const float * v1, const float * v2, const float * v0, const float * k_k, const float * k_a, const float * rk, const float * ln_w, const float * ln_b, float norm_eps, const float * state_in, float * state_out, float * y_preproj, float * v_first_out, int dim, int num_heads, int head_dim, int rank_w, int rank_a, int rank_g, int rank_v, float * scratch, size_t scratch_elems)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 
