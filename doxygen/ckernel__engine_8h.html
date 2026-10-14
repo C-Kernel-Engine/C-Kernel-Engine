@@ -813,8 +813,8 @@ Functions</h2></td></tr>
 <tr class="separator:a84ce00fad7103b550ea75b52a21a98f7"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a9a92ee48822b984fe47eef09eec7c2b3" id="r_a9a92ee48822b984fe47eef09eec7c2b3"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#a9a92ee48822b984fe47eef09eec7c2b3">gemma4_final_logit_softcap_forward</a> (float *logits, int tokens, int <a class="el" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a>, float cap)</td></tr>
 <tr class="separator:a9a92ee48822b984fe47eef09eec7c2b3"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a29669485bedcbde44e295c26106e4777" id="r_a29669485bedcbde44e295c26106e4777"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#a29669485bedcbde44e295c26106e4777">gemma4_per_layer_embed_forward</a> (float *hidden, const float *per_layer_input, const float *inp_gate, const float *proj, const float *post_norm, const float *out_scale, int tokens, int layer, int num_layers, int embed_dim, int per_layer_dim, float eps)</td></tr>
-<tr class="separator:a29669485bedcbde44e295c26106e4777"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4eead89f0a06792f12d01d53959144c6" id="r_a4eead89f0a06792f12d01d53959144c6"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#a4eead89f0a06792f12d01d53959144c6">gemma4_per_layer_embed_forward</a> (float *hidden, const float *per_layer_input, const float *inp_gate, const float *proj, const float *post_norm, const float *out_scale, int tokens, int layer, int num_layers, int embed_dim, int per_layer_dim, float eps, const int *segment_lengths, int num_segments, int singleton_tail)</td></tr>
+<tr class="separator:a4eead89f0a06792f12d01d53959144c6"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a99f72efdd7f3e0a2d23047c6f9905a90" id="r_a99f72efdd7f3e0a2d23047c6f9905a90"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#a99f72efdd7f3e0a2d23047c6f9905a90">gemma4_per_layer_prepare_bf16_forward</a> (float *per_layer_input, const float *hidden, const int32_t *token_ids, const uint16_t *per_layer_token_emb, const uint16_t *per_layer_model_proj, const float *per_layer_proj_norm, int tokens, int num_layers, int embed_dim, int per_layer_dim, int <a class="el" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a>, float eps)</td></tr>
 <tr class="separator:a99f72efdd7f3e0a2d23047c6f9905a90"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a0020e0bc4bd80b2f2499bb960a5b4365" id="r_a0020e0bc4bd80b2f2499bb960a5b4365"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#a0020e0bc4bd80b2f2499bb960a5b4365">gemma4_per_layer_prepare_forward</a> (float *per_layer_input, const float *hidden, const int32_t *token_ids, const void *per_layer_token_emb, const uint16_t *per_layer_model_proj, const float *per_layer_proj_norm, int tokens, int num_layers, int embed_dim, int per_layer_dim, int <a class="el" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a>, float eps)</td></tr>
@@ -1489,20 +1489,20 @@ Functions</h2></td></tr>
 <tr><td class="fieldname"><a id="a01c1b88e0a25e9f1a05b22122c11ff36ab2b762c82a789d6b6eecc727a35c42b4" name="a01c1b88e0a25e9f1a05b22122c11ff36ab2b762c82a789d6b6eecc727a35c42b4"></a>CK_ATTN_PREFILL_SCHEDULE_GQA_SHARED_KV_TILES&#160;</td><td class="fielddoc"></td></tr>
 </table>
 
-<p class="definition">Definition at line <a class="el" href="ckernel__engine_8h_source.html#l02236">2236</a> of file <a class="el" href="ckernel__engine_8h_source.html">ckernel_engine.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 2236</span>             {</div>
-<div class="line"><span class="lineno"> 2237</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36a1ea78a01558752ab59bdf4355fd4fe33">CK_ATTN_PREFILL_SCHEDULE_KV_HEADS</a> = 0,</div>
-<div class="line"><span class="lineno"> 2238</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36a2c30b4152a1d3817a2e5a75bdf9f40e1">CK_ATTN_PREFILL_SCHEDULE_QUERY_HEADS</a> = 1,</div>
-<div class="line"><span class="lineno"> 2239</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36a14c0b15894aa11e4c64d8f05e6510fef">CK_ATTN_PREFILL_SCHEDULE_QUERY_TILES</a> = 2,</div>
-<div class="line"><span class="lineno"> 2240</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36ae18681cb01afb607335d062840e36851">CK_ATTN_PREFILL_SCHEDULE_KV_GROUP_QUERY_TILES</a> = 3,</div>
-<div class="line"><span class="lineno"> 2241</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36ab2b762c82a789d6b6eecc727a35c42b4">CK_ATTN_PREFILL_SCHEDULE_GQA_SHARED_KV_TILES</a> = 4,</div>
-<div class="line"><span class="lineno"> 2242</span>} <a class="code hl_enumeration" href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36">ck_attention_prefill_schedule_t</a>;</div>
-<div class="ttc" id="ackernel__engine_8h_html_a01c1b88e0a25e9f1a05b22122c11ff36"><div class="ttname"><a href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36">ck_attention_prefill_schedule_t</a></div><div class="ttdeci">ck_attention_prefill_schedule_t</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02236">ckernel_engine.h:2236</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_a01c1b88e0a25e9f1a05b22122c11ff36a14c0b15894aa11e4c64d8f05e6510fef"><div class="ttname"><a href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36a14c0b15894aa11e4c64d8f05e6510fef">CK_ATTN_PREFILL_SCHEDULE_QUERY_TILES</a></div><div class="ttdeci">@ CK_ATTN_PREFILL_SCHEDULE_QUERY_TILES</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02239">ckernel_engine.h:2239</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_a01c1b88e0a25e9f1a05b22122c11ff36a1ea78a01558752ab59bdf4355fd4fe33"><div class="ttname"><a href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36a1ea78a01558752ab59bdf4355fd4fe33">CK_ATTN_PREFILL_SCHEDULE_KV_HEADS</a></div><div class="ttdeci">@ CK_ATTN_PREFILL_SCHEDULE_KV_HEADS</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02237">ckernel_engine.h:2237</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_a01c1b88e0a25e9f1a05b22122c11ff36a2c30b4152a1d3817a2e5a75bdf9f40e1"><div class="ttname"><a href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36a2c30b4152a1d3817a2e5a75bdf9f40e1">CK_ATTN_PREFILL_SCHEDULE_QUERY_HEADS</a></div><div class="ttdeci">@ CK_ATTN_PREFILL_SCHEDULE_QUERY_HEADS</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02238">ckernel_engine.h:2238</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_a01c1b88e0a25e9f1a05b22122c11ff36ab2b762c82a789d6b6eecc727a35c42b4"><div class="ttname"><a href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36ab2b762c82a789d6b6eecc727a35c42b4">CK_ATTN_PREFILL_SCHEDULE_GQA_SHARED_KV_TILES</a></div><div class="ttdeci">@ CK_ATTN_PREFILL_SCHEDULE_GQA_SHARED_KV_TILES</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02241">ckernel_engine.h:2241</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_a01c1b88e0a25e9f1a05b22122c11ff36ae18681cb01afb607335d062840e36851"><div class="ttname"><a href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36ae18681cb01afb607335d062840e36851">CK_ATTN_PREFILL_SCHEDULE_KV_GROUP_QUERY_TILES</a></div><div class="ttdeci">@ CK_ATTN_PREFILL_SCHEDULE_KV_GROUP_QUERY_TILES</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02240">ckernel_engine.h:2240</a></div></div>
+<p class="definition">Definition at line <a class="el" href="ckernel__engine_8h_source.html#l02239">2239</a> of file <a class="el" href="ckernel__engine_8h_source.html">ckernel_engine.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 2239</span>             {</div>
+<div class="line"><span class="lineno"> 2240</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36a1ea78a01558752ab59bdf4355fd4fe33">CK_ATTN_PREFILL_SCHEDULE_KV_HEADS</a> = 0,</div>
+<div class="line"><span class="lineno"> 2241</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36a2c30b4152a1d3817a2e5a75bdf9f40e1">CK_ATTN_PREFILL_SCHEDULE_QUERY_HEADS</a> = 1,</div>
+<div class="line"><span class="lineno"> 2242</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36a14c0b15894aa11e4c64d8f05e6510fef">CK_ATTN_PREFILL_SCHEDULE_QUERY_TILES</a> = 2,</div>
+<div class="line"><span class="lineno"> 2243</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36ae18681cb01afb607335d062840e36851">CK_ATTN_PREFILL_SCHEDULE_KV_GROUP_QUERY_TILES</a> = 3,</div>
+<div class="line"><span class="lineno"> 2244</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36ab2b762c82a789d6b6eecc727a35c42b4">CK_ATTN_PREFILL_SCHEDULE_GQA_SHARED_KV_TILES</a> = 4,</div>
+<div class="line"><span class="lineno"> 2245</span>} <a class="code hl_enumeration" href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36">ck_attention_prefill_schedule_t</a>;</div>
+<div class="ttc" id="ackernel__engine_8h_html_a01c1b88e0a25e9f1a05b22122c11ff36"><div class="ttname"><a href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36">ck_attention_prefill_schedule_t</a></div><div class="ttdeci">ck_attention_prefill_schedule_t</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02239">ckernel_engine.h:2239</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_a01c1b88e0a25e9f1a05b22122c11ff36a14c0b15894aa11e4c64d8f05e6510fef"><div class="ttname"><a href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36a14c0b15894aa11e4c64d8f05e6510fef">CK_ATTN_PREFILL_SCHEDULE_QUERY_TILES</a></div><div class="ttdeci">@ CK_ATTN_PREFILL_SCHEDULE_QUERY_TILES</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02242">ckernel_engine.h:2242</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_a01c1b88e0a25e9f1a05b22122c11ff36a1ea78a01558752ab59bdf4355fd4fe33"><div class="ttname"><a href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36a1ea78a01558752ab59bdf4355fd4fe33">CK_ATTN_PREFILL_SCHEDULE_KV_HEADS</a></div><div class="ttdeci">@ CK_ATTN_PREFILL_SCHEDULE_KV_HEADS</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02240">ckernel_engine.h:2240</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_a01c1b88e0a25e9f1a05b22122c11ff36a2c30b4152a1d3817a2e5a75bdf9f40e1"><div class="ttname"><a href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36a2c30b4152a1d3817a2e5a75bdf9f40e1">CK_ATTN_PREFILL_SCHEDULE_QUERY_HEADS</a></div><div class="ttdeci">@ CK_ATTN_PREFILL_SCHEDULE_QUERY_HEADS</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02241">ckernel_engine.h:2241</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_a01c1b88e0a25e9f1a05b22122c11ff36ab2b762c82a789d6b6eecc727a35c42b4"><div class="ttname"><a href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36ab2b762c82a789d6b6eecc727a35c42b4">CK_ATTN_PREFILL_SCHEDULE_GQA_SHARED_KV_TILES</a></div><div class="ttdeci">@ CK_ATTN_PREFILL_SCHEDULE_GQA_SHARED_KV_TILES</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02244">ckernel_engine.h:2244</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_a01c1b88e0a25e9f1a05b22122c11ff36ae18681cb01afb607335d062840e36851"><div class="ttname"><a href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36ae18681cb01afb607335d062840e36851">CK_ATTN_PREFILL_SCHEDULE_KV_GROUP_QUERY_TILES</a></div><div class="ttdeci">@ CK_ATTN_PREFILL_SCHEDULE_KV_GROUP_QUERY_TILES</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02243">ckernel_engine.h:2243</a></div></div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1525,20 +1525,20 @@ Functions</h2></td></tr>
 <tr><td class="fieldname"><a id="ac4e937f6afb8a4807301eda5aa8b010ea115dd6cf8ca1bbc5a7689a88c5d28463" name="ac4e937f6afb8a4807301eda5aa8b010ea115dd6cf8ca1bbc5a7689a88c5d28463"></a>CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA&#160;</td><td class="fielddoc"></td></tr>
 </table>
 
-<p class="definition">Definition at line <a class="el" href="ckernel__engine_8h_source.html#l02226">2226</a> of file <a class="el" href="ckernel__engine_8h_source.html">ckernel_engine.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 2226</span>             {</div>
-<div class="line"><span class="lineno"> 2227</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010eadbc9e39a1c54b34cb182196445e795b8">CK_ATTN_REDUCTION_FP32_ONLINE</a> = 0,</div>
-<div class="line"><span class="lineno"> 2228</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea85e68fd51ad8a3b0ddaff562ab9080f7">CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE</a> = 1,</div>
-<div class="line"><span class="lineno"> 2229</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010eacd061ae5c8ef1eadf0f2bf97ec2ca433">CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE</a> = 2,</div>
-<div class="line"><span class="lineno"> 2230</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea9de5268ef35fefa367f6c8219143d2bb">CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64</a> = 3,</div>
-<div class="line"><span class="lineno"> 2231</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea115dd6cf8ca1bbc5a7689a88c5d28463">CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA</a> = 4,</div>
-<div class="line"><span class="lineno"> 2232</span>} <a class="code hl_enumeration" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010e">ck_attention_reduction_t</a>;</div>
-<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010e"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010e">ck_attention_reduction_t</a></div><div class="ttdeci">ck_attention_reduction_t</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02226">ckernel_engine.h:2226</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010ea115dd6cf8ca1bbc5a7689a88c5d28463"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea115dd6cf8ca1bbc5a7689a88c5d28463">CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA</a></div><div class="ttdeci">@ CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02231">ckernel_engine.h:2231</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010ea85e68fd51ad8a3b0ddaff562ab9080f7"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea85e68fd51ad8a3b0ddaff562ab9080f7">CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE</a></div><div class="ttdeci">@ CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02228">ckernel_engine.h:2228</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010ea9de5268ef35fefa367f6c8219143d2bb"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea9de5268ef35fefa367f6c8219143d2bb">CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64</a></div><div class="ttdeci">@ CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02230">ckernel_engine.h:2230</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010eacd061ae5c8ef1eadf0f2bf97ec2ca433"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010eacd061ae5c8ef1eadf0f2bf97ec2ca433">CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE</a></div><div class="ttdeci">@ CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02229">ckernel_engine.h:2229</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010eadbc9e39a1c54b34cb182196445e795b8"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010eadbc9e39a1c54b34cb182196445e795b8">CK_ATTN_REDUCTION_FP32_ONLINE</a></div><div class="ttdeci">@ CK_ATTN_REDUCTION_FP32_ONLINE</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02227">ckernel_engine.h:2227</a></div></div>
+<p class="definition">Definition at line <a class="el" href="ckernel__engine_8h_source.html#l02229">2229</a> of file <a class="el" href="ckernel__engine_8h_source.html">ckernel_engine.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 2229</span>             {</div>
+<div class="line"><span class="lineno"> 2230</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010eadbc9e39a1c54b34cb182196445e795b8">CK_ATTN_REDUCTION_FP32_ONLINE</a> = 0,</div>
+<div class="line"><span class="lineno"> 2231</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea85e68fd51ad8a3b0ddaff562ab9080f7">CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE</a> = 1,</div>
+<div class="line"><span class="lineno"> 2232</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010eacd061ae5c8ef1eadf0f2bf97ec2ca433">CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE</a> = 2,</div>
+<div class="line"><span class="lineno"> 2233</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea9de5268ef35fefa367f6c8219143d2bb">CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64</a> = 3,</div>
+<div class="line"><span class="lineno"> 2234</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea115dd6cf8ca1bbc5a7689a88c5d28463">CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA</a> = 4,</div>
+<div class="line"><span class="lineno"> 2235</span>} <a class="code hl_enumeration" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010e">ck_attention_reduction_t</a>;</div>
+<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010e"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010e">ck_attention_reduction_t</a></div><div class="ttdeci">ck_attention_reduction_t</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02229">ckernel_engine.h:2229</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010ea115dd6cf8ca1bbc5a7689a88c5d28463"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea115dd6cf8ca1bbc5a7689a88c5d28463">CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA</a></div><div class="ttdeci">@ CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02234">ckernel_engine.h:2234</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010ea85e68fd51ad8a3b0ddaff562ab9080f7"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea85e68fd51ad8a3b0ddaff562ab9080f7">CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE</a></div><div class="ttdeci">@ CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02231">ckernel_engine.h:2231</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010ea9de5268ef35fefa367f6c8219143d2bb"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea9de5268ef35fefa367f6c8219143d2bb">CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64</a></div><div class="ttdeci">@ CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02233">ckernel_engine.h:2233</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010eacd061ae5c8ef1eadf0f2bf97ec2ca433"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010eacd061ae5c8ef1eadf0f2bf97ec2ca433">CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE</a></div><div class="ttdeci">@ CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02232">ckernel_engine.h:2232</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010eadbc9e39a1c54b34cb182196445e795b8"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010eadbc9e39a1c54b34cb182196445e795b8">CK_ATTN_REDUCTION_FP32_ONLINE</a></div><div class="ttdeci">@ CK_ATTN_REDUCTION_FP32_ONLINE</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02230">ckernel_engine.h:2230</a></div></div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1560,18 +1560,18 @@ Functions</h2></td></tr>
 <tr><td class="fieldname"><a id="adcb33ce8a8fd7acd821411605a3baf67ad762a0a2ebaaa15ce18a2bfbe86349c7" name="adcb33ce8a8fd7acd821411605a3baf67ad762a0a2ebaaa15ce18a2bfbe86349c7"></a>CK_ATTENTION_STATUS_INSUFFICIENT_WORKSPACE&#160;</td><td class="fielddoc"></td></tr>
 </table>
 
-<p class="definition">Definition at line <a class="el" href="ckernel__engine_8h_source.html#l02244">2244</a> of file <a class="el" href="ckernel__engine_8h_source.html">ckernel_engine.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 2244</span>             {</div>
-<div class="line"><span class="lineno"> 2245</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67abea27a79c4c94ac03dfe2ab71fb2cdf1">CK_ATTENTION_STATUS_OK</a> = 0,</div>
-<div class="line"><span class="lineno"> 2246</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67ad2afe3d323b8a120f969ba979c34a8df">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a> = -1,</div>
-<div class="line"><span class="lineno"> 2247</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67a1f3f246a2db6a868a9e1a5835d06e614">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a> = -2,</div>
-<div class="line"><span class="lineno"> 2248</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67ad762a0a2ebaaa15ce18a2bfbe86349c7">CK_ATTENTION_STATUS_INSUFFICIENT_WORKSPACE</a> = -3,</div>
-<div class="line"><span class="lineno"> 2249</span>} <a class="code hl_enumeration" href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67">ck_attention_status_t</a>;</div>
-<div class="ttc" id="ackernel__engine_8h_html_adcb33ce8a8fd7acd821411605a3baf67"><div class="ttname"><a href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67">ck_attention_status_t</a></div><div class="ttdeci">ck_attention_status_t</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02244">ckernel_engine.h:2244</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_adcb33ce8a8fd7acd821411605a3baf67a1f3f246a2db6a868a9e1a5835d06e614"><div class="ttname"><a href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67a1f3f246a2db6a868a9e1a5835d06e614">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a></div><div class="ttdeci">@ CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02247">ckernel_engine.h:2247</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_adcb33ce8a8fd7acd821411605a3baf67abea27a79c4c94ac03dfe2ab71fb2cdf1"><div class="ttname"><a href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67abea27a79c4c94ac03dfe2ab71fb2cdf1">CK_ATTENTION_STATUS_OK</a></div><div class="ttdeci">@ CK_ATTENTION_STATUS_OK</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02245">ckernel_engine.h:2245</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_adcb33ce8a8fd7acd821411605a3baf67ad2afe3d323b8a120f969ba979c34a8df"><div class="ttname"><a href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67ad2afe3d323b8a120f969ba979c34a8df">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a></div><div class="ttdeci">@ CK_ATTENTION_STATUS_INVALID_ARGUMENT</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02246">ckernel_engine.h:2246</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_adcb33ce8a8fd7acd821411605a3baf67ad762a0a2ebaaa15ce18a2bfbe86349c7"><div class="ttname"><a href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67ad762a0a2ebaaa15ce18a2bfbe86349c7">CK_ATTENTION_STATUS_INSUFFICIENT_WORKSPACE</a></div><div class="ttdeci">@ CK_ATTENTION_STATUS_INSUFFICIENT_WORKSPACE</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02248">ckernel_engine.h:2248</a></div></div>
+<p class="definition">Definition at line <a class="el" href="ckernel__engine_8h_source.html#l02247">2247</a> of file <a class="el" href="ckernel__engine_8h_source.html">ckernel_engine.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 2247</span>             {</div>
+<div class="line"><span class="lineno"> 2248</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67abea27a79c4c94ac03dfe2ab71fb2cdf1">CK_ATTENTION_STATUS_OK</a> = 0,</div>
+<div class="line"><span class="lineno"> 2249</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67ad2afe3d323b8a120f969ba979c34a8df">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a> = -1,</div>
+<div class="line"><span class="lineno"> 2250</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67a1f3f246a2db6a868a9e1a5835d06e614">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a> = -2,</div>
+<div class="line"><span class="lineno"> 2251</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67ad762a0a2ebaaa15ce18a2bfbe86349c7">CK_ATTENTION_STATUS_INSUFFICIENT_WORKSPACE</a> = -3,</div>
+<div class="line"><span class="lineno"> 2252</span>} <a class="code hl_enumeration" href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67">ck_attention_status_t</a>;</div>
+<div class="ttc" id="ackernel__engine_8h_html_adcb33ce8a8fd7acd821411605a3baf67"><div class="ttname"><a href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67">ck_attention_status_t</a></div><div class="ttdeci">ck_attention_status_t</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02247">ckernel_engine.h:2247</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_adcb33ce8a8fd7acd821411605a3baf67a1f3f246a2db6a868a9e1a5835d06e614"><div class="ttname"><a href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67a1f3f246a2db6a868a9e1a5835d06e614">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a></div><div class="ttdeci">@ CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02250">ckernel_engine.h:2250</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_adcb33ce8a8fd7acd821411605a3baf67abea27a79c4c94ac03dfe2ab71fb2cdf1"><div class="ttname"><a href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67abea27a79c4c94ac03dfe2ab71fb2cdf1">CK_ATTENTION_STATUS_OK</a></div><div class="ttdeci">@ CK_ATTENTION_STATUS_OK</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02248">ckernel_engine.h:2248</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_adcb33ce8a8fd7acd821411605a3baf67ad2afe3d323b8a120f969ba979c34a8df"><div class="ttname"><a href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67ad2afe3d323b8a120f969ba979c34a8df">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a></div><div class="ttdeci">@ CK_ATTENTION_STATUS_INVALID_ARGUMENT</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02249">ckernel_engine.h:2249</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_adcb33ce8a8fd7acd821411605a3baf67ad762a0a2ebaaa15ce18a2bfbe86349c7"><div class="ttname"><a href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67ad762a0a2ebaaa15ce18a2bfbe86349c7">CK_ATTENTION_STATUS_INSUFFICIENT_WORKSPACE</a></div><div class="ttdeci">@ CK_ATTENTION_STATUS_INSUFFICIENT_WORKSPACE</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02251">ckernel_engine.h:2251</a></div></div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -2736,18 +2736,18 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="gemma4__per__layer__embed_8c_source.html#l00438">438</a> of file <a class="el" href="gemma4__per__layer__embed_8c_source.html">gemma4_per_layer_embed.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  442</span>{</div>
-<div class="line"><span class="lineno">  443</span>    <span class="keywordflow">if</span> (!hidden || !scale || tokens &lt;= 0 || embed_dim &lt;= 0) {</div>
-<div class="line"><span class="lineno">  444</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  445</span>    }</div>
-<div class="line"><span class="lineno">  446</span> </div>
-<div class="line"><span class="lineno">  447</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> s = scale[0];</div>
-<div class="line"><span class="lineno">  448</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> n = (size_t)tokens * (<span class="keywordtype">size_t</span>)embed_dim;</div>
-<div class="line"><span class="lineno">  449</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; n; ++i) {</div>
-<div class="line"><span class="lineno">  450</span>        hidden[i] *= s;</div>
-<div class="line"><span class="lineno">  451</span>    }</div>
-<div class="line"><span class="lineno">  452</span>}</div>
+<p class="definition">Definition at line <a class="el" href="gemma4__per__layer__embed_8c_source.html#l00475">475</a> of file <a class="el" href="gemma4__per__layer__embed_8c_source.html">gemma4_per_layer_embed.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  479</span>{</div>
+<div class="line"><span class="lineno">  480</span>    <span class="keywordflow">if</span> (!hidden || !scale || tokens &lt;= 0 || embed_dim &lt;= 0) {</div>
+<div class="line"><span class="lineno">  481</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  482</span>    }</div>
+<div class="line"><span class="lineno">  483</span> </div>
+<div class="line"><span class="lineno">  484</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> s = scale[0];</div>
+<div class="line"><span class="lineno">  485</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> n = (size_t)tokens * (<span class="keywordtype">size_t</span>)embed_dim;</div>
+<div class="line"><span class="lineno">  486</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; n; ++i) {</div>
+<div class="line"><span class="lineno">  487</span>        hidden[i] *= s;</div>
+<div class="line"><span class="lineno">  488</span>    }</div>
+<div class="line"><span class="lineno">  489</span>}</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -5771,7 +5771,7 @@ Functions</h2></td></tr>
 <div class="ttc" id="aattention__kernels_8c_html_a3bc77f14aef03ee172f20d99627cb9f5"><div class="ttname"><a href="attention__kernels_8c.html#a3bc77f14aef03ee172f20d99627cb9f5">CK_GGML_FA_TILE_Q</a></div><div class="ttdeci">#define CK_GGML_FA_TILE_Q</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l02888">attention_kernels.c:2888</a></div></div>
 <div class="ttc" id="aattention__kernels_8c_html_a49061a12eedcf16aa601f8dc8d777992"><div class="ttname"><a href="attention__kernels_8c.html#a49061a12eedcf16aa601f8dc8d777992">attention_forward_causal_head_major_gqa_prefill_append_bf16cache_pytorch_contract_workspace</a></div><div class="ttdeci">ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_bf16cache_pytorch_contract_workspace(const float *q, const uint16_t *k_cache, const uint16_t *v_cache, float *output, int num_heads, int num_kv_heads, int q_tokens, int past_tokens, int cache_capacity, int head_dim, int aligned_head_dim, ck_attention_reduction_t reduction, float *token_workspace, size_t token_workspace_bytes)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l09264">attention_kernels.c:9264</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l09264">attention_forward_causal_head_major_gqa_prefill_append_bf16cache_pytorch_contract_workspace()</a>, <a class="el" href="ckernel__engine_8h_source.html#l02246">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, and <a class="el" href="attention__kernels_8c_source.html#l02888">CK_GGML_FA_TILE_Q</a>.</p>
+<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l09264">attention_forward_causal_head_major_gqa_prefill_append_bf16cache_pytorch_contract_workspace()</a>, <a class="el" href="ckernel__engine_8h_source.html#l02249">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, and <a class="el" href="attention__kernels_8c_source.html#l02888">CK_GGML_FA_TILE_Q</a>.</p>
 
 </div>
 </div>
@@ -5940,7 +5940,7 @@ Functions</h2></td></tr>
 <div class="ttc" id="ack__threadpool_8h_html_ada9a2b22c2eb79fe8834b026a3c7d8b4"><div class="ttname"><a href="ck__threadpool_8h.html#ada9a2b22c2eb79fe8834b026a3c7d8b4">ck_threadpool_thread_id</a></div><div class="ttdeci">int ck_threadpool_thread_id(const ck_threadpool_t *pool)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00594">ck_threadpool.c:594</a></div></div>
 <div class="ttc" id="atrue__bpe_8h_html_ac7f5fd4f55df36920bf0583c3516e72f"><div class="ttname"><a href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a></div><div class="ttdeci">const uint8_t size_t count</div><div class="ttdef"><b>Definition</b> <a href="true__bpe_8h_source.html#l00209">true_bpe.h:209</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l09190">attention_forward_decode_head_major_gqa_bf16cache_pytorch_contract()</a>, <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="attention__kernels_8c_source.html#l07042">ck_attention_f16_prefill_qtile64_work()</a>, <a class="el" href="ckernel__engine_8h_source.html#l02246">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02245">CK_ATTENTION_STATUS_OK</a>, <a class="el" href="ckernel__engine_8h_source.html#l02247">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02231">CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA</a>, <a class="el" href="attention__kernels_8c_source.html#l02888">CK_GGML_FA_TILE_Q</a>, <a class="el" href="ck__threadpool_8c_source.html#l00398">ck_threadpool_dispatch_n()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00685">ck_threadpool_global()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00584">ck_threadpool_n_threads()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00594">ck_threadpool_thread_id()</a>, <a class="el" href="true__bpe_8h_source.html#l00209">count</a>, and <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>.</p>
+<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l09190">attention_forward_decode_head_major_gqa_bf16cache_pytorch_contract()</a>, <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="attention__kernels_8c_source.html#l07042">ck_attention_f16_prefill_qtile64_work()</a>, <a class="el" href="ckernel__engine_8h_source.html#l02249">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02248">CK_ATTENTION_STATUS_OK</a>, <a class="el" href="ckernel__engine_8h_source.html#l02250">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02234">CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA</a>, <a class="el" href="attention__kernels_8c_source.html#l02888">CK_GGML_FA_TILE_Q</a>, <a class="el" href="ck__threadpool_8c_source.html#l00398">ck_threadpool_dispatch_n()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00685">ck_threadpool_global()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00584">ck_threadpool_n_threads()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00594">ck_threadpool_thread_id()</a>, <a class="el" href="true__bpe_8h_source.html#l00209">count</a>, and <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="attention__kernels_8c_source.html#l09341">attention_forward_causal_head_major_gqa_prefill_append_bf16cache_pytorch_contract()</a>.</p>
 
@@ -6139,7 +6139,7 @@ Functions</h2></td></tr>
 <div class="ttc" id="aattention__kernels_8c_html_a799abd849ac31acee3371df4d78c81e5"><div class="ttname"><a href="attention__kernels_8c.html#a799abd849ac31acee3371df4d78c81e5">attention_forward_causal_head_major_gqa_prefill_append_f16cache_gqa_reuse_config</a></div><div class="ttdeci">ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_f16cache_gqa_reuse_config(const float *q, const uint16_t *k_cache, const uint16_t *v_cache, float *output, int num_heads, int num_kv_heads, int q_tokens, int past_tokens, int cache_capacity, int head_dim, int aligned_head_dim, int query_tile_size, int concurrent_query_tiles, void *workspace, size_t workspace_bytes)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l07514">attention_kernels.c:7514</a></div></div>
 <div class="ttc" id="aattention__kernels_8c_html_ad1a72792cdc40d8fc00a3221a86e82cb"><div class="ttname"><a href="attention__kernels_8c.html#ad1a72792cdc40d8fc00a3221a86e82cb">attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract_workspace</a></div><div class="ttdeci">ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract_workspace(const float *q, const uint16_t *k_cache, const uint16_t *v_cache, float *output, int num_heads, int num_kv_heads, int q_tokens, int past_tokens, int cache_capacity, int head_dim, int aligned_head_dim, ck_attention_reduction_t reduction, float *token_workspace, size_t token_workspace_bytes)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l07699">attention_kernels.c:7699</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l07699">attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract_workspace()</a>, <a class="el" href="attention__kernels_8c_source.html#l07514">attention_forward_causal_head_major_gqa_prefill_append_f16cache_gqa_reuse_config()</a>, <a class="el" href="ckernel__engine_8h_source.html#l02246">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02230">CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64</a>, <a class="el" href="ck__threadpool_8c_source.html#l00685">ck_threadpool_global()</a>, and <a class="el" href="ck__threadpool_8c_source.html#l00584">ck_threadpool_n_threads()</a>.</p>
+<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l07699">attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract_workspace()</a>, <a class="el" href="attention__kernels_8c_source.html#l07514">attention_forward_causal_head_major_gqa_prefill_append_f16cache_gqa_reuse_config()</a>, <a class="el" href="ckernel__engine_8h_source.html#l02249">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02233">CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64</a>, <a class="el" href="ck__threadpool_8c_source.html#l00685">ck_threadpool_global()</a>, and <a class="el" href="ck__threadpool_8c_source.html#l00584">ck_threadpool_n_threads()</a>.</p>
 
 </div>
 </div>
@@ -6261,7 +6261,7 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno"> 8122</span>    <span class="keywordflow">return</span> status;</div>
 <div class="line"><span class="lineno"> 8123</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l07699">attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract_workspace()</a>, <a class="el" href="ckernel__engine_8h_source.html#l02246">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02230">CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64</a>, and <a class="el" href="attention__kernels_8c_source.html#l02888">CK_GGML_FA_TILE_Q</a>.</p>
+<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l07699">attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract_workspace()</a>, <a class="el" href="ckernel__engine_8h_source.html#l02249">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02233">CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64</a>, and <a class="el" href="attention__kernels_8c_source.html#l02888">CK_GGML_FA_TILE_Q</a>.</p>
 
 </div>
 </div>
@@ -6435,7 +6435,7 @@ Functions</h2></td></tr>
 <div class="ttc" id="aattention__kernels_8c_html_a9cf90fc2e0ba9e04ecf4d6bc4ce20c3b"><div class="ttname"><a href="attention__kernels_8c.html#a9cf90fc2e0ba9e04ecf4d6bc4ce20c3b">ck_attention_f16_prefill_qtile64_dispatch</a></div><div class="ttdeci">static ck_attention_status_t ck_attention_f16_prefill_qtile64_dispatch(const float *q, const uint16_t *k_cache, const uint16_t *v_cache, float *output, int num_heads, int num_kv_heads, int q_tokens, int past_tokens, int cache_capacity, int head_dim, int aligned_head_dim, int cache_is_bf16, float attention_scale, size_t q_head_stride, size_t output_head_stride, ck_attention_prefill_schedule_t schedule)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l07453">attention_kernels.c:7453</a></div></div>
 <div class="ttc" id="aattention__kernels_8c_html_ae5334baaab9469712be3e9acaf9d3aaa"><div class="ttname"><a href="attention__kernels_8c.html#ae5334baaab9469712be3e9acaf9d3aaa">attention_forward_decode_head_major_gqa_flash_f16cache_contract</a></div><div class="ttdeci">ck_attention_status_t attention_forward_decode_head_major_gqa_flash_f16cache_contract(const float *q_token, const uint16_t *k_cache, const uint16_t *v_cache, float *out_token, int num_heads, int num_kv_heads, int kv_tokens, int cache_capacity, int head_dim, int aligned_head_dim, ck_attention_reduction_t reduction)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l06862">attention_kernels.c:6862</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l06862">attention_forward_decode_head_major_gqa_flash_f16cache_contract()</a>, <a class="el" href="attention__kernels_8c_source.html#l07453">ck_attention_f16_prefill_qtile64_dispatch()</a>, <a class="el" href="ckernel__engine_8h_source.html#l02246">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02245">CK_ATTENTION_STATUS_OK</a>, <a class="el" href="ckernel__engine_8h_source.html#l02247">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02239">CK_ATTN_PREFILL_SCHEDULE_QUERY_TILES</a>, <a class="el" href="ckernel__engine_8h_source.html#l02230">CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64</a>, <a class="el" href="ckernel__engine_8h_source.html#l02228">CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE</a>, <a class="el" href="ckernel__engine_8h_source.html#l02229">CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE</a>, <a class="el" href="ckernel__engine_8h_source.html#l02227">CK_ATTN_REDUCTION_FP32_ONLINE</a>, and <a class="el" href="attention__kernels_8c_source.html#l02888">CK_GGML_FA_TILE_Q</a>.</p>
+<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l06862">attention_forward_decode_head_major_gqa_flash_f16cache_contract()</a>, <a class="el" href="attention__kernels_8c_source.html#l07453">ck_attention_f16_prefill_qtile64_dispatch()</a>, <a class="el" href="ckernel__engine_8h_source.html#l02249">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02248">CK_ATTENTION_STATUS_OK</a>, <a class="el" href="ckernel__engine_8h_source.html#l02250">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02242">CK_ATTN_PREFILL_SCHEDULE_QUERY_TILES</a>, <a class="el" href="ckernel__engine_8h_source.html#l02233">CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64</a>, <a class="el" href="ckernel__engine_8h_source.html#l02231">CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE</a>, <a class="el" href="ckernel__engine_8h_source.html#l02232">CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE</a>, <a class="el" href="ckernel__engine_8h_source.html#l02230">CK_ATTN_REDUCTION_FP32_ONLINE</a>, and <a class="el" href="attention__kernels_8c_source.html#l02888">CK_GGML_FA_TILE_Q</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="attention__kernels_8c_source.html#l07615">attention_forward_causal_head_major_gqa_prefill_append_f16cache_auto_workspace()</a>, and <a class="el" href="attention__kernels_8c_source.html#l08081">attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract()</a>.</p>
 
@@ -6747,7 +6747,7 @@ Functions</h2></td></tr>
 <div class="ttc" id="aattention__kernels_8c_html_ab9e879205ae5c20e31e802274cc5359a"><div class="ttname"><a href="attention__kernels_8c.html#ab9e879205ae5c20e31e802274cc5359a">ck_attention_f16_prefill_gqa_reuse_worker_bytes</a></div><div class="ttdeci">static size_t ck_attention_f16_prefill_gqa_reuse_worker_bytes(int num_heads, int num_kv_heads, int head_dim, int workers, int query_tile_size, int concurrent_query_tiles)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l06955">attention_kernels.c:6955</a></div></div>
 <div class="ttc" id="aattention__kernels_8c_html_ae4145a7ddaa070d8344c9d4bcdca6422"><div class="ttname"><a href="attention__kernels_8c.html#ae4145a7ddaa070d8344c9d4bcdca6422">ck_attention_align64_size</a></div><div class="ttdeci">static size_t ck_attention_align64_size(size_t value)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l06950">attention_kernels.c:6950</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l06993">attention_forward_causal_head_major_gqa_prefill_append_f16cache_gqa_reuse_workspace_bytes()</a>, <a class="el" href="attention__kernels_8c_source.html#l06950">ck_attention_align64_size()</a>, <a class="el" href="attention__kernels_8c_source.html#l07221">ck_attention_f16_prefill_gqa_reuse_work()</a>, <a class="el" href="attention__kernels_8c_source.html#l06955">ck_attention_f16_prefill_gqa_reuse_worker_bytes()</a>, <a class="el" href="ckernel__engine_8h_source.html#l02248">CK_ATTENTION_STATUS_INSUFFICIENT_WORKSPACE</a>, <a class="el" href="ckernel__engine_8h_source.html#l02246">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02245">CK_ATTENTION_STATUS_OK</a>, <a class="el" href="ckernel__engine_8h_source.html#l02247">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02241">CK_ATTN_PREFILL_SCHEDULE_GQA_SHARED_KV_TILES</a>, <a class="el" href="attention__kernels_8c_source.html#l02890">CK_GGML_FA_TILE_KV</a>, <a class="el" href="ck__threadpool_8c_source.html#l00398">ck_threadpool_dispatch_n()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00685">ck_threadpool_global()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00584">ck_threadpool_n_threads()</a>, and <a class="el" href="ck__threadpool_8c_source.html#l00594">ck_threadpool_thread_id()</a>.</p>
+<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l06993">attention_forward_causal_head_major_gqa_prefill_append_f16cache_gqa_reuse_workspace_bytes()</a>, <a class="el" href="attention__kernels_8c_source.html#l06950">ck_attention_align64_size()</a>, <a class="el" href="attention__kernels_8c_source.html#l07221">ck_attention_f16_prefill_gqa_reuse_work()</a>, <a class="el" href="attention__kernels_8c_source.html#l06955">ck_attention_f16_prefill_gqa_reuse_worker_bytes()</a>, <a class="el" href="ckernel__engine_8h_source.html#l02251">CK_ATTENTION_STATUS_INSUFFICIENT_WORKSPACE</a>, <a class="el" href="ckernel__engine_8h_source.html#l02249">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02248">CK_ATTENTION_STATUS_OK</a>, <a class="el" href="ckernel__engine_8h_source.html#l02250">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02244">CK_ATTN_PREFILL_SCHEDULE_GQA_SHARED_KV_TILES</a>, <a class="el" href="attention__kernels_8c_source.html#l02890">CK_GGML_FA_TILE_KV</a>, <a class="el" href="ck__threadpool_8c_source.html#l00398">ck_threadpool_dispatch_n()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00685">ck_threadpool_global()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00584">ck_threadpool_n_threads()</a>, and <a class="el" href="ck__threadpool_8c_source.html#l00594">ck_threadpool_thread_id()</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="attention__kernels_8c_source.html#l07615">attention_forward_causal_head_major_gqa_prefill_append_f16cache_auto_workspace()</a>.</p>
 
@@ -6931,7 +6931,7 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno"> 7696</span>        (<span class="keywordtype">size_t</span>) q_tokens * (<span class="keywordtype">size_t</span>) aligned_head_dim, schedule);</div>
 <div class="line"><span class="lineno"> 7697</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l07453">ck_attention_f16_prefill_qtile64_dispatch()</a>, <a class="el" href="ckernel__engine_8h_source.html#l02246">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, and <a class="el" href="attention__kernels_8c_source.html#l02888">CK_GGML_FA_TILE_Q</a>.</p>
+<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l07453">ck_attention_f16_prefill_qtile64_dispatch()</a>, <a class="el" href="ckernel__engine_8h_source.html#l02249">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, and <a class="el" href="attention__kernels_8c_source.html#l02888">CK_GGML_FA_TILE_Q</a>.</p>
 
 </div>
 </div>
@@ -7162,7 +7162,7 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno"> 9415</span><span class="preprocessor">#endif</span></div>
 <div class="line"><span class="lineno"> 9416</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="ckernel__engine_8h_source.html#l02246">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02247">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a>, and <a class="el" href="ckernel__engine_8h_source.html#l02231">CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA</a>.</p>
+<p class="reference">References <a class="el" href="ckernel__engine_8h_source.html#l02249">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02250">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a>, and <a class="el" href="ckernel__engine_8h_source.html#l02234">CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA</a>.</p>
 
 </div>
 </div>
@@ -7286,7 +7286,7 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno"> 8079</span>}</div>
 <div class="ttc" id="aattention__kernels_8c_html_a49f18d6b371ddf49f03acae38b761eb5"><div class="ttname"><a href="attention__kernels_8c.html#a49f18d6b371ddf49f03acae38b761eb5">ck_attention_forward_causal_head_major_gqa_prefill_segmented_f16cache_schedule_workspace</a></div><div class="ttdeci">static ck_attention_status_t ck_attention_forward_causal_head_major_gqa_prefill_segmented_f16cache_schedule_workspace(const float *q, const uint16_t *k_cache, const uint16_t *v_cache, float *output, int num_heads, int num_kv_heads, int q_tokens, int past_tokens, int cache_capacity, int head_dim, int aligned_head_dim, ck_attention_reduction_t reduction, float *token_workspace, size_t token_workspace_bytes, const int *segment_lengths, int num_segments, ck_attention_prefill_schedule_t schedule)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l07943">attention_kernels.c:7943</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l07943">ck_attention_forward_causal_head_major_gqa_prefill_segmented_f16cache_schedule_workspace()</a>, and <a class="el" href="ckernel__engine_8h_source.html#l02239">CK_ATTN_PREFILL_SCHEDULE_QUERY_TILES</a>.</p>
+<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l07943">ck_attention_forward_causal_head_major_gqa_prefill_segmented_f16cache_schedule_workspace()</a>, and <a class="el" href="ckernel__engine_8h_source.html#l02242">CK_ATTN_PREFILL_SCHEDULE_QUERY_TILES</a>.</p>
 
 </div>
 </div>
@@ -7951,7 +7951,7 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno"> 9262</span>}</div>
 <div class="ttc" id="atokenizer_8h_html_a86dbad16ac00b8aa3c450398e4f8b741"><div class="ttname"><a href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a></div><div class="ttdeci">int32_t float * score</div><div class="ttdef"><b>Definition</b> <a href="tokenizer_8h_source.html#l00328">tokenizer.h:328</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="ckernel__engine_8h_source.html#l02246">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02245">CK_ATTENTION_STATUS_OK</a>, <a class="el" href="ckernel__engine_8h_source.html#l02247">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02231">CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA</a>, <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>, <a class="el" href="tokenizer_8h_source.html#l00328">score</a>, and <a class="el" href="tokenizer_8h_source.html#l00307">token</a>.</p>
+<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="ckernel__engine_8h_source.html#l02249">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02248">CK_ATTENTION_STATUS_OK</a>, <a class="el" href="ckernel__engine_8h_source.html#l02250">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02234">CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA</a>, <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>, <a class="el" href="tokenizer_8h_source.html#l00328">score</a>, and <a class="el" href="tokenizer_8h_source.html#l00307">token</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="attention__kernels_8c_source.html#l09264">attention_forward_causal_head_major_gqa_prefill_append_bf16cache_pytorch_contract_workspace()</a>.</p>
 
@@ -8574,7 +8574,7 @@ Functions</h2></td></tr>
 <div class="ttc" id="aattention__kernels_8c_html_ad7693ff011ebdd2eb16801f863b010c6"><div class="ttname"><a href="attention__kernels_8c.html#ad7693ff011ebdd2eb16801f863b010c6">attention_forward_decode_head_major_gqa_flash_f16cache_split</a></div><div class="ttdeci">void attention_forward_decode_head_major_gqa_flash_f16cache_split(const float *q_token, const uint16_t *k_cache, const uint16_t *v_cache, float *out_token, int num_heads, int num_kv_heads, int kv_tokens, int cache_capacity, int head_dim, int aligned_head_dim, int split_chunks)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l06784">attention_kernels.c:6784</a></div></div>
 <div class="ttc" id="ackernel__engine_8h_html_aedf852ec498fe7db175f59f810886b9f"><div class="ttname"><a href="ckernel__engine_8h.html#aedf852ec498fe7db175f59f810886b9f">ck_get_num_threads</a></div><div class="ttdeci">int ck_get_num_threads(void)</div><div class="ttdef"><b>Definition</b> <a href="ckernel__strict_8c_source.html#l00310">ckernel_strict.c:310</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l09418">attention_forward_decode_head_major_gqa_flash_f16cache()</a>, <a class="el" href="attention__kernels_8c_source.html#l06784">attention_forward_decode_head_major_gqa_flash_f16cache_split()</a>, <a class="el" href="ckernel__engine_8h_source.html#l02246">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02245">CK_ATTENTION_STATUS_OK</a>, <a class="el" href="ckernel__engine_8h_source.html#l02247">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02228">CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE</a>, <a class="el" href="ckernel__engine_8h_source.html#l02229">CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE</a>, <a class="el" href="ckernel__engine_8h_source.html#l02227">CK_ATTN_REDUCTION_FP32_ONLINE</a>, and <a class="el" href="ckernel__strict_8c_source.html#l00310">ck_get_num_threads()</a>.</p>
+<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l09418">attention_forward_decode_head_major_gqa_flash_f16cache()</a>, <a class="el" href="attention__kernels_8c_source.html#l06784">attention_forward_decode_head_major_gqa_flash_f16cache_split()</a>, <a class="el" href="ckernel__engine_8h_source.html#l02249">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02248">CK_ATTENTION_STATUS_OK</a>, <a class="el" href="ckernel__engine_8h_source.html#l02250">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02231">CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE</a>, <a class="el" href="ckernel__engine_8h_source.html#l02232">CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE</a>, <a class="el" href="ckernel__engine_8h_source.html#l02230">CK_ATTN_REDUCTION_FP32_ONLINE</a>, and <a class="el" href="ckernel__strict_8c_source.html#l00310">ck_get_num_threads()</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="attention__kernels_8c_source.html#l07699">attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract_workspace()</a>, and <a class="el" href="attention__kernels_8c_source.html#l07943">ck_attention_forward_causal_head_major_gqa_prefill_segmented_f16cache_schedule_workspace()</a>.</p>
 
@@ -12180,7 +12180,7 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno"> 8939</span><span class="preprocessor">#endif</span></div>
 <div class="line"><span class="lineno"> 8940</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="ckernel__engine_8h_source.html#l02245">CK_ATTENTION_STATUS_OK</a>.</p>
+<p class="reference">References <a class="el" href="ckernel__engine_8h_source.html#l02248">CK_ATTENTION_STATUS_OK</a>.</p>
 
 </div>
 </div>
@@ -31919,24 +31919,24 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="gemma4__per__layer__embed_8c_source.html#l00454">454</a> of file <a class="el" href="gemma4__per__layer__embed_8c_source.html">gemma4_per_layer_embed.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  458</span>{</div>
-<div class="line"><span class="lineno">  459</span>    <span class="keywordflow">if</span> (!logits || tokens &lt;= 0 || <a class="code hl_variable" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a> &lt;= 0 || cap &lt;= 0.0f) {</div>
-<div class="line"><span class="lineno">  460</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  461</span>    }</div>
-<div class="line"><span class="lineno">  462</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> inv_cap = 1.0f / cap;</div>
-<div class="line"><span class="lineno">  463</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> total = (size_t)tokens * (<span class="keywordtype">size_t</span>)<a class="code hl_variable" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a>;</div>
-<div class="line"><span class="lineno">  464</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; total; ++i) {</div>
-<div class="line"><span class="lineno">  465</span>        logits[i] = tanhf(logits[i] * inv_cap) * cap;</div>
-<div class="line"><span class="lineno">  466</span>    }</div>
-<div class="line"><span class="lineno">  467</span>}</div>
+<p class="definition">Definition at line <a class="el" href="gemma4__per__layer__embed_8c_source.html#l00491">491</a> of file <a class="el" href="gemma4__per__layer__embed_8c_source.html">gemma4_per_layer_embed.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  495</span>{</div>
+<div class="line"><span class="lineno">  496</span>    <span class="keywordflow">if</span> (!logits || tokens &lt;= 0 || <a class="code hl_variable" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a> &lt;= 0 || cap &lt;= 0.0f) {</div>
+<div class="line"><span class="lineno">  497</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  498</span>    }</div>
+<div class="line"><span class="lineno">  499</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> inv_cap = 1.0f / cap;</div>
+<div class="line"><span class="lineno">  500</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> total = (size_t)tokens * (<span class="keywordtype">size_t</span>)<a class="code hl_variable" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a>;</div>
+<div class="line"><span class="lineno">  501</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; total; ++i) {</div>
+<div class="line"><span class="lineno">  502</span>        logits[i] = tanhf(logits[i] * inv_cap) * cap;</div>
+<div class="line"><span class="lineno">  503</span>    }</div>
+<div class="line"><span class="lineno">  504</span>}</div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="true__bpe_8h_source.html#l00197">vocab_size</a>.</p>
 
 </div>
 </div>
-<a id="a29669485bedcbde44e295c26106e4777" name="a29669485bedcbde44e295c26106e4777"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a29669485bedcbde44e295c26106e4777">&#9670;&#160;</a></span>gemma4_per_layer_embed_forward()</h2>
+<a id="a4eead89f0a06792f12d01d53959144c6" name="a4eead89f0a06792f12d01d53959144c6"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a4eead89f0a06792f12d01d53959144c6">&#9670;&#160;</a></span>gemma4_per_layer_embed_forward()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -32011,7 +32011,25 @@ Functions</h2></td></tr>
           <td class="paramkey"></td>
           <td></td>
           <td class="paramtype">float&#160;</td>
-          <td class="paramname"><em>eps</em>&#160;</td>
+          <td class="paramname"><em>eps</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const int *&#160;</td>
+          <td class="paramname"><em>segment_lengths</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_segments</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>singleton_tail</em>&#160;</td>
         </tr>
         <tr>
           <td></td>
@@ -32021,38 +32039,52 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="gemma4__per__layer__embed_8c_source.html#l00397">397</a> of file <a class="el" href="gemma4__per__layer__embed_8c_source.html">gemma4_per_layer_embed.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  409</span>{</div>
-<div class="line"><span class="lineno">  410</span>    <span class="keywordflow">if</span> (!hidden || !per_layer_input || !inp_gate || !proj || !post_norm ||</div>
-<div class="line"><span class="lineno">  411</span>        tokens &lt;= 0 || layer &lt; 0 || layer &gt;= num_layers || embed_dim &lt;= 0 ||</div>
-<div class="line"><span class="lineno">  412</span>        per_layer_dim != <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a> || embed_dim &gt; 4096) {</div>
-<div class="line"><span class="lineno">  413</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  414</span>    }</div>
-<div class="line"><span class="lineno">  415</span> </div>
-<div class="line"><span class="lineno">  416</span>    ck_gemma4_embed_args_t args = {</div>
-<div class="line"><span class="lineno">  417</span>        .hidden = hidden,</div>
-<div class="line"><span class="lineno">  418</span>        .per_layer_input = per_layer_input,</div>
-<div class="line"><span class="lineno">  419</span>        .inp_gate = inp_gate,</div>
-<div class="line"><span class="lineno">  420</span>        .proj = proj,</div>
-<div class="line"><span class="lineno">  421</span>        .post_norm = post_norm,</div>
-<div class="line"><span class="lineno">  422</span>        .out_scale = out_scale,</div>
-<div class="line"><span class="lineno">  423</span>        .layer = layer,</div>
-<div class="line"><span class="lineno">  424</span>        .num_layers = num_layers,</div>
-<div class="line"><span class="lineno">  425</span>        .embed_dim = embed_dim,</div>
-<div class="line"><span class="lineno">  426</span>        .per_layer_dim = per_layer_dim,</div>
-<div class="line"><span class="lineno">  427</span>        .eps = eps,</div>
-<div class="line"><span class="lineno">  428</span>    };</div>
-<div class="line"><span class="lineno">  429</span>    ck_threadpool_t *pool = <a class="code hl_function" href="ck__threadpool_8h.html#a4597badcb0a5a6c31549f2b6bc6a88a7">ck_threadpool_global</a>();</div>
-<div class="line"><span class="lineno">  430</span>    <span class="keywordtype">int</span> active = pool ? <a class="code hl_function" href="ck__threadpool_8h.html#aef9103ab0a271feb7fdc74c915a78d10">ck_threadpool_n_threads</a>(pool) : 1;</div>
-<div class="line"><span class="lineno">  431</span>    <span class="keyword">const</span> <span class="keywordtype">char</span> *disabled = getenv(<span class="stringliteral">&quot;CK_DISABLE_GEMMA4_EMBED_PARALLEL&quot;</span>);</div>
-<div class="line"><span class="lineno">  432</span>    <span class="keywordflow">if</span> (disabled &amp;&amp; disabled[0] &amp;&amp; strcmp(disabled, <span class="stringliteral">&quot;0&quot;</span>) != 0) active = 1;</div>
-<div class="line"><span class="lineno">  433</span>    <span class="keywordflow">if</span> (active &gt; tokens) active = tokens;</div>
-<div class="line"><span class="lineno">  434</span>    <a class="code hl_function" href="ck__threadpool_8h.html#a201c68c915e80d824c95721b55c5ab83">ck_threadpool_parallel_for_n</a>(</div>
-<div class="line"><span class="lineno">  435</span>        pool, active, 0, tokens, 1, <a class="code hl_function" href="gemma4__per__layer__embed_8c.html#a44ec1cbc9e8de0e2cad3dc725c59fdd9">ck_gemma4_embed_range</a>, &amp;args);</div>
-<div class="line"><span class="lineno">  436</span>}</div>
-<div class="ttc" id="agemma4__per__layer__embed_8c_html_a44ec1cbc9e8de0e2cad3dc725c59fdd9"><div class="ttname"><a href="gemma4__per__layer__embed_8c.html#a44ec1cbc9e8de0e2cad3dc725c59fdd9">ck_gemma4_embed_range</a></div><div class="ttdeci">static void ck_gemma4_embed_range(int begin, int end, void *opaque)</div><div class="ttdef"><b>Definition</b> <a href="gemma4__per__layer__embed_8c_source.html#l00355">gemma4_per_layer_embed.c:355</a></div></div>
+<p class="definition">Definition at line <a class="el" href="gemma4__per__layer__embed_8c_source.html#l00417">417</a> of file <a class="el" href="gemma4__per__layer__embed_8c_source.html">gemma4_per_layer_embed.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  432</span>{</div>
+<div class="line"><span class="lineno">  433</span>    <span class="keywordflow">if</span> (!hidden || !per_layer_input || !inp_gate || !proj || !post_norm ||</div>
+<div class="line"><span class="lineno">  434</span>        tokens &lt;= 0 || layer &lt; 0 || layer &gt;= num_layers || embed_dim &lt;= 0 ||</div>
+<div class="line"><span class="lineno">  435</span>        per_layer_dim != <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a> || embed_dim &gt; 4096 ||</div>
+<div class="line"><span class="lineno">  436</span>        (segment_lengths == NULL) != (num_segments == 0) ||</div>
+<div class="line"><span class="lineno">  437</span>        (singleton_tail != 0 &amp;&amp; singleton_tail != 1)) {</div>
+<div class="line"><span class="lineno">  438</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  439</span>    }</div>
+<div class="line"><span class="lineno">  440</span>    <span class="keywordflow">if</span> (segment_lengths) {</div>
+<div class="line"><span class="lineno">  441</span>        <span class="keywordtype">int</span> remaining = tokens;</div>
+<div class="line"><span class="lineno">  442</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; num_segments; ++i) {</div>
+<div class="line"><span class="lineno">  443</span>            <span class="keywordflow">if</span> (segment_lengths[i] &lt; 0 || segment_lengths[i] &gt; remaining) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  444</span>            remaining -= segment_lengths[i];</div>
+<div class="line"><span class="lineno">  445</span>        }</div>
+<div class="line"><span class="lineno">  446</span>        <span class="keywordflow">if</span> (remaining != 0) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  447</span>    }</div>
+<div class="line"><span class="lineno">  448</span> </div>
+<div class="line"><span class="lineno">  449</span>    ck_gemma4_embed_args_t args = {</div>
+<div class="line"><span class="lineno">  450</span>        .hidden = hidden,</div>
+<div class="line"><span class="lineno">  451</span>        .per_layer_input = per_layer_input,</div>
+<div class="line"><span class="lineno">  452</span>        .inp_gate = inp_gate,</div>
+<div class="line"><span class="lineno">  453</span>        .proj = proj,</div>
+<div class="line"><span class="lineno">  454</span>        .post_norm = post_norm,</div>
+<div class="line"><span class="lineno">  455</span>        .out_scale = out_scale,</div>
+<div class="line"><span class="lineno">  456</span>        .layer = layer,</div>
+<div class="line"><span class="lineno">  457</span>        .num_layers = num_layers,</div>
+<div class="line"><span class="lineno">  458</span>        .embed_dim = embed_dim,</div>
+<div class="line"><span class="lineno">  459</span>        .per_layer_dim = per_layer_dim,</div>
+<div class="line"><span class="lineno">  460</span>        .tokens = tokens,</div>
+<div class="line"><span class="lineno">  461</span>        .eps = eps,</div>
+<div class="line"><span class="lineno">  462</span>        .segment_lengths = segment_lengths,</div>
+<div class="line"><span class="lineno">  463</span>        .num_segments = num_segments,</div>
+<div class="line"><span class="lineno">  464</span>        .singleton_tail = singleton_tail,</div>
+<div class="line"><span class="lineno">  465</span>    };</div>
+<div class="line"><span class="lineno">  466</span>    ck_threadpool_t *pool = <a class="code hl_function" href="ck__threadpool_8h.html#a4597badcb0a5a6c31549f2b6bc6a88a7">ck_threadpool_global</a>();</div>
+<div class="line"><span class="lineno">  467</span>    <span class="keywordtype">int</span> active = pool ? <a class="code hl_function" href="ck__threadpool_8h.html#aef9103ab0a271feb7fdc74c915a78d10">ck_threadpool_n_threads</a>(pool) : 1;</div>
+<div class="line"><span class="lineno">  468</span>    <span class="keyword">const</span> <span class="keywordtype">char</span> *disabled = getenv(<span class="stringliteral">&quot;CK_DISABLE_GEMMA4_EMBED_PARALLEL&quot;</span>);</div>
+<div class="line"><span class="lineno">  469</span>    <span class="keywordflow">if</span> (disabled &amp;&amp; disabled[0] &amp;&amp; strcmp(disabled, <span class="stringliteral">&quot;0&quot;</span>) != 0) active = 1;</div>
+<div class="line"><span class="lineno">  470</span>    <span class="keywordflow">if</span> (active &gt; tokens) active = tokens;</div>
+<div class="line"><span class="lineno">  471</span>    <a class="code hl_function" href="ck__threadpool_8h.html#a201c68c915e80d824c95721b55c5ab83">ck_threadpool_parallel_for_n</a>(</div>
+<div class="line"><span class="lineno">  472</span>        pool, active, 0, tokens, 1, <a class="code hl_function" href="gemma4__per__layer__embed_8c.html#a44ec1cbc9e8de0e2cad3dc725c59fdd9">ck_gemma4_embed_range</a>, &amp;args);</div>
+<div class="line"><span class="lineno">  473</span>}</div>
+<div class="ttc" id="agemma4__per__layer__embed_8c_html_a44ec1cbc9e8de0e2cad3dc725c59fdd9"><div class="ttname"><a href="gemma4__per__layer__embed_8c.html#a44ec1cbc9e8de0e2cad3dc725c59fdd9">ck_gemma4_embed_range</a></div><div class="ttdeci">static void ck_gemma4_embed_range(int begin, int end, void *opaque)</div><div class="ttdef"><b>Definition</b> <a href="gemma4__per__layer__embed_8c_source.html#l00383">gemma4_per_layer_embed.c:383</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="gemma4__per__layer__embed_8c_source.html#l00355">ck_gemma4_embed_range()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00685">ck_threadpool_global()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00584">ck_threadpool_n_threads()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00523">ck_threadpool_parallel_for_n()</a>, and <a class="el" href="ckernel__quant_8h_source.html#l00175">QK_K</a>.</p>
+<p class="reference">References <a class="el" href="gemma4__per__layer__embed_8c_source.html#l00383">ck_gemma4_embed_range()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00685">ck_threadpool_global()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00584">ck_threadpool_n_threads()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00523">ck_threadpool_parallel_for_n()</a>, and <a class="el" href="ckernel__quant_8h_source.html#l00175">QK_K</a>.</p>
 
 </div>
 </div>
@@ -32142,38 +32174,38 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="gemma4__per__layer__embed_8c_source.html#l00302">302</a> of file <a class="el" href="gemma4__per__layer__embed_8c_source.html">gemma4_per_layer_embed.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  314</span>{</div>
-<div class="line"><span class="lineno">  315</span>    <span class="keywordflow">if</span> (!per_layer_input || !hidden || !token_ids || !per_layer_token_emb ||</div>
-<div class="line"><span class="lineno">  316</span>        !per_layer_model_proj || !per_layer_proj_norm || tokens &lt;= 0 ||</div>
-<div class="line"><span class="lineno">  317</span>        num_layers &lt;= 0 || embed_dim &lt;= 0 || embed_dim &gt; <a class="code hl_define" href="gemma4__per__layer__embed_8c.html#a0f2251e860e038855b37b4f6cb135cce">CK_GEMMA4_MAX_EMBED_DIM</a> ||</div>
-<div class="line"><span class="lineno">  318</span>        per_layer_dim &lt;= 0 || <a class="code hl_variable" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a> &lt;= 0) {</div>
-<div class="line"><span class="lineno">  319</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  320</span>    }</div>
-<div class="line"><span class="lineno">  321</span> </div>
-<div class="line"><span class="lineno">  322</span>    <span class="keywordflow">if</span> (per_layer_dim &gt; <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>) {</div>
-<div class="line"><span class="lineno">  323</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  324</span>    }</div>
-<div class="line"><span class="lineno">  325</span>    ck_gemma4_prepare_args_t args = {</div>
-<div class="line"><span class="lineno">  326</span>        .per_layer_input = per_layer_input,</div>
-<div class="line"><span class="lineno">  327</span>        .hidden = hidden,</div>
-<div class="line"><span class="lineno">  328</span>        .token_ids = token_ids,</div>
-<div class="line"><span class="lineno">  329</span>        .per_layer_token_emb = per_layer_token_emb,</div>
-<div class="line"><span class="lineno">  330</span>        .per_layer_model_proj = per_layer_model_proj,</div>
-<div class="line"><span class="lineno">  331</span>        .per_layer_proj_norm = per_layer_proj_norm,</div>
-<div class="line"><span class="lineno">  332</span>        .num_layers = num_layers,</div>
-<div class="line"><span class="lineno">  333</span>        .embed_dim = embed_dim,</div>
-<div class="line"><span class="lineno">  334</span>        .per_layer_dim = per_layer_dim,</div>
-<div class="line"><span class="lineno">  335</span>        .vocab_size = <a class="code hl_variable" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a>,</div>
-<div class="line"><span class="lineno">  336</span>        .eps = eps,</div>
-<div class="line"><span class="lineno">  337</span>    };</div>
-<div class="line"><span class="lineno">  338</span>    <a class="code hl_function" href="gemma4__per__layer__embed_8c.html#a3bd934b2994fd4fd15d2819330100b04">ck_gemma4_prepare_parallel</a>(tokens, <a class="code hl_function" href="gemma4__per__layer__embed_8c.html#aa2ceae6e66aad8127a5f680b2bf70fd1">ck_gemma4_prepare_bf16_range</a>, &amp;args);</div>
-<div class="line"><span class="lineno">  339</span>}</div>
-<div class="ttc" id="agemma4__per__layer__embed_8c_html_a0f2251e860e038855b37b4f6cb135cce"><div class="ttname"><a href="gemma4__per__layer__embed_8c.html#a0f2251e860e038855b37b4f6cb135cce">CK_GEMMA4_MAX_EMBED_DIM</a></div><div class="ttdeci">#define CK_GEMMA4_MAX_EMBED_DIM</div><div class="ttdef"><b>Definition</b> <a href="gemma4__per__layer__embed_8c_source.html#l00022">gemma4_per_layer_embed.c:22</a></div></div>
-<div class="ttc" id="agemma4__per__layer__embed_8c_html_a3bd934b2994fd4fd15d2819330100b04"><div class="ttname"><a href="gemma4__per__layer__embed_8c.html#a3bd934b2994fd4fd15d2819330100b04">ck_gemma4_prepare_parallel</a></div><div class="ttdeci">static void ck_gemma4_prepare_parallel(int tokens, ck_range_fn_t fn, ck_gemma4_prepare_args_t *args)</div><div class="ttdef"><b>Definition</b> <a href="gemma4__per__layer__embed_8c_source.html#l00254">gemma4_per_layer_embed.c:254</a></div></div>
-<div class="ttc" id="agemma4__per__layer__embed_8c_html_aa2ceae6e66aad8127a5f680b2bf70fd1"><div class="ttname"><a href="gemma4__per__layer__embed_8c.html#aa2ceae6e66aad8127a5f680b2bf70fd1">ck_gemma4_prepare_bf16_range</a></div><div class="ttdeci">static void ck_gemma4_prepare_bf16_range(int begin, int end, void *opaque)</div><div class="ttdef"><b>Definition</b> <a href="gemma4__per__layer__embed_8c_source.html#l00203">gemma4_per_layer_embed.c:203</a></div></div>
+<p class="definition">Definition at line <a class="el" href="gemma4__per__layer__embed_8c_source.html#l00309">309</a> of file <a class="el" href="gemma4__per__layer__embed_8c_source.html">gemma4_per_layer_embed.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  321</span>{</div>
+<div class="line"><span class="lineno">  322</span>    <span class="keywordflow">if</span> (!per_layer_input || !hidden || !token_ids || !per_layer_token_emb ||</div>
+<div class="line"><span class="lineno">  323</span>        !per_layer_model_proj || !per_layer_proj_norm || tokens &lt;= 0 ||</div>
+<div class="line"><span class="lineno">  324</span>        num_layers &lt;= 0 || embed_dim &lt;= 0 || embed_dim &gt; <a class="code hl_define" href="gemma4__per__layer__embed_8c.html#a0f2251e860e038855b37b4f6cb135cce">CK_GEMMA4_MAX_EMBED_DIM</a> ||</div>
+<div class="line"><span class="lineno">  325</span>        per_layer_dim &lt;= 0 || <a class="code hl_variable" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a> &lt;= 0) {</div>
+<div class="line"><span class="lineno">  326</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  327</span>    }</div>
+<div class="line"><span class="lineno">  328</span> </div>
+<div class="line"><span class="lineno">  329</span>    <span class="keywordflow">if</span> (per_layer_dim &gt; <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>) {</div>
+<div class="line"><span class="lineno">  330</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  331</span>    }</div>
+<div class="line"><span class="lineno">  332</span>    ck_gemma4_prepare_args_t args = {</div>
+<div class="line"><span class="lineno">  333</span>        .per_layer_input = per_layer_input,</div>
+<div class="line"><span class="lineno">  334</span>        .hidden = hidden,</div>
+<div class="line"><span class="lineno">  335</span>        .token_ids = token_ids,</div>
+<div class="line"><span class="lineno">  336</span>        .per_layer_token_emb = per_layer_token_emb,</div>
+<div class="line"><span class="lineno">  337</span>        .per_layer_model_proj = per_layer_model_proj,</div>
+<div class="line"><span class="lineno">  338</span>        .per_layer_proj_norm = per_layer_proj_norm,</div>
+<div class="line"><span class="lineno">  339</span>        .num_layers = num_layers,</div>
+<div class="line"><span class="lineno">  340</span>        .embed_dim = embed_dim,</div>
+<div class="line"><span class="lineno">  341</span>        .per_layer_dim = per_layer_dim,</div>
+<div class="line"><span class="lineno">  342</span>        .vocab_size = <a class="code hl_variable" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a>,</div>
+<div class="line"><span class="lineno">  343</span>        .eps = eps,</div>
+<div class="line"><span class="lineno">  344</span>    };</div>
+<div class="line"><span class="lineno">  345</span>    <a class="code hl_function" href="gemma4__per__layer__embed_8c.html#a3bd934b2994fd4fd15d2819330100b04">ck_gemma4_prepare_parallel</a>(tokens, <a class="code hl_function" href="gemma4__per__layer__embed_8c.html#aa2ceae6e66aad8127a5f680b2bf70fd1">ck_gemma4_prepare_bf16_range</a>, &amp;args);</div>
+<div class="line"><span class="lineno">  346</span>}</div>
+<div class="ttc" id="agemma4__per__layer__embed_8c_html_a0f2251e860e038855b37b4f6cb135cce"><div class="ttname"><a href="gemma4__per__layer__embed_8c.html#a0f2251e860e038855b37b4f6cb135cce">CK_GEMMA4_MAX_EMBED_DIM</a></div><div class="ttdeci">#define CK_GEMMA4_MAX_EMBED_DIM</div><div class="ttdef"><b>Definition</b> <a href="gemma4__per__layer__embed_8c_source.html#l00029">gemma4_per_layer_embed.c:29</a></div></div>
+<div class="ttc" id="agemma4__per__layer__embed_8c_html_a3bd934b2994fd4fd15d2819330100b04"><div class="ttname"><a href="gemma4__per__layer__embed_8c.html#a3bd934b2994fd4fd15d2819330100b04">ck_gemma4_prepare_parallel</a></div><div class="ttdeci">static void ck_gemma4_prepare_parallel(int tokens, ck_range_fn_t fn, ck_gemma4_prepare_args_t *args)</div><div class="ttdef"><b>Definition</b> <a href="gemma4__per__layer__embed_8c_source.html#l00261">gemma4_per_layer_embed.c:261</a></div></div>
+<div class="ttc" id="agemma4__per__layer__embed_8c_html_aa2ceae6e66aad8127a5f680b2bf70fd1"><div class="ttname"><a href="gemma4__per__layer__embed_8c.html#aa2ceae6e66aad8127a5f680b2bf70fd1">ck_gemma4_prepare_bf16_range</a></div><div class="ttdeci">static void ck_gemma4_prepare_bf16_range(int begin, int end, void *opaque)</div><div class="ttdef"><b>Definition</b> <a href="gemma4__per__layer__embed_8c_source.html#l00210">gemma4_per_layer_embed.c:210</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="gemma4__per__layer__embed_8c_source.html#l00022">CK_GEMMA4_MAX_EMBED_DIM</a>, <a class="el" href="gemma4__per__layer__embed_8c_source.html#l00203">ck_gemma4_prepare_bf16_range()</a>, <a class="el" href="gemma4__per__layer__embed_8c_source.html#l00254">ck_gemma4_prepare_parallel()</a>, <a class="el" href="ckernel__quant_8h_source.html#l00175">QK_K</a>, and <a class="el" href="true__bpe_8h_source.html#l00197">vocab_size</a>.</p>
+<p class="reference">References <a class="el" href="gemma4__per__layer__embed_8c_source.html#l00029">CK_GEMMA4_MAX_EMBED_DIM</a>, <a class="el" href="gemma4__per__layer__embed_8c_source.html#l00210">ck_gemma4_prepare_bf16_range()</a>, <a class="el" href="gemma4__per__layer__embed_8c_source.html#l00261">ck_gemma4_prepare_parallel()</a>, <a class="el" href="ckernel__quant_8h_source.html#l00175">QK_K</a>, and <a class="el" href="true__bpe_8h_source.html#l00197">vocab_size</a>.</p>
 
 </div>
 </div>
@@ -32263,33 +32295,33 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="gemma4__per__layer__embed_8c_source.html#l00265">265</a> of file <a class="el" href="gemma4__per__layer__embed_8c_source.html">gemma4_per_layer_embed.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  277</span>{</div>
-<div class="line"><span class="lineno">  278</span>    <span class="keywordflow">if</span> (!per_layer_input || !hidden || !token_ids || !per_layer_token_emb ||</div>
-<div class="line"><span class="lineno">  279</span>        !per_layer_model_proj || !per_layer_proj_norm || tokens &lt;= 0 ||</div>
-<div class="line"><span class="lineno">  280</span>        num_layers &lt;= 0 || embed_dim &lt;= 0 || embed_dim &gt; <a class="code hl_define" href="gemma4__per__layer__embed_8c.html#a0f2251e860e038855b37b4f6cb135cce">CK_GEMMA4_MAX_EMBED_DIM</a> ||</div>
-<div class="line"><span class="lineno">  281</span>        per_layer_dim != <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a> || <a class="code hl_variable" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a> &lt;= 0) {</div>
-<div class="line"><span class="lineno">  282</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  283</span>    }</div>
-<div class="line"><span class="lineno">  284</span> </div>
-<div class="line"><span class="lineno">  285</span>    ck_gemma4_prepare_args_t args = {</div>
-<div class="line"><span class="lineno">  286</span>        .per_layer_input = per_layer_input,</div>
-<div class="line"><span class="lineno">  287</span>        .hidden = hidden,</div>
-<div class="line"><span class="lineno">  288</span>        .token_ids = token_ids,</div>
-<div class="line"><span class="lineno">  289</span>        .per_layer_token_emb = per_layer_token_emb,</div>
-<div class="line"><span class="lineno">  290</span>        .per_layer_model_proj = per_layer_model_proj,</div>
-<div class="line"><span class="lineno">  291</span>        .per_layer_proj_norm = per_layer_proj_norm,</div>
-<div class="line"><span class="lineno">  292</span>        .num_layers = num_layers,</div>
-<div class="line"><span class="lineno">  293</span>        .embed_dim = embed_dim,</div>
-<div class="line"><span class="lineno">  294</span>        .per_layer_dim = per_layer_dim,</div>
-<div class="line"><span class="lineno">  295</span>        .vocab_size = <a class="code hl_variable" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a>,</div>
-<div class="line"><span class="lineno">  296</span>        .eps = eps,</div>
-<div class="line"><span class="lineno">  297</span>    };</div>
-<div class="line"><span class="lineno">  298</span>    <a class="code hl_function" href="gemma4__per__layer__embed_8c.html#a3bd934b2994fd4fd15d2819330100b04">ck_gemma4_prepare_parallel</a>(tokens, <a class="code hl_function" href="gemma4__per__layer__embed_8c.html#ac7a692b609a8048ad70863e7aec40ac2">ck_gemma4_prepare_q5_range</a>, &amp;args);</div>
-<div class="line"><span class="lineno">  299</span>}</div>
-<div class="ttc" id="agemma4__per__layer__embed_8c_html_ac7a692b609a8048ad70863e7aec40ac2"><div class="ttname"><a href="gemma4__per__layer__embed_8c.html#ac7a692b609a8048ad70863e7aec40ac2">ck_gemma4_prepare_q5_range</a></div><div class="ttdeci">static void ck_gemma4_prepare_q5_range(int begin, int end, void *opaque)</div><div class="ttdef"><b>Definition</b> <a href="gemma4__per__layer__embed_8c_source.html#l00151">gemma4_per_layer_embed.c:151</a></div></div>
+<p class="definition">Definition at line <a class="el" href="gemma4__per__layer__embed_8c_source.html#l00272">272</a> of file <a class="el" href="gemma4__per__layer__embed_8c_source.html">gemma4_per_layer_embed.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  284</span>{</div>
+<div class="line"><span class="lineno">  285</span>    <span class="keywordflow">if</span> (!per_layer_input || !hidden || !token_ids || !per_layer_token_emb ||</div>
+<div class="line"><span class="lineno">  286</span>        !per_layer_model_proj || !per_layer_proj_norm || tokens &lt;= 0 ||</div>
+<div class="line"><span class="lineno">  287</span>        num_layers &lt;= 0 || embed_dim &lt;= 0 || embed_dim &gt; <a class="code hl_define" href="gemma4__per__layer__embed_8c.html#a0f2251e860e038855b37b4f6cb135cce">CK_GEMMA4_MAX_EMBED_DIM</a> ||</div>
+<div class="line"><span class="lineno">  288</span>        per_layer_dim != <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a> || <a class="code hl_variable" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a> &lt;= 0) {</div>
+<div class="line"><span class="lineno">  289</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  290</span>    }</div>
+<div class="line"><span class="lineno">  291</span> </div>
+<div class="line"><span class="lineno">  292</span>    ck_gemma4_prepare_args_t args = {</div>
+<div class="line"><span class="lineno">  293</span>        .per_layer_input = per_layer_input,</div>
+<div class="line"><span class="lineno">  294</span>        .hidden = hidden,</div>
+<div class="line"><span class="lineno">  295</span>        .token_ids = token_ids,</div>
+<div class="line"><span class="lineno">  296</span>        .per_layer_token_emb = per_layer_token_emb,</div>
+<div class="line"><span class="lineno">  297</span>        .per_layer_model_proj = per_layer_model_proj,</div>
+<div class="line"><span class="lineno">  298</span>        .per_layer_proj_norm = per_layer_proj_norm,</div>
+<div class="line"><span class="lineno">  299</span>        .num_layers = num_layers,</div>
+<div class="line"><span class="lineno">  300</span>        .embed_dim = embed_dim,</div>
+<div class="line"><span class="lineno">  301</span>        .per_layer_dim = per_layer_dim,</div>
+<div class="line"><span class="lineno">  302</span>        .vocab_size = <a class="code hl_variable" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a>,</div>
+<div class="line"><span class="lineno">  303</span>        .eps = eps,</div>
+<div class="line"><span class="lineno">  304</span>    };</div>
+<div class="line"><span class="lineno">  305</span>    <a class="code hl_function" href="gemma4__per__layer__embed_8c.html#a3bd934b2994fd4fd15d2819330100b04">ck_gemma4_prepare_parallel</a>(tokens, <a class="code hl_function" href="gemma4__per__layer__embed_8c.html#ac7a692b609a8048ad70863e7aec40ac2">ck_gemma4_prepare_q5_range</a>, &amp;args);</div>
+<div class="line"><span class="lineno">  306</span>}</div>
+<div class="ttc" id="agemma4__per__layer__embed_8c_html_ac7a692b609a8048ad70863e7aec40ac2"><div class="ttname"><a href="gemma4__per__layer__embed_8c.html#ac7a692b609a8048ad70863e7aec40ac2">ck_gemma4_prepare_q5_range</a></div><div class="ttdeci">static void ck_gemma4_prepare_q5_range(int begin, int end, void *opaque)</div><div class="ttdef"><b>Definition</b> <a href="gemma4__per__layer__embed_8c_source.html#l00158">gemma4_per_layer_embed.c:158</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="gemma4__per__layer__embed_8c_source.html#l00022">CK_GEMMA4_MAX_EMBED_DIM</a>, <a class="el" href="gemma4__per__layer__embed_8c_source.html#l00254">ck_gemma4_prepare_parallel()</a>, <a class="el" href="gemma4__per__layer__embed_8c_source.html#l00151">ck_gemma4_prepare_q5_range()</a>, <a class="el" href="ckernel__quant_8h_source.html#l00175">QK_K</a>, and <a class="el" href="true__bpe_8h_source.html#l00197">vocab_size</a>.</p>
+<p class="reference">References <a class="el" href="gemma4__per__layer__embed_8c_source.html#l00029">CK_GEMMA4_MAX_EMBED_DIM</a>, <a class="el" href="gemma4__per__layer__embed_8c_source.html#l00261">ck_gemma4_prepare_parallel()</a>, <a class="el" href="gemma4__per__layer__embed_8c_source.html#l00158">ck_gemma4_prepare_q5_range()</a>, <a class="el" href="ckernel__quant_8h_source.html#l00175">QK_K</a>, and <a class="el" href="true__bpe_8h_source.html#l00197">vocab_size</a>.</p>
 
 </div>
 </div>

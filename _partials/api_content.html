@@ -1,6 +1,6 @@
 
 <details open>
-    <summary>GEMM (Matrix Multiplication) (278)</summary>
+    <summary>GEMM (Matrix Multiplication) (279)</summary>
     <div class="accordion-content">
 
 
@@ -460,6 +460,16 @@
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void ck_gemma4_embed_range(int begin, int end, void * opaque)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_gemma4_embed_row_group</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int ck_gemma4_embed_row_group(const ck_gemma4_embed_args_t * args, int token, int tokens)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 
@@ -2679,7 +2689,7 @@
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">gemma4_per_layer_embed_forward</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void gemma4_per_layer_embed_forward(float * hidden, const float * per_layer_input, const float * inp_gate, const float * proj, const float * post_norm, const float * out_scale, int tokens, int layer, int num_layers, int embed_dim, int per_layer_dim, float eps)</pre>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void gemma4_per_layer_embed_forward(float * hidden, const float * per_layer_input, const float * inp_gate, const float * proj, const float * post_norm, const float * out_scale, int tokens, int layer, int num_layers, int embed_dim, int per_layer_dim, float eps, const int * segment_lengths, int num_segments, int singleton_tail)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Forward pass computation</p>
         </div>
 

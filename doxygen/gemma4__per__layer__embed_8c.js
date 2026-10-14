@@ -6,6 +6,7 @@ var gemma4__per__layer__embed_8c =
     [ "ck_gemma4_bf16_dot", "gemma4__per__layer__embed_8c.html#a97d42409795897cef50e90f5fadb95e2", null ],
     [ "ck_gemma4_dequant_q5_k_block", "gemma4__per__layer__embed_8c.html#a2aa87174026cb74a26c93cba1b96ba10", null ],
     [ "ck_gemma4_embed_range", "gemma4__per__layer__embed_8c.html#a44ec1cbc9e8de0e2cad3dc725c59fdd9", null ],
+    [ "ck_gemma4_embed_row_group", "gemma4__per__layer__embed_8c.html#a30422424fed31c45296604972fcf124e", null ],
     [ "ck_gemma4_gelu", "gemma4__per__layer__embed_8c.html#a8df789062851b1738820b4eeecd5fded", null ],
     [ "ck_gemma4_prepare_bf16_range", "gemma4__per__layer__embed_8c.html#aa2ceae6e66aad8127a5f680b2bf70fd1", null ],
     [ "ck_gemma4_prepare_parallel", "gemma4__per__layer__embed_8c.html#a3bd934b2994fd4fd15d2819330100b04", null ],
@@ -13,8 +14,10 @@ var gemma4__per__layer__embed_8c =
     [ "ck_gemma4_q5_k_value", "gemma4__per__layer__embed_8c.html#ae099e36bff3b434c5da1eb299ef80646", null ],
     [ "ck_gemma4_rmsnorm_tmp", "gemma4__per__layer__embed_8c.html#ae09646e3100c56024ea482a3125a6fc6", null ],
     [ "ck_gemma4_unpack_q5_k_scales", "gemma4__per__layer__embed_8c.html#a562d10af21415229ce39871223295450", null ],
+    [ "gemm_nt_f32_llama_production_output_range", "gemma4__per__layer__embed_8c.html#a21bf1789acc5556879531b42b0bd40cd", null ],
     [ "gemma4_final_logit_softcap_forward", "gemma4__per__layer__embed_8c.html#a9a92ee48822b984fe47eef09eec7c2b3", null ],
-    [ "gemma4_per_layer_embed_forward", "gemma4__per__layer__embed_8c.html#a29669485bedcbde44e295c26106e4777", null ],
+    [ "gemma4_per_layer_embed_forward", "gemma4__per__layer__embed_8c.html#a4eead89f0a06792f12d01d53959144c6", null ],
     [ "gemma4_per_layer_prepare_bf16_forward", "gemma4__per__layer__embed_8c.html#a99f72efdd7f3e0a2d23047c6f9905a90", null ],
-    [ "gemma4_per_layer_prepare_forward", "gemma4__per__layer__embed_8c.html#a0020e0bc4bd80b2f2499bb960a5b4365", null ]
+    [ "gemma4_per_layer_prepare_forward", "gemma4__per__layer__embed_8c.html#a0020e0bc4bd80b2f2499bb960a5b4365", null ],
+    [ "rmsnorm_forward_llama_production", "gemma4__per__layer__embed_8c.html#a21313e5d9f149097d8059085232aabe9", null ]
 ];
