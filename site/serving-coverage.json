@@ -1,12 +1,12 @@
 {
   "chat_scope_counts": {
     "component": 46,
-    "linked_chat_declaration": 5,
-    "text_decoder_candidate": 13,
+    "linked_chat_declaration": 6,
+    "text_decoder_candidate": 12,
     "unassessed": 4
   },
   "circuit_count": 68,
-  "circuit_linked_count": 5,
+  "circuit_linked_count": 6,
   "rows": [
     {
       "artifact": {
@@ -603,11 +603,11 @@
         "revision": null,
         "tokenizer_sha256": null
       },
-      "chat_scope": "text_decoder_candidate",
-      "chat_scope_reason": "text decoder and token/logit contracts; serving unlinked",
+      "chat_scope": "linked_chat_declaration",
+      "chat_scope_reason": "circuit references a resolved serving profile",
       "circuit": "instella_moe",
       "circuit_path": "version/v8/circuits/instella_moe.json",
-      "circuit_sha256": "7a69f0bfbc44596f532f64ed79eb120e98d7b45c22550543534e57a60fa88c08",
+      "circuit_sha256": "e78ceeeac4d081213cb12f383bb89e17bb40adaf487b6e4d1811a9bda1f94805",
       "evidence": {
         "cancellation_recovery": "not_assessed",
         "exact_token_ids": "not_assessed",
@@ -619,18 +619,26 @@
         "tool_round_trip": "not_assessed"
       },
       "family": "instella_moe",
-      "input_modalities": null,
-      "output_protocol": null,
-      "profile_id": null,
-      "profile_ref": null,
-      "profile_sha256": null,
-      "publisher_template": null,
+      "input_modalities": [
+        "text"
+      ],
+      "output_protocol": "none",
+      "profile_id": "publisher-chat-v1",
+      "profile_ref": "serving_profiles/publisher_chat_v1.json",
+      "profile_sha256": "200fc72933f240c3cd58f936e5d793c87020828561fd0a8669bb8bbc520eb092",
+      "publisher_template": {
+        "source": "publisher",
+        "variant": "default"
+      },
       "reasoning_protocol": null,
-      "renderer": null,
-      "serving_declaration": "missing",
+      "renderer": "jinja-chat-v1",
+      "serving_declaration": "circuit_linked",
       "stop_policy": null,
-      "tool_template": null,
-      "variant": null
+      "tool_template": {
+        "source": "publisher",
+        "variant": "default"
+      },
+      "variant": "publisher"
     },
     {
       "artifact": {
