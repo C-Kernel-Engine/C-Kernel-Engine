@@ -1,12 +1,12 @@
 {
   "chat_scope_counts": {
     "component": 46,
-    "linked_chat_declaration": 4,
-    "text_decoder_candidate": 14,
+    "linked_chat_declaration": 5,
+    "text_decoder_candidate": 13,
     "unassessed": 4
   },
   "circuit_count": 68,
-  "circuit_linked_count": 4,
+  "circuit_linked_count": 5,
   "rows": [
     {
       "artifact": {
@@ -2123,11 +2123,11 @@
         "revision": null,
         "tokenizer_sha256": null
       },
-      "chat_scope": "text_decoder_candidate",
-      "chat_scope_reason": "text decoder and token/logit contracts; serving unlinked",
+      "chat_scope": "linked_chat_declaration",
+      "chat_scope_reason": "circuit references a resolved serving profile",
       "circuit": "muse_glimmer_text",
       "circuit_path": "version/v8/circuits/muse_glimmer_text.json",
-      "circuit_sha256": "f6b0a538e736cdc0263f7bad125fd5c0d78a8d3af88a765f9f5ef3a99474909c",
+      "circuit_sha256": "b9a8b3100faf31dbd00802b262c9e14a95f203d21260c1a23fe1b381d0bd72d6",
       "evidence": {
         "cancellation_recovery": "not_assessed",
         "exact_token_ids": "not_assessed",
@@ -2139,18 +2139,26 @@
         "tool_round_trip": "not_assessed"
       },
       "family": "muse_glimmer",
-      "input_modalities": null,
-      "output_protocol": null,
-      "profile_id": null,
-      "profile_ref": null,
-      "profile_sha256": null,
-      "publisher_template": null,
+      "input_modalities": [
+        "text"
+      ],
+      "output_protocol": "muse_atem_v1",
+      "profile_id": "muse-glimmer-v1",
+      "profile_ref": "serving_profiles/muse_glimmer_v1.json",
+      "profile_sha256": "bc5d7a8845c7731464c7633b6fff0e859b3b48672e04bda789b28b70078d850c",
+      "publisher_template": {
+        "source": "publisher",
+        "variant": "default"
+      },
       "reasoning_protocol": null,
-      "renderer": null,
-      "serving_declaration": "missing",
+      "renderer": "jinja-chat-v1",
+      "serving_declaration": "circuit_linked",
       "stop_policy": null,
-      "tool_template": null,
-      "variant": null
+      "tool_template": {
+        "source": "publisher",
+        "variant": "default"
+      },
+      "variant": "publisher"
     },
     {
       "artifact": {

@@ -132,6 +132,8 @@
         <tr><td>Short real-weight prefill and cached decode</td><td class="pass">Passed: 384 / 384 finite, bit-exact rows</td></tr>
         <tr><td>Decode stride beyond live KV length; workspace capacity and overflow</td><td class="pass">Passed</td></tr>
         <tr><td>Ordinary nightly compiler and portable BF16 kernel contracts</td><td class="pass">Passed; oneDNN attention joins this target when selected by the engine build</td></tr>
+        <tr><td>Circuit-linked publisher template and ATEM output protocol</td><td class="pass">Declared; pinned prompt bytes/token IDs and scripted HTTP parsing pass</td></tr>
+        <tr><td>Current-main resolved real-weight serving bundle and harness task</td><td class="open">Not tested; the retained September build predates the current chat-contract snapshot and requires rebuilding</td></tr>
         <tr><td>Repeated-call library allocation instrumentation</td><td class="open">Not tested</td></tr>
         <tr><td>2,047 / 2,048 / 2,049-token window boundaries</td><td class="open">Not tested</td></tr>
         <tr><td>4K through 128K context</td><td class="blocked">Blocked by eager workspace budget</td></tr>
@@ -140,6 +142,24 @@
         <tr><td>Vision and image preprocessing</td><td class="open">Deferred</td></tr>
       </tbody>
     </table></div>
+  </section>
+
+  <section class="muse-section" id="serving">
+    <h2>Serving contract</h2>
+    <p>
+      The <code>muse_glimmer_text</code> circuit now references <code>muse-glimmer-v1</code>. Bundle construction
+      selects the imported publisher Jinja and declares the ATEM output parser. The server separates
+      <code>to=self</code> reasoning, <code>to=user</code> answers, and recipient-scoped tool calls. Scripted
+      streaming and non-streaming tests cover tool-result continuation, malformed calls, and follow-up recovery.
+      The stop policy uses <code>&lt;|eot|&gt;</code> and <code>&lt;|end_of_text|&gt;</code>;
+      <code>&lt;|eom|&gt;</code> remains a message boundary so later tool calls are not lost.
+    </p>
+    <p>
+      These protocol tests do not certify Muse-generated tool use. The retained real-weight runtime predates the
+      current circuit chat-contract metadata; its compiled snapshot cannot be promoted by a serving-only update.
+      Rebuild a separate bundle from current sources, then check loaded identities, ordinary chat, an actual tool
+      round trip, cancellation and recovery, and a completed disposable harness task.
+    </p>
   </section>
 
   <section class="muse-section" id="reproduce">
