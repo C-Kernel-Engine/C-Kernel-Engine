@@ -48,6 +48,7 @@ var true__bpe_8c =
     [ "is_letter", "true__bpe_8c.html#a2661d3a5aec088c75126c08a32e355d1", null ],
     [ "is_whitespace", "true__bpe_8c.html#a8f8799a3df3ab598e163ab91b50423c6", null ],
     [ "is_word_prefix_char", "true__bpe_8c.html#ab5b6476ecc972bb40a826d6066a98817", null ],
+    [ "isolated_contraction_len", "true__bpe_8c.html#ab30090203bf142f4e80df675529ebcb7", null ],
     [ "lookup_token_exact", "true__bpe_8c.html#ae277dc9b5acb2244cae7f956ac418f5f", null ],
     [ "match_special_token", "true__bpe_8c.html#aa55a40014a7c834ab58b172d1a1b62f2", null ],
     [ "merge_hash", "true__bpe_8c.html#aaaa185f311d9d89550cb0b8223c5dcc3", null ],
