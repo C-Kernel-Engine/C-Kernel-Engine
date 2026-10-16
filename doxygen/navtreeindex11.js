@@ -1,5 +1,9 @@
 var NAVTREEINDEX11 =
 {
+"ckernel__section__layout_8h.html#aff5ee31d19be80e3bc7d00f0506f8efeaa4b32bb297017e550a88ca82c0346b02":[2,0,0,46,19,6],
+"ckernel__section__layout_8h.html#aff5ee31d19be80e3bc7d00f0506f8efeabdee28d29574a516859ce8a97cdbe959":[2,0,0,46,19,3],
+"ckernel__section__layout_8h.html#aff5ee31d19be80e3bc7d00f0506f8efeac49b63f12bae2e1fb3db203ec6a60fca":[2,0,0,46,19,5],
+"ckernel__section__layout_8h.html#aff5ee31d19be80e3bc7d00f0506f8efeac701cd87ffd41b651fdb39fd4d9231db":[2,0,0,46,19,0],
 "ckernel__section__layout_8h_source.html":[2,0,0,46],
 "ckernel__strict_8c.html":[2,0,1,25],
 "ckernel__strict_8c.html#a0878a8fbdd6fbda1d6e6efcd6682b8ae":[2,0,1,25,8],
@@ -245,9 +249,5 @@ var NAVTREEINDEX11 =
 "functions_vars_c.html":[1,2,1,2],
 "functions_vars_d.html":[1,2,1,3],
 "functions_vars_e.html":[1,2,1,4],
-"functions_vars_f.html":[1,2,1,5],
-"functions_vars_g.html":[1,2,1,6],
-"functions_vars_h.html":[1,2,1,7],
-"functions_vars_i.html":[1,2,1,8],
-"functions_vars_k.html":[1,2,1,9]
+"functions_vars_f.html":[1,2,1,5]
 };

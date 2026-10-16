@@ -53,6 +53,7 @@ var attention__kernels_8c =
     [ "attention_forward_chunk_head_major_gqa_flash_gemma4", "attention__kernels_8c.html#a55d297a433dfc0178b9df84151a1c6b0", null ],
     [ "attention_forward_decode_head_major_gqa_bf16cache_pytorch_contract", "attention__kernels_8c.html#ab0a9c9cc11cdf029cbee5fefecd77ae1", null ],
     [ "attention_forward_decode_head_major_gqa_f16cache_gemma4_contract", "attention__kernels_8c.html#a41299a27b33a8d63c93f60eb2b58df8f", null ],
+    [ "attention_forward_decode_head_major_gqa_f16cache_regular_noscale", "attention__kernels_8c.html#a209b08bab8aebb4d9b36535419f78ceb", null ],
     [ "attention_forward_decode_head_major_gqa_f16cache_sliding_gemma4_contract", "attention__kernels_8c.html#aca471c5e4e847c7ffe48772c308e9fba", null ],
     [ "attention_forward_decode_head_major_gqa_flash", "attention__kernels_8c.html#a84803f8c5509c325dd6b9feec50a0493", null ],
     [ "attention_forward_decode_head_major_gqa_flash_f16cache", "attention__kernels_8c.html#a075a6f808200a567e709c87acc5602dd", null ],

@@ -1,5 +1,6 @@
 var NAVTREEINDEX2 =
 {
+"axpy__kernels_8c.html#a19cf8a76d9f3a4dd99221d7ee3025e9b":[2,0,1,1,31,23],
 "axpy__kernels_8c.html#a1a115d05ac67b4d285299c09dc846fe6":[2,0,1,1,31,7],
 "axpy__kernels_8c.html#a1c30e36b4ad231ae8958f26cb73eb395":[2,0,1,1,31,8],
 "axpy__kernels_8c.html#a1dacada9ab42215f00fdd77696883afb":[2,0,1,1,31,11],
@@ -248,6 +249,5 @@ var NAVTREEINDEX2 =
 "ck__cli__v6_86_8c.html#aeec52a356d39d8866deebb08d75aa708":[2,0,1,7,2,28],
 "ck__cli__v6_86_8c.html#af2a870d48bb374653be32c8a779b3139":[2,0,1,7,2,31],
 "ck__cli__v6_86_8c.html#af40b97e43c83401d927b8c8d34546ef3":[2,0,1,7,2,6],
-"ck__cli__v6_86_8c.html#af963da9602f7a5dd1aeb7cdde2c6dce9":[2,0,1,7,2,49],
-"ck__cli__v6_86_8c.html#afc72cc80be78368af715686669663668":[2,0,1,7,2,16]
+"ck__cli__v6_86_8c.html#af963da9602f7a5dd1aeb7cdde2c6dce9":[2,0,1,7,2,49]
 };

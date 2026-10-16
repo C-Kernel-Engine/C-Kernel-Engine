@@ -1,5 +1,9 @@
 var NAVTREEINDEX20 =
 {
+"structCKLayerOffsets.html#a10218069303bec4b99fa47a715b31918":[1,0,41,22],
+"structCKLayerOffsets.html#a13f7bd9b925dd8d55fb6cfa885e8b7d7":[1,0,41,6],
+"structCKLayerOffsets.html#a207b51ce0a5d8afb92fbb3f810ca4574":[1,0,41,8],
+"structCKLayerOffsets.html#a21dedb037033c59edb5c355268bbbad5":[1,0,41,37],
 "structCKLayerOffsets.html#a253ebe103830f66006e992c1942359c6":[1,0,41,30],
 "structCKLayerOffsets.html#a4394bd2a46480cc9ad149128ba576354":[1,0,41,9],
 "structCKLayerOffsets.html#a4b9708d80f644d75e1fcbb65b08263fd":[1,0,41,32],
@@ -245,9 +249,5 @@ var NAVTREEINDEX20 =
 "structCKSectionConfig.html#a754d226bbafb22421965678394c0920c":[1,0,59,9],
 "structCKSectionConfig.html#a817bec49fb3f194acfc02ae60597121c":[1,0,59,10],
 "structCKSectionConfig.html#a96ef28b42bf7654f3eeb5167950f31e9":[1,0,59,11],
-"structCKSectionConfig.html#ac248115abce1c49956194ac4c4ad4be4":[1,0,59,1],
-"structCKSectionConfig.html#acc666f5160d9139f4e59567c7eb0ad83":[1,0,59,3],
-"structCKSectionConfig.html#adb98840ee192100731d7c970794be581":[1,0,59,0],
-"structCKSectionConfig.html#aeb21ad93633c6b7fba562f4882706e22":[1,0,59,14],
-"structCKSessionConfigV8.html":[1,0,60]
+"structCKSectionConfig.html#ac248115abce1c49956194ac4c4ad4be4":[1,0,59,1]
 };

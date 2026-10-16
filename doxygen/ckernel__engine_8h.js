@@ -13,7 +13,9 @@ var ckernel__engine_8h =
       [ "CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE", "ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea85e68fd51ad8a3b0ddaff562ab9080f7", null ],
       [ "CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE", "ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010eacd061ae5c8ef1eadf0f2bf97ec2ca433", null ],
       [ "CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64", "ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea9de5268ef35fefa367f6c8219143d2bb", null ],
-      [ "CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA", "ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea115dd6cf8ca1bbc5a7689a88c5d28463", null ]
+      [ "CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA", "ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea115dd6cf8ca1bbc5a7689a88c5d28463", null ],
+      [ "CK_ATTN_REDUCTION_F16_REGULAR_NOSCALE", "ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea78eef0509b737da7c60e385ff47b9858", null ],
+      [ "CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64_REGULAR_TAIL_NOSCALE", "ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea293c836a8b2382e6539db16341508435", null ]
     ] ],
     [ "ck_attention_status_t", "ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67", [
       [ "CK_ATTENTION_STATUS_OK", "ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67abea27a79c4c94ac03dfe2ab71fb2cdf1", null ],
@@ -76,6 +78,7 @@ var ckernel__engine_8h =
     [ "attention_forward_chunk_head_major_gqa_flash_gemma4", "ckernel__engine_8h.html#a55d297a433dfc0178b9df84151a1c6b0", null ],
     [ "attention_forward_decode_head_major_gqa_bf16cache_pytorch_contract", "ckernel__engine_8h.html#ab0a9c9cc11cdf029cbee5fefecd77ae1", null ],
     [ "attention_forward_decode_head_major_gqa_f16cache_gemma4_contract", "ckernel__engine_8h.html#a41299a27b33a8d63c93f60eb2b58df8f", null ],
+    [ "attention_forward_decode_head_major_gqa_f16cache_regular_noscale", "ckernel__engine_8h.html#a209b08bab8aebb4d9b36535419f78ceb", null ],
     [ "attention_forward_decode_head_major_gqa_f16cache_sliding_gemma4_contract", "ckernel__engine_8h.html#aca471c5e4e847c7ffe48772c308e9fba", null ],
     [ "attention_forward_decode_head_major_gqa_flash", "ckernel__engine_8h.html#a84803f8c5509c325dd6b9feec50a0493", null ],
     [ "attention_forward_decode_head_major_gqa_flash_f16cache", "ckernel__engine_8h.html#a075a6f808200a567e709c87acc5602dd", null ],
