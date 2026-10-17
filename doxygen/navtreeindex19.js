@@ -1,5 +1,7 @@
 var NAVTREEINDEX19 =
 {
+"structCKKokoroShapeLimitsV8.html#abaa10c06b8417fdd2069899515716ec9":[1,0,34,4],
+"structCKKokoroShapeLimitsV8.html#ac2e4ad7617e9ec70d8b95415128d9f30":[1,0,34,5],
 "structCKKokoroShapeLimitsV8.html#aca56d1fb4b293fe2b813a344a1bfdf28":[1,0,34,2],
 "structCKKokoroShapeLimitsV8.html#ae1b953ec6627d0a84792569560fadddc":[1,0,34,10],
 "structCKKokoroShapeLimitsV8.html#af034f7415248b3715e1940e3430aa9cb":[1,0,34,9],
@@ -247,7 +249,5 @@ var NAVTREEINDEX19 =
 "structCKLayerLayout.html#aa04c864979d24512fe185bd224f2e851":[1,0,40,9],
 "structCKLayerLayout.html#aaece9ea1e0a761b00bdce132c24aa6a0":[1,0,40,0],
 "structCKLayerLayout.html#ac37e13c1afa44111c2b2f1b38bdab7de":[1,0,40,6],
-"structCKLayerLayout.html#accc0cc61e693a25dfa5e140f91534dc6":[1,0,40,4],
-"structCKLayerLayout.html#ace90b671a13ec6e8cb08fac170a25038":[1,0,40,1],
-"structCKLayerOffsets.html":[1,0,41]
+"structCKLayerLayout.html#accc0cc61e693a25dfa5e140f91534dc6":[1,0,40,4]
 };

@@ -1,5 +1,7 @@
 var NAVTREEINDEX22 =
 {
+"structPCIeDevice.html#afc1f0a1bb21313d965608d9dac1f2ab4":[1,0,81,8],
+"structPCIeDevice.html#afc8e2ec8cb06bb20fd879836155ad92a":[1,0,81,0],
 "structPCIeTopology.html":[1,0,82],
 "structPCIeTopology.html#a1bee054acd7b3485af38b94205bfd15a":[1,0,82,3],
 "structPCIeTopology.html#a609de1883e5729bd1a9e658ef6f062fe":[1,0,82,1],
@@ -247,7 +249,5 @@ var NAVTREEINDEX22 =
 "system__topology_8h.html#ae2a6ad58442a4e6de7cdfa4aeea1ec02":[2,0,0,52,45],
 "system__topology_8h.html#ae541edad293faa847014c35c8e6411a5":[2,0,0,52,33],
 "system__topology_8h.html#aeb96e2b430111e055cfe76293dbf2258":[2,0,0,52,20],
-"system__topology_8h.html#af347a49445c57e42f3d5edba2039591e":[2,0,0,52,26],
-"system__topology_8h.html#afbc559e029cc2c0fddd0a1dac9b1be20":[2,0,0,52,37],
-"system__topology_8h.html#afd3ae767003bf9070768199caa3f7ee1":[2,0,0,52,31]
+"system__topology_8h.html#af347a49445c57e42f3d5edba2039591e":[2,0,0,52,26]
 };
