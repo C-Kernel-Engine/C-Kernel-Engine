@@ -1,5 +1,6 @@
 var NAVTREEINDEX15 =
 {
+"globals_f.html":[2,1,0,6],
 "globals_func.html":[2,1,1,0],
 "globals_func.html":[2,1,1],
 "globals_func_a.html":[2,1,1,1],
@@ -248,6 +249,5 @@ var NAVTREEINDEX15 =
 "mega__fused__attention__avx_8c.html#a0dfb0d638f2eaaba130772508d90f5e8":[2,0,1,1,0,3,10],
 "mega__fused__attention__avx_8c.html#a0f1bc2213a8b5b37144943e6da1eb48a":[2,0,1,1,0,3,1],
 "mega__fused__attention__avx_8c.html#a28f0a742d715a18075ec198b4bc1a725":[2,0,1,1,0,3,13],
-"mega__fused__attention__avx_8c.html#a460bd562be1b122ecd6f7a1ed67278db":[2,0,1,1,0,3,12],
-"mega__fused__attention__avx_8c.html#a481d5a4d4ee37e40f432109b3873bc05":[2,0,1,1,0,3,11]
+"mega__fused__attention__avx_8c.html#a460bd562be1b122ecd6f7a1ed67278db":[2,0,1,1,0,3,12]
 };

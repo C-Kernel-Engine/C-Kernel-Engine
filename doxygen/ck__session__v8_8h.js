@@ -10,7 +10,8 @@ var ck__session__v8_8h =
       [ "CK_SESSION_REQUEST_RAW_PROMPT", "ck__session__v8_8h.html#ab6d219efed8902e9110785e6d9920fcfa6de345e4efea7b9d129744ffb60481f4", null ],
       [ "CK_SESSION_REQUEST_IGNORE_EOS", "ck__session__v8_8h.html#ab6d219efed8902e9110785e6d9920fcfaa347fe050bae06c4265ab683b3b19ca6", null ],
       [ "CK_SESSION_REQUEST_TIMESTAMPS", "ck__session__v8_8h.html#ab6d219efed8902e9110785e6d9920fcfa14f586ed52449d7e703f5d5ed84b9c2b", null ],
-      [ "CK_SESSION_REQUEST_CONTINUE_STATE", "ck__session__v8_8h.html#ab6d219efed8902e9110785e6d9920fcfa11881a1ddb44d8eab6ea353870a77a0b", null ]
+      [ "CK_SESSION_REQUEST_CONTINUE_STATE", "ck__session__v8_8h.html#ab6d219efed8902e9110785e6d9920fcfa11881a1ddb44d8eab6ea353870a77a0b", null ],
+      [ "CK_SESSION_REQUEST_REJECT_PROMPT_TRUNCATION", "ck__session__v8_8h.html#ab6d219efed8902e9110785e6d9920fcfa1973e18af4ff52f5fe4e649ecf48c912", null ]
     ] ],
     [ "CKSessionStatusV8", "ck__session__v8_8h.html#a7b2292e66074bb6a2f4d7b04efd3c603", [
       [ "CK_SESSION_V8_OK", "ck__session__v8_8h.html#a7b2292e66074bb6a2f4d7b04efd3c603a6137a90b7bc764a7b0dd126f83729ee9", null ],
