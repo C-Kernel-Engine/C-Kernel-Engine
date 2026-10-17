@@ -17,7 +17,9 @@ NAMES = ('predictor_style', 'decoder_style', 'predicted_duration',
          'generator_harmonic_gaussian', 'generator_source_samples',
          'decoder_input_1', 'generator_stft_window',
          'generator_source_magnitude', 'generator_source_phase',
-         'decoder_generator_noise_convs_0')
+         'decoder_generator_noise_convs_0',
+         'decoder_generator_noise_res_0',
+         'decoder_generator_stage0_join')
 
 
 def sha256(data):
@@ -46,8 +48,8 @@ def main():
     args.output.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(args.output, **arrays)
     meta = {
-        'schema': 'cke.kokoro.runtime_decoder_hello_8.v5',
-        'scope': 'direct pinned full-model eight-ID decoder, source and first convolution outputs',
+        'schema': 'cke.kokoro.runtime_decoder_hello_8.v6',
+        'scope': 'direct pinned full-model eight-ID decoder, source and first generator join',
         'model_pin': capture['pin']['model']['revision'],
         'code_pin': capture['pin']['reference_code']['kokoro'],
         'asset_sha256': capture['assets'],
