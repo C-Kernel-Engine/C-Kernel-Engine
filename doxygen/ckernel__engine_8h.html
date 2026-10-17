@@ -14828,21 +14828,23 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01367">1367</a> of file <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html">gemm_kernels_q6k_q8k.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 1368</span>{</div>
-<div class="line"><span class="lineno"> 1369</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a>() || <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#aa98a62f017969e334a0d3bbcbf34935d">ck_q6k_q8k_force_ref</a>()) {</div>
-<div class="line"><span class="lineno"> 1370</span>        <span class="keywordflow">return</span> <span class="stringliteral">&quot;q6_k_q8_k_ref&quot;</span>;</div>
-<div class="line"><span class="lineno"> 1371</span>    }</div>
-<div class="line"><span class="lineno"> 1372</span><span class="preprocessor">#if defined(__AVX2__)</span></div>
-<div class="line"><span class="lineno"> 1373</span>    <span class="keywordflow">return</span> <span class="stringliteral">&quot;q6_k_q8_k_avx2&quot;</span>;</div>
-<div class="line"><span class="lineno"> 1374</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
-<div class="line"><span class="lineno"> 1375</span>    <span class="keywordflow">return</span> <span class="stringliteral">&quot;q6_k_q8_k_avx&quot;</span>;</div>
-<div class="line"><span class="lineno"> 1376</span><span class="preprocessor">#elif defined(__SSE4_1__)</span></div>
-<div class="line"><span class="lineno"> 1377</span>    <span class="keywordflow">return</span> <span class="stringliteral">&quot;q6_k_q8_k_sse&quot;</span>;</div>
-<div class="line"><span class="lineno"> 1378</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno"> 1379</span>    <span class="keywordflow">return</span> <span class="stringliteral">&quot;q6_k_q8_k_ref&quot;</span>;</div>
-<div class="line"><span class="lineno"> 1380</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno"> 1381</span>}</div>
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01389">1389</a> of file <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html">gemm_kernels_q6k_q8k.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 1390</span>{</div>
+<div class="line"><span class="lineno"> 1391</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a>() || <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#aa98a62f017969e334a0d3bbcbf34935d">ck_q6k_q8k_force_ref</a>()) {</div>
+<div class="line"><span class="lineno"> 1392</span>        <span class="keywordflow">return</span> <span class="stringliteral">&quot;q6_k_q8_k_ref&quot;</span>;</div>
+<div class="line"><span class="lineno"> 1393</span>    }</div>
+<div class="line"><span class="lineno"> 1394</span><span class="preprocessor">#if defined(__AVX2__)</span></div>
+<div class="line"><span class="lineno"> 1395</span>    <span class="keywordflow">return</span> <span class="stringliteral">&quot;q6_k_q8_k_avx2&quot;</span>;</div>
+<div class="line"><span class="lineno"> 1396</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
+<div class="line"><span class="lineno"> 1397</span>    <span class="keywordflow">return</span> <span class="stringliteral">&quot;q6_k_q8_k_avx&quot;</span>;</div>
+<div class="line"><span class="lineno"> 1398</span><span class="preprocessor">#elif defined(__SSE4_1__)</span></div>
+<div class="line"><span class="lineno"> 1399</span>    <span class="keywordflow">return</span> <span class="stringliteral">&quot;q6_k_q8_k_sse&quot;</span>;</div>
+<div class="line"><span class="lineno"> 1400</span><span class="preprocessor">#elif defined(__ARM_NEON) || defined(__aarch64__)</span></div>
+<div class="line"><span class="lineno"> 1401</span>    <span class="keywordflow">return</span> <span class="stringliteral">&quot;q6_k_q8_k_neon&quot;</span>;</div>
+<div class="line"><span class="lineno"> 1402</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno"> 1403</span>    <span class="keywordflow">return</span> <span class="stringliteral">&quot;q6_k_q8_k_ref&quot;</span>;</div>
+<div class="line"><span class="lineno"> 1404</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno"> 1405</span>}</div>
 <div class="ttc" id="agemm__kernels__q6k__q8k_8c_html_aa98a62f017969e334a0d3bbcbf34935d"><div class="ttname"><a href="gemm__kernels__q6k__q8k_8c.html#aa98a62f017969e334a0d3bbcbf34935d">ck_q6k_q8k_force_ref</a></div><div class="ttdeci">static int ck_q6k_q8k_force_ref(void)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q6k__q8k_8c_source.html#l00108">gemm_kernels_q6k_q8k.c:108</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l00108">ck_q6k_q8k_force_ref()</a>, and <a class="el" href="ckernel__strict_8c_source.html#l00043">ck_strict_parity_enabled()</a>.</p>
@@ -15328,7 +15330,7 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="ckernel__strict_8c_source.html#l00022">ck_strict_parity</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="optimizer__kernels_8c_source.html#l00355">adamw_update_f32_impl()</a>, <a class="el" href="attention__kernels_8c_source.html#l09615">attention_forward_decode_head_major_gqa_regular()</a>, <a class="el" href="attention__kernels_8c_source.html#l05446">attention_forward_full_head_major_gqa_exact_strided()</a>, <a class="el" href="attention__kernels_8c_source.html#l05523">attention_forward_full_head_major_gqa_ggml_strided_workspace()</a>, <a class="el" href="attention__kernels_8c_source.html#l04183">attention_forward_head_major_gqa_flash_impl()</a>, <a class="el" href="attention__kernels_8c_source.html#l05182">attention_forward_mixed_visual_chunk_head_major_gqa_flash_strided_gemma4_impl()</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01702">ck_dot_q6_k_q8_k_fast_or_ref()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01004">ck_layer_forward_rmsnorm_swiglu()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01126">ck_layer_forward_rmsnorm_swiglu_ref()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00952">ck_mlp_swiglu_forward()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00978">ck_mlp_swiglu_forward_ref()</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01367">ck_q6_k_q8_k_provider_name()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00314">ck_q8k_activations_enabled()</a>, <a class="el" href="deltanet__kernels_8c_source.html#l01956">gated_deltanet_autoregressive_forward()</a>, <a class="el" href="deltanet__kernels_8c_source.html#l01940">gated_deltanet_impl_name()</a>, <a class="el" href="geglu__kernels_8c_source.html#l00070">geglu_forward_fp32()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00230">gemm_avx512_parallel()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00849">gemm_blocked_serial()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00286">gemm_fine_grained_parallel()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00206">gemm_naive_parallel()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00420">gemm_nn_avx512()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00493">gemm_nn_avx512_probe()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00590">gemm_nn_blocked()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00398">gemm_nn_parallel()</a>, <a class="el" href="gemm__kernels__f16_8c_source.html#l00970">gemm_nt_f16()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00179">gemm_nt_fp32_exact_parallel_dispatch()</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01521">gemm_nt_q6_k_q8_k()</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01767">gemm_nt_q6_k_q8_k_m4_tile()</a>, <a class="el" href="gemm__kernels__q8__0__q8__0__contract_8c_source.html#l00447">gemm_nt_q8_0_q8_0_contract()</a>, <a class="el" href="gemm__kernels__q8__0__q8__0__contract_8c_source.html#l00418">gemm_nt_q8_0_q8_0_contract_m2()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00709">gemm_tn_avx512()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00769">gemm_tn_blocked()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00687">gemm_tn_parallel()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03540">gemv_q4_k_q8_k_vnni()</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01341">gemv_q6_k_q8_k()</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01430">gemv_q6_k_q8_k_parallel_simd()</a>, <a class="el" href="gemm__kernels__q8__0__q8__0__contract_8c_source.html#l00385">gemv_q8_0_q8_0_contract()</a>, <a class="el" href="layernorm__kernels_8c_source.html#l00398">layernorm_forward_rolled_slice()</a>, <a class="el" href="layernorm__kernels_8c_source.html#l00730">layernorm_forward_unrolled_slice()</a>, <a class="el" href="rope__kernels_8c_source.html#l02776">mrope_qk_imrope_positions()</a>, <a class="el" href="rope__kernels_8c_source.html#l02624">mrope_qk_vision()</a>, <a class="el" href="rmsnorm__kernels_8c_source.html#l00812">rmsnorm_backward()</a>, <a class="el" href="rmsnorm__kernels_8c_source.html#l00550">rmsnorm_forward_strided_f32()</a>, <a class="el" href="loss__kernels_8c_source.html#l00064">softmax_cross_entropy_loss_index_mean_impl()</a>, <a class="el" href="loss__kernels_8c_source.html#l00169">softmax_cross_entropy_loss_legacy_mean_impl()</a>, <a class="el" href="swiglu__kernels_8c_source.html#l00387">swiglu_backward()</a>, <a class="el" href="swiglu__kernels_8c_source.html#l00238">swiglu_forward()</a>, and <a class="el" href="swiglu__kernels_8c_source.html#l00320">swiglu_forward_q8_k()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="optimizer__kernels_8c_source.html#l00355">adamw_update_f32_impl()</a>, <a class="el" href="attention__kernels_8c_source.html#l09615">attention_forward_decode_head_major_gqa_regular()</a>, <a class="el" href="attention__kernels_8c_source.html#l05446">attention_forward_full_head_major_gqa_exact_strided()</a>, <a class="el" href="attention__kernels_8c_source.html#l05523">attention_forward_full_head_major_gqa_ggml_strided_workspace()</a>, <a class="el" href="attention__kernels_8c_source.html#l04183">attention_forward_head_major_gqa_flash_impl()</a>, <a class="el" href="attention__kernels_8c_source.html#l05182">attention_forward_mixed_visual_chunk_head_major_gqa_flash_strided_gemma4_impl()</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01729">ck_dot_q6_k_q8_k_fast_or_ref()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01004">ck_layer_forward_rmsnorm_swiglu()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l01126">ck_layer_forward_rmsnorm_swiglu_ref()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00952">ck_mlp_swiglu_forward()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00978">ck_mlp_swiglu_forward_ref()</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01389">ck_q6_k_q8_k_provider_name()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00314">ck_q8k_activations_enabled()</a>, <a class="el" href="deltanet__kernels_8c_source.html#l01956">gated_deltanet_autoregressive_forward()</a>, <a class="el" href="deltanet__kernels_8c_source.html#l01940">gated_deltanet_impl_name()</a>, <a class="el" href="geglu__kernels_8c_source.html#l00070">geglu_forward_fp32()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00230">gemm_avx512_parallel()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00849">gemm_blocked_serial()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00286">gemm_fine_grained_parallel()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00206">gemm_naive_parallel()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00420">gemm_nn_avx512()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00493">gemm_nn_avx512_probe()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00590">gemm_nn_blocked()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00398">gemm_nn_parallel()</a>, <a class="el" href="gemm__kernels__f16_8c_source.html#l00970">gemm_nt_f16()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00179">gemm_nt_fp32_exact_parallel_dispatch()</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01548">gemm_nt_q6_k_q8_k()</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01797">gemm_nt_q6_k_q8_k_m4_tile()</a>, <a class="el" href="gemm__kernels__q8__0__q8__0__contract_8c_source.html#l00447">gemm_nt_q8_0_q8_0_contract()</a>, <a class="el" href="gemm__kernels__q8__0__q8__0__contract_8c_source.html#l00418">gemm_nt_q8_0_q8_0_contract_m2()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00709">gemm_tn_avx512()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00769">gemm_tn_blocked()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00687">gemm_tn_parallel()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03540">gemv_q4_k_q8_k_vnni()</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01356">gemv_q6_k_q8_k()</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01454">gemv_q6_k_q8_k_parallel_simd()</a>, <a class="el" href="gemm__kernels__q8__0__q8__0__contract_8c_source.html#l00385">gemv_q8_0_q8_0_contract()</a>, <a class="el" href="layernorm__kernels_8c_source.html#l00398">layernorm_forward_rolled_slice()</a>, <a class="el" href="layernorm__kernels_8c_source.html#l00730">layernorm_forward_unrolled_slice()</a>, <a class="el" href="rope__kernels_8c_source.html#l02776">mrope_qk_imrope_positions()</a>, <a class="el" href="rope__kernels_8c_source.html#l02624">mrope_qk_vision()</a>, <a class="el" href="rmsnorm__kernels_8c_source.html#l00812">rmsnorm_backward()</a>, <a class="el" href="rmsnorm__kernels_8c_source.html#l00550">rmsnorm_forward_strided_f32()</a>, <a class="el" href="loss__kernels_8c_source.html#l00064">softmax_cross_entropy_loss_index_mean_impl()</a>, <a class="el" href="loss__kernels_8c_source.html#l00169">softmax_cross_entropy_loss_legacy_mean_impl()</a>, <a class="el" href="swiglu__kernels_8c_source.html#l00387">swiglu_backward()</a>, <a class="el" href="swiglu__kernels_8c_source.html#l00238">swiglu_forward()</a>, and <a class="el" href="swiglu__kernels_8c_source.html#l00320">swiglu_forward_q8_k()</a>.</p>
 
 </div>
 </div>
@@ -30251,43 +30253,43 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01521">1521</a> of file <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html">gemm_kernels_q6k_q8k.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 1526</span>{</div>
-<div class="line"><span class="lineno"> 1527</span>    <span class="keywordflow">if</span> (!A_q8 || !B || !<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>) {</div>
-<div class="line"><span class="lineno"> 1528</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 1529</span>    }</div>
-<div class="line"><span class="lineno"> 1530</span>    <span class="keywordflow">if</span> (M &lt;= 0 || N &lt;= 0 || K &lt;= 0) {</div>
-<div class="line"><span class="lineno"> 1531</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 1532</span>    }</div>
-<div class="line"><span class="lineno"> 1533</span><span class="preprocessor">#if defined(__AVX2__) &amp;&amp; defined(__FMA__)</span></div>
-<div class="line"><span class="lineno"> 1534</span>    <span class="keywordflow">if</span> (M &gt;= 8 &amp;&amp; <a class="code hl_function" href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a>()) {</div>
-<div class="line"><span class="lineno"> 1535</span>        <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#a4b5f491082fe215fdae989bf35ba38be">gemm_nt_q6_k_q8_k_tiled_parity</a>(A_q8, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
-<div class="line"><span class="lineno"> 1536</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 1537</span>    }</div>
-<div class="line"><span class="lineno"> 1538</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno"> 1539</span> </div>
-<div class="line"><span class="lineno"> 1540</span>    <span class="comment">/* Prefill GEMM uses the pinned x86 leaf reduction for short row groups</span></div>
-<div class="line"><span class="lineno"> 1541</span><span class="comment">     * and the tiled reduction for strict batches of at least eight rows.</span></div>
-<div class="line"><span class="lineno"> 1542</span><span class="comment">     * CK_DEBUG_Q6K_Q8K_REF=1 still forces the scalar reference leaf. */</span></div>
-<div class="line"><span class="lineno"> 1543</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *A = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *)A_q8;</div>
-<div class="line"><span class="lineno"> 1544</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *W = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *)B;</div>
-<div class="line"><span class="lineno"> 1545</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_vec = K / <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
-<div class="line"><span class="lineno"> 1546</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_row = K / <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
-<div class="line"><span class="lineno"> 1547</span> </div>
-<div class="line"><span class="lineno"> 1548</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m = 0; m &lt; M; ++m) {</div>
-<div class="line"><span class="lineno"> 1549</span>        <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *a_row = A + (size_t)m * (<span class="keywordtype">size_t</span>)blocks_per_vec;</div>
-<div class="line"><span class="lineno"> 1550</span>        <span class="keywordtype">float</span> *c_row = <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a> + (size_t)m * (<span class="keywordtype">size_t</span>)N;</div>
-<div class="line"><span class="lineno"> 1551</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = 0; n &lt; N; ++n) {</div>
-<div class="line"><span class="lineno"> 1552</span>            <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *w_row = W + (size_t)n * (<span class="keywordtype">size_t</span>)blocks_per_row;</div>
-<div class="line"><span class="lineno"> 1553</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> b = bias ? bias[n] : 0.0f;</div>
-<div class="line"><span class="lineno"> 1554</span>            c_row[n] = <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#a65fa62c32264072d07f5ff8a00ded586">ck_dot_q6_k_q8_k_fast_or_ref</a>(w_row, a_row, K) + b;</div>
-<div class="line"><span class="lineno"> 1555</span>        }</div>
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01548">1548</a> of file <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html">gemm_kernels_q6k_q8k.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 1553</span>{</div>
+<div class="line"><span class="lineno"> 1554</span>    <span class="keywordflow">if</span> (!A_q8 || !B || !<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>) {</div>
+<div class="line"><span class="lineno"> 1555</span>        <span class="keywordflow">return</span>;</div>
 <div class="line"><span class="lineno"> 1556</span>    }</div>
-<div class="line"><span class="lineno"> 1557</span>}</div>
-<div class="ttc" id="agemm__kernels__q6k__q8k_8c_html_a4b5f491082fe215fdae989bf35ba38be"><div class="ttname"><a href="gemm__kernels__q6k__q8k_8c.html#a4b5f491082fe215fdae989bf35ba38be">gemm_nt_q6_k_q8_k_tiled_parity</a></div><div class="ttdeci">void gemm_nt_q6_k_q8_k_tiled_parity(const void *A_q8, const void *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdoc">NT GEMM: C = A @ B^T where A is Q8_K and B is Q6_K.</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q6k__q8k_8c_source.html#l01599">gemm_kernels_q6k_q8k.c:1599</a></div></div>
-<div class="ttc" id="agemm__kernels__q6k__q8k_8c_html_a65fa62c32264072d07f5ff8a00ded586"><div class="ttname"><a href="gemm__kernels__q6k__q8k_8c.html#a65fa62c32264072d07f5ff8a00ded586">ck_dot_q6_k_q8_k_fast_or_ref</a></div><div class="ttdeci">static float ck_dot_q6_k_q8_k_fast_or_ref(const block_q6_K *w, const block_q8_K *x, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q6k__q8k_8c_source.html#l01702">gemm_kernels_q6k_q8k.c:1702</a></div></div>
+<div class="line"><span class="lineno"> 1557</span>    <span class="keywordflow">if</span> (M &lt;= 0 || N &lt;= 0 || K &lt;= 0) {</div>
+<div class="line"><span class="lineno"> 1558</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1559</span>    }</div>
+<div class="line"><span class="lineno"> 1560</span><span class="preprocessor">#if defined(__AVX2__) &amp;&amp; defined(__FMA__)</span></div>
+<div class="line"><span class="lineno"> 1561</span>    <span class="keywordflow">if</span> (M &gt;= 8 &amp;&amp; <a class="code hl_function" href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a>()) {</div>
+<div class="line"><span class="lineno"> 1562</span>        <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#a4b5f491082fe215fdae989bf35ba38be">gemm_nt_q6_k_q8_k_tiled_parity</a>(A_q8, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
+<div class="line"><span class="lineno"> 1563</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1564</span>    }</div>
+<div class="line"><span class="lineno"> 1565</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno"> 1566</span> </div>
+<div class="line"><span class="lineno"> 1567</span>    <span class="comment">/* Prefill GEMM uses the pinned x86 leaf reduction for short row groups</span></div>
+<div class="line"><span class="lineno"> 1568</span><span class="comment">     * and the tiled reduction for strict batches of at least eight rows.</span></div>
+<div class="line"><span class="lineno"> 1569</span><span class="comment">     * CK_DEBUG_Q6K_Q8K_REF=1 still forces the scalar reference leaf. */</span></div>
+<div class="line"><span class="lineno"> 1570</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *A = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *)A_q8;</div>
+<div class="line"><span class="lineno"> 1571</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *W = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *)B;</div>
+<div class="line"><span class="lineno"> 1572</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_vec = K / <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
+<div class="line"><span class="lineno"> 1573</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_row = K / <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
+<div class="line"><span class="lineno"> 1574</span> </div>
+<div class="line"><span class="lineno"> 1575</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m = 0; m &lt; M; ++m) {</div>
+<div class="line"><span class="lineno"> 1576</span>        <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *a_row = A + (size_t)m * (<span class="keywordtype">size_t</span>)blocks_per_vec;</div>
+<div class="line"><span class="lineno"> 1577</span>        <span class="keywordtype">float</span> *c_row = <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a> + (size_t)m * (<span class="keywordtype">size_t</span>)N;</div>
+<div class="line"><span class="lineno"> 1578</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = 0; n &lt; N; ++n) {</div>
+<div class="line"><span class="lineno"> 1579</span>            <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *w_row = W + (size_t)n * (<span class="keywordtype">size_t</span>)blocks_per_row;</div>
+<div class="line"><span class="lineno"> 1580</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> b = bias ? bias[n] : 0.0f;</div>
+<div class="line"><span class="lineno"> 1581</span>            c_row[n] = <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#a65fa62c32264072d07f5ff8a00ded586">ck_dot_q6_k_q8_k_fast_or_ref</a>(w_row, a_row, K) + b;</div>
+<div class="line"><span class="lineno"> 1582</span>        }</div>
+<div class="line"><span class="lineno"> 1583</span>    }</div>
+<div class="line"><span class="lineno"> 1584</span>}</div>
+<div class="ttc" id="agemm__kernels__q6k__q8k_8c_html_a4b5f491082fe215fdae989bf35ba38be"><div class="ttname"><a href="gemm__kernels__q6k__q8k_8c.html#a4b5f491082fe215fdae989bf35ba38be">gemm_nt_q6_k_q8_k_tiled_parity</a></div><div class="ttdeci">void gemm_nt_q6_k_q8_k_tiled_parity(const void *A_q8, const void *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdoc">NT GEMM: C = A @ B^T where A is Q8_K and B is Q6_K.</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q6k__q8k_8c_source.html#l01626">gemm_kernels_q6k_q8k.c:1626</a></div></div>
+<div class="ttc" id="agemm__kernels__q6k__q8k_8c_html_a65fa62c32264072d07f5ff8a00ded586"><div class="ttname"><a href="gemm__kernels__q6k__q8k_8c.html#a65fa62c32264072d07f5ff8a00ded586">ck_dot_q6_k_q8_k_fast_or_ref</a></div><div class="ttdeci">static float ck_dot_q6_k_q8_k_fast_or_ref(const block_q6_K *w, const block_q8_K *x, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q6k__q8k_8c_source.html#l01729">gemm_kernels_q6k_q8k.c:1729</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01702">ck_dot_q6_k_q8_k_fast_or_ref()</a>, <a class="el" href="ckernel__strict_8c_source.html#l00043">ck_strict_parity_enabled()</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01599">gemm_nt_q6_k_q8_k_tiled_parity()</a>, and <a class="el" href="ckernel__quant_8h_source.html#l00175">QK_K</a>.</p>
+<p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01729">ck_dot_q6_k_q8_k_fast_or_ref()</a>, <a class="el" href="ckernel__strict_8c_source.html#l00043">ck_strict_parity_enabled()</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01626">gemm_nt_q6_k_q8_k_tiled_parity()</a>, and <a class="el" href="ckernel__quant_8h_source.html#l00175">QK_K</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="prefill__fused__gemm_8c_source.html#l00937">gemm_nt_q8_k_mlp_dispatch()</a>, and <a class="el" href="prefill__fused__gemm_8c_source.html#l00198">gemm_nt_q8_k_qkv_dispatch()</a>.</p>
 
@@ -30349,16 +30351,16 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01824">1824</a> of file <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html">gemm_kernels_q6k_q8k.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 1827</span>{</div>
-<div class="line"><span class="lineno"> 1828</span>    <span class="keywordflow">if</span> (!A_q8 || !B || !<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a> || M != 2 || N &lt;= 0 || K &lt;= 0 ||</div>
-<div class="line"><span class="lineno"> 1829</span>        (K % <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>) != 0) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 1830</span>    <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#a5f2da3b1403501ba959104c826a70a7e">gemm_nt_q6_k_q8_k_m4_tile</a>(A_q8, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K,</div>
-<div class="line"><span class="lineno"> 1831</span>                                0, M, 0, N);</div>
-<div class="line"><span class="lineno"> 1832</span>}</div>
-<div class="ttc" id="agemm__kernels__q6k__q8k_8c_html_a5f2da3b1403501ba959104c826a70a7e"><div class="ttname"><a href="gemm__kernels__q6k__q8k_8c.html#a5f2da3b1403501ba959104c826a70a7e">gemm_nt_q6_k_q8_k_m4_tile</a></div><div class="ttdeci">void gemm_nt_q6_k_q8_k_m4_tile(const void *A_q8, const void *B, const float *bias, float *C, int M, int N, int K, int m0, int m1, int n0, int n1)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q6k__q8k_8c_source.html#l01767">gemm_kernels_q6k_q8k.c:1767</a></div></div>
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01854">1854</a> of file <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html">gemm_kernels_q6k_q8k.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 1857</span>{</div>
+<div class="line"><span class="lineno"> 1858</span>    <span class="keywordflow">if</span> (!A_q8 || !B || !<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a> || M != 2 || N &lt;= 0 || K &lt;= 0 ||</div>
+<div class="line"><span class="lineno"> 1859</span>        (K % <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>) != 0) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1860</span>    <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#a5f2da3b1403501ba959104c826a70a7e">gemm_nt_q6_k_q8_k_m4_tile</a>(A_q8, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K,</div>
+<div class="line"><span class="lineno"> 1861</span>                                0, M, 0, N);</div>
+<div class="line"><span class="lineno"> 1862</span>}</div>
+<div class="ttc" id="agemm__kernels__q6k__q8k_8c_html_a5f2da3b1403501ba959104c826a70a7e"><div class="ttname"><a href="gemm__kernels__q6k__q8k_8c.html#a5f2da3b1403501ba959104c826a70a7e">gemm_nt_q6_k_q8_k_m4_tile</a></div><div class="ttdeci">void gemm_nt_q6_k_q8_k_m4_tile(const void *A_q8, const void *B, const float *bias, float *C, int M, int N, int K, int m0, int m1, int n0, int n1)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q6k__q8k_8c_source.html#l01797">gemm_kernels_q6k_q8k.c:1797</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01767">gemm_nt_q6_k_q8_k_m4_tile()</a>, and <a class="el" href="ckernel__quant_8h_source.html#l00175">QK_K</a>.</p>
+<p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01797">gemm_nt_q6_k_q8_k_m4_tile()</a>, and <a class="el" href="ckernel__quant_8h_source.html#l00175">QK_K</a>.</p>
 
 </div>
 </div>
@@ -30442,59 +30444,59 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01767">1767</a> of file <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html">gemm_kernels_q6k_q8k.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 1774</span>{</div>
-<div class="line"><span class="lineno"> 1775</span>    <span class="keywordflow">if</span> (!A_q8 || !B || !<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a> || M &lt;= 0 || N &lt;= 0 || K &lt;= 0 ||</div>
-<div class="line"><span class="lineno"> 1776</span>        K % <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a> != 0) {</div>
-<div class="line"><span class="lineno"> 1777</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 1778</span>    }</div>
-<div class="line"><span class="lineno"> 1779</span>    <span class="keywordflow">if</span> (m0 &lt; 0) m0 = 0;</div>
-<div class="line"><span class="lineno"> 1780</span>    <span class="keywordflow">if</span> (n0 &lt; 0) n0 = 0;</div>
-<div class="line"><span class="lineno"> 1781</span>    <span class="keywordflow">if</span> (m1 &gt; M) m1 = M;</div>
-<div class="line"><span class="lineno"> 1782</span>    <span class="keywordflow">if</span> (n1 &gt; N) n1 = N;</div>
-<div class="line"><span class="lineno"> 1783</span>    <span class="keywordflow">if</span> (m0 &gt;= m1 || n0 &gt;= n1) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 1784</span> </div>
-<div class="line"><span class="lineno"> 1785</span><span class="preprocessor">#if defined(__AVX2__)</span></div>
-<div class="line"><span class="lineno"> 1786</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a>() &amp;&amp; !<a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#aa98a62f017969e334a0d3bbcbf34935d">ck_q6k_q8k_force_ref</a>()) {</div>
-<div class="line"><span class="lineno"> 1787</span>        <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *A = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *)A_q8;</div>
-<div class="line"><span class="lineno"> 1788</span>        <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *W = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *)B;</div>
-<div class="line"><span class="lineno"> 1789</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_vec = K / <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
-<div class="line"><span class="lineno"> 1790</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = n0; n &lt; n1; ++n) {</div>
-<div class="line"><span class="lineno"> 1791</span>            <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *w_row =</div>
-<div class="line"><span class="lineno"> 1792</span>                W + (size_t)n * (<span class="keywordtype">size_t</span>)blocks_per_vec;</div>
-<div class="line"><span class="lineno"> 1793</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> b = bias ? bias[n] : 0.0f;</div>
-<div class="line"><span class="lineno"> 1794</span>            <span class="keywordtype">int</span> m = m0;</div>
-<div class="line"><span class="lineno"> 1795</span>            <span class="keywordflow">for</span> (; m + 4 &lt;= m1; m += 4) {</div>
-<div class="line"><span class="lineno"> 1796</span>                <span class="keywordtype">float</span> values[4];</div>
-<div class="line"><span class="lineno"> 1797</span>                dot_q6_k_q8_k_avx2_m4(</div>
-<div class="line"><span class="lineno"> 1798</span>                    w_row, A + (<span class="keywordtype">size_t</span>)m * (<span class="keywordtype">size_t</span>)blocks_per_vec,</div>
-<div class="line"><span class="lineno"> 1799</span>                    blocks_per_vec, 4, K, values);</div>
-<div class="line"><span class="lineno"> 1800</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; 4; ++r) {</div>
-<div class="line"><span class="lineno"> 1801</span>                    <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)(m + r) * (size_t)N + (<span class="keywordtype">size_t</span>)n] = values[r] + b;</div>
-<div class="line"><span class="lineno"> 1802</span>                }</div>
-<div class="line"><span class="lineno"> 1803</span>            }</div>
-<div class="line"><span class="lineno"> 1804</span>            <span class="keywordflow">if</span> (m &lt; m1) {</div>
-<div class="line"><span class="lineno"> 1805</span>                <span class="keywordtype">float</span> values[4];</div>
-<div class="line"><span class="lineno"> 1806</span>                <span class="keyword">const</span> <span class="keywordtype">int</span> rows = m1 - m;</div>
-<div class="line"><span class="lineno"> 1807</span>                dot_q6_k_q8_k_avx2_m4(</div>
-<div class="line"><span class="lineno"> 1808</span>                    w_row, A + (<span class="keywordtype">size_t</span>)m * (<span class="keywordtype">size_t</span>)blocks_per_vec,</div>
-<div class="line"><span class="lineno"> 1809</span>                    blocks_per_vec, rows, K, values);</div>
-<div class="line"><span class="lineno"> 1810</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; rows; ++r) {</div>
-<div class="line"><span class="lineno"> 1811</span>                    <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)(m + r) * (size_t)N + (<span class="keywordtype">size_t</span>)n] = values[r] + b;</div>
-<div class="line"><span class="lineno"> 1812</span>                }</div>
-<div class="line"><span class="lineno"> 1813</span>            }</div>
-<div class="line"><span class="lineno"> 1814</span>        }</div>
-<div class="line"><span class="lineno"> 1815</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 1816</span>    }</div>
-<div class="line"><span class="lineno"> 1817</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno"> 1818</span>    <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#a0486ad5eb531ba02427e9765bab1d146">gemm_nt_q6_k_q8_k_tile</a>(</div>
-<div class="line"><span class="lineno"> 1819</span>        A_q8, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K, m0, m1, n0, n1);</div>
-<div class="line"><span class="lineno"> 1820</span>}</div>
-<div class="ttc" id="agemm__kernels__q6k__q8k_8c_html_a0486ad5eb531ba02427e9765bab1d146"><div class="ttname"><a href="gemm__kernels__q6k__q8k_8c.html#a0486ad5eb531ba02427e9765bab1d146">gemm_nt_q6_k_q8_k_tile</a></div><div class="ttdeci">void gemm_nt_q6_k_q8_k_tile(const void *A_q8, const void *B, const float *bias, float *C, int M, int N, int K, int m0, int m1, int n0, int n1)</div><div class="ttdoc">Compute one C[m0:m1, n0:n1] tile for Q8_K activations x Q6_K weights.</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q6k__q8k_8c_source.html#l01730">gemm_kernels_q6k_q8k.c:1730</a></div></div>
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01797">1797</a> of file <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html">gemm_kernels_q6k_q8k.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 1804</span>{</div>
+<div class="line"><span class="lineno"> 1805</span>    <span class="keywordflow">if</span> (!A_q8 || !B || !<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a> || M &lt;= 0 || N &lt;= 0 || K &lt;= 0 ||</div>
+<div class="line"><span class="lineno"> 1806</span>        K % <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a> != 0) {</div>
+<div class="line"><span class="lineno"> 1807</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1808</span>    }</div>
+<div class="line"><span class="lineno"> 1809</span>    <span class="keywordflow">if</span> (m0 &lt; 0) m0 = 0;</div>
+<div class="line"><span class="lineno"> 1810</span>    <span class="keywordflow">if</span> (n0 &lt; 0) n0 = 0;</div>
+<div class="line"><span class="lineno"> 1811</span>    <span class="keywordflow">if</span> (m1 &gt; M) m1 = M;</div>
+<div class="line"><span class="lineno"> 1812</span>    <span class="keywordflow">if</span> (n1 &gt; N) n1 = N;</div>
+<div class="line"><span class="lineno"> 1813</span>    <span class="keywordflow">if</span> (m0 &gt;= m1 || n0 &gt;= n1) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1814</span> </div>
+<div class="line"><span class="lineno"> 1815</span><span class="preprocessor">#if defined(__AVX2__)</span></div>
+<div class="line"><span class="lineno"> 1816</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a>() &amp;&amp; !<a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#aa98a62f017969e334a0d3bbcbf34935d">ck_q6k_q8k_force_ref</a>()) {</div>
+<div class="line"><span class="lineno"> 1817</span>        <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *A = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *)A_q8;</div>
+<div class="line"><span class="lineno"> 1818</span>        <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *W = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *)B;</div>
+<div class="line"><span class="lineno"> 1819</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_vec = K / <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
+<div class="line"><span class="lineno"> 1820</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = n0; n &lt; n1; ++n) {</div>
+<div class="line"><span class="lineno"> 1821</span>            <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *w_row =</div>
+<div class="line"><span class="lineno"> 1822</span>                W + (size_t)n * (<span class="keywordtype">size_t</span>)blocks_per_vec;</div>
+<div class="line"><span class="lineno"> 1823</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> b = bias ? bias[n] : 0.0f;</div>
+<div class="line"><span class="lineno"> 1824</span>            <span class="keywordtype">int</span> m = m0;</div>
+<div class="line"><span class="lineno"> 1825</span>            <span class="keywordflow">for</span> (; m + 4 &lt;= m1; m += 4) {</div>
+<div class="line"><span class="lineno"> 1826</span>                <span class="keywordtype">float</span> values[4];</div>
+<div class="line"><span class="lineno"> 1827</span>                dot_q6_k_q8_k_avx2_m4(</div>
+<div class="line"><span class="lineno"> 1828</span>                    w_row, A + (<span class="keywordtype">size_t</span>)m * (<span class="keywordtype">size_t</span>)blocks_per_vec,</div>
+<div class="line"><span class="lineno"> 1829</span>                    blocks_per_vec, 4, K, values);</div>
+<div class="line"><span class="lineno"> 1830</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; 4; ++r) {</div>
+<div class="line"><span class="lineno"> 1831</span>                    <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)(m + r) * (size_t)N + (<span class="keywordtype">size_t</span>)n] = values[r] + b;</div>
+<div class="line"><span class="lineno"> 1832</span>                }</div>
+<div class="line"><span class="lineno"> 1833</span>            }</div>
+<div class="line"><span class="lineno"> 1834</span>            <span class="keywordflow">if</span> (m &lt; m1) {</div>
+<div class="line"><span class="lineno"> 1835</span>                <span class="keywordtype">float</span> values[4];</div>
+<div class="line"><span class="lineno"> 1836</span>                <span class="keyword">const</span> <span class="keywordtype">int</span> rows = m1 - m;</div>
+<div class="line"><span class="lineno"> 1837</span>                dot_q6_k_q8_k_avx2_m4(</div>
+<div class="line"><span class="lineno"> 1838</span>                    w_row, A + (<span class="keywordtype">size_t</span>)m * (<span class="keywordtype">size_t</span>)blocks_per_vec,</div>
+<div class="line"><span class="lineno"> 1839</span>                    blocks_per_vec, rows, K, values);</div>
+<div class="line"><span class="lineno"> 1840</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; rows; ++r) {</div>
+<div class="line"><span class="lineno"> 1841</span>                    <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)(m + r) * (size_t)N + (<span class="keywordtype">size_t</span>)n] = values[r] + b;</div>
+<div class="line"><span class="lineno"> 1842</span>                }</div>
+<div class="line"><span class="lineno"> 1843</span>            }</div>
+<div class="line"><span class="lineno"> 1844</span>        }</div>
+<div class="line"><span class="lineno"> 1845</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1846</span>    }</div>
+<div class="line"><span class="lineno"> 1847</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno"> 1848</span>    <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#a0486ad5eb531ba02427e9765bab1d146">gemm_nt_q6_k_q8_k_tile</a>(</div>
+<div class="line"><span class="lineno"> 1849</span>        A_q8, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K, m0, m1, n0, n1);</div>
+<div class="line"><span class="lineno"> 1850</span>}</div>
+<div class="ttc" id="agemm__kernels__q6k__q8k_8c_html_a0486ad5eb531ba02427e9765bab1d146"><div class="ttname"><a href="gemm__kernels__q6k__q8k_8c.html#a0486ad5eb531ba02427e9765bab1d146">gemm_nt_q6_k_q8_k_tile</a></div><div class="ttdeci">void gemm_nt_q6_k_q8_k_tile(const void *A_q8, const void *B, const float *bias, float *C, int M, int N, int K, int m0, int m1, int n0, int n1)</div><div class="ttdoc">Compute one C[m0:m1, n0:n1] tile for Q8_K activations x Q6_K weights.</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q6k__q8k_8c_source.html#l01760">gemm_kernels_q6k_q8k.c:1760</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l00108">ck_q6k_q8k_force_ref()</a>, <a class="el" href="ckernel__strict_8c_source.html#l00043">ck_strict_parity_enabled()</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01730">gemm_nt_q6_k_q8_k_tile()</a>, and <a class="el" href="ckernel__quant_8h_source.html#l00175">QK_K</a>.</p>
+<p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l00108">ck_q6k_q8k_force_ref()</a>, <a class="el" href="ckernel__strict_8c_source.html#l00043">ck_strict_parity_enabled()</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01760">gemm_nt_q6_k_q8_k_tile()</a>, and <a class="el" href="ckernel__quant_8h_source.html#l00175">QK_K</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01824">gemm_nt_q6_k_q8_k_m2()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01854">gemm_nt_q6_k_q8_k_m2()</a>.</p>
 
 </div>
 </div>
@@ -30581,40 +30583,40 @@ Functions</h2></td></tr>
 <p>Compute one C[m0:m1, n0:n1] tile for Q8_K activations x Q6_K weights. </p>
 <p>Pure tile math only: no threadpool, no global scheduling, no allocation. The orchestrator decides how to split tile jobs across cores. </p>
 
-<p class="definition">Definition at line <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01730">1730</a> of file <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html">gemm_kernels_q6k_q8k.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 1737</span>{</div>
-<div class="line"><span class="lineno"> 1738</span>    <span class="keywordflow">if</span> (!A_q8 || !B || !<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>) {</div>
-<div class="line"><span class="lineno"> 1739</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 1740</span>    }</div>
-<div class="line"><span class="lineno"> 1741</span>    <span class="keywordflow">if</span> (M &lt;= 0 || N &lt;= 0 || K &lt;= 0 || K % <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a> != 0) {</div>
-<div class="line"><span class="lineno"> 1742</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 1743</span>    }</div>
-<div class="line"><span class="lineno"> 1744</span>    <span class="keywordflow">if</span> (m0 &lt; 0) m0 = 0;</div>
-<div class="line"><span class="lineno"> 1745</span>    <span class="keywordflow">if</span> (n0 &lt; 0) n0 = 0;</div>
-<div class="line"><span class="lineno"> 1746</span>    <span class="keywordflow">if</span> (m1 &gt; M) m1 = M;</div>
-<div class="line"><span class="lineno"> 1747</span>    <span class="keywordflow">if</span> (n1 &gt; N) n1 = N;</div>
-<div class="line"><span class="lineno"> 1748</span>    <span class="keywordflow">if</span> (m0 &gt;= m1 || n0 &gt;= n1) {</div>
-<div class="line"><span class="lineno"> 1749</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 1750</span>    }</div>
-<div class="line"><span class="lineno"> 1751</span> </div>
-<div class="line"><span class="lineno"> 1752</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *A = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *)A_q8;</div>
-<div class="line"><span class="lineno"> 1753</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *W = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *)B;</div>
-<div class="line"><span class="lineno"> 1754</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_vec = K / <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
-<div class="line"><span class="lineno"> 1755</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_row = K / <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
-<div class="line"><span class="lineno"> 1756</span> </div>
-<div class="line"><span class="lineno"> 1757</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = n0; n &lt; n1; ++n) {</div>
-<div class="line"><span class="lineno"> 1758</span>        <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *w_row = W + (size_t)n * (<span class="keywordtype">size_t</span>)blocks_per_row;</div>
-<div class="line"><span class="lineno"> 1759</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> b = bias ? bias[n] : 0.0f;</div>
-<div class="line"><span class="lineno"> 1760</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m = m0; m &lt; m1; ++m) {</div>
-<div class="line"><span class="lineno"> 1761</span>            <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *a_row = A + (size_t)m * (<span class="keywordtype">size_t</span>)blocks_per_vec;</div>
-<div class="line"><span class="lineno"> 1762</span>            <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)m * (<span class="keywordtype">size_t</span>)N + (size_t)n] = <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#a65fa62c32264072d07f5ff8a00ded586">ck_dot_q6_k_q8_k_fast_or_ref</a>(w_row, a_row, K) + b;</div>
-<div class="line"><span class="lineno"> 1763</span>        }</div>
-<div class="line"><span class="lineno"> 1764</span>    }</div>
-<div class="line"><span class="lineno"> 1765</span>}</div>
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01760">1760</a> of file <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html">gemm_kernels_q6k_q8k.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 1767</span>{</div>
+<div class="line"><span class="lineno"> 1768</span>    <span class="keywordflow">if</span> (!A_q8 || !B || !<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>) {</div>
+<div class="line"><span class="lineno"> 1769</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1770</span>    }</div>
+<div class="line"><span class="lineno"> 1771</span>    <span class="keywordflow">if</span> (M &lt;= 0 || N &lt;= 0 || K &lt;= 0 || K % <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a> != 0) {</div>
+<div class="line"><span class="lineno"> 1772</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1773</span>    }</div>
+<div class="line"><span class="lineno"> 1774</span>    <span class="keywordflow">if</span> (m0 &lt; 0) m0 = 0;</div>
+<div class="line"><span class="lineno"> 1775</span>    <span class="keywordflow">if</span> (n0 &lt; 0) n0 = 0;</div>
+<div class="line"><span class="lineno"> 1776</span>    <span class="keywordflow">if</span> (m1 &gt; M) m1 = M;</div>
+<div class="line"><span class="lineno"> 1777</span>    <span class="keywordflow">if</span> (n1 &gt; N) n1 = N;</div>
+<div class="line"><span class="lineno"> 1778</span>    <span class="keywordflow">if</span> (m0 &gt;= m1 || n0 &gt;= n1) {</div>
+<div class="line"><span class="lineno"> 1779</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1780</span>    }</div>
+<div class="line"><span class="lineno"> 1781</span> </div>
+<div class="line"><span class="lineno"> 1782</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *A = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *)A_q8;</div>
+<div class="line"><span class="lineno"> 1783</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *W = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *)B;</div>
+<div class="line"><span class="lineno"> 1784</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_vec = K / <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
+<div class="line"><span class="lineno"> 1785</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_row = K / <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
+<div class="line"><span class="lineno"> 1786</span> </div>
+<div class="line"><span class="lineno"> 1787</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = n0; n &lt; n1; ++n) {</div>
+<div class="line"><span class="lineno"> 1788</span>        <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *w_row = W + (size_t)n * (<span class="keywordtype">size_t</span>)blocks_per_row;</div>
+<div class="line"><span class="lineno"> 1789</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> b = bias ? bias[n] : 0.0f;</div>
+<div class="line"><span class="lineno"> 1790</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m = m0; m &lt; m1; ++m) {</div>
+<div class="line"><span class="lineno"> 1791</span>            <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *a_row = A + (size_t)m * (<span class="keywordtype">size_t</span>)blocks_per_vec;</div>
+<div class="line"><span class="lineno"> 1792</span>            <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)m * (<span class="keywordtype">size_t</span>)N + (size_t)n] = <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#a65fa62c32264072d07f5ff8a00ded586">ck_dot_q6_k_q8_k_fast_or_ref</a>(w_row, a_row, K) + b;</div>
+<div class="line"><span class="lineno"> 1793</span>        }</div>
+<div class="line"><span class="lineno"> 1794</span>    }</div>
+<div class="line"><span class="lineno"> 1795</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01702">ck_dot_q6_k_q8_k_fast_or_ref()</a>, and <a class="el" href="ckernel__quant_8h_source.html#l00175">QK_K</a>.</p>
+<p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01729">ck_dot_q6_k_q8_k_fast_or_ref()</a>, and <a class="el" href="ckernel__quant_8h_source.html#l00175">QK_K</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01767">gemm_nt_q6_k_q8_k_m4_tile()</a>, and <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01840">gemm_nt_q6_k_q8_k_tiled()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01797">gemm_nt_q6_k_q8_k_m4_tile()</a>, and <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01870">gemm_nt_q6_k_q8_k_tiled()</a>.</p>
 
 </div>
 </div>
@@ -30677,19 +30679,19 @@ Functions</h2></td></tr>
 <p>Experimental single-thread tiled NT GEMM wrapper. </p>
 <p>Kept as a separate symbol from gemm_nt_q6_k_q8_k for benchmarks and parity. Production prefill should prefer the v8 2D tile scheduler when enabled. </p>
 
-<p class="definition">Definition at line <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01840">1840</a> of file <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html">gemm_kernels_q6k_q8k.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 1845</span>{</div>
-<div class="line"><span class="lineno"> 1846</span>    <span class="keyword">enum</span> { TILE_M = 8, TILE_N = 16 };</div>
-<div class="line"><span class="lineno"> 1847</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n0 = 0; n0 &lt; N; n0 += TILE_N) {</div>
-<div class="line"><span class="lineno"> 1848</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> n1 = (n0 + TILE_N &lt; N) ? (n0 + TILE_N) : N;</div>
-<div class="line"><span class="lineno"> 1849</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m0 = 0; m0 &lt; M; m0 += TILE_M) {</div>
-<div class="line"><span class="lineno"> 1850</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> m1 = (m0 + TILE_M &lt; M) ? (m0 + TILE_M) : M;</div>
-<div class="line"><span class="lineno"> 1851</span>            <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#a0486ad5eb531ba02427e9765bab1d146">gemm_nt_q6_k_q8_k_tile</a>(A_q8, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K, m0, m1, n0, n1);</div>
-<div class="line"><span class="lineno"> 1852</span>        }</div>
-<div class="line"><span class="lineno"> 1853</span>    }</div>
-<div class="line"><span class="lineno"> 1854</span>}</div>
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01870">1870</a> of file <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html">gemm_kernels_q6k_q8k.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 1875</span>{</div>
+<div class="line"><span class="lineno"> 1876</span>    <span class="keyword">enum</span> { TILE_M = 8, TILE_N = 16 };</div>
+<div class="line"><span class="lineno"> 1877</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n0 = 0; n0 &lt; N; n0 += TILE_N) {</div>
+<div class="line"><span class="lineno"> 1878</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> n1 = (n0 + TILE_N &lt; N) ? (n0 + TILE_N) : N;</div>
+<div class="line"><span class="lineno"> 1879</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m0 = 0; m0 &lt; M; m0 += TILE_M) {</div>
+<div class="line"><span class="lineno"> 1880</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> m1 = (m0 + TILE_M &lt; M) ? (m0 + TILE_M) : M;</div>
+<div class="line"><span class="lineno"> 1881</span>            <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#a0486ad5eb531ba02427e9765bab1d146">gemm_nt_q6_k_q8_k_tile</a>(A_q8, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K, m0, m1, n0, n1);</div>
+<div class="line"><span class="lineno"> 1882</span>        }</div>
+<div class="line"><span class="lineno"> 1883</span>    }</div>
+<div class="line"><span class="lineno"> 1884</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, and <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01730">gemm_nt_q6_k_q8_k_tile()</a>.</p>
+<p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, and <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01760">gemm_nt_q6_k_q8_k_tile()</a>.</p>
 
 </div>
 </div>
@@ -31545,23 +31547,23 @@ Functions</h2></td></tr>
   </dd>
 </dl>
 
-<p class="definition">Definition at line <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01481">1481</a> of file <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html">gemm_kernels_q6k_q8k.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 1485</span>{</div>
-<div class="line"><span class="lineno"> 1486</span>    <span class="keywordflow">if</span> (!Y || !W || !X_q8 || M &lt;= 0 || N &lt;= 0 || K &lt;= 0) {</div>
-<div class="line"><span class="lineno"> 1487</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 1488</span>    }</div>
-<div class="line"><span class="lineno"> 1489</span> </div>
-<div class="line"><span class="lineno"> 1490</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *X = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *)X_q8;</div>
-<div class="line"><span class="lineno"> 1491</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_vec = K / <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
-<div class="line"><span class="lineno"> 1492</span> </div>
-<div class="line"><span class="lineno"> 1493</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = 0; n &lt; N; ++n) {</div>
-<div class="line"><span class="lineno"> 1494</span>        <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *x_row = X + (size_t)n * (<span class="keywordtype">size_t</span>)blocks_per_vec;</div>
-<div class="line"><span class="lineno"> 1495</span>        <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#a7b78875a957c11b30c9f7170b6c87c45">gemv_q6_k_q8_k</a>(&amp;Y[n * M], W, x_row, M, K);</div>
-<div class="line"><span class="lineno"> 1496</span>    }</div>
-<div class="line"><span class="lineno"> 1497</span>}</div>
-<div class="ttc" id="agemm__kernels__q6k__q8k_8c_html_a7b78875a957c11b30c9f7170b6c87c45"><div class="ttname"><a href="gemm__kernels__q6k__q8k_8c.html#a7b78875a957c11b30c9f7170b6c87c45">gemv_q6_k_q8_k</a></div><div class="ttdeci">void gemv_q6_k_q8_k(float *y, const void *W, const void *x_q8, int M, int K)</div><div class="ttdoc">GEMV: y = W @ x where W is Q6_K and x is Q8_K.</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q6k__q8k_8c_source.html#l01341">gemm_kernels_q6k_q8k.c:1341</a></div></div>
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01508">1508</a> of file <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html">gemm_kernels_q6k_q8k.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 1512</span>{</div>
+<div class="line"><span class="lineno"> 1513</span>    <span class="keywordflow">if</span> (!Y || !W || !X_q8 || M &lt;= 0 || N &lt;= 0 || K &lt;= 0) {</div>
+<div class="line"><span class="lineno"> 1514</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1515</span>    }</div>
+<div class="line"><span class="lineno"> 1516</span> </div>
+<div class="line"><span class="lineno"> 1517</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *X = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *)X_q8;</div>
+<div class="line"><span class="lineno"> 1518</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_vec = K / <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
+<div class="line"><span class="lineno"> 1519</span> </div>
+<div class="line"><span class="lineno"> 1520</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = 0; n &lt; N; ++n) {</div>
+<div class="line"><span class="lineno"> 1521</span>        <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *x_row = X + (size_t)n * (<span class="keywordtype">size_t</span>)blocks_per_vec;</div>
+<div class="line"><span class="lineno"> 1522</span>        <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#a7b78875a957c11b30c9f7170b6c87c45">gemv_q6_k_q8_k</a>(&amp;Y[n * M], W, x_row, M, K);</div>
+<div class="line"><span class="lineno"> 1523</span>    }</div>
+<div class="line"><span class="lineno"> 1524</span>}</div>
+<div class="ttc" id="agemm__kernels__q6k__q8k_8c_html_a7b78875a957c11b30c9f7170b6c87c45"><div class="ttname"><a href="gemm__kernels__q6k__q8k_8c.html#a7b78875a957c11b30c9f7170b6c87c45">gemv_q6_k_q8_k</a></div><div class="ttdeci">void gemv_q6_k_q8_k(float *y, const void *W, const void *x_q8, int M, int K)</div><div class="ttdoc">GEMV: y = W @ x where W is Q6_K and x is Q8_K.</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q6k__q8k_8c_source.html#l01356">gemm_kernels_q6k_q8k.c:1356</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01341">gemv_q6_k_q8_k()</a>, and <a class="el" href="ckernel__quant_8h_source.html#l00175">QK_K</a>.</p>
+<p class="reference">References <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01356">gemv_q6_k_q8_k()</a>, and <a class="el" href="ckernel__quant_8h_source.html#l00175">QK_K</a>.</p>
 
 </div>
 </div>
@@ -34333,34 +34335,41 @@ Functions</h2></td></tr>
 
 <p>GEMV: y = W @ x where W is Q6_K and x is Q8_K. </p>
 
-<p class="definition">Definition at line <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01341">1341</a> of file <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html">gemm_kernels_q6k_q8k.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 1345</span>{</div>
-<div class="line"><span class="lineno"> 1346</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a>() || <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#aa98a62f017969e334a0d3bbcbf34935d">ck_q6k_q8k_force_ref</a>()) {</div>
-<div class="line"><span class="lineno"> 1347</span>        <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#a06c7e59ac3d04a760a5bcc83921ac9a9">gemv_q6_k_q8_k_ref</a>(y, W, x_q8, M, K);</div>
-<div class="line"><span class="lineno"> 1348</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 1349</span>    }</div>
-<div class="line"><span class="lineno"> 1350</span> </div>
-<div class="line"><span class="lineno"> 1351</span><span class="preprocessor">#if defined(__AVX2__)</span></div>
-<div class="line"><span class="lineno"> 1352</span>    <span class="comment">/* llama.cpp&#39;s x86 Q6_K production graph keeps the AVX2 reduction order</span></div>
-<div class="line"><span class="lineno"> 1353</span><span class="comment">     * even when AVX-512 is available. Wider ISA availability is not a license</span></div>
-<div class="line"><span class="lineno"> 1354</span><span class="comment">     * to change this numerical contract. */</span></div>
-<div class="line"><span class="lineno"> 1355</span>    <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#a87e49526fafb85021b4acf46de5c5159">gemv_q6_k_q8_k_avx2</a>(y, W, x_q8, M, K);</div>
-<div class="line"><span class="lineno"> 1356</span>    <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 1357</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
-<div class="line"><span class="lineno"> 1358</span>    <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#a2267ad482f0cda1249db2f6d5273b5da">gemv_q6_k_q8_k_avx</a>(y, W, x_q8, M, K);</div>
-<div class="line"><span class="lineno"> 1359</span>    <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 1360</span><span class="preprocessor">#elif defined(__SSE4_1__)</span></div>
-<div class="line"><span class="lineno"> 1361</span>    <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#a1dc45962cc0ed3df6427421935a4754f">gemv_q6_k_q8_k_sse</a>(y, W, x_q8, M, K);</div>
-<div class="line"><span class="lineno"> 1362</span>    <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 1363</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno"> 1364</span>    <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#a06c7e59ac3d04a760a5bcc83921ac9a9">gemv_q6_k_q8_k_ref</a>(y, W, x_q8, M, K);</div>
-<div class="line"><span class="lineno"> 1365</span>}</div>
-<div class="ttc" id="agemm__kernels__q6k__q8k_8c_html_a06c7e59ac3d04a760a5bcc83921ac9a9"><div class="ttname"><a href="gemm__kernels__q6k__q8k_8c.html#a06c7e59ac3d04a760a5bcc83921ac9a9">gemv_q6_k_q8_k_ref</a></div><div class="ttdeci">void gemv_q6_k_q8_k_ref(float *y, const void *W, const void *x_q8, int M, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q6k__q8k_8c_source.html#l00270">gemm_kernels_q6k_q8k.c:270</a></div></div>
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01356">1356</a> of file <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html">gemm_kernels_q6k_q8k.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 1360</span>{</div>
+<div class="line"><span class="lineno"> 1361</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a>() || <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#aa98a62f017969e334a0d3bbcbf34935d">ck_q6k_q8k_force_ref</a>()) {</div>
+<div class="line"><span class="lineno"> 1362</span>        <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#a06c7e59ac3d04a760a5bcc83921ac9a9">gemv_q6_k_q8_k_ref</a>(y, W, x_q8, M, K);</div>
+<div class="line"><span class="lineno"> 1363</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1364</span>    }</div>
+<div class="line"><span class="lineno"> 1365</span> </div>
+<div class="line"><span class="lineno"> 1366</span><span class="preprocessor">#if defined(__AVX2__)</span></div>
+<div class="line"><span class="lineno"> 1367</span>    <span class="comment">/* llama.cpp&#39;s x86 Q6_K production graph keeps the AVX2 reduction order</span></div>
+<div class="line"><span class="lineno"> 1368</span><span class="comment">     * even when AVX-512 is available. Wider ISA availability is not a license</span></div>
+<div class="line"><span class="lineno"> 1369</span><span class="comment">     * to change this numerical contract. */</span></div>
+<div class="line"><span class="lineno"> 1370</span>    <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#a87e49526fafb85021b4acf46de5c5159">gemv_q6_k_q8_k_avx2</a>(y, W, x_q8, M, K);</div>
+<div class="line"><span class="lineno"> 1371</span>    <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1372</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
+<div class="line"><span class="lineno"> 1373</span>    <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#a2267ad482f0cda1249db2f6d5273b5da">gemv_q6_k_q8_k_avx</a>(y, W, x_q8, M, K);</div>
+<div class="line"><span class="lineno"> 1374</span>    <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1375</span><span class="preprocessor">#elif defined(__SSE4_1__)</span></div>
+<div class="line"><span class="lineno"> 1376</span>    <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#a1dc45962cc0ed3df6427421935a4754f">gemv_q6_k_q8_k_sse</a>(y, W, x_q8, M, K);</div>
+<div class="line"><span class="lineno"> 1377</span>    <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1378</span><span class="preprocessor">#elif defined(__ARM_NEON) || defined(__aarch64__)</span></div>
+<div class="line"><span class="lineno"> 1379</span>    <span class="comment">/* NEON keeps the same integer-exact per-block dot as the scalar</span></div>
+<div class="line"><span class="lineno"> 1380</span><span class="comment">     * reference but accumulates the FP32 block contributions sequentially</span></div>
+<div class="line"><span class="lineno"> 1381</span><span class="comment">     * instead of through eight partial lanes, so strict parity mode (handled</span></div>
+<div class="line"><span class="lineno"> 1382</span><span class="comment">     * above) still uses the reference reduction order. */</span></div>
+<div class="line"><span class="lineno"> 1383</span>    gemv_q6_k_q8_k_neon(y, W, x_q8, M, K);</div>
+<div class="line"><span class="lineno"> 1384</span>    <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1385</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno"> 1386</span>    <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#a06c7e59ac3d04a760a5bcc83921ac9a9">gemv_q6_k_q8_k_ref</a>(y, W, x_q8, M, K);</div>
+<div class="line"><span class="lineno"> 1387</span>}</div>
+<div class="ttc" id="agemm__kernels__q6k__q8k_8c_html_a06c7e59ac3d04a760a5bcc83921ac9a9"><div class="ttname"><a href="gemm__kernels__q6k__q8k_8c.html#a06c7e59ac3d04a760a5bcc83921ac9a9">gemv_q6_k_q8_k_ref</a></div><div class="ttdeci">void gemv_q6_k_q8_k_ref(float *y, const void *W, const void *x_q8, int M, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q6k__q8k_8c_source.html#l00285">gemm_kernels_q6k_q8k.c:285</a></div></div>
 <div class="ttc" id="agemm__kernels__q6k__q8k_8c_html_a1dc45962cc0ed3df6427421935a4754f"><div class="ttname"><a href="gemm__kernels__q6k__q8k_8c.html#a1dc45962cc0ed3df6427421935a4754f">gemv_q6_k_q8_k_sse</a></div><div class="ttdeci">void gemv_q6_k_q8_k_sse(float *y, const void *W, const void *x_q8, int M, int K)</div></div>
 <div class="ttc" id="agemm__kernels__q6k__q8k_8c_html_a2267ad482f0cda1249db2f6d5273b5da"><div class="ttname"><a href="gemm__kernels__q6k__q8k_8c.html#a2267ad482f0cda1249db2f6d5273b5da">gemv_q6_k_q8_k_avx</a></div><div class="ttdeci">void gemv_q6_k_q8_k_avx(float *y, const void *W, const void *x_q8, int M, int K)</div></div>
 <div class="ttc" id="agemm__kernels__q6k__q8k_8c_html_a87e49526fafb85021b4acf46de5c5159"><div class="ttname"><a href="gemm__kernels__q6k__q8k_8c.html#a87e49526fafb85021b4acf46de5c5159">gemv_q6_k_q8_k_avx2</a></div><div class="ttdeci">void gemv_q6_k_q8_k_avx2(float *y, const void *W, const void *x_q8, int M, int K)</div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l00108">ck_q6k_q8k_force_ref()</a>, <a class="el" href="ckernel__strict_8c_source.html#l00043">ck_strict_parity_enabled()</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c.html#a2267ad482f0cda1249db2f6d5273b5da">gemv_q6_k_q8_k_avx()</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c.html#a87e49526fafb85021b4acf46de5c5159">gemv_q6_k_q8_k_avx2()</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l00270">gemv_q6_k_q8_k_ref()</a>, and <a class="el" href="gemm__kernels__q6k__q8k_8c.html#a1dc45962cc0ed3df6427421935a4754f">gemv_q6_k_q8_k_sse()</a>.</p>
+<p class="reference">References <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l00108">ck_q6k_q8k_force_ref()</a>, <a class="el" href="ckernel__strict_8c_source.html#l00043">ck_strict_parity_enabled()</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c.html#a2267ad482f0cda1249db2f6d5273b5da">gemv_q6_k_q8_k_avx()</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c.html#a87e49526fafb85021b4acf46de5c5159">gemv_q6_k_q8_k_avx2()</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l00285">gemv_q6_k_q8_k_ref()</a>, and <a class="el" href="gemm__kernels__q6k__q8k_8c.html#a1dc45962cc0ed3df6427421935a4754f">gemv_q6_k_q8_k_sse()</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="axpy__kernels_8c_source.html#l01616">ck_moe_q4k_mixed_route_work()</a>, <a class="el" href="axpy__kernels_8c_source.html#l00869">moe_swiglu_expert_forward_q4k_q6k_workspace()</a>, and <a class="el" href="axpy__kernels_8c_source.html#l01185">moe_swiglu_shared_forward_q4k_q6k_workspace()</a>.</p>
 
@@ -34425,27 +34434,27 @@ Functions</h2></td></tr>
 <p>Parallel reference GEMV for Q6_K × Q8_K. </p>
 <p>Caller provides ith (thread index) and nth (total threads). Each thread processes rows [r0, r1). </p>
 
-<p class="definition">Definition at line <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01398">1398</a> of file <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html">gemm_kernels_q6k_q8k.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 1403</span>{</div>
-<div class="line"><span class="lineno"> 1404</span>    <span class="keywordflow">if</span> (!y || !W || !x_q8 || M &lt;= 0 || K &lt;= 0) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 1405</span>    <span class="keywordflow">if</span> (ith &lt; 0 || nth &lt;= 0 || ith &gt;= nth) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 1406</span> </div>
-<div class="line"><span class="lineno"> 1407</span>    <span class="comment">/* Compute row range for this thread */</span></div>
-<div class="line"><span class="lineno"> 1408</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> dr = (M + nth - 1) / nth;</div>
-<div class="line"><span class="lineno"> 1409</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> r0 = dr * ith;</div>
-<div class="line"><span class="lineno"> 1410</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> r1 = (r0 + dr &lt; M) ? (r0 + dr) : M;</div>
-<div class="line"><span class="lineno"> 1411</span> </div>
-<div class="line"><span class="lineno"> 1412</span>    <span class="keywordflow">if</span> (r0 &gt;= M) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 1413</span> </div>
-<div class="line"><span class="lineno"> 1414</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *blocks = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *)W;</div>
-<div class="line"><span class="lineno"> 1415</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *x = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *)x_q8;</div>
-<div class="line"><span class="lineno"> 1416</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_row = K / <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
-<div class="line"><span class="lineno"> 1417</span> </div>
-<div class="line"><span class="lineno"> 1418</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = r0; row &lt; r1; ++row) {</div>
-<div class="line"><span class="lineno"> 1419</span>        <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *w_row = blocks + (size_t)row * (<span class="keywordtype">size_t</span>)blocks_per_row;</div>
-<div class="line"><span class="lineno"> 1420</span>        y[row] = <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#ae26ffd50d4f4c9b317e265d436cdf9e1">dot_q6_k_q8_k_ref</a>(w_row, x, K);</div>
-<div class="line"><span class="lineno"> 1421</span>    }</div>
-<div class="line"><span class="lineno"> 1422</span>}</div>
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01422">1422</a> of file <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html">gemm_kernels_q6k_q8k.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 1427</span>{</div>
+<div class="line"><span class="lineno"> 1428</span>    <span class="keywordflow">if</span> (!y || !W || !x_q8 || M &lt;= 0 || K &lt;= 0) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1429</span>    <span class="keywordflow">if</span> (ith &lt; 0 || nth &lt;= 0 || ith &gt;= nth) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1430</span> </div>
+<div class="line"><span class="lineno"> 1431</span>    <span class="comment">/* Compute row range for this thread */</span></div>
+<div class="line"><span class="lineno"> 1432</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> dr = (M + nth - 1) / nth;</div>
+<div class="line"><span class="lineno"> 1433</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> r0 = dr * ith;</div>
+<div class="line"><span class="lineno"> 1434</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> r1 = (r0 + dr &lt; M) ? (r0 + dr) : M;</div>
+<div class="line"><span class="lineno"> 1435</span> </div>
+<div class="line"><span class="lineno"> 1436</span>    <span class="keywordflow">if</span> (r0 &gt;= M) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1437</span> </div>
+<div class="line"><span class="lineno"> 1438</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *blocks = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *)W;</div>
+<div class="line"><span class="lineno"> 1439</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *x = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *)x_q8;</div>
+<div class="line"><span class="lineno"> 1440</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_row = K / <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
+<div class="line"><span class="lineno"> 1441</span> </div>
+<div class="line"><span class="lineno"> 1442</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = r0; row &lt; r1; ++row) {</div>
+<div class="line"><span class="lineno"> 1443</span>        <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *w_row = blocks + (size_t)row * (<span class="keywordtype">size_t</span>)blocks_per_row;</div>
+<div class="line"><span class="lineno"> 1444</span>        y[row] = <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#ae26ffd50d4f4c9b317e265d436cdf9e1">dot_q6_k_q8_k_ref</a>(w_row, x, K);</div>
+<div class="line"><span class="lineno"> 1445</span>    }</div>
+<div class="line"><span class="lineno"> 1446</span>}</div>
 <div class="ttc" id="agemm__kernels__q6k__q8k_8c_html_ae26ffd50d4f4c9b317e265d436cdf9e1"><div class="ttname"><a href="gemm__kernels__q6k__q8k_8c.html#ae26ffd50d4f4c9b317e265d436cdf9e1">dot_q6_k_q8_k_ref</a></div><div class="ttdeci">static float dot_q6_k_q8_k_ref(const block_q6_K *w, const block_q8_K *x, int K)</div><div class="ttdoc">Scalar dot product for Q6_K x Q8_K.</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q6k__q8k_8c_source.html#l00135">gemm_kernels_q6k_q8k.c:135</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l00135">dot_q6_k_q8_k_ref()</a>, and <a class="el" href="ckernel__quant_8h_source.html#l00175">QK_K</a>.</p>
@@ -34511,38 +34520,41 @@ Functions</h2></td></tr>
 <p>Parallel SIMD GEMV for Q6_K × Q8_K. </p>
 <p>Uses best available SIMD (AVX/SSE) with row prefetching. Caller provides ith/nth from OpenMP region. </p>
 
-<p class="definition">Definition at line <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01430">1430</a> of file <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html">gemm_kernels_q6k_q8k.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 1435</span>{</div>
-<div class="line"><span class="lineno"> 1436</span>    <span class="keywordflow">if</span> (!y || !W || !x_q8 || M &lt;= 0 || K &lt;= 0) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 1437</span>    <span class="keywordflow">if</span> (ith &lt; 0 || nth &lt;= 0 || ith &gt;= nth) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 1438</span> </div>
-<div class="line"><span class="lineno"> 1439</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> dr = (M + nth - 1) / nth;</div>
-<div class="line"><span class="lineno"> 1440</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> r0 = dr * ith;</div>
-<div class="line"><span class="lineno"> 1441</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> r1 = (r0 + dr &lt; M) ? (r0 + dr) : M;</div>
-<div class="line"><span class="lineno"> 1442</span> </div>
-<div class="line"><span class="lineno"> 1443</span>    <span class="keywordflow">if</span> (r0 &gt;= M) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 1444</span> </div>
-<div class="line"><span class="lineno"> 1445</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *blocks = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *)W;</div>
-<div class="line"><span class="lineno"> 1446</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *x = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *)x_q8;</div>
-<div class="line"><span class="lineno"> 1447</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_row = K / <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
-<div class="line"><span class="lineno"> 1448</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> strict = <a class="code hl_function" href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a>() || <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#aa98a62f017969e334a0d3bbcbf34935d">ck_q6k_q8k_force_ref</a>();</div>
-<div class="line"><span class="lineno"> 1449</span> </div>
-<div class="line"><span class="lineno"> 1450</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = r0; row &lt; r1; ++row) {</div>
-<div class="line"><span class="lineno"> 1451</span>        <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *w_row = blocks + (size_t)row * (<span class="keywordtype">size_t</span>)blocks_per_row;</div>
-<div class="line"><span class="lineno"> 1452</span><span class="preprocessor">#if defined(__AVX2__)</span></div>
-<div class="line"><span class="lineno"> 1453</span>        y[row] = strict ? <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#ae26ffd50d4f4c9b317e265d436cdf9e1">dot_q6_k_q8_k_ref</a>(w_row, x, K)</div>
-<div class="line"><span class="lineno"> 1454</span>                        : dot_q6_k_q8_k_avx2(w_row, x, K);</div>
-<div class="line"><span class="lineno"> 1455</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
-<div class="line"><span class="lineno"> 1456</span>        y[row] = strict ? <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#ae26ffd50d4f4c9b317e265d436cdf9e1">dot_q6_k_q8_k_ref</a>(w_row, x, K)</div>
-<div class="line"><span class="lineno"> 1457</span>                        : dot_q6_k_q8_k_avx(w_row, x, K);</div>
-<div class="line"><span class="lineno"> 1458</span><span class="preprocessor">#elif defined(__SSE4_1__)</span></div>
-<div class="line"><span class="lineno"> 1459</span>        y[row] = strict ? <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#ae26ffd50d4f4c9b317e265d436cdf9e1">dot_q6_k_q8_k_ref</a>(w_row, x, K)</div>
-<div class="line"><span class="lineno"> 1460</span>                        : dot_q6_k_q8_k_sse(w_row, x, K);</div>
-<div class="line"><span class="lineno"> 1461</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno"> 1462</span>        y[row] = <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#ae26ffd50d4f4c9b317e265d436cdf9e1">dot_q6_k_q8_k_ref</a>(w_row, x, K);</div>
-<div class="line"><span class="lineno"> 1463</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno"> 1464</span>    }</div>
-<div class="line"><span class="lineno"> 1465</span>}</div>
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01454">1454</a> of file <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html">gemm_kernels_q6k_q8k.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 1459</span>{</div>
+<div class="line"><span class="lineno"> 1460</span>    <span class="keywordflow">if</span> (!y || !W || !x_q8 || M &lt;= 0 || K &lt;= 0) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1461</span>    <span class="keywordflow">if</span> (ith &lt; 0 || nth &lt;= 0 || ith &gt;= nth) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1462</span> </div>
+<div class="line"><span class="lineno"> 1463</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> dr = (M + nth - 1) / nth;</div>
+<div class="line"><span class="lineno"> 1464</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> r0 = dr * ith;</div>
+<div class="line"><span class="lineno"> 1465</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> r1 = (r0 + dr &lt; M) ? (r0 + dr) : M;</div>
+<div class="line"><span class="lineno"> 1466</span> </div>
+<div class="line"><span class="lineno"> 1467</span>    <span class="keywordflow">if</span> (r0 &gt;= M) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1468</span> </div>
+<div class="line"><span class="lineno"> 1469</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *blocks = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *)W;</div>
+<div class="line"><span class="lineno"> 1470</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *x = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *)x_q8;</div>
+<div class="line"><span class="lineno"> 1471</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_row = K / <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
+<div class="line"><span class="lineno"> 1472</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> strict = <a class="code hl_function" href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a>() || <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#aa98a62f017969e334a0d3bbcbf34935d">ck_q6k_q8k_force_ref</a>();</div>
+<div class="line"><span class="lineno"> 1473</span> </div>
+<div class="line"><span class="lineno"> 1474</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = r0; row &lt; r1; ++row) {</div>
+<div class="line"><span class="lineno"> 1475</span>        <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *w_row = blocks + (size_t)row * (<span class="keywordtype">size_t</span>)blocks_per_row;</div>
+<div class="line"><span class="lineno"> 1476</span><span class="preprocessor">#if defined(__AVX2__)</span></div>
+<div class="line"><span class="lineno"> 1477</span>        y[row] = strict ? <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#ae26ffd50d4f4c9b317e265d436cdf9e1">dot_q6_k_q8_k_ref</a>(w_row, x, K)</div>
+<div class="line"><span class="lineno"> 1478</span>                        : dot_q6_k_q8_k_avx2(w_row, x, K);</div>
+<div class="line"><span class="lineno"> 1479</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
+<div class="line"><span class="lineno"> 1480</span>        y[row] = strict ? <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#ae26ffd50d4f4c9b317e265d436cdf9e1">dot_q6_k_q8_k_ref</a>(w_row, x, K)</div>
+<div class="line"><span class="lineno"> 1481</span>                        : dot_q6_k_q8_k_avx(w_row, x, K);</div>
+<div class="line"><span class="lineno"> 1482</span><span class="preprocessor">#elif defined(__SSE4_1__)</span></div>
+<div class="line"><span class="lineno"> 1483</span>        y[row] = strict ? <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#ae26ffd50d4f4c9b317e265d436cdf9e1">dot_q6_k_q8_k_ref</a>(w_row, x, K)</div>
+<div class="line"><span class="lineno"> 1484</span>                        : dot_q6_k_q8_k_sse(w_row, x, K);</div>
+<div class="line"><span class="lineno"> 1485</span><span class="preprocessor">#elif defined(__ARM_NEON) || defined(__aarch64__)</span></div>
+<div class="line"><span class="lineno"> 1486</span>        y[row] = strict ? <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#ae26ffd50d4f4c9b317e265d436cdf9e1">dot_q6_k_q8_k_ref</a>(w_row, x, K)</div>
+<div class="line"><span class="lineno"> 1487</span>                        : dot_q6_k_q8_k_neon(w_row, x, K);</div>
+<div class="line"><span class="lineno"> 1488</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno"> 1489</span>        y[row] = <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#ae26ffd50d4f4c9b317e265d436cdf9e1">dot_q6_k_q8_k_ref</a>(w_row, x, K);</div>
+<div class="line"><span class="lineno"> 1490</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno"> 1491</span>    }</div>
+<div class="line"><span class="lineno"> 1492</span>}</div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l00108">ck_q6k_q8k_force_ref()</a>, <a class="el" href="ckernel__strict_8c_source.html#l00043">ck_strict_parity_enabled()</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l00135">dot_q6_k_q8_k_ref()</a>, and <a class="el" href="ckernel__quant_8h_source.html#l00175">QK_K</a>.</p>
 
@@ -43300,9 +43312,9 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">  942</span>    }</div>
 <div class="line"><span class="lineno">  943</span>    <span class="keywordflow">return</span> 0;</div>
 <div class="line"><span class="lineno">  944</span>}</div>
-<div class="ttc" id="ackernel__engine_8h_html_a7b78875a957c11b30c9f7170b6c87c45"><div class="ttname"><a href="ckernel__engine_8h.html#a7b78875a957c11b30c9f7170b6c87c45">gemv_q6_k_q8_k</a></div><div class="ttdeci">void gemv_q6_k_q8_k(float *y, const void *W, const void *x_q8, int M, int K)</div><div class="ttdoc">GEMV: y = W @ x where W is Q6_K and x is Q8_K.</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q6k__q8k_8c_source.html#l01341">gemm_kernels_q6k_q8k.c:1341</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_a7b78875a957c11b30c9f7170b6c87c45"><div class="ttname"><a href="ckernel__engine_8h.html#a7b78875a957c11b30c9f7170b6c87c45">gemv_q6_k_q8_k</a></div><div class="ttdeci">void gemv_q6_k_q8_k(float *y, const void *W, const void *x_q8, int M, int K)</div><div class="ttdoc">GEMV: y = W @ x where W is Q6_K and x is Q8_K.</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q6k__q8k_8c_source.html#l01356">gemm_kernels_q6k_q8k.c:1356</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="axpy__kernels_8c_source.html#l00105">axpy_f32()</a>, <a class="el" href="ckernel__dtype_8h_source.html#l00041">CK_DT_Q4_K</a>, <a class="el" href="ckernel__dtype_8h_source.html#l00042">CK_DT_Q6_K</a>, <a class="el" href="ckernel__dtype_8h_source.html#l00044">CK_DT_Q8_K</a>, <a class="el" href="ckernel__dtype_8h_source.html#l00145">ck_dtype_row_bytes()</a>, <a class="el" href="axpy__kernels_8c_source.html#l00672">ck_moe_align64()</a>, <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00275">gemv_q4_k_q8_k()</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01341">gemv_q6_k_q8_k()</a>, <a class="el" href="axpy__kernels_8c_source.html#l00727">moe_swiglu_expert_q4k_q5k_workspace_bytes()</a>, <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00123">quantize_row_q8_k()</a>, and <a class="el" href="swiglu__kernels_8c_source.html#l00667">swiglu_forward_ggml()</a>.</p>
+<p class="reference">References <a class="el" href="axpy__kernels_8c_source.html#l00105">axpy_f32()</a>, <a class="el" href="ckernel__dtype_8h_source.html#l00041">CK_DT_Q4_K</a>, <a class="el" href="ckernel__dtype_8h_source.html#l00042">CK_DT_Q6_K</a>, <a class="el" href="ckernel__dtype_8h_source.html#l00044">CK_DT_Q8_K</a>, <a class="el" href="ckernel__dtype_8h_source.html#l00145">ck_dtype_row_bytes()</a>, <a class="el" href="axpy__kernels_8c_source.html#l00672">ck_moe_align64()</a>, <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00275">gemv_q4_k_q8_k()</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01356">gemv_q6_k_q8_k()</a>, <a class="el" href="axpy__kernels_8c_source.html#l00727">moe_swiglu_expert_q4k_q5k_workspace_bytes()</a>, <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00123">quantize_row_q8_k()</a>, and <a class="el" href="swiglu__kernels_8c_source.html#l00667">swiglu_forward_ggml()</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="axpy__kernels_8c_source.html#l01858">moe_swiglu_expert_forward_q4k_q6k_parallel_workspace()</a>.</p>
 
@@ -45201,7 +45213,7 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno"> 1239</span>    <span class="keywordflow">return</span> 0;</div>
 <div class="line"><span class="lineno"> 1240</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="ckernel__dtype_8h_source.html#l00044">CK_DT_Q8_K</a>, <a class="el" href="ckernel__dtype_8h_source.html#l00145">ck_dtype_row_bytes()</a>, <a class="el" href="axpy__kernels_8c_source.html#l00672">ck_moe_align64()</a>, <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00275">gemv_q4_k_q8_k()</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01341">gemv_q6_k_q8_k()</a>, <a class="el" href="axpy__kernels_8c_source.html#l00727">moe_swiglu_expert_q4k_q5k_workspace_bytes()</a>, <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00123">quantize_row_q8_k()</a>, and <a class="el" href="swiglu__kernels_8c_source.html#l00667">swiglu_forward_ggml()</a>.</p>
+<p class="reference">References <a class="el" href="ckernel__dtype_8h_source.html#l00044">CK_DT_Q8_K</a>, <a class="el" href="ckernel__dtype_8h_source.html#l00145">ck_dtype_row_bytes()</a>, <a class="el" href="axpy__kernels_8c_source.html#l00672">ck_moe_align64()</a>, <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00275">gemv_q4_k_q8_k()</a>, <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01356">gemv_q6_k_q8_k()</a>, <a class="el" href="axpy__kernels_8c_source.html#l00727">moe_swiglu_expert_q4k_q5k_workspace_bytes()</a>, <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00123">quantize_row_q8_k()</a>, and <a class="el" href="swiglu__kernels_8c_source.html#l00667">swiglu_forward_ggml()</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="axpy__kernels_8c_source.html#l02052">moe_swiglu_shared_forward_q4k_q6k_parallel_workspace()</a>.</p>
 
@@ -63300,19 +63312,19 @@ Functions</h2></td></tr>
 
 <p>Q6_K x Q8_K dot product (single row) </p>
 
-<p class="definition">Definition at line <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01324">1324</a> of file <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html">gemm_kernels_q6k_q8k.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 1325</span>{</div>
-<div class="line"><span class="lineno"> 1326</span>    <span class="keywordflow">if</span> (!s || !vx || !vy || n &lt;= 0) {</div>
-<div class="line"><span class="lineno"> 1327</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 1328</span>    }</div>
-<div class="line"><span class="lineno"> 1329</span> </div>
-<div class="line"><span class="lineno"> 1330</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *x = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *)vx;</div>
-<div class="line"><span class="lineno"> 1331</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *y = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *)vy;</div>
-<div class="line"><span class="lineno"> 1332</span> </div>
-<div class="line"><span class="lineno"> 1333</span>    <span class="comment">/* This is the architecture-neutral scalar oracle. Production x86 dispatch</span></div>
-<div class="line"><span class="lineno"> 1334</span><span class="comment">     * uses the separately parity-tested SIMD reduction tree. */</span></div>
-<div class="line"><span class="lineno"> 1335</span>    *s = <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#ae26ffd50d4f4c9b317e265d436cdf9e1">dot_q6_k_q8_k_ref</a>(x, y, n);</div>
-<div class="line"><span class="lineno"> 1336</span>}</div>
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l01339">1339</a> of file <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html">gemm_kernels_q6k_q8k.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 1340</span>{</div>
+<div class="line"><span class="lineno"> 1341</span>    <span class="keywordflow">if</span> (!s || !vx || !vy || n &lt;= 0) {</div>
+<div class="line"><span class="lineno"> 1342</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1343</span>    }</div>
+<div class="line"><span class="lineno"> 1344</span> </div>
+<div class="line"><span class="lineno"> 1345</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *x = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q6__K.html">block_q6_K</a> *)vx;</div>
+<div class="line"><span class="lineno"> 1346</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *y = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *)vy;</div>
+<div class="line"><span class="lineno"> 1347</span> </div>
+<div class="line"><span class="lineno"> 1348</span>    <span class="comment">/* This is the architecture-neutral scalar oracle. Production x86 dispatch</span></div>
+<div class="line"><span class="lineno"> 1349</span><span class="comment">     * uses the separately parity-tested SIMD reduction tree. */</span></div>
+<div class="line"><span class="lineno"> 1350</span>    *s = <a class="code hl_function" href="gemm__kernels__q6k__q8k_8c.html#ae26ffd50d4f4c9b317e265d436cdf9e1">dot_q6_k_q8_k_ref</a>(x, y, n);</div>
+<div class="line"><span class="lineno"> 1351</span>}</div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="gemm__kernels__q6k__q8k_8c_source.html#l00135">dot_q6_k_q8_k_ref()</a>.</p>
 
