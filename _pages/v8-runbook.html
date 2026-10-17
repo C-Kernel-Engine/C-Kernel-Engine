@@ -303,6 +303,16 @@ make v8-training-python-authoring-smoke
         native executable as <code>NOT_CERTIFIED</code>. Qwen3.5 DeltaNet authoring remains behind
         composition-level state and backward certification. RWKV is outside this workstream.
     </p>
+    <p class="v8-note">
+        <strong>RWKV-7 inference groundwork is not executable-model certification.</strong>
+        The candidate <code>rwkv7.json</code> circuit and FP32 maps describe operation
+        interfaces; primitive oracle tests do not prove a generated full-model trajectory.
+        Native <code>rwkv_world_trie</code> tokenization is unsupported and fails before
+        tokenizer C emission. Weight import, recurrent-state and residual-buffer placement,
+        layer-zero value sharing, token-serial prefill, and generated multi-token parity
+        remain bring-up gates. Use the ordinary native host once those contracts are complete,
+        rather than introducing a separate model-specific CLI or hardcoded prompt formatter.
+    </p>
 </div>
 
 <div class="card" id="frozen-svg-training-fixture">
