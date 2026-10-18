@@ -463,6 +463,22 @@ void gemm_nt_bf16_bf16_storage_parallel_dispatch(const float *A,
                                                   const float *bias,
                                                   float *C,
                                                   int M, int N, int K);
+void gemm_nt_bf16_accurate_storage(const float *A,
+                                   const void *B,
+                                   const float *bias,
+                                   float *C,
+                                   int M, int N, int K);
+void gemm_nt_bf16_accurate_storage_row_range(const float *A,
+                                              const void *B,
+                                              const float *bias,
+                                              float *C,
+                                              int M, int N, int K,
+                                              int row_begin, int row_end);
+void gemm_nt_bf16_accurate_storage_parallel_dispatch(const float *A,
+                                                       const void *B,
+                                                       const float *bias,
+                                                       float *C,
+                                                       int M, int N, int K);
 
 void gemm_nt_bf16_native_bf16_storage(const float *A,
                                       const void *B,

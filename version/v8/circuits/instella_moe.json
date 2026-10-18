@@ -175,14 +175,14 @@
       ],
       "phases": {
         "prefill": {
-          "contract_id": "bf16_weight_bf16_input_fp32_dot_bf16_output",
+          "contract_id": "bf16_weight_bf16_input_accurate_dot_bf16_output",
           "validation": "validated",
-          "evidence": "Instella stores BF16 projection outputs before MLA, gated attention, dense SwiGLU, and logits consumers."
+          "evidence": "Instella stores BF16 projection outputs before MLA, gated attention, dense SwiGLU, and logits consumers. The selected accurate-dot provider preserves the captured BF16 midpoint and MoE routing boundary."
         },
         "decode": {
-          "contract_id": "bf16_weight_bf16_input_fp32_dot_bf16_output",
+          "contract_id": "bf16_weight_bf16_input_accurate_dot_bf16_output",
           "validation": "validated",
-          "evidence": "Single-token decode retains the same BF16 linear-output storage boundary."
+          "evidence": "Single-token decode selects the same accurate-dot and BF16 linear-output storage boundary as prefill."
         }
       },
       "checkpoint": {

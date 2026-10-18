@@ -2842,6 +2842,44 @@
       "description": "BF16 weights and BF16-rounded FP32 activation loads with ascending-K FP32 dot products and BF16 RNE output storage.",
       "operator_family": "gemm"
     },
+    "bf16_weight_bf16_input_accurate_dot_bf16_output": {
+      "status": "validated",
+      "storage": {
+        "input": "fp32",
+        "weight": "bf16",
+        "output": "bf16"
+      },
+      "compute": {
+        "input": "bf16_rne",
+        "weight": "bf16",
+        "accumulator": "fp64",
+        "contraction": "disabled",
+        "evaluation_order": "even_and_odd_ascending_k_fp64_partial_sums_then_fp64_merge_then_fp32_bias_input_promoted_to_fp64_then_fp32_output_conversion"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": [
+          "input_load",
+          "reduction_finalize",
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "dot_product",
+        "order": "contract_defined_chunks",
+        "partial_accumulator": "fp64",
+        "merge_order": "pairwise_tree"
+      },
+      "threading": {
+        "work_partition": "independent_rows",
+        "split_strategy": "independent_outputs",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "BF16 operands with two FP64 partial dot sums, FP32 output conversion and BF16 RNE output storage. Explicitly selected when the midpoint boundary affects routing.",
+      "operator_family": "gemm"
+    },
     "fp32_weight_fp32_input_llamafile_x86_native_fp32_output": {
       "operator_family": "gemm",
       "status": "validated",
