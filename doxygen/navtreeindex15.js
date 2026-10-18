@@ -1,5 +1,12 @@
 var NAVTREEINDEX15 =
 {
+"globals_defs_w.html":[2,1,6,18],
+"globals_defs_y.html":[2,1,6,19],
+"globals_e.html":[2,1,0,5],
+"globals_enum.html":[2,1,4],
+"globals_eval.html":[2,1,5],
+"globals_eval.html":[2,1,5,0],
+"globals_eval_g.html":[2,1,5,1],
 "globals_eval_q.html":[2,1,5,2],
 "globals_eval_r.html":[2,1,5,3],
 "globals_f.html":[2,1,0,6],
@@ -242,12 +249,5 @@ var NAVTREEINDEX15 =
 "mega__fused__attention_8h.html#ab74480f5b3519b41f21a0f8c25fd6498":[2,0,0,51,7],
 "mega__fused__attention_8h.html#abddf5082728f226c8888fc95c14b7e24":[2,0,0,51,1],
 "mega__fused__attention_8h.html#aca1476c2ed7a5ed20fd199f597a67149":[2,0,0,51,13],
-"mega__fused__attention_8h.html#acdd13869b94d435a14a0ada232c66e71":[2,0,0,51,9],
-"mega__fused__attention_8h.html#aeeb0cc88f51b1af24d80deeea9bae2b4":[2,0,0,51,4],
-"mega__fused__attention_8h.html#af5a9a3482344942ff204ca604ac1715b":[2,0,0,51,0],
-"mega__fused__attention_8h_source.html":[2,0,0,51],
-"mega__fused__attention__avx_8c.html":[2,0,1,1,0,3],
-"mega__fused__attention__avx_8c.html#a0493a1e92829e37919fe80374ddf06d9":[2,0,1,1,0,3,7],
-"mega__fused__attention__avx_8c.html#a0dfb0d638f2eaaba130772508d90f5e8":[2,0,1,1,0,3,10],
-"mega__fused__attention__avx_8c.html#a0f1bc2213a8b5b37144943e6da1eb48a":[2,0,1,1,0,3,1]
+"mega__fused__attention_8h.html#acdd13869b94d435a14a0ada232c66e71":[2,0,0,51,9]
 };

@@ -1,5 +1,12 @@
 var NAVTREEINDEX18 =
 {
+"runtime__extent_8c.html#aafb5911cb55ad85cb3102bb703a77e74":[2,0,1,1,114,1],
+"runtime__extent_8c_source.html":[2,0,1,1,114],
+"rwkv7__decode_8c.html":[2,0,1,1,115],
+"rwkv7__decode_8c.html#a06cd318c6cd148188cafec9975688063":[2,0,1,1,115,3],
+"rwkv7__decode_8c.html#a11b2eaaf160fb24734d3b5374a55496c":[2,0,1,1,115,0],
+"rwkv7__decode_8c.html#a123d0108a84d9bfbe954606dcb79b5d4":[2,0,1,1,115,17],
+"rwkv7__decode_8c.html#a1dff0f15378b76335795df47c4e89b1b":[2,0,1,1,115,15],
 "rwkv7__decode_8c.html#a64973642226e4f40eb884878288013ab":[2,0,1,1,115,1],
 "rwkv7__decode_8c.html#a6fcc6465e48f60e8023a7f5d0eca7e0c":[2,0,1,1,115,11],
 "rwkv7__decode_8c.html#a7d03a1eda3bae5252e748280b310fbfa":[2,0,1,1,115,10],
@@ -242,12 +249,5 @@ var NAVTREEINDEX18 =
 "structCKKernelSpec.html#a851ca16066a7dfa2499bee69cfef2360":[1,0,33,1],
 "structCKKernelSpec.html#ab6e588e0f3701c3c63904c231325185d":[1,0,33,4],
 "structCKKernelSpec.html#aba0f53ce7d166eb16ab0a2cb0973040b":[1,0,33,0],
-"structCKKernelSpec.html#af3d9a06048ce2f5e9fa5c852d864d625":[1,0,33,3],
-"structCKKokoroShapeLimitsV8.html":[1,0,34],
-"structCKKokoroShapeLimitsV8.html#a2b669f619722897c5671c009fedda00a":[1,0,34,7],
-"structCKKokoroShapeLimitsV8.html#a2e63d3dfe27c5b2e73a61248727d8783":[1,0,34,6],
-"structCKKokoroShapeLimitsV8.html#a559c2443d1019f6723443adda7cba702":[1,0,34,11],
-"structCKKokoroShapeLimitsV8.html#a796427e30ff2e16e9ebba3889ebf9b6f":[1,0,34,1],
-"structCKKokoroShapeLimitsV8.html#a8af54bed1db937931192d3e20efe088c":[1,0,34,8],
-"structCKKokoroShapeLimitsV8.html#a9af98b25afda3ced8b86248a4cb19c10":[1,0,34,0]
+"structCKKernelSpec.html#af3d9a06048ce2f5e9fa5c852d864d625":[1,0,33,3]
 };
