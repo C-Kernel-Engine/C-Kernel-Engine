@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import importlib.util
+import ctypes
 import json
 import math
+import struct
 import subprocess
 import sys
 import tempfile
@@ -28,6 +30,15 @@ def _load_converter():
 
 
 converter = _load_converter()
+
+
+def _bf16_to_float(bits: int) -> float:
+    return struct.unpack("<f", struct.pack("<I", bits << 16))[0]
+
+
+def _float_to_bf16(value: float) -> int:
+    word = struct.unpack("<I", struct.pack("<f", value))[0]
+    return ((word + 0x7FFF + ((word >> 16) & 1)) >> 16) & 0xFFFF
 
 
 def _tiny_config() -> dict:
@@ -350,7 +361,7 @@ class InstellaMoEBringupTests(unittest.TestCase):
                         continue
                     self.assertEqual(
                         op.get("call_abi", {}).get("kernel_id"),
-                        "gemm_nt_bf16_bf16_storage",
+                        "gemm_nt_bf16_accurate_storage",
                         op,
                     )
                 for op in ops:
@@ -529,6 +540,76 @@ class InstellaMoEBringupTests(unittest.TestCase):
                 layout,
                 None,
             )
+
+
+class BF16StorageProjectionTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        library = ROOT / "build" / "libckernel_engine.so"
+        build = subprocess.run(
+            ["make", "build/libckernel_engine.so"], cwd=ROOT,
+            capture_output=True, text=True, timeout=180,
+        )
+        if build.returncode:
+            raise AssertionError(build.stdout[-2000:] + build.stderr[-2000:])
+        cls.library = ctypes.CDLL(str(library))
+        cls.project = cls.library.gemm_nt_bf16_accurate_storage
+        cls.project.argtypes = [
+            ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p,
+            ctypes.c_int, ctypes.c_int, ctypes.c_int,
+        ]
+        cls.legacy_project = cls.library.gemm_nt_bf16_bf16_storage
+        cls.legacy_project.argtypes = cls.project.argtypes
+
+    def _project(
+        self, inputs: list[float], weights: list[int], bias: list[float] | None,
+        m: int, n: int, k: int,
+    ) -> list[float]:
+        x = (ctypes.c_float * len(inputs))(*inputs)
+        w = (ctypes.c_uint16 * len(weights))(*weights)
+        b = (ctypes.c_float * len(bias))(*bias) if bias is not None else None
+        out = (ctypes.c_float * (m * n))(*([-999.0] * (m * n)))
+        self.project(x, w, b, out, m, n, k)
+        return list(out)
+
+    def test_synthetic_rounding_boundary_matches_independent_sum(self) -> None:
+        fixture = json.loads((ROOT / "tests" / "fixtures" / "v8" /
+                              "bf16_gemm_storage_rounding.json").read_text())
+        x = [_bf16_to_float(bits) for bits in fixture["x_bf16_bits"]]
+        w = fixture["w_bf16_bits"]
+        exact = math.fsum(a * _bf16_to_float(b) for a, b in zip(x, w))
+        self.assertEqual(_float_to_bf16(exact), fixture["expected_bf16_bits"])
+        result = self._project(x, w, None, 1, 1, fixture["k"])
+        self.assertEqual(_float_to_bf16(result[0]), fixture["expected_bf16_bits"])
+        x_array = (ctypes.c_float * len(x))(*x)
+        w_array = (ctypes.c_uint16 * len(w))(*w)
+        old_output = (ctypes.c_float * 1)(-999.0)
+        self.legacy_project(x_array, w_array, None, old_output, 1, 1, fixture["k"])
+        self.assertNotEqual(_float_to_bf16(old_output[0]), fixture["expected_bf16_bits"])
+
+    def test_odd_width_bias_and_two_rows_match_independent_sum(self) -> None:
+        k, n, m = 7, 3, 2
+        x_bits = [0x3F80, 0xBE80, 0x3D80, 0xBF20, 0x3F10, 0x3E00, 0x3C80,
+                  0xBF40, 0x3F00, 0x3E80, 0x3D00, 0xBD80, 0x3F20, 0x3E40]
+        w_bits = [0x3E80, 0xBF00, 0x3D00, 0x3F40, 0xBD80, 0x3E00, 0x3F10,
+                  0xBF20, 0x3F00, 0x3E40, 0x3D80, 0xBE00, 0x3F40, 0x3C80,
+                  0x3D80, 0x3F20, 0xBF10, 0x3E80, 0x3F00, 0xBC80, 0x3E00]
+        x = [_bf16_to_float(bits) for bits in x_bits]
+        bias = [0.125, -0.25, 0.375]
+        actual = self._project(x, w_bits, bias, m, n, k)
+        for row in range(m):
+            for col in range(n):
+                exact = math.fsum(
+                    x[row * k + i] * _bf16_to_float(w_bits[col * k + i])
+                    for i in range(k)
+                ) + bias[col]
+                self.assertEqual(
+                    _float_to_bf16(actual[row * n + col]),
+                    _float_to_bf16(exact),
+                )
+
+    def test_invalid_width_does_not_publish_output(self) -> None:
+        self.assertEqual(self._project([1.0], [0x3F80], None, 1, 1, 0), [-999.0])
 
 
 if __name__ == "__main__":

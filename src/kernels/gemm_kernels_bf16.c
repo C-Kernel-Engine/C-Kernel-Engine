@@ -2067,11 +2067,60 @@ void gemm_nt_bf16_bf16_storage_row_range(const float *A,
     }
 }
 
+void gemm_nt_bf16_accurate_storage_row_range(const float *A,
+                                              const void *B,
+                                              const float *bias,
+                                              float *C,
+                                              int M, int N, int K,
+                                              int row_begin, int row_end)
+{
+    const uint16_t *w = (const uint16_t *)B;
+    if (!A || !w || !C || M <= 0 || N <= 0 || K <= 0 ||
+        row_begin < 0 || row_begin >= row_end || row_end > M) {
+        return;
+    }
+    for (int row = row_begin; row < row_end; ++row) {
+        const float *a_row = A + (size_t)row * (size_t)K;
+        float *dst = C + (size_t)row * (size_t)N;
+        for (int col = 0; col < N; ++col) {
+            const uint16_t *w_row = w + (size_t)col * (size_t)K;
+            /* BF16 products are exact in double. A single FP32 accumulator can
+             * round a long dot across a BF16 midpoint before output storage;
+             * that changes downstream routing. Keep the accumulation accurate
+             * until the declared FP32 bias/output conversion boundary. */
+            double even = 0.0;
+            double odd = 0.0;
+            int k = 0;
+            for (; k + 1 < K; k += 2) {
+                even += (double)bf16_to_float(float_to_bf16(a_row[k])) *
+                        (double)bf16_to_float(w_row[k]);
+                odd += (double)bf16_to_float(float_to_bf16(a_row[k + 1])) *
+                       (double)bf16_to_float(w_row[k + 1]);
+            }
+            if (k < K) {
+                even += (double)bf16_to_float(float_to_bf16(a_row[k])) *
+                        (double)bf16_to_float(w_row[k]);
+            }
+            const float sum = (float)((even + odd) + (bias ? bias[col] : 0.0f));
+            dst[col] = bf16_to_float(float_to_bf16(sum));
+        }
+    }
+}
+
 static void ck_gemm_nt_bf16_storage_exact_rows(int begin, int end, void *opaque)
 {
     const ck_gemm_nt_bf16_exact_args_t *args =
         (const ck_gemm_nt_bf16_exact_args_t *)opaque;
     gemm_nt_bf16_bf16_storage_row_range(
+        args->A, args->B, args->bias, args->C,
+        args->M, args->N, args->K, begin, end);
+}
+
+static void ck_gemm_nt_bf16_accurate_storage_rows(int begin, int end, void *opaque)
+{
+    const ck_gemm_nt_bf16_exact_args_t *args =
+        (const ck_gemm_nt_bf16_exact_args_t *)opaque;
+    gemm_nt_bf16_accurate_storage_row_range(
         args->A, args->B, args->bias, args->C,
         args->M, args->N, args->K, begin, end);
 }
@@ -2107,6 +2156,39 @@ void gemm_nt_bf16_bf16_storage(const float *A,
                                 int M, int N, int K)
 {
     gemm_nt_bf16_bf16_storage_parallel_dispatch(A, B, bias, C, M, N, K);
+}
+
+void gemm_nt_bf16_accurate_storage_parallel_dispatch(const float *A,
+                                                       const void *B,
+                                                       const float *bias,
+                                                       float *C,
+                                                       int M, int N, int K)
+{
+    ck_threadpool_t *pool = ck_threadpool_global();
+    if (!pool || ck_threadpool_n_threads(pool) <= 1 || M < 2 ||
+        (size_t)M * (size_t)N <= 4096) {
+        gemm_nt_bf16_accurate_storage_row_range(A, B, bias, C, M, N, K, 0, M);
+        return;
+    }
+
+    ck_gemm_nt_bf16_exact_args_t args = {
+        .A = A, .B = B, .bias = bias, .C = C, .M = M, .N = N, .K = K,
+    };
+    int active = ck_threadpool_n_threads(pool);
+    if (active > M) active = M;
+    int grain = M / (active * 4);
+    if (grain < 1) grain = 1;
+    ck_threadpool_parallel_for_n(
+        pool, active, 0, M, grain, ck_gemm_nt_bf16_accurate_storage_rows, &args);
+}
+
+void gemm_nt_bf16_accurate_storage(const float *A,
+                                   const void *B,
+                                   const float *bias,
+                                   float *C,
+                                   int M, int N, int K)
+{
+    gemm_nt_bf16_accurate_storage_parallel_dispatch(A, B, bias, C, M, N, K);
 }
 
 void gemm_backward_bf16_mixed(const uint16_t *d_output,
