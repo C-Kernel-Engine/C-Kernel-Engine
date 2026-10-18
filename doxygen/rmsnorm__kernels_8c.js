@@ -1,5 +1,6 @@
 var rmsnorm__kernels_8c =
 [
+    [ "ck_rmsnorm_provider_name", "rmsnorm__kernels_8c.html#ac84f44f358ab2938364e36c4ed34e878", null ],
     [ "gemma4_v_norm_forward", "rmsnorm__kernels_8c.html#abf3180347af2f640c551aa53af1878b8", null ],
     [ "rmsnorm_backward", "rmsnorm__kernels_8c.html#aca68d7dda1a7de9ff926920804751db0", null ],
     [ "rmsnorm_backward_strict_scalar", "rmsnorm__kernels_8c.html#ac429025594088a6caf98de6d42095692", null ],
