@@ -5293,7 +5293,7 @@ test_softmax.py::TestSoftmaxForward::test_exact_vs_fast</p>
 
 
 <details open>
-    <summary>Attention (183)</summary>
+    <summary>Attention (188)</summary>
     <div class="accordion-content">
 
 
@@ -6937,6 +6937,36 @@ test_attention.py::TestAttentionForward::test_flash_decode</p>
 
         <div class="card" style="margin-bottom: 1rem;">
             <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">deepseek_mla_attention_bf16_phases_parallel_dispatch</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void deepseek_mla_attention_bf16_phases_parallel_dispatch(const float * q, const float * k, const float * v, float * output, int num_heads, int num_kv_heads, int num_tokens, int qk_head_dim, int v_head_dim, float scale, float * scores, size_t scores_bytes)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">deepseek_mla_attention_bf16_phases_workspace</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void deepseek_mla_attention_bf16_phases_workspace(const float * q, const float * k, const float * v, float * output, int num_heads, int num_kv_heads, int num_tokens, int qk_head_dim, int v_head_dim, float scale, float * scores, size_t scores_bytes)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">deepseek_mla_attention_decode_bf16_phases_workspace</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void deepseek_mla_attention_decode_bf16_phases_workspace(const float * q, const float * k_cache, const float * v_cache, float * output, int num_heads, int num_kv_heads, int cache_len, int qk_head_dim, int v_head_dim, int max_seq_len, int cache_stride, float scale, float * scores, size_t scores_bytes)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">deepseek_mla_attention_decode_f32</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
@@ -6987,10 +7017,20 @@ test_attention.py::TestAttentionForward::test_flash_decode</p>
 
         <div class="card" style="margin-bottom: 1rem;">
             <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ds_mla_attention_decode_workspace</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void ds_mla_attention_decode_workspace(const float * q, const float * k_cache, const float * v_cache, float * output, int num_heads, int num_kv_heads, int cache_len, int qk_head_dim, int v_head_dim, int max_seq_len, int cache_stride, float scale, float * scores, size_t scores_bytes, int bf16_phases)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ds_mla_attention_f32_query_range</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void ds_mla_attention_f32_query_range(const float * q, const float * k, const float * v, float * output, int num_heads, int num_kv_heads, int num_tokens, int qk_head_dim, int v_head_dim, float scale, float * scores, int query_begin, int query_end, int query_step)</pre>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void ds_mla_attention_f32_query_range(const float * q, const float * k, const float * v, float * output, int num_heads, int num_kv_heads, int num_tokens, int qk_head_dim, int v_head_dim, float scale, float * scores, int query_begin, int query_end, int query_step, int bf16_phases)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 
@@ -7001,6 +7041,16 @@ test_attention.py::TestAttentionForward::test_flash_decode</p>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void ds_mla_attention_f32_work(int ith, int nth, void * opaque)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ds_mla_attention_parallel_dispatch</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void ds_mla_attention_parallel_dispatch(const float * q, const float * k, const float * v, float * output, int num_heads, int num_kv_heads, int num_tokens, int qk_head_dim, int v_head_dim, float scale, float * scores, size_t scores_bytes, int bf16_phases)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 
@@ -9294,7 +9344,7 @@ test_rope.py::TestRoPECache::test_cache_values</p>
 
 
 <details open>
-    <summary>Other Functions (1504)</summary>
+    <summary>Other Functions (1505)</summary>
     <div class="accordion-content">
 
 
@@ -17275,6 +17325,16 @@ hugepage_mode
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void ds_mla_kv_decompress_bf16_rows(int begin, int end, void * opaque)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ds_mla_prefill_valid</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int ds_mla_prefill_valid(const float * q, const float * k, const float * v, float * output, int num_heads, int num_kv_heads, int num_tokens, int qk_head_dim, int v_head_dim, float scale, float * scores, size_t scores_bytes)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 

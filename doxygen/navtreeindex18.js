@@ -1,5 +1,14 @@
 var NAVTREEINDEX18 =
 {
+"rope__kernels__bf16_8c.html#aa0dd19a90e07b0190fefaccbb39412cc":[2,0,1,1,113,2],
+"rope__kernels__bf16_8c.html#aa78ff3e5ee18285ce8c1d28f9957eed0":[2,0,1,1,113,3],
+"rope__kernels__bf16_8c.html#adb1b1464a7e234c8743347c430044623":[2,0,1,1,113,4],
+"rope__kernels__bf16_8c.html#ae4433c52cd7bdc8e4900e0a738fb9baf":[2,0,1,1,113,5],
+"rope__kernels__bf16_8c_source.html":[2,0,1,1,113],
+"runtime__extent_8c.html":[2,0,1,1,114],
+"runtime__extent_8c.html#a2e3491878be5e3941b8adf4406550db7":[2,0,1,1,114,2],
+"runtime__extent_8c.html#a313dfde74e1135de3ab52d2f74a47a19":[2,0,1,1,114,3],
+"runtime__extent_8c.html#a826f3c5fb3ee31dbbd7bd26e2898a6dd":[2,0,1,1,114,0],
 "runtime__extent_8c.html#aafb5911cb55ad85cb3102bb703a77e74":[2,0,1,1,114,1],
 "runtime__extent_8c_source.html":[2,0,1,1,114],
 "rwkv7__decode_8c.html":[2,0,1,1,115],
@@ -240,14 +249,5 @@ var NAVTREEINDEX18 =
 "structCKInputRef.html":[1,0,25],
 "structCKInputRef.html#a952a97cab88682ffb36027b353492e6f":[1,0,25,1],
 "structCKInputRef.html#ae1ae7d92ed1362d599e30bf5aff958e3":[1,0,25,0],
-"structCKKernelId.html":[1,0,32],
-"structCKKernelId.html#aaa58279e743ef1ec7a4c9cce3dc67c79":[1,0,32,1],
-"structCKKernelId.html#ab2cebeabdb83297de77f4926e9994ac9":[1,0,32,0],
-"structCKKernelSpec.html":[1,0,33],
-"structCKKernelSpec.html#a19f87171754de66c10e0d6a0968489e2":[1,0,33,2],
-"structCKKernelSpec.html#a702e1368abaa202d24597a58f2f5c751":[1,0,33,5],
-"structCKKernelSpec.html#a851ca16066a7dfa2499bee69cfef2360":[1,0,33,1],
-"structCKKernelSpec.html#ab6e588e0f3701c3c63904c231325185d":[1,0,33,4],
-"structCKKernelSpec.html#aba0f53ce7d166eb16ab0a2cb0973040b":[1,0,33,0],
-"structCKKernelSpec.html#af3d9a06048ce2f5e9fa5c852d864d625":[1,0,33,3]
+"structCKKernelId.html":[1,0,32]
 };

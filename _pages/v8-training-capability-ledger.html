@@ -1,11 +1,11 @@
 <!-- TITLE: v8 Training Kernel Capability Ledger -->
 <h1>v8 training kernel capability ledger</h1>
-<p>Generated from <code>version/v8/kernel_maps/*.json</code> by <code>version/v8/scripts/build_training_capability_ledger_v8.py</code>. Source digest: <code>2e1e6a11ac5571e0fc721d0b8c3657f1274e9280beeeefbd369eca95643a1c45</code>; provider maps: 434.</p>
+<p>Generated from <code>version/v8/kernel_maps/*.json</code> by <code>version/v8/scripts/build_training_capability_ledger_v8.py</code>. Source digest: <code>ecb626881ae33d32512d22c73fca036ddbae07711a9d2a20aafde373c6ed9124</code>; provider maps: 436.</p>
 <p>This is a <strong>map inventory, not a training PASS</strong>. A backward declaration means a backward provider is registered; it does not prove matching geometry, selection by a generated circuit, or executed PyTorch parity. BF16-tagged includes storage or arithmetic tags. Quantized forward maps do not imply quantized-base gradients or QLoRA support. Direct executed evidence: <code>NOT_MEASURED_BY_MAP_INVENTORY</code>.</p>
 <p><strong>Authoring, lowering, and execution are separate.</strong> The public <code>cke.nn</code> module list below comes from its Python source. A class existing there does not establish that v8 can lower it, select a backward provider, or certify a generated training run. Exact kernel-map operation names are not automatically equivalent to Python modules.</p>
 <table class="table"><thead><tr><th>Dtype family</th><th>Provider maps</th><th>Forward or unspecified</th><th>Declared training forward</th><th>Declared backward</th><th>Backward-named without mode</th><th>Maps with registered tests</th></tr></thead><tbody>
 <tr><td>fp32-tagged</td><td>276</td><td>252</td><td>15</td><td>24</td><td>5</td><td>235</td></tr>
-<tr><td>bf16-tagged</td><td>79</td><td>79</td><td>0</td><td>0</td><td>0</td><td>64</td></tr>
+<tr><td>bf16-tagged</td><td>81</td><td>81</td><td>0</td><td>0</td><td>0</td><td>64</td></tr>
 <tr><td>quantized</td><td>62</td><td>62</td><td>0</td><td>0</td><td>0</td><td>42</td></tr>
 <tr><td>unspecified</td><td>17</td><td>17</td><td>0</td><td>0</td><td>0</td><td>10</td></tr>
 </tbody></table>
@@ -45,6 +45,7 @@
 <tr><td>bf16-tagged</td><td>kv_cache_store_batch_bf16</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>bf16-tagged</td><td>kv_lora_decompress</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>bf16-tagged</td><td>layernorm</td><td>2</td><td>—</td><td>—</td></tr>
+<tr><td>bf16-tagged</td><td>mla_attention</td><td>2</td><td>—</td><td>—</td></tr>
 <tr><td>bf16-tagged</td><td>moe_swiglu_expert_mlp</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>bf16-tagged</td><td>moe_swiglu_packed_expert_mlp</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>bf16-tagged</td><td>partial_rope_concat</td><td>1</td><td>—</td><td>—</td></tr>
@@ -244,7 +245,7 @@
 <tr><td>unspecified</td><td>speculative_commit_or_reject</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>unspecified</td><td>tokenizer</td><td>1</td><td>—</td><td>—</td></tr>
 </tbody></table>
-<details><summary>All 434 provider maps</summary>
+<details><summary>All 436 provider maps</summary>
 <table class="table"><thead><tr><th>Map</th><th>Provider ID</th><th>Operation</th><th>Dtype family</th><th>Backward mode</th><th>Registered test</th></tr></thead><tbody>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/adamw_update_f32.json">version/v8/kernel_maps/adamw_update_f32.json</a></td><td>adamw_update_f32</td><td>optimizer</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/add_stream_inplace.json">version/v8/kernel_maps/add_stream_inplace.json</a></td><td>add_stream_inplace</td><td>add_stream</td><td>fp32-tagged</td><td>not declared</td><td>not registered</td></tr>
@@ -375,6 +376,8 @@
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/ck_residual_add_token_major.json">version/v8/kernel_maps/ck_residual_add_token_major.json</a></td><td>ck_residual_add_token_major</td><td>residual_add</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/ck_residual_add_token_major_bf16_storage.json">version/v8/kernel_maps/ck_residual_add_token_major_bf16_storage.json</a></td><td>ck_residual_add_token_major_bf16_storage</td><td>residual_add</td><td>bf16-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/copy_last_logits.json">version/v8/kernel_maps/copy_last_logits.json</a></td><td>copy_last_logits</td><td>copy_last_logits</td><td>fp32-tagged</td><td>not declared</td><td>not registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/deepseek_mla_attention_bf16_phases.json">version/v8/kernel_maps/deepseek_mla_attention_bf16_phases.json</a></td><td>deepseek_mla_attention_bf16_phases</td><td>mla_attention</td><td>bf16-tagged</td><td>not declared</td><td>not registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/deepseek_mla_attention_decode_bf16_phases.json">version/v8/kernel_maps/deepseek_mla_attention_decode_bf16_phases.json</a></td><td>deepseek_mla_attention_decode_bf16_phases</td><td>mla_attention</td><td>bf16-tagged</td><td>not declared</td><td>not registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/deepseek_mla_attention_decode_f32.json">version/v8/kernel_maps/deepseek_mla_attention_decode_f32.json</a></td><td>deepseek_mla_attention_decode_f32</td><td>mla_attention</td><td>fp32-tagged</td><td>not declared</td><td>not registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/deepseek_mla_attention_f32.json">version/v8/kernel_maps/deepseek_mla_attention_f32.json</a></td><td>deepseek_mla_attention_f32</td><td>mla_attention</td><td>fp32-tagged</td><td>not declared</td><td>not registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/deepseek_mla_kv_cache_batch_store_f32.json">version/v8/kernel_maps/deepseek_mla_kv_cache_batch_store_f32.json</a></td><td>deepseek_mla_kv_cache_batch_store_f32</td><td>mla_kv_cache_batch_store</td><td>fp32-tagged</td><td>not declared</td><td>not registered</td></tr>

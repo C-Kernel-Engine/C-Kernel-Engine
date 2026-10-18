@@ -473,6 +473,12 @@ Functions</h2></td></tr>
 <tr class="separator:ab9a59b0578508c087ab9e8b664fc3d9f"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a5cf609c6189f831fd35aebb7b18d14da" id="r_a5cf609c6189f831fd35aebb7b18d14da"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#a5cf609c6189f831fd35aebb7b18d14da">deepseek_mhc_mix_f32</a> (const float *streams, const float *mix, float *out, int tokens, int n_streams, int dim)</td></tr>
 <tr class="separator:a5cf609c6189f831fd35aebb7b18d14da"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4e29c86ada4d525f0e3ffc4aeb03c3b7" id="r_a4e29c86ada4d525f0e3ffc4aeb03c3b7"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#a4e29c86ada4d525f0e3ffc4aeb03c3b7">deepseek_mla_attention_bf16_phases_parallel_dispatch</a> (const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int qk_head_dim, int v_head_dim, float scale, float *scores, size_t scores_bytes)</td></tr>
+<tr class="separator:a4e29c86ada4d525f0e3ffc4aeb03c3b7"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aafebbcbfb2a95c0a529aa509893d926d" id="r_aafebbcbfb2a95c0a529aa509893d926d"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#aafebbcbfb2a95c0a529aa509893d926d">deepseek_mla_attention_bf16_phases_workspace</a> (const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int qk_head_dim, int v_head_dim, float scale, float *scores, size_t scores_bytes)</td></tr>
+<tr class="separator:aafebbcbfb2a95c0a529aa509893d926d"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad6270580122323c369efac2c8e3e7e70" id="r_ad6270580122323c369efac2c8e3e7e70"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#ad6270580122323c369efac2c8e3e7e70">deepseek_mla_attention_decode_bf16_phases_workspace</a> (const float *q, const float *k_cache, const float *v_cache, float *output, int num_heads, int num_kv_heads, int cache_len, int qk_head_dim, int v_head_dim, int max_seq_len, int cache_stride, float scale, float *scores, size_t scores_bytes)</td></tr>
+<tr class="separator:ad6270580122323c369efac2c8e3e7e70"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:adf428053e5873c00d89d3dfc311a73ef" id="r_adf428053e5873c00d89d3dfc311a73ef"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#adf428053e5873c00d89d3dfc311a73ef">deepseek_mla_attention_decode_f32</a> (const float *q, const float *k_cache, const float *v_cache, float *output, int num_heads, int num_kv_heads, int cache_len, int qk_head_dim, int v_head_dim, int max_seq_len, int cache_stride)</td></tr>
 <tr class="separator:adf428053e5873c00d89d3dfc311a73ef"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a56a3b28ef641f0c78cfbbb7a20b8e86d" id="r_a56a3b28ef641f0c78cfbbb7a20b8e86d"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#a56a3b28ef641f0c78cfbbb7a20b8e86d">deepseek_mla_attention_decode_f32_workspace</a> (const float *q, const float *k_cache, const float *v_cache, float *output, int num_heads, int num_kv_heads, int cache_len, int qk_head_dim, int v_head_dim, int max_seq_len, int cache_stride, float scale, float *scores, size_t scores_bytes)</td></tr>
@@ -1499,20 +1505,20 @@ Functions</h2></td></tr>
 <tr><td class="fieldname"><a id="a01c1b88e0a25e9f1a05b22122c11ff36ab2b762c82a789d6b6eecc727a35c42b4" name="a01c1b88e0a25e9f1a05b22122c11ff36ab2b762c82a789d6b6eecc727a35c42b4"></a>CK_ATTN_PREFILL_SCHEDULE_GQA_SHARED_KV_TILES&#160;</td><td class="fielddoc"></td></tr>
 </table>
 
-<p class="definition">Definition at line <a class="el" href="ckernel__engine_8h_source.html#l02257">2257</a> of file <a class="el" href="ckernel__engine_8h_source.html">ckernel_engine.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 2257</span>             {</div>
-<div class="line"><span class="lineno"> 2258</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36a1ea78a01558752ab59bdf4355fd4fe33">CK_ATTN_PREFILL_SCHEDULE_KV_HEADS</a> = 0,</div>
-<div class="line"><span class="lineno"> 2259</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36a2c30b4152a1d3817a2e5a75bdf9f40e1">CK_ATTN_PREFILL_SCHEDULE_QUERY_HEADS</a> = 1,</div>
-<div class="line"><span class="lineno"> 2260</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36a14c0b15894aa11e4c64d8f05e6510fef">CK_ATTN_PREFILL_SCHEDULE_QUERY_TILES</a> = 2,</div>
-<div class="line"><span class="lineno"> 2261</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36ae18681cb01afb607335d062840e36851">CK_ATTN_PREFILL_SCHEDULE_KV_GROUP_QUERY_TILES</a> = 3,</div>
-<div class="line"><span class="lineno"> 2262</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36ab2b762c82a789d6b6eecc727a35c42b4">CK_ATTN_PREFILL_SCHEDULE_GQA_SHARED_KV_TILES</a> = 4,</div>
-<div class="line"><span class="lineno"> 2263</span>} <a class="code hl_enumeration" href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36">ck_attention_prefill_schedule_t</a>;</div>
-<div class="ttc" id="ackernel__engine_8h_html_a01c1b88e0a25e9f1a05b22122c11ff36"><div class="ttname"><a href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36">ck_attention_prefill_schedule_t</a></div><div class="ttdeci">ck_attention_prefill_schedule_t</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02257">ckernel_engine.h:2257</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_a01c1b88e0a25e9f1a05b22122c11ff36a14c0b15894aa11e4c64d8f05e6510fef"><div class="ttname"><a href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36a14c0b15894aa11e4c64d8f05e6510fef">CK_ATTN_PREFILL_SCHEDULE_QUERY_TILES</a></div><div class="ttdeci">@ CK_ATTN_PREFILL_SCHEDULE_QUERY_TILES</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02260">ckernel_engine.h:2260</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_a01c1b88e0a25e9f1a05b22122c11ff36a1ea78a01558752ab59bdf4355fd4fe33"><div class="ttname"><a href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36a1ea78a01558752ab59bdf4355fd4fe33">CK_ATTN_PREFILL_SCHEDULE_KV_HEADS</a></div><div class="ttdeci">@ CK_ATTN_PREFILL_SCHEDULE_KV_HEADS</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02258">ckernel_engine.h:2258</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_a01c1b88e0a25e9f1a05b22122c11ff36a2c30b4152a1d3817a2e5a75bdf9f40e1"><div class="ttname"><a href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36a2c30b4152a1d3817a2e5a75bdf9f40e1">CK_ATTN_PREFILL_SCHEDULE_QUERY_HEADS</a></div><div class="ttdeci">@ CK_ATTN_PREFILL_SCHEDULE_QUERY_HEADS</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02259">ckernel_engine.h:2259</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_a01c1b88e0a25e9f1a05b22122c11ff36ab2b762c82a789d6b6eecc727a35c42b4"><div class="ttname"><a href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36ab2b762c82a789d6b6eecc727a35c42b4">CK_ATTN_PREFILL_SCHEDULE_GQA_SHARED_KV_TILES</a></div><div class="ttdeci">@ CK_ATTN_PREFILL_SCHEDULE_GQA_SHARED_KV_TILES</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02262">ckernel_engine.h:2262</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_a01c1b88e0a25e9f1a05b22122c11ff36ae18681cb01afb607335d062840e36851"><div class="ttname"><a href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36ae18681cb01afb607335d062840e36851">CK_ATTN_PREFILL_SCHEDULE_KV_GROUP_QUERY_TILES</a></div><div class="ttdeci">@ CK_ATTN_PREFILL_SCHEDULE_KV_GROUP_QUERY_TILES</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02261">ckernel_engine.h:2261</a></div></div>
+<p class="definition">Definition at line <a class="el" href="ckernel__engine_8h_source.html#l02296">2296</a> of file <a class="el" href="ckernel__engine_8h_source.html">ckernel_engine.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 2296</span>             {</div>
+<div class="line"><span class="lineno"> 2297</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36a1ea78a01558752ab59bdf4355fd4fe33">CK_ATTN_PREFILL_SCHEDULE_KV_HEADS</a> = 0,</div>
+<div class="line"><span class="lineno"> 2298</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36a2c30b4152a1d3817a2e5a75bdf9f40e1">CK_ATTN_PREFILL_SCHEDULE_QUERY_HEADS</a> = 1,</div>
+<div class="line"><span class="lineno"> 2299</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36a14c0b15894aa11e4c64d8f05e6510fef">CK_ATTN_PREFILL_SCHEDULE_QUERY_TILES</a> = 2,</div>
+<div class="line"><span class="lineno"> 2300</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36ae18681cb01afb607335d062840e36851">CK_ATTN_PREFILL_SCHEDULE_KV_GROUP_QUERY_TILES</a> = 3,</div>
+<div class="line"><span class="lineno"> 2301</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36ab2b762c82a789d6b6eecc727a35c42b4">CK_ATTN_PREFILL_SCHEDULE_GQA_SHARED_KV_TILES</a> = 4,</div>
+<div class="line"><span class="lineno"> 2302</span>} <a class="code hl_enumeration" href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36">ck_attention_prefill_schedule_t</a>;</div>
+<div class="ttc" id="ackernel__engine_8h_html_a01c1b88e0a25e9f1a05b22122c11ff36"><div class="ttname"><a href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36">ck_attention_prefill_schedule_t</a></div><div class="ttdeci">ck_attention_prefill_schedule_t</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02296">ckernel_engine.h:2296</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_a01c1b88e0a25e9f1a05b22122c11ff36a14c0b15894aa11e4c64d8f05e6510fef"><div class="ttname"><a href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36a14c0b15894aa11e4c64d8f05e6510fef">CK_ATTN_PREFILL_SCHEDULE_QUERY_TILES</a></div><div class="ttdeci">@ CK_ATTN_PREFILL_SCHEDULE_QUERY_TILES</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02299">ckernel_engine.h:2299</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_a01c1b88e0a25e9f1a05b22122c11ff36a1ea78a01558752ab59bdf4355fd4fe33"><div class="ttname"><a href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36a1ea78a01558752ab59bdf4355fd4fe33">CK_ATTN_PREFILL_SCHEDULE_KV_HEADS</a></div><div class="ttdeci">@ CK_ATTN_PREFILL_SCHEDULE_KV_HEADS</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02297">ckernel_engine.h:2297</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_a01c1b88e0a25e9f1a05b22122c11ff36a2c30b4152a1d3817a2e5a75bdf9f40e1"><div class="ttname"><a href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36a2c30b4152a1d3817a2e5a75bdf9f40e1">CK_ATTN_PREFILL_SCHEDULE_QUERY_HEADS</a></div><div class="ttdeci">@ CK_ATTN_PREFILL_SCHEDULE_QUERY_HEADS</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02298">ckernel_engine.h:2298</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_a01c1b88e0a25e9f1a05b22122c11ff36ab2b762c82a789d6b6eecc727a35c42b4"><div class="ttname"><a href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36ab2b762c82a789d6b6eecc727a35c42b4">CK_ATTN_PREFILL_SCHEDULE_GQA_SHARED_KV_TILES</a></div><div class="ttdeci">@ CK_ATTN_PREFILL_SCHEDULE_GQA_SHARED_KV_TILES</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02301">ckernel_engine.h:2301</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_a01c1b88e0a25e9f1a05b22122c11ff36ae18681cb01afb607335d062840e36851"><div class="ttname"><a href="ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36ae18681cb01afb607335d062840e36851">CK_ATTN_PREFILL_SCHEDULE_KV_GROUP_QUERY_TILES</a></div><div class="ttdeci">@ CK_ATTN_PREFILL_SCHEDULE_KV_GROUP_QUERY_TILES</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02300">ckernel_engine.h:2300</a></div></div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1537,24 +1543,24 @@ Functions</h2></td></tr>
 <tr><td class="fieldname"><a id="ac4e937f6afb8a4807301eda5aa8b010ea293c836a8b2382e6539db16341508435" name="ac4e937f6afb8a4807301eda5aa8b010ea293c836a8b2382e6539db16341508435"></a>CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64_REGULAR_TAIL_NOSCALE&#160;</td><td class="fielddoc"></td></tr>
 </table>
 
-<p class="definition">Definition at line <a class="el" href="ckernel__engine_8h_source.html#l02245">2245</a> of file <a class="el" href="ckernel__engine_8h_source.html">ckernel_engine.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 2245</span>             {</div>
-<div class="line"><span class="lineno"> 2246</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010eadbc9e39a1c54b34cb182196445e795b8">CK_ATTN_REDUCTION_FP32_ONLINE</a> = 0,</div>
-<div class="line"><span class="lineno"> 2247</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea85e68fd51ad8a3b0ddaff562ab9080f7">CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE</a> = 1,</div>
-<div class="line"><span class="lineno"> 2248</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010eacd061ae5c8ef1eadf0f2bf97ec2ca433">CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE</a> = 2,</div>
-<div class="line"><span class="lineno"> 2249</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea9de5268ef35fefa367f6c8219143d2bb">CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64</a> = 3,</div>
-<div class="line"><span class="lineno"> 2250</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea115dd6cf8ca1bbc5a7689a88c5d28463">CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA</a> = 4,</div>
-<div class="line"><span class="lineno"> 2251</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea78eef0509b737da7c60e385ff47b9858">CK_ATTN_REDUCTION_F16_REGULAR_NOSCALE</a> = 5,</div>
-<div class="line"><span class="lineno"> 2252</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea293c836a8b2382e6539db16341508435">CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64_REGULAR_TAIL_NOSCALE</a> = 6,</div>
-<div class="line"><span class="lineno"> 2253</span>} <a class="code hl_enumeration" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010e">ck_attention_reduction_t</a>;</div>
-<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010e"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010e">ck_attention_reduction_t</a></div><div class="ttdeci">ck_attention_reduction_t</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02245">ckernel_engine.h:2245</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010ea115dd6cf8ca1bbc5a7689a88c5d28463"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea115dd6cf8ca1bbc5a7689a88c5d28463">CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA</a></div><div class="ttdeci">@ CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02250">ckernel_engine.h:2250</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010ea293c836a8b2382e6539db16341508435"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea293c836a8b2382e6539db16341508435">CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64_REGULAR_TAIL_NOSCALE</a></div><div class="ttdeci">@ CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64_REGULAR_TAIL_NOSCALE</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02252">ckernel_engine.h:2252</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010ea78eef0509b737da7c60e385ff47b9858"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea78eef0509b737da7c60e385ff47b9858">CK_ATTN_REDUCTION_F16_REGULAR_NOSCALE</a></div><div class="ttdeci">@ CK_ATTN_REDUCTION_F16_REGULAR_NOSCALE</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02251">ckernel_engine.h:2251</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010ea85e68fd51ad8a3b0ddaff562ab9080f7"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea85e68fd51ad8a3b0ddaff562ab9080f7">CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE</a></div><div class="ttdeci">@ CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02247">ckernel_engine.h:2247</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010ea9de5268ef35fefa367f6c8219143d2bb"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea9de5268ef35fefa367f6c8219143d2bb">CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64</a></div><div class="ttdeci">@ CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02249">ckernel_engine.h:2249</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010eacd061ae5c8ef1eadf0f2bf97ec2ca433"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010eacd061ae5c8ef1eadf0f2bf97ec2ca433">CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE</a></div><div class="ttdeci">@ CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02248">ckernel_engine.h:2248</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010eadbc9e39a1c54b34cb182196445e795b8"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010eadbc9e39a1c54b34cb182196445e795b8">CK_ATTN_REDUCTION_FP32_ONLINE</a></div><div class="ttdeci">@ CK_ATTN_REDUCTION_FP32_ONLINE</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02246">ckernel_engine.h:2246</a></div></div>
+<p class="definition">Definition at line <a class="el" href="ckernel__engine_8h_source.html#l02284">2284</a> of file <a class="el" href="ckernel__engine_8h_source.html">ckernel_engine.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 2284</span>             {</div>
+<div class="line"><span class="lineno"> 2285</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010eadbc9e39a1c54b34cb182196445e795b8">CK_ATTN_REDUCTION_FP32_ONLINE</a> = 0,</div>
+<div class="line"><span class="lineno"> 2286</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea85e68fd51ad8a3b0ddaff562ab9080f7">CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE</a> = 1,</div>
+<div class="line"><span class="lineno"> 2287</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010eacd061ae5c8ef1eadf0f2bf97ec2ca433">CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE</a> = 2,</div>
+<div class="line"><span class="lineno"> 2288</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea9de5268ef35fefa367f6c8219143d2bb">CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64</a> = 3,</div>
+<div class="line"><span class="lineno"> 2289</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea115dd6cf8ca1bbc5a7689a88c5d28463">CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA</a> = 4,</div>
+<div class="line"><span class="lineno"> 2290</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea78eef0509b737da7c60e385ff47b9858">CK_ATTN_REDUCTION_F16_REGULAR_NOSCALE</a> = 5,</div>
+<div class="line"><span class="lineno"> 2291</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea293c836a8b2382e6539db16341508435">CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64_REGULAR_TAIL_NOSCALE</a> = 6,</div>
+<div class="line"><span class="lineno"> 2292</span>} <a class="code hl_enumeration" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010e">ck_attention_reduction_t</a>;</div>
+<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010e"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010e">ck_attention_reduction_t</a></div><div class="ttdeci">ck_attention_reduction_t</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02284">ckernel_engine.h:2284</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010ea115dd6cf8ca1bbc5a7689a88c5d28463"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea115dd6cf8ca1bbc5a7689a88c5d28463">CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA</a></div><div class="ttdeci">@ CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02289">ckernel_engine.h:2289</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010ea293c836a8b2382e6539db16341508435"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea293c836a8b2382e6539db16341508435">CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64_REGULAR_TAIL_NOSCALE</a></div><div class="ttdeci">@ CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64_REGULAR_TAIL_NOSCALE</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02291">ckernel_engine.h:2291</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010ea78eef0509b737da7c60e385ff47b9858"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea78eef0509b737da7c60e385ff47b9858">CK_ATTN_REDUCTION_F16_REGULAR_NOSCALE</a></div><div class="ttdeci">@ CK_ATTN_REDUCTION_F16_REGULAR_NOSCALE</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02290">ckernel_engine.h:2290</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010ea85e68fd51ad8a3b0ddaff562ab9080f7"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea85e68fd51ad8a3b0ddaff562ab9080f7">CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE</a></div><div class="ttdeci">@ CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02286">ckernel_engine.h:2286</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010ea9de5268ef35fefa367f6c8219143d2bb"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea9de5268ef35fefa367f6c8219143d2bb">CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64</a></div><div class="ttdeci">@ CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02288">ckernel_engine.h:2288</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010eacd061ae5c8ef1eadf0f2bf97ec2ca433"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010eacd061ae5c8ef1eadf0f2bf97ec2ca433">CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE</a></div><div class="ttdeci">@ CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02287">ckernel_engine.h:2287</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010eadbc9e39a1c54b34cb182196445e795b8"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010eadbc9e39a1c54b34cb182196445e795b8">CK_ATTN_REDUCTION_FP32_ONLINE</a></div><div class="ttdeci">@ CK_ATTN_REDUCTION_FP32_ONLINE</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02285">ckernel_engine.h:2285</a></div></div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1576,18 +1582,18 @@ Functions</h2></td></tr>
 <tr><td class="fieldname"><a id="adcb33ce8a8fd7acd821411605a3baf67ad762a0a2ebaaa15ce18a2bfbe86349c7" name="adcb33ce8a8fd7acd821411605a3baf67ad762a0a2ebaaa15ce18a2bfbe86349c7"></a>CK_ATTENTION_STATUS_INSUFFICIENT_WORKSPACE&#160;</td><td class="fielddoc"></td></tr>
 </table>
 
-<p class="definition">Definition at line <a class="el" href="ckernel__engine_8h_source.html#l02265">2265</a> of file <a class="el" href="ckernel__engine_8h_source.html">ckernel_engine.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 2265</span>             {</div>
-<div class="line"><span class="lineno"> 2266</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67abea27a79c4c94ac03dfe2ab71fb2cdf1">CK_ATTENTION_STATUS_OK</a> = 0,</div>
-<div class="line"><span class="lineno"> 2267</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67ad2afe3d323b8a120f969ba979c34a8df">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a> = -1,</div>
-<div class="line"><span class="lineno"> 2268</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67a1f3f246a2db6a868a9e1a5835d06e614">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a> = -2,</div>
-<div class="line"><span class="lineno"> 2269</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67ad762a0a2ebaaa15ce18a2bfbe86349c7">CK_ATTENTION_STATUS_INSUFFICIENT_WORKSPACE</a> = -3,</div>
-<div class="line"><span class="lineno"> 2270</span>} <a class="code hl_enumeration" href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67">ck_attention_status_t</a>;</div>
-<div class="ttc" id="ackernel__engine_8h_html_adcb33ce8a8fd7acd821411605a3baf67"><div class="ttname"><a href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67">ck_attention_status_t</a></div><div class="ttdeci">ck_attention_status_t</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02265">ckernel_engine.h:2265</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_adcb33ce8a8fd7acd821411605a3baf67a1f3f246a2db6a868a9e1a5835d06e614"><div class="ttname"><a href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67a1f3f246a2db6a868a9e1a5835d06e614">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a></div><div class="ttdeci">@ CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02268">ckernel_engine.h:2268</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_adcb33ce8a8fd7acd821411605a3baf67abea27a79c4c94ac03dfe2ab71fb2cdf1"><div class="ttname"><a href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67abea27a79c4c94ac03dfe2ab71fb2cdf1">CK_ATTENTION_STATUS_OK</a></div><div class="ttdeci">@ CK_ATTENTION_STATUS_OK</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02266">ckernel_engine.h:2266</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_adcb33ce8a8fd7acd821411605a3baf67ad2afe3d323b8a120f969ba979c34a8df"><div class="ttname"><a href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67ad2afe3d323b8a120f969ba979c34a8df">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a></div><div class="ttdeci">@ CK_ATTENTION_STATUS_INVALID_ARGUMENT</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02267">ckernel_engine.h:2267</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_adcb33ce8a8fd7acd821411605a3baf67ad762a0a2ebaaa15ce18a2bfbe86349c7"><div class="ttname"><a href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67ad762a0a2ebaaa15ce18a2bfbe86349c7">CK_ATTENTION_STATUS_INSUFFICIENT_WORKSPACE</a></div><div class="ttdeci">@ CK_ATTENTION_STATUS_INSUFFICIENT_WORKSPACE</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02269">ckernel_engine.h:2269</a></div></div>
+<p class="definition">Definition at line <a class="el" href="ckernel__engine_8h_source.html#l02304">2304</a> of file <a class="el" href="ckernel__engine_8h_source.html">ckernel_engine.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 2304</span>             {</div>
+<div class="line"><span class="lineno"> 2305</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67abea27a79c4c94ac03dfe2ab71fb2cdf1">CK_ATTENTION_STATUS_OK</a> = 0,</div>
+<div class="line"><span class="lineno"> 2306</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67ad2afe3d323b8a120f969ba979c34a8df">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a> = -1,</div>
+<div class="line"><span class="lineno"> 2307</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67a1f3f246a2db6a868a9e1a5835d06e614">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a> = -2,</div>
+<div class="line"><span class="lineno"> 2308</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67ad762a0a2ebaaa15ce18a2bfbe86349c7">CK_ATTENTION_STATUS_INSUFFICIENT_WORKSPACE</a> = -3,</div>
+<div class="line"><span class="lineno"> 2309</span>} <a class="code hl_enumeration" href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67">ck_attention_status_t</a>;</div>
+<div class="ttc" id="ackernel__engine_8h_html_adcb33ce8a8fd7acd821411605a3baf67"><div class="ttname"><a href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67">ck_attention_status_t</a></div><div class="ttdeci">ck_attention_status_t</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02304">ckernel_engine.h:2304</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_adcb33ce8a8fd7acd821411605a3baf67a1f3f246a2db6a868a9e1a5835d06e614"><div class="ttname"><a href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67a1f3f246a2db6a868a9e1a5835d06e614">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a></div><div class="ttdeci">@ CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02307">ckernel_engine.h:2307</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_adcb33ce8a8fd7acd821411605a3baf67abea27a79c4c94ac03dfe2ab71fb2cdf1"><div class="ttname"><a href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67abea27a79c4c94ac03dfe2ab71fb2cdf1">CK_ATTENTION_STATUS_OK</a></div><div class="ttdeci">@ CK_ATTENTION_STATUS_OK</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02305">ckernel_engine.h:2305</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_adcb33ce8a8fd7acd821411605a3baf67ad2afe3d323b8a120f969ba979c34a8df"><div class="ttname"><a href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67ad2afe3d323b8a120f969ba979c34a8df">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a></div><div class="ttdeci">@ CK_ATTENTION_STATUS_INVALID_ARGUMENT</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02306">ckernel_engine.h:2306</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_adcb33ce8a8fd7acd821411605a3baf67ad762a0a2ebaaa15ce18a2bfbe86349c7"><div class="ttname"><a href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67ad762a0a2ebaaa15ce18a2bfbe86349c7">CK_ATTENTION_STATUS_INSUFFICIENT_WORKSPACE</a></div><div class="ttdeci">@ CK_ATTENTION_STATUS_INSUFFICIENT_WORKSPACE</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l02308">ckernel_engine.h:2308</a></div></div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -5787,7 +5793,7 @@ Functions</h2></td></tr>
 <div class="ttc" id="aattention__kernels_8c_html_a3bc77f14aef03ee172f20d99627cb9f5"><div class="ttname"><a href="attention__kernels_8c.html#a3bc77f14aef03ee172f20d99627cb9f5">CK_GGML_FA_TILE_Q</a></div><div class="ttdeci">#define CK_GGML_FA_TILE_Q</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l02888">attention_kernels.c:2888</a></div></div>
 <div class="ttc" id="aattention__kernels_8c_html_a49061a12eedcf16aa601f8dc8d777992"><div class="ttname"><a href="attention__kernels_8c.html#a49061a12eedcf16aa601f8dc8d777992">attention_forward_causal_head_major_gqa_prefill_append_bf16cache_pytorch_contract_workspace</a></div><div class="ttdeci">ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_bf16cache_pytorch_contract_workspace(const float *q, const uint16_t *k_cache, const uint16_t *v_cache, float *output, int num_heads, int num_kv_heads, int q_tokens, int past_tokens, int cache_capacity, int head_dim, int aligned_head_dim, ck_attention_reduction_t reduction, float *token_workspace, size_t token_workspace_bytes)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l09338">attention_kernels.c:9338</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l09338">attention_forward_causal_head_major_gqa_prefill_append_bf16cache_pytorch_contract_workspace()</a>, <a class="el" href="ckernel__engine_8h_source.html#l02267">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, and <a class="el" href="attention__kernels_8c_source.html#l02888">CK_GGML_FA_TILE_Q</a>.</p>
+<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l09338">attention_forward_causal_head_major_gqa_prefill_append_bf16cache_pytorch_contract_workspace()</a>, <a class="el" href="ckernel__engine_8h_source.html#l02306">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, and <a class="el" href="attention__kernels_8c_source.html#l02888">CK_GGML_FA_TILE_Q</a>.</p>
 
 </div>
 </div>
@@ -5956,7 +5962,7 @@ Functions</h2></td></tr>
 <div class="ttc" id="ack__threadpool_8h_html_ada9a2b22c2eb79fe8834b026a3c7d8b4"><div class="ttname"><a href="ck__threadpool_8h.html#ada9a2b22c2eb79fe8834b026a3c7d8b4">ck_threadpool_thread_id</a></div><div class="ttdeci">int ck_threadpool_thread_id(const ck_threadpool_t *pool)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00594">ck_threadpool.c:594</a></div></div>
 <div class="ttc" id="atrue__bpe_8h_html_ac7f5fd4f55df36920bf0583c3516e72f"><div class="ttname"><a href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a></div><div class="ttdeci">const uint8_t size_t count</div><div class="ttdef"><b>Definition</b> <a href="true__bpe_8h_source.html#l00209">true_bpe.h:209</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l09264">attention_forward_decode_head_major_gqa_bf16cache_pytorch_contract()</a>, <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="attention__kernels_8c_source.html#l07113">ck_attention_f16_prefill_qtile64_work()</a>, <a class="el" href="ckernel__engine_8h_source.html#l02267">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02266">CK_ATTENTION_STATUS_OK</a>, <a class="el" href="ckernel__engine_8h_source.html#l02268">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02250">CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA</a>, <a class="el" href="attention__kernels_8c_source.html#l02888">CK_GGML_FA_TILE_Q</a>, <a class="el" href="ck__threadpool_8c_source.html#l00398">ck_threadpool_dispatch_n()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00685">ck_threadpool_global()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00584">ck_threadpool_n_threads()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00594">ck_threadpool_thread_id()</a>, <a class="el" href="true__bpe_8h_source.html#l00209">count</a>, and <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>.</p>
+<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l09264">attention_forward_decode_head_major_gqa_bf16cache_pytorch_contract()</a>, <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="attention__kernels_8c_source.html#l07113">ck_attention_f16_prefill_qtile64_work()</a>, <a class="el" href="ckernel__engine_8h_source.html#l02306">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02305">CK_ATTENTION_STATUS_OK</a>, <a class="el" href="ckernel__engine_8h_source.html#l02307">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02289">CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA</a>, <a class="el" href="attention__kernels_8c_source.html#l02888">CK_GGML_FA_TILE_Q</a>, <a class="el" href="ck__threadpool_8c_source.html#l00398">ck_threadpool_dispatch_n()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00685">ck_threadpool_global()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00584">ck_threadpool_n_threads()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00594">ck_threadpool_thread_id()</a>, <a class="el" href="true__bpe_8h_source.html#l00209">count</a>, and <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="attention__kernels_8c_source.html#l09415">attention_forward_causal_head_major_gqa_prefill_append_bf16cache_pytorch_contract()</a>.</p>
 
@@ -6155,7 +6161,7 @@ Functions</h2></td></tr>
 <div class="ttc" id="aattention__kernels_8c_html_a799abd849ac31acee3371df4d78c81e5"><div class="ttname"><a href="attention__kernels_8c.html#a799abd849ac31acee3371df4d78c81e5">attention_forward_causal_head_major_gqa_prefill_append_f16cache_gqa_reuse_config</a></div><div class="ttdeci">ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_f16cache_gqa_reuse_config(const float *q, const uint16_t *k_cache, const uint16_t *v_cache, float *output, int num_heads, int num_kv_heads, int q_tokens, int past_tokens, int cache_capacity, int head_dim, int aligned_head_dim, int query_tile_size, int concurrent_query_tiles, void *workspace, size_t workspace_bytes)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l07585">attention_kernels.c:7585</a></div></div>
 <div class="ttc" id="aattention__kernels_8c_html_ad1a72792cdc40d8fc00a3221a86e82cb"><div class="ttname"><a href="attention__kernels_8c.html#ad1a72792cdc40d8fc00a3221a86e82cb">attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract_workspace</a></div><div class="ttdeci">ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract_workspace(const float *q, const uint16_t *k_cache, const uint16_t *v_cache, float *output, int num_heads, int num_kv_heads, int q_tokens, int past_tokens, int cache_capacity, int head_dim, int aligned_head_dim, ck_attention_reduction_t reduction, float *token_workspace, size_t token_workspace_bytes)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l07770">attention_kernels.c:7770</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l07770">attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract_workspace()</a>, <a class="el" href="attention__kernels_8c_source.html#l07585">attention_forward_causal_head_major_gqa_prefill_append_f16cache_gqa_reuse_config()</a>, <a class="el" href="ckernel__engine_8h_source.html#l02267">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02249">CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64</a>, <a class="el" href="ck__threadpool_8c_source.html#l00685">ck_threadpool_global()</a>, and <a class="el" href="ck__threadpool_8c_source.html#l00584">ck_threadpool_n_threads()</a>.</p>
+<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l07770">attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract_workspace()</a>, <a class="el" href="attention__kernels_8c_source.html#l07585">attention_forward_causal_head_major_gqa_prefill_append_f16cache_gqa_reuse_config()</a>, <a class="el" href="ckernel__engine_8h_source.html#l02306">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02288">CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64</a>, <a class="el" href="ck__threadpool_8c_source.html#l00685">ck_threadpool_global()</a>, and <a class="el" href="ck__threadpool_8c_source.html#l00584">ck_threadpool_n_threads()</a>.</p>
 
 </div>
 </div>
@@ -6277,7 +6283,7 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno"> 8196</span>    <span class="keywordflow">return</span> status;</div>
 <div class="line"><span class="lineno"> 8197</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l07770">attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract_workspace()</a>, <a class="el" href="ckernel__engine_8h_source.html#l02267">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02249">CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64</a>, and <a class="el" href="attention__kernels_8c_source.html#l02888">CK_GGML_FA_TILE_Q</a>.</p>
+<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l07770">attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract_workspace()</a>, <a class="el" href="ckernel__engine_8h_source.html#l02306">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02288">CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64</a>, and <a class="el" href="attention__kernels_8c_source.html#l02888">CK_GGML_FA_TILE_Q</a>.</p>
 
 </div>
 </div>
@@ -6451,7 +6457,7 @@ Functions</h2></td></tr>
 <div class="ttc" id="aattention__kernels_8c_html_a9cf90fc2e0ba9e04ecf4d6bc4ce20c3b"><div class="ttname"><a href="attention__kernels_8c.html#a9cf90fc2e0ba9e04ecf4d6bc4ce20c3b">ck_attention_f16_prefill_qtile64_dispatch</a></div><div class="ttdeci">static ck_attention_status_t ck_attention_f16_prefill_qtile64_dispatch(const float *q, const uint16_t *k_cache, const uint16_t *v_cache, float *output, int num_heads, int num_kv_heads, int q_tokens, int past_tokens, int cache_capacity, int head_dim, int aligned_head_dim, int cache_is_bf16, float attention_scale, size_t q_head_stride, size_t output_head_stride, ck_attention_prefill_schedule_t schedule)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l07524">attention_kernels.c:7524</a></div></div>
 <div class="ttc" id="aattention__kernels_8c_html_ae5334baaab9469712be3e9acaf9d3aaa"><div class="ttname"><a href="attention__kernels_8c.html#ae5334baaab9469712be3e9acaf9d3aaa">attention_forward_decode_head_major_gqa_flash_f16cache_contract</a></div><div class="ttdeci">ck_attention_status_t attention_forward_decode_head_major_gqa_flash_f16cache_contract(const float *q_token, const uint16_t *k_cache, const uint16_t *v_cache, float *out_token, int num_heads, int num_kv_heads, int kv_tokens, int cache_capacity, int head_dim, int aligned_head_dim, ck_attention_reduction_t reduction)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l06933">attention_kernels.c:6933</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l06933">attention_forward_decode_head_major_gqa_flash_f16cache_contract()</a>, <a class="el" href="attention__kernels_8c_source.html#l07524">ck_attention_f16_prefill_qtile64_dispatch()</a>, <a class="el" href="ckernel__engine_8h_source.html#l02267">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02266">CK_ATTENTION_STATUS_OK</a>, <a class="el" href="ckernel__engine_8h_source.html#l02268">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02260">CK_ATTN_PREFILL_SCHEDULE_QUERY_TILES</a>, <a class="el" href="ckernel__engine_8h_source.html#l02249">CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64</a>, <a class="el" href="ckernel__engine_8h_source.html#l02247">CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE</a>, <a class="el" href="ckernel__engine_8h_source.html#l02248">CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE</a>, <a class="el" href="ckernel__engine_8h_source.html#l02246">CK_ATTN_REDUCTION_FP32_ONLINE</a>, and <a class="el" href="attention__kernels_8c_source.html#l02888">CK_GGML_FA_TILE_Q</a>.</p>
+<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l06933">attention_forward_decode_head_major_gqa_flash_f16cache_contract()</a>, <a class="el" href="attention__kernels_8c_source.html#l07524">ck_attention_f16_prefill_qtile64_dispatch()</a>, <a class="el" href="ckernel__engine_8h_source.html#l02306">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02305">CK_ATTENTION_STATUS_OK</a>, <a class="el" href="ckernel__engine_8h_source.html#l02307">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02299">CK_ATTN_PREFILL_SCHEDULE_QUERY_TILES</a>, <a class="el" href="ckernel__engine_8h_source.html#l02288">CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64</a>, <a class="el" href="ckernel__engine_8h_source.html#l02286">CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE</a>, <a class="el" href="ckernel__engine_8h_source.html#l02287">CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE</a>, <a class="el" href="ckernel__engine_8h_source.html#l02285">CK_ATTN_REDUCTION_FP32_ONLINE</a>, and <a class="el" href="attention__kernels_8c_source.html#l02888">CK_GGML_FA_TILE_Q</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="attention__kernels_8c_source.html#l07686">attention_forward_causal_head_major_gqa_prefill_append_f16cache_auto_workspace()</a>, and <a class="el" href="attention__kernels_8c_source.html#l08155">attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract()</a>.</p>
 
@@ -6763,7 +6769,7 @@ Functions</h2></td></tr>
 <div class="ttc" id="aattention__kernels_8c_html_ab9e879205ae5c20e31e802274cc5359a"><div class="ttname"><a href="attention__kernels_8c.html#ab9e879205ae5c20e31e802274cc5359a">ck_attention_f16_prefill_gqa_reuse_worker_bytes</a></div><div class="ttdeci">static size_t ck_attention_f16_prefill_gqa_reuse_worker_bytes(int num_heads, int num_kv_heads, int head_dim, int workers, int query_tile_size, int concurrent_query_tiles)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l07026">attention_kernels.c:7026</a></div></div>
 <div class="ttc" id="aattention__kernels_8c_html_ae4145a7ddaa070d8344c9d4bcdca6422"><div class="ttname"><a href="attention__kernels_8c.html#ae4145a7ddaa070d8344c9d4bcdca6422">ck_attention_align64_size</a></div><div class="ttdeci">static size_t ck_attention_align64_size(size_t value)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l07021">attention_kernels.c:7021</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l07064">attention_forward_causal_head_major_gqa_prefill_append_f16cache_gqa_reuse_workspace_bytes()</a>, <a class="el" href="attention__kernels_8c_source.html#l07021">ck_attention_align64_size()</a>, <a class="el" href="attention__kernels_8c_source.html#l07292">ck_attention_f16_prefill_gqa_reuse_work()</a>, <a class="el" href="attention__kernels_8c_source.html#l07026">ck_attention_f16_prefill_gqa_reuse_worker_bytes()</a>, <a class="el" href="ckernel__engine_8h_source.html#l02269">CK_ATTENTION_STATUS_INSUFFICIENT_WORKSPACE</a>, <a class="el" href="ckernel__engine_8h_source.html#l02267">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02266">CK_ATTENTION_STATUS_OK</a>, <a class="el" href="ckernel__engine_8h_source.html#l02268">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02262">CK_ATTN_PREFILL_SCHEDULE_GQA_SHARED_KV_TILES</a>, <a class="el" href="attention__kernels_8c_source.html#l02890">CK_GGML_FA_TILE_KV</a>, <a class="el" href="ck__threadpool_8c_source.html#l00398">ck_threadpool_dispatch_n()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00685">ck_threadpool_global()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00584">ck_threadpool_n_threads()</a>, and <a class="el" href="ck__threadpool_8c_source.html#l00594">ck_threadpool_thread_id()</a>.</p>
+<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l07064">attention_forward_causal_head_major_gqa_prefill_append_f16cache_gqa_reuse_workspace_bytes()</a>, <a class="el" href="attention__kernels_8c_source.html#l07021">ck_attention_align64_size()</a>, <a class="el" href="attention__kernels_8c_source.html#l07292">ck_attention_f16_prefill_gqa_reuse_work()</a>, <a class="el" href="attention__kernels_8c_source.html#l07026">ck_attention_f16_prefill_gqa_reuse_worker_bytes()</a>, <a class="el" href="ckernel__engine_8h_source.html#l02308">CK_ATTENTION_STATUS_INSUFFICIENT_WORKSPACE</a>, <a class="el" href="ckernel__engine_8h_source.html#l02306">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02305">CK_ATTENTION_STATUS_OK</a>, <a class="el" href="ckernel__engine_8h_source.html#l02307">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02301">CK_ATTN_PREFILL_SCHEDULE_GQA_SHARED_KV_TILES</a>, <a class="el" href="attention__kernels_8c_source.html#l02890">CK_GGML_FA_TILE_KV</a>, <a class="el" href="ck__threadpool_8c_source.html#l00398">ck_threadpool_dispatch_n()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00685">ck_threadpool_global()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00584">ck_threadpool_n_threads()</a>, and <a class="el" href="ck__threadpool_8c_source.html#l00594">ck_threadpool_thread_id()</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="attention__kernels_8c_source.html#l07686">attention_forward_causal_head_major_gqa_prefill_append_f16cache_auto_workspace()</a>.</p>
 
@@ -6947,7 +6953,7 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno"> 7767</span>        (<span class="keywordtype">size_t</span>) q_tokens * (<span class="keywordtype">size_t</span>) aligned_head_dim, schedule);</div>
 <div class="line"><span class="lineno"> 7768</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l07524">ck_attention_f16_prefill_qtile64_dispatch()</a>, <a class="el" href="ckernel__engine_8h_source.html#l02267">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, and <a class="el" href="attention__kernels_8c_source.html#l02888">CK_GGML_FA_TILE_Q</a>.</p>
+<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l07524">ck_attention_f16_prefill_qtile64_dispatch()</a>, <a class="el" href="ckernel__engine_8h_source.html#l02306">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, and <a class="el" href="attention__kernels_8c_source.html#l02888">CK_GGML_FA_TILE_Q</a>.</p>
 
 </div>
 </div>
@@ -7178,7 +7184,7 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno"> 9489</span><span class="preprocessor">#endif</span></div>
 <div class="line"><span class="lineno"> 9490</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="ckernel__engine_8h_source.html#l02267">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02268">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a>, and <a class="el" href="ckernel__engine_8h_source.html#l02250">CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA</a>.</p>
+<p class="reference">References <a class="el" href="ckernel__engine_8h_source.html#l02306">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02307">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a>, and <a class="el" href="ckernel__engine_8h_source.html#l02289">CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA</a>.</p>
 
 </div>
 </div>
@@ -7302,7 +7308,7 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno"> 8153</span>}</div>
 <div class="ttc" id="aattention__kernels_8c_html_a49f18d6b371ddf49f03acae38b761eb5"><div class="ttname"><a href="attention__kernels_8c.html#a49f18d6b371ddf49f03acae38b761eb5">ck_attention_forward_causal_head_major_gqa_prefill_segmented_f16cache_schedule_workspace</a></div><div class="ttdeci">static ck_attention_status_t ck_attention_forward_causal_head_major_gqa_prefill_segmented_f16cache_schedule_workspace(const float *q, const uint16_t *k_cache, const uint16_t *v_cache, float *output, int num_heads, int num_kv_heads, int q_tokens, int past_tokens, int cache_capacity, int head_dim, int aligned_head_dim, ck_attention_reduction_t reduction, float *token_workspace, size_t token_workspace_bytes, const int *segment_lengths, int num_segments, ck_attention_prefill_schedule_t schedule)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l08017">attention_kernels.c:8017</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l08017">ck_attention_forward_causal_head_major_gqa_prefill_segmented_f16cache_schedule_workspace()</a>, and <a class="el" href="ckernel__engine_8h_source.html#l02260">CK_ATTN_PREFILL_SCHEDULE_QUERY_TILES</a>.</p>
+<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l08017">ck_attention_forward_causal_head_major_gqa_prefill_segmented_f16cache_schedule_workspace()</a>, and <a class="el" href="ckernel__engine_8h_source.html#l02299">CK_ATTN_PREFILL_SCHEDULE_QUERY_TILES</a>.</p>
 
 </div>
 </div>
@@ -7967,7 +7973,7 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno"> 9336</span>}</div>
 <div class="ttc" id="atokenizer_8h_html_a86dbad16ac00b8aa3c450398e4f8b741"><div class="ttname"><a href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a></div><div class="ttdeci">int32_t float * score</div><div class="ttdef"><b>Definition</b> <a href="tokenizer_8h_source.html#l00328">tokenizer.h:328</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="ckernel__engine_8h_source.html#l02267">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02266">CK_ATTENTION_STATUS_OK</a>, <a class="el" href="ckernel__engine_8h_source.html#l02268">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02250">CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA</a>, <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>, <a class="el" href="tokenizer_8h_source.html#l00328">score</a>, and <a class="el" href="tokenizer_8h_source.html#l00307">token</a>.</p>
+<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="ckernel__engine_8h_source.html#l02306">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02305">CK_ATTENTION_STATUS_OK</a>, <a class="el" href="ckernel__engine_8h_source.html#l02307">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02289">CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA</a>, <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>, <a class="el" href="tokenizer_8h_source.html#l00328">score</a>, and <a class="el" href="tokenizer_8h_source.html#l00307">token</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="attention__kernels_8c_source.html#l09338">attention_forward_causal_head_major_gqa_prefill_append_bf16cache_pytorch_contract_workspace()</a>.</p>
 
@@ -8204,7 +8210,7 @@ Functions</h2></td></tr>
 <div class="ttc" id="ackernel__quant_8h_html_a7edd411b02255eed928c775b91396c2a"><div class="ttname"><a href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a></div><div class="ttdeci">#define CK_FP16_TO_FP32(x)</div><div class="ttdef"><b>Definition</b> <a href="ckernel__quant_8h_source.html#l00440">ckernel_quant.h:440</a></div></div>
 <div class="ttc" id="ackernel__quant_8h_html_aa217c07d43400999fb76ccfcdda2a47d"><div class="ttname"><a href="ckernel__quant_8h.html#aa217c07d43400999fb76ccfcdda2a47d">CK_FP32_TO_FP16</a></div><div class="ttdeci">#define CK_FP32_TO_FP16(x)</div><div class="ttdef"><b>Definition</b> <a href="ckernel__quant_8h_source.html#l00441">ckernel_quant.h:441</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l06426">ck_attention_dot_f16_llama()</a>, <a class="el" href="attention__kernels_8c_source.html#l01243">ck_attention_reference_expf()</a>, <a class="el" href="ckernel__engine_8h_source.html#l02267">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02266">CK_ATTENTION_STATUS_OK</a>, <a class="el" href="ckernel__quant_8h_source.html#l00440">CK_FP16_TO_FP32</a>, <a class="el" href="ckernel__quant_8h_source.html#l00441">CK_FP32_TO_FP16</a>, <a class="el" href="tokenizer_8h_source.html#l00328">score</a>, and <a class="el" href="tokenizer_8h_source.html#l00307">token</a>.</p>
+<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l06426">ck_attention_dot_f16_llama()</a>, <a class="el" href="attention__kernels_8c_source.html#l01243">ck_attention_reference_expf()</a>, <a class="el" href="ckernel__engine_8h_source.html#l02306">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02305">CK_ATTENTION_STATUS_OK</a>, <a class="el" href="ckernel__quant_8h_source.html#l00440">CK_FP16_TO_FP32</a>, <a class="el" href="ckernel__quant_8h_source.html#l00441">CK_FP32_TO_FP16</a>, <a class="el" href="tokenizer_8h_source.html#l00328">score</a>, and <a class="el" href="tokenizer_8h_source.html#l00307">token</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="attention__kernels_8c_source.html#l06806">ck_attention_forward_decode_f16cache_gemma4()</a>.</p>
 
@@ -8734,7 +8740,7 @@ Functions</h2></td></tr>
 <div class="ttc" id="aattention__kernels_8c_html_ad7693ff011ebdd2eb16801f863b010c6"><div class="ttname"><a href="attention__kernels_8c.html#ad7693ff011ebdd2eb16801f863b010c6">attention_forward_decode_head_major_gqa_flash_f16cache_split</a></div><div class="ttdeci">void attention_forward_decode_head_major_gqa_flash_f16cache_split(const float *q_token, const uint16_t *k_cache, const uint16_t *v_cache, float *out_token, int num_heads, int num_kv_heads, int kv_tokens, int cache_capacity, int head_dim, int aligned_head_dim, int split_chunks)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l06784">attention_kernels.c:6784</a></div></div>
 <div class="ttc" id="ackernel__engine_8h_html_aedf852ec498fe7db175f59f810886b9f"><div class="ttname"><a href="ckernel__engine_8h.html#aedf852ec498fe7db175f59f810886b9f">ck_get_num_threads</a></div><div class="ttdeci">int ck_get_num_threads(void)</div><div class="ttdef"><b>Definition</b> <a href="ckernel__strict_8c_source.html#l00310">ckernel_strict.c:310</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l09492">attention_forward_decode_head_major_gqa_flash_f16cache()</a>, <a class="el" href="attention__kernels_8c_source.html#l06784">attention_forward_decode_head_major_gqa_flash_f16cache_split()</a>, <a class="el" href="ckernel__engine_8h_source.html#l02267">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02266">CK_ATTENTION_STATUS_OK</a>, <a class="el" href="ckernel__engine_8h_source.html#l02268">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02247">CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE</a>, <a class="el" href="ckernel__engine_8h_source.html#l02248">CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE</a>, <a class="el" href="ckernel__engine_8h_source.html#l02246">CK_ATTN_REDUCTION_FP32_ONLINE</a>, and <a class="el" href="ckernel__strict_8c_source.html#l00310">ck_get_num_threads()</a>.</p>
+<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l09492">attention_forward_decode_head_major_gqa_flash_f16cache()</a>, <a class="el" href="attention__kernels_8c_source.html#l06784">attention_forward_decode_head_major_gqa_flash_f16cache_split()</a>, <a class="el" href="ckernel__engine_8h_source.html#l02306">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02305">CK_ATTENTION_STATUS_OK</a>, <a class="el" href="ckernel__engine_8h_source.html#l02307">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a>, <a class="el" href="ckernel__engine_8h_source.html#l02286">CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE</a>, <a class="el" href="ckernel__engine_8h_source.html#l02287">CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE</a>, <a class="el" href="ckernel__engine_8h_source.html#l02285">CK_ATTN_REDUCTION_FP32_ONLINE</a>, and <a class="el" href="ckernel__strict_8c_source.html#l00310">ck_get_num_threads()</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="attention__kernels_8c_source.html#l07770">attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract_workspace()</a>, and <a class="el" href="attention__kernels_8c_source.html#l08017">ck_attention_forward_causal_head_major_gqa_prefill_segmented_f16cache_schedule_workspace()</a>.</p>
 
@@ -12340,7 +12346,7 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno"> 9013</span><span class="preprocessor">#endif</span></div>
 <div class="line"><span class="lineno"> 9014</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="ckernel__engine_8h_source.html#l02266">CK_ATTENTION_STATUS_OK</a>.</p>
+<p class="reference">References <a class="el" href="ckernel__engine_8h_source.html#l02305">CK_ATTENTION_STATUS_OK</a>.</p>
 
 </div>
 </div>
@@ -16198,6 +16204,319 @@ Functions</h2></td></tr>
 
 </div>
 </div>
+<a id="a4e29c86ada4d525f0e3ffc4aeb03c3b7" name="a4e29c86ada4d525f0e3ffc4aeb03c3b7"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a4e29c86ada4d525f0e3ffc4aeb03c3b7">&#9670;&#160;</a></span>deepseek_mla_attention_bf16_phases_parallel_dispatch()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void deepseek_mla_attention_bf16_phases_parallel_dispatch </td>
+          <td>(</td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>q</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>k</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>v</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>output</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_heads</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_kv_heads</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_tokens</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>qk_head_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>v_head_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float&#160;</td>
+          <td class="paramname"><em>scale</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>scores</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>scores_bytes</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="deepseek__kernels_8c_source.html#l00942">942</a> of file <a class="el" href="deepseek__kernels_8c_source.html">deepseek_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  947</span>{</div>
+<div class="line"><span class="lineno">  948</span>    <a class="code hl_function" href="deepseek__kernels_8c.html#af8e7b32339783784b69f72bb8c9d2023">ds_mla_attention_parallel_dispatch</a>(q, k, v, output, num_heads,</div>
+<div class="line"><span class="lineno">  949</span>        num_kv_heads, num_tokens, qk_head_dim, v_head_dim,</div>
+<div class="line"><span class="lineno">  950</span>        scale, scores, scores_bytes, 1);</div>
+<div class="line"><span class="lineno">  951</span>}</div>
+<div class="ttc" id="adeepseek__kernels_8c_html_af8e7b32339783784b69f72bb8c9d2023"><div class="ttname"><a href="deepseek__kernels_8c.html#af8e7b32339783784b69f72bb8c9d2023">ds_mla_attention_parallel_dispatch</a></div><div class="ttdeci">static void ds_mla_attention_parallel_dispatch(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int qk_head_dim, int v_head_dim, float scale, float *scores, size_t scores_bytes, int bf16_phases)</div><div class="ttdef"><b>Definition</b> <a href="deepseek__kernels_8c_source.html#l00880">deepseek_kernels.c:880</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="deepseek__kernels_8c_source.html#l00880">ds_mla_attention_parallel_dispatch()</a>.</p>
+
+</div>
+</div>
+<a id="aafebbcbfb2a95c0a529aa509893d926d" name="aafebbcbfb2a95c0a529aa509893d926d"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aafebbcbfb2a95c0a529aa509893d926d">&#9670;&#160;</a></span>deepseek_mla_attention_bf16_phases_workspace()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void deepseek_mla_attention_bf16_phases_workspace </td>
+          <td>(</td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>q</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>k</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>v</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>output</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_heads</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_kv_heads</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_tokens</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>qk_head_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>v_head_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float&#160;</td>
+          <td class="paramname"><em>scale</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>scores</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>scores_bytes</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="deepseek__kernels_8c_source.html#l00823">823</a> of file <a class="el" href="deepseek__kernels_8c_source.html">deepseek_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  828</span>{</div>
+<div class="line"><span class="lineno">  829</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="deepseek__kernels_8c.html#a4e00703bb8e58c23c9bcf3f8b3d595e7">ds_mla_prefill_valid</a>(q, k, v, output, num_heads, num_kv_heads,</div>
+<div class="line"><span class="lineno">  830</span>            num_tokens, qk_head_dim, v_head_dim, scale, scores,</div>
+<div class="line"><span class="lineno">  831</span>            scores_bytes)) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  832</span>    <a class="code hl_function" href="deepseek__kernels_8c.html#a808e2b28bec412581326fd8736b8d2e7">ds_mla_attention_f32_query_range</a>(</div>
+<div class="line"><span class="lineno">  833</span>        q, k, v, output, num_heads, num_kv_heads, num_tokens,</div>
+<div class="line"><span class="lineno">  834</span>        qk_head_dim, v_head_dim, scale, scores,</div>
+<div class="line"><span class="lineno">  835</span>        0, num_tokens * num_heads, 1, 1);</div>
+<div class="line"><span class="lineno">  836</span>}</div>
+<div class="ttc" id="adeepseek__kernels_8c_html_a4e00703bb8e58c23c9bcf3f8b3d595e7"><div class="ttname"><a href="deepseek__kernels_8c.html#a4e00703bb8e58c23c9bcf3f8b3d595e7">ds_mla_prefill_valid</a></div><div class="ttdeci">static int ds_mla_prefill_valid(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int qk_head_dim, int v_head_dim, float scale, float *scores, size_t scores_bytes)</div><div class="ttdef"><b>Definition</b> <a href="deepseek__kernels_8c_source.html#l00783">deepseek_kernels.c:783</a></div></div>
+<div class="ttc" id="adeepseek__kernels_8c_html_a808e2b28bec412581326fd8736b8d2e7"><div class="ttname"><a href="deepseek__kernels_8c.html#a808e2b28bec412581326fd8736b8d2e7">ds_mla_attention_f32_query_range</a></div><div class="ttdeci">static void ds_mla_attention_f32_query_range(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int qk_head_dim, int v_head_dim, float scale, float *scores, int query_begin, int query_end, int query_step, int bf16_phases)</div><div class="ttdef"><b>Definition</b> <a href="deepseek__kernels_8c_source.html#l00716">deepseek_kernels.c:716</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="deepseek__kernels_8c_source.html#l00716">ds_mla_attention_f32_query_range()</a>, and <a class="el" href="deepseek__kernels_8c_source.html#l00783">ds_mla_prefill_valid()</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="deepseek__kernels_8c_source.html#l00880">ds_mla_attention_parallel_dispatch()</a>.</p>
+
+</div>
+</div>
+<a id="ad6270580122323c369efac2c8e3e7e70" name="ad6270580122323c369efac2c8e3e7e70"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ad6270580122323c369efac2c8e3e7e70">&#9670;&#160;</a></span>deepseek_mla_attention_decode_bf16_phases_workspace()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void deepseek_mla_attention_decode_bf16_phases_workspace </td>
+          <td>(</td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>q</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>k_cache</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>v_cache</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>output</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_heads</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_kv_heads</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>cache_len</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>qk_head_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>v_head_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>max_seq_len</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>cache_stride</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float&#160;</td>
+          <td class="paramname"><em>scale</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>scores</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>scores_bytes</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="deepseek__kernels_8c_source.html#l01144">1144</a> of file <a class="el" href="deepseek__kernels_8c_source.html">deepseek_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 1149</span>{</div>
+<div class="line"><span class="lineno"> 1150</span>    <a class="code hl_function" href="deepseek__kernels_8c.html#a435b225c9743498f15d7383701d379c5">ds_mla_attention_decode_workspace</a>(q, k_cache, v_cache, output,</div>
+<div class="line"><span class="lineno"> 1151</span>        num_heads, num_kv_heads, cache_len, qk_head_dim, v_head_dim,</div>
+<div class="line"><span class="lineno"> 1152</span>        max_seq_len, cache_stride, scale, scores, scores_bytes, 1);</div>
+<div class="line"><span class="lineno"> 1153</span>}</div>
+<div class="ttc" id="adeepseek__kernels_8c_html_a435b225c9743498f15d7383701d379c5"><div class="ttname"><a href="deepseek__kernels_8c.html#a435b225c9743498f15d7383701d379c5">ds_mla_attention_decode_workspace</a></div><div class="ttdeci">static void ds_mla_attention_decode_workspace(const float *q, const float *k_cache, const float *v_cache, float *output, int num_heads, int num_kv_heads, int cache_len, int qk_head_dim, int v_head_dim, int max_seq_len, int cache_stride, float scale, float *scores, size_t scores_bytes, int bf16_phases)</div><div class="ttdef"><b>Definition</b> <a href="deepseek__kernels_8c_source.html#l01052">deepseek_kernels.c:1052</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="deepseek__kernels_8c_source.html#l01052">ds_mla_attention_decode_workspace()</a>.</p>
+
+</div>
+</div>
 <a id="adf428053e5873c00d89d3dfc311a73ef" name="adf428053e5873c00d89d3dfc311a73ef"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#adf428053e5873c00d89d3dfc311a73ef">&#9670;&#160;</a></span>deepseek_mla_attention_decode_f32()</h2>
 
@@ -16278,21 +16597,21 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="deepseek__kernels_8c_source.html#l01044">1044</a> of file <a class="el" href="deepseek__kernels_8c_source.html">deepseek_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 1055</span>{</div>
-<div class="line"><span class="lineno"> 1056</span>    <span class="keywordflow">if</span> (cache_len &lt;= 0 || (<span class="keywordtype">size_t</span>)cache_len &gt; SIZE_MAX / <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>)) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 1057</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> scores_bytes = (size_t)cache_len * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>);</div>
-<div class="line"><span class="lineno"> 1058</span>    <span class="keywordtype">float</span> *scores = (<span class="keywordtype">float</span> *)malloc(scores_bytes);</div>
-<div class="line"><span class="lineno"> 1059</span>    <span class="keywordflow">if</span> (!scores) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 1060</span>    <a class="code hl_function" href="deepseek__kernels_8c.html#a56a3b28ef641f0c78cfbbb7a20b8e86d">deepseek_mla_attention_decode_f32_workspace</a>(</div>
-<div class="line"><span class="lineno"> 1061</span>        q, k_cache, v_cache, output, num_heads, num_kv_heads, cache_len,</div>
-<div class="line"><span class="lineno"> 1062</span>        qk_head_dim, v_head_dim, max_seq_len, cache_stride,</div>
-<div class="line"><span class="lineno"> 1063</span>        1.0f / sqrtf((<span class="keywordtype">float</span>)qk_head_dim), scores, scores_bytes);</div>
-<div class="line"><span class="lineno"> 1064</span>    free(scores);</div>
-<div class="line"><span class="lineno"> 1065</span>}</div>
-<div class="ttc" id="adeepseek__kernels_8c_html_a56a3b28ef641f0c78cfbbb7a20b8e86d"><div class="ttname"><a href="deepseek__kernels_8c.html#a56a3b28ef641f0c78cfbbb7a20b8e86d">deepseek_mla_attention_decode_f32_workspace</a></div><div class="ttdeci">void deepseek_mla_attention_decode_f32_workspace(const float *q, const float *k_cache, const float *v_cache, float *output, int num_heads, int num_kv_heads, int cache_len, int qk_head_dim, int v_head_dim, int max_seq_len, int cache_stride, float scale, float *scores, size_t scores_bytes)</div><div class="ttdef"><b>Definition</b> <a href="deepseek__kernels_8c_source.html#l00978">deepseek_kernels.c:978</a></div></div>
+<p class="definition">Definition at line <a class="el" href="deepseek__kernels_8c_source.html#l01155">1155</a> of file <a class="el" href="deepseek__kernels_8c_source.html">deepseek_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 1166</span>{</div>
+<div class="line"><span class="lineno"> 1167</span>    <span class="keywordflow">if</span> (cache_len &lt;= 0 || (<span class="keywordtype">size_t</span>)cache_len &gt; SIZE_MAX / <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>)) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1168</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> scores_bytes = (size_t)cache_len * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>);</div>
+<div class="line"><span class="lineno"> 1169</span>    <span class="keywordtype">float</span> *scores = (<span class="keywordtype">float</span> *)malloc(scores_bytes);</div>
+<div class="line"><span class="lineno"> 1170</span>    <span class="keywordflow">if</span> (!scores) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1171</span>    <a class="code hl_function" href="deepseek__kernels_8c.html#a56a3b28ef641f0c78cfbbb7a20b8e86d">deepseek_mla_attention_decode_f32_workspace</a>(</div>
+<div class="line"><span class="lineno"> 1172</span>        q, k_cache, v_cache, output, num_heads, num_kv_heads, cache_len,</div>
+<div class="line"><span class="lineno"> 1173</span>        qk_head_dim, v_head_dim, max_seq_len, cache_stride,</div>
+<div class="line"><span class="lineno"> 1174</span>        1.0f / sqrtf((<span class="keywordtype">float</span>)qk_head_dim), scores, scores_bytes);</div>
+<div class="line"><span class="lineno"> 1175</span>    free(scores);</div>
+<div class="line"><span class="lineno"> 1176</span>}</div>
+<div class="ttc" id="adeepseek__kernels_8c_html_a56a3b28ef641f0c78cfbbb7a20b8e86d"><div class="ttname"><a href="deepseek__kernels_8c.html#a56a3b28ef641f0c78cfbbb7a20b8e86d">deepseek_mla_attention_decode_f32_workspace</a></div><div class="ttdeci">void deepseek_mla_attention_decode_f32_workspace(const float *q, const float *k_cache, const float *v_cache, float *output, int num_heads, int num_kv_heads, int cache_len, int qk_head_dim, int v_head_dim, int max_seq_len, int cache_stride, float scale, float *scores, size_t scores_bytes)</div><div class="ttdef"><b>Definition</b> <a href="deepseek__kernels_8c_source.html#l01133">deepseek_kernels.c:1133</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="deepseek__kernels_8c_source.html#l00978">deepseek_mla_attention_decode_f32_workspace()</a>.</p>
+<p class="reference">References <a class="el" href="deepseek__kernels_8c_source.html#l01133">deepseek_mla_attention_decode_f32_workspace()</a>.</p>
 
 </div>
 </div>
@@ -16394,62 +16713,16 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="deepseek__kernels_8c_source.html#l00978">978</a> of file <a class="el" href="deepseek__kernels_8c_source.html">deepseek_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  992</span>{</div>
-<div class="line"><span class="lineno">  993</span>    <span class="keywordflow">if</span> (!q || !k_cache || !v_cache || !output || num_heads &lt;= 0 ||</div>
-<div class="line"><span class="lineno">  994</span>        num_kv_heads &lt;= 0 || cache_len &lt;= 0 || qk_head_dim &lt;= 0 ||</div>
-<div class="line"><span class="lineno">  995</span>        v_head_dim &lt;= 0 || max_seq_len &lt;= 0 || cache_stride &lt;= 0 ||</div>
-<div class="line"><span class="lineno">  996</span>        !isfinite(scale) || scale &lt;= 0.0f) {</div>
-<div class="line"><span class="lineno">  997</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  998</span>    }</div>
-<div class="line"><span class="lineno">  999</span>    <span class="keywordflow">if</span> (qk_head_dim &gt; cache_stride || v_head_dim &gt; cache_stride) {</div>
-<div class="line"><span class="lineno"> 1000</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 1001</span>    }</div>
-<div class="line"><span class="lineno"> 1002</span>    <span class="keywordflow">if</span> ((<span class="keywordtype">size_t</span>)cache_len &gt; SIZE_MAX / <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>) || !scores ||</div>
-<div class="line"><span class="lineno"> 1003</span>        scores_bytes &lt; (<span class="keywordtype">size_t</span>)cache_len * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>)) {</div>
-<div class="line"><span class="lineno"> 1004</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 1005</span>    }</div>
-<div class="line"><span class="lineno"> 1006</span> </div>
-<div class="line"><span class="lineno"> 1007</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
-<div class="line"><span class="lineno"> 1008</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> kv_h = (int)((<span class="keywordtype">long</span> <span class="keywordtype">long</span>)h * (<span class="keywordtype">long</span> long)num_kv_heads / (<span class="keywordtype">long</span> <span class="keywordtype">long</span>)num_heads);</div>
-<div class="line"><span class="lineno"> 1009</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *q_vec = q + (size_t)h * (<span class="keywordtype">size_t</span>)qk_head_dim;</div>
-<div class="line"><span class="lineno"> 1010</span> </div>
-<div class="line"><span class="lineno"> 1011</span>        <span class="keywordtype">float</span> max_score = -FLT_MAX;</div>
-<div class="line"><span class="lineno"> 1012</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; cache_len; ++j) {</div>
-<div class="line"><span class="lineno"> 1013</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *k_vec = k_cache + ((size_t)kv_h * (<span class="keywordtype">size_t</span>)max_seq_len + (size_t)j) * (size_t)cache_stride;</div>
-<div class="line"><span class="lineno"> 1014</span>            <span class="keywordtype">float</span> dot = 0.0f;</div>
-<div class="line"><span class="lineno"> 1015</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; qk_head_dim; ++d) {</div>
-<div class="line"><span class="lineno"> 1016</span>                dot += q_vec[d] * k_vec[d];</div>
-<div class="line"><span class="lineno"> 1017</span>            }</div>
-<div class="line"><span class="lineno"> 1018</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> <a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a> = dot * scale;</div>
-<div class="line"><span class="lineno"> 1019</span>            scores[j] = <a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a>;</div>
-<div class="line"><span class="lineno"> 1020</span>            <span class="keywordflow">if</span> (<a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a> &gt; max_score) max_score = <a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a>;</div>
-<div class="line"><span class="lineno"> 1021</span>        }</div>
-<div class="line"><span class="lineno"> 1022</span> </div>
-<div class="line"><span class="lineno"> 1023</span>        <span class="keywordtype">float</span> sum = 0.0f;</div>
-<div class="line"><span class="lineno"> 1024</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; cache_len; ++j) {</div>
-<div class="line"><span class="lineno"> 1025</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> e = expf(scores[j] - max_score);</div>
-<div class="line"><span class="lineno"> 1026</span>            scores[j] = e;</div>
-<div class="line"><span class="lineno"> 1027</span>            sum += e;</div>
-<div class="line"><span class="lineno"> 1028</span>        }</div>
-<div class="line"><span class="lineno"> 1029</span> </div>
-<div class="line"><span class="lineno"> 1030</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> inv_sum = sum &gt; 0.0f ? (1.0f / sum) : 0.0f;</div>
-<div class="line"><span class="lineno"> 1031</span>        <span class="keywordtype">float</span> *out = output + (size_t)h * (<span class="keywordtype">size_t</span>)v_head_dim;</div>
-<div class="line"><span class="lineno"> 1032</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; v_head_dim; ++d) out[d] = 0.0f;</div>
-<div class="line"><span class="lineno"> 1033</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; cache_len; ++j) {</div>
-<div class="line"><span class="lineno"> 1034</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> w = scores[j] * inv_sum;</div>
-<div class="line"><span class="lineno"> 1035</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *v_vec = v_cache + ((size_t)kv_h * (<span class="keywordtype">size_t</span>)max_seq_len + (size_t)j) * (size_t)cache_stride;</div>
-<div class="line"><span class="lineno"> 1036</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; v_head_dim; ++d) {</div>
-<div class="line"><span class="lineno"> 1037</span>                out[d] += w * v_vec[d];</div>
-<div class="line"><span class="lineno"> 1038</span>            }</div>
-<div class="line"><span class="lineno"> 1039</span>        }</div>
-<div class="line"><span class="lineno"> 1040</span>    }</div>
-<div class="line"><span class="lineno"> 1041</span> </div>
-<div class="line"><span class="lineno"> 1042</span>}</div>
+<p class="definition">Definition at line <a class="el" href="deepseek__kernels_8c_source.html#l01133">1133</a> of file <a class="el" href="deepseek__kernels_8c_source.html">deepseek_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 1138</span>{</div>
+<div class="line"><span class="lineno"> 1139</span>    <a class="code hl_function" href="deepseek__kernels_8c.html#a435b225c9743498f15d7383701d379c5">ds_mla_attention_decode_workspace</a>(q, k_cache, v_cache, output,</div>
+<div class="line"><span class="lineno"> 1140</span>        num_heads, num_kv_heads, cache_len, qk_head_dim, v_head_dim,</div>
+<div class="line"><span class="lineno"> 1141</span>        max_seq_len, cache_stride, scale, scores, scores_bytes, 0);</div>
+<div class="line"><span class="lineno"> 1142</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="tokenizer_8h_source.html#l00328">score</a>.</p>
+<p class="reference">References <a class="el" href="deepseek__kernels_8c_source.html#l01052">ds_mla_attention_decode_workspace()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="deepseek__kernels_8c_source.html#l01044">deepseek_mla_attention_decode_f32()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="deepseek__kernels_8c_source.html#l01155">deepseek_mla_attention_decode_f32()</a>.</p>
 
 </div>
 </div>
@@ -16521,21 +16794,21 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="deepseek__kernels_8c_source.html#l00879">879</a> of file <a class="el" href="deepseek__kernels_8c_source.html">deepseek_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  888</span>{</div>
-<div class="line"><span class="lineno">  889</span>    <span class="keywordflow">if</span> (num_tokens &lt;= 0 || (<span class="keywordtype">size_t</span>)num_tokens &gt; SIZE_MAX / <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>)) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  890</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> scores_bytes = (size_t)num_tokens * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>);</div>
-<div class="line"><span class="lineno">  891</span>    <span class="keywordtype">float</span> *scores = (<span class="keywordtype">float</span> *)malloc(scores_bytes);</div>
-<div class="line"><span class="lineno">  892</span>    <span class="keywordflow">if</span> (!scores) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  893</span>    <a class="code hl_function" href="deepseek__kernels_8c.html#a3625048a020bc0685ef19a2e65b3874f">deepseek_mla_attention_f32_workspace</a>(</div>
-<div class="line"><span class="lineno">  894</span>        q, k, v, output, num_heads, num_kv_heads, num_tokens,</div>
-<div class="line"><span class="lineno">  895</span>        qk_head_dim, v_head_dim, 1.0f / sqrtf((<span class="keywordtype">float</span>)qk_head_dim),</div>
-<div class="line"><span class="lineno">  896</span>        scores, scores_bytes);</div>
-<div class="line"><span class="lineno">  897</span>    free(scores);</div>
-<div class="line"><span class="lineno">  898</span>}</div>
-<div class="ttc" id="adeepseek__kernels_8c_html_a3625048a020bc0685ef19a2e65b3874f"><div class="ttname"><a href="deepseek__kernels_8c.html#a3625048a020bc0685ef19a2e65b3874f">deepseek_mla_attention_f32_workspace</a></div><div class="ttdeci">void deepseek_mla_attention_f32_workspace(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int qk_head_dim, int v_head_dim, float scale, float *scores, size_t scores_bytes)</div><div class="ttdef"><b>Definition</b> <a href="deepseek__kernels_8c_source.html#l00768">deepseek_kernels.c:768</a></div></div>
+<p class="definition">Definition at line <a class="el" href="deepseek__kernels_8c_source.html#l00953">953</a> of file <a class="el" href="deepseek__kernels_8c_source.html">deepseek_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  962</span>{</div>
+<div class="line"><span class="lineno">  963</span>    <span class="keywordflow">if</span> (num_tokens &lt;= 0 || (<span class="keywordtype">size_t</span>)num_tokens &gt; SIZE_MAX / <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>)) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  964</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> scores_bytes = (size_t)num_tokens * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>);</div>
+<div class="line"><span class="lineno">  965</span>    <span class="keywordtype">float</span> *scores = (<span class="keywordtype">float</span> *)malloc(scores_bytes);</div>
+<div class="line"><span class="lineno">  966</span>    <span class="keywordflow">if</span> (!scores) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  967</span>    <a class="code hl_function" href="deepseek__kernels_8c.html#a3625048a020bc0685ef19a2e65b3874f">deepseek_mla_attention_f32_workspace</a>(</div>
+<div class="line"><span class="lineno">  968</span>        q, k, v, output, num_heads, num_kv_heads, num_tokens,</div>
+<div class="line"><span class="lineno">  969</span>        qk_head_dim, v_head_dim, 1.0f / sqrtf((<span class="keywordtype">float</span>)qk_head_dim),</div>
+<div class="line"><span class="lineno">  970</span>        scores, scores_bytes);</div>
+<div class="line"><span class="lineno">  971</span>    free(scores);</div>
+<div class="line"><span class="lineno">  972</span>}</div>
+<div class="ttc" id="adeepseek__kernels_8c_html_a3625048a020bc0685ef19a2e65b3874f"><div class="ttname"><a href="deepseek__kernels_8c.html#a3625048a020bc0685ef19a2e65b3874f">deepseek_mla_attention_f32_workspace</a></div><div class="ttdeci">void deepseek_mla_attention_f32_workspace(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int qk_head_dim, int v_head_dim, float scale, float *scores, size_t scores_bytes)</div><div class="ttdef"><b>Definition</b> <a href="deepseek__kernels_8c_source.html#l00800">deepseek_kernels.c:800</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="deepseek__kernels_8c_source.html#l00768">deepseek_mla_attention_f32_workspace()</a>.</p>
+<p class="reference">References <a class="el" href="deepseek__kernels_8c_source.html#l00800">deepseek_mla_attention_f32_workspace()</a>.</p>
 
 </div>
 </div>
@@ -16625,36 +16898,14 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="deepseek__kernels_8c_source.html#l00839">839</a> of file <a class="el" href="deepseek__kernels_8c_source.html">deepseek_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  852</span>{</div>
-<div class="line"><span class="lineno">  853</span>    ck_threadpool_t *pool = <a class="code hl_function" href="ck__threadpool_8h.html#a4597badcb0a5a6c31549f2b6bc6a88a7">ck_threadpool_global</a>();</div>
-<div class="line"><span class="lineno">  854</span>    <span class="keyword">const</span> <span class="keywordtype">char</span> *disabled = getenv(<span class="stringliteral">&quot;CK_DISABLE_MLA_PARALLEL_PREFILL&quot;</span>);</div>
-<div class="line"><span class="lineno">  855</span>    <span class="keywordtype">int</span> active = pool ? <a class="code hl_function" href="ck__threadpool_8h.html#aef9103ab0a271feb7fdc74c915a78d10">ck_threadpool_n_threads</a>(pool) : 1;</div>
-<div class="line"><span class="lineno">  856</span>    <span class="keywordflow">if</span> (active &gt; num_heads) active = num_heads;</div>
-<div class="line"><span class="lineno">  857</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> score_row_bytes =</div>
-<div class="line"><span class="lineno">  858</span>        num_tokens &gt; 0 ? (size_t)num_tokens * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>) : 0;</div>
-<div class="line"><span class="lineno">  859</span>    <span class="keywordflow">if</span> ((disabled &amp;&amp; disabled[0] &amp;&amp; strcmp(disabled, <span class="stringliteral">&quot;0&quot;</span>) != 0) ||</div>
-<div class="line"><span class="lineno">  860</span>        !pool || active &lt;= 1 || num_tokens &lt;= 0 || num_heads &lt;= 0 ||</div>
-<div class="line"><span class="lineno">  861</span>        num_tokens &gt; INT_MAX / num_heads ||</div>
-<div class="line"><span class="lineno">  862</span>        score_row_bytes == 0 || (<span class="keywordtype">size_t</span>)active &gt; SIZE_MAX / score_row_bytes ||</div>
-<div class="line"><span class="lineno">  863</span>        scores_bytes &lt; (<span class="keywordtype">size_t</span>)active * score_row_bytes) {</div>
-<div class="line"><span class="lineno">  864</span>        <a class="code hl_function" href="deepseek__kernels_8c.html#a3625048a020bc0685ef19a2e65b3874f">deepseek_mla_attention_f32_workspace</a>(</div>
-<div class="line"><span class="lineno">  865</span>            q, k, v, output, num_heads, num_kv_heads, num_tokens,</div>
-<div class="line"><span class="lineno">  866</span>            qk_head_dim, v_head_dim, scale, scores, scores_bytes);</div>
-<div class="line"><span class="lineno">  867</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  868</span>    }</div>
-<div class="line"><span class="lineno">  869</span>    ds_mla_attention_f32_args_t args = {</div>
-<div class="line"><span class="lineno">  870</span>        .q = q, .k = k, .v = v, .output = output,</div>
-<div class="line"><span class="lineno">  871</span>        .num_heads = num_heads, .num_kv_heads = num_kv_heads,</div>
-<div class="line"><span class="lineno">  872</span>        .num_tokens = num_tokens, .qk_head_dim = qk_head_dim,</div>
-<div class="line"><span class="lineno">  873</span>        .v_head_dim = v_head_dim, .scale = scale, .scores = scores,</div>
-<div class="line"><span class="lineno">  874</span>    };</div>
-<div class="line"><span class="lineno">  875</span>    atomic_init(&amp;args.next_token, 0);</div>
-<div class="line"><span class="lineno">  876</span>    <a class="code hl_function" href="ck__threadpool_8h.html#a4554995880b7a47e275f9b10511b5e43">ck_threadpool_dispatch_n</a>(pool, active, <a class="code hl_function" href="deepseek__kernels_8c.html#a0d2105645ed8d3c361c54d8bc14bc285">ds_mla_attention_f32_work</a>, &amp;args);</div>
-<div class="line"><span class="lineno">  877</span>}</div>
-<div class="ttc" id="adeepseek__kernels_8c_html_a0d2105645ed8d3c361c54d8bc14bc285"><div class="ttname"><a href="deepseek__kernels_8c.html#a0d2105645ed8d3c361c54d8bc14bc285">ds_mla_attention_f32_work</a></div><div class="ttdeci">static void ds_mla_attention_f32_work(int ith, int nth, void *opaque)</div><div class="ttdef"><b>Definition</b> <a href="deepseek__kernels_8c_source.html#l00813">deepseek_kernels.c:813</a></div></div>
+<p class="definition">Definition at line <a class="el" href="deepseek__kernels_8c_source.html#l00931">931</a> of file <a class="el" href="deepseek__kernels_8c_source.html">deepseek_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  936</span>{</div>
+<div class="line"><span class="lineno">  937</span>    <a class="code hl_function" href="deepseek__kernels_8c.html#af8e7b32339783784b69f72bb8c9d2023">ds_mla_attention_parallel_dispatch</a>(q, k, v, output, num_heads,</div>
+<div class="line"><span class="lineno">  938</span>        num_kv_heads, num_tokens, qk_head_dim, v_head_dim,</div>
+<div class="line"><span class="lineno">  939</span>        scale, scores, scores_bytes, 0);</div>
+<div class="line"><span class="lineno">  940</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="ck__threadpool_8c_source.html#l00398">ck_threadpool_dispatch_n()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00685">ck_threadpool_global()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00584">ck_threadpool_n_threads()</a>, <a class="el" href="deepseek__kernels_8c_source.html#l00768">deepseek_mla_attention_f32_workspace()</a>, and <a class="el" href="deepseek__kernels_8c_source.html#l00813">ds_mla_attention_f32_work()</a>.</p>
+<p class="reference">References <a class="el" href="deepseek__kernels_8c_source.html#l00880">ds_mla_attention_parallel_dispatch()</a>.</p>
 
 </div>
 </div>
@@ -16744,29 +16995,21 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="deepseek__kernels_8c_source.html#l00768">768</a> of file <a class="el" href="deepseek__kernels_8c_source.html">deepseek_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  780</span>{</div>
-<div class="line"><span class="lineno">  781</span>    <span class="keywordflow">if</span> (!q || !k || !v || !output || num_heads &lt;= 0 || num_kv_heads &lt;= 0 ||</div>
-<div class="line"><span class="lineno">  782</span>        num_tokens &lt;= 0 || qk_head_dim &lt;= 0 || v_head_dim &lt;= 0 ||</div>
-<div class="line"><span class="lineno">  783</span>        num_tokens &gt; INT_MAX / num_heads ||</div>
-<div class="line"><span class="lineno">  784</span>        !isfinite(scale) || scale &lt;= 0.0f) {</div>
-<div class="line"><span class="lineno">  785</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  786</span>    }</div>
-<div class="line"><span class="lineno">  787</span>    <span class="keywordflow">if</span> ((<span class="keywordtype">size_t</span>)num_tokens &gt; SIZE_MAX / <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>) || !scores ||</div>
-<div class="line"><span class="lineno">  788</span>        scores_bytes &lt; (<span class="keywordtype">size_t</span>)num_tokens * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>)) {</div>
-<div class="line"><span class="lineno">  789</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  790</span>    }</div>
-<div class="line"><span class="lineno">  791</span> </div>
-<div class="line"><span class="lineno">  792</span>    <a class="code hl_function" href="deepseek__kernels_8c.html#a7d0dd1a6d37cea665740ab21d5cb850c">ds_mla_attention_f32_query_range</a>(</div>
-<div class="line"><span class="lineno">  793</span>        q, k, v, output, num_heads, num_kv_heads, num_tokens,</div>
-<div class="line"><span class="lineno">  794</span>        qk_head_dim, v_head_dim, scale, scores,</div>
-<div class="line"><span class="lineno">  795</span>        0, num_tokens * num_heads, 1);</div>
-<div class="line"><span class="lineno">  796</span>}</div>
-<div class="ttc" id="adeepseek__kernels_8c_html_a7d0dd1a6d37cea665740ab21d5cb850c"><div class="ttname"><a href="deepseek__kernels_8c.html#a7d0dd1a6d37cea665740ab21d5cb850c">ds_mla_attention_f32_query_range</a></div><div class="ttdeci">static void ds_mla_attention_f32_query_range(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int qk_head_dim, int v_head_dim, float scale, float *scores, int query_begin, int query_end, int query_step)</div><div class="ttdef"><b>Definition</b> <a href="deepseek__kernels_8c_source.html#l00716">deepseek_kernels.c:716</a></div></div>
+<p class="definition">Definition at line <a class="el" href="deepseek__kernels_8c_source.html#l00800">800</a> of file <a class="el" href="deepseek__kernels_8c_source.html">deepseek_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  812</span>{</div>
+<div class="line"><span class="lineno">  813</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="deepseek__kernels_8c.html#a4e00703bb8e58c23c9bcf3f8b3d595e7">ds_mla_prefill_valid</a>(q, k, v, output, num_heads, num_kv_heads,</div>
+<div class="line"><span class="lineno">  814</span>            num_tokens, qk_head_dim, v_head_dim, scale, scores,</div>
+<div class="line"><span class="lineno">  815</span>            scores_bytes)) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  816</span> </div>
+<div class="line"><span class="lineno">  817</span>    <a class="code hl_function" href="deepseek__kernels_8c.html#a808e2b28bec412581326fd8736b8d2e7">ds_mla_attention_f32_query_range</a>(</div>
+<div class="line"><span class="lineno">  818</span>        q, k, v, output, num_heads, num_kv_heads, num_tokens,</div>
+<div class="line"><span class="lineno">  819</span>        qk_head_dim, v_head_dim, scale, scores,</div>
+<div class="line"><span class="lineno">  820</span>        0, num_tokens * num_heads, 1, 0);</div>
+<div class="line"><span class="lineno">  821</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="deepseek__kernels_8c_source.html#l00716">ds_mla_attention_f32_query_range()</a>.</p>
+<p class="reference">References <a class="el" href="deepseek__kernels_8c_source.html#l00716">ds_mla_attention_f32_query_range()</a>, and <a class="el" href="deepseek__kernels_8c_source.html#l00783">ds_mla_prefill_valid()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="deepseek__kernels_8c_source.html#l00879">deepseek_mla_attention_f32()</a>, and <a class="el" href="deepseek__kernels_8c_source.html#l00839">deepseek_mla_attention_f32_parallel_dispatch()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="deepseek__kernels_8c_source.html#l00953">deepseek_mla_attention_f32()</a>, and <a class="el" href="deepseek__kernels_8c_source.html#l00880">ds_mla_attention_parallel_dispatch()</a>.</p>
 
 </div>
 </div>
@@ -16844,33 +17087,33 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="deepseek__kernels_8c_source.html#l00900">900</a> of file <a class="el" href="deepseek__kernels_8c_source.html">deepseek_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  910</span>{</div>
-<div class="line"><span class="lineno">  911</span>    <span class="keywordflow">if</span> (!k_cache || !v_cache || !k || !v || num_tokens &lt;= 0 ||</div>
-<div class="line"><span class="lineno">  912</span>        num_kv_heads &lt;= 0 || qk_head_dim &lt;= 0 || v_head_dim &lt;= 0 ||</div>
-<div class="line"><span class="lineno">  913</span>        max_seq_len &lt;= 0 || cache_stride &lt;= 0) {</div>
-<div class="line"><span class="lineno">  914</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  915</span>    }</div>
-<div class="line"><span class="lineno">  916</span>    <span class="keywordflow">if</span> (qk_head_dim &gt; cache_stride || v_head_dim &gt; cache_stride) {</div>
-<div class="line"><span class="lineno">  917</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  918</span>    }</div>
-<div class="line"><span class="lineno">  919</span>    <span class="keywordflow">if</span> (num_tokens &gt; max_seq_len) {</div>
-<div class="line"><span class="lineno">  920</span>        num_tokens = max_seq_len;</div>
-<div class="line"><span class="lineno">  921</span>    }</div>
-<div class="line"><span class="lineno">  922</span> </div>
-<div class="line"><span class="lineno">  923</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; num_tokens; ++t) {</div>
-<div class="line"><span class="lineno">  924</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_kv_heads; ++h) {</div>
-<div class="line"><span class="lineno">  925</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *k_src = k + ((size_t)t * (<span class="keywordtype">size_t</span>)num_kv_heads + (size_t)h) * (size_t)qk_head_dim;</div>
-<div class="line"><span class="lineno">  926</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *v_src = v + ((size_t)t * (<span class="keywordtype">size_t</span>)num_kv_heads + (size_t)h) * (size_t)v_head_dim;</div>
-<div class="line"><span class="lineno">  927</span>            <span class="keywordtype">float</span> *k_dst = k_cache + ((size_t)h * (<span class="keywordtype">size_t</span>)max_seq_len + (size_t)t) * (size_t)cache_stride;</div>
-<div class="line"><span class="lineno">  928</span>            <span class="keywordtype">float</span> *v_dst = v_cache + ((size_t)h * (<span class="keywordtype">size_t</span>)max_seq_len + (size_t)t) * (size_t)cache_stride;</div>
-<div class="line"><span class="lineno">  929</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; qk_head_dim; ++d) k_dst[d] = k_src[d];</div>
-<div class="line"><span class="lineno">  930</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = qk_head_dim; d &lt; cache_stride; ++d) k_dst[d] = 0.0f;</div>
-<div class="line"><span class="lineno">  931</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; v_head_dim; ++d) v_dst[d] = v_src[d];</div>
-<div class="line"><span class="lineno">  932</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = v_head_dim; d &lt; cache_stride; ++d) v_dst[d] = 0.0f;</div>
-<div class="line"><span class="lineno">  933</span>        }</div>
-<div class="line"><span class="lineno">  934</span>    }</div>
-<div class="line"><span class="lineno">  935</span>}</div>
+<p class="definition">Definition at line <a class="el" href="deepseek__kernels_8c_source.html#l00974">974</a> of file <a class="el" href="deepseek__kernels_8c_source.html">deepseek_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  984</span>{</div>
+<div class="line"><span class="lineno">  985</span>    <span class="keywordflow">if</span> (!k_cache || !v_cache || !k || !v || num_tokens &lt;= 0 ||</div>
+<div class="line"><span class="lineno">  986</span>        num_kv_heads &lt;= 0 || qk_head_dim &lt;= 0 || v_head_dim &lt;= 0 ||</div>
+<div class="line"><span class="lineno">  987</span>        max_seq_len &lt;= 0 || cache_stride &lt;= 0) {</div>
+<div class="line"><span class="lineno">  988</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  989</span>    }</div>
+<div class="line"><span class="lineno">  990</span>    <span class="keywordflow">if</span> (qk_head_dim &gt; cache_stride || v_head_dim &gt; cache_stride) {</div>
+<div class="line"><span class="lineno">  991</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  992</span>    }</div>
+<div class="line"><span class="lineno">  993</span>    <span class="keywordflow">if</span> (num_tokens &gt; max_seq_len) {</div>
+<div class="line"><span class="lineno">  994</span>        num_tokens = max_seq_len;</div>
+<div class="line"><span class="lineno">  995</span>    }</div>
+<div class="line"><span class="lineno">  996</span> </div>
+<div class="line"><span class="lineno">  997</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; num_tokens; ++t) {</div>
+<div class="line"><span class="lineno">  998</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_kv_heads; ++h) {</div>
+<div class="line"><span class="lineno">  999</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *k_src = k + ((size_t)t * (<span class="keywordtype">size_t</span>)num_kv_heads + (size_t)h) * (size_t)qk_head_dim;</div>
+<div class="line"><span class="lineno"> 1000</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *v_src = v + ((size_t)t * (<span class="keywordtype">size_t</span>)num_kv_heads + (size_t)h) * (size_t)v_head_dim;</div>
+<div class="line"><span class="lineno"> 1001</span>            <span class="keywordtype">float</span> *k_dst = k_cache + ((size_t)h * (<span class="keywordtype">size_t</span>)max_seq_len + (size_t)t) * (size_t)cache_stride;</div>
+<div class="line"><span class="lineno"> 1002</span>            <span class="keywordtype">float</span> *v_dst = v_cache + ((size_t)h * (<span class="keywordtype">size_t</span>)max_seq_len + (size_t)t) * (size_t)cache_stride;</div>
+<div class="line"><span class="lineno"> 1003</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; qk_head_dim; ++d) k_dst[d] = k_src[d];</div>
+<div class="line"><span class="lineno"> 1004</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = qk_head_dim; d &lt; cache_stride; ++d) k_dst[d] = 0.0f;</div>
+<div class="line"><span class="lineno"> 1005</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; v_head_dim; ++d) v_dst[d] = v_src[d];</div>
+<div class="line"><span class="lineno"> 1006</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = v_head_dim; d &lt; cache_stride; ++d) v_dst[d] = 0.0f;</div>
+<div class="line"><span class="lineno"> 1007</span>        }</div>
+<div class="line"><span class="lineno"> 1008</span>    }</div>
+<div class="line"><span class="lineno"> 1009</span>}</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -16948,37 +17191,37 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="deepseek__kernels_8c_source.html#l00937">937</a> of file <a class="el" href="deepseek__kernels_8c_source.html">deepseek_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  947</span>{</div>
-<div class="line"><span class="lineno">  948</span>    <span class="keywordflow">if</span> (!k_cache || !v_cache || !k || !v || pos &lt; 0 ||</div>
-<div class="line"><span class="lineno">  949</span>        num_kv_heads &lt;= 0 || qk_head_dim &lt;= 0 || v_head_dim &lt;= 0 ||</div>
-<div class="line"><span class="lineno">  950</span>        max_seq_len &lt;= 0 || cache_stride &lt;= 0) {</div>
-<div class="line"><span class="lineno">  951</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  952</span>    }</div>
-<div class="line"><span class="lineno">  953</span>    <span class="keywordflow">if</span> (pos &gt;= max_seq_len || qk_head_dim &gt; cache_stride || v_head_dim &gt; cache_stride) {</div>
-<div class="line"><span class="lineno">  954</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  955</span>    }</div>
-<div class="line"><span class="lineno">  956</span> </div>
-<div class="line"><span class="lineno">  957</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_kv_heads; ++h) {</div>
-<div class="line"><span class="lineno">  958</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *k_src = k + ((size_t)h * (<span class="keywordtype">size_t</span>)qk_head_dim);</div>
-<div class="line"><span class="lineno">  959</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *v_src = v + ((size_t)h * (<span class="keywordtype">size_t</span>)v_head_dim);</div>
-<div class="line"><span class="lineno">  960</span>        <span class="keywordtype">float</span> *k_dst = k_cache + ((size_t)h * (<span class="keywordtype">size_t</span>)max_seq_len + (size_t)pos) * (size_t)cache_stride;</div>
-<div class="line"><span class="lineno">  961</span>        <span class="keywordtype">float</span> *v_dst = v_cache + ((size_t)h * (<span class="keywordtype">size_t</span>)max_seq_len + (size_t)pos) * (size_t)cache_stride;</div>
-<div class="line"><span class="lineno">  962</span> </div>
-<div class="line"><span class="lineno">  963</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; qk_head_dim; ++d) {</div>
-<div class="line"><span class="lineno">  964</span>            k_dst[d] = k_src[d];</div>
-<div class="line"><span class="lineno">  965</span>        }</div>
-<div class="line"><span class="lineno">  966</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = qk_head_dim; d &lt; cache_stride; ++d) {</div>
-<div class="line"><span class="lineno">  967</span>            k_dst[d] = 0.0f;</div>
-<div class="line"><span class="lineno">  968</span>        }</div>
-<div class="line"><span class="lineno">  969</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; v_head_dim; ++d) {</div>
-<div class="line"><span class="lineno">  970</span>            v_dst[d] = v_src[d];</div>
-<div class="line"><span class="lineno">  971</span>        }</div>
-<div class="line"><span class="lineno">  972</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = v_head_dim; d &lt; cache_stride; ++d) {</div>
-<div class="line"><span class="lineno">  973</span>            v_dst[d] = 0.0f;</div>
-<div class="line"><span class="lineno">  974</span>        }</div>
-<div class="line"><span class="lineno">  975</span>    }</div>
-<div class="line"><span class="lineno">  976</span>}</div>
+<p class="definition">Definition at line <a class="el" href="deepseek__kernels_8c_source.html#l01011">1011</a> of file <a class="el" href="deepseek__kernels_8c_source.html">deepseek_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 1021</span>{</div>
+<div class="line"><span class="lineno"> 1022</span>    <span class="keywordflow">if</span> (!k_cache || !v_cache || !k || !v || pos &lt; 0 ||</div>
+<div class="line"><span class="lineno"> 1023</span>        num_kv_heads &lt;= 0 || qk_head_dim &lt;= 0 || v_head_dim &lt;= 0 ||</div>
+<div class="line"><span class="lineno"> 1024</span>        max_seq_len &lt;= 0 || cache_stride &lt;= 0) {</div>
+<div class="line"><span class="lineno"> 1025</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1026</span>    }</div>
+<div class="line"><span class="lineno"> 1027</span>    <span class="keywordflow">if</span> (pos &gt;= max_seq_len || qk_head_dim &gt; cache_stride || v_head_dim &gt; cache_stride) {</div>
+<div class="line"><span class="lineno"> 1028</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1029</span>    }</div>
+<div class="line"><span class="lineno"> 1030</span> </div>
+<div class="line"><span class="lineno"> 1031</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_kv_heads; ++h) {</div>
+<div class="line"><span class="lineno"> 1032</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *k_src = k + ((size_t)h * (<span class="keywordtype">size_t</span>)qk_head_dim);</div>
+<div class="line"><span class="lineno"> 1033</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *v_src = v + ((size_t)h * (<span class="keywordtype">size_t</span>)v_head_dim);</div>
+<div class="line"><span class="lineno"> 1034</span>        <span class="keywordtype">float</span> *k_dst = k_cache + ((size_t)h * (<span class="keywordtype">size_t</span>)max_seq_len + (size_t)pos) * (size_t)cache_stride;</div>
+<div class="line"><span class="lineno"> 1035</span>        <span class="keywordtype">float</span> *v_dst = v_cache + ((size_t)h * (<span class="keywordtype">size_t</span>)max_seq_len + (size_t)pos) * (size_t)cache_stride;</div>
+<div class="line"><span class="lineno"> 1036</span> </div>
+<div class="line"><span class="lineno"> 1037</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; qk_head_dim; ++d) {</div>
+<div class="line"><span class="lineno"> 1038</span>            k_dst[d] = k_src[d];</div>
+<div class="line"><span class="lineno"> 1039</span>        }</div>
+<div class="line"><span class="lineno"> 1040</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = qk_head_dim; d &lt; cache_stride; ++d) {</div>
+<div class="line"><span class="lineno"> 1041</span>            k_dst[d] = 0.0f;</div>
+<div class="line"><span class="lineno"> 1042</span>        }</div>
+<div class="line"><span class="lineno"> 1043</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; v_head_dim; ++d) {</div>
+<div class="line"><span class="lineno"> 1044</span>            v_dst[d] = v_src[d];</div>
+<div class="line"><span class="lineno"> 1045</span>        }</div>
+<div class="line"><span class="lineno"> 1046</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = v_head_dim; d &lt; cache_stride; ++d) {</div>
+<div class="line"><span class="lineno"> 1047</span>            v_dst[d] = 0.0f;</div>
+<div class="line"><span class="lineno"> 1048</span>        }</div>
+<div class="line"><span class="lineno"> 1049</span>    }</div>
+<div class="line"><span class="lineno"> 1050</span>}</div>
 </div><!-- fragment -->
 </div>
 </div>
