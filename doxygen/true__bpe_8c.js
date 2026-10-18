@@ -1,7 +1,6 @@
 var true__bpe_8c =
 [
     [ "INITIAL_TOKEN_CAPACITY", "true__bpe_8c.html#aeee34d11578416e6e7ba54873260f34d", null ],
-    [ "MAX_SPECIAL_TOKENS", "true__bpe_8c.html#a524e748db6389290da3a8fd267964ec4", null ],
     [ "MAX_TOKEN_LEN", "true__bpe_8c.html#a3f6d16dfdf7920e1e5f1dad5db5347f2", null ],
     [ "MERGE_HASH_SIZE", "true__bpe_8c.html#aa4cd3b9c68870f9874e953080d27b0a7", null ],
     [ "ChunkType", "true__bpe_8c.html#a6742d03aa1e93ba39b234d0ea402ee6d", [
@@ -58,6 +57,7 @@ var true__bpe_8c =
     [ "merge_table_insert", "true__bpe_8c.html#abb66f64d1c5dff523feb9d632f23d630", null ],
     [ "merge_table_lookup", "true__bpe_8c.html#a08f555c94935c343bcfb7ec35a88a7b6", null ],
     [ "preprocess_text", "true__bpe_8c.html#a782d1c06da75ca70c98690a59eeede43", null ],
+    [ "reserve_special_tokens", "true__bpe_8c.html#ab0b078f835dd4804caa171823ad7b9b9", null ],
     [ "token_list_append", "true__bpe_8c.html#a8686fc27c2c25e81c582041e5c335e0d", null ],
     [ "token_list_clear", "true__bpe_8c.html#a72a2743792c98b19ab360f088f0ab746", null ],
     [ "token_list_create", "true__bpe_8c.html#a4bf023684e0005d5c3656bb7f3abe679", null ],
