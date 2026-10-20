@@ -6,8 +6,8 @@
   <p class="lead">
     Muse-Glimmer-30B is a bounded text correctness candidate in CKE v8. The complete checkpoint converts,
     both 52-layer graphs generate and compile, and three short prefill plus cached-decode trajectories match
-    the pinned PyTorch eager BF16 reference bit for bit. The selected eager attention provider has quadratic
-    prefill scratch, so this result does not certify practical long-context inference or vision.
+    the pinned PyTorch eager BF16 reference bit for bit. Query-row tiling now bounds the selected attention
+    provider's scratch, but this historical result does not certify practical long-context inference or vision.
   </p>
 
   <style>
@@ -108,10 +108,12 @@
   <section class="muse-section" id="limits">
     <h2>Memory and allocation boundary</h2>
     <p>
-      Eager prefill requires <code>6*T*C + 4*C*D + 2*T*D</code> bytes. Score buffers alone use <code>6*T*C</code>:
-      24 GiB at <code>T=C=64K</code> and 96 GiB at <code>T=C=128K</code>. Sliding attention still materializes the
-      full matrix before masking, so the maps impose a 1 GiB call-workspace gate. A bounded-memory provider needs
-      separate numerical validation before this gate can expand.
+      Muse prefill now processes at most 1,024 query rows at a time while retaining the full key width in each
+      softmax. Its declared call scratch is <code>6*1024*C + 4*C*D + 2*1024*D</code> bytes for larger prompts,
+      rather than growing with every query row. Sliding attention still computes full-width scores before masking.
+      The 1 GiB call-workspace gate remains: it admits a 32K context under the declared scratch plan but rejects
+      larger contexts once that budget is exceeded. The 32K model bundle and a real Muse Code task still need
+      separate generation and certification; this planner change alone does not establish either result.
     </p>
     <p>
       Selected Muse maps make attention and projection tensor scratch caller-owned and contain no explicit C heap

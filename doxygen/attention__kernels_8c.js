@@ -5,6 +5,7 @@ var attention__kernels_8c =
     [ "CK_GGML_FA_TILE_Q", "attention__kernels_8c.html#a3bc77f14aef03ee172f20d99627cb9f5", null ],
     [ "CK_GGML_FA_TILE_Q_LARGE", "attention__kernels_8c.html#a9a000f269caa75d2e031fb0dba22c87b", null ],
     [ "CK_GGML_FA_TILE_Q_LARGE_MIN_TOKENS", "attention__kernels_8c.html#acf8badf50db6a74c4ea884f07635f4b0", null ],
+    [ "CK_MUSE_PREFILL_QUERY_TILE", "attention__kernels_8c.html#aa0b96241d79b08360d6225be3661c82c", null ],
     [ "CK_NOINLINE", "attention__kernels_8c.html#a3d95b3463c77064e6a98cf98c6ba49b6", null ],
     [ "CK_OPTNONE", "attention__kernels_8c.html#a54568b8be869568ed6759114f1e19693", null ],
     [ "FLASH_QUERY_IMPL", "attention__kernels_8c.html#a686599872afcb86c5fc7ad5e5e5b4773", null ],
