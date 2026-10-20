@@ -1544,6 +1544,11 @@ version/v8/scripts/ck_serve_v8.py "$RUN_DIR" --run "$RUN_DIR" \
         formatting but still validates a present resolved bundle and actual loaded libraries. Runtime template
         overrides are rejected for resolved bundles. The sidecar marks certification
         <code>NOT_TESTED</code>; dependency resolution alone is not a model/tool certification.
+        Freshly compiled bundles also bind selected kernel runtime dependencies to the compiled
+        kernel registry. If a selected provider needs <code>Sleef_expf16_u10</code>, startup
+        checks <code>CK_SLEEF_LIBRARY</code> (or an already loaded process symbol) before
+        opening HTTP traffic. Rebuild and re-resolve older bundles to gain this check;
+        changing an existing server process does not upgrade its loaded runtime.
     </p>
     <p>
         Run <code>make test-v8-serve-native-jinja</code> for the deterministic sidecar-loader,
