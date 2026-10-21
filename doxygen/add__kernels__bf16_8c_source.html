@@ -345,168 +345,164 @@ $(document).ready(function(){initNavTree('add__kernels__bf16_8c_source.html','')
 <div class="line"><a id="l00199" name="l00199"></a><span class="lineno">  199</span>    <span class="keywordflow">if</span> (d_a &amp;&amp; d_a != d_y) {</div>
 <div class="line"><a id="l00200" name="l00200"></a><span class="lineno">  200</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
 <div class="line"><a id="l00201" name="l00201"></a><span class="lineno">  201</span>        <span class="keywordflow">for</span> (; i + 32 &lt;= n; i += 32) {</div>
-<div class="line"><a id="l00202" name="l00202"></a><span class="lineno">  202</span>            __m512i v0 = _mm512_loadu_si512((<span class="keyword">const</span> __m512i*)&amp;d_y[i]);</div>
-<div class="line"><a id="l00203" name="l00203"></a><span class="lineno">  203</span>            __m512i v1 = _mm512_loadu_si512((<span class="keyword">const</span> __m512i*)&amp;d_y[i + 32]);</div>
-<div class="line"><a id="l00204" name="l00204"></a><span class="lineno">  204</span>            _mm512_storeu_si512((__m512i*)&amp;d_a[i], v0);</div>
-<div class="line"><a id="l00205" name="l00205"></a><span class="lineno">  205</span>            _mm512_storeu_si512((__m512i*)&amp;d_a[i + 32], v1);</div>
-<div class="line"><a id="l00206" name="l00206"></a><span class="lineno">  206</span>        }</div>
-<div class="line"><a id="l00207" name="l00207"></a><span class="lineno">  207</span><span class="preprocessor">#endif</span></div>
-<div class="line"><a id="l00208" name="l00208"></a><span class="lineno">  208</span>        <span class="keywordflow">for</span> (; i &lt; n; ++i) {</div>
-<div class="line"><a id="l00209" name="l00209"></a><span class="lineno">  209</span>            d_a[i] = d_y[i];</div>
-<div class="line"><a id="l00210" name="l00210"></a><span class="lineno">  210</span>        }</div>
-<div class="line"><a id="l00211" name="l00211"></a><span class="lineno">  211</span>    }</div>
-<div class="line"><a id="l00212" name="l00212"></a><span class="lineno">  212</span> </div>
-<div class="line"><a id="l00213" name="l00213"></a><span class="lineno">  213</span>    <span class="comment">/* Copy to d_b if not in-place */</span></div>
-<div class="line"><a id="l00214" name="l00214"></a><span class="lineno">  214</span>    i = 0;</div>
-<div class="line"><a id="l00215" name="l00215"></a><span class="lineno">  215</span>    <span class="keywordflow">if</span> (d_b &amp;&amp; d_b != d_y) {</div>
-<div class="line"><a id="l00216" name="l00216"></a><span class="lineno">  216</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
-<div class="line"><a id="l00217" name="l00217"></a><span class="lineno">  217</span>        <span class="keywordflow">for</span> (; i + 32 &lt;= n; i += 32) {</div>
-<div class="line"><a id="l00218" name="l00218"></a><span class="lineno">  218</span>            __m512i v0 = _mm512_loadu_si512((<span class="keyword">const</span> __m512i*)&amp;d_y[i]);</div>
-<div class="line"><a id="l00219" name="l00219"></a><span class="lineno">  219</span>            __m512i v1 = _mm512_loadu_si512((<span class="keyword">const</span> __m512i*)&amp;d_y[i + 32]);</div>
-<div class="line"><a id="l00220" name="l00220"></a><span class="lineno">  220</span>            _mm512_storeu_si512((__m512i*)&amp;d_b[i], v0);</div>
-<div class="line"><a id="l00221" name="l00221"></a><span class="lineno">  221</span>            _mm512_storeu_si512((__m512i*)&amp;d_b[i + 32], v1);</div>
+<div class="line"><a id="l00202" name="l00202"></a><span class="lineno">  202</span>            __m512i values = _mm512_loadu_si512((<span class="keyword">const</span> __m512i*)&amp;d_y[i]);</div>
+<div class="line"><a id="l00203" name="l00203"></a><span class="lineno">  203</span>            _mm512_storeu_si512((__m512i*)&amp;d_a[i], values);</div>
+<div class="line"><a id="l00204" name="l00204"></a><span class="lineno">  204</span>        }</div>
+<div class="line"><a id="l00205" name="l00205"></a><span class="lineno">  205</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00206" name="l00206"></a><span class="lineno">  206</span>        <span class="keywordflow">for</span> (; i &lt; n; ++i) {</div>
+<div class="line"><a id="l00207" name="l00207"></a><span class="lineno">  207</span>            d_a[i] = d_y[i];</div>
+<div class="line"><a id="l00208" name="l00208"></a><span class="lineno">  208</span>        }</div>
+<div class="line"><a id="l00209" name="l00209"></a><span class="lineno">  209</span>    }</div>
+<div class="line"><a id="l00210" name="l00210"></a><span class="lineno">  210</span> </div>
+<div class="line"><a id="l00211" name="l00211"></a><span class="lineno">  211</span>    <span class="comment">/* Copy to d_b if not in-place */</span></div>
+<div class="line"><a id="l00212" name="l00212"></a><span class="lineno">  212</span>    i = 0;</div>
+<div class="line"><a id="l00213" name="l00213"></a><span class="lineno">  213</span>    <span class="keywordflow">if</span> (d_b &amp;&amp; d_b != d_y) {</div>
+<div class="line"><a id="l00214" name="l00214"></a><span class="lineno">  214</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
+<div class="line"><a id="l00215" name="l00215"></a><span class="lineno">  215</span>        <span class="keywordflow">for</span> (; i + 32 &lt;= n; i += 32) {</div>
+<div class="line"><a id="l00216" name="l00216"></a><span class="lineno">  216</span>            __m512i values = _mm512_loadu_si512((<span class="keyword">const</span> __m512i*)&amp;d_y[i]);</div>
+<div class="line"><a id="l00217" name="l00217"></a><span class="lineno">  217</span>            _mm512_storeu_si512((__m512i*)&amp;d_b[i], values);</div>
+<div class="line"><a id="l00218" name="l00218"></a><span class="lineno">  218</span>        }</div>
+<div class="line"><a id="l00219" name="l00219"></a><span class="lineno">  219</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00220" name="l00220"></a><span class="lineno">  220</span>        <span class="keywordflow">for</span> (; i &lt; n; ++i) {</div>
+<div class="line"><a id="l00221" name="l00221"></a><span class="lineno">  221</span>            d_b[i] = d_y[i];</div>
 <div class="line"><a id="l00222" name="l00222"></a><span class="lineno">  222</span>        }</div>
-<div class="line"><a id="l00223" name="l00223"></a><span class="lineno">  223</span><span class="preprocessor">#endif</span></div>
-<div class="line"><a id="l00224" name="l00224"></a><span class="lineno">  224</span>        <span class="keywordflow">for</span> (; i &lt; n; ++i) {</div>
-<div class="line"><a id="l00225" name="l00225"></a><span class="lineno">  225</span>            d_b[i] = d_y[i];</div>
-<div class="line"><a id="l00226" name="l00226"></a><span class="lineno">  226</span>        }</div>
-<div class="line"><a id="l00227" name="l00227"></a><span class="lineno">  227</span>    }</div>
-<div class="line"><a id="l00228" name="l00228"></a><span class="lineno">  228</span>}</div>
+<div class="line"><a id="l00223" name="l00223"></a><span class="lineno">  223</span>    }</div>
+<div class="line"><a id="l00224" name="l00224"></a><span class="lineno">  224</span>}</div>
 </div>
-<div class="line"><a id="l00229" name="l00229"></a><span class="lineno">  229</span> </div>
-<div class="line"><a id="l00230" name="l00230"></a><span class="lineno">  230</span><span class="comment">/* =============================================================================</span></div>
-<div class="line"><a id="l00231" name="l00231"></a><span class="lineno">  231</span><span class="comment"> * 2D tensor version: add_forward_2d_bf16</span></div>
-<div class="line"><a id="l00232" name="l00232"></a><span class="lineno">  232</span><span class="comment"> * For [T, D] shaped tensors (common in transformers)</span></div>
-<div class="line"><a id="l00233" name="l00233"></a><span class="lineno">  233</span><span class="comment"> * ============================================================================= */</span></div>
-<div class="line"><a id="l00234" name="l00234"></a><span class="lineno">  234</span> </div>
-<div class="foldopen" id="foldopen00235" data-start="{" data-end="}">
-<div class="line"><a id="l00235" name="l00235"></a><span class="lineno"><a class="line" href="ckernel__engine_8h.html#a9855ffa2b0a5cc3070238b9ad6b3d6f2">  235</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="add__kernels__bf16_8c.html#a9855ffa2b0a5cc3070238b9ad6b3d6f2">add_forward_2d_bf16</a>(<span class="keyword">const</span> uint16_t *a,</div>
-<div class="line"><a id="l00236" name="l00236"></a><span class="lineno">  236</span>                         <span class="keyword">const</span> uint16_t *b,</div>
-<div class="line"><a id="l00237" name="l00237"></a><span class="lineno">  237</span>                         uint16_t *y,</div>
-<div class="line"><a id="l00238" name="l00238"></a><span class="lineno">  238</span>                         <span class="keywordtype">int</span> tokens,</div>
-<div class="line"><a id="l00239" name="l00239"></a><span class="lineno">  239</span>                         <span class="keywordtype">int</span> dim,</div>
-<div class="line"><a id="l00240" name="l00240"></a><span class="lineno">  240</span>                         <span class="keywordtype">int</span> aligned_dim)</div>
-<div class="line"><a id="l00241" name="l00241"></a><span class="lineno">  241</span>{</div>
-<div class="line"><a id="l00242" name="l00242"></a><span class="lineno">  242</span>    <span class="keywordflow">if</span> (!a || !b || !y || tokens &lt;= 0 || dim &lt;= 0) {</div>
-<div class="line"><a id="l00243" name="l00243"></a><span class="lineno">  243</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><a id="l00244" name="l00244"></a><span class="lineno">  244</span>    }</div>
-<div class="line"><a id="l00245" name="l00245"></a><span class="lineno">  245</span> </div>
-<div class="line"><a id="l00246" name="l00246"></a><span class="lineno">  246</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; tokens; ++t) {</div>
-<div class="line"><a id="l00247" name="l00247"></a><span class="lineno">  247</span>        <span class="keyword">const</span> uint16_t *a_row = a + (size_t)t * aligned_dim;</div>
-<div class="line"><a id="l00248" name="l00248"></a><span class="lineno">  248</span>        <span class="keyword">const</span> uint16_t *b_row = b + (size_t)t * aligned_dim;</div>
-<div class="line"><a id="l00249" name="l00249"></a><span class="lineno">  249</span>        uint16_t *y_row = y + (size_t)t * aligned_dim;</div>
-<div class="line"><a id="l00250" name="l00250"></a><span class="lineno">  250</span> </div>
-<div class="line"><a id="l00251" name="l00251"></a><span class="lineno">  251</span>        <span class="keywordtype">int</span> d = 0;</div>
-<div class="line"><a id="l00252" name="l00252"></a><span class="lineno">  252</span> </div>
-<div class="line"><a id="l00253" name="l00253"></a><span class="lineno">  253</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
-<div class="line"><a id="l00254" name="l00254"></a><span class="lineno">  254</span>        <span class="keywordflow">for</span> (; d + 16 &lt;= dim; d += 16) {</div>
-<div class="line"><a id="l00255" name="l00255"></a><span class="lineno">  255</span>            __m512 av = bf16_loadu_cvt_fp32(&amp;a_row[d]);</div>
-<div class="line"><a id="l00256" name="l00256"></a><span class="lineno">  256</span>            __m512 bv = bf16_loadu_cvt_fp32(&amp;b_row[d]);</div>
-<div class="line"><a id="l00257" name="l00257"></a><span class="lineno">  257</span>            __m512 yv = _mm512_add_ps(av, bv);</div>
-<div class="line"><a id="l00258" name="l00258"></a><span class="lineno">  258</span>            fp32_cvt_storeu_bf16(&amp;y_row[d], yv);</div>
-<div class="line"><a id="l00259" name="l00259"></a><span class="lineno">  259</span>        }</div>
-<div class="line"><a id="l00260" name="l00260"></a><span class="lineno">  260</span><span class="preprocessor">#endif</span></div>
-<div class="line"><a id="l00261" name="l00261"></a><span class="lineno">  261</span> </div>
-<div class="line"><a id="l00262" name="l00262"></a><span class="lineno">  262</span>        <span class="keywordflow">for</span> (; d &lt; dim; ++d) {</div>
-<div class="line"><a id="l00263" name="l00263"></a><span class="lineno">  263</span>            <span class="keywordtype">float</span> af = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(a_row[d]);</div>
-<div class="line"><a id="l00264" name="l00264"></a><span class="lineno">  264</span>            <span class="keywordtype">float</span> bf = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(b_row[d]);</div>
-<div class="line"><a id="l00265" name="l00265"></a><span class="lineno">  265</span>            y_row[d] = <a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(af + bf);</div>
-<div class="line"><a id="l00266" name="l00266"></a><span class="lineno">  266</span>        }</div>
-<div class="line"><a id="l00267" name="l00267"></a><span class="lineno">  267</span>    }</div>
-<div class="line"><a id="l00268" name="l00268"></a><span class="lineno">  268</span>}</div>
+<div class="line"><a id="l00225" name="l00225"></a><span class="lineno">  225</span> </div>
+<div class="line"><a id="l00226" name="l00226"></a><span class="lineno">  226</span><span class="comment">/* =============================================================================</span></div>
+<div class="line"><a id="l00227" name="l00227"></a><span class="lineno">  227</span><span class="comment"> * 2D tensor version: add_forward_2d_bf16</span></div>
+<div class="line"><a id="l00228" name="l00228"></a><span class="lineno">  228</span><span class="comment"> * For [T, D] shaped tensors (common in transformers)</span></div>
+<div class="line"><a id="l00229" name="l00229"></a><span class="lineno">  229</span><span class="comment"> * ============================================================================= */</span></div>
+<div class="line"><a id="l00230" name="l00230"></a><span class="lineno">  230</span> </div>
+<div class="foldopen" id="foldopen00231" data-start="{" data-end="}">
+<div class="line"><a id="l00231" name="l00231"></a><span class="lineno"><a class="line" href="ckernel__engine_8h.html#a9855ffa2b0a5cc3070238b9ad6b3d6f2">  231</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="add__kernels__bf16_8c.html#a9855ffa2b0a5cc3070238b9ad6b3d6f2">add_forward_2d_bf16</a>(<span class="keyword">const</span> uint16_t *a,</div>
+<div class="line"><a id="l00232" name="l00232"></a><span class="lineno">  232</span>                         <span class="keyword">const</span> uint16_t *b,</div>
+<div class="line"><a id="l00233" name="l00233"></a><span class="lineno">  233</span>                         uint16_t *y,</div>
+<div class="line"><a id="l00234" name="l00234"></a><span class="lineno">  234</span>                         <span class="keywordtype">int</span> tokens,</div>
+<div class="line"><a id="l00235" name="l00235"></a><span class="lineno">  235</span>                         <span class="keywordtype">int</span> dim,</div>
+<div class="line"><a id="l00236" name="l00236"></a><span class="lineno">  236</span>                         <span class="keywordtype">int</span> aligned_dim)</div>
+<div class="line"><a id="l00237" name="l00237"></a><span class="lineno">  237</span>{</div>
+<div class="line"><a id="l00238" name="l00238"></a><span class="lineno">  238</span>    <span class="keywordflow">if</span> (!a || !b || !y || tokens &lt;= 0 || dim &lt;= 0) {</div>
+<div class="line"><a id="l00239" name="l00239"></a><span class="lineno">  239</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><a id="l00240" name="l00240"></a><span class="lineno">  240</span>    }</div>
+<div class="line"><a id="l00241" name="l00241"></a><span class="lineno">  241</span> </div>
+<div class="line"><a id="l00242" name="l00242"></a><span class="lineno">  242</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; tokens; ++t) {</div>
+<div class="line"><a id="l00243" name="l00243"></a><span class="lineno">  243</span>        <span class="keyword">const</span> uint16_t *a_row = a + (size_t)t * aligned_dim;</div>
+<div class="line"><a id="l00244" name="l00244"></a><span class="lineno">  244</span>        <span class="keyword">const</span> uint16_t *b_row = b + (size_t)t * aligned_dim;</div>
+<div class="line"><a id="l00245" name="l00245"></a><span class="lineno">  245</span>        uint16_t *y_row = y + (size_t)t * aligned_dim;</div>
+<div class="line"><a id="l00246" name="l00246"></a><span class="lineno">  246</span> </div>
+<div class="line"><a id="l00247" name="l00247"></a><span class="lineno">  247</span>        <span class="keywordtype">int</span> d = 0;</div>
+<div class="line"><a id="l00248" name="l00248"></a><span class="lineno">  248</span> </div>
+<div class="line"><a id="l00249" name="l00249"></a><span class="lineno">  249</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
+<div class="line"><a id="l00250" name="l00250"></a><span class="lineno">  250</span>        <span class="keywordflow">for</span> (; d + 16 &lt;= dim; d += 16) {</div>
+<div class="line"><a id="l00251" name="l00251"></a><span class="lineno">  251</span>            __m512 av = bf16_loadu_cvt_fp32(&amp;a_row[d]);</div>
+<div class="line"><a id="l00252" name="l00252"></a><span class="lineno">  252</span>            __m512 bv = bf16_loadu_cvt_fp32(&amp;b_row[d]);</div>
+<div class="line"><a id="l00253" name="l00253"></a><span class="lineno">  253</span>            __m512 yv = _mm512_add_ps(av, bv);</div>
+<div class="line"><a id="l00254" name="l00254"></a><span class="lineno">  254</span>            fp32_cvt_storeu_bf16(&amp;y_row[d], yv);</div>
+<div class="line"><a id="l00255" name="l00255"></a><span class="lineno">  255</span>        }</div>
+<div class="line"><a id="l00256" name="l00256"></a><span class="lineno">  256</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00257" name="l00257"></a><span class="lineno">  257</span> </div>
+<div class="line"><a id="l00258" name="l00258"></a><span class="lineno">  258</span>        <span class="keywordflow">for</span> (; d &lt; dim; ++d) {</div>
+<div class="line"><a id="l00259" name="l00259"></a><span class="lineno">  259</span>            <span class="keywordtype">float</span> af = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(a_row[d]);</div>
+<div class="line"><a id="l00260" name="l00260"></a><span class="lineno">  260</span>            <span class="keywordtype">float</span> bf = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(b_row[d]);</div>
+<div class="line"><a id="l00261" name="l00261"></a><span class="lineno">  261</span>            y_row[d] = <a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(af + bf);</div>
+<div class="line"><a id="l00262" name="l00262"></a><span class="lineno">  262</span>        }</div>
+<div class="line"><a id="l00263" name="l00263"></a><span class="lineno">  263</span>    }</div>
+<div class="line"><a id="l00264" name="l00264"></a><span class="lineno">  264</span>}</div>
 </div>
-<div class="line"><a id="l00269" name="l00269"></a><span class="lineno">  269</span> </div>
-<div class="line"><a id="l00270" name="l00270"></a><span class="lineno">  270</span><span class="comment">/* =============================================================================</span></div>
-<div class="line"><a id="l00271" name="l00271"></a><span class="lineno">  271</span><span class="comment"> * FP32 versions (for reference/testing)</span></div>
-<div class="line"><a id="l00272" name="l00272"></a><span class="lineno">  272</span><span class="comment"> * ============================================================================= */</span></div>
-<div class="line"><a id="l00273" name="l00273"></a><span class="lineno">  273</span><span class="comment"></span> </div>
-<div class="line"><a id="l00274" name="l00274"></a><span class="lineno">  274</span><span class="comment">/**</span></div>
-<div class="line"><a id="l00275" name="l00275"></a><span class="lineno">  275</span><span class="comment"> * Element-wise add: y = a + b</span></div>
-<div class="line"><a id="l00276" name="l00276"></a><span class="lineno">  276</span><span class="comment"> * @test test_add.py::TestAddForward::test_add_forward_f32</span></div>
-<div class="line"><a id="l00277" name="l00277"></a><span class="lineno">  277</span><span class="comment"> * @test test_add.py::TestAddForward::test_add_inplace_f32</span></div>
-<div class="line"><a id="l00278" name="l00278"></a><span class="lineno">  278</span><span class="comment"> * @test test_multi_layer_parity.py::TestMultiLayerParity::test_residual_add</span></div>
-<div class="line"><a id="l00279" name="l00279"></a><span class="lineno">  279</span><span class="comment"> *</span></div>
-<div class="line"><a id="l00280" name="l00280"></a><span class="lineno">  280</span><span class="comment"> * Element-wise addition of two vectors.</span></div>
-<div class="line"><a id="l00281" name="l00281"></a><span class="lineno">  281</span><span class="comment"> *</span></div>
-<div class="line"><a id="l00282" name="l00282"></a><span class="lineno">  282</span><span class="comment"> * After changes: make test</span></div>
-<div class="line"><a id="l00283" name="l00283"></a><span class="lineno">  283</span><span class="comment"> */</span></div>
-<div class="foldopen" id="foldopen00284" data-start="{" data-end="}">
-<div class="line"><a id="l00284" name="l00284"></a><span class="lineno"><a class="line" href="ckernel__engine_8h.html#a4c166feaf5808ab05b916adb1b09e323">  284</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="add__kernels__bf16_8c.html#a4c166feaf5808ab05b916adb1b09e323">add_forward_f32</a>(<span class="keyword">const</span> <span class="keywordtype">float</span> *a,</div>
-<div class="line"><a id="l00285" name="l00285"></a><span class="lineno">  285</span>                     <span class="keyword">const</span> <span class="keywordtype">float</span> *b,</div>
-<div class="line"><a id="l00286" name="l00286"></a><span class="lineno">  286</span>                     <span class="keywordtype">float</span> *y,</div>
-<div class="line"><a id="l00287" name="l00287"></a><span class="lineno">  287</span>                     <span class="keywordtype">size_t</span> n)</div>
-<div class="line"><a id="l00288" name="l00288"></a><span class="lineno">  288</span>{</div>
-<div class="line"><a id="l00289" name="l00289"></a><span class="lineno">  289</span>    <span class="keywordflow">if</span> (!a || !b || !y || n == 0) {</div>
-<div class="line"><a id="l00290" name="l00290"></a><span class="lineno">  290</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><a id="l00291" name="l00291"></a><span class="lineno">  291</span>    }</div>
-<div class="line"><a id="l00292" name="l00292"></a><span class="lineno">  292</span> </div>
-<div class="line"><a id="l00293" name="l00293"></a><span class="lineno">  293</span>    <span class="keywordtype">size_t</span> i = 0;</div>
-<div class="line"><a id="l00294" name="l00294"></a><span class="lineno">  294</span> </div>
-<div class="line"><a id="l00295" name="l00295"></a><span class="lineno">  295</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
-<div class="line"><a id="l00296" name="l00296"></a><span class="lineno">  296</span>    <span class="keywordflow">for</span> (; i + 16 &lt;= n; i += 16) {</div>
-<div class="line"><a id="l00297" name="l00297"></a><span class="lineno">  297</span>        __m512 av = _mm512_loadu_ps(&amp;a[i]);</div>
-<div class="line"><a id="l00298" name="l00298"></a><span class="lineno">  298</span>        __m512 bv = _mm512_loadu_ps(&amp;b[i]);</div>
-<div class="line"><a id="l00299" name="l00299"></a><span class="lineno">  299</span>        __m512 yv = _mm512_add_ps(av, bv);</div>
-<div class="line"><a id="l00300" name="l00300"></a><span class="lineno">  300</span>        _mm512_storeu_ps(&amp;y[i], yv);</div>
-<div class="line"><a id="l00301" name="l00301"></a><span class="lineno">  301</span>    }</div>
-<div class="line"><a id="l00302" name="l00302"></a><span class="lineno">  302</span><span class="preprocessor">#endif</span></div>
-<div class="line"><a id="l00303" name="l00303"></a><span class="lineno">  303</span> </div>
-<div class="line"><a id="l00304" name="l00304"></a><span class="lineno">  304</span><span class="preprocessor">#if defined(__AVX2__)</span></div>
-<div class="line"><a id="l00305" name="l00305"></a><span class="lineno">  305</span>    <span class="keywordflow">for</span> (; i + 8 &lt;= n; i += 8) {</div>
-<div class="line"><a id="l00306" name="l00306"></a><span class="lineno">  306</span>        __m256 av = _mm256_loadu_ps(&amp;a[i]);</div>
-<div class="line"><a id="l00307" name="l00307"></a><span class="lineno">  307</span>        __m256 bv = _mm256_loadu_ps(&amp;b[i]);</div>
-<div class="line"><a id="l00308" name="l00308"></a><span class="lineno">  308</span>        __m256 yv = _mm256_add_ps(av, bv);</div>
-<div class="line"><a id="l00309" name="l00309"></a><span class="lineno">  309</span>        _mm256_storeu_ps(&amp;y[i], yv);</div>
-<div class="line"><a id="l00310" name="l00310"></a><span class="lineno">  310</span>    }</div>
-<div class="line"><a id="l00311" name="l00311"></a><span class="lineno">  311</span><span class="preprocessor">#endif</span></div>
-<div class="line"><a id="l00312" name="l00312"></a><span class="lineno">  312</span> </div>
-<div class="line"><a id="l00313" name="l00313"></a><span class="lineno">  313</span>    <span class="keywordflow">for</span> (; i &lt; n; ++i) {</div>
-<div class="line"><a id="l00314" name="l00314"></a><span class="lineno">  314</span>        y[i] = a[i] + b[i];</div>
-<div class="line"><a id="l00315" name="l00315"></a><span class="lineno">  315</span>    }</div>
-<div class="line"><a id="l00316" name="l00316"></a><span class="lineno">  316</span>}</div>
+<div class="line"><a id="l00265" name="l00265"></a><span class="lineno">  265</span> </div>
+<div class="line"><a id="l00266" name="l00266"></a><span class="lineno">  266</span><span class="comment">/* =============================================================================</span></div>
+<div class="line"><a id="l00267" name="l00267"></a><span class="lineno">  267</span><span class="comment"> * FP32 versions (for reference/testing)</span></div>
+<div class="line"><a id="l00268" name="l00268"></a><span class="lineno">  268</span><span class="comment"> * ============================================================================= */</span></div>
+<div class="line"><a id="l00269" name="l00269"></a><span class="lineno">  269</span><span class="comment"></span> </div>
+<div class="line"><a id="l00270" name="l00270"></a><span class="lineno">  270</span><span class="comment">/**</span></div>
+<div class="line"><a id="l00271" name="l00271"></a><span class="lineno">  271</span><span class="comment"> * Element-wise add: y = a + b</span></div>
+<div class="line"><a id="l00272" name="l00272"></a><span class="lineno">  272</span><span class="comment"> * @test test_add.py::TestAddForward::test_add_forward_f32</span></div>
+<div class="line"><a id="l00273" name="l00273"></a><span class="lineno">  273</span><span class="comment"> * @test test_add.py::TestAddForward::test_add_inplace_f32</span></div>
+<div class="line"><a id="l00274" name="l00274"></a><span class="lineno">  274</span><span class="comment"> * @test test_multi_layer_parity.py::TestMultiLayerParity::test_residual_add</span></div>
+<div class="line"><a id="l00275" name="l00275"></a><span class="lineno">  275</span><span class="comment"> *</span></div>
+<div class="line"><a id="l00276" name="l00276"></a><span class="lineno">  276</span><span class="comment"> * Element-wise addition of two vectors.</span></div>
+<div class="line"><a id="l00277" name="l00277"></a><span class="lineno">  277</span><span class="comment"> *</span></div>
+<div class="line"><a id="l00278" name="l00278"></a><span class="lineno">  278</span><span class="comment"> * After changes: make test</span></div>
+<div class="line"><a id="l00279" name="l00279"></a><span class="lineno">  279</span><span class="comment"> */</span></div>
+<div class="foldopen" id="foldopen00280" data-start="{" data-end="}">
+<div class="line"><a id="l00280" name="l00280"></a><span class="lineno"><a class="line" href="ckernel__engine_8h.html#a4c166feaf5808ab05b916adb1b09e323">  280</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="add__kernels__bf16_8c.html#a4c166feaf5808ab05b916adb1b09e323">add_forward_f32</a>(<span class="keyword">const</span> <span class="keywordtype">float</span> *a,</div>
+<div class="line"><a id="l00281" name="l00281"></a><span class="lineno">  281</span>                     <span class="keyword">const</span> <span class="keywordtype">float</span> *b,</div>
+<div class="line"><a id="l00282" name="l00282"></a><span class="lineno">  282</span>                     <span class="keywordtype">float</span> *y,</div>
+<div class="line"><a id="l00283" name="l00283"></a><span class="lineno">  283</span>                     <span class="keywordtype">size_t</span> n)</div>
+<div class="line"><a id="l00284" name="l00284"></a><span class="lineno">  284</span>{</div>
+<div class="line"><a id="l00285" name="l00285"></a><span class="lineno">  285</span>    <span class="keywordflow">if</span> (!a || !b || !y || n == 0) {</div>
+<div class="line"><a id="l00286" name="l00286"></a><span class="lineno">  286</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><a id="l00287" name="l00287"></a><span class="lineno">  287</span>    }</div>
+<div class="line"><a id="l00288" name="l00288"></a><span class="lineno">  288</span> </div>
+<div class="line"><a id="l00289" name="l00289"></a><span class="lineno">  289</span>    <span class="keywordtype">size_t</span> i = 0;</div>
+<div class="line"><a id="l00290" name="l00290"></a><span class="lineno">  290</span> </div>
+<div class="line"><a id="l00291" name="l00291"></a><span class="lineno">  291</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
+<div class="line"><a id="l00292" name="l00292"></a><span class="lineno">  292</span>    <span class="keywordflow">for</span> (; i + 16 &lt;= n; i += 16) {</div>
+<div class="line"><a id="l00293" name="l00293"></a><span class="lineno">  293</span>        __m512 av = _mm512_loadu_ps(&amp;a[i]);</div>
+<div class="line"><a id="l00294" name="l00294"></a><span class="lineno">  294</span>        __m512 bv = _mm512_loadu_ps(&amp;b[i]);</div>
+<div class="line"><a id="l00295" name="l00295"></a><span class="lineno">  295</span>        __m512 yv = _mm512_add_ps(av, bv);</div>
+<div class="line"><a id="l00296" name="l00296"></a><span class="lineno">  296</span>        _mm512_storeu_ps(&amp;y[i], yv);</div>
+<div class="line"><a id="l00297" name="l00297"></a><span class="lineno">  297</span>    }</div>
+<div class="line"><a id="l00298" name="l00298"></a><span class="lineno">  298</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00299" name="l00299"></a><span class="lineno">  299</span> </div>
+<div class="line"><a id="l00300" name="l00300"></a><span class="lineno">  300</span><span class="preprocessor">#if defined(__AVX2__)</span></div>
+<div class="line"><a id="l00301" name="l00301"></a><span class="lineno">  301</span>    <span class="keywordflow">for</span> (; i + 8 &lt;= n; i += 8) {</div>
+<div class="line"><a id="l00302" name="l00302"></a><span class="lineno">  302</span>        __m256 av = _mm256_loadu_ps(&amp;a[i]);</div>
+<div class="line"><a id="l00303" name="l00303"></a><span class="lineno">  303</span>        __m256 bv = _mm256_loadu_ps(&amp;b[i]);</div>
+<div class="line"><a id="l00304" name="l00304"></a><span class="lineno">  304</span>        __m256 yv = _mm256_add_ps(av, bv);</div>
+<div class="line"><a id="l00305" name="l00305"></a><span class="lineno">  305</span>        _mm256_storeu_ps(&amp;y[i], yv);</div>
+<div class="line"><a id="l00306" name="l00306"></a><span class="lineno">  306</span>    }</div>
+<div class="line"><a id="l00307" name="l00307"></a><span class="lineno">  307</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00308" name="l00308"></a><span class="lineno">  308</span> </div>
+<div class="line"><a id="l00309" name="l00309"></a><span class="lineno">  309</span>    <span class="keywordflow">for</span> (; i &lt; n; ++i) {</div>
+<div class="line"><a id="l00310" name="l00310"></a><span class="lineno">  310</span>        y[i] = a[i] + b[i];</div>
+<div class="line"><a id="l00311" name="l00311"></a><span class="lineno">  311</span>    }</div>
+<div class="line"><a id="l00312" name="l00312"></a><span class="lineno">  312</span>}</div>
 </div>
-<div class="line"><a id="l00317" name="l00317"></a><span class="lineno">  317</span> </div>
-<div class="foldopen" id="foldopen00318" data-start="{" data-end="}">
-<div class="line"><a id="l00318" name="l00318"></a><span class="lineno"><a class="line" href="ckernel__engine_8h.html#a51008eb010aff17a631159e631ecbcb3">  318</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="add__kernels__bf16_8c.html#a51008eb010aff17a631159e631ecbcb3">add_inplace_f32</a>(<span class="keywordtype">float</span> *a,</div>
-<div class="line"><a id="l00319" name="l00319"></a><span class="lineno">  319</span>                     <span class="keyword">const</span> <span class="keywordtype">float</span> *b,</div>
-<div class="line"><a id="l00320" name="l00320"></a><span class="lineno">  320</span>                     <span class="keywordtype">size_t</span> n)</div>
-<div class="line"><a id="l00321" name="l00321"></a><span class="lineno">  321</span>{</div>
-<div class="line"><a id="l00322" name="l00322"></a><span class="lineno">  322</span>    <span class="keywordflow">if</span> (!a || !b || n == 0) {</div>
-<div class="line"><a id="l00323" name="l00323"></a><span class="lineno">  323</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><a id="l00324" name="l00324"></a><span class="lineno">  324</span>    }</div>
-<div class="line"><a id="l00325" name="l00325"></a><span class="lineno">  325</span> </div>
-<div class="line"><a id="l00326" name="l00326"></a><span class="lineno">  326</span>    <span class="keywordtype">size_t</span> i = 0;</div>
-<div class="line"><a id="l00327" name="l00327"></a><span class="lineno">  327</span> </div>
-<div class="line"><a id="l00328" name="l00328"></a><span class="lineno">  328</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
-<div class="line"><a id="l00329" name="l00329"></a><span class="lineno">  329</span>    <span class="keywordflow">for</span> (; i + 16 &lt;= n; i += 16) {</div>
-<div class="line"><a id="l00330" name="l00330"></a><span class="lineno">  330</span>        __m512 av = _mm512_loadu_ps(&amp;a[i]);</div>
-<div class="line"><a id="l00331" name="l00331"></a><span class="lineno">  331</span>        __m512 bv = _mm512_loadu_ps(&amp;b[i]);</div>
-<div class="line"><a id="l00332" name="l00332"></a><span class="lineno">  332</span>        __m512 yv = _mm512_add_ps(av, bv);</div>
-<div class="line"><a id="l00333" name="l00333"></a><span class="lineno">  333</span>        _mm512_storeu_ps(&amp;a[i], yv);</div>
-<div class="line"><a id="l00334" name="l00334"></a><span class="lineno">  334</span>    }</div>
-<div class="line"><a id="l00335" name="l00335"></a><span class="lineno">  335</span><span class="preprocessor">#endif</span></div>
-<div class="line"><a id="l00336" name="l00336"></a><span class="lineno">  336</span> </div>
-<div class="line"><a id="l00337" name="l00337"></a><span class="lineno">  337</span><span class="preprocessor">#if defined(__AVX2__)</span></div>
-<div class="line"><a id="l00338" name="l00338"></a><span class="lineno">  338</span>    <span class="keywordflow">for</span> (; i + 8 &lt;= n; i += 8) {</div>
-<div class="line"><a id="l00339" name="l00339"></a><span class="lineno">  339</span>        __m256 av = _mm256_loadu_ps(&amp;a[i]);</div>
-<div class="line"><a id="l00340" name="l00340"></a><span class="lineno">  340</span>        __m256 bv = _mm256_loadu_ps(&amp;b[i]);</div>
-<div class="line"><a id="l00341" name="l00341"></a><span class="lineno">  341</span>        __m256 yv = _mm256_add_ps(av, bv);</div>
-<div class="line"><a id="l00342" name="l00342"></a><span class="lineno">  342</span>        _mm256_storeu_ps(&amp;a[i], yv);</div>
-<div class="line"><a id="l00343" name="l00343"></a><span class="lineno">  343</span>    }</div>
-<div class="line"><a id="l00344" name="l00344"></a><span class="lineno">  344</span><span class="preprocessor">#endif</span></div>
-<div class="line"><a id="l00345" name="l00345"></a><span class="lineno">  345</span> </div>
-<div class="line"><a id="l00346" name="l00346"></a><span class="lineno">  346</span>    <span class="keywordflow">for</span> (; i &lt; n; ++i) {</div>
-<div class="line"><a id="l00347" name="l00347"></a><span class="lineno">  347</span>        a[i] = a[i] + b[i];</div>
-<div class="line"><a id="l00348" name="l00348"></a><span class="lineno">  348</span>    }</div>
-<div class="line"><a id="l00349" name="l00349"></a><span class="lineno">  349</span>}</div>
+<div class="line"><a id="l00313" name="l00313"></a><span class="lineno">  313</span> </div>
+<div class="foldopen" id="foldopen00314" data-start="{" data-end="}">
+<div class="line"><a id="l00314" name="l00314"></a><span class="lineno"><a class="line" href="ckernel__engine_8h.html#a51008eb010aff17a631159e631ecbcb3">  314</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="add__kernels__bf16_8c.html#a51008eb010aff17a631159e631ecbcb3">add_inplace_f32</a>(<span class="keywordtype">float</span> *a,</div>
+<div class="line"><a id="l00315" name="l00315"></a><span class="lineno">  315</span>                     <span class="keyword">const</span> <span class="keywordtype">float</span> *b,</div>
+<div class="line"><a id="l00316" name="l00316"></a><span class="lineno">  316</span>                     <span class="keywordtype">size_t</span> n)</div>
+<div class="line"><a id="l00317" name="l00317"></a><span class="lineno">  317</span>{</div>
+<div class="line"><a id="l00318" name="l00318"></a><span class="lineno">  318</span>    <span class="keywordflow">if</span> (!a || !b || n == 0) {</div>
+<div class="line"><a id="l00319" name="l00319"></a><span class="lineno">  319</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><a id="l00320" name="l00320"></a><span class="lineno">  320</span>    }</div>
+<div class="line"><a id="l00321" name="l00321"></a><span class="lineno">  321</span> </div>
+<div class="line"><a id="l00322" name="l00322"></a><span class="lineno">  322</span>    <span class="keywordtype">size_t</span> i = 0;</div>
+<div class="line"><a id="l00323" name="l00323"></a><span class="lineno">  323</span> </div>
+<div class="line"><a id="l00324" name="l00324"></a><span class="lineno">  324</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
+<div class="line"><a id="l00325" name="l00325"></a><span class="lineno">  325</span>    <span class="keywordflow">for</span> (; i + 16 &lt;= n; i += 16) {</div>
+<div class="line"><a id="l00326" name="l00326"></a><span class="lineno">  326</span>        __m512 av = _mm512_loadu_ps(&amp;a[i]);</div>
+<div class="line"><a id="l00327" name="l00327"></a><span class="lineno">  327</span>        __m512 bv = _mm512_loadu_ps(&amp;b[i]);</div>
+<div class="line"><a id="l00328" name="l00328"></a><span class="lineno">  328</span>        __m512 yv = _mm512_add_ps(av, bv);</div>
+<div class="line"><a id="l00329" name="l00329"></a><span class="lineno">  329</span>        _mm512_storeu_ps(&amp;a[i], yv);</div>
+<div class="line"><a id="l00330" name="l00330"></a><span class="lineno">  330</span>    }</div>
+<div class="line"><a id="l00331" name="l00331"></a><span class="lineno">  331</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00332" name="l00332"></a><span class="lineno">  332</span> </div>
+<div class="line"><a id="l00333" name="l00333"></a><span class="lineno">  333</span><span class="preprocessor">#if defined(__AVX2__)</span></div>
+<div class="line"><a id="l00334" name="l00334"></a><span class="lineno">  334</span>    <span class="keywordflow">for</span> (; i + 8 &lt;= n; i += 8) {</div>
+<div class="line"><a id="l00335" name="l00335"></a><span class="lineno">  335</span>        __m256 av = _mm256_loadu_ps(&amp;a[i]);</div>
+<div class="line"><a id="l00336" name="l00336"></a><span class="lineno">  336</span>        __m256 bv = _mm256_loadu_ps(&amp;b[i]);</div>
+<div class="line"><a id="l00337" name="l00337"></a><span class="lineno">  337</span>        __m256 yv = _mm256_add_ps(av, bv);</div>
+<div class="line"><a id="l00338" name="l00338"></a><span class="lineno">  338</span>        _mm256_storeu_ps(&amp;a[i], yv);</div>
+<div class="line"><a id="l00339" name="l00339"></a><span class="lineno">  339</span>    }</div>
+<div class="line"><a id="l00340" name="l00340"></a><span class="lineno">  340</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00341" name="l00341"></a><span class="lineno">  341</span> </div>
+<div class="line"><a id="l00342" name="l00342"></a><span class="lineno">  342</span>    <span class="keywordflow">for</span> (; i &lt; n; ++i) {</div>
+<div class="line"><a id="l00343" name="l00343"></a><span class="lineno">  343</span>        a[i] = a[i] + b[i];</div>
+<div class="line"><a id="l00344" name="l00344"></a><span class="lineno">  344</span>    }</div>
+<div class="line"><a id="l00345" name="l00345"></a><span class="lineno">  345</span>}</div>
 </div>
 <div class="ttc" id="aadd__kernels__bf16_8c_html_a25d5cb6d82feccae28f7e2e1e885b39b"><div class="ttname"><a href="add__kernels__bf16_8c.html#a25d5cb6d82feccae28f7e2e1e885b39b">ck_residual_add_token_major_bf16_storage</a></div><div class="ttdeci">void ck_residual_add_token_major_bf16_storage(const float *a, const float *b, float *out, int tokens, int aligned_embed_dim)</div><div class="ttdef"><b>Definition</b> <a href="add__kernels__bf16_8c_source.html#l00067">add_kernels_bf16.c:67</a></div></div>
 <div class="ttc" id="aadd__kernels__bf16_8c_html_a29182cacb5925fc3bfcef5c8db425c3f"><div class="ttname"><a href="add__kernels__bf16_8c.html#a29182cacb5925fc3bfcef5c8db425c3f">add_scaled_forward_bf16</a></div><div class="ttdeci">void add_scaled_forward_bf16(const uint16_t *a, const uint16_t *b, uint16_t *y, float alpha, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="add__kernels__bf16_8c_source.html#l00086">add_kernels_bf16.c:86</a></div></div>
 <div class="ttc" id="aadd__kernels__bf16_8c_html_a33b5300506aebe863f2781fe7d58ae95"><div class="ttname"><a href="add__kernels__bf16_8c.html#a33b5300506aebe863f2781fe7d58ae95">add_inplace_bf16</a></div><div class="ttdeci">void add_inplace_bf16(uint16_t *a, const uint16_t *b, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="add__kernels__bf16_8c_source.html#l00119">add_kernels_bf16.c:119</a></div></div>
-<div class="ttc" id="aadd__kernels__bf16_8c_html_a4c166feaf5808ab05b916adb1b09e323"><div class="ttname"><a href="add__kernels__bf16_8c.html#a4c166feaf5808ab05b916adb1b09e323">add_forward_f32</a></div><div class="ttdeci">void add_forward_f32(const float *a, const float *b, float *y, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="add__kernels__bf16_8c_source.html#l00284">add_kernels_bf16.c:284</a></div></div>
-<div class="ttc" id="aadd__kernels__bf16_8c_html_a51008eb010aff17a631159e631ecbcb3"><div class="ttname"><a href="add__kernels__bf16_8c.html#a51008eb010aff17a631159e631ecbcb3">add_inplace_f32</a></div><div class="ttdeci">void add_inplace_f32(float *a, const float *b, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="add__kernels__bf16_8c_source.html#l00318">add_kernels_bf16.c:318</a></div></div>
+<div class="ttc" id="aadd__kernels__bf16_8c_html_a4c166feaf5808ab05b916adb1b09e323"><div class="ttname"><a href="add__kernels__bf16_8c.html#a4c166feaf5808ab05b916adb1b09e323">add_forward_f32</a></div><div class="ttdeci">void add_forward_f32(const float *a, const float *b, float *y, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="add__kernels__bf16_8c_source.html#l00280">add_kernels_bf16.c:280</a></div></div>
+<div class="ttc" id="aadd__kernels__bf16_8c_html_a51008eb010aff17a631159e631ecbcb3"><div class="ttname"><a href="add__kernels__bf16_8c.html#a51008eb010aff17a631159e631ecbcb3">add_inplace_f32</a></div><div class="ttdeci">void add_inplace_f32(float *a, const float *b, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="add__kernels__bf16_8c_source.html#l00314">add_kernels_bf16.c:314</a></div></div>
 <div class="ttc" id="aadd__kernels__bf16_8c_html_a96a426e195f548c8cad7a3d8ccc691d6"><div class="ttname"><a href="add__kernels__bf16_8c.html#a96a426e195f548c8cad7a3d8ccc691d6">add_forward_bf16</a></div><div class="ttdeci">void add_forward_bf16(const uint16_t *a, const uint16_t *b, uint16_t *y, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="add__kernels__bf16_8c_source.html#l00038">add_kernels_bf16.c:38</a></div></div>
-<div class="ttc" id="aadd__kernels__bf16_8c_html_a9855ffa2b0a5cc3070238b9ad6b3d6f2"><div class="ttname"><a href="add__kernels__bf16_8c.html#a9855ffa2b0a5cc3070238b9ad6b3d6f2">add_forward_2d_bf16</a></div><div class="ttdeci">void add_forward_2d_bf16(const uint16_t *a, const uint16_t *b, uint16_t *y, int tokens, int dim, int aligned_dim)</div><div class="ttdef"><b>Definition</b> <a href="add__kernels__bf16_8c_source.html#l00235">add_kernels_bf16.c:235</a></div></div>
+<div class="ttc" id="aadd__kernels__bf16_8c_html_a9855ffa2b0a5cc3070238b9ad6b3d6f2"><div class="ttname"><a href="add__kernels__bf16_8c.html#a9855ffa2b0a5cc3070238b9ad6b3d6f2">add_forward_2d_bf16</a></div><div class="ttdeci">void add_forward_2d_bf16(const uint16_t *a, const uint16_t *b, uint16_t *y, int tokens, int dim, int aligned_dim)</div><div class="ttdef"><b>Definition</b> <a href="add__kernels__bf16_8c_source.html#l00231">add_kernels_bf16.c:231</a></div></div>
 <div class="ttc" id="aadd__kernels__bf16_8c_html_af14d547ba76e5cb7b26c812751f9a749"><div class="ttname"><a href="add__kernels__bf16_8c.html#af14d547ba76e5cb7b26c812751f9a749">add_backward_bf16</a></div><div class="ttdeci">void add_backward_bf16(const uint16_t *d_y, uint16_t *d_a, uint16_t *d_b, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="add__kernels__bf16_8c_source.html#l00187">add_kernels_bf16.c:187</a></div></div>
 <div class="ttc" id="aadd__kernels__bf16_8c_html_afd826861943ffdc6583156dfa789cdb7"><div class="ttname"><a href="add__kernels__bf16_8c.html#afd826861943ffdc6583156dfa789cdb7">add_scaled_inplace_bf16</a></div><div class="ttdeci">void add_scaled_inplace_bf16(uint16_t *a, const uint16_t *b, float alpha, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="add__kernels__bf16_8c_source.html#l00149">add_kernels_bf16.c:149</a></div></div>
 <div class="ttc" id="abf16__utils_8h_html"><div class="ttname"><a href="bf16__utils_8h.html">bf16_utils.h</a></div></div>
