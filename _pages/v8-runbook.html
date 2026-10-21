@@ -1804,6 +1804,14 @@ version/v8/scripts/ck_serve_v8.py "$RUN_DIR" --run "$RUN_DIR" \
         messages or tool results cannot choose the initial parser state. Tool-bearing streams
         expose reasoning while withholding tool calls until validation. Over-limit calls are
         rejected together; the server never silently executes a retained subset.</p>
+    <p>The Responses API's <code>usage.output_tokens_details.reasoning_tokens</code> is
+        currently an estimate: the server divides visible reasoning text length by four and
+        rounds down. It is not an exact count of generated reasoning token IDs and should not
+        be used for billing or context admission. <code>reasoning.effort=none</code> selects
+        the server's suppressed reasoning mode; actual model behavior remains artifact-specific.
+        Other accepted effort labels do not select different compute budgets.
+        Accepted <code>service_tier</code> values are echoed in the response but do not change
+        native scheduling priority or model speed.</p>
     <p>Typed images, files, audio and video are rejected before rendering or native execution
         in this text-only session ABI, including media returned by tools. Publisher image-marker
         rendering tests are render-only evidence. Plain paths remain text. Enabling vision requires
@@ -1876,6 +1884,14 @@ version/v8/scripts/ck_serve_v8.py "$RUN_DIR" --run "$RUN_DIR" \
         the tested 0.8B artifact, not every Qwen3.5 variant.</p>
 
     <h3 style="margin-top: 0;">Qwen Code Interactive And Overnight Profiles</h3>
+    <p>On ARM, an explicit <code>CK_ARM_ARCH</code> used to build the engine is
+        retained by ordinary <code>cks-v8-run run</code> and <code>serve</code>
+        invocations in the same build tree. The runner checks compiler support,
+        rebuilds with that profile, and records it with the bundled library
+        hashes. Set a new <code>CK_ARM_ARCH</code> to change the target, or set
+        <code>CK_ARM_NATIVE=0</code> explicitly to request baseline ARM. If an
+        existing engine has no valid build-flag record, choose a profile
+        explicitly before rebuilding; do not infer its ISA from its filename.</p>
     <p>
         A cached Qwen Code 0.24.6 <code>read_file</code> task passed through the Responses server
         using the circuit-resolved publisher Jinja bundle. The earlier 0.21.5 pilot used the
