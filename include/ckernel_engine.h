@@ -2119,6 +2119,17 @@ void attention_forward_full_head_major_gqa_flash_strided_gemma4(const float *q,
                                                                 int aligned_head_dim,
                                                                 int kv_stride_tokens);
 
+void attention_forward_full_head_major_gqa_flash_strided_noscale_f32kv(const float *q,
+                                                                       const float *k,
+                                                                       const float *v,
+                                                                       float *output,
+                                                                       int num_heads,
+                                                                       int num_kv_heads,
+                                                                       int num_tokens,
+                                                                       int head_dim,
+                                                                       int aligned_head_dim,
+                                                                       int kv_stride_tokens);
+
 void attention_forward_mixed_visual_chunk_head_major_gqa_flash_strided_gemma4(const float *q,
                                                                               const float *k,
                                                                               const float *v,

@@ -5,12 +5,12 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 436,
+      "total": 437,
       "by_op": {
         "add_backward": 1,
         "add_stream": 2,
         "assistant_layer_scale": 1,
-        "attention": 38,
+        "attention": 39,
         "attention_full_token_major_checked": 1,
         "attention_projection": 1,
         "attention_sliding": 13,
@@ -9404,9 +9404,185 @@
           "unittest/test_attention.py"
         ]
       },
-      "notes": "Gemma4 no-scale full multi-head attention. Gemma4 uses attention_scale=1.0 in llama.cpp, not 1/sqrt(head_dim).",
+      "notes": "No-scale full multi-head attention with internal FP16 rounding of K/V before FP32 score and value accumulation. This numerical contract differs from the pinned llama.cpp non-flash FP32-K/V vision path.",
       "name": "attention_forward_full_head_major_gqa_flash_strided_gemma4",
       "_source_file": "attention_forward_full_head_major_gqa_flash_strided_gemma4.json"
+    },
+    {
+      "id": "attention_forward_full_head_major_gqa_flash_strided_noscale_f32kv",
+      "op": "attention",
+      "variant": "full_flash_fp32_noscale_f32kv",
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "T",
+            "D"
+          ],
+          "desc": "Query tensor [heads, tokens, head_dim]"
+        }
+      ],
+      "weights": [],
+      "activations": [],
+      "runtime_buffers": [
+        {
+          "name": "k",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "S",
+            "D"
+          ],
+          "desc": "FP32 keys [kv_heads, seq_len, head_dim], without FP16 rounding"
+        },
+        {
+          "name": "v",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "S",
+            "D"
+          ],
+          "desc": "FP32 values [kv_heads, seq_len, head_dim], without FP16 rounding"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "out",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "T",
+            "D"
+          ],
+          "desc": "Head-major attention output"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "qkv_scratch",
+          "dtype": "fp32",
+          "size_bytes": "H * T * D * 4",
+          "desc": "QKV tiles for attention"
+        },
+        {
+          "name": "attn_scratch",
+          "dtype": "fp32",
+          "size_bytes": "H * T * T * 4",
+          "desc": "Attention scores"
+        }
+      ],
+      "dims": [
+        "H",
+        "KV",
+        "T",
+        "S",
+        "D"
+      ],
+      "params": [
+        {
+          "name": "kv_stride_tokens",
+          "dtype": "int32",
+          "desc": "Stride in tokens for KV layout"
+        },
+        {
+          "name": "head_dim",
+          "dtype": "int32",
+          "desc": "Unpadded head dimension"
+        },
+        {
+          "name": "aligned_head_dim",
+          "dtype": "int32",
+          "desc": "Aligned head dimension"
+        }
+      ],
+      "parallelization": {
+        "supported": [
+          "head"
+        ],
+        "preferred": {
+          "prefill": "head"
+        },
+        "strategies": [
+          {
+            "name": "head",
+            "partition_dim": "H",
+            "param_style": "ith_nth",
+            "notes": "Distribute independent heads across workers."
+          }
+        ]
+      },
+      "constraints": {
+        "alignment": {
+          "D": 64,
+          "T": 32
+        },
+        "notes": "Full bidirectional attention; FP32 Q/K/V arithmetic and score scale 1.0."
+      },
+      "impl": {
+        "function": "attention_forward_full_head_major_gqa_flash_strided_noscale_f32kv",
+        "c_declaration": "void attention_forward_full_head_major_gqa_flash_strided_noscale_f32kv(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int kv_stride_tokens);",
+        "sources": [
+          "src/kernels/attention_kernels.c",
+          "src/kernels/softmax_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "avx512",
+            "requires": [
+              "avx512f",
+              "fma"
+            ],
+            "compile_flags": [
+              "-mavx512f",
+              "-mfma"
+            ]
+          },
+          {
+            "name": "avx2",
+            "requires": [
+              "avx2",
+              "fma"
+            ],
+            "compile_flags": [
+              "-mavx2",
+              "-mfma"
+            ]
+          },
+          {
+            "name": "avx",
+            "requires": [
+              "avx"
+            ],
+            "compile_flags": [
+              "-mavx"
+            ]
+          },
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_attention_full.py"
+        ],
+        "bench": [
+          "unittest/test_attention.py"
+        ]
+      },
+      "notes": "Full no-scale attention consuming FP32 K/V without an implicit FP16 conversion. Select only when the oracle and circuit declare that numerical contract.",
+      "name": "attention_forward_full_head_major_gqa_flash_strided_noscale_f32kv",
+      "_source_file": "attention_forward_full_head_major_gqa_flash_strided_noscale_f32kv.json"
     },
     {
       "id": "attention_forward_full_head_major_gqa_ggml_strided",

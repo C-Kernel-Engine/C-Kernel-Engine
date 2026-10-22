@@ -5178,6 +5178,28 @@ void attention_forward_full_head_major_gqa_flash_strided_gemma4(const float *q,
                                                 1.0f);
 }
 
+void attention_forward_full_head_major_gqa_flash_strided_noscale_f32kv(const float *q,
+                                                                       const float *k,
+                                                                       const float *v,
+                                                                       float *output,
+                                                                       int num_heads,
+                                                                       int num_kv_heads,
+                                                                       int num_tokens,
+                                                                       int head_dim,
+                                                                       int aligned_head_dim,
+                                                                       int kv_stride_tokens)
+{
+    attention_forward_head_major_gqa_flash_impl(q, k, v, output,
+                                                num_heads, num_kv_heads,
+                                                num_tokens, head_dim,
+                                                aligned_head_dim,
+                                                kv_stride_tokens,
+                                                /*causal=*/0,
+                                                /*round_full_kv_fp16=*/0,
+                                                /*output_token_major=*/0,
+                                                1.0f);
+}
+
 
 static void attention_forward_mixed_visual_chunk_head_major_gqa_flash_strided_gemma4_impl(
     const float *q,

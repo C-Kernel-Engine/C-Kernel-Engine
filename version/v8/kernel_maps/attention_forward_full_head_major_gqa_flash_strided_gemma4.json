@@ -170,7 +170,7 @@
       "unittest/test_attention.py"
     ]
   },
-  "notes": "Gemma4 no-scale full multi-head attention. Gemma4 uses attention_scale=1.0 in llama.cpp, not 1/sqrt(head_dim).",
+  "notes": "No-scale full multi-head attention with internal FP16 rounding of K/V before FP32 score and value accumulation. This numerical contract differs from the pinned llama.cpp non-flash FP32-K/V vision path.",
   "name": "attention_forward_full_head_major_gqa_flash_strided_gemma4",
   "_source_file": "attention_forward_full_head_major_gqa_flash_strided_gemma4.json"
 }

@@ -38,6 +38,15 @@ from run_multimodal_bridge_v8 import _resolve_bridge_execution_policy  # type: i
 
 
 class Gemma3RopeMetadataTests(unittest.TestCase):
+    def test_gemma4_vision_selects_fp32_kv_attention_contract(self):
+        provider_id = "attention_forward_full_head_major_gqa_flash_strided_noscale_f32kv"
+        vision = _load_builtin_template_doc("gemma4_vision")
+        self.assertEqual(vision["kernels"]["attn_prefill"], provider_id)
+        registry = load_kernel_registry()
+        provider = next(kernel for kernel in registry["kernels"] if kernel["id"] == provider_id)
+        self.assertEqual(provider["impl"]["function"], provider_id)
+        self.assertIn("without an implicit FP16 conversion", provider["notes"])
+
     def test_gemma4_bridge_uses_persistent_cache_after_mixed_prefill(self):
         bridge = _load_builtin_template_doc("gemma4")["contract"]["multimodal_bridge"]
         self.assertEqual(bridge["cache_policy"], "persistent_decoder_kv")

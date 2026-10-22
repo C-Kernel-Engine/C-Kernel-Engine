@@ -50,6 +50,16 @@ lib.attention_forward_full_head_major_gqa_flash_strided.argtypes = [
 ]
 lib.attention_forward_full_head_major_gqa_flash_strided.restype = None
 
+lib.attention_forward_full_head_major_gqa_flash_strided_noscale_f32kv.argtypes = list(
+    lib.attention_forward_full_head_major_gqa_flash_strided.argtypes
+)
+lib.attention_forward_full_head_major_gqa_flash_strided_noscale_f32kv.restype = None
+
+lib.attention_forward_full_head_major_gqa_flash_strided_gemma4.argtypes = list(
+    lib.attention_forward_full_head_major_gqa_flash_strided.argtypes
+)
+lib.attention_forward_full_head_major_gqa_flash_strided_gemma4.restype = None
+
 lib.attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided.argtypes = [
     ctypes.POINTER(ctypes.c_float),
     ctypes.POINTER(ctypes.c_float),
@@ -179,6 +189,49 @@ class TestAttentionFull(unittest.TestCase):
 
         self.out_full = np.zeros((self.H, self.T, self.aligned), dtype=np.float32)
         self.out_causal = np.zeros_like(self.out_full)
+
+    def test_full_noscale_f32kv_preserves_kv_precision(self) -> None:
+        rng = np.random.default_rng(4701)
+        heads, kv_heads, tokens, dim, stride = 4, 2, 9, 8, 13
+        q = rng.standard_normal((heads, tokens, dim), dtype=np.float32)
+        k = np.zeros((kv_heads, stride, dim), dtype=np.float32)
+        v = np.zeros_like(k)
+        k[:, :tokens] = rng.standard_normal((kv_heads, tokens, dim), dtype=np.float32)
+        v[:, :tokens] = rng.standard_normal((kv_heads, tokens, dim), dtype=np.float32)
+        output = np.zeros((heads * tokens * dim + 2,), dtype=np.float32)
+        output[-2:] = [12345.0, -12345.0]
+        rounded_output = np.zeros_like(output)
+
+        lib.attention_forward_full_head_major_gqa_flash_strided_noscale_f32kv(
+            numpy_to_ptr(q), numpy_to_ptr(k), numpy_to_ptr(v), numpy_to_ptr(output),
+            heads, kv_heads, tokens, dim, dim, stride,
+        )
+        lib.attention_forward_full_head_major_gqa_flash_strided_gemma4(
+            numpy_to_ptr(q), numpy_to_ptr(k), numpy_to_ptr(v), numpy_to_ptr(rounded_output),
+            heads, kv_heads, tokens, dim, dim, stride,
+        )
+
+        q64 = torch.from_numpy(q).to(torch.float64)
+        k64 = torch.from_numpy(k[:, :tokens]).to(torch.float64)
+        v64 = torch.from_numpy(v[:, :tokens]).to(torch.float64)
+        reference = torch.empty((heads, tokens, dim), dtype=torch.float64)
+        rounded_reference = torch.empty_like(reference)
+        for head in range(heads):
+            kv_head = head // (heads // kv_heads)
+            for query in range(tokens):
+                scores = k64[kv_head] @ q64[head, query]
+                reference[head, query] = torch.softmax(scores, dim=0) @ v64[kv_head]
+                rounded_k = k64[kv_head].to(torch.float16).to(torch.float64)
+                rounded_v = v64[kv_head].to(torch.float16).to(torch.float64)
+                rounded_scores = rounded_k @ q64[head, query]
+                rounded_reference[head, query] = torch.softmax(rounded_scores, dim=0) @ rounded_v
+
+        actual = output[:-2].reshape(heads, tokens, dim)
+        rounded_actual = rounded_output[:-2].reshape(heads, tokens, dim)
+        self.assertTrue(np.array_equal(output[-2:], [12345.0, -12345.0]))
+        self.assertLess(float(np.max(np.abs(actual - reference.numpy()))), 5e-5)
+        self.assertGreater(float(np.max(np.abs(actual - rounded_reference.numpy()))), 1e-5)
+        self.assertLess(float(np.max(np.abs(rounded_actual - rounded_reference.numpy()))), 5e-5)
 
     def test_full_flash_matches_pytorch_reference(self) -> None:
         lib.attention_forward_full_head_major_gqa_flash(
