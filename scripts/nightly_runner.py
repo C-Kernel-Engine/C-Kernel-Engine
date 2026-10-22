@@ -743,6 +743,10 @@ TEST_SUITES = {
         "Qwen3-TTS 0.6B CustomVoice Pinned Oracle Contract", "inference",
         ROOT / "tests" / "test_v8_qwen3_tts_oracle_capture.py",
     ),
+    "tts_qwen3_first_block_oracle_contract": TestSuite(
+        "Qwen3-TTS First Talker Block Pinned Oracle Contract", "inference",
+        ROOT / "tests" / "test_v8_qwen3_tts_first_block_capture.py",
+    ),
     "tts_runtime_extent": TestSuite(
         "TTS Runtime Extent Kernels and Compiler Contract", "kernels",
         ROOT / "tests" / "test_v8_runtime_extent_kernel.py",
