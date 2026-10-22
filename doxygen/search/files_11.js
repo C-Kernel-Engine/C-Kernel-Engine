@@ -5,7 +5,8 @@ var searchData=
   ['tokenizer_2eh_2',['tokenizer.h',['../tokenizer_8h.html',1,'']]],
   ['tokenizer_5fspm_2ec_3',['tokenizer_spm.c',['../tokenizer__spm_8c.html',1,'']]],
   ['topk_5fkernels_2ec_4',['topk_kernels.c',['../topk__kernels_8c.html',1,'']]],
-  ['trie_2ec_5',['trie.c',['../trie_8c.html',1,'']]],
-  ['true_5fbpe_2ec_6',['true_bpe.c',['../true__bpe_8c.html',1,'']]],
-  ['true_5fbpe_2eh_7',['true_bpe.h',['../true__bpe_8h.html',1,'']]]
+  ['transformer_5frows_5fchecked_2ec_5',['transformer_rows_checked.c',['../transformer__rows__checked_8c.html',1,'']]],
+  ['trie_2ec_6',['trie.c',['../trie_8c.html',1,'']]],
+  ['true_5fbpe_2ec_7',['true_bpe.c',['../true__bpe_8c.html',1,'']]],
+  ['true_5fbpe_2eh_8',['true_bpe.h',['../true__bpe_8h.html',1,'']]]
 ];

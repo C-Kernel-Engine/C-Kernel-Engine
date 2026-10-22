@@ -310,19 +310,19 @@ Functions</h2></td></tr>
 
 <p class="definition">Definition at line <a class="el" href="linear__rows__checked_8c_source.html#l00025">25</a> of file <a class="el" href="linear__rows__checked_8c_source.html">linear_rows_checked.c</a>.</p>
 <div class="fragment"><div class="line"><span class="lineno">   31</span>{</div>
-<div class="line"><span class="lineno">   32</span>    <span class="keywordflow">if</span> (!input || !weight || !bias || !output ||</div>
+<div class="line"><span class="lineno">   32</span>    <span class="keywordflow">if</span> (!input || !weight || !output ||</div>
 <div class="line"><span class="lineno">   33</span>        !<a class="code hl_function" href="linear__rows__checked_8c.html#a43a2bce256149887d9ed75bace12e37b">span_fits</a>(rows, input_stride, input_channels, input_elements) ||</div>
 <div class="line"><span class="lineno">   34</span>        !<a class="code hl_function" href="linear__rows__checked_8c.html#a43a2bce256149887d9ed75bace12e37b">span_fits</a>(output_channels, weight_stride, input_channels, weight_elements) ||</div>
 <div class="line"><span class="lineno">   35</span>        !<a class="code hl_function" href="linear__rows__checked_8c.html#a43a2bce256149887d9ed75bace12e37b">span_fits</a>(rows, output_stride, output_channels, output_elements) ||</div>
-<div class="line"><span class="lineno">   36</span>        bias_elements &lt; output_channels)</div>
-<div class="line"><span class="lineno">   37</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">   36</span>        (bias ? bias_elements &lt; output_channels : bias_elements != 0))</div>
+<div class="line"><span class="lineno">   37</span>        return -1;</div>
 <div class="line"><span class="lineno">   38</span> </div>
 <div class="line"><span class="lineno">   39</span>    <span class="comment">/* Validate every accessed value and every result before the first write. */</span></div>
 <div class="line"><span class="lineno">   40</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> r = 0; r &lt; rows; ++r)</div>
 <div class="line"><span class="lineno">   41</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> c = 0; c &lt; input_channels; ++c)</div>
 <div class="line"><span class="lineno">   42</span>            <span class="keywordflow">if</span> (!isfinite(input[r * input_stride + c])) <span class="keywordflow">return</span> -1;</div>
 <div class="line"><span class="lineno">   43</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> o = 0; o &lt; output_channels; ++o) {</div>
-<div class="line"><span class="lineno">   44</span>        <span class="keywordflow">if</span> (!isfinite(bias[o])) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">   44</span>        <span class="keywordflow">if</span> (bias &amp;&amp; !isfinite(bias[o])) <span class="keywordflow">return</span> -1;</div>
 <div class="line"><span class="lineno">   45</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> c = 0; c &lt; input_channels; ++c)</div>
 <div class="line"><span class="lineno">   46</span>            <span class="keywordflow">if</span> (!isfinite(weight[o * weight_stride + c])) <span class="keywordflow">return</span> -1;</div>
 <div class="line"><span class="lineno">   47</span>    }</div>
@@ -330,14 +330,14 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">   49</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> o = 0; o &lt; output_channels; ++o) {</div>
 <div class="line"><span class="lineno">   50</span>            <span class="keyword">const</span> <span class="keywordtype">double</span> result = <a class="code hl_function" href="linear__rows__checked_8c.html#ae7816c3478a9999aad8dddcdce467cc7">dot_bias</a>(input + r * input_stride,</div>
 <div class="line"><span class="lineno">   51</span>                                           weight + o * weight_stride,</div>
-<div class="line"><span class="lineno">   52</span>                                           input_channels, bias[o]);</div>
+<div class="line"><span class="lineno">   52</span>                                           input_channels, bias ? bias[o] : 0.0f);</div>
 <div class="line"><span class="lineno">   53</span>            <span class="keywordflow">if</span> (!isfinite(result) || fabs(result) &gt; FLT_MAX) <span class="keywordflow">return</span> -1;</div>
 <div class="line"><span class="lineno">   54</span>        }</div>
 <div class="line"><span class="lineno">   55</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> r = 0; r &lt; rows; ++r)</div>
 <div class="line"><span class="lineno">   56</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> o = 0; o &lt; output_channels; ++o)</div>
 <div class="line"><span class="lineno">   57</span>            output[r * output_stride + o] = (<span class="keywordtype">float</span>)<a class="code hl_function" href="linear__rows__checked_8c.html#ae7816c3478a9999aad8dddcdce467cc7">dot_bias</a>(</div>
 <div class="line"><span class="lineno">   58</span>                input + r * input_stride, weight + o * weight_stride,</div>
-<div class="line"><span class="lineno">   59</span>                input_channels, bias[o]);</div>
+<div class="line"><span class="lineno">   59</span>                input_channels, bias ? bias[o] : 0.0f);</div>
 <div class="line"><span class="lineno">   60</span>    <span class="keywordflow">return</span> 0;</div>
 <div class="line"><span class="lineno">   61</span>}</div>
 <div class="ttc" id="alinear__rows__checked_8c_html_a43a2bce256149887d9ed75bace12e37b"><div class="ttname"><a href="linear__rows__checked_8c.html#a43a2bce256149887d9ed75bace12e37b">span_fits</a></div><div class="ttdeci">static int span_fits(size_t rows, size_t stride, size_t width, size_t elements)</div><div class="ttdef"><b>Definition</b> <a href="linear__rows__checked_8c_source.html#l00007">linear_rows_checked.c:7</a></div></div>

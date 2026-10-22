@@ -90,7 +90,8 @@ var searchData=
   ['ckernel_5fsection_5flayout_2eh_87',['ckernel_section_layout.h',['../ckernel__section__layout_8h.html',1,'']]],
   ['ckernel_5fstrict_2ec_88',['ckernel_strict.c',['../ckernel__strict_8c.html',1,'']]],
   ['ckernel_5fstrided_5funary_5fchecked_2eh_89',['ckernel_strided_unary_checked.h',['../ckernel__strided__unary__checked_8h.html',1,'']]],
-  ['ckernel_5ftts_2eh_90',['ckernel_tts.h',['../ckernel__tts_8h.html',1,'']]],
-  ['cpu_5ffeatures_2ec_91',['cpu_features.c',['../cpu__features_8c.html',1,'']]],
-  ['cpu_5ffeatures_2eh_92',['cpu_features.h',['../cpu__features_8h.html',1,'']]]
+  ['ckernel_5ftransformer_5frows_5fchecked_2eh_90',['ckernel_transformer_rows_checked.h',['../ckernel__transformer__rows__checked_8h.html',1,'']]],
+  ['ckernel_5ftts_2eh_91',['ckernel_tts.h',['../ckernel__tts_8h.html',1,'']]],
+  ['cpu_5ffeatures_2ec_92',['cpu_features.c',['../cpu__features_8c.html',1,'']]],
+  ['cpu_5ffeatures_2eh_93',['cpu_features.h',['../cpu__features_8h.html',1,'']]]
 ];
