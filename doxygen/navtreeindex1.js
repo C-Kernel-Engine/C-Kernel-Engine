@@ -246,8 +246,8 @@ var NAVTREEINDEX1 =
 "audio__text__embedding_8c.html":[2,0,1,1,30],
 "audio__text__embedding_8c.html#a9767092c3dd433c75a9cfec16c7762fa":[2,0,1,1,30,0],
 "audio__text__embedding_8c_source.html":[2,0,1,1,30],
-"axpy__kernels_8c.html":[2,0,1,1,31],
-"axpy__kernels_8c.html#a016bad88c138cb1af2b1bf0b5ec3d39b":[2,0,1,1,31,33],
-"axpy__kernels_8c.html#a05c2cabc2f651bd23803aa46f953586e":[2,0,1,1,31,5],
-"axpy__kernels_8c.html#a0674d3fec70a1bc06d905cccb120a690":[2,0,1,1,31,69]
+"audio__zero__pad__checked_8c.html":[2,0,1,1,31],
+"audio__zero__pad__checked_8c.html#a8e154fa3399ff4e4d5a982a2e720ed55":[2,0,1,1,31,0],
+"audio__zero__pad__checked_8c_source.html":[2,0,1,1,31],
+"axpy__kernels_8c.html":[2,0,1,1,32]
 };

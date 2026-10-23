@@ -31,6 +31,7 @@ var dir_40856f0cdd4bcafd28810d9265a200f7 =
     [ "audio_spectral_head.c", "audio__spectral__head_8c.html", "audio__spectral__head_8c" ],
     [ "audio_stft_mag_phase_checked.c", "audio__stft__mag__phase__checked_8c.html", "audio__stft__mag__phase__checked_8c" ],
     [ "audio_text_embedding.c", "audio__text__embedding_8c.html", "audio__text__embedding_8c" ],
+    [ "audio_zero_pad_checked.c", "audio__zero__pad__checked_8c.html", "audio__zero__pad__checked_8c" ],
     [ "axpy_kernels.c", "axpy__kernels_8c.html", "axpy__kernels_8c" ],
     [ "checked_float_buffer.h", "checked__float__buffer_8h.html", "checked__float__buffer_8h" ],
     [ "deepseek_kernels.c", "deepseek__kernels_8c.html", "deepseek__kernels_8c" ],

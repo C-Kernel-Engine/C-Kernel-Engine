@@ -241,6 +241,7 @@ var ckernel__engine_8h =
     [ "geglu_forward_fp32", "ckernel__engine_8h.html#a80b1ec81e751b153977f05a3e44b4fda", null ],
     [ "geglu_forward_ggml_native", "ckernel__engine_8h.html#a90c720d31b619809ed5e2cc723019b7b", null ],
     [ "geglu_forward_quick", "ckernel__engine_8h.html#ac64c09951a9619da235ba9cef4ae857b", null ],
+    [ "geglu_forward_quick_fp16_table", "ckernel__engine_8h.html#a5c3f0e226acc65c4c53f1b047e796e9c", null ],
     [ "gelu_backward_exact", "ckernel__engine_8h.html#a3075b77764b4b408e3c1c9b89a2822ad", null ],
     [ "gelu_backward_exact_bf16", "ckernel__engine_8h.html#a79b99577c3b4e080aa37e41ffa43c46f", null ],
     [ "gelu_backward_fast", "ckernel__engine_8h.html#aeaf518a5239f4588f8c28b05b96d5478", null ],

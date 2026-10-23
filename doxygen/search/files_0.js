@@ -31,5 +31,6 @@ var searchData=
   ['audio_5fspectral_5fhead_2ec_28',['audio_spectral_head.c',['../audio__spectral__head_8c.html',1,'']]],
   ['audio_5fstft_5fmag_5fphase_5fchecked_2ec_29',['audio_stft_mag_phase_checked.c',['../audio__stft__mag__phase__checked_8c.html',1,'']]],
   ['audio_5ftext_5fembedding_2ec_30',['audio_text_embedding.c',['../audio__text__embedding_8c.html',1,'']]],
-  ['axpy_5fkernels_2ec_31',['axpy_kernels.c',['../axpy__kernels_8c.html',1,'']]]
+  ['audio_5fzero_5fpad_5fchecked_2ec_31',['audio_zero_pad_checked.c',['../audio__zero__pad__checked_8c.html',1,'']]],
+  ['axpy_5fkernels_2ec_32',['axpy_kernels.c',['../axpy__kernels_8c.html',1,'']]]
 ];
