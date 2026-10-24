@@ -1707,9 +1707,17 @@ version/v8/scripts/ck_serve_v8.py "$RUN_DIR" --run "$RUN_DIR" \
         <code>--compare-ordinary</code> flag records this as a failing,
         artifact-bound diagnostic in
         <code>version/v8/reports/batch_prefill_gemma3_270m_20261011.json</code>.
-        The cause and which path matches the publisher reference remain
-        unverified. Mixed-step parity against decode replay does not certify
-        ordinary-prefill parity or a resolved serving deployment.
+        This older decode-replay result remains a regression diagnostic. The
+        optional <code>--batch-http-prefill-phase</code> instead selects
+        map-resolved prefill-phase arithmetic for both standalone staged rows
+        and mixed rows. Startup requires the relevant loaded entries and a row-group
+        contract of one; unsupported bundles reject the option before serving.
+        The rebuilt Gemma3-270M Q5_K_M native report in
+        <code>version/v8/reports/batch_mixed_prefill_phase_gemma3_270m_20261024.json</code>
+        compares full logits, complete KV and positions at every 10- and
+        12-token prefix in both slots. A separate isolated HTTP test observed
+        two attributed mixed streams, cancellation and a successful follow-up.
+        This does not certify longer prompts, model tools or a performance gain.
     </p>
     <p>
         The optional <code>--compare-ordinary --oracle-gguf GGUF_PATH</code>
