@@ -147,6 +147,7 @@ var ckernel__engine_8h =
     [ "ck_memcpy_parallel_dispatch", "ckernel__engine_8h.html#a0b858c39435ec012ad89b8b8c59fe08e", null ],
     [ "ck_multimodal_mrope_positions_2d", "ckernel__engine_8h.html#abd6ab9084229d028a570a77712000c46", null ],
     [ "ck_multimodal_prefix_insert_f32", "ckernel__engine_8h.html#a410a57d9f55e9b45c97df10e7ba13fd0", null ],
+    [ "ck_q5_0_q8_0_provider_name", "ckernel__engine_8h.html#a5b9c85c0df8d866b02260c12b180f453", null ],
     [ "ck_q6_k_prepared_provider_name", "ckernel__engine_8h.html#abba0f90824d1fa9862a4f98564a95430", null ],
     [ "ck_q6_k_q8_k_provider_name", "ckernel__engine_8h.html#a4add2625b432613d83486a87bdfd5da5", null ],
     [ "ck_residual_add_backward", "ckernel__engine_8h.html#a35426895690beefd7b84cf090639b169", null ],

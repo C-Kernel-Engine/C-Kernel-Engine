@@ -1,5 +1,7 @@
 var gemm__kernels__q5__0_8c =
 [
+    [ "ck_q5_0_q8_0_force_ref", "gemm__kernels__q5__0_8c.html#a59efd99d9223b8153b44b2a8962a4283", null ],
+    [ "ck_q5_0_q8_0_provider_name", "gemm__kernels__q5__0_8c.html#a5b9c85c0df8d866b02260c12b180f453", null ],
     [ "dequant_q5_0_block", "gemm__kernels__q5__0_8c.html#a22c4a007b8fe9fe8a1a9e4c3f4c3e04a", null ],
     [ "dequant_q5_0_row", "gemm__kernels__q5__0_8c.html#a4b1482bd60f21521ba08b497c5289770", null ],
     [ "dot_q5_0", "gemm__kernels__q5__0_8c.html#ac4c3c0e32b64297e71b21bde4a574999", null ],
