@@ -35,6 +35,7 @@ var ck__session__v8_8h =
     ] ],
     [ "ck_session_v8_batch2_enable", "ck__session__v8_8h.html#a59d1445dc1d62694869bc7f92aef0f76", null ],
     [ "ck_session_v8_batch2_mixed_step", "ck__session__v8_8h.html#a26a41fe7ee284398077daee78c34cdb2", null ],
+    [ "ck_session_v8_batch2_mixed_step_prefill_phase", "ck__session__v8_8h.html#afe0a54fbb8e7a723790a22efa7df5535", null ],
     [ "ck_session_v8_batch2_position", "ck__session__v8_8h.html#a104bbe7060e0fbb54bbc4068e5591254", null ],
     [ "ck_session_v8_batch2_prefill", "ck__session__v8_8h.html#a92b6b52e7a4dd1bb884c4da19a3b5015", null ],
     [ "ck_session_v8_batch2_prefill_append", "ck__session__v8_8h.html#a446ae4dc0227071eaf89db61cb492438", null ],

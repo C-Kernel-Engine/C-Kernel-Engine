@@ -1,5 +1,7 @@
 var NAVTREEINDEX20 =
 {
+"structCKLayerGradOffsets.html#a4d4316073d5fb0d152b0c2d670dada62":[1,0,39,48],
+"structCKLayerGradOffsets.html#a5383122bbd9bca1d26dc23bca84d3ef3":[1,0,39,0],
 "structCKLayerGradOffsets.html#a53ad485527d5607bbca6766b0f4727bb":[1,0,39,1],
 "structCKLayerGradOffsets.html#a5cbb9e13cf5e308e488a5cd8500ce91a":[1,0,39,11],
 "structCKLayerGradOffsets.html#a6272144a177f1aa0fd8a3ff88a84c88b":[1,0,39,37],
@@ -247,7 +249,5 @@ var NAVTREEINDEX20 =
 "structCKPlanStep.html#a07deae3fde9109078baca99987e58ad1":[1,0,55,1],
 "structCKPlanStep.html#a870b313bb3754be086178d1478aa8b9e":[1,0,55,0],
 "structCKPlanStepV2.html":[1,0,56],
-"structCKPlanStepV2.html#a1762220af86b81c437f4290195e928b1":[1,0,56,2],
-"structCKPlanStepV2.html#a22d5d759ab81944a97689a1a80456664":[1,0,56,1],
-"structCKPlanStepV2.html#a99fd1a750634dd8160937d173e7acf31":[1,0,56,3]
+"structCKPlanStepV2.html#a1762220af86b81c437f4290195e928b1":[1,0,56,2]
 };

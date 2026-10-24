@@ -7,6 +7,7 @@ var ck__model__abi__v8_8h =
     [ "ck_model_batch_decode_projection_groups_v8_fn", "ck__model__abi__v8_8h.html#a1cdf326a2d7160c4d81179fc5224193f", null ],
     [ "ck_model_batch_decode_shared_layers_v8_fn", "ck__model__abi__v8_8h.html#a52fbfb888a5c99a3d22137a9e319d220", null ],
     [ "ck_model_batch_decode_workspace_v8_fn", "ck__model__abi__v8_8h.html#a9a757cf609837314eeb3119e2b63eb2e", null ],
+    [ "ck_model_decode_batch2_mixed_prefill_v8_fn", "ck__model__abi__v8_8h.html#aa98bdf84b27cdcc60bfd0a275fd36594", null ],
     [ "ck_model_decode_batch2_v8_fn", "ck__model__abi__v8_8h.html#a4e9c3db4e47490dbca36761726a25ad8", null ],
     [ "ck_model_get_abi_version_v8_fn", "ck__model__abi__v8_8h.html#a5385b6e9bc0a739d8b8edd12cf376521", null ],
     [ "ck_model_get_capabilities_v8_fn", "ck__model__abi__v8_8h.html#a36dc8190afb9f8678f05368dcad38cee", null ],
