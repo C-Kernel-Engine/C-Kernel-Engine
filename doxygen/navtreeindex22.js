@@ -1,5 +1,8 @@
 var NAVTREEINDEX22 =
 {
+"structGEMMParams.html#a2956e1497d1e97174d5d17e872707769":[1,0,73,1],
+"structGEMMParams.html#a450121a9c76be4c90fe5326b1808eb1a":[1,0,73,3],
+"structGEMMParams.html#a6b0b003d129e3c027928ac6ad089e110":[1,0,73,2],
 "structGEMMParams.html#aa84a148f54c8ec49fec73e7b2354761c":[1,0,73,0],
 "structGEMMParams.html#adc0714de30284b4b62ecfac446979251":[1,0,73,4],
 "structMemoryInfo.html":[1,0,75],
@@ -246,8 +249,5 @@ var NAVTREEINDEX22 =
 "swiglu__kernels_8c.html#a26369aa07808fb6aae4502d54a1ba650":[2,0,1,1,125,9],
 "swiglu__kernels_8c.html#a2d1ada314dda9d7788371a08067917d6":[2,0,1,1,125,7],
 "swiglu__kernels_8c.html#a2f11fffb4367674cd2d81a375fef8067":[2,0,1,1,125,2],
-"swiglu__kernels_8c.html#a369266c24eacffb87046522897a570d5":[2,0,1,1,125,0],
-"swiglu__kernels_8c.html#a4d4e4e82751b575680dda192237167da":[2,0,1,1,125,4],
-"swiglu__kernels_8c.html#a771ec9e8b054416576cf1788ea8d3747":[2,0,1,1,125,8],
-"swiglu__kernels_8c.html#a9f878d17d42282d00f88d10c0bfd603c":[2,0,1,1,125,14]
+"swiglu__kernels_8c.html#a369266c24eacffb87046522897a570d5":[2,0,1,1,125,0]
 };
