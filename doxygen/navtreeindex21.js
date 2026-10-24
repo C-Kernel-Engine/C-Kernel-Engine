@@ -1,5 +1,7 @@
 var NAVTREEINDEX21 =
 {
+"structCKPlanBinding.html#adf2dd85574e578a94cd1fc656d077505":[1,0,54,0],
+"structCKPlanStep.html":[1,0,55],
 "structCKPlanStep.html#a07deae3fde9109078baca99987e58ad1":[1,0,55,1],
 "structCKPlanStep.html#a870b313bb3754be086178d1478aa8b9e":[1,0,55,0],
 "structCKPlanStepV2.html":[1,0,56],
@@ -247,7 +249,5 @@ var NAVTREEINDEX21 =
 "structMemoryInfo.html#ac20112f20e405d5fafdd560b3535f000":[1,0,75,4],
 "structMemoryInfo.html#ac9d849331a689ebbfa4c6e65da74f990":[1,0,75,1],
 "structMemoryInfo.html#acc92d92ac02ffaf28749375c652956e2":[1,0,75,3],
-"structMemoryInfo.html#af06394a062088cdac896d705b504ae9b":[1,0,75,12],
-"structMemoryInfo.html#af134427563f2d7794d5cb40fe77aac7f":[1,0,75,2],
-"structMemorySlot.html":[1,0,76]
+"structMemoryInfo.html#af06394a062088cdac896d705b504ae9b":[1,0,75,12]
 };

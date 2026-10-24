@@ -69,11 +69,13 @@ var NAVTREEINDEX11 =
 "ckernel__strided__unary__checked_8h.html#ace8266af93c1b83cc605aee00ae5817b":[2,0,0,48,1],
 "ckernel__strided__unary__checked_8h_source.html":[2,0,0,48],
 "ckernel__transformer__rows__checked_8h.html":[2,0,0,49],
-"ckernel__transformer__rows__checked_8h.html#a16d5992ca73c8ffc6006f4fa4c84b241":[2,0,0,49,3],
-"ckernel__transformer__rows__checked_8h.html#a5842e65a0d6b9369e8fa172596cb5048":[2,0,0,49,4],
-"ckernel__transformer__rows__checked_8h.html#a69b6c7e371e3861a728b8e331b00e4b8":[2,0,0,49,2],
+"ckernel__transformer__rows__checked_8h.html#a16d5992ca73c8ffc6006f4fa4c84b241":[2,0,0,49,5],
+"ckernel__transformer__rows__checked_8h.html#a1b0f4220fed062eec2447b49063c5dd1":[2,0,0,49,3],
+"ckernel__transformer__rows__checked_8h.html#a5842e65a0d6b9369e8fa172596cb5048":[2,0,0,49,6],
+"ckernel__transformer__rows__checked_8h.html#a69b6c7e371e3861a728b8e331b00e4b8":[2,0,0,49,4],
 "ckernel__transformer__rows__checked_8h.html#a96703045defdeab76e8db94f0051b461":[2,0,0,49,0],
-"ckernel__transformer__rows__checked_8h.html#aaa5cdc6268134450359b8bf0a83eeb45":[2,0,0,49,5],
+"ckernel__transformer__rows__checked_8h.html#aaa5cdc6268134450359b8bf0a83eeb45":[2,0,0,49,7],
+"ckernel__transformer__rows__checked_8h.html#ac6ccde6ed505aa8ddf108e7ab92ba7d6":[2,0,0,49,2],
 "ckernel__transformer__rows__checked_8h.html#ace67baa0aba90a45fb7c13187307698f":[2,0,0,49,1],
 "ckernel__transformer__rows__checked_8h_source.html":[2,0,0,49],
 "ckernel__tts_8h.html":[2,0,0,50],
@@ -247,7 +249,5 @@ var NAVTREEINDEX11 =
 "embedding__kernels__bf16_8c.html#a7c57b105fb88eb4165a0c649932be08d":[2,0,1,1,38,0],
 "embedding__kernels__bf16_8c.html#a97810f07c32705cdcee48a44525c647e":[2,0,1,1,38,3],
 "embedding__kernels__bf16_8c.html#adc97d3c00f6b59b24d8680e142ecc309":[2,0,1,1,38,1],
-"embedding__kernels__bf16_8c_source.html":[2,0,1,1,38],
-"embedding__three__table__layer__norm_8c.html":[2,0,1,1,39],
-"embedding__three__table__layer__norm_8c.html#a0e905b4259dafe335901d2ff632c8985":[2,0,1,1,39,1]
+"embedding__kernels__bf16_8c_source.html":[2,0,1,1,38]
 };

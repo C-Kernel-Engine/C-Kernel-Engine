@@ -1,5 +1,7 @@
 var NAVTREEINDEX19 =
 {
+"structCKIRNode.html#abf6244a44982d225b1f19abfa2906e8c":[1,0,27,2],
+"structCKIRNode.html#ac80c87853b9a0b35958d643481e95fc7":[1,0,27,3],
 "structCKIRV2Binding.html":[1,0,28],
 "structCKIRV2Binding.html#a0e50855a2852b3018c3b87ae5e53db19":[1,0,28,0],
 "structCKIRV2Binding.html#acbaa32705fa3caa147f63c8beecd6fe5":[1,0,28,1],
@@ -247,7 +249,5 @@ var NAVTREEINDEX19 =
 "structCKLayerGradOffsets.html#a0f042df968961329893d5a375b2ceb3d":[1,0,39,52],
 "structCKLayerGradOffsets.html#a22e21f41e2a46966632669d02fc0721d":[1,0,39,43],
 "structCKLayerGradOffsets.html#a298c68b6ec8832481837dd00c3a6fbdf":[1,0,39,44],
-"structCKLayerGradOffsets.html#a2d059e5b3e882d461ee74d459b54aeae":[1,0,39,2],
-"structCKLayerGradOffsets.html#a338e5dc53f5ef93dfa563d999e27826a":[1,0,39,21],
-"structCKLayerGradOffsets.html#a3c31cc6b97f3bc6b80d0d143a1394257":[1,0,39,47]
+"structCKLayerGradOffsets.html#a2d059e5b3e882d461ee74d459b54aeae":[1,0,39,2]
 };
