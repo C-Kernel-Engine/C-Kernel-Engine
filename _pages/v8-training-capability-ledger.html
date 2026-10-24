@@ -1,10 +1,10 @@
 <!-- TITLE: v8 Training Kernel Capability Ledger -->
 <h1>v8 training kernel capability ledger</h1>
-<p>Generated from <code>version/v8/kernel_maps/*.json</code> by <code>version/v8/scripts/build_training_capability_ledger_v8.py</code>. Source digest: <code>798a00d813c9b34a4a3e6e7acb52e4e52ba3663f8d1c3d316c44632e7b24c8af</code>; provider maps: 452.</p>
+<p>Generated from <code>version/v8/kernel_maps/*.json</code> by <code>version/v8/scripts/build_training_capability_ledger_v8.py</code>. Source digest: <code>bdbd5cdd0c6222efaa0e8e614372f6f28a17629a51c94c323854bdaac72fe620</code>; provider maps: 453.</p>
 <p>This is a <strong>map inventory, not a training PASS</strong>. A backward declaration means a backward provider is registered; it does not prove matching geometry, selection by a generated circuit, or executed PyTorch parity. BF16-tagged includes storage or arithmetic tags. Quantized forward maps do not imply quantized-base gradients or QLoRA support. Direct executed evidence: <code>NOT_MEASURED_BY_MAP_INVENTORY</code>.</p>
 <p><strong>Authoring, lowering, and execution are separate.</strong> The public <code>cke.nn</code> module list below comes from its Python source. A class existing there does not establish that v8 can lower it, select a backward provider, or certify a generated training run. Exact kernel-map operation names are not automatically equivalent to Python modules.</p>
 <table class="table"><thead><tr><th>Dtype family</th><th>Provider maps</th><th>Forward or unspecified</th><th>Declared training forward</th><th>Declared backward</th><th>Backward-named without mode</th><th>Maps with registered tests</th></tr></thead><tbody>
-<tr><td>fp32-tagged</td><td>292</td><td>268</td><td>15</td><td>24</td><td>5</td><td>251</td></tr>
+<tr><td>fp32-tagged</td><td>293</td><td>269</td><td>15</td><td>24</td><td>5</td><td>252</td></tr>
 <tr><td>bf16-tagged</td><td>81</td><td>81</td><td>0</td><td>0</td><td>0</td><td>64</td></tr>
 <tr><td>quantized</td><td>62</td><td>62</td><td>0</td><td>0</td><td>0</td><td>42</td></tr>
 <tr><td>unspecified</td><td>17</td><td>17</td><td>0</td><td>0</td><td>0</td><td>10</td></tr>
@@ -91,6 +91,7 @@
 <tr><td>fp32-tagged</td><td>audio_conv1d_dilated_checked</td><td>4</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>audio_conv2d</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>audio_conv_transpose1d_dense_checked</td><td>1</td><td>—</td><td>—</td></tr>
+<tr><td>fp32-tagged</td><td>audio_conv_transpose1d_dense_crop_right_checked</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>audio_conv_transpose1d_depthwise_checked</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>audio_duration_expand</td><td>2</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>audio_duration_logits_to_frames</td><td>1</td><td>—</td><td>—</td></tr>
@@ -258,7 +259,7 @@
 <tr><td>unspecified</td><td>speculative_commit_or_reject</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>unspecified</td><td>tokenizer</td><td>1</td><td>—</td><td>—</td></tr>
 </tbody></table>
-<details><summary>All 452 provider maps</summary>
+<details><summary>All 453 provider maps</summary>
 <table class="table"><thead><tr><th>Map</th><th>Provider ID</th><th>Operation</th><th>Dtype family</th><th>Backward mode</th><th>Registered test</th></tr></thead><tbody>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/adamw_update_f32.json">version/v8/kernel_maps/adamw_update_f32.json</a></td><td>adamw_update_f32</td><td>optimizer</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/add_rows_checked_f32.json">version/v8/kernel_maps/add_rows_checked_f32.json</a></td><td>add_rows_checked_f32</td><td>add_rows_checked</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
@@ -342,6 +343,7 @@
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/audio_conv1d_dilated_checked_channel_major_f32_hwfma.json">version/v8/kernel_maps/audio_conv1d_dilated_checked_channel_major_f32_hwfma.json</a></td><td>audio_conv1d_dilated_checked_channel_major_f32_hwfma</td><td>audio_conv1d_dilated_checked</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/audio_conv2d_whc_grouped_f32.json">version/v8/kernel_maps/audio_conv2d_whc_grouped_f32.json</a></td><td>audio_conv2d_whc_grouped_f32</td><td>audio_conv2d</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/audio_conv_transpose1d_dense_channel_major_f32_checked.json">version/v8/kernel_maps/audio_conv_transpose1d_dense_channel_major_f32_checked.json</a></td><td>audio_conv_transpose1d_dense_channel_major_f32_checked</td><td>audio_conv_transpose1d_dense_checked</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/audio_conv_transpose1d_dense_crop_right_channel_major_f32_checked.json">version/v8/kernel_maps/audio_conv_transpose1d_dense_crop_right_channel_major_f32_checked.json</a></td><td>audio_conv_transpose1d_dense_crop_right_channel_major_f32_checked</td><td>audio_conv_transpose1d_dense_crop_right_checked</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/audio_conv_transpose1d_depthwise_channel_major_f32_checked.json">version/v8/kernel_maps/audio_conv_transpose1d_depthwise_channel_major_f32_checked.json</a></td><td>audio_conv_transpose1d_depthwise_channel_major_f32_checked</td><td>audio_conv_transpose1d_depthwise_checked</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/audio_duration_expand_channel_major_f32.json">version/v8/kernel_maps/audio_duration_expand_channel_major_f32.json</a></td><td>audio_duration_expand_channel_major_f32</td><td>audio_duration_expand</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/audio_duration_expand_token_major_f32.json">version/v8/kernel_maps/audio_duration_expand_token_major_f32.json</a></td><td>audio_duration_expand_token_major_f32</td><td>audio_duration_expand</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>

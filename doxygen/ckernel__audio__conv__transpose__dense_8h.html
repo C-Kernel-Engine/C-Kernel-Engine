@@ -152,6 +152,8 @@ Enumerations</h2></td></tr>
 Functions</h2></td></tr>
 <tr class="memitem:aa19e48715196ed7d826480b39a650db8" id="r_aa19e48715196ed7d826480b39a650db8"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__audio__conv__transpose__dense_8h.html#aa19e48715196ed7d826480b39a650db8">audio_conv_transpose1d_dense_channel_major_f32_checked</a> (const float *input, size_t input_elements, size_t input_stride, const float *weight, size_t weight_elements, const float *bias, size_t bias_elements, float *output, size_t output_elements, size_t output_stride, float *scratch, size_t scratch_elements, size_t input_channels, size_t output_channels, size_t input_frames, size_t kernel_size, size_t stride, size_t padding, size_t output_padding, size_t output_frames)</td></tr>
 <tr class="separator:aa19e48715196ed7d826480b39a650db8"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a0a22dfde9c1d1752f7be8ad6dd3950b3" id="r_a0a22dfde9c1d1752f7be8ad6dd3950b3"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__audio__conv__transpose__dense_8h.html#a0a22dfde9c1d1752f7be8ad6dd3950b3">audio_conv_transpose1d_dense_crop_right_channel_major_f32_checked</a> (const float *input, size_t input_elements, size_t input_stride, const float *weight, size_t weight_elements, const float *bias, size_t bias_elements, float *output, size_t output_elements, size_t output_stride, float *scratch, size_t scratch_elements, size_t input_channels, size_t output_channels, size_t input_frames, size_t kernel_size, size_t stride, size_t padding, size_t output_padding, size_t right_crop, size_t output_frames)</td></tr>
+<tr class="separator:a0a22dfde9c1d1752f7be8ad6dd3950b3"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a208e97df27cc82830c83f353a9b4084a" id="r_a208e97df27cc82830c83f353a9b4084a"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__audio__conv__transpose__dense_8h.html#a208e97df27cc82830c83f353a9b4084a">audio_conv_transpose1d_dense_f32_workspace</a> (size_t output_channels, size_t output_frames, size_t *scratch_elements)</td></tr>
 <tr class="separator:a208e97df27cc82830c83f353a9b4084a"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
@@ -326,90 +328,170 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="audio__conv__transpose__dense__checked_8c_source.html#l00018">18</a> of file <a class="el" href="audio__conv__transpose__dense__checked_8c_source.html">audio_conv_transpose_dense_checked.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   26</span>                                                 {</div>
-<div class="line"><span class="lineno">   27</span>    <span class="keywordtype">size_t</span> geometry, input_span, output_span, weight_need, scratch_need;</div>
-<div class="line"><span class="lineno">   28</span>    <span class="keywordflow">if</span> (!input_channels || !output_channels || !input_frames ||</div>
-<div class="line"><span class="lineno">   29</span>        !kernel_size || !stride || !output_frames || output_padding &gt;= stride)</div>
-<div class="line"><span class="lineno">   30</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__transpose__dense_8h.html#aa5e1c878ae2734c1855db8c8c94a7c87a9a84947034b8ac4880beeb36e477b8a5">CK_AUDIO_DECONV_DENSE_INVALID</a>;</div>
-<div class="line"><span class="lineno">   31</span>    <span class="keywordflow">if</span> (input_frames - 1 &gt; SIZE_MAX / stride || padding &gt; SIZE_MAX / 2)</div>
-<div class="line"><span class="lineno">   32</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__transpose__dense_8h.html#aa5e1c878ae2734c1855db8c8c94a7c87abbab5fbccb3eff64cdf383298887fb77">CK_AUDIO_DECONV_DENSE_OVERFLOW</a>;</div>
-<div class="line"><span class="lineno">   33</span>    geometry = (input_frames - 1) * stride;</div>
-<div class="line"><span class="lineno">   34</span>    <span class="keywordflow">if</span> (geometry &gt; SIZE_MAX - kernel_size ||</div>
-<div class="line"><span class="lineno">   35</span>        geometry + kernel_size &gt; SIZE_MAX - output_padding)</div>
-<div class="line"><span class="lineno">   36</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__transpose__dense_8h.html#aa5e1c878ae2734c1855db8c8c94a7c87abbab5fbccb3eff64cdf383298887fb77">CK_AUDIO_DECONV_DENSE_OVERFLOW</a>;</div>
-<div class="line"><span class="lineno">   37</span>    geometry += kernel_size + output_padding;</div>
-<div class="line"><span class="lineno">   38</span>    <span class="keywordflow">if</span> (2 * padding &gt;= geometry || geometry - 2 * padding != output_frames)</div>
-<div class="line"><span class="lineno">   39</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__transpose__dense_8h.html#aa5e1c878ae2734c1855db8c8c94a7c87a9a84947034b8ac4880beeb36e477b8a5">CK_AUDIO_DECONV_DENSE_INVALID</a>;</div>
-<div class="line"><span class="lineno">   40</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="checked__float__buffer_8h.html#a80fa111d42598d70e6c6728193a1f8dc">ck_checked_span</a>(input_channels, input_frames, input_stride,</div>
-<div class="line"><span class="lineno">   41</span>                         &amp;input_span) ||</div>
-<div class="line"><span class="lineno">   42</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#a80fa111d42598d70e6c6728193a1f8dc">ck_checked_span</a>(output_channels, output_frames, output_stride,</div>
-<div class="line"><span class="lineno">   43</span>                         &amp;output_span) ||</div>
-<div class="line"><span class="lineno">   44</span>        input_channels &gt; SIZE_MAX / output_channels ||</div>
-<div class="line"><span class="lineno">   45</span>        input_channels * output_channels &gt; SIZE_MAX / kernel_size ||</div>
-<div class="line"><span class="lineno">   46</span>        <a class="code hl_function" href="audio__conv__transpose__dense__checked_8c.html#a208e97df27cc82830c83f353a9b4084a">audio_conv_transpose1d_dense_f32_workspace</a>(</div>
-<div class="line"><span class="lineno">   47</span>            output_channels, output_frames, &amp;scratch_need))</div>
-<div class="line"><span class="lineno">   48</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__transpose__dense_8h.html#aa5e1c878ae2734c1855db8c8c94a7c87abbab5fbccb3eff64cdf383298887fb77">CK_AUDIO_DECONV_DENSE_OVERFLOW</a>;</div>
-<div class="line"><span class="lineno">   49</span>    weight_need = input_channels * output_channels * kernel_size;</div>
-<div class="line"><span class="lineno">   50</span>    <span class="keywordflow">if</span> (weight_need &gt; SIZE_MAX / <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>))</div>
-<div class="line"><span class="lineno">   51</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__transpose__dense_8h.html#aa5e1c878ae2734c1855db8c8c94a7c87abbab5fbccb3eff64cdf383298887fb77">CK_AUDIO_DECONV_DENSE_OVERFLOW</a>;</div>
-<div class="line"><span class="lineno">   52</span>    <span class="keywordflow">if</span> (input_elements &lt; input_span || weight_elements &lt; weight_need ||</div>
-<div class="line"><span class="lineno">   53</span>        bias_elements &lt; output_channels || output_elements &lt; output_span ||</div>
-<div class="line"><span class="lineno">   54</span>        scratch_elements &lt; scratch_need)</div>
-<div class="line"><span class="lineno">   55</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__transpose__dense_8h.html#aa5e1c878ae2734c1855db8c8c94a7c87a277fbb88aad2cbc8d4ab346d7b82a35f">CK_AUDIO_DECONV_DENSE_CAPACITY</a>;</div>
-<div class="line"><span class="lineno">   56</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(input, input_span) ||</div>
-<div class="line"><span class="lineno">   57</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(weight, weight_need) ||</div>
-<div class="line"><span class="lineno">   58</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(bias, output_channels) ||</div>
-<div class="line"><span class="lineno">   59</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(output, output_span) ||</div>
-<div class="line"><span class="lineno">   60</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(scratch, scratch_need) ||</div>
-<div class="line"><span class="lineno">   61</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(output, output_span, input, input_span) ||</div>
-<div class="line"><span class="lineno">   62</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(output, output_span, weight, weight_need) ||</div>
-<div class="line"><span class="lineno">   63</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(output, output_span, bias, output_channels) ||</div>
-<div class="line"><span class="lineno">   64</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(output, output_span, scratch, scratch_need) ||</div>
-<div class="line"><span class="lineno">   65</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(scratch, scratch_need, input, input_span) ||</div>
-<div class="line"><span class="lineno">   66</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(scratch, scratch_need, weight, weight_need) ||</div>
-<div class="line"><span class="lineno">   67</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(scratch, scratch_need, bias, output_channels))</div>
-<div class="line"><span class="lineno">   68</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__transpose__dense_8h.html#aa5e1c878ae2734c1855db8c8c94a7c87a9a84947034b8ac4880beeb36e477b8a5">CK_AUDIO_DECONV_DENSE_INVALID</a>;</div>
-<div class="line"><span class="lineno">   69</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a>(weight, weight_need) ||</div>
-<div class="line"><span class="lineno">   70</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a>(bias, output_channels))</div>
-<div class="line"><span class="lineno">   71</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__transpose__dense_8h.html#aa5e1c878ae2734c1855db8c8c94a7c87acf92cc8a3a6986dcaec11610e564a3fd">CK_AUDIO_DECONV_DENSE_NONFINITE</a>;</div>
-<div class="line"><span class="lineno">   72</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> ic = 0; ic &lt; input_channels; ++ic)</div>
-<div class="line"><span class="lineno">   73</span>        <span class="keywordflow">if</span> (!<a class="code hl_function" href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a>(input + ic * input_stride, input_frames))</div>
-<div class="line"><span class="lineno">   74</span>            <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__transpose__dense_8h.html#aa5e1c878ae2734c1855db8c8c94a7c87acf92cc8a3a6986dcaec11610e564a3fd">CK_AUDIO_DECONV_DENSE_NONFINITE</a>;</div>
-<div class="line"><span class="lineno">   75</span> </div>
-<div class="line"><span class="lineno">   76</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> oc = 0; oc &lt; output_channels; ++oc)</div>
-<div class="line"><span class="lineno">   77</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> frame = 0; frame &lt; output_frames; ++frame)</div>
-<div class="line"><span class="lineno">   78</span>            scratch[oc * output_frames + frame] = bias[oc];</div>
-<div class="line"><span class="lineno">   79</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> ic = 0; ic &lt; input_channels; ++ic)</div>
-<div class="line"><span class="lineno">   80</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> frame = 0; frame &lt; input_frames; ++frame)</div>
-<div class="line"><span class="lineno">   81</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> tap = 0; tap &lt; kernel_size; ++tap) {</div>
-<div class="line"><span class="lineno">   82</span>                <span class="keywordtype">size_t</span> target = frame * stride + tap;</div>
-<div class="line"><span class="lineno">   83</span>                <span class="keywordflow">if</span> (target &lt; padding || target - padding &gt;= output_frames)</div>
-<div class="line"><span class="lineno">   84</span>                    <span class="keywordflow">continue</span>;</div>
-<div class="line"><span class="lineno">   85</span>                <span class="keywordtype">size_t</span> out_frame = target - padding;</div>
-<div class="line"><span class="lineno">   86</span>                <span class="keywordtype">float</span> value = input[ic * input_stride + frame];</div>
-<div class="line"><span class="lineno">   87</span>                <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> oc = 0; oc &lt; output_channels; ++oc) {</div>
-<div class="line"><span class="lineno">   88</span>                    <span class="keywordtype">size_t</span> index = oc * output_frames + out_frame;</div>
-<div class="line"><span class="lineno">   89</span>                    scratch[index] = fmaf(value,</div>
-<div class="line"><span class="lineno">   90</span>                        weight[(ic * output_channels + oc) * kernel_size + tap],</div>
-<div class="line"><span class="lineno">   91</span>                        scratch[index]);</div>
-<div class="line"><span class="lineno">   92</span>                }</div>
-<div class="line"><span class="lineno">   93</span>            }</div>
-<div class="line"><span class="lineno">   94</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a>(scratch, scratch_need))</div>
-<div class="line"><span class="lineno">   95</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__transpose__dense_8h.html#aa5e1c878ae2734c1855db8c8c94a7c87acf92cc8a3a6986dcaec11610e564a3fd">CK_AUDIO_DECONV_DENSE_NONFINITE</a>;</div>
-<div class="line"><span class="lineno">   96</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> oc = 0; oc &lt; output_channels; ++oc)</div>
-<div class="line"><span class="lineno">   97</span>        memcpy(output + oc * output_stride,</div>
-<div class="line"><span class="lineno">   98</span>               scratch + oc * output_frames,</div>
-<div class="line"><span class="lineno">   99</span>               output_frames * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">  100</span>    <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__audio__conv__transpose__dense_8h.html#aa5e1c878ae2734c1855db8c8c94a7c87a9b247b3d473430d985d203700c462fad">CK_AUDIO_DECONV_DENSE_OK</a>;</div>
-<div class="line"><span class="lineno">  101</span>}</div>
-<div class="ttc" id="aaudio__conv__transpose__dense__checked_8c_html_a208e97df27cc82830c83f353a9b4084a"><div class="ttname"><a href="audio__conv__transpose__dense__checked_8c.html#a208e97df27cc82830c83f353a9b4084a">audio_conv_transpose1d_dense_f32_workspace</a></div><div class="ttdeci">int audio_conv_transpose1d_dense_f32_workspace(size_t output_channels, size_t output_frames, size_t *scratch_elements)</div><div class="ttdef"><b>Definition</b> <a href="audio__conv__transpose__dense__checked_8c_source.html#l00008">audio_conv_transpose_dense_checked.c:8</a></div></div>
-<div class="ttc" id="achecked__float__buffer_8h_html_a1b266161b71bde9ca8d45c2fb5ac889a"><div class="ttname"><a href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a></div><div class="ttdeci">static int ck_checked_finite(const float *ptr, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00019">checked_float_buffer.h:19</a></div></div>
-<div class="ttc" id="achecked__float__buffer_8h_html_a80fa111d42598d70e6c6728193a1f8dc"><div class="ttname"><a href="checked__float__buffer_8h.html#a80fa111d42598d70e6c6728193a1f8dc">ck_checked_span</a></div><div class="ttdeci">static int ck_checked_span(size_t rows, size_t width, size_t stride, size_t *span)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00006">checked_float_buffer.h:6</a></div></div>
-<div class="ttc" id="achecked__float__buffer_8h_html_ada07e31487d86edb37408386003ac841"><div class="ttname"><a href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a></div><div class="ttdeci">static int ck_checked_region(const float *ptr, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00011">checked_float_buffer.h:11</a></div></div>
-<div class="ttc" id="achecked__float__buffer_8h_html_af87b7012571dc9a40b8e31c52e773abe"><div class="ttname"><a href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a></div><div class="ttdeci">static int ck_checked_overlap(const float *a, size_t na, const float *b, size_t nb)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00015">checked_float_buffer.h:15</a></div></div>
+<p class="definition">Definition at line <a class="el" href="audio__conv__transpose__dense__checked_8c_source.html#l00104">104</a> of file <a class="el" href="audio__conv__transpose__dense__checked_8c_source.html">audio_conv_transpose_dense_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  112</span>                                                 {</div>
+<div class="line"><span class="lineno">  113</span>    <span class="keywordflow">return</span> <a class="code hl_function" href="audio__conv__transpose__dense__checked_8c.html#afc85c8cb90d575189f27a12887ff7eec">dense_deconv_checked</a>(input, input_elements, input_stride,</div>
+<div class="line"><span class="lineno">  114</span>        weight, weight_elements, bias, bias_elements, output,</div>
+<div class="line"><span class="lineno">  115</span>        output_elements, output_stride, scratch, scratch_elements,</div>
+<div class="line"><span class="lineno">  116</span>        input_channels, output_channels, input_frames, kernel_size,</div>
+<div class="line"><span class="lineno">  117</span>        stride, padding, output_padding, 0, output_frames);</div>
+<div class="line"><span class="lineno">  118</span>}</div>
+<div class="ttc" id="aaudio__conv__transpose__dense__checked_8c_html_afc85c8cb90d575189f27a12887ff7eec"><div class="ttname"><a href="audio__conv__transpose__dense__checked_8c.html#afc85c8cb90d575189f27a12887ff7eec">dense_deconv_checked</a></div><div class="ttdeci">static int dense_deconv_checked(const float *input, size_t input_elements, size_t input_stride, const float *weight, size_t weight_elements, const float *bias, size_t bias_elements, float *output, size_t output_elements, size_t output_stride, float *scratch, size_t scratch_elements, size_t input_channels, size_t output_channels, size_t input_frames, size_t kernel_size, size_t stride, size_t padding, size_t output_padding, size_t right_crop, size_t output_frames)</div><div class="ttdef"><b>Definition</b> <a href="audio__conv__transpose__dense__checked_8c_source.html#l00018">audio_conv_transpose_dense_checked.c:18</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="audio__conv__transpose__dense__checked_8c_source.html#l00008">audio_conv_transpose1d_dense_f32_workspace()</a>, <a class="el" href="ckernel__audio__conv__transpose__dense_8h_source.html#l00013">CK_AUDIO_DECONV_DENSE_CAPACITY</a>, <a class="el" href="ckernel__audio__conv__transpose__dense_8h_source.html#l00012">CK_AUDIO_DECONV_DENSE_INVALID</a>, <a class="el" href="ckernel__audio__conv__transpose__dense_8h_source.html#l00014">CK_AUDIO_DECONV_DENSE_NONFINITE</a>, <a class="el" href="ckernel__audio__conv__transpose__dense_8h_source.html#l00011">CK_AUDIO_DECONV_DENSE_OK</a>, <a class="el" href="ckernel__audio__conv__transpose__dense_8h_source.html#l00015">CK_AUDIO_DECONV_DENSE_OVERFLOW</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00019">ck_checked_finite()</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00015">ck_checked_overlap()</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00011">ck_checked_region()</a>, and <a class="el" href="checked__float__buffer_8h_source.html#l00006">ck_checked_span()</a>.</p>
+<p class="reference">References <a class="el" href="audio__conv__transpose__dense__checked_8c_source.html#l00018">dense_deconv_checked()</a>.</p>
+
+</div>
+</div>
+<a id="a0a22dfde9c1d1752f7be8ad6dd3950b3" name="a0a22dfde9c1d1752f7be8ad6dd3950b3"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a0a22dfde9c1d1752f7be8ad6dd3950b3">&#9670;&#160;</a></span>audio_conv_transpose1d_dense_crop_right_channel_major_f32_checked()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int audio_conv_transpose1d_dense_crop_right_channel_major_f32_checked </td>
+          <td>(</td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>input</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>input_elements</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>input_stride</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>weight</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>weight_elements</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>bias</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>bias_elements</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>output</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>output_elements</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>output_stride</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>scratch</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>scratch_elements</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>input_channels</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>output_channels</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>input_frames</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>kernel_size</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>stride</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>padding</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>output_padding</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>right_crop</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>output_frames</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="audio__conv__transpose__dense__checked_8c_source.html#l00120">120</a> of file <a class="el" href="audio__conv__transpose__dense__checked_8c_source.html">audio_conv_transpose_dense_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  128</span>                                                                    {</div>
+<div class="line"><span class="lineno">  129</span>    <span class="keywordflow">return</span> <a class="code hl_function" href="audio__conv__transpose__dense__checked_8c.html#afc85c8cb90d575189f27a12887ff7eec">dense_deconv_checked</a>(input, input_elements, input_stride,</div>
+<div class="line"><span class="lineno">  130</span>        weight, weight_elements, bias, bias_elements, output,</div>
+<div class="line"><span class="lineno">  131</span>        output_elements, output_stride, scratch, scratch_elements,</div>
+<div class="line"><span class="lineno">  132</span>        input_channels, output_channels, input_frames, kernel_size,</div>
+<div class="line"><span class="lineno">  133</span>        stride, padding, output_padding, right_crop, output_frames);</div>
+<div class="line"><span class="lineno">  134</span>}</div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="audio__conv__transpose__dense__checked_8c_source.html#l00018">dense_deconv_checked()</a>.</p>
 
 </div>
 </div>
@@ -457,7 +539,7 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="ckernel__audio__conv__transpose__dense_8h_source.html#l00011">CK_AUDIO_DECONV_DENSE_OK</a>, and <a class="el" href="ckernel__audio__conv__transpose__dense_8h_source.html#l00015">CK_AUDIO_DECONV_DENSE_OVERFLOW</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="audio__conv__transpose__dense__checked_8c_source.html#l00018">audio_conv_transpose1d_dense_channel_major_f32_checked()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="audio__conv__transpose__dense__checked_8c_source.html#l00018">dense_deconv_checked()</a>.</p>
 
 </div>
 </div>

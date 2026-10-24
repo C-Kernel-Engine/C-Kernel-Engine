@@ -8,5 +8,6 @@ var ckernel__audio__conv__transpose__dense_8h =
       [ "CK_AUDIO_DECONV_DENSE_OVERFLOW", "ckernel__audio__conv__transpose__dense_8h.html#aa5e1c878ae2734c1855db8c8c94a7c87abbab5fbccb3eff64cdf383298887fb77", null ]
     ] ],
     [ "audio_conv_transpose1d_dense_channel_major_f32_checked", "ckernel__audio__conv__transpose__dense_8h.html#aa19e48715196ed7d826480b39a650db8", null ],
+    [ "audio_conv_transpose1d_dense_crop_right_channel_major_f32_checked", "ckernel__audio__conv__transpose__dense_8h.html#a0a22dfde9c1d1752f7be8ad6dd3950b3", null ],
     [ "audio_conv_transpose1d_dense_f32_workspace", "ckernel__audio__conv__transpose__dense_8h.html#a208e97df27cc82830c83f353a9b4084a", null ]
 ];

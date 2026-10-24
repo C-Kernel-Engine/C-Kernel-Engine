@@ -122,8 +122,10 @@ var NAVTREEINDEX1 =
 "audio__conv1d__parallel_8c.html#afad75a366cecacf111fc43dd7db4239a":[2,0,1,1,15,1],
 "audio__conv1d__parallel_8c_source.html":[2,0,1,1,15],
 "audio__conv__transpose__dense__checked_8c.html":[2,0,1,1,16],
-"audio__conv__transpose__dense__checked_8c.html#a208e97df27cc82830c83f353a9b4084a":[2,0,1,1,16,1],
+"audio__conv__transpose__dense__checked_8c.html#a0a22dfde9c1d1752f7be8ad6dd3950b3":[2,0,1,1,16,1],
+"audio__conv__transpose__dense__checked_8c.html#a208e97df27cc82830c83f353a9b4084a":[2,0,1,1,16,2],
 "audio__conv__transpose__dense__checked_8c.html#aa19e48715196ed7d826480b39a650db8":[2,0,1,1,16,0],
+"audio__conv__transpose__dense__checked_8c.html#afc85c8cb90d575189f27a12887ff7eec":[2,0,1,1,16,3],
 "audio__conv__transpose__dense__checked_8c_source.html":[2,0,1,1,16],
 "audio__duration__expand_8c.html":[2,0,1,1,17],
 "audio__duration__expand_8c.html#ac24cccf1fbd382d1067650282f3c3ed3":[2,0,1,1,17,0],
@@ -247,7 +249,5 @@ var NAVTREEINDEX1 =
 "audio__stft__mag__phase__checked_8c.html#a48bda373a0ae127afdb407f0034160e3":[2,0,1,1,30,3],
 "audio__stft__mag__phase__checked_8c.html#ab12498e6333b4a49fccb6675a222f4dd":[2,0,1,1,30,5],
 "audio__stft__mag__phase__checked_8c.html#ae0593aa06c49414f5c9130fef1ef4021":[2,0,1,1,30,4],
-"audio__stft__mag__phase__checked_8c_source.html":[2,0,1,1,30],
-"audio__text__embedding_8c.html":[2,0,1,1,31],
-"audio__text__embedding_8c.html#a9767092c3dd433c75a9cfec16c7762fa":[2,0,1,1,31,0]
+"audio__stft__mag__phase__checked_8c_source.html":[2,0,1,1,30]
 };
