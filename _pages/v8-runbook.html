@@ -1517,6 +1517,30 @@ make test-native-session-v8</pre>
         edit in a disposable worktree. That does not certify general edit-and-test
         reliability, cancellation recovery, or 262K actual input.
     </p>
+    <p>
+        The Nemotron Nano 9B v2 and Cohere Command R7B Q4_K_M GGUF circuits now
+        reference publisher-template serving profiles. Fresh 2,048-token generated
+        bundles matched pinned short prompt token IDs: two Nemotron chat cases and
+        its 223-token tool-declaration case against the publisher tokenizer, plus
+        one Cohere chat case against llama.cpp's GGUF tokenizer. These are tokenization
+        checks, not full-model numerical or harness certification.
+        Nemotron's optional <code>tools</code> variant selects the publisher's
+        <code>&lt;TOOLCALL&gt;</code> JSON-array protocol. Deterministic HTTP tests cover
+        streaming, argument preservation, tool-result continuation, malformed calls,
+        and recovery. A separately rebuilt P3 Nemotron bundle completed a real
+        short HTTP tool call for <code>read_file</code> with preserved arguments,
+        accepted a correlated result, and returned a final answer. Short chat and
+        streaming Responses also completed with the publisher's
+        <code>/no_think</code> control. This is a bounded 2,048-token tool round trip;
+        a coding harness task, repeated recovery, longer prompts, and full-model
+        numerical certification remain untested.
+        A fresh P3 Cohere bundle completed short Chat Completions and streaming
+        Responses, both answering <code>Hello!</code>. Its undeclared tool request
+        returned 501, and the next chat request succeeded on the same server.
+        The imported Cohere GGUF default template does not render supplied function
+        tools, so its profile remains chat-only. A usable Cohere tool harness requires
+        a verified publisher tool variant and an independently tested output parser.
+    </p>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
 <pre>RUN_DIR=/path/to/dedicated/qwen38-generated-runtime

@@ -1,12 +1,12 @@
 {
   "chat_scope_counts": {
     "component": 70,
-    "linked_chat_declaration": 6,
-    "text_decoder_candidate": 13,
+    "linked_chat_declaration": 8,
+    "text_decoder_candidate": 11,
     "unassessed": 4
   },
   "circuit_count": 93,
-  "circuit_linked_count": 6,
+  "circuit_linked_count": 8,
   "rows": [
     {
       "artifact": {
@@ -93,11 +93,11 @@
         "revision": null,
         "tokenizer_sha256": null
       },
-      "chat_scope": "text_decoder_candidate",
-      "chat_scope_reason": "text decoder and token/logit contracts; serving unlinked",
+      "chat_scope": "linked_chat_declaration",
+      "chat_scope_reason": "circuit references a resolved serving profile",
       "circuit": "cohere2",
       "circuit_path": "version/v8/circuits/cohere2.json",
-      "circuit_sha256": "06b49b9fdcba2f2b15723039165b6b491dbd28172ea3bcf77a5d4277e2ceb4a2",
+      "circuit_sha256": "112c7af4e340aeb049e24138f8d79a4d86a00747c66fe3f44b03202cef2467f7",
       "evidence": {
         "cancellation_recovery": "not_assessed",
         "exact_token_ids": "not_assessed",
@@ -109,18 +109,26 @@
         "tool_round_trip": "not_assessed"
       },
       "family": "cohere2",
-      "input_modalities": null,
-      "output_protocol": null,
-      "profile_id": null,
-      "profile_ref": null,
-      "profile_sha256": null,
-      "publisher_template": null,
+      "input_modalities": [
+        "text"
+      ],
+      "output_protocol": "none",
+      "profile_id": "cohere2-v1",
+      "profile_ref": "serving_profiles/cohere2_v1.json",
+      "profile_sha256": "bc2d821df5ee589f51fd241b61ed4a74ad46b804f8eea198e6aab372e5f115ee",
+      "publisher_template": {
+        "source": "publisher",
+        "variant": "default"
+      },
       "reasoning_protocol": null,
-      "renderer": null,
-      "serving_declaration": "missing",
+      "renderer": "jinja-chat-v1",
+      "serving_declaration": "circuit_linked",
       "stop_policy": null,
-      "tool_template": null,
-      "variant": null
+      "tool_template": {
+        "source": "publisher",
+        "variant": "default"
+      },
+      "variant": "chat"
     },
     {
       "artifact": {
@@ -2747,11 +2755,11 @@
         "revision": null,
         "tokenizer_sha256": null
       },
-      "chat_scope": "text_decoder_candidate",
-      "chat_scope_reason": "text decoder and token/logit contracts; serving unlinked",
+      "chat_scope": "linked_chat_declaration",
+      "chat_scope_reason": "circuit references a resolved serving profile",
       "circuit": "nemotron_h",
       "circuit_path": "version/v8/circuits/nemotron_h.json",
-      "circuit_sha256": "b7f6e67ed33d0e8369131864183702bc0fbcc7456a79e262156e4c409dc5ffcc",
+      "circuit_sha256": "b87554bf96de275e4c04242ece6732a2dea758c363e0a8b3f0ac9f89d648628d",
       "evidence": {
         "cancellation_recovery": "not_assessed",
         "exact_token_ids": "not_assessed",
@@ -2763,18 +2771,26 @@
         "tool_round_trip": "not_assessed"
       },
       "family": "nemotron_h",
-      "input_modalities": null,
-      "output_protocol": null,
-      "profile_id": null,
-      "profile_ref": null,
-      "profile_sha256": null,
-      "publisher_template": null,
+      "input_modalities": [
+        "text"
+      ],
+      "output_protocol": "none",
+      "profile_id": "nemotron-h-v1",
+      "profile_ref": "serving_profiles/nemotron_h_v1.json",
+      "profile_sha256": "0aefa787e19ad83077aa9efc54c01e1051d6f1f042fb84e6a745dcb74c68ee8a",
+      "publisher_template": {
+        "source": "publisher",
+        "variant": "default"
+      },
       "reasoning_protocol": null,
-      "renderer": null,
-      "serving_declaration": "missing",
+      "renderer": "jinja-chat-v1",
+      "serving_declaration": "circuit_linked",
       "stop_policy": null,
-      "tool_template": null,
-      "variant": null
+      "tool_template": {
+        "source": "publisher",
+        "variant": "default"
+      },
+      "variant": "chat"
     },
     {
       "artifact": {
