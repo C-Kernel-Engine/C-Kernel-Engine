@@ -1,5 +1,14 @@
 var NAVTREEINDEX20 =
 {
+"structCKLayerForwardParamsQ4K.html#ad6e110f69299b040cd07f83ed612548b":[1,0,38,43],
+"structCKLayerForwardParamsQ4K.html#ad73e1dbeb642314392d9bd140dd0aff8":[1,0,38,15],
+"structCKLayerForwardParamsQ4K.html#ad7671a4ac45c1d65be5e28c03c700d2a":[1,0,38,48],
+"structCKLayerForwardParamsQ4K.html#ad8373aa2774d6b69c1e4ea1d151d2646":[1,0,38,11],
+"structCKLayerForwardParamsQ4K.html#ada91d4c0f5e6040aca475655f7f1bcab":[1,0,38,2],
+"structCKLayerForwardParamsQ4K.html#af0407fc50e027301417628d774a41ff3":[1,0,38,22],
+"structCKLayerForwardParamsQ4K.html#af9afcd6bc50e22482a16dd1237aee02e":[1,0,38,16],
+"structCKLayerForwardParamsQ4K.html#afae06ea5bb1f1d1aed99a1bfd54dd6bf":[1,0,38,18],
+"structCKLayerGradOffsets.html":[1,0,39],
 "structCKLayerGradOffsets.html#a00bd2969b569fa381be440e4e6f9cb4a":[1,0,39,17],
 "structCKLayerGradOffsets.html#a020b61adaa42a2b67579be3ce01f4d4c":[1,0,39,19],
 "structCKLayerGradOffsets.html#a09f74e154441a54bddb99ab67a961235":[1,0,39,9],
@@ -240,14 +249,5 @@ var NAVTREEINDEX20 =
 "structCKModelConfig.html#a97a73a9bfbe5b159083d6048c9cc4712":[1,0,52,3],
 "structCKModelConfig.html#ab06cae54dbee02ac43cc9bbf81c5e22f":[1,0,52,14],
 "structCKModelConfig.html#ab9893d601d7e6c7b03e255fe83b4dab7":[1,0,52,19],
-"structCKModelConfig.html#ad2b6c5944307859fe26f4d915d089027":[1,0,52,18],
-"structCKModelConfig.html#add8cceba6c14fd375e8e6b4320e9df98":[1,0,52,13],
-"structCKModelConfig.html#ae7ab37061b5249887af28ef7eb481377":[1,0,52,15],
-"structCKModelConfig.html#afd04ffe4db48600b90f32904c49d73af":[1,0,52,4],
-"structCKModelRuntimeDescriptorV8.html":[1,0,53],
-"structCKModelRuntimeDescriptorV8.html#a091b5afa9a16fa6614aabe006ce8ebe8":[1,0,53,9],
-"structCKModelRuntimeDescriptorV8.html#a0d617809f817677c4f5297ae16ddf05c":[1,0,53,2],
-"structCKModelRuntimeDescriptorV8.html#a1c05637dda33b9c3abcec4e34fffec57":[1,0,53,3],
-"structCKModelRuntimeDescriptorV8.html#a69bdc18d9035ad0958631dcf7f9243c4":[1,0,53,5],
-"structCKModelRuntimeDescriptorV8.html#a7230fff85cda3eb99e6a7e26469dfd9b":[1,0,53,1]
+"structCKModelConfig.html#ad2b6c5944307859fe26f4d915d089027":[1,0,52,18]
 };

@@ -1,5 +1,14 @@
 var NAVTREEINDEX21 =
 {
+"structCKModelConfig.html#add8cceba6c14fd375e8e6b4320e9df98":[1,0,52,13],
+"structCKModelConfig.html#ae7ab37061b5249887af28ef7eb481377":[1,0,52,15],
+"structCKModelConfig.html#afd04ffe4db48600b90f32904c49d73af":[1,0,52,4],
+"structCKModelRuntimeDescriptorV8.html":[1,0,53],
+"structCKModelRuntimeDescriptorV8.html#a091b5afa9a16fa6614aabe006ce8ebe8":[1,0,53,9],
+"structCKModelRuntimeDescriptorV8.html#a0d617809f817677c4f5297ae16ddf05c":[1,0,53,2],
+"structCKModelRuntimeDescriptorV8.html#a1c05637dda33b9c3abcec4e34fffec57":[1,0,53,3],
+"structCKModelRuntimeDescriptorV8.html#a69bdc18d9035ad0958631dcf7f9243c4":[1,0,53,5],
+"structCKModelRuntimeDescriptorV8.html#a7230fff85cda3eb99e6a7e26469dfd9b":[1,0,53,1],
 "structCKModelRuntimeDescriptorV8.html#aac257f1176bc4823b6e7334638fc9537":[1,0,53,10],
 "structCKModelRuntimeDescriptorV8.html#ab0bb22f4a933cd1eb8d4603b8391f950":[1,0,53,6],
 "structCKModelRuntimeDescriptorV8.html#abd5584742189913e789e7d705fc3196d":[1,0,53,8],
@@ -240,14 +249,5 @@ var NAVTREEINDEX21 =
 "structGEMMParams.html":[1,0,73],
 "structGEMMParams.html#a2956e1497d1e97174d5d17e872707769":[1,0,73,1],
 "structGEMMParams.html#a450121a9c76be4c90fe5326b1808eb1a":[1,0,73,3],
-"structGEMMParams.html#a6b0b003d129e3c027928ac6ad089e110":[1,0,73,2],
-"structGEMMParams.html#aa84a148f54c8ec49fec73e7b2354761c":[1,0,73,0],
-"structGEMMParams.html#adc0714de30284b4b62ecfac446979251":[1,0,73,4],
-"structMemoryInfo.html":[1,0,75],
-"structMemoryInfo.html#a0ff8aa8993baa2138de40490c4545fff":[1,0,75,10],
-"structMemoryInfo.html#a2409920ad9ccdec3d75c1d81f1a664d2":[1,0,75,11],
-"structMemoryInfo.html#a3f07269515a43e096aa98be0daa48f46":[1,0,75,7],
-"structMemoryInfo.html#a4a595e517746ef202bb268465dd605b4":[1,0,75,5],
-"structMemoryInfo.html#a53dbc361ce7012951ceff084c52b17b9":[1,0,75,15],
-"structMemoryInfo.html#a558d233f4cd92a4c8fcde4e49da7db9d":[1,0,75,14]
+"structGEMMParams.html#a6b0b003d129e3c027928ac6ad089e110":[1,0,73,2]
 };

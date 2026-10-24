@@ -4,6 +4,7 @@ var gemm__kernels__q5__k_8c =
     [ "QK_K", "gemm__kernels__q5__k_8c.html#afd2f43dcca46f268b2008cb200198e50", null ],
     [ "ck_q5_k_prepare_weight", "gemm__kernels__q5__k_8c.html#a1d2c4fe4bf009a92a62d7d7b803b78e2", null ],
     [ "ck_q5_k_prepared_block_size", "gemm__kernels__q5__k_8c.html#ab79f02085140f8d858ae1ab0ef6f58fe", null ],
+    [ "ck_q5_k_provider_name", "gemm__kernels__q5__k_8c.html#a1fec6ff921a77aeb416b74b5e24aa6bc", null ],
     [ "ck_q5k_debug_fp32_fallback", "gemm__kernels__q5__k_8c.html#a97d5f32d99bfce1027e26f89ef4d09de", null ],
     [ "ck_q5k_debug_generic_dot", "gemm__kernels__q5__k_8c.html#a05e8183a955190d9e7e87b9b5d04642e", null ],
     [ "dot_q5_k_q8_k_row", "gemm__kernels__q5__k_8c.html#aaff0e20a1ba7d0fb69911995c0347431", null ],

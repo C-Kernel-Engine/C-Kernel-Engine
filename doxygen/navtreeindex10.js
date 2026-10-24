@@ -1,5 +1,9 @@
 var NAVTREEINDEX10 =
 {
+"ckernel__kernel__specs_8h.html#a3d91eb22ec223e36c65a04283581e390a29f29d6e4d6a83d51a84464caf90b5ad":[2,0,0,35,9,2],
+"ckernel__kernel__specs_8h.html#a3d91eb22ec223e36c65a04283581e390a366fb4213b618a2f19d10fcfadc3c7a9":[2,0,0,35,9,0],
+"ckernel__kernel__specs_8h.html#a3d91eb22ec223e36c65a04283581e390a3ad2a6283747a86588d92626a007a966":[2,0,0,35,9,8],
+"ckernel__kernel__specs_8h.html#a3d91eb22ec223e36c65a04283581e390a3cdb63a663d3f19f1d2d9aeb8c124a38":[2,0,0,35,9,7],
 "ckernel__kernel__specs_8h.html#a3d91eb22ec223e36c65a04283581e390a5b77bd8d985c0ad98814cdc0fe4c486d":[2,0,0,35,9,11],
 "ckernel__kernel__specs_8h.html#a3d91eb22ec223e36c65a04283581e390a89205855111843486cea0674ca1472bb":[2,0,0,35,9,4],
 "ckernel__kernel__specs_8h.html#a3d91eb22ec223e36c65a04283581e390a93c285e641a7b5adf02ab5789bd6c67e":[2,0,0,35,9,3],
@@ -245,9 +249,5 @@ var NAVTREEINDEX10 =
 "ckernel__runtime__extent_8h_source.html":[2,0,0,45],
 "ckernel__rwkv7__decode_8h.html":[2,0,0,46],
 "ckernel__rwkv7__decode_8h.html#a06cd318c6cd148188cafec9975688063":[2,0,0,46,5],
-"ckernel__rwkv7__decode_8h.html#a11b2eaaf160fb24734d3b5374a55496c":[2,0,0,46,2],
-"ckernel__rwkv7__decode_8h.html#a1dff0f15378b76335795df47c4e89b1b":[2,0,0,46,16],
-"ckernel__rwkv7__decode_8h.html#a64973642226e4f40eb884878288013ab":[2,0,0,46,3],
-"ckernel__rwkv7__decode_8h.html#a66dd24edfc16d8ab5316be93c5750c9e":[2,0,0,46,0],
-"ckernel__rwkv7__decode_8h.html#a6fcc6465e48f60e8023a7f5d0eca7e0c":[2,0,0,46,12]
+"ckernel__rwkv7__decode_8h.html#a11b2eaaf160fb24734d3b5374a55496c":[2,0,0,46,2]
 };

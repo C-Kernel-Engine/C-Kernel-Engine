@@ -1,5 +1,14 @@
 var NAVTREEINDEX16 =
 {
+"layernorm__kernels_8c.html#afd2e784d7b2b3ac7eb93e6f87c091fae":[2,0,1,1,84,3],
+"layernorm__kernels_8c_source.html":[2,0,1,1,84],
+"layernorm__kernels__bf16_8c.html":[2,0,1,1,85],
+"layernorm__kernels__bf16_8c.html#aa7733a43d00131cdc95692c34076b02e":[2,0,1,1,85,0],
+"layernorm__kernels__bf16_8c.html#ad8b1ba75e043f61ad20c8be7064a0de0":[2,0,1,1,85,2],
+"layernorm__kernels__bf16_8c.html#af62acc8f81d07c3913e0036ce21e6b76":[2,0,1,1,85,1],
+"layernorm__kernels__bf16_8c_source.html":[2,0,1,1,85],
+"layernorm__rows__checked_8c.html":[2,0,1,1,86],
+"layernorm__rows__checked_8c.html#a23b2efa3c66802b08faf84629277c722":[2,0,1,1,86,0],
 "layernorm__rows__checked_8c.html#ada75ccba3f692924bba36d5aca4f73b9":[2,0,1,1,86,1],
 "layernorm__rows__checked_8c_source.html":[2,0,1,1,86],
 "layout__kernels_8c.html":[2,0,1,1,87],
@@ -240,14 +249,5 @@ var NAVTREEINDEX16 =
 "prefill__fused__gemm_8c.html#a27912bbb68970a254a4222e66be7bf98":[2,0,1,1,0,9,0],
 "prefill__fused__gemm_8c.html#a2945c133b2cc63cb2f516c55e359ffba":[2,0,1,1,0,9,3],
 "prefill__fused__gemm_8c.html#a2b4421b1a9483deb705e46069d87844a":[2,0,1,1,0,9,21],
-"prefill__fused__gemm_8c.html#a312f98bb70a4da17154acc7b78bfbb1f":[2,0,1,1,0,9,4],
-"prefill__fused__gemm_8c.html#a314debc713536801afb2b4c13bede6fd":[2,0,1,1,0,9,25],
-"prefill__fused__gemm_8c.html#a37f81ee7436379c0f97ebd7f475b57c3":[2,0,1,1,0,9,9],
-"prefill__fused__gemm_8c.html#a3d6e23529a459885aef87c78fb8b4466":[2,0,1,1,0,9,7],
-"prefill__fused__gemm_8c.html#a40eb980b78fea10775ca56b350f2230a":[2,0,1,1,0,9,11],
-"prefill__fused__gemm_8c.html#a615bac7d9294b6bfd0cc45e0c1e2efcb":[2,0,1,1,0,9,18],
-"prefill__fused__gemm_8c.html#a77d5e9fd2c94d63935abf32e5584251b":[2,0,1,1,0,9,1],
-"prefill__fused__gemm_8c.html#a7c104f1e02b86be82622733c343bcfd3":[2,0,1,1,0,9,2],
-"prefill__fused__gemm_8c.html#a88d8c0c539707aaaa9e1275f3c6c0807":[2,0,1,1,0,9,10],
-"prefill__fused__gemm_8c.html#a96082b299d4fa9b2e3cfcd6077b22ca3":[2,0,1,1,0,9,26]
+"prefill__fused__gemm_8c.html#a312f98bb70a4da17154acc7b78bfbb1f":[2,0,1,1,0,9,4]
 };
