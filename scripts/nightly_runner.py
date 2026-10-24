@@ -798,6 +798,11 @@ TEST_SUITES = {
         ROOT / "tests" / "test_v8_qwen3_tts_codec_convnext_complete.py",
         timeout_sec=300,
     ),
+    "tts_qwen3_customvoice_codec_second_upsample": TestSuite(
+        "Qwen3-TTS Generated Codec Second Causal Upsample", "inference",
+        ROOT / "tests" / "test_v8_qwen3_tts_codec_second_upsample.py",
+        timeout_sec=300,
+    ),
     "tts_audio_sliding_attention_oracle": TestSuite(
         "Checked Sliding Attention Independent Oracle", "kernels",
         ROOT / "tests" / "test_v8_attention_sliding_bounded_oracle.py",
