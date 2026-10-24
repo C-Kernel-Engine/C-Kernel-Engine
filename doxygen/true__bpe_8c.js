@@ -42,6 +42,7 @@ var true__bpe_8c =
     [ "is_bpe_letter", "true__bpe_8c.html#a60316458b2abb5dd6096fa9862df8da2", null ],
     [ "is_bpe_newline", "true__bpe_8c.html#a6df5febf7bddcfd1db0995279b28c584", null ],
     [ "is_bpe_punct", "true__bpe_8c.html#a03f513f94a3f4171cfc80b568df3073e", null ],
+    [ "is_bpe_whitespace", "true__bpe_8c.html#a689635b134cba8d1e1ce422acf8ada51", null ],
     [ "is_digit", "true__bpe_8c.html#adc1caedaf2134f45e58b384a33bd8818", null ],
     [ "is_gpt2_space", "true__bpe_8c.html#a136114a1da9e0646aff5e045c91cffff", null ],
     [ "is_letter", "true__bpe_8c.html#a2661d3a5aec088c75126c08a32e355d1", null ],

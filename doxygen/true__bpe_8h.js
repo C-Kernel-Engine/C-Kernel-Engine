@@ -4,7 +4,8 @@ var true__bpe_8h =
     [ "CK_TRUE_BPE_API", "true__bpe_8h.html#aad53eaecf0a0944b0b9c62652972a758", null ],
     [ "CKBPEPretokenizer", "true__bpe_8h.html#aa305a05f65d005a4b58daebe8f8ff3f5", [
       [ "CK_BPE_PRETOKENIZER_GPT2", "true__bpe_8h.html#aa305a05f65d005a4b58daebe8f8ff3f5aa72c7e927552d5b52851d43da5438f1c", null ],
-      [ "CK_BPE_PRETOKENIZER_UNICODE_SPLIT_ISOLATED", "true__bpe_8h.html#aa305a05f65d005a4b58daebe8f8ff3f5a885dad2884774756a5108757c2b5fae4", null ]
+      [ "CK_BPE_PRETOKENIZER_UNICODE_SPLIT_ISOLATED", "true__bpe_8h.html#aa305a05f65d005a4b58daebe8f8ff3f5a885dad2884774756a5108757c2b5fae4", null ],
+      [ "CK_BPE_PRETOKENIZER_BYTELEVEL_SIMPLE", "true__bpe_8h.html#aa305a05f65d005a4b58daebe8f8ff3f5ad64d3eb66455d2279de9e4b1c9871634", null ]
     ] ],
     [ "CKSpacePrefixStyle", "true__bpe_8h.html#a28ac02199cd1d8b7d24c13952b86e9e6", [
       [ "CK_SPACE_PREFIX_AUTO", "true__bpe_8h.html#a28ac02199cd1d8b7d24c13952b86e9e6a78075f758c43702d3ee388d0c889d1be", null ],
