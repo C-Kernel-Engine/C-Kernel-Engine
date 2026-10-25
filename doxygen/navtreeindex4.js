@@ -1,5 +1,7 @@
 var NAVTREEINDEX4 =
 {
+"ck__parity__api_8h.html#a5c4d08fced7821fcb646b347b72b865b":[2,0,0,7,11],
+"ck__parity__api_8h.html#a5c84ceb207b535649864eccb69d493ac":[2,0,0,7,21],
 "ck__parity__api_8h.html#a6a7ac3284a467dbc3df23f48ad244c30":[2,0,0,7,35],
 "ck__parity__api_8h.html#a6b37e71eb014ef45b5c0c534a879f17a":[2,0,0,7,45],
 "ck__parity__api_8h.html#a6c5534c711d8306cf8973670bc9d3cfc":[2,0,0,7,26],
@@ -247,7 +249,5 @@ var NAVTREEINDEX4 =
 "ckernel__alloc_8c.html#ada1defb15c658adb17b9058087525057":[2,0,1,16,7],
 "ckernel__alloc_8c.html#ae8cf2951c2be25ccbe20a7bf9f9ff32b":[2,0,1,16,13],
 "ckernel__alloc_8c.html#af40ff2d14fdebba00915237c11b490c8":[2,0,1,16,1],
-"ckernel__alloc_8c.html#af814a916b578d2824aa0e9ec230ea166":[2,0,1,16,8],
-"ckernel__alloc_8c.html#afdf45ab35654e7a2a7e52a624a4b737b":[2,0,1,16,5],
-"ckernel__alloc_8c_source.html":[2,0,1,16]
+"ckernel__alloc_8c.html#af814a916b578d2824aa0e9ec230ea166":[2,0,1,16,8]
 };

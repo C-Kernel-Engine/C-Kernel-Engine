@@ -1,5 +1,10 @@
 var NAVTREEINDEX22 =
 {
+"structCPUInfo.html#a943858d53173dca145611d8cb192f0ca":[1,0,72,2],
+"structCPUInfo.html#aa4bcdef1bf48fa3860742a28a7d57d6d":[1,0,72,35],
+"structCPUInfo.html#aa67080f78191b764515728bdabf55924":[1,0,72,37],
+"structCPUInfo.html#aabf53af233c0f5d4692beb98fa2c2434":[1,0,72,21],
+"structCPUInfo.html#aaf14c11cad59d839d69e7fa7e367dd05":[1,0,72,41],
 "structCPUInfo.html#ac02376e5e445112e00ec31ff39f0bd17":[1,0,72,11],
 "structCPUInfo.html#ac41947b54c3a9b315338aee3113b5714":[1,0,72,3],
 "structCPUInfo.html#ac60a906dc4aaa71a6ca5453d6628fa2e":[1,0,72,23],
@@ -244,10 +249,5 @@ var NAVTREEINDEX22 =
 "structck__audio__conv1d__job.html#af110fe7a64774b0dd3c93abbfc0d3d2d":[1,0,12,6],
 "structck__audio__conv1d__job.html#afad6469bb1f8abae4e19d8a84eb7eaf1":[1,0,12,2],
 "structck__bump__alloc__t.html":[1,0,13],
-"structck__bump__alloc__t.html#a02f56f6e9492c422502b8d69a9d266cc":[1,0,13,5],
-"structck__bump__alloc__t.html#a197ed664fe2b6dd05130e00c6093225d":[1,0,13,0],
-"structck__bump__alloc__t.html#a64fefe4e274a20faac155fc87b4dfc4a":[1,0,13,2],
-"structck__bump__alloc__t.html#a66772500081c422f01e036ff8f6db361":[1,0,13,1],
-"structck__bump__alloc__t.html#ab1f7de12a27705ebfc6390028d494a4b":[1,0,13,6],
-"structck__bump__alloc__t.html#ac6dedb478c486e2b22066b7bef49676d":[1,0,13,4]
+"structck__bump__alloc__t.html#a02f56f6e9492c422502b8d69a9d266cc":[1,0,13,5]
 };
