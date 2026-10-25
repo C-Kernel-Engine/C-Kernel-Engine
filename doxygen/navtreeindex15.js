@@ -1,5 +1,8 @@
 var NAVTREEINDEX15 =
 {
+"gemm__microkernel_8c.html#a6d69e1aaf7b6e0de9b1a7900c0e22a5a":[2,0,1,1,75,4],
+"gemm__microkernel_8c.html#a71d9e511e7e302cd831e83581219e70d":[2,0,1,1,75,2],
+"gemm__microkernel_8c.html#a73764abcca0b8bbf6bf355d9f1bab0b9":[2,0,1,1,75,1],
 "gemm__microkernel_8c.html#a757a5b148b758bc38cbc87a99d33de9f":[2,0,1,1,75,8],
 "gemm__microkernel_8c.html#a901f57b4416f1abe2f441bfdfe444e74":[2,0,1,1,75,17],
 "gemm__microkernel_8c.html#a9ecbd9f86f95534f1bcf71015d5ae81a":[2,0,1,1,75,3],
@@ -81,8 +84,8 @@ var NAVTREEINDEX15 =
 "globals_b.html":[2,1,0,2],
 "globals_c.html":[2,1,0,3],
 "globals_d.html":[2,1,0,4],
-"globals_defs.html":[2,1,6],
 "globals_defs.html":[2,1,6,0],
+"globals_defs.html":[2,1,6],
 "globals_defs_a.html":[2,1,6,1],
 "globals_defs_b.html":[2,1,6,2],
 "globals_defs_c.html":[2,1,6,3],
@@ -110,8 +113,8 @@ var NAVTREEINDEX15 =
 "globals_eval_q.html":[2,1,5,2],
 "globals_eval_r.html":[2,1,5,3],
 "globals_f.html":[2,1,0,6],
-"globals_func.html":[2,1,1],
 "globals_func.html":[2,1,1,0],
+"globals_func.html":[2,1,1],
 "globals_func_a.html":[2,1,1,1],
 "globals_func_b.html":[2,1,1,2],
 "globals_func_c.html":[2,1,1,3],
@@ -154,8 +157,8 @@ var NAVTREEINDEX15 =
 "globals_type.html":[2,1,3],
 "globals_u.html":[2,1,0,21],
 "globals_v.html":[2,1,0,22],
-"globals_vars.html":[2,1,2],
 "globals_vars.html":[2,1,2,0],
+"globals_vars.html":[2,1,2],
 "globals_vars_b.html":[2,1,2,1],
 "globals_vars_c.html":[2,1,2,2],
 "globals_vars_e.html":[2,1,2,3],
@@ -246,8 +249,5 @@ var NAVTREEINDEX15 =
 "hyper__connection__kernels_8c.html#afac10cd3b8fd76b0abe4d3dc71fe7982":[2,0,1,1,81,4],
 "hyper__connection__kernels_8c_source.html":[2,0,1,1,81],
 "include_2data__structures_2tries_2trie_8h.html":[2,0,0,0,0,0],
-"include_2data__structures_2tries_2trie_8h.html#a142d7df0376883bfddd8c48f008ecdcf":[2,0,0,0,0,0,3],
-"include_2data__structures_2tries_2trie_8h.html#a245a64683ba5bb40cdffa0c4a6de6980":[2,0,0,0,0,0,2],
-"include_2data__structures_2tries_2trie_8h.html#a77957858c36d4cf9efea8049948f7df3":[2,0,0,0,0,0,4],
-"include_2data__structures_2tries_2trie_8h.html#a7b254dc2cd5611e6eee69114e479266d":[2,0,0,0,0,0,7]
+"include_2data__structures_2tries_2trie_8h.html#a142d7df0376883bfddd8c48f008ecdcf":[2,0,0,0,0,0,3]
 };

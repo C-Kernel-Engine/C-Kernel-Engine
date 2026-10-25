@@ -224,7 +224,7 @@ versions and hashes; the selected voice ID and asset hash are also open.</p>
 <td>Qwen3-TTS 0.6B CustomVoice, 12 Hz — first CKE comparison target</td>
 <td><a href="https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice/tree/85e237c12c027371202489a0ec509ded67b5e4b5"><code>Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice@85e237c</code></a>, Apache 2.0</td>
 <td>The pinned <a href="https://github.com/QwenLM/Qwen3-TTS/commit/022e286b98fbec7e1e916cb940cdf532cd9f488e">reference code</a> tokenizes text, applies a preset speaker and language, runs a 28-layer talker and 5-layer code predictor, then decodes the 16-group codec tokens into 24 kHz PCM. The CKE oracle capture records text token IDs, codec tokens and waveform.</td>
-<td>CKE has generated talker first-block execution and a reference-code-fed codec path through all eight pre-transformer layers, both factor-2 vocoder upsamples, both complete ConvNeXt blocks, the channel-changing causal decoder ingress, all four decoder upsampling/residual blocks, and the final bounded 24 kHz PCM waveform. The 8- and 46-code-frame graphs are separately compiled. Autonomous code prediction and complete text-to-speech remain NOT_TESTED. This 0.6B CustomVoice variant ignores style instructions. Generated codec state, EOS and sampling remain to be contracted.</td>
+<td>CKE now connects pinned text, language, speaker and codec prompt IDs through native embedding, text projection and the first talker block in one generated entry. A separate reference-code-fed codec entry executes all eight pre-transformer layers, both factor-2 vocoder upsamples, both complete ConvNeXt blocks, the channel-changing causal decoder ingress, all four decoder upsampling/residual blocks, and the final bounded 24 kHz PCM waveform. The 8- and 46-code-frame codec graphs are separately compiled. The remaining 27 talker blocks, code predictor, autonomous code generation and complete text-to-speech remain NOT_TESTED. This 0.6B CustomVoice variant ignores style instructions. Generated cache state, EOS and sampling remain to be contracted.</td>
 </tr>
 <tr>
 <td>Kokoro v1.0</td>
@@ -251,7 +251,19 @@ versions and hashes; the selected voice ID and asset hash are also open.</p>
 code groups per frame, and 88,320 waveform samples at 24 kHz. The model snapshot
 declares a 2,048-channel text embedding followed by 2,048-channel linear,
 SiLU, and 1,024-channel linear projection into the talker. CKE now has
-generated-C checkpoints for the talker projection and first block. On the
+generated-C checkpoints for the talker projection and first block. One
+additional generated entry now assembles the pinned non-streaming English/Ryan
+prompt from projected text rows and codec embeddings, then runs the first
+talker block on that CKE-produced prompt. The declared row-index plan is
+validated by a reusable checked gather-and-sum provider. For the seven-token
+spoken-text context, prompt assembly differs from the direct model capture by
+at most 2.38e-7 and the first-block output by at most 9.54e-6. Invalid IDs and
+row indices stop downstream execution, while a valid but incorrect row edge
+fails the prompt checkpoint. The tests are
+<code>tests/test_v8_indexed_sum_rows_checked.py</code> and
+<code>tests/test_v8_qwen3_tts_prompt_first_block.py</code>. This establishes one
+connected prefill prefix, not the remaining 27 layers, decode cache, code
+predictor or text-to-waveform execution. On the
 decoder side, one checked generated entry reconstructs all 16 split-RVQ
 codebooks, transposes the resulting features, applies exact left zero padding,
 and executes the causal pre-convolution with pinned weights. It then transposes

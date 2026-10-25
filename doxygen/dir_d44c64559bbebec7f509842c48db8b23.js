@@ -33,6 +33,7 @@ var dir_d44c64559bbebec7f509842c48db8b23 =
     [ "ckernel_embedding_checked.h", "ckernel__embedding__checked_8h.html", "ckernel__embedding__checked_8h" ],
     [ "ckernel_engine.h", "ckernel__engine_8h.html", "ckernel__engine_8h" ],
     [ "ckernel_feature_concat_checked.h", "ckernel__feature__concat__checked_8h.html", "ckernel__feature__concat__checked_8h" ],
+    [ "ckernel_indexed_sum_rows_checked.h", "ckernel__indexed__sum__rows__checked_8h.html", "ckernel__indexed__sum__rows__checked_8h" ],
     [ "ckernel_ir.h", "ckernel__ir_8h.html", "ckernel__ir_8h" ],
     [ "ckernel_ir_v2.h", "ckernel__ir__v2_8h.html", "ckernel__ir__v2_8h" ],
     [ "ckernel_ir_v2_lower.h", "ckernel__ir__v2__lower_8h.html", "ckernel__ir__v2__lower_8h" ],

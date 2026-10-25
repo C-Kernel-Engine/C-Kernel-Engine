@@ -82,6 +82,7 @@ var dir_40856f0cdd4bcafd28810d9265a200f7 =
     [ "ggml_runtime_compat.h", "ggml__runtime__compat_8h.html", "ggml__runtime__compat_8h" ],
     [ "hybrid_attention_kernels.c", "hybrid__attention__kernels_8c.html", "hybrid__attention__kernels_8c" ],
     [ "hyper_connection_kernels.c", "hyper__connection__kernels_8c.html", "hyper__connection__kernels_8c" ],
+    [ "indexed_sum_rows_checked.c", "indexed__sum__rows__checked_8c.html", "indexed__sum__rows__checked_8c" ],
     [ "kokoro_shape_bounds.c", "kokoro__shape__bounds_8c.html", "kokoro__shape__bounds_8c" ],
     [ "kv_cache_kernels.c", "kv__cache__kernels_8c.html", "kv__cache__kernels_8c" ],
     [ "layernorm_kernels.c", "layernorm__kernels_8c.html", "layernorm__kernels_8c" ],
