@@ -1,5 +1,6 @@
 var NAVTREEINDEX12 =
 {
+"dequant__kernels_8c.html#a7b76a9677d59e551a7cbc57b2c396499":[2,0,1,1,37,0],
 "dequant__kernels_8c.html#a82b903e16498e719418051cf1ea32640":[2,0,1,1,37,14],
 "dequant__kernels_8c.html#a9fe84053743b560c755728a0f43c8887":[2,0,1,1,37,13],
 "dequant__kernels_8c.html#aa93fe3ed692c10046d000b65ed2076c0":[2,0,1,1,37,8],
@@ -248,6 +249,5 @@ var NAVTREEINDEX12 =
 "gemm__kernels_8c.html#ae808c1ad88909d53227862259add3b52":[2,0,1,1,51,17],
 "gemm__kernels_8c.html#af4f0e756d3ac00b45ce2c7a296b61ae3":[2,0,1,1,51,6],
 "gemm__kernels_8c.html#afd447dc190bd77241a42d8972f9c5fba":[2,0,1,1,51,13],
-"gemm__kernels_8c.html#afe5bf17f909def227c3e25b0c4338f93":[2,0,1,1,51,21],
-"gemm__kernels_8c_source.html":[2,0,1,1,51]
+"gemm__kernels_8c.html#afe5bf17f909def227c3e25b0c4338f93":[2,0,1,1,51,21]
 };
