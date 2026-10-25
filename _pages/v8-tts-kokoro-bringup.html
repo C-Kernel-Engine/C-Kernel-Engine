@@ -246,24 +246,29 @@ versions and hashes; the selected voice ID and asset hash are also open.</p>
 </tr>
 </tbody>
 </table>
-<p><strong>Qwen3-TTS first generated boundary:</strong> the committed CPU oracle for
+<p><strong>Qwen3-TTS generated talker prefill:</strong> the committed CPU oracle for
 <code>Hello, this is CKE.</code> contains 15 text token IDs, 46 codec frames with 16
 code groups per frame, and 88,320 waveform samples at 24 kHz. The model snapshot
 declares a 2,048-channel text embedding followed by 2,048-channel linear,
 SiLU, and 1,024-channel linear projection into the talker. CKE now has
-generated-C checkpoints for the talker projection and first block. One
-additional generated entry now assembles the pinned non-streaming English/Ryan
-prompt from projected text rows and codec embeddings, then runs the first
-talker block on that CKE-produced prompt. The declared row-index plan is
+generated-C checkpoints for the talker projection and all 28 prefill blocks.
+One generated entry assembles the pinned non-streaming English/Ryan prompt
+from projected text rows and codec embeddings, then runs the complete talker
+prefill, final normalization and codec head. The declared row-index plan is
 validated by a reusable checked gather-and-sum provider. For the seven-token
 spoken-text context, prompt assembly differs from the direct model capture by
 at most 2.38e-7 and the first-block output by at most 9.54e-6. Invalid IDs and
 row indices stop downstream execution, while a valid but incorrect row edge
-fails the prompt checkpoint. The tests are
+fails the prompt checkpoint. The complete prefill uses 570 declared operations
+and 316 distinct weight tensors. Direct pinned PyTorch checkpoints cover each
+layer and final logits; this is fixed-prompt prefill evidence, not continuation
+or autonomous code production. Standard nightly also runs a two-layer
+generated graph with nonzero synthetic weights and a scalar recurrence check,
+so repeated-layer stitching remains tested without the model asset. The tests are
 <code>tests/test_v8_indexed_sum_rows_checked.py</code> and
-<code>tests/test_v8_qwen3_tts_prompt_first_block.py</code>. This establishes one
-connected prefill prefix, not the remaining 27 layers, decode cache, code
-predictor or text-to-waveform execution. On the
+<code>tests/test_v8_qwen3_tts_prompt_first_block.py</code> and
+<code>tests/test_v8_qwen3_tts_talker_prefill.py</code>. Decode cache, code
+predictor and text-to-waveform execution remain. On the
 decoder side, one checked generated entry reconstructs all 16 split-RVQ
 codebooks, transposes the resulting features, applies exact left zero padding,
 and executes the causal pre-convolution with pinned weights. It then transposes
