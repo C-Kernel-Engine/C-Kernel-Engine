@@ -439,6 +439,8 @@ var ckernel__engine_8h =
     [ "moe_swiglu_expert_forward_bf16_row_range", "ckernel__engine_8h.html#a8e3f297e9eb3bbaae79736dedfd5e1f3", null ],
     [ "moe_swiglu_expert_forward_f32", "ckernel__engine_8h.html#ad882b6749a0724b4d0f76b2bf3675a26", null ],
     [ "moe_swiglu_expert_forward_pytorch_bf16_storage", "ckernel__engine_8h.html#a4fba55591d34562afbde38826f9c0d80", null ],
+    [ "moe_swiglu_expert_forward_pytorch_onednn_3_12_bf16_storage_checked", "ckernel__engine_8h.html#a626f110d11dde990b635b16024553afa", null ],
+    [ "moe_swiglu_expert_forward_pytorch_onednn_3_12_bf16_storage_workspace", "ckernel__engine_8h.html#a7b530065f48afe87d6e40ccbb49bd71d", null ],
     [ "moe_swiglu_expert_forward_q4k_q4k_parallel_workspace", "ckernel__engine_8h.html#a791182eaf5b9a6f691fd0ec4525fe4f6", null ],
     [ "moe_swiglu_expert_forward_q4k_q4k_workspace", "ckernel__engine_8h.html#a3d5558c312193036d33dd3b068ac1c53", null ],
     [ "moe_swiglu_expert_forward_q4k_q5_0_parallel_workspace", "ckernel__engine_8h.html#a83f7e6ddd98598df4f2170ea22ef2277", null ],
