@@ -1,0 +1,186 @@
+<!-- TITLE: Local Harness Quickstart -->
+<!-- NAV: architecture -->
+
+<h1>Local harness quickstart</h1>
+
+<p>Run a generated CKE model behind one OpenAI-compatible endpoint, then point a client at that
+endpoint. The harness owns files, tools and permissions; CKE owns rendering, tokenization, the
+native model session and response delivery. A model appearing in <code>/v1/models</code> proves
+that it loaded, not that it can complete an agent task. The table below names the tested
+artifact boundary as of 25 October 2026. Consult the
+<a href="v8-serving-coverage.html">serving coverage inventory</a> for circuit declarations and the
+<a href="v8-runbook.html#converted-jinja-serving">serving runbook</a> for detailed acceptance commands.</p>
+
+<div class="card">
+  <h2 style="margin-top:0;">Model and harness map</h2>
+  <table class="table">
+    <thead><tr><th>CKE model artifact</th><th>Client to try</th><th>Current evidence</th><th>Tool-task status</th></tr></thead>
+    <tbody>
+      <tr><td>Qwen3.8 27B Q4_K_M</td><td><a href="https://github.com/QwenLM/qwen-code">Qwen Code</a></td>
+        <td>Artifact-bound read → edit → test → summary tasks and HTTP recovery on the tested bundle.</td>
+        <td><strong>Bounded PASS.</strong> Use its exact resolved Qwen Code serving variant and a context profile no larger than the compiled runtime. Other Qwen artifacts require their own run.</td></tr>
+      <tr><td>Gemma4 E4B, explicit tools variant</td><td><a href="https://antigravity.google/docs/sdk/local-models/">Antigravity SDK</a></td>
+        <td>Four bounded local SDK tasks, including edit/validation and tool-error recovery, on a 2,048-token bundle.</td>
+        <td><strong>Bounded PASS.</strong> The chat-only variant rejects tools. Larger contexts and overnight reliability are separate gates.</td></tr>
+      <tr><td>Muse Glimmer</td><td>Muse Code is the intended family client; a generic OpenAI-compatible client is useful for diagnosis.</td>
+        <td>A short CKE tool call and correlated continuation passed. A complete 32K Muse Code task has not passed.</td>
+        <td><strong>Not certified.</strong> Do not treat an installed Muse Code CLI or rendered template as proof that it targets this CKE endpoint.</td></tr>
+      <tr><td>Instella-MoE Think BF16</td><td><a href="https://docs.openhands.dev/openhands/usage/llms/local-llms">OpenHands</a> is a proposed harness.</td>
+        <td>Exact tokenizer checks and two 32-token trajectories passed; isolated HTTP streaming and cancellation/recovery passed. Full-logit parity failed.</td>
+        <td><strong>Chat only.</strong> This publisher variant declares no tool-output protocol; CKE returns HTTP 501 for tools. OpenHands coding tasks cannot pass this pairing yet.</td></tr>
+      <tr><td>Nemotron Nano 9B v2 Q4_K_M</td><td><a href="https://docs.langchain.com/oss/python/deepagents/quickstart">LangChain Deep Agents</a> is a proposed harness.</td>
+        <td>A declared tool parser exists. A 42,132-token first-logit diagnostic matched the top token; its permissive threshold does not certify numerical parity.</td>
+        <td><strong>Not tested end to end.</strong> Run a real tool/result/task acceptance before enabling Deep Agents tools or subagents.</td></tr>
+      <tr><td>Cohere Command R7B Q4_K_M</td><td><a href="https://docs.langchain.com/oss/python/integrations/chat/openai">LangChain ChatOpenAI</a> for plain chat.</td>
+        <td>5,332 exact raw prompt IDs and bounded chat serving. First-logit differences remain measurable.</td>
+        <td><strong>Chat only.</strong> The selected imported template does not establish tool calling. Command A+ and Cohere North are different artifacts with separate gates.</td></tr>
+    </tbody>
+  </table>
+  <p class="mini-note">A client can connect to a CKE endpoint without the model being able to follow its tools.
+    Do not copy a PASS between quantizations, context builds, publisher variants or model families.</p>
+</div>
+
+<h2 id="start-server">1. Start an identified CKE endpoint</h2>
+<p>Use a <em>complete resolved serving bundle</em>: BUMP weights, compiled model/engine/tokenizer,
+manifest, circuit-linked profile and imported publisher assets. Build and resolve it with the
+<a href="v8-runbook.html#converted-jinja-serving">v8 runbook</a>; a GGUF filename or model name alone is not a
+serving contract. For the documented Qwen3.8 27B Q4_K_M artifact, this command downloads the
+checkpoint if needed, compiles a 16K runtime, and starts the server on the model host:</p>
+<pre>CK_NUM_THREADS=16 OMP_NUM_THREADS=1 \
+  version/v8/scripts/cks-v8-run serve \
+  hf://ggml-org/Qwen3.8-27B-GGUF/Qwen3.8-27B-Q4_K_M.gguf \
+  --run /path/to/qwen38-agent-runtime \
+  --context-len 16384 --force-compile \
+  --model-name qwen38-27b-q4km</pre>
+<p>Use the exact checkpoint, serving profile and generated bundle for another family; the
+<a href="v8-serving-coverage.html">coverage inventory</a> identifies circuit linkage but does
+not itself certify an artifact. Once a bundle exists, this example starts it without rebuilding:</p>
+<pre>BUNDLE=/path/to/resolved-generated-bundle
+CKE_MODEL=the-model-id-you-chose
+CK_NUM_THREADS=16 OMP_NUM_THREADS=1 \
+  python3 version/v8/scripts/ck_serve_v8.py "$BUNDLE" \
+  --run "$BUNDLE" --no-build --model-name "$CKE_MODEL" \
+  --host 127.0.0.1 --port 8080</pre>
+<p>The server must finish startup verification. On the model host, inspect its advertised ID,
+compiled context and loaded hashes:</p>
+<pre>curl -fsS http://127.0.0.1:8080/v1/models
+curl -fsS http://127.0.0.1:8080/v1/cke/loaded-identity</pre>
+<p>If the client is on another machine such as P3 and the server is on Ryzen, keep the server
+bound to loopback and open an SSH tunnel <em>from the client</em> in a separate terminal:</p>
+<pre>ssh -N -L 8080:127.0.0.1:8080 &lt;model-host&gt;
+# On the client, use http://127.0.0.1:8080/v1 as the base URL.</pre>
+<p>For a containerized client, its <code>127.0.0.1</code> is the container, so give the container a
+route to the forwarded host and set its base URL accordingly. Confirm <code>/v1/models</code> from
+inside that client environment. Many clients require an API-key field even when this loopback
+CKE endpoint does not authenticate; a placeholder such as <code>cke-local</code> satisfies that
+client field. Keep the tunnel and server access restricted to trusted users.</p>
+
+<h2 id="first-request">2. Prove plain HTTP before opening a harness</h2>
+<pre>curl -fsS http://127.0.0.1:8080/v1/responses \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"REPLACE_WITH_ID_FROM_MODELS","input":"Say hello.","max_output_tokens":64}'</pre>
+<p>Check the terminal status and stop reason. An output-limit <code>incomplete</code> response is
+not a completed answer. Record <code>GET /v1/cke/loaded-identity</code> before and after a task;
+its serving identity, loaded session hash and server-instance ID bind the evidence to the process.
+For cancellation and disconnect testing, use the black-box
+<code>server/http_lifecycle_acceptance.py</code> runner with both expected hashes.</p>
+
+<h2 id="qwen-code">3. Qwen Code with the certified Qwen3.8 bundle</h2>
+<p>The CKE-tested Qwen Code profile uses a Responses connection and names the loaded model
+explicitly. Install the client using the
+<a href="https://qwenlm.github.io/qwen-code-docs/en/users/overview/">official Qwen Code instructions</a>;
+this example pins 0.24.6, a version exercised in CKE's bounded probes. On the client machine,
+from the CKE repository:</p>
+<pre>npm install -g @qwen-code/qwen-code@0.24.6
+CKE_ROOT="$PWD"
+OPENAI_API_KEY=cke-local \
+OPENAI_BASE_URL=http://127.0.0.1:8080/v1 \
+OPENAI_MODEL=qwen38-27b-q4km \
+QWEN_CODE_MAX_OUTPUT_TOKENS=2048 \
+QWEN_CODE_SYSTEM_SETTINGS_PATH="$CKE_ROOT/server/qwen-code/interactive.settings.json" \
+qwen --auth-type openai-responses --model qwen38-27b-q4km</pre>
+<p>Replace the model ID if <code>/v1/models</code> reports a different one. The interactive profile
+advertises 16K context; its overnight counterpart requires a separately generated 256K runtime.
+For the bounded disposable read/edit/test gate, run
+<code>server/qwen_harness_acceptance.py</code> with the expected serving identity and session-library
+hash as shown in the <a href="v8-runbook.html#converted-jinja-serving">Qwen runbook</a>.
+Current Qwen Code releases also document <code>modelProviders.openai</code> with a per-model
+<code>wireApi: "responses"</code>; use the
+<a href="https://github.com/QwenLM/qwen-code/blob/main/docs/users/configuration/model-providers.md">provider reference</a>
+when changing client versions.</p>
+
+<h2 id="gemma-antigravity">4. Gemma4 with Antigravity SDK</h2>
+<p>Install the SDK in an isolated client environment. Use
+<a href="https://antigravity.google/docs/sdk/local-models/">LocalOpenAIAgentConfig</a> to connect
+to CKE; <code>LiteRTAgentConfig</code> runs a different model runtime and is not this path.
+Select the bundle's explicit tools variant for tool tasks and its exact advertised model ID.</p>
+<pre>python3 -m venv /tmp/cke-antigravity-venv
+/tmp/cke-antigravity-venv/bin/python -m pip install google-antigravity==0.1.20
+
+# In a small client script:
+import asyncio
+from google.antigravity import Agent, LocalOpenAIAgentConfig
+
+async def main():
+    config = LocalOpenAIAgentConfig(
+        model="REPLACE_WITH_GEMMA_TOOLS_MODEL_ID",
+        base_url="http://127.0.0.1:8080/v1",
+    ).lightweight()
+    async with Agent(config) as agent:
+        reply = await agent.chat("Say hello in one sentence.")
+        async for chunk in reply:
+            print(chunk, end="", flush=True)
+
+asyncio.run(main())</pre>
+<p>Start with a disposable workspace. For the retained read, two-file, edit/validate and
+failed-tool recovery cases, use <code>server/gemma_antigravity_acceptance.py</code> with both
+expected hashes and a per-case deadline. The published 2,048-token result does not establish
+larger prompt capacity.</p>
+
+<h2 id="other-clients">5. Experimental client connections</h2>
+<h3>Instella and OpenHands</h3>
+<p>OpenHands documents local OpenAI-compatible servers through its
+<a href="https://docs.openhands.dev/openhands/usage/llms/local-llms">local-model setup</a>.
+In its Advanced LLM settings, use <code>openai/REPLACE_WITH_ID_FROM_MODELS</code> as Custom Model,
+the CKE base URL visible to the OpenHands container, and <code>cke-local</code> as a placeholder
+key. This is a connection diagnostic only: the pinned Instella Think profile rejects tool
+requests with 501. Its current numerical and ordinary-chat limits are listed in the table;
+do not start an unattended OpenHands coding task with this artifact.</p>
+<h3>Nemotron and LangChain Deep Agents</h3>
+<p>Install <code>deepagents</code> and <code>langchain-openai</code> using the
+<a href="https://docs.langchain.com/oss/python/deepagents/quickstart">Deep Agents quickstart</a>.
+First verify a plain <code>ChatOpenAI</code> request against CKE, using the exact model ID:</p>
+<pre>from langchain_openai import ChatOpenAI
+model = ChatOpenAI(
+    model="REPLACE_WITH_NEMOTRON_MODEL_ID",
+    base_url="http://127.0.0.1:8080/v1",
+    api_key="cke-local",
+    temperature=0,
+)
+print(model.invoke("Say hello.").content)</pre>
+<p>Deep Agents requires working tool calling. Its provider/harness profile system does not
+establish that this Nemotron artifact handles a tool/result loop. Test that loop and a
+read/edit/validator task before creating a Deep Agent or enabling subagents. NVIDIA Dynamo is
+serving infrastructure, not the LangChain harness.</p>
+<h3>Cohere text and LangChain</h3>
+<p>The same <code>ChatOpenAI</code> connection above can test plain chat with a deployed Cohere
+Command R7B model ID. Keep tools disabled for its selected imported chat-only template. Cohere
+North and Command A+ need their own exact artifact, template, numerical and task acceptance;
+Cohere Transcribe uses a transcription interface instead of a coding-agent chat harness.</p>
+<h3>Muse Glimmer and Muse Code</h3>
+<p>Meta documents <a href="https://dev.meta.ai/docs/muse-code">Muse Code</a> as its terminal
+agent for the hosted Muse service. CKE has a bounded Glimmer tool round trip and a trace
+assessor, but no retained complete Muse Code task or verified supported CLI setting that
+redirects Muse Code to this CKE bundle. Start with the plain HTTP check above; do not assume
+that signing Muse Code in points it at CKE. A generic OpenAI-compatible client may be used
+for a separate experimental trial after checking the bundle's tool protocol and realistic
+context capacity.</p>
+
+<h2 id="acceptance">What counts as ready for work?</h2>
+<p>For each exact bundle, retain the loaded identity and test these gates independently:
+rendered bytes and token IDs; normal chat and streaming; declared tool call and correlated
+result; a real read → edit → test → summary task; cancellation/disconnect followed by another
+request on the same server; and numerical/state evidence under the provider contract. A
+missing asset-backed run is <strong>NOT_TESTED</strong>, not PASS. Queueing and two-slot batched
+decode are separate from whether a harness task succeeds. See the
+<a href="serving.html">serving architecture page</a> for the execution modes.</p>
