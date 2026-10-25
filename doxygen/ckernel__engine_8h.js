@@ -387,6 +387,7 @@ var ckernel__engine_8h =
     [ "hyper_stream_inject_f32", "ckernel__engine_8h.html#aae9afe19c025640c82a0de38817f779e", null ],
     [ "im2patch", "ckernel__engine_8h.html#a86aec042bcceb0bd8955f0daf0d986c4", null ],
     [ "im2patch_bf16", "ckernel__engine_8h.html#a57139580e075be2d5a65cfffc8e84898", null ],
+    [ "im2patch_fp16_round_f32", "ckernel__engine_8h.html#a291cc308b7585045636b55fafb97beb4", null ],
     [ "kv_cache_repack_head_major_inplace", "ckernel__engine_8h.html#a377bab84fd3d4ba79cf92024615c240a", null ],
     [ "kv_cache_store", "ckernel__engine_8h.html#ae9fc8e88b12cec4fcfbdb30b602bf7ef", null ],
     [ "kv_cache_store_batch_bf16", "ckernel__engine_8h.html#a7a9a469a61f3fd75a4d60bef404efc82", null ],

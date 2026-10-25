@@ -8,6 +8,7 @@ var vision__kernels_8c =
     [ "feature_slice_copy", "vision__kernels_8c.html#a6414bc6af9c28e7baf31b434073e794f", null ],
     [ "gemma4_vision_projector_prep_forward", "vision__kernels_8c.html#a95f0081ec402d0df10805093d32c8ae5", null ],
     [ "im2patch", "vision__kernels_8c.html#a86aec042bcceb0bd8955f0daf0d986c4", null ],
+    [ "im2patch_fp16_round_f32", "vision__kernels_8c.html#a291cc308b7585045636b55fafb97beb4", null ],
     [ "patch2im", "vision__kernels_8c.html#a3ffa58aab7da5c6e77096ad19385329a", null ],
     [ "position_embeddings_add", "vision__kernels_8c.html#aedf35588a71c8af25400e79faeec6dee", null ],
     [ "position_embeddings_add_at_offset", "vision__kernels_8c.html#ace7994d37be7b565c895e0b7205baad2", null ],

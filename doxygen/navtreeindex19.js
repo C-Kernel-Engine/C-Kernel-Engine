@@ -1,5 +1,6 @@
 var NAVTREEINDEX19 =
 {
+"structCKBumpMetaFooterV5.html#a4bc1f2b2775c0de9d20b6f8a5a8077ed":[1,0,20,1],
 "structCKBumpMetaFooterV5.html#abfa91da71ba88c4f26b60f2a945aca03":[1,0,20,0],
 "structCKDimToken.html":[1,0,21],
 "structCKDimToken.html#a39ef233b6095ec24fa1374c9f6cd93d3":[1,0,21,0],
@@ -248,6 +249,5 @@ var NAVTREEINDEX19 =
 "structCKLayerForwardParamsQ4K.html#a2ddfb5a4e6442a028d7475dc1e9266cd":[1,0,38,32],
 "structCKLayerForwardParamsQ4K.html#a31e2ba79a8c69429c6e31c20ee1c6efa":[1,0,38,17],
 "structCKLayerForwardParamsQ4K.html#a3372d9668e65bc5a77fcdb3e69547af3":[1,0,38,4],
-"structCKLayerForwardParamsQ4K.html#a35349f8d709bd6b19b8bdc1b46cbf10f":[1,0,38,49],
-"structCKLayerForwardParamsQ4K.html#a4384a52ba7c2f30d4895d3edd4321cab":[1,0,38,3]
+"structCKLayerForwardParamsQ4K.html#a35349f8d709bd6b19b8bdc1b46cbf10f":[1,0,38,49]
 };

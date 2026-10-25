@@ -1,5 +1,6 @@
 var NAVTREEINDEX16 =
 {
+"kokoro__shape__bounds_8c.html#a665733e67504d5412730d8733bceb0a4":[2,0,1,1,82,2],
 "kokoro__shape__bounds_8c.html#a6e9dd3692c2772fcd7b34548215ac63b":[2,0,1,1,82,0],
 "kokoro__shape__bounds_8c.html#adbbc04010193d2f3eafd68457c75a0dc":[2,0,1,1,82,1],
 "kokoro__shape__bounds_8c_source.html":[2,0,1,1,82],
@@ -248,6 +249,5 @@ var NAVTREEINDEX16 =
 "optimizer__kernels_8c_source.html":[2,0,1,1,96],
 "optimizer__kernels__bf16_8c.html":[2,0,1,1,97],
 "optimizer__kernels__bf16_8c.html#a04594793ece43bcbd8669ff6d0e0029b":[2,0,1,1,97,0],
-"optimizer__kernels__bf16_8c.html#a0461e04c92bea2dfd26c2f8cff17c871":[2,0,1,1,97,9],
-"optimizer__kernels__bf16_8c.html#a1c1d97635474696da41a9f318ac7600b":[2,0,1,1,97,8]
+"optimizer__kernels__bf16_8c.html#a0461e04c92bea2dfd26c2f8cff17c871":[2,0,1,1,97,9]
 };

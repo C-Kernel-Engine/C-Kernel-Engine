@@ -1,5 +1,6 @@
 var NAVTREEINDEX23 =
 {
+"structck__bump__alloc__t.html#ac9f12cd3ed6cd33ea08e2bcabe752d9c":[1,0,13,3],
 "structck__capability__t.html":[1,0,14],
 "structck__capability__t.html#a191ce26013f94ccb8f51a5fa5dd8c04b":[1,0,14,0],
 "structck__capability__t.html#a30b1549af2a1c4bab2992853b3883994":[1,0,14,2],
@@ -248,6 +249,5 @@ var NAVTREEINDEX23 =
 "transformer__rows__checked_8c.html#aaa5cdc6268134450359b8bf0a83eeb45":[2,0,1,1,128,7],
 "transformer__rows__checked_8c.html#ac6ccde6ed505aa8ddf108e7ab92ba7d6":[2,0,1,1,128,2],
 "transformer__rows__checked_8c.html#ace67baa0aba90a45fb7c13187307698f":[2,0,1,1,128,1],
-"transformer__rows__checked_8c_source.html":[2,0,1,1,128],
-"trie_8c.html":[2,0,1,0,0,0]
+"transformer__rows__checked_8c_source.html":[2,0,1,1,128]
 };
