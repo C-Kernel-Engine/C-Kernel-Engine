@@ -60,6 +60,7 @@ var axpy__kernels_8c =
     [ "moe_swiglu_expert_forward_bf16", "axpy__kernels_8c.html#a3ba5fbc58b8f6790535f7b6144584903", null ],
     [ "moe_swiglu_expert_forward_bf16_row_range", "axpy__kernels_8c.html#a8e3f297e9eb3bbaae79736dedfd5e1f3", null ],
     [ "moe_swiglu_expert_forward_f32", "axpy__kernels_8c.html#ad882b6749a0724b4d0f76b2bf3675a26", null ],
+    [ "moe_swiglu_expert_forward_pytorch_bf16_storage", "axpy__kernels_8c.html#a4fba55591d34562afbde38826f9c0d80", null ],
     [ "moe_swiglu_expert_forward_q4k_q4k_parallel_workspace", "axpy__kernels_8c.html#a791182eaf5b9a6f691fd0ec4525fe4f6", null ],
     [ "moe_swiglu_expert_forward_q4k_q4k_workspace", "axpy__kernels_8c.html#a3d5558c312193036d33dd3b068ac1c53", null ],
     [ "moe_swiglu_expert_forward_q4k_q5_0_parallel_workspace", "axpy__kernels_8c.html#a83f7e6ddd98598df4f2170ea22ef2277", null ],

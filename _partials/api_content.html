@@ -6753,7 +6753,7 @@ test_attention.py::TestAttentionForward::test_flash_decode</p>
 
 
 <details open>
-    <summary>SwiGLU Activation (67)</summary>
+    <summary>SwiGLU Activation (68)</summary>
     <div class="accordion-content">
 
 
@@ -6923,6 +6923,16 @@ test_attention.py::TestAttentionForward::test_flash_decode</p>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int moe_swiglu_expert_forward_nvfp4_workspace(const float * hidden, const int * indices, const float * routing_weights, const void * expert_gate, const float * expert_gate_scales, const void * expert_up, const float * expert_up_scales, const void * expert_down, const float * expert_down_scales, float * output, int rows, int hidden_dim, int intermediate_dim, int n_experts, int top_k, void * workspace, size_t workspace_bytes)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Forward pass computation</p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">moe_swiglu_expert_forward_pytorch_bf16_storage</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void moe_swiglu_expert_forward_pytorch_bf16_storage(const float * hidden, const int * indices, const float * routing_weights, const uint16_t * expert_gate, const uint16_t * expert_up, const uint16_t * expert_down, float * output, int rows, int hidden_dim, int intermediate_dim, int n_experts, int top_k)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Forward pass computation</p>
         </div>
 

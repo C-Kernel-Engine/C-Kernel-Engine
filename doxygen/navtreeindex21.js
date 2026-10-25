@@ -1,5 +1,7 @@
 var NAVTREEINDEX21 =
 {
+"structCKModel.html#aeb95a6d38bdc2c75a2c482e92b4e5e80":[1,0,50,5],
+"structCKModel.html#afdaa49dc294acb37ed54a2708b6bc8e0":[1,0,50,17],
 "structCKModelBatchDecodeRowV8.html":[1,0,51],
 "structCKModelBatchDecodeRowV8.html#a13bb49032a04a00f5259c4674a2f32d3":[1,0,51,4],
 "structCKModelBatchDecodeRowV8.html#a92611fee2012380bf4db35222b583bb2":[1,0,51,0],
@@ -247,7 +249,5 @@ var NAVTREEINDEX21 =
 "structCPUInfo.html#aa67080f78191b764515728bdabf55924":[1,0,72,37],
 "structCPUInfo.html#aabf53af233c0f5d4692beb98fa2c2434":[1,0,72,21],
 "structCPUInfo.html#aaf14c11cad59d839d69e7fa7e367dd05":[1,0,72,41],
-"structCPUInfo.html#ac02376e5e445112e00ec31ff39f0bd17":[1,0,72,11],
-"structCPUInfo.html#ac41947b54c3a9b315338aee3113b5714":[1,0,72,3],
-"structCPUInfo.html#ac60a906dc4aaa71a6ca5453d6628fa2e":[1,0,72,23]
+"structCPUInfo.html#ac02376e5e445112e00ec31ff39f0bd17":[1,0,72,11]
 };

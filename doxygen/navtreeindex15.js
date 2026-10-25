@@ -1,5 +1,7 @@
 var NAVTREEINDEX15 =
 {
+"gemm__microkernel_8c.html#af3dd4e1707c284abe511ed15be5c4f8f":[2,0,1,1,75,7],
+"gemm__microkernel_8c.html#af4c2881c7acb7acd3e792dcce0469e27":[2,0,1,1,75,15],
 "gemm__microkernel_8c_source.html":[2,0,1,1,75],
 "gemma4__per__layer__embed_8c.html":[2,0,1,1,76],
 "gemma4__per__layer__embed_8c.html#a0020e0bc4bd80b2f2499bb960a5b4365":[2,0,1,1,76,18],
@@ -247,7 +249,5 @@ var NAVTREEINDEX15 =
 "include_2data__structures_2tries_2trie_8h_source.html":[2,0,0,0,0,0],
 "index.html":[],
 "kokoro__shape__bounds_8c.html":[2,0,1,1,82],
-"kokoro__shape__bounds_8c.html#a665733e67504d5412730d8733bceb0a4":[2,0,1,1,82,2],
-"kokoro__shape__bounds_8c.html#a6e9dd3692c2772fcd7b34548215ac63b":[2,0,1,1,82,0],
-"kokoro__shape__bounds_8c.html#adbbc04010193d2f3eafd68457c75a0dc":[2,0,1,1,82,1]
+"kokoro__shape__bounds_8c.html#a665733e67504d5412730d8733bceb0a4":[2,0,1,1,82,2]
 };
