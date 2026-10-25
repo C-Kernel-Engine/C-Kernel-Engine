@@ -37,7 +37,7 @@ var searchData=
   ['learning_5frate_34',['learning_rate',['../structCKMetricsContext.html#a564f1b4ed0ffd23fdd066b45642b317f',1,'CKMetricsContext']]],
   ['left_35',['left',['../structCKMergeRule.html#a2f4fb999c8ad7581926948836ad96949',1,'CKMergeRule::left'],['../true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd',1,'left:&#160;true_bpe.h']]],
   ['left_5fid_36',['left_id',['../true__bpe_8h.html#a653610ea9bf7b912ffcd7b95ba5b37eb',1,'true_bpe.h']]],
-  ['legacy_20code_20not_20used_20in_20v6_206_37',['legacy code not used in v6 6',['../ckernel__codegen_8c.html#autotoc_md12',1,'LEGACY CODE - NOT USED IN v6.6'],['../ckernel__orchestration_8c.html#autotoc_md15',1,'LEGACY CODE - NOT USED IN v6.6']]],
+  ['legacy_20code_20not_20used_20in_20v6_206_37',['legacy code not used in v6 6',['../ckernel__codegen_8c.html#autotoc_md13',1,'LEGACY CODE - NOT USED IN v6.6'],['../ckernel__orchestration_8c.html#autotoc_md16',1,'LEGACY CODE - NOT USED IN v6.6']]],
   ['legacy_20header_20not_20used_20in_20v6_206_38',['LEGACY HEADER - NOT USED IN v6.6',['../ckernel__orchestration_8h.html#autotoc_md3',1,'']]],
   ['level_39',['level',['../structCacheInfo.html#a2bbafb632144b03c4ac4d74fea63b438',1,'CacheInfo']]],
   ['levels_40',['levels',['../structCacheTopology.html#a312d10896e318962d7a948eb04aaddd0',1,'CacheTopology']]],

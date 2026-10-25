@@ -13,7 +13,7 @@ var searchData=
   ['base_10',['base',['../structck__bump__alloc__t.html#a66772500081c422f01e036ff8f6db361',1,'ck_bump_alloc_t::base'],['../structCKModel.html#a159f37ead73ec53796773938896ad8c8',1,'CKModel::base'],['../structQWEN2__0__5B__DECODEModel.html#a07e198cd09baeda89471f687bf5ac3b7',1,'QWEN2_0_5B_DECODEModel::base']]],
   ['base_5ffreq_5fmhz_11',['base_freq_mhz',['../structCPUInfo.html#acfedda3a3d92c0fd6dde00f5757fdf92',1,'CPUInfo']]],
   ['batch_5fsize_12',['batch_size',['../structCKMetricsContext.html#ac39d3a091252ba9b4feef6212768340f',1,'CKMetricsContext::batch_size'],['../structCKModel.html#a139ab3cacb7c652d47bf8fcb0f2d4826',1,'CKModel::batch_size']]],
-  ['benefit_3a_13',['benefit:',['../fused__rmsnorm__linear_8c.html#autotoc_md30',1,'FUSION BENEFIT:'],['../fp16__convert_8c.html#autotoc_md27',1,'MEGA-FUSION BENEFIT:']]],
+  ['benefit_3a_13',['benefit:',['../fused__rmsnorm__linear_8c.html#autotoc_md31',1,'FUSION BENEFIT:'],['../fp16__convert_8c.html#autotoc_md28',1,'MEGA-FUSION BENEFIT:']]],
   ['best_5finterface_5fidx_14',['best_interface_idx',['../structNetworkTopology.html#adcb93d96209df982a321bc0a16c37637',1,'NetworkTopology']]],
   ['best_5fkernel_15',['best_kernel',['../structck__capability__t.html#a191ce26013f94ccb8f51a5fa5dd8c04b',1,'ck_capability_t']]],
   ['bf16_5ftensor_5fto_5ffloat_16',['bf16_tensor_to_float',['../bf16__utils_8h.html#a94c0b1e3b43eb46dcce37900ed5c1333',1,'bf16_utils.h']]],

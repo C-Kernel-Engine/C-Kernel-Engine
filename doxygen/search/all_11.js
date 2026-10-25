@@ -17,7 +17,7 @@ var searchData=
   ['node_5fid_14',['node_id',['../structNUMANode.html#a11cae96c43efc187a78bb509aa86355b',1,'NUMANode']]],
   ['nodes_15',['nodes',['../structCKIRGraph.html#aab28fe3564ea6a66b72b4226d05ffb2f',1,'CKIRGraph::nodes'],['../structCKIRV2Graph.html#a82745ad41882ae6c770f18a7759b23f6',1,'CKIRV2Graph::nodes'],['../structNUMATopology.html#a4f4876ca34eed1e6c7732e611a13a674',1,'NUMATopology::nodes']]],
   ['norm_5ftype_16',['norm_type',['../structCKSectionConfig.html#a96ef28b42bf7654f3eeb5167950f31e9',1,'CKSectionConfig']]],
-  ['not_20used_20in_20v6_206_17',['not used in v6 6',['../ckernel__orchestration_8c.html#autotoc_md15',1,'LEGACY CODE - NOT USED IN v6.6'],['../ckernel__codegen_8c.html#autotoc_md12',1,'LEGACY CODE - NOT USED IN v6.6'],['../ckernel__orchestration_8h.html#autotoc_md3',1,'LEGACY HEADER - NOT USED IN v6.6']]],
+  ['not_20used_20in_20v6_206_17',['not used in v6 6',['../ckernel__orchestration_8c.html#autotoc_md16',1,'LEGACY CODE - NOT USED IN v6.6'],['../ckernel__codegen_8c.html#autotoc_md13',1,'LEGACY CODE - NOT USED IN v6.6'],['../ckernel__orchestration_8h.html#autotoc_md3',1,'LEGACY HEADER - NOT USED IN v6.6']]],
   ['nr_18',['nr',['../gemm__microkernel_8c.html#af146485306ae74a2edf18636300fd107',1,'NR:&#160;gemm_microkernel.c'],['../structGEMMParams.html#adc0714de30284b4b62ecfac446979251',1,'GEMMParams::NR']]],
   ['nr_5ffixed_19',['NR_FIXED',['../gemm__microkernel_8c.html#af3dd4e1707c284abe511ed15be5c4f8f',1,'gemm_microkernel.c']]],
   ['num_5faffinity_5fcpus_20',['num_affinity_cpus',['../structAffinityInfo.html#aa8aceed4896f9d850b42199624e74f02',1,'AffinityInfo']]],

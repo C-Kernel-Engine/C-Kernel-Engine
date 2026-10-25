@@ -11,7 +11,7 @@ var searchData=
   ['opt_5fbytes_8',['opt_bytes',['../structCKModel.html#a4f3d9a363a8fc7d37556b33e6b20cd69',1,'CKModel']]],
   ['opt_5fend_9',['opt_end',['../structCKLayerOptimizerOffsets.html#ac4940fcc8708472a83f4622f033ebbb6',1,'CKLayerOptimizerOffsets']]],
   ['opt_5fstart_10',['opt_start',['../structCKLayerOptimizerOffsets.html#a768c2644e129903d370b4010d37c74eb',1,'CKLayerOptimizerOffsets']]],
-  ['optimization_3a_11',['PERFORMANCE OPTIMIZATION:',['../mega__fused__attention__prefill_8c.html#autotoc_md33',1,'']]],
+  ['optimization_3a_11',['PERFORMANCE OPTIMIZATION:',['../mega__fused__attention__prefill_8c.html#autotoc_md34',1,'']]],
   ['optimizer_5fkernels_2ec_12',['optimizer_kernels.c',['../optimizer__kernels_8c.html',1,'']]],
   ['optimizer_5fkernels_5fbf16_2ec_13',['optimizer_kernels_bf16.c',['../optimizer__kernels__bf16_8c.html',1,'']]],
   ['optional_14',['optional',['../structCKBufferSpec.html#a557043a61f56575dfa44c4f13b31cddb',1,'CKBufferSpec::optional'],['../structCKIRV2Buffer.html#a3b28242247696e6624bb2b9773c1e1a1',1,'CKIRV2Buffer::optional']]],

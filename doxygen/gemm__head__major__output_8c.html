@@ -161,7 +161,7 @@ Functions</h2></td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Output projection from head-major attention (NO LAYOUT CONVERSION) </p>
-<h1><a class="anchor" id="autotoc_md45"></a>
+<h1><a class="anchor" id="autotoc_md46"></a>
 CK-ENGINE KERNEL RULES:</h1>
 <ol type="1">
 <li>NO malloc/free - memory via bump allocator, pointers passed in</li>
@@ -171,7 +171,7 @@ CK-ENGINE KERNEL RULES:</h1>
 <li>Pure computation - deterministic, no side effects</li>
 </ol>
 <p>After changes: make test &amp;&amp; make llamacpp-parity-full</p>
-<h1><a class="anchor" id="autotoc_md46"></a>
+<h1><a class="anchor" id="autotoc_md47"></a>
 PROBLEM THIS SOLVES:</h1>
 <p>The standard mega_fused_attention_prefill has a bottleneck: attn_out [num_heads, tokens, head_dim] (head-major) → <a class="el" href="mega__fused__attention__prefill_8c.html#a3c0ac15e87fbf875bd91aad8288b7e7c">flatten_head_major()</a> - 448 memcpy calls for 32 tokens × 14 heads! → token-major buffer → GEMM output projection</p>
 <p>This kernel eliminates the flatten by reading head-major data directly with strided access. The output projection computes:</p>

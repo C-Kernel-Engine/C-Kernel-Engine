@@ -219,7 +219,7 @@ Functions</h2></td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Fused kernels for prefill phase with proper 2D tiling. </p>
-<h1><a class="anchor" id="autotoc_md36"></a>
+<h1><a class="anchor" id="autotoc_md37"></a>
 CK-ENGINE KERNEL RULES:</h1>
 <ol type="1">
 <li>NO malloc/free - memory via bump allocator, pointers passed in</li>
@@ -228,7 +228,7 @@ CK-ENGINE KERNEL RULES:</h1>
 <li>Pure computation - deterministic, no side effects</li>
 </ol>
 <p>After changes: make test &amp;&amp; make llamacpp-parity-full</p>
-<h2><a class="anchor" id="autotoc_md37"></a>
+<h2><a class="anchor" id="autotoc_md38"></a>
 KEY INSIGHT:</h2>
 <p>Naive M-dimension tiling (token tiles) causes weight reloading:</p><ul>
 <li>32 token tiles × 4MB weights = 128MB DRAM reads!</li>
@@ -238,7 +238,7 @@ KEY INSIGHT:</h2>
 <li>Process ALL tokens against that weight tile</li>
 <li>Weight tile stays in cache while streaming through tokens</li>
 </ul>
-<h2><a class="anchor" id="autotoc_md38"></a>
+<h2><a class="anchor" id="autotoc_md39"></a>
 TILING STRATEGY:</h2>
 <p>For C[M,N] = RMSNorm(A[M,K]) × B[N,K]^T:</p>
 <p>for n_tile in [0, N, TILE_N]: # Outer: weight tiles load B[n_tile:n_tile+TILE_N, :] into L3 for m_tile in [0, M, TILE_M]: # Inner: token tiles x_norm = rmsnorm(A[m_tile]) # x_norm in L2 C[m_tile, n_tile] = x_norm × B_tile # Consumes B from L3</p>
@@ -1884,10 +1884,10 @@ TILING STRATEGY:</h2>
 <div class="line"><span class="lineno">  196</span>}</div>
 <div class="ttc" id="ackernel__dtype_8h_html_a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226"><div class="ttname"><a href="ckernel__dtype_8h.html#a9d2373b6c685cf9421a6fb638964aa65a5d457ab016f0aa27984d875b9cc1f226">CK_DT_Q5_0</a></div><div class="ttdeci">@ CK_DT_Q5_0</div><div class="ttdef"><b>Definition</b> <a href="ckernel__dtype_8h_source.html#l00045">ckernel_dtype.h:45</a></div></div>
 <div class="ttc" id="ackernel__engine_8h_html_ab6bbe55b0fdb7a984ea9020ca18f76cc"><div class="ttname"><a href="ckernel__engine_8h.html#ab6bbe55b0fdb7a984ea9020ca18f76cc">gemm_nt_q8_0_q8_0</a></div><div class="ttdeci">void gemm_nt_q8_0_q8_0(const void *A_q8, const void *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdoc">gemm_nt_q8_0_q8_0 with optional bias (matches header signature)</div><div class="ttdef"><b>Definition</b> <a href="gemm__batch__int8_8c_source.html#l00552">gemm_batch_int8.c:552</a></div></div>
-<div class="ttc" id="ackernel__quant_8h_html_ab58c945a0911101ac318f093dfce1770"><div class="ttname"><a href="ckernel__quant_8h.html#ab58c945a0911101ac318f093dfce1770">gemm_nt_q5_0_q8_0</a></div><div class="ttdeci">void gemm_nt_q5_0_q8_0(const void *A_q8, const void *B_q5, const float *bias, float *C, int M, int N, int K)</div><div class="ttdoc">Batch GEMM with Q5_0 weights and Q8_0 activations for prefill.</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q5__0_8c_source.html#l01845">gemm_kernels_q5_0.c:1845</a></div></div>
+<div class="ttc" id="ackernel__quant_8h_html_ab58c945a0911101ac318f093dfce1770"><div class="ttname"><a href="ckernel__quant_8h.html#ab58c945a0911101ac318f093dfce1770">gemm_nt_q5_0_q8_0</a></div><div class="ttdeci">void gemm_nt_q5_0_q8_0(const void *A_q8, const void *B_q5, const float *bias, float *C, int M, int N, int K)</div><div class="ttdoc">Batch GEMM with Q5_0 weights and Q8_0 activations for prefill.</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q5__0_8c_source.html#l01851">gemm_kernels_q5_0.c:1851</a></div></div>
 <div class="ttc" id="ashow__config_8c_html_a3d5cffd490a70d568b820514b5a0f937"><div class="ttname"><a href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a></div><div class="ttdeci">#define C(color)</div><div class="ttdef"><b>Definition</b> <a href="show__config_8c_source.html#l00039">show_config.c:39</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="ckernel__dtype_8h_source.html#l00045">CK_DT_Q5_0</a>, <a class="el" href="ckernel__dtype_8h_source.html#l00043">CK_DT_Q8_0</a>, <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01845">gemm_nt_q5_0_q8_0()</a>, and <a class="el" href="gemm__batch__int8_8c_source.html#l00552">gemm_nt_q8_0_q8_0()</a>.</p>
+<p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="ckernel__dtype_8h_source.html#l00045">CK_DT_Q5_0</a>, <a class="el" href="ckernel__dtype_8h_source.html#l00043">CK_DT_Q8_0</a>, <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01851">gemm_nt_q5_0_q8_0()</a>, and <a class="el" href="gemm__batch__int8_8c_source.html#l00552">gemm_nt_q8_0_q8_0()</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="prefill__fused__gemm_8c_source.html#l00519">fused_rmsnorm_qkv_prefill_head_major_quant()</a>.</p>
 
@@ -1977,7 +1977,7 @@ TILING STRATEGY:</h2>
 <div class="line"><span class="lineno">  934</span>    }</div>
 <div class="line"><span class="lineno">  935</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="ckernel__dtype_8h_source.html#l00045">CK_DT_Q5_0</a>, <a class="el" href="ckernel__dtype_8h_source.html#l00043">CK_DT_Q8_0</a>, <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01845">gemm_nt_q5_0_q8_0()</a>, and <a class="el" href="gemm__batch__int8_8c_source.html#l00552">gemm_nt_q8_0_q8_0()</a>.</p>
+<p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="ckernel__dtype_8h_source.html#l00045">CK_DT_Q5_0</a>, <a class="el" href="ckernel__dtype_8h_source.html#l00043">CK_DT_Q8_0</a>, <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01851">gemm_nt_q5_0_q8_0()</a>, and <a class="el" href="gemm__batch__int8_8c_source.html#l00552">gemm_nt_q8_0_q8_0()</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="prefill__fused__gemm_8c_source.html#l00964">fused_mlp_swiglu_prefill_w1w2_quant()</a>.</p>
 

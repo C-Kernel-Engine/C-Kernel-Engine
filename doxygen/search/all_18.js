@@ -10,7 +10,7 @@ var searchData=
   ['use_5fcolors_7',['use_colors',['../show__config_8c.html#a7d98e2dd1964a2c9cdb897cc63f23d0b',1,'show_config.c']]],
   ['use_5ftrie_8',['use_trie',['../structCKTokenizerConfig.html#a6a4c7a490b1e83f6dfc73b351b3826ec',1,'CKTokenizerConfig::use_trie'],['../tokenizer_8h.html#abba2eff6b3bd59ba528a2828b636dc15',1,'use_trie:&#160;tokenizer.h']]],
   ['used_9',['used',['../structCKPoolBlock.html#ad15144404362a0676f0c46a5b5a8d0ba',1,'CKPoolBlock::used'],['../structCKTokenizerMemPool.html#a390bbe0c2c3c9c2dcc7f5fc14d8c587f',1,'CKTokenizerMemPool::used']]],
-  ['used_20in_20v6_206_10',['used in v6 6',['../ckernel__orchestration_8c.html#autotoc_md15',1,'LEGACY CODE - NOT USED IN v6.6'],['../ckernel__codegen_8c.html#autotoc_md12',1,'LEGACY CODE - NOT USED IN v6.6'],['../ckernel__orchestration_8h.html#autotoc_md3',1,'LEGACY HEADER - NOT USED IN v6.6']]],
+  ['used_20in_20v6_206_10',['used in v6 6',['../ckernel__orchestration_8c.html#autotoc_md16',1,'LEGACY CODE - NOT USED IN v6.6'],['../ckernel__codegen_8c.html#autotoc_md13',1,'LEGACY CODE - NOT USED IN v6.6'],['../ckernel__orchestration_8h.html#autotoc_md3',1,'LEGACY HEADER - NOT USED IN v6.6']]],
   ['user_5ftext_11',['user_text',['../structCKSessionGenerateRequestV8.html#ac5fa5c9cd39fee80c8274e6ddca104d1',1,'CKSessionGenerateRequestV8']]],
   ['utf8_2ec_12',['utf8.c',['../utf8_8c.html',1,'']]],
   ['utf8_2eh_13',['utf8.h',['../utf8_8h.html',1,'']]],

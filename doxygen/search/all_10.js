@@ -77,7 +77,7 @@ var searchData=
   ['max_5ftokens_74',['max_tokens',['../structCKSessionGenerateRequestV8.html#a24a2da51c5349c60b20a08880423a688',1,'CKSessionGenerateRequestV8']]],
   ['mc_75',['mc',['../structGEMMParams.html#a2956e1497d1e97174d5d17e872707769',1,'GEMMParams::MC'],['../gemm__microkernel_8c.html#a71d9e511e7e302cd831e83581219e70d',1,'MC:&#160;gemm_microkernel.c']]],
   ['measured_5fbandwidth_5fgbs_76',['measured_bandwidth_gbs',['../structMemoryInfo.html#a3f07269515a43e096aa98be0daa48f46',1,'MemoryInfo']]],
-  ['mega_20fusion_20benefit_3a_77',['MEGA-FUSION BENEFIT:',['../fp16__convert_8c.html#autotoc_md27',1,'']]],
+  ['mega_20fusion_20benefit_3a_77',['MEGA-FUSION BENEFIT:',['../fp16__convert_8c.html#autotoc_md28',1,'']]],
   ['mega_5ffuse_5fflash_5fattention_5favx_78',['mega_fuse_flash_attention_avx',['../mega__fused__attention__avx_8c.html#a460bd562be1b122ecd6f7a1ed67278db',1,'mega_fused_attention_avx.c']]],
   ['mega_5ffuse_5fget_5foptimal_5ftiles_79',['mega_fuse_get_optimal_tiles',['../mega__fused__attention_8h.html#a78cea35e8b996807df22a050b01c3471',1,'mega_fused_attention.h']]],
   ['mega_5ffuse_5fkv_5ftile_80',['MEGA_FUSE_KV_TILE',['../mega__fused__attention_8h.html#af5a9a3482344942ff204ca604ac1715b',1,'mega_fused_attention.h']]],
