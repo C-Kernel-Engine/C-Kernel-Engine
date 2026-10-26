@@ -1,11 +1,11 @@
 <!-- TITLE: v8 Training Kernel Capability Ledger -->
 <h1>v8 training kernel capability ledger</h1>
-<p>Generated from <code>version/v8/kernel_maps/*.json</code> by <code>version/v8/scripts/build_training_capability_ledger_v8.py</code>. Source digest: <code>9678dddad54494cd7dc546c8f20ff0c19ef005e41954519dbd66b834b86d6739</code>; provider maps: 463.</p>
+<p>Generated from <code>version/v8/kernel_maps/*.json</code> by <code>version/v8/scripts/build_training_capability_ledger_v8.py</code>. Source digest: <code>1ed66cdace727a928c1a7b9c59fbca482d17aeb3d969c43fb7d1bd43ca0e9bc6</code>; provider maps: 464.</p>
 <p>This is a <strong>map inventory, not a training PASS</strong>. A backward declaration means a backward provider is registered; it does not prove matching geometry, selection by a generated circuit, or executed PyTorch parity. BF16-tagged includes storage or arithmetic tags. Quantized forward maps do not imply quantized-base gradients or QLoRA support. Direct executed evidence: <code>NOT_MEASURED_BY_MAP_INVENTORY</code>.</p>
 <p><strong>Authoring, lowering, and execution are separate.</strong> The public <code>cke.nn</code> module list below comes from its Python source. A class existing there does not establish that v8 can lower it, select a backward provider, or certify a generated training run. Exact kernel-map operation names are not automatically equivalent to Python modules.</p>
 <table class="table"><thead><tr><th>Dtype family</th><th>Provider maps</th><th>Forward or unspecified</th><th>Declared training forward</th><th>Declared backward</th><th>Backward-named without mode</th><th>Maps with registered tests</th></tr></thead><tbody>
 <tr><td>fp32-tagged</td><td>300</td><td>276</td><td>15</td><td>24</td><td>5</td><td>259</td></tr>
-<tr><td>bf16-tagged</td><td>84</td><td>84</td><td>0</td><td>0</td><td>0</td><td>65</td></tr>
+<tr><td>bf16-tagged</td><td>85</td><td>85</td><td>0</td><td>0</td><td>0</td><td>65</td></tr>
 <tr><td>quantized</td><td>62</td><td>62</td><td>0</td><td>0</td><td>0</td><td>42</td></tr>
 <tr><td>unspecified</td><td>17</td><td>17</td><td>0</td><td>0</td><td>0</td><td>10</td></tr>
 </tbody></table>
@@ -26,7 +26,7 @@
 <tr><td>bf16-tagged</td><td>attention_sliding</td><td>2</td><td>—</td><td>—</td></tr>
 <tr><td>bf16-tagged</td><td>attn_gate_sigmoid_mul</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>bf16-tagged</td><td>embedding</td><td>1</td><td>—</td><td>—</td></tr>
-<tr><td>bf16-tagged</td><td>farskip_routed_shared_combine</td><td>2</td><td>—</td><td>—</td></tr>
+<tr><td>bf16-tagged</td><td>farskip_routed_shared_combine</td><td>3</td><td>—</td><td>—</td></tr>
 <tr><td>bf16-tagged</td><td>final_logit_scale</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>bf16-tagged</td><td>final_logit_softcap</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>bf16-tagged</td><td>full_softmax_topk_router</td><td>1</td><td>—</td><td>—</td></tr>
@@ -265,7 +265,7 @@
 <tr><td>unspecified</td><td>speculative_commit_or_reject</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>unspecified</td><td>tokenizer</td><td>1</td><td>—</td><td>—</td></tr>
 </tbody></table>
-<details><summary>All 463 provider maps</summary>
+<details><summary>All 464 provider maps</summary>
 <table class="table"><thead><tr><th>Map</th><th>Provider ID</th><th>Operation</th><th>Dtype family</th><th>Backward mode</th><th>Registered test</th></tr></thead><tbody>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/adamw_update_f32.json">version/v8/kernel_maps/adamw_update_f32.json</a></td><td>adamw_update_f32</td><td>optimizer</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/add_rows_checked_f32.json">version/v8/kernel_maps/add_rows_checked_f32.json</a></td><td>add_rows_checked_f32</td><td>add_rows_checked</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
@@ -430,6 +430,7 @@
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/embedding_three_table_layer_norm_f32.json">version/v8/kernel_maps/embedding_three_table_layer_norm_f32.json</a></td><td>embedding_three_table_layer_norm_f32</td><td>embedding_three_table_layer_norm</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/farskip_swiglu_shared_combine_bf16.json">version/v8/kernel_maps/farskip_swiglu_shared_combine_bf16.json</a></td><td>farskip_swiglu_shared_combine_bf16</td><td>farskip_routed_shared_combine</td><td>bf16-tagged</td><td>not declared</td><td>not registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/farskip_swiglu_shared_combine_pytorch_bf16_storage.json">version/v8/kernel_maps/farskip_swiglu_shared_combine_pytorch_bf16_storage.json</a></td><td>farskip_swiglu_shared_combine_pytorch_bf16_storage</td><td>farskip_routed_shared_combine</td><td>bf16-tagged</td><td>not declared</td><td>not registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/farskip_swiglu_shared_combine_pytorch_onednn_3_12_bf16_storage.json">version/v8/kernel_maps/farskip_swiglu_shared_combine_pytorch_onednn_3_12_bf16_storage.json</a></td><td>farskip_swiglu_shared_combine_pytorch_onednn_3_12_bf16_storage</td><td>farskip_routed_shared_combine</td><td>bf16-tagged</td><td>not declared</td><td>not registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/feature_concat.json">version/v8/kernel_maps/feature_concat.json</a></td><td>feature_concat</td><td>feature_concat</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/feature_concat_broadcast_rows_f32.json">version/v8/kernel_maps/feature_concat_broadcast_rows_f32.json</a></td><td>feature_concat_broadcast_rows_f32</td><td>feature_concat_broadcast_rows</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/feature_slice_copy.json">version/v8/kernel_maps/feature_slice_copy.json</a></td><td>feature_slice_copy</td><td>feature_slice_copy</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>

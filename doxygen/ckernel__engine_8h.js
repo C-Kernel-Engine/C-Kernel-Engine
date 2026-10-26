@@ -211,6 +211,8 @@ var ckernel__engine_8h =
     [ "farskip_swiglu_shared_combine_pytorch_bf16_storage", "ckernel__engine_8h.html#a9fa08c2d0ecabaa74ec717edd4643bc1", null ],
     [ "farskip_swiglu_shared_combine_pytorch_bf16_storage_parallel_dispatch", "ckernel__engine_8h.html#aea6b3b2d48bdc7ffe9a73068ab621fba", null ],
     [ "farskip_swiglu_shared_combine_pytorch_bf16_storage_row_range", "ckernel__engine_8h.html#a0087b34e52c554330c2e56040eb9eee6", null ],
+    [ "farskip_swiglu_shared_combine_pytorch_onednn_3_12_bf16_storage_checked", "ckernel__engine_8h.html#ae60ca4208be1507388da5fce5e542d17", null ],
+    [ "farskip_swiglu_shared_combine_pytorch_onednn_3_12_bf16_storage_workspace", "ckernel__engine_8h.html#a2d6457693161a1621e6e210be6cb9005", null ],
     [ "fc1_backward_kernel", "ckernel__engine_8h.html#a73e088d0e2388c78920e8fc99b0c3846", null ],
     [ "fc2_backward_kernel", "ckernel__engine_8h.html#a89a29fc853aae0baf9f6094fee52562a", null ],
     [ "feature_concat", "ckernel__engine_8h.html#ac3987d3d95a62a769029100abbbf852a", null ],

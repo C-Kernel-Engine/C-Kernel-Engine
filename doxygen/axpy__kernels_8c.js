@@ -47,6 +47,8 @@ var axpy__kernels_8c =
     [ "farskip_swiglu_shared_combine_bf16_row_range", "axpy__kernels_8c.html#ac2412b8506bd86fc87022cd55c912e1b", null ],
     [ "farskip_swiglu_shared_combine_pytorch_bf16_storage", "axpy__kernels_8c.html#a9fa08c2d0ecabaa74ec717edd4643bc1", null ],
     [ "farskip_swiglu_shared_combine_pytorch_bf16_storage_row_range", "axpy__kernels_8c.html#a0087b34e52c554330c2e56040eb9eee6", null ],
+    [ "farskip_swiglu_shared_combine_pytorch_onednn_3_12_bf16_storage_checked", "axpy__kernels_8c.html#ae60ca4208be1507388da5fce5e542d17", null ],
+    [ "farskip_swiglu_shared_combine_pytorch_onednn_3_12_bf16_storage_workspace", "axpy__kernels_8c.html#a2d6457693161a1621e6e210be6cb9005", null ],
     [ "gemm_nt_q4_k_packed_meta_x8_q8_k_gemv_order", "axpy__kernels_8c.html#ab9450aba197960356ce9b78278e3b4b1", null ],
     [ "gemm_nt_q4_k_q8_k_pairwise_split_min_parallel_dispatch", "axpy__kernels_8c.html#a6f443ad72c4490505c11c15765e4bc0b", null ],
     [ "gemm_q4_k_q8_k_compact_rows4", "axpy__kernels_8c.html#aed46b49a5b455d8c2389e37120166bc5", null ],

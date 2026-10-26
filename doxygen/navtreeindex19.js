@@ -1,5 +1,9 @@
 var NAVTREEINDEX19 =
 {
+"structCKBPEConfig.html#ab6d9b2ee3a8b5f532432a50c0613354c":[1,0,17,3],
+"structCKBPEConfig.html#abfb01eec95857319bd1dafbaf6336238":[1,0,17,0],
+"structCKBPEConfig.html#af3e1a881a51c302240ff8581f4cfcba5":[1,0,17,1],
+"structCKBufferSpec.html":[1,0,18],
 "structCKBufferSpec.html#a2b1e3d9cac9dfffef27a598dc88207c9":[1,0,18,2],
 "structCKBufferSpec.html#a313cd889d11375cfaf4db616ed1c99ac":[1,0,18,5],
 "structCKBufferSpec.html#a3d2e80ce499f08ea3e9d969de367f945":[1,0,18,0],
@@ -245,9 +249,5 @@ var NAVTREEINDEX19 =
 "structCKLayerForwardParams.html#a7bc3195febcef409f9bbbbbd55b55840":[1,0,37,0],
 "structCKLayerForwardParams.html#a7ca0c2bd14cfcde3504bd43030609e4b":[1,0,37,13],
 "structCKLayerForwardParams.html#a7e508ab8ae215c31fbae4f78b23d5929":[1,0,37,7],
-"structCKLayerForwardParams.html#a7e8ccf20ccec87eb230737334d589f5d":[1,0,37,44],
-"structCKLayerForwardParams.html#a86060e45304124966b764eb8db0365b7":[1,0,37,24],
-"structCKLayerForwardParams.html#a8b216d5540d147750b5b7d6ebe238445":[1,0,37,5],
-"structCKLayerForwardParams.html#a97ce8698227c9cf419c8e21d17cebc12":[1,0,37,31],
-"structCKLayerForwardParams.html#a98753685d03e778a1d655f8f3cd486ea":[1,0,37,42]
+"structCKLayerForwardParams.html#a7e8ccf20ccec87eb230737334d589f5d":[1,0,37,44]
 };

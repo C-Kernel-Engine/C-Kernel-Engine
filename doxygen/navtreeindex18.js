@@ -1,5 +1,9 @@
 var NAVTREEINDEX18 =
 {
+"rmsnorm__kernels__int4_8c.html#abd6eee8fe2cdb4c9b9934e93474f4f22":[2,0,1,1,115,3],
+"rmsnorm__kernels__int4_8c.html#ac4e3dd8120af16f51a0fc7178ba4d8cd":[2,0,1,1,115,5],
+"rmsnorm__kernels__int4_8c_source.html":[2,0,1,1,115],
+"rmsnorm__kernels__int8_8c.html":[2,0,1,1,116],
 "rmsnorm__kernels__int8_8c.html#a0296ca33e8e3ca947f0b2368c526aacd":[2,0,1,1,116,0],
 "rmsnorm__kernels__int8_8c.html#a05ce669a05d4f41b108073959a8a2449":[2,0,1,1,116,4],
 "rmsnorm__kernels__int8_8c.html#a45fe3ed3025a14b8ff912b887963cf4b":[2,0,1,1,116,2],
@@ -245,9 +249,5 @@ var NAVTREEINDEX18 =
 "structCKAudioWavInfo.html#ad5701d8a252c6d90e2658d18638b8eb0":[1,0,16,2],
 "structCKBPEConfig.html":[1,0,17],
 "structCKBPEConfig.html#a6d2ef23c628fac092ae6085b54705bb5":[1,0,17,2],
-"structCKBPEConfig.html#a8425351ff0b3ec6e13ab4dd55644911c":[1,0,17,4],
-"structCKBPEConfig.html#ab6d9b2ee3a8b5f532432a50c0613354c":[1,0,17,3],
-"structCKBPEConfig.html#abfb01eec95857319bd1dafbaf6336238":[1,0,17,0],
-"structCKBPEConfig.html#af3e1a881a51c302240ff8581f4cfcba5":[1,0,17,1],
-"structCKBufferSpec.html":[1,0,18]
+"structCKBPEConfig.html#a8425351ff0b3ec6e13ab4dd55644911c":[1,0,17,4]
 };
