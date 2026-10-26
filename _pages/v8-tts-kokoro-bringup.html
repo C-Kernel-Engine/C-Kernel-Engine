@@ -332,6 +332,20 @@ sample is about 80 ms and near silence. It is a numerical connection test,
 not intelligible Qwen speech. Producing later frames, EOS handling, a useful
 utterance, and a cancellable text-to-speech session remain. Tests:
 <code>tests/test_v8_qwen3_tts_first_frame_waveform.py</code>.</p>
+<p><strong>Generated first talker continuation:</strong> a bounded circuit seeds
+the 28-layer talker KV cache immediately after prompt prefill, then carries
+the first generated 16-codebook frame into the next talker input. The first
+codec ID uses the talker's embedding table; each of the remaining 15 IDs uses
+its own predictor codebook table. Circuit-declared FP32 sums combine those
+rows with the projected TTS pad row before one checked continuation step.
+This tests the feedback edge that the first-frame PCM graph does not execute.
+For the pinned utterance, all 16 generated IDs match; the next input has
+maximum absolute error 1.49e-8 and continuation logits 5.42e-5 against direct
+reference captures. An asset-free generated test checks rejection, output
+validity and recovery.
+It does not yet generate a second complete speech frame, loop to EOS, or
+produce an intelligible utterance. Test:
+<code>tests/test_v8_qwen3_tts_generated_talker_continuation.py</code>.</p>
 <p>On the decoder side, one checked generated entry reconstructs all 16 split-RVQ
 codebooks, transposes the resulting features, applies exact left zero padding,
 and executes the causal pre-convolution with pinned weights. It then transposes

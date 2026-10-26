@@ -29,8 +29,8 @@ artifact boundary as of 25 October 2026. Consult the
         <td>Exact tokenizer checks and two 32-token trajectories passed; isolated HTTP streaming and cancellation/recovery passed. Full-logit parity failed.</td>
         <td><strong>Chat only.</strong> This publisher variant declares no tool-output protocol; CKE returns HTTP 501 for tools. OpenHands coding tasks cannot pass this pairing yet.</td></tr>
       <tr><td>Nemotron Nano 9B v2 Q4_K_M</td><td><a href="https://docs.langchain.com/oss/python/deepagents/quickstart">LangChain Deep Agents</a> is a proposed harness.</td>
-        <td>A declared tool parser exists. A 42,132-token first-logit diagnostic matched the top token; its permissive threshold does not certify numerical parity.</td>
-        <td><strong>Not tested end to end.</strong> Run a real tool/result/task acceptance before enabling Deep Agents tools or subagents.</td></tr>
+        <td>A declared tool parser exists. Three restricted LangGraph file-read tool/result/final-answer attempts passed on one identified 2K bundle; a 42,132-token first-logit diagnostic matched the top token but does not certify numerical parity.</td>
+        <td><strong>Bounded file-read PASS.</strong> Edit/test tasks, Deep Agents, cancellation, longer context and subagents remain untested.</td></tr>
       <tr><td>Cohere Command R7B Q4_K_M</td><td><a href="https://docs.langchain.com/oss/python/integrations/chat/openai">LangChain ChatOpenAI</a> for plain chat.</td>
         <td>5,332 exact raw prompt IDs and bounded chat serving. First-logit differences remain measurable.</td>
         <td><strong>Chat only.</strong> The selected imported template does not establish tool calling. Command A+ and Cohere North are different artifacts with separate gates.</td></tr>
@@ -158,10 +158,17 @@ model = ChatOpenAI(
     temperature=0,
 )
 print(model.invoke("Say hello.").content)</pre>
-<p>Deep Agents requires working tool calling. Its provider/harness profile system does not
-establish that this Nemotron artifact handles a tool/result loop. Test that loop and a
-read/edit/validator task before creating a Deep Agent or enabling subagents. NVIDIA Dynamo is
-serving infrastructure, not the LangChain harness.</p>
+<p>A restricted LangGraph probe has now completed three consecutive <code>cat note.txt</code>
+tool calls, correlated results and correct final answers on one verified 2K bundle. Run
+<code>server/langgraph_read_acceptance.py</code> with <code>--base-url</code>, <code>--model</code>,
+<code>--run-dir</code>, <code>--expected-serving-identity</code> and
+<code>--expected-session-sha256</code>; its optional client dependencies are
+<code>langgraph</code> and <code>langchain-openai</code>. The retained result is
+<code>version/v8/reports/nemotron_langgraph_read_20261026.json</code>. The initial
+<code>/think</code> trial exhausted a 256-token output budget before a tool call; the passing
+matrix used a frozen <code>/no_think</code> prompt. This result does not certify a
+read/edit/validator task or LangChain Deep Agents. Test those before enabling subagents.
+NVIDIA Dynamo is serving infrastructure, not the LangChain harness.</p>
 <h3>Cohere text and LangChain</h3>
 <p>The same <code>ChatOpenAI</code> connection above can test plain chat with a deployed Cohere
 Command R7B model ID. Keep tools disabled for its selected imported chat-only template. Cohere
