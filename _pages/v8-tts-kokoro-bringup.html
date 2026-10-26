@@ -224,7 +224,7 @@ versions and hashes; the selected voice ID and asset hash are also open.</p>
 <td>Qwen3-TTS 0.6B CustomVoice, 12 Hz — first CKE comparison target</td>
 <td><a href="https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice/tree/85e237c12c027371202489a0ec509ded67b5e4b5"><code>Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice@85e237c</code></a>, Apache 2.0</td>
 <td>The pinned <a href="https://github.com/QwenLM/Qwen3-TTS/commit/022e286b98fbec7e1e916cb940cdf532cd9f488e">reference code</a> tokenizes text, applies a preset speaker and language, runs a 28-layer talker and 5-layer code predictor, then decodes the 16-group codec tokens into 24 kHz PCM. The CKE oracle capture records text token IDs, codec tokens and waveform.</td>
-<td>CKE now connects pinned text, language, speaker and codec prompt IDs through native embedding, text projection and the first talker block in one generated entry. A separate reference-code-fed codec entry executes all eight pre-transformer layers, both factor-2 vocoder upsamples, both complete ConvNeXt blocks, the channel-changing causal decoder ingress, all four decoder upsampling/residual blocks, and the final bounded 24 kHz PCM waveform. The 8- and 46-code-frame codec graphs are separately compiled. The remaining 27 talker blocks, code predictor, autonomous code generation and complete text-to-speech remain NOT_TESTED. This 0.6B CustomVoice variant ignores style instructions. Generated cache state, EOS and sampling remain to be contracted.</td>
+<td>CKE connects pinned prompt IDs through generated embedding, text projection and all 28 talker prefill blocks; a checked generated continuation graph executes three teacher-forced decode steps with KV state. A separate reference-code-fed codec entry executes the complete codec-to-24 kHz PCM path, with 8- and 46-frame graphs compiled separately. The five-layer code predictor now has a generated two-token prefill and fourteen teacher-forced decode calls for one speech frame. Predictor embeddings and codec IDs still come from the reference in these tests: autonomous code feedback, EOS/sampling, and complete text-to-speech remain NOT_TESTED. This 0.6B CustomVoice variant ignores style instructions.</td>
 </tr>
 <tr>
 <td>Kokoro v1.0</td>
@@ -279,10 +279,22 @@ so repeated-layer stitching remains tested without the model asset. The tests ar
 <code>tests/test_v8_indexed_sum_rows_checked.py</code> and
 <code>tests/test_v8_qwen3_tts_prompt_first_block.py</code> and
 <code>tests/test_v8_qwen3_tts_talker_prefill.py</code> and
-<code>tests/test_v8_qwen3_tts_talker_continuation.py</code>. Full code
-predictor, autonomous code production and text-to-waveform execution remain.
-On the
-decoder side, one checked generated entry reconstructs all 16 split-RVQ
+<code>tests/test_v8_qwen3_tts_talker_continuation.py</code>.</p>
+<p><strong>Qwen3-TTS code-predictor frame:</strong> the pinned CPU reference
+captures the first speech frame's two-token prefill, then fourteen one-token
+continuations. A generated five-layer prefill seeds caller-owned KV state;
+generated five-layer continuation calls append positions 2 through 15 with
+the declared codebook head for each step. With identical reference-supplied
+projected embeddings, all 15 greedy codebook IDs match, the largest newly
+appended KV-row difference is 2.46e-5, and the largest logit difference is
+6.49e-5. This certifies teacher-forced predictor arithmetic and cache
+progression, not autonomous code production. An intermediate layer-2 MLP
+output differs by 0.03125 on a value near 50,000, while its gate and up
+projections differ by at most 1.83e-4; the numerical diagnostics remain
+visible. Tests: <code>tests/test_v8_qwen3_tts_code_predictor_prefill.py</code>.
+Autonomous feedback, complete speech-code generation and text-to-waveform
+execution remain.</p>
+<p>On the decoder side, one checked generated entry reconstructs all 16 split-RVQ
 codebooks, transposes the resulting features, applies exact left zero padding,
 and executes the causal pre-convolution with pinned weights. It then transposes
 the result into token-major order, performs the pre-transformer input projection
