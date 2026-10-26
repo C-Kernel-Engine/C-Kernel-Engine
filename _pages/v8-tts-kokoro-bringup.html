@@ -224,7 +224,7 @@ versions and hashes; the selected voice ID and asset hash are also open.</p>
 <td>Qwen3-TTS 0.6B CustomVoice, 12 Hz — first CKE comparison target</td>
 <td><a href="https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice/tree/85e237c12c027371202489a0ec509ded67b5e4b5"><code>Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice@85e237c</code></a>, Apache 2.0</td>
 <td>The pinned <a href="https://github.com/QwenLM/Qwen3-TTS/commit/022e286b98fbec7e1e916cb940cdf532cd9f488e">reference code</a> tokenizes text, applies a preset speaker and language, runs a 28-layer talker and 5-layer code predictor, then decodes the 16-group codec tokens into 24 kHz PCM. The CKE oracle capture records text token IDs, codec tokens and waveform.</td>
-<td>CKE connects pinned prompt IDs through generated embedding, text projection and all 28 talker prefill blocks; a checked generated continuation graph separately executes three teacher-forced decode steps with KV state. One connected entry now selects the talker's first codec ID and generates all 15 predictor IDs for its first speech frame, using CKE-produced predictor input rows, feedback and KV updates. A separate reference-code-fed codec entry executes complete codec-to-24 kHz PCM, with 8- and 46-frame graphs compiled separately. The first-frame code IDs are not yet connected to that codec; later talker frames, EOS/sampling and complete text-to-speech remain NOT_TESTED. This 0.6B CustomVoice variant ignores style instructions.</td>
+<td>CKE connects pinned prompt IDs through generated embedding, text projection and all 28 talker prefill blocks; a checked generated continuation graph separately executes three teacher-forced decode steps with KV state. One connected entry selects the talker's first codec ID, generates all 15 predictor IDs and feeds that one frame into the complete codec, producing 1,920 PCM samples at 24 kHz. The retained one-frame reference comparison passes; this short output is near silence and is not playable speech. A separate reference-code-fed codec entry covers 8 and 46 frames. Later talker frames, EOS/sampling and complete text-to-speech remain NOT_TESTED. This 0.6B CustomVoice variant ignores style instructions.</td>
 </tr>
 <tr>
 <td>Kokoro v1.0</td>
@@ -321,6 +321,17 @@ bridge index plans; it does not supply neural intermediates. This certifies
 one pinned first frame, not continuation, EOS handling, codec-to-waveform
 composition, or complete text-to-speech. Tests:
 <code>tests/test_v8_qwen3_tts_talker_predictor_frame.py</code>.</p>
+<p><strong>Connected first frame to PCM:</strong> the generated ID scalars feed
+the matching 16 codec inputs as circuit edges, then the existing codec graph
+produces 1,920 finite samples at 24 kHz in the same native entry. The generated
+samples differ from a direct pinned one-frame PyTorch decoder capture by at
+most 9.55e-9. Waveform validity is cleared before talker execution and
+published only after the codec succeeds; an invalid selected codec table row
+prevents publication and permits recovery on the next call. The retained
+sample is about 80 ms and near silence. It is a numerical connection test,
+not intelligible Qwen speech. Producing later frames, EOS handling, a useful
+utterance, and a cancellable text-to-speech session remain. Tests:
+<code>tests/test_v8_qwen3_tts_first_frame_waveform.py</code>.</p>
 <p>On the decoder side, one checked generated entry reconstructs all 16 split-RVQ
 codebooks, transposes the resulting features, applies exact left zero padding,
 and executes the causal pre-convolution with pinned weights. It then transposes
