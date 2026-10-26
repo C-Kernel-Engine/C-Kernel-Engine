@@ -1,5 +1,7 @@
 var NAVTREEINDEX5 =
 {
+"ckernel__alloc_8c.html#a19108c1ddea653d46840daefcf542bb5":[2,0,1,16,2],
+"ckernel__alloc_8c.html#a34793e13c1b596328dfcc805c14381ab":[2,0,1,16,12],
 "ckernel__alloc_8c.html#a369266c24eacffb87046522897a570d5":[2,0,1,16,0],
 "ckernel__alloc_8c.html#a78d026646faf03ea83ff458d93f99b6a":[2,0,1,16,11],
 "ckernel__alloc_8c.html#a83159dbff7edb50adf987baf39f232c8":[2,0,1,16,6],
@@ -159,7 +161,9 @@ var NAVTREEINDEX5 =
 "ckernel__audio__snake__checked_8h.html#ac093580bc711f738335d22657ff17500":[2,0,0,23,0],
 "ckernel__audio__snake__checked_8h_source.html":[2,0,0,23],
 "ckernel__audio__text__embedding_8h.html":[2,0,0,24],
-"ckernel__audio__text__embedding_8h.html#a9767092c3dd433c75a9cfec16c7762fa":[2,0,0,24,0],
+"ckernel__audio__text__embedding_8h.html#a194345d4956203e4e58023c95a369d14":[2,0,0,24,0],
+"ckernel__audio__text__embedding_8h.html#a6c8023ad4e756c7b5b09cd6508cdc742":[2,0,0,24,2],
+"ckernel__audio__text__embedding_8h.html#a9767092c3dd433c75a9cfec16c7762fa":[2,0,0,24,1],
 "ckernel__audio__text__embedding_8h_source.html":[2,0,0,24],
 "ckernel__audio__zero__pad_8h.html":[2,0,0,25],
 "ckernel__audio__zero__pad_8h.html#a8e154fa3399ff4e4d5a982a2e720ed55":[2,0,0,25,1],
@@ -245,9 +249,5 @@ var NAVTREEINDEX5 =
 "ckernel__codegen__v2__sections_8c.html#a1a43f9f3bcd4506c4f8c237af70f0a04":[2,0,1,3,5,2],
 "ckernel__codegen__v2__sections_8c.html#a21a270a5a12b9a2b3f0e203fcc7b260c":[2,0,1,3,5,17],
 "ckernel__codegen__v2__sections_8c.html#a26bdf2b8cd441142de5a6cdd668fc6e4":[2,0,1,3,5,3],
-"ckernel__codegen__v2__sections_8c.html#a53921362b48f16a09556f3a2ed1a7cad":[2,0,1,3,5,4],
-"ckernel__codegen__v2__sections_8c.html#a58509f625e7fe7618d779aa877148934":[2,0,1,3,5,14],
-"ckernel__codegen__v2__sections_8c.html#a5c49554f4bb548792ba71593098ee340":[2,0,1,3,5,7],
-"ckernel__codegen__v2__sections_8c.html#a6251351b29a765643c4d864d7be295e7":[2,0,1,3,5,16],
-"ckernel__codegen__v2__sections_8c.html#a784a41eb11e59d580c4aa60579365431":[2,0,1,3,5,11]
+"ckernel__codegen__v2__sections_8c.html#a53921362b48f16a09556f3a2ed1a7cad":[2,0,1,3,5,4]
 };

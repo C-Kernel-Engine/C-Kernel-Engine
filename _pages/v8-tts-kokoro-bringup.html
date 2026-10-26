@@ -224,7 +224,7 @@ versions and hashes; the selected voice ID and asset hash are also open.</p>
 <td>Qwen3-TTS 0.6B CustomVoice, 12 Hz — first CKE comparison target</td>
 <td><a href="https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice/tree/85e237c12c027371202489a0ec509ded67b5e4b5"><code>Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice@85e237c</code></a>, Apache 2.0</td>
 <td>The pinned <a href="https://github.com/QwenLM/Qwen3-TTS/commit/022e286b98fbec7e1e916cb940cdf532cd9f488e">reference code</a> tokenizes text, applies a preset speaker and language, runs a 28-layer talker and 5-layer code predictor, then decodes the 16-group codec tokens into 24 kHz PCM. The CKE oracle capture records text token IDs, codec tokens and waveform.</td>
-<td>CKE connects pinned prompt IDs through generated embedding, text projection and all 28 talker prefill blocks; a checked generated continuation graph executes three teacher-forced decode steps with KV state. A separate reference-code-fed codec entry executes the complete codec-to-24 kHz PCM path, with 8- and 46-frame graphs compiled separately. The five-layer code predictor now has a generated two-token prefill and fourteen teacher-forced decode calls for one speech frame. Predictor embeddings and codec IDs still come from the reference in these tests: autonomous code feedback, EOS/sampling, and complete text-to-speech remain NOT_TESTED. This 0.6B CustomVoice variant ignores style instructions.</td>
+<td>CKE connects pinned prompt IDs through generated embedding, text projection and all 28 talker prefill blocks; a checked generated continuation graph executes three teacher-forced decode steps with KV state. A separate reference-code-fed codec entry executes the complete codec-to-24 kHz PCM path, with 8- and 46-frame graphs compiled separately. The five-layer code predictor now generates all 15 codebook IDs for one frame, including its own argmax, embedding feedback and KV updates in one generated entry. Its initial two-token input is still reference-supplied. The talker-to-predictor connection, EOS/sampling, generated-code-to-codec connection and complete text-to-speech remain NOT_TESTED. This 0.6B CustomVoice variant ignores style instructions.</td>
 </tr>
 <tr>
 <td>Kokoro v1.0</td>
@@ -292,8 +292,21 @@ progression, not autonomous code production. An intermediate layer-2 MLP
 output differs by 0.03125 on a value near 50,000, while its gate and up
 projections differ by at most 1.83e-4; the numerical diagnostics remain
 visible. Tests: <code>tests/test_v8_qwen3_tts_code_predictor_prefill.py</code>.
-Autonomous feedback, complete speech-code generation and text-to-waveform
-execution remain.</p>
+The teacher-forced suite remains a separate identical-input arithmetic lane.</p>
+<p><strong>Generated predictor feedback:</strong> a second circuit connects
+the prefill logits to checked final-row argmax, exact token-major codebook
+embedding, fourteen five-layer continuations and a final checked ID selection.
+One generated native entry emits all 15 predictor IDs in the pinned first
+speech frame, matching the reference sequence exactly. Maximum logit error
+across the continuation heads is 6.49e-5. The graph clears its valid-code
+count at the start of each invocation and publishes 15 only after the final
+selection succeeds. A late invalid embedding row leaves that count zero;
+restoring the weight permits reuse without reloading. This is autonomous
+<em>within the predictor frame</em>, starting from reference-supplied initial
+embeddings. The first talker code, complete talker generation, codec join,
+EOS/sampling and text-to-WAV remain unconnected. The cheap synthetic graph
+also tests alternate IDs and short → different → short reuse without model
+assets. Tests: <code>tests/test_v8_qwen3_tts_predictor_feedback.py</code>.</p>
 <p>On the decoder side, one checked generated entry reconstructs all 16 split-RVQ
 codebooks, transposes the resulting features, applies exact left zero padding,
 and executes the causal pre-convolution with pinned weights. It then transposes

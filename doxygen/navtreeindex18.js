@@ -1,5 +1,9 @@
 var NAVTREEINDEX18 =
 {
+"rmsnorm__kernels__int8_8c.html#a0296ca33e8e3ca947f0b2368c526aacd":[2,0,1,1,116,0],
+"rmsnorm__kernels__int8_8c.html#a05ce669a05d4f41b108073959a8a2449":[2,0,1,1,116,4],
+"rmsnorm__kernels__int8_8c.html#a45fe3ed3025a14b8ff912b887963cf4b":[2,0,1,1,116,2],
+"rmsnorm__kernels__int8_8c.html#a8bcb792646f1c21869164c8394c76bf1":[2,0,1,1,116,3],
 "rmsnorm__kernels__int8_8c.html#aa0f94daa3cbcf5611313ea3211874b55":[2,0,1,1,116,1],
 "rmsnorm__kernels__int8_8c_source.html":[2,0,1,1,116],
 "rmsnorm__q8__k__fused_8c.html":[2,0,1,1,0,10],
@@ -245,9 +249,5 @@ var NAVTREEINDEX18 =
 "structCKBPEConfig.html#ab6d9b2ee3a8b5f532432a50c0613354c":[1,0,17,3],
 "structCKBPEConfig.html#abfb01eec95857319bd1dafbaf6336238":[1,0,17,0],
 "structCKBPEConfig.html#af3e1a881a51c302240ff8581f4cfcba5":[1,0,17,1],
-"structCKBufferSpec.html":[1,0,18],
-"structCKBufferSpec.html#a2b1e3d9cac9dfffef27a598dc88207c9":[1,0,18,2],
-"structCKBufferSpec.html#a313cd889d11375cfaf4db616ed1c99ac":[1,0,18,5],
-"structCKBufferSpec.html#a3d2e80ce499f08ea3e9d969de367f945":[1,0,18,0],
-"structCKBufferSpec.html#a4af21c5671866d5883b7c95cd9032afd":[1,0,18,1]
+"structCKBufferSpec.html":[1,0,18]
 };

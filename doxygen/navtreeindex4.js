@@ -1,5 +1,7 @@
 var NAVTREEINDEX4 =
 {
+"ck__parity__api_8h.html#a3858997f4aa8579cd1e5ef3af9c1b633":[2,0,0,7,40],
+"ck__parity__api_8h.html#a39be7f87179b07496459ac582b0358fc":[2,0,0,7,23],
 "ck__parity__api_8h.html#a3b27a697b6b8b2463b5ae6da599d7d81":[2,0,0,7,29],
 "ck__parity__api_8h.html#a4198eccc7d458f35b88df4c9664834bf":[2,0,0,7,34],
 "ck__parity__api_8h.html#a426464dcb991e33454a0a082cb52d079":[2,0,0,7,6],
@@ -247,7 +249,5 @@ var NAVTREEINDEX4 =
 "ck__topology_8h_source.html":[2,0,0,13],
 "ckernel__alloc_8c.html":[2,0,1,16],
 "ckernel__alloc_8c.html#a061d0a5618d0d2b70adb0b6df132b30d":[2,0,1,16,3],
-"ckernel__alloc_8c.html#a08198388fe890bfe4b28ab6edbb9fea0":[2,0,1,16,4],
-"ckernel__alloc_8c.html#a19108c1ddea653d46840daefcf542bb5":[2,0,1,16,2],
-"ckernel__alloc_8c.html#a34793e13c1b596328dfcc805c14381ab":[2,0,1,16,12]
+"ckernel__alloc_8c.html#a08198388fe890bfe4b28ab6edbb9fea0":[2,0,1,16,4]
 };
