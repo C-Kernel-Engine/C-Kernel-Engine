@@ -2,6 +2,7 @@ var dir_40856f0cdd4bcafd28810d9265a200f7 =
 [
     [ "fused", "dir_1c853a5a8ed8516d7bf3abd0fdf6143b.html", "dir_1c853a5a8ed8516d7bf3abd0fdf6143b" ],
     [ "add_kernels_bf16.c", "add__kernels__bf16_8c.html", "add__kernels__bf16_8c" ],
+    [ "attention_decode_append_checked.c", "attention__decode__append__checked_8c.html", "attention__decode__append__checked_8c" ],
     [ "attention_decode_fused.c", "attention__decode__fused_8c.html", "attention__decode__fused_8c" ],
     [ "attention_flash_true.c", "attention__flash__true_8c.html", "attention__flash__true_8c" ],
     [ "attention_full_token_major.c", "attention__full__token__major_8c.html", "attention__full__token__major_8c" ],

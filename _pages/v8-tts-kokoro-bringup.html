@@ -261,14 +261,27 @@ at most 2.38e-7 and the first-block output by at most 9.54e-6. Invalid IDs and
 row indices stop downstream execution, while a valid but incorrect row edge
 fails the prompt checkpoint. The complete prefill uses 570 declared operations
 and 316 distinct weight tensors. Direct pinned PyTorch checkpoints cover each
-layer and final logits; this is fixed-prompt prefill evidence, not continuation
-or autonomous code production. Standard nightly also runs a two-layer
+layer and final logits. A separate checked continuation graph seeds 28
+caller-owned KV caches from generated prefill and executes three one-token
+teacher-forced decode steps through normal generated C. The step inputs are
+captured reference embeddings, so this tests continuation arithmetic and
+state, not autonomous code production. Each step checks the generated layer
+outputs, appended KV rows and logits against the pinned reference. The
+position is derived from a checked request step index; invalid positions
+reject before neural execution. On the pinned three-step replay, maximum
+differences are 6.78e-5 for the prefill cache, 6.20e-5 for decode layer
+outputs, 2.05e-5 for newly appended KV rows and 5.25e-5 for logits.
+The prefill cache copy is exact relative to CKE's own generated K/V;
+its comparison to PyTorch includes upstream projection drift. Standard
+nightly also runs a two-layer
 generated graph with nonzero synthetic weights and a scalar recurrence check,
 so repeated-layer stitching remains tested without the model asset. The tests are
 <code>tests/test_v8_indexed_sum_rows_checked.py</code> and
 <code>tests/test_v8_qwen3_tts_prompt_first_block.py</code> and
-<code>tests/test_v8_qwen3_tts_talker_prefill.py</code>. Decode cache, code
-predictor and text-to-waveform execution remain. On the
+<code>tests/test_v8_qwen3_tts_talker_prefill.py</code> and
+<code>tests/test_v8_qwen3_tts_talker_continuation.py</code>. Full code
+predictor, autonomous code production and text-to-waveform execution remain.
+On the
 decoder side, one checked generated entry reconstructs all 16 split-RVQ
 codebooks, transposes the resulting features, applies exact left zero padding,
 and executes the causal pre-convolution with pinned weights. It then transposes
