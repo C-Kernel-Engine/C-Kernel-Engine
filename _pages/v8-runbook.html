@@ -2244,6 +2244,33 @@ python3 server/harness_repeatability.py \
         time, complete server request time, and time outside native generation. Client tool execution
         occurs between requests and must be timed separately.
     </p>
+    <h4>Optional local harness nightly</h4>
+    <p>On a client host with active, identified Qwen and Gemma endpoints and an HTTP client environment containing <code>httpx</code>, run the
+        same repeatability config through <code>scripts/local_harness_nightly.py</code>.
+        It reuses the existing HTTP and harness runners, one exact endpoint at a
+        time, then checks their retained reports again without replaying tools.
+        A missing endpoint is <code>NOT_TESTED</code>, a wrong loaded identity is
+        <code>FAIL</code>, and a zero child exit without a passing reassessment is
+        <code>FAIL</code>. The local job does not start or replace model servers.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>.venv/bin/python3 scripts/local_harness_nightly.py \
+  --config /path/to/local-serving-matrix.json \
+  --state-dir /path/to/private-harness-nightly-state
+
+# After verifying the one-off command, schedule it on the client host:
+0 2 * * * cd /path/to/C-Kernel-Engine &amp;&amp; .venv/bin/python3 scripts/local_harness_nightly.py --config /path/to/local-serving-matrix.json --state-dir /path/to/private-harness-nightly-state &gt;&gt; /path/to/private-harness-nightly-state/cron.log 2&gt;&amp;1</pre>
+    </div>
+    <p class="mini-note">Create <code>PAUSE</code> in the private state directory
+        before the next scheduled start. It does not stop a sweep already running;
+        cancel that process explicitly if needed. A lock prevents overlapping
+        invocations. Each start immediately replaces <code>latest.json</code> with
+        <code>INCOMPLETE</code>; configuration and child-report errors leave a retained
+        terminal <code>FAIL</code> for the current run. The current repeatability config covers the Qwen Code and
+        Antigravity adapters. Nemotron's smaller LangGraph file-read probe and
+        chat-only family diagnostics have separate evidence; they do not inherit
+        this nightly's task PASS. A larger SVG edit-and-validator sweep requires
+        its own frozen task tier and artifact-specific results.</p>
 </div>
 
 <div class="card">
