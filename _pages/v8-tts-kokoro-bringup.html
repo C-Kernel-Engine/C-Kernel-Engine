@@ -246,6 +246,42 @@ versions and hashes; the selected voice ID and asset hash are also open.</p>
 </tr>
 </tbody>
 </table>
+<p><strong>Qwen3-TTS technical-text reference diagnostic:</strong> P3 runs of
+the pinned 0.6B CustomVoice model distinguish a model stop from a generation
+budget. The literal path and signed-number case
+<code>Read /home/antshiv/Workspace/C-Kernel-Engine/server_summary.txt. The value is -3.5, not +3.5.</code>
+reached a 320-token cap under deterministic greedy decoding, with 319 audio
+frames and no EOS; the replay reproduced the original diagnostic WAV SHA-256
+exactly. A plain sentence under the same greedy policy stopped at
+EOS. The pinned generation configuration defaults to sampling, while the
+earlier oracle capture requested greedy decoding. The sampled policy stopped
+on the literal case after 142
+audio frames, yielding 11.36 seconds of 24 kHz audio in 32.35 seconds on P3.
+The other six retained technical cases also reached EOS under sampled decoding.
+This identifies a text-and-policy interaction in the reference, not a CKE
+kernel defect. The retained technical-text corpus preserves source text and
+labels optional pronunciation expansions explicitly. The asset-backed
+<code>version/v8/tts/evaluate_qwen3_tts_accessibility_reference.py</code>
+records raw talker EOS, output hashes, model/reference identities, memory and
+timing; its cheap corpus/stop contract runs in standard nightly. Human
+listening, native CKE generation, and true
+first-audio latency remain separate unpassed gates. The official wrapper
+returns a complete waveform even when its text-input simulation mode is used;
+it does not establish streamed audio delivery. On the sampled diagnostic WAV,
+CKE Whisper Base recognized “not plus 3.5” but missed the minus sign and full
+path; this is supporting transcript evidence, not a human listening verdict
+or waveform-parity result. With an explicitly selected spoken expansion for
+the signed-number sentence, CKE Whisper recognized “minus 3.5, not plus 3.5.”
+That check uses different spoken input and still needs listening confirmation.
+Run the following in the pinned reference Python
+environment, with the verified model and reference checkouts set in the two
+environment variables:</p>
+<pre>PYTHONPATH="$CKE_QWEN3_TTS_REFERENCE_ROOT" python \
+  version/v8/tts/evaluate_qwen3_tts_accessibility_reference.py \
+  --model-dir "$CKE_QWEN3_TTS_MODEL_DIR" \
+  --case plain_update --case literal_path_signed \
+  --policy sampled --max-new-tokens 320 --require-eos \
+  --output-dir /tmp/cke-qwen3-accessibility-sampled</pre>
 <p><strong>Qwen3-TTS generated talker prefill:</strong> the committed CPU oracle for
 <code>Hello, this is CKE.</code> contains 15 text token IDs, 46 codec frames with 16
 code groups per frame, and 88,320 waveform samples at 24 kHz. The model snapshot
