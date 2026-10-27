@@ -2261,6 +2261,12 @@ python3 server/harness_repeatability.py \
 # After verifying the one-off command, schedule it on the client host:
 0 2 * * * cd /path/to/C-Kernel-Engine &amp;&amp; .venv/bin/python3 scripts/local_harness_nightly.py --config /path/to/local-serving-matrix.json --state-dir /path/to/private-harness-nightly-state &gt;&gt; /path/to/private-harness-nightly-state/cron.log 2&gt;&amp;1</pre>
     </div>
+    <p class="mini-note">For a scheduled run against current main, use a dedicated clean,
+        detached worktree and add <code>--refresh-main</code>. After publishing the
+        current run as <code>INCOMPLETE</code>, the runner fetches
+        <code>origin/main</code> and checks it out before probing endpoints. A dirty
+        checkout or failed fetch produces a retained <code>FAIL</code> for that run.
+        A <code>PAUSE</code> file skips the fetch and model work.</p>
     <p class="mini-note">Create <code>PAUSE</code> in the private state directory
         before the next scheduled start. It does not stop a sweep already running;
         cancel that process explicitly if needed. A lock prevents overlapping
