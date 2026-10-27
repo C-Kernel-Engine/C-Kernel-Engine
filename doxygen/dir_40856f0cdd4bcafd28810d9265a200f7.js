@@ -36,6 +36,7 @@ var dir_40856f0cdd4bcafd28810d9265a200f7 =
     [ "audio_zero_pad_checked.c", "audio__zero__pad__checked_8c.html", "audio__zero__pad__checked_8c" ],
     [ "axpy_kernels.c", "axpy__kernels_8c.html", "axpy__kernels_8c" ],
     [ "checked_float_buffer.h", "checked__float__buffer_8h.html", "checked__float__buffer_8h" ],
+    [ "concat_i32_checked.c", "concat__i32__checked_8c.html", "concat__i32__checked_8c" ],
     [ "deepseek_kernels.c", "deepseek__kernels_8c.html", "deepseek__kernels_8c" ],
     [ "deltanet_kernels.c", "deltanet__kernels_8c.html", "deltanet__kernels_8c" ],
     [ "dequant_kernels.c", "dequant__kernels_8c.html", "dequant__kernels_8c" ],

@@ -396,8 +396,19 @@ invalid bridge and over-capacity continuation before publishing the second
 frame count, preserves its selected output on failure, and recovers. This
 is connected generated execution from pinned text IDs, not an oracle-fed
 second frame. It is still one fixed non-EOS path: EOS-aware looping, later
-frames, joining multiple generated frames to the codec, and useful text-to-WAV
-remain. Test: <code>tests/test_v8_qwen3_tts_second_generated_frame.py</code>.</p>
+frames, and useful text-to-WAV remain. Test:
+<code>tests/test_v8_qwen3_tts_second_generated_frame.py</code>.</p>
+<p><strong>Two generated frames to PCM:</strong> a checked, model-neutral integer
+span concatenation provider packs each pair of CKE-generated codebook IDs
+into a two-frame input for the existing generated codec. The same generated
+entry then produces 3,840 FP32 samples at 24 kHz. The direct pinned decoder
+capture for these two frames is a separate oracle; the connected test matches
+all 32 IDs and has 8.85e-9 maximum waveform error. It preserves output
+validity on rejection and replays after recovery. This 160 ms fixed non-EOS
+prefix is diagnostic.
+It does not implement a generation loop, natural stopping, a useful utterance,
+or a speech session. Tests: <code>tests/test_v8_concat_i32_checked.py</code>
+and <code>tests/test_v8_qwen3_tts_two_frame_waveform.py</code>.</p>
 <p>On the decoder side, one checked generated entry reconstructs all 16 split-RVQ
 codebooks, transposes the resulting features, applies exact left zero padding,
 and executes the causal pre-convolution with pinned weights. It then transposes

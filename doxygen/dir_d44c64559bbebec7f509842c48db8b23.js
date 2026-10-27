@@ -29,6 +29,7 @@ var dir_d44c64559bbebec7f509842c48db8b23 =
     [ "ckernel_bump_v5.h", "ckernel__bump__v5_8h.html", "ckernel__bump__v5_8h" ],
     [ "ckernel_codegen.h", "ckernel__codegen_8h.html", "ckernel__codegen_8h" ],
     [ "ckernel_codegen_v2.h", "ckernel__codegen__v2_8h.html", "ckernel__codegen__v2_8h" ],
+    [ "ckernel_concat_i32.h", "ckernel__concat__i32_8h.html", "ckernel__concat__i32_8h" ],
     [ "ckernel_dtype.h", "ckernel__dtype_8h.html", "ckernel__dtype_8h" ],
     [ "ckernel_embedding_checked.h", "ckernel__embedding__checked_8h.html", "ckernel__embedding__checked_8h" ],
     [ "ckernel_engine.h", "ckernel__engine_8h.html", "ckernel__engine_8h" ],
