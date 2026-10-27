@@ -1060,9 +1060,9 @@ results from their listed source revisions, not continuously current endpoint st
       <tr><td>Instella-MoE Think BF16</td><td><a href="https://docs.openhands.dev/openhands/usage/llms/local-llms">OpenHands</a> is a proposed harness.</td>
         <td>An identified 4K bundle completed short chat and streaming requests. A 128-token answer was incomplete; the same prompt completed at 256. This older generated library lacks <code>ck_model_count_text_tokens</code>, so an oversized prompt returned ambiguous HTTP 500 <code>native_tokenization_failed</code>; a later short request completed. Regenerate and retest that admission gate. Separate opt-in numerical work still reports full-logit divergence.</td>
         <td><strong>Chat only, partial acceptance.</strong> This publisher variant declares no tool-output protocol; CKE returns HTTP 501 for tools. OpenHands coding tasks cannot pass this pairing yet.</td></tr>
-      <tr><td>Nemotron Nano 9B v2 Q4_K_M</td><td><a href="https://docs.langchain.com/oss/python/deepagents/quickstart">LangChain Deep Agents</a> is a proposed harness.</td>
-        <td>A declared tool parser exists. Three restricted LangGraph file-read tool/result/final-answer attempts passed on one identified 2K bundle; a 42,132-token first-logit diagnostic matched the top token but does not certify numerical parity.</td>
-        <td><strong>Bounded file-read PASS.</strong> Edit/test tasks, Deep Agents, cancellation, longer context and subagents remain untested.</td></tr>
+      <tr><td>Nemotron Nano 9B v2 Q4_K_M</td><td><a href="https://docs.langchain.com/oss/python/deepagents/quickstart">LangChain Deep Agents</a></td>
+        <td>Three restricted LangGraph file-read attempts passed on one identified 2K bundle. A separate 20K-capacity P3 bundle completed a real Deep Agents read → edit → validator → exact-answer task and a failed-tool recovery task on 27 October 2026; see <code>version/v8/reports/nemotron_deepagents_edit_test_20k_20261027.json</code>. Its five turns used 3,242–3,519 input tokens and took 1,184.5 seconds.</td>
+        <td><strong>Two bounded Deep Agents tasks PASS.</strong> The shared server validates the client's nullable <code>anyOf</code> tool fields. A missing-file result was followed by a valid read and accurate answer on the same instance. Repeated reliability, 20K inputs, numerical parity, cancellation and subagents remain untested.</td></tr>
       <tr><td>Cohere Command R7B Q4_K_M</td><td><a href="https://docs.langchain.com/oss/python/integrations/chat/openai">LangChain ChatOpenAI</a> for plain chat.</td>
         <td>On an identified 2K bundle, plain chat and streaming completed; a counted 5,009-token prompt returned HTTP 400 before generation, and a later request completed on the same instance. Earlier 5,332 exact raw prompt IDs and first-logit differences remain separate numerical evidence.</td>
         <td><strong>Bounded chat PASS; tools unsupported.</strong> The selected imported template rejects tool calls with HTTP 501. Command A+ and Cohere North are different artifacts with separate gates.</td></tr>
@@ -1198,9 +1198,18 @@ tool calls, correlated results and correct final answers on one verified 2K bund
 <code>langgraph</code> and <code>langchain-openai</code>. The retained result is
 <code>version/v8/reports/nemotron_langgraph_read_20261026.json</code>. The initial
 <code>/think</code> trial exhausted a 256-token output budget before a tool call; the passing
-matrix used a frozen <code>/no_think</code> prompt. This result does not certify a
-read/edit/validator task or LangChain Deep Agents. Test those before enabling subagents.
-NVIDIA Dynamo is serving infrastructure, not the LangChain harness.</p>
+matrix used a frozen <code>/no_think</code> prompt. A later, separate 20K-capacity
+P3 bundle passed one restricted LangChain Deep Agents read/edit/validator task using
+<code>deepagents 0.7.32</code> and <code>langchain-openai 1.7.2</code>. Its first attempt
+failed before generation because CKE rejected nullable <code>anyOf</code> tool fields;
+the patched server admitted the unchanged captured client schemas. The completed task
+used 3,242–3,519 actual input tokens, took 1,184.5 seconds, and kept the same loaded
+identity; see <code>version/v8/reports/nemotron_deepagents_edit_test_20k_20261027.json</code>.
+A separate failed-tool case then returned a file-not-found error, read the valid file,
+and reported both outcomes correctly in 702.4 seconds, with 3,044–3,167 input tokens.
+These two bounded tasks do not establish longer-context or repeatability certification.
+Test cancellation and subagents separately. NVIDIA Dynamo is serving infrastructure,
+not the LangChain harness.</p>
 <h3>Cohere text and LangChain</h3>
 <p>The same <code>ChatOpenAI</code> connection above can test plain chat with a deployed Cohere
 Command R7B model ID. Keep tools disabled for its selected imported chat-only template. Cohere
