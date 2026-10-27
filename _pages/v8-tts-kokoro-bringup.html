@@ -395,9 +395,17 @@ bridge has maximum absolute error 7.63e-5. A small generated test rejects an
 invalid bridge and over-capacity continuation before publishing the second
 frame count, preserves its selected output on failure, and recovers. This
 is connected generated execution from pinned text IDs, not an oracle-fed
-second frame. It is still one fixed non-EOS path: EOS-aware looping, later
-frames, and useful text-to-WAV remain. Test:
-<code>tests/test_v8_qwen3_tts_second_generated_frame.py</code>.</p>
+second frame. Selection now follows the pinned minimum-length and suppressed-ID
+parts of the greedy stop policy: the
+model's 2048–3071 suppressed ID range is excluded except for EOS 2150 after
+two emitted frames, and budget exhaustion has a separate positive status.
+Generated checked calls propagate stop status and skip dependent predictor
+work. The connected two-frame fixture has one prior frame, so it exercises
+minimum-length EOS suppression; synthetic generated tests exercise actual EOS
+and budget short-circuits. The pinned reference also applies a repetition
+penalty; that history-dependent rule, a repeated generation loop, later frames,
+and useful text-to-WAV remain. Tests: <code>tests/test_v8_select_next_id_checked.py</code>
+and <code>tests/test_v8_qwen3_tts_second_generated_frame.py</code>.</p>
 <p><strong>Two generated frames to PCM:</strong> a checked, model-neutral integer
 span concatenation provider packs each pair of CKE-generated codebook IDs
 into a two-frame input for the existing generated codec. The same generated
