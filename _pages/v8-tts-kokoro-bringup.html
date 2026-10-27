@@ -400,12 +400,17 @@ parts of the greedy stop policy: the
 model's 2048–3071 suppressed ID range is excluded except for EOS 2150 after
 two emitted frames, and budget exhaustion has a separate positive status.
 Generated checked calls propagate stop status and skip dependent predictor
-work. The connected two-frame fixture has one prior frame, so it exercises
-minimum-length EOS suppression; synthetic generated tests exercise actual EOS
-and budget short-circuits. The pinned reference also applies a repetition
-penalty; that history-dependent rule, a repeated generation loop, later frames,
-and useful text-to-WAV remain. Tests: <code>tests/test_v8_select_next_id_checked.py</code>
-and <code>tests/test_v8_qwen3_tts_second_generated_frame.py</code>.</p>
+work. The second-frame graph now applies the reference's sign-dependent
+repetition penalty to the first CKE-generated code ID before selection. It
+penalizes duplicate history IDs once, with a declared 105/100 factor and
+checked output preservation. The pinned adjusted-logit checkpoint has maximum
+absolute error 5.41e-5. The connected fixture exercises minimum-length
+EOS suppression; synthetic generated tests exercise actual EOS, budget
+short-circuits, and invalid penalty history. A repeated KV-backed generation
+loop, later-frame history accumulation, and useful text-to-WAV remain. Tests:
+<code>tests/test_v8_select_next_id_checked.py</code>,
+<code>tests/test_v8_repetition_penalty_checked.py</code>, and
+<code>tests/test_v8_qwen3_tts_second_generated_frame.py</code>.</p>
 <p><strong>Two generated frames to PCM:</strong> a checked, model-neutral integer
 span concatenation provider packs each pair of CKE-generated codebook IDs
 into a two-frame input for the existing generated codec. The same generated

@@ -114,6 +114,7 @@ var dir_40856f0cdd4bcafd28810d9265a200f7 =
     [ "recurrent_state_kernels.c", "recurrent__state__kernels_8c.html", "recurrent__state__kernels_8c" ],
     [ "relu_kernels.c", "relu__kernels_8c.html", "relu__kernels_8c" ],
     [ "relu_kernels_bf16.c", "relu__kernels__bf16_8c.html", "relu__kernels__bf16_8c" ],
+    [ "repetition_penalty_checked.c", "repetition__penalty__checked_8c.html", "repetition__penalty__checked_8c" ],
     [ "rmsnorm_kernels.c", "rmsnorm__kernels_8c.html", "rmsnorm__kernels_8c" ],
     [ "rmsnorm_kernels_bf16.c", "rmsnorm__kernels__bf16_8c.html", "rmsnorm__kernels__bf16_8c" ],
     [ "rmsnorm_kernels_int4.c", "rmsnorm__kernels__int4_8c.html", "rmsnorm__kernels__int4_8c" ],

@@ -1,10 +1,10 @@
 <!-- TITLE: v8 Training Kernel Capability Ledger -->
 <h1>v8 training kernel capability ledger</h1>
-<p>Generated from <code>version/v8/kernel_maps/*.json</code> by <code>version/v8/scripts/build_training_capability_ledger_v8.py</code>. Source digest: <code>7ae5d52e7e14c7012453a8320497b11312de22af4e0c33a3b03c891e97fc6791</code>; provider maps: 466.</p>
+<p>Generated from <code>version/v8/kernel_maps/*.json</code> by <code>version/v8/scripts/build_training_capability_ledger_v8.py</code>. Source digest: <code>e0274c8ada45df0b49e448d40bf23bbd1ae670ad3e1de980a49e1f8b0145d181</code>; provider maps: 467.</p>
 <p>This is a <strong>map inventory, not a training PASS</strong>. A backward declaration means a backward provider is registered; it does not prove matching geometry, selection by a generated circuit, or executed PyTorch parity. BF16-tagged includes storage or arithmetic tags. Quantized forward maps do not imply quantized-base gradients or QLoRA support. Direct executed evidence: <code>NOT_MEASURED_BY_MAP_INVENTORY</code>.</p>
 <p><strong>Authoring, lowering, and execution are separate.</strong> The public <code>cke.nn</code> module list below comes from its Python source. A class existing there does not establish that v8 can lower it, select a backward provider, or certify a generated training run. Exact kernel-map operation names are not automatically equivalent to Python modules.</p>
 <table class="table"><thead><tr><th>Dtype family</th><th>Provider maps</th><th>Forward or unspecified</th><th>Declared training forward</th><th>Declared backward</th><th>Backward-named without mode</th><th>Maps with registered tests</th></tr></thead><tbody>
-<tr><td>fp32-tagged</td><td>301</td><td>277</td><td>15</td><td>24</td><td>5</td><td>260</td></tr>
+<tr><td>fp32-tagged</td><td>302</td><td>278</td><td>15</td><td>24</td><td>5</td><td>261</td></tr>
 <tr><td>bf16-tagged</td><td>85</td><td>85</td><td>0</td><td>0</td><td>0</td><td>65</td></tr>
 <tr><td>quantized</td><td>62</td><td>62</td><td>0</td><td>0</td><td>0</td><td>42</td></tr>
 <tr><td>unspecified</td><td>18</td><td>18</td><td>0</td><td>0</td><td>0</td><td>11</td></tr>
@@ -198,6 +198,7 @@
 <tr><td>fp32-tagged</td><td>recurrent_split_qkv</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>recurrent_split_qkv_backward</td><td>1</td><td>—</td><td>recurrent_split_qkv_backward_f32</td></tr>
 <tr><td>fp32-tagged</td><td>relu2</td><td>2</td><td>relu2_backward_f32</td><td>—</td></tr>
+<tr><td>fp32-tagged</td><td>repetition_penalty_last_row_checked</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>residual_add</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>residual_save</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>rmsnorm</td><td>7</td><td>rmsnorm_backward</td><td>—</td></tr>
@@ -267,7 +268,7 @@
 <tr><td>unspecified</td><td>speculative_commit_or_reject</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>unspecified</td><td>tokenizer</td><td>1</td><td>—</td><td>—</td></tr>
 </tbody></table>
-<details><summary>All 466 provider maps</summary>
+<details><summary>All 467 provider maps</summary>
 <table class="table"><thead><tr><th>Map</th><th>Provider ID</th><th>Operation</th><th>Dtype family</th><th>Backward mode</th><th>Registered test</th></tr></thead><tbody>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/adamw_update_f32.json">version/v8/kernel_maps/adamw_update_f32.json</a></td><td>adamw_update_f32</td><td>optimizer</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/add_rows_checked_f32.json">version/v8/kernel_maps/add_rows_checked_f32.json</a></td><td>add_rows_checked_f32</td><td>add_rows_checked</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
@@ -661,6 +662,7 @@
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/recurrent_split_qkv_forward.json">version/v8/kernel_maps/recurrent_split_qkv_forward.json</a></td><td>recurrent_split_qkv_forward</td><td>recurrent_split_qkv</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/relu2_backward.json">version/v8/kernel_maps/relu2_backward.json</a></td><td>relu2_backward_f32</td><td>relu2</td><td>fp32-tagged</td><td>declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/relu2_forward.json">version/v8/kernel_maps/relu2_forward.json</a></td><td>relu2_forward</td><td>relu2</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/repetition_penalty_last_row_checked_f32.json">version/v8/kernel_maps/repetition_penalty_last_row_checked_f32.json</a></td><td>repetition_penalty_last_row_checked_f32</td><td>repetition_penalty_last_row_checked</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/residual_add_backward_f32.json">version/v8/kernel_maps/residual_add_backward_f32.json</a></td><td>residual_add_backward_f32</td><td>add_backward</td><td>fp32-tagged</td><td>declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/rmsnorm_backward.json">version/v8/kernel_maps/rmsnorm_backward.json</a></td><td>rmsnorm_backward</td><td>rmsnorm</td><td>fp32-tagged</td><td>declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/rmsnorm_forward.json">version/v8/kernel_maps/rmsnorm_forward.json</a></td><td>rmsnorm_forward</td><td>rmsnorm</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>

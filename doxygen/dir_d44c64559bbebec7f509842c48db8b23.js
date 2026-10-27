@@ -48,6 +48,7 @@ var dir_d44c64559bbebec7f509842c48db8b23 =
     [ "ckernel_orchestration.h", "ckernel__orchestration_8h.html", "ckernel__orchestration_8h" ],
     [ "ckernel_quant.h", "ckernel__quant_8h.html", "ckernel__quant_8h" ],
     [ "ckernel_registry.h", "ckernel__registry_8h.html", "ckernel__registry_8h" ],
+    [ "ckernel_repetition_penalty_checked.h", "ckernel__repetition__penalty__checked_8h.html", "ckernel__repetition__penalty__checked_8h" ],
     [ "ckernel_runtime_extent.h", "ckernel__runtime__extent_8h.html", "ckernel__runtime__extent_8h" ],
     [ "ckernel_rwkv7_decode.h", "ckernel__rwkv7__decode_8h.html", "ckernel__rwkv7__decode_8h" ],
     [ "ckernel_section_layout.h", "ckernel__section__layout_8h.html", "ckernel__section__layout_8h" ],
