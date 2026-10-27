@@ -28,7 +28,7 @@ results from their listed source revisions, not continuously current endpoint st
         <td><strong>Bounded PASS for short tasks.</strong> The 32K build capacity is not a 32K-input result. The chat-only variant rejects tools; overnight reliability remains untested.</td></tr>
       <tr><td>Muse Glimmer</td><td>Direct OpenAI-compatible HTTP is tested; Muse Code and Hermes Agent remain separate client gates.</td>
         <td>On an identified 32K-capacity bundle, a direct HTTP file-read call and correlated result produced the exact final value. The continuation used 518 input and 328 output tokens; a 256-token cap failed mid-reasoning. See <code>version/v8/reports/serving_family_http_sweep_20261026.json</code>.</td>
-        <td><strong>Bounded HTTP tool PASS.</strong> The pinned Hermes Agent refused this 32K bundle because it requires at least 64K context. Muse Code routing, a complete coding task and actual 32K input remain untested.</td></tr>
+        <td><strong>Bounded HTTP tool PASS.</strong> The pinned Hermes Agent refused this 32K bundle because it requires at least 64K context. A captured Muse Code 1.4.8 file-task request rendered to 36,748 tokens, also exceeding the 32K bundle. A Muse Code task and long-context generation remain untested.</td></tr>
       <tr><td>Instella-MoE Think BF16</td><td><a href="https://docs.openhands.dev/openhands/usage/llms/local-llms">OpenHands</a> is a proposed harness.</td>
         <td>An identified 4K bundle completed short chat and streaming requests. A 128-token answer was incomplete; the same prompt completed at 256. This older generated library lacks <code>ck_model_count_text_tokens</code>, so an oversized prompt returned ambiguous HTTP 500 <code>native_tokenization_failed</code>; a later short request completed. Regenerate and retest that admission gate. Separate opt-in numerical work still reports full-logit divergence.</td>
         <td><strong>Chat only, partial acceptance.</strong> This publisher variant declares no tool-output protocol; CKE returns HTTP 501 for tools. OpenHands coding tasks cannot pass this pairing yet.</td></tr>
@@ -196,7 +196,12 @@ This was not a Muse Code CLI run. The pinned Hermes Agent client rejected the bu
 inference because it requires a 64K context window. Do not misstate the compiled 32K window
 to bypass that check; build and independently test a larger bundle if using that client.
 The HTTP trial used at most 518 input tokens and needed 328 output tokens for continuation.
-It does not certify a 32K input, an edit-and-test workflow, or Muse Code endpoint routing.</p>
+A separate Muse Code 1.4.8 file-task request rendered to 168,861 bytes and 36,748
+tokenizer tokens with its bundled instructions and 32 namespace tools. The 32K runtime
+cannot admit that request. A 64K-capacity bundle was built for an isolated client trial;
+capacity alone does not certify its result. Keep a bounded output allowance and verify
+loaded identity, actual tool execution, terminal status and follow-up recovery before
+calling the CLI pairing ready. Neither trial certifies an edit-and-test workflow.</p>
 
 <h2 id="acceptance">What counts as ready for work?</h2>
 <p>For each exact bundle, retain the loaded identity and test these gates independently:
