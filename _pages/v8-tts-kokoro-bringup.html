@@ -383,9 +383,21 @@ generated test proves the selected KV row, capacity rejection, untouched
 logits and recovery. Direct pinned-model parity remains established at
 position 18; positions 19 and 20 currently have safety evidence only because
 the graph still feeds back the first generated frame.
-It does not yet generate a second complete speech frame, loop to EOS, or
-produce an intelligible utterance. Test:
+This first-continuation circuit does not itself generate a second complete
+speech frame or loop to EOS. Test:
 <code>tests/test_v8_qwen3_tts_generated_talker_continuation.py</code>.</p>
+<p><strong>Connected second speech-code frame:</strong> the generated first-frame
+feedback produces the next talker logits, from which the same native entry
+selects the next codec ID, embeds it, assembles a two-row predictor input, and
+executes the five-layer predictor through all 15 remaining codebook selections.
+The pinned greedy case matches all 16 reference IDs in frame two; its predictor
+bridge has maximum absolute error 7.63e-5. A small generated test rejects an
+invalid bridge and over-capacity continuation before publishing the second
+frame count, preserves its selected output on failure, and recovers. This
+is connected generated execution from pinned text IDs, not an oracle-fed
+second frame. It is still one fixed non-EOS path: EOS-aware looping, later
+frames, joining multiple generated frames to the codec, and useful text-to-WAV
+remain. Test: <code>tests/test_v8_qwen3_tts_second_generated_frame.py</code>.</p>
 <p>On the decoder side, one checked generated entry reconstructs all 16 split-RVQ
 codebooks, transposes the resulting features, applies exact left zero padding,
 and executes the causal pre-convolution with pinned weights. It then transposes
