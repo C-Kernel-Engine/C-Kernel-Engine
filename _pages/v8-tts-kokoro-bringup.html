@@ -377,8 +377,12 @@ rows with the projected TTS pad row before one checked continuation step.
 This tests the feedback edge that the first-frame PCM graph does not execute.
 For the pinned utterance, all 16 generated IDs match; the next input has
 maximum absolute error 1.49e-8 and continuation logits 5.42e-5 against direct
-reference captures. An asset-free generated test checks rejection, output
-validity and recovery.
+reference captures. The continuation position now comes from a checked
+request step index, with supported positions 18 through 20. An asset-free
+generated test proves the selected KV row, capacity rejection, untouched
+logits and recovery. Direct pinned-model parity remains established at
+position 18; positions 19 and 20 currently have safety evidence only because
+the graph still feeds back the first generated frame.
 It does not yet generate a second complete speech frame, loop to EOS, or
 produce an intelligible utterance. Test:
 <code>tests/test_v8_qwen3_tts_generated_talker_continuation.py</code>.</p>
