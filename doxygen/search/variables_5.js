@@ -12,7 +12,7 @@ var searchData=
   ['final_5fln_5fbeta_9',['final_ln_beta',['../structCKSection.html#aaccfd552f51b90a5aa47a76b0e4be4aa',1,'CKSection::final_ln_beta'],['../structCKFooterOffsets.html#a8866b0a08fa2195bbb577d5e4a4e12dd',1,'CKFooterOffsets::final_ln_beta']]],
   ['final_5fln_5fbias_5foffset_10',['final_ln_bias_offset',['../structTransformerModel.html#a4a924d843ebdc352caa809c1f72b1838',1,'TransformerModel']]],
   ['final_5fln_5fgamma_11',['final_ln_gamma',['../structCKSection.html#a0dd3ee6e1e4f7b5e36cb36a95a87dcd3',1,'CKSection::final_ln_gamma'],['../structCKFooterOffsets.html#ab47cf73ae4b7e7de8cf801fa9ce1dc5c',1,'CKFooterOffsets::final_ln_gamma']]],
-  ['final_5fln_5foutput_12',['final_ln_output',['../structCKFooterOffsets.html#ab297d1de6261098375f31e149519d4d4',1,'CKFooterOffsets::final_ln_output'],['../structCKSection.html#aac276147ba6022404e73010f3ecd203b',1,'CKSection::final_ln_output']]],
+  ['final_5fln_5foutput_12',['final_ln_output',['../structCKSection.html#aac276147ba6022404e73010f3ecd203b',1,'CKSection::final_ln_output'],['../structCKFooterOffsets.html#ab297d1de6261098375f31e149519d4d4',1,'CKFooterOffsets::final_ln_output']]],
   ['final_5fln_5fweight_13',['final_ln_weight',['../structQWEN2__0__5B__DECODEFooterOffsets.html#aec463a130ddc1a065b9c753ec5c9bb19',1,'QWEN2_0_5B_DECODEFooterOffsets']]],
   ['final_5fln_5fweight_5foffset_14',['final_ln_weight_offset',['../structTransformerModel.html#a08ba885dfade40a3910ffba35076a1a3',1,'TransformerModel']]],
   ['final_5foutput_15',['final_output',['../structQWEN2__0__5B__DECODEFooterOffsets.html#ac589598a0405dd5321d3605f104c52af',1,'QWEN2_0_5B_DECODEFooterOffsets']]],
@@ -24,8 +24,11 @@ var searchData=
   ['footer_5fstart_21',['footer_start',['../structCKFooterOffsets.html#ae734eedf274912ce617fb86c5c14cbf4',1,'CKFooterOffsets']]],
   ['format_5ftag_22',['format_tag',['../structCKAudioWavInfo.html#abb73452bfec57f0df42413bf289b49e7',1,'CKAudioWavInfo']]],
   ['forward_23',['forward',['../structCKKernelSpec.html#af3d9a06048ce2f5e9fa5c852d864d625',1,'CKKernelSpec']]],
-  ['frames_24',['frames',['../structCKAudioWavInfo.html#a028e31e0ebfd2ddaa941c841b5a4df90',1,'CKAudioWavInfo']]],
-  ['function_25',['function',['../structPCIeDevice.html#a492fb416b29956d0442ec47c57c3f091',1,'PCIeDevice']]],
-  ['fused_5fqkv_26',['fused_qkv',['../structCKIRV2Graph.html#adfc2e02d30a154499cfa803b1095dc6a',1,'CKIRV2Graph']]],
-  ['fusion_5fflags_27',['fusion_flags',['../structCKModel.html#a2f32be944ddd75f746ac27532bff6851',1,'CKModel']]]
+  ['frame_24',['frame',['../structck__checked__frame__loop.html#a9687647808fcfcfa45b87f06d27026d2',1,'ck_checked_frame_loop']]],
+  ['frame_5fcode_5foffsets_25',['frame_code_offsets',['../structck__checked__frame__loop.html#a190488dc9d2344c2830b032d70f623be',1,'ck_checked_frame_loop']]],
+  ['frame_5fvalid_5fcode_5fcount_5foffset_26',['frame_valid_code_count_offset',['../structck__checked__frame__loop.html#afe08be69a1447ffbe435483379bd046c',1,'ck_checked_frame_loop']]],
+  ['frames_27',['frames',['../structCKAudioWavInfo.html#a028e31e0ebfd2ddaa941c841b5a4df90',1,'CKAudioWavInfo']]],
+  ['function_28',['function',['../structPCIeDevice.html#a492fb416b29956d0442ec47c57c3f091',1,'PCIeDevice']]],
+  ['fused_5fqkv_29',['fused_qkv',['../structCKIRV2Graph.html#adfc2e02d30a154499cfa803b1095dc6a',1,'CKIRV2Graph']]],
+  ['fusion_5fflags_30',['fusion_flags',['../structCKModel.html#a2f32be944ddd75f746ac27532bff6851',1,'CKModel']]]
 ];

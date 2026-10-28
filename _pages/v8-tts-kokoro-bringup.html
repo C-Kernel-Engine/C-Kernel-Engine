@@ -424,8 +424,9 @@ lookups, appends KV at a checked position, generates the next 16 IDs and
 commits state only after those checks pass. A failed frame invalidates state
 until a new prefill. The pinned full-weight test matches all 16 reference IDs
 for both frame two and frame three and checks that the immutable first-frame
-IDs remain available to the two-frame PCM graph. Position 20 has execution
-safety evidence only. The cache supports positions 18–20; the caller still
+IDs remain available to the two-frame PCM graph. Later positions have
+execution and capacity evidence only. The cache supports positions 18–80;
+the caller still
 supplies the step index, which generated C compares with its stored expected
 index before modifying KV state. This is a repeatable bounded step, not an autonomous
 EOS loop or a useful utterance. A model-neutral generated state-copy test
@@ -433,6 +434,20 @@ checks repeated calls, rejection and recovery. Tests:
 <code>tests/test_v8_copy_i32_span_checked.py</code>,
 <code>tests/test_v8_checked_multi_entry.py</code> and
 <code>tests/test_v8_qwen3_tts_two_phase_speech.py</code>.</p>
+<p><strong>Qwen3-TTS bounded generation shell:</strong> the rolling circuit now
+declares capacity for up to 64 generated code frames, including the corresponding
+talker KV rows and first-code history. A model-neutral native loop invokes the
+generated prefill and frame entries on one arena, reads their declared code
+slots, and stops on the checked EOS status or frame budget. It stages codec IDs
+in caller-owned memory and publishes them only on EOS; rejection and budget
+exhaustion leave the output buffer unchanged and its valid-frame count zero.
+Asset-free tests exercise generated EOS and budget paths, output preservation,
+repeated invocation and malformed offsets. The pinned full-weight comparison
+certifies the first five generated code frames and retains the existing
+two-frame PCM regression.
+Natural EOS, a complete reference-matching code sequence, and codes-to-codec
+WAV composition remain unproven. Test:
+<code>tests/test_v8_checked_frame_loop.py</code>.</p>
 <p><strong>Two generated frames to PCM:</strong> a checked, model-neutral integer
 span concatenation provider packs each pair of CKE-generated codebook IDs
 into a two-frame input for the existing generated codec. The same generated
