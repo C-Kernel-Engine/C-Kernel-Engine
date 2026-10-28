@@ -940,6 +940,53 @@ def test_qwen4_exp_attention_selects_cache_storage_contract() -> None:
         assert bf16["phases"][phase]["requires"]["tensor.kv.dtype"] == "bf16"
 
 
+def test_qwen4_exp_quantized_prefill_retains_decode_attention_reduction() -> None:
+    """The optional batched path must request an explicit phase-compatible provider."""
+    import resolve_attention_contracts_v8 as attention_resolver
+
+    circuit = json.loads(CIRCUIT.read_text(encoding="utf-8"))
+    request = circuit["required_contracts"]["decoder.attention"]["phases"]
+    assert request["prefill"]["requires"]["numerics.attention_reduction"] == (
+        request["decode"]["requires"]["numerics.attention_reduction"]
+    ) == "f16_online_fp32_merge"
+    plan = attention_resolver.resolve_contract(
+        circuit,
+        attention_resolver.load_json(attention_resolver.DEFAULT_CONTRACTS),
+        attention_resolver.load_kernel_capabilities(),
+        operation="decoder.attention",
+        phase="prefill",
+        mode="bringup",
+        source_circuit_path=CIRCUIT,
+    )
+    assert plan["kernel"]["id"] == (
+        "attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract"
+    )
+    assert plan["kernel"]["selector"] == "CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE"
+    assert plan["requirements"]["execution.prefill_batching"] == "batch_append"
+
+
+def test_qwen4_exp_quantized_prefill_rejects_missing_batch_capability() -> None:
+    import copy
+    import resolve_attention_contracts_v8 as attention_resolver
+
+    circuit = json.loads(CIRCUIT.read_text(encoding="utf-8"))
+    kernels = attention_resolver.load_kernel_capabilities()
+    provider = kernels["kernels"][
+        "attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract"
+    ]
+    provider["provides"]["execution.prefill_batching"] = ["segmented_append"]
+    with pytest.raises(attention_resolver.ContractError, match="no kernel provides decoder.attention.prefill"):
+        attention_resolver.resolve_contract(
+            copy.deepcopy(circuit),
+            attention_resolver.load_json(attention_resolver.DEFAULT_CONTRACTS),
+            kernels,
+            operation="decoder.attention",
+            phase="prefill",
+            mode="bringup",
+            source_circuit_path=CIRCUIT,
+        )
+
+
 def test_qwen4_exp_qsa_gate_selects_pytorch_bf16_storage() -> None:
     circuit = json.loads(CIRCUIT.read_text(encoding="utf-8"))
     contracts = numerical_resolver.load_json(numerical_resolver.DEFAULT_CONTRACTS)

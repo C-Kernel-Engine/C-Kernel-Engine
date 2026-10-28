@@ -1,0 +1,50 @@
+Qwen3.8 Flash Next phase-consistent batched prefill experiment
+2026-10-28 UTC — EXPERIMENTAL, NOT MERGE-READY
+
+Source
+------
+Branch: perf/qwen-flash-phase-consistent-prefill-20261028
+Source commit for the tested candidate: 6ac836d26
+Ryzen: AMD Ryzen 9 9950X3D, 16 native threads, 4,096-token generated context.
+Weights: the same immutable 119,148,108,200-byte weights.bump, hardlinked at inode 85721111 across the safe and candidate run directories. The candidate manifest differs from the safe manifest only in its embedded circuit required_contracts; weight entries and offsets agree.
+
+Question
+--------
+Can batched projection work retain the sequential decode attention reduction, and does that make batched prefill numerically equivalent to the safe sequential path?
+
+Implementation
+--------------
+The Qwen4-Exp circuit requests f16_online_fp32_merge for its quantized FP16-cache batched prefill, the same reduction it requests for decode. The existing prefill provider map now declares batch_append in addition to segmented_append. The compiler resolves the provider explicitly and generated C calls attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract_workspace. There is no HTTP, server, model-name compiler, or generated-source patch. The default bundle config still declares sequential_decode.
+
+Identity
+--------
+Candidate generated model_v8.c SHA-256: d258b409e86228a28bdb378e8aedbf7f5de521ab29fa61639c00a3fdbd97d103
+Candidate libmodel.so SHA-256: c306a17f196179f26e50b454b877fc908bde93bd2f7cdef5b3ec1fdadb0553ba
+Candidate engine SHA-256: b783753fcb3a758aab17ab4e215a4625d4302080d450f3f9cd40d5b06d3e0823
+Candidate tokenizer SHA-256: ac94e41160f7f441c3aa1f11a2a26b23e3f8bf4495aa82faf92f496057c8cbe5
+Weights manifest SHA-256: aae32c8f5614b2a2893c4b04ac54da8658f37383a8b42511f7ea72381975b371
+
+Validation
+----------
+Asset-free: 134 attention/Qwen4-Exp/prefill-codegen tests and 63 subtests passed. A negative contract test removes batch_append and proves provider resolution rejects the request.
+Generated: normal circuit -> map resolution -> generated C -> compiled libmodel.so succeeded. The generated layer-7 prefill call has the intended FP32-merge selector.
+Real-model two-token result: candidate full logits are byte-for-byte identical to the previous forced-batched candidate, and still differ from sequential execution. The candidate does not fix the first model-level gate.
+Identical-input replay: saved sequential layer-7 Q/K/V were packed into the declared FP16 cache. Decode and phase-consistent prefill attention each returned success and matched all 6,144 token-1 pre-gate output floats bit-exactly. This shows the tested attention kernels agree when operands match. It does not establish that batched projections produce identical operands.
+
+127-token diagnostic (one measured run per mode)
+  Safe sequential prefill: 17.905567 s; top token 21181.
+  Previous forced batched prefill: 6.337536 s; top token 21181; full-logit RMSE 0.784017 versus safe; max absolute difference 4.697743.
+  Phase-consistent candidate: 7.081601 s; top token 21181; full-logit RMSE 0.745778 versus safe; max absolute difference 4.325656.
+All 248,320 final logits differed from the safe path for both batched variants. The candidate is faster at 127 tokens but numerically uncertified. Timings are not a repeated benchmark or HTTP serving result.
+
+Comparison boundary
+-------------------
+This is an exact-equivalence test against CKE's current sequential path, which matters if serving switches execution modes transparently. It is not an oracle verdict. CKE's v8 runbook retains an earlier, artifact-specific 40-token batched Flash Next run that matched llama.cpp full logits bit-exactly, including initial prefill. That result does not certify this freshly generated bundle, 127-token input, or long contexts; equally, a mismatch with sequential CKE does not prove the batched result is wrong against llama.cpp. The current candidate's independent-oracle status is NOT_TESTED.
+
+Evidence files
+--------------
+Local audit folder: artifacts/cohere-qwen-investigation-20261027/ on P3. Relevant files: phase-consistent-2.*, phase-consistent-127.*, candidate-127-batched.*, prefill-127-sequential.*, replay_flash_attention_l7.py/json, flash-prefill-layer-amplification.json, and raw xray-* captures. They are not yet committed as a public replication package.
+
+Next gate
+---------
+Compare logical Q8 activation bytes/scales and provider outputs at the first row-group boundary, then replay actual FP16-rounded Q/K/V and logical KV by absolute token position. Locate the earliest consequential difference before selecting a tolerance. Do not enable this optional fast path or merge the experiment as a speed fix until full-logit, logical-state and continuation contracts pass on the pinned artifact. Preserve the safe sequential bundle and repeatable loaded-library identities. The separate dense Qwen3.8 slowdown still needs its own matched benchmark.
