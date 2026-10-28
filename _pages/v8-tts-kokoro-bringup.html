@@ -411,6 +411,21 @@ loop, later-frame history accumulation, and useful text-to-WAV remain. Tests:
 <code>tests/test_v8_select_next_id_checked.py</code>,
 <code>tests/test_v8_repetition_penalty_checked.py</code>, and
 <code>tests/test_v8_qwen3_tts_second_generated_frame.py</code>.</p>
+<p><strong>Qwen3-TTS shared-arena entry boundary:</strong> one lowered circuit
+now emits a checked prefill function and a checked second-frame function
+against the same compiler-planned arena. The existing full-call entry remains
+as a checked wrapper over those functions, so the canonical graph is shared
+rather than copied. The second function checks the
+first function's published validity before consuming its logits and clears
+its own output validity before work. A model-neutral generated composition
+test exercises calls on one arena, rejected producers, stop status, recovery,
+and malformed segment declarations. The Qwen asset-backed test compares the
+second frame's 16 IDs with the pinned capture across this entry boundary.
+This establishes a reusable entry-state boundary; the second function still
+uses the first continuation's fixed outputs. A rolling KV-backed step,
+accumulated code history, EOS loop, and useful utterance remain.
+Tests: <code>tests/test_v8_checked_multi_entry.py</code> and
+<code>tests/test_v8_qwen3_tts_two_phase_speech.py</code>.</p>
 <p><strong>Two generated frames to PCM:</strong> a checked, model-neutral integer
 span concatenation provider packs each pair of CKE-generated codebook IDs
 into a two-frame input for the existing generated codec. The same generated
