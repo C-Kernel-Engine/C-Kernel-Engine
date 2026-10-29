@@ -732,6 +732,10 @@ TEST_SUITES = {
         "Gemma4V Position Addition Order", "parity",
         ROOT / "tests" / "test_v8_gemma4v_position_add_order.py",
     ),
+    "gemma4v_f16_projection_n8": TestSuite(
+        "Gemma4V FP16 Projection Tile Contract", "kernels",
+        ROOT / "tests" / "test_v8_gemm_f16_clipped_n8.py",
+    ),
     "vision": TestSuite("Vision", "kernels", UNITTEST_DIR / "test_vision.py"),
     "audio_frontend": TestSuite(
         "Audio Log-Mel Frontend", "kernels", UNITTEST_DIR / "test_audio.py"

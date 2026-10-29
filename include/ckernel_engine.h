@@ -413,6 +413,15 @@ void gemm_nt_f16_clipped(const float *A,
                          const float *output_max,
                          float *C,
                          int M, int N, int K);
+void gemm_nt_f16_clipped_n8(const float *A,
+                            const void *B,
+                            const float *bias,
+                            const float *input_min,
+                            const float *input_max,
+                            const float *output_min,
+                            const float *output_max,
+                            float *C,
+                            int M, int N, int K);
 
 void gemv_bf16(float *y,
                const void *W,
