@@ -5,8 +5,11 @@ from __future__ import annotations
 
 import ctypes as C
 from concurrent.futures import ThreadPoolExecutor
+import json
 import os
 import struct
+import sys
+from threading import Barrier
 import unittest
 from pathlib import Path
 
@@ -16,7 +19,8 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 BASE = os.environ.get("CKE_MOE_REUSE_BASE_LIBRARY")
 BASE_LIB = C.CDLL(BASE, mode=C.RTLD_GLOBAL) if BASE else None
-LIB = C.CDLL(os.environ.get("CKE_MOE_REUSE_TEST_LIBRARY", str(ROOT / "build/libckernel_engine.so")),
+LIB_PATH = Path(os.environ.get("CKE_MOE_REUSE_TEST_LIBRARY", str(ROOT / "build/libckernel_engine.so")))
+LIB = C.CDLL(str(LIB_PATH),
              mode=C.RTLD_GLOBAL | getattr(os, "RTLD_DEEPBIND", 0))
 F32 = C.POINTER(C.c_float)
 I32 = C.POINTER(C.c_int)
@@ -64,6 +68,13 @@ class ExpertReuseTest(unittest.TestCase):
         cls.reuse_supported = bool(
             LIB.moe_swiglu_expert_q4k_q8_0_reuse_workspace_bytes(517, 256, 256, 4, 3)
         )
+        build_stamp = LIB_PATH.parent / ".ck_build_flags"
+        flags = build_stamp.read_text() if build_stamp.is_file() else ""
+        cls.require_reuse = os.environ.get("CKE_MOE_REUSE_REQUIRE_REUSE") == "1" or all(
+            flag in flags for flag in ("-mavx512f", "-mavx512bw", "-mavx512dq")
+        )
+        if cls.require_reuse and not cls.reuse_supported:
+            raise AssertionError("effective AVX-512 build must expose MoE packing reuse")
         for kind in ("q5_0", "q8_0"):
             for suffix in ("parallel", "reuse"):
                 fn = getattr(LIB, f"moe_swiglu_expert_forward_q4k_{kind}_{suffix}_workspace")
@@ -75,7 +86,8 @@ class ExpertReuseTest(unittest.TestCase):
 
     def run_case(self, kind: str, rows: int, experts: int, top_k: int,
                  distinct_routes: bool = False, baseline_workspace: bool = False,
-                 intermediate: int = 256) -> tuple[np.ndarray, tuple[int, ...]]:
+                 intermediate: int = 256, reset_stats: bool = True,
+                 reuse_barrier: Barrier | None = None) -> tuple[np.ndarray, tuple[int, ...]]:
         hidden = 256
         rng = np.random.default_rng(0xC0DE + rows + experts)
         x = np.ascontiguousarray(rng.normal(0, 0.2, (rows, hidden)), dtype=np.float32)
@@ -107,7 +119,10 @@ class ExpertReuseTest(unittest.TestCase):
         self.assertEqual(baseline(*common, expected.ctypes.data_as(F32), rows,
                                   hidden, intermediate, experts, top_k,
                                   original_space, len(original_space)), 0)
-        LIB.ck_moe_q4k_reuse_stats_reset()
+        if reset_stats:
+            LIB.ck_moe_q4k_reuse_stats_reset()
+        if reuse_barrier is not None:
+            reuse_barrier.wait(timeout=30)
         self.assertEqual(reuse(*common, actual.ctypes.data_as(F32), rows,
                                hidden, intermediate, experts, top_k,
                                reuse_space, len(reuse_space)), 0)
@@ -139,19 +154,101 @@ class ExpertReuseTest(unittest.TestCase):
         self.assertEqual(measured[2], 0)
         self.assertEqual(measured[4:], (0, 1))
 
+    def test_map_scratch_matches_native_workspace_for_row_tails(self) -> None:
+        if not self.reuse_supported:
+            self.skipTest("AVX-512 reuse provider unavailable on this runner")
+        sys.path.insert(0, str(ROOT / "version/v8/scripts"))
+        from build_ir_v8 import _kernel_scratch_size_bytes
+        maps = ROOT / "version/v8/kernel_maps"
+        shapes = ((512, 256, 256, 4, 3), (517, 256, 640, 4, 3),
+                  (520, 2560, 640, 512, 10), (2323, 2560, 640, 512, 10))
+        for kind in ("q5_0", "q8_0"):
+            provider = json.loads((maps / f"moe_swiglu_expert_forward_q4k_{kind}_reuse.json").read_text())
+            for rows, hidden, intermediate, experts, top_k in shapes:
+                with self.subTest(kind=kind, rows=rows, intermediate=intermediate):
+                    dims = dict(R=rows, H=hidden, I=intermediate, E=experts, K=top_k)
+                    planned = _kernel_scratch_size_bytes(provider["scratch"][0], dims, {})
+                    native = LIB.moe_swiglu_expert_q4k_q8_0_reuse_workspace_bytes(
+                        rows, hidden, intermediate, experts, top_k)
+                    self.assertGreater(native, 0)
+                    self.assertEqual(planned, native)
+
+    def test_rejected_route_and_workspace_preserve_canaries_then_recover(self) -> None:
+        if not self.reuse_supported:
+            self.skipTest("AVX-512 reuse provider unavailable on this runner")
+        rows, hidden, intermediate, experts, top_k = 517, 256, 256, 4, 3
+        rng = np.random.default_rng(321)
+        x = np.ascontiguousarray(rng.normal(0, 0.2, (rows, hidden)), dtype=np.float32)
+        indices = np.ascontiguousarray(rng.integers(0, experts, (rows, top_k)), dtype=np.int32)
+        routing = np.ascontiguousarray(rng.uniform(0.1, 0.9, (rows, top_k)), dtype=np.float32)
+        gate = q4_weights(experts * intermediate, 11)
+        up = q4_weights(experts * intermediate, 12)
+        for kind in ("q5_0", "q8_0"):
+            with self.subTest(kind=kind):
+                block_bytes = 22 if kind == "q5_0" else 34
+                down = down_weights(experts * hidden * (intermediate // 32), block_bytes, 13)
+                required = LIB.moe_swiglu_expert_q4k_q8_0_reuse_workspace_bytes(
+                    rows, hidden, intermediate, experts, top_k)
+                fallback_stride = LIB.moe_swiglu_expert_q4k_q8_0_workspace_bytes(
+                    hidden, intermediate)
+                raw = C.create_string_buffer(required + 192)
+                C.memset(raw, 0xA5, len(raw))
+                start = 64 + ((-C.addressof(raw) - 64) % 64)
+                end = start + required
+                workspace = C.c_void_p(C.addressof(raw) + start)
+                self.assertEqual(workspace.value % 64, 0)
+                output = np.full((rows, hidden), 17.0, dtype=np.float32)
+                original = output.copy()
+                common = (x.ctypes.data_as(F32), indices.ctypes.data_as(I32),
+                          routing.ctypes.data_as(F32), gate, up, down)
+                reuse = getattr(LIB, f"moe_swiglu_expert_forward_q4k_{kind}_reuse_workspace")
+                for row, slot, invalid in ((0, 0, experts), (rows - 1, top_k - 1, -1)):
+                    indices[row, slot] = invalid
+                    self.assertEqual(reuse(*common, output.ctypes.data_as(F32),
+                                           rows, hidden, intermediate, experts, top_k,
+                                           workspace, required), -2)
+                    np.testing.assert_array_equal(output, original)
+                    indices[row, slot] = 0
+                self.assertEqual(reuse(*common, output.ctypes.data_as(F32),
+                                       rows, hidden, intermediate, experts, top_k,
+                                       workspace, fallback_stride - 1), -1)
+                np.testing.assert_array_equal(output, original)
+                self.assertEqual(raw.raw[:start], b"\xa5" * start)
+                self.assertEqual(raw.raw[end:], b"\xa5" * (len(raw) - end))
+
+                expected = np.empty_like(output)
+                baseline_space = C.create_string_buffer(fallback_stride * 4)
+                baseline = getattr(LIB, f"moe_swiglu_expert_forward_q4k_{kind}_parallel_workspace")
+                self.assertEqual(baseline(*common, expected.ctypes.data_as(F32),
+                                          rows, hidden, intermediate, experts, top_k,
+                                          baseline_space, len(baseline_space)), 0)
+                LIB.ck_moe_q4k_reuse_stats_reset()
+                self.assertEqual(reuse(*common, output.ctypes.data_as(F32),
+                                       rows, hidden, intermediate, experts, top_k,
+                                       workspace, required), 0)
+                np.testing.assert_array_equal(output.view(np.uint32),
+                                              expected.view(np.uint32))
+                self.assertGreater(stats()[4], 0)
+                self.assertEqual(raw.raw[:start], b"\xa5" * start)
+                self.assertEqual(raw.raw[end:], b"\xa5" * (len(raw) - end))
+
     def test_independent_workspaces_can_execute_concurrently(self) -> None:
         if not self.reuse_supported:
             self.skipTest("AVX-512 reuse provider unavailable on this runner")
         threading_lib = BASE_LIB or LIB
-        threading_lib.ck_set_num_threads(1)
         try:
-            with ThreadPoolExecutor(max_workers=2) as executor:
-                results = list(executor.map(
-                    lambda kind: self.run_case(kind, rows=517, experts=4,
-                                               top_k=3)[0],
-                    ("q5_0", "q8_0"),
-                ))
-            self.assertEqual(len(results), 2)
+            for workers in (1, 4):
+                with self.subTest(workers=workers):
+                    threading_lib.ck_set_num_threads(workers)
+                    barrier = Barrier(2)
+                    with ThreadPoolExecutor(max_workers=2) as executor:
+                        results = list(executor.map(
+                            lambda kind: self.run_case(
+                                kind, rows=517, experts=4, top_k=3,
+                                reset_stats=False, reuse_barrier=barrier)[0],
+                            ("q5_0", "q8_0"),
+                        ))
+                    self.assertEqual(len(results), 2)
         finally:
             threading_lib.ck_set_num_threads(4)
 
