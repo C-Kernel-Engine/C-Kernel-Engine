@@ -3629,17 +3629,27 @@ CK_EXPORT int32_t ck_model_audio_prompt_token_id(int index) {{
         if uses_persistent_cross_kv_cache
         else ""
     )
-    for buf_name, macro_name in (
-        ("recurrent_conv_state", "A_RECURRENT_CONV_STATE"),
-        ("recurrent_ssm_state", "A_RECURRENT_SSM_STATE"),
-    ):
-        for buf in layout.get("memory", {}).get("activations", {}).get("buffers", []):
-            if buf.get("name") != buf_name:
-                continue
-            recurrent_reset_lines.append(
-                f"    memset(g_model->{buf_name}, 0, {int(buf.get('size', 0))});"
-            )
-            break
+    for buf in layout.get("memory", {}).get("activations", {}).get("buffers", []):
+        if buf.get("lifetime") != "sequence" or buf.get("mutable") is not True:
+            continue
+        name = buf.get("name")
+        if name == "kv_cache":
+            continue  # The active KV pointer is cleared above.
+        size = buf.get("size")
+        if not isinstance(size, int) or size <= 0:
+            raise RuntimeError(f"sequence buffer {name!r} has no proven reset extent")
+        if name in ("recurrent_conv_state", "recurrent_ssm_state"):
+            target = f"g_model->{name}"
+        else:
+            # Additional circuit-declared sequence state remains in the model
+            # arena until a sequence-switch contract explicitly owns it.
+            if sequence_state_contract is not None:
+                raise RuntimeError(f"sequence buffer {name!r} is not switch-owned")
+            macro = buf.get("define")
+            if not isinstance(macro, str) or re.fullmatch(r"A_[A-Z0-9_]+", macro) is None:
+                raise RuntimeError(f"sequence buffer {name!r} has no checked arena binding")
+            target = f"g_model->bump + {macro}"
+        recurrent_reset_lines.append(f"    memset({target}, 0, {size});")
     recurrent_reset_code = "\n".join(recurrent_reset_lines)
     if recurrent_reset_code:
         recurrent_reset_code += "\n"

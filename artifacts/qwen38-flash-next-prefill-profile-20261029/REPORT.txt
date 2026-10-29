@@ -1,0 +1,66 @@
+Qwen3.8 Flash Next prefill investigation, 2026-10-29
+
+Host: Ryzen 9 9950X3D, 16 CKE threads, Q4_K_M GGUF source, 8192-token
+generated runtime. Source revision before this change: f4c5f246e3e172255e4df714d332de9ad3bdb0e4.
+All numbers below are direct native calls, excluding HTTP, tokenization, and model
+initialization. They are observations of one pinned artifact, not family-wide
+certification.
+
+Matched CKE/llama.cpp 6089-token input from the preceding speed replay:
+CKE prefill 483.0 seconds (12.6 tokens/s), llama.cpp 89.5 seconds
+(68.0 tokens/s). Native decode was 6.30 versus 6.12 tokens/s respectively.
+See artifacts/qwen38-flash-next-8k-svg-20261029/REPORT.md for the complete
+replay settings and limits.
+
+Numerical reset defect:
+- The circuit's PLE token and convolution histories were marked call-lifetime
+  even though generated operations update them across tokens.
+- Before the fix, two identical 2323-token prefills on one loaded runtime,
+  separated by ck_model_kv_cache_reset(), produced different full-logit hashes:
+  d3d06cb8... then 96ee8170.... The same difference reproduced with one
+  thread at 64 tokens, so it was not caused by scheduling among workers.
+- The circuit now declares those histories as sequence-lifetime mutable state.
+  Generated reset clears their proven arena extents. Extra unbound sequence
+  state fails code generation rather than being silently left active.
+- The rebuilt candidate produced identical complete 248320-logit byte arrays
+  on both 64-token and 2323-token repeats. Its first run matched the original
+  first-run hash. This establishes reset repeatability for this artifact;
+  independent oracle parity and full recurrent-state comparison remain open.
+
+Performance profile and rejected experiments:
+- perf record -F 49 -e cycles:u on a 2323-token run attributed 53.67% of
+  sampled process cycles to pack_q4_k_to_packed_meta_x8. This is a cycle
+  fraction across worker threads, not a wall-time fraction.
+- The hot call is in the routed MoE projection: selected Q4_K experts are
+  repacked into scratch on each token. Parallelizing the unrelated prefill
+  weight-cache pack preserved logits but did not change end-to-end time:
+  109.85 seconds for its uncontended repeat, versus 109.47-110.02 seconds
+  for the reset-only candidate. That experiment was removed.
+- A direct canonical-Q4_K provider matched the packed provider bit-for-bit
+  on varied small shapes, but cost 0.073 ms versus 0.067 ms for pack plus
+  projection on a representative 640 x 2560 leaf. Full-model prefill was
+  108.46 seconds with the direct provider, a marginal single-run change.
+  That experiment was removed too.
+- The remaining MoE performance candidate is reuse of a packed expert across
+  the rows that route to it within one prefill call. It needs a caller-owned,
+  planner-budgeted cache or expert bucketing, exact route-order preservation,
+  a memory-capacity fallback, full-logit/KV parity, and matched throughput
+  measurements before deployment. The model has 48 layers, 512 routed experts,
+  10 experts per token, and 640 x 2560 Q4_K gate/up weights. A blanket
+  process-lifetime cache would be far too large.
+
+Qwen family boundary:
+- This run tested Qwen3.8 Flash Next only. Dense Qwen3.8 uses different hot
+  operations; Qwen3.6 and Qwen3.5 need separately pinned artifacts, provider
+  identities, full/chunked numerical comparisons, and perf captures.
+- Reusable profiling should report wall time per model phase and selected
+  provider as well as perf cycles. Do not infer speed from a kernel name or
+  transfer Flash Next's MoE finding to dense models.
+
+Retained host evidence:
+  /data/cke/runs/qwen-flash-perf-20261029/flash-2323.perf.data
+  /data/cke/runs/qwen-flash-perf-20261029/warm-prefill.stdout
+  /data/cke/runs/qwen-flash-perf-20261029/warm-prefill-2323-reset-candidate.stdout
+  /data/cke/runs/qwen-flash-perf-20261029/warm-prefill-2323-parallel.stdout
+  /data/cke/runs/qwen-flash-perf-20261029/warm-prefill-2323-direct.stdout
+  /data/cke/runs/qwen-flash-perf-20261029/moe-direct-test.log

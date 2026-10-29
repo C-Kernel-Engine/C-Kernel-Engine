@@ -1040,6 +1040,11 @@ def test_hyper_injection_edges_have_dedicated_activation_storage() -> None:
     bindings = circuit["activation_bindings"]
     buffers = circuit["activation_buffers"]
 
+    # PLE reads these histories on the next token and next request. They are
+    # sequence state, even though they live in the ordinary activation arena.
+    assert buffers["ple_token_state"]["lifetime"] == "sequence"
+    assert buffers["ple_conv_state"]["lifetime"] == "sequence"
+
     assert bindings["hyper_stream"] == "hyper_stream"
     assert buffers["hyper_stream"]["shape"] == [
         {"config": "execution_extent"},

@@ -233,7 +233,8 @@ int main(void) {
         self.assertIn("CK_MODEL_CAP_SEQUENCE_STATE_SWITCH", declared)
 
         hybrid_layout = _layout(
-            extra=[{"name": "arbitrary_buffer", "abs_offset": 160, "size": 16, "lifetime": "sequence", "mutable": True}]
+            extra=[{"name": "arbitrary_buffer", "abs_offset": 160, "size": 16,
+                    "define": "A_ARBITRARY_BUFFER", "lifetime": "sequence", "mutable": True}]
         )
         hybrid = codegen_core_v8.emit_model_and_api(layout=hybrid_layout, config=config)
         hybrid_declared = codegen_v8._emit_runtime_capability_api(
@@ -241,6 +242,14 @@ int main(void) {
         )
         self.assertNotIn("ck_model_sequence_state_create", hybrid)
         self.assertNotIn("CK_MODEL_CAP_SEQUENCE_STATE_SWITCH", hybrid_declared)
+        self.assertIn("memset(g_model->bump + A_ARBITRARY_BUFFER, 0, 16)", hybrid)
+
+        missing_binding = _layout(extra=[
+            {"name": "unbound_history", "abs_offset": 160, "size": 16,
+             "lifetime": "sequence", "mutable": True},
+        ])
+        with self.assertRaisesRegex(RuntimeError, "checked arena binding"):
+            codegen_core_v8.emit_model_and_api(layout=missing_binding, config=config)
 
     def test_named_kv_lookup_uses_active_handle(self) -> None:
         source = codegen_v8._inject_activation_lookup_api(
