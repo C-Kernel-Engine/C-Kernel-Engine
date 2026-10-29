@@ -834,6 +834,11 @@ TEST_SUITES = {
         ROOT / "tests" / "test_v8_qwen3_tts_loop_codec.py",
         timeout_sec=180,
     ),
+    "tts_qwen3_full_generated_waveform": TestSuite(
+        "Qwen3-TTS Pinned Generated Codes to Waveform", "inference",
+        ROOT / "tests" / "test_v8_qwen3_tts_full_generated_waveform.py",
+        timeout_sec=1200,
+    ),
     "tts_copy_i32_span_checked": TestSuite(
         "Checked Integer Span State Copy", "kernels",
         ROOT / "tests" / "test_v8_copy_i32_span_checked.py",
