@@ -44,8 +44,8 @@
     "ple_embedding": {"shape":[{"config":"execution_extent"},{"config":"ple_embed_dim"}]},
     "ple_key": {"shape":[{"config":"execution_extent"},{"mul":[{"config":"hc_count"},{"config":"embed_dim"}]}]},
     "ple_value": {"shape":[{"config":"execution_extent"},{"config":"embed_dim"}]},
-    "ple_token_state": {"shape":[{"config":"num_layers"},{"config":"ple_token_history"}]},
-    "ple_conv_state": {"shape":[{"config":"num_layers"},{"config":"ple_conv_history"},{"mul":[{"config":"hc_count"},{"config":"embed_dim"}]}]},
+    "ple_token_state": {"shape":[{"config":"num_layers"},{"config":"ple_token_history"}],"lifetime":"sequence"},
+    "ple_conv_state": {"shape":[{"config":"num_layers"},{"config":"ple_conv_history"},{"mul":[{"config":"hc_count"},{"config":"embed_dim"}]}],"lifetime":"sequence"},
     "qsa_index_projected": {"shape":[{"config":"execution_extent"},{"config":"qsa_index_proj_dim"}]},
     "qsa_selected_indices": {"shape":[{"config":"execution_extent"},{"config":"qsa_selection_width"}]},
     "qsa_index_key_cache": {"shape":[{"config":"num_layers"},{"config":"context_length"},{"config":"indexer_head_dim"}]}

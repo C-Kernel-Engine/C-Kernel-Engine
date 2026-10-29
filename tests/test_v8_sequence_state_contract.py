@@ -233,7 +233,8 @@ int main(void) {
         self.assertIn("CK_MODEL_CAP_SEQUENCE_STATE_SWITCH", declared)
 
         hybrid_layout = _layout(
-            extra=[{"name": "arbitrary_buffer", "abs_offset": 160, "size": 16, "lifetime": "sequence", "mutable": True}]
+            extra=[{"name": "arbitrary_buffer", "abs_offset": 160, "size": 16,
+                    "define": "A_ARBITRARY_BUFFER", "lifetime": "sequence", "mutable": True}]
         )
         hybrid = codegen_core_v8.emit_model_and_api(layout=hybrid_layout, config=config)
         hybrid_declared = codegen_v8._emit_runtime_capability_api(
@@ -241,6 +242,104 @@ int main(void) {
         )
         self.assertNotIn("ck_model_sequence_state_create", hybrid)
         self.assertNotIn("CK_MODEL_CAP_SEQUENCE_STATE_SWITCH", hybrid_declared)
+        self.assertIn("memset(g_model->bump + A_ARBITRARY_BUFFER, 0, 16)", hybrid)
+
+        missing_binding = _layout(extra=[
+            {"name": "unbound_history", "abs_offset": 160, "size": 16,
+             "lifetime": "sequence", "mutable": True},
+        ])
+        with self.assertRaisesRegex(RuntimeError, "checked arena binding"):
+            codegen_core_v8.emit_model_and_api(layout=missing_binding, config=config)
+
+        for offset, size, reason in (
+            (-16, 16, "range"), (250, 16, "planned arena"),
+            (128, 16, "overlaps logits"), (160, 0, "reset extent"),
+        ):
+            with self.subTest(offset=offset, size=size):
+                invalid = _layout(extra=[
+                    {"name": "extra_history", "abs_offset": offset, "size": size,
+                     "define": "A_EXTRA_HISTORY", "lifetime": "sequence", "mutable": True},
+                ])
+                with self.assertRaisesRegex(ValueError, reason):
+                    codegen_core_v8.emit_model_and_api(layout=invalid, config=config)
+
+        wrong_macro = _layout(extra=[
+            {"name": "extra_history", "abs_offset": 160, "size": 16,
+             "define": "A_LOGITS", "lifetime": "sequence", "mutable": True},
+        ])
+        with self.assertRaisesRegex(RuntimeError, "checked arena binding"):
+            codegen_core_v8.emit_model_and_api(layout=wrong_macro, config=config)
+
+        duplicate_macro = _layout(extra=[
+            {"name": "extra_history", "abs_offset": 160, "size": 16,
+             "define": "A_EXTRA_HISTORY", "lifetime": "sequence", "mutable": True},
+        ])
+        duplicate_macro["memory"]["activations"]["buffers"][1]["define"] = "A_EXTRA_HISTORY"
+        with self.assertRaisesRegex(RuntimeError, "checked arena binding"):
+            codegen_core_v8.emit_model_and_api(layout=duplicate_macro, config=config)
+
+    def test_emitted_reset_clears_only_declared_sequence_regions(self) -> None:
+        layout = _layout(extra=[
+            {"name": "extra_history", "abs_offset": 160, "size": 16,
+             "define": "A_EXTRA_HISTORY", "lifetime": "sequence", "mutable": True},
+            {"name": "neighbor", "abs_offset": 192, "size": 16,
+             "lifetime": "call", "mutable": True},
+        ])
+        emitted = codegen_core_v8.emit_model_and_api(
+            layout=layout, config={"num_layers": 1, "num_kv_heads": 1, "head_dim": 4})
+        start = emitted.index("CK_EXPORT void ck_model_kv_cache_reset(void) {")
+        end = emitted.index("CK_EXPORT int ck_model_kv_cache_enable", start)
+        reset = emitted[start:end]
+        source = r'''
+#include <assert.h>
+#include <stdint.h>
+#include <string.h>
+#define CK_EXPORT
+#define KV_CACHE_SIZE 32
+#define A_EXTRA_HISTORY 160
+typedef struct {
+    uint8_t *bump;
+    uint8_t *kv_cache;
+    int pos;
+    int rope_pos;
+    int bridge_has_explicit_positions;
+} CKModel;
+static CKModel *g_model;
+static uint8_t arena[256];
+static CKModel model;
+static void ck_trace_pos(const char *kind, int layer, int token, int before, int after) {
+    (void)kind; (void)layer; (void)token; (void)before; (void)after;
+}
+''' + reset + r'''
+int main(void) {
+    memset(arena, 0x5a, sizeof(arena));
+    model = (CKModel){.bump = arena, .kv_cache = arena + 64,
+                      .pos = 7, .rope_pos = 11, .bridge_has_explicit_positions = 1};
+    g_model = &model;
+    for (int run = 0; run < 2; ++run) {
+        memset(arena + 64, 0xa1, 32);
+        memset(arena + 160, 0xb2, 16);
+        ck_model_kv_cache_reset();
+        for (int i = 64; i < 96; ++i) assert(arena[i] == 0);
+        for (int i = 160; i < 176; ++i) assert(arena[i] == 0);
+        for (int i = 0; i < 64; ++i) assert(arena[i] == 0x5a);
+        for (int i = 96; i < 160; ++i) assert(arena[i] == 0x5a);
+        for (int i = 176; i < 256; ++i) assert(arena[i] == 0x5a);
+        assert(model.pos == 0 && model.rope_pos == 0);
+        assert(model.bridge_has_explicit_positions == 0);
+    }
+    return 0;
+}
+'''
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "reset.c").write_text(source)
+            build = subprocess.run(
+                ["cc", "-std=c11", "-Wall", "-Wextra", "-Werror",
+                 "reset.c", "-o", "reset"], cwd=root,
+                capture_output=True, text=True)
+            self.assertEqual(build.returncode, 0, build.stderr)
+            subprocess.run([str(root / "reset")], check=True, capture_output=True)
 
     def test_named_kv_lookup_uses_active_handle(self) -> None:
         source = codegen_v8._inject_activation_lookup_api(
