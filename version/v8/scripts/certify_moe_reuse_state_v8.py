@@ -11,6 +11,7 @@ import argparse
 import ctypes as C
 import hashlib
 import json
+import os
 from pathlib import Path
 
 
@@ -109,6 +110,12 @@ def capture(run: Path, ids: list[int]) -> dict:
             "libmodel_sha256": hashlib.sha256(lib_path.read_bytes()).hexdigest(),
             "engine_sha256": hashlib.sha256(engine_path.read_bytes()).hexdigest(),
             "generated_source_sha256": hashlib.sha256((run / "model_v8.c").read_bytes()).hexdigest(),
+            "weights_manifest_sha256": hashlib.sha256((run / "weights_manifest.json").read_bytes()).hexdigest(),
+            "cpu": next((line.split(":", 1)[1].strip() for line in
+                         Path("/proc/cpuinfo").read_text().splitlines()
+                         if line.startswith("model name")), "unknown"),
+            "ck_threads": os.environ.get("CK_NUM_THREADS", "runtime-default"),
+            "openmp_threads": os.environ.get("OMP_NUM_THREADS", "runtime-default"),
             "loaded_libraries": loaded,
             "reset_reproduced": reset_reproduced,
             "captures": captures,
@@ -130,7 +137,8 @@ def main() -> int:
         if baseline.get("schema") != candidate.get("schema"):
             parser.error("capture schemas differ")
         cases = []
-        for before, after in zip(baseline["captures"], candidate["captures"], strict=True):
+        inventory_match = len(baseline["captures"]) == len(candidate["captures"]) == 3
+        for before, after in zip(baseline["captures"], candidate["captures"]):
             same = (before["label"] == after["label"] and
                     before["ids_sha256"] == after["ids_sha256"] and
                     before["active_tokens"] == after["active_tokens"])
@@ -144,13 +152,14 @@ def main() -> int:
                           "reuse_executed": executed,
                           "fallback_calls": reuse.get("fallbacks")})
         result = {"schema": "cke.moe_reuse_state_verdict.v1",
-                  "status": "PASS" if reset_match(baseline["captures"]) and
-                  reset_match(candidate["captures"]) and len(cases) == 3 and all(
+                  "status": "PASS" if inventory_match and reset_match(baseline["captures"]) and
+                  reset_match(candidate["captures"]) and all(
                       all(x[key] for key in ("input_match", "full_logits_match",
                                              "full_named_state_match", "reuse_executed"))
                       for x in cases) else "FAIL", "cases": cases,
                   "baseline_libmodel_sha256": baseline["libmodel_sha256"],
-                  "candidate_libmodel_sha256": candidate["libmodel_sha256"]}
+                  "candidate_libmodel_sha256": candidate["libmodel_sha256"],
+                  "case_inventory_match": inventory_match}
         result["baseline_reset_reproduced"] = reset_match(baseline["captures"])
         result["candidate_reset_reproduced"] = reset_match(candidate["captures"])
         if args.out:
