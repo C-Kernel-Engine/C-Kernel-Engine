@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import ctypes
+import ctypes.util
 import os
 from pathlib import Path
 
@@ -23,6 +24,7 @@ STORAGE_RANGE_KERNEL = LIB.gemm_nt_bf16_bf16_storage_row_range
 STORAGE_PARALLEL_KERNEL = LIB.gemm_nt_bf16_bf16_storage_parallel_dispatch
 EXACT_KERNEL = LIB.gemm_nt_bf16
 EXACT_RANGE_KERNEL = LIB.gemm_nt_bf16_row_range
+EXACT_PARALLEL_KERNEL = LIB.gemm_nt_bf16_parallel_dispatch
 NATIVE_KERNEL = LIB.gemm_nt_bf16_native_bf16_storage
 AMX_KERNEL = LIB.gemm_nt_bf16_amx_bf16_storage
 AMX_WORKSPACE_KERNEL = LIB.gemm_nt_bf16_amx_bf16_storage_workspace
@@ -42,6 +44,8 @@ EXACT_KERNEL.argtypes = KERNEL.argtypes
 EXACT_KERNEL.restype = None
 EXACT_RANGE_KERNEL.argtypes = KERNEL.argtypes + [ctypes.c_int, ctypes.c_int]
 EXACT_RANGE_KERNEL.restype = None
+EXACT_PARALLEL_KERNEL.argtypes = KERNEL.argtypes
+EXACT_PARALLEL_KERNEL.restype = None
 NATIVE_KERNEL.argtypes = KERNEL.argtypes
 NATIVE_KERNEL.restype = None
 AMX_KERNEL.argtypes = KERNEL.argtypes
@@ -113,7 +117,84 @@ def run_case(m: int, n: int, k: int, seed: int) -> tuple[float, float]:
     return metrics["max_abs"], metrics["rmse"]
 
 
+def check_exact_tails() -> None:
+    rng = np.random.default_rng(29)
+    math_library = ctypes.util.find_library("m")
+    if not math_library:
+        raise RuntimeError("libm is required for the exact BF16 GEMM reference")
+    fmaf = ctypes.CDLL(math_library).fmaf
+    fmaf.argtypes = [ctypes.c_float, ctypes.c_float, ctypes.c_float]
+    fmaf.restype = ctypes.c_float
+    for m, n, k in (
+        (1, 7, 13), (3, 8, 17), (5, 9, 31),
+        (4, 17, 72), (3, 9, 257), (8, 513, 129),
+    ):
+        a = np.ascontiguousarray(rng.standard_normal((m, k), dtype=np.float32))
+        # Include values at BF16 rounding boundaries rather than only random normals.
+        a.flat[:4] = [1.00390625, -1.00390625, 0.99609375, -0.99609375]
+        b = bf16_bits(rng.standard_normal((n, k), dtype=np.float32))
+        for with_bias in (False, True):
+            bias = np.ascontiguousarray(rng.standard_normal(n, dtype=np.float32))
+            bias_ptr = bias.ctypes.data_as(FLOAT_P) if with_bias else None
+            results = []
+            for kernel in (EXACT_KERNEL, EXACT_PARALLEL_KERNEL, EXACT_RANGE_KERNEL):
+                guarded = np.full((m * n + 2,), np.float32(-317.25))
+                out = guarded[1:-1].reshape(m, n)
+                args = (
+                    a.ctypes.data_as(FLOAT_P), ctypes.c_void_p(b.ctypes.data),
+                    bias_ptr, out.ctypes.data_as(FLOAT_P), m, n, k,
+                )
+                if kernel is EXACT_RANGE_KERNEL:
+                    for begin in range(m):
+                        kernel(*args, begin, begin + 1)
+                else:
+                    kernel(*args)
+                if guarded[0] != -317.25 or guarded[-1] != -317.25:
+                    raise AssertionError("BF16 exact GEMM wrote outside output")
+                results.append(out.copy())
+            if any(result.tobytes() != results[0].tobytes() for result in results[1:]):
+                raise AssertionError(
+                    f"BF16 exact GEMM dispatch/range mismatch M={m} N={n} K={k}"
+                )
+            # This independent oracle checks the arithmetic, not exact reduction order.
+            rounded_a = torch.from_numpy(a).to(torch.bfloat16).float()
+            rounded_b = torch.from_numpy((b.astype(np.uint32) << 16).view(np.float32))
+            expected = torch.nn.functional.linear(
+                rounded_a, rounded_b, torch.from_numpy(bias) if with_bias else None,
+            ).numpy()
+            if not np.allclose(results[0], expected, rtol=0.01, atol=0.02):
+                raise AssertionError(f"BF16 exact GEMM oracle mismatch M={m} N={n} K={k}")
+            if (m, n, k) == (3, 9, 257):
+                fused = np.empty_like(results[0])
+                separate = np.empty_like(results[0])
+                av = rounded_a.numpy()
+                bv = rounded_b.numpy()
+                for row in range(m):
+                    for col in range(n):
+                        fused_sum = float(bias[col]) if with_bias else 0.0
+                        separate_sum = np.float32(fused_sum)
+                        for inner in range(k):
+                            fused_sum = fmaf(float(av[row, inner]), float(bv[col, inner]), fused_sum)
+                            separate_sum = np.float32(
+                                separate_sum + np.float32(av[row, inner] * bv[col, inner])
+                            )
+                        fused[row, col] = fused_sum
+                        separate[row, col] = separate_sum
+                if results[0].tobytes() not in (fused.tobytes(), separate.tobytes()):
+                    raise AssertionError("BF16 exact GEMM changed the per-output reduction contract")
+                changed_weight = b.copy()
+                changed_weight[0, 0] ^= np.uint16(0x0040)
+                changed = np.empty_like(results[0])
+                EXACT_KERNEL(
+                    a.ctypes.data_as(FLOAT_P), ctypes.c_void_p(changed_weight.ctypes.data),
+                    bias_ptr, changed.ctypes.data_as(FLOAT_P), m, n, k,
+                )
+                if changed.tobytes() == results[0].tobytes():
+                    raise AssertionError("BF16 exact GEMM ignored a changed weight")
+
+
 def main() -> int:
+    check_exact_tails()
     rng = np.random.default_rng(19)
     m, n, k = 7, 13, 24
     a = np.ascontiguousarray(rng.standard_normal((m, k), dtype=np.float32))
