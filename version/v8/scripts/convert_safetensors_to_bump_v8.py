@@ -2698,6 +2698,111 @@ def _build_config(model_dir: Path, arch: str, config_template: Path | None) -> d
                 // max(1, int(cfg.get("num_attention_heads", 1)))
                 or 2 * sum(int(v) for v in mrope)
             )
+    if arch == "rwkv7":
+        num_layers = int(
+            text.get("num_hidden_layers") or hf.get("num_hidden_layers") or 0
+        )
+        hidden_size = int(text.get("hidden_size") or hf.get("hidden_size") or 0)
+        if num_layers <= 0 or hidden_size <= 0:
+            raise SystemExit("RWKV-7 config missing num_hidden_layers/hidden_size")
+        head_size = int(text.get("head_size") or hf.get("head_size") or 0)
+        num_heads = int(
+            text.get("num_heads")
+            or text.get("num_attention_heads")
+            or hf.get("num_heads")
+            or (hidden_size // head_size if head_size > 0 else 0)
+        )
+        if head_size <= 0:
+            if num_heads <= 0 or hidden_size % num_heads != 0:
+                raise SystemExit("RWKV-7 config missing a consistent head_size/num_heads")
+            head_size = hidden_size // num_heads
+        if num_heads <= 0:
+            num_heads = hidden_size // head_size
+        if num_heads * head_size != hidden_size:
+            raise SystemExit(
+                "RWKV-7 head geometry mismatch: "
+                f"num_heads({num_heads}) * head_size({head_size}) != hidden_size({hidden_size})"
+            )
+        hidden_ratio_value = text.get("hidden_ratio")
+        if hidden_ratio_value is None:
+            hidden_ratio_value = hf.get("hidden_ratio")
+        intermediate_size = int(
+            text.get("intermediate_size") or hf.get("intermediate_size") or 0
+        )
+        if intermediate_size <= 0:
+            if hidden_ratio_value is None:
+                raise SystemExit(
+                    "RWKV-7 config missing intermediate_size/hidden_ratio"
+                )
+            expanded = hidden_size * float(hidden_ratio_value)
+            if not math.isfinite(expanded) or expanded <= 0 or not expanded.is_integer():
+                raise SystemExit("RWKV-7 hidden_ratio must produce a positive integral intermediate_size")
+            intermediate_size = int(expanded)
+        hidden_ratio = (
+            float(hidden_ratio_value)
+            if hidden_ratio_value is not None
+            else intermediate_size / hidden_size
+        )
+        if not math.isfinite(hidden_ratio) or hidden_ratio <= 0 or hidden_size * hidden_ratio != intermediate_size:
+            raise SystemExit("RWKV-7 hidden_ratio disagrees with intermediate_size")
+        activation = str(text.get("hidden_act") or "squared_relu")
+        if activation != "squared_relu":
+            raise SystemExit("RWKV-7 circuit requires squared_relu activation")
+        if text.get("tie_word_embeddings", False):
+            raise SystemExit("RWKV-7 importer requires an explicit untied head.weight")
+        vocab_size = int(text.get("vocab_size") or hf.get("vocab_size") or 0)
+        if vocab_size <= 0:
+            raise SystemExit("RWKV-7 config missing vocab_size")
+        context_length = int(
+            text.get("context_length")
+            or text.get("max_position_embeddings")
+            or text.get("inference_ctx_len")
+            or hf.get("context_length")
+            or 0
+        )
+        if context_length <= 0:
+            context_length = 4096
+        layer_kinds = ["layer_0"] + ["layer_gt0"] * max(0, num_layers - 1)
+        layer_eps = float(text.get("layer_norm_eps", text.get("norm_eps", 1e-5)))
+        if not math.isfinite(layer_eps) or layer_eps <= 0:
+            raise SystemExit("RWKV-7 layer norm epsilon must be finite and positive")
+        cfg.update({
+            "num_layers": num_layers,
+            "num_hidden_layers": num_layers,
+            "embed_dim": hidden_size,
+            "hidden_size": hidden_size,
+            "num_heads": num_heads,
+            "num_attention_heads": num_heads,
+            "num_kv_heads": num_heads,
+            "head_dim": head_size,
+            "attention_hidden_size": hidden_size,
+            "intermediate_size": intermediate_size,
+            "intermediate_dim": intermediate_size,
+            "hidden_ratio": hidden_ratio,
+            "vocab_size": vocab_size,
+            "n_vocab": vocab_size,
+            "context_length": context_length,
+            "max_seq_len": context_length,
+            "layer_kinds": layer_kinds,
+            "layer_types": ["rwkv7_dense"] * num_layers,
+            "hybrid_block_pattern": layer_kinds[:],
+            "has_qk_norm": False,
+            "has_attention_biases": False,
+            "rope": "none",
+            "activation": activation,
+            "tie_word_embeddings": False,
+            "layer_norm_eps": layer_eps,
+            "rms_eps": layer_eps,
+            "rms_norm_eps": layer_eps,
+        })
+        for rank_key in ("decay_rank", "key_rank", "value_rank", "gate_rank"):
+            rank_value = text.get(rank_key)
+            if rank_value is None:
+                rank_value = hf.get(rank_key)
+            if rank_value is not None:
+                if isinstance(rank_value, bool) or int(rank_value) != rank_value or int(rank_value) <= 0:
+                    raise SystemExit(f"RWKV-7 {rank_key} must be a positive integer")
+                cfg[rank_key] = int(rank_value)
     cfg = _inject_runtime_config_defaults(cfg, arch)
     if arch == "gemma4" and "layer_kinds" not in cfg:
         raise SystemExit("Gemma4 safetensors conversion currently requires --config-template with explicit layer_kinds/shared KV policy")
@@ -3016,6 +3121,28 @@ def _tokenizer_payloads_from_json(model_dir: Path, vocab_size: int) -> tuple[lis
     if isinstance(pretokenizer, str) and pretokenizer:
         contract["pretokenizer"] = pretokenizer
     special = _special_tokens_from_tokenizer_config(model_dir, tok_type, vocab_size)
+    tok_cfg_path = model_dir / "tokenizer_config.json"
+    tok_cfg = (
+        json.loads(tok_cfg_path.read_text(encoding="utf-8"))
+        if tok_cfg_path.exists()
+        else {}
+    )
+    backend = (
+        str(tok_cfg.get("backend") or "").strip().lower()
+        if isinstance(tok_cfg, dict)
+        else ""
+    )
+    if backend == "rwkv_world_trie":
+        # RWKV World tokenizers expose a WordPiece-shaped vocabulary but the
+        # runtime contract is a longest-match trie built from the same strings.
+        # Keep the vocab payloads; override the declared backend so the
+        # importer does not lie about the tokenizer family.
+        contract["tokenizer_type"] = "rwkv_world_trie"
+        contract["backend"] = "rwkv_world_trie"
+        contract["vocab_source_type"] = tok_type
+        special = _special_tokens_from_tokenizer_config(
+            model_dir, "rwkv_world_trie", vocab_size
+        )
     return payloads, contract, special
 
 
@@ -3212,7 +3339,7 @@ def main() -> int:
     ap.add_argument("--ram-dir", type=Path, default=Path("/dev/shm"), help="tmpfs directory for --ram-output; default: /dev/shm")
     ap.add_argument("--config-out", required=True, type=Path)
     ap.add_argument("--manifest-out", required=True, type=Path)
-    ap.add_argument("--arch", default="auto", choices=["auto", "parakeet_tdt", "muse_glimmer_text", "gemma4", "gemma4_assistant", "gemma3", "llama", "qwen2", "qwen3", "qwen3vl", "qwen3_vl_vision", "cohere_compass_text", "cohere_compass_vision", "cohere_command_a_plus_text", "qwen35", "qwen4_exp", "nemotron_h", "glm4", "kimi_vl", "instella_moe", "whisper_encoder", "whisper_decoder"])
+    ap.add_argument("--arch", default="auto", choices=["auto", "parakeet_tdt", "muse_glimmer_text", "gemma4", "gemma4_assistant", "gemma3", "llama", "qwen2", "qwen3", "qwen3vl", "qwen3_vl_vision", "cohere_compass_text", "cohere_compass_vision", "cohere_command_a_plus_text", "qwen35", "qwen4_exp", "nemotron_h", "glm4", "kimi_vl", "instella_moe", "whisper_encoder", "whisper_decoder", "rwkv7"])
     ap.add_argument("--config-template", type=Path, help="existing v8 config/manifest to reuse explicit runtime policy")
     ap.add_argument("--dtype", default="preserve", choices=["preserve", "bf16", "fp32"])
     ap.add_argument(

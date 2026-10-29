@@ -2868,3 +2868,494 @@ def test_qwen3vl_safetensors_vision_maps_temporal_patch_split(tmp_path: Path) ->
         and any(marker in function for marker in ("onednn", "mkl", "amx", "sleef"))
         for function in native_functions
     )
+
+
+_RWKV7_NUM_LAYERS = 24
+
+# RWKV-7 1.5B checkpoint inventory, declared independently of the model map so
+# the importer contract is checked against the published tensor layout rather
+# than against itself. The real ``rwkv-kernels`` index is untracked and may be
+# absent, so the tests synthesize the headers from these names.
+_RWKV7_GLOBAL_TENSORS = (
+    "head.weight",
+    "rwkv7.emb.weight",
+    "rwkv7.ln_out.weight",
+    "rwkv7.ln_out.bias",
+)
+_RWKV7_LAYER0_TENSORS = (
+    "rwkv7.blocks.0.ln0.weight",
+    "rwkv7.blocks.0.ln0.bias",
+)
+_RWKV7_LAYER_SUFFIXES = (
+    "ln1.weight",
+    "ln1.bias",
+    "ln2.weight",
+    "ln2.bias",
+    "att.receptance.weight",
+    "att.key.weight",
+    "att.value.weight",
+    "att.output.weight",
+    "att.ln_x.weight",
+    "att.ln_x.bias",
+    "att.x_r",
+    "att.x_w",
+    "att.x_k",
+    "att.x_v",
+    "att.x_a",
+    "att.x_g",
+    "att.w0",
+    "att.w1",
+    "att.w2",
+    "att.a0",
+    "att.a1",
+    "att.a2",
+    "att.g1",
+    "att.g2",
+    "att.v0",
+    "att.v1",
+    "att.v2",
+    "att.k_k",
+    "att.k_a",
+    "att.r_k",
+    "ffn.x_k",
+    "ffn.key.weight",
+    "ffn.value.weight",
+)
+
+
+def _rwkv7_inventory_names(num_layers: int = _RWKV7_NUM_LAYERS) -> set[str]:
+    names = set(_RWKV7_GLOBAL_TENSORS) | set(_RWKV7_LAYER0_TENSORS)
+    for layer in range(num_layers):
+        names.update(
+            f"rwkv7.blocks.{layer}.{suffix}" for suffix in _RWKV7_LAYER_SUFFIXES
+        )
+    return names
+
+
+def _rwkv7_headers(
+    converter, names: set[str] | None = None
+) -> dict[str, object]:
+    shard = Path("model.safetensors")
+    return {
+        name: converter.HeaderTensor(name, "BF16", [], shard)
+        for name in (names if names is not None else _rwkv7_inventory_names())
+    }
+
+
+def _load_build_ir():
+    scripts = str((ROOT / "version" / "v8" / "scripts").resolve())
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    path = ROOT / "version" / "v8" / "scripts" / "build_ir_v8.py"
+    spec = importlib.util.spec_from_file_location("build_ir_v8_rwkv7_contract_test", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_index_audit():
+    path = ROOT / "version" / "v8" / "scripts" / "audit_safetensors_index_v8.py"
+    spec = importlib.util.spec_from_file_location("audit_safetensors_index_v8_rwkv7_test", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_rwkv7_contract_covers_1p5b_inventory() -> None:
+    converter = _load_converter()
+    names = _rwkv7_inventory_names()
+    assert len(names) == 798
+    headers = _rwkv7_headers(converter, names)
+
+    refs = converter._refs_from_safetensors_contract(
+        "rwkv7", {"num_layers": _RWKV7_NUM_LAYERS}, headers
+    )
+    assert refs is not None
+    assert len(refs) == 798
+    targets = [ref.ck_name for ref in refs]
+    assert len(set(targets)) == len(targets) == 798
+    consumed = {src for ref in refs for src in ref.source_names}
+    assert consumed == names
+
+    target_set = set(targets)
+    assert {"token_emb", "final_ln_weight", "final_ln_bias", "lm_head"} <= target_set
+    assert "rwkv7.blocks.0.ln0.weight" in target_set
+    assert "rwkv7.blocks.0.ln0.bias" in target_set
+    assert "rwkv7.blocks.1.ln0.weight" not in target_set
+    assert "rwkv7.blocks.23.att.r_k" in target_set
+
+
+def test_rwkv7_weight_aliases_bind_every_indexed_weight() -> None:
+    converter = _load_converter()
+    build_ir = _load_build_ir()
+    refs = converter._refs_from_safetensors_contract(
+        "rwkv7", {"num_layers": _RWKV7_NUM_LAYERS}, _rwkv7_headers(converter)
+    )
+    assert refs is not None
+    manifest_names = {ref.ck_name for ref in refs}
+
+    rwkv7_ops = [
+        op for op in build_ir.TEMPLATE_OP_WEIGHTS if str(op).startswith("rwkv7_")
+    ]
+    assert "rwkv7_ln0" in rwkv7_ops
+    for op in rwkv7_ops:
+        for weight_key in build_ir.TEMPLATE_OP_WEIGHTS[op]:
+            patterns = build_ir.WEIGHT_PATTERNS.get(weight_key, [weight_key])
+            for layer in (0, 1, 23):
+                candidates = [
+                    pattern.replace("{L}", str(layer)) for pattern in patterns
+                ]
+                assert any(
+                    candidate in manifest_names for candidate in candidates
+                ), f"{op}.{weight_key} does not bind at layer {layer}: {candidates}"
+
+    assert build_ir.TEMPLATE_TO_KERNEL_OP["rwkv7_ln0"] == "layernorm"
+    assert build_ir.OP_DATAFLOW["rwkv7_ln0"]["inputs"] == {"input": "main_stream"}
+
+
+def test_rwkv7_config_builder_derives_layer_kinds(tmp_path: Path) -> None:
+    converter = _load_converter()
+    hf_config = {
+        "model_type": "rwkv7",
+        "num_hidden_layers": 24,
+        "hidden_size": 2048,
+        "num_heads": 32,
+        "head_size": 64,
+        "hidden_ratio": 4,
+        "vocab_size": 65536,
+        "context_length": 4096,
+        "decay_rank": 32,
+        "key_rank": 32,
+        "value_rank": 32,
+        "gate_rank": 32,
+    }
+    (tmp_path / "config.json").write_text(json.dumps(hf_config), encoding="utf-8")
+
+    config = converter._build_config(tmp_path, "rwkv7", None)
+
+    assert config["num_layers"] == 24
+    assert config["embed_dim"] == 2048
+    assert config["num_heads"] == 32
+    assert config["head_dim"] == 64
+    assert config["intermediate_size"] == 8192
+    assert config["layer_kinds"] == ["layer_0"] + ["layer_gt0"] * 23
+    assert config["tie_word_embeddings"] is False
+    assert config["decay_rank"] == 32
+    assert config["rms_eps"] == 1e-5
+
+
+def test_rwkv7_tokenizer_contract_declares_world_trie(tmp_path: Path) -> None:
+    converter = _load_converter()
+    tokenizer = {
+        "model": {
+            "type": "WordPiece",
+            "vocab": {token: index for index, token in enumerate("abcd")},
+        }
+    }
+    (tmp_path / "tokenizer.json").write_text(json.dumps(tokenizer), encoding="utf-8")
+    (tmp_path / "tokenizer_config.json").write_text(
+        json.dumps({"backend": "rwkv_world_trie"}), encoding="utf-8"
+    )
+
+    payloads, contract, _special = converter._tokenizer_payloads_from_json(
+        tmp_path, 4
+    )
+
+    assert contract is not None
+    assert contract["tokenizer_type"] == "rwkv_world_trie"
+    assert contract["backend"] == "rwkv_world_trie"
+    assert contract["vocab_source_type"] == "wordpiece"
+    payload_names = {name for name, *_rest in payloads}
+    assert {"vocab_offsets", "vocab_strings"} <= payload_names
+
+
+def test_rwkv7_circuit_declares_ln0_header_and_provider_contracts() -> None:
+    circuit_path = ROOT / "version" / "v8" / "circuits" / "rwkv7.json"
+    circuit = json.loads(circuit_path.read_text(encoding="utf-8"))
+    header = circuit["block_types"]["decoder"]["header"]
+    assert any(
+        isinstance(op, dict) and op.get("op") == "rwkv7_ln0" for op in header
+    )
+
+    requirements = circuit["contract"]["provider_numerical_requirements"]
+    for op in (
+        "rwkv7_time_mix_shifts",
+        "rwkv7_lora_gates",
+        "rwkv7_vgate_produce",
+        "rwkv7_vgate_vmix",
+        "rwkv7_kk_factor",
+        "rwkv7_norm_kk",
+        "rwkv7_scale_k",
+        "rwkv7_wkv_decode",
+        "rwkv7_channelmix_decode",
+    ):
+        assert requirements[op].startswith("rwkv7_")
+
+
+def test_rwkv7_kernel_weight_ports_are_bound() -> None:
+    build_ir = _load_build_ir()
+    circuit = json.loads(
+        (ROOT / "version" / "v8" / "circuits" / "rwkv7.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    circuit_kernels = circuit.get("kernels", {})
+    kernel_map_dir = ROOT / "version" / "v8" / "kernel_maps"
+
+    checked = 0
+    for op, weight_keys in build_ir.TEMPLATE_OP_WEIGHTS.items():
+        if not str(op).startswith("rwkv7_") or not weight_keys:
+            continue
+        kernel_op = build_ir.TEMPLATE_TO_KERNEL_OP.get(op)
+        if kernel_op in (None, "matmul"):
+            # matmul providers bind the single manifest matrix through
+            # ``_first_weight``; no per-port name mapping is required.
+            continue
+        candidates = [
+            circuit_kernels.get(op),
+            f"{kernel_op}_f32",
+            kernel_op,
+            "layernorm_forward",
+        ]
+        kernel_path = next(
+            (
+                kernel_map_dir / f"{name}.json"
+                for name in candidates
+                if name and (kernel_map_dir / f"{name}.json").exists()
+            ),
+            None,
+        )
+        assert kernel_path is not None, f"no kernel map for {op} ({kernel_op})"
+        kernel = json.loads(kernel_path.read_text(encoding="utf-8"))
+
+        weight_ports = {
+            weight["name"]
+            for weight in kernel.get("weights", [])
+            if isinstance(weight, dict) and weight.get("name")
+        }
+        weight_ports.update(
+            str(param["name"])
+            for param in kernel.get("call_abi", {}).get("params", [])
+            if str(param.get("source", "")).startswith("weight")
+            and param.get("name")
+        )
+        for port in weight_ports:
+            if port in {"_first_weight", "_bias"}:
+                continue
+            assert port in weight_keys or any(
+                build_ir.WEIGHT_TO_KERNEL_INPUT.get(key) == port
+                for key in weight_keys
+            ), f"{op} cannot bind kernel weight port {port!r}: {weight_keys}"
+            checked += 1
+    assert checked >= 20
+
+
+def test_rwkv7_circuit_uses_canonical_matmul_ports_and_alias_safe_residuals() -> None:
+    circuit = json.loads(
+        (ROOT / "version" / "v8" / "circuits" / "rwkv7.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    projections = {
+        "rwkv7_r_proj",
+        "rwkv7_k_proj",
+        "rwkv7_v_proj",
+        "rwkv7_out_proj",
+    }
+    for ops in circuit["block_types"]["decoder"]["body"]["ops_by_kind"].values():
+        for item in ops:
+            if not isinstance(item, dict):
+                continue
+            op = item.get("op")
+            if op in projections:
+                slots = item["graph_slots"]
+                assert set(slots["inputs"]) == {"A"}
+                assert set(slots["outputs"]) == {"C"}
+            if op == "residual_add":
+                slots = item["graph_slots"]
+                # ck_residual_add_token_major may alias input a, not input b.
+                assert slots["inputs"]["a"] == "main_stream"
+                assert slots["outputs"]["out"] == "main_stream"
+
+
+def test_rwkv7_contract_expands_to_declared_index_inventory() -> None:
+    converter = _load_converter()
+    contract = converter._safetensors_arch_contract("rwkv7")
+    assert contract["aliases"] == ["rwkv7"]
+    assert contract["index_contract"] == {
+        "tensor_count": 798,
+        "shard_count": 4,
+        "layer_count": _RWKV7_NUM_LAYERS,
+    }
+    assert len(contract["required_tensor_patterns"]) == 39
+    assert len(contract["tensor_refs"]) == 39
+
+    # The declared patterns must describe exactly the synthetic checkpoint
+    # layout, so the 798/4/24 inventory is validated without the real index.
+    expanded_patterns = {
+        pattern.replace("{L}", str(layer))
+        for pattern in contract["required_tensor_patterns"]
+        for layer in (
+            range(_RWKV7_NUM_LAYERS) if "{L}" in pattern else (0,)
+        )
+    }
+    assert expanded_patterns == _rwkv7_inventory_names()
+
+    headers = _rwkv7_headers(converter)
+    refs = converter._refs_from_safetensors_contract(
+        "rwkv7", {"num_layers": _RWKV7_NUM_LAYERS}, headers
+    )
+    assert refs is not None
+    assert len(refs) == 798
+    assert len({ref.ck_name for ref in refs}) == 798
+    assert len({src for ref in refs for src in ref.source_names}) == 798
+
+    by_name = {ref.ck_name: ref for ref in refs}
+    assert by_name["token_emb"].source_names == ("rwkv7.emb.weight",)
+    assert by_name["final_ln_weight"].source_names == ("rwkv7.ln_out.weight",)
+    assert by_name["final_ln_bias"].source_names == ("rwkv7.ln_out.bias",)
+    assert by_name["lm_head"].source_names == ("head.weight",)
+    assert by_name["rwkv7.blocks.0.ln0.weight"].source_names == (
+        "rwkv7.blocks.0.ln0.weight",
+    )
+    assert "rwkv7.blocks.1.ln0.weight" not in by_name
+
+
+def test_rwkv7_index_audit_attributes_blocks_to_layers(tmp_path: Path) -> None:
+    audit = _load_index_audit()
+
+    # ``LAYER_RE`` accepts ``rwkv7.blocks.{L}`` in addition to ``layers.{L}``,
+    # otherwise RWKV-7 indexes report ``layer_count = 0``.
+    assert audit.LAYER_RE.search("rwkv7.blocks.12.att.r_k").group(1) == "12"
+    assert audit.LAYER_RE.search("rwkv7.blocks.12.ffn.x_k").group(1) == "12"
+    # Vision blocks are not decoder layers and must stay unmatched.
+    assert audit.LAYER_RE.search("model.visual.blocks.12.attn.qkv.weight") is None
+
+    assert audit._family("rwkv7.emb.weight") == "rwkv7_embedding"
+    assert audit._family("rwkv7.ln_out.weight") == "rwkv7_final_norm"
+    assert audit._family("rwkv7.blocks.3.att.r_k") == "rwkv7_attention"
+    assert audit._family("rwkv7.blocks.3.ffn.x_k") == "rwkv7_channelmix"
+    assert audit._family("rwkv7.blocks.3.ln1.weight") == "rwkv7_norm"
+    assert audit._family("head.weight") == "head.weight"
+
+    index_path = tmp_path / "model.safetensors.index.json"
+    index_path.write_text(
+        json.dumps(
+            {
+                "metadata": {"total_size": 0},
+                "weight_map": {
+                    "rwkv7.emb.weight": "model-00001-of-00004.safetensors",
+                    "rwkv7.blocks.0.ln0.weight": "model-00001-of-00004.safetensors",
+                    "rwkv7.blocks.0.att.r_k": "model-00001-of-00004.safetensors",
+                    "rwkv7.blocks.23.att.r_k": "model-00004-of-00004.safetensors",
+                    "head.weight": "model-00004-of-00004.safetensors",
+                    "model.visual.blocks.12.attn.qkv.weight": (
+                        "model-00004-of-00004.safetensors"
+                    ),
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    report = audit.audit_index(index_path)
+    assert report["layer_count"] == 2
+    assert sorted(report["layers"]) == ["0", "23"]
+    assert report["layers"]["0"]["families"] == {
+        "rwkv7_attention": 1,
+        "rwkv7_norm": 1,
+    }
+    assert report["tensor_count"] == 6
+    assert report["shard_count"] == 2
+
+
+@pytest.mark.parametrize("override,message", [
+    ({"hidden_ratio": -1}, "hidden_ratio"),
+    ({"hidden_ratio": 1.1}, "hidden_ratio"),
+    ({"hidden_ratio": float("nan")}, "hidden_ratio"),
+    ({"intermediate_size": 12, "hidden_ratio": 4}, "hidden_ratio"),
+    ({"hidden_act": "silu"}, "squared_relu"),
+    ({"tie_word_embeddings": True}, "untied"),
+    ({"layer_norm_eps": 0}, "epsilon"),
+    ({"layer_norm_eps": float("inf")}, "epsilon"),
+    ({"decay_rank": 0}, "decay_rank"),
+    ({"gate_rank": 1.5}, "gate_rank"),
+    ({"head_size": 3}, "geometry"),
+])
+def test_rwkv7_rejects_config_incompatible_with_circuit(tmp_path, override, message):
+    config = dict(model_type="rwkv7", num_hidden_layers=2, hidden_size=8,
+                  head_size=4, num_heads=2, hidden_ratio=4, vocab_size=16)
+    config.update(override)
+    (tmp_path / "config.json").write_text(json.dumps(config))
+    with pytest.raises(SystemExit, match=message):
+        _load_converter()._build_config(tmp_path, "rwkv7", None)
+
+
+def test_rwkv7_real_conversion_preserves_nonzero_weights(tmp_path):
+    torch = pytest.importorskip("torch")
+    st = pytest.importorskip("safetensors.torch")
+    checkpoint = tmp_path / "checkpoint"
+    checkpoint.mkdir()
+    output = tmp_path / "out"
+    output.mkdir()
+    config = dict(model_type="rwkv7", num_hidden_layers=2, hidden_size=8,
+                  head_size=4, num_heads=2, hidden_ratio=4, vocab_size=16,
+                  decay_rank=2, key_rank=2, value_rank=2, gate_rank=2)
+    (checkpoint / "config.json").write_text(json.dumps(config))
+    (checkpoint / "tokenizer.json").write_text(json.dumps({
+        "model": {"type": "WordPiece", "vocab": {chr(65+i): i for i in range(16)}}}))
+    (checkpoint / "tokenizer_config.json").write_text(
+        json.dumps({"backend": "rwkv_world_trie"}))
+    tensors = {}
+    for index, name in enumerate(sorted(_rwkv7_inventory_names(2))):
+        shape = (8,)
+        if name in ("head.weight", "rwkv7.emb.weight"):
+            shape = (16, 8)
+        elif name.endswith(("receptance.weight", "att.key.weight", "att.value.weight", "output.weight")):
+            shape = (8, 8)
+        elif name.endswith("ffn.key.weight"):
+            shape = (32, 8)
+        elif name.endswith("ffn.value.weight"):
+            shape = (8, 32)
+        elif name.endswith((".w1", ".a1", ".v1", ".g1")):
+            shape = (8, 2)
+        elif name.endswith((".w2", ".a2", ".v2", ".g2")):
+            shape = (2, 8)
+        elif name.endswith(".r_k"):
+            shape = (2, 4)
+        tensors[name] = ((torch.arange(math.prod(shape)).reshape(shape) - 7) / 16 + index / 8).to(torch.bfloat16)
+    st.save_file(tensors, checkpoint / "model.safetensors")
+    subprocess.run([
+        sys.executable, str(CONVERTER_PATH), "--checkpoint", str(checkpoint),
+        "--output", str(output / "weights.bump"), "--config-out", str(output / "config.json"),
+        "--manifest-out", str(output / "weights_manifest.json"), "--arch", "auto",
+    ], cwd=ROOT, check=True, capture_output=True, text=True)
+    manifest = json.loads((output / "weights_manifest.json").read_text())
+    audit = json.loads((output / "conversion_audit.json").read_text())
+    assert audit["verdict"] == "pass"
+    assert audit["unmapped_source_tensors"] == []
+    assert manifest["tokenizer_contract"]["tokenizer_type"] == "rwkv_world_trie"
+    entries = {entry["name"]: entry for entry in manifest["entries"]}
+    data = (output / "weights.bump").read_bytes()
+    for name in ("rwkv7.blocks.0.att.w1", "rwkv7.blocks.1.att.w2",
+                 "rwkv7.blocks.0.ffn.key.weight", "rwkv7.blocks.1.att.r_k"):
+        entry = entries[name]
+        assert entry["dtype"] == "fp32"
+        assert entry["shape"] == list(tensors[name].shape)
+        actual = np.frombuffer(data, dtype="<f4", count=tensors[name].numel(),
+                               offset=entry["file_offset"])
+        np.testing.assert_array_equal(actual, tensors[name].float().numpy().ravel())
+
+
+@pytest.mark.parametrize("missing", [
+    "rwkv7.blocks.0.ln0.weight", "rwkv7.blocks.1.att.w2", "head.weight",
+])
+def test_rwkv7_missing_required_weight_fails_closed(missing):
+    converter = _load_converter()
+    headers = _rwkv7_headers(converter, _rwkv7_inventory_names(2) - {missing})
+    with pytest.raises(SystemExit, match="Missing required safetensors tensor"):
+        converter._refs_from_safetensors_contract("rwkv7", {"num_layers": 2}, headers)

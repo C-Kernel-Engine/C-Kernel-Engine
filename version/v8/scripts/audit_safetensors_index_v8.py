@@ -15,7 +15,12 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT_SAFETENSORS_CK_MAP = SCRIPT_DIR.parent / "model_maps" / "safetensors_ck_map.json"
 
 
-LAYER_RE = re.compile(r"(?:^|\.)layers\.(\d+)\.")
+# `layers.{L}` is the generic HF block name; RWKV-7 checkpoints instead use
+# `rwkv7.blocks.{L}`, so the alternation keeps those tensors attributable to a
+# layer. The leading `(?:^|\.)` boundary still prevents accidental matches
+# inside other names (for example `model.visual.blocks.{L}`, which is a vision
+# block rather than a decoder layer and is intentionally left unmatched).
+LAYER_RE = re.compile(r"(?:^|\.)(?:layers|rwkv7\.blocks)\.(\d+)\.")
 EXPERT_RE = re.compile(r"\.experts\.(\d+)\.")
 
 
@@ -31,6 +36,7 @@ def _load_index(path: Path) -> dict[str, Any]:
 def _family(name: str) -> str:
     if name in {
         "lm_head.weight",
+        "head.weight",
         "language_model.lm_head.weight",
         "backbone.embeddings.weight",
         "model.embed_tokens.weight",
@@ -38,6 +44,18 @@ def _family(name: str) -> str:
         "language_model.model.embed_tokens.weight",
     }:
         return name
+    if name.startswith("rwkv7."):
+        if name == "rwkv7.emb.weight":
+            return "rwkv7_embedding"
+        if name.startswith("rwkv7.ln_out."):
+            return "rwkv7_final_norm"
+        if ".att." in name:
+            return "rwkv7_attention"
+        if ".ffn." in name:
+            return "rwkv7_channelmix"
+        if ".ln0." in name or ".ln1." in name or ".ln2." in name:
+            return "rwkv7_norm"
+        return "rwkv7_other"
     if name.startswith("model.visual.patch_embed."):
         return "vision_patch_embed"
     if name.startswith("model.visual.pos_embed."):

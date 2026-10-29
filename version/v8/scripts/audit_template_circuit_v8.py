@@ -53,6 +53,7 @@ CRITICAL_TEMPLATE_INPUTS: dict[str, tuple[str, ...]] = {
     "v_proj": ("x",),
     "kv_a_proj": ("x",),
     "kv_a_layernorm": ("input",),
+    "rwkv7_ln0": ("input",),
     "kv_lora_decompress": ("compressed_kv",),
     "partial_rope_concat": ("q_packed", "k_nope", "k_pe"),
     "mla_attention": ("q", "k", "v"),

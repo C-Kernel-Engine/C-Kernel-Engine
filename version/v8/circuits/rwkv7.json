@@ -3,10 +3,10 @@
   "name": "rwkv7",
   "family": "rwkv7",
   "projection_inputs": {
-    "rwkv7_r_proj": {"x": "xr_lane"},
-    "rwkv7_k_proj": {"x": "xk_lane"},
-    "rwkv7_v_proj": {"x": "xv_lane"},
-    "rwkv7_out_proj": {"x": "wkv_out"},
+    "rwkv7_r_proj": {"A": "xr_lane"},
+    "rwkv7_k_proj": {"A": "xk_lane"},
+    "rwkv7_v_proj": {"A": "xv_lane"},
+    "rwkv7_out_proj": {"A": "wkv_out"},
     "rwkv7_channelmix_decode": {"x": "normalized_stream"}
   },
   "flags": {
@@ -64,6 +64,17 @@
       "stop_text_markers": [],
       "template_markers": ["User:", "Assistant:", "System:", "<think>", "</think>"],
       "min_response_tokens": 1
+    },
+    "provider_numerical_requirements": {
+      "rwkv7_time_mix_shifts": "rwkv7_time_mix_shifts_fp32",
+      "rwkv7_lora_gates": "rwkv7_lora_gates_fp32",
+      "rwkv7_vgate_produce": "rwkv7_vgate_vmix_fp32",
+      "rwkv7_vgate_vmix": "rwkv7_vgate_vmix_fp32",
+      "rwkv7_kk_factor": "rwkv7_kk_factor_fp32",
+      "rwkv7_norm_kk": "rwkv7_norm_kk_fp32",
+      "rwkv7_scale_k": "rwkv7_scale_k_fp32",
+      "rwkv7_wkv_decode": "rwkv7_wkv_decode_fp32",
+      "rwkv7_channelmix_decode": "rwkv7_channelmix_decode_fp32"
     },
     "attention_contract": {
       "attn_variant": "rwkv7_wkv",
@@ -317,7 +328,8 @@
       "sequence": ["header", "body", "footer"],
       "header": [
         "rwkv7_trie_tokenizer",
-        "dense_embedding_lookup"
+        "dense_embedding_lookup",
+        {"op": "rwkv7_ln0", "graph_slots": {"inputs": {"input": "main_stream"}, "outputs": {"output": "main_stream"}}}
       ],
       "body": {
         "type": "rwkv7_dense",
@@ -326,38 +338,38 @@
           "layer_0": [
             {"op": "layernorm", "graph_slots": {"inputs": {"input": "main_stream"}, "outputs": {"output": "normalized_stream"}}},
             {"op": "rwkv7_time_mix_shifts", "graph_slots": {"inputs": {"x": "normalized_stream", "shift_in": "att_shift"}, "outputs": {"xr": "xr_lane", "xw": "xw_lane", "xk": "xk_lane", "xv": "xv_lane", "xa": "xa_lane", "xg": "xg_lane", "shift_out": "att_shift"}}},
-            {"op": "rwkv7_r_proj", "graph_slots": {"inputs": {"x": "xr_lane"}, "outputs": {"y": "r_vec"}}},
-            {"op": "rwkv7_k_proj", "graph_slots": {"inputs": {"x": "xk_lane"}, "outputs": {"y": "k_raw_vec"}}},
-            {"op": "rwkv7_v_proj", "graph_slots": {"inputs": {"x": "xv_lane"}, "outputs": {"y": "v_in_vec"}}},
+            {"op": "rwkv7_r_proj", "graph_slots": {"inputs": {"A": "xr_lane"}, "outputs": {"C": "r_vec"}}},
+            {"op": "rwkv7_k_proj", "graph_slots": {"inputs": {"A": "xk_lane"}, "outputs": {"C": "k_raw_vec"}}},
+            {"op": "rwkv7_v_proj", "graph_slots": {"inputs": {"A": "xv_lane"}, "outputs": {"C": "v_in_vec"}}},
             {"op": "rwkv7_lora_gates", "graph_slots": {"inputs": {"xw": "xw_lane", "xa": "xa_lane", "xg": "xg_lane"}, "outputs": {"w_log": "w_log_vec", "a_out": "a_vec", "g_out": "g_vec"}}},
             {"op": "rwkv7_vgate_produce", "graph_slots": {"inputs": {"v_in": "v_in_vec"}, "outputs": {"v_out": "v_mix_vec", "v_first_out": "v_first"}}},
             {"op": "rwkv7_kk_factor", "graph_slots": {"inputs": {"k": "k_raw_vec"}, "outputs": {"kk_raw": "kk_raw_vec"}}},
             {"op": "rwkv7_norm_kk", "graph_slots": {"inputs": {"kk_in": "kk_raw_vec"}, "outputs": {"kk_out": "kk_vec"}}},
             {"op": "rwkv7_scale_k", "graph_slots": {"inputs": {"k_in": "k_raw_vec", "a": "a_vec"}, "outputs": {"k_out": "k_scaled_vec"}}},
             {"op": "rwkv7_wkv_decode", "graph_slots": {"inputs": {"r": "r_vec", "w_log": "w_log_vec", "k": "k_scaled_vec", "v": "v_mix_vec", "kk": "kk_vec", "a": "a_vec", "g": "g_vec", "rk": "external:rwkv7_time_mix_rk", "state_in": "wkv"}, "outputs": {"y": "wkv_out", "state_out": "wkv"}}},
-            {"op": "rwkv7_out_proj", "graph_slots": {"inputs": {"x": "wkv_out"}, "outputs": {"y": "post_attention_stream"}}},
-            {"op": "residual_add", "graph_slots": {"inputs": {"a": "post_attention_stream", "b": "main_stream"}, "outputs": {"out": "main_stream"}}},
+            {"op": "rwkv7_out_proj", "graph_slots": {"inputs": {"A": "wkv_out"}, "outputs": {"C": "post_attention_stream"}}},
+            {"op": "residual_add", "graph_slots": {"inputs": {"a": "main_stream", "b": "post_attention_stream"}, "outputs": {"out": "main_stream"}}},
             {"op": "layernorm", "graph_slots": {"inputs": {"input": "main_stream"}, "outputs": {"output": "normalized_stream"}}},
             {"op": "rwkv7_channelmix_decode", "graph_slots": {"inputs": {"x": "normalized_stream", "shift_in": "ffn_shift"}, "outputs": {"shift_out": "ffn_shift", "out": "channelmix_output"}}},
-            {"op": "residual_add", "graph_slots": {"inputs": {"a": "channelmix_output", "b": "main_stream"}, "outputs": {"out": "main_stream"}}}
+            {"op": "residual_add", "graph_slots": {"inputs": {"a": "main_stream", "b": "channelmix_output"}, "outputs": {"out": "main_stream"}}}
           ],
           "layer_gt0": [
             {"op": "layernorm", "graph_slots": {"inputs": {"input": "main_stream"}, "outputs": {"output": "normalized_stream"}}},
             {"op": "rwkv7_time_mix_shifts", "graph_slots": {"inputs": {"x": "normalized_stream", "shift_in": "att_shift"}, "outputs": {"xr": "xr_lane", "xw": "xw_lane", "xk": "xk_lane", "xv": "xv_lane", "xa": "xa_lane", "xg": "xg_lane", "shift_out": "att_shift"}}},
-            {"op": "rwkv7_r_proj", "graph_slots": {"inputs": {"x": "xr_lane"}, "outputs": {"y": "r_vec"}}},
-            {"op": "rwkv7_k_proj", "graph_slots": {"inputs": {"x": "xk_lane"}, "outputs": {"y": "k_raw_vec"}}},
-            {"op": "rwkv7_v_proj", "graph_slots": {"inputs": {"x": "xv_lane"}, "outputs": {"y": "v_in_vec"}}},
+            {"op": "rwkv7_r_proj", "graph_slots": {"inputs": {"A": "xr_lane"}, "outputs": {"C": "r_vec"}}},
+            {"op": "rwkv7_k_proj", "graph_slots": {"inputs": {"A": "xk_lane"}, "outputs": {"C": "k_raw_vec"}}},
+            {"op": "rwkv7_v_proj", "graph_slots": {"inputs": {"A": "xv_lane"}, "outputs": {"C": "v_in_vec"}}},
             {"op": "rwkv7_lora_gates", "graph_slots": {"inputs": {"xw": "xw_lane", "xa": "xa_lane", "xg": "xg_lane"}, "outputs": {"w_log": "w_log_vec", "a_out": "a_vec", "g_out": "g_vec"}}},
             {"op": "rwkv7_vgate_vmix", "graph_slots": {"inputs": {"v_in": "v_in_vec", "v_first": "v_first", "xv": "xv_lane"}, "outputs": {"v_out": "v_mix_vec", "v_first_out": "v_first"}}},
             {"op": "rwkv7_kk_factor", "graph_slots": {"inputs": {"k": "k_raw_vec"}, "outputs": {"kk_raw": "kk_raw_vec"}}},
             {"op": "rwkv7_norm_kk", "graph_slots": {"inputs": {"kk_in": "kk_raw_vec"}, "outputs": {"kk_out": "kk_vec"}}},
             {"op": "rwkv7_scale_k", "graph_slots": {"inputs": {"k_in": "k_raw_vec", "a": "a_vec"}, "outputs": {"k_out": "k_scaled_vec"}}},
             {"op": "rwkv7_wkv_decode", "graph_slots": {"inputs": {"r": "r_vec", "w_log": "w_log_vec", "k": "k_scaled_vec", "v": "v_mix_vec", "kk": "kk_vec", "a": "a_vec", "g": "g_vec", "rk": "external:rwkv7_time_mix_rk", "state_in": "wkv"}, "outputs": {"y": "wkv_out", "state_out": "wkv"}}},
-            {"op": "rwkv7_out_proj", "graph_slots": {"inputs": {"x": "wkv_out"}, "outputs": {"y": "post_attention_stream"}}},
-            {"op": "residual_add", "graph_slots": {"inputs": {"a": "post_attention_stream", "b": "main_stream"}, "outputs": {"out": "main_stream"}}},
+            {"op": "rwkv7_out_proj", "graph_slots": {"inputs": {"A": "wkv_out"}, "outputs": {"C": "post_attention_stream"}}},
+            {"op": "residual_add", "graph_slots": {"inputs": {"a": "main_stream", "b": "post_attention_stream"}, "outputs": {"out": "main_stream"}}},
             {"op": "layernorm", "graph_slots": {"inputs": {"input": "main_stream"}, "outputs": {"output": "normalized_stream"}}},
             {"op": "rwkv7_channelmix_decode", "graph_slots": {"inputs": {"x": "normalized_stream", "shift_in": "ffn_shift"}, "outputs": {"shift_out": "ffn_shift", "out": "channelmix_output"}}},
-            {"op": "residual_add", "graph_slots": {"inputs": {"a": "channelmix_output", "b": "main_stream"}, "outputs": {"out": "main_stream"}}}
+            {"op": "residual_add", "graph_slots": {"inputs": {"a": "main_stream", "b": "channelmix_output"}, "outputs": {"out": "main_stream"}}}
           ]
         }
       },

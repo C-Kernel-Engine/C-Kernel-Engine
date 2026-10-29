@@ -125,9 +125,13 @@ class V8KernelCallABITests(unittest.TestCase):
                 for port, slot in inputs.items():
                     self.assertEqual(nodes[0]["graph_slots"]["inputs"][port], slot,
                                      (kind, op, port))
-        self.assertEqual(circuit["projection_inputs"]["rwkv7_r_proj"]["x"], "xr_lane")
-        self.assertEqual(circuit["projection_inputs"]["rwkv7_k_proj"]["x"], "xk_lane")
-        self.assertEqual(circuit["projection_inputs"]["rwkv7_v_proj"]["x"], "xv_lane")
+        for op in ("rwkv7_r_proj", "rwkv7_k_proj", "rwkv7_v_proj", "rwkv7_out_proj"):
+            self.assertEqual(build_ir_v8.OP_DATAFLOW[op]["inputs"],
+                             circuit["projection_inputs"][op])
+            self.assertEqual(set(build_ir_v8.OP_DATAFLOW[op]["outputs"]), {"C"})
+        self.assertEqual(circuit["projection_inputs"]["rwkv7_r_proj"]["A"], "xr_lane")
+        self.assertEqual(circuit["projection_inputs"]["rwkv7_k_proj"]["A"], "xk_lane")
+        self.assertEqual(circuit["projection_inputs"]["rwkv7_v_proj"]["A"], "xv_lane")
 
     def test_unimplemented_trie_tokenizer_fails_before_emitting_c(self) -> None:
         with self.assertRaisesRegex(ValueError, "native longest-match encoding is not implemented"):
