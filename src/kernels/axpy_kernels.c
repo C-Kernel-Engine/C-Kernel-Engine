@@ -2320,11 +2320,13 @@ static int ck_moe_bucket_layout(int rows,
                                 int intermediate_dim,
                                 int n_experts,
                                 int top_k,
+                                int intermediate_multiple,
                                 ck_moe_q4k_q5k_bucket_layout_t *layout)
 {
     if (!layout || rows <= 0 || hidden_dim <= 0 || intermediate_dim <= 0 ||
         n_experts <= 0 || top_k <= 0 || top_k > n_experts ||
-        hidden_dim % 256 != 0 || intermediate_dim % 256 != 0) {
+        hidden_dim % 256 != 0 || intermediate_multiple <= 0 ||
+        intermediate_dim % intermediate_multiple != 0) {
         return -1;
     }
 
@@ -2410,7 +2412,7 @@ size_t moe_swiglu_expert_q4k_q5k_bucketed_workspace_bytes(
 {
     ck_moe_q4k_q5k_bucket_layout_t layout;
     if (ck_moe_bucket_layout(rows, hidden_dim, intermediate_dim, n_experts,
-                             top_k, &layout) != 0) {
+                             top_k, 256, &layout) != 0) {
         return 0;
     }
     return layout.total_bytes;
@@ -2658,7 +2660,7 @@ static int ck_moe_swiglu_expert_forward_q4k_q5k_bucketed_impl(
         !expert_down || !output || !workspace ||
         ((expert_gate_packed == NULL) != (expert_up_packed == NULL)) ||
         ck_moe_bucket_layout(rows, hidden_dim, intermediate_dim, n_experts,
-                             top_k, &layout) != 0 ||
+                             top_k, 256, &layout) != 0 ||
         workspace_bytes < layout.total_bytes) {
         return -1;
     }
@@ -2816,6 +2818,325 @@ int moe_swiglu_expert_forward_q4k_q5k_bucketed_prepared_workspace(
         expert_gate_packed, expert_up_packed, output,
         rows, hidden_dim, intermediate_dim, n_experts, top_k,
         workspace, workspace_bytes);
+}
+
+/* Reuse compact Q4_K gate/up packing for all rows of one routed expert.
+ * Each routing slot has a barrier, preserving the original weighted sum order.
+ * Packed weights live only in the caller-owned per-worker workspace. */
+typedef struct {
+    const int *rows_by_expert;
+    const int *offsets;
+    const float *routing_weights;
+    const uint8_t *hidden_q8;
+    const uint8_t *gate_base;
+    const uint8_t *up_base;
+    const uint8_t *down_base;
+    float *output;
+    uint8_t *workers;
+    size_t worker_stride;
+    size_t hidden_q8_stride;
+    size_t q4_expert_stride;
+    size_t down_expert_stride;
+    size_t packed_bytes;
+    int hidden_dim;
+    int intermediate_dim;
+    int n_experts;
+    int top_k;
+    int slot;
+    int down_kind;
+    atomic_int next_expert;
+} ck_moe_q4k_reuse_work_t;
+
+static atomic_ullong ck_moe_reuse_assignments = 0;
+static atomic_ullong ck_moe_reuse_distinct = 0;
+static atomic_ullong ck_moe_reuse_pack_calls = 0;
+static atomic_ullong ck_moe_reuse_packed_bytes = 0;
+static atomic_ullong ck_moe_reuse_calls = 0;
+static atomic_ullong ck_moe_reuse_fallbacks = 0;
+
+void ck_moe_q4k_reuse_stats_reset(void)
+{
+    atomic_store(&ck_moe_reuse_assignments, 0);
+    atomic_store(&ck_moe_reuse_distinct, 0);
+    atomic_store(&ck_moe_reuse_pack_calls, 0);
+    atomic_store(&ck_moe_reuse_packed_bytes, 0);
+    atomic_store(&ck_moe_reuse_calls, 0);
+    atomic_store(&ck_moe_reuse_fallbacks, 0);
+}
+
+void ck_moe_q4k_reuse_stats(uint64_t *assignments, uint64_t *distinct,
+                            uint64_t *pack_calls, uint64_t *packed_bytes,
+                            uint64_t *reuse_calls, uint64_t *fallbacks)
+{
+    if (assignments) *assignments = atomic_load(&ck_moe_reuse_assignments);
+    if (distinct) *distinct = atomic_load(&ck_moe_reuse_distinct);
+    if (pack_calls) *pack_calls = atomic_load(&ck_moe_reuse_pack_calls);
+    if (packed_bytes) *packed_bytes = atomic_load(&ck_moe_reuse_packed_bytes);
+    if (reuse_calls) *reuse_calls = atomic_load(&ck_moe_reuse_calls);
+    if (fallbacks) *fallbacks = atomic_load(&ck_moe_reuse_fallbacks);
+}
+
+static int ck_moe_q4k_reuse_layout(
+    int rows, int hidden_dim, int intermediate_dim, int n_experts,
+    int top_k, ck_moe_q4k_q5k_bucket_layout_t *layout,
+    size_t *packed_bytes)
+{
+#if defined(__AVX512F__) && defined(__AVX512BW__) && defined(__AVX512DQ__)
+    if (ck_moe_bucket_layout(rows, hidden_dim, intermediate_dim,
+                             n_experts, top_k, 32, layout) != 0 ||
+        intermediate_dim % 16 != 0 || intermediate_dim % QK8_0 != 0) {
+        return -1;
+    }
+    const size_t packed = ck_moe_q4k_llama_projection_scratch_bytes(
+        intermediate_dim, hidden_dim);
+    if (!packed) return -1;
+    size_t worker = 0;
+    if (ck_moe_size_mul(2u * sizeof(float), (size_t)intermediate_dim,
+                        &worker) != 0) return -1;
+    worker = ck_moe_align64(worker);
+    if (ck_moe_size_add(worker, ck_moe_align64(ck_dtype_row_bytes(
+            CK_DT_Q8_0, (size_t)intermediate_dim)), &worker) != 0 ||
+        ck_moe_size_add(worker, ck_moe_align64(
+            (size_t)hidden_dim * sizeof(float)), &worker) != 0 ||
+        ck_moe_size_add(worker, packed, &worker) != 0 ||
+        ck_moe_size_add(worker, packed, &worker) != 0) return -1;
+    layout->worker_stride = worker;
+    size_t workers_bytes = 0;
+    if (ck_moe_size_mul((size_t)CK_THREADPOOL_MAX_THREADS, worker,
+                        &workers_bytes) != 0 ||
+        ck_moe_size_add(layout->workers_offset, workers_bytes,
+                        &layout->total_bytes) != 0) return -1;
+    *packed_bytes = packed;
+    return 0;
+#else
+    (void)rows; (void)hidden_dim; (void)intermediate_dim;
+    (void)n_experts; (void)top_k; (void)layout; (void)packed_bytes;
+    return -1;
+#endif
+}
+
+size_t moe_swiglu_expert_q4k_q8_0_reuse_workspace_bytes(
+    int rows, int hidden_dim, int intermediate_dim, int n_experts, int top_k)
+{
+    ck_moe_q4k_q5k_bucket_layout_t layout;
+    size_t packed_bytes = 0;
+    return ck_moe_q4k_reuse_layout(rows, hidden_dim, intermediate_dim,
+                                   n_experts, top_k, &layout,
+                                   &packed_bytes) == 0 ? layout.total_bytes : 0;
+}
+
+static void ck_moe_q4k_reuse_worker(int ith, int nth, void *opaque)
+{
+#if defined(__AVX512F__) && defined(__AVX512BW__) && defined(__AVX512DQ__)
+    (void)nth;
+    ck_moe_q4k_reuse_work_t *args = (ck_moe_q4k_reuse_work_t *)opaque;
+    uint8_t *cursor = args->workers + (size_t)ith * args->worker_stride;
+    float *gate_up = (float *)cursor;
+    cursor += ck_moe_align64(2u * (size_t)args->intermediate_dim * sizeof(float));
+    void *act_q8 = cursor;
+    cursor += ck_moe_align64(ck_dtype_row_bytes(
+        CK_DT_Q8_0, (size_t)args->intermediate_dim));
+    float *expert_output = (float *)cursor;
+    cursor += ck_moe_align64((size_t)args->hidden_dim * sizeof(float));
+    void *gate_packed = cursor;
+    void *up_packed = cursor + args->packed_bytes;
+    uint64_t packed_experts = 0;
+
+    for (;;) {
+        const int expert = atomic_fetch_add_explicit(
+            &args->next_expert, 1, memory_order_relaxed);
+        if (expert >= args->n_experts) break;
+        const int begin = args->offsets[expert];
+        const int end = args->offsets[expert + 1];
+        if (begin == end) continue;
+        const uint8_t *gate = args->gate_base +
+            (size_t)expert * args->q4_expert_stride;
+        const uint8_t *up = args->up_base +
+            (size_t)expert * args->q4_expert_stride;
+        const uint8_t *down = args->down_base +
+            (size_t)expert * args->down_expert_stride;
+        pack_q4_k_to_packed_meta_x8(gate, gate_packed,
+                                    args->intermediate_dim, args->hidden_dim);
+        pack_q4_k_to_packed_meta_x8(up, up_packed,
+                                    args->intermediate_dim, args->hidden_dim);
+        packed_experts++;
+        for (int at = begin; at < end; ++at) {
+            const int row = args->rows_by_expert[at];
+            const void *hidden = args->hidden_q8 +
+                (size_t)row * args->hidden_q8_stride;
+            gemm_nt_q4_k_packed_meta_x8_q8_k_gemv_order(
+                hidden, gate_packed, NULL, gate_up, 1,
+                args->intermediate_dim, args->hidden_dim);
+            gemm_nt_q4_k_packed_meta_x8_q8_k_gemv_order(
+                hidden, up_packed, NULL,
+                gate_up + args->intermediate_dim, 1,
+                args->intermediate_dim, args->hidden_dim);
+            swiglu_forward_ggml(gate_up, gate_up, 1, args->intermediate_dim);
+            quantize_row_q8_0(gate_up, act_q8, args->intermediate_dim);
+            if (args->down_kind == CK_MOE_DOWN_Q8_0) {
+                gemv_q8_0_q8_0(expert_output, down, act_q8,
+                    args->hidden_dim, args->intermediate_dim);
+            } else {
+                gemv_q5_0_q8_0(expert_output, down, act_q8,
+                    args->hidden_dim, args->intermediate_dim);
+            }
+            const size_t route_index =
+                (size_t)row * (size_t)args->top_k + (size_t)args->slot;
+            ck_moe_llama_weighted_accumulate(
+                args->output + (size_t)row * (size_t)args->hidden_dim,
+                expert_output, args->routing_weights[route_index],
+                args->hidden_dim);
+        }
+    }
+    atomic_fetch_add(&ck_moe_reuse_pack_calls, 2u * packed_experts);
+    atomic_fetch_add(&ck_moe_reuse_packed_bytes,
+                     2u * packed_experts * args->packed_bytes);
+#else
+    (void)ith; (void)nth; (void)opaque;
+#endif
+}
+
+static int ck_moe_q4k_reuse_forward(
+    const float *hidden, const int *indices, const float *routing_weights,
+    const void *expert_gate, const void *expert_up, const void *expert_down,
+    float *output, int rows, int hidden_dim, int intermediate_dim,
+    int n_experts, int top_k, void *workspace, size_t workspace_bytes,
+    int down_kind)
+{
+    int (*fallback)(const float *, const int *, const float *,
+        const void *, const void *, const void *, float *, int, int, int,
+        int, int, void *, size_t) =
+        down_kind == CK_MOE_DOWN_Q8_0
+            ? moe_swiglu_expert_forward_q4k_q8_0_parallel_workspace
+            : moe_swiglu_expert_forward_q4k_q5_0_parallel_workspace;
+    ck_moe_q4k_q5k_bucket_layout_t layout;
+    size_t packed_bytes = 0;
+    if (rows < 512 || ck_moe_q4k_reuse_layout(
+            rows, hidden_dim, intermediate_dim, n_experts, top_k,
+            &layout, &packed_bytes) != 0 ||
+        workspace_bytes < layout.total_bytes) {
+        atomic_fetch_add(&ck_moe_reuse_fallbacks, 1);
+        return fallback(hidden, indices, routing_weights, expert_gate,
+                        expert_up, expert_down, output, rows, hidden_dim,
+                        intermediate_dim, n_experts, top_k,
+                        workspace, workspace_bytes);
+    }
+    if (!hidden || !indices || !routing_weights || !expert_gate || !expert_up ||
+        !expert_down || !output || !workspace) return -1;
+
+    uint8_t *base = (uint8_t *)workspace;
+    uint8_t *hidden_q8 = base + layout.hidden_q8_offset;
+    int *route_rows = (int *)(base + layout.route_rows_offset);
+    int *offsets = (int *)(base + layout.slot_offsets_offset);
+    int *counts = (int *)(base + layout.counts_offset);
+    int *cursors = (int *)(base + layout.cursors_offset);
+    int distinct = 0;
+    for (int slot = 0; slot < top_k; ++slot) {
+        memset(counts, 0, (size_t)n_experts * sizeof(*counts));
+        for (int row = 0; row < rows; ++row) {
+            const int expert = indices[(size_t)row * (size_t)top_k +
+                                       (size_t)slot];
+            if (expert < 0 || expert >= n_experts) return -2;
+            counts[expert]++;
+        }
+        int *slot_offsets = offsets +
+            (size_t)slot * ((size_t)n_experts + 1u);
+        slot_offsets[0] = 0;
+        for (int expert = 0; expert < n_experts; ++expert) {
+            distinct += counts[expert] != 0;
+            slot_offsets[expert + 1] = slot_offsets[expert] + counts[expert];
+            cursors[expert] = slot_offsets[expert];
+        }
+        int *slot_rows = route_rows + (size_t)slot * (size_t)rows;
+        for (int row = 0; row < rows; ++row) {
+            const int expert = indices[(size_t)row * (size_t)top_k +
+                                       (size_t)slot];
+            slot_rows[cursors[expert]++] = row;
+        }
+    }
+    /* Sparse buckets do not amortize packing and worker dispatch. */
+    if ((size_t)rows * (size_t)top_k <= 2u * (size_t)distinct) {
+        atomic_fetch_add(&ck_moe_reuse_fallbacks, 1);
+        return fallback(hidden, indices, routing_weights, expert_gate,
+                        expert_up, expert_down, output, rows, hidden_dim,
+                        intermediate_dim, n_experts, top_k,
+                        workspace, workspace_bytes);
+    }
+    atomic_fetch_add(&ck_moe_reuse_calls, 1);
+    atomic_fetch_add(&ck_moe_reuse_assignments,
+                     (unsigned long long)rows * (unsigned long long)top_k);
+    atomic_fetch_add(&ck_moe_reuse_distinct, (unsigned long long)distinct);
+    memset(output, 0, (size_t)rows * (size_t)hidden_dim * sizeof(float));
+    ck_threadpool_t *pool = ck_threadpool_global();
+    int active = pool ? ck_threadpool_n_threads(pool) : 1;
+    if (active > n_experts) active = n_experts;
+    if (active > CK_THREADPOOL_MAX_THREADS) active = CK_THREADPOOL_MAX_THREADS;
+    if (active < 1) active = 1;
+    ck_moe_q4k_q5k_quantize_args_t quant_args = {
+        .hidden = hidden, .hidden_q8 = hidden_q8, .rows = rows,
+        .hidden_dim = hidden_dim,
+        .hidden_q8_row_bytes = layout.hidden_q8_row_bytes,
+    };
+    if (active > 1 && pool) {
+        ck_threadpool_dispatch_n(pool, active,
+            ck_moe_q4k_q5k_quantize_work, &quant_args);
+    } else {
+        ck_moe_q4k_q5k_quantize_work(0, 1, &quant_args);
+    }
+    const size_t q4_stride = (size_t)intermediate_dim *
+        ck_dtype_row_bytes(CK_DT_Q4_K, (size_t)hidden_dim);
+    const size_t down_stride = (size_t)hidden_dim *
+        ck_dtype_row_bytes(down_kind == CK_MOE_DOWN_Q8_0
+            ? CK_DT_Q8_0 : CK_DT_Q5_0, (size_t)intermediate_dim);
+    for (int slot = 0; slot < top_k; ++slot) {
+        ck_moe_q4k_reuse_work_t args = {
+            .rows_by_expert = route_rows + (size_t)slot * (size_t)rows,
+            .offsets = offsets +
+                (size_t)slot * ((size_t)n_experts + 1u),
+            .routing_weights = routing_weights, .hidden_q8 = hidden_q8,
+            .gate_base = expert_gate, .up_base = expert_up,
+            .down_base = expert_down, .output = output,
+            .workers = base + layout.workers_offset,
+            .worker_stride = layout.worker_stride,
+            .hidden_q8_stride = layout.hidden_q8_row_bytes,
+            .q4_expert_stride = q4_stride, .down_expert_stride = down_stride,
+            .packed_bytes = packed_bytes, .hidden_dim = hidden_dim,
+            .intermediate_dim = intermediate_dim, .n_experts = n_experts,
+            .top_k = top_k, .slot = slot, .down_kind = down_kind,
+        };
+        atomic_init(&args.next_expert, 0);
+        if (active > 1 && pool) {
+            ck_threadpool_dispatch_n(pool, active,
+                ck_moe_q4k_reuse_worker, &args);
+        } else {
+            ck_moe_q4k_reuse_worker(0, 1, &args);
+        }
+    }
+    return 0;
+}
+
+int moe_swiglu_expert_forward_q4k_q8_0_reuse_workspace(
+    const float *hidden, const int *indices, const float *routing_weights,
+    const void *expert_gate, const void *expert_up, const void *expert_down,
+    float *output, int rows, int hidden_dim, int intermediate_dim,
+    int n_experts, int top_k, void *workspace, size_t workspace_bytes)
+{
+    return ck_moe_q4k_reuse_forward(hidden, indices, routing_weights,
+        expert_gate, expert_up, expert_down, output, rows, hidden_dim,
+        intermediate_dim, n_experts, top_k, workspace, workspace_bytes,
+        CK_MOE_DOWN_Q8_0);
+}
+
+int moe_swiglu_expert_forward_q4k_q5_0_reuse_workspace(
+    const float *hidden, const int *indices, const float *routing_weights,
+    const void *expert_gate, const void *expert_up, const void *expert_down,
+    float *output, int rows, int hidden_dim, int intermediate_dim,
+    int n_experts, int top_k, void *workspace, size_t workspace_bytes)
+{
+    return ck_moe_q4k_reuse_forward(hidden, indices, routing_weights,
+        expert_gate, expert_up, expert_down, output, rows, hidden_dim,
+        intermediate_dim, n_experts, top_k, workspace, workspace_bytes,
+        CK_MOE_DOWN_Q5_0);
 }
 
 int moe_swiglu_expert_forward_q4k_q5k_auto_workspace(

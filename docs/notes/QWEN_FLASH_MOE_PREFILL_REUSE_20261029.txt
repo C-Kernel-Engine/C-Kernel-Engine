@@ -1,0 +1,84 @@
+Qwen3.8 Flash Next routed-expert prefill reuse, 2026-10-29
+
+Scope
+-----
+This is a new generated-runtime provider for Q4_K gate/up weights with
+Q5_0 or Q8_0 down weights. It groups already-computed input rows by selected
+expert inside each routing slot, packs that expert's gate/up weights once in
+caller-owned per-worker scratch, and processes the bucket. A barrier between
+slots preserves every token's original weighted-accumulation order. Sparse
+buckets, small row counts, unsupported ISA, and insufficient reuse workspace
+retain the existing parallel provider. Existing deployed bundles do not change
+until rebuilt; a compatible rebuilt bundle selects the provider for prefill.
+No recurrent update is reordered.
+
+The pinned 8K Q4_K_M bundle resolves 24 Q5_0 and 24 Q8_0 reuse calls in
+prefill; decode continues to resolve the original providers. The bundle was
+generated from commit 796a87322 in an isolated worktree. No existing server
+was replaced.
+
+Pinned execution
+----------------
+Host: AMD Ryzen 9 9950X3D, 16 CKE/OpenMP threads, CPU only. Muse was
+stopped for the large-memory replay and restored afterward. Source weights
+and token IDs were identical between old and candidate runs.
+
+Old libmodel SHA-256: f25effe5f11d0c3b1a9d5c07886cd9c7650a4b5c1ac749a837ff355effa79912
+New libmodel SHA-256: a9b616ccf27152ca8f7e39314fe1d6dbe22282a21ca96dfb44b34d69c0998568
+New engine SHA-256: 07791940ec9b097324c48c566c97e41ee63ffec1b84b0e8490d1c071b062ecaa
+New weights manifest SHA-256: dff2910668bf6ef7c4c27825dca9a5ae0a9877bc556d2a9d99b495c3fca754f1
+
+Prefill comparison, excluding model initialization and Python logit scans:
+
+  Input IDs    Existing provider    Reuse provider    Full first-step logits
+  2,323        110.070 s            55.933 s          bit exact
+  6,089        483.710 s            402.428 s         bit exact
+
+A second 2,323-token control/candidate comparison measured 107.972 versus
+52.508 seconds. The 6,089-token candidate repeated at 366.653 seconds, with
+the same full logit hash. These timings are native prefill only. The two
+16-token trajectories following the 2,323-token prompt had identical full
+logits and generated token IDs at every step. Native decode time was 2.764
+seconds on the old bundle and 2.822 seconds on the candidate, a difference
+too small to characterize as a decode performance change from one trial.
+
+The 6,089-token timings are from consecutive control/candidate runs in one
+isolated window. The 2,323-token control is the earlier same-day isolated
+profile. First-step logit SHA-256: d3d06cb8... (2,323) and 962da1f9...
+(6,089), identical for old and candidate. A 127-token prefill additionally
+matched the old bundle's full first-step logits and complete named KV,
+recurrent-convolution, recurrent-SSM, PLE-token, PLE-convolution, and QSA
+index-key state hashes.
+
+The candidate reported 1,091,810 assignments, 161,793 distinct expert/slot
+buckets, 323,586 pack calls and one fallback at 2,323 tokens. At 6,089 it
+reported 1,925,120 assignments, 165,573 distinct buckets, 331,146 pack
+calls and one fallback. These counters cover the reuse path only; they do not
+include packing inside the one fallback or unrelated projections.
+
+Both layouts report 119,148,020,522 bytes of weights and 14,034,815,360
+bytes of planned prefill activations. During the long runs, observed process
+peak RSS was 132,915,188 KB on the old 2,323-token run and 132,915,720 KB
+on the candidate run; the 6,089-token candidate reached 132,917,788 KB.
+These are process measurements, not a formal bound on all system memory.
+
+Retained commands, JSON, float logits, stderr, and perf data are on Ryzen:
+  /data/cke/runs/qwen-flash-speed-20261029/reuse-probe-20261029/
+  /data/cke/runs/qwen-flash-speed-20261029/reuse-bundle-8k-20261029/
+The first diagnostic profile and excluded OOM attempt are separately noted
+in prefill-profile-20261029/PREFILL_PROFILE_SUMMARY.txt.
+
+Limitations and next gates
+--------------------------
+This is one repeated-route candidate on one artifact, not a general prefill
+speed certification. The 6,089-token runs remain about 4.1–4.5 times slower
+than the earlier matched llama.cpp prefill (89.5 s); the run used the same
+tokens but was not a same-window llama.cpp rerun. A sample during the new
+long run attributed 48% of sampled CPU cycles to packed Q4_K projection work,
+with about 15% still in packing in the existing fallback path. Sampled cycles
+are not wall-time savings.
+
+Before promoting this as a production serving speed claim: verify reset/repeat
+and cancellation on the rebuilt bundle, repeat matched idle-host measurements,
+and require final-head nightly. Keep a low-reuse case in regression coverage so
+grouping overhead does not become a hidden regression.

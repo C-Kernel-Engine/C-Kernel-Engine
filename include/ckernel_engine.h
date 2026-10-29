@@ -4080,6 +4080,24 @@ int moe_swiglu_expert_forward_q4k_q8_0_parallel_workspace(
     float *output, int rows, int hidden_dim, int intermediate_dim,
     int n_experts, int top_k, void *workspace, size_t workspace_bytes);
 
+/* Opt-in Q4_K gate/up packing reuse for Q5_0 or Q8_0 down projections. */
+size_t moe_swiglu_expert_q4k_q8_0_reuse_workspace_bytes(
+    int rows, int hidden_dim, int intermediate_dim, int n_experts, int top_k);
+int moe_swiglu_expert_forward_q4k_q5_0_reuse_workspace(
+    const float *hidden, const int *indices, const float *routing_weights,
+    const void *expert_gate, const void *expert_up, const void *expert_down,
+    float *output, int rows, int hidden_dim, int intermediate_dim,
+    int n_experts, int top_k, void *workspace, size_t workspace_bytes);
+int moe_swiglu_expert_forward_q4k_q8_0_reuse_workspace(
+    const float *hidden, const int *indices, const float *routing_weights,
+    const void *expert_gate, const void *expert_up, const void *expert_down,
+    float *output, int rows, int hidden_dim, int intermediate_dim,
+    int n_experts, int top_k, void *workspace, size_t workspace_bytes);
+void ck_moe_q4k_reuse_stats_reset(void);
+void ck_moe_q4k_reuse_stats(uint64_t *assignments, uint64_t *distinct,
+                            uint64_t *pack_calls, uint64_t *packed_bytes,
+                            uint64_t *reuse_calls, uint64_t *fallbacks);
+
 int moe_swiglu_shared_forward_q4k_q6k_workspace(
     const float *hidden,
     const float *routed,
