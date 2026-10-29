@@ -740,14 +740,29 @@ void gemm_nt_bf16_row_range(const float *A,
     for (int i = row_begin; i < row_end; ++i) {
         const float *a_row = A + (size_t)i * (size_t)K;
         float *c_row = C + (size_t)i * (size_t)N;
-        for (int j = 0; j < N; ++j) {
-            const uint16_t *w_row = w + (size_t)j * (size_t)K;
-            float sum = bias ? bias[j] : 0.0f;
-            for (int k = 0; k < K; ++k) {
-                const float ab = bf16_to_float(float_to_bf16(a_row[k]));
-                sum += ab * bf16_to_float(w_row[k]);
+        for (int j = 0; j < N; j += 8) {
+            const int width = N - j < 8 ? N - j : 8;
+            float sums[8];
+            for (int lane = 0; lane < width; ++lane) {
+                sums[lane] = bias ? bias[j + lane] : 0.0f;
             }
-            c_row[j] = sum;
+            /* Reuse rounded activations while each output keeps its original K order. */
+            for (int k0 = 0; k0 < K; k0 += 128) {
+                const int count = K - k0 < 128 ? K - k0 : 128;
+                float rounded[128];
+                for (int k = 0; k < count; ++k) {
+                    rounded[k] = bf16_to_float(float_to_bf16(a_row[k0 + k]));
+                }
+                for (int lane = 0; lane < width; ++lane) {
+                    const uint16_t *w_row = w + ((size_t)j + (size_t)lane) * (size_t)K + (size_t)k0;
+                    for (int k = 0; k < count; ++k) {
+                        sums[lane] += rounded[k] * bf16_to_float(w_row[k]);
+                    }
+                }
+            }
+            for (int lane = 0; lane < width; ++lane) {
+                c_row[j + lane] = sums[lane];
+            }
         }
     }
 }

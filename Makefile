@@ -4398,6 +4398,10 @@ test-numerical-contracts: $(LIB)
 	@$(PYTHON) unittest/bf16/test_rmsnorm_pytorch_storage_bf16.py
 	@$(PYTHON) unittest/bf16/test_qk_norm_pytorch_storage_bf16.py
 	@$(PYTHON) unittest/bf16/test_gemm_storage_contract_bf16.py
+	@$(CC) -O3 -Iinclude -ffunction-sections -fdata-sections \
+		src/kernels/gemm_kernels_bf16.c unittest/bf16/test_gemm_nt_bf16_scalar.c \
+		-Wl,--gc-sections -lm -o $(BUILD_DIR)/test_gemm_nt_bf16_scalar
+	@$(BUILD_DIR)/test_gemm_nt_bf16_scalar
 	@$(PYTHON) unittest/bf16/test_gemv_parallel_bf16.py
 	@$(PYTHON) unittest/bf16/test_patch_projection_native_bf16.py
 	@$(PYTHON) unittest/bf16/test_attention_storage_contract_bf16.py
