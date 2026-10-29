@@ -3,10 +3,12 @@ from __future__ import annotations
 
 import contextlib
 import copy
+import ctypes
 import hashlib
 import importlib.util
 import io
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -2403,6 +2405,33 @@ class V8DecoderFirstTokenParityTests(unittest.TestCase):
                         dump_atol=1.0e-4, dump_rtol=1.0e-3, dump_nonflash_inputs=True,
                     )
             self.assertTrue(llama_capture.call_args.kwargs["dump_nonflash_inputs"])
+
+    def test_requested_post_store_cache_enables_capture_and_rejects_missing_dump(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="v8_cache_capture_missing_") as directory:
+            libc = ctypes.CDLL(None)
+            libc.getenv.argtypes = [ctypes.c_char_p]
+            libc.getenv.restype = ctypes.c_char_p
+
+            def capture(*args, **kwargs):
+                self.assertEqual(os.environ.get("CK_PARITY_CAPTURE_F16_CACHE"), "1")
+                self.assertEqual(libc.getenv(b"CK_PARITY_CAPTURE_F16_CACHE"), b"1")
+                return {"vocab_size": 1, "logits": array("f", [0.0])}
+
+            with mock.patch.dict(os.environ, {"CK_PARITY_CAPTURE_F16_CACHE": "0"}), \
+                 mock.patch.object(decoder_parity_v8, "_run_llama_capture",
+                                   return_value={"meta": {"dumped": 1}}), \
+                 mock.patch.object(decoder_parity_v8, "_capture_ck_dump", side_effect=capture), \
+                 mock.patch.object(decoder_parity_v8.parity_test_v7, "read_dump_file", return_value=[]):
+                with self.assertRaisesRegex(RuntimeError, "requested CKE post-store cache capture missing"):
+                    decoder_parity_v8._capture_dump_compare(
+                        Path("/tmp/model.gguf"), {"embed_dim": 4}, array("f", [0.0] * 8),
+                        2, [1], prefix_row_dim=4, ctx_len=8, top_k=2, threads=1,
+                        dump_root=Path(directory), dump_names="Qcur-0", dump_pass="prefill",
+                        dump_atol=1.0e-4, dump_rtol=1.0e-3,
+                        ck_extra_dump_names="Kcache_post_store-0,Vcache_post_store-0",
+                    )
+                self.assertEqual(os.environ["CK_PARITY_CAPTURE_F16_CACHE"], "0")
+                self.assertEqual(libc.getenv(b"CK_PARITY_CAPTURE_F16_CACHE"), b"0")
 
     def test_coalesce_multimodal_prefill_segments_joins_token_rows(self) -> None:
         dump = decoder_parity_v8.parity_test_v7.ParityDump
