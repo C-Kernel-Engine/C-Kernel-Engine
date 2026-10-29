@@ -224,7 +224,7 @@ versions and hashes; the selected voice ID and asset hash are also open.</p>
 <td>Qwen3-TTS 0.6B CustomVoice, 12 Hz — first CKE comparison target</td>
 <td><a href="https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice/tree/85e237c12c027371202489a0ec509ded67b5e4b5"><code>Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice@85e237c</code></a>, Apache 2.0</td>
 <td>The pinned <a href="https://github.com/QwenLM/Qwen3-TTS/commit/022e286b98fbec7e1e916cb940cdf532cd9f488e">reference code</a> tokenizes text, applies a preset speaker and language, runs a 28-layer talker and 5-layer code predictor, then decodes the 16-group codec tokens into 24 kHz PCM. The CKE oracle capture records text token IDs, codec tokens and waveform.</td>
-<td>CKE connects pinned prompt IDs through generated embedding, text projection and all 28 talker prefill blocks; a checked generated continuation graph separately executes three teacher-forced decode steps with KV state. One connected entry selects the talker's first codec ID, generates all 15 predictor IDs and feeds that one frame into the complete codec, producing 1,920 PCM samples at 24 kHz. The retained one-frame reference comparison passes; this short output is near silence and is not playable speech. A separate reference-code-fed codec entry covers 8 and 46 frames. Later talker frames, EOS/sampling and complete text-to-speech remain NOT_TESTED. This 0.6B CustomVoice variant ignores style instructions.</td>
+<td>CKE connects pinned prompt IDs through generated embedding, text projection and all 28 talker prefill blocks. The bounded generated loop now reaches natural EOS on one pinned request after 46 frames, with all 46 × 16 code IDs matching the committed reference. A separate one-frame generated-code entry produces 1,920 reference-matching PCM samples, and the reference-code-fed codec covers 8 and 46 frames. The new generic code-to-codec handoff is tested at synthetic two-frame geometry. A complete pinned text-to-WAV join, varied requests and sampled generation remain NOT_TESTED. This 0.6B CustomVoice variant ignores style instructions.</td>
 </tr>
 <tr>
 <td>Kokoro v1.0</td>
@@ -442,12 +442,27 @@ slots, and stops on the checked EOS status or frame budget. It stages codec IDs
 in caller-owned memory and publishes them only on EOS; rejection and budget
 exhaustion leave the output buffer unchanged and its valid-frame count zero.
 Asset-free tests exercise generated EOS and budget paths, output preservation,
-repeated invocation and malformed offsets. The pinned full-weight comparison
-certifies the first five generated code frames and retains the existing
-two-frame PCM regression.
-Natural EOS, a complete reference-matching code sequence, and codes-to-codec
-WAV composition remain unproven. Test:
-<code>tests/test_v8_checked_frame_loop.py</code>.</p>
+repeated invocation and malformed offsets. The asset-backed test runs the
+pinned full-weight graph to natural EOS at 46 frames and compares all 16 code IDs
+per frame with the committed reference. Its arena is about 3.74 GB. The
+talker-step limit is circuit-produced and bound to the generic checked extent
+provider; the previous inherited limit of 14 rejected talker step 15. This proves
+one complete greedy code trajectory, not varied-text or sampled generation.
+Tests: <code>tests/test_v8_checked_frame_loop.py</code> and
+<code>tests/test_v8_qwen3_tts_full_code_loop.py</code>.</p>
+<p><strong>Qwen3-TTS checked code-to-codec handoff:</strong> a new bounded
+circuit declares the frame-major code buffer, each codebook packing edge, and
+the complete codec schedule. A generic native shell accepts only a generated
+EOS with the exact frame and codebook geometry selected for that codec segment;
+it then executes the generated codec on the same planned arena and publishes
+finite PCM samples only after the sample count is checked. The asset-free
+synthetic test compiles all three segments through normal lowering and codegen,
+checks codebook order, rejects a wrong length or failing codec without
+publishing PCM, and verifies recovery on the same arena. The synthetic test
+forces EOS at two frames; it does not certify the complete pinned-model
+code-to-waveform join or a useful text-to-speech utterance. The existing fixed-code codec
+oracle remains a separate numerical lane. Test:
+<code>tests/test_v8_qwen3_tts_loop_codec.py</code>.</p>
 <p><strong>Two generated frames to PCM:</strong> a checked, model-neutral integer
 span concatenation provider packs each pair of CKE-generated codebook IDs
 into a two-frame input for the existing generated codec. The same generated

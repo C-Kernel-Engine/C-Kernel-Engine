@@ -13,11 +13,13 @@ var searchData=
   ['optional_10',['optional',['../structCKIRV2Buffer.html#a3b28242247696e6624bb2b9773c1e1a1',1,'CKIRV2Buffer::optional'],['../structCKBufferSpec.html#a557043a61f56575dfa44c4f13b31cddb',1,'CKBufferSpec::optional']]],
   ['out_5findex_11',['out_index',['../structCKInputRef.html#ae1ae7d92ed1362d599e30bf5aff958e3',1,'CKInputRef']]],
   ['out_5flen_12',['out_len',['../tokenizer_8h.html#afcd8f560b02b3c7a2bc2b3effa325fcf',1,'tokenizer.h']]],
-  ['output_13',['output',['../structCKLayerForwardParamsQ4K.html#a2532f454e8565aafe5bc975e518e90e2',1,'CKLayerForwardParamsQ4K::output'],['../structCKLayerOffsets.html#a253ebe103830f66006e992c1942359c6',1,'CKLayerOffsets::output'],['../structQWEN2__0__5B__DECODELayerOffsets.html#aa901fee3b15422d052e90e6f11aac70c',1,'QWEN2_0_5B_DECODELayerOffsets::output'],['../structCKLayerForwardParams.html#a61d1bcef2bcffd12c7a49d243a6c51d1',1,'CKLayerForwardParams::output']]],
-  ['output_5fchannels_14',['output_channels',['../structck__audio__conv1d__job.html#ae454826123de0dbda577e250711a943c',1,'ck_audio_conv1d_job']]],
-  ['output_5fcodes_15',['output_codes',['../structck__checked__frame__loop.html#a990e5aaa1fa2d5911288d4f7891e9154',1,'ck_checked_frame_loop']]],
-  ['output_5felements_16',['output_elements',['../structck__checked__frame__loop.html#a3a59335dc5b21370a50b76b3de8f18c4',1,'ck_checked_frame_loop']]],
-  ['output_5fframes_17',['output_frames',['../structck__audio__conv1d__job.html#aad4e0c1033545acc467d3fc09e635d90',1,'ck_audio_conv1d_job']]],
-  ['output_5fsamples_5fupper_5fbound_18',['output_samples_upper_bound',['../structCKKokoroShapeV8.html#a3dd5f3215bcf6411a5a191d29bf574f3',1,'CKKokoroShapeV8']]],
-  ['outputs_19',['outputs',['../structCKIRV2Node.html#ab853f000478eff6cb0e5f76d2b50efa1',1,'CKIRV2Node']]]
+  ['output_13',['output',['../structCKLayerOffsets.html#a253ebe103830f66006e992c1942359c6',1,'CKLayerOffsets::output'],['../structQWEN2__0__5B__DECODELayerOffsets.html#aa901fee3b15422d052e90e6f11aac70c',1,'QWEN2_0_5B_DECODELayerOffsets::output'],['../structCKLayerForwardParamsQ4K.html#a2532f454e8565aafe5bc975e518e90e2',1,'CKLayerForwardParamsQ4K::output'],['../structCKLayerForwardParams.html#a61d1bcef2bcffd12c7a49d243a6c51d1',1,'CKLayerForwardParams::output']]],
+  ['output_5fcapacity_14',['output_capacity',['../structck__checked__frame__codec.html#abf023a954f0a41bd2b9cc36e0ebb1a3a',1,'ck_checked_frame_codec']]],
+  ['output_5fchannels_15',['output_channels',['../structck__audio__conv1d__job.html#ae454826123de0dbda577e250711a943c',1,'ck_audio_conv1d_job']]],
+  ['output_5fcodes_16',['output_codes',['../structck__checked__frame__loop.html#a990e5aaa1fa2d5911288d4f7891e9154',1,'ck_checked_frame_loop']]],
+  ['output_5felements_17',['output_elements',['../structck__checked__frame__loop.html#a3a59335dc5b21370a50b76b3de8f18c4',1,'ck_checked_frame_loop']]],
+  ['output_5fframes_18',['output_frames',['../structck__audio__conv1d__job.html#aad4e0c1033545acc467d3fc09e635d90',1,'ck_audio_conv1d_job']]],
+  ['output_5fsamples_19',['output_samples',['../structck__checked__frame__codec.html#a34b1a6a865cc4d36c75144c94f84235b',1,'ck_checked_frame_codec']]],
+  ['output_5fsamples_5fupper_5fbound_20',['output_samples_upper_bound',['../structCKKokoroShapeV8.html#a3dd5f3215bcf6411a5a191d29bf574f3',1,'CKKokoroShapeV8']]],
+  ['outputs_21',['outputs',['../structCKIRV2Node.html#ab853f000478eff6cb0e5f76d2b50efa1',1,'CKIRV2Node']]]
 ];

@@ -1,5 +1,13 @@
 var NAVTREEINDEX15 =
 {
+"gemm__kernels__q8__0_8c.html#a5b0dfb196cf30cb85db5c5a866142c03":[2,0,1,1,77,17],
+"gemm__kernels__q8__0_8c.html#a6319eb9192df15549a476f85f52cd806":[2,0,1,1,77,21],
+"gemm__kernels__q8__0_8c.html#a64b28ca8a25883986a0d22e39a574a32":[2,0,1,1,77,23],
+"gemm__kernels__q8__0_8c.html#a6943271d972d64d1c4bfa34524ecdad8":[2,0,1,1,77,8],
+"gemm__kernels__q8__0_8c.html#a7522a539e09d34bc1298e9d5a3d09692":[2,0,1,1,77,25],
+"gemm__kernels__q8__0_8c.html#a79cb8f09192d8d62f7413e7f27fc6512":[2,0,1,1,77,16],
+"gemm__kernels__q8__0_8c.html#a7e5a611b6fcfc7119a1c689a7347f768":[2,0,1,1,77,18],
+"gemm__kernels__q8__0_8c.html#a8085f1506d8fadd2070f5b71fedb5554":[2,0,1,1,77,7],
 "gemm__kernels__q8__0_8c.html#a85197b983d949018f42bd43e3751478b":[2,0,1,1,77,5],
 "gemm__kernels__q8__0_8c.html#a93f8f68b0da241b2dc1e6c2a70bef457":[2,0,1,1,77,9],
 "gemm__kernels__q8__0_8c.html#a954875a4cb83dc1047be856c77770525":[2,0,1,1,77,1],
@@ -140,8 +148,8 @@ var NAVTREEINDEX15 =
 "ggml__runtime__compat_8h.html#aed82669845c3d2180182458027fc03b6":[2,0,1,1,83,3],
 "ggml__runtime__compat_8h.html#af96c7de149a9dab3bc48b7d9b70c4ad8":[2,0,1,1,83,10],
 "ggml__runtime__compat_8h_source.html":[2,0,1,1,83],
-"globals.html":[2,1,0,0],
 "globals.html":[2,1,0],
+"globals.html":[2,1,0,0],
 "globals_a.html":[2,1,0,1],
 "globals_b.html":[2,1,0,2],
 "globals_c.html":[2,1,0,3],
@@ -241,13 +249,5 @@ var NAVTREEINDEX15 =
 "globals_y.html":[2,1,0,24],
 "globals_z.html":[2,1,0,25],
 "hash__table_8c.html":[2,0,1,3,0],
-"hash__table_8c.html#a0e16265f47b209eccc74d3b82d56b1c3":[2,0,1,3,0,4],
-"hash__table_8c.html#a3087be1b3a49b7a46ea950f45f8c002a":[2,0,1,3,0,0],
-"hash__table_8c.html#a65e19011e07f1a22c523261e659a5ce1":[2,0,1,3,0,5],
-"hash__table_8c.html#a74ea90a2aeb358e8daa596041a081d12":[2,0,1,3,0,11],
-"hash__table_8c.html#a7a93b1af26ca875e7f75de188d6fc39d":[2,0,1,3,0,8],
-"hash__table_8c.html#a983e15e7b082f5fd2601a1b2b639b44e":[2,0,1,3,0,14],
-"hash__table_8c.html#a9bb1b4c9ce9bba82bced8fd7ddb375ad":[2,0,1,3,0,15],
-"hash__table_8c.html#a9d089f807b84052dfb30b9a390e305f8":[2,0,1,3,0,10],
-"hash__table_8c.html#ab4009b6a76738c2ad1c3ff4854f20d87":[2,0,1,3,0,9]
+"hash__table_8c.html#a0e16265f47b209eccc74d3b82d56b1c3":[2,0,1,3,0,4]
 };

@@ -1,7 +1,7 @@
 var searchData=
 [
   ['elem_5fbytes_0',['elem_bytes',['../structTransformerModel.html#a15ebe2bd4db54209b7cc8e89bb1cb8fd',1,'TransformerModel']]],
-  ['embed_5fdim_1',['embed_dim',['../structCKModelConfig.html#a47a1c1e684f06184220bc13087dda0ff',1,'CKModelConfig::embed_dim'],['../structCKBumpHeaderV5.html#a34256a5791efef6fd0acb56bc485de48',1,'CKBumpHeaderV5::embed_dim'],['../structCKSectionConfig.html#acc666f5160d9139f4e59567c7eb0ad83',1,'CKSectionConfig::embed_dim'],['../structCKLayerForwardParams.html#a0a48ad009d13315fb1a18ec1f9aff5c8',1,'CKLayerForwardParams::embed_dim'],['../structCKLayerBackwardParams.html#a0febb76bba354013a9f7c651010c11bf',1,'CKLayerBackwardParams::embed_dim'],['../structCKLayerForwardParamsQ4K.html#ad8373aa2774d6b69c1e4ea1d151d2646',1,'CKLayerForwardParamsQ4K::embed_dim']]],
+  ['embed_5fdim_1',['embed_dim',['../structCKModelConfig.html#a47a1c1e684f06184220bc13087dda0ff',1,'CKModelConfig::embed_dim'],['../structCKLayerForwardParamsQ4K.html#ad8373aa2774d6b69c1e4ea1d151d2646',1,'CKLayerForwardParamsQ4K::embed_dim'],['../structCKLayerBackwardParams.html#a0febb76bba354013a9f7c651010c11bf',1,'CKLayerBackwardParams::embed_dim'],['../structCKLayerForwardParams.html#a0a48ad009d13315fb1a18ec1f9aff5c8',1,'CKLayerForwardParams::embed_dim'],['../structCKSectionConfig.html#acc666f5160d9139f4e59567c7eb0ad83',1,'CKSectionConfig::embed_dim'],['../structCKBumpHeaderV5.html#a34256a5791efef6fd0acb56bc485de48',1,'CKBumpHeaderV5::embed_dim']]],
   ['embed_5foutput_2',['embed_output',['../structCKSection.html#a66b301cef7e5239b28cc6b37437d3ed7',1,'CKSection::embed_output'],['../structCKHeaderOffsets.html#a1c5c78d482920812a8353fe8b31a9038',1,'CKHeaderOffsets::embed_output']]],
   ['embed_5fweight_3',['embed_weight',['../structCKHeaderOffsets.html#a09edd285803f7fecfbfe1a80ec241b23',1,'CKHeaderOffsets']]],
   ['embedded_5finput_4',['embedded_input',['../structQWEN2__0__5B__DECODEHeaderOffsets.html#a92c86736f04c96df7c5d506b32f1336a',1,'QWEN2_0_5B_DECODEHeaderOffsets']]],
@@ -20,5 +20,8 @@ var searchData=
   ['eos_5fid_17',['eos_id',['../structCKTokenizer.html#a70622f7babd13c77a93825497fdf2c5f',1,'CKTokenizer']]],
   ['eps_18',['eps',['../structCKLayerForwardParams.html#a63e37652b3bb5e0d394ea70af0895595',1,'CKLayerForwardParams::eps'],['../structCKLayerBackwardParams.html#ab6c8a9964ea61d631737361e490766c7',1,'CKLayerBackwardParams::eps'],['../structCKLayerForwardParamsQ4K.html#a002187e74b3fa26e39bd17a965c72f8b',1,'CKLayerForwardParamsQ4K::eps']]],
   ['estimated_5fchannels_19',['estimated_channels',['../structMemoryInfo.html#a58d128299366a3bbd1bef1b86180d2c9',1,'MemoryInfo']]],
-  ['expanded_5fframes_20',['expanded_frames',['../structCKKokoroShapeV8.html#a80bb32ace7694678728349c1391ba66c',1,'CKKokoroShapeV8']]]
+  ['expanded_5fframes_20',['expanded_frames',['../structCKKokoroShapeV8.html#a80bb32ace7694678728349c1391ba66c',1,'CKKokoroShapeV8']]],
+  ['expected_5fcode_5fframes_21',['expected_code_frames',['../structck__checked__frame__codec.html#af55cf19d75b7b8dec7496d6be62396e2',1,'ck_checked_frame_codec']]],
+  ['expected_5fcodebooks_22',['expected_codebooks',['../structck__checked__frame__codec.html#a7b779d608bc0f128e3a6dccb1bb53fbe',1,'ck_checked_frame_codec']]],
+  ['expected_5fsamples_23',['expected_samples',['../structck__checked__frame__codec.html#a4dbced71f17c455bfccc0f8bc84d87f4',1,'ck_checked_frame_codec']]]
 ];
