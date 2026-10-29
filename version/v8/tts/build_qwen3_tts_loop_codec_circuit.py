@@ -24,17 +24,22 @@ else:
     from build_qwen3_tts_first_frame_waveform_circuit import attach_codec
 
 OUTPUT = ROOT / "version/v8/circuits/qwen3_tts_loop_codec_bounded.json"
+SCALAR_CODEC_CONV = "audio_conv1d_dilated_checked_channel_major_f32"
+AVX2_CODEC_CONV = SCALAR_CODEC_CONV + "_avx2_fma"
 
 
 def build_circuit(*, frames: int = 5, max_generated_frames: int = 64,
                   talker_layers: int = 28, continuation_steps: int = 14,
-                  codec_kwargs: dict | None = None) -> dict:
+                  codec_kwargs: dict | None = None,
+                  codec_conv_provider: str = "scalar") -> dict:
     if (isinstance(frames, bool) or not isinstance(frames, int)
             or not 2 <= frames <= max_generated_frames):
         raise ValueError("frames must be in 2..max_generated_frames")
     codebooks = continuation_steps + 2
     if codec_kwargs is not None and codec_kwargs.get("acoustic_codebooks", 15) != codebooks - 1:
         raise ValueError("codec acoustic codebooks must match generated codes")
+    if codec_conv_provider not in ("scalar", "avx2_fma"):
+        raise ValueError("unsupported codec Conv1D provider")
     graph = generated_frames(
         talker_layers=talker_layers, continuation_steps=continuation_steps,
         max_generated_frames=max_generated_frames)
@@ -81,6 +86,22 @@ def build_circuit(*, frames: int = 5, max_generated_frames: int = 64,
     }
     graph = attach_codec(graph, frames=frames, ids=ids,
                          codec_kwargs=codec_kwargs)
+    if codec_conv_provider == "avx2_fma":
+        selected = 0
+        for block_name in graph["sequence"]:
+            if not block_name.startswith("codec_"):
+                continue
+            block = graph["block_types"][block_name]
+            for op in (block.get("header", []) +
+                       block.get("body", {}).get("ops", []) +
+                       block.get("footer", [])):
+                if op.get("kernel") == SCALAR_CODEC_CONV:
+                    op["kernel"] = AVX2_CODEC_CONV
+                    selected += 1
+        if selected == 0:
+            raise ValueError("codec has no selectable Conv1D operations")
+        graph["name"] += "_avx2_fma"
+        graph["contract"]["runtime_invariants"]["codec_conv_provider"] = AVX2_CODEC_CONV
     entry["segments"].append({
         "function": entry["function"] + "_codec",
         "last_op": "publish_waveform_sample_count",

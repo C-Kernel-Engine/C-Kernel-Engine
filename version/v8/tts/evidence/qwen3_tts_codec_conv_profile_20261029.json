@@ -1,0 +1,41 @@
+{
+  "schema": "cke.qwen3_tts.generated_profile.v1",
+  "date_utc": "2026-10-29",
+  "baseline_cke_commit": "346ab783c724ac82ccb77ac6cf001efef7094f14",
+  "model": "Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice",
+  "model_revision": "85e237c12c027371202489a0ec509ded67b5e4b5",
+  "host": {
+    "cpu": "Intel(R) Core(TM) i7-14700T",
+    "logical_cpus": 28,
+    "os": "Linux 7.0.0-29-generic",
+    "compiler": "gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0"
+  },
+  "test": "tests.test_v8_qwen3_tts_full_generated_waveform.Qwen3TTSFullGeneratedWaveformTest.test_pinned_natural_eos_to_waveform",
+  "input": "pinned 46-code-frame deterministic prompt; 16 codebooks; 88,320 output samples",
+  "selected_codec_conv_calls": 25,
+  "scalar": {
+    "provider": "audio_conv1d_dilated_checked_channel_major_f32",
+    "generated_execution_seconds": 338.66,
+    "codec_segment_seconds": 214.79,
+    "full_test_seconds": 477.80,
+    "max_abs_vs_pinned_waveform": 1.3262033462524414e-6,
+    "code_sha256": "9431ba62c93b23f2327626314e6d338efdbe18ec7b733826f4fa2142f11386bf",
+    "waveform_f32_sha256": "f9a8c5fae95a19888a3cadf8c909375f82ee9a0de28bd8aa93328ffcabed663f"
+  },
+  "avx2_fma": {
+    "provider": "audio_conv1d_dilated_checked_channel_major_f32_avx2_fma",
+    "generated_execution_seconds": [197.43, 196.20],
+    "codec_segment_seconds": 72.37,
+    "full_test_seconds": [335.68, 334.11],
+    "max_abs_vs_pinned_waveform": 1.3262033462524414e-6,
+    "code_sha256": "9431ba62c93b23f2327626314e6d338efdbe18ec7b733826f4fa2142f11386bf",
+    "waveform_f32_sha256": "f9a8c5fae95a19888a3cadf8c909375f82ee9a0de28bd8aa93328ffcabed663f"
+  },
+  "diagnosis": "Codec-only perf sampling found scalar Conv1D at 37.18% of samples across two generated libraries, libm fmaf at 22.11%, dense deconvolution at 15.54%, and fmaf PLT at 9.85%. These are samples, not exclusive wall-time attribution.",
+  "reproduce": [
+    "export CKE_QWEN3_TTS_MODEL_DIR=/path/to/pinned/85e237c12c027371202489a0ec509ded67b5e4b5",
+    "python version/v8/tts/evidence/profile_qwen3_tts_generated.py",
+    "CKE_QWEN3_TTS_CODEC_CONV_PROVIDER=avx2_fma python version/v8/tts/evidence/profile_qwen3_tts_generated.py"
+  ],
+  "limits": "Single pinned utterance on one host; no real-time or varied-text claim. Python test process includes model preparation; generated_execution_seconds excludes that setup."
+}

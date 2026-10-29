@@ -19,7 +19,9 @@ from tests.test_v8_qwen3_tts_prompt_first_block import compile_entry, view
 from tests.test_v8_qwen3_tts_second_generated_frame import prepare_inputs
 from tests.test_v8_qwen3_tts_talker_prefill import weight_shapes
 from tests.test_v8_qwen3_tts_two_phase_speech import SOURCES, segment_function
-from version.v8.tts.build_qwen3_tts_loop_codec_circuit import OUTPUT, build_circuit
+from version.v8.tts.build_qwen3_tts_loop_codec_circuit import (
+    AVX2_CODEC_CONV, OUTPUT, SCALAR_CODEC_CONV, build_circuit,
+)
 from version.v8.tts.build_qwen3_tts_second_generated_frame_circuit import (
     build_circuit as generated_frames,
 )
@@ -68,6 +70,20 @@ class Qwen3TTSLoopCodecTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             build_circuit(frames=2, continuation_steps=2,
                           codec_kwargs={**GEOMETRY, "acoustic_codebooks": 2})
+        with self.assertRaises(ValueError):
+            build_circuit(codec_conv_provider="unknown")
+        optimized = build_circuit(frames=2, max_generated_frames=3,
+                                  talker_layers=1, continuation_steps=2,
+                                  codec_kwargs=GEOMETRY,
+                                  codec_conv_provider="avx2_fma")
+        selected = [op["kernel"] for block in optimized["sequence"]
+                    for op in optimized["block_types"][block].get("body", {}).get("ops", [])
+                    if op["op"] == "audio_conv1d_dilated_checked"]
+        self.assertTrue(selected)
+        self.assertEqual(set(selected), {AVX2_CODEC_CONV})
+        self.assertEqual(optimized["contract"]["runtime_invariants"][
+            "codec_conv_provider"], AVX2_CODEC_CONV)
+        self.assertNotIn(SCALAR_CODEC_CONV, selected)
 
     def test_generated_loop_to_codec_and_recovery(self):
         arrays = synthetic_arrays(np.random.default_rng(20261029))

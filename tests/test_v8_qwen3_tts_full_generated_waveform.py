@@ -76,7 +76,9 @@ class Qwen3TTSFullGeneratedWaveformTest(unittest.TestCase):
 
         model_dir = Path(os.environ["CKE_QWEN3_TTS_MODEL_DIR"])
         verify_model_dir(model_dir)
-        graph = build_circuit(frames=FRAMES, max_generated_frames=MAX_FRAMES)
+        provider = os.environ.get("CKE_QWEN3_TTS_CODEC_CONV_PROVIDER", "scalar")
+        graph = build_circuit(frames=FRAMES, max_generated_frames=MAX_FRAMES,
+                              codec_conv_provider=provider)
         with safe_open(model_dir / "model.safetensors", framework="pt", device="cpu") as main, \
              safe_open(model_dir / "speech_tokenizer/model.safetensors",
                        framework="pt", device="cpu") as codec, \
@@ -87,6 +89,12 @@ class Qwen3TTSFullGeneratedWaveformTest(unittest.TestCase):
             _, acts, weights, layout, calls, library = compile_entry(
                 Path(temp), graph, shapes, extra_sources=SOURCES_ALL)
             self.assertEqual(len(calls["entry"]["segments"]), 3)
+            if provider == "avx2_fma":
+                available = ctypes.CDLL(str(library)).audio_conv1d_checked_avx2_fma_available
+                available.argtypes = []
+                available.restype = ctypes.c_int
+                if not available():
+                    self.skipTest("AVX2/FMA codec provider unavailable on this CPU")
             size = layout["memory"]["arena"]["total_size"]
             raw = (ctypes.c_uint8 * (size + 63))()
             arena = (ctypes.c_uint8 * size).from_buffer(
@@ -156,6 +164,7 @@ class Qwen3TTSFullGeneratedWaveformTest(unittest.TestCase):
             maximum = float(np.max(np.abs(delta)))
             metric = {
                 "code_frames": FRAMES, "codebooks": CODEBOOKS,
+                "codec_conv_provider": provider,
                 "code_sha256": hashlib.sha256(
                     codes[:FRAMES * CODEBOOKS].tobytes()).hexdigest(),
                 "samples": SAMPLES, "sample_rate_hz": 24000,
