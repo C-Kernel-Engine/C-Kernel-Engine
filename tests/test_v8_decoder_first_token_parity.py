@@ -3,10 +3,12 @@ from __future__ import annotations
 
 import contextlib
 import copy
+import ctypes
 import hashlib
 import importlib.util
 import io
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -2403,6 +2405,83 @@ class V8DecoderFirstTokenParityTests(unittest.TestCase):
                         dump_atol=1.0e-4, dump_rtol=1.0e-3, dump_nonflash_inputs=True,
                     )
             self.assertTrue(llama_capture.call_args.kwargs["dump_nonflash_inputs"])
+
+    def test_requested_post_store_cache_requires_each_name_and_layer(self) -> None:
+        libc = ctypes.CDLL(None)
+        libc.getenv.argtypes = [ctypes.c_char_p]
+        libc.getenv.restype = ctypes.c_char_p
+        cache_env = b"CK_PARITY_CAPTURE_F16_CACHE"
+        dump = decoder_parity_v8.parity_test_v7.ParityDump
+        cases = (
+            ("missing both", "Kcache_post_store-0,Vcache_post_store-0", (), True),
+            ("missing V", "Kcache_post_store-0,Vcache_post_store-0", ((0, "Kcache_post_store"),), True),
+            ("wrong layer", "Kcache_post_store-0,Vcache_post_store-0",
+             ((1, "Kcache_post_store"), (1, "Vcache_post_store")), True),
+            ("both present", "Kcache_post_store-0,Vcache_post_store-0",
+             ((0, "Kcache_post_store"), (0, "Vcache_post_store")), False),
+            ("unnumbered means any layer", "Kcache_post_store,Vcache_post_store",
+             ((1, "Kcache_post_store"), (2, "Vcache_post_store")), False),
+        )
+        for label, requested, captured, should_fail in cases:
+            with self.subTest(label=label), tempfile.TemporaryDirectory(prefix="v8_cache_capture_") as directory:
+                def capture(*args, **kwargs):
+                    self.assertEqual(os.environ.get("CK_PARITY_CAPTURE_F16_CACHE"), "1")
+                    self.assertEqual(libc.getenv(cache_env), b"1")
+                    return {"vocab_size": 1, "logits": array("f", [0.0])}
+
+                dumps = [dump(layer, name, np.zeros(1, dtype=np.float16), 0, "fp16")
+                         for layer, name in captured]
+                with mock.patch.dict(os.environ, {"CK_PARITY_CAPTURE_F16_CACHE": "0"}), \
+                     mock.patch.object(decoder_parity_v8, "_run_llama_capture",
+                                       return_value={"meta": {"dumped": 1}}), \
+                     mock.patch.object(decoder_parity_v8, "_capture_ck_dump", side_effect=capture), \
+                     mock.patch.object(decoder_parity_v8.parity_test_v7, "read_dump_file", return_value=dumps), \
+                     mock.patch.object(decoder_parity_v8, "_load_llama_dump_dir", return_value=[]), \
+                     mock.patch.object(decoder_parity_v8, "_compare_dump_sets",
+                                       return_value={"summary": {"error": 0, "fail": 0}}):
+                    call = lambda: decoder_parity_v8._capture_dump_compare(
+                        Path("/tmp/model.gguf"), {"embed_dim": 4}, array("f"),
+                        0, [1], prefix_row_dim=4, ctx_len=8, top_k=2, threads=1,
+                        dump_root=Path(directory), dump_names="Qcur-0", dump_pass="all",
+                        dump_atol=1.0e-4, dump_rtol=1.0e-3,
+                        ck_extra_dump_names=requested,
+                    )
+                    if should_fail:
+                        with self.assertRaisesRegex(RuntimeError, "requested CKE post-store cache capture missing"):
+                            call()
+                    else:
+                        self.assertEqual(call()[1]["status"], "ok")
+                    self.assertEqual(os.environ["CK_PARITY_CAPTURE_F16_CACHE"], "0")
+                    self.assertEqual(libc.getenv(cache_env), b"0")
+
+    def test_post_store_cache_capture_restores_unset_environment_on_error(self) -> None:
+        libc = ctypes.CDLL(None)
+        libc.getenv.argtypes = [ctypes.c_char_p]
+        libc.getenv.restype = ctypes.c_char_p
+        cache_env = b"CK_PARITY_CAPTURE_F16_CACHE"
+
+        def fail_capture(*args, **kwargs):
+            self.assertEqual(os.environ.get("CK_PARITY_CAPTURE_F16_CACHE"), "1")
+            self.assertEqual(libc.getenv(cache_env), b"1")
+            raise RuntimeError("native capture failed")
+
+        with tempfile.TemporaryDirectory(prefix="v8_cache_capture_error_") as directory, \
+             mock.patch.dict(os.environ, {}, clear=True), \
+             mock.patch.object(decoder_parity_v8, "_run_llama_capture",
+                               return_value={"meta": {"dumped": 1}}), \
+             mock.patch.object(decoder_parity_v8, "_capture_ck_dump", side_effect=fail_capture):
+            self.assertIsNone(os.environ.get("CK_PARITY_CAPTURE_F16_CACHE"))
+            self.assertIsNone(libc.getenv(cache_env))
+            with self.assertRaisesRegex(RuntimeError, "native capture failed"):
+                decoder_parity_v8._capture_dump_compare(
+                    Path("/tmp/model.gguf"), {"embed_dim": 4}, array("f"),
+                    0, [1], prefix_row_dim=4, ctx_len=8, top_k=2, threads=1,
+                    dump_root=Path(directory), dump_names="Qcur-0", dump_pass="all",
+                    dump_atol=1.0e-4, dump_rtol=1.0e-3,
+                    ck_extra_dump_names="Kcache_post_store-0,Vcache_post_store-0",
+                )
+            self.assertIsNone(os.environ.get("CK_PARITY_CAPTURE_F16_CACHE"))
+            self.assertIsNone(libc.getenv(cache_env))
 
     def test_coalesce_multimodal_prefill_segments_joins_token_rows(self) -> None:
         dump = decoder_parity_v8.parity_test_v7.ParityDump

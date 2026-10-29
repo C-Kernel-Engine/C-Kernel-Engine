@@ -2151,9 +2151,18 @@ def _capture_dump_compare(
             post_layer_embedding_layers=post_layer_embedding_layers,
         )
         ck_dump_names = ",".join(filter(None, (ck_dump_names, extra_names)))
+    requested_cache = {
+        (layer, name)
+        for item in ck_dump_names.split(",") if item
+        for layer, name in [parity_test_v7._normalize_layer_and_op(-1, item)]
+        if name in {"Kcache_post_store", "Vcache_post_store"}
+    }
     old_ck_op_filter = os.environ.get("CK_PARITY_OP_FILTER")
+    old_cache_capture = os.environ.get("CK_PARITY_CAPTURE_F16_CACHE")
     if ck_dump_names:
         os.environ["CK_PARITY_OP_FILTER"] = ck_dump_names
+    if requested_cache:
+        os.environ["CK_PARITY_CAPTURE_F16_CACHE"] = "1"
     try:
         try:
             import ctypes as _ctypes
@@ -2161,6 +2170,8 @@ def _capture_dump_compare(
             _libc.setenv.argtypes = [_ctypes.c_char_p, _ctypes.c_char_p, _ctypes.c_int]
             if ck_dump_names:
                 _libc.setenv(b"CK_PARITY_OP_FILTER", ck_dump_names.encode(), 1)
+            if requested_cache:
+                _libc.setenv(b"CK_PARITY_CAPTURE_F16_CACHE", b"1", 1)
         except Exception:
             pass
         ck = _capture_ck_dump(
@@ -2195,9 +2206,32 @@ def _capture_dump_compare(
                 _libc.setenv(b"CK_PARITY_OP_FILTER", old_ck_op_filter.encode(), 1)
             except Exception:
                 pass
+        if requested_cache:
+            if old_cache_capture is None:
+                os.environ.pop("CK_PARITY_CAPTURE_F16_CACHE", None)
+                try:
+                    _libc.unsetenv(b"CK_PARITY_CAPTURE_F16_CACHE")
+                except Exception:
+                    pass
+            else:
+                os.environ["CK_PARITY_CAPTURE_F16_CACHE"] = old_cache_capture
+                try:
+                    _libc.setenv(b"CK_PARITY_CAPTURE_F16_CACHE", old_cache_capture.encode(), 1)
+                except Exception:
+                    pass
 
     ck_dump_path = ck_dump_dir / "dump.bin"
     ck_dumps = parity_test_v7.read_dump_file(ck_dump_path)
+    captured_cache = {(dump.layer_id, dump.op_name) for dump in ck_dumps}
+    missing_cache = {
+        (layer, name) for layer, name in requested_cache
+        if not any(
+            captured_name == name and (layer < 0 or captured_layer == layer)
+            for captured_layer, captured_name in captured_cache
+        )
+    }
+    if missing_cache:
+        raise RuntimeError(f"requested CKE post-store cache capture missing: {sorted(missing_cache)}")
     llama_dumps = _load_llama_dump_dir(
         llama_dump_dir,
         post_layer_embedding_layers=post_layer_embedding_layers,
@@ -2347,7 +2381,9 @@ def main(argv: list[str] | None = None) -> int:
         "--ck-extra-dump-names",
         type=str,
         default="",
-        help="Additional CKE-only dump names; not passed to the llama.cpp capture helper",
+        help=("Additional CKE-only dump names; not passed to llama.cpp. An unnumbered "
+              "post-store cache name requires presence in at least one layer; use -N "
+              "suffixes to require specific layers."),
     )
     ap.add_argument("--dump-atol", type=float, default=1.0e-4)
     ap.add_argument("--dump-rtol", type=float, default=1.0e-3)
