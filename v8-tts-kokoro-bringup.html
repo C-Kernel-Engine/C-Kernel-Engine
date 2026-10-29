@@ -1505,6 +1505,23 @@ padding remains untouched. The model assets are required for this test; their
 absence is NOT_TESTED. The test does not perform runtime text tokenization,
 support arbitrary text or lengths, write a WAV, or provide a cancellable speech
 session. Test: <code>tests/test_v8_qwen3_tts_full_generated_waveform.py</code>.</p>
+<p><strong>Qwen3-TTS codec Conv1D provider profile:</strong> on an Intel
+Core i7-14700T, segment timing of the pinned generated entry attributed about
+215 of 339 warm execution seconds to codec decoding. A codec-only CPU sample
+profile placed the checked scalar Conv1D path ahead of dense deconvolution.
+Selecting the existing checked AVX2/FMA Conv1D map for codec calls in the
+circuit reduced the codec segment to 72.37 seconds in a repeat profile and
+the measured full generated execution to 197.43 and 196.20 seconds;
+all 736 generated code IDs and the FP32 waveform SHA-256 remained identical to
+the scalar run, and the pinned PyTorch waveform comparison retained its
+1.33e-6 maximum error. This is one host and one pinned utterance, not a
+general latency guarantee. The scalar map remains the default; set
+<code>CKE_QWEN3_TTS_CODEC_CONV_PROVIDER=avx2_fma</code> for the optional
+asset-backed test. The provider is selected in circuit authoring, with normal
+map resolution and generated execution. Reproduce segment timings with
+<code>version/v8/tts/evidence/profile_qwen3_tts_generated.py</code> and the
+pinned model directory in <code>CKE_QWEN3_TTS_MODEL_DIR</code>. This does not
+provide variable text, a persistent request session or audio streaming.</p>
 <p><strong>Two generated frames to PCM:</strong> a checked, model-neutral integer
 span concatenation provider packs each pair of CKE-generated codebook IDs
 into a two-frame input for the existing generated codec. The same generated
