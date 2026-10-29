@@ -1,5 +1,7 @@
 var NAVTREEINDEX23 =
 {
+"structRecommendation.html#a2dea715a398d739605559094647c11eb":[1,0,91,3],
+"structRecommendation.html#aa8cbf25679d19f8407ac276b25c1b1bf":[1,0,91,1],
 "structRecommendation.html#ab10fd7bc5c1c6eee44e39a537f53cc51":[1,0,91,4],
 "structRecommendation.html#ac691a32118bd2279bf9536d183329119":[1,0,91,2],
 "structRecommendation.html#ad4009263d6f5d6e3feeab261f071beaf":[1,0,91,0],
@@ -247,7 +249,5 @@ var NAVTREEINDEX23 =
 "tokenizer_8c.html#a67319d1870a3020397c7c458d577f8ec":[2,0,1,3,4,7],
 "tokenizer_8c.html#a79f2004663c9c2d056c7acd92c23ebd7":[2,0,1,3,4,3],
 "tokenizer_8c.html#a8722adbfa81829f8942e2f326a0985c5":[2,0,1,3,4,0],
-"tokenizer_8c.html#aad7d008ac73952c45a288cbb69806835":[2,0,1,3,4,6],
-"tokenizer_8c.html#ab6aad37269a5b849a167c07a50c79ee8":[2,0,1,3,4,20],
-"tokenizer_8c.html#ac300919bef1f23da17327134992f7490":[2,0,1,3,4,25]
+"tokenizer_8c.html#aad7d008ac73952c45a288cbb69806835":[2,0,1,3,4,6]
 };

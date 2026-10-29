@@ -40,6 +40,7 @@ var gemm__kernels__f16_8c =
     [ "gemm_f16_ref", "gemm__kernels__f16_8c.html#a0989256b6558ca88475731f3fd05d699", null ],
     [ "gemm_nt_f16", "gemm__kernels__f16_8c.html#a35c4d014ba8d4c8b63cc30114bd1ccf9", null ],
     [ "gemm_nt_f16_clipped", "gemm__kernels__f16_8c.html#a9388bc1e31c430befcde26ec5a572100", null ],
+    [ "gemm_nt_f16_clipped_n8", "gemm__kernels__f16_8c.html#a3e9c8a1db8a8d42d56506584782a45d4", null ],
     [ "gemm_nt_f16_ggml_strict", "gemm__kernels__f16_8c.html#a6c857b078710f3cf5c13968d27885bb2", null ],
     [ "gemv_f16", "gemm__kernels__f16_8c.html#a3718c32b9aaa8acd213a9e1cc4238220", null ],
     [ "gemv_f16_backward", "gemm__kernels__f16_8c.html#ab64031adeb76f584f88d8b4f29c37466", null ],

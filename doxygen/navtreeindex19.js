@@ -1,5 +1,7 @@
 var NAVTREEINDEX19 =
 {
+"sigmoid__kernels_8c_source.html":[2,0,1,1,126],
+"sigmoid__kernels__bf16_8c.html":[2,0,1,1,127],
 "sigmoid__kernels__bf16_8c.html#a8ff367a15f1448b30193ac1fe96446d8":[2,0,1,1,127,1],
 "sigmoid__kernels__bf16_8c.html#a90690701828d7be0e2d375c4cbde511d":[2,0,1,1,127,0],
 "sigmoid__kernels__bf16_8c_source.html":[2,0,1,1,127],
@@ -247,7 +249,5 @@ var NAVTREEINDEX19 =
 "structCKLayerBackwardParams.html#aa9203c2951372bedee83fd38e3ef57fb":[1,0,38,47],
 "structCKLayerBackwardParams.html#aab3a0f3828a687d937a07f74131b2a3f":[1,0,38,54],
 "structCKLayerBackwardParams.html#aabe923efab694bfed90a3d86084c9be9":[1,0,38,25],
-"structCKLayerBackwardParams.html#aae3da518cc5f67a49d2d1d332f6fb620":[1,0,38,46],
-"structCKLayerBackwardParams.html#ab177ccef441842dede3cb9717e4deff5":[1,0,38,57],
-"structCKLayerBackwardParams.html#ab5ce33fe414d678705eb03372371d68d":[1,0,38,4]
+"structCKLayerBackwardParams.html#aae3da518cc5f67a49d2d1d332f6fb620":[1,0,38,46]
 };
