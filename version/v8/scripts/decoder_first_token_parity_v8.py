@@ -2381,7 +2381,9 @@ def main(argv: list[str] | None = None) -> int:
         "--ck-extra-dump-names",
         type=str,
         default="",
-        help="Additional CKE-only dump names; not passed to the llama.cpp capture helper",
+        help=("Additional CKE-only dump names; not passed to llama.cpp. An unnumbered "
+              "post-store cache name requires presence in at least one layer; use -N "
+              "suffixes to require specific layers."),
     )
     ap.add_argument("--dump-atol", type=float, default=1.0e-4)
     ap.add_argument("--dump-rtol", type=float, default=1.0e-3)
