@@ -3244,9 +3244,12 @@ def emit_model_and_api(
       These ops have c_code that reads from bump memory (needs loaded weights).
     """
     logits_stride = int(logits_stride)
-    from sequence_state_contract_v8 import resolve_sequence_state_contract
+    from sequence_state_contract_v8 import (
+        resolve_sequence_state_contract, validate_sequence_reset_regions,
+    )
     from sequence_state_codegen_v8 import emit_sequence_state_api
 
+    reset_regions = validate_sequence_reset_regions(layout or {})
     sequence_state_contract = resolve_sequence_state_contract(layout or {}, config or {}, decode_ops)
     sequence_state_api = emit_sequence_state_api(sequence_state_contract) if sequence_state_contract else ""
     sequence_state_release = "    ck_sequence_release_all();\n" if sequence_state_contract else ""
@@ -3629,9 +3632,12 @@ CK_EXPORT int32_t ck_model_audio_prompt_token_id(int index) {{
         if uses_persistent_cross_kv_cache
         else ""
     )
-    for buf in layout.get("memory", {}).get("activations", {}).get("buffers", []):
-        if buf.get("lifetime") != "sequence" or buf.get("mutable") is not True:
-            continue
+    all_layout_macros: list[str] = []
+    for entry in (layout or {}).get("memory", {}).get("weights", {}).get("entries", []):
+        all_layout_macros.append(entry.get("define") or f"W_{_sanitize_macro(entry.get('name', 'weight'))}")
+    for entry in (layout or {}).get("memory", {}).get("activations", {}).get("buffers", []):
+        all_layout_macros.append(entry.get("define") or f"A_{_sanitize_macro(entry.get('name', 'buffer'))}")
+    for buf in reset_regions:
         name = buf.get("name")
         if name == "kv_cache":
             continue  # The active KV pointer is cleared above.
@@ -3646,7 +3652,8 @@ CK_EXPORT int32_t ck_model_audio_prompt_token_id(int index) {{
             if sequence_state_contract is not None:
                 raise RuntimeError(f"sequence buffer {name!r} is not switch-owned")
             macro = buf.get("define")
-            if not isinstance(macro, str) or re.fullmatch(r"A_[A-Z0-9_]+", macro) is None:
+            expected_macro = f"A_{_sanitize_macro(name)}"
+            if macro != expected_macro or all_layout_macros.count(macro) != 1:
                 raise RuntimeError(f"sequence buffer {name!r} has no checked arena binding")
             target = f"g_model->bump + {macro}"
         recurrent_reset_lines.append(f"    memset({target}, 0, {size});")

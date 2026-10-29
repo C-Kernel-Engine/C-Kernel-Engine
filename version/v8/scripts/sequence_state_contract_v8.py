@@ -22,6 +22,47 @@ _RECURRENT_MACRO_PATTERN = re.compile(
 )
 
 
+def validate_sequence_reset_regions(layout: dict[str, Any]) -> list[dict[str, Any]]:
+    """Prove every mutable sequence buffer can be cleared in the model arena.
+
+    Reset safety must not depend on sequence-switch eligibility: hybrid models
+    can own persistent state even when switching is deliberately unavailable.
+    """
+    memory = layout.get("memory", {})
+    buffers = memory.get("activations", {}).get("buffers", [])
+    if not isinstance(buffers, list):
+        raise ValueError("activation buffers must be a list")
+    targets = [row for row in buffers if isinstance(row, dict) and
+               row.get("lifetime") == "sequence" and row.get("mutable") is True]
+    if not targets:
+        return []
+    target_ids = {id(row) for row in targets}
+    arena_size = memory.get("arena", {}).get("total_size")
+    if type(arena_size) is not int or arena_size <= 0:
+        raise ValueError("sequence reset requires a proven arena size")
+    regions: list[tuple[int, int, dict[str, Any]]] = []
+    for row in buffers:
+        if not isinstance(row, dict) or not isinstance(row.get("name"), str):
+            raise ValueError("activation buffer has no name")
+        start, size = row.get("abs_offset"), row.get("size")
+        if type(start) is not int or type(size) is not int or start < 0 or size < 0:
+            raise ValueError(f"{row['name']} has no proven arena range")
+        if start > arena_size or size > arena_size - start:
+            raise ValueError(f"{row['name']} exceeds the planned arena")
+        if id(row) in target_ids and size == 0:
+            raise ValueError(f"{row['name']} has no proven reset extent")
+        regions.append((start, start + size, row))
+    for start, end, row in regions:
+        if id(row) not in target_ids:
+            continue
+        for other_start, other_end, other in regions:
+            if other is row or other_start == other_end:
+                continue
+            if start < other_end and other_start < end:
+                raise ValueError(f"{row['name']} overlaps {other['name']}")
+    return targets
+
+
 def recurrent_state_operand(arg: dict[str, Any]) -> tuple[str, int, str] | None:
     """Return a checked buffer name, literal byte offset, and active pointer.
 
