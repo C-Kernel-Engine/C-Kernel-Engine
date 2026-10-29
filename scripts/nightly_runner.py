@@ -843,6 +843,22 @@ TEST_SUITES = {
         ROOT / "tests" / "test_v8_qwen3_tts_full_generated_waveform.py",
         timeout_sec=1200,
     ),
+    "tts_qwen3_pinned_session": TestSuite(
+        "Qwen3-TTS Pinned Speech Session Contracts", "inference",
+        ROOT / "tests" / "test_v8_qwen3_tts_pinned_session.py",
+        unittest_targets=(
+            "tests.test_v8_qwen3_tts_pinned_session.Qwen3TTSPinnedSessionTest.test_pcm_wav_header_and_rejection",
+            "tests.test_v8_qwen3_tts_pinned_session.Qwen3TTSPinnedSessionTest.test_unsupported_text_rejected_before_model_access",
+        ),
+    ),
+    "tts_qwen3_pinned_session_asset": TestSuite(
+        "Qwen3-TTS Repeated Native Speech Session", "inference",
+        ROOT / "tests" / "test_v8_qwen3_tts_pinned_session.py",
+        timeout_sec=1200,
+        unittest_targets=(
+            "tests.test_v8_qwen3_tts_pinned_session.Qwen3TTSPinnedSessionTest.test_repeated_pinned_native_synthesis",
+        ),
+    ),
     "tts_copy_i32_span_checked": TestSuite(
         "Checked Integer Span State Copy", "kernels",
         ROOT / "tests" / "test_v8_copy_i32_span_checked.py",
