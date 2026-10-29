@@ -1252,7 +1252,7 @@ versions and hashes; the selected voice ID and asset hash are also open.</p>
 <td>Qwen3-TTS 0.6B CustomVoice, 12 Hz — first CKE comparison target</td>
 <td><a href="https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice/tree/85e237c12c027371202489a0ec509ded67b5e4b5"><code>Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice@85e237c</code></a>, Apache 2.0</td>
 <td>The pinned <a href="https://github.com/QwenLM/Qwen3-TTS/commit/022e286b98fbec7e1e916cb940cdf532cd9f488e">reference code</a> tokenizes text, applies a preset speaker and language, runs a 28-layer talker and 5-layer code predictor, then decodes the 16-group codec tokens into 24 kHz PCM. The CKE oracle capture records text token IDs, codec tokens and waveform.</td>
-<td>CKE connects pinned prompt IDs through generated embedding, text projection and all 28 talker prefill blocks. The bounded generated loop now reaches natural EOS on one pinned request after 46 frames, with all 46 × 16 code IDs matching the committed reference. A separate one-frame generated-code entry produces 1,920 reference-matching PCM samples, and the reference-code-fed codec covers 8 and 46 frames. The new generic code-to-codec handoff is tested at synthetic two-frame geometry. A complete pinned text-to-WAV join, varied requests and sampled generation remain NOT_TESTED. This 0.6B CustomVoice variant ignores style instructions.</td>
+<td>CKE connects pinned prompt IDs through generated embedding, text projection and all 28 talker prefill blocks. The bounded generated loop reaches natural EOS after 46 frames, with all 46 × 16 code IDs matching the committed reference. The generated loop now feeds the complete codec on the same planned arena and produces 88,320 FP32 samples at 24 kHz; maximum error against the pinned waveform is 1.33e-6. This certifies one pinned prompt-ID-to-PCM trajectory. Runtime text preparation, varied requests, sampled generation, a WAV host and speech-session behavior remain NOT_TESTED. This 0.6B CustomVoice variant ignores style instructions.</td>
 </tr>
 <tr>
 <td>Kokoro v1.0</td>
@@ -1487,10 +1487,24 @@ finite PCM samples only after the sample count is checked. The asset-free
 synthetic test compiles all three segments through normal lowering and codegen,
 checks codebook order, rejects a wrong length or failing codec without
 publishing PCM, and verifies recovery on the same arena. The synthetic test
-forces EOS at two frames; it does not certify the complete pinned-model
-code-to-waveform join or a useful text-to-speech utterance. The existing fixed-code codec
-oracle remains a separate numerical lane. Test:
+forces EOS at two frames; it checks generic handoff and failure behavior. The
+separate pinned connected test below checks the complete model trajectory.
+The existing fixed-code codec oracle remains an independent numerical lane. Test:
 <code>tests/test_v8_qwen3_tts_loop_codec.py</code>.</p>
+<p><strong>Qwen3-TTS pinned prompt-ID-to-PCM trajectory:</strong> one checked
+native call invokes circuit-declared generated prefill, frame and codec
+segments. It uses the pinned prompt IDs and weights to generate 46 code frames, stops
+at natural EOS, packs all 16 codebooks per frame, and runs the complete codec
+on the same planned arena. The 736 generated IDs match the pinned reference
+exactly. The output has 88,320 finite FP32 samples at 24 kHz; maximum absolute
+waveform error is 1.33e-6 and RMSE is 7.23e-8 against the direct pinned-model
+capture. The measured generated run took 338.64 seconds for 3.68 seconds of
+audio on this bring-up host, so this is not yet interactive speech. An
+undersized arena rejects without publishing samples, and output
+padding remains untouched. The model assets are required for this test; their
+absence is NOT_TESTED. The test does not perform runtime text tokenization,
+support arbitrary text or lengths, write a WAV, or provide a cancellable speech
+session. Test: <code>tests/test_v8_qwen3_tts_full_generated_waveform.py</code>.</p>
 <p><strong>Two generated frames to PCM:</strong> a checked, model-neutral integer
 span concatenation provider packs each pair of CKE-generated codebook IDs
 into a two-frame input for the existing generated codec. The same generated
