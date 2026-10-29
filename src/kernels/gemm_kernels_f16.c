@@ -1037,6 +1037,52 @@ void gemm_nt_f16_clipped(const float *A,
     }
 }
 
+void gemm_nt_f16_clipped_n8(const float *A,
+                            const void *B,
+                            const float *bias,
+                            const float *input_min,
+                            const float *input_max,
+                            const float *output_min,
+                            const float *output_max,
+                            float *C,
+                            int M, int N, int K)
+{
+    const float in_min = input_min ? input_min[0] : -3.4028234663852886e38f;
+    const float in_max = input_max ? input_max[0] : 3.4028234663852886e38f;
+    const float out_min = output_min ? output_min[0] : -3.4028234663852886e38f;
+    const float out_max = output_max ? output_max[0] : 3.4028234663852886e38f;
+    const uint16_t *W = (const uint16_t *)B;
+
+#pragma omp parallel for schedule(static) if(M > 1)
+    for (int m = 0; m < M; ++m) {
+        const float *a_row = A + (size_t)m * (size_t)K;
+        float *c_row = C + (size_t)m * (size_t)N;
+        for (int n0 = 0; n0 < N; n0 += 8) {
+            const int width = N - n0 < 8 ? N - n0 : 8;
+            float sums[8];
+            for (int j = 0; j < width; ++j) {
+                sums[j] = bias ? bias[n0 + j] : 0.0f;
+            }
+            for (int k = 0; k < K; ++k) {
+                float x = a_row[k];
+                if (x < in_min) x = in_min;
+                if (x > in_max) x = in_max;
+                const float a = fp16_to_fp32(fp32_to_fp16(x));
+                for (int j = 0; j < width; ++j) {
+                    const uint16_t w = W[(size_t)(n0 + j) * (size_t)K + (size_t)k];
+                    sums[j] += fp16_to_fp32(w) * a;
+                }
+            }
+            for (int j = 0; j < width; ++j) {
+                float sum = sums[j];
+                if (sum < out_min) sum = out_min;
+                if (sum > out_max) sum = out_max;
+                c_row[n0 + j] = sum;
+            }
+        }
+    }
+}
+
 /* ============================================================================
  * FP16 Tensor Conversion Utilities
  * ============================================================================ */

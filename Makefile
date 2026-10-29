@@ -6948,6 +6948,7 @@ test-kernel-maps:
 		tests/test_v8_rope_split_direct_parallel.py \
 		tests/test_v8_numerical_execution_contracts.py
 	@$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_gemma4_provider_contracts.py
+	@$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_gemm_f16_clipped_n8.py
 	@$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_gemma4_bf16_reduction_oracle.py
 	@$(MAKE) --no-print-directory v8-kernel-registry-freshness
 

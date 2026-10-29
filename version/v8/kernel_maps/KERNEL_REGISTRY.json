@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 471,
+      "total": 472,
       "by_op": {
         "add_backward": 1,
         "add_rows_checked": 1,
@@ -96,7 +96,7 @@
         "gated_shared_swiglu_expert_mlp": 4,
         "geglu": 7,
         "gelu": 10,
-        "gemm": 24,
+        "gemm": 25,
         "gemm_backward": 1,
         "gemma4_per_layer_embed": 1,
         "gemma4_per_layer_prepare": 2,
@@ -43344,6 +43344,261 @@
       "notes": "Gemma4V ClippableLinear: clamp input, F16 matmul, clamp output.",
       "name": "gemm_nt_f16_clipped",
       "_source_file": "gemm_nt_f16_clipped.json"
+    },
+    {
+      "id": "gemm_nt_f16_clipped_n8",
+      "op": "gemm",
+      "operation_interface": "gemm.fp32_activation.fp16_weight.clipped_fp32_output.v1",
+      "variant": "f16_w_fp32_a_fp32_out_clipped",
+      "quant": {
+        "weight": "fp16|f16",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "A",
+          "dtype": "fp32",
+          "shape": [
+            "M",
+            "K"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required",
+          "desc": "Activation matrix [M,K], clamped before FP16 rounding"
+        }
+      ],
+      "weights": [
+        {
+          "name": "B",
+          "dtype": "fp16",
+          "shape": [
+            "N",
+            "K"
+          ],
+          "layout": "output_feature_major_contiguous",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required",
+          "desc": "Weight matrix [N,K] FP16"
+        },
+        {
+          "name": "bias",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "layout": "feature_contiguous",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "optional",
+          "optional": true
+        },
+        {
+          "name": "input_min",
+          "dtype": "fp32",
+          "shape": [
+            1
+          ],
+          "layout": "scalar",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "optional",
+          "optional": true
+        },
+        {
+          "name": "input_max",
+          "dtype": "fp32",
+          "shape": [
+            1
+          ],
+          "layout": "scalar",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "optional",
+          "optional": true
+        },
+        {
+          "name": "output_min",
+          "dtype": "fp32",
+          "shape": [
+            1
+          ],
+          "layout": "scalar",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "optional",
+          "optional": true
+        },
+        {
+          "name": "output_max",
+          "dtype": "fp32",
+          "shape": [
+            1
+          ],
+          "layout": "scalar",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "optional",
+          "optional": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "C",
+          "dtype": "fp32",
+          "shape": [
+            "M",
+            "N"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "M",
+        "N",
+        "K"
+      ],
+      "impl": {
+        "function": "gemm_nt_f16_clipped_n8",
+        "c_declaration": "void gemm_nt_f16_clipped_n8(const float *A, const void *B, const float *bias, const float *input_min, const float *input_max, const float *output_min, const float *output_max, float *C, int M, int N, int K);",
+        "sources": [
+          "src/kernels/gemm_kernels_f16.c"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "A",
+            "source": "activation:a",
+            "cast": "const float*",
+            "ports": [
+              "input:A"
+            ]
+          },
+          {
+            "name": "B",
+            "source": "weight:_first_weight",
+            "ports": [
+              "weight:B"
+            ]
+          },
+          {
+            "name": "bias",
+            "source": "weight_f:_bias",
+            "ports": [
+              "weight:bias"
+            ]
+          },
+          {
+            "name": "input_min",
+            "source": "weight_f:_input_min",
+            "cast": "const float*",
+            "ports": [
+              "weight:input_min"
+            ],
+            "alt": [
+              "wq_input_min",
+              "wk_input_min",
+              "wv_input_min",
+              "wo_input_min",
+              "w1_input_min",
+              "w2_input_min",
+              "w3_input_min",
+              "mm1_w_input_min"
+            ]
+          },
+          {
+            "name": "input_max",
+            "source": "weight_f:_input_max",
+            "cast": "const float*",
+            "ports": [
+              "weight:input_max"
+            ],
+            "alt": [
+              "wq_input_max",
+              "wk_input_max",
+              "wv_input_max",
+              "wo_input_max",
+              "w1_input_max",
+              "w2_input_max",
+              "w3_input_max",
+              "mm1_w_input_max"
+            ]
+          },
+          {
+            "name": "output_min",
+            "source": "weight_f:_output_min",
+            "cast": "const float*",
+            "ports": [
+              "weight:output_min"
+            ],
+            "alt": [
+              "wq_output_min",
+              "wk_output_min",
+              "wv_output_min",
+              "wo_output_min",
+              "w1_output_min",
+              "w2_output_min",
+              "w3_output_min",
+              "mm1_w_output_min"
+            ]
+          },
+          {
+            "name": "output_max",
+            "source": "weight_f:_output_max",
+            "cast": "const float*",
+            "ports": [
+              "weight:output_max"
+            ],
+            "alt": [
+              "wq_output_max",
+              "wk_output_max",
+              "wv_output_max",
+              "wo_output_max",
+              "w1_output_max",
+              "w2_output_max",
+              "w3_output_max",
+              "mm1_w_output_max"
+            ]
+          },
+          {
+            "name": "C",
+            "source": "output:c",
+            "cast": "float*",
+            "ports": [
+              "output:C"
+            ]
+          },
+          {
+            "name": "M",
+            "source": "dim:_m"
+          },
+          {
+            "name": "N",
+            "source": "dim:_output_dim"
+          },
+          {
+            "name": "K",
+            "source": "dim:_input_dim"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_gemm_f16_clipped_n8.py"
+        ]
+      },
+      "notes": "Tile eight independent output channels while retaining each channel's original K reduction order, input/output clamps, FP16 activation rounding, and FP32 output. No workspace.",
+      "name": "gemm_nt_f16_clipped_n8",
+      "_source_file": "gemm_nt_f16_clipped_n8.json"
     },
     {
       "id": "gemm_nt_f32_llama_production",
