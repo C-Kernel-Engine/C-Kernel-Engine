@@ -18325,7 +18325,10 @@ def main(args: List[str]) -> int:
         "--context-len",
         type=int,
         default=None,
-        help="Context length for buffer allocation (default: from model config)"
+        help=(
+            "Context length for buffer allocation (default: from model config); "
+            "must not exceed the manifest's declared context_length"
+        )
     )
     parser.add_argument(
         "--prefill-chunk-len",
@@ -18437,6 +18440,31 @@ def main(args: List[str]) -> int:
     _hydrate_manifest_template(manifest)
     _backfill_template_runtime_flags(manifest)
     manifest["config"] = _normalize_manifest_config(manifest.get("config", {}))
+    if parsed_args.context_len is not None:
+        requested_context = int(parsed_args.context_len)
+        declared_context = int(
+            manifest["config"].get("context_length")
+            or manifest["config"].get("max_seq_len")
+            or 0
+        )
+        if requested_context <= 0 or (
+            declared_context > 0 and requested_context > declared_context
+        ):
+            raise BuildDiagnosticError(
+                "requested context length is outside the declared model capacity",
+                code="CKE-V8-CONTEXT-CAPACITY",
+                stage="input_validation",
+                category="user_configuration",
+                summary="requested context length cannot be represented by the model manifest",
+                remediation=(
+                    "Choose a positive --context-len no greater than the manifest's "
+                    "context_length, or regenerate the manifest for the intended capacity."
+                ),
+                observed={
+                    "requested_context_len": requested_context,
+                    "declared_context_length": declared_context,
+                },
+            )
     _apply_prefill_policy_override(manifest, parsed_args.prefill_policy_override)
     if parsed_args.prefer_q8_activation:
         manifest.setdefault("config", {})["prefer_q8_activation"] = True
