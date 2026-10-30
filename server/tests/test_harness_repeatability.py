@@ -46,6 +46,39 @@ def test_qwen_child_workspace_is_separate_from_retained_logs(tmp_path):
     assert report == tmp_path / "workspace" / "report.json"
 
 
+def test_qwen_code_versions_and_profiles_are_explicit(tmp_path):
+    legacy = _config()["clients"][0]
+    assert matrix._validate(_config())
+    legacy_command, _, _ = matrix._command(legacy, "task", tmp_path)
+    assert legacy_command[legacy_command.index("--qwen-profile") + 1] == "bare"
+    assert legacy_command[legacy_command.index("--expected-qwen-version") + 1] == "0.24.6"
+
+    current = dict(legacy, qwen_version="0.25.1", qwen_profile="normal",
+                   task_timeout_seconds=14400, max_output_tokens=2048)
+    config = _config()
+    config["clients"] = [current]
+    assert matrix._validate(config)
+    command, _, deadline = matrix._command(current, "task", tmp_path)
+    assert command[command.index("--qwen-profile") + 1] == "normal"
+    assert command[command.index("--expected-qwen-version") + 1] == "0.25.1"
+    assert command[command.index("--max-output-tokens") + 1] == "2048"
+    assert deadline == 14490
+    current["qwen_version"] = "0.25.2"
+    with pytest.raises(ValueError, match="unsupported pinned"):
+        matrix._validate(config)
+    current["qwen_version"] = {"unhashable": True}
+    with pytest.raises(ValueError, match="unsupported pinned"):
+        matrix._validate(config)
+    current["qwen_version"] = "0.25.1"
+    current["qwen_profile"] = {"unhashable": True}
+    with pytest.raises(ValueError, match="qwen_profile"):
+        matrix._validate(config)
+    current["qwen_profile"] = "normal"
+    current["settings"] = {"path": "settings.json"}
+    with pytest.raises(ValueError, match="settings"):
+        matrix._validate(config)
+
+
 def test_matrix_preserves_every_attempt_and_separates_statuses(tmp_path, monkeypatch):
     calls = []
 
@@ -131,6 +164,70 @@ def test_successful_child_exit_cannot_certify_wrong_report_schema(tmp_path, monk
     assert row["exit_code"] == 0
     assert row["status"] == "fail"
     assert row["report_schema_status"] == "missing_or_invalid"
+
+
+def test_coordinator_time_budget_retains_incomplete_task(tmp_path, monkeypatch):
+    import subprocess
+
+    class SlowChild:
+        pid = 12345
+        waits = 0
+
+        def wait(self, timeout):
+            self.waits += 1
+            if self.waits == 1:
+                raise subprocess.TimeoutExpired("qwen", timeout)
+            return 0
+
+    monkeypatch.setattr(matrix, "_command", lambda _client, _kind, directory: (
+        ["qwen"], directory / "report.json", 1))
+    monkeypatch.setattr(matrix.subprocess, "Popen", lambda *_args, **_kwargs: SlowChild())
+    monkeypatch.setattr(matrix.os, "killpg", lambda *_args: None)
+    row = matrix._run_step(_config()["clients"][0], "task", tmp_path / "step")
+    assert row["status"] == "fail"
+    assert row["timed_out"] is True
+    assert row["task_status"] == "incomplete"
+    assert row["incomplete_reason"] == "coordinator_time_budget_exceeded"
+    assert row["termination_reason"] == "coordinator_time_budget_exceeded"
+
+
+def test_coordinator_timeout_preserves_child_protocol_failure(tmp_path, monkeypatch):
+    import subprocess
+
+    client = _config()["clients"][0]
+    identity = {"model": client["model"], "serving_identity": HASH,
+                "session_library_sha256": HASH, "server_instance_id": "first"}
+    report = {"schema": "cke.serving_harness_acceptance.v1",
+              "model": client["model"], "endpoint": client["endpoint"],
+              "identity": {"before": identity, "after": identity},
+              "result": {"status": "fail", "errors": ["mixed_stream_sessions"],
+                         "observed_failures": ["mixed_stream_sessions"]},
+              "certification": {"status": "fail"}}
+
+    class SlowChild:
+        pid = 12345
+        waits = 0
+
+        def wait(self, timeout):
+            self.waits += 1
+            if self.waits == 1:
+                raise subprocess.TimeoutExpired("qwen", timeout)
+            return 0
+
+    def fake_command(_client, _kind, directory):
+        path = directory / "report.json"
+        path.write_text(json.dumps(report))
+        return ["qwen"], path, 1
+
+    monkeypatch.setattr(matrix, "_command", fake_command)
+    monkeypatch.setattr(matrix.subprocess, "Popen", lambda *_args, **_kwargs: SlowChild())
+    monkeypatch.setattr(matrix.os, "killpg", lambda *_args: None)
+    row = matrix._run_step(client, "task", tmp_path / "failed-step")
+    assert row["status"] == "fail"
+    assert row["task_status"] == "fail"
+    assert row["termination_reason"] == "coordinator_time_budget_exceeded"
+    assert row["observed_failures"] == ["mixed_stream_sessions"]
+    assert "incomplete_reason" not in row
 
 
 def test_swapped_http_suite_report_fails_and_retains_its_hash(tmp_path, monkeypatch):

@@ -395,6 +395,9 @@ def test_bad_identity_does_not_start_harness(monkeypatch, tmp_path, malformed):
     assert report['certification']['reason'] == (
         'loaded_identity_preflight_probe_failed' if malformed
         else 'loaded_artifact_identity_mismatch')
+    assert report['qwen_code_version'] == '0.24.6'
+    assert report['qwen_profile'] == 'bare'
+    assert report['time_budget_seconds'] == 10
     assert json.loads((tmp_path / 'task/report.json').read_text()) == report
 
 
@@ -423,3 +426,137 @@ def test_individual_identity_mismatch_prevents_client_launch(
     report = acceptance.run(args)
     assert report['result']['status'] == 'not_run'
     assert report['certification'] == {'status': 'fail', 'reason': reason, 'detail': None}
+
+
+@pytest.mark.parametrize('version,profile,expected_bare,budget_mode', [
+    ('0.24.6', 'bare', True, None),
+    ('0.25.1', 'normal', False, 'runner'),
+    ('0.25.1', 'normal', False, 'client'),
+])
+def test_versioned_qwen_profile_retains_settings_and_time_budget(
+        monkeypatch, tmp_path, version, profile, expected_bare, budget_mode):
+    def fake_urlopen(url, **_kwargs):
+        payload = {'data': [{'id': MODEL}]} if url.endswith('/models') else _loaded_identity()
+        return io.BytesIO(json.dumps(payload).encode())
+
+    monkeypatch.setattr(acceptance, 'urlopen', fake_urlopen)
+    monkeypatch.setattr(acceptance.subprocess, 'run',
+                        lambda *_args, **_kwargs: subprocess.CompletedProcess([], 0, version + '\n'))
+    launched = []
+    def fake_popen(command, **kwargs):
+        launched.append((command, kwargs))
+        if budget_mode == 'client':
+            kwargs['stderr'].write(
+                b'Run aborted: wall-clock budget of 14400s exceeded (--max-wall-time).\n')
+        return object()
+
+    monkeypatch.setattr(acceptance.subprocess, 'Popen', fake_popen)
+    monkeypatch.setattr(acceptance, '_session_file', lambda *_args: tmp_path / 'empty.jsonl')
+    (tmp_path / 'empty.jsonl').write_text('')
+    settings = tmp_path / 'settings.json'
+    settings.write_text('{"model":{"maxWallTimeSeconds":14400,"generationConfig":{"contextWindowSize":32768}}}')
+
+    def wait(_process, _timeout, on_ready=None, on_timeout=None):
+        if budget_mode == 'runner':
+            on_timeout()
+            return 124
+        if budget_mode == 'client':
+            return 55
+        return 0
+
+    monkeypatch.setattr(acceptance, '_wait_for_client', wait)
+    args = argparse.Namespace(timeout=14400, max_output_tokens=2048, qwen_bin='qwen',
+                              qwen_profile=profile, expected_qwen_version=version,
+                              run_dir=tmp_path / profile, settings=str(settings),
+                              endpoint='http://example.test/v1', model=MODEL,
+                              expected_serving_identity='a' * 64,
+                              expected_session_library_sha256='c' * 64,
+                              api_key='cke-local-only')
+    report = acceptance.run(args)
+    command, kwargs = launched[0]
+    assert ('--bare' in command) is expected_bare
+    assert kwargs['env']['QWEN_CODE_SYSTEM_SETTINGS_PATH'] == str(settings.resolve())
+    assert report['qwen_code_version'] == version
+    assert report['qwen_profile'] == profile
+    assert report['qwen_settings_sha256'] == acceptance._sha256(settings)
+    assert report['declared_client_wall_time_seconds'] == 14400
+    assert report['time_budget_seconds'] == 14400
+    assert report['time_budget_exceeded'] is (budget_mode == 'runner')
+    assert report['client_time_budget_exceeded'] is (budget_mode == 'client')
+    if budget_mode:
+        assert report['result']['status'] == 'incomplete'
+        assert report['result']['incomplete_reason'] == 'time_budget_exceeded'
+
+
+def test_client_budget_abort_is_incomplete_only_with_explicit_stderr(tmp_path):
+    stderr = tmp_path / 'stderr.log'
+    stderr.write_text('Run aborted: wall-clock budget of 1200s exceeded (--max-wall-time).\n')
+    assert acceptance._client_time_budget_exceeded(55, stderr)
+    assert not acceptance._client_time_budget_exceeded(0, stderr)
+    stderr.write_text('Runtime error during generation.\n')
+    assert not acceptance._client_time_budget_exceeded(55, stderr)
+
+
+@pytest.mark.parametrize('budget_mode', ('runner', 'client'))
+def test_timeout_preserves_observed_session_failure(monkeypatch, tmp_path, budget_mode):
+    def fake_urlopen(url, **_kwargs):
+        payload = {'data': [{'id': MODEL}]} if url.endswith('/models') else _loaded_identity()
+        return io.BytesIO(json.dumps(payload).encode())
+
+    monkeypatch.setattr(acceptance, 'urlopen', fake_urlopen)
+    monkeypatch.setattr(acceptance.subprocess, 'run',
+                        lambda *_args, **_kwargs: subprocess.CompletedProcess([], 0, '0.25.1\n'))
+
+    def fake_popen(_command, **kwargs):
+        kwargs['stdout'].write((json.dumps({
+            'type': 'system', 'subtype': 'init', 'session_id': 'wrong-session',
+            'model': MODEL,
+        }) + '\n').encode())
+        if budget_mode == 'client':
+            kwargs['stderr'].write(
+                b'Run aborted: wall-clock budget of 10s exceeded (--max-wall-time).\n')
+        return object()
+
+    monkeypatch.setattr(acceptance.subprocess, 'Popen', fake_popen)
+    monkeypatch.setattr(acceptance, '_session_file', lambda *_args: tmp_path / 'empty.jsonl')
+    (tmp_path / 'empty.jsonl').write_text('')
+
+    def wait(_process, _timeout, on_ready=None, on_timeout=None):
+        if budget_mode == 'runner':
+            on_timeout()
+            return 124
+        return 55
+
+    monkeypatch.setattr(acceptance, '_wait_for_client', wait)
+    args = argparse.Namespace(timeout=10, max_output_tokens=16, qwen_bin='qwen',
+                              qwen_profile='normal', expected_qwen_version='0.25.1',
+                              run_dir=tmp_path / budget_mode,
+                              endpoint='http://example.test/v1', model=MODEL,
+                              expected_serving_identity='a' * 64,
+                              expected_session_library_sha256='c' * 64,
+                              api_key='cke-local-only')
+    report = acceptance.run(args)
+    assert report['result']['status'] == 'fail'
+    assert 'stream_session_identity_missing_or_mismatched' in report['result']['observed_failures']
+    assert 'incomplete_reason' not in report['result']
+    assert report['termination_reason'] == f'{budget_mode}_time_budget_exceeded'
+
+
+def test_timeout_rejects_observed_unknown_result_and_tool_name():
+    events = [
+        {'type': 'assistant', 'message': {'content': [
+            {'type': 'tool_use', 'id': 'call-1', 'name': 'unexpected_tool'}]}},
+        {'type': 'user', 'message': {'content': [
+            {'type': 'tool_result', 'tool_use_id': 'call-2'}]}},
+    ]
+    assert acceptance._observed_timeout_failures(events, ['wrong_tool_sequence']) == [
+        'unexpected_tool_name', 'tool_result_before_call_or_unknown',
+    ]
+
+
+@pytest.mark.parametrize('timeout,output_tokens', [
+    (0, 16), (86401, 16), (True, 16), (10, 0), (10, 32769), (10, True),
+])
+def test_direct_runner_rejects_unbounded_budgets(timeout, output_tokens):
+    with pytest.raises(ValueError, match='must be an integer'):
+        acceptance.run(argparse.Namespace(timeout=timeout, max_output_tokens=output_tokens))

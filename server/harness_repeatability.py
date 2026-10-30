@@ -25,6 +25,8 @@ SCHEMA = "cke.harness_repeatability.v1"
 SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 NAME = re.compile(r"[a-z][a-z0-9_-]{0,47}\Z")
 ADAPTERS = {"qwen_code", "antigravity_gemma"}
+QWEN_CODE_VERSIONS = frozenset({"0.24.6", "0.25.1"})
+QWEN_CODE_PROFILES = frozenset({"bare", "normal"})
 HTTP_CASES = {
     "plain-chat": {"chat-completions", "responses-stream", "multi-turn",
                    "output-limit", "undeclared-tools"},
@@ -74,11 +76,21 @@ def _validate(config: dict) -> dict:
         if client["adapter"] == "qwen_code":
             if not isinstance(client.get("qwen_bin"), str) or not client["qwen_bin"]:
                 raise ValueError(f"{name}: qwen_bin is required")
-            if client.get("qwen_version") != "0.24.6":
-                raise ValueError(f"{name}: this runner pins Qwen Code 0.24.6")
+            version = client.get("qwen_version")
+            if not isinstance(version, str) or version not in QWEN_CODE_VERSIONS:
+                raise ValueError(f"{name}: unsupported pinned Qwen Code version")
+            profile = client.get("qwen_profile", "bare")
+            if not isinstance(profile, str) or profile not in QWEN_CODE_PROFILES:
+                raise ValueError(f"{name}: qwen_profile must be bare or normal")
+            settings = client.get("settings")
+            if settings is not None and (not isinstance(settings, str) or not settings):
+                raise ValueError(f"{name}: settings must be a nonempty path")
             deadline = client.get("task_timeout_seconds", 1800)
-            if type(deadline) is not int or not 1 <= deadline <= 7200:
+            if type(deadline) is not int or not 1 <= deadline <= 86400:
                 raise ValueError(f"{name}: invalid task timeout")
+            output_tokens = client.get("max_output_tokens", 768)
+            if type(output_tokens) is not int or not 1 <= output_tokens <= 32768:
+                raise ValueError(f"{name}: invalid max_output_tokens")
         else:
             if not isinstance(client.get("python"), str) or not client["python"]:
                 raise ValueError(f"{name}: Python with pinned Antigravity SDK is required")
@@ -170,7 +182,9 @@ def _command(client: dict, kind: str, directory: Path) -> tuple[list[str], Path,
                    *base, "--run-dir", str(directory / "workspace"),
                    "--qwen-bin", client["qwen_bin"],
                    "--expected-qwen-version", client["qwen_version"],
-                   "--timeout", str(client.get("task_timeout_seconds", 1800))]
+                   "--qwen-profile", client.get("qwen_profile", "bare"),
+                   "--timeout", str(client.get("task_timeout_seconds", 1800)),
+                   "--max-output-tokens", str(client.get("max_output_tokens", 768))]
         if client.get("settings"):
             command += ["--settings", client["settings"]]
         return command, report, client.get("task_timeout_seconds", 1800) + 90
@@ -224,7 +238,20 @@ def _run_step(client: dict, kind: str, directory: Path) -> dict:
            "loaded_identity_status": _identity_status(client, report) if report else "missing",
            "server_instance_id": _server_instance(client, report)}
     if kind == "task" and client["adapter"] == "qwen_code":
-        row["task_status"] = (report or {}).get("result", {}).get("status", "missing")
+        child_result = (report or {}).get("result", {})
+        child_status = child_result.get("status", "missing")
+        row["task_status"] = ("fail" if timed_out and child_status == "fail" else
+                              "incomplete" if timed_out else child_status)
+        row["termination_reason"] = ("coordinator_time_budget_exceeded" if timed_out else
+                                     (report or {}).get("termination_reason"))
+        row["task_errors"] = child_result.get("errors", [])
+        row["observed_failures"] = child_result.get("observed_failures", [])
+        if timed_out:
+            if row["task_status"] == "incomplete":
+                row["incomplete_reason"] = "coordinator_time_budget_exceeded"
+        elif row["task_status"] == "incomplete":
+            row["incomplete_reason"] = child_result.get(
+                "incomplete_reason", "client_incomplete")
         row["client_certification_status"] = (report or {}).get("certification", {}).get("status", "missing")
         row["tool_call_count"] = len((report or {}).get("result", {}).get("tool_call_ids", []))
     elif kind == "task":
