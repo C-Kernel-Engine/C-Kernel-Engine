@@ -91,10 +91,12 @@ def test_stream_send_failure_runs_disconnect_settlement_before_worker_start():
 def test_nonstream_disconnect_cancels_native_generation(monkeypatch):
     class WaitingSession:
         def __init__(self):
+            self.started = threading.Event()
             self.cancelled = threading.Event()
 
         def generate(self, system, user, *, max_tokens, temperature, top_p,
                      on_token, flags=0, stop_on_text=(), stop_at_eos=False):
+            self.started.set()
             if not self.cancelled.wait(timeout=2):
                 raise AssertionError("native generation was not cancelled")
             on_token(0, "")
@@ -106,11 +108,13 @@ def test_nonstream_disconnect_cancels_native_generation(monkeypatch):
         def close(self):
             pass
 
+    session = WaitingSession()
+
     async def disconnected(_request):
-        return True
+        # Admission must still succeed; the disconnect occurs during native work.
+        return session.started.is_set()
 
     monkeypatch.setattr("server.live.Request.is_disconnected", disconnected)
-    session = WaitingSession()
     app = create_app(session, model="m")
     response = TestClient(app).post("/v1/responses", json={"model": "m", "input": "hello"})
     assert response.status_code == 200
