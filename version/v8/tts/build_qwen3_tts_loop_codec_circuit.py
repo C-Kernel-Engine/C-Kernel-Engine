@@ -28,7 +28,8 @@ SCALAR_CODEC_CONV = "audio_conv1d_dilated_checked_channel_major_f32"
 AVX2_CODEC_CONV = SCALAR_CODEC_CONV + "_avx2_fma"
 
 
-def build_circuit(*, frames: int = 5, max_generated_frames: int = 64,
+def build_circuit(*, context_tokens: int = 7, frames: int = 5,
+                  max_generated_frames: int = 64,
                   talker_layers: int = 28, continuation_steps: int = 14,
                   codec_kwargs: dict | None = None,
                   codec_conv_provider: str = "scalar") -> dict:
@@ -41,9 +42,11 @@ def build_circuit(*, frames: int = 5, max_generated_frames: int = 64,
     if codec_conv_provider not in ("scalar", "avx2_fma"):
         raise ValueError("unsupported codec Conv1D provider")
     graph = generated_frames(
-        talker_layers=talker_layers, continuation_steps=continuation_steps,
+        context_tokens=context_tokens, talker_layers=talker_layers,
+        continuation_steps=continuation_steps,
         max_generated_frames=max_generated_frames)
-    canonical = (frames == 5 and max_generated_frames == 64 and
+    canonical = (context_tokens == 7 and frames == 5
+                 and max_generated_frames == 64 and
                  talker_layers == 28 and continuation_steps == 14 and
                  codec_kwargs is None)
     graph["name"] = ("qwen3_tts_loop_codec_bounded" if canonical else

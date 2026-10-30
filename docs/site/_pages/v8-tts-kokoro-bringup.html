@@ -560,9 +560,22 @@ exhausted the bounded generation budget without publishing audio; the pinned
 reference also did not emit EOS within 64 new tokens. Thus the bounded
 variable-length path is demonstrated, while general short-text stopping,
 latency and interactive accessibility speech remain unfinished.</p>
+<p><strong>Qwen3-TTS expanded prompt capacity:</strong> circuit authoring now
+derives cache and projection storage from a checked capacity of 16 spoken-text
+tokens. A generated 3 → 16 → 3 synthetic sequence checks the maximum extent,
+cache writes and untouched padding. The eight-token
+<code>Yes, I can hear you now.</code> request naturally stops at 39 code
+frames: all 624 generated IDs match a direct pinned full-model capture, and
+the 74,880-sample PCM16 output differs by at most one unit at 106 samples.
+The measured run took 179.89 seconds warm after a 138.43-second cold load on
+the bring-up host. Sixteen-token execution currently has safety evidence;
+full-model numerical evidence reaches eight tokens. The output remains bound
+to 46 code frames, so longer or non-stopping text is rejected without a WAV.
+This is not general assistant-reply coverage or interactive latency.</p>
 <pre><code>python version/v8/tts/qwen3_tts_pinned_session.py \
   --model-dir /path/to/85e237c12c027371202489a0ec509ded67b5e4b5 \
-  --runtime-prompts --text 'Thank you.' --output /tmp/qwen3-thanks.wav</code></pre>
+  --runtime-prompts --text 'Yes, I can hear you now.' \
+  --output /tmp/qwen3-eight.wav</code></pre>
 <p><strong>Two generated frames to PCM:</strong> a checked, model-neutral integer
 span concatenation provider packs each pair of CKE-generated codebook IDs
 into a two-frame input for the existing generated codec. The same generated

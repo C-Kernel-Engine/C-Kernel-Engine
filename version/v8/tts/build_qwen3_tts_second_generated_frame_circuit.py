@@ -58,16 +58,17 @@ def copy_ids(op_id: str, source: str, destination: str,
     return op
 
 
-def build_circuit(*, talker_layers: int = 28,
+def build_circuit(*, context_tokens: int = 7, talker_layers: int = 28,
                   continuation_steps: int = 14,
                   max_generated_frames: int = 64) -> dict:
     if (isinstance(max_generated_frames, bool)
             or not isinstance(max_generated_frames, int)
             or not 2 <= max_generated_frames <= 64):
         raise ValueError("max_generated_frames must be in 2..64")
-    cache_capacity = 17 + max_generated_frames
+    cache_capacity = context_tokens + 10 + max_generated_frames
     max_step_index = max_generated_frames - 2
-    graph = first_continuation(talker_layers=talker_layers,
+    graph = first_continuation(context_tokens=context_tokens,
+                               talker_layers=talker_layers,
                                continuation_steps=continuation_steps,
                                max_generated_frames=max_generated_frames)
     predictor = predictor_frame(continuation_steps=continuation_steps)
@@ -79,7 +80,7 @@ def build_circuit(*, talker_layers: int = 28,
     graph["contract"]["runtime_invariants"].update({
         "generated_speech_code_frames": 2,
         "second_frame_requires_non_eos_talker_id": True,
-        "second_frame_pinned_talker_position": 18,
+        "second_frame_pinned_talker_position": context_tokens + 11,
         "later_continuation_positions_safety_only": [19, cache_capacity - 1],
         "generation_policy": "greedy_fixed_non_eos_prefix_with_repetition_penalty",
         "repetition_penalty": "105/100 sign-dependent on generated-code history",

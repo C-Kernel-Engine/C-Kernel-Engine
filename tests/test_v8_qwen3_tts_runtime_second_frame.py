@@ -37,6 +37,7 @@ SHORT_FIXTURE = (ROOT / "tests/fixtures/tts/qwen3_tts_0b6_customvoice"
 LONG_FIXTURE = (SHORT_FIXTURE.parent / "qwen3_tts_talker_continuation.npz")
 SPEECH_FIXTURE = SHORT_FIXTURE.parent / "qwen3_tts_thank_you_speech.npz"
 SEVEN_TOKEN_SPEECH = SHORT_FIXTURE.parent / "qwen3_tts_customvoice_reference.npz"
+EIGHT_TOKEN_SPEECH = SHORT_FIXTURE.parent / "qwen3_tts_eight_token_speech.npz"
 
 
 def prepare(arena, acts, layout, arena_bytes, count):
@@ -96,6 +97,25 @@ class Qwen3TTSRuntimeSecondFrameTest(unittest.TestCase):
             self.assertEqual(reference["waveform"].shape, (20 * 1920,))
             self.assertTrue(np.isfinite(reference["waveform"]).all())
 
+    def test_eight_token_speech_reference_identity(self):
+        manifest = json.loads(EIGHT_TOKEN_SPEECH.with_suffix(".json").read_text())
+        baseline = json.loads(SPEECH_FIXTURE.with_suffix(".json").read_text())
+        self.assertEqual(hashlib.sha256(EIGHT_TOKEN_SPEECH.read_bytes()).hexdigest(),
+                         manifest["fixture_sha256"])
+        for key in ("model_revision", "model_files_sha256",
+                    "reference_revision", "reference_files_sha256"):
+            self.assertEqual(manifest[key], baseline[key])
+        self.assertEqual(manifest["request"]["text"], "Yes, I can hear you now.")
+        self.assertFalse(manifest["request"]["do_sample"])
+        self.assertFalse(manifest["request"]["subtalker_dosample"])
+        self.assertEqual(manifest["reference_runtime"]["torch"], "2.12.1+cpu")
+        self.assertEqual(manifest["reference_runtime"]["transformers"], "4.57.3")
+        with np.load(EIGHT_TOKEN_SPEECH) as reference:
+            self.assertEqual(reference["context_ids"].shape, (1, 8))
+            self.assertEqual(reference["codec_ids"].shape, (39, 16))
+            self.assertEqual(reference["waveform"].shape, (39 * 1920,))
+            self.assertTrue(np.isfinite(reference["waveform"]).all())
+
     def test_runtime_prompt_rejects_bad_lengths_before_model_execution(self):
         class Tokenizer:
             def encode(self, text, add_special_tokens=False):
@@ -113,11 +133,11 @@ class Qwen3TTSRuntimeSecondFrameTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             model_dir = Path(temp)
             (model_dir / "config.json").write_text(json.dumps(config))
-            for count in (1, 3, 7):
+            for count in (1, 3, 7, 16):
                 text_ids, _ = _prompt_ids(model_dir, str(count), Tokenizer(), None)
                 self.assertEqual(len(text_ids), count + 6)
-            for count in (0, 8):
-                with self.assertRaisesRegex(ValueError, "1..7 tokens"):
+            for count in (0, 17):
+                with self.assertRaisesRegex(ValueError, "1..16 tokens"):
                     _prompt_ids(model_dir, str(count), Tokenizer(), None)
             with self.assertRaisesRegex(ValueError, "nonempty"):
                 _prompt_ids(model_dir, "\n", Tokenizer(), None)
@@ -144,7 +164,7 @@ class Qwen3TTSRuntimeSecondFrameTest(unittest.TestCase):
         committed = ROOT / "version/v8/circuits/qwen3_tts_runtime_loop_codec_bounded.json"
         self.assertEqual(json.loads(committed.read_text()), graph)
         self.assertEqual(len(graph["native_entry"]["segments"]), 3)
-        self.assertEqual(graph["contract"]["runtime_invariants"]["context_capacity"], 7)
+        self.assertEqual(graph["contract"]["runtime_invariants"]["context_capacity"], 16)
 
     def test_generated_segments_change_position_and_reject_stale_context(self):
         graph = build_circuit(talker_layers=1, continuation_steps=2,
@@ -205,6 +225,49 @@ class Qwen3TTSRuntimeSecondFrameTest(unittest.TestCase):
                 prepare(arena, acts, layout, size, 2)
                 self.assertEqual(prefill(arena, size), 0)
                 self.assertEqual(frame(arena, size), 0)
+
+    def test_sixteen_token_capacity_stitches_through_generated_frame(self):
+        graph = build_circuit(context_capacity=16, talker_layers=1,
+                              continuation_steps=2, max_generated_frames=4)
+        with tempfile.TemporaryDirectory() as temp:
+            _, acts, _, layout, _, library = compile_entry(
+                Path(temp), graph, weight_shapes(graph), extra_sources=EXTRA_SOURCES)
+            native = ctypes.CDLL(str(library))
+            prefill = getattr(native, graph["native_entry"]["segments"][0]["function"])
+            frame = getattr(native, graph["native_entry"]["segments"][1]["function"])
+            for fn in (prefill, frame):
+                fn.argtypes = [ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t]
+                fn.restype = ctypes.c_int
+            size = layout["memory"]["arena"]["total_size"]
+            raw = (ctypes.c_uint8 * (size + 63))()
+            arena = (ctypes.c_uint8 * size).from_buffer(
+                raw, (-ctypes.addressof(raw)) & 63)
+            for count in (3, 16, 3):
+                with self.subTest(context_tokens=count):
+                    prepare(arena, acts, layout, size, count)
+                    self.assertEqual(prefill(arena, size), 0)
+                    rows = count + 11
+                    self.assertEqual(int(view(arena, acts, "published_prompt_rows",
+                                              np.int32, (1,))[0]), rows)
+                    for kind in ("k", "v"):
+                        cache = view(arena, acts, f"talker_layer0_cache_{kind}",
+                                     np.float32, (8, 30, 128))
+                        cache[:, rows:] = -777
+                    self.assertEqual(frame(arena, size), 0)
+                    for kind in ("k", "v"):
+                        cache = view(arena, acts, f"talker_layer0_cache_{kind}",
+                                     np.float32, (8, 30, 128))
+                        self.assertTrue(np.all(cache[:, rows] != -777))
+                        np.testing.assert_array_equal(cache[:, rows + 1:], -777)
+            prepare(arena, acts, layout, size, 3)
+            view(arena, acts, "request_context_tokens", np.int32, (1,))[0] = 17
+            published = view(arena, acts, "published_prompt_rows", np.int32, (1,))
+            published[0] = -901
+            self.assertNotEqual(prefill(arena, size), 0)
+            self.assertEqual(int(published[0]), -901)
+            prepare(arena, acts, layout, size, 3)
+            self.assertEqual(prefill(arena, size), 0)
+            self.assertEqual(frame(arena, size), 0)
 
     @unittest.skipUnless(os.environ.get("CKE_QWEN3_TTS_MODEL_DIR"),
                          "pinned Qwen assets unavailable; runtime continuation NOT_TESTED")
@@ -294,17 +357,18 @@ class Qwen3TTSRuntimeSecondFrameTest(unittest.TestCase):
 
     @unittest.skipUnless(os.environ.get("CKE_QWEN3_TTS_MODEL_DIR"),
                          "pinned Qwen assets unavailable; varied-length WAV NOT_TESTED")
-    def test_two_lengths_generated_wavs_match_direct_references(self):
+    def test_three_lengths_generated_wavs_match_direct_references(self):
         with tempfile.TemporaryDirectory() as temp:
             session = PinnedQwenSession(
                 Path(os.environ["CKE_QWEN3_TTS_MODEL_DIR"]), Path(temp),
                 provider=os.environ.get("CKE_QWEN3_TTS_CODEC_CONV_PROVIDER", "scalar"),
                 runtime_prompts=True)
-            with self.assertRaisesRegex(ValueError, "1..7 tokens"):
-                session.synthesize("This sentence has more than seven spoken tokens.")
+            with self.assertRaisesRegex(ValueError, "1..16 tokens"):
+                session.synthesize("one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen")
             for text, count, frames, path, code_key in (
                 ("Thank you.", 3, 20, SPEECH_FIXTURE, "codec_ids"),
                 ("Hello, this is CKE.", 7, 46, SEVEN_TOKEN_SPEECH, "codec_tokens"),
+                ("Yes, I can hear you now.", 8, 39, EIGHT_TOKEN_SPEECH, "codec_ids"),
             ):
                 with self.subTest(text=text), np.load(path) as reference:
                     samples, metric = session.synthesize(text)
