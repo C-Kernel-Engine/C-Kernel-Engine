@@ -1029,13 +1029,13 @@
     </header>
     <main>
 <h1>v8 training kernel capability ledger</h1>
-<p>Generated from <code>version/v8/kernel_maps/*.json</code> by <code>version/v8/scripts/build_training_capability_ledger_v8.py</code>. Source digest: <code>5ec1ac53371c1a830ff0b231ef4c4afe5957e0f9f1b31a5621735aa77512cad5</code>; provider maps: 472.</p>
+<p>Generated from <code>version/v8/kernel_maps/*.json</code> by <code>version/v8/scripts/build_training_capability_ledger_v8.py</code>. Source digest: <code>3f4ce63d499a43bb85c4758f5028ac6141ff94e97a1492a47ebd91bbb23db3b0</code>; provider maps: 474.</p>
 <p>This is a <strong>map inventory, not a training PASS</strong>. A backward declaration means a backward provider is registered; it does not prove matching geometry, selection by a generated circuit, or executed PyTorch parity. BF16-tagged includes storage or arithmetic tags. Quantized forward maps do not imply quantized-base gradients or QLoRA support. Direct executed evidence: <code>NOT_MEASURED_BY_MAP_INVENTORY</code>.</p>
 <p><strong>Authoring, lowering, and execution are separate.</strong> The public <code>cke.nn</code> module list below comes from its Python source. A class existing there does not establish that v8 can lower it, select a backward provider, or certify a generated training run. Exact kernel-map operation names are not automatically equivalent to Python modules.</p>
 <table class="table"><thead><tr><th>Dtype family</th><th>Provider maps</th><th>Forward or unspecified</th><th>Declared training forward</th><th>Declared backward</th><th>Backward-named without mode</th><th>Maps with registered tests</th></tr></thead><tbody>
 <tr><td>fp32-tagged</td><td>303</td><td>279</td><td>15</td><td>24</td><td>5</td><td>262</td></tr>
 <tr><td>bf16-tagged</td><td>87</td><td>87</td><td>0</td><td>0</td><td>0</td><td>67</td></tr>
-<tr><td>quantized</td><td>62</td><td>62</td><td>0</td><td>0</td><td>0</td><td>42</td></tr>
+<tr><td>quantized</td><td>64</td><td>64</td><td>0</td><td>0</td><td>0</td><td>44</td></tr>
 <tr><td>unspecified</td><td>20</td><td>20</td><td>0</td><td>0</td><td>0</td><td>14</td></tr>
 </tbody></table>
 <h2>Python authoring modules</h2>
@@ -1278,7 +1278,7 @@
 <tr><td>quantized</td><td>hyper_connection_final_mix</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>quantized</td><td>hyper_connection_mix</td><td>2</td><td>—</td><td>—</td></tr>
 <tr><td>quantized</td><td>moe_relu2_expert_mlp</td><td>2</td><td>—</td><td>—</td></tr>
-<tr><td>quantized</td><td>moe_swiglu_expert_mlp</td><td>7</td><td>—</td><td>—</td></tr>
+<tr><td>quantized</td><td>moe_swiglu_expert_mlp</td><td>9</td><td>—</td><td>—</td></tr>
 <tr><td>quantized</td><td>ple_ngram_embed</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>quantized</td><td>quantize</td><td>3</td><td>—</td><td>—</td></tr>
 <tr><td>quantized</td><td>quantize_batch</td><td>2</td><td>—</td><td>—</td></tr>
@@ -1299,7 +1299,7 @@
 <tr><td>unspecified</td><td>speculative_commit_or_reject</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>unspecified</td><td>tokenizer</td><td>1</td><td>—</td><td>—</td></tr>
 </tbody></table>
-<details><summary>All 472 provider maps</summary>
+<details><summary>All 474 provider maps</summary>
 <table class="table"><thead><tr><th>Map</th><th>Provider ID</th><th>Operation</th><th>Dtype family</th><th>Backward mode</th><th>Registered test</th></tr></thead><tbody>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/adamw_update_f32.json">version/v8/kernel_maps/adamw_update_f32.json</a></td><td>adamw_update_f32</td><td>optimizer</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/add_rows_checked_f32.json">version/v8/kernel_maps/add_rows_checked_f32.json</a></td><td>add_rows_checked_f32</td><td>add_rows_checked</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
@@ -1614,10 +1614,12 @@
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/moe_swiglu_expert_forward_pytorch_onednn_3_12_bf16_storage.json">version/v8/kernel_maps/moe_swiglu_expert_forward_pytorch_onednn_3_12_bf16_storage.json</a></td><td>moe_swiglu_expert_forward_pytorch_onednn_3_12_bf16_storage</td><td>moe_swiglu_expert_mlp</td><td>bf16-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/moe_swiglu_expert_forward_q4k_q4k.json">version/v8/kernel_maps/moe_swiglu_expert_forward_q4k_q4k.json</a></td><td>moe_swiglu_expert_forward_q4k_q4k</td><td>moe_swiglu_expert_mlp</td><td>quantized</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/moe_swiglu_expert_forward_q4k_q5_0.json">version/v8/kernel_maps/moe_swiglu_expert_forward_q4k_q5_0.json</a></td><td>moe_swiglu_expert_forward_q4k_q5_0</td><td>moe_swiglu_expert_mlp</td><td>quantized</td><td>not declared</td><td>registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/moe_swiglu_expert_forward_q4k_q5_0_reuse.json">version/v8/kernel_maps/moe_swiglu_expert_forward_q4k_q5_0_reuse.json</a></td><td>moe_swiglu_expert_forward_q4k_q5_0_reuse</td><td>moe_swiglu_expert_mlp</td><td>quantized</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/moe_swiglu_expert_forward_q4k_q5k.json">version/v8/kernel_maps/moe_swiglu_expert_forward_q4k_q5k.json</a></td><td>moe_swiglu_expert_forward_q4k_q5k</td><td>moe_swiglu_expert_mlp</td><td>quantized</td><td>not declared</td><td>not registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/moe_swiglu_expert_forward_q4k_q5k_bucketed.json">version/v8/kernel_maps/moe_swiglu_expert_forward_q4k_q5k_bucketed.json</a></td><td>moe_swiglu_expert_forward_q4k_q5k_bucketed</td><td>moe_swiglu_expert_mlp</td><td>quantized</td><td>not declared</td><td>not registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/moe_swiglu_expert_forward_q4k_q6k.json">version/v8/kernel_maps/moe_swiglu_expert_forward_q4k_q6k.json</a></td><td>moe_swiglu_expert_forward_q4k_q6k</td><td>moe_swiglu_expert_mlp</td><td>quantized</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/moe_swiglu_expert_forward_q4k_q8_0.json">version/v8/kernel_maps/moe_swiglu_expert_forward_q4k_q8_0.json</a></td><td>moe_swiglu_expert_forward_q4k_q8_0</td><td>moe_swiglu_expert_mlp</td><td>quantized</td><td>not declared</td><td>registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/moe_swiglu_expert_forward_q4k_q8_0_reuse.json">version/v8/kernel_maps/moe_swiglu_expert_forward_q4k_q8_0_reuse.json</a></td><td>moe_swiglu_expert_forward_q4k_q8_0_reuse</td><td>moe_swiglu_expert_mlp</td><td>quantized</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/moe_swiglu_packed_expert_forward_bf16.json">version/v8/kernel_maps/moe_swiglu_packed_expert_forward_bf16.json</a></td><td>moe_swiglu_packed_expert_forward_bf16</td><td>moe_swiglu_packed_expert_mlp</td><td>bf16-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/moe_swiglu_shared_backward_f32.json">version/v8/kernel_maps/moe_swiglu_shared_backward_f32.json</a></td><td>moe_swiglu_shared_backward_f32</td><td>shared_swiglu_expert_mlp</td><td>fp32-tagged</td><td>declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/moe_swiglu_shared_forward_bf16.json">version/v8/kernel_maps/moe_swiglu_shared_forward_bf16.json</a></td><td>moe_swiglu_shared_forward_bf16</td><td>shared_swiglu_expert_mlp</td><td>bf16-tagged</td><td>not declared</td><td>not registered</td></tr>
@@ -2024,7 +2026,7 @@
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-10-29</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-10-30</p>
             </div>
         </div>
     </footer>
