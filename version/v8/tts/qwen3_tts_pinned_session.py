@@ -197,7 +197,11 @@ def _compile(folder: Path, graph: dict, shapes: dict):
         "activation_buffer_dtypes": {
             name: "i32" for name in (
                 "text_ids", "codec_ids", "left_indices", "right_indices",
-                "step_index_input", "step_index_checked", "position_checked")},
+                "step_index_input", "step_index_checked", "position_checked",
+                "request_context_tokens", "valid_context_tokens",
+                "valid_text_rows", "valid_prompt_rows",
+                "valid_q_norm_rows", "valid_k_norm_rows",
+                "valid_hidden_elements", "valid_mlp_elements")},
     }, "entries": entries, "quant_summary": {}, "template": graph}
     registry = build_ir_v8.load_kernel_registry()
     with contextlib.redirect_stdout(io.StringIO()):
@@ -239,7 +243,8 @@ def _view(arena, acts, name, dtype, shape):
                       offset=acts[name]["abs_offset"])
 
 
-def _prompt_ids(model_dir: Path, text: str, tokenizer=None):
+def _prompt_ids(model_dir: Path, text: str, tokenizer=None,
+                context_tokens: int = CONTEXT_TOKENS):
     if not isinstance(text, str) or not text.strip() or any(ord(c) < 32 for c in text):
         raise ValueError("text must be nonempty and contain no control characters")
     if "<|" in text or "|>" in text:
@@ -250,8 +255,8 @@ def _prompt_ids(model_dir: Path, text: str, tokenizer=None):
         tokenizer = AutoTokenizer.from_pretrained(str(model_dir), local_files_only=True)
     context = tokenizer.encode(text, add_special_tokens=False)
     prefix = tokenizer.encode("<|im_start|>assistant\n", add_special_tokens=False)
-    if len(context) != CONTEXT_TOKENS or len(prefix) != 3:
-        raise ValueError(f"text must encode to exactly {CONTEXT_TOKENS} tokens")
+    if len(context) != context_tokens or len(prefix) != 3:
+        raise ValueError(f"text must encode to exactly {context_tokens} tokens")
     config = json.loads((model_dir / "config.json").read_text())
     talker = config["talker_config"]
     text_ids = np.array([

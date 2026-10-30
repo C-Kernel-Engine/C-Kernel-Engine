@@ -1,0 +1,1753 @@
+{
+  "version": 3,
+  "name": "qwen3_tts_runtime_prompt_first_block_bounded",
+  "family": "bounded_graph",
+  "checked_native_entry": true,
+  "contract": {
+    "runtime_invariants": {
+      "inference_only": true,
+      "production_kernel_heap_allocation": false,
+      "tokens": 13,
+      "complete_talker_block": true,
+      "complete_synthesis": false,
+      "context_tokens": 7,
+      "prompt_rows": 18,
+      "complete_talker": false,
+      "prompt_index_plan": {
+        "left_indices": [
+          0,
+          1,
+          2,
+          3,
+          3,
+          3,
+          3,
+          3,
+          4,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          5,
+          3
+        ],
+        "right_indices": [
+          -1,
+          -1,
+          -1,
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          6
+        ]
+      },
+      "reference_scope": "CustomVoice English Ryan non-streaming prefill",
+      "context_capacity": 7,
+      "supported_context_tokens": "1..7",
+      "runtime_prompt_rows": "valid_context_tokens+11"
+    }
+  },
+  "activation_buffers": {
+    "text_ids": {
+      "shape": [
+        13
+      ]
+    },
+    "embedding_channel": {
+      "shape": [
+        2048,
+        13
+      ]
+    },
+    "embedding_token": {
+      "shape": [
+        13,
+        2048
+      ]
+    },
+    "projection_fc1": {
+      "shape": [
+        13,
+        2048
+      ]
+    },
+    "projection_active": {
+      "shape": [
+        13,
+        2048
+      ]
+    },
+    "projection_output": {
+      "shape": [
+        13,
+        1024
+      ]
+    },
+    "codec_ids": {
+      "shape": [
+        7
+      ]
+    },
+    "codec_embedding_channel": {
+      "shape": [
+        1024,
+        7
+      ]
+    },
+    "codec_embedding_token": {
+      "shape": [
+        7,
+        1024
+      ]
+    },
+    "left_indices": {
+      "shape": [
+        18
+      ]
+    },
+    "right_indices": {
+      "shape": [
+        18
+      ]
+    },
+    "block_input": {
+      "shape": [
+        18,
+        1024
+      ]
+    },
+    "input_norm": {
+      "shape": [
+        18,
+        1024
+      ]
+    },
+    "q_proj": {
+      "shape": [
+        18,
+        2048
+      ]
+    },
+    "k_proj": {
+      "shape": [
+        18,
+        1024
+      ]
+    },
+    "v_proj": {
+      "shape": [
+        18,
+        1024
+      ]
+    },
+    "q_norm": {
+      "shape": [
+        18,
+        2048
+      ]
+    },
+    "k_norm": {
+      "shape": [
+        18,
+        1024
+      ]
+    },
+    "q_head": {
+      "shape": [
+        16,
+        18,
+        128
+      ]
+    },
+    "k_head": {
+      "shape": [
+        8,
+        18,
+        128
+      ]
+    },
+    "v_head": {
+      "shape": [
+        8,
+        18,
+        128
+      ]
+    },
+    "attention_work": {
+      "shape": [
+        16,
+        18,
+        128
+      ]
+    },
+    "attention_head": {
+      "shape": [
+        16,
+        18,
+        128
+      ]
+    },
+    "attention_token": {
+      "shape": [
+        18,
+        2048
+      ]
+    },
+    "attention_proj": {
+      "shape": [
+        18,
+        1024
+      ]
+    },
+    "post_attention": {
+      "shape": [
+        18,
+        1024
+      ]
+    },
+    "post_attention_norm": {
+      "shape": [
+        18,
+        1024
+      ]
+    },
+    "gate_proj": {
+      "shape": [
+        18,
+        3072
+      ]
+    },
+    "up_proj": {
+      "shape": [
+        18,
+        3072
+      ]
+    },
+    "gated_mlp": {
+      "shape": [
+        18,
+        3072
+      ]
+    },
+    "down_proj": {
+      "shape": [
+        18,
+        1024
+      ]
+    },
+    "block_output": {
+      "shape": [
+        18,
+        1024
+      ]
+    },
+    "valid_context_tokens": {
+      "shape": [
+        1
+      ]
+    },
+    "valid_text_rows": {
+      "shape": [
+        1
+      ]
+    },
+    "valid_prompt_rows": {
+      "shape": [
+        1
+      ]
+    },
+    "valid_q_norm_rows": {
+      "shape": [
+        1
+      ]
+    },
+    "valid_k_norm_rows": {
+      "shape": [
+        1
+      ]
+    },
+    "valid_hidden_elements": {
+      "shape": [
+        1
+      ]
+    },
+    "valid_mlp_elements": {
+      "shape": [
+        1
+      ]
+    },
+    "request_context_tokens": {
+      "shape": [
+        1
+      ]
+    }
+  },
+  "activation_bindings": {
+    "text_ids": "text_ids",
+    "embedding_channel": "embedding_channel",
+    "embedding_token": "embedding_token",
+    "projection_fc1": "projection_fc1",
+    "projection_active": "projection_active",
+    "projection_output": "projection_output",
+    "codec_ids": "codec_ids",
+    "codec_embedding_channel": "codec_embedding_channel",
+    "codec_embedding_token": "codec_embedding_token",
+    "left_indices": "left_indices",
+    "right_indices": "right_indices",
+    "block_input": "block_input",
+    "input_norm": "input_norm",
+    "q_proj": "q_proj",
+    "k_proj": "k_proj",
+    "v_proj": "v_proj",
+    "q_norm": "q_norm",
+    "k_norm": "k_norm",
+    "q_head": "q_head",
+    "k_head": "k_head",
+    "v_head": "v_head",
+    "attention_work": "attention_work",
+    "attention_head": "attention_head",
+    "attention_token": "attention_token",
+    "attention_proj": "attention_proj",
+    "post_attention": "post_attention",
+    "post_attention_norm": "post_attention_norm",
+    "gate_proj": "gate_proj",
+    "up_proj": "up_proj",
+    "gated_mlp": "gated_mlp",
+    "down_proj": "down_proj",
+    "block_output": "block_output",
+    "valid_context_tokens": "valid_context_tokens",
+    "valid_text_rows": "valid_text_rows",
+    "valid_prompt_rows": "valid_prompt_rows",
+    "valid_q_norm_rows": "valid_q_norm_rows",
+    "valid_k_norm_rows": "valid_k_norm_rows",
+    "valid_hidden_elements": "valid_hidden_elements",
+    "valid_mlp_elements": "valid_mlp_elements",
+    "request_context_tokens": "request_context_tokens"
+  },
+  "native_entry": {
+    "function": "ck_qwen3_tts_runtime_prompt_first_block_bounded",
+    "params": [
+      {
+        "c_type": "uint8_t *",
+        "name": "arena"
+      },
+      {
+        "c_type": "size_t",
+        "name": "arena_bytes"
+      }
+    ],
+    "arena": {
+      "pointer": "arena",
+      "bytes": "arena_bytes"
+    }
+  },
+  "sequence": [
+    "text_projection",
+    "first_block"
+  ],
+  "block_types": {
+    "text_projection": {
+      "sequence": [
+        "header",
+        "body",
+        "footer"
+      ],
+      "header": [
+        {
+          "id": "check_valid_context_tokens",
+          "op": "runtime_extent_sum",
+          "kernel": "runtime_extent_sum_i32",
+          "returns_status": true,
+          "produces_runtime_lengths": {
+            "valid_context_tokens": "valid_extent"
+          },
+          "graph_slots": {
+            "inputs": {
+              "values": "external:request_context_tokens"
+            },
+            "outputs": {
+              "valid_extent": "valid_context_tokens"
+            }
+          }
+        },
+        {
+          "id": "check_valid_text_rows",
+          "op": "runtime_extent_affine",
+          "kernel": "runtime_extent_affine_i32",
+          "returns_status": true,
+          "consumes_runtime_lengths": [
+            "valid_context_tokens"
+          ],
+          "produces_runtime_lengths": {
+            "valid_text_rows": "valid_extent"
+          },
+          "runtime_scalar_bindings": {
+            "extent_affine_source": "valid_context_tokens"
+          },
+          "params": {
+            "call_constants": {
+              "extent_affine_factor": 1,
+              "extent_affine_offset": 6,
+              "extent_affine_capacity": 13
+            }
+          },
+          "graph_slots": {
+            "inputs": {},
+            "outputs": {
+              "valid_extent": "valid_text_rows"
+            }
+          }
+        },
+        {
+          "id": "check_valid_prompt_rows",
+          "op": "runtime_extent_affine",
+          "kernel": "runtime_extent_affine_i32",
+          "returns_status": true,
+          "consumes_runtime_lengths": [
+            "valid_context_tokens"
+          ],
+          "produces_runtime_lengths": {
+            "valid_prompt_rows": "valid_extent"
+          },
+          "runtime_scalar_bindings": {
+            "extent_affine_source": "valid_context_tokens"
+          },
+          "params": {
+            "call_constants": {
+              "extent_affine_factor": 1,
+              "extent_affine_offset": 11,
+              "extent_affine_capacity": 18
+            }
+          },
+          "graph_slots": {
+            "inputs": {},
+            "outputs": {
+              "valid_extent": "valid_prompt_rows"
+            }
+          }
+        },
+        {
+          "id": "check_valid_q_norm_rows",
+          "op": "runtime_extent_scale",
+          "kernel": "runtime_extent_scale_i32",
+          "returns_status": true,
+          "consumes_runtime_lengths": [
+            "valid_prompt_rows"
+          ],
+          "produces_runtime_lengths": {
+            "valid_q_norm_rows": "valid_extent"
+          },
+          "runtime_scalar_bindings": {
+            "extent_scale_source": "valid_prompt_rows"
+          },
+          "params": {
+            "call_constants": {
+              "extent_scale_factor": 16,
+              "extent_scale_capacity": 288
+            }
+          },
+          "graph_slots": {
+            "inputs": {},
+            "outputs": {
+              "valid_extent": "valid_q_norm_rows"
+            }
+          }
+        },
+        {
+          "id": "check_valid_k_norm_rows",
+          "op": "runtime_extent_scale",
+          "kernel": "runtime_extent_scale_i32",
+          "returns_status": true,
+          "consumes_runtime_lengths": [
+            "valid_prompt_rows"
+          ],
+          "produces_runtime_lengths": {
+            "valid_k_norm_rows": "valid_extent"
+          },
+          "runtime_scalar_bindings": {
+            "extent_scale_source": "valid_prompt_rows"
+          },
+          "params": {
+            "call_constants": {
+              "extent_scale_factor": 8,
+              "extent_scale_capacity": 144
+            }
+          },
+          "graph_slots": {
+            "inputs": {},
+            "outputs": {
+              "valid_extent": "valid_k_norm_rows"
+            }
+          }
+        },
+        {
+          "id": "check_valid_hidden_elements",
+          "op": "runtime_extent_scale",
+          "kernel": "runtime_extent_scale_i32",
+          "returns_status": true,
+          "consumes_runtime_lengths": [
+            "valid_prompt_rows"
+          ],
+          "produces_runtime_lengths": {
+            "valid_hidden_elements": "valid_extent"
+          },
+          "runtime_scalar_bindings": {
+            "extent_scale_source": "valid_prompt_rows"
+          },
+          "params": {
+            "call_constants": {
+              "extent_scale_factor": 1024,
+              "extent_scale_capacity": 18432
+            }
+          },
+          "graph_slots": {
+            "inputs": {},
+            "outputs": {
+              "valid_extent": "valid_hidden_elements"
+            }
+          }
+        },
+        {
+          "id": "check_valid_mlp_elements",
+          "op": "runtime_extent_scale",
+          "kernel": "runtime_extent_scale_i32",
+          "returns_status": true,
+          "consumes_runtime_lengths": [
+            "valid_prompt_rows"
+          ],
+          "produces_runtime_lengths": {
+            "valid_mlp_elements": "valid_extent"
+          },
+          "runtime_scalar_bindings": {
+            "extent_scale_source": "valid_prompt_rows"
+          },
+          "params": {
+            "call_constants": {
+              "extent_scale_factor": 3072,
+              "extent_scale_capacity": 55296
+            }
+          },
+          "graph_slots": {
+            "inputs": {},
+            "outputs": {
+              "valid_extent": "valid_mlp_elements"
+            }
+          }
+        }
+      ],
+      "body": {
+        "type": "dense",
+        "ops": [
+          {
+            "id": "text_embedding",
+            "op": "embedding_lookup_checked",
+            "kernel": "audio_text_embedding_channel_major_f32",
+            "returns_status": true,
+            "weight_refs": {
+              "table": "talker.model.text_embedding.weight"
+            },
+            "graph_slots": {
+              "inputs": {
+                "ids": "external:text_ids"
+              },
+              "outputs": {
+                "output": "embedding_channel"
+              }
+            },
+            "params": {
+              "T": 13,
+              "V": 151936,
+              "C": 2048,
+              "T_capacity": 13,
+              "call_constants": {
+                "id_elements": 13,
+                "table_elements": 311164928,
+                "vocabulary": 151936,
+                "channels": 2048,
+                "table_stride": 2048,
+                "output_elements": 26624,
+                "output_stride": 13
+              }
+            },
+            "consumes_runtime_lengths": [
+              "valid_text_rows"
+            ],
+            "runtime_scalar_bindings": {
+              "tokens": "valid_text_rows"
+            }
+          },
+          {
+            "id": "embedding_transpose",
+            "op": "transpose_strided_checked",
+            "kernel": "transpose_strided_f32_checked",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "embedding_channel"
+              },
+              "outputs": {
+                "output": "embedding_token"
+              }
+            },
+            "params": {
+              "R": 2048,
+              "C": 13,
+              "call_constants": {
+                "transpose_input_elements": 26624,
+                "transpose_input_stride": 13,
+                "transpose_output_elements": 26624,
+                "transpose_output_stride": 2048,
+                "transpose_rows": 2048
+              }
+            },
+            "consumes_runtime_lengths": [
+              "valid_text_rows"
+            ],
+            "runtime_scalar_bindings": {
+              "transpose_columns": "valid_text_rows"
+            }
+          },
+          {
+            "id": "projection_fc1",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "weight_refs": {
+              "weight": "talker.text_projection.linear_fc1.weight",
+              "bias": "talker.text_projection.linear_fc1.bias"
+            },
+            "graph_slots": {
+              "inputs": {
+                "input": "embedding_token"
+              },
+              "outputs": {
+                "output": "projection_fc1"
+              }
+            },
+            "params": {
+              "M": 13,
+              "K": 2048,
+              "N": 2048,
+              "call_constants": {
+                "linear_input_elements": 26624,
+                "linear_input_stride": 2048,
+                "linear_weight_elements": 4194304,
+                "linear_weight_stride": 2048,
+                "linear_bias_elements": 2048,
+                "linear_output_elements": 26624,
+                "linear_output_stride": 2048,
+                "linear_input_channels": 2048,
+                "linear_output_channels": 2048
+              }
+            },
+            "consumes_runtime_lengths": [
+              "valid_text_rows"
+            ],
+            "runtime_scalar_bindings": {
+              "linear_rows": "valid_text_rows"
+            }
+          },
+          {
+            "id": "projection_active",
+            "op": "silu_strided_checked",
+            "kernel": "silu_strided_f32_checked",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "projection_fc1"
+              },
+              "outputs": {
+                "output": "projection_active"
+              }
+            },
+            "params": {
+              "R": 13,
+              "C": 2048,
+              "call_constants": {
+                "silu_input_elements": 26624,
+                "silu_input_stride": 2048,
+                "silu_output_elements": 26624,
+                "silu_output_stride": 2048,
+                "silu_columns": 2048
+              }
+            },
+            "consumes_runtime_lengths": [
+              "valid_text_rows"
+            ],
+            "runtime_scalar_bindings": {
+              "silu_rows": "valid_text_rows"
+            }
+          },
+          {
+            "id": "projection_fc2",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "weight_refs": {
+              "weight": "talker.text_projection.linear_fc2.weight",
+              "bias": "talker.text_projection.linear_fc2.bias"
+            },
+            "graph_slots": {
+              "inputs": {
+                "input": "projection_active"
+              },
+              "outputs": {
+                "output": "projection_output"
+              }
+            },
+            "params": {
+              "M": 13,
+              "K": 2048,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 26624,
+                "linear_input_stride": 2048,
+                "linear_weight_elements": 2097152,
+                "linear_weight_stride": 2048,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 13312,
+                "linear_output_stride": 1024,
+                "linear_input_channels": 2048,
+                "linear_output_channels": 1024
+              }
+            },
+            "consumes_runtime_lengths": [
+              "valid_text_rows"
+            ],
+            "runtime_scalar_bindings": {
+              "linear_rows": "valid_text_rows"
+            }
+          },
+          {
+            "id": "codec_embedding",
+            "op": "embedding_lookup_checked",
+            "kernel": "audio_text_embedding_channel_major_f32",
+            "returns_status": true,
+            "weight_refs": {
+              "table": "talker.model.codec_embedding.weight"
+            },
+            "graph_slots": {
+              "inputs": {
+                "ids": "external:codec_ids"
+              },
+              "outputs": {
+                "output": "codec_embedding_channel"
+              }
+            },
+            "params": {
+              "T": 7,
+              "V": 3072,
+              "C": 1024,
+              "T_capacity": 7,
+              "call_constants": {
+                "id_elements": 7,
+                "table_elements": 3145728,
+                "vocabulary": 3072,
+                "channels": 1024,
+                "table_stride": 1024,
+                "output_elements": 7168,
+                "tokens": 7,
+                "output_stride": 7
+              }
+            }
+          },
+          {
+            "id": "codec_embedding_transpose",
+            "op": "transpose_strided_checked",
+            "kernel": "transpose_strided_f32_checked",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "codec_embedding_channel"
+              },
+              "outputs": {
+                "output": "codec_embedding_token"
+              }
+            },
+            "params": {
+              "R": 1024,
+              "C": 7,
+              "call_constants": {
+                "transpose_input_elements": 7168,
+                "transpose_input_stride": 7,
+                "transpose_output_elements": 7168,
+                "transpose_output_stride": 1024,
+                "transpose_rows": 1024,
+                "transpose_columns": 7
+              }
+            }
+          },
+          {
+            "id": "prompt_assembly",
+            "op": "indexed_sum_rows_checked",
+            "kernel": "indexed_sum_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "left": "projection_output",
+                "right": "codec_embedding_token",
+                "left_indices": "external:left_indices",
+                "right_indices": "external:right_indices"
+              },
+              "outputs": {
+                "output": "block_input"
+              }
+            },
+            "params": {
+              "L": 13,
+              "K": 7,
+              "R": 18,
+              "C": 1024,
+              "call_constants": {
+                "left_elements": 13312,
+                "left_stride": 1024,
+                "right_elements": 7168,
+                "right_stride": 1024,
+                "right_rows": 7,
+                "left_index_elements": 18,
+                "right_index_elements": 18,
+                "output_elements": 18432,
+                "output_stride": 1024,
+                "channels": 1024
+              }
+            },
+            "consumes_runtime_lengths": [
+              "valid_prompt_rows",
+              "valid_text_rows"
+            ],
+            "runtime_scalar_bindings": {
+              "left_rows": "valid_text_rows",
+              "rows": "valid_prompt_rows"
+            }
+          }
+        ]
+      },
+      "footer": []
+    },
+    "first_block": {
+      "sequence": [
+        "header",
+        "body",
+        "footer"
+      ],
+      "header": [],
+      "body": {
+        "type": "dense",
+        "ops": [
+          {
+            "id": "input_norm",
+            "op": "rmsnorm_rows_checked",
+            "kernel": "rmsnorm_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "block_input"
+              },
+              "outputs": {
+                "output": "input_norm"
+              }
+            },
+            "weight_refs": {
+              "gamma": "talker.model.layers.0.input_layernorm.weight"
+            },
+            "params": {
+              "R": 18,
+              "C": 1024,
+              "eps": 1e-06,
+              "call_constants": {
+                "input_elements": 18432,
+                "input_stride": 1024,
+                "gamma_elements": 1024,
+                "output_elements": 18432,
+                "output_stride": 1024,
+                "width": 1024
+              }
+            },
+            "consumes_runtime_lengths": [
+              "valid_prompt_rows"
+            ],
+            "runtime_scalar_bindings": {
+              "rows": "valid_prompt_rows"
+            }
+          },
+          {
+            "id": "q_proj",
+            "op": "linear_rows_checked_no_bias",
+            "kernel": "linear_rows_checked_no_bias_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "input_norm"
+              },
+              "outputs": {
+                "output": "q_proj"
+              }
+            },
+            "weight_refs": {
+              "weight": "talker.model.layers.0.self_attn.q_proj.weight"
+            },
+            "params": {
+              "M": 18,
+              "K": 1024,
+              "N": 2048,
+              "call_constants": {
+                "linear_input_elements": 18432,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 2097152,
+                "linear_weight_stride": 1024,
+                "linear_output_elements": 36864,
+                "linear_output_stride": 2048,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 2048
+              }
+            },
+            "consumes_runtime_lengths": [
+              "valid_prompt_rows"
+            ],
+            "runtime_scalar_bindings": {
+              "linear_rows": "valid_prompt_rows"
+            }
+          },
+          {
+            "id": "k_proj",
+            "op": "linear_rows_checked_no_bias",
+            "kernel": "linear_rows_checked_no_bias_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "input_norm"
+              },
+              "outputs": {
+                "output": "k_proj"
+              }
+            },
+            "weight_refs": {
+              "weight": "talker.model.layers.0.self_attn.k_proj.weight"
+            },
+            "params": {
+              "M": 18,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 18432,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_output_elements": 18432,
+                "linear_output_stride": 1024,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            },
+            "consumes_runtime_lengths": [
+              "valid_prompt_rows"
+            ],
+            "runtime_scalar_bindings": {
+              "linear_rows": "valid_prompt_rows"
+            }
+          },
+          {
+            "id": "v_proj",
+            "op": "linear_rows_checked_no_bias",
+            "kernel": "linear_rows_checked_no_bias_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "input_norm"
+              },
+              "outputs": {
+                "output": "v_proj"
+              }
+            },
+            "weight_refs": {
+              "weight": "talker.model.layers.0.self_attn.v_proj.weight"
+            },
+            "params": {
+              "M": 18,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 18432,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_output_elements": 18432,
+                "linear_output_stride": 1024,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            },
+            "consumes_runtime_lengths": [
+              "valid_prompt_rows"
+            ],
+            "runtime_scalar_bindings": {
+              "linear_rows": "valid_prompt_rows"
+            }
+          },
+          {
+            "id": "q_norm",
+            "op": "rmsnorm_rows_checked",
+            "kernel": "rmsnorm_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "q_proj"
+              },
+              "outputs": {
+                "output": "q_norm"
+              }
+            },
+            "weight_refs": {
+              "gamma": "talker.model.layers.0.self_attn.q_norm.weight"
+            },
+            "params": {
+              "R": 288,
+              "C": 128,
+              "eps": 1e-06,
+              "call_constants": {
+                "input_elements": 36864,
+                "input_stride": 128,
+                "gamma_elements": 128,
+                "output_elements": 36864,
+                "output_stride": 128,
+                "width": 128
+              }
+            },
+            "consumes_runtime_lengths": [
+              "valid_q_norm_rows"
+            ],
+            "runtime_scalar_bindings": {
+              "rows": "valid_q_norm_rows"
+            }
+          },
+          {
+            "id": "k_norm",
+            "op": "rmsnorm_rows_checked",
+            "kernel": "rmsnorm_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "k_proj"
+              },
+              "outputs": {
+                "output": "k_norm"
+              }
+            },
+            "weight_refs": {
+              "gamma": "talker.model.layers.0.self_attn.k_norm.weight"
+            },
+            "params": {
+              "R": 144,
+              "C": 128,
+              "eps": 1e-06,
+              "call_constants": {
+                "input_elements": 18432,
+                "input_stride": 128,
+                "gamma_elements": 128,
+                "output_elements": 18432,
+                "output_stride": 128,
+                "width": 128
+              }
+            },
+            "consumes_runtime_lengths": [
+              "valid_k_norm_rows"
+            ],
+            "runtime_scalar_bindings": {
+              "rows": "valid_k_norm_rows"
+            }
+          },
+          {
+            "id": "q_head",
+            "op": "token_head_layout_checked",
+            "kernel": "layout_token_to_head_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "q_norm"
+              },
+              "outputs": {
+                "output": "q_head"
+              }
+            },
+            "params": {
+              "T": 18,
+              "H": 16,
+              "D": 128,
+              "call_constants": {
+                "input_elements": 36864,
+                "output_elements": 36864,
+                "heads": 16,
+                "head_dim": 128
+              }
+            },
+            "consumes_runtime_lengths": [
+              "valid_prompt_rows"
+            ],
+            "runtime_scalar_bindings": {
+              "tokens": "valid_prompt_rows"
+            }
+          },
+          {
+            "id": "k_head",
+            "op": "token_head_layout_checked",
+            "kernel": "layout_token_to_head_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "k_norm"
+              },
+              "outputs": {
+                "output": "k_head"
+              }
+            },
+            "params": {
+              "T": 18,
+              "H": 8,
+              "D": 128,
+              "call_constants": {
+                "input_elements": 18432,
+                "output_elements": 18432,
+                "heads": 8,
+                "head_dim": 128
+              }
+            },
+            "consumes_runtime_lengths": [
+              "valid_prompt_rows"
+            ],
+            "runtime_scalar_bindings": {
+              "tokens": "valid_prompt_rows"
+            }
+          },
+          {
+            "id": "v_head",
+            "op": "token_head_layout_checked",
+            "kernel": "layout_token_to_head_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "v_proj"
+              },
+              "outputs": {
+                "output": "v_head"
+              }
+            },
+            "params": {
+              "T": 18,
+              "H": 8,
+              "D": 128,
+              "call_constants": {
+                "input_elements": 18432,
+                "output_elements": 18432,
+                "heads": 8,
+                "head_dim": 128
+              }
+            },
+            "consumes_runtime_lengths": [
+              "valid_prompt_rows"
+            ],
+            "runtime_scalar_bindings": {
+              "tokens": "valid_prompt_rows"
+            }
+          },
+          {
+            "id": "rope_qk",
+            "op": "rope_qk_bounded",
+            "kernel": "rope_qk_split_bounded_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "q": "q_head",
+                "k": "k_head"
+              },
+              "outputs": {
+                "q": "q_head",
+                "k": "k_head"
+              }
+            },
+            "params": {
+              "H": 16,
+              "KV": 8,
+              "T": 18,
+              "D": 128,
+              "freq_base": 1000000.0,
+              "call_constants": {
+                "q_elements": 36864,
+                "k_elements": 18432,
+                "heads": 16,
+                "kv_heads": 8,
+                "head_dim": 128,
+                "pos_offset": 0
+              }
+            },
+            "consumes_runtime_lengths": [
+              "valid_prompt_rows"
+            ],
+            "runtime_scalar_bindings": {
+              "tokens": "valid_prompt_rows"
+            }
+          },
+          {
+            "id": "attention_head",
+            "op": "attention_causal_bounded",
+            "kernel": "attention_causal_head_major_bounded_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "q": "q_head",
+                "k": "k_head",
+                "v": "v_head"
+              },
+              "outputs": {
+                "work": "attention_work",
+                "out": "attention_head"
+              }
+            },
+            "params": {
+              "H": 16,
+              "KV": 8,
+              "T": 18,
+              "D": 128,
+              "call_constants": {
+                "q_elements": 36864,
+                "k_elements": 18432,
+                "v_elements": 18432,
+                "work_elements": 36864,
+                "output_elements": 36864,
+                "heads": 16,
+                "kv_heads": 8,
+                "head_dim": 128
+              }
+            },
+            "consumes_runtime_lengths": [
+              "valid_prompt_rows"
+            ],
+            "runtime_scalar_bindings": {
+              "tokens": "valid_prompt_rows"
+            }
+          },
+          {
+            "id": "attention_token",
+            "op": "token_head_layout_checked",
+            "kernel": "layout_head_to_token_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "attention_head"
+              },
+              "outputs": {
+                "output": "attention_token"
+              }
+            },
+            "params": {
+              "T": 18,
+              "H": 16,
+              "D": 128,
+              "call_constants": {
+                "input_elements": 36864,
+                "output_elements": 36864,
+                "heads": 16,
+                "head_dim": 128
+              }
+            },
+            "consumes_runtime_lengths": [
+              "valid_prompt_rows"
+            ],
+            "runtime_scalar_bindings": {
+              "tokens": "valid_prompt_rows"
+            }
+          },
+          {
+            "id": "attention_proj",
+            "op": "linear_rows_checked_no_bias",
+            "kernel": "linear_rows_checked_no_bias_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "attention_token"
+              },
+              "outputs": {
+                "output": "attention_proj"
+              }
+            },
+            "weight_refs": {
+              "weight": "talker.model.layers.0.self_attn.o_proj.weight"
+            },
+            "params": {
+              "M": 18,
+              "K": 2048,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 36864,
+                "linear_input_stride": 2048,
+                "linear_weight_elements": 2097152,
+                "linear_weight_stride": 2048,
+                "linear_output_elements": 18432,
+                "linear_output_stride": 1024,
+                "linear_input_channels": 2048,
+                "linear_output_channels": 1024
+              }
+            },
+            "consumes_runtime_lengths": [
+              "valid_prompt_rows"
+            ],
+            "runtime_scalar_bindings": {
+              "linear_rows": "valid_prompt_rows"
+            }
+          },
+          {
+            "id": "post_attention",
+            "op": "add_rows_checked",
+            "kernel": "add_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "left": "block_input",
+                "right": "attention_proj"
+              },
+              "outputs": {
+                "output": "post_attention"
+              }
+            },
+            "params": {
+              "N": 18432,
+              "call_constants": {
+                "left_elements": 18432,
+                "right_elements": 18432,
+                "output_elements": 18432
+              }
+            },
+            "consumes_runtime_lengths": [
+              "valid_hidden_elements"
+            ],
+            "runtime_scalar_bindings": {
+              "elements": "valid_hidden_elements"
+            }
+          },
+          {
+            "id": "post_attention_norm",
+            "op": "rmsnorm_rows_checked",
+            "kernel": "rmsnorm_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "post_attention"
+              },
+              "outputs": {
+                "output": "post_attention_norm"
+              }
+            },
+            "weight_refs": {
+              "gamma": "talker.model.layers.0.post_attention_layernorm.weight"
+            },
+            "params": {
+              "R": 18,
+              "C": 1024,
+              "eps": 1e-06,
+              "call_constants": {
+                "input_elements": 18432,
+                "input_stride": 1024,
+                "gamma_elements": 1024,
+                "output_elements": 18432,
+                "output_stride": 1024,
+                "width": 1024
+              }
+            },
+            "consumes_runtime_lengths": [
+              "valid_prompt_rows"
+            ],
+            "runtime_scalar_bindings": {
+              "rows": "valid_prompt_rows"
+            }
+          },
+          {
+            "id": "gate_proj",
+            "op": "linear_rows_checked_no_bias",
+            "kernel": "linear_rows_checked_no_bias_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "post_attention_norm"
+              },
+              "outputs": {
+                "output": "gate_proj"
+              }
+            },
+            "weight_refs": {
+              "weight": "talker.model.layers.0.mlp.gate_proj.weight"
+            },
+            "params": {
+              "M": 18,
+              "K": 1024,
+              "N": 3072,
+              "call_constants": {
+                "linear_input_elements": 18432,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 3145728,
+                "linear_weight_stride": 1024,
+                "linear_output_elements": 55296,
+                "linear_output_stride": 3072,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 3072
+              }
+            },
+            "consumes_runtime_lengths": [
+              "valid_prompt_rows"
+            ],
+            "runtime_scalar_bindings": {
+              "linear_rows": "valid_prompt_rows"
+            }
+          },
+          {
+            "id": "up_proj",
+            "op": "linear_rows_checked_no_bias",
+            "kernel": "linear_rows_checked_no_bias_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "post_attention_norm"
+              },
+              "outputs": {
+                "output": "up_proj"
+              }
+            },
+            "weight_refs": {
+              "weight": "talker.model.layers.0.mlp.up_proj.weight"
+            },
+            "params": {
+              "M": 18,
+              "K": 1024,
+              "N": 3072,
+              "call_constants": {
+                "linear_input_elements": 18432,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 3145728,
+                "linear_weight_stride": 1024,
+                "linear_output_elements": 55296,
+                "linear_output_stride": 3072,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 3072
+              }
+            },
+            "consumes_runtime_lengths": [
+              "valid_prompt_rows"
+            ],
+            "runtime_scalar_bindings": {
+              "linear_rows": "valid_prompt_rows"
+            }
+          },
+          {
+            "id": "gated_mlp",
+            "op": "silu_mul_rows_checked",
+            "kernel": "silu_mul_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "gate": "gate_proj",
+                "up": "up_proj"
+              },
+              "outputs": {
+                "output": "gated_mlp"
+              }
+            },
+            "params": {
+              "N": 55296,
+              "call_constants": {
+                "gate_elements": 55296,
+                "up_elements": 55296,
+                "output_elements": 55296
+              }
+            },
+            "consumes_runtime_lengths": [
+              "valid_mlp_elements"
+            ],
+            "runtime_scalar_bindings": {
+              "elements": "valid_mlp_elements"
+            }
+          },
+          {
+            "id": "down_proj",
+            "op": "linear_rows_checked_no_bias",
+            "kernel": "linear_rows_checked_no_bias_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "gated_mlp"
+              },
+              "outputs": {
+                "output": "down_proj"
+              }
+            },
+            "weight_refs": {
+              "weight": "talker.model.layers.0.mlp.down_proj.weight"
+            },
+            "params": {
+              "M": 18,
+              "K": 3072,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 55296,
+                "linear_input_stride": 3072,
+                "linear_weight_elements": 3145728,
+                "linear_weight_stride": 3072,
+                "linear_output_elements": 18432,
+                "linear_output_stride": 1024,
+                "linear_input_channels": 3072,
+                "linear_output_channels": 1024
+              }
+            },
+            "consumes_runtime_lengths": [
+              "valid_prompt_rows"
+            ],
+            "runtime_scalar_bindings": {
+              "linear_rows": "valid_prompt_rows"
+            }
+          },
+          {
+            "id": "block_output",
+            "op": "add_rows_checked",
+            "kernel": "add_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "left": "post_attention",
+                "right": "down_proj"
+              },
+              "outputs": {
+                "output": "block_output"
+              }
+            },
+            "params": {
+              "N": 18432,
+              "call_constants": {
+                "left_elements": 18432,
+                "right_elements": 18432,
+                "output_elements": 18432
+              }
+            },
+            "consumes_runtime_lengths": [
+              "valid_hidden_elements"
+            ],
+            "runtime_scalar_bindings": {
+              "elements": "valid_hidden_elements"
+            }
+          }
+        ]
+      },
+      "footer": []
+    }
+  },
+  "semantic_checkpoints": {
+    "schema": "cke.semantic_checkpoint_contract",
+    "schema_version": 1,
+    "exports": {
+      "text_embedding": {
+        "section": "body",
+        "template_op_id": "text_embedding",
+        "op": "embedding_lookup_checked",
+        "checkpoints": [
+          {
+            "id": "qwen3_tts.talker.text_embedding",
+            "producer": "text_embedding",
+            "tensor": "embedding_channel",
+            "logical_layout": "channel_major",
+            "axis_names": [
+              "channel",
+              "token"
+            ],
+            "storage_dtype": "fp32"
+          }
+        ]
+      },
+      "embedding_transpose": {
+        "section": "body",
+        "template_op_id": "embedding_transpose",
+        "op": "transpose_strided_checked",
+        "checkpoints": [
+          {
+            "id": "qwen3_tts.talker.embedding_transpose",
+            "producer": "embedding_transpose",
+            "tensor": "embedding_token",
+            "logical_layout": "token_major",
+            "axis_names": [
+              "token",
+              "channel"
+            ],
+            "storage_dtype": "fp32"
+          }
+        ]
+      },
+      "projection_fc1": {
+        "section": "body",
+        "template_op_id": "projection_fc1",
+        "op": "linear_rows_checked",
+        "checkpoints": [
+          {
+            "id": "qwen3_tts.talker.projection_fc1",
+            "producer": "projection_fc1",
+            "tensor": "projection_fc1",
+            "logical_layout": "token_major",
+            "axis_names": [
+              "token",
+              "channel"
+            ],
+            "storage_dtype": "fp32"
+          }
+        ]
+      },
+      "projection_active": {
+        "section": "body",
+        "template_op_id": "projection_active",
+        "op": "silu_strided_checked",
+        "checkpoints": [
+          {
+            "id": "qwen3_tts.talker.projection_active",
+            "producer": "projection_active",
+            "tensor": "projection_active",
+            "logical_layout": "token_major",
+            "axis_names": [
+              "token",
+              "channel"
+            ],
+            "storage_dtype": "fp32"
+          }
+        ]
+      },
+      "projection_fc2": {
+        "section": "body",
+        "template_op_id": "projection_fc2",
+        "op": "linear_rows_checked",
+        "checkpoints": [
+          {
+            "id": "qwen3_tts.talker.projection_fc2",
+            "producer": "projection_fc2",
+            "tensor": "projection_output",
+            "logical_layout": "token_major",
+            "axis_names": [
+              "token",
+              "channel"
+            ],
+            "storage_dtype": "fp32"
+          }
+        ]
+      },
+      "codec_embedding": {
+        "section": "body",
+        "template_op_id": "codec_embedding",
+        "op": "embedding_lookup_checked",
+        "checkpoints": [
+          {
+            "id": "qwen3_tts.talker.codec_embedding",
+            "producer": "codec_embedding",
+            "tensor": "codec_embedding_channel",
+            "logical_layout": "channel_major",
+            "axis_names": [
+              "channel",
+              "token"
+            ],
+            "storage_dtype": "fp32"
+          }
+        ]
+      },
+      "prompt_assembly": {
+        "section": "body",
+        "template_op_id": "prompt_assembly",
+        "op": "indexed_sum_rows_checked",
+        "checkpoints": [
+          {
+            "id": "qwen3_tts.talker.prompt_assembly",
+            "producer": "prompt_assembly",
+            "tensor": "block_input",
+            "logical_layout": "token_major",
+            "axis_names": [
+              "token",
+              "channel"
+            ],
+            "storage_dtype": "fp32"
+          }
+        ]
+      },
+      "block_output": {
+        "section": "body",
+        "template_op_id": "block_output",
+        "op": "add_rows_checked",
+        "checkpoints": [
+          {
+            "id": "qwen3_tts.talker.block_output",
+            "producer": "block_output",
+            "tensor": "block_output",
+            "logical_layout": "token_major",
+            "axis_names": [
+              "token",
+              "channel"
+            ],
+            "storage_dtype": "fp32"
+          }
+        ]
+      }
+    }
+  },
+  "runtime_constants": {
+    "value_elements": 1,
+    "phoneme_count": 1,
+    "max_duration": 7,
+    "expanded_capacity": 7
+  },
+  "runtime_lengths": {
+    "valid_context_tokens": {
+      "producer": "check_valid_context_tokens",
+      "result": "valid_extent",
+      "capacity": 7,
+      "allow_zero": false
+    },
+    "valid_text_rows": {
+      "producer": "check_valid_text_rows",
+      "result": "valid_extent",
+      "capacity": 13,
+      "allow_zero": false
+    },
+    "valid_prompt_rows": {
+      "producer": "check_valid_prompt_rows",
+      "result": "valid_extent",
+      "capacity": 18,
+      "allow_zero": false
+    },
+    "valid_q_norm_rows": {
+      "producer": "check_valid_q_norm_rows",
+      "result": "valid_extent",
+      "capacity": 288,
+      "allow_zero": false
+    },
+    "valid_k_norm_rows": {
+      "producer": "check_valid_k_norm_rows",
+      "result": "valid_extent",
+      "capacity": 144,
+      "allow_zero": false
+    },
+    "valid_hidden_elements": {
+      "producer": "check_valid_hidden_elements",
+      "result": "valid_extent",
+      "capacity": 18432,
+      "allow_zero": false
+    },
+    "valid_mlp_elements": {
+      "producer": "check_valid_mlp_elements",
+      "result": "valid_extent",
+      "capacity": 55296,
+      "allow_zero": false
+    }
+  }
+}
