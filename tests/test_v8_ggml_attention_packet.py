@@ -1,3 +1,4 @@
+import json
 import os
 import subprocess
 import tempfile
@@ -7,9 +8,10 @@ from pathlib import Path
 import numpy as np
 
 from version.v8.scripts.replay_ggml_attention_packet_v8 import (
-    FLASH_SOURCE, _compile_ggml_source, fp64_full_flash_reference_rows,
+    FLASH_SOURCE, OBSERVED_SOURCE, _compile_ggml_source, _observed_capture,
+    fp64_full_flash_reference_rows,
     fp64_reference, pinned_tree_identity, run_ggml, run_ggml_flash_rows,
-    validate_oracle_contract,
+    replay_observed_oracle, validate_oracle_contract,
 )
 from version.v8.scripts.xray_operation_bundle_v8 import BundleError
 
@@ -38,6 +40,98 @@ class GgmlAttentionPacketTests(unittest.TestCase):
                 call = {**self.call, **call_patch}
                 with self.assertRaisesRegex(BundleError, message):
                     validate_oracle_contract(manifest, call, [1, 2])
+
+    def _synthetic_observed_capture(self, root):
+        name = "kqv_out-0-token-000001-occ-000"
+        q = np.array([
+            [[0.5, -0.25, 0.75, 0.125], [-0.5, 0.4, 0.2, 0.3]],
+            [[0.1, 0.2, -0.7, 0.9], [0.25, -0.3, 0.6, 0.4]],
+        ], dtype="<f4")
+        k = np.zeros((32, 1, 4), dtype="<f2")
+        k[0, 0] = [0.5, 0.25, -0.25, 0.75]
+        k[1, 0] = [-0.5, 0.1, 0.8, -0.3]
+        v = np.zeros((32, 1, 4), dtype="<f2")
+        v[0, 0] = [0.1, 0.2, 0.3, 0.4]
+        v[1, 0] = [-0.2, 0.4, 0.8, 0.1]
+        mask = np.full((2, 32), -np.inf, dtype="<f4")
+        mask[0, 0] = 0
+        mask[1, :2] = 0
+        entries = {
+            "q": (q.tobytes(), 0, [4, 2, 2, 1], [4, 32, 16, 64]),
+            "k": (k.tobytes(), 1, [4, 32, 1, 1], [2, 8, 8, 256]),
+            "v": (v[:, 0].T.copy().tobytes(), 1, [32, 4, 1, 1], [2, 64, 256, 256]),
+            "mask": (mask.tobytes(), 0, [32, 2, 1, 1], [4, 128, 256, 256]),
+        }
+        for role, (raw, dtype, ne, nb) in entries.items():
+            base = root / f"{name}.nonflash_{role}"
+            Path(str(base) + ".bin").write_bytes(raw)
+            Path(str(base) + ".json").write_text(json.dumps({
+                "role": role, "type": dtype, "ne": ne, "nb": nb, "nbytes": len(raw),
+            }), encoding="ascii")
+        (root / f"{name}.bin").write_bytes(np.zeros(16, dtype="<f4").tobytes())
+        (root / f"{name}.json").write_text(json.dumps({
+            "type": 0, "ne": [8, 2, 1, 1], "nb": [4, 32, 64, 64],
+        }), encoding="ascii")
+        return name, v, mask
+
+    def test_observed_nonflash_capture_checks_physical_layout_and_mask(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            name, _, _ = self._synthetic_observed_capture(root)
+            specs, geometry = _observed_capture(root, name)
+            self.assertEqual((geometry["queries"], geometry["keys"]), (2, 32))
+            self.assertEqual(specs["v"]["nb"][1], 64)
+            mask_path = root / f"{name}.nonflash_mask.bin"
+            original = mask_path.read_bytes()
+            mask_path.write_bytes(original[:-4])
+            with self.assertRaisesRegex(BundleError, "storage contract"):
+                _observed_capture(root, name)
+            mask_path.write_bytes(original)
+            report_path = root / "parity.json"
+            report_path.write_text(json.dumps({"dump_compare": {
+                "llama_flash_attention_mode": "disabled",
+                "llama_dump_dir": str(root / "other"),
+                "llama_nonflash_input_captures": 1,
+            }}), encoding="ascii")
+            with self.assertRaisesRegex(BundleError, "does not bind"):
+                replay_observed_oracle(
+                    Path("unused"), root, name, scale=1, alibi=0, threads=1,
+                    parity_report=report_path,
+                )
+
+    def test_observed_nonflash_ggml_replay_detects_wrong_mask(self):
+        tree = Path(os.environ.get("CK_PINNED_LLAMA_TREE", str(ROOT / "llama.cpp")))
+        try:
+            pinned_tree_identity(tree)
+        except (BundleError, OSError, subprocess.CalledProcessError):
+            self.skipTest("pinned GGML libraries unavailable; asset-backed replay runs locally")
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            name, v, mask = self._synthetic_observed_capture(root)
+            with tempfile.TemporaryDirectory(prefix="cke-observed-synthetic-") as build:
+                executable = Path(build) / "replay"
+                output = Path(build) / "out.f32"
+                _compile_ggml_source(tree, OBSERVED_SOURCE, executable)
+                args = [str(executable)]
+                args.extend(str(root / f"{name}.nonflash_{role}.bin")
+                            for role in ("q", "k", "v", "mask"))
+                args.extend((str(output), "2", "32", "2", "1", "4",
+                             "32", "16", "8", "8", "64", "256", "128",
+                             "1", "0", "1"))
+                subprocess.run(args, check=True, capture_output=True, text=True)
+                actual = np.fromfile(output, dtype="<f4").reshape(2, 2, 4)
+                self.assertLess(float(np.max(np.abs(actual[0] - v[0, 0]))), 1e-6)
+                self.assertGreater(float(np.max(np.abs(actual[1] - actual[0]))), 0.05)
+                actual.tofile(root / f"{name}.bin")
+            report = replay_observed_oracle(tree, root, name, scale=1, alibi=0, threads=1)
+            self.assertEqual(report["oracle_replay_fidelity"], "pass")
+            altered = mask.copy()
+            altered[1, 0] = -np.inf
+            mask_path = root / f"{name}.nonflash_mask.bin"
+            mask_path.write_bytes(altered.tobytes())
+            changed = replay_observed_oracle(tree, root, name, scale=1, alibi=0, threads=1)
+            self.assertEqual(changed["oracle_replay_fidelity"], "fail")
+            self.assertGreater(changed["comparison"]["max_abs"], 0.05)
 
     def test_pinned_ggml_graph_bounded_against_small_fp64_case(self):
         tree = Path(os.environ.get("CK_PINNED_LLAMA_TREE", str(ROOT / "llama.cpp")))
