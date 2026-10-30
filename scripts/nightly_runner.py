@@ -1438,6 +1438,10 @@ TEST_SUITES = {
         "Kokoro Native Speech Stop, Replace and Recovery", "inference",
         ROOT / "tests" / "test_v8_kokoro_native_speech_session.py",
     ),
+    "accessible_voice_control": TestSuite(
+        "Confirmed Voice Request and Correlated CKE Reply", "inference",
+        ROOT / "tests" / "test_v8_accessible_voice.py",
+    ),
     "tts_audio_harmonic_source_generated": TestSuite(
         "Checked Harmonic Source Normal-Compiler Generated Graph", "inference",
         ROOT / "tests" / "test_v8_audio_harmonic_source_generated.py",
