@@ -30,16 +30,17 @@ OUTPUT = ROOT / "version/v8/circuits/qwen3_tts_generated_talker_continuation_bou
 VOCAB = 2048
 
 
-def build_circuit(*, talker_layers: int = 28,
+def build_circuit(*, context_tokens: int = 7, talker_layers: int = 28,
                   continuation_steps: int = 14,
                   max_generated_frames: int = 4) -> dict:
     if (isinstance(max_generated_frames, bool)
             or not isinstance(max_generated_frames, int)
             or not 2 <= max_generated_frames <= 64):
         raise ValueError("max_generated_frames must be in 2..64")
-    cache_capacity = 17 + max_generated_frames
+    cache_capacity = context_tokens + 10 + max_generated_frames
     max_step_index = max_generated_frames - 2
-    graph = generated_frame(talker_layers=talker_layers,
+    graph = generated_frame(context_tokens=context_tokens,
+                            talker_layers=talker_layers,
                             continuation_steps=continuation_steps)
     graph["name"] = ("qwen3_tts_generated_talker_continuation_bounded" if
                      talker_layers == 28 else
@@ -47,7 +48,7 @@ def build_circuit(*, talker_layers: int = 28,
     graph["native_entry"]["function"] = "ck_" + graph["name"]
     graph["contract"]["runtime_invariants"].update({
         "generated_talker_continuation_steps": 1,
-        "continuation_positions": [18, cache_capacity - 1],
+        "continuation_positions": [context_tokens + 11, cache_capacity - 1],
         "codebook_feedback_rows": continuation_steps + 2,
         "oracle_fed_model_intermediates": False,
         "complete_text_to_wav": False,
@@ -103,7 +104,8 @@ def build_circuit(*, talker_layers: int = 28,
          "produces_runtime_lengths": {"talker_decode_position": "valid_extent"},
          "runtime_scalar_bindings": {"extent_affine_source": "talker_step_index"},
          "params": {"call_constants": {
-             "extent_affine_factor": 1, "extent_affine_offset": 18,
+             "extent_affine_factor": 1,
+             "extent_affine_offset": context_tokens + 11,
              "extent_affine_capacity": cache_capacity - 1}},
          "graph_slots": {"inputs": {},
                          "outputs": {"valid_extent": "talker_decode_position_checked"}}},
@@ -111,7 +113,8 @@ def build_circuit(*, talker_layers: int = 28,
 
     # Seed state immediately after the prefill. Its Q/K/V producers must remain
     # alive until this point, before predictor work can reuse their arena space.
-    seed = cached_prefill(cache_capacity=cache_capacity)["block_types"]["talker_cache_seed"]
+    seed = cached_prefill(context_tokens=context_tokens,
+                          cache_capacity=cache_capacity)["block_types"]["talker_cache_seed"]
     seed_ops = copy.deepcopy(seed["body"]["ops"][:talker_layers])
     for layer in range(talker_layers):
         for kind in ("k", "v"):
@@ -174,11 +177,13 @@ def build_circuit(*, talker_layers: int = 28,
             "left_indices": "external:feedback_left_indices",
             "right_indices": "external:feedback_right_indices"},
             "outputs": {"output": "feedback_next_input"}},
-        "params": {"L": 1, "K": 13, "R": 1, "C": HIDDEN,
+        "params": {"L": 1, "K": context_tokens + 6, "R": 1, "C": HIDDEN,
                    "call_constants": {
                        "left_elements": HIDDEN, "left_stride": HIDDEN,
-                       "left_rows": 1, "right_elements": 13 * HIDDEN,
-                       "right_stride": HIDDEN, "right_rows": 13,
+                       "left_rows": 1,
+                       "right_elements": (context_tokens + 6) * HIDDEN,
+                       "right_stride": HIDDEN,
+                       "right_rows": context_tokens + 6,
                        "left_index_elements": 1, "right_index_elements": 1,
                        "output_elements": HIDDEN, "output_stride": HIDDEN,
                        "rows": 1, "channels": HIDDEN}},
