@@ -1007,6 +1007,7 @@ def _resolve_llama_dump_names(
             else:
                 graph_name = (
                     "attn_out" if oracle_graph == "gemma4" and semantic_name == "after_attn"
+                    else "Qcur" if oracle_graph == "gemma4" and semantic_name == "q_proj"
                     else _LLAMA_SEMANTIC_DUMP_NAMES[semantic_name]
                 )
                 append(f"{graph_name}-{layer_id}")

@@ -654,6 +654,12 @@ class V8DecoderFirstTokenParityTests(unittest.TestCase):
     def test_gemma_oracle_attn_out_is_residual_not_projection(self) -> None:
         self.assertEqual(
             decoder_parity_v8._resolve_llama_dump_names(
+                "q_proj-0,after_attn-0", layer_count=1, oracle_graph="gemma4"
+            ),
+            "Qcur-0,attn_out-0",
+        )
+        self.assertEqual(
+            decoder_parity_v8._resolve_llama_dump_names(
                 "after_attn-0", layer_count=1, oracle_graph="gemma4"
             ),
             "attn_out-0",
@@ -664,6 +670,17 @@ class V8DecoderFirstTokenParityTests(unittest.TestCase):
             ),
             "attn_residual-0",
         )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            name = "Qcur-0-token-000000-occ-000"
+            (root / f"{name}.bin").write_bytes(np.array([3.0, 5.0], dtype=np.float32).tobytes())
+            (root / "index.json").write_text(json.dumps({
+                "name": name, "base_name": "Qcur-0", "token_id": 0,
+                "occurrence": 0, "dtype": 0, "rank": 1, "shape": [2],
+                "elem_count": 2, "nbytes": 8,
+            }) + "\n", encoding="utf-8")
+            gemma_q = decoder_parity_v8._load_llama_dump_dir(root, oracle_graph="gemma4")
+        self.assertEqual(gemma_q[0].op_name, "q_proj")
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             name = "attn_out-0-token-000000-occ-000"
