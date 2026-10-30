@@ -1,5 +1,8 @@
 var NAVTREEINDEX11 =
 {
+"ckernel__orchestration_8c.html#ac841f4e0a273b07808cc036a715b742e":[2,0,1,25,29],
+"ckernel__orchestration_8c.html#acc9d893cdd6cf7bf0dbf35d42c5f0e99":[2,0,1,25,21],
+"ckernel__orchestration_8c.html#ad492e291abbf309f2332cdf955597083":[2,0,1,25,37],
 "ckernel__orchestration_8c.html#ad677ad79b893d5368132b37424c38f95":[2,0,1,25,33],
 "ckernel__orchestration_8c.html#ad6aa365279862f31a7bd98385374a268":[2,0,1,25,27],
 "ckernel__orchestration_8c.html#ad9e143397c01620ba314aa448ed922a1":[2,0,1,25,39],
@@ -246,8 +249,5 @@ var NAVTREEINDEX11 =
 "cpu__features_8h.html#a87e02c44ce8117ceb227f928980a175a":[2,0,0,60,6],
 "cpu__features_8h.html#a9f67b8a4e1c74de8b6f0d8b535e44877":[2,0,0,60,7],
 "cpu__features_8h.html#ab051fa0f4c2fc0723066eab07401fed6":[2,0,0,60,2],
-"cpu__features_8h.html#add9495a8b0827ace67807e0826a890d1":[2,0,0,60,8],
-"cpu__features_8h_source.html":[2,0,0,60],
-"deepseek__kernels_8c.html":[2,0,1,1,38],
-"deepseek__kernels_8c.html#a055589c2ea54c496e37add9646657afc":[2,0,1,1,38,25]
+"cpu__features_8h.html#add9495a8b0827ace67807e0826a890d1":[2,0,0,60,8]
 };

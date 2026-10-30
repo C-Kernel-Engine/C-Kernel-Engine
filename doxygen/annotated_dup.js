@@ -16,6 +16,7 @@ var annotated_dup =
     [ "ck_bump_alloc_t", "structck__bump__alloc__t.html", "structck__bump__alloc__t" ],
     [ "ck_capability_t", "structck__capability__t.html", "structck__capability__t" ],
     [ "ck_checked_frame_codec", "structck__checked__frame__codec.html", "structck__checked__frame__codec" ],
+    [ "ck_checked_frame_codec_prefix", "structck__checked__frame__codec__prefix.html", "structck__checked__frame__codec__prefix" ],
     [ "ck_checked_frame_loop", "structck__checked__frame__loop.html", "structck__checked__frame__loop" ],
     [ "ck_threadpool_profile_t", "structck__threadpool__profile__t.html", "structck__threadpool__profile__t" ],
     [ "CKAudioWavInfo", "structCKAudioWavInfo.html", "structCKAudioWavInfo" ],

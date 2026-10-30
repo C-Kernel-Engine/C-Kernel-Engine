@@ -1,5 +1,11 @@
 var NAVTREEINDEX26 =
 {
+"v6_85_2test__generated_2int8__q4k__test_8c.html#a2de339e18e60a7acdea6c5946c3622d1":[2,0,1,7,0,3,36],
+"v6_85_2test__generated_2int8__q4k__test_8c.html#a2ef8bd680264619273689144a6d0b5ce":[2,0,1,7,0,3,26],
+"v6_85_2test__generated_2int8__q4k__test_8c.html#a2fa0ffc8295865ecf0b19fcb2ce566ae":[2,0,1,7,0,3,51],
+"v6_85_2test__generated_2int8__q4k__test_8c.html#a369266c24eacffb87046522897a570d5":[2,0,1,7,0,3,0],
+"v6_85_2test__generated_2int8__q4k__test_8c.html#a3ccffdacf50ebbd982fff268651a2c0e":[2,0,1,7,0,3,50],
+"v6_85_2test__generated_2int8__q4k__test_8c.html#a462a350626f70f9ce0046f7eda07c6a3":[2,0,1,7,0,3,3],
 "v6_85_2test__generated_2int8__q4k__test_8c.html#a50d24a31f1b4b0ced60287c3bc8e3968":[2,0,1,7,0,3,57],
 "v6_85_2test__generated_2int8__q4k__test_8c.html#a51778090a9920f0a739041e9dc0ca9fc":[2,0,1,7,0,3,44],
 "v6_85_2test__generated_2int8__q4k__test_8c.html#a5e1f0a349cf4e88d7509898aa5d8a01f":[2,0,1,7,0,3,11],
@@ -243,11 +249,5 @@ var NAVTREEINDEX26 =
 "v6_86_2generated_2ck-kernel-inference_8h.html#a2e52bbf66a7851a3bdd5d8ec614cc393":[2,0,1,8,0,1,40],
 "v6_86_2generated_2ck-kernel-inference_8h.html#a30748c53ae173dc9eef7f8258b029014":[2,0,1,8,0,1,6],
 "v6_86_2generated_2ck-kernel-inference_8h.html#a35ee22152d4193629c6d1d8a89e971d5":[2,0,1,8,0,1,39],
-"v6_86_2generated_2ck-kernel-inference_8h.html#a3ebd7b368696bd871314c7aa13419e5c":[2,0,1,8,0,1,34],
-"v6_86_2generated_2ck-kernel-inference_8h.html#a431f85d6b77e3ff5dff8d2e640c44108":[2,0,1,8,0,1,13],
-"v6_86_2generated_2ck-kernel-inference_8h.html#a49f4d83446c58f6b567e6667ee468f06":[2,0,1,8,0,1,30],
-"v6_86_2generated_2ck-kernel-inference_8h.html#a5679336dfb3a2d4f45c0390e57a8d2b8":[2,0,1,8,0,1,43],
-"v6_86_2generated_2ck-kernel-inference_8h.html#a58be7c1e5da3bd086d9e8f14613da2c5":[2,0,1,8,0,1,10],
-"v6_86_2generated_2ck-kernel-inference_8h.html#a5c2177d7c16a2388e636db83b2e1e216":[2,0,1,8,0,1,42],
-"v6_86_2generated_2ck-kernel-inference_8h.html#a6032e6abcbaf688ec03e1ffef9aa9ee7":[2,0,1,8,0,1,21]
+"v6_86_2generated_2ck-kernel-inference_8h.html#a3ebd7b368696bd871314c7aa13419e5c":[2,0,1,8,0,1,34]
 };
