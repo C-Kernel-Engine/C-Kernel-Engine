@@ -802,9 +802,19 @@ def compare_logits(
     llama_logits: np.ndarray,
     top_k: int,
 ) -> dict[str, Any]:
-    n = min(int(ck_logits.size), int(llama_logits.size))
-    a = ck_logits[:n].astype(np.float64, copy=False)
-    b = llama_logits[:n].astype(np.float64, copy=False)
+    ck_logits = np.asarray(ck_logits)
+    llama_logits = np.asarray(llama_logits)
+    if ck_logits.ndim != 1 or llama_logits.ndim != 1:
+        raise ValueError("logit comparison requires one-dimensional vocabulary tensors")
+    if ck_logits.size != llama_logits.size or ck_logits.size == 0:
+        raise ValueError(
+            f"logit vocabulary extent mismatch: ck={ck_logits.size} llama={llama_logits.size}"
+        )
+    if not np.isfinite(ck_logits).all() or not np.isfinite(llama_logits).all():
+        raise ValueError("logit comparison requires finite values from both runtimes")
+    n = int(ck_logits.size)
+    a = ck_logits.astype(np.float64, copy=False)
+    b = llama_logits.astype(np.float64, copy=False)
     diff = a - b
     max_abs = float(np.max(np.abs(diff)))
     mean_abs = float(np.mean(np.abs(diff)))
