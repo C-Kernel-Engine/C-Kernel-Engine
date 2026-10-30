@@ -833,6 +833,11 @@ TEST_SUITES = {
         ROOT / "tests" / "test_v8_checked_frame_codec_prefix.py",
         timeout_sec=120,
     ),
+    "tts_checked_frame_codec_control": TestSuite(
+        "Checked Speech Frame Cancellation", "inference",
+        ROOT / "tests" / "test_v8_checked_frame_codec_control.py",
+        timeout_sec=120,
+    ),
     "tts_qwen3_pinned_natural_eos": TestSuite(
         "Qwen3-TTS Pinned Natural EOS Codes", "inference",
         ROOT / "tests" / "test_v8_qwen3_tts_full_code_loop.py",

@@ -30,7 +30,10 @@ static void write_scalar(uint8_t *arena, size_t offset, int32_t value) {
     memcpy(arena + offset, &value, sizeof(value));
 }
 
-int ck_run_checked_frame_loop(const ck_checked_frame_loop *request) {
+static int run_checked_frame_loop(const ck_checked_frame_loop *request,
+                                  ck_checked_frame_cancel should_cancel,
+                                  void *cancel_context,
+                                  int control_required) {
     if (!request || !request->valid_frames ||
         (uintptr_t)request->valid_frames % _Alignof(size_t) != 0 ||
         !span(request->valid_frames, sizeof(size_t)))
@@ -45,7 +48,8 @@ int ck_run_checked_frame_loop(const ck_checked_frame_loop *request) {
                   request->output_elements * sizeof(int32_t)))
         return CK_FRAME_LOOP_INVALID;
     *request->valid_frames = 0;
-    if (!request->prefill || !request->frame || !request->arena ||
+    if ((control_required && !should_cancel) ||
+        !request->prefill || !request->frame || !request->arena ||
         !request->prefill_code_offsets || !request->frame_code_offsets ||
         !request->staging_codes || !request->output_codes ||
         (uintptr_t)request->prefill_code_offsets % _Alignof(size_t) != 0 ||
@@ -89,8 +93,12 @@ int ck_run_checked_frame_loop(const ck_checked_frame_loop *request) {
                            request->arena_bytes))
             return CK_FRAME_LOOP_INVALID;
     }
+    if (should_cancel && should_cancel(cancel_context))
+        return CK_FRAME_LOOP_CANCELLED;
     if (request->prefill(request->arena, request->arena_bytes) != 0)
         return CK_FRAME_LOOP_ENTRY_FAILED;
+    if (should_cancel && should_cancel(cancel_context))
+        return CK_FRAME_LOOP_CANCELLED;
     if (read_scalar(request->arena,
                     request->prefill_valid_code_count_offset) !=
         (int32_t)(request->codebooks - 1))
@@ -100,10 +108,14 @@ int ck_run_checked_frame_loop(const ck_checked_frame_loop *request) {
             request->arena, request->prefill_code_offsets[codebook]);
 
     for (size_t step = 0; step < request->max_frames - 1; ++step) {
+        if (should_cancel && should_cancel(cancel_context))
+            return CK_FRAME_LOOP_CANCELLED;
         write_scalar(request->arena, request->step_index_offset,
                      (int32_t)step);
         const int status = request->frame(request->arena,
                                           request->arena_bytes);
+        if (should_cancel && should_cancel(cancel_context))
+            return CK_FRAME_LOOP_CANCELLED;
         if (status == 1) {
             const size_t frames = step + 1;
             memcpy(request->output_codes, request->staging_codes,
@@ -123,4 +135,16 @@ int ck_run_checked_frame_loop(const ck_checked_frame_loop *request) {
                             request->frame_code_offsets[codebook]);
     }
     return CK_FRAME_LOOP_BUDGET_EXHAUSTED;
+}
+
+int ck_run_checked_frame_loop(const ck_checked_frame_loop *request) {
+    return run_checked_frame_loop(request, NULL, NULL, 0);
+}
+
+int ck_run_checked_frame_loop_control(
+    const ck_checked_frame_loop_control *request) {
+    if (!request)
+        return CK_FRAME_LOOP_INVALID;
+    return run_checked_frame_loop(&request->base, request->should_cancel,
+                                  request->cancel_context, 1);
 }

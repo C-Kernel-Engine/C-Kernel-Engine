@@ -9,13 +9,15 @@ extern "C" {
 #endif
 
 typedef int (*ck_checked_frame_entry)(uint8_t *arena, size_t arena_bytes);
+typedef int (*ck_checked_frame_cancel)(void *context);
 
 enum {
     CK_FRAME_LOOP_EOS = 0,
     CK_FRAME_LOOP_BUDGET_EXHAUSTED = 2,
     CK_FRAME_LOOP_INVALID = -1,
     CK_FRAME_LOOP_ENTRY_FAILED = -2,
-    CK_FRAME_LOOP_INVALID_OUTPUT = -3
+    CK_FRAME_LOOP_INVALID_OUTPUT = -3,
+    CK_FRAME_LOOP_CANCELLED = -7
 };
 
 /* The offsets are byte offsets into one compiler-planned arena. Each entry
@@ -43,6 +45,19 @@ typedef struct {
 } ck_checked_frame_loop;
 
 int ck_run_checked_frame_loop(const ck_checked_frame_loop *request);
+
+/* The callback is sampled before prefill and between complete frame entries.
+ * It must be safe to call from the execution thread and return nonzero when
+ * cancellation is requested. Cancellation publishes no codes or valid frames.
+ * An entry already in progress runs to its next checked boundary. */
+typedef struct {
+    ck_checked_frame_loop base;
+    ck_checked_frame_cancel should_cancel;
+    void *cancel_context;
+} ck_checked_frame_loop_control;
+
+int ck_run_checked_frame_loop_control(
+    const ck_checked_frame_loop_control *request);
 
 #ifdef __cplusplus
 }
