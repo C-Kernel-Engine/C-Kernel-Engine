@@ -66,6 +66,17 @@ def test_qwen_code_versions_and_profiles_are_explicit(tmp_path):
     current["qwen_version"] = "0.25.2"
     with pytest.raises(ValueError, match="unsupported pinned"):
         matrix._validate(config)
+    current["qwen_version"] = {"unhashable": True}
+    with pytest.raises(ValueError, match="unsupported pinned"):
+        matrix._validate(config)
+    current["qwen_version"] = "0.25.1"
+    current["qwen_profile"] = {"unhashable": True}
+    with pytest.raises(ValueError, match="qwen_profile"):
+        matrix._validate(config)
+    current["qwen_profile"] = "normal"
+    current["settings"] = {"path": "settings.json"}
+    with pytest.raises(ValueError, match="settings"):
+        matrix._validate(config)
 
 
 def test_matrix_preserves_every_attempt_and_separates_statuses(tmp_path, monkeypatch):

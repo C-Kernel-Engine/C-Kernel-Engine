@@ -76,10 +76,15 @@ def _validate(config: dict) -> dict:
         if client["adapter"] == "qwen_code":
             if not isinstance(client.get("qwen_bin"), str) or not client["qwen_bin"]:
                 raise ValueError(f"{name}: qwen_bin is required")
-            if client.get("qwen_version") not in QWEN_CODE_VERSIONS:
+            version = client.get("qwen_version")
+            if not isinstance(version, str) or version not in QWEN_CODE_VERSIONS:
                 raise ValueError(f"{name}: unsupported pinned Qwen Code version")
-            if client.get("qwen_profile", "bare") not in QWEN_CODE_PROFILES:
+            profile = client.get("qwen_profile", "bare")
+            if not isinstance(profile, str) or profile not in QWEN_CODE_PROFILES:
                 raise ValueError(f"{name}: qwen_profile must be bare or normal")
+            settings = client.get("settings")
+            if settings is not None and (not isinstance(settings, str) or not settings):
+                raise ValueError(f"{name}: settings must be a nonempty path")
             deadline = client.get("task_timeout_seconds", 1800)
             if type(deadline) is not int or not 1 <= deadline <= 86400:
                 raise ValueError(f"{name}: invalid task timeout")
