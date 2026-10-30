@@ -1558,9 +1558,8 @@ projection and the first talker block. The seven-token prompt and a two-token
 <code>Hi.</code> prompt execute short→long→short on the same loaded entry.
 The short prompt has a direct pinned-model first-block capture; its final
 block output differs by at most 9.54e-6 in the measured CPU lane. This is
-prefill-prefix evidence, not variable-length speech. The full talker still
-needs its continuation position to consume the checked prompt length before
-one speech library can handle different token counts.</p>
+prefill-prefix evidence. The continuation position now consumes the checked
+prompt length in the generated runtime circuit described below.</p>
 <p><strong>Qwen3-TTS runtime prefill cache:</strong> the same checked row extent
 now drives all 28 talker layers and their per-layer K/V cache seeds. One
 generated entry runs two-token → seven-token → two-token text requests with
@@ -1568,8 +1567,30 @@ capacity-strided cache storage. The seven-token logits match the pinned
 full-prefill capture within the existing 1.5e-4 bound; the short first-layer
 K/V rows match a separate direct capture within 8e-5. Cache copying, output
 padding, invalid lengths and repeated execution are checked separately.
-Continuation still starts from the fixed position contract, so this is
-variable-length prefill and cache seeding, not variable-length speech.</p>
+The continuation circuit now checks that the request length agrees with the
+prefill length before it appends to the cache.</p>
+<p><strong>Qwen3-TTS checked runtime continuation and short speech:</strong>
+the generated prefill and continuation segments derive attention position from
+the request's checked text-token count. A model-neutral extent operation and
+existing equality provider reject changed context between segments. Direct
+pinned captures for two- and seven-token prompts match generated prefill,
+first continuation logits and K/V rows; a synthetic generated test covers the
+next continuation position, invalid lengths and recovery. The same generated
+speech/codec library produces a 20-frame, 38,400-sample WAV for the three-token
+<code>Thank you.</code> request. All 320 generated code IDs match the pinned
+reference, and the PCM16 result differs by at most one quantization unit at
+27 samples. Without reloading or recompiling, the same library then produces
+the seven-token <code>Hello, this is CKE.</code> reference: all 736 codebook
+IDs match, and PCM16 differs by at most one unit at 91 of 88,320 samples.
+The measured three-token run took 131.74 seconds after a 137.50-second cold
+load on the bring-up host. The separate two-token <code>Hi.</code> request
+exhausted the bounded generation budget without publishing audio; the pinned
+reference also did not emit EOS within 64 new tokens. Thus the bounded
+variable-length path is demonstrated, while general short-text stopping,
+latency and interactive accessibility speech remain unfinished.</p>
+<pre><code>python version/v8/tts/qwen3_tts_pinned_session.py \
+  --model-dir /path/to/85e237c12c027371202489a0ec509ded67b5e4b5 \
+  --runtime-prompts --text 'Thank you.' --output /tmp/qwen3-thanks.wav</code></pre>
 <p><strong>Two generated frames to PCM:</strong> a checked, model-neutral integer
 span concatenation provider packs each pair of CKE-generated codebook IDs
 into a two-frame input for the existing generated codec. The same generated
