@@ -24,7 +24,8 @@ class CaptureComplete(Exception):
     """Stop generation after the two required layer calls."""
 
 
-def capture(model_dir: Path, output_dir: Path) -> dict:
+def capture(model_dir: Path, output_dir: Path,
+            text: str = DEFAULT_TEXT) -> dict:
     model_hashes = verify_model_dir(model_dir)
     import numpy as np
     import torch
@@ -104,7 +105,7 @@ def capture(model_dir: Path, output_dir: Path) -> dict:
     try:
         with torch.inference_mode():
             model.generate_custom_voice(
-                text=DEFAULT_TEXT, speaker=DEFAULT_SPEAKER,
+                text=text, speaker=DEFAULT_SPEAKER,
                 language=DEFAULT_LANGUAGE, do_sample=False,
                 subtalker_dosample=False, max_new_tokens=8,
                 non_streaming_mode=True)
@@ -129,7 +130,7 @@ def capture(model_dir: Path, output_dir: Path) -> dict:
         "model_files_sha256": model_hashes,
         "reference_revision": REFERENCE_REVISION,
         "reference_files_sha256": reference_hashes,
-        "request": {"text": DEFAULT_TEXT, "speaker": DEFAULT_SPEAKER,
+        "request": {"text": text, "speaker": DEFAULT_SPEAKER,
                     "language": DEFAULT_LANGUAGE, "seed": 20261022},
         "calls": [{key: list(value.shape) for key, value in call.items()}
                   for call in calls],
@@ -144,8 +145,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model-dir", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--text", default=DEFAULT_TEXT)
     args = parser.parse_args()
-    print(json.dumps(capture(args.model_dir, args.output_dir), indent=2))
+    print(json.dumps(capture(args.model_dir, args.output_dir, args.text), indent=2))
 
 
 if __name__ == "__main__":

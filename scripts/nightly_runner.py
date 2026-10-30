@@ -871,6 +871,23 @@ TEST_SUITES = {
             "tests.test_v8_qwen3_tts_pinned_session.Qwen3TTSPinnedSessionTest.test_repeated_pinned_native_synthesis",
         ),
     ),
+    "tts_qwen3_runtime_prompt_rows": TestSuite(
+        "Qwen3-TTS Runtime Prompt-Row Contracts", "inference",
+        ROOT / "tests" / "test_v8_qwen3_tts_runtime_prompt_first_block.py",
+        unittest_targets=(
+            "tests.test_v8_qwen3_tts_runtime_prompt_first_block.Qwen3TTSRuntimePromptFirstBlockTest.test_committed_circuit_matches_authoring",
+            "tests.test_v8_qwen3_tts_runtime_prompt_first_block.Qwen3TTSRuntimePromptFirstBlockTest.test_short_reference_integrity",
+            "tests.test_v8_qwen3_tts_runtime_prompt_first_block.Qwen3TTSRuntimePromptFirstBlockTest.test_declared_row_bindings_and_boundaries",
+        ),
+    ),
+    "tts_qwen3_runtime_prompt_rows_asset": TestSuite(
+        "Qwen3-TTS Generated Short/Long Prompt Rows", "inference",
+        ROOT / "tests" / "test_v8_qwen3_tts_runtime_prompt_first_block.py",
+        timeout_sec=360,
+        unittest_targets=(
+            "tests.test_v8_qwen3_tts_runtime_prompt_first_block.Qwen3TTSRuntimePromptFirstBlockTest.test_two_lengths_and_recovery_on_one_generated_entry",
+        ),
+    ),
     "tts_copy_i32_span_checked": TestSuite(
         "Checked Integer Span State Copy", "kernels",
         ROOT / "tests" / "test_v8_copy_i32_span_checked.py",
