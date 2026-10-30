@@ -50,10 +50,11 @@ def build_circuit(*, context_capacity: int = 7,
                   talker_layers: int = 28,
                   continuation_steps: int = 14,
                   max_generated_frames: int = 64) -> dict:
-    graph = generated_frames(talker_layers=talker_layers,
+    graph = generated_frames(context_tokens=context_capacity,
+                             talker_layers=talker_layers,
                              continuation_steps=continuation_steps,
                              max_generated_frames=max_generated_frames)
-    cache_capacity = 17 + max_generated_frames
+    cache_capacity = context_capacity + 10 + max_generated_frames
     dynamic = runtime_prefill(context_capacity=context_capacity,
                               cache_capacity=cache_capacity,
                               layers=talker_layers)
@@ -77,17 +78,21 @@ def build_circuit(*, context_capacity: int = 7,
         bindings[name] = name
     shapes["request_context_tokens"]["lifetime"] = "sequence"
     graph["runtime_lengths"].update(copy.deepcopy(dynamic["runtime_lengths"]))
+    for name in ("max_duration", "expanded_capacity"):
+        graph["runtime_constants"][name] = max(
+            graph["runtime_constants"][name], dynamic["runtime_constants"][name])
     shapes["published_prompt_rows"] = {"shape": [1], "lifetime": "sequence"}
     bindings["published_prompt_rows"] = "published_prompt_rows"
 
     projection = graph["block_types"]["text_projection"]
     projection["header"].extend(copy.deepcopy(
         dynamic["block_types"]["text_projection"]["header"]))
-    for block_name in ("text_projection", "first_block", "talker_head",
-                       "talker_cache_seed"):
+    for block_name in ("text_projection", "first_block", "talker_head"):
         _copy_runtime_bindings(
             graph["block_types"][block_name]["body"]["ops"],
             dynamic["block_types"][block_name]["body"]["ops"])
+    graph["block_types"]["talker_cache_seed"] = copy.deepcopy(
+        dynamic["block_types"]["talker_cache_seed"])
     for layer in range(1, talker_layers):
         name = f"talker_layer_{layer}"
         _copy_runtime_bindings(

@@ -16,25 +16,27 @@ OUTPUT = ROOT / "version/v8/circuits/qwen3_tts_talker_prefill_cache_bounded.json
 LAYERS = 28
 KV_HEADS = 8
 HEAD_DIM = 128
-PROMPT_ROWS = 18
-CACHE_CAPACITY = 21
 
 
-def build_circuit(*, cache_capacity: int = CACHE_CAPACITY) -> dict:
+def build_circuit(*, context_tokens: int = 7,
+                  cache_capacity: int | None = None) -> dict:
+    graph = prefill(context_tokens=context_tokens)
+    prompt_rows = context_tokens + 11
+    if cache_capacity is None:
+        cache_capacity = prompt_rows + 3
     if (isinstance(cache_capacity, bool) or not isinstance(cache_capacity, int)
-            or cache_capacity < PROMPT_ROWS + 1):
+            or cache_capacity < prompt_rows + 1):
         raise ValueError("cache_capacity must exceed prompt rows")
-    graph = prefill()
     graph["name"] = "qwen3_tts_talker_prefill_cache_bounded"
     graph["native_entry"]["function"] = "ck_qwen3_tts_talker_prefill_cache_bounded"
     graph["contract"]["runtime_invariants"].update({
         "cache_capacity": cache_capacity,
-        "cache_valid_rows_after_success": PROMPT_ROWS,
+        "cache_valid_rows_after_success": prompt_rows,
         "cache_requires_reset_after_failed_entry": True,
         "autonomous_code_generation": False,
     })
     cache_elements = KV_HEADS * cache_capacity * HEAD_DIM
-    source_elements = KV_HEADS * PROMPT_ROWS * HEAD_DIM
+    source_elements = KV_HEADS * prompt_rows * HEAD_DIM
     ops = []
     for layer in range(LAYERS):
         prefix = "" if layer == 0 else f"layer{layer}_"
@@ -56,14 +58,14 @@ def build_circuit(*, cache_capacity: int = CACHE_CAPACITY) -> dict:
                 "outputs": {"cache_k": "external:" + cache_k,
                             "cache_v": "external:" + cache_v},
             },
-            "params": {"KV": KV_HEADS, "T": PROMPT_ROWS,
+            "params": {"KV": KV_HEADS, "T": prompt_rows,
                        "S": cache_capacity, "D": HEAD_DIM,
                        "call_constants": {
                            "k_elements": source_elements,
                            "v_elements": source_elements,
                            "k_cache_elements": cache_elements,
                            "v_cache_elements": cache_elements,
-                           "kv_heads": KV_HEADS, "tokens": PROMPT_ROWS,
+                           "kv_heads": KV_HEADS, "tokens": prompt_rows,
                            "cache_capacity": cache_capacity,
                            "head_dim": HEAD_DIM}},
         })

@@ -911,19 +911,21 @@ TEST_SUITES = {
         unittest_targets=(
             "tests.test_v8_qwen3_tts_runtime_second_frame.Qwen3TTSRuntimeSecondFrameTest.test_short_reference_identity",
             "tests.test_v8_qwen3_tts_runtime_second_frame.Qwen3TTSRuntimeSecondFrameTest.test_three_token_speech_reference_identity",
+            "tests.test_v8_qwen3_tts_runtime_second_frame.Qwen3TTSRuntimeSecondFrameTest.test_eight_token_speech_reference_identity",
             "tests.test_v8_qwen3_tts_runtime_second_frame.Qwen3TTSRuntimeSecondFrameTest.test_runtime_prompt_rejects_bad_lengths_before_model_execution",
             "tests.test_v8_qwen3_tts_runtime_second_frame.Qwen3TTSRuntimeSecondFrameTest.test_canonical_runtime_edges",
             "tests.test_v8_qwen3_tts_runtime_second_frame.Qwen3TTSRuntimeSecondFrameTest.test_runtime_loop_artifact_matches_authoring",
             "tests.test_v8_qwen3_tts_runtime_second_frame.Qwen3TTSRuntimeSecondFrameTest.test_generated_segments_change_position_and_reject_stale_context",
+            "tests.test_v8_qwen3_tts_runtime_second_frame.Qwen3TTSRuntimeSecondFrameTest.test_sixteen_token_capacity_stitches_through_generated_frame",
         ),
     ),
     "tts_qwen3_runtime_second_frame_asset": TestSuite(
         "Qwen3-TTS Generated Short/Long Continuation", "inference",
         ROOT / "tests" / "test_v8_qwen3_tts_runtime_second_frame.py",
-        timeout_sec=1200,
+        timeout_sec=1800,
         unittest_targets=(
             "tests.test_v8_qwen3_tts_runtime_second_frame.Qwen3TTSRuntimeSecondFrameTest.test_full_weight_short_long_short_continuation",
-            "tests.test_v8_qwen3_tts_runtime_second_frame.Qwen3TTSRuntimeSecondFrameTest.test_two_lengths_generated_wavs_match_direct_references",
+            "tests.test_v8_qwen3_tts_runtime_second_frame.Qwen3TTSRuntimeSecondFrameTest.test_three_lengths_generated_wavs_match_direct_references",
         ),
     ),
     "tts_copy_i32_span_checked": TestSuite(
@@ -1437,6 +1439,10 @@ TEST_SUITES = {
     "tts_kokoro_native_speech_session": TestSuite(
         "Kokoro Native Speech Stop, Replace and Recovery", "inference",
         ROOT / "tests" / "test_v8_kokoro_native_speech_session.py",
+    ),
+    "accessible_voice_control": TestSuite(
+        "Confirmed Voice Request and Correlated CKE Reply", "inference",
+        ROOT / "tests" / "test_v8_accessible_voice.py",
     ),
     "tts_audio_harmonic_source_generated": TestSuite(
         "Checked Harmonic Source Normal-Compiler Generated Graph", "inference",

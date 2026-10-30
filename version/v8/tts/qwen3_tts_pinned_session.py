@@ -3,7 +3,7 @@
 
 The host imports weights, prepares text IDs and writes PCM. The native checked
 frame-codec shell invokes the circuit-generated prefill, frame and codec entries.
-The fixed seven-token path and optional 1..7-token path retain separate
+The fixed seven-token path and optional 1..16-token path retain separate
 reference evidence. Unsupported or budget-exhausting requests publish no PCM.
 """
 
@@ -48,6 +48,7 @@ SAMPLES = 88320
 SAMPLE_RATE = 24000
 CONTEXT_TOKENS = 7
 PROMPT_ROWS = 18
+RUNTIME_CONTEXT_CAPACITY = 16
 
 EXTRA_SOURCES = (
     "src/kernels/select_next_id_checked.c",
@@ -263,8 +264,8 @@ def _prompt_ids(model_dir: Path, text: str, tokenizer=None,
     if len(prefix) != 3:
         raise ValueError("pinned role prefix must encode to exactly 3 tokens")
     if context_tokens is None:
-        if not 1 <= len(context) <= CONTEXT_TOKENS:
-            raise ValueError(f"text must encode to 1..{CONTEXT_TOKENS} tokens")
+        if not 1 <= len(context) <= RUNTIME_CONTEXT_CAPACITY:
+            raise ValueError(f"text must encode to 1..{RUNTIME_CONTEXT_CAPACITY} tokens")
     elif len(context) != context_tokens:
         raise ValueError(f"text must encode to exactly {context_tokens} tokens")
     config = json.loads((model_dir / "config.json").read_text())
@@ -326,9 +327,11 @@ class PinnedQwenSession:
         self.model_hashes = verify_model_dir(self.model_dir)
         self._runtime_prompts = runtime_prompts
         circuit_builder = build_runtime_circuit if runtime_prompts else build_circuit
-        self.graph = circuit_builder(frames=CODE_FRAMES,
-                                     max_generated_frames=MAX_FRAMES,
-                                     codec_conv_provider=provider)
+        options = {"frames": CODE_FRAMES, "max_generated_frames": MAX_FRAMES,
+                   "codec_conv_provider": provider}
+        if runtime_prompts:
+            options["context_capacity"] = RUNTIME_CONTEXT_CAPACITY
+        self.graph = circuit_builder(**options)
         started = time.monotonic()
         with safe_open(self.model_dir / "model.safetensors", framework="pt", device="cpu") as main, \
              safe_open(self.model_dir / "speech_tokenizer/model.safetensors",
@@ -471,7 +474,7 @@ def main() -> int:
     parser.add_argument("--text", required=True,
                         help="English text within the selected token-length contract")
     parser.add_argument("--runtime-prompts", action="store_true",
-                        help="accept checked 1..7-token prompts through one generated library")
+                        help="accept checked 1..16-token prompts through one generated library")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--codec-conv-provider", choices=("scalar", "avx2_fma"),
                         default="avx2_fma")

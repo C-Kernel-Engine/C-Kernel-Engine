@@ -27,12 +27,12 @@ else:
 OUTPUT = ROOT / "version/v8/circuits/qwen3_tts_runtime_loop_codec_bounded.json"
 
 
-def build_circuit(*, context_capacity: int = 7,
+def build_circuit(*, context_capacity: int = 16,
                   frames: int = 46, max_generated_frames: int = 64,
                   talker_layers: int = 28, continuation_steps: int = 14,
                   codec_kwargs: dict | None = None,
                   codec_conv_provider: str = "scalar") -> dict:
-    graph = fixed_loop(frames=frames,
+    graph = fixed_loop(context_tokens=context_capacity, frames=frames,
                        max_generated_frames=max_generated_frames,
                        talker_layers=talker_layers,
                        continuation_steps=continuation_steps,
