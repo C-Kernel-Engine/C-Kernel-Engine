@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Persistent, bounded Qwen3-TTS generated execution for the pinned request.
+"""Persistent, bounded Qwen3-TTS generated execution for seven-token text.
 
 The host imports weights, prepares text IDs and writes PCM. The native checked
 frame-codec shell invokes the circuit-generated prefill, frame and codec entries.
-This first deployment boundary accepts only the independently certified prompt;
-other text and output lengths need a declared runtime-length codec contract.
+The pinned prompt retains independent numerical evidence. Other seven-token
+requests are bounded execution evidence until independently captured.
 """
 
 from __future__ import annotations
@@ -115,6 +115,10 @@ class FrameCodec(ctypes.Structure):
     ]
 
 
+class FrameCodecPrefix(ctypes.Structure):
+    _fields_ = [("base", FrameCodec), ("samples_per_code_frame", ctypes.c_size_t)]
+
+
 def _weight_shapes(graph, main, codec):
     refs = {name for block in graph["sequence"]
             for op in graph["block_types"][block].get("body", {}).get("ops", [])
@@ -222,16 +226,19 @@ def _view(arena, acts, name, dtype, shape):
                       offset=acts[name]["abs_offset"])
 
 
-def _prompt_ids(model_dir: Path, text: str):
-    if text != DEFAULT_TEXT:
-        raise ValueError(f"only the pinned request is certified: {DEFAULT_TEXT!r}")
+def _prompt_ids(model_dir: Path, text: str, tokenizer=None):
+    if not isinstance(text, str) or not text.strip() or any(ord(c) < 32 for c in text):
+        raise ValueError("text must be nonempty and contain no control characters")
+    if "<|" in text or "|>" in text:
+        raise ValueError("special-token syntax is unsupported in spoken text")
     from transformers import AutoTokenizer
 
-    tokenizer = AutoTokenizer.from_pretrained(str(model_dir), local_files_only=True)
+    if tokenizer is None:
+        tokenizer = AutoTokenizer.from_pretrained(str(model_dir), local_files_only=True)
     context = tokenizer.encode(text, add_special_tokens=False)
     prefix = tokenizer.encode("<|im_start|>assistant\n", add_special_tokens=False)
     if len(context) != CONTEXT_TOKENS or len(prefix) != 3:
-        raise ValueError("tokenizer output contradicts pinned prompt geometry")
+        raise ValueError(f"text must encode to exactly {CONTEXT_TOKENS} tokens")
     config = json.loads((model_dir / "config.json").read_text())
     talker = config["talker_config"]
     text_ids = np.array([
@@ -263,7 +270,9 @@ def _set_inputs(arena, acts, text_ids, codec_ids):
 
 
 def write_wav(path: Path, samples: np.ndarray):
-    if samples.ndim != 1 or samples.size != SAMPLES or not np.isfinite(samples).all():
+    if (samples.ndim != 1 or not 0 < samples.size <= SAMPLES or
+            samples.size % (SAMPLES // CODE_FRAMES) or
+            not np.isfinite(samples).all()):
         raise ValueError("invalid generated PCM extent or values")
     pcm = np.rint(np.clip(samples, -1.0, 1.0) * 32767.0).astype("<i2")
     with wave.open(str(path), "wb") as stream:
@@ -278,6 +287,7 @@ class PinnedQwenSession:
 
     def __init__(self, model_dir: Path, build_dir: Path, provider: str = "avx2_fma"):
         from safetensors import safe_open
+        from transformers import AutoTokenizer
 
         self.model_dir = Path(model_dir)
         self.model_hashes = verify_model_dir(self.model_dir)
@@ -324,25 +334,29 @@ class PinnedQwenSession:
             fn.argtypes = [ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t]
             fn.restype = ctypes.c_int
             self._segments.append(fn)
-        self._run = self._native.ck_run_checked_frame_codec
-        self._run.argtypes, self._run.restype = [ctypes.POINTER(FrameCodec)], ctypes.c_int
-        self.text_ids, self.codec_ids = _prompt_ids(self.model_dir, DEFAULT_TEXT)
+        self._run = self._native.ck_run_checked_frame_codec_prefix
+        self._run.argtypes, self._run.restype = [ctypes.POINTER(FrameCodecPrefix)], ctypes.c_int
+        self._tokenizer = AutoTokenizer.from_pretrained(str(self.model_dir), local_files_only=True)
+        self.text_ids, self.codec_ids = _prompt_ids(
+            self.model_dir, DEFAULT_TEXT, self._tokenizer)
         self.load_seconds = time.monotonic() - started
         self.load_count = 1
         self._lock = threading.Lock()
 
     def synthesize(self, text: str) -> tuple[np.ndarray, dict]:
-        if text != DEFAULT_TEXT:
-            raise ValueError(f"only the pinned request is certified: {DEFAULT_TEXT!r}")
         with self._lock:
-            return self._synthesize_checked()
+            text_ids, codec_ids = _prompt_ids(self.model_dir, text, self._tokenizer)
+            samples, metric = self._synthesize_checked(text_ids, codec_ids)
+            metric["text_sha256"] = hashlib.sha256(text.encode("utf-8")).hexdigest()
+            metric["text_tokens"] = CONTEXT_TOKENS
+            return samples, metric
 
-    def _synthesize_checked(self) -> tuple[np.ndarray, dict]:
+    def _synthesize_checked(self, text_ids, codec_ids) -> tuple[np.ndarray, dict]:
         # The planner places all mutable activations after immutable weights.
         # This also clears recurrent/KV state before each request.
         ctypes.memset(ctypes.addressof(self.arena) + self.activation_base, 0,
                       self.arena_bytes - self.activation_base)
-        _set_inputs(self.arena, self.acts, self.text_ids, self.codec_ids)
+        _set_inputs(self.arena, self.acts, text_ids, codec_ids)
         first = ["talker_first_code_id", "pred_predictor_codebook0_selected_id"] + [
             f"pred_step{i}_selected_id" for i in range(1, 15)]
         later = ["second_talker_first_code_id",
@@ -368,7 +382,7 @@ class PinnedQwenSession:
             staging.ctypes.data_as(ctypes.POINTER(ctypes.c_int32)), len(staging),
             codes.ctypes.data_as(ctypes.POINTER(ctypes.c_int32)), len(codes),
             ctypes.pointer(frames))
-        request = FrameCodec(
+        request = FrameCodecPrefix(FrameCodec(
             ctypes.pointer(loop), ctypes.cast(self._segments[2], ctypes.c_void_p),
             self.acts["loop_frame_major_codes"]["abs_offset"],
             CODEBOOKS, CODE_FRAMES,
@@ -376,20 +390,22 @@ class PinnedQwenSession:
             self.acts["waveform_valid_samples"]["abs_offset"],
             SAMPLES,
             samples.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-            len(samples), ctypes.pointer(valid))
+            len(samples), ctypes.pointer(valid)), SAMPLES // CODE_FRAMES)
         started = time.monotonic()
         status = self._run(ctypes.byref(request))
         seconds = time.monotonic() - started
-        if status != 0 or frames.value != CODE_FRAMES or valid.value != SAMPLES:
+        if status != 0 or not 0 < frames.value <= CODE_FRAMES or \
+                valid.value != frames.value * (SAMPLES // CODE_FRAMES):
             if valid.value != 0:
                 raise RuntimeError("failed synthesis published an output extent")
             raise RuntimeError(f"native Qwen synthesis failed: status={status}, frames={frames.value}")
-        if not np.isfinite(samples[:SAMPLES]).all() or np.any(samples[SAMPLES:] != -901):
+        if not np.isfinite(samples[:valid.value]).all() or \
+                np.any(samples[valid.value:] != -901):
             raise RuntimeError("native Qwen output or padding is invalid")
-        return samples[:SAMPLES].copy(), {
+        return samples[:valid.value].copy(), {
             "frames": frames.value, "samples": valid.value,
-            "code_sha256": hashlib.sha256(codes[:CODE_FRAMES * CODEBOOKS].tobytes()).hexdigest(),
-            "waveform_f32_sha256": hashlib.sha256(samples[:SAMPLES].tobytes()).hexdigest(),
+            "code_sha256": hashlib.sha256(codes[:frames.value * CODEBOOKS].tobytes()).hexdigest(),
+            "waveform_f32_sha256": hashlib.sha256(samples[:valid.value].tobytes()).hexdigest(),
             "library_sha256": self.library_sha256,
             "load_count": self.load_count,
             "run_seconds": round(seconds, 3),
@@ -400,17 +416,19 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model-dir", type=Path, required=True)
     parser.add_argument("--text", required=True,
-                        help=f"currently supported: {DEFAULT_TEXT!r}")
+                        help=f"must encode to {CONTEXT_TOKENS} Qwen tokens")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--codec-conv-provider", choices=("scalar", "avx2_fma"),
                         default="avx2_fma")
     parser.add_argument("--repeat", type=int, default=1,
                         help="run the same request repeatedly on one loaded model")
     args = parser.parse_args()
-    if args.text != DEFAULT_TEXT:
-        parser.error(f"only the pinned request is certified: {DEFAULT_TEXT!r}")
     if not 1 <= args.repeat <= 8:
         parser.error("--repeat must be in 1..8")
+    try:
+        _prompt_ids(args.model_dir, args.text)
+    except ValueError as exc:
+        parser.error(str(exc))
     with tempfile.TemporaryDirectory(prefix="cke-qwen3tts-") as temp:
         session = PinnedQwenSession(args.model_dir, Path(temp),
                                     args.codec_conv_provider)
@@ -436,7 +454,7 @@ def main() -> int:
             raise RuntimeError("repeated requests produced different PCM")
         write_wav(args.output, samples)
         print("QWEN3_TTS_PINNED_WAV " + json.dumps({
-            "path": str(args.output), "samples": SAMPLES,
+            "path": str(args.output), "samples": len(samples),
             "sample_rate_hz": SAMPLE_RATE,
             "sha256": hashlib.sha256(args.output.read_bytes()).hexdigest(),
         }, sort_keys=True), flush=True)
