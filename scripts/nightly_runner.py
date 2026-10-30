@@ -904,6 +904,28 @@ TEST_SUITES = {
             "tests.test_v8_qwen3_tts_runtime_prompt_cache.Qwen3TTSRuntimePromptCacheTest.test_two_lengths_seed_cache_and_recover",
         ),
     ),
+    "tts_qwen3_runtime_second_frame": TestSuite(
+        "Qwen3-TTS Runtime Continuation Contracts", "inference",
+        ROOT / "tests" / "test_v8_qwen3_tts_runtime_second_frame.py",
+        timeout_sec=180,
+        unittest_targets=(
+            "tests.test_v8_qwen3_tts_runtime_second_frame.Qwen3TTSRuntimeSecondFrameTest.test_short_reference_identity",
+            "tests.test_v8_qwen3_tts_runtime_second_frame.Qwen3TTSRuntimeSecondFrameTest.test_three_token_speech_reference_identity",
+            "tests.test_v8_qwen3_tts_runtime_second_frame.Qwen3TTSRuntimeSecondFrameTest.test_runtime_prompt_rejects_bad_lengths_before_model_execution",
+            "tests.test_v8_qwen3_tts_runtime_second_frame.Qwen3TTSRuntimeSecondFrameTest.test_canonical_runtime_edges",
+            "tests.test_v8_qwen3_tts_runtime_second_frame.Qwen3TTSRuntimeSecondFrameTest.test_runtime_loop_artifact_matches_authoring",
+            "tests.test_v8_qwen3_tts_runtime_second_frame.Qwen3TTSRuntimeSecondFrameTest.test_generated_segments_change_position_and_reject_stale_context",
+        ),
+    ),
+    "tts_qwen3_runtime_second_frame_asset": TestSuite(
+        "Qwen3-TTS Generated Short/Long Continuation", "inference",
+        ROOT / "tests" / "test_v8_qwen3_tts_runtime_second_frame.py",
+        timeout_sec=1200,
+        unittest_targets=(
+            "tests.test_v8_qwen3_tts_runtime_second_frame.Qwen3TTSRuntimeSecondFrameTest.test_full_weight_short_long_short_continuation",
+            "tests.test_v8_qwen3_tts_runtime_second_frame.Qwen3TTSRuntimeSecondFrameTest.test_two_lengths_generated_wavs_match_direct_references",
+        ),
+    ),
     "tts_copy_i32_span_checked": TestSuite(
         "Checked Integer Span State Copy", "kernels",
         ROOT / "tests" / "test_v8_copy_i32_span_checked.py",
