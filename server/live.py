@@ -1648,28 +1648,60 @@ class _FlightAdmission:
         self.guard = threading.Condition()
         self.waiters: deque[object] = deque()
 
-    def acquire(self, timeout: float) -> str:
+    def acquire(self, timeout: float, *, cancelled: Callable[[], bool] | None = None) -> str:
         deadline = time.monotonic() + max(0.0, timeout)
+        # The callback may cross into the ASGI event loop. Never invoke it
+        # while holding guard: stream cleanup on that loop also needs guard.
+        def cancelled_after_acquire() -> bool:
+            try:
+                return cancelled is not None and cancelled()
+            except BaseException:
+                self.lock.release()
+                self.notify_release()
+                raise
+
+        if cancelled is not None and cancelled():
+            return "cancelled"
         with self.guard:
             if not self.waiters and self.lock.acquire(blocking=False):
-                return "acquired"
-            if len(self.waiters) >= self.max_waiters:
+                acquired = True
+                ticket = None
+            elif len(self.waiters) >= self.max_waiters:
                 return "full"
-            ticket = object()
-            self.waiters.append(ticket)
-            try:
-                while True:
+            else:
+                acquired = False
+                ticket = object()
+                self.waiters.append(ticket)
+        if acquired:
+            if cancelled_after_acquire():
+                self.lock.release()
+                self.notify_release()
+                return "cancelled"
+            return "acquired"
+        try:
+            while True:
+                if cancelled is not None and cancelled():
+                    return "cancelled"
+                with self.guard:
                     if self.waiters[0] is ticket and self.lock.acquire(blocking=False):
                         self.waiters.popleft()
                         self.guard.notify_all()
-                        return "acquired"
-                    remaining = deadline - time.monotonic()
-                    if remaining <= 0:
-                        return "timeout"
-                    # Some tests and external hosts hold the exposed lock
-                    # directly, so retain a bounded poll as a fallback.
-                    self.guard.wait(min(remaining, 0.05))
-            finally:
+                        acquired = True
+                    else:
+                        remaining = deadline - time.monotonic()
+                        if remaining <= 0:
+                            return "timeout"
+                        # External hosts may hold the exposed lock directly.
+                        self.guard.wait(min(remaining, 0.05))
+                        acquired = False
+                if acquired:
+                    if cancelled_after_acquire():
+                        self.lock.release()
+                        self.notify_release()
+                        return "cancelled"
+                    return "acquired"
+        finally:
+            with self.guard:
                 if ticket in self.waiters:
                     self.waiters.remove(ticket)
                     self.guard.notify_all()
@@ -3200,7 +3232,7 @@ def create_app(
                 stored["completed_at"] = int(time.time())
 
 
-    def _acquire_flight_or_429(timeout: float | None = None) -> None:
+    def _acquire_flight_or_429(request: Request, timeout: float | None = None) -> None:
         """Take the single-flight lock through bounded FIFO admission.
 
         Concurrent harness requests (e.g. title + main, client retries) wait
@@ -3210,9 +3242,22 @@ def create_app(
         """
         if timeout is None:
             timeout = _FLIGHT_WAIT_SECONDS
-        outcome = _flight_admission.acquire(timeout)
+
+        def client_disconnected() -> bool:
+            try:
+                return bool(anyio.from_thread.run(request.is_disconnected))
+            except RuntimeError:
+                # Synchronous test callers can lack an AnyIO worker token.
+                return False
+
+        outcome = _flight_admission.acquire(timeout, cancelled=client_disconnected)
         if outcome == "acquired":
             return
+        if outcome == "cancelled":
+            raise _harness_error(
+                499, "Client disconnected while waiting for admission.",
+                err_type="invalid_request_error", code="client_disconnected",
+            )
         raise _harness_error(
             429,
             "Session busy: admission queue is full." if outcome == "full"
@@ -3229,7 +3274,7 @@ def create_app(
         try:
             _validate_request(body)
             if batch_http is None:
-                _acquire_flight_or_429()
+                _acquire_flight_or_429(request)
                 lease = _FlightLease(_flight_lock, session, _flight_admission.notify_release)
             else:
                 try:

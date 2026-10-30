@@ -233,6 +233,123 @@ def test_timed_out_admission_removes_its_ticket():
     lock.release()
 
 
+def test_disconnected_admission_removes_ticket_before_native_ownership():
+    lock = threading.Lock()
+    admission = live._FlightAdmission(lock, max_waiters=1)
+    disconnected = threading.Event()
+    lock.acquire()
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        queued = pool.submit(admission.acquire, 5, cancelled=disconnected.is_set)
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            with admission.guard:
+                if admission.waiters:
+                    break
+            threading.Event().wait(.001)
+        else:
+            pytest.fail('request did not join admission queue')
+        disconnected.set()
+        assert queued.result(timeout=1) == 'cancelled'
+    assert not admission.waiters
+    assert lock.locked()
+    lock.release()
+    assert admission.acquire(0) == 'acquired'
+    lock.release()
+
+
+def test_admission_disconnect_probe_does_not_hold_cleanup_lock():
+    lock = threading.Lock()
+    admission = live._FlightAdmission(lock, max_waiters=1)
+    probe_entered = threading.Event()
+    cleanup_done = threading.Event()
+    release_probe = threading.Event()
+    probes = 0
+
+    def disconnect_probe():
+        nonlocal probes
+        probes += 1
+        if probes == 1:
+            return False
+        probe_entered.set()
+        assert release_probe.wait(2)
+        return True
+
+    def cleanup():
+        admission.notify_release()
+        cleanup_done.set()
+        release_probe.set()
+
+    lock.acquire()
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        queued = pool.submit(admission.acquire, 5, cancelled=disconnect_probe)
+        try:
+            assert probe_entered.wait(1)
+            notifier = pool.submit(cleanup)
+            # Before the fix, cleanup needed guard while the callback held it.
+            assert cleanup_done.wait(.3)
+            notifier.result(timeout=1)
+            assert queued.result(timeout=1) == 'cancelled'
+        finally:
+            release_probe.set()
+            lock.release()
+    assert not admission.waiters
+
+
+def test_disconnect_during_admission_handoff_releases_native_owner():
+    lock = threading.Lock()
+    admission = live._FlightAdmission(lock, max_waiters=1)
+    observations = iter((False, True))
+    assert admission.acquire(0, cancelled=lambda: next(observations)) == 'cancelled'
+    assert not lock.locked()
+    assert admission.acquire(0) == 'acquired'
+    lock.release()
+
+
+def test_http_disconnected_waiter_never_starts_native_work(monkeypatch):
+    disconnected = threading.Event()
+    original = Request.is_disconnected
+
+    async def simulated_disconnect(request):
+        if request.headers.get('x-test-disconnect') == 'yes':
+            return disconnected.is_set()
+        return await original(request)
+
+    monkeypatch.setattr(Request, 'is_disconnected', simulated_disconnect)
+    monkeypatch.setattr(live, '_FLIGHT_WAIT_SECONDS', 5.0)
+    session = Session()
+    session.release.set()
+    app = create_app(session, model='test', chat_template=TEMPLATE)
+    client = TestClient(app)
+    assert app.state.flight_lock.acquire(blocking=False)
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            queued = pool.submit(
+                client.post, '/v1/responses',
+                json={'model': 'test', 'input': 'queued'},
+                headers={'x-test-disconnect': 'yes'},
+            )
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline:
+                with app.state.flight_admission.guard:
+                    if app.state.flight_admission.waiters:
+                        break
+                threading.Event().wait(.001)
+            else:
+                pytest.fail('request did not join admission queue')
+            disconnected.set()
+            response = queued.result(timeout=1)
+            assert response.status_code == 499
+            assert response.json()['error']['code'] == 'client_disconnected'
+            assert not app.state.flight_admission.waiters
+            assert session.calls == 0
+    finally:
+        app.state.flight_lock.release()
+        app.state.flight_admission.notify_release()
+    followup = client.post('/v1/responses', json={'model': 'test', 'input': 'followup'})
+    assert followup.status_code == 200
+    assert session.calls == 1
+
+
 @pytest.mark.parametrize("route", ["responses", "chat/completions"])
 def test_http_admission_overflow_does_not_start_native_work(monkeypatch, route):
     monkeypatch.setattr(live, "_FLIGHT_MAX_WAITERS", 1)
