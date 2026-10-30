@@ -16,8 +16,8 @@ SCHEMA = ROOT / "version" / "v8" / "schemas" / "kernel_call_abi.schema.json"
 REGISTRY = MAPS / "KERNEL_REGISTRY.json"
 EXCLUDED = {"KERNEL_REGISTRY.json", "kernel_bindings.json", "kernel_bindings.overlay.json"}
 BUILD_IR = ROOT / "version" / "v8" / "scripts" / "build_ir_v8.py"
-EXPECTED_GOVERNED_MAP_COUNT = 252
-EXPECTED_MAP_OWNED_ABI_COUNT = 347
+EXPECTED_GOVERNED_MAP_COUNT = 253
+EXPECTED_MAP_OWNED_ABI_COUNT = 348
 GLM4_PARITY_PROVIDERS = {
     "rope_forward_qk_pairwise_llama_cpu",
     "rope_precompute_cache_llama_cpu",

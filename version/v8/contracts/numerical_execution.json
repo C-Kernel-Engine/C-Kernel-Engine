@@ -919,6 +919,17 @@
       "position_transform": null,
       "description": "Checks positive int32 durations and exact bounded extent before copying token-major FP32 features to channel-major strided expanded rows; padding is untouched."
     },
+    "alignment_attention_normalize_median_dtw_ordered_f32": {
+      "operator_family": "alignment_attention_dtw",
+      "status": "validated",
+      "storage": {"input": "fp32", "weight": "none", "output": "int32"},
+      "compute": {"input": "fp32", "weight": "none", "accumulator": "fp64", "contraction": "disabled", "evaluation_order": "ascending_head_frame_token_population_normalization_reflect_median_head_mean_then_frame_token_dtw"},
+      "rounding": {"mode": "rne", "points": ["input_load", "reduction_update", "partial_store", "output_store"]},
+      "reduction": {"kind": "composite", "order": "stage_ordered", "partial_accumulator": "fp64", "merge_order": "none"},
+      "threading": {"work_partition": "serial", "split_strategy": "serial", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Selected attention-head population normalization over text tokens, reflect median over audio frames, head mean and ordered DTW. Returns first frame for each token; rejects degenerate or nonfinite input before changing output. This is not a word boundary or calibrated confidence contract."
+    },
     "audio_istft_mag_phase_centered_hann_ola_fp32": {
       "operator_family": "audio_istft_mag_phase",
       "status": "validated",
