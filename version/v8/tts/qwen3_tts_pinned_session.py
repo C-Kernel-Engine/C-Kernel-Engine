@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Persistent, bounded Qwen3-TTS generated execution for seven-token text.
+"""Persistent, bounded Qwen3-TTS generated execution for checked text lengths.
 
 The host imports weights, prepares text IDs and writes PCM. The native checked
 frame-codec shell invokes the circuit-generated prefill, frame and codec entries.
-The pinned prompt retains independent numerical evidence. Other seven-token
-requests are bounded execution evidence until independently captured.
+The fixed seven-token path and optional 1..7-token path retain separate
+reference evidence. Unsupported or budget-exhausting requests publish no PCM.
 """
 
 from __future__ import annotations
@@ -32,6 +32,9 @@ sys.path.insert(0, str(ROOT / "version/v8/scripts"))
 import build_ir_v8
 
 from version.v8.tts.build_qwen3_tts_loop_codec_circuit import build_circuit
+from version.v8.tts.build_qwen3_tts_runtime_loop_codec_circuit import (
+    build_circuit as build_runtime_circuit,
+)
 from version.v8.tts.build_qwen3_tts_prompt_first_block_circuit import prompt_plan
 from version.v8.tts.build_qwen3_tts_talker_predictor_frame_circuit import bridge_plan
 from version.v8.tts.capture_qwen3_tts_customvoice_oracle import (
@@ -201,7 +204,10 @@ def _compile(folder: Path, graph: dict, shapes: dict):
                 "request_context_tokens", "valid_context_tokens",
                 "valid_text_rows", "valid_prompt_rows",
                 "valid_q_norm_rows", "valid_k_norm_rows",
-                "valid_hidden_elements", "valid_mlp_elements")},
+                "valid_hidden_elements", "valid_mlp_elements",
+                "published_prompt_rows", "frame_context_tokens",
+                "frame_prompt_rows", "frame_prompt_rows_value",
+                "prompt_rows_verified")},
     }, "entries": entries, "quant_summary": {}, "template": graph}
     registry = build_ir_v8.load_kernel_registry()
     with contextlib.redirect_stdout(io.StringIO()):
@@ -244,18 +250,22 @@ def _view(arena, acts, name, dtype, shape):
 
 
 def _prompt_ids(model_dir: Path, text: str, tokenizer=None,
-                context_tokens: int = CONTEXT_TOKENS):
+                context_tokens: int | None = CONTEXT_TOKENS):
     if not isinstance(text, str) or not text.strip() or any(ord(c) < 32 for c in text):
         raise ValueError("text must be nonempty and contain no control characters")
     if "<|" in text or "|>" in text:
         raise ValueError("special-token syntax is unsupported in spoken text")
-    from transformers import AutoTokenizer
-
     if tokenizer is None:
+        from transformers import AutoTokenizer
         tokenizer = AutoTokenizer.from_pretrained(str(model_dir), local_files_only=True)
     context = tokenizer.encode(text, add_special_tokens=False)
     prefix = tokenizer.encode("<|im_start|>assistant\n", add_special_tokens=False)
-    if len(context) != context_tokens or len(prefix) != 3:
+    if len(prefix) != 3:
+        raise ValueError("pinned role prefix must encode to exactly 3 tokens")
+    if context_tokens is None:
+        if not 1 <= len(context) <= CONTEXT_TOKENS:
+            raise ValueError(f"text must encode to 1..{CONTEXT_TOKENS} tokens")
+    elif len(context) != context_tokens:
         raise ValueError(f"text must encode to exactly {context_tokens} tokens")
     config = json.loads((model_dir / "config.json").read_text())
     talker = config["talker_config"]
@@ -273,12 +283,16 @@ def _prompt_ids(model_dir: Path, text: str, tokenizer=None,
 
 
 def _set_inputs(arena, acts, text_ids, codec_ids):
-    _view(arena, acts, "text_ids", np.int32, (13,))[:] = text_ids
+    context_tokens = len(text_ids) - 6
+    prompt_rows = context_tokens + 11
+    _view(arena, acts, "text_ids", np.int32, (len(text_ids),))[:] = text_ids
     _view(arena, acts, "codec_ids", np.int32, (7,))[:] = codec_ids
-    for name, indices in prompt_plan(CONTEXT_TOKENS).items():
-        _view(arena, acts, name, np.int32, (PROMPT_ROWS,))[:] = indices
-    for name, indices in bridge_plan(PROMPT_ROWS).items():
+    for name, indices in prompt_plan(context_tokens).items():
+        _view(arena, acts, name, np.int32, (len(indices),))[:] = indices
+    for name, indices in bridge_plan(prompt_rows).items():
         _view(arena, acts, "bridge_" + name, np.int32, (2,))[:] = indices
+    if "request_context_tokens" in acts:
+        _view(arena, acts, "request_context_tokens", np.int32, (1,))[0] = context_tokens
     for name in ("pred_feedback_step_index_input", "feedback_left_indices",
                  "talker_step_index_input", "second_feedback_step_index_input"):
         _view(arena, acts, name, np.int32, (1,))[0] = 0
@@ -303,15 +317,18 @@ def write_wav(path: Path, samples: np.ndarray):
 class PinnedQwenSession:
     """Keep one generated library and one weight arena loaded across calls."""
 
-    def __init__(self, model_dir: Path, build_dir: Path, provider: str = "avx2_fma"):
+    def __init__(self, model_dir: Path, build_dir: Path,
+                 provider: str = "avx2_fma", *, runtime_prompts: bool = False):
         from safetensors import safe_open
         from transformers import AutoTokenizer
 
         self.model_dir = Path(model_dir)
         self.model_hashes = verify_model_dir(self.model_dir)
-        self.graph = build_circuit(frames=CODE_FRAMES,
-                                   max_generated_frames=MAX_FRAMES,
-                                   codec_conv_provider=provider)
+        self._runtime_prompts = runtime_prompts
+        circuit_builder = build_runtime_circuit if runtime_prompts else build_circuit
+        self.graph = circuit_builder(frames=CODE_FRAMES,
+                                     max_generated_frames=MAX_FRAMES,
+                                     codec_conv_provider=provider)
         started = time.monotonic()
         with safe_open(self.model_dir / "model.safetensors", framework="pt", device="cpu") as main, \
              safe_open(self.model_dir / "speech_tokenizer/model.safetensors",
@@ -368,10 +385,14 @@ class PinnedQwenSession:
     def synthesize(self, text: str) -> tuple[np.ndarray, dict]:
         with self._lock:
             self._cancel_requested.clear()
-            text_ids, codec_ids = _prompt_ids(self.model_dir, text, self._tokenizer)
+            text_ids, codec_ids = _prompt_ids(
+                self.model_dir, text, self._tokenizer,
+                context_tokens=None if self._runtime_prompts else CONTEXT_TOKENS)
+            context_tokens = len(text_ids) - 6
             samples, metric = self._synthesize_checked(text_ids, codec_ids)
             metric["text_sha256"] = hashlib.sha256(text.encode("utf-8")).hexdigest()
-            metric["text_tokens"] = CONTEXT_TOKENS
+            metric["text_tokens"] = context_tokens
+            metric["prompt_rows"] = context_tokens + 11
             return samples, metric
 
     def stop(self) -> None:
@@ -448,7 +469,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model-dir", type=Path, required=True)
     parser.add_argument("--text", required=True,
-                        help=f"must encode to {CONTEXT_TOKENS} Qwen tokens")
+                        help="English text within the selected token-length contract")
+    parser.add_argument("--runtime-prompts", action="store_true",
+                        help="accept checked 1..7-token prompts through one generated library")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--codec-conv-provider", choices=("scalar", "avx2_fma"),
                         default="avx2_fma")
@@ -458,17 +481,25 @@ def main() -> int:
     if not 1 <= args.repeat <= 8:
         parser.error("--repeat must be in 1..8")
     try:
-        _prompt_ids(args.model_dir, args.text)
+        if args.runtime_prompts:
+            from transformers import AutoTokenizer
+            tokenizer = AutoTokenizer.from_pretrained(str(args.model_dir),
+                                                       local_files_only=True)
+            _prompt_ids(args.model_dir, args.text, tokenizer, context_tokens=None)
+        else:
+            _prompt_ids(args.model_dir, args.text)
     except ValueError as exc:
         parser.error(str(exc))
     with tempfile.TemporaryDirectory(prefix="cke-qwen3tts-") as temp:
         session = PinnedQwenSession(args.model_dir, Path(temp),
-                                    args.codec_conv_provider)
+                                    args.codec_conv_provider,
+                                    runtime_prompts=args.runtime_prompts)
         print("QWEN3_TTS_PINNED_LOAD " + json.dumps({
             "model_revision": MODEL_REVISION,
             "model_sha256": session.model_hashes["model.safetensors"],
             "library_sha256": session.library_sha256,
             "codec_conv_provider": args.codec_conv_provider,
+            "runtime_prompts": args.runtime_prompts,
             "arena_bytes": session.arena_bytes,
             "compile_seconds": round(session.compile_seconds, 3),
             "cold_load_seconds": round(session.load_seconds, 3),

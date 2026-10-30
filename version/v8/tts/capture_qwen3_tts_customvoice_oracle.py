@@ -120,15 +120,14 @@ def capture(model_dir: Path, output_dir: Path, text: str, speaker: str,
 
     def record_projection(_, inputs, output):
         if inputs[0].ndim == 3 and inputs[0].shape[1] == captured.get("context_tokens"):
-            if "context_projection_output" in captured:
-                raise RuntimeError("reference projected the spoken text more than once")
+            # The role and single-token projections can have the same row
+            # count as a short spoken context. The full-context projection is
+            # the last matching call in non-streaming prompt assembly.
             captured["context_projection_input"] = inputs[0].detach().cpu().numpy().copy()
             captured["context_projection_output"] = output.detach().cpu().numpy().copy()
 
     def record_fc1(_, inputs, output):
         if inputs[0].ndim == 3 and inputs[0].shape[1] == captured.get("context_tokens"):
-            if "context_fc1_output" in captured:
-                raise RuntimeError("reference evaluated spoken-text fc1 more than once")
             captured["context_fc1_output"] = output.detach().cpu().numpy().copy()
 
     projection_hook = model.model.talker.text_projection.register_forward_hook(record_projection)
@@ -160,6 +159,12 @@ def capture(model_dir: Path, output_dir: Path, text: str, speaker: str,
 
     if len(wavs) != 1 or not captured.get("codec_tokens") or "context_projection_output" not in captured:
         raise RuntimeError("reference did not return waveform, codec sequence and context projection")
+    with torch.inference_mode():
+        expected_projection_input = model.model.talker.get_text_embeddings()(
+            torch.tensor(captured["context_token_ids"], device=model.model.talker.device)
+        ).detach().cpu().numpy()
+    if not np.array_equal(captured["context_projection_input"], expected_projection_input):
+        raise RuntimeError("captured projection does not match the spoken-text IDs")
     waveform = np.asarray(wavs[0], dtype=np.float32).reshape(-1)
     if not waveform.size or not np.isfinite(waveform).all():
         raise RuntimeError("reference returned empty or nonfinite audio")

@@ -28,7 +28,8 @@ else:
     )
 
 
-def capture(model_dir: Path, output_dir: Path) -> dict:
+def capture(model_dir: Path, output_dir: Path,
+            text: str = DEFAULT_TEXT) -> dict:
     model_hashes = verify_model_dir(model_dir)
     import numpy as np
     import torch
@@ -80,7 +81,7 @@ def capture(model_dir: Path, output_dir: Path) -> dict:
     try:
         with torch.inference_mode():
             model.generate_custom_voice(
-                text=DEFAULT_TEXT, speaker=DEFAULT_SPEAKER,
+                text=text, speaker=DEFAULT_SPEAKER,
                 language=DEFAULT_LANGUAGE, do_sample=False,
                 subtalker_dosample=False, max_new_tokens=4,
                 non_streaming_mode=True)
@@ -88,12 +89,13 @@ def capture(model_dir: Path, output_dir: Path) -> dict:
         for handle in handles:
             handle.remove()
     if state["step"] != 3 or len(talker.model.layers) != 28:
-        raise RuntimeError("expected 18-row prefill and exactly three one-token continuations")
+        raise RuntimeError("expected prefill and exactly three one-token continuations")
+    prompt_rows = arrays["step0_input"].shape[1]
     for step in range(4):
-        rows = 18 if step == 0 else 1
+        rows = prompt_rows if step == 0 else 1
         if arrays[f"step{step}_input"].shape != (1, rows, 1024):
             raise RuntimeError(f"unexpected step {step} input geometry")
-        expected_position = list(range(18)) if step == 0 else [17 + step]
+        expected_position = list(range(prompt_rows)) if step == 0 else [prompt_rows - 1 + step]
         if arrays[f"step{step}_cache_position"].tolist() != expected_position:
             raise RuntimeError(f"unexpected step {step} cache position")
         for layer in range(28):
@@ -110,7 +112,9 @@ def capture(model_dir: Path, output_dir: Path) -> dict:
     np.savez_compressed(fixture, **arrays)
     manifest = {
         "schema": 1,
-        "scope": "pinned 18-row prefill and three teacher-forced continuation steps; CKE execution NOT_TESTED",
+        "scope": ("pinned 18-row prefill and three teacher-forced continuation steps; CKE execution NOT_TESTED"
+                  if text == DEFAULT_TEXT else
+                  "selected-text prefill and three teacher-forced continuation steps; CKE execution NOT_TESTED"),
         "model_revision": MODEL_REVISION,
         "model_files_sha256": model_hashes,
         "reference_revision": REFERENCE_REVISION,
@@ -119,7 +123,7 @@ def capture(model_dir: Path, output_dir: Path) -> dict:
                     "numpy": np.__version__, "machine": platform.machine(),
                     "device": "cpu", "dtype": "float32", "attention": "eager",
                     "threads": torch.get_num_threads()},
-        "request": {"text": DEFAULT_TEXT, "speaker": DEFAULT_SPEAKER,
+        "request": {"text": text, "speaker": DEFAULT_SPEAKER,
                     "language": DEFAULT_LANGUAGE, "seed": 20261022,
                     "do_sample": False, "subtalker_dosample": False,
                     "max_new_tokens": 4, "non_streaming_mode": True},
@@ -136,8 +140,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model-dir", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--text", default=DEFAULT_TEXT)
     args = parser.parse_args()
-    print(json.dumps(capture(args.model_dir, args.output_dir), indent=2))
+    print(json.dumps(capture(args.model_dir, args.output_dir, args.text), indent=2))
 
 
 if __name__ == "__main__":
