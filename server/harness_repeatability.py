@@ -238,12 +238,19 @@ def _run_step(client: dict, kind: str, directory: Path) -> dict:
            "loaded_identity_status": _identity_status(client, report) if report else "missing",
            "server_instance_id": _server_instance(client, report)}
     if kind == "task" and client["adapter"] == "qwen_code":
-        row["task_status"] = ("incomplete" if timed_out else
-                              (report or {}).get("result", {}).get("status", "missing"))
+        child_result = (report or {}).get("result", {})
+        child_status = child_result.get("status", "missing")
+        row["task_status"] = ("fail" if timed_out and child_status == "fail" else
+                              "incomplete" if timed_out else child_status)
+        row["termination_reason"] = ("coordinator_time_budget_exceeded" if timed_out else
+                                     (report or {}).get("termination_reason"))
+        row["task_errors"] = child_result.get("errors", [])
+        row["observed_failures"] = child_result.get("observed_failures", [])
         if timed_out:
-            row["incomplete_reason"] = "coordinator_time_budget_exceeded"
+            if row["task_status"] == "incomplete":
+                row["incomplete_reason"] = "coordinator_time_budget_exceeded"
         elif row["task_status"] == "incomplete":
-            row["incomplete_reason"] = (report or {}).get("result", {}).get(
+            row["incomplete_reason"] = child_result.get(
                 "incomplete_reason", "client_incomplete")
         row["client_certification_status"] = (report or {}).get("certification", {}).get("status", "missing")
         row["tool_call_count"] = len((report or {}).get("result", {}).get("tool_call_ids", []))

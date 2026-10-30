@@ -90,6 +90,46 @@ def _client_time_budget_exceeded(exit_code: int, stderr_path: Path) -> bool:
     return 'Run aborted: wall-clock budget of ' in tail and ' exceeded' in tail
 
 
+def _observed_timeout_failures(events: list[dict], errors: list[str]) -> list[str]:
+    """Identify violations proven by captured events, independent of completion."""
+    definite = {
+        'mixed_stream_sessions', 'mixed_recorded_sessions',
+        'duplicate_tool_result', 'invalid_stream_tool_arguments',
+        'invalid_recorded_tool_arguments', 'invalid_call_ids',
+        'unexpected_tool_path', 'unexpected_validation_command',
+        'unexpected_validation_directory', 'tool_error',
+        'recorded_tool_error', 'tool_activity_after_terminal',
+        'stream_recording_summary_mismatch',
+    }
+    observed = [error for error in errors if error in definite]
+    init = next((row for row in events if row.get('type') == 'system'
+                 and row.get('subtype') == 'init'), None)
+    if init is not None:
+        observed.extend(error for error in errors if error in {
+            'stream_session_identity_missing_or_mismatched',
+            'stream_model_identity_missing_or_mismatched',
+        })
+    seen_calls: set[str] = set()
+    for row in events:
+        message = row.get('message') or {}
+        if row.get('type') == 'assistant':
+            for part in message.get('content', []):
+                if part.get('type') != 'tool_use':
+                    continue
+                if part.get('name') not in EXPECTED_TOOLS:
+                    observed.append('unexpected_tool_name')
+                seen_calls.add(str(part.get('id', '')))
+        elif row.get('type') == 'user':
+            for part in message.get('content', []):
+                if (part.get('type') == 'tool_result'
+                        and str(part.get('tool_use_id', '')) not in seen_calls):
+                    observed.append('tool_result_before_call_or_unknown')
+        elif row.get('type') == 'result' and (row.get('subtype') != 'success'
+                                               or row.get('is_error')):
+            observed.append('stream_final_missing_or_failed')
+    return observed
+
+
 def _valid_sha256(value: object) -> bool:
     return isinstance(value, str) and len(value) == 64 and all(
         char in '0123456789abcdef' for char in value)
@@ -426,8 +466,10 @@ def evaluate(events: list[dict], recording: list[dict], *, session_id: str,
 
 
 def run(args: argparse.Namespace) -> dict:
-    if args.timeout <= 0 or args.max_output_tokens <= 0:
-        raise ValueError('timeout and max-output-tokens must be positive')
+    if type(args.timeout) is not int or not 1 <= args.timeout <= 86400:
+        raise ValueError('timeout must be an integer from 1 to 86400 seconds')
+    if type(args.max_output_tokens) is not int or not 1 <= args.max_output_tokens <= 32768:
+        raise ValueError('max-output-tokens must be an integer from 1 to 32768')
     version = subprocess.run([args.qwen_bin, '--version'], capture_output=True,
                              text=True, timeout=10, check=True).stdout.strip()
     if version != args.expected_qwen_version:
@@ -492,6 +534,7 @@ def run(args: argparse.Namespace) -> dict:
             'declared_client_wall_time_seconds': declared_client_wall_time,
             'max_output_tokens': args.max_output_tokens,
             'time_budget_seconds': args.timeout,
+            'termination_reason': None,
             'result': {'status': 'not_run', 'errors': ['loaded_identity_preflight_failed']},
             'identity': {'level': 'preflight_rejected', 'before': identity_before, 'after': None},
             'certification': {'status': 'fail', 'reason': reason,
@@ -547,8 +590,13 @@ def run(args: argparse.Namespace) -> dict:
     if verdict['errors']:
         verdict['status'] = 'fail'
     if timed_out or client_budget_exceeded:
-        verdict['status'] = 'incomplete'
-        verdict['incomplete_reason'] = 'time_budget_exceeded'
+        verdict['observed_failures'] = _observed_timeout_failures(
+            events, verdict['errors'])
+        if not verdict['observed_failures']:
+            verdict['status'] = 'incomplete'
+            verdict['incomplete_reason'] = 'time_budget_exceeded'
+    termination_reason = ('runner_time_budget_exceeded' if timed_out else
+                          'client_time_budget_exceeded' if client_budget_exceeded else None)
     try:
         identity_after = _read_loaded_identity(endpoint)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
@@ -581,6 +629,7 @@ def run(args: argparse.Namespace) -> dict:
         'time_budget_seconds': args.timeout,
         'time_budget_exceeded': timed_out,
         'client_time_budget_exceeded': client_budget_exceeded,
+        'termination_reason': termination_reason,
         'advertised_model': advertised,
         'exit_code': exit_code,
         'runner_sha256': _sha256(Path(__file__)),
