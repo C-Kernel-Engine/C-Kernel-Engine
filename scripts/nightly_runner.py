@@ -888,6 +888,22 @@ TEST_SUITES = {
             "tests.test_v8_qwen3_tts_runtime_prompt_first_block.Qwen3TTSRuntimePromptFirstBlockTest.test_two_lengths_and_recovery_on_one_generated_entry",
         ),
     ),
+    "tts_qwen3_runtime_prompt_cache": TestSuite(
+        "Qwen3-TTS Runtime Prompt Cache Contracts", "inference",
+        ROOT / "tests" / "test_v8_qwen3_tts_runtime_prompt_cache.py",
+        unittest_targets=(
+            "tests.test_v8_qwen3_tts_runtime_prompt_cache.Qwen3TTSRuntimePromptCacheTest.test_circuit_regeneration_and_scalar_binding",
+            "tests.test_v8_qwen3_tts_runtime_prompt_cache.Qwen3TTSRuntimePromptCacheTest.test_short_reference_integrity",
+        ),
+    ),
+    "tts_qwen3_runtime_prompt_cache_asset": TestSuite(
+        "Qwen3-TTS Generated Short/Long Prompt Cache", "inference",
+        ROOT / "tests" / "test_v8_qwen3_tts_runtime_prompt_cache.py",
+        timeout_sec=360,
+        unittest_targets=(
+            "tests.test_v8_qwen3_tts_runtime_prompt_cache.Qwen3TTSRuntimePromptCacheTest.test_two_lengths_seed_cache_and_recover",
+        ),
+    ),
     "tts_copy_i32_span_checked": TestSuite(
         "Checked Integer Span State Copy", "kernels",
         ROOT / "tests" / "test_v8_copy_i32_span_checked.py",
