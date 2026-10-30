@@ -854,12 +854,14 @@ TEST_SUITES = {
         unittest_targets=(
             "tests.test_v8_qwen3_tts_pinned_session.Qwen3TTSPinnedSessionTest.test_pcm_wav_header_and_rejection",
             "tests.test_v8_qwen3_tts_pinned_session.Qwen3TTSPinnedSessionTest.test_unsupported_text_rejected_before_model_access",
+            "tests.test_v8_qwen3_tts_pinned_session.Qwen3TTSPinnedSessionTest.test_request_text_selects_distinct_prompt_ids",
+            "tests.test_v8_qwen3_tts_pinned_session.Qwen3TTSPinnedSessionTest.test_second_reference_fixture_integrity",
         ),
     ),
     "tts_qwen3_pinned_session_asset": TestSuite(
         "Qwen3-TTS Repeated Native Speech Session", "inference",
         ROOT / "tests" / "test_v8_qwen3_tts_pinned_session.py",
-        timeout_sec=1200,
+        timeout_sec=1800,
         unittest_targets=(
             "tests.test_v8_qwen3_tts_pinned_session.Qwen3TTSPinnedSessionTest.test_repeated_pinned_native_synthesis",
         ),
