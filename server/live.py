@@ -3634,6 +3634,15 @@ def create_app(
         return {**attestation, "server_instance_id": server_instance_id,
                 "effective_serving": effective_serving}
 
+    if callable(getattr(session, "progress", None)) and batch_http is None:
+        @router.get("/cke/native-progress")
+        def get_native_progress():
+            # The snapshot contains no prompt or output text. It reports
+            # completed generated work, independent of SSE delivery.
+            return {"schema": "cke.native_progress.v1", "model": model,
+                    "server_instance_id": server_instance_id,
+                    **session.progress()}
+
     if batch_http is not None:
         @router.get("/cke/batch-observation")
         def get_batch_observation():

@@ -3691,6 +3691,17 @@ static CKModel *g_model = NULL;
 static ck_manifest_map_t *g_manifest = NULL;
 static int g_ck_skip_decode_logits = 0;
 static const atomic_int *g_ck_cancel_flag = NULL;
+typedef void (*ck_model_progress_callback_v8)(void *, int32_t, int32_t, int32_t, int32_t);
+static ck_model_progress_callback_v8 g_ck_progress_callback = NULL;
+static void *g_ck_progress_user_data = NULL;
+
+static inline void ck_model_progress_report(int32_t completed_layers,
+                                            int32_t total_layers, int32_t chunk_tokens,
+                                            int32_t chunk_start_position) {{
+    if (g_ck_progress_callback)
+        g_ck_progress_callback(g_ck_progress_user_data, completed_layers,
+                               total_layers, chunk_tokens, chunk_start_position);
+}}
 
 static int ck_model_cancel_requested(void) {{
     return g_ck_cancel_flag && atomic_load_explicit(g_ck_cancel_flag, memory_order_relaxed);
@@ -4075,6 +4086,12 @@ static void ck_trace_pos(const char *stage, int32_t token, int count, int before
 /* Embed tokens (prefill) - stores embeddings in activation buffer */
 CK_EXPORT void ck_model_set_cancel_flag(const atomic_int *flag) {{
     g_ck_cancel_flag = flag;
+}}
+
+CK_EXPORT void ck_model_set_progress_callback(
+        ck_model_progress_callback_v8 callback, void *user_data) {{
+    g_ck_progress_callback = callback;
+    g_ck_progress_user_data = user_data;
 }}
 
 /* One means that external prefill appends have no grouped-row boundary. */

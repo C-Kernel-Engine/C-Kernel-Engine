@@ -159,6 +159,8 @@ typedef int (*build_generation_prefix_t)(const char *, const char *, uint32_t, i
 typedef int (*apply_generation_policy_t)(float *, int, const int32_t *, int, int, uint32_t);
 typedef int (*set_gemm_schedule_t)(int);
 typedef void (*set_cancel_flag_t)(const atomic_int *);
+typedef void (*model_progress_callback_t)(void *, int32_t, int32_t, int32_t, int32_t);
+typedef void (*set_progress_callback_t)(model_progress_callback_t, void *);
 
 typedef struct {
     void *handle;
@@ -223,6 +225,7 @@ typedef struct {
     apply_generation_policy_t apply_generation_policy;
     set_gemm_schedule_t set_gemm_schedule;
     set_cancel_flag_t set_cancel_flag;
+    set_progress_callback_t set_progress_callback;
     ck_model_sequence_state_requirements_v8_fn sequence_requirements;
     ck_model_sequence_state_create_v8_fn sequence_create;
     ck_model_sequence_state_activate_v8_fn sequence_activate;
@@ -393,8 +396,11 @@ typedef struct {
     ck_session_token_callback_v8 token_callback;
     void *token_callback_user_data;
     const atomic_int *cancel_requested;
+    CKSessionV8 *progress_session;
     CKSessionGenerateResultV8 *session_result;
 } CLIOptions;
+
+static void session_progress_set_phase(CKSessionV8 *session, int phase);
 
 static bool cli_cancel_requested(const CLIOptions *opt) {
     return opt && opt->cancel_requested &&
@@ -1827,6 +1833,8 @@ static bool load_model_api(const char *lib_path, ModelAPI *api) {
     }
     resolve_symbol(api->handle, "ck_model_embed_tokens", (void **)&api->embed, false);
     resolve_symbol(api->handle, "ck_model_set_cancel_flag", (void **)&api->set_cancel_flag, false);
+    resolve_symbol(api->handle, "ck_model_set_progress_callback",
+                   (void **)&api->set_progress_callback, false);
     resolve_symbol(api->handle, "ck_model_forward", (void **)&api->forward, false);
     resolve_symbol(api->handle, "ck_model_decode", (void **)&api->decode, false);
     resolve_symbol(api->handle, "ck_model_sequence_state_requirements", (void **)&api->sequence_requirements, false);
@@ -2765,6 +2773,7 @@ prefill_done:
         free(ids);
         return 0;
     }
+    session_progress_set_phase(opt->progress_session, CK_SESSION_PROGRESS_DECODE);
     int generation_status = run_generation_loop(api, opt);
     free(ids);
     return generation_status;
@@ -5658,6 +5667,8 @@ static char *read_repl_turn(bool multiline_input) {
 struct CKSessionV8 {
     ModelAPI api;
     pthread_mutex_t generation_lock;
+    pthread_mutex_t progress_lock;
+    CKSessionProgressV8 progress;
     atomic_int cancel_requested;
     pthread_t generation_thread;
     volatile sig_atomic_t generation_thread_valid;
@@ -5679,6 +5690,40 @@ struct CKSessionV8 {
     int batch_poisoned;
     unsigned batch_poison_reset_mask;
 };
+
+static void session_progress_set_phase(CKSessionV8 *session, int phase) {
+    if (!session) return;
+    pthread_mutex_lock(&session->progress_lock);
+    session->progress.phase = phase;
+    pthread_mutex_unlock(&session->progress_lock);
+}
+
+static void session_progress_layer(void *user_data, int32_t completed,
+                                   int32_t total, int32_t chunk_tokens,
+                                   int32_t chunk_start_position) {
+    CKSessionV8 *session = (CKSessionV8 *)user_data;
+    if (!session || total <= 0 || completed < 0 || completed > total ||
+        chunk_tokens < 0 || chunk_start_position < 0)
+        return;
+    pthread_mutex_lock(&session->progress_lock);
+    if (session->progress.phase == CK_SESSION_PROGRESS_PREFILL) {
+        session->progress.completed_layers = completed;
+        session->progress.total_layers = total;
+        session->progress.chunk_tokens = chunk_tokens;
+        session->progress.chunk_start_position = chunk_start_position;
+    }
+    pthread_mutex_unlock(&session->progress_lock);
+}
+
+int ck_session_v8_get_progress(CKSessionV8 *session, CKSessionProgressV8 *progress) {
+    if (!session || !progress || progress->struct_size != sizeof(*progress) ||
+        progress->abi_version != CK_SESSION_ABI_V8_VERSION)
+        return CK_SESSION_V8_ERROR_INVALID_ARGUMENT;
+    pthread_mutex_lock(&session->progress_lock);
+    *progress = session->progress;
+    pthread_mutex_unlock(&session->progress_lock);
+    return CK_SESSION_V8_OK;
+}
 
 static int session_error(CKSessionV8 *session, int status, const char *message) {
     if (session) {
@@ -5714,12 +5759,20 @@ int ck_session_v8_open(
         free(session);
         return CK_SESSION_V8_ERROR_RUNTIME;
     }
+    if (pthread_mutex_init(&session->progress_lock, NULL) != 0) {
+        pthread_mutex_destroy(&session->generation_lock);
+        free(session);
+        return CK_SESSION_V8_ERROR_RUNTIME;
+    }
+    session->progress.struct_size = sizeof(session->progress);
+    session->progress.abi_version = CK_SESSION_ABI_V8_VERSION;
     if (config->num_threads > 0) {
         char thread_text[32];
         snprintf(thread_text, sizeof(thread_text), "%d", config->num_threads);
         setenv("CK_NUM_THREADS", thread_text, 1);
     }
     if (!load_model_api(config->model_library_path, &session->api)) {
+        pthread_mutex_destroy(&session->progress_lock);
         pthread_mutex_destroy(&session->generation_lock);
         free(session);
         return CK_SESSION_V8_ERROR_LOAD;
@@ -5767,6 +5820,7 @@ fail_initialized:
     if (session->api.free_fn) session->api.free_fn();
 fail:
     if (session->api.handle) dlclose(session->api.handle);
+    pthread_mutex_destroy(&session->progress_lock);
     pthread_mutex_destroy(&session->generation_lock);
     free(session);
     return failure_status;
@@ -5788,6 +5842,7 @@ void ck_session_v8_close(CKSessionV8 *session) {
     if (session->api.handle) dlclose(session->api.handle);
     pthread_mutex_unlock(&session->generation_lock);
     pthread_mutex_destroy(&session->generation_lock);
+    pthread_mutex_destroy(&session->progress_lock);
     free(session);
 }
 
@@ -5913,8 +5968,18 @@ int ck_session_v8_generate(
 
     memset((char *)result + 2 * sizeof(uint32_t), 0,
             sizeof(*result) - 2 * sizeof(uint32_t));
+    pthread_mutex_lock(&session->progress_lock);
+    session->progress.request_serial++;
+    session->progress.phase = CK_SESSION_PROGRESS_PREFILL;
+    session->progress.completed_layers = 0;
+    session->progress.total_layers = 0;
+    session->progress.chunk_tokens = 0;
+    session->progress.chunk_start_position = 0;
+    pthread_mutex_unlock(&session->progress_lock);
     atomic_store_explicit(&session->cancel_requested, 0, memory_order_relaxed);
     if (session->api.set_cancel_flag) session->api.set_cancel_flag(&session->cancel_requested);
+    if (session->api.set_progress_callback)
+        session->api.set_progress_callback(session_progress_layer, session);
     session->last_error[0] = '\0';
     g_exit_requested = 0;
     if (!(request->flags & CK_SESSION_REQUEST_CONTINUE_STATE) &&
@@ -5941,6 +6006,7 @@ int ck_session_v8_generate(
     opt.token_callback = callback;
     opt.token_callback_user_data = user_data;
     opt.cancel_requested = &session->cancel_requested;
+    opt.progress_session = session;
     opt.session_result = result;
 
     int status = run_prompt(&session->api, &opt, request->user_text);
@@ -5949,6 +6015,8 @@ int ck_session_v8_generate(
                       "native generation failed");
     }
     if (session->api.set_cancel_flag) session->api.set_cancel_flag(NULL);
+    if (session->api.set_progress_callback)
+        session->api.set_progress_callback(NULL, NULL);
     /* A failed forward may have updated KV, recurrent state or the position
      * cursor before reporting failure. Never expose that partial state to a
      * later request, including one that asks to continue the session. */
@@ -5956,6 +6024,7 @@ int ck_session_v8_generate(
         session->api.kv_reset) {
         session->api.kv_reset();
     }
+    session_progress_set_phase(session, CK_SESSION_PROGRESS_COMPLETE);
     pthread_mutex_unlock(&session->generation_lock);
     return status == 0 ? CK_SESSION_V8_OK : CK_SESSION_V8_ERROR_RUNTIME;
 }
