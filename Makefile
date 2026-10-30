@@ -1821,6 +1821,7 @@ test-v8-qwen38-flash-contracts: $(BUILD_DIR)/libckernel_engine.so
 		unittest/test_qwen4_exp_qsa_bf16.py \
 		unittest/test_moe_swiglu_q4k_q5_0.py \
 		unittest/test_moe_swiglu_q4k_q8_0.py \
+		unittest/test_moe_q4k_expert_reuse.py \
 		unittest/test_moe_swiglu_shared_bf16_gated.py \
 		unittest/test_recurrent_norm_sigmoid_gate_llama.py \
 		unittest/bf16/test_attn_gate_sigmoid_pytorch_storage_bf16.py \
@@ -6943,6 +6944,7 @@ test-kernel-maps:
 		tests/test_v8_kernel_allocation_audit.py \
 		tests/test_v8_quantized_write_bounds.py \
 		tests/test_v8_provider_selection.py \
+		tests/test_v8_moe_expert_reuse_contract.py \
 		tests/test_v8_kernel_call_abi.py \
 		tests/test_v8_shared_provider_migration.py \
 		tests/test_v8_build_diagnostics.py \

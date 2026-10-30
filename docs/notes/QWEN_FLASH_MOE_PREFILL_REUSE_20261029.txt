@@ -1,0 +1,114 @@
+Qwen3.8 Flash Next routed-expert prefill reuse, 2026-10-29
+
+Scope
+-----
+This is a new generated-runtime provider for Q4_K gate/up weights with
+Q5_0 or Q8_0 down weights. It groups already-computed input rows by selected
+expert inside each routing slot, packs that expert's gate/up weights once in
+caller-owned per-worker scratch, and processes the bucket. A barrier between
+slots preserves every token's original weighted-accumulation order. Sparse
+buckets, small row counts, unsupported ISA, and insufficient reuse workspace
+retain the existing parallel provider. Existing deployed bundles do not change
+until rebuilt; a compatible rebuilt bundle selects the provider for prefill.
+No recurrent update is reordered.
+
+The pinned 8K Q4_K_M bundle resolves 24 Q5_0 and 24 Q8_0 reuse calls in
+prefill; decode continues to resolve the original providers. The bundle was
+generated from commit 796a87322 in an isolated worktree. No existing server
+was replaced.
+
+Pinned execution
+----------------
+Host: AMD Ryzen 9 9950X3D, 16 CKE threads and one OpenMP thread, CPU only. Muse was
+stopped for the large-memory replay and restored afterward. Source weights
+and token IDs were identical between old and candidate runs.
+
+Original speed-control libmodel SHA-256: f25effe5f11d0c3b1a9d5c07886cd9c7650a4b5c1ac749a837ff355effa79912
+Post-reset control libmodel SHA-256: 7cdd1a53ef1ff6a33d06a20add0ec88a7ea5a0a4a61d126a00d6c1456ca475f4
+Post-reset control engine SHA-256: b783753fcb3a758aab17ab4e215a4625d4302080d450f3f9cd40d5b06d3e0823
+Post-reset control generated-C SHA-256: 1c0b2f00e9401fe244db51939bb84d79f0641034e3278e86214074054e4386be
+New libmodel SHA-256: a9b616ccf27152ca8f7e39314fe1d6dbe22282a21ca96dfb44b34d69c0998568
+New engine SHA-256: 07791940ec9b097324c48c566c97e41ee63ffec1b84b0e8490d1c071b062ecaa
+New generated-C SHA-256: dc5a137c54ed2ac51f29bd50c62002a869b8775396771ad5d9f100f3e9d6212c
+New weights manifest SHA-256: dff2910668bf6ef7c4c27825dca9a5ae0a9877bc556d2a9d99b495c3fca754f1
+
+Matched post-#975 native prefill, excluding initialization and Python scans:
+
+  Input IDs    Control     Reuse      Ratio    Full-logit comparison
+  2,323        109.678 s   51.682 s   2.12x    16 rows bit exact
+  6,089        489.895 s   383.951 s  1.28x    final row bit exact
+
+The 2,323-token pair generated the same 16 token IDs. Native decode measured
+2.906 versus 2.746 seconds, insufficient to claim a decode speed change from
+one trial. Peak process RSS was 132,915,988 versus 132,915,592 KB. At 6,089
+tokens, peak RSS was 132,915,260 versus 132,916,764 KB. Both bundles used
+the same token IDs, weight manifest, batched-prefill policy and 8K context.
+The machine-readable postreset-speed-verdict.json retains all float-row,
+token, timing, counter, library and memory comparisons.
+
+Earlier same-day runs against the pre-#975 control measured 110.070 versus
+55.933 seconds at 2,323 tokens and 483.710 versus 402.428 seconds at 6,089
+tokens. A second candidate long run took 366.653 seconds. They are useful
+variability evidence, but the post-reset pairs above are the primary matched
+comparison. A 127-token prefill additionally matched that older bundle's
+full first-step logits and complete named KV,
+recurrent-convolution, recurrent-SSM, PLE-token, PLE-convolution, and QSA
+index-key state hashes. The 127-token run exercises the fallback provider,
+so it does not certify state after optimized reuse.
+
+517-row reset and complete-state gate
+-------------------------------------
+The original speed-control bundle predates #975: its generated reset did not
+clear PLE state. It matched the candidate's first A prefill in full logits
+and all six named state buffers, but its B and repeated A diverged. That old
+bundle is therefore excluded from reset certification.
+
+A fresh control was generated from post-#975 commit 498ad35d7 using the same
+source weights, prompt IDs, batched-prefill policy, context and CPU settings.
+Its reset clears PLE state as the candidate does. The retained 517-row A/B/A
+comparison reports PASS for full last-row logits and complete named KV,
+recurrent-convolution, recurrent-SSM, PLE-token, PLE-convolution and QSA
+index-key buffers at all three steps. Both bundles reproduced A after B and
+reset. The candidate recorded 47 reuse calls and one fallback for each
+prompt. A negative control that altered B's KV digest failed specifically at
+the named-state gate. Exact reports are state-control-postreset-517-aba.json,
+state-reuse-517-aba.json, state-control-vs-reuse-517-verdict.json and
+state-negative-kv-517-verdict.json in the retained Ryzen probe directory.
+The reusable driver is version/v8/scripts/certify_moe_reuse_state_v8.py.
+Run it separately for each bundle with --run, --ids, --prefix-len 517 and
+--out, then use --compare CONTROL.json CANDIDATE.json --out VERDICT.json.
+Each capture records the loaded model and engine libraries, generated source,
+prompt IDs and complete named-state hashes. The verdict fails if reuse did
+not execute, a reset did not reproduce A, or any full-logit or named-state
+hash differs.
+
+The candidate reported 1,091,810 assignments, 161,793 distinct expert/slot
+buckets, 323,586 pack calls and one fallback at 2,323 tokens. At 6,089 it
+reported 1,925,120 assignments, 165,573 distinct buckets, 331,146 pack
+calls and one fallback. These counters cover the reuse path only; they do not
+include packing inside the one fallback or unrelated projections.
+
+Both layouts report 119,148,020,522 bytes of weights and 14,034,815,360
+bytes of planned prefill activations. Process RSS above is observed peak
+memory, not a formal bound on all system memory.
+
+Retained commands, JSON, float logits, stderr, and perf data are on Ryzen:
+  /data/cke/runs/qwen-flash-speed-20261029/reuse-probe-20261029/
+  /data/cke/runs/qwen-flash-speed-20261029/reuse-bundle-8k-20261029/
+The first diagnostic profile and excluded OOM attempt are separately noted
+in prefill-profile-20261029/PREFILL_PROFILE_SUMMARY.txt.
+
+Limitations and next gates
+--------------------------
+This is one repeated-route candidate on one artifact, not a general prefill
+speed certification. The 6,089-token runs remain about 4.1–4.5 times slower
+than the earlier matched llama.cpp prefill (89.5 s); the run used the same
+tokens but was not a same-window llama.cpp rerun. A sample during the new
+long run attributed 48% of sampled CPU cycles to packed Q4_K projection work,
+with about 15% still in packing in the existing fallback path. Sampled cycles
+are not wall-time savings.
+
+Before promoting this as a production serving speed claim: verify cancellation
+on the rebuilt bundle, repeat matched idle-host measurements,
+and require final-head nightly. Keep a low-reuse case in regression coverage so
+grouping overhead does not become a hidden regression.
