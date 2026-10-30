@@ -14,7 +14,10 @@ static int disjoint(uintptr_t a, size_t a_bytes, uintptr_t b, size_t b_bytes) {
 
 static int run_checked_frame_codec(const ck_checked_frame_codec *request,
                                    size_t samples_per_code_frame,
-                                   int prefix_mode) {
+                                   int prefix_mode,
+                                   ck_checked_frame_cancel should_cancel,
+                                   void *cancel_context,
+                                   int control_required) {
     if (!request || !request->generation || !request->valid_samples ||
         (uintptr_t)request->valid_samples % _Alignof(size_t) != 0 ||
         (uintptr_t)request->valid_samples > UINTPTR_MAX - sizeof(size_t))
@@ -57,7 +60,8 @@ static int run_checked_frame_codec(const ck_checked_frame_codec *request,
                   loop->staging_elements * sizeof(int32_t)))
         return CK_FRAME_LOOP_INVALID;
     *request->valid_samples = 0;
-    if ((prefix_mode && !samples_per_code_frame) ||
+    if ((control_required && !should_cancel) ||
+        (prefix_mode && !samples_per_code_frame) ||
         !loop->arena || !loop->output_codes || !request->codec ||
         !request->output_samples || !request->expected_code_frames ||
         !request->expected_codebooks ||
@@ -114,9 +118,23 @@ static int run_checked_frame_codec(const ck_checked_frame_codec *request,
         !disjoint((uintptr_t)request->valid_samples, sizeof(size_t),
                   (uintptr_t)loop->staging_codes, code_bytes))
         return CK_FRAME_LOOP_INVALID;
-    const int generation_status = ck_run_checked_frame_loop(loop);
+    int generation_status;
+    if (should_cancel) {
+        ck_checked_frame_loop_control controlled = {
+            .base = *loop,
+            .should_cancel = should_cancel,
+            .cancel_context = cancel_context,
+        };
+        generation_status = ck_run_checked_frame_loop_control(&controlled);
+    } else {
+        generation_status = ck_run_checked_frame_loop(loop);
+    }
     if (generation_status != CK_FRAME_LOOP_EOS)
         return generation_status;
+    if (should_cancel && should_cancel(cancel_context)) {
+        *loop->valid_frames = 0;
+        return CK_FRAME_LOOP_CANCELLED;
+    }
     if (!loop->valid_frames || !*loop->valid_frames ||
         *loop->valid_frames > request->expected_code_frames ||
         (!samples_per_code_frame &&
@@ -130,6 +148,10 @@ static int run_checked_frame_codec(const ck_checked_frame_codec *request,
            *loop->valid_frames * loop->codebooks * sizeof(int32_t));
     if (request->codec(loop->arena, loop->arena_bytes) != 0)
         return CK_FRAME_CODEC_ENTRY_FAILED;
+    if (should_cancel && should_cancel(cancel_context)) {
+        *loop->valid_frames = 0;
+        return CK_FRAME_LOOP_CANCELLED;
+    }
     int32_t produced = 0;
     memcpy(&produced, loop->arena + request->waveform_valid_samples_offset,
            sizeof(produced));
@@ -139,6 +161,10 @@ static int run_checked_frame_codec(const ck_checked_frame_codec *request,
         loop->arena + request->waveform_offset);
     for (size_t index = 0; index < request->expected_samples; ++index)
         if (!isfinite(samples[index])) return CK_FRAME_CODEC_INVALID_OUTPUT;
+    if (should_cancel && should_cancel(cancel_context)) {
+        *loop->valid_frames = 0;
+        return CK_FRAME_LOOP_CANCELLED;
+    }
     const size_t valid_samples = samples_per_code_frame
         ? *loop->valid_frames * samples_per_code_frame
         : request->expected_samples;
@@ -148,7 +174,7 @@ static int run_checked_frame_codec(const ck_checked_frame_codec *request,
 }
 
 int ck_run_checked_frame_codec(const ck_checked_frame_codec *request) {
-    return run_checked_frame_codec(request, 0, 0);
+    return run_checked_frame_codec(request, 0, 0, NULL, NULL, 0);
 }
 
 int ck_run_checked_frame_codec_prefix(
@@ -156,5 +182,16 @@ int ck_run_checked_frame_codec_prefix(
     if (!request)
         return CK_FRAME_LOOP_INVALID;
     return run_checked_frame_codec(&request->base,
-                                   request->samples_per_code_frame, 1);
+                                   request->samples_per_code_frame, 1,
+                                   NULL, NULL, 0);
+}
+
+int ck_run_checked_frame_codec_prefix_control(
+    const ck_checked_frame_codec_prefix_control *request) {
+    if (!request)
+        return CK_FRAME_LOOP_INVALID;
+    return run_checked_frame_codec(&request->base.base,
+                                   request->base.samples_per_code_frame, 1,
+                                   request->should_cancel,
+                                   request->cancel_context, 1);
 }

@@ -514,11 +514,16 @@ IDs and a 1.68e-6 maximum waveform difference in the asset-backed test. The
 second capture uses PyTorch 2.12.1+cpu; its manifest records the model,
 reference-code and runtime identities separately from the older fixture.
 This is a bounded two-text numerical demonstration, not arbitrary assistant
-replies, cancellation, streaming or conversational latency. The host prepares
+replies, streaming or conversational latency. The persistent Python session
+now exposes <code>stop()</code>: the generic native shell checks it before
+prefill and between generated frames, and withholds valid PCM after a stop.
+An in-progress generated frame or codec entry runs to its next checked
+boundary; this does not yet establish prompt stop latency during codec work
+or playback cancellation. The host prepares
 input IDs and packages PCM; the circuit and generated native entries execute
 the neural graph. The registered session suite covers text rejection and WAV
-integrity; the asset-backed run checks A→B→A state reset and direct reference
-parity.</p>
+integrity; the asset-backed run checks cancellation recovery, A→B→A state
+reset and direct reference parity.</p>
 <p><strong>Two generated frames to PCM:</strong> a checked, model-neutral integer
 span concatenation provider packs each pair of CKE-generated codebook IDs
 into a two-frame input for the existing generated codec. The same generated

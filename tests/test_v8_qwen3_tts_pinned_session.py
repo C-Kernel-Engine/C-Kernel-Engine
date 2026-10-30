@@ -13,7 +13,8 @@ import wave
 import numpy as np
 
 from version.v8.tts.qwen3_tts_pinned_session import (
-    DEFAULT_TEXT, PinnedQwenSession, SAMPLE_RATE, SAMPLES,
+    CancelCallback, DEFAULT_TEXT, PinnedQwenSession, SAMPLE_RATE, SAMPLES,
+    SynthesisCancelled,
     _prompt_ids, write_wav,
 )
 
@@ -30,6 +31,23 @@ class Qwen3TTSPinnedSessionTest(unittest.TestCase):
             session = PinnedQwenSession(
                 Path(os.environ["CKE_QWEN3_TTS_MODEL_DIR"]), Path(temp),
                 provider=os.environ.get("CKE_QWEN3_TTS_CODEC_CONV_PROVIDER", "scalar"))
+            checks = 0
+            original_callback = session._cancel_callback
+
+            def stop_after_first_frame(_context):
+                nonlocal checks
+                checks += 1
+                if checks == 4:
+                    session.stop()
+                return int(session._cancel_requested.is_set())
+
+            session._cancel_callback = CancelCallback(stop_after_first_frame)
+            try:
+                with self.assertRaises(SynthesisCancelled):
+                    session.synthesize(DEFAULT_TEXT)
+            finally:
+                session._cancel_callback = original_callback
+            self.assertGreaterEqual(checks, 4)
             with self.assertRaisesRegex(ValueError, "exactly 7 tokens"):
                 session.synthesize("Hi.")
             first, first_metric = session.synthesize(DEFAULT_TEXT)

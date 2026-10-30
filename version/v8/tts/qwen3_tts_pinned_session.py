@@ -119,6 +119,19 @@ class FrameCodecPrefix(ctypes.Structure):
     _fields_ = [("base", FrameCodec), ("samples_per_code_frame", ctypes.c_size_t)]
 
 
+CancelCallback = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_void_p)
+
+
+class FrameCodecPrefixControl(ctypes.Structure):
+    _fields_ = [("base", FrameCodecPrefix),
+                ("should_cancel", CancelCallback),
+                ("cancel_context", ctypes.c_void_p)]
+
+
+class SynthesisCancelled(RuntimeError):
+    """The current generated request stopped at a checked boundary."""
+
+
 def _weight_shapes(graph, main, codec):
     refs = {name for block in graph["sequence"]
             for op in graph["block_types"][block].get("body", {}).get("ops", [])
@@ -334,8 +347,12 @@ class PinnedQwenSession:
             fn.argtypes = [ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t]
             fn.restype = ctypes.c_int
             self._segments.append(fn)
-        self._run = self._native.ck_run_checked_frame_codec_prefix
-        self._run.argtypes, self._run.restype = [ctypes.POINTER(FrameCodecPrefix)], ctypes.c_int
+        self._run = self._native.ck_run_checked_frame_codec_prefix_control
+        self._run.argtypes = [ctypes.POINTER(FrameCodecPrefixControl)]
+        self._run.restype = ctypes.c_int
+        self._cancel_requested = threading.Event()
+        self._cancel_callback = CancelCallback(
+            lambda _context: int(self._cancel_requested.is_set()))
         self._tokenizer = AutoTokenizer.from_pretrained(str(self.model_dir), local_files_only=True)
         self.text_ids, self.codec_ids = _prompt_ids(
             self.model_dir, DEFAULT_TEXT, self._tokenizer)
@@ -345,11 +362,16 @@ class PinnedQwenSession:
 
     def synthesize(self, text: str) -> tuple[np.ndarray, dict]:
         with self._lock:
+            self._cancel_requested.clear()
             text_ids, codec_ids = _prompt_ids(self.model_dir, text, self._tokenizer)
             samples, metric = self._synthesize_checked(text_ids, codec_ids)
             metric["text_sha256"] = hashlib.sha256(text.encode("utf-8")).hexdigest()
             metric["text_tokens"] = CONTEXT_TOKENS
             return samples, metric
+
+    def stop(self) -> None:
+        """Stop the active request at its next checked native boundary."""
+        self._cancel_requested.set()
 
     def _synthesize_checked(self, text_ids, codec_ids) -> tuple[np.ndarray, dict]:
         # The planner places all mutable activations after immutable weights.
@@ -382,7 +404,7 @@ class PinnedQwenSession:
             staging.ctypes.data_as(ctypes.POINTER(ctypes.c_int32)), len(staging),
             codes.ctypes.data_as(ctypes.POINTER(ctypes.c_int32)), len(codes),
             ctypes.pointer(frames))
-        request = FrameCodecPrefix(FrameCodec(
+        request = FrameCodecPrefixControl(FrameCodecPrefix(FrameCodec(
             ctypes.pointer(loop), ctypes.cast(self._segments[2], ctypes.c_void_p),
             self.acts["loop_frame_major_codes"]["abs_offset"],
             CODEBOOKS, CODE_FRAMES,
@@ -390,10 +412,15 @@ class PinnedQwenSession:
             self.acts["waveform_valid_samples"]["abs_offset"],
             SAMPLES,
             samples.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-            len(samples), ctypes.pointer(valid)), SAMPLES // CODE_FRAMES)
+            len(samples), ctypes.pointer(valid)), SAMPLES // CODE_FRAMES),
+            self._cancel_callback, None)
         started = time.monotonic()
         status = self._run(ctypes.byref(request))
         seconds = time.monotonic() - started
+        if status == -7:
+            if valid.value != 0:
+                raise RuntimeError("cancelled synthesis published an output extent")
+            raise SynthesisCancelled("native Qwen synthesis was cancelled")
         if status != 0 or not 0 < frames.value <= CODE_FRAMES or \
                 valid.value != frames.value * (SAMPLES // CODE_FRAMES):
             if valid.value != 0:

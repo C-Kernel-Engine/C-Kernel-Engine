@@ -47,6 +47,18 @@ typedef struct {
 int ck_run_checked_frame_codec_prefix(
     const ck_checked_frame_codec_prefix *request);
 
+/* Apply the generic cancellation contract to generation and check again
+ * before and after the codec entry. The codec entry itself is not interrupted.
+ * A cancelled call leaves output_samples unchanged and valid_samples zero. */
+typedef struct {
+    ck_checked_frame_codec_prefix base;
+    ck_checked_frame_cancel should_cancel;
+    void *cancel_context;
+} ck_checked_frame_codec_prefix_control;
+
+int ck_run_checked_frame_codec_prefix_control(
+    const ck_checked_frame_codec_prefix_control *request);
+
 #ifdef __cplusplus
 }
 #endif
