@@ -1533,13 +1533,20 @@ Run from the repository root with the pinned model snapshot:</p>
 <pre><code>python version/v8/tts/qwen3_tts_pinned_session.py \
   --model-dir /path/to/85e237c12c027371202489a0ec509ded67b5e4b5 \
   --text 'Hello, this is CKE.' --output /tmp/qwen3-cke.wav --repeat 2</code></pre>
-<p>The command currently accepts only this certified text, Ryan voice and
-English conditioning, with exactly 46 generated codec frames. Other requests
-fail explicitly. It does not yet handle arbitrary assistant replies,
-cancellation, streaming or conversational latency. The host prepares input
-IDs and packages PCM; the circuit and generated native entries execute the
-neural graph. The registered session suite covers text rejection and WAV
-integrity; the asset-backed run checks repeated native synthesis.</p>
+<p>The command accepts nonempty, control-free English text that the pinned
+tokenizer encodes to exactly seven context tokens, with Ryan conditioning and
+up to 46 generated codec frames. It rejects other token lengths and requests
+that exhaust the frame budget. The original prompt produces 46 frames;
+<code>Yes, this is CKE.</code> produces 40 frames with matching reference code
+IDs and a 1.68e-6 maximum waveform difference in the asset-backed test. The
+second capture uses PyTorch 2.12.1+cpu; its manifest records the model,
+reference-code and runtime identities separately from the older fixture.
+This is a bounded two-text numerical demonstration, not arbitrary assistant
+replies, cancellation, streaming or conversational latency. The host prepares
+input IDs and packages PCM; the circuit and generated native entries execute
+the neural graph. The registered session suite covers text rejection and WAV
+integrity; the asset-backed run checks A→B→A state reset and direct reference
+parity.</p>
 <p><strong>Two generated frames to PCM:</strong> a checked, model-neutral integer
 span concatenation provider packs each pair of CKE-generated codebook IDs
 into a two-frame input for the existing generated codec. The same generated
