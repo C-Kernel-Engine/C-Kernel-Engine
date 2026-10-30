@@ -34,6 +34,19 @@ typedef struct {
 
 int ck_run_checked_frame_codec(const ck_checked_frame_codec *request);
 
+/* Run a codec compiled for expected_code_frames of storage while publishing
+ * only the prefix produced before EOS. The codec must be prefix causal for
+ * the selected provider and geometry; callers must certify that property.
+ * Unused frame-major code slots are filled with code zero. expected_samples
+ * remains the full compiled waveform capacity. */
+typedef struct {
+    ck_checked_frame_codec base;
+    size_t samples_per_code_frame;
+} ck_checked_frame_codec_prefix;
+
+int ck_run_checked_frame_codec_prefix(
+    const ck_checked_frame_codec_prefix *request);
+
 #ifdef __cplusplus
 }
 #endif
