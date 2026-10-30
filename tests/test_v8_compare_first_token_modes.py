@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest import mock
 
 import numpy as np
+import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -27,6 +28,43 @@ def _load_module():
 
 
 compare = _load_module()
+
+
+def test_logit_comparison_rejects_truncated_vocabularies() -> None:
+    with pytest.raises(ValueError, match="vocabulary extent mismatch: ck=2 llama=3"):
+        compare.compare_logits(
+            np.array([1.0, 2.0], dtype=np.float32),
+            np.array([1.0, 2.0, 100.0], dtype=np.float32),
+            2,
+        )
+    with pytest.raises(ValueError, match="vocabulary extent mismatch: ck=0 llama=0"):
+        compare.compare_logits(np.array([]), np.array([]), 1)
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), -float("inf")])
+def test_logit_comparison_rejects_nonfinite_inputs(bad: float) -> None:
+    good = np.array([1.0, 2.0], dtype=np.float32)
+    invalid = np.array([1.0, bad], dtype=np.float32)
+    with pytest.raises(ValueError, match="finite values"):
+        compare.compare_logits(invalid, good, 2)
+    with pytest.raises(ValueError, match="finite values"):
+        compare.compare_logits(good, invalid, 2)
+
+
+def test_logit_comparison_rejects_wrong_axes() -> None:
+    with pytest.raises(ValueError, match="one-dimensional"):
+        compare.compare_logits(np.array([[1.0, 2.0]]), np.array([1.0, 2.0]), 2)
+
+
+def test_logit_comparison_retains_complete_finite_metrics() -> None:
+    result = compare.compare_logits(
+        np.array([1.0, 2.0, 3.0], dtype=np.float32),
+        np.array([1.0, 2.5, 3.0], dtype=np.float32),
+        2,
+    )
+    assert result["n_compared"] == 3
+    assert result["max_abs_diff"] == 0.5
+    assert result["top1_match"] is True
 
 
 def test_auto_llama_mode_mirrors_sequential_contract() -> None:
