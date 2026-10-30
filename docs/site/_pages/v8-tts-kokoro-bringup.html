@@ -531,9 +531,17 @@ projection and the first talker block. The seven-token prompt and a two-token
 The short prompt has a direct pinned-model first-block capture; its final
 block output differs by at most 9.54e-6 in the measured CPU lane. This is
 prefill-prefix evidence, not variable-length speech. The full talker still
-seeds 18 fixed KV rows and starts continuation at position 18; those contracts
-must consume the checked prompt length before one speech library can handle
-different token counts.</p>
+needs its continuation position to consume the checked prompt length before
+one speech library can handle different token counts.</p>
+<p><strong>Qwen3-TTS runtime prefill cache:</strong> the same checked row extent
+now drives all 28 talker layers and their per-layer K/V cache seeds. One
+generated entry runs two-token → seven-token → two-token text requests with
+capacity-strided cache storage. The seven-token logits match the pinned
+full-prefill capture within the existing 1.5e-4 bound; the short first-layer
+K/V rows match a separate direct capture within 8e-5. Cache copying, output
+padding, invalid lengths and repeated execution are checked separately.
+Continuation still starts from the fixed position contract, so this is
+variable-length prefill and cache seeding, not variable-length speech.</p>
 <p><strong>Two generated frames to PCM:</strong> a checked, model-neutral integer
 span concatenation provider packs each pair of CKE-generated codebook IDs
 into a two-frame input for the existing generated codec. The same generated
