@@ -8,7 +8,7 @@ import time
 from fastapi.testclient import TestClient
 
 from server.live import create_app
-from server.session_v8 import SessionV8
+from server.session_v8 import SessionError, SessionV8
 
 
 MODEL = r'''
@@ -172,3 +172,71 @@ def test_older_generated_model_reports_unavailable_layer_progress(tmp_path):
         session.close()
     assert not worker.is_alive()
     assert result[0]["stop_reason"] == 3
+
+
+def test_progress_reader_holds_native_session_alive_until_close(tmp_path):
+    source = tmp_path / "fake.c"
+    source.write_text(MODEL)
+    root = __import__("pathlib").Path(__file__).resolve().parents[2]
+    model_path = tmp_path / "libmodel.so"
+    subprocess.run(["cc", "-shared", "-fPIC", "-std=c11", "-I", str(root / "include"),
+                    str(source), "-o", str(model_path)], check=True)
+    (tmp_path / "weights.bump").write_bytes(b"")
+    (tmp_path / "weights_manifest.map").write_text("")
+    session = SessionV8.open(tmp_path, context_length=16, num_threads=1)
+    entered_native = threading.Event()
+    release_native = threading.Event()
+    close_waiting = threading.Event()
+    native_closed = threading.Event()
+    original_get = session.lib.ck_session_v8_get_progress
+    original_close = session.lib.ck_session_v8_close
+
+    class SignallingLock:
+        def __init__(self):
+            self.lock = threading.Lock()
+
+        def __enter__(self):
+            if threading.current_thread().name == "close-session":
+                close_waiting.set()
+            self.lock.acquire()
+            return self
+
+        def __exit__(self, *_):
+            self.lock.release()
+
+    def held_get(*args):
+        entered_native.set()
+        assert release_native.wait(3), "progress test did not release native getter"
+        return original_get(*args)
+
+    def observed_close(*args):
+        native_closed.set()
+        return original_close(*args)
+
+    session._lifecycle_lock = SignallingLock()
+    session.lib.ck_session_v8_get_progress = held_get
+    session.lib.ck_session_v8_close = observed_close
+    progress_result = []
+    reader = threading.Thread(target=lambda: progress_result.append(session.progress()))
+    closer = threading.Thread(target=session.close, name="close-session")
+    try:
+        reader.start()
+        assert entered_native.wait(3)
+        closer.start()
+        assert close_waiting.wait(3)
+        assert not native_closed.is_set(), "close freed a session held by progress"
+    finally:
+        release_native.set()
+        reader.join(timeout=3)
+        if closer.ident is not None:
+            closer.join(timeout=3)
+        session.close()
+    assert not reader.is_alive() and not closer.is_alive()
+    assert native_closed.is_set()
+    assert progress_result[0]["phase"] == "idle"
+    try:
+        session.progress()
+    except SessionError as exc:
+        assert exc.status == -6
+    else:
+        raise AssertionError("progress accepted a closed native session")

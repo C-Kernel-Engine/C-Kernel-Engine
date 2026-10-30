@@ -531,6 +531,9 @@ class SessionV8:
         import threading
 
         self._lock = threading.Lock()
+        # A progress read can overlap generate, but must never overlap close.
+        # Keep this separate from the lock used by tokenizer and batch calls.
+        self._lifecycle_lock = threading.Lock()
         self.lib: Any = None
         self.session: Any = None
         self._batch2: Batch2SessionV8 | None = None
@@ -579,6 +582,7 @@ class SessionV8:
         import threading
 
         self._lock = threading.Lock()
+        self._lifecycle_lock = threading.Lock()
         self.lib = lib
         self.session = session
         self._batch2 = None
@@ -837,8 +841,11 @@ class SessionV8:
         snapshot = _Progress()
         snapshot.struct_size = ctypes.sizeof(_Progress)
         snapshot.abi_version = self.CK_ABI_VERSION
-        status = self.lib.ck_session_v8_get_progress(self.session, ctypes.byref(snapshot))
-        _raise_native_error(self.lib, self.session, "ck_session_v8_get_progress", status)
+        with self._lifecycle_lock:
+            if self.session is None:
+                raise SessionError(-6, "session is closed")
+            status = self.lib.ck_session_v8_get_progress(self.session, ctypes.byref(snapshot))
+            _raise_native_error(self.lib, self.session, "ck_session_v8_get_progress", status)
         return {
             "request_serial": int(snapshot.request_serial),
             "phase": _PROGRESS_PHASES.get(int(snapshot.phase), "unknown"),
@@ -850,6 +857,9 @@ class SessionV8:
 
     def close(self) -> None:
         with self._lock:
-            if self.session is not None:
-                self.lib.ck_session_v8_close(self.session)
-                self.session = None
+            # Lock order is _lock, then _lifecycle_lock. A progress reader only
+            # takes the latter, so it cannot keep a freed native handle alive.
+            with self._lifecycle_lock:
+                if self.session is not None:
+                    self.lib.ck_session_v8_close(self.session)
+                    self.session = None

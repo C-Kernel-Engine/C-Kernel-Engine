@@ -165,8 +165,9 @@ class InstellaMlaBf16PhasesTest(unittest.TestCase):
             args = args[:3] + (self.ptr(parallel),) + args[4:]
             self.prefill_parallel(*args)
             np.testing.assert_array_equal(parallel, serial)
-            self.assertFalse(np.all(scores[t:2*t] == -77),
-                             "the second worker's private score row must be used")
+            for worker in range(4):
+                self.assertFalse(np.all(scores[worker*t:(worker+1)*t] == -77),
+                                 f"worker {worker}'s private score row must be used")
             self.assertEqual(scores[-1], -77)
 
             for function in (self.prefill, self.prefill_parallel,
