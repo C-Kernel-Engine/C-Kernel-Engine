@@ -38,7 +38,8 @@ EXPECTED_TOOLS = ('read_file', 'edit', 'run_shell_command')
 LOADED_IDENTITY_SCHEMA = 'cke.loaded_serving_identity.v1'
 
 
-def _wait_for_client(process: subprocess.Popen, timeout: int, on_ready=None) -> int:
+def _wait_for_client(process: subprocess.Popen, timeout: int, on_ready=None,
+                     on_timeout=None) -> int:
     """Wait for Qwen Code and reap its separate process group on interruption."""
     class Interrupted(Exception):
         def __init__(self, signum: int):
@@ -55,6 +56,8 @@ def _wait_for_client(process: subprocess.Popen, timeout: int, on_ready=None) -> 
         try:
             return process.wait(timeout=timeout)
         except (subprocess.TimeoutExpired, Interrupted) as exc:
+            if isinstance(exc, subprocess.TimeoutExpired) and on_timeout is not None:
+                on_timeout()
             try:
                 os.killpg(process.pid, signal.SIGTERM)
             except ProcessLookupError:
@@ -75,6 +78,16 @@ def _wait_for_client(process: subprocess.Popen, timeout: int, on_ready=None) -> 
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _client_time_budget_exceeded(exit_code: int, stderr_path: Path) -> bool:
+    if exit_code == 0:
+        return False
+    try:
+        tail = stderr_path.read_bytes()[-8192:].decode('utf-8', 'replace')
+    except OSError:
+        return False
+    return 'Run aborted: wall-clock budget of ' in tail and ' exceeded' in tail
 
 
 def _valid_sha256(value: object) -> bool:
@@ -420,6 +433,19 @@ def run(args: argparse.Namespace) -> dict:
     if version != args.expected_qwen_version:
         raise ValueError(f'Qwen Code version {version!r} differs from pinned '
                          f'{args.expected_qwen_version!r}')
+    profile = getattr(args, 'qwen_profile', 'bare')
+    if profile not in ('bare', 'normal'):
+        raise ValueError('qwen-profile must be bare or normal')
+    settings_path = Path(args.settings).resolve() if getattr(args, 'settings', None) else None
+    settings_sha256 = _sha256(settings_path) if settings_path else None
+    declared_client_wall_time = None
+    if settings_path:
+        settings_document = json.loads(settings_path.read_text(encoding='utf-8'))
+        if not isinstance(settings_document, dict):
+            raise ValueError('Qwen Code settings must be a JSON object')
+        model_settings = settings_document.get('model')
+        if isinstance(model_settings, dict):
+            declared_client_wall_time = model_settings.get('maxWallTimeSeconds')
     run_dir = Path(args.run_dir).resolve()
     run_dir.mkdir(parents=True, exist_ok=True)
     if any(run_dir.iterdir()):
@@ -460,6 +486,12 @@ def run(args: argparse.Namespace) -> dict:
             'expected_serving_identity': expected_identity,
             'expected_session_library_sha256': expected_session,
             'started_at_unix': started,
+            'qwen_code_version': version,
+            'qwen_profile': profile,
+            'qwen_settings_sha256': settings_sha256,
+            'declared_client_wall_time_seconds': declared_client_wall_time,
+            'max_output_tokens': args.max_output_tokens,
+            'time_budget_seconds': args.timeout,
             'result': {'status': 'not_run', 'errors': ['loaded_identity_preflight_failed']},
             'identity': {'level': 'preflight_rejected', 'before': identity_before, 'after': None},
             'certification': {'status': 'fail', 'reason': reason,
@@ -467,7 +499,10 @@ def run(args: argparse.Namespace) -> dict:
         }
         (run_dir / 'report.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
         return report
-    cmd = [args.qwen_bin, '--bare', '--auth-type', 'openai-responses',
+    cmd = [args.qwen_bin]
+    if profile == 'bare':
+        cmd.append('--bare')
+    cmd += ['--auth-type', 'openai-responses',
            '--model', args.model, '--session-id', session_id,
            '--chat-recording', '--allowed-tools', 'read_file', 'edit',
            'run_shell_command', '--max-tool-calls', '6',
@@ -476,12 +511,17 @@ def run(args: argparse.Namespace) -> dict:
     env.update(OPENAI_BASE_URL=endpoint, OPENAI_MODEL=args.model,
                OPENAI_API_KEY=args.api_key,
                QWEN_CODE_MAX_OUTPUT_TOKENS=str(args.max_output_tokens))
-    if args.settings:
-        env['QWEN_CODE_SYSTEM_SETTINGS_PATH'] = str(Path(args.settings).resolve())
+    if settings_path:
+        env['QWEN_CODE_SYSTEM_SETTINGS_PATH'] = str(settings_path)
+    timed_out = False
+    def mark_timeout():
+        nonlocal timed_out
+        timed_out = True
     with (run_dir / 'events.jsonl').open('wb') as output, (run_dir / 'stderr.log').open('wb') as errors:
         process = subprocess.Popen(cmd, cwd=run_dir, env=env, stdout=output,
                                    stderr=errors, start_new_session=True)
-        exit_code = _wait_for_client(process, args.timeout)
+        exit_code = _wait_for_client(process, args.timeout, on_timeout=mark_timeout)
+    client_budget_exceeded = _client_time_budget_exceeded(exit_code, run_dir / 'stderr.log')
     try:
         session_path = _session_file(args.qwen_bin, run_dir, session_id)
         shutil.copyfile(session_path, run_dir / 'session.jsonl')
@@ -506,6 +546,9 @@ def run(args: argparse.Namespace) -> dict:
         verdict['errors'].append('event_stream_unavailable: ' + event_error)
     if verdict['errors']:
         verdict['status'] = 'fail'
+    if timed_out or client_budget_exceeded:
+        verdict['status'] = 'incomplete'
+        verdict['incomplete_reason'] = 'time_budget_exceeded'
     try:
         identity_after = _read_loaded_identity(endpoint)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
@@ -531,6 +574,13 @@ def run(args: argparse.Namespace) -> dict:
         'started_at_unix': started,
         'elapsed_seconds': time.time() - started,
         'qwen_code_version': version,
+        'qwen_profile': profile,
+        'qwen_settings_sha256': settings_sha256,
+        'declared_client_wall_time_seconds': declared_client_wall_time,
+        'max_output_tokens': args.max_output_tokens,
+        'time_budget_seconds': args.timeout,
+        'time_budget_exceeded': timed_out,
+        'client_time_budget_exceeded': client_budget_exceeded,
         'advertised_model': advertised,
         'exit_code': exit_code,
         'runner_sha256': _sha256(Path(__file__)),
@@ -553,6 +603,7 @@ def main() -> int:
     parser.add_argument('--run-dir', required=True)
     parser.add_argument('--qwen-bin', default='qwen')
     parser.add_argument('--expected-qwen-version', default='0.24.6')
+    parser.add_argument('--qwen-profile', choices=('bare', 'normal'), default='bare')
     parser.add_argument('--settings')
     parser.add_argument('--api-key', default='cke-local-only')
     parser.add_argument('--timeout', type=int, default=1800)
