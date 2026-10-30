@@ -1,5 +1,12 @@
 var NAVTREEINDEX22 =
 {
+"structCKSessionGenerateRequestV8.html#a28007ad9705b62600399c839451ff85c":[1,0,66,6],
+"structCKSessionGenerateRequestV8.html#a70fdc91e18f8203e8f7b535d0a84ec20":[1,0,66,3],
+"structCKSessionGenerateRequestV8.html#a75eb7c89d2b95adb6497b552e098aef1":[1,0,66,1],
+"structCKSessionGenerateRequestV8.html#aa1ebfe5d9b025c62e8d99da0480956be":[1,0,66,8],
+"structCKSessionGenerateRequestV8.html#aa6274c83f941a5c47d04f56a952d72bb":[1,0,66,0],
+"structCKSessionGenerateRequestV8.html#aae79740b1fecc0445423d59cf5549021":[1,0,66,7],
+"structCKSessionGenerateRequestV8.html#ac5fa5c9cd39fee80c8274e6ddca104d1":[1,0,66,9],
 "structCKSessionGenerateRequestV8.html#adfa7c4e95fcc09a55a8c367162c6b5f0":[1,0,66,4],
 "structCKSessionGenerateRequestV8.html#ae18f23f160fed1d26cd64fc5c757c87b":[1,0,66,5],
 "structCKSessionGenerateResultV8.html":[1,0,67],
@@ -242,12 +249,5 @@ var NAVTREEINDEX22 =
 "structQWEN2__0__5B__DECODEFooterOffsets.html#aa7f30858b9156e6490e32a352acc1e94":[1,0,89,3],
 "structQWEN2__0__5B__DECODEFooterOffsets.html#ac589598a0405dd5321d3605f104c52af":[1,0,89,1],
 "structQWEN2__0__5B__DECODEFooterOffsets.html#ac6811e11a982eaed8ba5bab63e4d7289":[1,0,89,2],
-"structQWEN2__0__5B__DECODEFooterOffsets.html#aec463a130ddc1a065b9c753ec5c9bb19":[1,0,89,0],
-"structQWEN2__0__5B__DECODEGlobalOffsets.html":[1,0,90],
-"structQWEN2__0__5B__DECODEGlobalOffsets.html#a8e04d4088aaa68a9725b418e7566a6e9":[1,0,90,0],
-"structQWEN2__0__5B__DECODEGlobalOffsets.html#a927654a893e08df5673da7123577a3b9":[1,0,90,1],
-"structQWEN2__0__5B__DECODEHeaderOffsets.html":[1,0,91],
-"structQWEN2__0__5B__DECODEHeaderOffsets.html#a132bfc09c544e8e77e4643564e740d3b":[1,0,91,1],
-"structQWEN2__0__5B__DECODEHeaderOffsets.html#a60e3a70cccede22b6473dd0be408af24":[1,0,91,4],
-"structQWEN2__0__5B__DECODEHeaderOffsets.html#a7c4211b4f3a7c74aec65281818a81693":[1,0,91,3]
+"structQWEN2__0__5B__DECODEFooterOffsets.html#aec463a130ddc1a065b9c753ec5c9bb19":[1,0,89,0]
 };

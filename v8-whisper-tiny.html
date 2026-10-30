@@ -1031,6 +1031,42 @@
 
 <h1>Whisper Tiny and Base End-to-End</h1>
 
+<h2>Word alignment bring-up boundary</h2>
+<table>
+  <thead><tr><th>Stage</th><th>Current evidence</th><th>Missing alignment contract</th></tr></thead>
+  <tbody>
+    <tr><td>Audio frontend and encoder</td><td>Generated WAV decode/features and encoder memory already feed the decoder.</td><td>Retain each window's valid 20 ms attention-frame extent.</td></tr>
+    <tr><td>Decoder and timestamp tokens</td><td>Generated decoder produces text IDs and optional paired segment timestamps.</td><td>Publish selected per-token cross-attention heads; segment timestamps cannot locate words.</td></tr>
+    <tr><td>Tokenizer and window assembly</td><td>The runner decodes text and offsets segment times across long recordings.</td><td>Associate word text with exact token IDs, absolute window positions and ambiguous spans; deduplicate overlaps using time.</td></tr>
+    <tr><td>Editing</td><td>No native filler-review contract exists.</td><td>Measure filler recall, present non-destructive cut proposals and require approval before rendering.</td></tr>
+  </tbody>
+</table>
+<p>The generated frontend, encoder and decoder produce transcription tokens.
+The optional timestamp-token policy and long-audio window offsets produce
+segment timing, not word timing. The pinned base artifact's
+<code>generation_config.json</code> declares eight alignment heads: layer/head
+3/1, 4/2, 4/3, 4/7, 5/1, 5/2, 5/4 and 5/6. The generated cross-attention
+provider uses head-major query/key/value and caller-owned score scratch.
+That scratch contains temporary, unnormalized exponentials for the current
+query and is overwritten by later decoder layers. It is not an exported
+per-token attention trace. The first missing graph edge is therefore a
+declared copy/normalization of selected heads immediately after each
+cross-attention call into a bounded, persistent trace. This is an observation
+contract, not a new Whisper decoder schedule.</p>
+<p>The generic native <code>alignment_attention_dtw_f32</code> provider now
+accepts selected attention heads, standardizes across text tokens, applies
+reflect-padded median smoothing over audio frames, averages heads and performs
+ordered dynamic time warping to return token-first-frame indices. A
+model-neutral generated graph tests the selected map and failure propagation.
+This is primitive and generated-composition evidence only. Current CKE Whisper
+does not yet supply all selected heads to it, group tokens into words or report
+measured word-boundary accuracy. Flat/nonfinite attention is rejected rather
+than assigned a fabricated confidence. The next gate is a full-model trace
+and a public recording with manually checked boundaries; filler detection
+and non-destructive edit review follow separately. The reference operation
+order is documented in the
+<a href="https://github.com/huggingface/transformers/blob/main/src/transformers/models/whisper/generation_whisper.py">Transformers Whisper generation source</a>.</p>
+
 <div class="alert alert-info">
     <div class="alert-icon">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
