@@ -5,11 +5,12 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 474,
+      "total": 475,
       "by_op": {
         "add_backward": 1,
         "add_rows_checked": 1,
         "add_stream": 2,
+        "alignment_attention_dtw": 1,
         "argmax_last_row_checked": 1,
         "assistant_layer_scale": 1,
         "attention": 39,
@@ -636,6 +637,346 @@
       "notes": "Sum two token-major streams and reorder them into merged-tile traversal using the auxiliary stream as scratch.",
       "name": "add_stream_reorder_2d",
       "_source_file": "add_stream_reorder_2d.json"
+    },
+    {
+      "id": "alignment_attention_dtw_f32",
+      "op": "alignment_attention_dtw",
+      "operation_interface": "alignment.attention.selected_heads.token_frame.fp32.v1",
+      "variant": "scalar_reflect_median_population_variance_dtw",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "equivalence_group": "alignment_attention_dtw_f32",
+        "phases": [
+          "prefill"
+        ]
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "i32"
+      },
+      "inputs": [
+        {
+          "name": "attention",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "T",
+            "F_capacity"
+          ],
+          "layout": "head_token_frame_strided",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "token_frames",
+          "dtype": "i32",
+          "shape": [
+            "T"
+          ],
+          "layout": "token_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "score_scratch",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "F"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read_write",
+          "storage_class": "scratch",
+          "consumption": "required",
+          "lifetime": "kernel_call",
+          "alignment": 4,
+          "size_bytes": "4 * T * F",
+          "size_resolution": "required"
+        },
+        {
+          "name": "mean_scratch",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "F"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read_write",
+          "storage_class": "scratch",
+          "consumption": "required",
+          "lifetime": "kernel_call",
+          "alignment": 4,
+          "size_bytes": "4 * T * F",
+          "size_resolution": "required"
+        },
+        {
+          "name": "cost_scratch",
+          "dtype": "fp32",
+          "shape": [
+            "T+1",
+            "F+1"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read_write",
+          "storage_class": "scratch",
+          "consumption": "required",
+          "lifetime": "kernel_call",
+          "alignment": 4,
+          "size_bytes": "4 * (T+1) * (F+1)",
+          "size_resolution": "required"
+        },
+        {
+          "name": "trace_scratch",
+          "dtype": "u8",
+          "shape": [
+            "T+1",
+            "F+1"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read_write",
+          "storage_class": "scratch",
+          "consumption": "required",
+          "lifetime": "kernel_call",
+          "alignment": 1,
+          "size_bytes": "(T+1) * (F+1)",
+          "size_resolution": "required"
+        }
+      ],
+      "dims": [
+        "attention_elements",
+        "heads",
+        "tokens",
+        "frames",
+        "token_stride",
+        "head_stride",
+        "median_width",
+        "score_elements",
+        "mean_elements",
+        "cost_elements",
+        "trace_elements",
+        "token_capacity"
+      ],
+      "constraints": {
+        "notes": "Selected attention heads already packed as [head,token,frame]. Population-variance normalization across text tokens, reflect median over audio frames, mean of heads, ordered DTW. Return token first-frame indices; caller supplies every buffer. Reject nonfinite, degenerate or undersized input before publishing output. Word grouping and confidence are separate host contracts."
+      },
+      "impl": {
+        "function": "alignment_attention_dtw_f32",
+        "c_declaration": "int alignment_attention_dtw_f32(const float *attention, size_t attention_elements, size_t heads, size_t tokens, size_t frames, size_t token_stride, size_t head_stride, size_t median_width, float *score_scratch, size_t score_elements, float *mean_scratch, size_t mean_elements, float *cost_scratch, size_t cost_elements, uint8_t *trace_scratch, size_t trace_elements, int32_t *token_frames, size_t token_capacity);",
+        "sources": [
+          "src/kernels/alignment_attention_dtw_f32.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "alignment_attention_normalize_median_dtw_ordered_f32",
+          "status": "validated",
+          "phases": [
+            "prefill"
+          ],
+          "function": "alignment_attention_dtw_f32",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "contract_defined"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp64",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "serial"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "attention",
+            "source": "activation:attention",
+            "cast": "const float*",
+            "ports": [
+              "input:attention"
+            ]
+          },
+          {
+            "name": "attention_elements",
+            "source": "runtime:attention_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "heads",
+            "source": "runtime:heads",
+            "value_type": "size_t"
+          },
+          {
+            "name": "tokens",
+            "source": "runtime:tokens",
+            "value_type": "size_t"
+          },
+          {
+            "name": "frames",
+            "source": "runtime:frames",
+            "value_type": "size_t"
+          },
+          {
+            "name": "token_stride",
+            "source": "runtime:token_stride",
+            "value_type": "size_t"
+          },
+          {
+            "name": "head_stride",
+            "source": "runtime:head_stride",
+            "value_type": "size_t"
+          },
+          {
+            "name": "median_width",
+            "source": "dim:median_width"
+          },
+          {
+            "name": "score_scratch",
+            "source": "scratch:score_scratch",
+            "cast": "float*"
+          },
+          {
+            "name": "score_elements",
+            "source": "runtime:score_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "mean_scratch",
+            "source": "scratch:mean_scratch",
+            "cast": "float*"
+          },
+          {
+            "name": "mean_elements",
+            "source": "runtime:mean_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "cost_scratch",
+            "source": "scratch:cost_scratch",
+            "cast": "float*"
+          },
+          {
+            "name": "cost_elements",
+            "source": "runtime:cost_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "trace_scratch",
+            "source": "scratch:trace_scratch",
+            "cast": "uint8_t*"
+          },
+          {
+            "name": "trace_elements",
+            "source": "runtime:trace_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "token_frames",
+            "source": "output:token_frames",
+            "cast": "int32_t*",
+            "ports": [
+              "output:token_frames"
+            ]
+          },
+          {
+            "name": "token_capacity",
+            "source": "runtime:token_capacity",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_alignment_attention_dtw.py"
+        ],
+        "oracle": "Independent NumPy population normalization, reflect median and ordered DTW; pinned Whisper trace integration not yet certified"
+      },
+      "notes": "This map defines only native alignment postprocessing. The decoder does not yet publish all selected cross-attention heads; segment timestamps are not word timestamps.",
+      "call_constant_contract": {
+        "shape_symbols": {
+          "H": "heads",
+          "T": "tokens",
+          "F_capacity": "token_stride"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "attention",
+            "elements": "attention_elements",
+            "rows": "heads",
+            "width": "head_stride",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "score_scratch",
+            "elements": "score_elements",
+            "rows": 1,
+            "width": "score_elements",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "mean_scratch",
+            "elements": "mean_elements",
+            "rows": 1,
+            "width": "mean_elements",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "cost_scratch",
+            "elements": "cost_elements",
+            "rows": 1,
+            "width": "cost_elements",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "trace_scratch",
+            "elements": "trace_elements",
+            "rows": 1,
+            "width": "trace_elements",
+            "element_bytes": 1
+          },
+          {
+            "pointer": "token_frames",
+            "elements": "token_capacity",
+            "rows": 1,
+            "width": "tokens",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "name": "alignment_attention_dtw_f32",
+      "_source_file": "alignment_attention_dtw_f32.json"
     },
     {
       "id": "assistant_layer_scale_forward",

@@ -4586,6 +4586,18 @@ int attention_forward_query_key_head_major_f32_packed_k(
     int head_dim,
     float scale);
 
+/* Postprocess selected attention heads to token-first-frame indices.
+ * The host remains responsible for tokenizer word grouping and time offsets. */
+int alignment_attention_dtw_f32(
+    const float *attention, size_t attention_elements,
+    size_t heads, size_t tokens, size_t frames,
+    size_t token_stride, size_t head_stride, size_t median_width,
+    float *score_scratch, size_t score_elements,
+    float *mean_scratch, size_t mean_elements,
+    float *cost_scratch, size_t cost_elements,
+    uint8_t *trace_scratch, size_t trace_elements,
+    int32_t *token_frames, size_t token_capacity);
+
 int attention_forward_query_key_head_major_tiled_f16kv_fp32(
     const float *query,
     const float *key,

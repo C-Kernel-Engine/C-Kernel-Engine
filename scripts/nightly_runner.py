@@ -1436,6 +1436,14 @@ TEST_SUITES = {
             "tests.test_v8_kokoro_whisper_roundtrip.KokoroWhisperRoundTripTest.test_public_audio_entry_uses_importable_worker_target",
         ),
     ),
+    "whisper_native_attention_alignment": TestSuite(
+        "Native Selected-Attention Token Alignment", "inference",
+        ROOT / "tests" / "test_v8_alignment_attention_dtw.py",
+    ),
+    "whisper_generated_attention_alignment": TestSuite(
+        "Generated Selected-Attention Token Alignment", "inference",
+        ROOT / "tests" / "test_v8_alignment_attention_dtw_generated.py",
+    ),
     "tts_kokoro_native_speech_session": TestSuite(
         "Kokoro Native Speech Stop, Replace and Recovery", "inference",
         ROOT / "tests" / "test_v8_kokoro_native_speech_session.py",
