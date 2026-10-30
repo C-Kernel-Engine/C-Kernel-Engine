@@ -189,6 +189,7 @@ class Qwen3TTSCodecWaveformTest(unittest.TestCase):
         with np.load(MODEL) as source, np.load(CHECKPOINT) as oracle:
             codes = source["codec_tokens"].astype(np.int32)
             lengths = (8,) if os.environ.get("CKE_QWEN3_TTS_CODEC_SHORT_ONLY") == "1" else (8, 46)
+            generated_waveforms = {}
             for frames in lengths:
                 with self.subTest(frames=frames), tempfile.TemporaryDirectory() as temp:
                     fn, arena, acts, calls, library = generated_entry(
@@ -198,6 +199,7 @@ class Qwen3TTSCodecWaveformTest(unittest.TestCase):
                     self.assertEqual(fn(arena, len(arena)), 0)
                     expected = oracle["waveform_output" if frames == 8 else "full_waveform_output"]
                     actual = view(arena, acts, "waveform_output", np.float32, expected.shape)
+                    generated_waveforms[frames] = actual.copy()
                     difference = actual.astype(np.float64) - expected.astype(np.float64)
                     index = np.unravel_index(int(np.argmax(np.abs(difference))), difference.shape)
                     metric = {"code_frames": frames, "samples": actual.size,
@@ -293,6 +295,11 @@ class Qwen3TTSCodecWaveformTest(unittest.TestCase):
                     # Connected PCM parity remains a separate verdict from
                     # successful execution and WAV serialization.
                     self.assertLessEqual(metric["max_abs"], 3e-6)
+            if 46 in generated_waveforms:
+                # The capacity graph may publish only a shorter valid prefix
+                # when future codec frames cannot influence earlier samples.
+                np.testing.assert_array_equal(
+                    generated_waveforms[8], generated_waveforms[46][:, :8 * 1920])
 
 
 if __name__ == "__main__":

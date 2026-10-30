@@ -52,7 +52,121 @@ class FrameCodec(ctypes.Structure):
     ]
 
 
+class FrameCodecPrefix(ctypes.Structure):
+    _fields_ = [("base", FrameCodec), ("samples_per_code_frame", ctypes.c_size_t)]
+
+
 class Qwen3TTSLoopCodecTest(unittest.TestCase):
+    def test_generated_loop_short_eos_through_capacity_codec(self):
+        arrays = synthetic_arrays(np.random.default_rng(20261030))
+        arrays["codec.acoustic.2.effective_embedding"] = (
+            arrays["codec.acoustic.0.effective_embedding"].copy())
+        graph = build_circuit(frames=3, max_generated_frames=3,
+                              talker_layers=1, continuation_steps=2,
+                              codec_kwargs=GEOMETRY)
+        # The synthetic selector forces EOS after two frames; no reference
+        # codes or waveform values enter the generated connected run.
+        selector = graph["block_types"]["second_talker_predictor_bridge"]["body"]["ops"][1]
+        selector["params"]["call_constants"]["stop_id"] = 0
+        base_graph = generated_frames(talker_layers=1, continuation_steps=2,
+                                      max_generated_frames=3)
+        shapes = weight_shapes(base_graph)
+        shapes.update({name: value.shape for name, value in arrays.items()})
+        sources = tuple(dict.fromkeys((*SOURCES, *CODEC_SOURCES,
+                                       "src/runtime/checked_frame_loop.c",
+                                       "src/runtime/checked_frame_codec.c")))
+        with tempfile.TemporaryDirectory() as temp:
+            _, acts, weights, layout, _, library = compile_entry(
+                Path(temp), graph, shapes, extra_sources=sources)
+            size = layout["memory"]["arena"]["total_size"]
+            raw = (ctypes.c_uint8 * (size + 63))()
+            arena = (ctypes.c_uint8 * size).from_buffer(
+                raw, (-ctypes.addressof(raw)) & 63)
+            for name, value in arrays.items():
+                item = weights[name]
+                arena[item["abs_offset"]:item["abs_offset"] + value.nbytes] = value.tobytes()
+            prepare_inputs(arena, acts)
+            first = ["talker_first_code_id", "pred_predictor_codebook0_selected_id",
+                     "pred_step1_selected_id", "pred_step2_selected_id"]
+            later = ["second_talker_first_code_id",
+                     "second_predictor_codebook0_selected_id",
+                     "second_step1_selected_id", "second_step2_selected_id"]
+            first_offsets = (ctypes.c_size_t * 4)(
+                *(acts[name]["abs_offset"] for name in first))
+            later_offsets = (ctypes.c_size_t * 4)(
+                *(acts[name]["abs_offset"] for name in later))
+            staging = np.full(12, -901, np.int32)
+            codes = np.full(12, -901, np.int32)
+            frames = ctypes.c_size_t(99)
+            loop = Loop(
+                ctypes.cast(segment_function(library, graph, 0), ctypes.c_void_p),
+                ctypes.cast(segment_function(library, graph, 1), ctypes.c_void_p),
+                arena, size, acts["talker_step_index_input"]["abs_offset"],
+                acts["pred_predictor_valid_code_count"]["abs_offset"],
+                acts["second_predictor_valid_code_count"]["abs_offset"],
+                first_offsets, later_offsets, 4, 3,
+                staging.ctypes.data_as(ctypes.POINTER(ctypes.c_int32)), 12,
+                codes.ctypes.data_as(ctypes.POINTER(ctypes.c_int32)), 12,
+                ctypes.pointer(frames))
+            samples = np.full(193, -901, np.float32)
+            valid = ctypes.c_size_t(99)
+            request = FrameCodecPrefix(FrameCodec(
+                ctypes.pointer(loop),
+                ctypes.cast(segment_function(library, graph, 2), ctypes.c_void_p),
+                acts["loop_frame_major_codes"]["abs_offset"], 4, 3,
+                acts["codec_waveform_output"]["abs_offset"],
+                acts["waveform_valid_samples"]["abs_offset"], 192,
+                samples.ctypes.data_as(ctypes.POINTER(ctypes.c_float)), 193,
+                ctypes.pointer(valid)), 64)
+            run = ctypes.CDLL(str(library)).ck_run_checked_frame_codec_prefix
+            run.argtypes = [ctypes.POINTER(FrameCodecPrefix)]
+            run.restype = ctypes.c_int
+            self.assertEqual(run(ctypes.byref(request)), 0)
+            self.assertEqual((frames.value, valid.value), (2, 128))
+            np.testing.assert_array_equal(samples[128:], -901)
+            np.testing.assert_array_equal(
+                view(arena, acts, "loop_frame_major_codes", np.int32, (12,))[8:], 0)
+            direct_folder = Path(temp) / "direct"
+            direct_folder.mkdir()
+            direct, direct_arena, direct_acts, _, _ = generated_entry(
+                direct_folder, arrays, 2, acoustic_codebooks=3,
+                codec_waveform=True, decoder_upsample_rate=2,
+                second_decoder_upsample_rate=2,
+                third_decoder_upsample_rate=2,
+                fourth_decoder_upsample_rate=2,
+                convnext_expansion=2, transformer_layers=2,
+                qkv_heads=2, qkv_head_dim=2, sliding_window=3)
+            fill_ids(direct_arena, direct_acts, codes[:8].reshape(2, 4))
+            self.assertEqual(direct(direct_arena, len(direct_arena)), 0)
+            np.testing.assert_array_equal(
+                samples[:128], view(direct_arena, direct_acts,
+                                    "waveform_output", np.float32, (128,)))
+
+    def test_codec_waveform_prefix_is_causal_across_compiled_lengths(self):
+        """A capacity-sized codec may publish a shorter prefix only if it is causal."""
+        arrays = synthetic_arrays(np.random.default_rng(20261030))
+        arrays["codec.acoustic.2.effective_embedding"] = (
+            arrays["codec.acoustic.0.effective_embedding"].copy())
+        codes = np.array([[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 0]],
+                         dtype=np.int32)
+        outputs = {}
+        with tempfile.TemporaryDirectory() as temp:
+            for frames in (2, 3):
+                folder = Path(temp) / str(frames)
+                folder.mkdir()
+                fn, arena, acts, _, _ = generated_entry(
+                    folder, arrays, frames,
+                    acoustic_codebooks=3, codec_waveform=True,
+                    decoder_upsample_rate=2, second_decoder_upsample_rate=2,
+                    third_decoder_upsample_rate=2, fourth_decoder_upsample_rate=2,
+                    convnext_expansion=2, transformer_layers=2,
+                    qkv_heads=2, qkv_head_dim=2, sliding_window=3)
+                fill_ids(arena, acts, codes[:frames])
+                self.assertEqual(fn(arena, len(arena)), 0)
+                outputs[frames] = view(arena, acts, "waveform_output",
+                                       np.float32, (frames * 64,)).copy()
+        np.testing.assert_array_equal(outputs[2], outputs[3][:128])
+
     def test_declared_handoff_and_geometry(self):
         graph = build_circuit()
         self.assertEqual(OUTPUT.read_text(), json.dumps(graph, indent=2) + "\n")
