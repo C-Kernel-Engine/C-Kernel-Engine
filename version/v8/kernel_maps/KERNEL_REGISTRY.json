@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 475,
+      "total": 476,
       "by_op": {
         "add_backward": 1,
         "add_rows_checked": 1,
@@ -17,6 +17,7 @@
         "attention_causal_bounded": 1,
         "attention_decode_append_checked": 1,
         "attention_full_token_major_checked": 1,
+        "attention_last_query_prob_trace": 1,
         "attention_projection": 1,
         "attention_sliding": 14,
         "attention_sliding_bounded": 1,
@@ -13762,6 +13763,308 @@
       "notes": "Inference-only full attention for token-major FP32 inputs. The pinned standalone Kokoro encoder fixture forces PyTorch eager attention; the pinned full KModel defaults to SDPA and has a separate numerical reference. At 36 tokens their final encoder features differ by 1.49e-5 maximum on the pinned PyTorch 2.8 CPU capture. This provider does not claim SDPA reduction-order parity; an alternative must have its own provider and numerical contract. No causal mask, key padding, dropout, output projection, or residual/LayerNorm. Kokoro's fixed 36-token fixture has no padding; other mask semantics require a separate contract.",
       "name": "attention_full_token_major_f32_checked",
       "_source_file": "attention_full_token_major_f32_checked.json"
+    },
+    {
+      "id": "attention_last_query_prob_trace_f32",
+      "op": "attention_last_query_prob_trace",
+      "operation_interface": "attention.last_query_probability_trace.fp32.v1",
+      "variant": "checked_head_major_fmaf_exp",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "equivalence_group": "attention.last_query_probability_trace.fp32.v1",
+        "phases": [
+          "decode",
+          "prefill"
+        ]
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "query",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "Tq",
+            "D"
+          ],
+          "layout": "head_query_channel",
+          "storage_class": "activation",
+          "access": "read",
+          "consumption": "required"
+        },
+        {
+          "name": "key",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "F_capacity",
+            "D"
+          ],
+          "layout": "head_frame_channel",
+          "storage_class": "activation",
+          "access": "read",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "trace",
+          "dtype": "fp32",
+          "shape": [
+            "L",
+            "H",
+            "F_capacity"
+          ],
+          "layout": "layer_head_frame",
+          "storage_class": "activation",
+          "access": "write",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "score_scratch",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "F_capacity"
+          ],
+          "layout": "head_frame",
+          "storage_class": "scratch",
+          "access": "read_write",
+          "consumption": "required",
+          "lifetime": "kernel_call",
+          "alignment": 4,
+          "size_bytes": "4 * H * F_capacity",
+          "size_resolution": "required"
+        }
+      ],
+      "dims": [
+        "query_elements",
+        "key_elements",
+        "trace_elements",
+        "score_elements",
+        "layers",
+        "layer",
+        "heads",
+        "query_tokens",
+        "key_tokens",
+        "frame_capacity",
+        "head_dim",
+        "scale"
+      ],
+      "constraints": {
+        "notes": "Observe the last query row of each layer. Use checked physical capacities, retain other layers and padding, and publish only after all heads succeed. The host selects artifact-declared heads and token rows."
+      },
+      "impl": {
+        "function": "attention_last_query_prob_trace_f32",
+        "c_declaration": "int attention_last_query_prob_trace_f32(const float *query, size_t query_elements, const float *key, size_t key_elements, float *trace, size_t trace_elements, float *score_scratch, size_t score_elements, size_t layers, size_t layer, size_t heads, size_t query_tokens, size_t key_tokens, size_t frame_capacity, size_t head_dim, float scale);",
+        "sources": [
+          "src/kernels/attention_last_query_prob_trace_f32.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "attention_last_query_probability_trace_f32",
+          "status": "validated",
+          "phases": [
+            "decode",
+            "prefill"
+          ],
+          "function": "attention_last_query_prob_trace_f32",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "contract_defined"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp32",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "serial"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "query",
+            "source": "activation:query",
+            "cast": "const float*",
+            "ports": [
+              "input:query"
+            ]
+          },
+          {
+            "name": "query_elements",
+            "source": "runtime:query_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "key",
+            "source": "activation:key",
+            "cast": "const float*",
+            "ports": [
+              "input:key"
+            ]
+          },
+          {
+            "name": "key_elements",
+            "source": "runtime:key_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "trace",
+            "source": "output:trace",
+            "cast": "float*",
+            "ports": [
+              "output:trace"
+            ]
+          },
+          {
+            "name": "trace_elements",
+            "source": "runtime:trace_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "score_scratch",
+            "source": "scratch:score_scratch",
+            "cast": "float*"
+          },
+          {
+            "name": "score_elements",
+            "source": "runtime:score_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "layers",
+            "source": "runtime:layers",
+            "value_type": "size_t"
+          },
+          {
+            "name": "layer",
+            "source": "runtime:layer",
+            "value_type": "size_t"
+          },
+          {
+            "name": "heads",
+            "source": "runtime:heads",
+            "value_type": "size_t"
+          },
+          {
+            "name": "query_tokens",
+            "source": "runtime:query_tokens",
+            "value_type": "size_t"
+          },
+          {
+            "name": "key_tokens",
+            "source": "runtime:key_tokens",
+            "value_type": "size_t"
+          },
+          {
+            "name": "frame_capacity",
+            "source": "runtime:frame_capacity",
+            "value_type": "size_t"
+          },
+          {
+            "name": "head_dim",
+            "source": "runtime:head_dim",
+            "value_type": "size_t"
+          },
+          {
+            "name": "scale",
+            "source": "dim:attention_scale"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_attention_last_query_prob_trace.py"
+        ],
+        "oracle": "Independent NumPy FP32 head-major QK softmax reference; real Whisper selected-head trace remains a separate connected gate"
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "H": "heads",
+          "Tq": "query_tokens",
+          "D": "head_dim",
+          "L": "layers",
+          "F_capacity": "frame_capacity"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "query",
+            "elements": "query_elements",
+            "rows": 1,
+            "width": "query_elements",
+            "element_bytes": 4,
+            "exact_elements_product": [
+              "heads",
+              "query_tokens",
+              "head_dim"
+            ]
+          },
+          {
+            "pointer": "key",
+            "elements": "key_elements",
+            "rows": 1,
+            "width": "key_elements",
+            "element_bytes": 4,
+            "exact_elements_product": [
+              "heads",
+              "frame_capacity",
+              "head_dim"
+            ]
+          },
+          {
+            "pointer": "trace",
+            "elements": "trace_elements",
+            "rows": 1,
+            "width": "trace_elements",
+            "element_bytes": 4,
+            "exact_elements_product": [
+              "layers",
+              "heads",
+              "frame_capacity"
+            ]
+          },
+          {
+            "pointer": "score_scratch",
+            "elements": "score_elements",
+            "rows": 1,
+            "width": "score_elements",
+            "element_bytes": 4,
+            "exact_elements_product": [
+              "heads",
+              "frame_capacity"
+            ]
+          }
+        ]
+      },
+      "name": "attention_last_query_prob_trace_f32",
+      "_source_file": "attention_last_query_prob_trace_f32.json"
     },
     {
       "id": "attention_sliding_head_major_bounded_f32",

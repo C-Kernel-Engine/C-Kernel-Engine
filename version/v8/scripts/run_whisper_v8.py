@@ -258,6 +258,10 @@ def _open_decoder_model(run_dir: Path) -> tuple[ctypes.CDLL, float]:
     model.ck_model_get_logits.restype = _FLOAT_P
     model.ck_model_get_vocab_size.argtypes = []
     model.ck_model_get_vocab_size.restype = ctypes.c_int
+    model.ck_model_get_named_activation_ptr.argtypes = [ctypes.c_char_p]
+    model.ck_model_get_named_activation_ptr.restype = ctypes.c_void_p
+    model.ck_model_get_named_activation_nbytes.argtypes = [ctypes.c_char_p]
+    model.ck_model_get_named_activation_nbytes.restype = ctypes.c_size_t
     try:
         reset = model.ck_model_kv_cache_reset
     except AttributeError as error:
@@ -760,11 +764,38 @@ def _decoder_worker(
             raise FileNotFoundError(path)
     generation = json.loads(generation_path.read_text(encoding="utf-8"))
     encoder_memory = np.load(args.encoder_output).astype(np.float32, copy=False)
+    trace_output = getattr(args, "attention_trace_output", None)
 
     owns_model = model is None
     init_seconds = 0.0
     if model is None:
         model, init_seconds = _open_decoder_model(run_dir)
+    selected_heads: list[list[int]] = []
+    observed_rows: list[np.ndarray] = []
+    trace_buffer: np.ndarray | None = None
+    if trace_output is not None:
+        decoder_config = json.loads((run_dir / "config.json").read_text(encoding="utf-8"))
+        layers = int(decoder_config["num_layers"])
+        heads = int(decoder_config["num_heads"])
+        frames = int(decoder_config["encoder_memory_length"])
+        selected_heads = generation.get("alignment_heads", [])
+        if (not isinstance(selected_heads, list) or not selected_heads or
+                any(not isinstance(pair, list) or len(pair) != 2 or
+                    any(not isinstance(value, int) or isinstance(value, bool)
+                        for value in pair) or
+                    not (0 <= pair[0] < layers and 0 <= pair[1] < heads)
+                    for pair in selected_heads)):
+            raise RuntimeError("invalid or missing pinned alignment-head selection")
+        if len({tuple(pair) for pair in selected_heads}) != len(selected_heads):
+            raise RuntimeError("pinned alignment-head selection contains duplicates")
+        required = layers * heads * frames * np.dtype(np.float32).itemsize
+        address = int(model.ck_model_get_named_activation_ptr(b"attention_trace") or 0)
+        available = int(model.ck_model_get_named_activation_nbytes(b"attention_trace"))
+        if not address or available < required:
+            raise RuntimeError("generated decoder has no complete attention-trace buffer")
+        trace_buffer = np.ctypeslib.as_array(
+            ctypes.cast(address, _FLOAT_P), shape=(layers * heads * frames,)
+        ).reshape(layers, heads, frames)
     try:
         # Each audio window is an independent decoder request. Retain immutable
         # weights and prepared constants, but never retain generated state.
@@ -819,11 +850,25 @@ def _decoder_worker(
                 stop = "eos"
                 break
             tokens.append(token)
+            if trace_buffer is not None:
+                trace_buffer.fill(np.nan)
             status = int(model.ck_model_decode(token, None))
             if status != 0:
                 raise RuntimeError(
                     f"decoder step {step} failed with code {status}"
                 )
+            if trace_buffer is not None:
+                selected = np.stack([
+                    trace_buffer[layer, head].copy()
+                    for layer, head in selected_heads
+                ])
+                if (not np.isfinite(selected).all() or
+                        not np.allclose(selected.sum(axis=1), 1.0,
+                                        rtol=0, atol=2e-4)):
+                    raise RuntimeError(
+                        f"decoder step {step} did not publish a valid attention trace"
+                    )
+                observed_rows.append(selected)
         decode_seconds = time.perf_counter() - decode_started
     finally:
         if owns_model:
@@ -842,6 +887,19 @@ def _decoder_worker(
         transcript_tokens,
         skip_special_tokens=True,
     )
+    if trace_output is not None:
+        trace_output.parent.mkdir(parents=True, exist_ok=True)
+        selected_attention = np.stack(observed_rows, axis=1) if observed_rows else np.empty(
+            (len(selected_heads), 0, frames), dtype=np.float32)
+        fd = os.open(trace_output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "wb") as handle:
+            np.savez_compressed(
+                handle,
+                selected_attention=selected_attention,
+                token_ids=np.asarray(tokens, dtype=np.int32),
+                alignment_heads=np.asarray(selected_heads, dtype=np.int32),
+                frame_capacity=np.asarray(frames, dtype=np.int32),
+            )
     args.worker_report.write_text(
         json.dumps(
             {
@@ -856,6 +914,12 @@ def _decoder_worker(
                 "decode_seconds": decode_seconds,
                 "model_init_seconds": init_seconds,
                 "execution_topology": execution_topology,
+                "attention_trace": ({
+                    "path": str(trace_output),
+                    "sha256": _sha256(trace_output),
+                    "selected_heads": selected_heads,
+                    "shape": list(selected_attention.shape),
+                } if trace_output is not None else None),
             },
             indent=2,
         )
@@ -1206,6 +1270,8 @@ def _run_segment(
     encoder_output = temp / f"encoder-{index:04d}.npy"
     encoder_report = temp / f"encoder-{index:04d}.json"
     decoder_report = temp / f"decoder-{index:04d}.json"
+    trace_dir = getattr(args, "attention_trace_dir", None)
+    trace_output = trace_dir / f"window-{index:04d}.npz" if trace_dir else None
     encoder_arguments = {
         "encoder_run_dir": encoder_dir,
         "wav": wav_path,
@@ -1224,6 +1290,7 @@ def _run_segment(
         "max_tokens": args.max_tokens,
         "timestamps": args.timestamps,
         "worker_report": decoder_report,
+        "attention_trace_output": trace_output,
     }
     encoder_started = time.perf_counter()
     if encoder_worker is not None and decoder_worker is not None:
@@ -1278,6 +1345,8 @@ def _run_segment(
                 "--max-tokens",
                 str(args.max_tokens),
                 *(["--timestamps"] if args.timestamps else []),
+                *(["--attention-trace-output", str(trace_output)]
+                  if trace_output else []),
                 "--worker-report",
                 str(decoder_report),
             ],
@@ -1730,6 +1799,10 @@ def _parser() -> argparse.ArgumentParser:
     )
     run.add_argument("--output", type=Path)
     run.add_argument(
+        "--attention-trace-dir", type=Path,
+        help="Opt-in private selected-head trace output, one NPZ per audio window",
+    )
+    run.add_argument(
         "--temp-dir",
         type=Path,
         help="Temporary storage root for request-scoped audio artifacts",
@@ -1774,6 +1847,7 @@ def _parser() -> argparse.ArgumentParser:
     decoder.add_argument("--task", required=True)
     decoder.add_argument("--max-tokens", type=int, required=True)
     decoder.add_argument("--timestamps", action="store_true")
+    decoder.add_argument("--attention-trace-output", type=Path)
     decoder.add_argument("--worker-report", type=Path, required=True)
     return parser
 

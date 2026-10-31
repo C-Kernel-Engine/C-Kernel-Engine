@@ -1444,6 +1444,18 @@ TEST_SUITES = {
         "Generated Selected-Attention Token Alignment", "inference",
         ROOT / "tests" / "test_v8_alignment_attention_dtw_generated.py",
     ),
+    "whisper_native_attention_trace": TestSuite(
+        "Native Selected-Attention Trace", "inference",
+        ROOT / "tests" / "test_v8_attention_last_query_prob_trace.py",
+    ),
+    "whisper_generated_attention_trace": TestSuite(
+        "Generated Selected-Attention Trace", "inference",
+        ROOT / "tests" / "test_v8_attention_last_query_prob_trace_generated.py",
+    ),
+    "whisper_alignment_trace_authoring": TestSuite(
+        "Whisper Alignment Trace Authoring", "inference",
+        ROOT / "tests" / "test_v8_whisper_alignment_trace_manifest.py",
+    ),
     "tts_kokoro_native_speech_session": TestSuite(
         "Kokoro Native Speech Stop, Replace and Recovery", "inference",
         ROOT / "tests" / "test_v8_kokoro_native_speech_session.py",
