@@ -47,6 +47,82 @@ chunked_compare = _load_module(
 
 
 class TestV8PrefillCodegen(unittest.TestCase):
+    def test_layer_progress_is_emitted_after_real_layer_operations(self):
+        ops = [
+            {"op": "first", "function": "first", "layer": 0, "args": []},
+            {"op": "second", "function": "second", "layer": 0, "args": []},
+            {"op": "third", "function": "third", "layer": 1, "args": []},
+            {"op": "logits", "function": "finish", "layer": -1, "args": []},
+        ]
+        emitted = codegen_prefill_v8.emit_prefill_function(
+            ops, {"context_length": 16, "prefill_chunk_length": 16})
+        first = emitted.index("first(")
+        second = emitted.index("second(")
+        one_done = emitted.index("ck_model_progress_report(1, 2, num_tokens, prefill_start_pos)")
+        third = emitted.index("third(")
+        two_done = emitted.index("ck_model_progress_report(2, 2, num_tokens, prefill_start_pos)")
+        self.assertLess(first, second)
+        self.assertLess(second, one_done)
+        self.assertLess(one_done, third)
+        self.assertLess(third, two_done)
+        self.assertIn("ck_model_progress_report(0, 2, num_tokens, prefill_start_pos)", emitted)
+        self.assertEqual(emitted.count("ck_model_progress_report("), 3)
+        compiler = shutil.which("cc")
+        if compiler is None:
+            self.skipTest("C compiler unavailable")
+        harness = r'''
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#define MAX_SEQ_LEN 16
+#define A_TOKEN_IDS 0
+typedef struct { unsigned char bump[64]; int pos, rope_pos, encoder_kv_ready; } CKModel;
+static int g_ck_skip_decode_logits, completed[3], total[3], chunk[3], start[3];
+static int callbacks, operations;
+static int ck_model_cancel_requested(void) { return 0; }
+static void ck_model_progress_report(int a, int b, int c, int d) {
+    if (callbacks < 3) {
+        completed[callbacks] = a; total[callbacks] = b;
+        chunk[callbacks] = c; start[callbacks] = d;
+    }
+    callbacks++;
+}
+static void ck_trace_pos(const char *a, int b, int c, int d, int e) {
+    (void)a; (void)b; (void)c; (void)d; (void)e;
+}
+static void ck_parallel_prefill_release_transient_caches(void) {}
+static int ck_env_truthy_or_qwen3vl_ocr_profile(const char *x) {
+    (void)x; return 0;
+}
+static void ck_decode(CKModel *m, int32_t t) { (void)t; m->pos++; }
+static void first(void) { operations++; }
+static void second(void) { operations++; }
+static void third(void) { operations++; }
+static void finish(void) { operations++; }
+''' + emitted + r'''
+int main(void) {
+    CKModel model = {0};
+    int32_t ids[2] = {1, 2};
+    ck_prefill(&model, ids, 2);
+    if (model.pos != 2 || operations != 4 || callbacks != 3) return 1;
+    for (int i = 0; i < 3; ++i)
+        if (completed[i] != i || total[i] != 2 || chunk[i] != 2 || start[i] != 0)
+            return 2;
+    return 0;
+}
+'''
+        with tempfile.TemporaryDirectory(dir=os.environ.get("TMPDIR")) as directory:
+            source = Path(directory) / "progress.c"
+            executable = Path(directory) / "progress"
+            source.write_text(harness)
+            subprocess.run([compiler, "-std=c11", str(source), "-o", str(executable)],
+                           check=True, capture_output=True, text=True)
+            subprocess.run([str(executable)], check=True)
+        interrupted = codegen_prefill_v8.emit_prefill_function(
+            [ops[0], ops[-1], ops[1]],
+            {"context_length": 16, "prefill_chunk_length": 16})
+        self.assertNotIn("ck_model_progress_report(", interrupted)
+
     def test_prior_cache_attention_keeps_chunked_prefill_with_gate_projection(self):
         config = {"context_length": 32, "prefill_chunk_length": 8, "embed_dim": 16}
         ops = [

@@ -106,6 +106,31 @@ typedef struct CKSessionGenerateResultV8 {
     uint64_t reserved[8];
 } CKSessionGenerateResultV8;
 
+/* Read-only progress for the current or most recently completed generate.
+ * Safe to query from another thread while generate runs, like cancel. A
+ * completed layer means all its generated prefill operations returned for
+ * the current chunk; it is not a count of completed prompt tokens.
+ * chunk_start_position identifies that chunk's absolute starting position.
+ * Older model libraries may not publish layer progress, in which case
+ * total_layers remains zero. */
+enum CKSessionProgressPhaseV8 {
+    CK_SESSION_PROGRESS_IDLE = 0,
+    CK_SESSION_PROGRESS_PREFILL = 1,
+    CK_SESSION_PROGRESS_DECODE = 2,
+    CK_SESSION_PROGRESS_COMPLETE = 3
+};
+
+typedef struct CKSessionProgressV8 {
+    uint32_t struct_size;
+    uint32_t abi_version;
+    uint64_t request_serial;
+    int32_t phase;
+    int32_t completed_layers;
+    int32_t total_layers;
+    int32_t chunk_tokens;
+    int32_t chunk_start_position;
+} CKSessionProgressV8;
+
 /* Return zero to continue generation. A non-zero result requests a clean stop. */
 typedef int (*ck_session_token_callback_v8)(
     void *user_data,
@@ -162,6 +187,7 @@ int ck_session_v8_generate(
     CKSessionGenerateResultV8 *result);
 
 void ck_session_v8_cancel(CKSessionV8 *session);
+int ck_session_v8_get_progress(CKSessionV8 *session, CKSessionProgressV8 *progress);
 int ck_session_v8_reset(CKSessionV8 *session);
 const char *ck_session_v8_last_error(const CKSessionV8 *session);
 

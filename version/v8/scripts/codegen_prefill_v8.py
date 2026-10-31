@@ -152,6 +152,29 @@ def _annotate_kv_transpose_roles(ops: List[Dict]) -> None:
             layer_kv_count[layer] = count + 1
 
 
+def _progress_layer_boundaries(ops: List[Dict]) -> Dict[int, int]:
+    """Map the final operation of each contiguous decoder layer to its ordinal."""
+    layers = [int(op.get("layer", -1) if op.get("layer") is not None else -1)
+              for op in ops]
+    closed: set[int] = set()
+    previous = -1
+    for layer in layers:
+        if layer != previous and previous >= 0:
+            closed.add(previous)
+        if layer >= 0 and layer in closed:
+            # A layer interrupted by another section cannot be reported as
+            # complete at its first boundary. Leave progress unavailable.
+            return {}
+        previous = layer
+    boundaries: Dict[int, int] = {}
+    completed = 0
+    for index, layer in enumerate(layers):
+        if layer >= 0 and (index + 1 == len(layers) or layers[index + 1] != layer):
+            completed += 1
+            boundaries[index] = completed
+    return boundaries
+
+
 def get_parallel_pragma(op: Dict) -> str:
     """
     Get OpenMP pragma from op's parallel annotation.
@@ -1939,6 +1962,11 @@ static void ck_prefill_range(CKModel *model, const int32_t *tokens, int num_toke
         lines.append("")
 
     _annotate_kv_transpose_roles(ops)
+    progress_boundaries = _progress_layer_boundaries(ops)
+    progress_total = len(progress_boundaries)
+    progress_tokens = "prefill_original_num_tokens" if terminal_rows else "num_tokens"
+    if progress_total:
+        lines.append(f"    ck_model_progress_report(0, {progress_total}, {progress_tokens}, prefill_start_pos);")
     residual_add_count_total = 0
     residual_add_counts_by_layer: Dict[int, int] = {}
     residual_save_counts_by_layer: Dict[int, int] = {}
@@ -2053,6 +2081,11 @@ static void ck_prefill_range(CKModel *model, const int32_t *tokens, int num_toke
         (const float*)(((const float*)(model->bump + A_EMBEDDED_INPUT)) + (((size_t)num_tokens - 1u) * (size_t)EMBED_DIM)),
         EMBED_DIM);""")
             embed_scale_emitted = True
+        if seq_idx in progress_boundaries:
+            lines.append(
+                f"    ck_model_progress_report({progress_boundaries[seq_idx]}, "
+                f"{progress_total}, {progress_tokens}, prefill_start_pos);"
+            )
         lines.append("")
 
     if terminal_rows:

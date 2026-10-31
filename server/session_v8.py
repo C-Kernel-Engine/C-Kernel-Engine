@@ -119,6 +119,22 @@ class _GenerateResult(ctypes.Structure):
     ]
 
 
+class _Progress(ctypes.Structure):
+    _fields_ = [
+        ("struct_size", ctypes.c_uint32),
+        ("abi_version", ctypes.c_uint32),
+        ("request_serial", ctypes.c_uint64),
+        ("phase", ctypes.c_int32),
+        ("completed_layers", ctypes.c_int32),
+        ("total_layers", ctypes.c_int32),
+        ("chunk_tokens", ctypes.c_int32),
+        ("chunk_start_position", ctypes.c_int32),
+    ]
+
+
+_PROGRESS_PHASES = {0: "idle", 1: "prefill", 2: "decode", 3: "complete"}
+
+
 class _ModelDescriptor(ctypes.Structure):
     _fields_ = [
         ("struct_size", ctypes.c_uint32), ("abi_version", ctypes.c_uint32),
@@ -246,6 +262,9 @@ def _configure_abi(lib: Any, name: str) -> None:
             ctypes.c_void_p,
             ctypes.POINTER(_GenerateResult),
         ]
+    elif name == "ck_session_v8_get_progress":
+        fn.restype = ctypes.c_int
+        fn.argtypes = [ctypes.c_void_p, ctypes.POINTER(_Progress)]
     elif name in ("ck_session_v8_cancel", "ck_session_v8_close"):
         fn.restype = None
         fn.argtypes = [ctypes.c_void_p]
@@ -268,6 +287,7 @@ def _configure_lib(lib: Any) -> None:
         "ck_session_v8_encode",
         "ck_session_v8_decode",
         "ck_session_v8_generate",
+        "ck_session_v8_get_progress",
         "ck_session_v8_cancel",
         "ck_session_v8_close",
         "ck_session_v8_last_error",
@@ -511,6 +531,9 @@ class SessionV8:
         import threading
 
         self._lock = threading.Lock()
+        # A progress read can overlap generate, but must never overlap close.
+        # Keep this separate from the lock used by tokenizer and batch calls.
+        self._lifecycle_lock = threading.Lock()
         self.lib: Any = None
         self.session: Any = None
         self._batch2: Batch2SessionV8 | None = None
@@ -559,6 +582,7 @@ class SessionV8:
         import threading
 
         self._lock = threading.Lock()
+        self._lifecycle_lock = threading.Lock()
         self.lib = lib
         self.session = session
         self._batch2 = None
@@ -812,8 +836,30 @@ class SessionV8:
     def cancel(self) -> None:
         self.lib.ck_session_v8_cancel(self.session)
 
+    def progress(self) -> dict[str, int | str]:
+        """Read native completed-layer progress without waiting for generate."""
+        snapshot = _Progress()
+        snapshot.struct_size = ctypes.sizeof(_Progress)
+        snapshot.abi_version = self.CK_ABI_VERSION
+        with self._lifecycle_lock:
+            if self.session is None:
+                raise SessionError(-6, "session is closed")
+            status = self.lib.ck_session_v8_get_progress(self.session, ctypes.byref(snapshot))
+            _raise_native_error(self.lib, self.session, "ck_session_v8_get_progress", status)
+        return {
+            "request_serial": int(snapshot.request_serial),
+            "phase": _PROGRESS_PHASES.get(int(snapshot.phase), "unknown"),
+            "completed_layers": int(snapshot.completed_layers),
+            "total_layers": int(snapshot.total_layers),
+            "chunk_tokens": int(snapshot.chunk_tokens),
+            "chunk_start_position": int(snapshot.chunk_start_position),
+        }
+
     def close(self) -> None:
         with self._lock:
-            if self.session is not None:
-                self.lib.ck_session_v8_close(self.session)
-                self.session = None
+            # Lock order is _lock, then _lifecycle_lock. A progress reader only
+            # takes the latter, so it cannot keep a freed native handle alive.
+            with self._lifecycle_lock:
+                if self.session is not None:
+                    self.lib.ck_session_v8_close(self.session)
+                    self.session = None

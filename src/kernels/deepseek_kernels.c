@@ -856,10 +856,21 @@ static void ds_mla_attention_f32_work(int ith, int nth, void *opaque)
     ds_mla_attention_f32_args_t *args =
         (ds_mla_attention_f32_args_t *)opaque;
     float *thread_scores = args->scores + (size_t)ith * (size_t)args->num_tokens;
+    /* Give each participating worker one row before dynamic claims. This
+     * ensures each worker's private score row is exercised even if the main
+     * thread reaches the claim loop before another worker is scheduled. */
+    if (ith < args->num_tokens) {
+        ds_mla_attention_f32_query_range(
+            args->q, args->k, args->v, args->output,
+            args->num_heads, args->num_kv_heads, args->num_tokens,
+            args->qk_head_dim, args->v_head_dim, args->scale,
+            thread_scores,
+            ith * args->num_heads,
+            (ith + 1) * args->num_heads,
+            1, args->bf16_phases);
+    }
     (void)nth;
-    /* One token row contains every query head and costs O(t). Dynamic claims
-     * keep asymmetric cores busy without sharing score scratch. Query rows are
-     * independent, and every row retains its original reduction order. */
+    /* Remaining query rows are independent and retain their reduction order. */
     for (;;) {
         const int token = atomic_fetch_add_explicit(
             &args->next_token,
@@ -899,6 +910,7 @@ static void ds_mla_attention_parallel_dispatch(
     const char *disabled = getenv("CK_DISABLE_MLA_PARALLEL_PREFILL");
     int active = pool ? ck_threadpool_n_threads(pool) : 1;
     if (active > num_heads) active = num_heads;
+    if (active > num_tokens) active = num_tokens;
     const size_t score_row_bytes =
         num_tokens > 0 ? (size_t)num_tokens * sizeof(float) : 0;
     if ((disabled && disabled[0] && strcmp(disabled, "0") != 0) ||
@@ -924,7 +936,7 @@ static void ds_mla_attention_parallel_dispatch(
         .v_head_dim = v_head_dim, .scale = scale, .scores = scores,
         .bf16_phases = bf16_phases,
     };
-    atomic_init(&args.next_token, 0);
+    atomic_init(&args.next_token, active);
     ck_threadpool_dispatch_n(pool, active, ds_mla_attention_f32_work, &args);
 }
 

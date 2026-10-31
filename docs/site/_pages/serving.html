@@ -63,6 +63,10 @@ It distinguishes a working HTTP connection from a completed tool task.</p>
                 <td><span class="badge badge-green">Shipped</span></td>
                 <td><code>server/live.py</code>, <code>ck_cli_v8.c</code> cancel flag</td>
                 <td>lifecycle hardening + streaming socket tests</td></tr>
+            <tr><td>Native progress snapshot for an ordinary request</td>
+                <td><span class="badge badge-orange">Diagnostic</span></td>
+                <td><code>GET /v1/cke/native-progress</code>, <code>ck_session_v8_get_progress</code></td>
+                <td><code>test_native_progress.py</code>, generated prefill layer test</td></tr>
             <tr><td>Per-request KV isolation in default mode (reset per request, shared weights)</td>
                 <td><span class="badge badge-green">Shipped</span></td>
                 <td><code>ck_session_v8_generate</code> → <code>kv_reset</code>; one process-wide <code>libmodel.so</code></td>
@@ -92,6 +96,22 @@ It distinguishes a working HTTP connection from a completed tool task.</p>
     <p style="color: var(--text-muted); font-size: 0.85rem;">Passing scheduler unit tests are not
     proof of batched model execution or end-to-end serving throughput; those require separate
     evidence. This table is the claim boundary for the whole page.</p>
+</div>
+
+<div class="card">
+    <h2 style="margin-top: 0;">Observing a long prefill</h2>
+    <p>On a rebuilt ordinary-session server, <code>GET /v1/cke/native-progress</code>
+    returns the server instance, a request serial and its current phase. During
+    generated prefill it reports completed and total decoder layers for the current
+    chunk, plus that chunk's token count and absolute starting position. The count
+    advances only after a layer's generated operations return; it does not count
+    tokens completed inside a layer or prove numerical correctness. A bundled model
+    without the progress callback reports zero total layers. The endpoint contains
+    no prompt or generated text. It is unavailable in the opt-in batch HTTP mode.</p>
+    <p>Use the request serial and chunk position when comparing samples. A steady
+    counter within one expensive layer is not evidence of a stalled server. SSE
+    heartbeats and CPU activity remain separate from completed native work.
+    Cancellation is cooperative and may wait for the current kernel to return.</p>
 </div>
 
 <div class="card">
