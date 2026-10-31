@@ -148,6 +148,8 @@ Data Structures</h2></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structCKSessionGenerateResultV8.html">CKSessionGenerateResultV8</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structCKSessionProgressV8.html">CKSessionProgressV8</a></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="define-members" name="define-members"></a>
 Macros</h2></td></tr>
@@ -163,6 +165,12 @@ Typedefs</h2></td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="enum-members" name="enum-members"></a>
 Enumerations</h2></td></tr>
+<tr class="memitem:a6b968d6150a0230e7bd2cb748000b604" id="r_a6b968d6150a0230e7bd2cb748000b604"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ck__session__v8_8h.html#a6b968d6150a0230e7bd2cb748000b604">CKSessionProgressPhaseV8</a> { <a class="el" href="ck__session__v8_8h.html#a6b968d6150a0230e7bd2cb748000b604aa80f0c87c16c36b5006973b813aad387">CK_SESSION_PROGRESS_IDLE</a> = 0
+, <a class="el" href="ck__session__v8_8h.html#a6b968d6150a0230e7bd2cb748000b604a8b7e820376db38c49ede4436d66f5abe">CK_SESSION_PROGRESS_PREFILL</a> = 1
+, <a class="el" href="ck__session__v8_8h.html#a6b968d6150a0230e7bd2cb748000b604a94540b9b2e0ebf5bee2d9a664fba4ee4">CK_SESSION_PROGRESS_DECODE</a> = 2
+, <a class="el" href="ck__session__v8_8h.html#a6b968d6150a0230e7bd2cb748000b604a38842a1ed722d7bfa5c5de554ddd7034">CK_SESSION_PROGRESS_COMPLETE</a> = 3
+ }</td></tr>
+<tr class="separator:a6b968d6150a0230e7bd2cb748000b604"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ab6d219efed8902e9110785e6d9920fcf" id="r_ab6d219efed8902e9110785e6d9920fcf"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ck__session__v8_8h.html#ab6d219efed8902e9110785e6d9920fcf">CKSessionRequestFlagsV8</a> { <br />
 &#160;&#160;<a class="el" href="ck__session__v8_8h.html#ab6d219efed8902e9110785e6d9920fcfa6de345e4efea7b9d129744ffb60481f4">CK_SESSION_REQUEST_RAW_PROMPT</a> = UINT32_C(1) &lt;&lt; 0
 , <a class="el" href="ck__session__v8_8h.html#ab6d219efed8902e9110785e6d9920fcfaa347fe050bae06c4265ab683b3b19ca6">CK_SESSION_REQUEST_IGNORE_EOS</a> = UINT32_C(1) &lt;&lt; 1
@@ -243,6 +251,8 @@ Functions</h2></td></tr>
 <tr class="separator:a89aaf5e7382ca7e2c6c3caa2ec65bf45"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a6a5e68996841153114998d3c3f4aa3da" id="r_a6a5e68996841153114998d3c3f4aa3da"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ck__session__v8_8h.html#a6a5e68996841153114998d3c3f4aa3da">ck_session_v8_get_model_descriptor</a> (const <a class="el" href="ck__session__v8_8h.html#a662ce370d189b1138dd8d10af00872c2">CKSessionV8</a> *session, <a class="el" href="structCKModelRuntimeDescriptorV8.html">CKModelRuntimeDescriptorV8</a> *descriptor, size_t descriptor_size)</td></tr>
 <tr class="separator:a6a5e68996841153114998d3c3f4aa3da"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ab380feb3b65c157233416f68b6a0cf63" id="r_ab380feb3b65c157233416f68b6a0cf63"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ck__session__v8_8h.html#ab380feb3b65c157233416f68b6a0cf63">ck_session_v8_get_progress</a> (<a class="el" href="ck__session__v8_8h.html#a662ce370d189b1138dd8d10af00872c2">CKSessionV8</a> *session, <a class="el" href="structCKSessionProgressV8.html">CKSessionProgressV8</a> *progress)</td></tr>
+<tr class="separator:ab380feb3b65c157233416f68b6a0cf63"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:acd07860df80d445702c7f0bdab1e06c2" id="r_acd07860df80d445702c7f0bdab1e06c2"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ck__session__v8_8h.html#acd07860df80d445702c7f0bdab1e06c2">ck_session_v8_get_stop_token_ids</a> (<a class="el" href="ck__session__v8_8h.html#a662ce370d189b1138dd8d10af00872c2">CKSessionV8</a> *session, int32_t *output, int32_t capacity)</td></tr>
 <tr class="separator:acd07860df80d445702c7f0bdab1e06c2"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a0d8e657d40221ddc9e6eebb26d3058b0" id="r_a0d8e657d40221ddc9e6eebb26d3058b0"><td class="memItemLeft" align="right" valign="top">const char *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ck__session__v8_8h.html#a0d8e657d40221ddc9e6eebb26d3058b0">ck_session_v8_last_error</a> (const <a class="el" href="ck__session__v8_8h.html#a662ce370d189b1138dd8d10af00872c2">CKSessionV8</a> *session)</td></tr>
@@ -282,7 +292,7 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="ck__session__v8_8h_source.html#l00110">110</a> of file <a class="el" href="ck__session__v8_8h_source.html">ck_session_v8.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="ck__session__v8_8h_source.html#l00135">135</a> of file <a class="el" href="ck__session__v8_8h_source.html">ck_session_v8.h</a>.</p>
 
 </div>
 </div>
@@ -303,6 +313,38 @@ Functions</h2></td></tr>
 </div>
 </div>
 <h2 class="groupheader">Enumeration Type Documentation</h2>
+<a id="a6b968d6150a0230e7bd2cb748000b604" name="a6b968d6150a0230e7bd2cb748000b604"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a6b968d6150a0230e7bd2cb748000b604">&#9670;&#160;</a></span>CKSessionProgressPhaseV8</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">enum <a class="el" href="ck__session__v8_8h.html#a6b968d6150a0230e7bd2cb748000b604">CKSessionProgressPhaseV8</a></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<table class="fieldtable">
+<tr><th colspan="2">Enumerator</th></tr><tr><td class="fieldname"><a id="a6b968d6150a0230e7bd2cb748000b604aa80f0c87c16c36b5006973b813aad387" name="a6b968d6150a0230e7bd2cb748000b604aa80f0c87c16c36b5006973b813aad387"></a>CK_SESSION_PROGRESS_IDLE&#160;</td><td class="fielddoc"></td></tr>
+<tr><td class="fieldname"><a id="a6b968d6150a0230e7bd2cb748000b604a8b7e820376db38c49ede4436d66f5abe" name="a6b968d6150a0230e7bd2cb748000b604a8b7e820376db38c49ede4436d66f5abe"></a>CK_SESSION_PROGRESS_PREFILL&#160;</td><td class="fielddoc"></td></tr>
+<tr><td class="fieldname"><a id="a6b968d6150a0230e7bd2cb748000b604a94540b9b2e0ebf5bee2d9a664fba4ee4" name="a6b968d6150a0230e7bd2cb748000b604a94540b9b2e0ebf5bee2d9a664fba4ee4"></a>CK_SESSION_PROGRESS_DECODE&#160;</td><td class="fielddoc"></td></tr>
+<tr><td class="fieldname"><a id="a6b968d6150a0230e7bd2cb748000b604a38842a1ed722d7bfa5c5de554ddd7034" name="a6b968d6150a0230e7bd2cb748000b604a38842a1ed722d7bfa5c5de554ddd7034"></a>CK_SESSION_PROGRESS_COMPLETE&#160;</td><td class="fielddoc"></td></tr>
+</table>
+
+<p class="definition">Definition at line <a class="el" href="ck__session__v8_8h_source.html#l00116">116</a> of file <a class="el" href="ck__session__v8_8h_source.html">ck_session_v8.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  116</span>                              {</div>
+<div class="line"><span class="lineno">  117</span>    <a class="code hl_enumvalue" href="ck__session__v8_8h.html#a6b968d6150a0230e7bd2cb748000b604aa80f0c87c16c36b5006973b813aad387">CK_SESSION_PROGRESS_IDLE</a> = 0,</div>
+<div class="line"><span class="lineno">  118</span>    <a class="code hl_enumvalue" href="ck__session__v8_8h.html#a6b968d6150a0230e7bd2cb748000b604a8b7e820376db38c49ede4436d66f5abe">CK_SESSION_PROGRESS_PREFILL</a> = 1,</div>
+<div class="line"><span class="lineno">  119</span>    <a class="code hl_enumvalue" href="ck__session__v8_8h.html#a6b968d6150a0230e7bd2cb748000b604a94540b9b2e0ebf5bee2d9a664fba4ee4">CK_SESSION_PROGRESS_DECODE</a> = 2,</div>
+<div class="line"><span class="lineno">  120</span>    <a class="code hl_enumvalue" href="ck__session__v8_8h.html#a6b968d6150a0230e7bd2cb748000b604a38842a1ed722d7bfa5c5de554ddd7034">CK_SESSION_PROGRESS_COMPLETE</a> = 3</div>
+<div class="line"><span class="lineno">  121</span>};</div>
+<div class="ttc" id="ack__session__v8_8h_html_a6b968d6150a0230e7bd2cb748000b604a38842a1ed722d7bfa5c5de554ddd7034"><div class="ttname"><a href="ck__session__v8_8h.html#a6b968d6150a0230e7bd2cb748000b604a38842a1ed722d7bfa5c5de554ddd7034">CK_SESSION_PROGRESS_COMPLETE</a></div><div class="ttdeci">@ CK_SESSION_PROGRESS_COMPLETE</div><div class="ttdef"><b>Definition</b> <a href="ck__session__v8_8h_source.html#l00121">ck_session_v8.h:120</a></div></div>
+<div class="ttc" id="ack__session__v8_8h_html_a6b968d6150a0230e7bd2cb748000b604a8b7e820376db38c49ede4436d66f5abe"><div class="ttname"><a href="ck__session__v8_8h.html#a6b968d6150a0230e7bd2cb748000b604a8b7e820376db38c49ede4436d66f5abe">CK_SESSION_PROGRESS_PREFILL</a></div><div class="ttdeci">@ CK_SESSION_PROGRESS_PREFILL</div><div class="ttdef"><b>Definition</b> <a href="ck__session__v8_8h_source.html#l00118">ck_session_v8.h:118</a></div></div>
+<div class="ttc" id="ack__session__v8_8h_html_a6b968d6150a0230e7bd2cb748000b604a94540b9b2e0ebf5bee2d9a664fba4ee4"><div class="ttname"><a href="ck__session__v8_8h.html#a6b968d6150a0230e7bd2cb748000b604a94540b9b2e0ebf5bee2d9a664fba4ee4">CK_SESSION_PROGRESS_DECODE</a></div><div class="ttdeci">@ CK_SESSION_PROGRESS_DECODE</div><div class="ttdef"><b>Definition</b> <a href="ck__session__v8_8h_source.html#l00119">ck_session_v8.h:119</a></div></div>
+<div class="ttc" id="ack__session__v8_8h_html_a6b968d6150a0230e7bd2cb748000b604aa80f0c87c16c36b5006973b813aad387"><div class="ttname"><a href="ck__session__v8_8h.html#a6b968d6150a0230e7bd2cb748000b604aa80f0c87c16c36b5006973b813aad387">CK_SESSION_PROGRESS_IDLE</a></div><div class="ttdeci">@ CK_SESSION_PROGRESS_IDLE</div><div class="ttdef"><b>Definition</b> <a href="ck__session__v8_8h_source.html#l00117">ck_session_v8.h:117</a></div></div>
+</div><!-- fragment -->
+</div>
+</div>
 <a id="ab6d219efed8902e9110785e6d9920fcf" name="ab6d219efed8902e9110785e6d9920fcf"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#ab6d219efed8902e9110785e6d9920fcf">&#9670;&#160;</a></span>CKSessionRequestFlagsV8</h2>
 
@@ -1194,6 +1236,34 @@ Functions</h2></td></tr>
           <td></td>
           <td class="paramtype">size_t&#160;</td>
           <td class="paramname"><em>descriptor_size</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="ab380feb3b65c157233416f68b6a0cf63" name="ab380feb3b65c157233416f68b6a0cf63"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ab380feb3b65c157233416f68b6a0cf63">&#9670;&#160;</a></span>ck_session_v8_get_progress()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int ck_session_v8_get_progress </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="ck__session__v8_8h.html#a662ce370d189b1138dd8d10af00872c2">CKSessionV8</a> *&#160;</td>
+          <td class="paramname"><em>session</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="structCKSessionProgressV8.html">CKSessionProgressV8</a> *&#160;</td>
+          <td class="paramname"><em>progress</em>&#160;</td>
         </tr>
         <tr>
           <td></td>

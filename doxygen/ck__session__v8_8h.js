@@ -3,9 +3,16 @@ var ck__session__v8_8h =
     [ "CKSessionConfigV8", "structCKSessionConfigV8.html", "structCKSessionConfigV8" ],
     [ "CKSessionGenerateRequestV8", "structCKSessionGenerateRequestV8.html", "structCKSessionGenerateRequestV8" ],
     [ "CKSessionGenerateResultV8", "structCKSessionGenerateResultV8.html", "structCKSessionGenerateResultV8" ],
+    [ "CKSessionProgressV8", "structCKSessionProgressV8.html", "structCKSessionProgressV8" ],
     [ "CK_SESSION_ABI_V8_VERSION", "ck__session__v8_8h.html#a247f35bc16080cb3d818fc8efcffac3a", null ],
     [ "ck_session_token_callback_v8", "ck__session__v8_8h.html#a16ef8c38f1a1006190320a0419d857db", null ],
     [ "CKSessionV8", "ck__session__v8_8h.html#a662ce370d189b1138dd8d10af00872c2", null ],
+    [ "CKSessionProgressPhaseV8", "ck__session__v8_8h.html#a6b968d6150a0230e7bd2cb748000b604", [
+      [ "CK_SESSION_PROGRESS_IDLE", "ck__session__v8_8h.html#a6b968d6150a0230e7bd2cb748000b604aa80f0c87c16c36b5006973b813aad387", null ],
+      [ "CK_SESSION_PROGRESS_PREFILL", "ck__session__v8_8h.html#a6b968d6150a0230e7bd2cb748000b604a8b7e820376db38c49ede4436d66f5abe", null ],
+      [ "CK_SESSION_PROGRESS_DECODE", "ck__session__v8_8h.html#a6b968d6150a0230e7bd2cb748000b604a94540b9b2e0ebf5bee2d9a664fba4ee4", null ],
+      [ "CK_SESSION_PROGRESS_COMPLETE", "ck__session__v8_8h.html#a6b968d6150a0230e7bd2cb748000b604a38842a1ed722d7bfa5c5de554ddd7034", null ]
+    ] ],
     [ "CKSessionRequestFlagsV8", "ck__session__v8_8h.html#ab6d219efed8902e9110785e6d9920fcf", [
       [ "CK_SESSION_REQUEST_RAW_PROMPT", "ck__session__v8_8h.html#ab6d219efed8902e9110785e6d9920fcfa6de345e4efea7b9d129744ffb60481f4", null ],
       [ "CK_SESSION_REQUEST_IGNORE_EOS", "ck__session__v8_8h.html#ab6d219efed8902e9110785e6d9920fcfaa347fe050bae06c4265ab683b3b19ca6", null ],
@@ -53,6 +60,7 @@ var ck__session__v8_8h =
     [ "ck_session_v8_generate", "ck__session__v8_8h.html#a974e5fe465942fb57e6ac6e6216af5a9", null ],
     [ "ck_session_v8_get_abi_version", "ck__session__v8_8h.html#a89aaf5e7382ca7e2c6c3caa2ec65bf45", null ],
     [ "ck_session_v8_get_model_descriptor", "ck__session__v8_8h.html#a6a5e68996841153114998d3c3f4aa3da", null ],
+    [ "ck_session_v8_get_progress", "ck__session__v8_8h.html#ab380feb3b65c157233416f68b6a0cf63", null ],
     [ "ck_session_v8_get_stop_token_ids", "ck__session__v8_8h.html#acd07860df80d445702c7f0bdab1e06c2", null ],
     [ "ck_session_v8_last_error", "ck__session__v8_8h.html#a0d8e657d40221ddc9e6eebb26d3058b0", null ],
     [ "ck_session_v8_open", "ck__session__v8_8h.html#a1135a4513592770a326eaf0bd2d8a2ca", null ],

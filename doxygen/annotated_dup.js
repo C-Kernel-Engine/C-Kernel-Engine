@@ -68,6 +68,7 @@ var annotated_dup =
     [ "CKSessionConfigV8", "structCKSessionConfigV8.html", "structCKSessionConfigV8" ],
     [ "CKSessionGenerateRequestV8", "structCKSessionGenerateRequestV8.html", "structCKSessionGenerateRequestV8" ],
     [ "CKSessionGenerateResultV8", "structCKSessionGenerateResultV8.html", "structCKSessionGenerateResultV8" ],
+    [ "CKSessionProgressV8", "structCKSessionProgressV8.html", "structCKSessionProgressV8" ],
     [ "CKTokenizer", "structCKTokenizer.html", "structCKTokenizer" ],
     [ "CKTokenizerConfig", "structCKTokenizerConfig.html", "structCKTokenizerConfig" ],
     [ "CKTokenizerHashEntry", "structCKTokenizerHashEntry.html", "structCKTokenizerHashEntry" ],
