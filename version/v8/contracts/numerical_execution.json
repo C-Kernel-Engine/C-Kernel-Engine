@@ -919,6 +919,17 @@
       "position_transform": null,
       "description": "Checks positive int32 durations and exact bounded extent before copying token-major FP32 features to channel-major strided expanded rows; padding is untouched."
     },
+    "attention_last_query_probability_trace_f32": {
+      "operator_family": "attention_last_query_prob_trace",
+      "status": "validated",
+      "storage": {"input": "fp32", "weight": "none", "output": "fp32"},
+      "compute": {"input": "fp32", "weight": "none", "accumulator": "fp32", "contraction": "enabled", "evaluation_order": "ascending_head_frame_channel_fmaf_max_exp_double_denominator_fp32_inverse"},
+      "rounding": {"mode": "rne", "points": ["input_load", "reduction_update", "denominator_max", "vector_exponential", "denominator_add", "reciprocal", "softmax_probability_store"]},
+      "reduction": {"kind": "composite", "order": "stage_ordered", "partial_accumulator": "fp32", "merge_order": "none"},
+      "threading": {"work_partition": "serial", "split_strategy": "serial", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Observe the final query's normalized QK probabilities for each head into the selected layer slice; other layers and output padding remain untouched. This is an opt-in generic attention observation, not word alignment."
+    },
     "alignment_attention_normalize_median_dtw_ordered_f32": {
       "operator_family": "alignment_attention_dtw",
       "status": "validated",

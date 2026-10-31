@@ -4598,6 +4598,18 @@ int alignment_attention_dtw_f32(
     uint8_t *trace_scratch, size_t trace_elements,
     int32_t *token_frames, size_t token_capacity);
 
+/* Optional last-query attention observation into a caller-owned
+ * [layer,head,frame_capacity] trace. The selected layer is the only output
+ * region changed on success. */
+int attention_last_query_prob_trace_f32(
+    const float *query, size_t query_elements,
+    const float *key, size_t key_elements,
+    float *trace, size_t trace_elements,
+    float *score_scratch, size_t score_elements,
+    size_t layers, size_t layer, size_t heads,
+    size_t query_tokens, size_t key_tokens,
+    size_t frame_capacity, size_t head_dim, float scale);
+
 int attention_forward_query_key_head_major_tiled_f16kv_fp32(
     const float *query,
     const float *key,
