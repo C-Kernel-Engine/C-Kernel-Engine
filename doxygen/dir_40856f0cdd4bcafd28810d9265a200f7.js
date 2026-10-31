@@ -9,6 +9,7 @@ var dir_40856f0cdd4bcafd28810d9265a200f7 =
     [ "attention_full_token_major.c", "attention__full__token__major_8c.html", "attention__full__token__major_8c" ],
     [ "attention_kernels.c", "attention__kernels_8c.html", "attention__kernels_8c" ],
     [ "attention_kernels_sliding.c", "attention__kernels__sliding_8c.html", "attention__kernels__sliding_8c" ],
+    [ "attention_last_query_prob_trace_f32.c", "attention__last__query__prob__trace__f32_8c.html", "attention__last__query__prob__trace__f32_8c" ],
     [ "attention_oracle_ggml.c", "attention__oracle__ggml_8c.html", "attention__oracle__ggml_8c" ],
     [ "attention_oracle_ggml.h", "attention__oracle__ggml_8h.html", "attention__oracle__ggml_8h" ],
     [ "audio_adain_instance_norm.c", "audio__adain__instance__norm_8c.html", "audio__adain__instance__norm_8c" ],

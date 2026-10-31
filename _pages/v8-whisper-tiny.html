@@ -8,8 +8,8 @@
   <thead><tr><th>Stage</th><th>Current evidence</th><th>Missing alignment contract</th></tr></thead>
   <tbody>
     <tr><td>Audio frontend and encoder</td><td>Generated WAV decode/features and encoder memory already feed the decoder.</td><td>Retain each window's valid 20 ms attention-frame extent.</td></tr>
-    <tr><td>Decoder and timestamp tokens</td><td>Generated decoder produces text IDs and optional paired segment timestamps.</td><td>Publish selected per-token cross-attention heads; segment timestamps cannot locate words.</td></tr>
-    <tr><td>Tokenizer and window assembly</td><td>The runner decodes text and offsets segment times across long recordings.</td><td>Associate word text with exact token IDs, absolute window positions and ambiguous spans; deduplicate overlaps using time.</td></tr>
+    <tr><td>Decoder and timestamp tokens</td><td>Generated decoder produces text IDs, optional paired segment timestamps, and an opt-in selected-head trace on the base artifact.</td><td>Measure word-boundary accuracy; segment timestamps alone cannot locate words.</td></tr>
+    <tr><td>Tokenizer and window assembly</td><td>The trace analyzer reports token correspondence and absolute word times for one window.</td><td>Validate ambiguous spans and deduplicate long-window overlaps using time.</td></tr>
     <tr><td>Editing</td><td>No native filler-review contract exists.</td><td>Measure filler recall, present non-destructive cut proposals and require approval before rendering.</td></tr>
   </tbody>
 </table>
@@ -20,23 +20,29 @@ segment timing, not word timing. The pinned base artifact's
 3/1, 4/2, 4/3, 4/7, 5/1, 5/2, 5/4 and 5/6. The generated cross-attention
 provider uses head-major query/key/value and caller-owned score scratch.
 That scratch contains temporary, unnormalized exponentials for the current
-query and is overwritten by later decoder layers. It is not an exported
-per-token attention trace. The first missing graph edge is therefore a
-declared copy/normalization of selected heads immediately after each
-cross-attention call into a bounded, persistent trace. This is an observation
-contract, not a new Whisper decoder schedule.</p>
+query and is overwritten by later decoder layers. An opt-in generic observer
+now recomputes the final query probability row from the generated Q/K tensors
+immediately after each cross-attention call. Its circuit-declared buffer keeps
+the selected layer/head rows across decoder steps. The prefill layout reserves
+that buffer without emitting a false prefill observation. The host rejects
+missing or nonfinite selected rows and writes private trace files.</p>
 <p>The generic native <code>alignment_attention_dtw_f32</code> provider now
 accepts selected attention heads, standardizes across text tokens, applies
 reflect-padded median smoothing over audio frames, averages heads and performs
 ordered dynamic time warping to return token-first-frame indices. A
 model-neutral generated graph tests the selected map and failure propagation.
-This is primitive and generated-composition evidence only. Current CKE Whisper
-does not yet supply all selected heads to it, group tokens into words or report
-measured word-boundary accuracy. Flat/nonfinite attention is rejected rather
-than assigned a fabricated confidence. The next gate is a full-model trace
-and a public recording with manually checked boundaries; filler detection
-and non-destructive edit review follow separately. The reference operation
-order is documented in the
+The opt-in analyzer groups tokenizer spans into words, crops attention to the
+valid audio extent and invokes this native provider. On public LibriSpeech
+recording 2086-149220-0033, generated Whisper Base produced 22 timed words.
+Against the independent, automatically forced-aligned
+<a href="https://huggingface.co/datasets/gilkeyio/librispeech-alignments">LibriSpeech alignments dataset</a>, 20 matching
+words had 40 matching boundaries with median absolute difference 150 ms and
+95th percentile 396 ms; three reference words differ from CKE's transcript.
+These provisional boundaries are not manually verified and are not certified
+for edits. No calibrated transcription or boundary confidence is claimed.
+Generated execution, trace capture and word output pass; boundary accuracy,
+long-window deduplication, filler recall and non-destructive edit review remain
+open. The reference operation order is documented in the
 <a href="https://github.com/huggingface/transformers/blob/main/src/transformers/models/whisper/generation_whisper.py">Transformers Whisper generation source</a>.</p>
 
 <div class="alert alert-info">
