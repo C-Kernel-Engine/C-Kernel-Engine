@@ -1456,6 +1456,10 @@ TEST_SUITES = {
         "Whisper Alignment Trace Authoring", "inference",
         ROOT / "tests" / "test_v8_whisper_alignment_trace_manifest.py",
     ),
+    "whisper_word_boundary_evaluation": TestSuite(
+        "Whisper Word Boundary Evaluation Contract", "inference",
+        ROOT / "tests" / "test_v8_whisper_word_boundary_eval.py",
+    ),
     "tts_kokoro_native_speech_session": TestSuite(
         "Kokoro Native Speech Stop, Replace and Recovery", "inference",
         ROOT / "tests" / "test_v8_kokoro_native_speech_session.py",
