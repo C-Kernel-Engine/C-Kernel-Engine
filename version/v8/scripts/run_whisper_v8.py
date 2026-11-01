@@ -796,6 +796,18 @@ def _decoder_worker(
         trace_buffer = np.ctypeslib.as_array(
             ctypes.cast(address, _FLOAT_P), shape=(layers * heads * frames,)
         ).reshape(layers, heads, frames)
+
+    def selected_trace(label: str) -> np.ndarray:
+        if trace_buffer is None:
+            raise RuntimeError("attention trace was not requested")
+        selected = np.stack([
+            trace_buffer[layer, head].copy() for layer, head in selected_heads
+        ])
+        if (not np.isfinite(selected).all() or
+                not np.allclose(selected.sum(axis=1), 1.0, rtol=0, atol=2e-4)):
+            raise RuntimeError(f"{label} did not publish a valid attention trace")
+        return selected
+
     try:
         # Each audio window is an independent decoder request. Retain immutable
         # weights and prepared constants, but never retain generated state.
@@ -816,11 +828,14 @@ def _decoder_worker(
             timestamps=args.timestamps,
         )
         prefix_array = (ctypes.c_int32 * len(prefix))(*prefix)
+        if trace_buffer is not None:
+            trace_buffer.fill(np.nan)
         started = time.perf_counter()
         status = int(model.ck_model_embed_tokens(prefix_array, len(prefix)))
         prefill_seconds = time.perf_counter() - started
         if status != 0:
             raise RuntimeError(f"decoder prefill failed with code {status}")
+        pending_trace = selected_trace("decoder prefill") if trace_buffer is not None else None
 
         vocab_size = int(model.ck_model_get_vocab_size())
         suppress = np.asarray(generation.get("suppress_tokens", []), dtype=np.int64)
@@ -851,6 +866,7 @@ def _decoder_worker(
                 break
             tokens.append(token)
             if trace_buffer is not None:
+                observed_rows.append(pending_trace)
                 trace_buffer.fill(np.nan)
             status = int(model.ck_model_decode(token, None))
             if status != 0:
@@ -858,17 +874,7 @@ def _decoder_worker(
                     f"decoder step {step} failed with code {status}"
                 )
             if trace_buffer is not None:
-                selected = np.stack([
-                    trace_buffer[layer, head].copy()
-                    for layer, head in selected_heads
-                ])
-                if (not np.isfinite(selected).all() or
-                        not np.allclose(selected.sum(axis=1), 1.0,
-                                        rtol=0, atol=2e-4)):
-                    raise RuntimeError(
-                        f"decoder step {step} did not publish a valid attention trace"
-                    )
-                observed_rows.append(selected)
+                pending_trace = selected_trace(f"decoder step {step}")
         decode_seconds = time.perf_counter() - decode_started
     finally:
         if owns_model:
@@ -899,6 +905,7 @@ def _decoder_worker(
                 token_ids=np.asarray(tokens, dtype=np.int32),
                 alignment_heads=np.asarray(selected_heads, dtype=np.int32),
                 frame_capacity=np.asarray(frames, dtype=np.int32),
+                schema=np.asarray("cke.whisper_selected_attention.v2"),
             )
     args.worker_report.write_text(
         json.dumps(
@@ -919,6 +926,7 @@ def _decoder_worker(
                     "sha256": _sha256(trace_output),
                     "selected_heads": selected_heads,
                     "shape": list(selected_attention.shape),
+                    "schema": "cke.whisper_selected_attention.v2",
                 } if trace_output is not None else None),
             },
             indent=2,

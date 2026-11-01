@@ -76,11 +76,14 @@ def align_trace(report: dict, trace_path: Path, decoder_dir: Path,
         token_ids = np.asarray(data["token_ids"], dtype=np.int32)
         heads = np.asarray(data["alignment_heads"], dtype=np.int32)
         frame_capacity = int(data["frame_capacity"])
+        trace_schema = str(data["schema"]) if "schema" in data else None
     if (attention.ndim != 3 or attention.shape !=
             (heads.shape[0], len(token_ids), frame_capacity) or
             heads.shape != (len(identity["selected_heads"]), 2) or
             heads.tolist() != identity["selected_heads"] or
             list(attention.shape) != identity.get("shape") or
+            trace_schema != "cke.whisper_selected_attention.v2" or
+            identity.get("schema") != trace_schema or
             token_ids.tolist() != decoder["generated_tokens"] or
             not np.isfinite(attention).all() or
             (attention.shape[1] and not np.allclose(

@@ -23,22 +23,24 @@ That scratch contains temporary, unnormalized exponentials for the current
 query and is overwritten by later decoder layers. An opt-in generic observer
 now recomputes the final query probability row from the generated Q/K tensors
 immediately after each cross-attention call. Its circuit-declared buffer keeps
-the selected layer/head rows across decoder steps. The prefill layout reserves
-that buffer without emitting a false prefill observation. The host rejects
-missing or nonfinite selected rows and writes private trace files.</p>
+the selected layer/head rows across decoder steps. The last prefill query
+predicts the first generated token; each later decode call predicts the next
+token. The host associates those rows with the predicted token, rejects missing
+or nonfinite selected rows, and writes private versioned trace files.</p>
 <p>The generic native <code>alignment_attention_dtw_f32</code> provider now
 accepts selected attention heads, standardizes across text tokens, applies
 reflect-padded median smoothing over audio frames, averages heads and performs
 ordered dynamic time warping to return token-first-frame indices. A
 model-neutral generated graph tests the selected map and failure propagation.
 The opt-in analyzer groups tokenizer spans into words, crops attention to the
-valid audio extent and invokes this native provider. On public LibriSpeech
-recording 2086-149220-0033, generated Whisper Base produced 22 timed words.
-Against the independent, automatically forced-aligned
+valid audio extent and invokes this native provider. An earlier trace of public
+LibriSpeech recording 2086-149220-0033 produced 22 timed words. That trace
+used the incorrect token association and must be rerun before its timing can
+support a current claim. Against the independent, automatically forced-aligned
 <a href="https://huggingface.co/datasets/gilkeyio/librispeech-alignments">LibriSpeech alignments dataset</a>, 20 matching
-words had 40 matching boundaries with median absolute difference 150 ms and
-95th percentile 396 ms; three reference words differ from CKE's transcript.
-These provisional boundaries are not manually verified and are not certified
+words previously had 40 matching boundaries with median absolute difference
+150 ms and 95th percentile 396 ms; three reference words differed from CKE's
+transcript. These historical boundaries are not manually verified or certified
 for edits. No calibrated transcription or boundary confidence is claimed.
 Generated execution, trace capture and word output pass; boundary accuracy,
 long-window deduplication, filler recall and non-destructive edit review remain
@@ -55,11 +57,18 @@ It does not turn a missed word into a timing match.</p>
 <table>
   <thead><tr><th>Clip</th><th>Transcription</th><th>Matched-boundary error</th><th>Important failure</th></tr></thead>
   <tbody>
-    <tr><td><code>s0802a_023</code></td><td>11/13 words matched; both “um” fillers omitted</td><td>Median 148 ms; maximum 5,189 ms</td><td>The first recognized word is placed at 0 s although its hand-corrected start is 5.189 s.</td></tr>
-    <tr><td><code>s0303b_005</code></td><td>18/18 words matched</td><td>Median 225 ms; maximum 1,484 ms</td><td>A pause is absorbed into an adjacent word span.</td></tr>
+    <tr><td><code>s0802a_023</code></td><td>11/13 words matched; both “um” fillers omitted</td><td>Median 56 ms across 10 timed words; maximum 5,189 ms</td><td>One matched word has no valid timing. The first recognized word is placed at 0 s although its hand-corrected start is 5.189 s.</td></tr>
+    <tr><td><code>s0303b_005</code></td><td>18/18 words matched</td><td>Median 74 ms; maximum 1,077 ms. Previous median was 225 ms.</td><td>Word boundaries remain provisional; this one clip does not establish edit-grade accuracy.</td></tr>
   </tbody>
 </table>
-<p>These results fail an edit-grade timing claim. The first clip also
+<p>The initial trace attached each decode call's attention to the token it
+consumed, one token later than the token that attention predicted. Replaying
+the generated decoder with prefill and decode observations corrected the clean
+clip's median matched-boundary error from 225 ms to 74 ms without changing its
+transcript. An independent pinned Transformers run measured 81 ms on the same
+hand-corrected reference. Older traces are rejected by the analyzer because
+their token correspondence is wrong. These results still fail an edit-grade
+timing claim. The first clip also
 demonstrates why filler detection must be scored independently: alignment
 cannot recover fillers absent from the transcript. A diagnostic replay that
 renormalized the captured attention within valid frames did not improve the
