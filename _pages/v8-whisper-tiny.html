@@ -44,6 +44,28 @@ Generated execution, trace capture and word output pass; boundary accuracy,
 long-window deduplication, filler recall and non-destructive edit review remain
 open. The reference operation order is documented in the
 <a href="https://github.com/huggingface/transformers/blob/main/src/transformers/models/whisper/generation_whisper.py">Transformers Whisper generation source</a>.</p>
+<h3>Hand-corrected boundary check</h3>
+<p>A local, optional evaluation uses two clips from the
+<a href="https://buckeyecorpus.osu.edu/">Buckeye Corpus</a>, whose word
+boundaries were hand-corrected by trained annotators. The audio and corpus
+manifest are kept outside this repository under their noncommercial-use terms.
+The evaluator verifies recording and trace identities, then reports
+transcription edits, filler recall, and timing error only for matched words.
+It does not turn a missed word into a timing match.</p>
+<table>
+  <thead><tr><th>Clip</th><th>Transcription</th><th>Matched-boundary error</th><th>Important failure</th></tr></thead>
+  <tbody>
+    <tr><td><code>s0802a_023</code></td><td>11/13 words matched; both “um” fillers omitted</td><td>Median 148 ms; maximum 5,189 ms</td><td>The first recognized word is placed at 0 s although its hand-corrected start is 5.189 s.</td></tr>
+    <tr><td><code>s0303b_005</code></td><td>18/18 words matched</td><td>Median 225 ms; maximum 1,484 ms</td><td>A pause is absorbed into an adjacent word span.</td></tr>
+  </tbody>
+</table>
+<p>These results fail an edit-grade timing claim. The first clip also
+demonstrates why filler detection must be scored independently: alignment
+cannot recover fillers absent from the transcript. A diagnostic replay that
+renormalized the captured attention within valid frames did not improve the
+clean clip's median boundary error; no production arithmetic was changed on
+that basis. Native timing remains an inspectable diagnostic pending numerical
+localization, silence handling, and manually reviewed edit intervals.</p>
 
 <div class="alert alert-info">
     <div class="alert-icon">
