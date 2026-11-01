@@ -13,7 +13,9 @@ import json
 from pathlib import Path
 
 
-def trace_manifest(source: dict, generation: dict, *, emit_observer: bool = True) -> dict:
+def trace_manifest(source: dict, generation: dict, *, phase: str = "decode") -> dict:
+    if phase not in {"decode", "prefill"}:
+        raise ValueError("attention trace phase must be decode or prefill")
     manifest = copy.deepcopy(source)
     config = manifest.get("config")
     template = manifest.get("template")
@@ -23,7 +25,8 @@ def trace_manifest(source: dict, generation: dict, *, emit_observer: bool = True
     layers = int(config.get("num_layers", 0))
     frames = int(config.get("encoder_memory_length", 0))
     dim = int(config.get("head_dim", 0))
-    if min(heads, layers, frames, dim) <= 0:
+    query_capacity = int(config.get("context_length", 0)) if phase == "prefill" else 1
+    if min(heads, layers, frames, dim, query_capacity) <= 0:
         raise ValueError("decoder manifest lacks positive attention dimensions")
     raw_heads = generation.get("alignment_heads")
     if not isinstance(raw_heads, list) or not raw_heads:
@@ -54,12 +57,12 @@ def trace_manifest(source: dict, generation: dict, *, emit_observer: bool = True
            for item in ops):
         raise ValueError("decoder already contains an attention trace")
     constants = {
-        "query_elements": heads * dim,
+        "query_elements": heads * query_capacity * dim,
         "key_elements": heads * frames * dim,
         "trace_elements": layers * heads * frames,
         "score_elements": heads * frames,
         "layers": layers, "heads": heads,
-        "query_tokens": 1, "key_tokens": frames,
+        "query_tokens": query_capacity, "key_tokens": frames,
         "frame_capacity": frames, "head_dim": dim,
     }
     config["alignment_trace_call_constants"] = constants
@@ -73,7 +76,9 @@ def trace_manifest(source: dict, generation: dict, *, emit_observer: bool = True
     observer = {
         "id": "attention_trace", "op": "attention_last_query_prob_trace",
         "kernel": "attention_last_query_prob_trace_f32", "returns_status": True,
-        "params": {"H_from_config": "num_heads", "Tq": 1,
+        "params": {"H_from_config": "num_heads",
+                   **({"Tq_from_config": "context_length"} if phase == "prefill"
+                      else {"Tq": 1}),
                    "D_from_config": "head_dim", "L_from_config": "num_layers",
                    "F_capacity_from_config": "encoder_memory_length",
                    "call_constants_from_config": "alignment_trace_call_constants"},
@@ -81,12 +86,12 @@ def trace_manifest(source: dict, generation: dict, *, emit_observer: bool = True
             "inputs": {"query": "cross_q_scratch", "key": "cross_k_cache"},
             "outputs": {"trace": "attention_trace"}},
     }
-    if emit_observer:
-        ops.insert(matches[0] + 1, observer)
+    ops.insert(matches[0] + 1, observer)
     template.setdefault("contract", {})["alignment_trace"] = {
         "layout": "layer_head_frame_capacity", "selected_heads": selected,
-        "observation": ("last_query_probability_row" if emit_observer
-                        else "reserved_decode_trace_buffer"),
+        "observation": "last_query_probability_row",
+        "token_association": ("next_generated_token_after_prefix" if phase == "prefill"
+                              else "next_generated_token_after_decode"),
         "valid_frames": "encoder_memory_length",
     }
     return manifest
@@ -98,7 +103,7 @@ def main() -> int:
     parser.add_argument("--generation-config", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--prefill-output", type=Path,
-                        help="Write a matching prefill layout without the decode observer")
+                        help="Write a matching prefill observer for the first generated token")
     args = parser.parse_args()
     source = json.loads(args.manifest.read_text())
     generation = json.loads(args.generation_config.read_text())
@@ -106,7 +111,7 @@ def main() -> int:
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(output, indent=2) + "\n")
     if args.prefill_output is not None:
-        prefill = trace_manifest(source, generation, emit_observer=False)
+        prefill = trace_manifest(source, generation, phase="prefill")
         args.prefill_output.parent.mkdir(parents=True, exist_ok=True)
         args.prefill_output.write_text(json.dumps(prefill, indent=2) + "\n")
     print(args.output)

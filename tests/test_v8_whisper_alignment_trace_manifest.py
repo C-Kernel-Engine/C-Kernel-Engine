@@ -33,7 +33,7 @@ class FakeTokenizer:
 class WhisperAlignmentTraceManifestTest(unittest.TestCase):
     def setUp(self):
         self.source = {
-            "config": {"num_heads": 3, "num_layers": 2,
+            "config": {"num_heads": 3, "num_layers": 2, "context_length": 5,
                        "encoder_memory_length": 7, "head_dim": 4},
             "template": {"block_types": {"decoder": {"body": {"ops": [
                 "self_attn", "cross_attn", "residual"
@@ -41,21 +41,26 @@ class WhisperAlignmentTraceManifestTest(unittest.TestCase):
         }
         self.generation = {"alignment_heads": [[0, 1], [1, 2]]}
 
-    def test_decode_observer_and_prefill_layout_are_distinct(self):
+    def test_decode_and_prefill_observers_have_distinct_query_capacities(self):
         original = copy.deepcopy(self.source)
         decode = author.trace_manifest(self.source, self.generation)
-        prefill = author.trace_manifest(self.source, self.generation, emit_observer=False)
+        prefill = author.trace_manifest(self.source, self.generation, phase="prefill")
         self.assertEqual(self.source, original)
         operations = decode["template"]["block_types"]["decoder"]["body"]["ops"]
         self.assertEqual(operations[2]["op"], "attention_last_query_prob_trace")
         self.assertEqual(operations[1], "cross_attn")
-        self.assertEqual(prefill["template"]["block_types"]["decoder"]["body"]["ops"],
-                         original["template"]["block_types"]["decoder"]["body"]["ops"])
+        self.assertEqual(prefill["template"]["block_types"]["decoder"]["body"]["ops"][2]["op"],
+                         "attention_last_query_prob_trace")
         self.assertEqual(decode["template"]["activation_buffers"],
                          prefill["template"]["activation_buffers"])
         self.assertEqual(decode["config"]["alignment_trace_call_constants"]["trace_elements"], 42)
+        self.assertEqual(decode["config"]["alignment_trace_call_constants"]["query_elements"], 12)
+        self.assertEqual(prefill["config"]["alignment_trace_call_constants"]["query_elements"], 60)
+        self.assertEqual(prefill["config"]["alignment_trace_call_constants"]["query_tokens"], 5)
 
     def test_rejects_wrong_head_selection_and_missing_edge(self):
+        with self.assertRaisesRegex(ValueError, "phase"):
+            author.trace_manifest(self.source, self.generation, phase="unknown")
         for heads in ([], [[0, 1], [0, 1]], [[2, 1]], [[0, 3]], [[True, 1]], [[0]]):
             with self.subTest(heads=heads):
                 with self.assertRaises(ValueError):
@@ -79,12 +84,14 @@ class WhisperAlignmentTraceManifestTest(unittest.TestCase):
             np.savez_compressed(path, selected_attention=attention,
                                 token_ids=np.asarray([1, 2], np.int32),
                                 alignment_heads=np.asarray([[0, 1]], np.int32),
-                                frame_capacity=np.asarray(3, np.int32))
+                                frame_capacity=np.asarray(3, np.int32),
+                                schema=np.asarray("cke.whisper_selected_attention.v2"))
             sha = hashlib.sha256(path.read_bytes()).hexdigest()
             report = {"encoder": {}, "decoder": {
                 "generated_tokens": [1, 2],
                 "attention_trace": {"sha256": sha, "selected_heads": [[0, 1]],
-                                    "shape": [1, 2, 3]},
+                                    "shape": [1, 2, 3],
+                                    "schema": "cke.whisper_selected_attention.v2"},
             }}
             with self.assertRaisesRegex(ValueError, "hash"):
                 broken = copy.deepcopy(report)
@@ -94,6 +101,12 @@ class WhisperAlignmentTraceManifestTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "geometry"):
                 broken = copy.deepcopy(report)
                 broken["decoder"]["attention_trace"]["shape"] = [1, 3, 2]
+                aligner.align_trace(broken, path, Path(directory), Path(directory),
+                                    Path(directory) / "missing.so", 0)
+            with self.assertRaisesRegex(ValueError, "geometry"):
+                broken = copy.deepcopy(report)
+                broken["decoder"]["attention_trace"]["schema"] = (
+                    "cke.whisper_selected_attention.v1")
                 aligner.align_trace(broken, path, Path(directory), Path(directory),
                                     Path(directory) / "missing.so", 0)
 
