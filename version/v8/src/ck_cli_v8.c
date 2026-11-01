@@ -230,6 +230,9 @@ typedef struct {
     ck_model_sequence_state_create_v8_fn sequence_create;
     ck_model_sequence_state_activate_v8_fn sequence_activate;
     ck_model_sequence_state_destroy_v8_fn sequence_destroy;
+    ck_model_sequence_checkpoint_requirements_v8_fn checkpoint_requirements;
+    ck_model_sequence_checkpoint_save_v8_fn checkpoint_save;
+    ck_model_sequence_checkpoint_restore_v8_fn checkpoint_restore;
     ck_model_batch_decode_workspace_v8_fn batch_workspace;
     ck_model_decode_batch2_v8_fn decode_batch2;
     ck_model_decode_batch2_mixed_prefill_v8_fn decode_batch2_mixed_prefill;
@@ -258,6 +261,7 @@ static void print_runtime_capabilities(const ModelAPI *api) {
     CK_PRINT_CAP(CK_MODEL_CAP_ENCODER_MEMORY, "encoder-memory");
     CK_PRINT_CAP(CK_MODEL_CAP_NAMED_ACTIVATIONS, "named-activations");
     CK_PRINT_CAP(CK_MODEL_CAP_GENERATION_POLICY, "generation-policy");
+    CK_PRINT_CAP(CK_MODEL_CAP_SEQUENCE_CHECKPOINT, "sequence-checkpoint");
 #undef CK_PRINT_CAP
     printf("\n");
 }
@@ -1841,6 +1845,12 @@ static bool load_model_api(const char *lib_path, ModelAPI *api) {
     resolve_symbol(api->handle, "ck_model_sequence_state_create", (void **)&api->sequence_create, false);
     resolve_symbol(api->handle, "ck_model_sequence_state_activate", (void **)&api->sequence_activate, false);
     resolve_symbol(api->handle, "ck_model_sequence_state_destroy", (void **)&api->sequence_destroy, false);
+    resolve_symbol(api->handle, "ck_model_sequence_checkpoint_requirements",
+                   (void **)&api->checkpoint_requirements, false);
+    resolve_symbol(api->handle, "ck_model_sequence_checkpoint_save",
+                   (void **)&api->checkpoint_save, false);
+    resolve_symbol(api->handle, "ck_model_sequence_checkpoint_restore",
+                   (void **)&api->checkpoint_restore, false);
     resolve_symbol(api->handle, "ck_model_batch_decode_workspace", (void **)&api->batch_workspace, false);
     resolve_symbol(api->handle, "ck_model_decode_batch2", (void **)&api->decode_batch2, false);
     resolve_symbol(api->handle, "ck_model_decode_batch2_mixed_prefill",
@@ -1955,6 +1965,9 @@ static bool load_model_api(const char *lib_path, ModelAPI *api) {
         CK_REQUIRE_CAPABILITY_SYMBOL(CK_MODEL_CAP_ENCODER_MEMORY, api->set_encoder_memory, "encoder memory");
         CK_REQUIRE_CAPABILITY_SYMBOL(CK_MODEL_CAP_GENERATION_POLICY, api->build_generation_prefix, "generation prefix");
         CK_REQUIRE_CAPABILITY_SYMBOL(CK_MODEL_CAP_GENERATION_POLICY, api->apply_generation_policy, "generation logits policy");
+        CK_REQUIRE_CAPABILITY_SYMBOL(CK_MODEL_CAP_SEQUENCE_CHECKPOINT, api->checkpoint_requirements, "checkpoint requirements");
+        CK_REQUIRE_CAPABILITY_SYMBOL(CK_MODEL_CAP_SEQUENCE_CHECKPOINT, api->checkpoint_save, "checkpoint save");
+        CK_REQUIRE_CAPABILITY_SYMBOL(CK_MODEL_CAP_SEQUENCE_CHECKPOINT, api->checkpoint_restore, "checkpoint restore");
 #undef CK_REQUIRE_CAPABILITY_SYMBOL
         if ((caps & CK_MODEL_CAP_AUTOREGRESSIVE_DECODE) &&
             (!api->embed || !api->forward || !api->decode)) {

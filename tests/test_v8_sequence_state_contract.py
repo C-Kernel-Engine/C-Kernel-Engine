@@ -171,11 +171,15 @@ int main(void) {
             layout=layout, config={"num_layers": 2, "num_kv_heads": 1,
                                    "head_dim": 4}, decode_ops=ops)
         self.assertIn("ck_model_sequence_state_create", source)
+        self.assertIn("ck_model_sequence_checkpoint_requirements", source)
+        self.assertIn("ck_model_sequence_checkpoint_save", source)
+        self.assertIn("ck_model_sequence_checkpoint_restore", source)
         self.assertIn("memset(g_model->recurrent_conv_state", source)
         self.assertIn("memset(g_model->recurrent_ssm_state", source)
         capability = codegen_v8._emit_runtime_capability_api(
             {"config": config, "operations": ops}, layout, None)
         self.assertIn("CK_MODEL_CAP_SEQUENCE_STATE_SWITCH", capability)
+        self.assertIn("CK_MODEL_CAP_SEQUENCE_CHECKPOINT", capability)
         self.assertNotIn("CK_MODEL_CAP_BATCH_DECODE_2", capability)
         self.assertIsNone(resolve_sequence_state_contract(layout, config,
             [{"layer": 0, "args": [state_arg("recurrent_conv_state"),
@@ -231,6 +235,7 @@ int main(void) {
         )
         self.assertIn("ck_model_sequence_state_create", dense)
         self.assertIn("CK_MODEL_CAP_SEQUENCE_STATE_SWITCH", declared)
+        self.assertIn("CK_MODEL_CAP_SEQUENCE_CHECKPOINT", declared)
 
         hybrid_layout = _layout(
             extra=[{"name": "arbitrary_buffer", "abs_offset": 160, "size": 16,
@@ -242,6 +247,7 @@ int main(void) {
         )
         self.assertNotIn("ck_model_sequence_state_create", hybrid)
         self.assertNotIn("CK_MODEL_CAP_SEQUENCE_STATE_SWITCH", hybrid_declared)
+        self.assertNotIn("CK_MODEL_CAP_SEQUENCE_CHECKPOINT", hybrid_declared)
         self.assertIn("memset(g_model->bump + A_ARBITRARY_BUFFER, 0, 16)", hybrid)
 
         missing_binding = _layout(extra=[
