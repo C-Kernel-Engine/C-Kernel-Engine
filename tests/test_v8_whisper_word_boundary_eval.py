@@ -10,6 +10,10 @@ SCRIPT = (Path(__file__).resolve().parents[1] / "version/v8/scripts" /
 SPEC = importlib.util.spec_from_file_location("whisper_boundary_eval", SCRIPT)
 evaluator = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(evaluator)
+ASSEMBLY_SPEC = importlib.util.spec_from_file_location(
+    "whisper_word_assembly", SCRIPT.with_name("assemble_whisper_word_timings_v8.py"))
+assembly = importlib.util.module_from_spec(ASSEMBLY_SPEC)
+ASSEMBLY_SPEC.loader.exec_module(assembly)
 
 
 def reference(words):
@@ -89,6 +93,83 @@ class WhisperBoundaryEvalTest(unittest.TestCase):
         aligned["provenance"]["trace_sha256"] = "second"
         with self.assertRaisesRegex(ValueError, "audio hash"):
             evaluator.validate_provenance(report, aligned, "different")
+
+
+class WhisperWindowAssemblyTest(unittest.TestCase):
+    def setUp(self):
+        self.report_hash = "c" * 64
+        self.audio_hash = "d" * 64
+        self.report = {"wav_sha256": self.audio_hash, "segments": [
+            {"index": index, "source_frame_start": start,
+             "source_frame_consumed_end": consumed,
+             "source_frame_window_end": window_end,
+             "encoder": {"audio": {"source_sample_rate": 100,
+                                    "source_frames": 1000,
+                                    "window_source_frames": 600}},
+             "decoder": {"attention_trace": {"sha256": str(index + 1) * 64}}}
+            for index, start, consumed, window_end in
+            ((0, 0, 400, 600), (1, 400, 1000, 1000))]}
+
+    def aligned(self, index, words):
+        return {"schema": "cke.whisper_word_alignment.v1",
+                "window": {"index": index, "start_seconds": index * 4.0,
+                           "source_frames": 600, "source_sample_rate": 100},
+                "provenance": {"trace_sha256": str(index + 1) * 64,
+                               "run_report_sha256": self.report_hash,
+                               "audio_sha256": self.audio_hash},
+                "words": [{"text": text, "start_seconds": start,
+                           "end_seconds": end, "audio_window": index}
+                          for text, start, end in words]}
+
+    def test_commit_intervals_preserve_real_repetition_and_expose_overlap(self):
+        first = self.aligned(0, [("go", 1.0, 1.2), ("go", 2.0, 2.2),
+                                 ("seam", 3.9, 4.1), ("echo", 4.3, 4.5)])
+        second = self.aligned(1, [("seam", 4.1, 4.3), ("echo", 4.3, 4.5),
+                                  ("go", 7.0, 7.2)])
+        result = assembly.assemble(self.report, [first, second], self.report_hash)
+        self.assertEqual([word["text"] for word in result["words"]],
+                         ["go", "go", "seam", "echo", "go"])
+        self.assertEqual([word["assembly_review_reasons"] for word in
+                          result["review_words"]],
+                         [["crosses_consumed_boundary"],
+                          ["unconsumed_window_overlap"]])
+        self.assertEqual(result["status"], "REVIEW_REQUIRED")
+        self.assertFalse(result["edit_ready"])
+
+    def test_long_silence_span_and_missing_word_timing_require_review(self):
+        self.report["segments"] = [{
+            "index": 0, "source_frame_start": 0,
+            "source_frame_consumed_end": 1000, "source_frame_window_end": 1000,
+            "encoder": {"audio": {"source_sample_rate": 100,
+                                   "source_frames": 1000,
+                                   "window_source_frames": 1000}},
+            "decoder": {"attention_trace": {"sha256": "1" * 64}}}]
+        aligned = self.aligned(0, [("Actually", 0.0, 5.44),
+                                   ("I", None, None), ("think", 5.6, 5.72)])
+        aligned["window"]["source_frames"] = 1000
+        result = assembly.assemble(self.report, [aligned], self.report_hash)
+        self.assertEqual([word["text"] for word in result["words"]], ["think"])
+        self.assertEqual([word["assembly_review_reasons"] for word in
+                          result["review_words"]],
+                         [["long_alignment_span"], ["missing_word_timing"]])
+
+    def test_wrong_provenance_geometry_and_missing_window_fail_closed(self):
+        first = self.aligned(0, [("one", 1.0, 1.2)])
+        second = self.aligned(1, [("two", 7.0, 7.2)])
+        with self.assertRaisesRegex(ValueError, "every audio window"):
+            assembly.assemble(self.report, [first], self.report_hash)
+        second["provenance"]["trace_sha256"] = "1" * 64
+        with self.assertRaisesRegex(ValueError, "provenance"):
+            assembly.assemble(self.report, [first, second], self.report_hash)
+        second["provenance"]["trace_sha256"] = "2" * 64
+        second["window"]["start_seconds"] = 0.0
+        with self.assertRaisesRegex(ValueError, "geometry"):
+            assembly.assemble(self.report, [first, second], self.report_hash)
+        second["window"]["start_seconds"] = 4.0
+        first["words"].append({"text": "earlier", "start_seconds": .5,
+                               "end_seconds": .7, "audio_window": 0})
+        with self.assertRaisesRegex(ValueError, "backward"):
+            assembly.assemble(self.report, [first, second], self.report_hash)
 
 
 if __name__ == "__main__":

@@ -9,7 +9,7 @@
   <tbody>
     <tr><td>Audio frontend and encoder</td><td>Generated WAV decode/features and encoder memory already feed the decoder.</td><td>Retain each window's valid 20 ms attention-frame extent.</td></tr>
     <tr><td>Decoder and timestamp tokens</td><td>Generated decoder produces text IDs, optional paired segment timestamps, and an opt-in selected-head trace on the base artifact.</td><td>Measure word-boundary accuracy; segment timestamps alone cannot locate words.</td></tr>
-    <tr><td>Tokenizer and window assembly</td><td>The trace analyzer reports token correspondence and absolute word times for one window.</td><td>Validate ambiguous spans and deduplicate long-window overlaps using time.</td></tr>
+    <tr><td>Tokenizer and window assembly</td><td>The trace analyzer reports token correspondence and absolute word times per window. A checked assembler partitions words at each consumed audio extent and exposes overlap for review.</td><td>Measure boundary accuracy on real long recordings; review words crossing seek boundaries.</td></tr>
     <tr><td>Editing</td><td>No native filler-review contract exists.</td><td>Measure filler recall, present non-destructive cut proposals and require approval before rendering.</td></tr>
   </tbody>
 </table>
@@ -75,6 +75,30 @@ renormalized the captured attention within valid frames did not improve the
 clean clip's median boundary error; no production arithmetic was changed on
 that basis. Native timing remains an inspectable diagnostic pending numerical
 localization, silence handling, and manually reviewed edit intervals.</p>
+<h3>Checked long-window assembly</h3>
+<p>Run <code>assemble_whisper_word_timings_v8.py</code> with the original audio,
+generated run report, and one alignment JSON per audio window in order. It
+verifies the audio, report, trace and window identities, then publishes only
+words inside each window's consumed source-frame interval. A word crossing a
+seek boundary, appearing only in replayed overlap, lacking timing, or spanning
+more than two seconds goes into <code>review_words</code> with a named reason.
+It does not deduplicate by spelling: repeated words at distinct times remain
+distinct. The two-second rule is a conservative review trigger, not a
+calibrated word-duration or silence detector. Every assembled result has
+<code>edit_ready=false</code>; this tool proposes no cuts.</p>
+<p>A generated Whisper Base run on a 35.8-second recording made by repeating
+the clean clip four times exercised timestamp-seek overlap: two windows,
+with the first consuming audio through 27.76 seconds of its 30-second view.
+The assembler retained 71 bounded words, including all four distinct “bring”
+occurrences, and flagged one “family” span crossing the consumed boundary for
+review. This synthetic repetition checks window accounting; it is not a
+manually verified long-recording timing benchmark.</p>
+<p>On the local hand-corrected clips, the clean 18-word recording assembles
+without a review span. The filler recording publishes nine bounded words and
+flags “Actually” for its 5.44-second span and “I” for missing timing. The two
+omitted “um” fillers remain a separate transcription-recall failure measured
+by the boundary evaluator. This prevents the long first span from silently
+becoming an edit interval, but does not locate the missing fillers.</p>
 
 <div class="alert alert-info">
     <div class="alert-icon">
