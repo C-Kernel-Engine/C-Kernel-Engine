@@ -99,6 +99,22 @@ flags “Actually” for its 5.44-second span and “I” for missing timing. Th
 omitted “um” fillers remain a separate transcription-recall failure measured
 by the boundary evaluator. This prevents the long first span from silently
 becoming an edit interval, but does not locate the missing fillers.</p>
+<p>An additional local check used three 25-second clips from different
+speakers in the <a href="https://huggingface.co/datasets/alexwengg/buckeye">Buckeye
+benchmark mirror</a>. Their matched-word median boundary errors were 65,
+50 and 70 ms, while maximum errors reached 4.745, 1.850 and 0.916 seconds.
+CKE omitted all 16 hand-labeled fillers; the pinned PyTorch Whisper Base run
+also emitted none of them. These are segment-level results, not a natural
+long-recording benchmark, and one clip has a larger CKE-versus-PyTorch
+transcript difference requiring separate diagnosis. The source audio and
+annotations remain local under the corpus terms.</p>
+<p>This check also exposed a physical-end boundary bug. A 25.196-second WAV
+can occupy a final 20 ms attention frame ending at 25.200 seconds. The word
+analyzer now caps reported word ends at the actual WAV end, preserves
+sub-millisecond source offsets, and marks capped words with
+<code>clipped_to_physical_window_end</code>. The checked assembler accepts
+all three corrected per-window reports and still requires review for any
+long or ambiguous span.</p>
 <h3>Filler review and approved copy</h3>
 <p><code>review_whisper_fillers_v8.py propose</code> accepts the original mono
 PCM16 WAV, its generated run report, checked word assembly, and optional
