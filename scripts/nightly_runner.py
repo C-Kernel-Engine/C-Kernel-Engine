@@ -1472,6 +1472,10 @@ TEST_SUITES = {
         "Confirmed Voice Request and Correlated CKE Reply", "inference",
         ROOT / "tests" / "test_v8_accessible_voice.py",
     ),
+    "tts_kokoro_voice_playback": TestSuite(
+        "Checked Kokoro Whole-Text WAV Playback Adapter", "inference",
+        ROOT / "tests" / "test_v8_kokoro_voice_playback.py",
+    ),
     "tts_audio_harmonic_source_generated": TestSuite(
         "Checked Harmonic Source Normal-Compiler Generated Graph", "inference",
         ROOT / "tests" / "test_v8_audio_harmonic_source_generated.py",
