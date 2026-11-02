@@ -1038,7 +1038,7 @@
     <tr><td>Audio frontend and encoder</td><td>Generated WAV decode/features and encoder memory already feed the decoder.</td><td>Retain each window's valid 20 ms attention-frame extent.</td></tr>
     <tr><td>Decoder and timestamp tokens</td><td>Generated decoder produces text IDs, optional paired segment timestamps, and an opt-in selected-head trace on the base artifact.</td><td>Measure word-boundary accuracy; segment timestamps alone cannot locate words.</td></tr>
     <tr><td>Tokenizer and window assembly</td><td>The trace analyzer reports token correspondence and absolute word times per window. A checked assembler partitions words at each consumed audio extent and exposes overlap for review.</td><td>Measure boundary accuracy on real long recordings; review words crossing seek boundaries.</td></tr>
-    <tr><td>Editing</td><td>No native filler-review contract exists.</td><td>Measure filler recall, present non-destructive cut proposals and require approval before rendering.</td></tr>
+    <tr><td>Editing</td><td>A local review tool produces private context WAVs and unapproved filler proposals; an edited copy requires a separate approval file tied to audio and preview hashes.</td><td>Measure filler recall and conduct human listening before any edit-readiness claim.</td></tr>
   </tbody>
 </table>
 <p>The generated frontend, encoder and decoder produce transcription tokens.
@@ -1127,6 +1127,43 @@ flags “Actually” for its 5.44-second span and “I” for missing timing. Th
 omitted “um” fillers remain a separate transcription-recall failure measured
 by the boundary evaluator. This prevents the long first span from silently
 becoming an edit interval, but does not locate the missing fillers.</p>
+<h3>Filler review and approved copy</h3>
+<p><code>review_whisper_fillers_v8.py propose</code> accepts the original mono
+PCM16 WAV, its generated run report, checked word assembly, and optional
+manual flags. It writes private context WAVs and <code>proposals.json</code>
+in a new directory without changing the source. Recognized “um,” “uh,”
+“erm,” and “hmm” words become proposals only when timed. Missing timings are
+listed as unlocated; fillers omitted by transcription require a separate
+manually placed flag. A manual-flags file has schema
+<code>cke.whisper_manual_filler_flags.v1</code>, the original audio SHA-256,
+and a <code>flags</code> list with <code>label</code>,
+<code>start_seconds</code>, and <code>end_seconds</code>.</p>
+<p>After listening to each context WAV, a reviewer may create a separate
+<code>cke.whisper_filler_approval.v1</code> JSON with
+<code>audio_sha256</code>, <code>proposal_sha256</code>, a nonempty
+<code>approved_by</code>, and an <code>approved</code> list. Each selected ID
+must provide its <code>reviewed_preview_sha256</code> and exact
+<code>cut_start_seconds</code>/<code>cut_end_seconds</code>. The
+<code>render</code> command verifies those identities, rejects overlapping or
+out-of-context cuts, and writes a new WAV plus an evidence JSON. It refuses
+to overwrite the original or existing outputs. <code>approved_by</code> is
+a reviewer declaration, not authentication or proof that playback occurred.
+The preview and approval steps do not certify Whisper's boundaries.</p>
+<pre><code>python3 version/v8/scripts/review_whisper_fillers_v8.py propose \
+  --audio recording.wav --run-report run.json --assembly assembly.json \
+  --manual-flags flags.json --output-dir filler-review
+# Listen to filler-review/f0000-context.wav and inspect proposals.json.
+# Write approval.json by hand with the reviewed preview hash and exact cut times.
+python3 version/v8/scripts/review_whisper_fillers_v8.py render \
+  --audio recording.wav --proposals filler-review/proposals.json \
+  --approval approval.json --output reviewed-copy.wav \
+  --evidence reviewed-copy.json</code></pre>
+<p>In the local hand-corrected <code>s0802a_023</code> diagnostic, the model
+transcript supplied no filler proposal. Two manually flagged “um” intervals
+produced two context WAVs for review; no edit to that recording was approved
+or rendered. Synthetic tests cover approval, interval rejection, unchanged
+source audio, and the edited-copy frame count. Filler detection recall and
+human listening remain distinct acceptance gates.</p>
 
 <div class="alert alert-info">
     <div class="alert-icon">
