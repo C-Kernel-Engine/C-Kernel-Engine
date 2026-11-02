@@ -55,6 +55,20 @@ def _word_tokens(tokenizer, ids: list[int]) -> tuple[str, list[dict]]:
     return text, words
 
 
+def _physical_word_interval(begin: int, end: int, window_start: float,
+                            seconds_per_frame: float,
+                            physical_end: float) -> tuple[float, float, bool] | None:
+    first = window_start + begin * seconds_per_frame
+    unbounded_end = window_start + end * seconds_per_frame
+    bounded_end = min(unbounded_end, physical_end)
+    if first >= bounded_end:
+        return None
+    # Attention frames are 20 ms, but the WAV may end between frames. Preserve
+    # sub-millisecond source offsets while keeping the reported interval inside
+    # the physical recording.
+    return round(first, 6), round(bounded_end, 6), unbounded_end > physical_end
+
+
 def align_trace(report: dict, trace_path: Path, decoder_dir: Path,
                 encoder_dir: Path, library_path: Path, window_index: int) -> dict:
     segments = report.get("segments")
@@ -113,6 +127,7 @@ def align_trace(report: dict, trace_path: Path, decoder_dir: Path,
     text, words = _word_tokens(tokenizer, text_ids)
     seconds_per_frame = hop * stride / target_rate
     window_start_seconds = start_frame / source_rate
+    physical_window_end = window_start_seconds + source_frames / source_rate
     aligned_frames: np.ndarray | None = None
     provider_status = None
     if len(text_ids) >= 2:
@@ -159,13 +174,18 @@ def align_trace(report: dict, trace_path: Path, decoder_dir: Path,
         if not (0 <= begin < end <= valid_frames):
             word["boundary_reliability"] = "ambiguous"
             continue
-        word["start_seconds"] = round(window_start_seconds + begin * seconds_per_frame, 3)
-        word["end_seconds"] = round(window_start_seconds + end * seconds_per_frame, 3)
+        interval = _physical_word_interval(begin, end, window_start_seconds,
+                                           seconds_per_frame, physical_window_end)
+        if interval is None:
+            word["boundary_reliability"] = "ambiguous"
+            continue
+        word["start_seconds"], word["end_seconds"], clipped = interval
         word["boundary_reliability"] = "uncalibrated_alignment"
         word["quality_indicators"] = {
             "calibrated": False,
             "selected_head_peak_mean": float(attention[:, selected_indices[first], begin].mean()),
             "duration_frames": end - begin,
+            "clipped_to_physical_window_end": clipped,
         }
     status = "aligned" if words and all(
         word["start_seconds"] is not None for word in words) else "partial"
