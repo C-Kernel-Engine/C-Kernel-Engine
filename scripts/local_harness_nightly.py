@@ -119,7 +119,95 @@ def _http_dependencies_ready() -> bool:
     return True
 
 
-def run(config_path: Path, state_dir: Path, *, refresh_main: bool = False) -> dict:
+def _prefix_certification(config_path: Path, run_dir: Path,
+                          paused: bool) -> dict:
+    """Optional pinned native prefix lane; missing assets remain NOT_TESTED."""
+    row = {"status": "INCOMPLETE", "config": str(config_path), "cases": []}
+    if paused:
+        row.update(status="NOT_TESTED", reason="paused before startup")
+        return row
+    if not config_path.is_file():
+        row.update(status="NOT_TESTED", reason="prefix certification config unavailable")
+        return row
+    config = json.loads(config_path.read_text())
+    if not isinstance(config, dict) or config.get("schema") != "cke.local_prefix_cert.v1":
+        raise ValueError("invalid local prefix certification schema")
+    paths = {}
+    for name in ("bundle", "session_library", "ids"):
+        value = config.get(name)
+        if not isinstance(value, str) or not value:
+            raise ValueError(f"missing prefix certification {name}")
+        paths[name] = Path(value).expanduser().resolve()
+    cases = config.get("cases")
+    threads = config.get("threads", 16)
+    if (not isinstance(cases, list) or not 1 <= len(cases) <= 16 or
+            type(threads) is not int or not 1 <= threads <= 256 or
+            any(not isinstance(case, dict) or
+                type(case.get("prefix")) is not int or case["prefix"] < 1 or
+                type(case.get("suffix")) is not int or case["suffix"] < 2
+                for case in cases)):
+        raise ValueError("invalid prefix certification cases or threads")
+    required = (paths["bundle"] / "libmodel.so",
+                paths["bundle"] / "libckernel_engine.so",
+                paths["bundle"] / "layout_decode.json",
+                paths["bundle"] / "weights.bump",
+                paths["bundle"] / "model_v8.c",
+                paths["bundle"] / "weights_manifest.map",
+                paths["bundle"] / "config.json",
+                paths["session_library"], paths["ids"])
+    missing = [str(path) for path in required if not path.is_file()]
+    if missing:
+        row.update(status="NOT_TESTED", reason="prefix assets unavailable",
+                   missing=missing)
+        return row
+    for name, path in (("model_sha256", required[0]),
+                       ("session_sha256", paths["session_library"])):
+        expected = config.get(name)
+        if not isinstance(expected, str) or len(expected) != 64:
+            raise ValueError(f"missing pinned {name}")
+        digest = hashlib.sha256()
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(16 << 20), b""):
+                digest.update(chunk)
+        if digest.hexdigest() != expected:
+            row.update(status="FAIL", reason=f"pinned {name} differs")
+            return row
+    lane = run_dir / "prefix_certification"
+    lane.mkdir()
+    probe = ROOT / "version/v8/scripts/certify_session_multitoken_prefill_v8.py"
+    if not probe.is_file():
+        row.update(status="NOT_TESTED", reason="prefix probe unavailable")
+        return row
+    for index, case in enumerate(cases):
+        output = lane / f"case-{index}.json"
+        code = _invoke([
+            sys.executable, str(probe), "--bundle", str(paths["bundle"]),
+            "--session-library", str(paths["session_library"]),
+            "--ids", str(paths["ids"]), "--prefix", str(case["prefix"]),
+            "--suffix", str(case["suffix"]), "--threads", str(threads),
+            "--out", str(output),
+        ], cwd=ROOT, log=lane / f"case-{index}.log", deadline=None)
+        try:
+            observed = json.loads(output.read_text())
+        except (OSError, ValueError):
+            observed = {"verdict": "INCOMPLETE"}
+        verdict = observed.get("verdict")
+        row["cases"].append({"prefix": case["prefix"], "suffix": case["suffix"],
+                             "verdict": verdict, "exit_code": code,
+                             "report": str(output)})
+        reported_model = (observed.get("artifact_sha256") or {}).get("libmodel.so")
+        reported_session = observed.get("session_library_sha256")
+        if (code != 0 or verdict != "PASS" or
+                reported_model != config["model_sha256"] or
+                reported_session != config["session_sha256"]):
+            row.update(status="FAIL", reason="prefix parity case failed")
+            return row
+    row["status"] = "PASS"
+    return row
+
+
+def run(config_path: Path, state_dir: Path, *, refresh_main: bool = False,
+        prefix_cert_config: Path | None = None) -> dict:
     state_dir.mkdir(parents=True, exist_ok=True)
     started = datetime.now(timezone.utc)
     run_dir = state_dir / "runs" / (started.strftime("%Y%m%dT%H%M%S%fZ"))
@@ -227,6 +315,22 @@ def run(config_path: Path, state_dir: Path, *, refresh_main: bool = False) -> di
                 report["status"] = ("FAIL" if "FAIL" in statuses else
                                     "PASS" if statuses == {"PASS"} else
                                     "NOT_TESTED" if statuses == {"NOT_TESTED"} else "INCOMPLETE")
+        if prefix_cert_config is not None:
+            stage = "prefix_certification"
+            report["prefix_certification"] = {
+                "status": "INCOMPLETE", "config": str(prefix_cert_config),
+                "cases": []}
+            publish()
+            report["prefix_certification"] = _prefix_certification(
+                prefix_cert_config, run_dir, (state_dir / "PAUSE").exists())
+            publish()
+            prefix_status = report["prefix_certification"]["status"]
+            if prefix_status == "FAIL":
+                report["status"] = "FAIL"
+            elif prefix_status == "NOT_TESTED" and report["status"] == "PASS":
+                report["status"] = "INCOMPLETE"
+            elif prefix_status == "PASS" and report["status"] == "NOT_TESTED":
+                report["status"] = "INCOMPLETE"
     except Exception as exc:
         report.update(status="FAIL", reason=f"{stage} failed: {type(exc).__name__}: {exc}",
                       error_type=type(exc).__name__, failure_stage=stage)
@@ -244,6 +348,8 @@ def main() -> int:
     parser.add_argument("--state-dir", type=Path, required=True)
     parser.add_argument("--refresh-main", action="store_true",
                         help="fetch origin/main in a clean detached worktree before testing")
+    parser.add_argument("--prefix-cert-config", type=Path,
+                        help="optional pinned exact-prefix native certification matrix")
     args = parser.parse_args()
     args.state_dir.mkdir(parents=True, exist_ok=True)
     with (args.state_dir / "LOCK").open("a+") as lock:
@@ -253,7 +359,8 @@ def main() -> int:
             print("another local harness nightly owns this state directory")
             return 2
         try:
-            result = run(args.config, args.state_dir, refresh_main=args.refresh_main)
+            result = run(args.config, args.state_dir, refresh_main=args.refresh_main,
+                         prefix_cert_config=args.prefix_cert_config)
         except (OSError, ValueError, json.JSONDecodeError) as exc:
             print(f"local harness nightly configuration or report error: {exc}")
             return 1

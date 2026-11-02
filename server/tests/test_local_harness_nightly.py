@@ -1,5 +1,6 @@
 """A local harness night cannot turn missing execution into PASS."""
 import json
+import hashlib
 from pathlib import Path
 import subprocess
 
@@ -25,6 +26,72 @@ def test_missing_config_is_not_tested(tmp_path, monkeypatch):
     report = lane.run(tmp_path / "missing.json", tmp_path / "state")
     assert report["status"] == "NOT_TESTED"
     assert json.loads((tmp_path / "state/latest.json").read_text())["status"] == "NOT_TESTED"
+
+
+def test_optional_prefix_lane_missing_assets_is_not_tested(tmp_path):
+    config = tmp_path / "prefix.json"
+    config.write_text(json.dumps({
+        "schema": "cke.local_prefix_cert.v1", "bundle": str(tmp_path / "bundle"),
+        "session_library": str(tmp_path / "missing.so"),
+        "ids": str(tmp_path / "missing.ids.json"),
+        "cases": [{"prefix": 128, "suffix": 9}],
+        "model_sha256": "a" * 64, "session_sha256": "b" * 64,
+    }))
+    row = lane._prefix_certification(config, tmp_path, paused=False)
+    assert row["status"] == "NOT_TESTED"
+    assert row["reason"] == "prefix assets unavailable"
+
+
+def test_optional_prefix_lane_requires_pinned_pass_report(tmp_path, monkeypatch):
+    bundle = tmp_path / "bundle"
+    bundle.mkdir()
+    for name in ("libmodel.so", "libckernel_engine.so", "layout_decode.json",
+                 "weights.bump", "model_v8.c", "weights_manifest.map", "config.json"):
+        (bundle / name).write_bytes(name.encode())
+    session = tmp_path / "session.so"
+    ids = tmp_path / "ids.json"
+    session.write_bytes(b"session")
+    ids.write_text("[1,2,3]")
+    config = tmp_path / "prefix.json"
+    config.write_text(json.dumps({
+        "schema": "cke.local_prefix_cert.v1", "bundle": str(bundle),
+        "session_library": str(session), "ids": str(ids),
+        "cases": [{"prefix": 128, "suffix": 9}], "threads": 2,
+        "model_sha256": hashlib.sha256((bundle / "libmodel.so").read_bytes()).hexdigest(),
+        "session_sha256": hashlib.sha256(session.read_bytes()).hexdigest(),
+    }))
+
+    def fake_invoke(command, **_kwargs):
+        output = Path(command[command.index("--out") + 1])
+        output.write_text(json.dumps({
+            "verdict": "PASS",
+            "artifact_sha256": {"libmodel.so": config_doc["model_sha256"]},
+            "session_library_sha256": config_doc["session_sha256"],
+        }))
+        return 0
+
+    config_doc = json.loads(config.read_text())
+    monkeypatch.setattr(lane, "_invoke", fake_invoke)
+    row = lane._prefix_certification(config, tmp_path, paused=False)
+    assert row["status"] == "PASS" and row["cases"][0]["verdict"] == "PASS"
+    config_doc["session_sha256"] = "0" * 64
+    config.write_text(json.dumps(config_doc))
+    row = lane._prefix_certification(config, tmp_path / "other", paused=False)
+    assert row["status"] == "FAIL" and "pinned" in row["reason"]
+
+
+def test_malformed_current_prefix_config_replaces_previous_pass(tmp_path, monkeypatch):
+    monkeypatch.setattr(lane, "_source_commit", lambda: "c" * 40)
+    state = tmp_path / "state"
+    state.mkdir()
+    (state / "latest.json").write_text(json.dumps({"status": "PASS", "run_id": "old"}))
+    prefix = tmp_path / "prefix.json"
+    prefix.write_text("{")
+    report = lane.run(tmp_path / "missing-harness.json", state,
+                      prefix_cert_config=prefix)
+    assert report["status"] == "FAIL"
+    assert report["failure_stage"] == "prefix_certification"
+    assert json.loads((state / "latest.json").read_text())["status"] == "FAIL"
 
 
 def test_unavailable_endpoint_cannot_pass(tmp_path, monkeypatch):
