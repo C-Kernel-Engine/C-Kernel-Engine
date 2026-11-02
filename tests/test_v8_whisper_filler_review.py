@@ -30,6 +30,7 @@ class WhisperFillerReviewTest(unittest.TestCase):
         self.root = Path(self.temp.name)
         self.audio = self.root / "source.wav"
         samples = [index % 1000 - 500 for index in range(2000)]
+        self.samples = samples
         with wave.open(str(self.audio), "wb") as output:
             output.setnchannels(1)
             output.setsampwidth(2)
@@ -106,6 +107,9 @@ class WhisperFillerReviewTest(unittest.TestCase):
         with wave.open(str(output), "rb") as opened:
             self.assertEqual(opened.getnframes(), 1800)
             self.assertEqual(opened.getframerate(), 1000)
+            observed = struct.unpack("1800h", opened.readframes(1800))
+        self.assertEqual(observed, tuple(self.samples[:220] + self.samples[320:920] +
+                                         self.samples[1020:]))
         self.assertEqual(json.loads(evidence.read_text())["output_audio_sha256"],
                          review.sha256(output))
 
