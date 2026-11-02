@@ -41,13 +41,17 @@ static CKSequenceStateV8 g_sequence_states[3];
 static CKSequenceStateV8 *g_active_sequence = NULL;
 static uint64_t g_sequence_generation = 0;
 static uint64_t g_sequence_model_epoch = 1;
+static uint64_t g_sequence_instance_nonce_hi = 0;
+static uint64_t g_sequence_instance_nonce_lo = 0;
+static int g_sequence_instance_bound = 0;
 
 /* Checkpoints are process-local and caller-owned. The host must additionally
  * bind them to the exact model artifact and token prefix before reuse. */
 typedef struct CKSequenceCheckpointV8 {
     uint64_t magic;
     uint64_t model_epoch;
-    uint64_t model_cookie;
+    uint64_t instance_nonce_hi;
+    uint64_t instance_nonce_lo;
     uint64_t state_bytes;
     uint64_t checksum;
     int32_t pos;
@@ -60,7 +64,8 @@ static uint64_t ck_sequence_checkpoint_hash(const CKSequenceCheckpointV8 *head,
                                             const uint8_t *payload) {
     uint64_t hash = UINT64_C(14695981039346656037);
     const uint64_t fields[] = {
-        head->magic, head->model_epoch, head->model_cookie,
+        head->magic, head->model_epoch,
+        head->instance_nonce_hi, head->instance_nonce_lo,
         head->state_bytes, (uint64_t)(uint32_t)head->pos,
         (uint64_t)(uint32_t)head->rope_pos,
     };
@@ -128,6 +133,9 @@ static void ck_sequence_ensure_default(void) {
 static void ck_sequence_release_all(void) {
     memset(g_sequence_states, 0, sizeof(g_sequence_states));
     g_active_sequence = NULL;
+    g_sequence_instance_nonce_hi = 0;
+    g_sequence_instance_nonce_lo = 0;
+    g_sequence_instance_bound = 0;
     if (g_sequence_model_epoch != UINT64_MAX) ++g_sequence_model_epoch;
 }
 
@@ -230,9 +238,20 @@ CK_EXPORT int ck_model_sequence_state_destroy(uint64_t handle) {
     return 0;
 }
 
+/* The owner issues a fresh 128-bit nonce after each successful model init.
+ * Never derive it from DSO or heap addresses, which may repeat after dlclose. */
+CK_EXPORT int ck_model_sequence_checkpoint_bind_instance(uint64_t nonce_hi,
+                                                        uint64_t nonce_lo) {
+    if (!g_model || g_sequence_instance_bound || !(nonce_hi | nonce_lo)) return -1;
+    g_sequence_instance_nonce_hi = nonce_hi;
+    g_sequence_instance_nonce_lo = nonce_lo;
+    g_sequence_instance_bound = 1;
+    return 0;
+}
+
 CK_EXPORT int ck_model_sequence_checkpoint_requirements(size_t *bytes,
                                                         size_t *alignment) {
-    if (!bytes || !alignment || !g_model ||
+    if (!bytes || !alignment || !g_model || !g_sequence_instance_bound ||
         CK_SEQ_ARENA_BYTES > SIZE_MAX - sizeof(CKSequenceCheckpointV8))
         return -1;
     *bytes = sizeof(CKSequenceCheckpointV8) + (size_t)CK_SEQ_ARENA_BYTES;
@@ -254,7 +273,8 @@ CK_EXPORT int ck_model_sequence_checkpoint_save(uint64_t handle, void *out,
     CKSequenceCheckpointV8 head = {
         .magic = CK_SEQUENCE_CHECKPOINT_MAGIC,
         .model_epoch = g_sequence_model_epoch,
-        .model_cookie = (uint64_t)((uintptr_t)g_model ^ (uintptr_t)&g_sequence_states),
+        .instance_nonce_hi = g_sequence_instance_nonce_hi,
+        .instance_nonce_lo = g_sequence_instance_nonce_lo,
         .state_bytes = (uint64_t)CK_SEQ_ARENA_BYTES,
         .pos = pos, .rope_pos = rope_pos,
     };
@@ -285,8 +305,8 @@ CK_EXPORT int ck_model_sequence_checkpoint_restore(uint64_t handle,
     const uint8_t *payload = (const uint8_t *)snapshot + sizeof(head);
     if (head.magic != CK_SEQUENCE_CHECKPOINT_MAGIC ||
         head.model_epoch != g_sequence_model_epoch ||
-        head.model_cookie !=
-            (uint64_t)((uintptr_t)g_model ^ (uintptr_t)&g_sequence_states) ||
+        head.instance_nonce_hi != g_sequence_instance_nonce_hi ||
+        head.instance_nonce_lo != g_sequence_instance_nonce_lo ||
         head.state_bytes != (uint64_t)CK_SEQ_ARENA_BYTES ||
         head.pos < 0 || head.pos > MAX_SEQ_LEN || head.rope_pos < 0 ||
         head.checksum != ck_sequence_checkpoint_hash(&head, payload)) return -2;

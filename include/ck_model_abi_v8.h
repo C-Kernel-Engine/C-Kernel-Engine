@@ -91,11 +91,13 @@ typedef int (*ck_model_sequence_state_destroy_v8_fn)(uint64_t handle);
  * serialized with all model execution and used only at a successful forward
  * boundary; a failed or cancelled forward requires reset. The caller owns aligned snapshot
  * storage and must bind its exact token prefix and loaded artifact identity;
- * generated snapshots only validate the in-process model instance and state
+ * generated snapshots validate a fresh host-issued 128-bit instance nonce and state
  * layout. They are not a portable disk or cross-process format. Invalid or
  * corrupt snapshots must leave the destination sequence unchanged. Logits are
  * not saved; a caller must execute a new token before sampling from restored
  * state, or separately retain validated logits for an exact-prefix hit. */
+typedef int (*ck_model_sequence_checkpoint_bind_instance_v8_fn)(uint64_t nonce_hi,
+                                                               uint64_t nonce_lo);
 typedef int (*ck_model_sequence_checkpoint_requirements_v8_fn)(size_t *bytes,
                                                                size_t *alignment);
 typedef int (*ck_model_sequence_checkpoint_save_v8_fn)(uint64_t handle,

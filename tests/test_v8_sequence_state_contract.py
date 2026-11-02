@@ -172,6 +172,7 @@ int main(void) {
                                    "head_dim": 4}, decode_ops=ops)
         self.assertIn("ck_model_sequence_state_create", source)
         self.assertIn("ck_model_sequence_checkpoint_requirements", source)
+        self.assertIn("ck_model_sequence_checkpoint_bind_instance", source)
         self.assertIn("ck_model_sequence_checkpoint_save", source)
         self.assertIn("ck_model_sequence_checkpoint_restore", source)
         self.assertIn("memset(g_model->recurrent_conv_state", source)

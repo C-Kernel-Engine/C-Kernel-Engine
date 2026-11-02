@@ -35,6 +35,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <sys/random.h>
 #include <pthread.h>
 
 #ifdef HAVE_READLINE
@@ -231,6 +232,7 @@ typedef struct {
     ck_model_sequence_state_activate_v8_fn sequence_activate;
     ck_model_sequence_state_destroy_v8_fn sequence_destroy;
     ck_model_sequence_checkpoint_requirements_v8_fn checkpoint_requirements;
+    ck_model_sequence_checkpoint_bind_instance_v8_fn checkpoint_bind_instance;
     ck_model_sequence_checkpoint_save_v8_fn checkpoint_save;
     ck_model_sequence_checkpoint_restore_v8_fn checkpoint_restore;
     ck_model_batch_decode_workspace_v8_fn batch_workspace;
@@ -1847,6 +1849,8 @@ static bool load_model_api(const char *lib_path, ModelAPI *api) {
     resolve_symbol(api->handle, "ck_model_sequence_state_destroy", (void **)&api->sequence_destroy, false);
     resolve_symbol(api->handle, "ck_model_sequence_checkpoint_requirements",
                    (void **)&api->checkpoint_requirements, false);
+    resolve_symbol(api->handle, "ck_model_sequence_checkpoint_bind_instance",
+                   (void **)&api->checkpoint_bind_instance, false);
     resolve_symbol(api->handle, "ck_model_sequence_checkpoint_save",
                    (void **)&api->checkpoint_save, false);
     resolve_symbol(api->handle, "ck_model_sequence_checkpoint_restore",
@@ -1966,6 +1970,7 @@ static bool load_model_api(const char *lib_path, ModelAPI *api) {
         CK_REQUIRE_CAPABILITY_SYMBOL(CK_MODEL_CAP_GENERATION_POLICY, api->build_generation_prefix, "generation prefix");
         CK_REQUIRE_CAPABILITY_SYMBOL(CK_MODEL_CAP_GENERATION_POLICY, api->apply_generation_policy, "generation logits policy");
         CK_REQUIRE_CAPABILITY_SYMBOL(CK_MODEL_CAP_SEQUENCE_CHECKPOINT, api->checkpoint_requirements, "checkpoint requirements");
+        CK_REQUIRE_CAPABILITY_SYMBOL(CK_MODEL_CAP_SEQUENCE_CHECKPOINT, api->checkpoint_bind_instance, "checkpoint instance binding");
         CK_REQUIRE_CAPABILITY_SYMBOL(CK_MODEL_CAP_SEQUENCE_CHECKPOINT, api->checkpoint_save, "checkpoint save");
         CK_REQUIRE_CAPABILITY_SYMBOL(CK_MODEL_CAP_SEQUENCE_CHECKPOINT, api->checkpoint_restore, "checkpoint restore");
 #undef CK_REQUIRE_CAPABILITY_SYMBOL
@@ -2792,16 +2797,43 @@ prefill_done:
     return generation_status;
 }
 
+static int fresh_checkpoint_nonce(uint64_t nonce[2]) {
+    unsigned char *next = (unsigned char *)nonce;
+    size_t remaining = 2 * sizeof(uint64_t);
+    while (remaining) {
+        ssize_t count = getrandom(next, remaining, 0);
+        if (count < 0 && errno == EINTR) continue;
+        if (count <= 0) return -1;
+        next += (size_t)count;
+        remaining -= (size_t)count;
+    }
+    return (nonce[0] | nonce[1]) ? 0 : -1;
+}
+
 static int initialize_model_api(
     ModelAPI *api,
     const char *weights_path,
     const char *manifest_path) {
     if (!api || !weights_path) return -1;
+    int status = -3;
     if (api->init_with_manifest) {
         if (!manifest_path) return -2;
-        return api->init_with_manifest(weights_path, manifest_path);
+        status = api->init_with_manifest(weights_path, manifest_path);
+    } else if (api->init) {
+        status = api->init(weights_path);
     }
-    return api->init ? api->init(weights_path) : -3;
+    if (status != 0) return status;
+    if (api->has_descriptor &&
+        (api->descriptor.capabilities & CK_MODEL_CAP_SEQUENCE_CHECKPOINT)) {
+        uint64_t nonce[2] = {0, 0};
+        if (fresh_checkpoint_nonce(nonce) != 0 ||
+            api->checkpoint_bind_instance(nonce[0], nonce[1]) != 0) {
+            if (api->free_fn) api->free_fn();
+            api->free_fn = NULL;
+            return -4;
+        }
+    }
+    return 0;
 }
 
 static int run_audio_file(ModelAPI *decoder, CLIOptions *opt) {
