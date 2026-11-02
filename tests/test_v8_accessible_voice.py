@@ -13,6 +13,7 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -260,6 +261,26 @@ class AccessibleVoiceTest(unittest.TestCase):
         pid = int(marker.read_text())
         with self.assertRaises(ProcessLookupError):
             os.kill(pid, 0)
+
+    def test_kokoro_answer_uses_checked_playback_adapter(self):
+        with mock.patch.object(voice, "confirm", return_value="Read status"), \
+             mock.patch.object(voice, "speak_and_control") as speak:
+            status = voice.main([
+                "--text", "Read status", "--agent-id", "cke",
+                "--project-id", "engine", "--server-url", self.url,
+                "--journal", str(self.journal),
+                "--kokoro-config", "/pinned/config.json",
+                "--kokoro-bundle-dir", "/pinned/bundle",
+                "--audio-player", "/usr/bin/aplay",
+            ])
+        self.assertEqual(status, 0)
+        args, kwargs = speak.call_args
+        self.assertEqual(args[0], "Status is good.")
+        self.assertEqual(args[1].name, "ck_kokoro_play.py")
+        self.assertEqual(kwargs["label"], "CKE Kokoro")
+        self.assertEqual(kwargs["arguments"], (
+            "--config", "/pinned/config.json", "--bundle-dir", "/pinned/bundle",
+            "--player", "/usr/bin/aplay"))
 
 
 if __name__ == "__main__":

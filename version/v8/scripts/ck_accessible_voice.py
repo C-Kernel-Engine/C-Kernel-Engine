@@ -289,20 +289,22 @@ def submit(text: str, *, server_url: str, model: str, journal: Path,
     raise VoiceError("server returned no answer")
 
 
-def speak_and_control(text: str, speech_exe: Path, read=input) -> None:
+def speak_and_control(text: str, speech_exe: Path, read=input,
+                      *, arguments: tuple[str, ...] = (),
+                      label: str = "System speech") -> None:
     if not speech_exe.is_file() or not os.access(speech_exe, os.X_OK):
-        raise VoiceError(f"system speech executable unavailable: {speech_exe}")
-    print("System speech backend selected.", flush=True)
+        raise VoiceError(f"speech executable unavailable: {speech_exe}")
+    print(f"{label} backend selected.", flush=True)
     child = None
     try:
         while True:
             if child is None:
-                child = subprocess.Popen([str(speech_exe), text],
+                child = subprocess.Popen([str(speech_exe), *arguments, text],
                                          start_new_session=True)
             choice = read("Speech: enter=finish, repeat=restart, stop=silence: ").strip().lower()
             if choice == "":
                 if child.wait() != 0:
-                    raise VoiceError("system speech failed")
+                    raise VoiceError(f"{label} failed")
                 return
             if child.poll() is None:
                 os.killpg(child.pid, signal.SIGTERM)
@@ -340,12 +342,23 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--model", default="ck-v8")
     parser.add_argument("--journal", type=Path, required=True)
     parser.add_argument("--speech-exe", type=Path, help="blocking local speech command accepting text as one argument")
+    parser.add_argument("--kokoro-config", type=Path,
+                        help="pinned Kokoro frontend configuration for generated speech")
+    parser.add_argument("--kokoro-bundle-dir", type=Path,
+                        help="verified Kokoro generated runtime bundle")
+    parser.add_argument("--audio-player", type=Path,
+                        help="local player accepting one 24 kHz mono PCM16 WAV path")
     args = parser.parse_args(argv)
     try:
         if (args.wav or args.record) and (not args.encoder_run_dir or not args.decoder_run_dir):
             parser.error("audio input requires both Whisper run directories")
         if args.record and not args.capture_device:
             parser.error("--record requires --capture-device")
+        kokoro_options = (args.kokoro_config, args.kokoro_bundle_dir, args.audio_player)
+        if args.speech_exe and any(kokoro_options):
+            parser.error("--speech-exe cannot be combined with Kokoro options")
+        if any(kokoro_options) and not all(kokoro_options):
+            parser.error("Kokoro requires --kokoro-config, --kokoro-bundle-dir and --audio-player")
         if args.record:
             with tempfile.TemporaryDirectory(prefix="cke-voice-capture-") as folder:
                 wav = Path(folder) / "microphone.wav"
@@ -372,6 +385,13 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Answer from {args.agent_id} [{request_id}]:\n{answer}", flush=True)
         if args.speech_exe:
             speak_and_control(answer, args.speech_exe)
+        elif all(kokoro_options):
+            adapter = Path(__file__).resolve().parents[1] / "tts/ck_kokoro_play.py"
+            speak_and_control(answer, adapter,
+                              arguments=("--config", str(args.kokoro_config),
+                                         "--bundle-dir", str(args.kokoro_bundle_dir),
+                                         "--player", str(args.audio_player)),
+                              label="CKE Kokoro")
         else:
             print("No speech executable selected; answer was displayed only.", flush=True)
         return 0
