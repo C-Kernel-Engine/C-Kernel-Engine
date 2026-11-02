@@ -142,6 +142,40 @@ class Qwen3TTSPinnedSessionTest(unittest.TestCase):
         self.assertEqual((first[-1], second[-1]), (16, 17))
         np.testing.assert_array_equal(first_codec, second_codec)
 
+    def test_prompt_ids_reject_invalid_token_values_before_native_entry(self):
+        class FakeTokenizer:
+            value = 12
+
+            def encode(self, text, add_special_tokens=False):
+                return [1, 2, 3] if text.startswith("<|im_start|>") else [self.value]
+
+        config = {
+            "tts_pad_token_id": 20, "tts_bos_token_id": 21,
+            "tts_eos_token_id": 22,
+            "talker_config": {
+                "codec_think_id": 30, "codec_think_bos_id": 31,
+                "codec_language_id": {"english": 32},
+                "codec_think_eos_id": 33, "spk_id": {"ryan": 34},
+                "codec_pad_id": 35, "codec_bos_id": 36,
+            },
+        }
+        with tempfile.TemporaryDirectory() as temp:
+            model_dir = Path(temp)
+            (model_dir / "config.json").write_text(json.dumps(config))
+            tokenizer = FakeTokenizer()
+            for invalid in (-1, True, 1.5, 1 << 31):
+                with self.subTest(source="spoken text", invalid=invalid):
+                    tokenizer.value = invalid
+                    with self.assertRaisesRegex(ValueError, "text token IDs"):
+                        _prompt_ids(model_dir, "Test", tokenizer, context_tokens=None)
+            tokenizer.value = 12
+            for invalid in (-1, False, 1.5, 1 << 31):
+                with self.subTest(source="codec config", invalid=invalid):
+                    config["talker_config"]["codec_bos_id"] = invalid
+                    (model_dir / "config.json").write_text(json.dumps(config))
+                    with self.assertRaisesRegex(ValueError, "codec token IDs"):
+                        _prompt_ids(model_dir, "Test", tokenizer, context_tokens=None)
+
     def test_second_reference_fixture_integrity(self):
         manifest = json.loads(SECOND_FIXTURE.with_suffix(".json").read_text())
         baseline = json.loads((SECOND_FIXTURE.parent /

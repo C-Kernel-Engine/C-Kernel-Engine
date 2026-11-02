@@ -15,6 +15,7 @@ import ctypes
 import hashlib
 import io
 import json
+import numbers
 from pathlib import Path
 import resource
 import subprocess
@@ -270,16 +271,23 @@ def _prompt_ids(model_dir: Path, text: str, tokenizer=None,
         raise ValueError(f"text must encode to exactly {context_tokens} tokens")
     config = json.loads((model_dir / "config.json").read_text())
     talker = config["talker_config"]
-    text_ids = np.array([
+    text_values = [
         *prefix, config["tts_pad_token_id"], config["tts_bos_token_id"],
         config["tts_eos_token_id"], *context,
-    ], dtype=np.int32)
-    codec_ids = np.array([
+    ]
+    codec_values = [
         talker["codec_think_id"], talker["codec_think_bos_id"],
         talker["codec_language_id"]["english"],
         talker["codec_think_eos_id"], talker["spk_id"]["ryan"],
         talker["codec_pad_id"], talker["codec_bos_id"],
-    ], dtype=np.int32)
+    ]
+    for label, values in (("text", text_values), ("codec", codec_values)):
+        if any(isinstance(value, (bool, np.bool_)) or
+               not isinstance(value, numbers.Integral) or
+               not 0 <= value <= np.iinfo(np.int32).max for value in values):
+            raise ValueError(f"{label} token IDs must be nonnegative int32 values")
+    text_ids = np.asarray(text_values, dtype=np.int32)
+    codec_ids = np.asarray(codec_values, dtype=np.int32)
     return text_ids, codec_ids
 
 
