@@ -118,6 +118,17 @@ def test_malformed_current_prefix_config_replaces_previous_pass(tmp_path, monkey
     assert json.loads((state / "latest.json").read_text())["status"] == "FAIL"
 
 
+def test_incomplete_prefix_lane_cannot_leave_current_run_not_tested(tmp_path, monkeypatch):
+    monkeypatch.setattr(lane, "_source_commit", lambda: "c" * 40)
+    monkeypatch.setattr(lane, "_prefix_certification", lambda *_args: {
+        "status": "INCOMPLETE", "reason": "time budget expired", "cases": []})
+    state = tmp_path / "state"
+    report = lane.run(tmp_path / "missing-harness.json", state,
+                      prefix_cert_config=tmp_path / "prefix.json")
+    assert report["status"] == "INCOMPLETE"
+    assert json.loads((state / "latest.json").read_text())["status"] == "INCOMPLETE"
+
+
 def test_unavailable_endpoint_cannot_pass(tmp_path, monkeypatch):
     monkeypatch.setattr(lane, "_source_commit", lambda: "c" * 40)
     config = tmp_path / "config.json"

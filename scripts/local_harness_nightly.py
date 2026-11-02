@@ -356,9 +356,9 @@ def run(config_path: Path, state_dir: Path, *, refresh_main: bool = False,
             prefix_status = report["prefix_certification"]["status"]
             if prefix_status == "FAIL":
                 report["status"] = "FAIL"
-            elif prefix_status != "PASS" and report["status"] == "PASS":
+            elif "INCOMPLETE" in (prefix_status, report["status"]):
                 report["status"] = "INCOMPLETE"
-            elif prefix_status == "PASS" and report["status"] == "NOT_TESTED":
+            elif prefix_status != report["status"]:
                 report["status"] = "INCOMPLETE"
     except Exception as exc:
         report.update(status="FAIL", reason=f"{stage} failed: {type(exc).__name__}: {exc}",
