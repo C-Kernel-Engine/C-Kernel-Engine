@@ -34,6 +34,64 @@ def _layout(*, extra: list[dict] | None = None) -> dict:
 
 
 class SequenceStateContractTests(unittest.TestCase):
+    def test_recurrent_named_activation_tracks_active_arena(self) -> None:
+        layout = {"memory": {"arena": {"activations_base": 0},
+                             "activations": {"buffers": [
+            {"name": "kv_cache", "offset": 64, "size": 32},
+            {"name": "recurrent_conv_state", "offset": 192, "size": 16},
+            {"name": "recurrent_ssm_state", "offset": 256, "size": 32},
+        ]}}}
+        lookup = codegen_v8._inject_activation_lookup_api(
+            "", layout, sequence_switch=True, sequence_recurrent=True)
+        source = r'''
+#include <assert.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <string.h>
+#define CK_EXPORT
+#define A_KV_CACHE 64
+#define A_RECURRENT_CONV_STATE 192
+#define A_RECURRENT_SSM_STATE 256
+typedef struct {
+    uint8_t *bump;
+    float *kv_cache;
+    float *recurrent_conv_state;
+    float *recurrent_ssm_state;
+} CKModel;
+static CKModel storage, *g_model = &storage;
+''' + lookup + r'''
+int main(void) {
+    uint8_t arena[320] = {0}, other[320] = {0};
+    g_model->bump = arena;
+    g_model->kv_cache = (float *)(arena + A_KV_CACHE);
+    g_model->recurrent_conv_state = (float *)(arena + A_RECURRENT_CONV_STATE);
+    g_model->recurrent_ssm_state = (float *)(arena + A_RECURRENT_SSM_STATE);
+    assert(ck_model_get_named_activation_runtime_offset("recurrent_ssm_state") == 256);
+    g_model->kv_cache = (float *)(other + A_KV_CACHE);
+    g_model->recurrent_conv_state = (float *)(other + A_RECURRENT_CONV_STATE);
+    g_model->recurrent_ssm_state = (float *)(other + A_RECURRENT_SSM_STATE);
+    assert(ck_model_get_named_activation_runtime_offset("kv_cache") == -1);
+    assert(ck_model_get_named_activation_runtime_offset("recurrent_conv_state") == -1);
+    assert(ck_model_get_named_activation_runtime_offset("recurrent_ssm_state") == -1);
+    assert(ck_model_get_named_activation_ptr("kv_cache") == (uintptr_t)(other + A_KV_CACHE));
+    assert(ck_model_get_named_activation_ptr("recurrent_conv_state") ==
+           (uintptr_t)(other + A_RECURRENT_CONV_STATE));
+    assert(ck_model_get_named_activation_ptr("recurrent_ssm_state") ==
+           (uintptr_t)(other + A_RECURRENT_SSM_STATE));
+    assert(ck_model_get_named_activation_nbytes("recurrent_ssm_state") == 32);
+    return 0;
+}
+'''
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "probe.c").write_text(source)
+            compiled = subprocess.run(
+                ["cc", "-std=c11", "-Wall", "-Wextra", "-Werror",
+                 "probe.c", "-o", "probe"], cwd=root, capture_output=True, text=True)
+            self.assertEqual(compiled.returncode, 0, compiled.stderr)
+            executed = subprocess.run([str(root / "probe")], capture_output=True, text=True)
+            self.assertEqual(executed.returncode, 0, executed.stderr)
+
     def test_recurrent_handles_switch_all_state_and_reject_stale_reuse(self) -> None:
         contract = {
             "arena_bytes": 192,

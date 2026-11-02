@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import ctypes as C
 import subprocess
 import sys
 import tempfile
@@ -13,9 +14,55 @@ from pathlib import Path
 SCRIPTS = Path(__file__).resolve().parents[1] / "version" / "v8" / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 from sequence_state_codegen_v8 import emit_sequence_state_api  # noqa: E402
+from certify_sequence_checkpoint_v8 import declared_state_regions, signature  # noqa: E402
 
 
 class SequenceCheckpointTests(unittest.TestCase):
+    def test_probe_requires_declared_recurrent_regions_and_extents(self) -> None:
+        buffers = [
+            {"name": "kv_cache", "abs_offset": 0, "size": 32,
+             "lifetime": "sequence", "mutable": True},
+            {"name": "recurrent_conv_state", "abs_offset": 64, "size": 16,
+             "lifetime": "sequence", "mutable": True},
+            {"name": "recurrent_ssm_state", "abs_offset": 128, "size": 32,
+             "lifetime": "sequence", "mutable": True},
+        ]
+        layout = {"memory": {"arena": {"total_size": 256},
+                             "activations": {"buffers": buffers}}}
+        required = declared_state_regions(layout)
+        self.assertEqual(required, {"kv_cache": 32,
+                                    "recurrent_conv_state": 16,
+                                    "recurrent_ssm_state": 32})
+        storage = {name: C.create_string_buffer(size) for name, size in required.items()}
+
+        class FakeModel:
+            def __init__(self) -> None:
+                self.pointers = {name: C.addressof(value) for name, value in storage.items()}
+                self.extents = dict(required)
+
+            def ck_model_get_named_activation_ptr(self, name: bytes) -> int:
+                return self.pointers.get(name.decode(), 0)
+
+            def ck_model_get_named_activation_nbytes(self, name: bytes) -> int:
+                return self.extents.get(name.decode(), -1)
+
+            def ck_model_get_active_tokens(self) -> int:
+                return 3
+
+        model = FakeModel()
+        logits = (C.c_float * 4)(1, 2, 3, 4)
+        self.assertEqual(set(signature(model, logits, required)["state"]), set(required))
+        model.pointers["recurrent_conv_state"] = 0
+        with self.assertRaisesRegex(RuntimeError, "recurrent_conv_state missing"):
+            signature(model, logits, required)
+        model.pointers["recurrent_conv_state"] = C.addressof(storage["recurrent_conv_state"])
+        model.extents["recurrent_ssm_state"] = 31
+        with self.assertRaisesRegex(RuntimeError, "recurrent_ssm_state missing"):
+            signature(model, logits, required)
+        self.assertEqual(declared_state_regions({"memory": {
+            "arena": {"total_size": 64}, "activations": {"buffers": buffers[:1]}}}),
+            {"kv_cache": 32})
+
     def test_kv_and_recurrent_checkpoints_restore_only_validated_state(self) -> None:
         for recurrent in (False, True):
             with self.subTest(recurrent=recurrent):
@@ -365,9 +412,16 @@ int main(int argc, char **argv) {
         model = r'''
 #include "ck_model_abi_v8.h"
 #include <stdint.h>
+#include <stdatomic.h>
 #include <string.h>
+#include <sched.h>
 static uint64_t bound_hi, bound_lo;
-static int32_t token_ids[1] = {1};
+static uint64_t state_word;
+static uint64_t embed_seen_state;
+static int position, fail_embed_once, cancel_embed_once;
+static const atomic_int *cancel_flag;
+static atomic_int hold_restore, entered_restore;
+static int32_t token_ids[2] = {1, 1};
 static float logits[4] = {0, 1, 0, 0};
 static const uint64_t caps = CK_MODEL_CAP_INIT |
     CK_MODEL_CAP_AUTOREGRESSIVE_DECODE | CK_MODEL_CAP_TEXT_ENCODE |
@@ -382,17 +436,36 @@ int ck_model_get_runtime_descriptor(CKModelRuntimeDescriptorV8 *out, size_t size
         .artifact_role=CK_MODEL_ROLE_DECODER, .context_length=16, .vocab_size=4};
     return 0;
 }
-int ck_model_init(const char *weights) { (void)weights; bound_hi=bound_lo=0; return 0; }
+int ck_model_init(const char *weights) {
+    (void)weights; bound_hi=bound_lo=state_word=0; position=0; return 0;
+}
 void ck_model_free(void) { bound_hi=bound_lo=0; }
 int ck_model_embed_tokens(const int32_t *tokens, int count) {
-    (void)tokens; (void)count; return 0;
+    embed_seen_state = state_word;
+    if (fail_embed_once) { fail_embed_once = 0; return -1; }
+    if (count <= 0 || !tokens) return -1;
+    for (int i=0; i<count; ++i) state_word += (uint64_t)tokens[i];
+    position += count;
+    if (cancel_embed_once) {
+        cancel_embed_once = 0;
+        if (cancel_flag) atomic_store((atomic_int *)cancel_flag, 1);
+    }
+    return 0;
 }
+void ck_model_kv_cache_reset(void) { state_word=0; position=0; }
+void ck_model_set_cancel_flag(const atomic_int *flag) { cancel_flag=flag; }
 int ck_model_forward(float *out) { if (out) memcpy(out, logits, sizeof(logits)); return 0; }
 int ck_model_decode(int32_t token, float *out) {
-    (void)token; return ck_model_forward(out);
+    state_word += (uint64_t)token; ++position; return ck_model_forward(out);
 }
+int ck_model_get_active_tokens(void) { return position; }
+int ck_model_get_vocab_size(void) { return 4; }
+float *ck_model_get_logits(void) { return logits; }
+int ck_model_get_logits_stride(void) { return 0; }
+int ck_model_can_encode_text(void) { return 1; }
 int ck_model_encode_text(const char *text, int length) {
-    (void)text; (void)length; return 1;
+    (void)length; token_ids[0] = text && text[0] == 'B' ? 2 : 1;
+    return text && text[0] == 'M' ? 2 : 1;
 }
 const int32_t *ck_model_get_token_buffer(void) { return token_ids; }
 int ck_model_decode_tokens(const int32_t *tokens, int count, char *text, int capacity) {
@@ -400,6 +473,9 @@ int ck_model_decode_tokens(const int32_t *tokens, int count, char *text, int cap
     if (capacity < 2 || !text) return 1;
     text[0]='x'; text[1]=0; return 1;
 }
+#ifndef OMIT_DEFAULT
+uint64_t ck_model_sequence_state_default(void) { return 7; }
+#endif
 #ifndef OMIT_BIND
 int ck_model_sequence_checkpoint_bind_instance(uint64_t hi, uint64_t lo) {
     bound_hi=hi; bound_lo=lo; return (hi|lo) ? 0 : -1;
@@ -413,26 +489,66 @@ int ck_model_sequence_checkpoint_requirements(size_t *bytes, size_t *alignment) 
 #endif
 #ifndef OMIT_SAVE
 int ck_model_sequence_checkpoint_save(uint64_t handle, void *out, size_t bytes) {
-    (void)handle; (void)out; (void)bytes; return 0;
+    if (handle != 7 || !out || bytes != 64) return -1;
+    uint64_t data[4] = {bound_hi, bound_lo, state_word, (uint64_t)position};
+    memcpy(out, data, sizeof(data));
+    return 0;
 }
 #endif
 #ifndef OMIT_RESTORE
 int ck_model_sequence_checkpoint_restore(uint64_t handle, const void *in,
                                          size_t bytes) {
-    (void)handle; (void)in; (void)bytes; return 0;
+    if (handle != 7 || !in || bytes != 64) return -1;
+    if (atomic_load(&hold_restore)) {
+        atomic_store(&entered_restore, 1);
+        while (atomic_load(&hold_restore)) sched_yield();
+    }
+    const uint64_t *data = (const uint64_t *)in;
+    if (data[0] != bound_hi || data[1] != bound_lo) return -2;
+    state_word = data[2];
+    position = (int)data[3];
+    return 0;
 }
 #endif
 uint64_t ck_fake_bound_hi(void) { return bound_hi; }
 uint64_t ck_fake_bound_lo(void) { return bound_lo; }
+uint64_t ck_fake_state(void) { return state_word; }
+uint64_t ck_fake_embed_seen_state(void) { return embed_seen_state; }
+void ck_fake_set_state(uint64_t value) { state_word = value; }
+void ck_fake_fail_embed_once(void) { fail_embed_once = 1; }
+void ck_fake_cancel_embed_once(void) { cancel_embed_once = 1; }
+void ck_fake_hold_restore(int hold) { atomic_store(&hold_restore, hold); }
+int ck_fake_restore_entered(void) { return atomic_load(&entered_restore); }
+void ck_fake_make_snapshot(void *out, uint64_t value, uint64_t pos) {
+    uint64_t data[4] = {bound_hi, bound_lo, value, pos};
+    memcpy(out, data, sizeof(data));
+}
 '''
         driver = r'''
+#define _POSIX_C_SOURCE 200112L
 #include "ck_session_v8.h"
 #include <assert.h>
 #include <dlfcn.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <pthread.h>
+#include <sched.h>
 typedef uint64_t (*nonce_fn)(void);
+typedef void (*set_fn)(uint64_t);
+typedef void (*snapshot_fn)(void *, uint64_t, uint64_t);
+typedef void (*trigger_fn)(void);
+typedef void (*hold_fn)(int);
+typedef int (*entered_fn)(void);
+typedef struct { CKSessionV8 *session; void *snapshot; size_t bytes; int status; } RestoreJob;
+static void *restore_thread(void *arg) {
+    RestoreJob *job = (RestoreJob *)arg;
+    job->status = ck_session_v8_checkpoint_restore(
+        job->session, job->snapshot, job->bytes);
+    return NULL;
+}
 int main(int argc, char **argv) {
-    assert(argc == 7);
+    assert(argc == 8);
     CKSessionConfigV8 config = {.struct_size=sizeof(config),
         .abi_version=CK_SESSION_ABI_V8_VERSION,
         .model_library_path=argv[1], .weights_path=argv[2],
@@ -445,11 +561,114 @@ int main(int argc, char **argv) {
     nonce_fn high = (nonce_fn)dlsym(model, "ck_fake_bound_hi");
     nonce_fn low = (nonce_fn)dlsym(model, "ck_fake_bound_lo");
     assert(high && low && (high() | low()));
+    nonce_fn get_state = (nonce_fn)dlsym(model, "ck_fake_state");
+    nonce_fn get_embed_seen = (nonce_fn)dlsym(model, "ck_fake_embed_seen_state");
+    set_fn set_state = (set_fn)dlsym(model, "ck_fake_set_state");
+    trigger_fn fail_embed = (trigger_fn)dlsym(model, "ck_fake_fail_embed_once");
+    trigger_fn cancel_embed = (trigger_fn)dlsym(model, "ck_fake_cancel_embed_once");
+    snapshot_fn make_snapshot = (snapshot_fn)dlsym(model, "ck_fake_make_snapshot");
+    hold_fn hold_restore = (hold_fn)dlsym(model, "ck_fake_hold_restore");
+    entered_fn restore_entered = (entered_fn)dlsym(model, "ck_fake_restore_entered");
+    assert(get_state && get_embed_seen && set_state && make_snapshot &&
+           fail_embed && cancel_embed && hold_restore && restore_entered);
+    size_t bytes = 0, alignment = 0;
+    assert(ck_session_v8_checkpoint_requirements(session, &bytes, &alignment) == 0);
+    assert(bytes == 64 && alignment == 64);
+    void *snapshot = NULL;
+    assert(posix_memalign(&snapshot, alignment, bytes) == 0);
+    assert(ck_session_v8_checkpoint_save(session, snapshot, bytes) ==
+           CK_SESSION_V8_ERROR_INVALID_ARGUMENT);
+    make_snapshot(snapshot, 123, 1);
+    assert(ck_session_v8_checkpoint_restore(session, snapshot, bytes) == 0);
+    assert(get_state() == 123);
+    set_state(456);
+    assert(ck_session_v8_checkpoint_save(session, snapshot, bytes) == 0);
+    set_state(789);
+    assert(ck_session_v8_checkpoint_restore(session, snapshot, bytes) == 0);
+    assert(get_state() == 456);
+    hold_restore(1);
+    RestoreJob job = {.session=session, .snapshot=snapshot, .bytes=bytes, .status=123};
+    pthread_t worker;
+    assert(pthread_create(&worker, NULL, restore_thread, &job) == 0);
+    while (!restore_entered()) sched_yield();
+    assert(ck_session_v8_checkpoint_requirements(session, &bytes, &alignment) ==
+           CK_SESSION_V8_ERROR_BUSY);
+    assert(ck_session_v8_checkpoint_save(session, snapshot, bytes) ==
+           CK_SESSION_V8_ERROR_BUSY);
+    hold_restore(0);
+    assert(pthread_join(worker, NULL) == 0 && job.status == 0);
+    assert(ck_session_v8_reset(session) == 0);
+    assert(ck_session_v8_checkpoint_save(session, snapshot, bytes) ==
+           CK_SESSION_V8_ERROR_INVALID_ARGUMENT);
+    CKSessionGenerateRequestV8 request = {.struct_size=sizeof(request),
+        .abi_version=CK_SESSION_ABI_V8_VERSION, .user_text="A",
+        .max_tokens=1, .flags=CK_SESSION_REQUEST_RAW_PROMPT |
+        CK_SESSION_REQUEST_REJECT_PROMPT_TRUNCATION};
+    CKSessionGenerateResultV8 result = {.struct_size=sizeof(result),
+        .abi_version=CK_SESSION_ABI_V8_VERSION};
+    assert(ck_session_v8_generate(session, &request, NULL, NULL, &result) == 0);
+    assert(get_state() == 1 && result.stop_reason == CK_SESSION_STOP_TOKEN_LIMIT);
+    assert(ck_session_v8_checkpoint_save(session, snapshot, bytes) == 0);
+    void *saved_a = NULL;
+    assert(posix_memalign(&saved_a, alignment, bytes) == 0);
+    memcpy(saved_a, snapshot, bytes);
+    request.user_text = "B";
+    assert(ck_session_v8_generate(session, &request, NULL, NULL, &result) == 0);
+    assert(get_state() == 2);
+    assert(ck_session_v8_checkpoint_restore(session, saved_a, bytes) == 0);
+    request.user_text = "suffix";
+    request.flags = CK_SESSION_REQUEST_RAW_PROMPT |
+                    CK_SESSION_REQUEST_CONTINUE_STATE |
+                    CK_SESSION_REQUEST_REJECT_PROMPT_TRUNCATION;
+    request.flags &= ~CK_SESSION_REQUEST_RAW_PROMPT;
+    assert(ck_session_v8_generate(session, &request, NULL, NULL, &result) ==
+           CK_SESSION_V8_ERROR_INVALID_ARGUMENT);
+    assert(get_state() == 1);
+    request.flags |= CK_SESSION_REQUEST_RAW_PROMPT;
+    request.user_text = "MULTI";
+    assert(ck_session_v8_generate(session, &request, NULL, NULL, &result) ==
+           CK_SESSION_V8_ERROR_INVALID_ARGUMENT);
+    assert(get_state() == 1);
+    request.user_text = "suffix";
+    assert(ck_session_v8_generate(session, &request, NULL, NULL, &result) == 0);
+    assert(get_embed_seen() == 1 && get_state() == 2);
+    assert(ck_session_v8_checkpoint_save(session, snapshot, bytes) == 0);
+    make_snapshot(snapshot, 456, 15);
+    assert(ck_session_v8_checkpoint_restore(session, snapshot, bytes) == 0);
+    request.max_tokens = 2;
+    assert(ck_session_v8_generate(session, &request, NULL, NULL, &result) ==
+           CK_SESSION_V8_ERROR_INVALID_ARGUMENT);
+    assert(strstr(ck_session_v8_last_error(session), "context") != NULL);
+    assert(get_state() == 456);
+    assert(ck_session_v8_checkpoint_save(session, snapshot, bytes) == 0);
+    request.max_tokens = 1;
+    assert(ck_session_v8_checkpoint_restore(session, saved_a, bytes) == 0);
+    fail_embed();
+    assert(ck_session_v8_generate(session, &request, NULL, NULL, &result) ==
+           CK_SESSION_V8_ERROR_RUNTIME);
+    assert(ck_session_v8_checkpoint_save(session, snapshot, bytes) ==
+           CK_SESSION_V8_ERROR_INVALID_ARGUMENT);
+    assert(ck_session_v8_checkpoint_restore(session, saved_a, bytes) == 0);
+    cancel_embed();
+    assert(ck_session_v8_generate(session, &request, NULL, NULL, &result) == 0);
+    assert(result.stop_reason == CK_SESSION_STOP_CANCELLED);
+    assert(ck_session_v8_checkpoint_save(session, snapshot, bytes) ==
+           CK_SESSION_V8_ERROR_INVALID_ARGUMENT);
+    request.flags = CK_SESSION_REQUEST_RAW_PROMPT;
+    request.user_text = "A";
+    assert(ck_session_v8_generate(session, &request, NULL, NULL, &result) == 0);
+    assert(get_state() == 1);
     uint64_t first_hi=high(), first_lo=low();
     ck_session_v8_close(session);
     assert(ck_session_v8_open(&config, &session) == CK_SESSION_V8_OK && session);
     assert(high() != first_hi || low() != first_lo);
+    set_state(999);
+    assert(ck_session_v8_checkpoint_restore(session, snapshot, bytes) ==
+           CK_SESSION_V8_ERROR_INVALID_ARGUMENT);
+    assert(get_state() == 999);
     ck_session_v8_close(session);
+    free(snapshot);
+    free(saved_a);
     dlclose(model);
     for (int i=3; i<argc; ++i) {
         config.model_library_path=argv[i];
@@ -472,7 +691,7 @@ int main(int argc, char **argv) {
             source = folder / "fake.c"
             source.write_text(model)
             paths = []
-            for omitted in (None, "BIND", "REQUIREMENTS", "SAVE", "RESTORE"):
+            for omitted in (None, "DEFAULT", "BIND", "REQUIREMENTS", "SAVE", "RESTORE"):
                 path = folder / ("libvalid.so" if omitted is None else
                                  f"libmissing_{omitted.lower()}.so")
                 command = ["cc", "-std=c11", "-shared", "-fPIC", "-I", str(root / "include")]
@@ -489,14 +708,14 @@ int main(int argc, char **argv) {
             compiled = subprocess.run(
                 ["cc", "-std=c11", "-I", str(root / "include"),
                  str(driver_source), "-L", str(build), "-lck_session_v8",
-                 "-ldl", f"-Wl,-rpath,{build}", "-o", str(driver_exe)],
+                 "-ldl", "-pthread", f"-Wl,-rpath,{build}", "-o", str(driver_exe)],
                 capture_output=True, text=True,
             )
             self.assertEqual(compiled.returncode, 0, compiled.stderr)
             executed = subprocess.run(
                 [str(driver_exe), str(paths[0]), str(folder / "weights.bump"),
                  *(str(path) for path in paths[1:])],
-                capture_output=True, text=True,
+                capture_output=True, text=True, timeout=15,
             )
             self.assertEqual(executed.returncode, 0, executed.stderr)
 

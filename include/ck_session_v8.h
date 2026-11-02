@@ -57,8 +57,11 @@ enum CKSessionRequestFlagsV8 {
     CK_SESSION_REQUEST_RAW_PROMPT = UINT32_C(1) << 0,
     CK_SESSION_REQUEST_IGNORE_EOS = UINT32_C(1) << 1,
     CK_SESSION_REQUEST_TIMESTAMPS = UINT32_C(1) << 2,
-    /* Requests reset generated recurrent/KV state by default. Set this only
-     * when the caller deliberately continues the preceding request. */
+    /* Requests reset generated recurrent/KV state by default. Continuation
+     * requires RAW_PROMPT, a completed prior forward or successful restore,
+     * and exactly one raw suffix token whose tokenization is bound by the caller to the
+     * saved exact prefix. Existing position + suffix + output reservation
+     * must fit the selected context; overflow is rejected before mutation. */
     CK_SESSION_REQUEST_CONTINUE_STATE = UINT32_C(1) << 3,
     /* Fail the request instead of silently truncating a prompt that does not
      * fit the remaining context budget. Serving layers set this so their
@@ -190,6 +193,21 @@ void ck_session_v8_cancel(CKSessionV8 *session);
 int ck_session_v8_get_progress(CKSessionV8 *session, CKSessionProgressV8 *progress);
 int ck_session_v8_reset(CKSessionV8 *session);
 const char *ck_session_v8_last_error(const CKSessionV8 *session);
+
+/* Checkpoint the default sequence at a completed forward boundary. These
+ * calls serialize with generate/reset and return BUSY while either is active.
+ * Storage is caller-owned and must meet the reported alignment and size.
+ * A restore is valid only for the same loaded model instance. The caller must
+ * bind the snapshot to exact rendered token IDs and execution policy; these
+ * APIs do not save logits, sampler state or any HTTP request state. A failed
+ * or cancelled forward must be reset before saving another checkpoint. */
+int ck_session_v8_checkpoint_requirements(CKSessionV8 *session,
+                                          size_t *bytes, size_t *alignment);
+int ck_session_v8_checkpoint_save(CKSessionV8 *session,
+                                  void *snapshot, size_t snapshot_bytes);
+int ck_session_v8_checkpoint_restore(CKSessionV8 *session,
+                                     const void *snapshot,
+                                     size_t snapshot_bytes);
 
 /* Optional bounded two-slot decode mode. This mode owns the generated model
  * until close and is mutually exclusive with generate/reset. Both prompts are

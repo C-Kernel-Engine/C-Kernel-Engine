@@ -1586,7 +1586,8 @@ def _inject_strict_vision_encoder_oracle(code: str, layout_obj: Dict[str, Any]) 
 
 
 def _inject_activation_lookup_api(
-    code: str, layout_obj: Dict[str, Any], *, sequence_switch: bool = False
+    code: str, layout_obj: Dict[str, Any], *, sequence_switch: bool = False,
+    sequence_recurrent: bool = False,
 ) -> str:
     act_buffers = (layout_obj.get("memory", {}) or {}).get("activations", {}).get("buffers", []) or []
     if not act_buffers:
@@ -1636,14 +1637,19 @@ def _inject_activation_lookup_api(
     if not cases:
         return code
 
-    kv_offset_guard = (
-        '    if (g_model && name && strcmp(name, "kv_cache") == 0 && '
-        'g_model->kv_cache != (float *)(g_model->bump + A_KV_CACHE)) return -1;\n'
-        if sequence_switch else ""
+    state_pointers = (("kv_cache", "kv_cache"),) if sequence_switch else ()
+    if sequence_recurrent:
+        state_pointers += (("recurrent_conv_state", "recurrent_conv_state"),
+                           ("recurrent_ssm_state", "recurrent_ssm_state"))
+    state_offset_guard = "".join(
+        f'    if (g_model && name && strcmp(name, "{name}") == 0 && '
+        f'g_model->{member} != (float *)(g_model->bump + A_{name.upper()})) return -1;\n'
+        for name, member in state_pointers
     )
-    kv_pointer_guard = (
-        '    if (name && strcmp(name, "kv_cache") == 0) return (uintptr_t)g_model->kv_cache;\n'
-        if sequence_switch else ""
+    state_pointer_guard = "".join(
+        f'    if (name && strcmp(name, "{name}") == 0) '
+        f'return (uintptr_t)g_model->{member};\n'
+        for name, member in state_pointers
     )
     block = """/* v8 activation lookup helpers for external hosts */
 static int ck_lookup_named_activation_info(const char *name, size_t *offset_out, size_t *size_out) {
@@ -1654,7 +1660,7 @@ static int ck_lookup_named_activation_info(const char *name, size_t *offset_out,
 
 CK_EXPORT intptr_t ck_model_get_named_activation_runtime_offset(const char *name) {
     size_t offset = 0;
-{kv_offset_guard}
+{state_offset_guard}
     if (!ck_lookup_named_activation_info(name, &offset, NULL)) return -1;
     return (intptr_t)offset;
 }
@@ -1668,13 +1674,13 @@ CK_EXPORT intptr_t ck_model_get_named_activation_nbytes(const char *name) {
 CK_EXPORT uintptr_t ck_model_get_named_activation_ptr(const char *name) {
     size_t offset = 0;
     if (!g_model) return (uintptr_t)0;
-{kv_pointer_guard}
+{state_pointer_guard}
     if (!ck_lookup_named_activation_info(name, &offset, NULL)) return (uintptr_t)0;
     return (uintptr_t)(g_model->bump + offset);
 }
 """.replace("{cases}", "\n".join(cases)).replace(
-        "{kv_offset_guard}", kv_offset_guard
-    ).replace("{kv_pointer_guard}", kv_pointer_guard)
+        "{state_offset_guard}", state_offset_guard
+    ).replace("{state_pointer_guard}", state_pointer_guard)
     return code + "\n\n" + block
 
 
@@ -2933,10 +2939,12 @@ def main(argv: list[str] | None = None) -> int:
 
         sequence_config = dict(ir_obj.get("config", {}) or {})
         sequence_config.update(layout_obj.get("config", {}) or {})
-        sequence_switch = bool(resolve_sequence_state_contract(
-            layout_obj, sequence_config, ir_obj.get("operations", ir_obj.get("ops", []))))
+        sequence_contract = resolve_sequence_state_contract(
+            layout_obj, sequence_config, ir_obj.get("operations", ir_obj.get("ops", [])))
         code = _inject_activation_lookup_api(
-            code, layout_obj, sequence_switch=sequence_switch
+            code, layout_obj, sequence_switch=bool(sequence_contract),
+            sequence_recurrent=bool(sequence_contract and
+                                    "recurrent_conv_state_bytes" in sequence_contract),
         )
         include_marker = "#include <math.h>"
         abi_include = '#include "ck_model_abi_v8.h"'
