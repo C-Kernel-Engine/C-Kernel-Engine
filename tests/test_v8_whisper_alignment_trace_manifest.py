@@ -77,6 +77,14 @@ class WhisperAlignmentTraceManifestTest(unittest.TestCase):
                           for w in words],
                          [("Hello", 0, 1), ("world", 1, 2), ("again", 2, 3)])
 
+    def test_last_attention_frame_cannot_extend_word_past_source_audio(self):
+        interval = aligner._physical_word_interval(1249, 1260, 0.0, .02, 25.1965)
+        self.assertEqual(interval, (24.98, 25.1965, True))
+        self.assertEqual(aligner._physical_word_interval(1, 2, 3.125, .02, 4.0),
+                         (3.145, 3.165, False))
+        self.assertIsNone(aligner._physical_word_interval(1260, 1261, 0.0,
+                                                          .02, 25.1965))
+
     def test_trace_identity_and_normalization_rejected_before_alignment(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "trace.npz"
