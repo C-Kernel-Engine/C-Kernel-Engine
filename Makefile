@@ -4568,6 +4568,7 @@ test-v8-dsl-policy: test-source-integrity
 	@$(PYTHON) -m unittest tests.test_v8_kernel_call_abi -v
 	@$(PYTHON) -m unittest tests.test_v8_codegen_capabilities -v
 	@$(PYTHON) -m unittest tests.test_v8_sequence_state_contract -v
+	@$(PYTHON) -m unittest tests.test_v8_sequence_checkpoint -v
 	@$(PYTHON) -m unittest tests.test_v8_two_row_batch_decode -v
 	@$(PYTHON) -m unittest tests.test_v8_dsl_nightly_registration -v
 

@@ -30,10 +30,12 @@ enum CKModelCapabilityV8 {
     /* Serialized state switching only; this does not imply batched arithmetic. */
     CK_MODEL_CAP_SEQUENCE_STATE_SWITCH   = UINT64_C(1) << 16,
     /* Generated M=2 projection work with sequence-local attention/KV. */
-    CK_MODEL_CAP_BATCH_DECODE_TWO_ROWS   = UINT64_C(1) << 17
+    CK_MODEL_CAP_BATCH_DECODE_TWO_ROWS   = UINT64_C(1) << 17,
+    /* Process-local state save/restore for a checked sequence-state layout. */
+    CK_MODEL_CAP_SEQUENCE_CHECKPOINT     = UINT64_C(1) << 18
 };
 
-#define CK_MODEL_CAP_V8_KNOWN_MASK ((UINT64_C(1) << 18) - UINT64_C(1))
+#define CK_MODEL_CAP_V8_KNOWN_MASK ((UINT64_C(1) << 19) - UINT64_C(1))
 
 enum CKGenerationFlagsV8 {
     CK_GENERATION_FLAG_TIMESTAMPS = 1u << 0
@@ -84,6 +86,25 @@ typedef int (*ck_model_sequence_state_create_v8_fn)(void *arena, size_t arena_by
                                                     uint64_t *handle_out);
 typedef int (*ck_model_sequence_state_activate_v8_fn)(uint64_t handle);
 typedef int (*ck_model_sequence_state_destroy_v8_fn)(uint64_t handle);
+
+/* Optional with CK_MODEL_CAP_SEQUENCE_CHECKPOINT. These operations are
+ * serialized with all model execution and used only at a successful forward
+ * boundary; a failed or cancelled forward requires reset. The caller owns aligned snapshot
+ * storage and must bind its exact token prefix and loaded artifact identity;
+ * generated snapshots validate a fresh host-issued 128-bit instance nonce and state
+ * layout. They are not a portable disk or cross-process format. Invalid or
+ * corrupt snapshots must leave the destination sequence unchanged. Logits are
+ * not saved; a caller must execute a new token before sampling from restored
+ * state, or separately retain validated logits for an exact-prefix hit. */
+typedef int (*ck_model_sequence_checkpoint_bind_instance_v8_fn)(uint64_t nonce_hi,
+                                                               uint64_t nonce_lo);
+typedef int (*ck_model_sequence_checkpoint_requirements_v8_fn)(size_t *bytes,
+                                                               size_t *alignment);
+typedef int (*ck_model_sequence_checkpoint_save_v8_fn)(uint64_t handle,
+                                                       void *out, size_t out_bytes);
+typedef int (*ck_model_sequence_checkpoint_restore_v8_fn)(uint64_t handle,
+                                                          const void *snapshot,
+                                                          size_t snapshot_bytes);
 
 /* Optional when CK_MODEL_CAP_BATCH_DECODE_TWO_ROWS is set. The first version
  * accepts two distinct sequence handles with one token each. row_offset and

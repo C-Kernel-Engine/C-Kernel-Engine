@@ -19,6 +19,9 @@ def emit_sequence_state_api(contract: dict[str, int] | None = None) -> str:
 #ifndef CK_SEQ_ARENA_BYTES
 #define CK_SEQ_ARENA_BYTES KV_CACHE_SIZE
 #endif
+#ifndef MAX_SEQ_LEN
+#define MAX_SEQ_LEN INT32_MAX
+#endif
 /* Execution is serialized. Handles are generation-tagged IDs, never pointers. */
 typedef struct CKSequenceStateV8 {
     uint8_t *kv;
@@ -37,6 +40,68 @@ typedef struct CKSequenceStateV8 {
 static CKSequenceStateV8 g_sequence_states[3];
 static CKSequenceStateV8 *g_active_sequence = NULL;
 static uint64_t g_sequence_generation = 0;
+static uint64_t g_sequence_model_epoch = 1;
+static uint64_t g_sequence_instance_nonce_hi = 0;
+static uint64_t g_sequence_instance_nonce_lo = 0;
+static int g_sequence_instance_bound = 0;
+
+/* Checkpoints are process-local and caller-owned. The host must additionally
+ * bind them to the exact model artifact and token prefix before reuse. */
+typedef struct CKSequenceCheckpointV8 {
+    uint64_t magic;
+    uint64_t model_epoch;
+    uint64_t instance_nonce_hi;
+    uint64_t instance_nonce_lo;
+    uint64_t state_bytes;
+    uint64_t checksum;
+    int32_t pos;
+    int32_t rope_pos;
+} CKSequenceCheckpointV8;
+
+#define CK_SEQUENCE_CHECKPOINT_MAGIC UINT64_C(0x314b504351534b43)
+
+static uint64_t ck_sequence_checkpoint_hash(const CKSequenceCheckpointV8 *head,
+                                            const uint8_t *payload) {
+    uint64_t hash = UINT64_C(14695981039346656037);
+    const uint64_t fields[] = {
+        head->magic, head->model_epoch,
+        head->instance_nonce_hi, head->instance_nonce_lo,
+        head->state_bytes, (uint64_t)(uint32_t)head->pos,
+        (uint64_t)(uint32_t)head->rope_pos,
+    };
+    for (size_t i = 0; i < sizeof(fields) / sizeof(fields[0]); ++i) {
+        uint64_t value = fields[i];
+        for (unsigned byte = 0; byte < 8; ++byte) {
+            hash = (hash ^ (uint8_t)value) * UINT64_C(1099511628211);
+            value >>= 8;
+        }
+    }
+    for (size_t i = 0; i < (size_t)head->state_bytes; ++i)
+        hash = (hash ^ payload[i]) * UINT64_C(1099511628211);
+    return hash;
+}
+
+static int ck_sequence_checkpoint_disjoint(const void *memory, size_t bytes) {
+    uintptr_t start = (uintptr_t)memory;
+    if (!memory || start > UINTPTR_MAX - bytes) return 0;
+    uintptr_t end = start + bytes;
+    uintptr_t descriptors = (uintptr_t)&g_sequence_states[0];
+    if (start < descriptors + sizeof(g_sequence_states) &&
+        descriptors < end) return 0;
+    uintptr_t model_object = (uintptr_t)g_model;
+    if (start < model_object + sizeof(*g_model) && model_object < end) return 0;
+    uintptr_t model = (uintptr_t)g_model->bump;
+    if (g_model->bump_size && model <= UINTPTR_MAX - g_model->bump_size &&
+        start < model + g_model->bump_size && model < end) return 0;
+    for (unsigned i = 1; i < 3; ++i) {
+        const CKSequenceStateV8 *state = &g_sequence_states[i];
+        if (!state->occupied) continue;
+        uintptr_t arena = (uintptr_t)state->kv;
+        if (arena > UINTPTR_MAX - (size_t)CK_SEQ_ARENA_BYTES ||
+            (start < arena + (size_t)CK_SEQ_ARENA_BYTES && arena < end)) return 0;
+    }
+    return 1;
+}
 
 static uint64_t ck_sequence_new_id(unsigned slot) {
     if (g_sequence_generation >= (UINT64_MAX >> 2)) return 0;
@@ -68,6 +133,10 @@ static void ck_sequence_ensure_default(void) {
 static void ck_sequence_release_all(void) {
     memset(g_sequence_states, 0, sizeof(g_sequence_states));
     g_active_sequence = NULL;
+    g_sequence_instance_nonce_hi = 0;
+    g_sequence_instance_nonce_lo = 0;
+    g_sequence_instance_bound = 0;
+    if (g_sequence_model_epoch != UINT64_MAX) ++g_sequence_model_epoch;
 }
 
 CK_EXPORT int ck_model_sequence_state_requirements(size_t *bytes, size_t *alignment) {
@@ -166,6 +235,92 @@ CK_EXPORT int ck_model_sequence_state_destroy(uint64_t handle) {
     if (state == g_active_sequence &&
         ck_model_sequence_state_activate(g_sequence_states[0].generation) != 0) return -1;
     memset(state, 0, sizeof(*state));
+    return 0;
+}
+
+/* The owner issues a fresh 128-bit nonce after each successful model init.
+ * Never derive it from DSO or heap addresses, which may repeat after dlclose. */
+CK_EXPORT int ck_model_sequence_checkpoint_bind_instance(uint64_t nonce_hi,
+                                                        uint64_t nonce_lo) {
+    if (!g_model || g_sequence_instance_bound || !(nonce_hi | nonce_lo)) return -1;
+    g_sequence_instance_nonce_hi = nonce_hi;
+    g_sequence_instance_nonce_lo = nonce_lo;
+    g_sequence_instance_bound = 1;
+    return 0;
+}
+
+CK_EXPORT int ck_model_sequence_checkpoint_requirements(size_t *bytes,
+                                                        size_t *alignment) {
+    if (!bytes || !alignment || !g_model || !g_sequence_instance_bound ||
+        CK_SEQ_ARENA_BYTES > SIZE_MAX - sizeof(CKSequenceCheckpointV8))
+        return -1;
+    *bytes = sizeof(CKSequenceCheckpointV8) + (size_t)CK_SEQ_ARENA_BYTES;
+    *alignment = 64;
+    return 0;
+}
+
+CK_EXPORT int ck_model_sequence_checkpoint_save(uint64_t handle, void *out,
+                                               size_t out_bytes) {
+    size_t needed = 0, alignment = 0;
+    if (ck_model_sequence_checkpoint_requirements(&needed, &alignment) != 0 ||
+        !out || ((uintptr_t)out & (alignment - 1)) || out_bytes < needed ||
+        !ck_sequence_checkpoint_disjoint(out, needed)) return -2;
+    CKSequenceStateV8 *state = ck_sequence_find(handle);
+    if (!state) return -1;
+    const int pos = state == g_active_sequence ? g_model->pos : state->pos;
+    const int rope_pos = state == g_active_sequence ? g_model->rope_pos : state->rope_pos;
+    if (pos < 0 || pos > MAX_SEQ_LEN || rope_pos < 0) return -2;
+    CKSequenceCheckpointV8 head = {
+        .magic = CK_SEQUENCE_CHECKPOINT_MAGIC,
+        .model_epoch = g_sequence_model_epoch,
+        .instance_nonce_hi = g_sequence_instance_nonce_hi,
+        .instance_nonce_lo = g_sequence_instance_nonce_lo,
+        .state_bytes = (uint64_t)CK_SEQ_ARENA_BYTES,
+        .pos = pos, .rope_pos = rope_pos,
+    };
+    uint8_t *payload = (uint8_t *)out + sizeof(head);
+    memset(payload, 0, (size_t)CK_SEQ_ARENA_BYTES);
+    memcpy(payload, state->kv, (size_t)KV_CACHE_SIZE);
+#ifdef CK_SEQ_CONV_BYTES
+    memcpy(payload + CK_SEQ_CONV_OFFSET, state->conv, (size_t)CK_SEQ_CONV_BYTES);
+    memcpy(payload + CK_SEQ_SSM_OFFSET, state->ssm, (size_t)CK_SEQ_SSM_BYTES);
+#endif
+    head.checksum = ck_sequence_checkpoint_hash(&head, payload);
+    memcpy(out, &head, sizeof(head));
+    return 0;
+}
+
+CK_EXPORT int ck_model_sequence_checkpoint_restore(uint64_t handle,
+                                                  const void *snapshot,
+                                                  size_t snapshot_bytes) {
+    size_t needed = 0, alignment = 0;
+    if (ck_model_sequence_checkpoint_requirements(&needed, &alignment) != 0 ||
+        !snapshot || ((uintptr_t)snapshot & (alignment - 1)) ||
+        snapshot_bytes != needed ||
+        !ck_sequence_checkpoint_disjoint(snapshot, needed)) return -2;
+    CKSequenceStateV8 *state = ck_sequence_find(handle);
+    if (!state) return -1;
+    CKSequenceCheckpointV8 head;
+    memcpy(&head, snapshot, sizeof(head));
+    const uint8_t *payload = (const uint8_t *)snapshot + sizeof(head);
+    if (head.magic != CK_SEQUENCE_CHECKPOINT_MAGIC ||
+        head.model_epoch != g_sequence_model_epoch ||
+        head.instance_nonce_hi != g_sequence_instance_nonce_hi ||
+        head.instance_nonce_lo != g_sequence_instance_nonce_lo ||
+        head.state_bytes != (uint64_t)CK_SEQ_ARENA_BYTES ||
+        head.pos < 0 || head.pos > MAX_SEQ_LEN || head.rope_pos < 0 ||
+        head.checksum != ck_sequence_checkpoint_hash(&head, payload)) return -2;
+    memcpy(state->kv, payload, (size_t)KV_CACHE_SIZE);
+#ifdef CK_SEQ_CONV_BYTES
+    memcpy(state->conv, payload + CK_SEQ_CONV_OFFSET, (size_t)CK_SEQ_CONV_BYTES);
+    memcpy(state->ssm, payload + CK_SEQ_SSM_OFFSET, (size_t)CK_SEQ_SSM_BYTES);
+#endif
+    state->pos = head.pos;
+    state->rope_pos = head.rope_pos;
+    if (state == g_active_sequence) {
+        g_model->pos = head.pos;
+        g_model->rope_pos = head.rope_pos;
+    }
     return 0;
 }
 '''
