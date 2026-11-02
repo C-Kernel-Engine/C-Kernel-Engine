@@ -36,6 +36,7 @@ def test_optional_prefix_lane_missing_assets_is_not_tested(tmp_path):
         "ids": str(tmp_path / "missing.ids.json"),
         "cases": [{"prefix": 128, "suffix": 9}],
         "artifact_sha256": {}, "session_sha256": "b" * 64,
+        "ids_sha256": "c" * 64,
     }))
     row = lane._prefix_certification(config, tmp_path, paused=False)
     assert row["status"] == "NOT_TESTED"
@@ -62,6 +63,7 @@ def test_optional_prefix_lane_requires_pinned_pass_report(tmp_path, monkeypatch)
                                          "model_v8.c", "weights.bump",
                                          "weights_manifest.map", "config.json")},
         "session_sha256": hashlib.sha256(session.read_bytes()).hexdigest(),
+        "ids_sha256": hashlib.sha256(ids.read_bytes()).hexdigest(),
     }))
 
     def fake_invoke(command, **_kwargs):
@@ -70,6 +72,7 @@ def test_optional_prefix_lane_requires_pinned_pass_report(tmp_path, monkeypatch)
             "verdict": "PASS",
             "artifact_sha256": config_doc["artifact_sha256"],
             "session_library_sha256": config_doc["session_sha256"],
+            "ids_sha256": config_doc["ids_sha256"],
         }))
         return 0
 

@@ -171,6 +171,7 @@ def _prefix_certification(config_path: Path, run_dir: Path,
               for name in artifact_names]
     pinned.append(("session_library", paths["session_library"],
                    config.get("session_sha256")))
+    pinned.append(("ids", paths["ids"], config.get("ids_sha256")))
     for name, path, expected in pinned:
         if (not isinstance(expected, str) or len(expected) != 64 or
                 any(char not in "0123456789abcdef" for char in expected)):
@@ -210,10 +211,12 @@ def _prefix_certification(config_path: Path, run_dir: Path,
             return row
         reported_artifacts = observed.get("artifact_sha256") or {}
         reported_session = observed.get("session_library_sha256")
+        reported_ids = observed.get("ids_sha256")
         if (code != 0 or verdict != "PASS" or
                 any(reported_artifacts.get(name) != bundle_hashes[name]
                     for name in artifact_names) or
-                reported_session != config["session_sha256"]):
+                reported_session != config["session_sha256"] or
+                reported_ids != config["ids_sha256"]):
             row.update(status="FAIL", reason="prefix parity case failed")
             return row
     row["status"] = "PASS"
