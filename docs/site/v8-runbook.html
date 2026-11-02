@@ -2949,6 +2949,17 @@ qwen --bare \
         time, complete server request time, and time outside native generation. Client tool execution
         occurs between requests and must be timed separately.
     </p>
+    <h4>Experimental exact-prefix checkpoints</h4>
+    <p>On a separately certified native-session bundle, opt in with
+        <code>--prefix-checkpoint-cache-bytes BYTES</code>. The server keeps one
+        exact-token checkpoint per request owner under a global byte budget;
+        a changed prefix falls back to ordinary prefill. The initial snapshot
+        leaves a bounded tail outside the checkpoint so client-edited trailing
+        prompt items do not invalidate the reusable earlier prefix. Snapshots
+        contain state but no logits, so an exact-prefix hit also takes the
+        ordinary path. The tested 32K Qwen3.8 bundle needs about 2.36 GB per
+        checkpoint. Keep this opt-in on an isolated endpoint until real tool
+        turns demonstrate both correctness and a measured total-time benefit.</p>
     <h4>Optional local harness nightly</h4>
     <p>On a client host with active, identified Qwen and Gemma endpoints and an HTTP client environment containing <code>httpx</code>, run the
         same repeatability config through <code>scripts/local_harness_nightly.py</code>.
