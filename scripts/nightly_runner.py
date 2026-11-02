@@ -1460,6 +1460,10 @@ TEST_SUITES = {
         "Whisper Word Boundary Evaluation Contract", "inference",
         ROOT / "tests" / "test_v8_whisper_word_boundary_eval.py",
     ),
+    "whisper_filler_review": TestSuite(
+        "Whisper Filler Review Contract", "inference",
+        ROOT / "tests" / "test_v8_whisper_filler_review.py",
+    ),
     "tts_kokoro_native_speech_session": TestSuite(
         "Kokoro Native Speech Stop, Replace and Recovery", "inference",
         ROOT / "tests" / "test_v8_kokoro_native_speech_session.py",
