@@ -126,6 +126,22 @@ def test_returned_but_unprocessed_sample_is_not_in_checkpoint_state():
     assert session.restores == [(10,) * 64]
 
 
+def test_bounded_checkpoint_tail_survives_revised_harness_prompt_item():
+    session = FakeSession()
+    session.context_length = 4096
+    session.tokens["initial"] = [10] * 2000
+    session.tokens["continued"] = [10] * 1600 + [20] * 420
+    cache = ExactPrefixCheckpointCache(session, max_bytes=192, identity="instance")
+    first = cache.prepare("initial", output_tokens=4, flags=CK_SESSION_REQUEST_RAW_PROMPT)
+    assert first.candidate is not None
+    assert len(first.candidate[0]) == 1472
+    cache.settle(first, success=True)
+    next_turn = cache.prepare("continued", output_tokens=4,
+                              flags=CK_SESSION_REQUEST_RAW_PROMPT)
+    assert next_turn.reused_tokens == 1472
+    assert next_turn.prompt_ids == tuple([10] * 128 + [20] * 420)
+
+
 def test_a_b_a_replacement_never_restores_wrong_snapshot():
     session = FakeSession()
     cache = ExactPrefixCheckpointCache(session, max_bytes=192, identity="instance")

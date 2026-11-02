@@ -101,12 +101,19 @@ class ExactPrefixCheckpointCache:
                     len(ids), len(prefix), len(suffix_ids), 0.0,
                     monotonic() - started, prompt_ids=tuple(suffix_ids),
                     owner_key=owner_key)
-        # Leave at least two IDs for the normal generation path. An exact
-        # prefix hit has no logits in its snapshot and must use fresh prefill.
-        cut = ((len(ids) - 2) // self.step) * self.step
-        if cut < self.minimum:
+        # Leave a bounded suffix outside the first snapshot. Harnesses may
+        # revise trailing prompt items (for example, removing a first-turn
+        # reminder) before appending a tool result. Exact ID comparison still
+        # decides whether the checkpoint is reusable. Keep at least two IDs
+        # for generation because snapshots contain no logits.
+        latest = ((len(ids) - 2) // self.step) * self.step
+        earliest = ((self.minimum + self.step - 1) // self.step) * self.step
+        if latest < earliest:
             self.misses += 1
             return ordinary
+        tail = min(1024, max(2, len(ids) // 4))
+        target = ((len(ids) - tail) // self.step) * self.step
+        cut = max(earliest, min(latest, target))
         suffix_ids = ids[cut:]
         candidate = SequenceCheckpointV8(self.size, self.snapshot_alignment)
         try:
