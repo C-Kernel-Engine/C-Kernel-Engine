@@ -110,6 +110,22 @@ def test_budget_and_special_token_suffix_uses_exact_ids():
     assert hit.prompt_ids == (255,) * 16 + (1,) * 8
 
 
+def test_returned_but_unprocessed_sample_is_not_in_checkpoint_state():
+    session = FakeSession()
+    session.tokens["first"] = [10] * 80
+    session.tokens["next"] = [10] * 80 + [777]
+    cache = ExactPrefixCheckpointCache(session, max_bytes=192, identity="instance")
+    first = cache.prepare("first", output_tokens=2, flags=CK_SESSION_REQUEST_RAW_PROMPT)
+    assert first.candidate is not None
+    assert first.candidate[0] == (10,) * 64
+    # The model may return token 777 before it is processed into persistent state.
+    cache.settle(first, success=True)
+    next_turn = cache.prepare("next", output_tokens=2, flags=CK_SESSION_REQUEST_RAW_PROMPT)
+    assert next_turn.reused_tokens == 64
+    assert next_turn.prompt_ids == (10,) * 16 + (777,)
+    assert session.restores == [(10,) * 64]
+
+
 def test_a_b_a_replacement_never_restores_wrong_snapshot():
     session = FakeSession()
     cache = ExactPrefixCheckpointCache(session, max_bytes=192, identity="instance")
