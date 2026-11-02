@@ -200,6 +200,8 @@ def main() -> int:
     result = align_trace(report, args.trace, args.decoder_run_dir,
                          args.encoder_run_dir, args.alignment_library,
                          args.window_index)
+    result["provenance"]["run_report_sha256"] = _sha256(args.report)
+    result["provenance"]["audio_sha256"] = report["wav_sha256"]
     args.output.write_text(json.dumps(result, indent=2) + "\n")
     print(f"{result['status']}: {len(result['words'])} words -> {args.output}")
     return 0 if result["status"] == "aligned" else 2
