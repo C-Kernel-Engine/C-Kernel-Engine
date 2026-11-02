@@ -2958,8 +2958,10 @@ qwen --bare \
         prompt items do not invalidate the reusable earlier prefix. Snapshots
         contain state but no logits, so an exact-prefix hit also takes the
         ordinary path. The tested 32K Qwen3.8 bundle needs about 2.36 GB per
-        checkpoint. Keep this opt-in on an isolated endpoint until real tool
-        turns demonstrate both correctness and a measured total-time benefit.</p>
+        checkpoint. One retained Qwen Code read/edit/test trial passed with
+        35,136 reused input tokens and 737 versus 1,442 seconds on the same
+        pinned Ryzen bundle. Keep this opt-in on an isolated endpoint while
+        repeatability and other workloads are certified.</p>
     <h4>Optional local harness nightly</h4>
     <p>On a client host with active, identified Qwen and Gemma endpoints and an HTTP client environment containing <code>httpx</code>, run the
         same repeatability config through <code>scripts/local_harness_nightly.py</code>.
