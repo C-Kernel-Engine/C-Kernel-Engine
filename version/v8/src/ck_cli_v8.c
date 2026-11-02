@@ -174,6 +174,8 @@ typedef struct {
     decode_t decode;
     ck_model_decode_prefill_phase_v8_fn decode_prefill_phase;
     ck_model_prefill_append_row_group_v8_fn prefill_append_row_group;
+    get_int_t prefill_append_min_prefix;
+    get_int_t prefill_append_alignment;
     prefill_t prefill;  /* ck_prefill for batched prefill (optional) */
     write_embeddings_t write_embeddings;
     embed_tokens_at_t embed_tokens_at;
@@ -384,6 +386,7 @@ typedef struct {
     bool continue_state;
     bool state_mutated;
     bool admission_rejected;
+    const char *admission_message;
     const char *system_prompt;
     const char *token_trace_json_path;
     const char *gemm_schedule;
@@ -1868,6 +1871,10 @@ static bool load_model_api(const char *lib_path, ModelAPI *api) {
                    (void **)&api->decode_prefill_phase, false);
     resolve_symbol(api->handle, "ck_model_prefill_append_row_group",
                    (void **)&api->prefill_append_row_group, false);
+    resolve_symbol(api->handle, "ck_model_prefill_append_min_prefix",
+                   (void **)&api->prefill_append_min_prefix, false);
+    resolve_symbol(api->handle, "ck_model_prefill_append_alignment",
+                   (void **)&api->prefill_append_alignment, false);
     /* ck_prefill - optional, only present when prefill IR was generated */
     resolve_symbol(api->handle, "ck_prefill", (void **)&api->prefill, false);
     resolve_symbol(api->handle, "ck_model_write_embeddings", (void **)&api->write_embeddings, false);
@@ -2695,17 +2702,27 @@ static int run_token_ids(ModelAPI *api, CLIOptions *opt, int32_t *ids, int n, in
             existing_tokens > ctx) {
             fprintf(stderr, "Error: continuation has no valid active prefix\n");
             opt->admission_rejected = true;
+            opt->admission_message = "continuation has no valid active prefix";
             free(ids);
             return -1;
         }
-        /* The checked first continuation executes the generated one-token
-         * decode path. Multi-token append can select a different grouped
-         * prefill provider and needs separate numerical certification. */
         if (n != 1) {
-            fprintf(stderr, "Error: native continuation supports one suffix token per call\n");
-            opt->admission_rejected = true;
-            free(ids);
-            return -1;
+            const int minimum = api->prefill_append_min_prefix
+                ? api->prefill_append_min_prefix() : 0;
+            const int alignment = api->prefill_append_alignment
+                ? api->prefill_append_alignment() : 0;
+            const int row_group = api->prefill_append_row_group
+                ? api->prefill_append_row_group() : 0;
+            if (minimum < 1 || alignment < 2 || row_group < 1 ||
+                existing_tokens < minimum ||
+                existing_tokens % alignment != 0 ||
+                existing_tokens % row_group != 0) {
+                fprintf(stderr, "Error: unsupported multi-token continuation split\n");
+                opt->admission_rejected = true;
+                opt->admission_message = "unsupported multi-token continuation split";
+                free(ids);
+                return -1;
+            }
         }
     }
     if (max_tokens > ctx - existing_tokens ||
@@ -6025,13 +6042,17 @@ int ck_session_v8_format_chat(
     return session->api.format_chat(system_text, user_text, output, capacity);
 }
 
-int ck_session_v8_generate(
+static int ck_session_v8_generate_impl(
     CKSessionV8 *session,
     const CKSessionGenerateRequestV8 *request,
+    const int32_t *prompt_ids, int32_t prompt_id_count,
     ck_session_token_callback_v8 callback,
     void *user_data,
     CKSessionGenerateResultV8 *result) {
     if (!session || !request || !request->user_text || !result ||
+        (prompt_ids && prompt_id_count <= 0) ||
+        (!prompt_ids && prompt_id_count != 0) ||
+        (prompt_ids && !(request->flags & CK_SESSION_REQUEST_RAW_PROMPT)) ||
         request->struct_size != sizeof(*request) ||
         request->abi_version != CK_SESSION_ABI_V8_VERSION ||
         result->struct_size != sizeof(*result) ||
@@ -6047,11 +6068,36 @@ int ck_session_v8_generate(
         return session_error(session, CK_SESSION_V8_ERROR_BUSY,
                              "bounded batch mode owns the generated model");
     }
+    int32_t *owned_ids = NULL;
+    if (prompt_ids) {
+        const int vocab = session->api.get_vocab_size ? session->api.get_vocab_size() : 0;
+        if (vocab <= 0 || prompt_id_count > session->context_length ||
+            (size_t)prompt_id_count > SIZE_MAX / sizeof(*owned_ids)) {
+            pthread_mutex_unlock(&session->generation_lock);
+            return session_error(session, CK_SESSION_V8_ERROR_INVALID_ARGUMENT,
+                                 "invalid exact prompt token count");
+        }
+        for (int32_t i = 0; i < prompt_id_count; ++i) {
+            if (prompt_ids[i] < 0 || prompt_ids[i] >= vocab) {
+                pthread_mutex_unlock(&session->generation_lock);
+                return session_error(session, CK_SESSION_V8_ERROR_INVALID_ARGUMENT,
+                                     "invalid exact prompt token ID");
+            }
+        }
+        owned_ids = malloc((size_t)prompt_id_count * sizeof(*owned_ids));
+        if (!owned_ids) {
+            pthread_mutex_unlock(&session->generation_lock);
+            return session_error(session, CK_SESSION_V8_ERROR_RUNTIME,
+                                 "exact prompt token allocation failed");
+        }
+        memcpy(owned_ids, prompt_ids, (size_t)prompt_id_count * sizeof(*owned_ids));
+    }
     const bool continue_state =
         (request->flags & CK_SESSION_REQUEST_CONTINUE_STATE) != 0;
     if (continue_state &&
         (!(request->flags & CK_SESSION_REQUEST_RAW_PROMPT) ||
          !session->checkpoint_ready || !session->api.get_active_tokens)) {
+        free(owned_ids);
         pthread_mutex_unlock(&session->generation_lock);
         return session_error(session, CK_SESSION_V8_ERROR_INVALID_ARGUMENT,
                              "continuation requires a checked prefix and raw suffix");
@@ -6096,12 +6142,17 @@ int ck_session_v8_generate(
     opt.progress_session = session;
     opt.session_result = result;
 
-    int status = run_prompt(&session->api, &opt, request->user_text);
+    int status = owned_ids
+        ? run_token_ids(&session->api, &opt, owned_ids, prompt_id_count,
+                        prompt_id_count)
+        : run_prompt(&session->api, &opt, request->user_text);
     if (status != 0) {
         session_error(session,
                       opt.admission_rejected ? CK_SESSION_V8_ERROR_INVALID_ARGUMENT :
                       CK_SESSION_V8_ERROR_RUNTIME,
-                      opt.admission_rejected ? "request exceeds available context" :
+                      opt.admission_rejected
+                          ? (opt.admission_message ? opt.admission_message :
+                             "request exceeds available context") :
                       "native generation failed");
     }
     if (session->api.set_cancel_flag) session->api.set_cancel_flag(NULL);
@@ -6123,6 +6174,152 @@ int ck_session_v8_generate(
     return status == 0 ? CK_SESSION_V8_OK :
         (opt.admission_rejected ? CK_SESSION_V8_ERROR_INVALID_ARGUMENT :
          CK_SESSION_V8_ERROR_RUNTIME);
+}
+
+int ck_session_v8_generate(CKSessionV8 *session,
+                           const CKSessionGenerateRequestV8 *request,
+                           ck_session_token_callback_v8 callback, void *user_data,
+                           CKSessionGenerateResultV8 *result) {
+    return ck_session_v8_generate_impl(session, request, NULL, 0,
+                                       callback, user_data, result);
+}
+
+int ck_session_v8_generate_ids(CKSessionV8 *session,
+                               const CKSessionGenerateRequestV8 *request,
+                               const int32_t *prompt_ids, int32_t prompt_id_count,
+                               ck_session_token_callback_v8 callback,
+                               void *user_data,
+                               CKSessionGenerateResultV8 *result) {
+    if (!prompt_ids || prompt_id_count <= 0)
+        return CK_SESSION_V8_ERROR_INVALID_ARGUMENT;
+    return ck_session_v8_generate_impl(session, request, prompt_ids,
+                                       prompt_id_count, callback, user_data,
+                                       result);
+}
+
+int ck_session_v8_prefill_ids(CKSessionV8 *session,
+                              const int32_t *tokens, int32_t token_count,
+                              int32_t reserved_tokens, uint32_t flags) {
+    if (!session || !tokens || token_count <= 0 || reserved_tokens < 0 ||
+        (flags & ~CK_SESSION_PREFILL_CONTINUE_STATE))
+        return CK_SESSION_V8_ERROR_INVALID_ARGUMENT;
+    if (pthread_mutex_trylock(&session->generation_lock) != 0)
+        return session_error(session, CK_SESSION_V8_ERROR_BUSY,
+                             "session already has an active request");
+    int status = CK_SESSION_V8_OK;
+    const bool continuing = (flags & CK_SESSION_PREFILL_CONTINUE_STATE) != 0;
+    if (session->batch_enabled || !session->api.checkpoint_requirements ||
+        !session->api.checkpoint_save || !session->api.sequence_default ||
+        !session->api.get_active_tokens || !session->api.get_vocab_size ||
+        !session->api.prefill_append_min_prefix ||
+        !session->api.prefill_append_alignment ||
+        !session->api.prefill_append_row_group || !session->api.kv_reset) {
+        status = session_error(session, CK_SESSION_V8_ERROR_CAPABILITY,
+                               "checked checkpoint prefill is unavailable");
+        goto done;
+    }
+    const int minimum = session->api.prefill_append_min_prefix();
+    const int alignment = session->api.prefill_append_alignment();
+    const int row_group = session->api.prefill_append_row_group();
+    const int existing = continuing ? session->api.get_active_tokens() : 0;
+    const int vocab = session->api.get_vocab_size();
+    if (minimum < 1 || alignment < 2 || row_group < 1 || vocab < 1) {
+        status = session_error(session, CK_SESSION_V8_ERROR_CAPABILITY,
+                               "loaded provider has no certified append boundary");
+        goto done;
+    }
+    if (existing < 0 ||
+        (continuing && (!session->checkpoint_ready || existing < minimum ||
+                        existing % alignment != 0 || existing % row_group != 0)) ||
+        token_count > session->context_length ||
+        existing > session->context_length - token_count ||
+        reserved_tokens > session->context_length - existing - token_count ||
+        existing + token_count < minimum ||
+        (existing + token_count) % alignment != 0 ||
+        (existing + token_count) % row_group != 0) {
+        status = session_error(session, CK_SESSION_V8_ERROR_INVALID_ARGUMENT,
+                               "prefix is outside the checked append or capacity boundary");
+        goto done;
+    }
+    for (int32_t i = 0; i < token_count; ++i) {
+        if (tokens[i] < 0 || tokens[i] >= vocab) {
+            status = session_error(session, CK_SESSION_V8_ERROR_INVALID_ARGUMENT,
+                                   "prefill contains an invalid token ID");
+            goto done;
+        }
+    }
+    session->last_error[0] = '\0';
+    pthread_mutex_lock(&session->progress_lock);
+    session->progress.request_serial++;
+    session->progress.phase = CK_SESSION_PROGRESS_PREFILL;
+    session->progress.completed_layers = 0;
+    session->progress.total_layers = 0;
+    session->progress.chunk_tokens = 0;
+    session->progress.chunk_start_position = existing;
+    pthread_mutex_unlock(&session->progress_lock);
+    atomic_store_explicit(&session->cancel_requested, 0, memory_order_relaxed);
+    if (session->api.set_cancel_flag)
+        session->api.set_cancel_flag(&session->cancel_requested);
+    if (session->api.set_progress_callback)
+        session->api.set_progress_callback(session_progress_layer, session);
+    session->checkpoint_ready = 0;
+    if (!continuing) session->api.kv_reset();
+    if (session->api.embed(tokens, token_count) != 0 ||
+        atomic_load_explicit(&session->cancel_requested, memory_order_relaxed)) {
+        status = CK_SESSION_V8_ERROR_CANCELLED;
+        if (!atomic_load_explicit(&session->cancel_requested, memory_order_relaxed))
+            status = CK_SESSION_V8_ERROR_RUNTIME;
+    } else if (session->api.forward(NULL) != 0 ||
+               session->api.get_active_tokens() != existing + token_count) {
+        status = CK_SESSION_V8_ERROR_RUNTIME;
+    }
+    if (status == CK_SESSION_V8_OK &&
+        atomic_load_explicit(&session->cancel_requested, memory_order_relaxed))
+        status = CK_SESSION_V8_ERROR_CANCELLED;
+    if (status != CK_SESSION_V8_OK) {
+        session->api.kv_reset();
+        session_error(session, status, status == CK_SESSION_V8_ERROR_CANCELLED
+                      ? "prefill cancelled" : "native checkpoint prefill failed");
+    } else {
+        session->checkpoint_ready = 1;
+    }
+    if (session->api.set_cancel_flag) session->api.set_cancel_flag(NULL);
+    if (session->api.set_progress_callback)
+        session->api.set_progress_callback(NULL, NULL);
+    session_progress_set_phase(session, CK_SESSION_PROGRESS_COMPLETE);
+done:
+    pthread_mutex_unlock(&session->generation_lock);
+    return status;
+}
+
+int ck_session_v8_prefill_contract(CKSessionV8 *session,
+                                   int32_t *minimum_prefix,
+                                   int32_t *alignment,
+                                   int32_t *row_group) {
+    if (!session || !minimum_prefix || !alignment || !row_group)
+        return CK_SESSION_V8_ERROR_INVALID_ARGUMENT;
+    if (pthread_mutex_trylock(&session->generation_lock) != 0)
+        return CK_SESSION_V8_ERROR_BUSY;
+    int status = CK_SESSION_V8_OK;
+    if (session->batch_enabled || !session->api.prefill_append_min_prefix ||
+        !session->api.prefill_append_alignment ||
+        !session->api.prefill_append_row_group ||
+        !session->api.checkpoint_save || !session->api.checkpoint_restore) {
+        status = CK_SESSION_V8_ERROR_CAPABILITY;
+    } else {
+        int minimum = session->api.prefill_append_min_prefix();
+        int align = session->api.prefill_append_alignment();
+        int group = session->api.prefill_append_row_group();
+        if (minimum < 1 || align < 2 || group < 1)
+            status = CK_SESSION_V8_ERROR_CAPABILITY;
+        else {
+            *minimum_prefix = minimum;
+            *alignment = align;
+            *row_group = group;
+        }
+    }
+    pthread_mutex_unlock(&session->generation_lock);
+    return status;
 }
 
 void ck_session_v8_cancel(CKSessionV8 *session) {

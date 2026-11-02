@@ -55,6 +55,7 @@ except ImportError:
 
 from .routes.conversations import router as conversations_router
 from .runtime import load_manifest_templates
+from .prefix_checkpoint import ExactPrefixCheckpointCache
 from .schemas.common import ResponseStatus
 from .schemas.content import ResponseOutputText
 from .schemas.output_items import (
@@ -429,7 +430,7 @@ def _performance_profile(result: dict[str, Any]) -> dict[str, Any]:
     generated_tokens = int(result.get("generated_tokens") or 0)
     prefill_ms = float(result.get("prefill_time_ms") or 0.0)
     decode_ms = float(result.get("decode_time_ms") or 0.0)
-    return {
+    profile = {
         "prompt_tokens": prompt_tokens,
         "generated_tokens": generated_tokens,
         "prefill_ms": prefill_ms,
@@ -449,6 +450,11 @@ def _performance_profile(result: dict[str, Any]) -> dict[str, Any]:
         "total_ms": round(prefill_ms + decode_ms, 2),
         "stop_reason": stop_reason_name(result.get("stop_reason")),
     }
+    cache = result.get("prefix_cache")
+    if isinstance(cache, dict):
+        profile["prefix_cache"] = cache
+        profile["computed_prefill_tokens"] = int(cache.get("suffix_tokens") or 0)
+    return profile
 
 
 def _log_performance(model: str, perf: dict[str, Any] | None) -> None:
@@ -1836,6 +1842,7 @@ def create_app(
     viz_html: str | None = None,
     extra_route_registrar: Callable[[APIRouter, Callable[..., Any]], None] | None = None,
     batch_http=None,
+    prefix_cache_bytes: int | None = None,
 ):
     """Build the live Responses FastAPI app around a session (real or fake).
 
@@ -1864,6 +1871,8 @@ def create_app(
         raise ValueError("request_prompt_byte_cap must be a positive byte count")
     if batch_http is not None and context_length != batch_http.context_length:
         raise ValueError("batch HTTP context must match the loaded native session")
+    if prefix_cache_bytes is not None and batch_http is not None:
+        raise ValueError("checkpoint prefix cache requires serialized session ownership")
 
     router = APIRouter()
     if loaded_identity is not None and loaded_identity.get("schema") != "cke.loaded_serving_identity.v1":
@@ -1876,6 +1885,11 @@ def create_app(
         raise ValueError("loaded serving identity requires positive effective context and output limits")
     attestation = copy.deepcopy(loaded_identity)
     server_instance_id = uuid.uuid4().hex
+    prefix_cache = (ExactPrefixCheckpointCache(
+        session, max_bytes=prefix_cache_bytes,
+        identity=server_instance_id + ":" + hashlib.sha256(
+            json.dumps(attestation, sort_keys=True).encode()).hexdigest())
+        if prefix_cache_bytes is not None else None)
     response_store: OrderedDict[str, dict[str, Any]] = OrderedDict()
     response_history_store: OrderedDict[str, list[dict[str, Any]]] = OrderedDict()
     response_store_lock = threading.Lock()
@@ -1926,6 +1940,45 @@ def create_app(
         effective_serving["batch_output_token_cap"] = batch_http.max_output_tokens
         effective_serving["batch_output_byte_cap"] = batch_http.max_output_bytes
         effective_serving["batch_delivery_timeout_seconds"] = batch_http.delivery_timeout
+    if prefix_cache is not None:
+        effective_serving["execution_mode"] = "experimental_exact_prefix_checkpoint"
+        effective_serving["prefix_cache_byte_budget"] = prefix_cache.max_bytes
+        effective_serving["prefix_checkpoint_bytes"] = prefix_cache.size
+
+    def _generate_with_prefix_cache(lease, prompt, *, max_tokens, temperature,
+                                    top_p, on_token, flags, stop_on_text,
+                                    stop_at_eos, owner_key="anonymous"):
+        if prefix_cache is None:
+            return lease.session.generate(
+                None, prompt, max_tokens=max_tokens, temperature=temperature,
+                top_p=top_p, on_token=on_token, flags=flags,
+                stop_on_text=stop_on_text, stop_at_eos=stop_at_eos)
+        prepared = None
+        started = time.monotonic()
+        try:
+            prepared = prefix_cache.prepare(prompt, output_tokens=max_tokens,
+                                            flags=flags, owner_key=owner_key)
+            preparation_ms = (time.monotonic() - started) * 1000.0
+            result = lease.session.generate(
+                None, prepared.prompt, max_tokens=max_tokens,
+                temperature=temperature, top_p=top_p, on_token=on_token,
+                flags=prepared.flags, stop_on_text=stop_on_text,
+                stop_at_eos=stop_at_eos, prompt_ids=prepared.prompt_ids)
+        except Exception:
+            prefix_cache.settle(prepared, success=False)
+            raise
+        prefix_cache.settle(prepared, success=True)
+        result["prompt_tokens"] = prepared.input_tokens
+        result["prefill_time_ms"] = float(result.get("prefill_time_ms") or 0) + preparation_ms
+        result["prefix_cache"] = {
+            "reused_tokens": prepared.reused_tokens,
+            "suffix_tokens": prepared.suffix_tokens,
+            "cache_bytes": prefix_cache.bytes_used,
+            "save_ms": prepared.save_seconds * 1000.0,
+            "restore_ms": prepared.restore_seconds * 1000.0,
+            "preparation_ms": preparation_ms,
+        }
+        return result
 
     def _conversation_echo(body) -> dict[str, Any] | None:
         conv = body.conversation
@@ -1934,6 +1987,16 @@ def create_app(
         if conv is not None:
             return {"id": conv.id}
         return None
+
+    def _prefix_owner_key(body) -> str:
+        conv = _conversation_echo(body)
+        if conv is not None and conv.get("id"):
+            return "conversation:" + str(conv["id"])
+        if body.prompt_cache_key:
+            return "prompt_cache_key:" + str(body.prompt_cache_key)
+        if body.user:
+            return "user:" + str(body.user)
+        return "anonymous"
 
     def _validate_request(body) -> None:
         _reject_live_media(body.input)
@@ -2365,6 +2428,10 @@ def create_app(
         }
         if result is not None:
             resp["performance"] = _performance_profile(result)
+            cache_stats = result.get("prefix_cache")
+            if isinstance(cache_stats, dict):
+                resp["usage"]["input_tokens_details"]["cached_tokens"] = int(
+                    cache_stats.get("reused_tokens") or 0)
         should_store = getattr(body, "store", None) is not False
         if should_store:
             history = _request_messages(body)
@@ -2525,8 +2592,8 @@ def create_app(
 
         def worker():
             try:
-                result = lease.session.generate(
-                    None,
+                result = _generate_with_prefix_cache(
+                    lease,
                     prompt,
                     max_tokens=max_tokens,
                     temperature=temperature,
@@ -2535,6 +2602,7 @@ def create_app(
                     flags=effective_flags if effective_flags is not None else flags,
                     stop_on_text=stop_markers,
                     stop_at_eos=stop_at_eos,
+                    owner_key=_prefix_owner_key(body),
                 )
                 if splitter is not None:
                     for state, delta in splitter.flush():
@@ -3383,8 +3451,8 @@ def create_app(
                         chunks.append(text)
                     return -1 if disconnect_cancelled.is_set() else 0
 
-                result = lease.session.generate(
-                    None,
+                result = _generate_with_prefix_cache(
+                    lease,
                     prompt,
                     max_tokens=tok_limit,
                     temperature=temperature_eff,
@@ -3393,6 +3461,7 @@ def create_app(
                     flags=effective_flags,
                     stop_on_text=stop_markers,
                     stop_at_eos=stop_at_eos,
+                    owner_key=_prefix_owner_key(body),
                 )
             except SessionBusyError:
                 busy_exc = _harness_error(
@@ -3700,6 +3769,7 @@ def create_app(
     app.state.flight_lock = _flight_lock
     app.state.flight_admission = _flight_admission
     app.state.session = session
+    app.state.prefix_cache = prefix_cache
 
     return app
 

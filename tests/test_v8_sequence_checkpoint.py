@@ -460,6 +460,9 @@ int ck_model_decode(int32_t token, float *out) {
 }
 int ck_model_get_active_tokens(void) { return position; }
 int ck_model_get_vocab_size(void) { return 4; }
+int ck_model_prefill_append_row_group(void) { return 1; }
+int ck_model_prefill_append_min_prefix(void) { return 4; }
+int ck_model_prefill_append_alignment(void) { return 4; }
 float *ck_model_get_logits(void) { return logits; }
 int ck_model_get_logits_stride(void) { return 0; }
 int ck_model_can_encode_text(void) { return 1; }
@@ -571,6 +574,10 @@ int main(int argc, char **argv) {
     entered_fn restore_entered = (entered_fn)dlsym(model, "ck_fake_restore_entered");
     assert(get_state && get_embed_seen && set_state && make_snapshot &&
            fail_embed && cancel_embed && hold_restore && restore_entered);
+    int32_t minimum = 0, append_alignment = 0, row_group = 0;
+    assert(ck_session_v8_prefill_contract(session, &minimum,
+                                         &append_alignment, &row_group) == 0);
+    assert(minimum == 4 && append_alignment == 4 && row_group == 1);
     size_t bytes = 0, alignment = 0;
     assert(ck_session_v8_checkpoint_requirements(session, &bytes, &alignment) == 0);
     assert(bytes == 64 && alignment == 64);
@@ -598,6 +605,51 @@ int main(int argc, char **argv) {
     hold_restore(0);
     assert(pthread_join(worker, NULL) == 0 && job.status == 0);
     assert(ck_session_v8_reset(session) == 0);
+    assert(ck_session_v8_checkpoint_save(session, snapshot, bytes) ==
+           CK_SESSION_V8_ERROR_INVALID_ARGUMENT);
+    int32_t prefix_ids[4] = {1, 1, 1, 1};
+    int32_t invalid_ids[4] = {1, 1, 1, 4};
+    assert(ck_session_v8_prefill_ids(session, prefix_ids, 3, 1, 0) ==
+           CK_SESSION_V8_ERROR_INVALID_ARGUMENT);
+    assert(ck_session_v8_prefill_ids(session, prefix_ids, 4, 13, 0) ==
+           CK_SESSION_V8_ERROR_INVALID_ARGUMENT);
+    assert(ck_session_v8_prefill_ids(session, invalid_ids, 4, 1, 0) ==
+           CK_SESSION_V8_ERROR_INVALID_ARGUMENT);
+    assert(get_state() == 0);
+    assert(ck_session_v8_prefill_ids(session, prefix_ids, 4, 2, 0) == 0);
+    assert(get_state() == 4);
+    assert(ck_session_v8_checkpoint_save(session, snapshot, bytes) == 0);
+    assert(ck_session_v8_prefill_ids(session, prefix_ids, 4, 2,
+           CK_SESSION_PREFILL_CONTINUE_STATE) == 0);
+    assert(get_state() == 8);
+    assert(ck_session_v8_checkpoint_restore(session, snapshot, bytes) == 0);
+    assert(get_state() == 4);
+    CKSessionGenerateRequestV8 multi = {.struct_size=sizeof(multi),
+        .abi_version=CK_SESSION_ABI_V8_VERSION, .user_text="MULTI",
+        .max_tokens=1, .flags=CK_SESSION_REQUEST_RAW_PROMPT |
+        CK_SESSION_REQUEST_CONTINUE_STATE |
+        CK_SESSION_REQUEST_REJECT_PROMPT_TRUNCATION};
+    CKSessionGenerateResultV8 multi_result = {.struct_size=sizeof(multi_result),
+        .abi_version=CK_SESSION_ABI_V8_VERSION};
+    assert(ck_session_v8_generate(session, &multi, NULL, NULL, &multi_result) == 0);
+    assert(get_embed_seen() == 4 && get_state() == 6);
+    assert(ck_session_v8_checkpoint_restore(session, snapshot, bytes) == 0);
+    int32_t exact_suffix[2] = {1, 2};
+    multi.user_text = "";
+    assert(ck_session_v8_generate_ids(session, &multi, exact_suffix, 2,
+                                      NULL, NULL, &multi_result) == 0);
+    assert(get_embed_seen() == 4 && get_state() == 7);
+    assert(ck_session_v8_checkpoint_restore(session, snapshot, bytes) == 0);
+    exact_suffix[1] = 4;
+    assert(ck_session_v8_generate_ids(session, &multi, exact_suffix, 2,
+                                      NULL, NULL, &multi_result) ==
+           CK_SESSION_V8_ERROR_INVALID_ARGUMENT);
+    assert(get_state() == 4);
+    exact_suffix[1] = 2;
+    cancel_embed();
+    assert(ck_session_v8_prefill_ids(session, prefix_ids, 4, 2,
+           CK_SESSION_PREFILL_CONTINUE_STATE) == CK_SESSION_V8_ERROR_CANCELLED);
+    assert(get_state() == 0);
     assert(ck_session_v8_checkpoint_save(session, snapshot, bytes) ==
            CK_SESSION_V8_ERROR_INVALID_ARGUMENT);
     CKSessionGenerateRequestV8 request = {.struct_size=sizeof(request),
