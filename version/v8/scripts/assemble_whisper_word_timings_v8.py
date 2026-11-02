@@ -50,6 +50,9 @@ def assemble(report: dict, alignments: list[dict], report_hash: str) -> dict:
         raise ValueError("run report has no audio windows")
     if len(segments) != len(alignments):
         raise ValueError("one alignment is required for every audio window")
+    declared_count = report.get("windowing", {}).get("window_count")
+    if declared_count is not None and declared_count != len(segments):
+        raise ValueError("run report window count disagrees with its segments")
     if not isinstance(report_hash, str) or not _SHA256.fullmatch(report_hash):
         raise ValueError("run report hash is missing")
     audio_hash = report.get("wav_sha256")
@@ -69,6 +72,8 @@ def assemble(report: dict, alignments: list[dict], report_hash: str) -> dict:
         total = _integer(audio.get("source_frames"), "source frame count", minimum=1)
         window_frames = _integer(audio.get("window_source_frames"), "window frame count", minimum=1)
         start = _integer(segment.get("source_frame_start"), "window start")
+        if _integer(audio.get("window_start_frame"), "encoder window start") != start:
+            raise ValueError("encoder audio start disagrees with run window")
         end = _integer(segment.get("source_frame_consumed_end"), "consumed end", minimum=1)
         window_end = _integer(segment.get("source_frame_window_end"), "window end", minimum=1)
         if (start != expected_start or not start < end <= window_end <= total or
@@ -86,6 +91,7 @@ def assemble(report: dict, alignments: list[dict], report_hash: str) -> dict:
         if not isinstance(trace_hash, str) or not _SHA256.fullmatch(trace_hash):
             raise ValueError("run window has no valid attention trace hash")
         if (alignment.get("schema") != "cke.whisper_word_alignment.v1" or
+                alignment.get("status") not in {"aligned", "partial"} or
                 _integer(window.get("index"), "alignment window index") != index or
                 provenance.get("trace_sha256") != trace_hash or
                 provenance.get("run_report_sha256") != report_hash or

@@ -105,13 +105,14 @@ class WhisperWindowAssemblyTest(unittest.TestCase):
              "source_frame_window_end": window_end,
              "encoder": {"audio": {"source_sample_rate": 100,
                                     "source_frames": 1000,
-                                    "window_source_frames": 600}},
+                                    "window_source_frames": 600,
+                                    "window_start_frame": start}},
              "decoder": {"attention_trace": {"sha256": str(index + 1) * 64}}}
             for index, start, consumed, window_end in
             ((0, 0, 400, 600), (1, 400, 1000, 1000))]}
 
     def aligned(self, index, words):
-        return {"schema": "cke.whisper_word_alignment.v1",
+        return {"schema": "cke.whisper_word_alignment.v1", "status": "aligned",
                 "window": {"index": index, "start_seconds": index * 4.0,
                            "source_frames": 600, "source_sample_rate": 100},
                 "provenance": {"trace_sha256": str(index + 1) * 64,
@@ -142,7 +143,8 @@ class WhisperWindowAssemblyTest(unittest.TestCase):
             "source_frame_consumed_end": 1000, "source_frame_window_end": 1000,
             "encoder": {"audio": {"source_sample_rate": 100,
                                    "source_frames": 1000,
-                                   "window_source_frames": 1000}},
+                                   "window_source_frames": 1000,
+                                   "window_start_frame": 0}},
             "decoder": {"attention_trace": {"sha256": "1" * 64}}}]
         aligned = self.aligned(0, [("Actually", 0.0, 5.44),
                                    ("I", None, None), ("think", 5.6, 5.72)])
