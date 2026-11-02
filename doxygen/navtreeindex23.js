@@ -1,5 +1,8 @@
 var NAVTREEINDEX23 =
 {
+"structPCIeDevice.html#a492fb416b29956d0442ec47c57c3f091":[1,0,87,6],
+"structPCIeDevice.html#a7179511c6502936e503a2ff80dcf464d":[1,0,87,4],
+"structPCIeDevice.html#a8119bb375e580a3302f3110f689fc213":[1,0,87,12],
 "structPCIeDevice.html#a8dbbcf7fbfc94195d0832c48ae5c4fd0":[1,0,87,5],
 "structPCIeDevice.html#a97e23b1ccdb120c47d9fef6beb9b050b":[1,0,87,3],
 "structPCIeDevice.html#acd83cab295bf599ca7f3d1e8d6268094":[1,0,87,11],
@@ -246,8 +249,5 @@ var NAVTREEINDEX23 =
 "system__topology_8c.html#a685baee571576af254de8ea2cd9eaed8":[2,0,1,30,23],
 "system__topology_8c.html#a6a740276441a137e33d3b11888bfd2da":[2,0,1,30,13],
 "system__topology_8c.html#a6d93f41b7303c9e4c21b16e0ce3e858f":[2,0,1,30,25],
-"system__topology_8c.html#a74f7ad14b6c779249df057c693cfada4":[2,0,1,30,10],
-"system__topology_8c.html#a7e083b9d0fb7a63db6e505f64a3237ce":[2,0,1,30,24],
-"system__topology_8c.html#a817c234eb71a734950fee25dceb5b02b":[2,0,1,30,2],
-"system__topology_8c.html#a8d1095a0656548a8adae0cf8ad6a59cd":[2,0,1,30,16]
+"system__topology_8c.html#a74f7ad14b6c779249df057c693cfada4":[2,0,1,30,10]
 };
