@@ -262,6 +262,36 @@ class AccessibleVoiceTest(unittest.TestCase):
         with self.assertRaises(ProcessLookupError):
             os.kill(pid, 0)
 
+    def test_stop_terminates_speech_worker_descendant(self):
+        marker = Path(self.temp.name) / "descendant.pid"
+        executable = Path(self.temp.name) / "speech-with-worker"
+        executable.write_text(
+            "#!/usr/bin/env python3\n"
+            "import subprocess,sys\nfrom pathlib import Path\n"
+            "child=subprocess.Popen([sys.executable,'-c','import time;time.sleep(30)'])\n"
+            f"Path({str(marker)!r}).write_text(str(child.pid))\n"
+            "child.wait()\n")
+        executable.chmod(0o700)
+
+        def stop_when_started(_prompt):
+            deadline = time.monotonic() + 3
+            while not marker.exists() and time.monotonic() < deadline:
+                time.sleep(0.01)
+            self.assertTrue(marker.exists())
+            return "stop"
+
+        voice.speak_and_control("Hello.", executable, stop_when_started)
+        pid = int(marker.read_text())
+        # A killed worker may remain a zombie until the local init reaps it.
+        deadline = time.monotonic() + 3
+        while Path(f"/proc/{pid}/stat").exists() and time.monotonic() < deadline:
+            state = Path(f"/proc/{pid}/stat").read_text().split()[2]
+            if state == "Z":
+                break
+            time.sleep(0.01)
+        if Path(f"/proc/{pid}/stat").exists():
+            self.assertEqual(Path(f"/proc/{pid}/stat").read_text().split()[2], "Z")
+
     def test_kokoro_answer_uses_checked_playback_adapter(self):
         with mock.patch.object(voice, "confirm", return_value="Read status"), \
              mock.patch.object(voice, "speak_and_control") as speak:
@@ -272,6 +302,7 @@ class AccessibleVoiceTest(unittest.TestCase):
                 "--kokoro-config", "/pinned/config.json",
                 "--kokoro-bundle-dir", "/pinned/bundle",
                 "--audio-player", "/usr/bin/aplay",
+                "--kokoro-incremental",
             ])
         self.assertEqual(status, 0)
         args, kwargs = speak.call_args
@@ -280,7 +311,7 @@ class AccessibleVoiceTest(unittest.TestCase):
         self.assertEqual(kwargs["label"], "CKE Kokoro")
         self.assertEqual(kwargs["arguments"], (
             "--config", "/pinned/config.json", "--bundle-dir", "/pinned/bundle",
-            "--player", "/usr/bin/aplay"))
+            "--player", "/usr/bin/aplay", "--incremental"))
 
 
 if __name__ == "__main__":

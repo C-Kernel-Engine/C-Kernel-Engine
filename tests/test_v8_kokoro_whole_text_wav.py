@@ -72,6 +72,12 @@ for line in sys.stdin:
                 with wave.open(str(output), "rb") as audio:
                     self.assertEqual(audio.getnframes(), 60)
                 self.assertEqual(list(root.glob(".kokoro-speech-*")), [])
+                with patch.object(module, "prepare", return_value={
+                        **plan, "chunks": plan["chunks"] * 22}):
+                    with self.assertRaisesRegex(module.SpeechError, "at most 64 chunks"):
+                        module.synthesize("abc", root / "config", bundle,
+                                          root / "too-long.wav", 7)
+                self.assertFalse((root / "too-long.wav").exists())
                 with self.assertRaisesRegex(module.SpeechError, "native worker rejected APPEND"):
                     module.synthesize("abc", root / "config", bundle,
                                       root / "failed.wav", 97)

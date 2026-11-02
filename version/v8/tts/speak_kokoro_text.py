@@ -67,6 +67,8 @@ def synthesize(text: str, config: Path, bundle: Path, output: Path,
         raise SpeechError("output already exists")
     start = time.monotonic()
     plan = prepare(text, config, bundle)
+    if len(plan["chunks"]) > 64:
+        raise SpeechError("aggregate WAV supports at most 64 chunks; use incremental playback")
     if seed > (1 << 64) - len(plan["chunks"]):
         raise SpeechError("seed range exceeds unsigned 64-bit integer")
     planned = time.monotonic()
