@@ -2261,6 +2261,16 @@ python3 server/harness_repeatability.py \
 # After verifying the one-off command, schedule it on the client host:
 0 2 * * * cd /path/to/C-Kernel-Engine &amp;&amp; .venv/bin/python3 scripts/local_harness_nightly.py --config /path/to/local-serving-matrix.json --state-dir /path/to/private-harness-nightly-state &gt;&gt; /path/to/private-harness-nightly-state/cron.log 2&gt;&amp;1</pre>
     </div>
+    <p class="mini-note">To add exact-prefix numerical certification on an asset-equipped
+        host, pass <code>--prefix-cert-config /path/to/private-prefix-cert.json</code>
+        to that same command. The private JSON uses schema
+        <code>cke.local_prefix_cert.v1</code> with <code>bundle</code>,
+        <code>session_library</code>, <code>ids</code>, pinned
+        <code>model_sha256</code> and <code>session_sha256</code>, and
+        <code>cases</code> such as <code>[{"prefix":128,"suffix":9}]</code>.
+        Missing assets remain <code>NOT_TESTED</code>; a mismatched loaded artifact or
+        numerical report is <code>FAIL</code>. Run this lane away from a production
+        endpoint because it loads its own model and checkpoint memory.</p>
     <p class="mini-note">For a scheduled run against current main, use a dedicated clean,
         detached worktree and add <code>--refresh-main</code>. After publishing the
         current run as <code>INCOMPLETE</code>, the runner fetches
