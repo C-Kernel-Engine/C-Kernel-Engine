@@ -381,6 +381,9 @@ typedef struct {
     const char *prompt_tokens_csv;
     const char *prompt_tokens_file;
     bool reject_prompt_token_truncation;
+    bool continue_state;
+    bool state_mutated;
+    bool admission_rejected;
     const char *system_prompt;
     const char *token_trace_json_path;
     const char *gemm_schedule;
@@ -2685,16 +2688,39 @@ static int run_token_ids(ModelAPI *api, CLIOptions *opt, int32_t *ids, int n, in
     if (ctx <= 0) ctx = 4096;
 
     int max_tokens = opt->max_tokens > 0 ? opt->max_tokens : CK_CLI_DEFAULT_MAX_TOKENS;
-    if (n > ctx - max_tokens) {
-        if (opt->reject_prompt_token_truncation) {
-            fprintf(
-                stderr,
-                "Error: explicit prompt has %d tokens but context %d reserves %d generation tokens\n",
-                n, ctx, max_tokens);
+    int existing_tokens = 0;
+    if (opt->continue_state) {
+        if (!api->get_active_tokens ||
+            (existing_tokens = api->get_active_tokens()) <= 0 ||
+            existing_tokens > ctx) {
+            fprintf(stderr, "Error: continuation has no valid active prefix\n");
+            opt->admission_rejected = true;
             free(ids);
             return -1;
         }
-        n = ctx - max_tokens;
+        /* The checked first continuation executes the generated one-token
+         * decode path. Multi-token append can select a different grouped
+         * prefill provider and needs separate numerical certification. */
+        if (n != 1) {
+            fprintf(stderr, "Error: native continuation supports one suffix token per call\n");
+            opt->admission_rejected = true;
+            free(ids);
+            return -1;
+        }
+    }
+    if (max_tokens > ctx - existing_tokens ||
+        n > ctx - existing_tokens - max_tokens) {
+        if (opt->continue_state || opt->reject_prompt_token_truncation ||
+            max_tokens >= ctx) {
+            fprintf(
+                stderr,
+                "Error: %d existing + %d prompt tokens exceed context %d with %d reserved generation tokens\n",
+                existing_tokens, n, ctx, max_tokens);
+            opt->admission_rejected = true;
+            free(ids);
+            return -1;
+        }
+        n = ctx - existing_tokens - max_tokens;
         if (opt->verbose) {
             printf("[DEBUG] Truncated prompt to %d tokens\n", n);
         }
@@ -2706,7 +2732,6 @@ static int run_token_ids(ModelAPI *api, CLIOptions *opt, int32_t *ids, int n, in
     g_prompt_tokens = n;
     g_user_tokens = user_tokens;
 
-    if (api->kv_reset) api->kv_reset();
     ck_threadpool_t *profile_pool = NULL;
     ck_threadpool_t *(*profile_global_fn)(void) = NULL;
     void (*profile_reset_fn)(ck_threadpool_t *) = NULL;
@@ -2734,11 +2759,19 @@ static int run_token_ids(ModelAPI *api, CLIOptions *opt, int32_t *ids, int n, in
         free(ids);
         return -1;
     }
+    if (opt->continue_state && prefix_tokens > 0) {
+        fprintf(stderr, "Error: continuation cannot append a multimodal prefix\n");
+        free(prefix_embeddings);
+        free(ids);
+        return -1;
+    }
 
     struct timespec t0, t1;
     clock_gettime(CLOCK_MONOTONIC, &t0);
 
     if (cli_cancel_requested(opt)) goto prefill_done;
+    opt->state_mutated = true;
+    if (!opt->continue_state && api->kv_reset) api->kv_reset();
     if (prefix_tokens > 0) {
         if (opt->verbose) {
             fprintf(stderr,
@@ -6014,6 +6047,15 @@ int ck_session_v8_generate(
         return session_error(session, CK_SESSION_V8_ERROR_BUSY,
                              "bounded batch mode owns the generated model");
     }
+    const bool continue_state =
+        (request->flags & CK_SESSION_REQUEST_CONTINUE_STATE) != 0;
+    if (continue_state &&
+        (!(request->flags & CK_SESSION_REQUEST_RAW_PROMPT) ||
+         !session->checkpoint_ready || !session->api.get_active_tokens)) {
+        pthread_mutex_unlock(&session->generation_lock);
+        return session_error(session, CK_SESSION_V8_ERROR_INVALID_ARGUMENT,
+                             "continuation requires a checked prefix and raw suffix");
+    }
 
     memset((char *)result + 2 * sizeof(uint32_t), 0,
             sizeof(*result) - 2 * sizeof(uint32_t));
@@ -6031,12 +6073,6 @@ int ck_session_v8_generate(
         session->api.set_progress_callback(session_progress_layer, session);
     session->last_error[0] = '\0';
     g_exit_requested = 0;
-    if (!(request->flags & CK_SESSION_REQUEST_CONTINUE_STATE) &&
-        session->api.kv_reset) {
-        session->api.kv_reset();
-        session->checkpoint_ready = 0;
-    }
-
     CLIOptions opt;
     memset(&opt, 0, sizeof(opt));
     opt.max_tokens = request->max_tokens > 0
@@ -6048,6 +6084,7 @@ int ck_session_v8_generate(
     opt.no_chat_template = (request->flags & CK_SESSION_REQUEST_RAW_PROMPT) != 0;
     opt.reject_prompt_token_truncation =
         (request->flags & CK_SESSION_REQUEST_REJECT_PROMPT_TRUNCATION) != 0;
+    opt.continue_state = continue_state;
     opt.ignore_eos = (request->flags & CK_SESSION_REQUEST_IGNORE_EOS) != 0;
     opt.timestamps = (request->flags & CK_SESSION_REQUEST_TIMESTAMPS) != 0;
     opt.quiet_output = true;
@@ -6061,7 +6098,10 @@ int ck_session_v8_generate(
 
     int status = run_prompt(&session->api, &opt, request->user_text);
     if (status != 0) {
-        session_error(session, CK_SESSION_V8_ERROR_RUNTIME,
+        session_error(session,
+                      opt.admission_rejected ? CK_SESSION_V8_ERROR_INVALID_ARGUMENT :
+                      CK_SESSION_V8_ERROR_RUNTIME,
+                      opt.admission_rejected ? "request exceeds available context" :
                       "native generation failed");
     }
     if (session->api.set_cancel_flag) session->api.set_cancel_flag(NULL);
@@ -6071,14 +6111,18 @@ int ck_session_v8_generate(
      * cursor before reporting failure. Never expose that partial state to a
      * later request, including one that asks to continue the session. */
     if ((status != 0 || result->stop_reason == CK_SESSION_STOP_CANCELLED) &&
-        session->api.kv_reset) {
+        opt.state_mutated && session->api.kv_reset) {
         session->api.kv_reset();
     }
-    session->checkpoint_ready = status == 0 &&
-        result->stop_reason != CK_SESSION_STOP_CANCELLED;
+    if (opt.state_mutated) {
+        session->checkpoint_ready = status == 0 &&
+            result->stop_reason != CK_SESSION_STOP_CANCELLED;
+    }
     session_progress_set_phase(session, CK_SESSION_PROGRESS_COMPLETE);
     pthread_mutex_unlock(&session->generation_lock);
-    return status == 0 ? CK_SESSION_V8_OK : CK_SESSION_V8_ERROR_RUNTIME;
+    return status == 0 ? CK_SESSION_V8_OK :
+        (opt.admission_rejected ? CK_SESSION_V8_ERROR_INVALID_ARGUMENT :
+         CK_SESSION_V8_ERROR_RUNTIME);
 }
 
 void ck_session_v8_cancel(CKSessionV8 *session) {

@@ -57,8 +57,11 @@ enum CKSessionRequestFlagsV8 {
     CK_SESSION_REQUEST_RAW_PROMPT = UINT32_C(1) << 0,
     CK_SESSION_REQUEST_IGNORE_EOS = UINT32_C(1) << 1,
     CK_SESSION_REQUEST_TIMESTAMPS = UINT32_C(1) << 2,
-    /* Requests reset generated recurrent/KV state by default. Set this only
-     * when the caller deliberately continues the preceding request. */
+    /* Requests reset generated recurrent/KV state by default. Continuation
+     * requires RAW_PROMPT, a completed prior forward or successful restore,
+     * and exactly one raw suffix token whose tokenization is bound by the caller to the
+     * saved exact prefix. Existing position + suffix + output reservation
+     * must fit the selected context; overflow is rejected before mutation. */
     CK_SESSION_REQUEST_CONTINUE_STATE = UINT32_C(1) << 3,
     /* Fail the request instead of silently truncating a prompt that does not
      * fit the remaining context budget. Serving layers set this so their

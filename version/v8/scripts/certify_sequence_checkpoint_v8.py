@@ -15,6 +15,8 @@ from pathlib import Path
 import sys
 import time
 
+from sequence_state_contract_v8 import validate_sequence_reset_regions
+
 
 STATE_NAMES = ("kv_cache", "recurrent_conv_state", "recurrent_ssm_state")
 
@@ -34,17 +36,31 @@ def sha_memory(address, size):
     return h.hexdigest()
 
 
-def signature(model, logits):
+def declared_state_regions(layout):
+    rows = validate_sequence_reset_regions(layout)
+    required = {}
+    for row in rows:
+        name, size = row["name"], row["size"]
+        if name not in STATE_NAMES or type(size) is not int or size <= 0 or name in required:
+            raise RuntimeError(f"unsupported or unproven sequence-state region: {name}")
+        required[name] = size
+    if "kv_cache" not in required:
+        raise RuntimeError("selected artifact declares no KV sequence state")
+    if ("recurrent_conv_state" in required) != ("recurrent_ssm_state" in required):
+        raise RuntimeError("incomplete recurrent sequence-state pair")
+    return required
+
+
+def signature(model, logits, required_state):
     if any(not math.isfinite(value) for value in logits):
         raise RuntimeError("nonfinite logits")
     state = {}
-    for name in STATE_NAMES:
+    for name, required_bytes in required_state.items():
         pointer = model.ck_model_get_named_activation_ptr(name.encode())
         extent = model.ck_model_get_named_activation_nbytes(name.encode())
-        if pointer and extent > 0:
-            state[name] = {"bytes": extent, "sha256": sha_memory(pointer, extent)}
-    if "kv_cache" not in state:
-        raise RuntimeError("loaded model exposes no logical KV state")
+        if not pointer or extent != required_bytes:
+            raise RuntimeError(f"{name} missing or wrong extent: {extent}, expected {required_bytes}")
+        state[name] = {"bytes": extent, "sha256": sha_memory(pointer, extent)}
     return {
         "position": model.ck_model_get_active_tokens(),
         "logits_sha256": hashlib.sha256(bytes(logits)).hexdigest(),
@@ -111,6 +127,11 @@ def main():
     if str(model_path) not in loaded or str(engine_path) not in loaded:
         raise RuntimeError("loaded model/engine library identity mismatch")
     configure(model)
+    required_state = declared_state_regions(
+        json.loads((bundle / "layout_decode.json").read_text()))
+    model.ck_model_get_capabilities.restype = C.c_uint64
+    if not model.ck_model_get_capabilities() & (1 << 18):
+        raise RuntimeError("loaded model does not advertise sequence checkpoints")
     if model.ck_model_init(str(bundle / "weights.bump").encode()) != 0:
         raise RuntimeError("model initialization failed")
     report = {
@@ -121,6 +142,8 @@ def main():
         "artifact": {name: sha_file(bundle / name) for name in
                      ("libmodel.so", "libckernel_engine.so", "model_v8.c",
                       "weights_manifest.json", "config.json", "weights.bump")},
+        "probe_sha256": sha_file(Path(__file__)),
+        "required_state": required_state,
         "loaded_libraries": sorted(path for path in loaded if path in
                                    (str(model_path), str(engine_path))),
         "threads": {name: os.environ.get(name) for name in
@@ -165,12 +188,12 @@ def main():
             started = time.monotonic()
             model.ck_model_kv_cache_reset()
             prefill(prefix)
-            baseline_prefix = signature(model, logits)
+            baseline_prefix = signature(model, logits, required_state)
             baseline = []
             for token in suffix:
                 if model.ck_model_decode(token, logits) != 0:
                     raise RuntimeError("fresh decode failed")
-                baseline.append(signature(model, logits))
+                baseline.append(signature(model, logits, required_state))
             if first_baseline is None:
                 first_baseline = baseline
             model.ck_model_kv_cache_reset()
@@ -180,7 +203,7 @@ def main():
             model.ck_model_kv_cache_reset()
             if model.ck_model_sequence_checkpoint_restore(handle, snapshot, size.value) != 0:
                 raise RuntimeError("checkpoint restore failed")
-            restored_prefix = signature(model, logits)
+            restored_prefix = signature(model, logits, required_state)
             # Logits are intentionally absent from the snapshot; compare state only.
             restored_prefix.pop("logits_sha256")
             expected_prefix = dict(baseline_prefix)
@@ -190,7 +213,7 @@ def main():
             for token, expected in zip(suffix, baseline):
                 if model.ck_model_decode(token, logits) != 0:
                     raise RuntimeError("restored decode failed")
-                actual = signature(model, logits)
+                actual = signature(model, logits, required_state)
                 steps.append({"token": token, "exact": actual == expected,
                               "expected": expected, "actual": actual})
                 matches &= actual == expected
@@ -230,11 +253,11 @@ def main():
             prefill(ids[2:2 + b_length])
             if model.ck_model_decode(ids[2 + b_length], logits) != 0:
                 raise RuntimeError("B continuation failed")
-            b_before = signature(model, logits)
+            b_before = signature(model, logits, required_state)
             C.c_uint8.from_address(snapshot).value ^= 1
             rejected = model.ck_model_sequence_checkpoint_restore(
                 other.value, snapshot, size.value) != 0
-            b_after_reject = signature(model, logits)
+            b_after_reject = signature(model, logits, required_state)
             C.c_uint8.from_address(snapshot).value ^= 1
             if model.ck_model_sequence_state_activate(handle) != 0 or \
                     model.ck_model_sequence_checkpoint_restore(
@@ -245,10 +268,10 @@ def main():
                     ids[a_length:a_length + args.suffix_tokens], first_baseline):
                 if model.ck_model_decode(token, logits) != 0:
                     raise RuntimeError("A survivor continuation failed")
-                a_steps.append(signature(model, logits) == expected)
+                a_steps.append(signature(model, logits, required_state) == expected)
             if model.ck_model_sequence_state_activate(other.value) != 0:
                 raise RuntimeError("B reactivation failed")
-            b_after_a = signature(model, logits)
+            b_after_a = signature(model, logits, required_state)
             b_after_a.pop("logits_sha256")
             b_expected = dict(b_before)
             b_expected.pop("logits_sha256")
