@@ -52,7 +52,7 @@ def test_optional_prefix_lane_requires_pinned_pass_report(tmp_path, monkeypatch)
     session = tmp_path / "session.so"
     ids = tmp_path / "ids.json"
     session.write_bytes(b"session")
-    ids.write_text("[1,2,3]")
+    ids.write_text("[1, 2, 3]\n")
     config = tmp_path / "prefix.json"
     config.write_text(json.dumps({
         "schema": "cke.local_prefix_cert.v1", "bundle": str(bundle),
@@ -63,7 +63,7 @@ def test_optional_prefix_lane_requires_pinned_pass_report(tmp_path, monkeypatch)
                                          "model_v8.c", "weights.bump",
                                          "weights_manifest.map", "config.json")},
         "session_sha256": hashlib.sha256(session.read_bytes()).hexdigest(),
-        "ids_sha256": hashlib.sha256(ids.read_bytes()).hexdigest(),
+        "ids_sha256": hashlib.sha256(b"[1,2,3]").hexdigest(),
     }))
 
     def fake_invoke(command, **_kwargs):

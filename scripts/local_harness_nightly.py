@@ -171,7 +171,6 @@ def _prefix_certification(config_path: Path, run_dir: Path,
               for name in artifact_names]
     pinned.append(("session_library", paths["session_library"],
                    config.get("session_sha256")))
-    pinned.append(("ids", paths["ids"], config.get("ids_sha256")))
     for name, path, expected in pinned:
         if (not isinstance(expected, str) or len(expected) != 64 or
                 any(char not in "0123456789abcdef" for char in expected)):
@@ -183,6 +182,19 @@ def _prefix_certification(config_path: Path, run_dir: Path,
         if digest.hexdigest() != expected:
             row.update(status="FAIL", reason=f"pinned {name} differs")
             return row
+    ids = json.loads(paths["ids"].read_text())
+    if not isinstance(ids, list) or any(type(value) is not int or value < 0
+                                        for value in ids):
+        raise ValueError("invalid pinned exact token IDs")
+    expected_ids = config.get("ids_sha256")
+    if (not isinstance(expected_ids, str) or len(expected_ids) != 64 or
+            any(char not in "0123456789abcdef" for char in expected_ids)):
+        raise ValueError("missing pinned ids sha256")
+    observed_ids = hashlib.sha256(json.dumps(
+        ids, separators=(",", ":")).encode()).hexdigest()
+    if observed_ids != expected_ids:
+        row.update(status="FAIL", reason="pinned ids differ")
+        return row
     lane = run_dir / "prefix_certification"
     lane.mkdir(parents=True)
     probe = ROOT / "version/v8/scripts/certify_session_multitoken_prefill_v8.py"
