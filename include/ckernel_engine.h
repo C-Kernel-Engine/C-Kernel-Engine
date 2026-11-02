@@ -2318,6 +2318,7 @@ typedef enum {
     CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA = 4,
     CK_ATTN_REDUCTION_F16_REGULAR_NOSCALE = 5,
     CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64_REGULAR_TAIL_NOSCALE = 6,
+    CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64_APPEND_TILED = 7,  // tiled short-Q append after a tiled prefix
 } ck_attention_reduction_t;
 
 // Research selectors for partitioning independent prefill attention outputs.

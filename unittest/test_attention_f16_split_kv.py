@@ -637,6 +637,44 @@ def _prefill_append_matches_decode_loop_case():
     )
 
 
+def _prefill_auto_tiled_append_case():
+    """The tail of a tiled ordinary prefill must survive a short append."""
+    heads, kv_heads, prefix, suffix, head_dim = 4, 2, 128, 2, 32
+    total = prefix + suffix
+    rng = np.random.default_rng(20261102)
+    q = np.ascontiguousarray(
+        rng.normal(0.0, 0.55, (heads, total, head_dim)).astype(np.float32))
+    k = _half_bits(rng.normal(0.0, 0.55, (kv_heads, total, head_dim))
+                   .astype(np.float32))
+    v = _half_bits(rng.normal(0.0, 0.75, (kv_heads, total, head_dim))
+                   .astype(np.float32))
+    full = np.zeros_like(q)
+    appended_q = np.ascontiguousarray(q[:, prefix:, :])
+    appended = np.zeros_like(appended_q)
+    wrong_online = np.zeros_like(appended_q)
+    full_status = lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract(
+        _f32_ptr(q), _u16_ptr(k), _u16_ptr(v), _f32_ptr(full),
+        heads, kv_heads, total, 0, total, head_dim, head_dim, 7)
+    append_status = lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract(
+        _f32_ptr(appended_q), _u16_ptr(k), _u16_ptr(v), _f32_ptr(appended),
+        heads, kv_heads, suffix, prefix, total, head_dim, head_dim, 7)
+    wrong_status = lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract(
+        _f32_ptr(appended_q), _u16_ptr(k), _u16_ptr(v), _f32_ptr(wrong_online),
+        heads, kv_heads, suffix, prefix, total, head_dim, head_dim, 2)
+    legacy_auto = np.zeros_like(appended_q)
+    legacy_status = lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract(
+        _f32_ptr(appended_q), _u16_ptr(k), _u16_ptr(v), _f32_ptr(legacy_auto),
+        heads, kv_heads, suffix, prefix, total, head_dim, head_dim, 3)
+    expected = full[:, prefix:, :]
+    diff = float(np.max(np.abs(expected - appended)))
+    return Result("prefill_auto_tiled_append_tail", diff, 0.0,
+                  full_status == 0 and append_status == 0 and
+                  wrong_status == 0 and legacy_status == 0 and
+                  np.array_equal(expected, appended) and
+                  not np.array_equal(expected, wrong_online) and
+                  np.array_equal(wrong_online, legacy_auto))
+
+
 def _prefill_auto_matches_llama_case(
     name, seed, heads, kv_heads, q_tokens, past_tokens, head_dim, threads
 ):
@@ -904,6 +942,7 @@ def main():
     results = []
     threads = max(1, int(lib.ck_get_num_threads()))
     results.append(_prefill_append_matches_decode_loop_case())
+    results.append(_prefill_auto_tiled_append_case())
     # Current llama.cpp changes flash-attention arithmetic at Q=64. Exercise
     # both sides of that production dispatch boundary and the actual Qwen3-VL
     # visual segment shape; leaf decode coverage cannot certify this route.

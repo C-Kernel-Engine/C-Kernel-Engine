@@ -7774,7 +7774,8 @@ ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_f16
     ck_threadpool_t *pool = ck_threadpool_global();
     const int active = pool ? ck_threadpool_n_threads(pool) : 1;
     const int kv_tokens = past_tokens + q_tokens;
-    if (reduction == CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64 &&
+    if ((reduction == CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64 ||
+         reduction == CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64_APPEND_TILED) &&
         num_heads == route_num_heads && num_kv_heads == route_num_kv_heads &&
         head_dim == route_head_dim && aligned_head_dim == route_head_dim &&
         q_tokens == route_query_tokens && kv_tokens >= route_min_kv_tokens &&
@@ -7841,8 +7842,16 @@ ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_f16
         return CK_ATTENTION_STATUS_INVALID_ARGUMENT;
     }
 
-    if (reduction == CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64 &&
-        q_tokens < CK_GGML_FA_TILE_Q) {
+    /* The staged-append selector preserves tiled arithmetic after a complete
+     * prefix tile. The legacy auto selector keeps its original short-query
+     * online contract for callers that did not opt into staged append. */
+    if (reduction == CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64_APPEND_TILED) {
+        reduction = q_tokens >= CK_GGML_FA_TILE_Q ||
+                    past_tokens >= CK_GGML_FA_TILE_Q
+            ? CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64
+            : CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE;
+    } else if (reduction == CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64 &&
+               q_tokens < CK_GGML_FA_TILE_Q) {
         reduction = CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE;
     }
 
@@ -7960,8 +7969,11 @@ static ck_attention_status_t ck_attention_prefill_append_f16cache_gemma4_workspa
         const int rows = segment_lengths[s];
         if (rows == 0) continue;
         if ((reduction == CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64 ||
+             reduction == CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64_APPEND_TILED ||
              reduction == CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64_REGULAR_TAIL_NOSCALE) &&
-            rows >= CK_GGML_FA_TILE_Q &&
+            (rows >= CK_GGML_FA_TILE_Q ||
+             (reduction == CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64_APPEND_TILED &&
+              past_tokens + row_offset >= CK_GGML_FA_TILE_Q)) &&
             (sliding_window == 0 || past_tokens + row_offset + rows <= sliding_window)) {
             const ck_attention_status_t status = ck_attention_f16_prefill_qtile64_dispatch(
                 q + (size_t) row_offset * (size_t) aligned_head_dim,
@@ -7977,7 +7989,8 @@ static ck_attention_status_t ck_attention_prefill_append_f16cache_gemma4_workspa
             continue;
         }
         const ck_attention_reduction_t selected =
-            reduction == CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64
+            (reduction == CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64 ||
+             reduction == CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64_APPEND_TILED)
                 ? CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE :
             reduction == CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64_REGULAR_TAIL_NOSCALE
                 ? CK_ATTN_REDUCTION_F16_REGULAR_NOSCALE : reduction;
@@ -8109,8 +8122,11 @@ static ck_attention_status_t ck_attention_forward_causal_head_major_gqa_prefill_
     for (int s = 0; s < num_segments; ++s) {
         const int rows = segment_lengths[s];
         if (rows == 0) continue;
-        if (reduction == CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64 &&
-            rows >= CK_GGML_FA_TILE_Q) {
+        if ((reduction == CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64 &&
+             rows >= CK_GGML_FA_TILE_Q) ||
+            (reduction == CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64_APPEND_TILED &&
+             (rows >= CK_GGML_FA_TILE_Q ||
+              past_tokens + row_offset >= CK_GGML_FA_TILE_Q))) {
             ck_attention_f16_prefill_qtile64_args_t args = {
                 .q = q + (size_t) row_offset * (size_t) aligned_head_dim,
                 .k_cache = k_cache,
@@ -8147,7 +8163,8 @@ static ck_attention_status_t ck_attention_forward_causal_head_major_gqa_prefill_
             float *q_token = token_workspace;
             float *out_token = token_workspace + token_elems;
             ck_attention_reduction_t selected = reduction;
-            if (selected == CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64) {
+            if (selected == CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64 ||
+                selected == CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64_APPEND_TILED) {
                 selected = CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE;
             }
             for (int t = 0; t < rows; ++t) {
@@ -8217,8 +8234,10 @@ ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_f16
     int aligned_head_dim,
     ck_attention_reduction_t reduction)
 {
-    if (reduction == CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64 &&
-        q_tokens >= CK_GGML_FA_TILE_Q) {
+    if ((reduction == CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64 &&
+         q_tokens >= CK_GGML_FA_TILE_Q) ||
+        (reduction == CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64_APPEND_TILED &&
+         (q_tokens >= CK_GGML_FA_TILE_Q || past_tokens >= CK_GGML_FA_TILE_Q))) {
         return attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract_workspace(
             q, k_cache, v_cache, output, num_heads, num_kv_heads, q_tokens,
             past_tokens, cache_capacity, head_dim, aligned_head_dim, reduction,

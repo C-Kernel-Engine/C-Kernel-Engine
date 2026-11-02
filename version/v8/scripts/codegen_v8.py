@@ -2798,6 +2798,28 @@ def main(argv: list[str] | None = None) -> int:
             # generated entry so external staged calls fail before mutation.
             ir_obj.setdefault("config", {})["prefill_append_row_group"] = (
                 prefill_obj["config"]["prefill_initial_chunk_alignment"])
+    if prefill_obj is not None:
+        minimum_prefixes = [
+            op.get("prefill_append_min_prefix")
+            for op in prefill_obj.get("operations", [])
+            if op.get("prefill_append_min_prefix") is not None
+        ]
+        if minimum_prefixes:
+            if any(type(value) is not int or value < 1 for value in minimum_prefixes):
+                raise RuntimeError("invalid selected prefill minimum prefix")
+            ir_obj.setdefault("config", {})["prefill_append_min_prefix"] = max(
+                minimum_prefixes)
+        append_alignments = [
+            op.get("prefill_append_alignment")
+            for op in prefill_obj.get("operations", [])
+            if op.get("prefill_append_alignment") is not None
+        ]
+        if append_alignments:
+            if any(type(value) is not int or value < 1
+                   for value in append_alignments):
+                raise RuntimeError("invalid selected prefill append alignment")
+            ir_obj.setdefault("config", {})["prefill_append_alignment"] = (
+                math.lcm(*append_alignments))
 
     init_call_obj = None
     init_path = args.init if args.init is not None else args.ir.parent / "init_call.json"

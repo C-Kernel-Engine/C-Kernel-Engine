@@ -3614,6 +3614,12 @@ CK_EXPORT int32_t ck_model_audio_prompt_token_id(int index) {{
     prefill_append_row_group = config.get("prefill_append_row_group", 1)
     if type(prefill_append_row_group) is not int or prefill_append_row_group < 1:
         raise RuntimeError("prefill append row group must be positive")
+    prefill_append_min_prefix = config.get("prefill_append_min_prefix", 0)
+    if type(prefill_append_min_prefix) is not int or prefill_append_min_prefix < 0:
+        raise RuntimeError("prefill append minimum prefix must be nonnegative")
+    prefill_append_alignment = config.get("prefill_append_alignment", 1)
+    if type(prefill_append_alignment) is not int or prefill_append_alignment < 1:
+        raise RuntimeError("prefill append alignment must be positive")
     prefill_count_guard = (
         "count > 0" if uses_persistent_cross_kv_cache else
         "(count > 1 || (count == 1 && g_model->pos > 0))"
@@ -3623,9 +3629,20 @@ CK_EXPORT int32_t ck_model_audio_prompt_token_id(int index) {{
         f"        if (g_model->pos > 0 && g_model->pos % {prefill_append_row_group} != 0) return -3;\n"
         if prefill_append_row_group > 1 else ""
     )
+    if prefill_append_min_prefix:
+        prefill_append_guard += (
+            f"        if (g_model->pos > 0 && g_model->pos < "
+            f"{prefill_append_min_prefix}) return -3;\n"
+        )
+    if prefill_append_alignment > 1:
+        prefill_append_guard += (
+            f"        if (g_model->pos > 0 && g_model->pos % "
+            f"{prefill_append_alignment} != 0) return -3;\n"
+        )
     prefill_append_comment = (
-        "        /* -3: a prior tail reduction cannot be regrouped; state is untouched. */\n"
-        if prefill_append_row_group > 1 else ""
+        "        /* -3: an unsupported numerical split leaves state untouched. */\n"
+        if prefill_append_row_group > 1 or prefill_append_min_prefix or
+        prefill_append_alignment > 1 else ""
     )
     decode_encoder_cache_guard = (
         "    if (!g_model->encoder_kv_ready) return -2;\n"
@@ -4099,8 +4116,18 @@ CK_EXPORT int ck_model_prefill_append_row_group(void) {{
     return {prefill_append_row_group};
 }}
 
+CK_EXPORT int ck_model_prefill_append_min_prefix(void) {{
+    return {prefill_append_min_prefix};
+}}
+
+CK_EXPORT int ck_model_prefill_append_alignment(void) {{
+    return {prefill_append_alignment};
+}}
+
 CK_EXPORT int ck_model_embed_tokens(const int32_t *tokens, int count) {{
     if (!g_model || !tokens || count <= 0) return -1;
+    if (g_model->pos < 0 || g_model->pos > MAX_SEQ_LEN ||
+        count > MAX_SEQ_LEN - g_model->pos) return -3;
     if (ck_model_cancel_requested()) return -2;
     int before_pos = g_model->pos;
     ck_trace_pos("embed_begin", tokens[0], count, before_pos, g_model->pos);

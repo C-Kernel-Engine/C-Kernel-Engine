@@ -237,7 +237,7 @@ class AttentionContractV8Tests(unittest.TestCase):
         )
         self.assertEqual(
             result["kernel"]["selector"],
-            "CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64",
+            "CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64_APPEND_TILED",
         )
         threading = self.kernels["kernels"][result["kernel"]["id"]][
             "implementation"
