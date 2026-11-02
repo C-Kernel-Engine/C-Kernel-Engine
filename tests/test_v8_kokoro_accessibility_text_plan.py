@@ -94,6 +94,18 @@ class KokoroAccessibilityTextPlanTest(unittest.TestCase):
         self.assertGreaterEqual(len(long_chunks), 4)
         self.assertTrue(long_chunks[-1]["source_text"].endswith("again."))
 
+    def test_thousand_word_plan_preserves_spans_beyond_aggregate_limit(self):
+        sound = next(char for char in VOCAB if char.strip()) * 6
+        text = "red " * 999 + "red"
+        tokens = [SimpleNamespace(text="red", whitespace=" " if index < 999 else "",
+                                  phonemes=sound) for index in range(1000)]
+        chunks = planner.plan_tokens(text, tokens, VOCAB, set(range(3, 41)))
+        self.assertGreater(len(chunks), 64)
+        self.assertLessEqual(len(chunks), planner.MAX_CHUNKS)
+        self.assertEqual("".join(text[item["source_start"]:item["source_end"]]
+                                 for item in chunks), text)
+        self.assertEqual([item["index"] for item in chunks], list(range(len(chunks))))
+
     def test_rejects_dropped_source_and_unsupported_geometry(self):
         with self.assertRaisesRegex(planner.TextPlanError, "unspoken source token"):
             planner.plan_tokens("🧪", [SimpleNamespace(text="🧪", whitespace="",

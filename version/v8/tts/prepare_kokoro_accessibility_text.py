@@ -19,7 +19,7 @@ import sys
 
 SCHEMA = "cke.kokoro.accessibility-text-plan.v1"
 MAX_TEXT_BYTES = 8192
-MAX_CHUNKS = 64
+MAX_CHUNKS = 512  # Bounded incremental playback; aggregate WAV stays at 64.
 MAX_REQUEST_IDS = 40
 PINNED_SHA256 = {
     "config": "5abb01e2403b072bf03d04fde160443e209d7a0dad49a423be15196b9b43c17f",

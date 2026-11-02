@@ -348,6 +348,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="verified Kokoro generated runtime bundle")
     parser.add_argument("--audio-player", type=Path,
                         help="local player accepting one 24 kHz mono PCM16 WAV path")
+    parser.add_argument("--kokoro-incremental", action="store_true",
+                        help="play checked Kokoro chunks as they are synthesized")
     args = parser.parse_args(argv)
     try:
         if (args.wav or args.record) and (not args.encoder_run_dir or not args.decoder_run_dir):
@@ -359,6 +361,8 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("--speech-exe cannot be combined with Kokoro options")
         if any(kokoro_options) and not all(kokoro_options):
             parser.error("Kokoro requires --kokoro-config, --kokoro-bundle-dir and --audio-player")
+        if args.kokoro_incremental and not all(kokoro_options):
+            parser.error("--kokoro-incremental requires Kokoro options")
         if args.record:
             with tempfile.TemporaryDirectory(prefix="cke-voice-capture-") as folder:
                 wav = Path(folder) / "microphone.wav"
@@ -387,10 +391,13 @@ def main(argv: list[str] | None = None) -> int:
             speak_and_control(answer, args.speech_exe)
         elif all(kokoro_options):
             adapter = Path(__file__).resolve().parents[1] / "tts/ck_kokoro_play.py"
+            arguments = ("--config", str(args.kokoro_config),
+                         "--bundle-dir", str(args.kokoro_bundle_dir),
+                         "--player", str(args.audio_player))
+            if args.kokoro_incremental:
+                arguments += ("--incremental",)
             speak_and_control(answer, adapter,
-                              arguments=("--config", str(args.kokoro_config),
-                                         "--bundle-dir", str(args.kokoro_bundle_dir),
-                                         "--player", str(args.audio_player)),
+                              arguments=arguments,
                               label="CKE Kokoro")
         else:
             print("No speech executable selected; answer was displayed only.", flush=True)
