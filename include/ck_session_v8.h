@@ -191,6 +191,21 @@ int ck_session_v8_get_progress(CKSessionV8 *session, CKSessionProgressV8 *progre
 int ck_session_v8_reset(CKSessionV8 *session);
 const char *ck_session_v8_last_error(const CKSessionV8 *session);
 
+/* Checkpoint the default sequence at a completed forward boundary. These
+ * calls serialize with generate/reset and return BUSY while either is active.
+ * Storage is caller-owned and must meet the reported alignment and size.
+ * A restore is valid only for the same loaded model instance. The caller must
+ * bind the snapshot to exact rendered token IDs and execution policy; these
+ * APIs do not save logits, sampler state or any HTTP request state. A failed
+ * or cancelled forward must be reset before saving another checkpoint. */
+int ck_session_v8_checkpoint_requirements(CKSessionV8 *session,
+                                          size_t *bytes, size_t *alignment);
+int ck_session_v8_checkpoint_save(CKSessionV8 *session,
+                                  void *snapshot, size_t snapshot_bytes);
+int ck_session_v8_checkpoint_restore(CKSessionV8 *session,
+                                     const void *snapshot,
+                                     size_t snapshot_bytes);
+
 /* Optional bounded two-slot decode mode. This mode owns the generated model
  * until close and is mutually exclusive with generate/reset. Both prompts are
  * prefilled independently using token IDs supplied by the caller. A step

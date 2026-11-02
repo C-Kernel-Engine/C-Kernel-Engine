@@ -228,6 +228,7 @@ typedef struct {
     set_cancel_flag_t set_cancel_flag;
     set_progress_callback_t set_progress_callback;
     ck_model_sequence_state_requirements_v8_fn sequence_requirements;
+    ck_model_sequence_state_default_v8_fn sequence_default;
     ck_model_sequence_state_create_v8_fn sequence_create;
     ck_model_sequence_state_activate_v8_fn sequence_activate;
     ck_model_sequence_state_destroy_v8_fn sequence_destroy;
@@ -1844,6 +1845,7 @@ static bool load_model_api(const char *lib_path, ModelAPI *api) {
     resolve_symbol(api->handle, "ck_model_forward", (void **)&api->forward, false);
     resolve_symbol(api->handle, "ck_model_decode", (void **)&api->decode, false);
     resolve_symbol(api->handle, "ck_model_sequence_state_requirements", (void **)&api->sequence_requirements, false);
+    resolve_symbol(api->handle, "ck_model_sequence_state_default", (void **)&api->sequence_default, false);
     resolve_symbol(api->handle, "ck_model_sequence_state_create", (void **)&api->sequence_create, false);
     resolve_symbol(api->handle, "ck_model_sequence_state_activate", (void **)&api->sequence_activate, false);
     resolve_symbol(api->handle, "ck_model_sequence_state_destroy", (void **)&api->sequence_destroy, false);
@@ -1970,6 +1972,7 @@ static bool load_model_api(const char *lib_path, ModelAPI *api) {
         CK_REQUIRE_CAPABILITY_SYMBOL(CK_MODEL_CAP_GENERATION_POLICY, api->build_generation_prefix, "generation prefix");
         CK_REQUIRE_CAPABILITY_SYMBOL(CK_MODEL_CAP_GENERATION_POLICY, api->apply_generation_policy, "generation logits policy");
         CK_REQUIRE_CAPABILITY_SYMBOL(CK_MODEL_CAP_SEQUENCE_CHECKPOINT, api->checkpoint_requirements, "checkpoint requirements");
+        CK_REQUIRE_CAPABILITY_SYMBOL(CK_MODEL_CAP_SEQUENCE_CHECKPOINT, api->sequence_default, "default sequence handle");
         CK_REQUIRE_CAPABILITY_SYMBOL(CK_MODEL_CAP_SEQUENCE_CHECKPOINT, api->checkpoint_bind_instance, "checkpoint instance binding");
         CK_REQUIRE_CAPABILITY_SYMBOL(CK_MODEL_CAP_SEQUENCE_CHECKPOINT, api->checkpoint_save, "checkpoint save");
         CK_REQUIRE_CAPABILITY_SYMBOL(CK_MODEL_CAP_SEQUENCE_CHECKPOINT, api->checkpoint_restore, "checkpoint restore");
@@ -5734,6 +5737,7 @@ struct CKSessionV8 {
     int batch_enabled;
     int batch_poisoned;
     unsigned batch_poison_reset_mask;
+    int checkpoint_ready;
 };
 
 static void session_progress_set_phase(CKSessionV8 *session, int phase) {
@@ -6030,6 +6034,7 @@ int ck_session_v8_generate(
     if (!(request->flags & CK_SESSION_REQUEST_CONTINUE_STATE) &&
         session->api.kv_reset) {
         session->api.kv_reset();
+        session->checkpoint_ready = 0;
     }
 
     CLIOptions opt;
@@ -6069,6 +6074,8 @@ int ck_session_v8_generate(
         session->api.kv_reset) {
         session->api.kv_reset();
     }
+    session->checkpoint_ready = status == 0 &&
+        result->stop_reason != CK_SESSION_STOP_CANCELLED;
     session_progress_set_phase(session, CK_SESSION_PROGRESS_COMPLETE);
     pthread_mutex_unlock(&session->generation_lock);
     return status == 0 ? CK_SESSION_V8_OK : CK_SESSION_V8_ERROR_RUNTIME;
@@ -6090,9 +6097,72 @@ int ck_session_v8_reset(CKSessionV8 *session) {
         return CK_SESSION_V8_ERROR_BUSY;
     }
     if (session->api.kv_reset) session->api.kv_reset();
+    session->checkpoint_ready = 0;
     atomic_store_explicit(&session->cancel_requested, 0, memory_order_relaxed);
     pthread_mutex_unlock(&session->generation_lock);
     return CK_SESSION_V8_OK;
+}
+
+static int checkpoint_lock(CKSessionV8 *session) {
+    if (!session) return CK_SESSION_V8_ERROR_INVALID_ARGUMENT;
+    if (pthread_mutex_trylock(&session->generation_lock) != 0)
+        return CK_SESSION_V8_ERROR_BUSY;
+    if (session->batch_enabled) {
+        pthread_mutex_unlock(&session->generation_lock);
+        return CK_SESSION_V8_ERROR_BUSY;
+    }
+    if (!(session->api.descriptor.capabilities & CK_MODEL_CAP_SEQUENCE_CHECKPOINT) ||
+        !session->api.sequence_default || !session->api.checkpoint_requirements ||
+        !session->api.checkpoint_save || !session->api.checkpoint_restore) {
+        pthread_mutex_unlock(&session->generation_lock);
+        return CK_SESSION_V8_ERROR_CAPABILITY;
+    }
+    return CK_SESSION_V8_OK;
+}
+
+int ck_session_v8_checkpoint_requirements(CKSessionV8 *session,
+                                          size_t *bytes, size_t *alignment) {
+    if (!bytes || !alignment) return CK_SESSION_V8_ERROR_INVALID_ARGUMENT;
+    int status = checkpoint_lock(session);
+    if (status != CK_SESSION_V8_OK) return status;
+    status = session->api.checkpoint_requirements(bytes, alignment) == 0 &&
+        *bytes && *alignment >= sizeof(void *) &&
+        !(*alignment & (*alignment - 1))
+        ? CK_SESSION_V8_OK : CK_SESSION_V8_ERROR_RUNTIME;
+    pthread_mutex_unlock(&session->generation_lock);
+    return status;
+}
+
+int ck_session_v8_checkpoint_save(CKSessionV8 *session,
+                                  void *snapshot, size_t snapshot_bytes) {
+    if (!snapshot) return CK_SESSION_V8_ERROR_INVALID_ARGUMENT;
+    int status = checkpoint_lock(session);
+    if (status != CK_SESSION_V8_OK) return status;
+    if (!session->checkpoint_ready) {
+        status = CK_SESSION_V8_ERROR_INVALID_ARGUMENT;
+    } else {
+        uint64_t handle = session->api.sequence_default();
+        status = handle && session->api.checkpoint_save(
+            handle, snapshot, snapshot_bytes) == 0
+            ? CK_SESSION_V8_OK : CK_SESSION_V8_ERROR_RUNTIME;
+    }
+    pthread_mutex_unlock(&session->generation_lock);
+    return status;
+}
+
+int ck_session_v8_checkpoint_restore(CKSessionV8 *session,
+                                     const void *snapshot,
+                                     size_t snapshot_bytes) {
+    if (!snapshot) return CK_SESSION_V8_ERROR_INVALID_ARGUMENT;
+    int status = checkpoint_lock(session);
+    if (status != CK_SESSION_V8_OK) return status;
+    uint64_t handle = session->api.sequence_default();
+    status = handle && session->api.checkpoint_restore(
+        handle, snapshot, snapshot_bytes) == 0
+        ? CK_SESSION_V8_OK : CK_SESSION_V8_ERROR_INVALID_ARGUMENT;
+    if (status == CK_SESSION_V8_OK) session->checkpoint_ready = 1;
+    pthread_mutex_unlock(&session->generation_lock);
+    return status;
 }
 
 static int batch2_lock(CKSessionV8 *session) {
