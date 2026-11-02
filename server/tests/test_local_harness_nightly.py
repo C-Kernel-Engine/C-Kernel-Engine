@@ -35,7 +35,7 @@ def test_optional_prefix_lane_missing_assets_is_not_tested(tmp_path):
         "session_library": str(tmp_path / "missing.so"),
         "ids": str(tmp_path / "missing.ids.json"),
         "cases": [{"prefix": 128, "suffix": 9}],
-        "model_sha256": "a" * 64, "session_sha256": "b" * 64,
+        "artifact_sha256": {}, "session_sha256": "b" * 64,
     }))
     row = lane._prefix_certification(config, tmp_path, paused=False)
     assert row["status"] == "NOT_TESTED"
@@ -57,7 +57,10 @@ def test_optional_prefix_lane_requires_pinned_pass_report(tmp_path, monkeypatch)
         "schema": "cke.local_prefix_cert.v1", "bundle": str(bundle),
         "session_library": str(session), "ids": str(ids),
         "cases": [{"prefix": 128, "suffix": 9}], "threads": 2,
-        "model_sha256": hashlib.sha256((bundle / "libmodel.so").read_bytes()).hexdigest(),
+        "artifact_sha256": {name: hashlib.sha256((bundle / name).read_bytes()).hexdigest()
+                            for name in ("libmodel.so", "libckernel_engine.so",
+                                         "model_v8.c", "weights.bump",
+                                         "weights_manifest.map", "config.json")},
         "session_sha256": hashlib.sha256(session.read_bytes()).hexdigest(),
     }))
 
@@ -65,7 +68,7 @@ def test_optional_prefix_lane_requires_pinned_pass_report(tmp_path, monkeypatch)
         output = Path(command[command.index("--out") + 1])
         output.write_text(json.dumps({
             "verdict": "PASS",
-            "artifact_sha256": {"libmodel.so": config_doc["model_sha256"]},
+            "artifact_sha256": config_doc["artifact_sha256"],
             "session_library_sha256": config_doc["session_sha256"],
         }))
         return 0
@@ -74,6 +77,24 @@ def test_optional_prefix_lane_requires_pinned_pass_report(tmp_path, monkeypatch)
     monkeypatch.setattr(lane, "_invoke", fake_invoke)
     row = lane._prefix_certification(config, tmp_path, paused=False)
     assert row["status"] == "PASS" and row["cases"][0]["verdict"] == "PASS"
+    (bundle / "weights.bump").write_bytes(b"replacement")
+    row = lane._prefix_certification(config, tmp_path / "replaced-weights", paused=False)
+    assert row["status"] == "FAIL" and "pinned weights.bump" in row["reason"]
+    (bundle / "weights.bump").write_bytes(b"weights.bump")
+    def wrong_report(command, **kwargs):
+        fake_invoke(command, **kwargs)
+        output = Path(command[command.index("--out") + 1])
+        observed = json.loads(output.read_text())
+        observed["artifact_sha256"]["weights.bump"] = "0" * 64
+        output.write_text(json.dumps(observed))
+        return 0
+
+    monkeypatch.setattr(lane, "_invoke", wrong_report)
+    row = lane._prefix_certification(config, tmp_path / "wrong-report", paused=False)
+    assert row["status"] == "FAIL" and row["reason"] == "prefix parity case failed"
+    monkeypatch.setattr(lane, "_invoke", lambda *args, **kwargs: 124)
+    row = lane._prefix_certification(config, tmp_path / "timeout", paused=False)
+    assert row["status"] == "INCOMPLETE" and "time budget" in row["reason"]
     config_doc["session_sha256"] = "0" * 64
     config.write_text(json.dumps(config_doc))
     row = lane._prefix_certification(config, tmp_path / "other", paused=False)

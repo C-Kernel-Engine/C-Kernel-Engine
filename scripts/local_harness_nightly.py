@@ -140,13 +140,15 @@ def _prefix_certification(config_path: Path, run_dir: Path,
         paths[name] = Path(value).expanduser().resolve()
     cases = config.get("cases")
     threads = config.get("threads", 16)
+    max_seconds = config.get("max_seconds", 7200)
     if (not isinstance(cases, list) or not 1 <= len(cases) <= 16 or
             type(threads) is not int or not 1 <= threads <= 256 or
+            type(max_seconds) is not int or not 60 <= max_seconds <= 86400 or
             any(not isinstance(case, dict) or
                 type(case.get("prefix")) is not int or case["prefix"] < 1 or
                 type(case.get("suffix")) is not int or case["suffix"] < 2
                 for case in cases)):
-        raise ValueError("invalid prefix certification cases or threads")
+        raise ValueError("invalid prefix certification cases, threads or time budget")
     required = (paths["bundle"] / "libmodel.so",
                 paths["bundle"] / "libckernel_engine.so",
                 paths["bundle"] / "layout_decode.json",
@@ -160,11 +162,19 @@ def _prefix_certification(config_path: Path, run_dir: Path,
         row.update(status="NOT_TESTED", reason="prefix assets unavailable",
                    missing=missing)
         return row
-    for name, path in (("model_sha256", required[0]),
-                       ("session_sha256", paths["session_library"])):
-        expected = config.get(name)
-        if not isinstance(expected, str) or len(expected) != 64:
-            raise ValueError(f"missing pinned {name}")
+    bundle_hashes = config.get("artifact_sha256")
+    artifact_names = ("libmodel.so", "libckernel_engine.so", "model_v8.c",
+                      "weights.bump", "weights_manifest.map", "config.json")
+    if not isinstance(bundle_hashes, dict) or set(bundle_hashes) != set(artifact_names):
+        raise ValueError("missing pinned bundle artifact hashes")
+    pinned = [(name, paths["bundle"] / name, bundle_hashes[name])
+              for name in artifact_names]
+    pinned.append(("session_library", paths["session_library"],
+                   config.get("session_sha256")))
+    for name, path, expected in pinned:
+        if (not isinstance(expected, str) or len(expected) != 64 or
+                any(char not in "0123456789abcdef" for char in expected)):
+            raise ValueError(f"missing pinned {name} sha256")
         digest = hashlib.sha256()
         with path.open("rb") as stream:
             for chunk in iter(lambda: stream.read(16 << 20), b""):
@@ -173,7 +183,7 @@ def _prefix_certification(config_path: Path, run_dir: Path,
             row.update(status="FAIL", reason=f"pinned {name} differs")
             return row
     lane = run_dir / "prefix_certification"
-    lane.mkdir()
+    lane.mkdir(parents=True)
     probe = ROOT / "version/v8/scripts/certify_session_multitoken_prefill_v8.py"
     if not probe.is_file():
         row.update(status="NOT_TESTED", reason="prefix probe unavailable")
@@ -186,7 +196,7 @@ def _prefix_certification(config_path: Path, run_dir: Path,
             "--ids", str(paths["ids"]), "--prefix", str(case["prefix"]),
             "--suffix", str(case["suffix"]), "--threads", str(threads),
             "--out", str(output),
-        ], cwd=ROOT, log=lane / f"case-{index}.log", deadline=None)
+        ], cwd=ROOT, log=lane / f"case-{index}.log", deadline=max_seconds)
         try:
             observed = json.loads(output.read_text())
         except (OSError, ValueError):
@@ -195,10 +205,14 @@ def _prefix_certification(config_path: Path, run_dir: Path,
         row["cases"].append({"prefix": case["prefix"], "suffix": case["suffix"],
                              "verdict": verdict, "exit_code": code,
                              "report": str(output)})
-        reported_model = (observed.get("artifact_sha256") or {}).get("libmodel.so")
+        if code == 124:
+            row.update(status="INCOMPLETE", reason="prefix case time budget expired")
+            return row
+        reported_artifacts = observed.get("artifact_sha256") or {}
         reported_session = observed.get("session_library_sha256")
         if (code != 0 or verdict != "PASS" or
-                reported_model != config["model_sha256"] or
+                any(reported_artifacts.get(name) != bundle_hashes[name]
+                    for name in artifact_names) or
                 reported_session != config["session_sha256"]):
             row.update(status="FAIL", reason="prefix parity case failed")
             return row
@@ -327,7 +341,7 @@ def run(config_path: Path, state_dir: Path, *, refresh_main: bool = False,
             prefix_status = report["prefix_certification"]["status"]
             if prefix_status == "FAIL":
                 report["status"] = "FAIL"
-            elif prefix_status == "NOT_TESTED" and report["status"] == "PASS":
+            elif prefix_status != "PASS" and report["status"] == "PASS":
                 report["status"] = "INCOMPLETE"
             elif prefix_status == "PASS" and report["status"] == "NOT_TESTED":
                 report["status"] = "INCOMPLETE"
