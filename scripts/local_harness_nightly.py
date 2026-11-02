@@ -346,20 +346,25 @@ def run(config_path: Path, state_dir: Path, *, refresh_main: bool = False,
                                     "NOT_TESTED" if statuses == {"NOT_TESTED"} else "INCOMPLETE")
         if prefix_cert_config is not None:
             stage = "prefix_certification"
+            harness_status = report["status"]
+            if harness_status != "FAIL":
+                report["status"] = "INCOMPLETE"
             report["prefix_certification"] = {
                 "status": "INCOMPLETE", "config": str(prefix_cert_config),
                 "cases": []}
             publish()
             report["prefix_certification"] = _prefix_certification(
                 prefix_cert_config, run_dir, (state_dir / "PAUSE").exists())
-            publish()
             prefix_status = report["prefix_certification"]["status"]
-            if prefix_status == "FAIL":
+            if "FAIL" in (harness_status, prefix_status):
                 report["status"] = "FAIL"
-            elif "INCOMPLETE" in (prefix_status, report["status"]):
+            elif "INCOMPLETE" in (harness_status, prefix_status):
                 report["status"] = "INCOMPLETE"
-            elif prefix_status != report["status"]:
+            elif prefix_status != harness_status:
                 report["status"] = "INCOMPLETE"
+            else:
+                report["status"] = harness_status
+            publish()
     except Exception as exc:
         report.update(status="FAIL", reason=f"{stage} failed: {type(exc).__name__}: {exc}",
                       error_type=type(exc).__name__, failure_stage=stage)

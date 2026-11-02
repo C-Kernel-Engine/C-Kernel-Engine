@@ -129,6 +129,22 @@ def test_incomplete_prefix_lane_cannot_leave_current_run_not_tested(tmp_path, mo
     assert json.loads((state / "latest.json").read_text())["status"] == "INCOMPLETE"
 
 
+def test_prefix_lane_publishes_incomplete_while_running(tmp_path, monkeypatch):
+    monkeypatch.setattr(lane, "_source_commit", lambda: "c" * 40)
+    state = tmp_path / "state"
+    def observe_current(*_args):
+        current = json.loads((state / "latest.json").read_text())
+        assert current["status"] == "INCOMPLETE"
+        assert current["prefix_certification"]["status"] == "INCOMPLETE"
+        return {"status": "PASS", "cases": []}
+
+    monkeypatch.setattr(lane, "_prefix_certification", observe_current)
+    report = lane.run(tmp_path / "missing-harness.json", state,
+                      prefix_cert_config=tmp_path / "prefix.json")
+    assert report["status"] == "INCOMPLETE"
+    assert report["prefix_certification"]["status"] == "PASS"
+
+
 def test_unavailable_endpoint_cannot_pass(tmp_path, monkeypatch):
     monkeypatch.setattr(lane, "_source_commit", lambda: "c" * 40)
     config = tmp_path / "config.json"
