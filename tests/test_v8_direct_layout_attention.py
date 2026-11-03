@@ -1147,5 +1147,45 @@ class DirectLayoutAttentionTests(unittest.TestCase):
             replay._resolved_segmented_call(call_ir, 0)
 
 
+    def test_z_flash_consumer_short_append_matches_fresh_tiled_prefix(self):
+        """The shared Flash map must keep the stored-KV tail's reduction."""
+        heads, kv_heads, dim, total, prefix = 2, 1, 16, 65, 64
+        q = array("f", (math.sin(i * 0.137 + 0.31)
+                        for i in range(heads * total * dim)))
+        def half(value):
+            return int.from_bytes(struct.pack("<e", value), "little")
+        k = array("H", (half(math.cos(i * 0.113 + 0.19))
+                        for i in range(kv_heads * total * dim)))
+        v = array("H", (half(math.sin(i * 0.171 + 0.27))
+                        for i in range(kv_heads * total * dim)))
+        tail_q = array("f", (value for head in range(heads)
+                             for value in q[(head * total + prefix) * dim:
+                                            (head * total + prefix + 1) * dim]))
+        token_workspace = array("f", [0.0]) * (2 * heads * dim)
+        def fp(values):
+            return (ctypes.c_float * len(values)).from_buffer(values)
+        def hp(values):
+            return (ctypes.c_uint16 * len(values)).from_buffer(values)
+        def run(query, rows, past, reduction):
+            out = array("f", [0.0]) * (heads * rows * dim)
+            status = self._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_auto_workspace(
+                fp(query), hp(k), hp(v), fp(out), heads, kv_heads, rows,
+                past, total, dim, dim, reduction, fp(token_workspace),
+                len(token_workspace) * 4, None, 0,
+                24, 4, 256, 4096, 8192, 16, 128, 4,
+            )
+            self.assertEqual(status, 0)
+            return out
+        full = run(q, total, 0, 7)
+        staged = run(tail_q, 1, prefix, 7)
+        expected = array("f", (value for head in range(heads)
+                               for value in full[(head * total + prefix) * dim:
+                                                 (head * total + prefix + 1) * dim]))
+        self.assertEqual(staged.tobytes(), expected.tobytes())
+        # The old selector's short-query online path is a real negative
+        # control, not just a changed map string.
+        self.assertNotEqual(run(tail_q, 1, prefix, 3).tobytes(), expected.tobytes())
+
+
 if __name__ == "__main__":
     unittest.main()

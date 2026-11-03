@@ -1,0 +1,220 @@
+[
+  {
+    "idx": 93,
+    "function": "kv_cache_store_batch_f16",
+    "op": "kv_cache_store_batch_f16",
+    "layer": 3,
+    "section": "body",
+    "args": [
+      {
+        "name": "kv_cache_k",
+        "source": "runtime:kv_cache_k_layer_f16",
+        "expr": "(uint16_t*)((model->kv_cache_f16 + ((size_t)3*2)*NUM_KV_HEADS*MAX_SEQ_LEN*1))"
+      },
+      {
+        "name": "kv_cache_v",
+        "source": "runtime:kv_cache_v_layer_f16",
+        "expr": "(uint16_t*)((model->kv_cache_f16 + ((size_t)3*2+1)*NUM_KV_HEADS*MAX_SEQ_LEN*1))"
+      },
+      {
+        "name": "k",
+        "source": "activation:k_src",
+        "expr": "(const float*)(model->bump + A_K_SCRATCH)",
+        "buffer_ref": "k_scratch"
+      },
+      {
+        "name": "v",
+        "source": "activation:v_src",
+        "expr": "(const float*)(model->bump + A_V_SCRATCH)",
+        "buffer_ref": "v_scratch"
+      },
+      {
+        "name": "start_pos",
+        "source": "runtime:prefill_start_pos",
+        "expr": "model->pos"
+      },
+      {
+        "name": "num_tokens",
+        "source": "dim:seq_len",
+        "expr": "4096"
+      },
+      {
+        "name": "num_kv_heads",
+        "source": "dim:num_kv_heads",
+        "expr": "4"
+      },
+      {
+        "name": "head_dim",
+        "source": "dim:head_dim",
+        "expr": "256"
+      },
+      {
+        "name": "max_seq_len",
+        "source": "dim:max_seq_len",
+        "expr": "4096"
+      }
+    ],
+    "errors": [],
+    "warnings": [],
+    "call_abi": {
+      "version": 1,
+      "owner": "kernel_map",
+      "kernel_id": "kv_cache_store_batch_f16",
+      "source_file": "kv_cache_store_batch_f16.json"
+    },
+    "resolved_contract": {
+      "function": "kv_cache_store_batch_f16",
+      "kernel_id": "kv_cache_store_batch_f16",
+      "operation": "decoder.kv_store"
+    }
+  },
+  {
+    "idx": 94,
+    "function": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_auto_workspace",
+    "op": "attn",
+    "layer": 3,
+    "section": "body",
+    "args": [
+      {
+        "name": "q",
+        "source": "scratch:q_scratch",
+        "expr": "(const float*)(model->bump + A_Q_SCRATCH)",
+        "buffer_ref": "q_scratch"
+      },
+      {
+        "name": "k_cache",
+        "source": "runtime:kv_cache_k_layer_f16",
+        "expr": "(const uint16_t*)((model->kv_cache_f16 + ((size_t)3*2)*NUM_KV_HEADS*MAX_SEQ_LEN*1))"
+      },
+      {
+        "name": "v_cache",
+        "source": "runtime:kv_cache_v_layer_f16",
+        "expr": "(const uint16_t*)((model->kv_cache_f16 + ((size_t)3*2+1)*NUM_KV_HEADS*MAX_SEQ_LEN*1))"
+      },
+      {
+        "name": "output",
+        "source": "output:out",
+        "expr": "(float*)(model->bump + A_ATTN_SCRATCH)",
+        "buffer_ref": "attn_scratch"
+      },
+      {
+        "name": "num_heads",
+        "source": "dim:num_heads",
+        "expr": "24"
+      },
+      {
+        "name": "num_kv_heads",
+        "source": "dim:num_kv_heads",
+        "expr": "4"
+      },
+      {
+        "name": "q_tokens",
+        "source": "dim:seq_len",
+        "expr": "4096"
+      },
+      {
+        "name": "past_tokens",
+        "source": "runtime:prefill_start_pos",
+        "expr": "model->pos"
+      },
+      {
+        "name": "cache_capacity",
+        "source": "dim:max_seq_len",
+        "expr": "4096"
+      },
+      {
+        "name": "head_dim",
+        "source": "dim:head_dim",
+        "expr": "256"
+      },
+      {
+        "name": "aligned_head_dim",
+        "source": "dim:head_dim",
+        "expr": "256"
+      },
+      {
+        "name": "reduction",
+        "source": "const:CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64_APPEND_TILED",
+        "expr": "CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64_APPEND_TILED"
+      },
+      {
+        "name": "token_workspace",
+        "source": "scratch:token_workspace",
+        "expr": "(float*)(model->bump + A_TOKEN_WORKSPACE)",
+        "buffer_ref": "token_workspace"
+      },
+      {
+        "name": "token_workspace_bytes",
+        "source": "scratch_size:token_workspace",
+        "expr": "49152"
+      },
+      {
+        "name": "gqa_workspace",
+        "source": "scratch:gqa_workspace",
+        "expr": "(void*)(model->bump + A_GQA_WORKSPACE)",
+        "buffer_ref": "gqa_workspace"
+      },
+      {
+        "name": "gqa_workspace_bytes",
+        "source": "scratch_size:gqa_workspace",
+        "expr": "33554432"
+      },
+      {
+        "name": "route_num_heads",
+        "source": "const:24",
+        "expr": "24"
+      },
+      {
+        "name": "route_num_kv_heads",
+        "source": "const:4",
+        "expr": "4"
+      },
+      {
+        "name": "route_head_dim",
+        "source": "const:256",
+        "expr": "256"
+      },
+      {
+        "name": "route_query_tokens",
+        "source": "const:4096",
+        "expr": "4096"
+      },
+      {
+        "name": "route_min_kv_tokens",
+        "source": "const:8192",
+        "expr": "8192"
+      },
+      {
+        "name": "route_workers",
+        "source": "const:16",
+        "expr": "16"
+      },
+      {
+        "name": "route_query_tile_size",
+        "source": "const:128",
+        "expr": "128"
+      },
+      {
+        "name": "route_concurrent_query_tiles",
+        "source": "const:4",
+        "expr": "4"
+      }
+    ],
+    "errors": [],
+    "warnings": [],
+    "call_abi": {
+      "version": 1,
+      "owner": "kernel_map",
+      "kernel_id": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_flash_auto_qtile64",
+      "source_file": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_flash_auto_qtile64.json"
+    },
+    "prefill_history_scope": "prior_cache",
+    "prefill_append_min_prefix": 64,
+    "prefill_append_alignment": 64,
+    "resolved_contract": {
+      "function": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_auto_workspace",
+      "kernel_id": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_flash_auto_qtile64",
+      "operation": "decoder.attention"
+    }
+  }
+]
