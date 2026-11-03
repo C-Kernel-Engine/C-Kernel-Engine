@@ -335,16 +335,19 @@ def test_plain_chat_suite_rejects_false_success(monkeypatch, terminal, limit_sta
     assert len(calls) == len(cases)
 
 
-@pytest.mark.parametrize("cap,mode", [(None, "output_reservation"),
-                                      (256, "rendered_byte_limit")])
-def test_budget_boundary_rejects_overflow_then_recovers(monkeypatch, cap, mode):
+@pytest.mark.parametrize("cap,byte_cap,mode", [
+    (None, None, "output_reservation"),
+    (256, 4096, "rendered_byte_limit"),
+    (256, None, "counted_token_limit"),
+])
+def test_budget_boundary_rejects_overflow_then_recovers(monkeypatch, cap, byte_cap, mode):
     calls = []
 
     def fake_request(method, path, **kwargs):
         calls.append(kwargs["payload"])
-        return (_Response(400, {"error": {"code": "context_length_exceeded"}})
-                if cap is None else
-                _Response(413, {"error": {"code": "prompt_bytes_limit_exceeded"}}))
+        return (_Response(413, {"error": {"code": "prompt_bytes_limit_exceeded"}})
+                if byte_cap is not None else
+                _Response(400, {"error": {"code": "context_length_exceeded"}}))
 
     monkeypatch.setattr(probe, "request", fake_request)
     monkeypatch.setattr(probe, "followup", lambda label: {"label": label,
@@ -353,14 +356,18 @@ def test_budget_boundary_rejects_overflow_then_recovers(monkeypatch, cap, mode):
     cases = []
     probe.run_budget_boundary({"effective_serving": {
         "active_context_limit": 2048, "request_output_cap": cap,
-        "request_prompt_byte_cap": 4096 if cap is not None else None}}, cases)
+        "request_prompt_byte_cap": byte_cap}}, cases)
     assert cases[0]["mode"] == mode
     assert cases[0]["followup"]["status"] == "completed"
     assert calls[0]["max_output_tokens"] == (2048 if cap is None else 1)
-    if cap is not None:
+    if byte_cap is not None:
         assert len(calls[0]["input"]) > 4096
         assert cases[0]["byte_limit_proven"] is True
         assert cases[0]["counted_token_exceedance_proven"] is False
+    if mode == "counted_token_limit":
+        assert calls[0]["input"].count("🙂") == 2049
+        assert cases[0]["counted_token_exceedance_proven"] is True
+        assert cases[0]["byte_limit_proven"] is False
 
 
 def test_budget_boundary_does_not_accept_silent_truncation(monkeypatch):
@@ -374,7 +381,7 @@ def test_budget_boundary_does_not_accept_silent_truncation(monkeypatch):
 def test_budget_boundary_does_not_treat_native_failure_as_capacity_rejection(monkeypatch):
     monkeypatch.setattr(probe, "request", lambda *args, **kwargs: _Response(
         500, {"error": {"code": "native_tokenization_failed"}}))
-    with pytest.raises(RuntimeError, match="explicit, bounded prompt byte cap"):
+    with pytest.raises(RuntimeError, match="overflow was not rejected"):
         probe.run_budget_boundary({"effective_serving": {
             "active_context_limit": 2048, "request_output_cap": 256}}, [])
     with pytest.raises(RuntimeError, match="overflow was not rejected"):
