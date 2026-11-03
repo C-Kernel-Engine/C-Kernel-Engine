@@ -283,14 +283,18 @@ class AccessibleVoiceTest(unittest.TestCase):
         voice.speak_and_control("Hello.", executable, stop_when_started)
         pid = int(marker.read_text())
         # A killed worker may remain a zombie until the local init reaps it.
+        def state() -> str | None:
+            try:
+                return Path(f"/proc/{pid}/stat").read_text().split()[2]
+            except FileNotFoundError:
+                return None
+
         deadline = time.monotonic() + 3
-        while Path(f"/proc/{pid}/stat").exists() and time.monotonic() < deadline:
-            state = Path(f"/proc/{pid}/stat").read_text().split()[2]
-            if state == "Z":
+        while time.monotonic() < deadline:
+            if state() in (None, "Z"):
                 break
             time.sleep(0.01)
-        if Path(f"/proc/{pid}/stat").exists():
-            self.assertEqual(Path(f"/proc/{pid}/stat").read_text().split()[2], "Z")
+        self.assertIn(state(), (None, "Z"), "speech worker remained live after stop")
 
     def test_kokoro_answer_uses_checked_playback_adapter(self):
         with mock.patch.object(voice, "confirm", return_value="Read status"), \
