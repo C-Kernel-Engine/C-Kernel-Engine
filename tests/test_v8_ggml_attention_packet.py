@@ -10,6 +10,7 @@ import numpy as np
 
 from version.v8.scripts.replay_ggml_attention_packet_v8 import (
     FLASH_SOURCE, OBSERVED_SOURCE, _compile_ggml_source, _observed_capture,
+    _observed_segment_plan,
     _substitute_observed_operands,
     compare_observed_cke_operands,
     fp64_full_flash_reference_rows,
@@ -129,6 +130,17 @@ class GgmlAttentionPacketTests(unittest.TestCase):
                 np.frombuffer(paths["k"].read_bytes(), dtype="<f2").reshape(1, 32, 4)[0, :2],
                 tensors["Kcache_post_store"][:, 0],
             ))
+            longer = {key: np.concatenate((value, value + 100), axis=0)
+                      for key, value in tensors.items()}
+            paths, extent = _substitute_observed_operands(
+                root, name, specs, geometry, longer, output,
+            )
+            self.assertEqual(extent["query_start"], 0)
+            self.assertEqual(extent["valid_cache_positions"], [0, 2])
+            self.assertTrue(np.array_equal(
+                np.frombuffer(paths["k"].read_bytes(), dtype="<f2").reshape(1, 32, 4)[0, :2],
+                tensors["Kcache_post_store"][:, 0],
+            ))
             wrong = {**tensors, "Qcur_rope": tensors["Qcur_rope"][:1]}
             with self.assertRaisesRegex(BundleError, "geometry"):
                 _substitute_observed_operands(root, name, specs, geometry, wrong, output)
@@ -153,6 +165,18 @@ class GgmlAttentionPacketTests(unittest.TestCase):
                         Path("unused"), scale=1, alibi=0, threads=1,
                         parity_report=report,
                     )
+
+    def test_partial_observed_replay_requires_complete_segment(self):
+        plan = [{"name": "text_before", "rows": 2, "physical_start": 0},
+                {"name": "visual", "rows": 3, "physical_start": 2},
+                {"name": "text_after", "rows": 1, "physical_start": 5}]
+        self.assertEqual(_observed_segment_plan(plan, [2, 3, 1], 5, 3), plan[:2])
+        with self.assertRaisesRegex(BundleError, "segment boundary"):
+            _observed_segment_plan(plan, [2, 3, 1], 4, 2)
+        with self.assertRaisesRegex(BundleError, "segment boundary"):
+            _observed_segment_plan(plan, [2, 3, 1], 5, 2)
+        with self.assertRaisesRegex(BundleError, "differs"):
+            _observed_segment_plan(plan, [3, 2, 1], 5, 3)
 
     def test_cache_history_reports_first_logical_row_and_segment(self):
         oracle = {kind: np.zeros((4, 2, 3), dtype="<f2") for kind in ("K", "V")}
