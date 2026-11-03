@@ -17,6 +17,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#define CK_TTS_MAX_SEQUENCE_CHUNKS 512u
 #ifdef CK_TTS_PARALLEL_CONV
 #include "ck_threadpool.h"
 #if !defined(CK_TTS_CONV_WORKERS) || CK_TTS_CONV_WORKERS < 1 || CK_TTS_CONV_WORKERS > 16
@@ -419,7 +420,8 @@ static int serve(loaded_package *package, const char *voice_path) {
         char *ids = seed ? strchr(seed, '\t') : NULL;
         if (ids) *ids++ = 0;
         if (!seed || !ids || (!append && !*output) || !*seed || !*ids ||
-            (append && (!sequence.stream || sequence.chunks >= 64))) {
+            (append && (!sequence.stream ||
+                        sequence.chunks >= CK_TTS_MAX_SEQUENCE_CHUNKS))) {
             if (append) abort_sequence(&sequence);
             puts("ERROR\tinvalid request");
             fflush(stdout);
