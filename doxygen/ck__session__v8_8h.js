@@ -7,6 +7,9 @@ var ck__session__v8_8h =
     [ "CK_SESSION_ABI_V8_VERSION", "ck__session__v8_8h.html#a247f35bc16080cb3d818fc8efcffac3a", null ],
     [ "ck_session_token_callback_v8", "ck__session__v8_8h.html#a16ef8c38f1a1006190320a0419d857db", null ],
     [ "CKSessionV8", "ck__session__v8_8h.html#a662ce370d189b1138dd8d10af00872c2", null ],
+    [ "CKSessionPrefillFlagsV8", "ck__session__v8_8h.html#ab150db94561001cdd19380fff0d5eba9", [
+      [ "CK_SESSION_PREFILL_CONTINUE_STATE", "ck__session__v8_8h.html#ab150db94561001cdd19380fff0d5eba9abca8642a2d47294052259d93ecfdc8d9", null ]
+    ] ],
     [ "CKSessionProgressPhaseV8", "ck__session__v8_8h.html#a6b968d6150a0230e7bd2cb748000b604", [
       [ "CK_SESSION_PROGRESS_IDLE", "ck__session__v8_8h.html#a6b968d6150a0230e7bd2cb748000b604aa80f0c87c16c36b5006973b813aad387", null ],
       [ "CK_SESSION_PROGRESS_PREFILL", "ck__session__v8_8h.html#a6b968d6150a0230e7bd2cb748000b604a8b7e820376db38c49ede4436d66f5abe", null ],
@@ -61,11 +64,14 @@ var ck__session__v8_8h =
     [ "ck_session_v8_encode", "ck__session__v8_8h.html#aa364837eac8585e557f9f155b363a144", null ],
     [ "ck_session_v8_format_chat", "ck__session__v8_8h.html#a772e200b97037aae7c5584914b6676be", null ],
     [ "ck_session_v8_generate", "ck__session__v8_8h.html#a974e5fe465942fb57e6ac6e6216af5a9", null ],
+    [ "ck_session_v8_generate_ids", "ck__session__v8_8h.html#af683b26fd374f29d8b96d7b3638b6b88", null ],
     [ "ck_session_v8_get_abi_version", "ck__session__v8_8h.html#a89aaf5e7382ca7e2c6c3caa2ec65bf45", null ],
     [ "ck_session_v8_get_model_descriptor", "ck__session__v8_8h.html#a6a5e68996841153114998d3c3f4aa3da", null ],
     [ "ck_session_v8_get_progress", "ck__session__v8_8h.html#ab380feb3b65c157233416f68b6a0cf63", null ],
     [ "ck_session_v8_get_stop_token_ids", "ck__session__v8_8h.html#acd07860df80d445702c7f0bdab1e06c2", null ],
     [ "ck_session_v8_last_error", "ck__session__v8_8h.html#a0d8e657d40221ddc9e6eebb26d3058b0", null ],
     [ "ck_session_v8_open", "ck__session__v8_8h.html#a1135a4513592770a326eaf0bd2d8a2ca", null ],
+    [ "ck_session_v8_prefill_contract", "ck__session__v8_8h.html#abcc9951c8b5842c50e19fab18e957571", null ],
+    [ "ck_session_v8_prefill_ids", "ck__session__v8_8h.html#a35f3b6b479ce7f912a5fb746859b72ec", null ],
     [ "ck_session_v8_reset", "ck__session__v8_8h.html#a8ea23a67d215065ed8fe1cf4386f86f1", null ]
 ];
