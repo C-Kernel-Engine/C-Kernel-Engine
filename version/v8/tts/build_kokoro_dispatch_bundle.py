@@ -55,11 +55,15 @@ def selected_runtime_counts(experimental_counts: tuple[int, ...],
 
 def build_bundle(bump_dir: Path, voice_bank: Path, output: Path,
                  *, conv_provider: str = "scalar",
+                 conv_workers: int = 4,
                  experimental_counts: tuple[int, ...] = (),
                  runtime_lengths: bool = False,
                  runtime_experimental_range: bool = False) -> dict:
     if conv_provider not in CONV_PROVIDERS:
         raise ValueError(f"unsupported Kokoro Conv1D provider: {conv_provider}")
+    if isinstance(conv_workers, bool) or not isinstance(conv_workers, int) or \
+            not 1 <= conv_workers <= 16:
+        raise ValueError("Conv1D worker count must be an integer in 1..16")
     if runtime_experimental_range and not runtime_lengths:
         raise ValueError("experimental runtime range requires --runtime-lengths")
     counts = (selected_runtime_counts(experimental_counts, runtime_experimental_range)
@@ -87,7 +91,7 @@ def build_bundle(bump_dir: Path, voice_bank: Path, output: Path,
                                      dir=output.parent) as temporary:
         staging = Path(temporary) / "bundle"
         report = _build_into(bump_dir, voice_bank, staging, bindings,
-                             expected_voice, conv_provider, counts,
+                             expected_voice, conv_provider, conv_workers, counts,
                              execution_only, runtime_lengths)
         # The complete bundle becomes visible in one same-filesystem rename.
         # Replacing an existing empty directory preserves the prior API.
@@ -100,7 +104,7 @@ def build_bundle(bump_dir: Path, voice_bank: Path, output: Path,
 
 def _build_into(bump_dir: Path, voice_bank: Path, output: Path,
                 bindings: dict, expected_voice: str,
-                conv_provider: str, counts: tuple[int, ...],
+                conv_provider: str, conv_workers: int, counts: tuple[int, ...],
                 experimental_counts: tuple[int, ...],
                 runtime_lengths: bool) -> dict:
     output.mkdir()
@@ -110,6 +114,8 @@ def _build_into(bump_dir: Path, voice_bank: Path, output: Path,
     buckets = {}
     for count in ((64,) if runtime_lengths else counts):
         runtime_options = {"runtime_lengths": True} if runtime_lengths else {}
+        if conv_provider == "avx2_parallel":
+            runtime_options["conv_workers"] = conv_workers
         report = build_runtime(bump_dir, output / str(count), count,
                                conv_provider=conv_provider,
                                **runtime_options)
@@ -152,6 +158,7 @@ def _build_into(bump_dir: Path, voice_bank: Path, output: Path,
         "schema": "cke.kokoro.native_dispatch_bundle.v1",
         "runtime_lengths": runtime_lengths,
         "conv_provider": conv_provider,
+        "conv_workers": conv_workers if conv_provider == "avx2_parallel" else 0,
         "supported_phoneme_counts": list(counts),
         "baseline_phoneme_counts": list(SUPPORTED_COUNTS),
         "captured_phoneme_counts": (list(RUNTIME_EXECUTION_COUNTS)
@@ -184,6 +191,8 @@ def main() -> None:
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--conv-provider", choices=CONV_PROVIDERS,
                         default="scalar")
+    parser.add_argument("--conv-workers", type=int, default=4,
+                        help="caller-owned worker pool size for avx2_parallel")
     parser.add_argument("--experimental-count", type=int, action="append",
                         default=[], help="add an experimental count (3..40); "
                         "runtime mode reuses one generated graph")
@@ -195,6 +204,7 @@ def main() -> None:
     args = parser.parse_args()
     print(json.dumps(build_bundle(args.bump_dir, args.voice_bank,
                                  args.output_dir, conv_provider=args.conv_provider,
+                                 conv_workers=args.conv_workers,
                                  experimental_counts=tuple(args.experimental_count),
                                  runtime_lengths=args.runtime_lengths,
                                  runtime_experimental_range=args.runtime_experimental_range),

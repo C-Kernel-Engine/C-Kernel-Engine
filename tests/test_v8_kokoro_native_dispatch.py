@@ -318,6 +318,26 @@ class KokoroNativeDispatchTest(unittest.TestCase):
         self.assertIn("audio_conv1d_checked_channel_major_f32_avx2_fma", selected)
         self.assertIn("audio_conv1d_dilated_checked_channel_major_f32_avx2_fma", selected)
         self.assertEqual(select_conv_provider(build_circuit(36), "avx2_fma"), 88)
+        parallel = build_circuit(8)
+        self.assertEqual(select_conv_provider(parallel, "avx2_parallel", workers=4), 88)
+        self.assertEqual(parallel["required_numerical_contracts"]["audio_conv1d_checked"]
+                         ["phases"]["prefill"]["contract_id"],
+                         "audio_conv1d_checked_x86_avx2_parallel_fp32")
+        self.assertEqual(parallel["native_entry"]["params"][-1],
+                         {"c_type": "void *", "name": "worker_pool"})
+        parallel_ops = [op for block in parallel["block_types"].values()
+                        for op in block["header"] + block["body"]["ops"] + block["footer"]
+                        if op.get("kernel", "").endswith("_avx2_parallel")]
+        self.assertEqual(len(parallel_ops), 88)
+        self.assertTrue(all(op["params"]["conv_worker_pool"] == "worker_pool" and
+                            op["params"]["conv_worker_count"] == 4 for op in parallel_ops))
+        for workers in (0, 17):
+            with self.assertRaisesRegex(ValueError, "worker"):
+                select_conv_provider(build_circuit(8), "avx2_parallel", workers=workers)
+            with self.assertRaisesRegex(ValueError, "worker"):
+                bundle_builder.build_bundle(self.root / "missing", self.root /
+                    "af_heart.ckvoice", self.root / "not-published",
+                    conv_provider="avx2_parallel", conv_workers=workers)
         with self.assertRaisesRegex(ValueError, "unsupported Kokoro Conv1D"):
             select_conv_provider(build_circuit(8), "avx512_vnni")
         with self.assertRaisesRegex(ValueError, "unsupported Kokoro Conv1D"):
