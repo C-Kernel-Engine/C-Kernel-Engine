@@ -17,6 +17,12 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#ifdef CK_TTS_PARALLEL_CONV
+#include "ck_threadpool.h"
+#if !defined(CK_TTS_CONV_WORKERS) || CK_TTS_CONV_WORKERS < 1 || CK_TTS_CONV_WORKERS > 16
+#error "parallel Conv1D requires a declared 1..16 worker count"
+#endif
+#endif
 #ifdef CK_TTS_RUNTIME_WAVEFORM
 #define CK_TTS_GENERATED_ENTRY ck_kokoro_runtime_waveform_bounded
 #define CK_TTS_GENERATED_SYMBOL "ck_kokoro_runtime_waveform_bounded"
@@ -70,10 +76,18 @@ static int verify_loaded_library(void) {
 
 #ifdef CK_TTS_RUNTIME_WAVEFORM
 extern int CK_TTS_GENERATED_ENTRY(uint8_t *, size_t, int32_t *, int32_t *,
-    int32_t *, int32_t *, int32_t *, int32_t *, int32_t *, int32_t *, int32_t *);
+    int32_t *, int32_t *, int32_t *, int32_t *, int32_t *, int32_t *, int32_t *
+#ifdef CK_TTS_PARALLEL_CONV
+    , void *
+#endif
+    );
 #else
 extern int CK_TTS_GENERATED_ENTRY(uint8_t *, size_t, int32_t *, int32_t *,
-    int32_t *, int32_t *, int32_t *, int32_t *, int32_t *);
+    int32_t *, int32_t *, int32_t *, int32_t *, int32_t *
+#ifdef CK_TTS_PARALLEL_CONV
+    , void *
+#endif
+    );
 #endif
 
 static int read_u32(FILE *stream, uint32_t *value) {
@@ -228,6 +242,7 @@ typedef struct {
     uint64_t ids_offset, ids_count;
     uint64_t predictor_offset, decoder_offset, request_length_offset;
     int runtime_request, native_noise, request;
+    void *worker_pool;
 } loaded_package;
 
 static int synthesize(loaded_package *package, const char *output,
@@ -275,6 +290,9 @@ static int synthesize(loaded_package *package, const char *output,
         &lengths[4], &lengths[5], &lengths[6]
 #ifdef CK_TTS_RUNTIME_WAVEFORM
         , &lengths[7], &lengths[8]
+#endif
+#ifdef CK_TTS_PARALLEL_CONV
+        , package->worker_pool
 #endif
         );
 #ifdef CK_TTS_RUNTIME_WAVEFORM
@@ -545,8 +563,16 @@ int main(int argc, char **argv) {
         .runtime_request = runtime_request,
         .native_noise = native_noise, .request = request,
     };
+#ifdef CK_TTS_PARALLEL_CONV
+    ck_threadpool_t *pool = ck_threadpool_create(CK_TTS_CONV_WORKERS);
+    if (!pool) { free(arena); return 5; }
+    package.worker_pool = pool;
+#endif
     if (session_mode) {
         const int result = serve(&package, argv[3]);
+#ifdef CK_TTS_PARALLEL_CONV
+        ck_threadpool_destroy(pool);
+#endif
         free(arena);
         return result;
     }
@@ -555,6 +581,9 @@ int main(int argc, char **argv) {
                                   argc >= 4 ? argv[3] : NULL,
                                   argc == 6 ? argv[4] : NULL,
                                   argc == 6 ? argv[5] : NULL, NULL, &samples);
+#ifdef CK_TTS_PARALLEL_CONV
+    ck_threadpool_destroy(pool);
+#endif
     free(arena);
     if (!result) printf("wrote %zu samples at 24000 Hz\n", samples);
     return result;
