@@ -33,6 +33,7 @@ BUILD_DIR = PROJECT_ROOT / "build"
 SESSION_LIB_PATH = BUILD_DIR / "libck_session_v8.so"
 
 CK_SESSION_REQUEST_RAW_PROMPT = 1 << 0
+CK_SESSION_REQUEST_CONTINUE_STATE = 1 << 3
 CK_SESSION_REQUEST_REJECT_PROMPT_TRUNCATION = 1 << 4
 
 _STOP_REASON_NAMES = {
@@ -262,9 +263,30 @@ def _configure_abi(lib: Any, name: str) -> None:
             ctypes.c_void_p,
             ctypes.POINTER(_GenerateResult),
         ]
+    elif name == "ck_session_v8_generate_ids":
+        fn.restype = ctypes.c_int
+        fn.argtypes = [ctypes.c_void_p, ctypes.c_void_p,
+                       ctypes.POINTER(ctypes.c_int32), ctypes.c_int32,
+                       ctypes.c_void_p, ctypes.c_void_p,
+                       ctypes.POINTER(_GenerateResult)]
     elif name == "ck_session_v8_get_progress":
         fn.restype = ctypes.c_int
         fn.argtypes = [ctypes.c_void_p, ctypes.POINTER(_Progress)]
+    elif name == "ck_session_v8_prefill_ids":
+        fn.restype = ctypes.c_int
+        fn.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_int32),
+                       ctypes.c_int32, ctypes.c_int32, ctypes.c_uint32]
+    elif name == "ck_session_v8_prefill_contract":
+        fn.restype = ctypes.c_int
+        fn.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_int32),
+                       ctypes.POINTER(ctypes.c_int32), ctypes.POINTER(ctypes.c_int32)]
+    elif name == "ck_session_v8_checkpoint_requirements":
+        fn.restype = ctypes.c_int
+        fn.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_size_t),
+                       ctypes.POINTER(ctypes.c_size_t)]
+    elif name in ("ck_session_v8_checkpoint_save", "ck_session_v8_checkpoint_restore"):
+        fn.restype = ctypes.c_int
+        fn.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_size_t]
     elif name in ("ck_session_v8_cancel", "ck_session_v8_close"):
         fn.restype = None
         fn.argtypes = [ctypes.c_void_p]
@@ -521,6 +543,21 @@ def stop_reason_name(value: Any) -> str:
 _stop_reason_name = stop_reason_name
 
 
+class SequenceCheckpointV8:
+    """Caller-owned aligned native snapshot; no logits or sampling state."""
+
+    __slots__ = ("storage", "address", "nbytes", "alignment")
+
+    def __init__(self, nbytes: int, alignment: int) -> None:
+        if nbytes <= 0 or alignment < 1 or alignment & (alignment - 1):
+            raise ValueError("invalid checkpoint size or alignment")
+        self.storage = ctypes.create_string_buffer(nbytes + alignment)
+        self.address = ((ctypes.addressof(self.storage) + alignment - 1)
+                        & ~(alignment - 1))
+        self.nbytes = nbytes
+        self.alignment = alignment
+
+
 class SessionV8:
     """ctypes binding for the session ABI (one process-local model load)."""
 
@@ -609,6 +646,87 @@ class SessionV8:
             if written != count:
                 raise SessionError(-7, "generated stop-token count changed")
             return tuple(int(output[i]) for i in range(count))
+
+    def checkpoint_requirements(self) -> tuple[int, int]:
+        with self._lock:
+            if self.session is None:
+                raise SessionError(-6, "session is closed")
+            try:
+                _configure_abi(self.lib, "ck_session_v8_checkpoint_requirements")
+            except AttributeError as exc:
+                raise SessionError(-5, "native checkpoint ABI is unavailable") from exc
+            size, alignment = ctypes.c_size_t(), ctypes.c_size_t()
+            status = self.lib.ck_session_v8_checkpoint_requirements(
+                self.session, ctypes.byref(size), ctypes.byref(alignment))
+            _raise_native_error(self.lib, self.session,
+                                "ck_session_v8_checkpoint_requirements", status)
+            if not size.value or not alignment.value or alignment.value & (alignment.value - 1):
+                raise SessionError(-5, "invalid native checkpoint requirements")
+            return int(size.value), int(alignment.value)
+
+    def checkpoint_save(self, snapshot: SequenceCheckpointV8) -> None:
+        if not isinstance(snapshot, SequenceCheckpointV8):
+            raise TypeError("snapshot must be a SequenceCheckpointV8")
+        with self._lock:
+            if self.session is None:
+                raise SessionError(-6, "session is closed")
+            try:
+                _configure_abi(self.lib, "ck_session_v8_checkpoint_save")
+            except AttributeError as exc:
+                raise SessionError(-5, "native checkpoint save ABI is unavailable") from exc
+            status = self.lib.ck_session_v8_checkpoint_save(
+                self.session, ctypes.c_void_p(snapshot.address), snapshot.nbytes)
+            _raise_native_error(self.lib, self.session, "ck_session_v8_checkpoint_save", status)
+
+    def checkpoint_restore(self, snapshot: SequenceCheckpointV8) -> None:
+        if not isinstance(snapshot, SequenceCheckpointV8):
+            raise TypeError("snapshot must be a SequenceCheckpointV8")
+        with self._lock:
+            if self.session is None:
+                raise SessionError(-6, "session is closed")
+            try:
+                _configure_abi(self.lib, "ck_session_v8_checkpoint_restore")
+            except AttributeError as exc:
+                raise SessionError(-5, "native checkpoint restore ABI is unavailable") from exc
+            status = self.lib.ck_session_v8_checkpoint_restore(
+                self.session, ctypes.c_void_p(snapshot.address), snapshot.nbytes)
+            _raise_native_error(self.lib, self.session, "ck_session_v8_checkpoint_restore", status)
+
+    def prefill_ids(self, tokens: Sequence[int], *, reserved_tokens: int,
+                    continue_state: bool = False) -> None:
+        if (not tokens or len(tokens) > 0x7FFFFFFF or
+                type(reserved_tokens) is not int or not 0 <= reserved_tokens <= 0x7FFFFFFF or
+                any(type(token) is not int or not 0 <= token <= 0x7FFFFFFF for token in tokens)):
+            raise ValueError("invalid checkpoint prefill token or reserve count")
+        values = (ctypes.c_int32 * len(tokens))(*tokens)
+        with self._lock:
+            if self.session is None:
+                raise SessionError(-6, "session is closed")
+            try:
+                _configure_abi(self.lib, "ck_session_v8_prefill_ids")
+            except AttributeError as exc:
+                raise SessionError(-5, "native checkpoint prefill ABI is unavailable") from exc
+            status = self.lib.ck_session_v8_prefill_ids(
+                self.session, values, len(tokens), int(reserved_tokens),
+                1 if continue_state else 0)
+            _raise_native_error(self.lib, self.session, "ck_session_v8_prefill_ids", status)
+
+    def prefill_contract(self) -> tuple[int, int, int]:
+        with self._lock:
+            if self.session is None:
+                raise SessionError(-6, "session is closed")
+            try:
+                _configure_abi(self.lib, "ck_session_v8_prefill_contract")
+            except AttributeError as exc:
+                raise SessionError(-5, "native checkpoint prefill contract is unavailable") from exc
+            minimum, alignment, group = (ctypes.c_int32(), ctypes.c_int32(), ctypes.c_int32())
+            status = self.lib.ck_session_v8_prefill_contract(
+                self.session, ctypes.byref(minimum), ctypes.byref(alignment),
+                ctypes.byref(group))
+            _raise_native_error(self.lib, self.session, "ck_session_v8_prefill_contract", status)
+            if minimum.value < 1 or alignment.value < 2 or group.value < 1:
+                raise SessionError(-5, "invalid native checkpoint prefill contract")
+            return minimum.value, alignment.value, group.value
 
     def batch2_phase_capabilities(self) -> int:
         """Inspect opt-in staged-prefill support from the loaded native model."""
@@ -738,6 +856,7 @@ class SessionV8:
         flags: int = 0,
         stop_on_text: Sequence[str] = (),
         stop_at_eos: bool = False,
+        prompt_ids: Sequence[int] | None = None,
     ) -> dict[str, Any]:
         request = _GenerateRequest(
             struct_size=ctypes.sizeof(_GenerateRequest),
@@ -803,13 +922,23 @@ class SessionV8:
                 return 1
             return 0
 
-        status = self.lib.ck_session_v8_generate(
-            self.session,
-            ctypes.byref(request),
-            callback,
-            None,
-            ctypes.byref(result),
-        )
+        if prompt_ids is None:
+            status = self.lib.ck_session_v8_generate(
+                self.session, ctypes.byref(request), callback, None,
+                ctypes.byref(result))
+        else:
+            if (not prompt_ids or len(prompt_ids) > 0x7FFFFFFF or
+                    any(type(token) is not int or not 0 <= token <= 0x7FFFFFFF
+                        for token in prompt_ids)):
+                raise ValueError("invalid exact prompt token IDs")
+            try:
+                _configure_abi(self.lib, "ck_session_v8_generate_ids")
+            except AttributeError as exc:
+                raise SessionError(-5, "native exact-token generation is unavailable") from exc
+            values = (ctypes.c_int32 * len(prompt_ids))(*prompt_ids)
+            status = self.lib.ck_session_v8_generate_ids(
+                self.session, ctypes.byref(request), values, len(prompt_ids),
+                callback, None, ctypes.byref(result))
         if status == self.CK_OK and not callback_stopped:
             final_text = truncate_stop_markers("".join(emitted), stop_markers)
             pending = final_text[visible_len:]

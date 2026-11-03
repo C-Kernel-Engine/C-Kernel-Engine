@@ -2949,6 +2949,19 @@ qwen --bare \
         time, complete server request time, and time outside native generation. Client tool execution
         occurs between requests and must be timed separately.
     </p>
+    <h4>Experimental exact-prefix checkpoints</h4>
+    <p>On a separately certified native-session bundle, opt in with
+        <code>--prefix-checkpoint-cache-bytes BYTES</code>. The server keeps one
+        exact-token checkpoint per request owner under a global byte budget;
+        a changed prefix falls back to ordinary prefill. The initial snapshot
+        leaves a bounded tail outside the checkpoint so client-edited trailing
+        prompt items do not invalidate the reusable earlier prefix. Snapshots
+        contain state but no logits, so an exact-prefix hit also takes the
+        ordinary path. The tested 32K Qwen3.8 bundle needs about 2.36 GB per
+        checkpoint. One retained Qwen Code read/edit/test trial passed with
+        35,136 reused input tokens and 737 versus 1,442 seconds on the same
+        pinned Ryzen bundle. Keep this opt-in on an isolated endpoint while
+        repeatability and other workloads are certified.</p>
     <h4>Optional local harness nightly</h4>
     <p>On a client host with active, identified Qwen and Gemma endpoints and an HTTP client environment containing <code>httpx</code>, run the
         same repeatability config through <code>scripts/local_harness_nightly.py</code>.
@@ -2966,6 +2979,18 @@ qwen --bare \
 # After verifying the one-off command, schedule it on the client host:
 0 2 * * * cd /path/to/C-Kernel-Engine &amp;&amp; .venv/bin/python3 scripts/local_harness_nightly.py --config /path/to/local-serving-matrix.json --state-dir /path/to/private-harness-nightly-state &gt;&gt; /path/to/private-harness-nightly-state/cron.log 2&gt;&amp;1</pre>
     </div>
+    <p class="mini-note">To add exact-prefix numerical certification on an asset-equipped
+        host, pass <code>--prefix-cert-config /path/to/private-prefix-cert.json</code>
+        to that same command. The private JSON uses schema
+        <code>cke.local_prefix_cert.v1</code> with <code>bundle</code>,
+        <code>session_library</code>, <code>ids</code>, a pinned
+        <code>artifact_sha256</code> map for the six bundle files reported by
+        the probe, <code>session_sha256</code>, <code>ids_sha256</code>, and
+        <code>cases</code> such as <code>[{"prefix":128,"suffix":9}]</code>.
+        Missing assets remain <code>NOT_TESTED</code>; a mismatched loaded artifact or
+        numerical report is <code>FAIL</code>. The default per-case time budget is
+        two hours; <code>max_seconds</code> can extend it. Run this lane away from a production
+        endpoint because it loads its own model and checkpoint memory.</p>
     <p class="mini-note">For a scheduled run against current main, use a dedicated clean,
         detached worktree and add <code>--refresh-main</code>. After publishing the
         current run as <code>INCOMPLETE</code>, the runner fetches
