@@ -15,6 +15,7 @@ from version.v8.scripts.replay_ggml_attention_packet_v8 import (
     fp64_full_flash_reference_rows,
     fp64_reference, pinned_tree_identity, run_ggml, run_ggml_flash_rows,
     replay_observed_oracle, validate_oracle_contract,
+    summarize_cache_history,
 )
 from version.v8.scripts.xray_operation_bundle_v8 import BundleError
 
@@ -152,6 +153,40 @@ class GgmlAttentionPacketTests(unittest.TestCase):
                         Path("unused"), scale=1, alibi=0, threads=1,
                         parity_report=report,
                     )
+
+    def test_cache_history_reports_first_logical_row_and_segment(self):
+        oracle = {kind: np.zeros((4, 2, 3), dtype="<f2") for kind in ("K", "V")}
+        cke = {kind: values.copy() for kind, values in oracle.items()}
+        cke["V"][0, 1, 2] = np.float16(0.0001)
+        cke["K"][2, 0, 1] = np.float16(0.5)
+        plan = [{"name": "text_before", "rows": 1, "physical_start": 0},
+                {"name": "visual", "rows": 2, "physical_start": 1},
+                {"name": "text_after", "rows": 1, "physical_start": 3}]
+        pre_store = {kind: (f"{kind}_producer", values.astype("<f4"))
+                     for kind, values in cke.items()}
+        report = summarize_cache_history(oracle, cke, plan, layer=7,
+                                         cke_pre_store=pre_store)
+        self.assertEqual(report["first"]["kind"], "V")
+        self.assertEqual((report["first"]["layer"], report["first"]["position"],
+                          report["first"]["head"], report["first"]["channel"]),
+                         (7, 0, 1, 2))
+        self.assertEqual(report["first"]["origin"], "text_before")
+        self.assertEqual(report["by_kind"]["K"]["largest"]["origin"], "visual")
+        self.assertEqual(report["by_kind"]["V"]["first"]["cke"]["raw_le_hex"],
+                         cke["V"][0, 1, 2].tobytes().hex())
+        self.assertTrue(report["by_kind"]["V"]["cke_producer"]["fp16_store_matches"])
+        self.assertEqual(report["first"]["cke_pre_store"]["capture"], "V_producer")
+        exact = summarize_cache_history(oracle, oracle, plan, layer=7)
+        self.assertIsNone(exact["first"])
+        self.assertIsNone(exact["by_kind"]["K"]["largest"])
+        with self.assertRaisesRegex(BundleError, "segment plan"):
+            summarize_cache_history(oracle, cke, plan[:-1], layer=7)
+        with self.assertRaisesRegex(BundleError, "segment plan"):
+            summarize_cache_history(oracle, cke,
+                                    [plan[0], {**plan[1], "name": "text_before"}, plan[2]],
+                                    layer=7)
+        with self.assertRaisesRegex(BundleError, "both K and V"):
+            summarize_cache_history({"K": oracle["K"]}, cke, plan, layer=7)
 
     def test_observed_nonflash_ggml_replay_detects_wrong_mask(self):
         tree = Path(os.environ.get("CK_PINNED_LLAMA_TREE", str(ROOT / "llama.cpp")))
