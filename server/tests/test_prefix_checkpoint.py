@@ -57,10 +57,10 @@ def test_exact_prefix_hit_and_changed_prefix_fallback():
     cache = ExactPrefixCheckpointCache(session, max_bytes=192, identity="loaded-instance")
     first = cache.prepare("a" * 80, output_tokens=4, flags=CK_SESSION_REQUEST_RAW_PROMPT)
     assert first.reused_tokens == 0
-    assert first.suffix_tokens == 16
+    assert first.suffix_tokens == 80
     assert first.prompt_ids == (97,) * 16
     assert session.prefills == [((97,) * 64, 20)]
-    assert cache.bytes_used == 0
+    assert cache.bytes_used == 192  # in-flight reservation counts against the budget
     cache.settle(first, success=True)
     assert cache.bytes_used == 192
     hit = cache.prepare("a" * 80 + "b" * 8, output_tokens=4,
@@ -177,6 +177,57 @@ def test_two_owners_share_a_global_budget_and_evict_oldest():
     assert miss_b.reused_tokens == 0
 
 
+def test_replacement_reserves_before_allocating_at_one_snapshot_budget(monkeypatch):
+    import server.prefix_checkpoint as module
+    original = module.SequenceCheckpointV8
+    live = 0
+    peak = 0
+
+    class TrackedSnapshot(original):
+        def __init__(self, *args):
+            nonlocal live, peak
+            super().__init__(*args)
+            live += 1
+            peak = max(peak, live)
+
+        def __del__(self):
+            nonlocal live
+            live -= 1
+
+    monkeypatch.setattr(module, "SequenceCheckpointV8", TrackedSnapshot)
+    session = FakeSession()
+    cache = ExactPrefixCheckpointCache(session, max_bytes=192, identity="instance")
+    for owner, text in (("A", "a" * 80), ("A", "b" * 80),
+                        ("B", "c" * 80)):
+        prepared = cache.prepare(text, output_tokens=1,
+                                 flags=CK_SESSION_REQUEST_RAW_PROMPT,
+                                 owner_key=owner)
+        assert cache.bytes_used <= cache.max_bytes
+        cache.settle(prepared, success=True)
+        del prepared
+        assert cache.bytes_used == 192
+    assert peak == 1
+
+
+def test_cancelled_preparation_releases_reservation():
+    session = FakeSession()
+    cache = ExactPrefixCheckpointCache(session, max_bytes=192, identity="instance")
+    def cancel_after_prefill(ids, *, reserved_tokens):
+        session.state = tuple(ids)
+        cancelled[0] = True
+    cancelled = [False]
+    session.prefill_ids = cancel_after_prefill
+    try:
+        cache.prepare("a" * 80, output_tokens=1,
+                      flags=CK_SESSION_REQUEST_RAW_PROMPT,
+                      cancelled=lambda: cancelled[0])
+    except Exception as exc:
+        assert "cancelled" in str(exc)
+    else:
+        assert False, "cancelled prefix preparation succeeded"
+    assert cache.bytes_used == 0
+
+
 def test_http_reuses_exact_prefix_and_reports_actual_input_usage():
     session = FakeSession()
     app = create_app(session, model="test", context_length=512,
@@ -191,7 +242,29 @@ def test_http_reuses_exact_prefix_and_reports_actual_input_usage():
     assert first.status_code == second.status_code == 200
     first_data, second_data = first.json(), second.json()
     assert first_data["performance"]["prefix_cache"]["reused_tokens"] == 0
+    assert first_data["performance"]["computed_prefill_tokens"] == 80
     assert second_data["performance"]["prefix_cache"]["reused_tokens"] == 64
+    assert second_data["performance"]["computed_prefill_tokens"] == 24
     assert second_data["usage"]["input_tokens"] == 88
     assert second_data["usage"]["input_tokens_details"]["cached_tokens"] == 64
     assert second_data["output_text"] == "ok"
+
+
+def test_http_cancelled_native_stop_does_not_publish_checkpoint():
+    class CancelledSession(FakeSession):
+        def generate(self, *args, **kwargs):
+            result = super().generate(*args, **kwargs)
+            result["stop_reason"] = 3
+            return result
+
+    session = CancelledSession()
+    app = create_app(session, model="test", context_length=512,
+                     chat_template="", allow_untemplated=True,
+                     flags=CK_SESSION_REQUEST_RAW_PROMPT,
+                     prefix_cache_bytes=192)
+    with TestClient(app) as client:
+        response = client.post("/v1/responses", json={
+            "model": "test", "input": "a" * 80, "max_output_tokens": 1})
+    assert response.status_code == 200
+    assert response.json()["status"] == "cancelled"
+    assert app.state.prefix_cache.bytes_used == 0

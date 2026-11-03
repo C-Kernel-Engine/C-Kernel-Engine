@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from collections import OrderedDict
 from math import lcm
 from time import monotonic
-from typing import Any
+from typing import Any, Callable
 
 from .session_v8 import (
     CK_SESSION_REQUEST_CONTINUE_STATE,
@@ -58,32 +58,43 @@ class ExactPrefixCheckpointCache:
         self._entries: OrderedDict[
             str, tuple[tuple[int, ...], SequenceCheckpointV8]
         ] = OrderedDict()
+        self._reserved_bytes = 0
         self.hits = 0
         self.misses = 0
 
     @property
     def bytes_used(self) -> int:
-        return self.allocation_bytes * len(self._entries)
+        return self.allocation_bytes * len(self._entries) + self._reserved_bytes
 
     def clear(self) -> None:
         self._entries.clear()
 
+    def discard(self, owner_key: str) -> None:
+        """Drop an entry when delivery later observes cancellation."""
+        self._entries.pop(owner_key, None)
+
     def prepare(self, prompt: str, *, output_tokens: int, flags: int,
-                owner_key: str = "anonymous") -> PreparedPrefix:
+                owner_key: str = "anonymous",
+                cancelled: Callable[[], bool] | None = None) -> PreparedPrefix:
         if not owner_key:
             raise ValueError("prefix cache owner key is empty")
         ids = self.session.encode_ids(prompt)
+        if cancelled is not None and cancelled():
+            raise SessionError(-9, "request cancelled before prefix preparation")
         ordinary = PreparedPrefix(prompt, flags, len(ids), 0, len(ids), 0.0, 0.0,
                                   owner_key=owner_key)
         if (not flags & CK_SESSION_REQUEST_RAW_PROMPT or output_tokens < 1 or
                 len(ids) + output_tokens > self.session.context_length):
             self.misses += 1
             return ordinary
+        snapshot = None
         entry = self._entries.get(owner_key)
         if entry is not None:
             prefix, snapshot = entry
             if len(ids) > len(prefix) and tuple(ids[:len(prefix)]) == prefix:
                 suffix_ids = ids[len(prefix):]
+                if cancelled is not None and cancelled():
+                    raise SessionError(-9, "request cancelled before checkpoint restore")
                 started = monotonic()
                 try:
                     self.session.checkpoint_restore(snapshot)
@@ -95,12 +106,18 @@ class ExactPrefixCheckpointCache:
                     return ordinary
                 self.hits += 1
                 self._entries.move_to_end(owner_key)
+                if cancelled is not None and cancelled():
+                    raise SessionError(-9, "request cancelled after checkpoint restore")
                 return PreparedPrefix(
                     "", flags | CK_SESSION_REQUEST_CONTINUE_STATE |
                     CK_SESSION_REQUEST_REJECT_PROMPT_TRUNCATION,
                     len(ids), len(prefix), len(suffix_ids), 0.0,
                     monotonic() - started, prompt_ids=tuple(suffix_ids),
                     owner_key=owner_key)
+        # Do not keep an old owner snapshot alive in this stack frame when
+        # eviction makes room for its replacement.
+        entry = None
+        snapshot = None
         # Leave a bounded suffix outside the first snapshot. Harnesses may
         # revise trailing prompt items (for example, removing a first-turn
         # reminder) before appending a tool result. Exact ID comparison still
@@ -115,31 +132,47 @@ class ExactPrefixCheckpointCache:
         target = ((len(ids) - tail) // self.step) * self.step
         cut = max(earliest, min(latest, target))
         suffix_ids = ids[cut:]
-        candidate = SequenceCheckpointV8(self.size, self.snapshot_alignment)
+        # Evict before constructing the candidate. Counting only committed
+        # entries permits two full snapshots to coexist at a one-entry budget.
+        while self._entries and self.bytes_used + self.allocation_bytes > self.max_bytes:
+            self._entries.popitem(last=False)
+        self._reserved_bytes += self.allocation_bytes
         try:
+            if cancelled is not None and cancelled():
+                raise SessionError(-9, "request cancelled before prefix prefill")
+            candidate = SequenceCheckpointV8(self.size, self.snapshot_alignment)
             self.session.prefill_ids(ids[:cut], reserved_tokens=len(suffix_ids) + output_tokens)
+            if cancelled is not None and cancelled():
+                raise SessionError(-9, "request cancelled after prefix prefill")
+            started = monotonic()
+            self.session.checkpoint_save(candidate)
+            if cancelled is not None and cancelled():
+                raise SessionError(-9, "request cancelled after checkpoint save")
         except SessionError as exc:
+            self._reserved_bytes -= self.allocation_bytes
+            if exc.status == -9:
+                raise
             if exc.status not in (-1, -5):
                 raise
             self.misses += 1
             return ordinary
-        started = monotonic()
-        self.session.checkpoint_save(candidate)
+        except BaseException:
+            self._reserved_bytes -= self.allocation_bytes
+            raise
         save_seconds = monotonic() - started
         self.misses += 1
         return PreparedPrefix(
             "", flags | CK_SESSION_REQUEST_CONTINUE_STATE |
             CK_SESSION_REQUEST_REJECT_PROMPT_TRUNCATION,
-            len(ids), 0, len(suffix_ids), save_seconds, 0.0,
+            len(ids), 0, len(ids), save_seconds, 0.0,
             (tuple(ids[:cut]), candidate), tuple(suffix_ids), owner_key)
 
     def settle(self, prepared: PreparedPrefix | None, *, success: bool) -> None:
+        if prepared is not None and prepared.candidate is not None:
+            self._reserved_bytes -= self.allocation_bytes
         if not success:
             if prepared is not None:
                 self._entries.pop(prepared.owner_key, None)
         elif prepared is not None and prepared.candidate is not None:
             self._entries.pop(prepared.owner_key, None)
-            while (self._entries and
-                   self.bytes_used + self.allocation_bytes > self.max_bytes):
-                self._entries.popitem(last=False)
             self._entries[prepared.owner_key] = prepared.candidate

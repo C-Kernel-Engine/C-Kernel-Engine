@@ -1955,19 +1955,38 @@ def create_app(
                 stop_on_text=stop_on_text, stop_at_eos=stop_at_eos)
         prepared = None
         started = time.monotonic()
+        def was_cancelled():
+            return lease.cancelled is not None and lease.cancelled.is_set()
         try:
             prepared = prefix_cache.prepare(prompt, output_tokens=max_tokens,
-                                            flags=flags, owner_key=owner_key)
+                                            flags=flags, owner_key=owner_key,
+                                            cancelled=was_cancelled)
             preparation_ms = (time.monotonic() - started) * 1000.0
+            if was_cancelled():
+                raise SessionError(-9, "request cancelled before generation")
             result = lease.session.generate(
                 None, prepared.prompt, max_tokens=max_tokens,
                 temperature=temperature, top_p=top_p, on_token=on_token,
                 flags=prepared.flags, stop_on_text=stop_on_text,
                 stop_at_eos=stop_at_eos, prompt_ids=prepared.prompt_ids)
+        except SessionError as exc:
+            prefix_cache.settle(prepared, success=False)
+            if exc.status == -9 and was_cancelled():
+                return {"prompt_tokens": prepared.input_tokens if prepared else 0,
+                        "generated_tokens": 0, "stop_reason": 3,
+                        "prefill_time_ms": (time.monotonic() - started) * 1000.0,
+                        "decode_time_ms": 0.0}
+            raise
         except Exception:
             prefix_cache.settle(prepared, success=False)
             raise
-        prefix_cache.settle(prepared, success=True)
+        # Cancellation acquires the same lease guard. Make publication and
+        # its cancellation check one transition for this execution owner.
+        with lease.guard:
+            prefix_cache.settle(
+                prepared,
+                success=(int(result.get("stop_reason") or 0) != 3 and
+                         not was_cancelled()))
         result["prompt_tokens"] = prepared.input_tokens
         result["prefill_time_ms"] = float(result.get("prefill_time_ms") or 0) + preparation_ms
         result["prefix_cache"] = {
@@ -2623,6 +2642,8 @@ def create_app(
                 # event. Publish cancellation only after native generation
                 # has returned, before releasing its session lease.
                 if cancelled.is_set() or terminal_event[0] in {"error", "busy"}:
+                    if prefix_cache is not None and cancelled.is_set():
+                        prefix_cache.discard(_prefix_owner_key(body))
                     with response_store_lock:
                         stored = response_store.get(response_id)
                         if stored is not None and stored["status"] == ResponseStatus.in_progress:
@@ -3510,6 +3531,8 @@ def create_app(
                 return err_resp
         finally:
             monitor_stop.set()
+            if prefix_cache is not None and disconnect_cancelled.is_set():
+                prefix_cache.discard(_prefix_owner_key(body))
             if monitor_thread is not None:
                 monitor_thread.join(timeout=1.0)
             lease.release()
