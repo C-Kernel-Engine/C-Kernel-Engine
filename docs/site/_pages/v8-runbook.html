@@ -2152,6 +2152,39 @@ python3 server/gemma_antigravity_acceptance.py \
         environment value in these examples; the older settings profile alone did not
         constrain its output request in a bounded local probe.
     </p>
+    <h4>Isolated dense Qwen3.8 prefix-reuse acceptance</h4>
+    <p>Build a separate resolved 32K dense Qwen3.8 bundle from the intended source revision;
+        verify its generated source, runtime libraries, tokenizer and weights with
+        <code>GET /v1/cke/loaded-identity</code>. The example below uses the tested
+        Ryzen budget for one 2.36 GB checkpoint. Choose a budget from the loaded
+        artifact's reported checkpoint requirement and available memory. It does not
+        change an existing serving process.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>CK_BUNDLE=/path/to/resolved-dense-qwen38-32k-bundle
+CK_NUM_THREADS=16 OMP_NUM_THREADS=1 CK_V8_FORCE_BATCHED_PREFILL=1 \
+python3 version/v8/scripts/ck_serve_v8.py "$CK_BUNDLE" --run "$CK_BUNDLE" \
+  --no-build --host 127.0.0.1 --port 8206 \
+  --model-name qwen38-dense-prefix-32k-main-test \
+  --request-output-cap 2048 --max-tokens 2048 --temperature 0 \
+  --prefix-checkpoint-cache-bytes 2500000000
+
+# On the client, forward only this isolated loopback endpoint.
+ssh -N -L 127.0.0.1:18236:127.0.0.1:8206 ryzen</pre>
+    </div>
+    <p>Use Qwen Code 0.25.1 normal mode with a client settings file declaring
+        <code>contextWindowSize: 32768</code>, a 2,048-token output allowance and an
+        explicit wall-time budget. Run <code>server/qwen_harness_acceptance.py</code>
+        with <code>--qwen-profile normal</code>, <code>--settings</code>, and both
+        expected loaded hashes. Retain every empty per-attempt workspace, including
+        incomplete attempts. Compare cache-on and cache-off runs on the same bundle,
+        thread count and frozen fixture, alternating trial order; check file content,
+        validator result, tool IDs, loaded identity, actual input and reused token
+        counts separately from elapsed time. The opt-in cache saves exact processed
+        token prefixes, and exact-prefix requests without a suffix use fresh prefill
+        because checkpoints do not contain logits. HTTP execution remains
+        single-flight: this cache does not enable recurrent batching or concurrent
+        native calls.</p>
     <h4>Repeated Qwen and Gemma harness acceptance</h4>
     <p>Run <code>server/harness_repeatability.py</code> from a client machine that can
         reach both endpoints through localhost tunnels. It invokes the existing
@@ -2160,7 +2193,8 @@ python3 server/gemma_antigravity_acceptance.py \
         the intended loaded serving and session-library SHA-256 values. Use a Python
         environment with the server test dependencies for the coordinator, and name
         a separate Python environment containing <code>google-antigravity==0.1.20</code>
-        for the Gemma client. The Qwen executable must report version 0.24.6.</p>
+        for the Gemma client. Pin the installed Qwen Code version in each client
+        entry; the runner currently accepts 0.24.6 and 0.25.1.</p>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
 <pre>{
