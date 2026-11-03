@@ -93,8 +93,15 @@ def synthesize(text: str, config: Path, bundle: Path, output: Path,
             first = None
             for chunk in plan["chunks"]:
                 ids = ",".join(map(str, chunk["phoneme_ids"]))
-                fields = _exchange(worker, f"APPEND\t{seed + chunk['index']}\t{ids}",
-                                   "CHUNK_READY")
+                try:
+                    fields = _exchange(worker,
+                                       f"APPEND\t{seed + chunk['index']}\t{ids}",
+                                       "CHUNK_READY")
+                except SpeechError as error:
+                    raise SpeechError(
+                        f"chunk {chunk['index']} source span "
+                        f"{chunk['source_start']}:{chunk['source_end']}: {error}"
+                    ) from error
                 if len(fields) != 3:
                     raise SpeechError("invalid native chunk response")
                 count, cumulative = map(int, fields[1:])

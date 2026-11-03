@@ -20,7 +20,7 @@ from export_kokoro_request_package import DEFAULT_BINDINGS, sha256_file
 SUPPORTED_COUNTS = (8, 36)
 RUNTIME_EXECUTION_COUNTS = (8, 13, 36)
 RUNTIME_MIN_COUNT = 3
-RUNTIME_MAX_COUNT = 40  # Native frontend, CSV parser, and voice-row contract.
+RUNTIME_MAX_COUNT = 48  # Opt-in runtime range; checked graph capacity is 64.
 DISPATCH_SOURCE = ROOT / "version/v8/tts/native_kokoro_dispatch.c"
 
 
@@ -47,7 +47,7 @@ def selected_runtime_counts(experimental_counts: tuple[int, ...],
            count < RUNTIME_MIN_COUNT or count > RUNTIME_MAX_COUNT or
            count in RUNTIME_EXECUTION_COUNTS for count in experimental_counts):
         raise ValueError("experimental runtime counts must be distinct integers "
-                         "from 3 to 40 outside the captured 8/13/36 counts")
+                         "from 3 to 48 outside the captured 8/13/36 counts")
     if len(experimental_counts) > 4 or len(set(experimental_counts)) != len(experimental_counts):
         raise ValueError("at most four distinct experimental runtime counts")
     return tuple(sorted((*RUNTIME_EXECUTION_COUNTS, *experimental_counts)))
@@ -199,7 +199,7 @@ def main() -> None:
     parser.add_argument("--runtime-lengths", action="store_true",
                         help="one 64-token-capacity generated graph for checked requests")
     parser.add_argument("--runtime-experimental-range", action="store_true",
-                        help="opt in to execution-only counts 3..40 with one runtime graph; "
+                        help="opt in to execution-only counts 3..48 with one runtime graph; "
                         "independent model parity is not established")
     args = parser.parse_args()
     print(json.dumps(build_bundle(args.bump_dir, args.voice_bank,

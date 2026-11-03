@@ -20,7 +20,8 @@ import sys
 SCHEMA = "cke.kokoro.accessibility-text-plan.v1"
 MAX_TEXT_BYTES = 8192
 MAX_CHUNKS = 512  # Shared bound for incremental playback and aggregate WAV.
-MAX_REQUEST_IDS = 40
+MAX_REQUEST_IDS = 48
+PREFERRED_REQUEST_IDS = 40  # Reserve 41..48 for an indivisible G2P token.
 PINNED_SHA256 = {
     "config": "5abb01e2403b072bf03d04fde160443e209d7a0dad49a423be15196b9b43c17f",
     "misaki_en": "a9c36c90a3fa6c6084e9042fd8e19f6049add4f1435d8fe5ca1b77f3529a98f4",
@@ -130,16 +131,18 @@ def plan_tokens(text: str, tokens: list, vocab: dict[str, int],
     if not supported_counts or min(supported_counts) < 3:
         raise TextPlanError("bundle has no valid supported phoneme counts")
     if max(supported_counts) > MAX_REQUEST_IDS:
-        raise TextPlanError("bundle exceeds the native 40-ID request contract")
+        raise TextPlanError(f"bundle exceeds the native {MAX_REQUEST_IDS}-ID request contract")
 
     chunks = []
     first = 0
     while first < len(tokens):
+        overlong_token = len(_phonemes(tokens[first:first + 1])) + 2 > PREFERRED_REQUEST_IDS
+        request_limit = MAX_REQUEST_IDS if overlong_token else PREFERRED_REQUEST_IDS
         candidates = []
         for end in range(first + 1, len(tokens) + 1):
             ps = _phonemes(tokens[first:end])
             count = len(ps) + 2
-            if count > MAX_REQUEST_IDS:
+            if count > request_limit:
                 break
             if count in supported_counts and _legal_boundary(tokens, first, end):
                 candidates.append((end, ps, _boundary_rank(tokens[end - 1]), count))
@@ -153,7 +156,11 @@ def plan_tokens(text: str, tokens: list, vocab: dict[str, int],
         # resulting chunks instead of stranding its last word.
         strong = [item for item in candidates if item[2] == 2]
         weak = [item for item in candidates if item[2] == 1 and item[3] >= 20]
-        if strong or weak:
+        if overlong_token:
+            # Keep a long number/name by itself, attaching punctuation only
+            # when the source-span boundary would otherwise be invalid.
+            end, ps, _, _ = min(candidates, key=lambda item: item[0])
+        elif strong or weak:
             end, ps, _, _ = max(strong or weak, key=lambda item: item[0])
         else:
             natural_end = first + 1

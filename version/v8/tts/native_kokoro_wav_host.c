@@ -17,6 +17,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#define CK_TTS_MAX_REQUEST_IDS 48u
 #define CK_TTS_MAX_SEQUENCE_CHUNKS 512u
 #ifdef CK_TTS_PARALLEL_CONV
 #include "ck_threadpool.h"
@@ -119,7 +120,7 @@ static int overlaps(uint64_t a, uint64_t a_bytes,
 }
 
 static int parse_phoneme_ids(const char *text, int32_t *ids, size_t count) {
-    if (count < 3 || count > 40 || !text) return 0;
+    if (count < 3 || count > CK_TTS_MAX_REQUEST_IDS || !text) return 0;
     const char *cursor = text;
     for (size_t i = 0; i < count; ++i) {
         if (*cursor < '0' || *cursor > '9') return 0;
@@ -143,8 +144,9 @@ static int parse_runtime_phoneme_ids(const char *text, int32_t ids[64],
     if (!text || !*text) return 0;
     size_t count = 1;
     for (const char *cursor = text; *cursor; ++cursor)
-        if (*cursor == ',' && ++count > 40) return 0;
-    if (count < 3 || count > 40 || !parse_phoneme_ids(text, ids, count))
+        if (*cursor == ',' && ++count > CK_TTS_MAX_REQUEST_IDS) return 0;
+    if (count < 3 || count > CK_TTS_MAX_REQUEST_IDS ||
+        !parse_phoneme_ids(text, ids, count))
         return 0;
     for (size_t index = count; index < 64; ++index) ids[index] = 178;
     *valid_count = count;

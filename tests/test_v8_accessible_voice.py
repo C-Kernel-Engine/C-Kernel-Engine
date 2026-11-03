@@ -296,6 +296,48 @@ class AccessibleVoiceTest(unittest.TestCase):
             time.sleep(0.01)
         self.assertIn(state(), (None, "Z"), "speech worker remained live after stop")
 
+    def test_stop_handles_process_group_exit_before_signal(self):
+        executable = Path(self.temp.name) / "speech-exits"
+        executable.write_text("#!/bin/sh\nexit 0\n")
+        executable.chmod(0o700)
+        child = mock.Mock(pid=12345)
+        child.wait.return_value = 0
+        with mock.patch.object(voice.subprocess, "Popen", return_value=child), \
+             mock.patch.object(voice.os, "killpg", side_effect=ProcessLookupError):
+            voice.speak_and_control("Hello.", executable, lambda _prompt: "stop")
+        child.wait.assert_called_once_with(timeout=1)
+
+    def test_stop_terminates_descendant_after_leader_exits(self):
+        marker = Path(self.temp.name) / "orphan.pid"
+        executable = Path(self.temp.name) / "speech-exits-with-worker"
+        executable.write_text(
+            "#!/usr/bin/env python3\n"
+            "import subprocess,sys\nfrom pathlib import Path\n"
+            "child=subprocess.Popen([sys.executable,'-c','import time;time.sleep(30)'])\n"
+            f"Path({str(marker)!r}).write_text(str(child.pid))\n")
+        executable.chmod(0o700)
+
+        def stop_after_leader_exit(_prompt):
+            deadline = time.monotonic() + 3
+            while not marker.exists() and time.monotonic() < deadline:
+                time.sleep(0.01)
+            self.assertTrue(marker.exists())
+            time.sleep(0.05)
+            return "stop"
+
+        voice.speak_and_control("Hello.", executable, stop_after_leader_exit)
+        pid = int(marker.read_text())
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline:
+            try:
+                state = Path(f"/proc/{pid}/stat").read_text().split()[2]
+            except FileNotFoundError:
+                state = None
+            if state in (None, "Z"):
+                break
+            time.sleep(0.01)
+        self.assertIn(state, (None, "Z"), "orphaned speech worker remained live")
+
     def test_kokoro_answer_uses_checked_playback_adapter(self):
         with mock.patch.object(voice, "confirm", return_value="Read status"), \
              mock.patch.object(voice, "speak_and_control") as speak:

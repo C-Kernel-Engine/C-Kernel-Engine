@@ -106,6 +106,41 @@ class KokoroAccessibilityTextPlanTest(unittest.TestCase):
                                  for item in chunks), text)
         self.assertEqual([item["index"] for item in chunks], list(range(len(chunks))))
 
+    def test_pinned_long_number_and_hash_tokens_fit_opt_in_range(self):
+        # Phonemes captured from the pinned full-context G2P on server_summary.txt.
+        text = "35,136 ab37035fc"
+        tokens = [
+            SimpleNamespace(text="35,136", whitespace=" ",
+                phonemes="θˈɜɹTi fˈIv θˈWzᵊnd wˈʌn hˈʌndɹəd θˈɜɹTi sˈɪks"),
+            SimpleNamespace(text="ab37035fc", whitespace="",
+                phonemes="ˈæb θˈɜɹTi sˈɛvən θˈWzənd θˈɜɹTi fˈIv ˌɛfsˈi"),
+        ]
+        with self.assertRaisesRegex(planner.TextPlanError, "35,136"):
+            planner.plan_tokens(text, tokens, VOCAB, set(range(3, 41)))
+        chunks = planner.plan_tokens(text, tokens, VOCAB, set(range(3, 49)))
+        self.assertEqual([item["valid_token_count"] for item in chunks], [48, 46])
+        self.assertEqual([item["voice_row"] for item in chunks], [45, 43])
+        self.assertEqual("".join(text[item["source_start"]:item["source_end"]]
+                                 for item in chunks), text)
+        self.assertEqual([item["phonemes"] for item in chunks],
+                         [token.phonemes for token in tokens])
+        sound = next(char for char in VOCAB if char.strip())
+        with self.assertRaisesRegex(planner.TextPlanError, "no supported chunk"):
+            planner.plan_tokens("long", [SimpleNamespace(text="long", whitespace="",
+                                                       phonemes=sound * 47)],
+                                VOCAB, set(range(3, 49)))
+
+    def test_opt_in_range_reserves_long_requests_for_single_tokens(self):
+        sound = next(char for char in VOCAB if char.strip()) * 6
+        text = "red " * 9 + "red"
+        tokens = [SimpleNamespace(text="red", whitespace=" " if index < 9 else "",
+                                  phonemes=sound) for index in range(10)]
+        chunks = planner.plan_tokens(text, tokens, VOCAB, set(range(3, 49)))
+        self.assertTrue(all(chunk["valid_token_count"] <=
+                            planner.PREFERRED_REQUEST_IDS for chunk in chunks))
+        self.assertEqual("".join(text[chunk["source_start"]:chunk["source_end"]]
+                                 for chunk in chunks), text)
+
     def test_rejects_dropped_source_and_unsupported_geometry(self):
         with self.assertRaisesRegex(planner.TextPlanError, "unspoken source token"):
             planner.plan_tokens("🧪", [SimpleNamespace(text="🧪", whitespace="",
@@ -118,7 +153,7 @@ class KokoroAccessibilityTextPlanTest(unittest.TestCase):
         with self.assertRaisesRegex(planner.TextPlanError, "no supported chunk"):
             planner.plan_tokens(case["text"], _tokens(case), VOCAB, {8})
         with self.assertRaisesRegex(planner.TextPlanError, "exceeds the native"):
-            planner.plan_tokens(case["text"], _tokens(case), VOCAB, {41})
+            planner.plan_tokens(case["text"], _tokens(case), VOCAB, {49})
         with self.assertRaisesRegex(planner.TextPlanError, "UTF-8 bytes"):
             planner.plan_tokens("x" * (planner.MAX_TEXT_BYTES + 1), _tokens(case),
                                 VOCAB, set(range(3, 41)))

@@ -1,0 +1,58 @@
+{
+  "schema": "cke.kokoro.long_token_range.v1",
+  "baseline_revision": "88b62a340",
+  "host": "P3, Intel Core i7-14700T",
+  "model_weights_sha256": "556a82f8116091d386ccab9d8218030d124ff286e0fb8e2ebc8d0cc8a5598148",
+  "voice_bank_sha256": "50a2b7d543cc5a9bdefb3217e3bf1a8d87e947dd5b4e8babf685c0bc4b3b4177",
+  "generated_library_sha256": "cc26e6bf0113510781d0c2950d4242060cca9a44cd9e1ea0b1f820eb03369d36",
+  "native_host_sha256": "13052e9cab08a30e4c17601da67b31042455269f9efcaa667230f0c27f0cc153",
+  "dispatcher_sha256": "459033c56cd0ed0b1b980288fde12622df41a13e6fff4a6fd3810fce5fdc2cef",
+  "bundle_identity_sha256": "9a701be682dc8deb81992568d2922b2bfd50669862e0fa274c2c5926956dd175",
+  "source_text_sha256": "ecc02663992739eb465b37eb115d158bc29ee0186e42f1ee5d152c95a8d5bc74",
+  "source_text_scope": "Local 359-word server_summary.txt; text itself is not committed in this evidence file",
+  "planned_spoken_text_sha256": "9185be4e6654d2224d477ff430a19a61be3572871524884fafb7ae0adaa70810",
+  "before": {
+    "planned_chunks": 77,
+    "ordinary_chunk_41": "The prior pinned Qwen3.8 numerical",
+    "ordinary_chunk_41_ids": 46,
+    "isolated_chunk_41_generated_status": -2,
+    "generated_status_meaning": "CK_AUDIO_EXTENT_LIMIT",
+    "whole_text_result": "FAIL, native ERROR 7, partial WAV discarded"
+  },
+  "after": {
+    "supported_range": "opt-in 3..48 IDs in one 64-token-capacity generated graph",
+    "preferred_multi_token_max_ids": 40,
+    "long_single_token_examples": [
+      {"source": "35,136", "valid_ids": 48, "voice_row": 45},
+      {"source": "ab37035fc.", "valid_ids": 47, "voice_row": 44}
+    ],
+    "planned_chunks": 90,
+    "source_span_coverage": "complete",
+    "isolated_native_preflight": {
+      "passed": 90,
+      "failed": 0,
+      "total_valid_samples": 4905000,
+      "maximum_valid_samples_per_chunk": 76800,
+      "chunks_at_sample_capacity": 1,
+      "preflight_report_sha256": "6e5cd605694dcde6aa9bc27a3019369572776b39c2c8b9b8104ac4930412537e"
+    },
+    "single_loaded_session": {
+      "status": "execution_pass",
+      "checked_chunks": 90,
+      "valid_samples": 4905000,
+      "sample_rate": 24000,
+      "audio_seconds": 204.375,
+      "plan_seconds": 2.71,
+      "first_chunk_seconds": 11.386,
+      "total_seconds": 647.011,
+      "wav_sha256": "862b0baf616eb92f97c8debb4e70359abfd705ae109f34937fed396151cf3be0",
+      "report_sha256": "fd3d88e5c95cfa864bf15f9f251c2f6e4425b249e27d979eea67726f7c14b639",
+      "all_chunk_sample_extents_equal_isolated_preflight": true,
+      "all_source_spans_equal_pinned_plan": true,
+      "selected_pcm_equal_to_fresh_execution": [0, 53, 69, 89],
+      "connected_pytorch_waveform_parity": "fail_unresolved",
+      "headset_listening": "not_tested"
+    }
+  },
+  "scope": "The 41..48-ID range is execution-only. No direct pinned-model waveform parity or listening-quality claim is made. The ordinary 40-ID target avoids a measured generated extent-limit failure; this does not prove every future phrase will fit its frame budget."
+}
