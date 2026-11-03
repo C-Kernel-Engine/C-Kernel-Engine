@@ -108,7 +108,8 @@ for line in sys.stdin:
                         module.synthesize("abc", root / "config", bundle,
                                           root / "too-long.wav", 7)
                 self.assertFalse((root / "too-long.wav").exists())
-                with self.assertRaisesRegex(module.SpeechError, "native worker rejected APPEND"):
+                with self.assertRaisesRegex(module.SpeechError,
+                        "chunk 2 source span 2:3: native worker rejected APPEND"):
                     module.synthesize("abc", root / "config", bundle,
                                       root / "failed.wav", 97)
                 self.assertFalse((root / "failed.wav").exists())

@@ -10,6 +10,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#define CK_TTS_MAX_REQUEST_IDS 48u
 
 static int digest_matches(const char *path, const char *expected) {
     if (!expected || strlen(expected) != 64) return 0;
@@ -41,11 +42,13 @@ static int joined(char *buffer, size_t capacity, const char *directory,
 }
 
 static int count_ids(const char *csv, unsigned *count) {
-    if (!csv || !*csv || strlen(csv) > 159) return 0;
+    if (!csv || !*csv || strlen(csv) > CK_TTS_MAX_REQUEST_IDS * 4u - 1u)
+        return 0;
     unsigned found = 0;
     const char *cursor = csv;
     for (;;) {
-        if (found == 40 || *cursor < '0' || *cursor > '9') return 0;
+        if (found == CK_TTS_MAX_REQUEST_IDS ||
+            *cursor < '0' || *cursor > '9') return 0;
         char *end = NULL;
         errno = 0;
         long id = strtol(cursor, &end, 10);

@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -17,6 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "version/v8/tts/native_kokoro_dispatch.c"
 sys.path.insert(0, str(ROOT / "version/v8/tts"))
 import build_kokoro_dispatch_bundle as bundle_builder
+import prepare_kokoro_accessibility_text as text_planner
 from build_kokoro_request_runtime import select_conv_provider
 from build_kokoro_waveform_circuit import build_circuit
 
@@ -26,6 +28,15 @@ def _hash(path):
 
 
 class KokoroNativeDispatchTest(unittest.TestCase):
+    def test_runtime_request_bound_agrees_across_frontend_and_hosts(self):
+        limit = bundle_builder.RUNTIME_MAX_COUNT
+        self.assertEqual(limit, text_planner.MAX_REQUEST_IDS)
+        for source in (SOURCE, ROOT / "version/v8/tts/native_kokoro_wav_host.c"):
+            match = re.search(r"#define CK_TTS_MAX_REQUEST_IDS (\d+)u",
+                              source.read_text())
+            self.assertIsNotNone(match, source)
+            self.assertEqual(int(match.group(1)), limit, source)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -93,7 +104,7 @@ class KokoroNativeDispatchTest(unittest.TestCase):
         self.assertEqual(bundle_builder.selected_runtime_counts((12,), False),
                          (8, 12, 13, 36))
         self.assertEqual(bundle_builder.selected_runtime_counts((), True),
-                         tuple(range(3, 41)))
+                         tuple(range(3, 49)))
         for counts in ((8,), (36,), (12, 12), (2,), (41,), (True,),
                        (12.0,), (3, 4, 5, 6, 7)):
             with self.subTest(counts=counts), self.assertRaises(ValueError):
@@ -101,7 +112,7 @@ class KokoroNativeDispatchTest(unittest.TestCase):
                     self.root / "af_heart.ckvoice", self.root / "not-published",
                     experimental_counts=counts)
             self.assertFalse((self.root / "not-published").exists())
-        for counts in ((8,), (13,), (36,), (12, 12), (2,), (41,),
+        for counts in ((8,), (13,), (36,), (12, 12), (2,), (49,),
                        (True,), (12.0,), (3, 4, 5, 6, 7)):
             with self.subTest(runtime_counts=counts), self.assertRaises(ValueError):
                 bundle_builder.build_bundle(self.root / "missing-bump",
@@ -181,9 +192,9 @@ class KokoroNativeDispatchTest(unittest.TestCase):
 
     def test_runtime_bundle_routes_three_lengths_to_one_generated_artifact(self):
         voice = self.root / "runtime-voice.ckvoice"
-        voice.write_bytes(b"CKVOICE1" + (38).to_bytes(4, "little") +
+        voice.write_bytes(b"CKVOICE1" + (46).to_bytes(4, "little") +
                           (256).to_bytes(4, "little") +
-                          b"\0" * (38 * 256 * 4))
+                          b"\0" * (46 * 256 * 4))
         bindings = self.root / "runtime-bindings.json"
         bindings.write_text(json.dumps({
             "native_voice_sha256": _hash(voice),
@@ -266,7 +277,7 @@ class KokoroNativeDispatchTest(unittest.TestCase):
         self.assertEqual(built, [64, 64])
         self.assertEqual(range_report["captured_phoneme_counts"], [8, 13, 36])
         self.assertEqual(range_report["execution_only_phoneme_counts"],
-                         [count for count in range(3, 41)
+                         [count for count in range(3, 49)
                           if count not in (8, 13, 36)])
         short_voice = self.root / "short-range-voice.ckvoice"
         short_voice.write_bytes(b"CKVOICE1" + (37).to_bytes(4, "little") +
@@ -285,7 +296,7 @@ class KokoroNativeDispatchTest(unittest.TestCase):
         self.assertFalse((self.root / "rejected-range-bundle").exists())
         self.assertEqual(len({item["library_sha256"] for item in
                               range_report["buckets"].values()}), 1)
-        for count in (3, 12, 40, 8, 12):
+        for count in (3, 12, 40, 46, 48, 8, 12):
             ids = ",".join(map(str, [0] + [4] * (count - 2) + [0]))
             wav = self.root / f"range-{count}.wav"
             wav.unlink(missing_ok=True)
@@ -294,7 +305,7 @@ class KokoroNativeDispatchTest(unittest.TestCase):
                 capture_output=True, text=True)
             self.assertEqual(run.returncode, 0, run.stderr)
             self.assertEqual(wav.read_text().strip(), f"runtime:{ids}")
-        for count in (2, 41):
+        for count in (2, 49):
             ids = ",".join(map(str, [0] + [4] * (count - 2) + [0]))
             wav = self.root / f"rejected-{count}.wav"
             run = subprocess.run([str(range_output / "native-kokoro-dispatch"),
