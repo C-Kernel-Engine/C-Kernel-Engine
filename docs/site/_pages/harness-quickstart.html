@@ -6,8 +6,8 @@
 <p>Run a generated CKE model behind one OpenAI-compatible endpoint, then point a client at that
 endpoint. The harness owns files, tools and permissions; CKE owns rendering, tokenization, the
 native model session and response delivery. A model appearing in <code>/v1/models</code> proves
-that it loaded, not that it can complete an agent task. The table below names the tested
-artifact boundary as of 26 October 2026. Consult the
+that it loaded, not that it can complete an agent task. The table below names dated, tested
+artifact boundaries. Consult the
 <a href="v8-serving-coverage.html">serving coverage inventory</a> for circuit declarations and the
 <a href="v8-runbook.html#converted-jinja-serving">serving runbook</a> for detailed acceptance commands.
 The Qwen report's <code>artifact_certification_status: PASS</code> means the expected
@@ -21,8 +21,11 @@ results from their listed source revisions, not continuously current endpoint st
     <thead><tr><th>CKE model artifact</th><th>Client to try</th><th>Current evidence</th><th>Tool-task status</th></tr></thead>
     <tbody>
       <tr><td>Qwen3.8 27B Q4_K_M</td><td><a href="https://github.com/QwenLM/qwen-code">Qwen Code</a></td>
-        <td>A fresh current-main read → edit → test → summary task passed on an identified 16K bundle in 847.9 seconds; see <code>version/v8/reports/qwen38_qwencode_16k_20261026.json</code>. Prior HTTP recovery evidence remains separate.</td>
-        <td><strong>Bounded PASS for one task.</strong> Its turns used 7,074–7,569 input tokens, not the full 16K capacity. Other artifacts, repeated reliability and batching require separate runs.</td></tr>
+        <td>An identified 32K bundle built from merged main completed repeated Qwen Code 0.25.1 read → edit → test tasks on Ryzen on 3 November 2026. An artifact-bound cache-on/off pair processed 58,872 input tokens across five responses in each mode; exact-prefix reuse saved prefill work. HTTP cancellation, eviction, capacity rejection and recovery checks passed. See <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/pull/1015">#1015</a> and the <a href="v8-runbook.html#converted-jinja-serving">serving runbook</a>.</td>
+        <td><strong>Bounded repeated task PASS for that 32K artifact.</strong> The 32K capacity was not consumed by one turn. Its ordinary HTTP path remains single-flight; recurrent batching and other Qwen3.8 builds require their own certification.</td></tr>
+      <tr><td>Qwen3.8 Flash Next Q4_K_M</td><td>No coding harness is certified for the pinned bundle.</td>
+        <td>The retained 8K-capacity generated runtime matched 64 full-vocabulary logit comparisons across a 40-token batched prompt. The Flash circuit and provider contract suite now runs alongside dense Qwen in standard nightly. See the <a href="v8-runbook.html#qwen38-flash-quickstart">Flash Next runbook</a>.</td>
+        <td><strong>Generated arithmetic evidence only.</strong> The older serving bundle has no declared tool protocol. Long-context state continuity, recurrent prefix restore, repeated harness tasks and current-endpoint recovery remain uncertified.</td></tr>
       <tr><td>Gemma4 E4B, explicit tools variant</td><td><a href="https://antigravity.google/docs/sdk/local-models/">Antigravity SDK</a></td>
         <td>Four bounded local SDK tasks passed on the historical 2K bundle and on one identified 32K-capacity bundle on 26 October 2026. The fresh run took 154.8 seconds; see <code>version/v8/reports/gemma4_antigravity_32k_20261026.json</code> for per-case evidence.</td>
         <td><strong>Bounded PASS for short tasks.</strong> The 32K build capacity is not a 32K-input result. The chat-only variant rejects tools; overnight reliability remains untested.</td></tr>

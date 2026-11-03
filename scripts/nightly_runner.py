@@ -2514,6 +2514,7 @@ NIGHTLY_PROFILES = {
         "v8_artifact_compile_matrix",
         "v8_muse_glimmer_contracts",
         "v8_qwen38_dense_contracts",
+        "v8_qwen38_flash_contracts",
         "v8_multimodal_ocr_contracts",
         "v8_command_a_plus_nvfp4",
         "v8_dsl_policy",
