@@ -1,5 +1,6 @@
 var NAVTREEINDEX19 =
 {
+"rwkv7__decode_8c.html#a7d03a1eda3bae5252e748280b310fbfa":[2,0,1,1,126,10],
 "rwkv7__decode_8c.html#a8a325bc13c423c3bc047d60f89392cc1":[2,0,1,1,126,5],
 "rwkv7__decode_8c.html#a8b4df991b381820a28ce0359f5f992a1":[2,0,1,1,126,7],
 "rwkv7__decode_8c.html#a9d25e7c22f213f74d5e7b03e1d27c814":[2,0,1,1,126,14],
@@ -248,6 +249,5 @@ var NAVTREEINDEX19 =
 "structCKKokoroShapeLimitsV8.html":[1,0,39],
 "structCKKokoroShapeLimitsV8.html#a2b669f619722897c5671c009fedda00a":[1,0,39,7],
 "structCKKokoroShapeLimitsV8.html#a2e63d3dfe27c5b2e73a61248727d8783":[1,0,39,6],
-"structCKKokoroShapeLimitsV8.html#a559c2443d1019f6723443adda7cba702":[1,0,39,11],
-"structCKKokoroShapeLimitsV8.html#a796427e30ff2e16e9ebba3889ebf9b6f":[1,0,39,1]
+"structCKKokoroShapeLimitsV8.html#a559c2443d1019f6723443adda7cba702":[1,0,39,11]
 };
