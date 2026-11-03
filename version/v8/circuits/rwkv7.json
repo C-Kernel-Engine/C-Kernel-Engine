@@ -124,7 +124,7 @@
       "activation": "squared_relu",
       "qkv_bias": false,
       "tail_order": "lora_gates -> vgate -> kk_factor -> norm_kk -> scale_k -> wkv_decode",
-      "bonus_weights": "rk, k_k, k_a are per-layer time-mix weights sourced from the manifest; rk reaches wkv_decode via an external slot"
+      "bonus_weights": "rk, k_k, k_a are per-layer time-mix weights sourced from the manifest; rk binds the wkv_decode bonus port directly from its per-layer checkpoint weight"
     },
     "logits_contract": {
       "final_norm": "layernorm",
@@ -384,7 +384,7 @@
             {"op": "rwkv7_kk_factor", "graph_slots": {"inputs": {"k": "k_raw_vec"}, "outputs": {"kk_raw": "kk_raw_vec"}}},
             {"op": "rwkv7_norm_kk", "graph_slots": {"inputs": {"kk_in": "kk_raw_vec"}, "outputs": {"kk_out": "kk_vec"}}},
             {"op": "rwkv7_scale_k", "graph_slots": {"inputs": {"k_in": "k_raw_vec", "a": "a_vec"}, "outputs": {"k_out": "k_scaled_vec"}}},
-            {"op": "rwkv7_wkv_decode", "graph_slots": {"inputs": {"r": "r_vec", "w_log": "w_log_vec", "k": "k_scaled_vec", "v": "v_mix_vec", "kk": "kk_vec", "a": "a_vec", "g": "g_vec", "rk": "external:rwkv7_time_mix_rk", "state_in": "wkv"}, "outputs": {"y": "wkv_out", "state_out": "wkv"}}},
+            {"op": "rwkv7_wkv_decode", "graph_slots": {"inputs": {"r": "r_vec", "w_log": "w_log_vec", "k": "k_scaled_vec", "v": "v_mix_vec", "kk": "kk_vec", "a": "a_vec", "g": "g_vec", "state_in": "wkv"}, "outputs": {"y": "wkv_out", "state_out": "wkv"}}},
             {"op": "rwkv7_out_proj", "graph_slots": {"inputs": {"A": "wkv_out"}, "outputs": {"C": "post_attention_stream"}}},
             {"op": "residual_add", "graph_slots": {"inputs": {"a": "main_stream", "b": "post_attention_stream"}, "outputs": {"out": "main_stream"}}},
             {"op": "layernorm", "graph_slots": {"inputs": {"input": "main_stream"}, "outputs": {"output": "normalized_stream"}}},
@@ -402,7 +402,7 @@
             {"op": "rwkv7_kk_factor", "graph_slots": {"inputs": {"k": "k_raw_vec"}, "outputs": {"kk_raw": "kk_raw_vec"}}},
             {"op": "rwkv7_norm_kk", "graph_slots": {"inputs": {"kk_in": "kk_raw_vec"}, "outputs": {"kk_out": "kk_vec"}}},
             {"op": "rwkv7_scale_k", "graph_slots": {"inputs": {"k_in": "k_raw_vec", "a": "a_vec"}, "outputs": {"k_out": "k_scaled_vec"}}},
-            {"op": "rwkv7_wkv_decode", "graph_slots": {"inputs": {"r": "r_vec", "w_log": "w_log_vec", "k": "k_scaled_vec", "v": "v_mix_vec", "kk": "kk_vec", "a": "a_vec", "g": "g_vec", "rk": "external:rwkv7_time_mix_rk", "state_in": "wkv"}, "outputs": {"y": "wkv_out", "state_out": "wkv"}}},
+            {"op": "rwkv7_wkv_decode", "graph_slots": {"inputs": {"r": "r_vec", "w_log": "w_log_vec", "k": "k_scaled_vec", "v": "v_mix_vec", "kk": "kk_vec", "a": "a_vec", "g": "g_vec", "state_in": "wkv"}, "outputs": {"y": "wkv_out", "state_out": "wkv"}}},
             {"op": "rwkv7_out_proj", "graph_slots": {"inputs": {"A": "wkv_out"}, "outputs": {"C": "post_attention_stream"}}},
             {"op": "residual_add", "graph_slots": {"inputs": {"a": "main_stream", "b": "post_attention_stream"}, "outputs": {"out": "main_stream"}}},
             {"op": "layernorm", "graph_slots": {"inputs": {"input": "main_stream"}, "outputs": {"output": "normalized_stream"}}},

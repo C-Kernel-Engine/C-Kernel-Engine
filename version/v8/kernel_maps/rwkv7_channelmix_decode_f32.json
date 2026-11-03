@@ -66,11 +66,11 @@
       },
       {
         "name": "dim",
-        "source": "dim:dim"
+        "source": "dim:embed_dim"
       },
       {
         "name": "hidden_dim",
-        "source": "dim:hidden_dim"
+        "source": "dim:intermediate_size"
       },
       {
         "name": "scratch",
@@ -86,8 +86,8 @@
   },
   "dims": [
     "C",
-    "dim",
-    "hidden_dim",
+    "embed_dim",
+    "intermediate_size",
     "scratch_elems"
   ],
   "id": "rwkv7_channelmix_decode_f32",
@@ -197,6 +197,15 @@
         "C"
       ],
       "storage_class": "activation"
+    }
+  ],
+  "scratch": [
+    {
+      "name": "scratch",
+      "dtype": "fp32",
+      "size_bytes": "(H + I) * 4",
+      "size_resolution": "required",
+      "desc": "xk [dim] followed by hidden [hidden_dim] for token-serial channelmix"
     }
   ],
   "modes": {

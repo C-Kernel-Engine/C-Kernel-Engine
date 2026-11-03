@@ -86704,11 +86704,11 @@
           },
           {
             "name": "dim",
-            "source": "dim:dim"
+            "source": "dim:embed_dim"
           },
           {
             "name": "hidden_dim",
-            "source": "dim:hidden_dim"
+            "source": "dim:intermediate_size"
           },
           {
             "name": "scratch",
@@ -86724,8 +86724,8 @@
       },
       "dims": [
         "C",
-        "dim",
-        "hidden_dim",
+        "embed_dim",
+        "intermediate_size",
         "scratch_elems"
       ],
       "id": "rwkv7_channelmix_decode_f32",
@@ -86837,6 +86837,15 @@
           "storage_class": "activation"
         }
       ],
+      "scratch": [
+        {
+          "name": "scratch",
+          "dtype": "fp32",
+          "size_bytes": "(H + I) * 4",
+          "size_resolution": "required",
+          "desc": "xk [dim] followed by hidden [hidden_dim] for token-serial channelmix"
+        }
+      ],
       "modes": {
         "backward": false,
         "inference": true,
@@ -86937,14 +86946,14 @@
           },
           {
             "name": "dim",
-            "source": "dim:dim"
+            "source": "dim:embed_dim"
           }
         ],
         "version": 1
       },
       "dims": [
         "C",
-        "dim"
+        "embed_dim"
       ],
       "id": "rwkv7_kk_factor_f32",
       "provider_numerical_contract_schema": 1,
@@ -87169,19 +87178,19 @@
           },
           {
             "name": "dim",
-            "source": "dim:dim"
+            "source": "dim:embed_dim"
           },
           {
             "name": "rank_w",
-            "source": "dim:rank_w"
+            "source": "dim:decay_rank"
           },
           {
             "name": "rank_a",
-            "source": "dim:rank_a"
+            "source": "dim:key_rank"
           },
           {
             "name": "rank_g",
-            "source": "dim:rank_g"
+            "source": "dim:gate_rank"
           },
           {
             "name": "w_log",
@@ -87212,10 +87221,10 @@
       },
       "dims": [
         "C",
-        "dim",
-        "rank_w",
-        "rank_a",
-        "rank_g"
+        "embed_dim",
+        "decay_rank",
+        "key_rank",
+        "gate_rank"
       ],
       "id": "rwkv7_lora_gates_f32",
       "provider_numerical_contract_schema": 1,
@@ -87682,14 +87691,14 @@
           },
           {
             "name": "dim",
-            "source": "dim:dim"
+            "source": "dim:embed_dim"
           }
         ],
         "version": 1
       },
       "dims": [
         "C",
-        "dim"
+        "embed_dim"
       ],
       "id": "rwkv7_scale_k_f32",
       "provider_numerical_contract_schema": 1,
@@ -87955,14 +87964,14 @@
           },
           {
             "name": "dim",
-            "source": "dim:dim"
+            "source": "dim:embed_dim"
           }
         ],
         "version": 1
       },
       "dims": [
         "C",
-        "dim"
+        "embed_dim"
       ],
       "id": "rwkv7_time_mix_shifts_f32",
       "provider_numerical_contract_schema": 1,
@@ -88291,11 +88300,11 @@
           },
           {
             "name": "dim",
-            "source": "dim:dim"
+            "source": "dim:embed_dim"
           },
           {
             "name": "rank_v",
-            "source": "dim:rank_v"
+            "source": "dim:value_rank"
           },
           {
             "name": "v_out",
@@ -88326,8 +88335,8 @@
       },
       "dims": [
         "C",
-        "dim",
-        "rank_v"
+        "embed_dim",
+        "value_rank"
       ],
       "id": "rwkv7_vgate_vmix_f32",
       "provider_numerical_contract_schema": 1,
@@ -88594,10 +88603,10 @@
           },
           {
             "name": "rk",
-            "source": "activation:rk",
+            "source": "weight:rk",
             "cast": "const float*",
             "ports": [
-              "input:rk"
+              "weight:rk"
             ]
           },
           {
@@ -88618,7 +88627,7 @@
           },
           {
             "name": "norm_eps",
-            "source": "dim:normalization_epsilon"
+            "source": "dim:layer_norm_eps"
           },
           {
             "name": "state_in",
@@ -88661,7 +88670,7 @@
         "N",
         "num_heads",
         "head_dim",
-        "normalization_epsilon"
+        "layer_norm_eps"
       ],
       "id": "rwkv7_wkv_decode_f32",
       "provider_numerical_contract_schema": 1,
@@ -88778,19 +88787,6 @@
           "consumption": "required",
           "dtype": "fp32",
           "layout": "head_major_row_major",
-          "name": "rk",
-          "placement": "local",
-          "shape": [
-            "H",
-            "N"
-          ],
-          "storage_class": "activation"
-        },
-        {
-          "access": "read",
-          "consumption": "required",
-          "dtype": "fp32",
-          "layout": "head_major_row_major",
           "name": "state_in",
           "placement": "local",
           "shape": [
@@ -88802,6 +88798,19 @@
         }
       ],
       "weights": [
+        {
+          "access": "read",
+          "consumption": "required",
+          "dtype": "fp32",
+          "layout": "head_major_row_major",
+          "name": "rk",
+          "placement": "local",
+          "shape": [
+            "H",
+            "N"
+          ],
+          "storage_class": "weight"
+        },
         {
           "access": "read",
           "consumption": "required",

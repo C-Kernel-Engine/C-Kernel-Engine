@@ -2585,7 +2585,6 @@ OP_DATAFLOW = {
             "kk": "kk_vec",
             "a": "a_vec",
             "g": "g_vec",
-            "rk": "external:rwkv7_time_mix_rk",
             "state_in": "wkv",
         },
         "outputs": {
@@ -5285,6 +5284,7 @@ WEIGHT_TO_KERNEL_INPUT = {
     "attn_lora_g1": "g1", "attn_lora_g2": "g2",
     "attn_lora_v1": "v1", "attn_lora_v2": "v2", "attn_lora_v0": "v0",
     "attn_k_k": "k_k", "attn_k_a": "k_a",
+    "attn_wkv_rk": "rk",
     "attn_wkv_ln_w": "ln_w", "attn_wkv_ln_b": "ln_b",
     "ffn_mu": "mu", "ffn_Wk": "Wk", "ffn_Wv": "Wv",
     "final_hyper_norm": "norm_weight",
@@ -7243,6 +7243,13 @@ def compute_matmul_dims(op_name: str, config: Dict) -> Tuple[Optional[int], Opti
         return embed, attn_out
     if op_name in ("recurrent_out_proj",):
         return embed, int(config.get("ssm_inner_size", attn_out))
+    if op_name in (
+        "rwkv7_r_proj",
+        "rwkv7_k_proj",
+        "rwkv7_v_proj",
+        "rwkv7_out_proj",
+    ):
+        return embed, embed
     if op_name in ("mamba_in_proj",):
         return int(config.get("mamba_projection_size", 0) or 0) or None, embed
     if op_name in ("mamba_out_proj",):
@@ -17496,18 +17503,23 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
 
             if src.startswith("activation:"):
                 key = src.split(":", 1)[1]
-                info = select_from_dict(key, activations, act_aliases)
-                if not info:
-                    op_errors.append(f"{func}.{name}: missing activation '{key}'")
+                if op_name == "rwkv7_vgate_produce" and key in ("v_first", "xv"):
+                    # Layer-0 produce path has no v_first/xv inputs; C selects the
+                    # produce branch only when xv is NULL.
                     expr = "NULL"
                 else:
-                    offset = info.get("activation_offset", 0)
-                    buf_name = info.get("buffer", key)
-                    if use_bump_base:
-                        off_expr = activation_off_expr(buf_name, offset)
-                        expr = ptr_expr("model->bump", off_expr, cast or "const float*")
+                    info = select_from_dict(key, activations, act_aliases)
+                    if not info:
+                        op_errors.append(f"{func}.{name}: missing activation '{key}'")
+                        expr = "NULL"
                     else:
-                        expr = ptr_expr("ACT", offset, cast or "const float*")
+                        offset = info.get("activation_offset", 0)
+                        buf_name = info.get("buffer", key)
+                        if use_bump_base:
+                            off_expr = activation_off_expr(buf_name, offset)
+                            expr = ptr_expr("model->bump", off_expr, cast or "const float*")
+                        else:
+                            expr = ptr_expr("ACT", offset, cast or "const float*")
 
             elif src.startswith("output:"):
                 key = src.split(":", 1)[1]
@@ -17589,21 +17601,24 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
 
             elif src.startswith("weight:"):
                 key = src.split(":", 1)[1]
-                sel = select_weight(key, weights, param.get("alt", None))
-                if not sel:
-                    op_errors.append(f"{func}.{name}: missing weight '{key}'")
+                if op_name == "rwkv7_vgate_produce" and key in ("v1", "v2", "v0"):
                     expr = "NULL"
                 else:
-                    _, winfo = sel
-                    offset = winfo.get("bump_offset", 0)
-                    wname = winfo.get("name")
-                    resolved_weight_ref = wname or resolved_weight_ref
-                    macro = weight_define.get(wname)
-                    if use_bump_base:
-                        off_expr = macro if macro else str(weights_base + int(offset))
-                        expr = ptr_expr("model->bump", off_expr, cast or "const void*")
+                    sel = select_weight(key, weights, param.get("alt", None))
+                    if not sel:
+                        op_errors.append(f"{func}.{name}: missing weight '{key}'")
+                        expr = "NULL"
                     else:
-                        expr = ptr_expr("model->bump_weights", offset, cast or "const void*")
+                        _, winfo = sel
+                        offset = winfo.get("bump_offset", 0)
+                        wname = winfo.get("name")
+                        resolved_weight_ref = wname or resolved_weight_ref
+                        macro = weight_define.get(wname)
+                        if use_bump_base:
+                            off_expr = macro if macro else str(weights_base + int(offset))
+                            expr = ptr_expr("model->bump", off_expr, cast or "const void*")
+                        else:
+                            expr = ptr_expr("model->bump_weights", offset, cast or "const void*")
 
             elif src.startswith("dim:"):
                 key = src.split(":", 1)[1]
@@ -17792,6 +17807,17 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
                     expr = "NULL"
                 elif key in ("multimodal_num_segments", "multimodal_singleton_tail"):
                     expr = "0"
+                elif key == "scratch_elems":
+                    if not scratch:
+                        op_errors.append(f"{func}.{name}: missing scratch storage for '{key}'")
+                        expr = "0"
+                    else:
+                        total_elems = 0
+                        for info in scratch.values():
+                            total_elems += int(info.get("size", 0) or 0) // _dtype_size_bytes(
+                                str(info.get("dtype", "fp32"))
+                            )
+                        expr = str(total_elems)
                 else:
                     op_errors.append(f"{func}.{name}: unknown runtime '{key}'")
                     expr = "0"

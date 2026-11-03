@@ -3441,3 +3441,207 @@ def test_rwkv7_missing_required_weight_fails_closed(missing):
     headers = _rwkv7_headers(converter, _rwkv7_inventory_names(2) - {missing})
     with pytest.raises(SystemExit, match="Missing required safetensors tensor"):
         converter._refs_from_safetensors_contract("rwkv7", {"num_layers": 2}, headers)
+
+
+def _write_rwkv7_synthetic_checkpoint(
+    tmp_path: Path,
+    *,
+    layers: int = 2,
+    hidden: int = 8,
+    heads: int = 2,
+    vocab: int = 16,
+    ranks: tuple[int, int, int, int] = (2, 2, 2, 2),
+) -> Path:
+    torch = pytest.importorskip("torch")
+    st = pytest.importorskip("safetensors.torch")
+    import math
+
+    checkpoint = tmp_path / "checkpoint"
+    checkpoint.mkdir()
+    head_size = hidden // heads
+    config = dict(
+        model_type="rwkv7",
+        num_hidden_layers=layers,
+        hidden_size=hidden,
+        head_size=head_size,
+        num_heads=heads,
+        hidden_ratio=4,
+        vocab_size=vocab,
+        decay_rank=ranks[0],
+        key_rank=ranks[1],
+        value_rank=ranks[2],
+        gate_rank=ranks[3],
+    )
+    (checkpoint / "config.json").write_text(json.dumps(config))
+    (checkpoint / "tokenizer.json").write_text(json.dumps({
+        "model": {"type": "WordPiece",
+                  "vocab": {chr(65 + i): i for i in range(vocab)}}}))
+    (checkpoint / "tokenizer_config.json").write_text(
+        json.dumps({"backend": "rwkv_world_trie"}))
+
+    tensors = {}
+    rank_for = {".w1": ranks[0], ".w2": ranks[0],
+                ".a1": ranks[1], ".a2": ranks[1],
+                ".g1": ranks[3], ".g2": ranks[3],
+                ".v1": ranks[2], ".v2": ranks[2]}
+    for index, name in enumerate(sorted(_rwkv7_inventory_names(layers))):
+        shape = (hidden,)
+        if name in ("head.weight", "rwkv7.emb.weight"):
+            shape = (vocab, hidden)
+        elif name.endswith(("receptance.weight", "att.key.weight",
+                            "att.value.weight", "output.weight")):
+            shape = (hidden, hidden)
+        elif name.endswith("ffn.key.weight"):
+            shape = (hidden * 4, hidden)
+        elif name.endswith("ffn.value.weight"):
+            shape = (hidden, hidden * 4)
+        elif name.endswith(tuple(rank_for)) and name.endswith((".w1", ".a1", ".v1", ".g1")):
+            shape = (hidden, rank_for[name[-3:]])
+        elif name.endswith(tuple(rank_for)) and name.endswith((".w2", ".a2", ".v2", ".g2")):
+            shape = (rank_for[name[-3:]], hidden)
+        elif name.endswith(".r_k"):
+            shape = (heads, head_size)
+        tensors[name] = (
+            (torch.arange(math.prod(shape)).reshape(shape) - 7) / 16 + index / 8
+        ).to(torch.bfloat16)
+    st.save_file(tensors, checkpoint / "model.safetensors")
+    return checkpoint
+
+
+def test_rwkv7_kernel_maps_use_real_config_dims_and_scratch() -> None:
+    build_ir = _load_build_ir()
+    kernel_maps = ROOT / "version" / "v8" / "kernel_maps"
+    expected_dim_sources = {
+        "rwkv7_time_mix_shifts_f32.json": {"dim": "embed_dim"},
+        "rwkv7_kk_factor_f32.json": {"dim": "embed_dim"},
+        "rwkv7_scale_k_f32.json": {"dim": "embed_dim"},
+        "rwkv7_lora_gates_f32.json": {
+            "dim": "embed_dim",
+            "rank_w": "decay_rank",
+            "rank_a": "key_rank",
+            "rank_g": "gate_rank",
+        },
+        "rwkv7_vgate_vmix_f32.json": {
+            "dim": "embed_dim",
+            "rank_v": "value_rank",
+        },
+        "rwkv7_channelmix_decode_f32.json": {
+            "dim": "embed_dim",
+            "hidden_dim": "intermediate_size",
+        },
+        "rwkv7_wkv_decode_f32.json": {
+            "norm_eps": "layer_norm_eps",
+        },
+    }
+    forbidden = {"dim", "rank_w", "rank_a", "rank_g", "rank_v",
+                 "hidden_dim", "normalization_epsilon"}
+    for filename, mapping in expected_dim_sources.items():
+        kernel = json.loads((kernel_maps / filename).read_text(encoding="utf-8"))
+        params = {
+            param["name"]: param
+            for param in kernel.get("call_abi", {}).get("params", [])
+        }
+        for port, config_key in mapping.items():
+            source = params[port]["source"]
+            assert source == f"dim:{config_key}", (filename, port, source)
+        for param in params.values():
+            source = str(param.get("source", ""))
+            if not source.startswith("dim:"):
+                continue
+            key = source.split(":", 1)[1]
+            if key in forbidden:
+                raise AssertionError(f"{filename} still uses stale dim source {source!r}")
+
+    channelmix = json.loads(
+        (kernel_maps / "rwkv7_channelmix_decode_f32.json").read_text(encoding="utf-8")
+    )
+    scratch = {entry["name"]: entry for entry in channelmix["scratch"]}
+    assert scratch["scratch"]["size_resolution"] == "required"
+    assert scratch["scratch"]["size_bytes"] == "(H + I) * 4"
+    params = {p["name"]: p for p in channelmix["call_abi"]["params"]}
+    assert params["scratch"]["source"] == "scratch:scratch"
+    assert params["scratch_elems"]["source"] == "runtime:scratch_elems"
+
+    config = {
+        "embed_dim": 128,
+        "num_heads": 2,
+        "head_dim": 64,
+        "intermediate_size": 512,
+        "vocab_size": 32,
+    }
+    for op in (
+        "rwkv7_r_proj",
+        "rwkv7_k_proj",
+        "rwkv7_v_proj",
+        "rwkv7_out_proj",
+    ):
+        assert build_ir.compute_matmul_dims(op, config) == (128, 128)
+
+
+def test_rwkv7_wkv_binds_rk_as_per_layer_weight() -> None:
+    build_ir = _load_build_ir()
+    kernel = json.loads(
+        (ROOT / "version" / "v8" / "kernel_maps"
+         / "rwkv7_wkv_decode_f32.json").read_text(encoding="utf-8")
+    )
+    param = next(p for p in kernel["call_abi"]["params"] if p["name"] == "rk")
+    assert param["source"] == "weight:rk"
+    assert param["ports"] == ["weight:rk"]
+    assert "rk" not in {entry["name"] for entry in kernel["inputs"]}
+    assert "rk" in {entry["name"] for entry in kernel["weights"]}
+    assert build_ir.WEIGHT_TO_KERNEL_INPUT["attn_wkv_rk"] == "rk"
+    assert build_ir.OP_DATAFLOW["rwkv7_wkv_decode"]["inputs"].get("rk") is None
+
+
+def test_rwkv7_lower_3_binds_layer0_vgate_nulls_and_channelmix_scratch(
+    tmp_path: Path,
+) -> None:
+    checkpoint = _write_rwkv7_synthetic_checkpoint(tmp_path)
+    output = tmp_path / "out"
+    output.mkdir()
+    subprocess.run([
+        sys.executable, str(CONVERTER_PATH), "--checkpoint", str(checkpoint),
+        "--output", str(output / "weights.bump"),
+        "--config-out", str(output / "config.json"),
+        "--manifest-out", str(output / "weights_manifest.json"),
+        "--arch", "auto",
+    ], cwd=ROOT, check=True, capture_output=True, text=True)
+
+    run = subprocess.run([
+        sys.executable,
+        str(ROOT / "version" / "v8" / "scripts" / "build_ir_v8.py"),
+        "--manifest", str(output / "weights_manifest.json"),
+        "--mode", "prefill",
+        "--output", str(output / "ir1.json"),
+        "--layout-output", str(output / "layout.json"),
+        "--lowered-output", str(output / "lowered.json"),
+        "--call-output", str(output / "lowered_call.json"),
+        "--context-len", "8",
+        "--logits-layout", "auto",
+    ], cwd=ROOT, capture_output=True, text=True)
+    assert run.returncode == 0, run.stderr[-4000:]
+
+    call_ir = json.loads((output / "lowered_call.json").read_text(encoding="utf-8"))
+    assert call_ir.get("errors") == []
+    assert [op["idx"] for op in call_ir["operations"] if op.get("errors")] == []
+
+    def args_of(op_name: str, layer: int) -> dict[str, dict]:
+        op = next(
+            item for item in call_ir["operations"]
+            if item["op"] == op_name and item["layer"] == layer
+        )
+        return {arg["name"]: arg for arg in op["args"]}
+
+    layer0_vgate = args_of("rwkv7_vgate_produce", 0)
+    for port in ("v_first", "xv", "v1", "v2", "v0"):
+        assert layer0_vgate[port]["expr"] == "NULL", (port, layer0_vgate[port])
+
+    wkv_args = args_of("rwkv7_wkv_decode", 0)
+    assert wkv_args["rk"]["source"] == "weight:rk"
+    assert "W_RWKV7_BLOCKS_0_ATT_R_K" in wkv_args["rk"]["expr"]
+    assert wkv_args["state_in"]["source"] == "activation:state_in"
+
+    channelmix = args_of("rwkv7_channelmix_decode", 0)
+    assert channelmix["scratch"]["source"] == "scratch:scratch"
+    assert channelmix["scratch"]["expr"] != "NULL"
+    assert channelmix["scratch_elems"]["expr"].isdigit()
