@@ -4,11 +4,14 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import numpy as np
 
 from version.v8.scripts.replay_ggml_attention_packet_v8 import (
     FLASH_SOURCE, OBSERVED_SOURCE, _compile_ggml_source, _observed_capture,
+    _substitute_observed_operands,
+    compare_observed_cke_operands,
     fp64_full_flash_reference_rows,
     fp64_reference, pinned_tree_identity, run_ggml, run_ggml_flash_rows,
     replay_observed_oracle, validate_oracle_contract,
@@ -98,6 +101,57 @@ class GgmlAttentionPacketTests(unittest.TestCase):
                     Path("unused"), root, name, scale=1, alibi=0, threads=1,
                     parity_report=report_path,
                 )
+
+    def test_substitute_observed_operands_preserves_physical_mask_and_rejects_wrong_extent(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            name, _, mask = self._synthetic_observed_capture(root)
+            specs, geometry = _observed_capture(root, name)
+            tensors = {
+                "Qcur_rope": np.arange(16, dtype="<f4").reshape(2, 2, 4),
+                "Kcache_post_store": np.arange(8, dtype="<f2").reshape(2, 1, 4),
+                "Vcache_post_store": np.arange(8, dtype="<f2").reshape(2, 1, 4) + 20,
+            }
+            output = root / "substituted"
+            output.mkdir()
+            paths, extent = _substitute_observed_operands(
+                root, name, specs, geometry, tensors, output,
+            )
+            self.assertEqual(extent["valid_cache_positions"], [0, 2])
+            self.assertGreater(extent["operand_metrics"]["q"]["max_abs"], 1)
+            self.assertEqual(paths["mask"].read_bytes(), mask.tobytes())
+            self.assertTrue(np.array_equal(
+                np.frombuffer(paths["q"].read_bytes(), dtype="<f4").reshape(2, 2, 4),
+                tensors["Qcur_rope"],
+            ))
+            self.assertTrue(np.array_equal(
+                np.frombuffer(paths["k"].read_bytes(), dtype="<f2").reshape(1, 32, 4)[0, :2],
+                tensors["Kcache_post_store"][:, 0],
+            ))
+            wrong = {**tensors, "Qcur_rope": tensors["Qcur_rope"][:1]}
+            with self.assertRaisesRegex(BundleError, "geometry"):
+                _substitute_observed_operands(root, name, specs, geometry, wrong, output)
+            mask_path = root / f"{name}.nonflash_mask.bin"
+            changed = mask.copy()
+            changed[1, 0] = -np.inf
+            mask_path.write_bytes(changed.tobytes())
+            with self.assertRaisesRegex(BundleError, "mask"):
+                _substitute_observed_operands(root, name, specs, geometry, tensors, output)
+
+    def test_identical_input_replay_rejects_stale_parity_report(self):
+        with tempfile.TemporaryDirectory() as temp:
+            report = Path(temp) / "parity.json"
+            report.write_text("{}", encoding="ascii")
+            with patch(
+                "version.v8.scripts.replay_ggml_attention_packet_v8.load_bundle",
+                return_value=({"context": {"source_sha256": {"parity_report": "stale"}}}, {}),
+            ):
+                with self.assertRaisesRegex(BundleError, "same parity report"):
+                    compare_observed_cke_operands(
+                        Path("unused"), Path(temp), "kqv_out-0-token-000001-occ-000",
+                        Path("unused"), scale=1, alibi=0, threads=1,
+                        parity_report=report,
+                    )
 
     def test_observed_nonflash_ggml_replay_detects_wrong_mask(self):
         tree = Path(os.environ.get("CK_PINNED_LLAMA_TREE", str(ROOT / "llama.cpp")))
