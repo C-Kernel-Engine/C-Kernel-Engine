@@ -296,6 +296,15 @@ def speak_and_control(text: str, speech_exe: Path, read=input,
         raise VoiceError(f"speech executable unavailable: {speech_exe}")
     print(f"{label} backend selected.", flush=True)
     child = None
+
+    def signal_group(sig: signal.Signals) -> None:
+        # The group can exit between the control callback and this signal.
+        # Signal even if the leader exited: a speech worker may still live.
+        try:
+            os.killpg(child.pid, sig)
+        except ProcessLookupError:
+            pass
+
     try:
         while True:
             if child is None:
@@ -303,23 +312,24 @@ def speak_and_control(text: str, speech_exe: Path, read=input,
                                          start_new_session=True)
             choice = read("Speech: enter=finish, repeat=restart, stop=silence: ").strip().lower()
             if choice == "":
-                if child.wait() != 0:
+                returncode = child.wait()
+                child = None
+                if returncode != 0:
                     raise VoiceError(f"{label} failed")
                 return
-            if child.poll() is None:
-                os.killpg(child.pid, signal.SIGTERM)
-                try:
-                    child.wait(timeout=1)
-                except subprocess.TimeoutExpired:
-                    os.killpg(child.pid, signal.SIGKILL)
-                    child.wait()
+            signal_group(signal.SIGTERM)
+            try:
+                child.wait(timeout=1)
+            except subprocess.TimeoutExpired:
+                signal_group(signal.SIGKILL)
+                child.wait()
             child = None
             if choice == "repeat":
                 continue
             return
     finally:
-        if child is not None and child.poll() is None:
-            os.killpg(child.pid, signal.SIGKILL)
+        if child is not None:
+            signal_group(signal.SIGKILL)
             child.wait()
 
 
