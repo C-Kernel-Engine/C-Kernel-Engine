@@ -2965,6 +2965,16 @@ def _load_index_audit():
     return module
 
 
+def _load_codegen():
+    path = ROOT / "version" / "v8" / "scripts" / "codegen_v8.py"
+    spec = importlib.util.spec_from_file_location("codegen_v8_rwkv7_prefill_test", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 def test_rwkv7_contract_covers_1p5b_inventory() -> None:
     converter = _load_converter()
     names = _rwkv7_inventory_names()
@@ -3152,6 +3162,78 @@ def test_rwkv7_kernel_weight_ports_are_bound() -> None:
             ), f"{op} cannot bind kernel weight port {port!r}: {weight_keys}"
             checked += 1
     assert checked >= 20
+
+
+def test_rwkv7_providers_certify_every_declared_phase() -> None:
+    build_ir = _load_build_ir()
+    circuit = json.loads(
+        (ROOT / "version" / "v8" / "circuits" / "rwkv7.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    requirements = circuit["contract"]["provider_numerical_requirements"]
+    kernel_maps = ROOT / "version" / "v8" / "kernel_maps"
+
+    kernel_ops = {
+        build_ir.TEMPLATE_TO_KERNEL_OP[op] for op in requirements
+    }
+    assert "rwkv7_wkv_decode" in kernel_ops
+
+    checked = 0
+    for kernel_op in sorted(kernel_ops):
+        if not str(kernel_op).startswith("rwkv7_"):
+            continue
+        path = kernel_maps / f"{kernel_op}_f32.json"
+        assert path.exists(), f"missing kernel map: {path}"
+        kernel = json.loads(path.read_text(encoding="utf-8"))
+        selection_phases = set(kernel["selection"]["phases"])
+        capability_phases = set(kernel["numerical_capabilities"][0]["phases"])
+        # The circuit declares decode and prefill for every RWKV-7 provider;
+        # the selection gate only reads ``selection.phases``, so a capability
+        # promoted for prefill must also be promoted for selection.
+        assert {"decode", "prefill"} <= selection_phases, (kernel_op, selection_phases)
+        assert selection_phases == capability_phases, (
+            kernel_op,
+            selection_phases,
+            capability_phases,
+        )
+        checked += 1
+    assert checked == 8
+
+
+def test_rwkv7_prefill_uses_token_serial_decode_path() -> None:
+    converter = _load_converter()
+    build_ir = _load_build_ir()
+    codegen = _load_codegen()
+    circuit = json.loads(
+        (ROOT / "version" / "v8" / "circuits" / "rwkv7.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    contract = converter._safetensors_arch_contract("rwkv7")
+
+    # T=1 RWKV-7 ops are reused token-serially; any other policy value makes
+    # codegen take the generated batched-prefill path.
+    assert circuit["flags"]["prefill_policy"] == "sequential_decode"
+    assert contract["config"]["prefill_policy"] == "sequential_decode"
+    assert (
+        codegen._uses_generated_batched_prefill({"config": contract["config"]})
+        is False
+    )
+    assert (
+        codegen._uses_generated_batched_prefill({"config": circuit["flags"]})
+        is False
+    )
+    assert (
+        codegen._uses_generated_batched_prefill(
+            {"config": {"prefill_policy": "batched"}}
+        )
+        is True
+    )
+
+    manifest: dict[str, object] = {"config": {}}
+    build_ir._apply_prefill_policy_override(manifest, "sequential_decode")
+    assert manifest["config"]["prefill_policy"] == "sequential_decode"
 
 
 def test_rwkv7_circuit_uses_canonical_matmul_ports_and_alias_safe_residuals() -> None:

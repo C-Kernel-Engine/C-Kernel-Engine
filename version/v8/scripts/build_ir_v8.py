@@ -7134,6 +7134,35 @@ def _apply_layer_quant_aliases(
     return effective
 
 
+def _apply_layer_quant_entry_fallback(
+    layer_quant: Dict[str, Any],
+    entry_dtype: Dict[str, str],
+    layer_idx: int,
+) -> Dict[str, Any]:
+    """Resolve canonical layer weight-slot dtypes from the manifest entries.
+
+    Manifests whose per-layer tensors are not named ``layer.{L}.*`` (RWKV-7
+    keeps ``rwkv7.blocks.{L}.*``) carry no ``layer.{L}`` quant summary. Without
+    this fallback provider selection defaults every slot to fp32 while the
+    binder still maps the real entry, so selection and stored dtype disagree.
+    Reuse the binder's ``WEIGHT_PATTERNS`` so both always resolve the same
+    tensor.
+    """
+    effective = dict(layer_quant or {})
+    token = str(layer_idx)
+    for canonical, candidates in WEIGHT_PATTERNS.items():
+        if canonical in effective:
+            continue
+        for candidate in candidates:
+            if "{L}" not in candidate:
+                continue
+            dtype = entry_dtype.get(candidate.replace("{L}", token))
+            if dtype:
+                effective[canonical] = str(dtype).lower()
+                break
+    return effective
+
+
 def _apply_header_quant_aliases(
     header_quant: Dict[str, Any],
     entry_dtype: Dict[str, str],
@@ -10691,6 +10720,11 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                         config,
                         layer_idx,
                     )
+                    layer_quant = _apply_layer_quant_entry_fallback(
+                        layer_quant,
+                        entry_dtype,
+                        layer_idx,
+                    )
                     # Reset instance counts for each layer
                     pass1_instance_counts = {k: v for k, v in pass1_instance_counts.items()
                                              if k[0] != layer_idx}
@@ -13069,10 +13103,6 @@ WEIGHT_PATTERNS = {
     "b2": ["layer.{L}.b2", "layers.{L}.feed_forward.b2", "v.blk.{L}.ffn_down.bias"],
 
     # Layer norms
-    "ln1_gamma": ["layer.{L}.ln1_gamma", "layers.{L}.attention_norm.weight", "layer.{L}.attn_norm", "layer.{L}.block_norm", "rwkv7.blocks.{L}.ln1.weight"],
-    "ln2_gamma": ["layer.{L}.ln2_gamma", "layers.{L}.ffn_norm.weight", "layer.{L}.post_attention_norm", "rwkv7.blocks.{L}.ln2.weight"],
-    "ln1_beta": ["layer.{L}.ln1_beta", "layers.{L}.attention_norm.bias", "v.blk.{L}.ln1.bias", "rwkv7.blocks.{L}.ln1.bias"],
-    "ln2_beta": ["layer.{L}.ln2_beta", "layers.{L}.ffn_norm.bias", "v.blk.{L}.ln2.bias", "rwkv7.blocks.{L}.ln2.bias"],
     "post_attention_norm": ["layer.{L}.post_attention_norm", "layers.{L}.post_attention_norm.weight"],
     "post_ffn_norm": ["layer.{L}.post_ffn_norm", "layer.{L}.post_ffw_norm", "layers.{L}.post_ffn_norm.weight"],
     "per_layer_token_emb": ["per_layer_token_emb"],
@@ -13158,10 +13188,10 @@ WEIGHT_PATTERNS = {
     "assistant_pre_projection": ["assistant.pre_projection"],
     "assistant_post_projection": ["assistant.post_projection"],
     "attn_qkv": ["layer.{L}.attn_qkv", "layer.{L}.attn_qkv.weight", "v.blk.{L}.attn_qkv.weight"],
-    "ln1_gamma": ["layer.{L}.ln1_gamma", "layers.{L}.attention_norm.weight", "layer.{L}.attn_norm", "layer.{L}.block_norm", "v.blk.{L}.ln1.weight"],
-    "ln2_gamma": ["layer.{L}.ln2_gamma", "layers.{L}.ffn_norm.weight", "layer.{L}.post_attention_norm", "v.blk.{L}.ln2.weight"],
-    "ln1_beta": ["layer.{L}.ln1_beta", "layers.{L}.attention_norm.bias", "v.blk.{L}.ln1.bias"],
-    "ln2_beta": ["layer.{L}.ln2_beta", "layers.{L}.ffn_norm.bias", "v.blk.{L}.ln2.bias"],
+    "ln1_gamma": ["layer.{L}.ln1_gamma", "layers.{L}.attention_norm.weight", "layer.{L}.attn_norm", "layer.{L}.block_norm", "v.blk.{L}.ln1.weight", "rwkv7.blocks.{L}.ln1.weight"],
+    "ln2_gamma": ["layer.{L}.ln2_gamma", "layers.{L}.ffn_norm.weight", "layer.{L}.post_attention_norm", "v.blk.{L}.ln2.weight", "rwkv7.blocks.{L}.ln2.weight"],
+    "ln1_beta": ["layer.{L}.ln1_beta", "layers.{L}.attention_norm.bias", "v.blk.{L}.ln1.bias", "rwkv7.blocks.{L}.ln1.bias"],
+    "ln2_beta": ["layer.{L}.ln2_beta", "layers.{L}.ffn_norm.bias", "v.blk.{L}.ln2.bias", "rwkv7.blocks.{L}.ln2.bias"],
     "wo": ["layer.{L}.wo", "layers.{L}.attention.wo", "layer.{L}.attn_output", "layer.{L}.attn_o", "layer.{L}.mla_out_proj", "v.blk.{L}.attn_out.weight"],
     "bo": ["layer.{L}.bo", "layers.{L}.attention.bo", "v.blk.{L}.attn_out.bias"],
     "w1": ["layer.{L}.w1", "layers.{L}.feed_forward.w1", "layer.{L}.ffn_gate", "layer.{L}.mlp_gate", "v.blk.{L}.ffn_gate.weight"],

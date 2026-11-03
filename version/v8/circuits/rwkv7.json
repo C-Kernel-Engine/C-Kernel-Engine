@@ -15,7 +15,7 @@
     "activation": "squared_relu",
     "rope": "none",
     "tokenizer": "rwkv_world_trie",
-    "prefill_policy": "sequential_scan",
+    "prefill_policy": "sequential_decode",
     "hybrid_block_pattern": "config.layer_kinds"
   },
   "activation_bindings": {
@@ -23,6 +23,33 @@
     "normalized_stream": "layer_input",
     "post_attention_stream": "embedded_input",
     "channelmix_output": "layer_output"
+  },
+  "activation_buffers": {
+    "att_shift": {
+      "shape": [{"config": "num_layers"}, {"config": "embed_dim"}],
+      "lifetime": "sequence",
+      "mutable": true
+    },
+    "ffn_shift": {
+      "shape": [{"config": "num_layers"}, {"config": "embed_dim"}],
+      "lifetime": "sequence",
+      "mutable": true
+    },
+    "wkv": {
+      "shape": [
+        {"config": "num_layers"},
+        {"config": "num_heads"},
+        {"config": "head_dim"},
+        {"config": "head_dim"}
+      ],
+      "lifetime": "sequence",
+      "mutable": true
+    },
+    "v_first": {
+      "shape": [{"config": "num_layers"}, {"config": "embed_dim"}],
+      "lifetime": "sequence",
+      "mutable": true
+    }
   },
   "contract": {
     "tokenizer_contract": {
@@ -108,6 +135,17 @@
       "kernel_select": "weight_dtype_registry",
       "activation_dtype": "fp32",
       "per_tensor_mixed_quant": false
+    },
+    "weight_policy": {
+      "ignore": [
+        {
+          "pattern": "rwkv7.blocks.0.att.v[012]",
+          "reason": "layer 0 sets v_first from v_in, so the v-gate LoRA operands are called with NULL and their checkpoint weights are unused"
+        }
+      ]
+    },
+    "runtime_defaults": {
+      "external_activation_slots": ["att_shift", "ffn_shift", "wkv", "v_first"]
     },
     "runtime_invariants": {
       "required_call_args": {}
@@ -280,7 +318,7 @@
         "prefill": {
           "contract_id": "rwkv7_wkv_decode_fp32",
           "validation": "observed",
-          "evidence": "Pinned fixture tests/fixtures/rwkv7/decode_torch.json; prefill reuses one-step math token-serially."
+          "evidence": "Pinned fixture tests/fixtures/rwkv7/decode_torch.json; prefill_policy=sequential_decode reuses the one-step math token-serially, and the provider is certified for prefill."
         },
         "decode": {
           "contract_id": "rwkv7_wkv_decode_fp32",
