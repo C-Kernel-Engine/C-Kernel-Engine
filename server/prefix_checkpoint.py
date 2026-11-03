@@ -111,10 +111,10 @@ class ExactPrefixCheckpointCache:
                         raise
                     self.misses += 1
                     return ordinary
-                self.hits += 1
-                self._entries.move_to_end(owner_key)
                 if cancelled is not None and cancelled():
                     raise SessionError(-9, "request cancelled after checkpoint restore")
+                self.hits += 1
+                self._entries.move_to_end(owner_key)
                 return PreparedPrefix(
                     "", flags | CK_SESSION_REQUEST_CONTINUE_STATE |
                     CK_SESSION_REQUEST_REJECT_PROMPT_TRUNCATION,

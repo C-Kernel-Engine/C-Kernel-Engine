@@ -1,7 +1,7 @@
 """Exact-token and lifecycle controls for the opt-in prefix cache."""
 
 from server.prefix_checkpoint import ExactPrefixCheckpointCache
-from server.session_v8 import CK_SESSION_REQUEST_RAW_PROMPT
+from server.session_v8 import CK_SESSION_REQUEST_RAW_PROMPT, SessionError
 from server.live import create_app, _OwnedStreamingResponse
 from fastapi.testclient import TestClient
 from starlette.requests import ClientDisconnect
@@ -229,6 +229,64 @@ def test_cancelled_preparation_releases_reservation():
     else:
         assert False, "cancelled prefix preparation succeeded"
     assert cache.bytes_used == 0
+
+
+def test_cancellation_after_checkpoint_save_does_not_publish_or_poison_retry():
+    class CancelAfterSave(FakeSession):
+        def checkpoint_save(self, snapshot):
+            super().checkpoint_save(snapshot)
+            if self.cancel_on_save:
+                cancelled[0] = True
+
+    cancelled = [False]
+    session = CancelAfterSave()
+    session.cancel_on_save = True
+    cache = ExactPrefixCheckpointCache(session, max_bytes=192, identity="instance")
+    with pytest.raises(SessionError, match="cancelled after checkpoint save"):
+        cache.prepare("a" * 80, output_tokens=1,
+                      flags=CK_SESSION_REQUEST_RAW_PROMPT,
+                      cancelled=lambda: cancelled[0])
+    assert cache.bytes_used == 0
+    cancelled[0] = False
+    session.cancel_on_save = False
+    retry = cache.prepare("a" * 80, output_tokens=1,
+                          flags=CK_SESSION_REQUEST_RAW_PROMPT,
+                          cancelled=lambda: cancelled[0])
+    assert retry.reused_tokens == 0
+    cache.settle(retry, success=True)
+    assert cache.bytes_used == 192
+
+
+def test_cancellation_after_restore_preserves_old_snapshot_for_retry():
+    class CancelAfterRestore(FakeSession):
+        def checkpoint_restore(self, snapshot):
+            super().checkpoint_restore(snapshot)
+            if self.cancel_on_restore:
+                cancelled[0] = True
+
+    cancelled = [False]
+    session = CancelAfterRestore()
+    session.cancel_on_restore = False
+    cache = ExactPrefixCheckpointCache(session, max_bytes=192, identity="instance")
+    first = cache.prepare("a" * 80, output_tokens=1,
+                          flags=CK_SESSION_REQUEST_RAW_PROMPT)
+    cache.settle(first, success=True)
+    session.cancel_on_restore = True
+    with pytest.raises(SessionError, match="cancelled after checkpoint restore"):
+        cache.prepare("a" * 88, output_tokens=1,
+                      flags=CK_SESSION_REQUEST_RAW_PROMPT,
+                      cancelled=lambda: cancelled[0])
+    assert cache.bytes_used == 192
+    assert cache.hits == 0
+    cancelled[0] = False
+    session.cancel_on_restore = False
+    retry = cache.prepare("a" * 88, output_tokens=1,
+                          flags=CK_SESSION_REQUEST_RAW_PROMPT,
+                          cancelled=lambda: cancelled[0])
+    assert retry.reused_tokens == 64
+    assert cache.hits == 1
+    cache.settle(retry, success=True)
+    assert cache.bytes_used == 192
 
 
 def test_late_disconnect_cannot_evict_newer_owner_checkpoint():
