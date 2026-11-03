@@ -1771,24 +1771,30 @@ class _FlightLease:
 
 class _OwnedStreamingResponse(StreamingResponse):
     def __init__(self, *args, lease, on_disconnect=None,
-                 delivery_timeout=None, on_delivery_timeout=None, **kwargs):
+                 delivery_timeout=None, on_delivery_timeout=None,
+                 on_incomplete_delivery=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.lease = lease
         self.on_disconnect = on_disconnect
         self.delivery_timeout = delivery_timeout
         self.on_delivery_timeout = on_delivery_timeout
+        self.on_incomplete_delivery = on_incomplete_delivery
 
     async def __call__(self, scope, receive, send):
+        sent_terminal = False
         async def bounded_send(message):
+            nonlocal sent_terminal
             try:
                 await asyncio.wait_for(send(message), timeout=self.delivery_timeout)
             except asyncio.TimeoutError as exc:
                 raise _DeliveryTimeout from exc
+            if message.get("type") == "http.response.body" and not message.get("more_body", False):
+                sent_terminal = True
 
         try:
             await super().__call__(
                 scope, receive,
-                bounded_send if self.delivery_timeout is not None else send,
+                bounded_send,
             )
         except _DeliveryTimeout:
             # Headers may already be sent. End this client's stream and keep
@@ -1801,6 +1807,11 @@ class _OwnedStreamingResponse(StreamingResponse):
                 self.lease.disconnect()
             finally:
                 try:
+                    # Set native/lease cancellation before discarding an
+                    # entry: an in-flight worker must not publish after the
+                    # delivery callback has already removed its candidate.
+                    if not sent_terminal and self.on_incomplete_delivery is not None:
+                        self.on_incomplete_delivery()
                     if self.on_disconnect is not None:
                         self.on_disconnect()
                 finally:
@@ -1947,7 +1958,8 @@ def create_app(
 
     def _generate_with_prefix_cache(lease, prompt, *, max_tokens, temperature,
                                     top_p, on_token, flags, stop_on_text,
-                                    stop_at_eos, owner_key="anonymous"):
+                                    stop_at_eos, owner_key="anonymous",
+                                    request_id=""):
         if prefix_cache is None:
             return lease.session.generate(
                 None, prompt, max_tokens=max_tokens, temperature=temperature,
@@ -1960,6 +1972,7 @@ def create_app(
         try:
             prepared = prefix_cache.prepare(prompt, output_tokens=max_tokens,
                                             flags=flags, owner_key=owner_key,
+                                            request_id=request_id,
                                             cancelled=was_cancelled)
             preparation_ms = (time.monotonic() - started) * 1000.0
             if was_cancelled():
@@ -2622,6 +2635,7 @@ def create_app(
                     stop_on_text=stop_markers,
                     stop_at_eos=stop_at_eos,
                     owner_key=_prefix_owner_key(body),
+                    request_id=response_id,
                 )
                 if splitter is not None:
                     for state, delta in splitter.flush():
@@ -2643,7 +2657,8 @@ def create_app(
                 # has returned, before releasing its session lease.
                 if cancelled.is_set() or terminal_event[0] in {"error", "busy"}:
                     if prefix_cache is not None and cancelled.is_set():
-                        prefix_cache.discard(_prefix_owner_key(body))
+                        prefix_cache.discard(_prefix_owner_key(body),
+                                             request_id=response_id)
                     with response_store_lock:
                         stored = response_store.get(response_id)
                         if stored is not None and stored["status"] == ResponseStatus.in_progress:
@@ -3417,6 +3432,11 @@ def create_app(
                 on_delivery_timeout=(
                     (lambda: _settle_delivery_timeout(stream_response_id))
                     if batch_http is not None else None
+                ),
+                on_incomplete_delivery=(
+                    (lambda: prefix_cache.discard(_prefix_owner_key(body),
+                                                  request_id=stream_response_id))
+                    if prefix_cache is not None else None
                 ),
                 media_type="text/event-stream",
                 headers={

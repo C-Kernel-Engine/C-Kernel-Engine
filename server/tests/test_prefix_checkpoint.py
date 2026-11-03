@@ -2,8 +2,11 @@
 
 from server.prefix_checkpoint import ExactPrefixCheckpointCache
 from server.session_v8 import CK_SESSION_REQUEST_RAW_PROMPT
-from server.live import create_app
+from server.live import create_app, _OwnedStreamingResponse
 from fastapi.testclient import TestClient
+from starlette.requests import ClientDisconnect
+import asyncio
+import pytest
 
 
 class FakeSession:
@@ -228,6 +231,23 @@ def test_cancelled_preparation_releases_reservation():
     assert cache.bytes_used == 0
 
 
+def test_late_disconnect_cannot_evict_newer_owner_checkpoint():
+    session = FakeSession()
+    cache = ExactPrefixCheckpointCache(session, max_bytes=192, identity="instance")
+    old = cache.prepare("a" * 80, output_tokens=1,
+                        flags=CK_SESSION_REQUEST_RAW_PROMPT,
+                        owner_key="A", request_id="old")
+    cache.settle(old, success=True)
+    new = cache.prepare("b" * 80, output_tokens=1,
+                        flags=CK_SESSION_REQUEST_RAW_PROMPT,
+                        owner_key="A", request_id="new")
+    cache.settle(new, success=True)
+    cache.discard("A", request_id="old")
+    assert cache.bytes_used == 192
+    cache.discard("A", request_id="new")
+    assert cache.bytes_used == 0
+
+
 def test_http_reuses_exact_prefix_and_reports_actual_input_usage():
     session = FakeSession()
     app = create_app(session, model="test", context_length=512,
@@ -268,3 +288,25 @@ def test_http_cancelled_native_stop_does_not_publish_checkpoint():
     assert response.status_code == 200
     assert response.json()["status"] == "cancelled"
     assert app.state.prefix_cache.bytes_used == 0
+
+
+def test_incomplete_stream_delivery_discards_after_disconnect():
+    order = []
+    class Lease:
+        def disconnect(self):
+            order.append("disconnect")
+    async def chunks():
+        yield b"data: response.created\n\n"
+    async def send(message):
+        if message["type"] == "http.response.body":
+            raise OSError("client disconnected")
+    async def receive():
+        return {"type": "http.request", "body": b"", "more_body": False}
+    response = _OwnedStreamingResponse(
+        chunks(), lease=Lease(),
+        on_incomplete_delivery=lambda: order.append("discard"))
+    scope = {"type": "http", "method": "GET", "path": "/", "headers": [],
+             "asgi": {"version": "3.0", "spec_version": "2.4"}}
+    with pytest.raises(ClientDisconnect):
+        asyncio.run(response(scope, receive, send))
+    assert order == ["disconnect", "discard"]

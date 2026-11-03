@@ -34,6 +34,7 @@ class PreparedPrefix:
     candidate: tuple[tuple[int, ...], SequenceCheckpointV8] | None = None
     prompt_ids: tuple[int, ...] | None = None
     owner_key: str = "anonymous"
+    request_id: str = ""
 
 
 class ExactPrefixCheckpointCache:
@@ -58,6 +59,7 @@ class ExactPrefixCheckpointCache:
         self._entries: OrderedDict[
             str, tuple[tuple[int, ...], SequenceCheckpointV8]
         ] = OrderedDict()
+        self._entry_request_ids: dict[str, str] = {}
         self._reserved_bytes = 0
         self.hits = 0
         self.misses = 0
@@ -68,13 +70,18 @@ class ExactPrefixCheckpointCache:
 
     def clear(self) -> None:
         self._entries.clear()
+        self._entry_request_ids.clear()
 
-    def discard(self, owner_key: str) -> None:
+    def discard(self, owner_key: str, *, request_id: str | None = None) -> None:
         """Drop an entry when delivery later observes cancellation."""
+        if request_id is not None and self._entry_request_ids.get(owner_key) != request_id:
+            return
         self._entries.pop(owner_key, None)
+        self._entry_request_ids.pop(owner_key, None)
 
     def prepare(self, prompt: str, *, output_tokens: int, flags: int,
                 owner_key: str = "anonymous",
+                request_id: str = "",
                 cancelled: Callable[[], bool] | None = None) -> PreparedPrefix:
         if not owner_key:
             raise ValueError("prefix cache owner key is empty")
@@ -82,7 +89,7 @@ class ExactPrefixCheckpointCache:
         if cancelled is not None and cancelled():
             raise SessionError(-9, "request cancelled before prefix preparation")
         ordinary = PreparedPrefix(prompt, flags, len(ids), 0, len(ids), 0.0, 0.0,
-                                  owner_key=owner_key)
+                                  owner_key=owner_key, request_id=request_id)
         if (not flags & CK_SESSION_REQUEST_RAW_PROMPT or output_tokens < 1 or
                 len(ids) + output_tokens > self.session.context_length):
             self.misses += 1
@@ -99,7 +106,7 @@ class ExactPrefixCheckpointCache:
                 try:
                     self.session.checkpoint_restore(snapshot)
                 except SessionError as exc:
-                    self._entries.pop(owner_key, None)
+                    self.discard(owner_key)
                     if exc.status not in (-1, -5):
                         raise
                     self.misses += 1
@@ -113,7 +120,7 @@ class ExactPrefixCheckpointCache:
                     CK_SESSION_REQUEST_REJECT_PROMPT_TRUNCATION,
                     len(ids), len(prefix), len(suffix_ids), 0.0,
                     monotonic() - started, prompt_ids=tuple(suffix_ids),
-                    owner_key=owner_key)
+                    owner_key=owner_key, request_id=request_id)
         # Do not keep an old owner snapshot alive in this stack frame when
         # eviction makes room for its replacement.
         entry = None
@@ -135,7 +142,7 @@ class ExactPrefixCheckpointCache:
         # Evict before constructing the candidate. Counting only committed
         # entries permits two full snapshots to coexist at a one-entry budget.
         while self._entries and self.bytes_used + self.allocation_bytes > self.max_bytes:
-            self._entries.popitem(last=False)
+            self.discard(next(iter(self._entries)))
         self._reserved_bytes += self.allocation_bytes
         try:
             if cancelled is not None and cancelled():
@@ -165,14 +172,16 @@ class ExactPrefixCheckpointCache:
             "", flags | CK_SESSION_REQUEST_CONTINUE_STATE |
             CK_SESSION_REQUEST_REJECT_PROMPT_TRUNCATION,
             len(ids), 0, len(ids), save_seconds, 0.0,
-            (tuple(ids[:cut]), candidate), tuple(suffix_ids), owner_key)
+            (tuple(ids[:cut]), candidate), tuple(suffix_ids), owner_key,
+            request_id)
 
     def settle(self, prepared: PreparedPrefix | None, *, success: bool) -> None:
         if prepared is not None and prepared.candidate is not None:
             self._reserved_bytes -= self.allocation_bytes
         if not success:
             if prepared is not None:
-                self._entries.pop(prepared.owner_key, None)
+                self.discard(prepared.owner_key)
         elif prepared is not None and prepared.candidate is not None:
-            self._entries.pop(prepared.owner_key, None)
+            self.discard(prepared.owner_key)
             self._entries[prepared.owner_key] = prepared.candidate
+            self._entry_request_ids[prepared.owner_key] = prepared.request_id
