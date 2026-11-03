@@ -1,139 +1,149 @@
 {
+  "idx": 94,
+  "function": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_auto_workspace",
+  "op": "attn",
+  "layer": 3,
+  "section": "body",
   "args": [
     {
-      "buffer_ref": "q_scratch",
-      "expr": "(const float*)(model->bump + A_Q_SCRATCH)",
       "name": "q",
-      "source": "scratch:q_scratch"
+      "source": "scratch:q_scratch",
+      "expr": "(const float*)(model->bump + A_Q_SCRATCH)",
+      "buffer_ref": "q_scratch"
     },
     {
-      "expr": "(const uint16_t*)((model->kv_cache_f16 + 0ULL*MAX_SEQ_LEN))",
       "name": "k_cache",
-      "source": "runtime:kv_cache_k_layer_f16"
+      "source": "runtime:kv_cache_k_layer_f16",
+      "expr": "(const uint16_t*)((model->kv_cache_f16 + ((size_t)3*2)*NUM_KV_HEADS*MAX_SEQ_LEN*1))"
     },
     {
-      "expr": "(const uint16_t*)((model->kv_cache_f16 + 512ULL*MAX_SEQ_LEN))",
       "name": "v_cache",
-      "source": "runtime:kv_cache_v_layer_f16"
+      "source": "runtime:kv_cache_v_layer_f16",
+      "expr": "(const uint16_t*)((model->kv_cache_f16 + ((size_t)3*2+1)*NUM_KV_HEADS*MAX_SEQ_LEN*1))"
     },
     {
-      "buffer_ref": "attn_scratch",
-      "expr": "(float*)(model->bump + A_ATTN_SCRATCH)",
       "name": "output",
-      "source": "output:out"
+      "source": "output:out",
+      "expr": "(float*)(model->bump + A_ATTN_SCRATCH)",
+      "buffer_ref": "attn_scratch"
     },
     {
-      "expr": "24",
       "name": "num_heads",
-      "source": "dim:num_heads"
+      "source": "dim:num_heads",
+      "expr": "24"
     },
     {
-      "expr": "2",
       "name": "num_kv_heads",
-      "source": "dim:num_kv_heads"
+      "source": "dim:num_kv_heads",
+      "expr": "4"
     },
     {
-      "expr": "4096",
       "name": "q_tokens",
-      "source": "dim:seq_len"
+      "source": "dim:seq_len",
+      "expr": "4096"
     },
     {
-      "expr": "model->pos",
       "name": "past_tokens",
-      "source": "runtime:prefill_start_pos"
+      "source": "runtime:prefill_start_pos",
+      "expr": "model->pos"
     },
     {
-      "expr": "4096",
       "name": "cache_capacity",
-      "source": "dim:max_seq_len"
+      "source": "dim:max_seq_len",
+      "expr": "4096"
     },
     {
-      "expr": "256",
       "name": "head_dim",
-      "source": "dim:head_dim"
+      "source": "dim:head_dim",
+      "expr": "256"
     },
     {
-      "expr": "256",
       "name": "aligned_head_dim",
-      "source": "dim:head_dim"
+      "source": "dim:head_dim",
+      "expr": "256"
     },
     {
-      "expr": "CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64",
       "name": "reduction",
-      "source": "const:CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64"
+      "source": "const:CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64_APPEND_TILED",
+      "expr": "CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64_APPEND_TILED"
     },
     {
-      "buffer_ref": "mlp_scratch",
-      "expr": "(float*)(model->bump + A_MLP_SCRATCH)",
       "name": "token_workspace",
-      "source": "scratch:token_workspace"
+      "source": "scratch:token_workspace",
+      "expr": "(float*)(model->bump + A_TOKEN_WORKSPACE)",
+      "buffer_ref": "token_workspace"
     },
     {
-      "expr": "49152",
       "name": "token_workspace_bytes",
-      "source": "scratch_size:token_workspace"
+      "source": "scratch_size:token_workspace",
+      "expr": "49152"
     },
     {
-      "buffer_ref": "mlp_scratch",
-      "expr": "(void*)(model->bump + (A_MLP_SCRATCH + 49152))",
       "name": "gqa_workspace",
-      "source": "scratch:gqa_workspace"
+      "source": "scratch:gqa_workspace",
+      "expr": "(void*)(model->bump + A_GQA_WORKSPACE)",
+      "buffer_ref": "gqa_workspace"
     },
     {
-      "expr": "33554432",
       "name": "gqa_workspace_bytes",
-      "source": "scratch_size:gqa_workspace"
+      "source": "scratch_size:gqa_workspace",
+      "expr": "33554432"
     },
     {
-      "expr": "24",
       "name": "route_num_heads",
-      "source": "const:24"
+      "source": "const:24",
+      "expr": "24"
     },
     {
-      "expr": "4",
       "name": "route_num_kv_heads",
-      "source": "const:4"
+      "source": "const:4",
+      "expr": "4"
     },
     {
-      "expr": "256",
       "name": "route_head_dim",
-      "source": "const:256"
+      "source": "const:256",
+      "expr": "256"
     },
     {
-      "expr": "4096",
       "name": "route_query_tokens",
-      "source": "const:4096"
+      "source": "const:4096",
+      "expr": "4096"
     },
     {
-      "expr": "8192",
       "name": "route_min_kv_tokens",
-      "source": "const:8192"
+      "source": "const:8192",
+      "expr": "8192"
     },
     {
-      "expr": "16",
       "name": "route_workers",
-      "source": "const:16"
+      "source": "const:16",
+      "expr": "16"
     },
     {
-      "expr": "128",
       "name": "route_query_tile_size",
-      "source": "const:128"
+      "source": "const:128",
+      "expr": "128"
     },
     {
-      "expr": "4",
       "name": "route_concurrent_query_tiles",
-      "source": "const:4"
+      "source": "const:4",
+      "expr": "4"
     }
   ],
+  "errors": [],
+  "warnings": [],
   "call_abi": {
-    "kernel_id": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_flash_auto_qtile64",
+    "version": 1,
     "owner": "kernel_map",
-    "source_file": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_flash_auto_qtile64.json",
-    "version": 1
+    "kernel_id": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_flash_auto_qtile64",
+    "source_file": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_flash_auto_qtile64.json"
   },
-  "function": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_auto_workspace",
-  "idx": 94,
-  "layer": 3,
-  "op": "attn",
-  "section": "body"
+  "prefill_history_scope": "prior_cache",
+  "prefill_append_min_prefix": 64,
+  "prefill_append_alignment": 64,
+  "resolved_contract": {
+    "function": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_auto_workspace",
+    "kernel_id": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_flash_auto_qtile64",
+    "operation": "decoder.attention"
+  }
 }

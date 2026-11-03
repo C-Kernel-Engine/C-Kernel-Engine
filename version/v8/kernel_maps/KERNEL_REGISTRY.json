@@ -6894,6 +6894,13 @@
       "physical_contract_version": 1,
       "variant": "causal_head_major_gqa_prefill_append_f16cache_flash_auto_qtile64",
       "mode": "prefill",
+      "prefill_history_scope": "prior_cache",
+      "prior_cache_binding": {
+        "mode": "in_place_store_before_attention",
+        "store_kernel": "kv_cache_store_batch_f16"
+      },
+      "prefill_append_min_prefix": 64,
+      "prefill_append_alignment": 64,
       "contract_schema_version": 1,
       "provides": {
         "execution.phase": [
@@ -6921,8 +6928,8 @@
           "status": "validated",
           "function": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_auto_workspace",
           "explicit_selector": true,
-          "selector": "CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64",
-          "notes": "Q<64 uses FP16 online single-range arithmetic. Q>=64 uses 64x64 tiled FP32 arithmetic. The measured 24Q/4KV/D256, Q=4096, 16-worker long-context region reuses each converted K/V tile across four concurrent query tiles without changing key reduction order."
+          "selector": "CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64_APPEND_TILED",
+          "notes": "Fresh Q<64 uses FP16 online single-range arithmetic. Q>=64 and appends into a prefix of at least 64 tokens use 64x64 tiled FP32 arithmetic. Appends into shorter prefixes are rejected by the generated minimum-prefix contract. The measured 24Q/4KV/D256, Q=4096, 16-worker long-context region reuses each converted K/V tile across four concurrent query tiles without changing key reduction order."
         }
       },
       "implementation": {
@@ -7022,7 +7029,7 @@
           "layout": "head_major_contiguous",
           "placement": "local",
           "access": "read",
-          "storage_class": "runtime",
+          "storage_class": "state",
           "consumption": "required"
         },
         {
@@ -7036,7 +7043,7 @@
           "layout": "head_major_contiguous",
           "placement": "local",
           "access": "read",
-          "storage_class": "runtime",
+          "storage_class": "state",
           "consumption": "required"
         }
       ],
@@ -7167,7 +7174,7 @@
           },
           {
             "name": "reduction",
-            "source": "const:CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64"
+            "source": "const:CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64_APPEND_TILED"
           },
           {
             "name": "token_workspace",
