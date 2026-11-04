@@ -317,27 +317,27 @@ class CheckedConvHardwareFmaTest(unittest.TestCase):
         if not self.avx2_available():
             self.skipTest('x86 AVX2/FMA unavailable')
         function = self.functions['audio_conv1d_checked_channel_major_f32_avx2_fma']
-        source = np.full((1, 17), 1e30, np.float32)
+        source = np.full((1, 40), 1e30, np.float32)
         weight = np.full((1, 1, 1), 1e30, np.float32)
         bias = np.zeros(1, np.float32)
-        output = np.full((1, 20), -91., np.float32)
-        scratch = np.empty((1, 17), np.float32)
+        output = np.full((1, 43), -91., np.float32)
+        scratch = np.empty((1, 40), np.float32)
         self.assertEqual(self.call(function, source, weight, bias, output,
-                                   scratch, 17, 1, 1, 0), -4)
+                                   scratch, 40, 1, 1, 0), -4)
         self.assertTrue(np.all(output == -91.))
         source.fill(2.)
         weight.fill(3.)
         self.assertEqual(self.call(function, source, weight, bias, output,
-                                   scratch, 17, 1, 1, 0), 0)
-        np.testing.assert_array_equal(output[0, :17], np.full(17, 6., np.float32))
-        self.assertTrue(np.all(output[0, 17:] == -91.))
+                                   scratch, 40, 1, 1, 0), 0)
+        np.testing.assert_array_equal(output[0, :40], np.full(40, 6., np.float32))
+        self.assertTrue(np.all(output[0, 40:] == -91.))
 
     def test_avx2_vector_boundaries_stride_and_dilation(self):
         if not self.avx2_available():
             self.skipTest('x86 AVX2/FMA unavailable')
         rng = np.random.default_rng(744)
-        # Zero, one, and multiple complete eight-frame tiles, plus scalar
-        # padding/tails and the non-unit-stride fallback in both ABIs.
+        # Zero, one, and multiple eight- and 32-frame tiles, including
+        # boundary scalar frames and the non-unit-stride fallback in both ABIs.
         geometries = (
             ('ordinary', 7, 1, 1, 0, 1),
             ('ordinary', 8, 1, 1, 0, 1),
@@ -345,6 +345,11 @@ class CheckedConvHardwareFmaTest(unittest.TestCase):
             ('ordinary', 15, 1, 1, 0, 1),
             ('ordinary', 16, 1, 1, 0, 1),
             ('ordinary', 17, 3, 1, 1, 1),
+            ('ordinary', 31, 1, 1, 0, 1),
+            ('ordinary', 32, 1, 1, 0, 1),
+            ('ordinary', 33, 1, 1, 0, 1),
+            ('ordinary', 34, 3, 1, 1, 1),
+            ('ordinary', 65, 3, 1, 1, 1),
             ('ordinary', 17, 1, 2, 0, 1),
             ('dilated', 7, 3, 1, 2, 2),
             ('dilated', 8, 1, 1, 0, 3),
@@ -352,6 +357,8 @@ class CheckedConvHardwareFmaTest(unittest.TestCase):
             ('dilated', 15, 1, 1, 0, 2),
             ('dilated', 16, 3, 1, 2, 2),
             ('dilated', 17, 1, 1, 0, 2),
+            ('dilated', 36, 3, 1, 2, 2),
+            ('dilated', 68, 3, 1, 2, 2),
             ('dilated', 17, 3, 2, 2, 2),
         )
         for entry, output_frames, kernel, stride, padding, dilation in geometries:
