@@ -1,0 +1,71 @@
+{
+  "coverage": {
+    "connected_pytorch_waveform_parity": "fail_unresolved",
+    "human_listening": "not_tested",
+    "sony_headset_playback": "not_tested; no PulseAudio/PipeWire client or Sony sink available in this session",
+    "stop_replace_with_real_summary": "not_tested",
+    "timed_player": "pass; non-audible duration simulation"
+  },
+  "host": "P3 Intel Core i7-14700T",
+  "input": {
+    "exact_mode_planned_chunks": 116,
+    "path": "server_summary.txt (untracked user file; contents not committed)",
+    "path_expansions": 4,
+    "source_sha256": "2e902276b61f3af5033433a7f56a8b88560f190252b03c5db2a34e3561fca044",
+    "utf8_bytes": 2592,
+    "word_count": 387
+  },
+  "limitation": "The full run preceded a CLI-only --text-file addition and a redundant-check removal in the frontend; the candidate source hashes identify the final review code. Neither later edit changed G2P, chunk IDs, generated execution, or playback order.",
+  "policy": {
+    "leading_slash": "root slash",
+    "mode": "natural",
+    "oversized_component": "spell characters under native ID limit",
+    "separators": [
+      "slash",
+      "dash",
+      "underscore",
+      "dot"
+    ],
+    "unsupported_url_syntax": "explicit rejection"
+  },
+  "reproduction": {
+    "nightly": "python3 scripts/nightly_runner.py --tests tts_kokoro_accessibility_text_plan tts_kokoro_whole_text_wav tts_kokoro_voice_playback accessible_voice_control --ci --require-executed",
+    "plan": "Pinned Python 3.13 with Kokoro/Misaki 0.9.4: version/v8/tts/prepare_kokoro_accessibility_text.py --text-file server_summary.txt --config <pinned-config> --bundle-dir <verified-bundle> --output <new-plan.json>",
+    "play": "Pinned Python 3.13: version/v8/tts/ck_kokoro_play.py --text-file server_summary.txt --config <pinned-config> --bundle-dir <verified-bundle> --player <24-kHz-WAV-player> --incremental --synthesis-workers 3 --report <new-private-report.json>"
+  },
+  "result": {
+    "audio_seconds": 251.85,
+    "chunk_count": 111,
+    "chunk_indices_consecutive": true,
+    "chunk_sample_and_wav_hash_digest_sha256": "1e075ab24d907ff53e93abc9cd572090e730d3f459f3c8ffb827dab58122111c",
+    "connected_waveform_parity": "fail_unresolved",
+    "first_playback_start_seconds": 9.270063526928425,
+    "max_gap_seconds": 0.024804607965052128,
+    "max_valid_token_count": 40,
+    "playback_gap_total_seconds": 0.13081015273928642,
+    "sample_count": 6044400,
+    "source_spans_cover_input": true,
+    "status": "execution_pass",
+    "total_seconds": 263.3966922564432
+  },
+  "runtime": {
+    "bundle_identity_sha256": "24f4b2428aa0099a618677e27fc4aea48c4f271d7a45256dfaf815bb2b612ac3",
+    "bundle_manifest_sha256": "a8c0a8eef775c8a69f124a5c4e4a1439e798f13a6812d62b390e6154b68356e8",
+    "candidate_adapter_sha256": "32efd1e89c181f877b5a00d320ccc943ce71ee4bc58d8eb7117181f85d29fbeb",
+    "candidate_frontend_sha256": "455f8b306dfdb394cf58fce418f790b20059e4d0285cf34c8c9d33b73d48cbc1",
+    "generated_library_sha256": "53708cd716edd1b6655d6dea828a958655479a362f64c6e21b113203c173b314",
+    "model_weights_sha256": "556a82f8116091d386ccab9d8218030d124ff286e0fb8e2ebc8d0cc8a5598148",
+    "native_model_loads": 3,
+    "player_sha256": "5b55f0710d4b75dcb0da6585c50e68ed5ff08869158ef4590c717c29259e987d",
+    "synthesis_workers": 3,
+    "voice_bank_sha256": "50a2b7d543cc5a9bdefb3217e3bf1a8d87e947dd5b4e8babf685c0bc4b3b4177"
+  },
+  "schema": "cke.kokoro.p3_technical_path_playback.v1",
+  "short_path_smoke": {
+    "exact_chunks": 3,
+    "exact_samples": 177000,
+    "natural_chunks": 3,
+    "natural_samples": 153600
+  },
+  "source_base_revision": "daaee7f3b"
+}

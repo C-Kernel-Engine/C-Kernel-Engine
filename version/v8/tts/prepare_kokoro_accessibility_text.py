@@ -14,7 +14,9 @@ import inspect
 import json
 import os
 from pathlib import Path
+import re
 import sys
+from types import SimpleNamespace
 
 
 SCHEMA = "cke.kokoro.accessibility-text-plan.v1"
@@ -30,6 +32,8 @@ PINNED_SHA256 = {
     "espeak_library": "b15ce0803b26254e8a0d088c6b9281a2637b2b02613147cc320cfdefaf2c3ccf",
     "espeak_data": "e1a4e7c181fdfb2042e3d7c8da98a4f9f8390d471d833eff9c15340eb9f033bc",
 }
+PATH_SEPARATORS = {"/": "slash", "-": "dash", "_": "underscore",
+                   ".": "dot"}
 
 
 class TextPlanError(ValueError):
@@ -85,6 +89,66 @@ def _source_spans(text: str, tokens: list) -> list[tuple[int, int]]:
 def _phonemes(tokens: list) -> str:
     return "".join(token.phonemes + (" " if token.whitespace else "")
                    for token in tokens).strip()
+
+
+def expand_technical_paths(tokens: list, pronounce,
+                           mode: str = "natural") -> tuple[list, list[dict]]:
+    """Give path characters explicit speech while retaining exact source spans.
+
+    `pronounce` is the pinned G2P, supplied by prepare(). The same adapter can
+    be exercised without model assets using a deterministic test G2P.
+    """
+    if mode not in ("natural", "exact"):
+        raise TextPlanError("technical path mode must be natural or exact")
+    expanded, changes = [], []
+    cursor = 0
+    for index, token in enumerate(tokens):
+        raw = token.text
+        next_token = tokens[index + 1] if index + 1 < len(tokens) else None
+        if "/" not in raw:
+            expanded.append(token)
+            cursor += len(raw + token.whitespace)
+            continue
+        if mode == "exact":
+            parts = list(raw)
+        else:
+            parts = re.findall(r"[A-Za-z0-9]+|[/._-]", raw)
+        if "".join(parts) != raw:
+            raise TextPlanError(f"unsupported character in technical path {raw!r}")
+        root = raw.startswith("/") and (
+            len(raw) > 1 or
+            (next_token is not None and not token.whitespace and
+             "/" in next_token.text))
+        spoken = []
+        for part in parts:
+            if part in PATH_SEPARATORS:
+                term = "root slash" if part == "/" and root else PATH_SEPARATORS[part]
+                root = False
+                pieces = [(part, term)]
+            elif mode == "exact":
+                pieces = [(part, part.upper() + "." if part.isalpha() else part)]
+            else:
+                sound = pronounce(part)
+                if not sound:
+                    raise TextPlanError(f"unspoken technical path component {part!r}")
+                pieces = ([(letter, letter.upper() + "." if letter.isalpha()
+                            else letter) for letter in part]
+                          if len(sound) + 2 > MAX_REQUEST_IDS else [(part, part)])
+            for source, word in pieces:
+                sound = pronounce(word)
+                if not sound or len(sound) + 2 > MAX_REQUEST_IDS:
+                    raise TextPlanError(f"unspoken or oversized technical path part {source!r}")
+                spoken.append(word)
+                expanded.append(SimpleNamespace(text=source, whitespace="",
+                                                phonemes=sound + " "))
+        expanded[-1].whitespace = token.whitespace
+        if token.whitespace:
+            expanded[-1].phonemes = expanded[-1].phonemes.rstrip()
+        changes.append({"source_start": cursor, "source_end": cursor + len(raw),
+                        "source_text": raw, "mode": mode,
+                        "spoken_text": " ".join(spoken)})
+        cursor += len(raw + token.whitespace)
+    return expanded, changes
 
 
 def _boundary_rank(token: object) -> int:
@@ -194,7 +258,8 @@ def plan_tokens(text: str, tokens: list, vocab: dict[str, int],
     return chunks
 
 
-def prepare(text: str, config_path: Path, bundle_path: Path) -> dict:
+def prepare(text: str, config_path: Path, bundle_path: Path,
+            *, technical_mode: str = "natural") -> dict:
     spoken_text = text.strip()
     if not spoken_text:
         raise TextPlanError("empty text")
@@ -244,6 +309,8 @@ def prepare(text: str, config_path: Path, bundle_path: Path) -> dict:
     reference_phonemes, tokens = pipeline.g2p(spoken_text)
     if reference_phonemes != _phonemes(tokens):
         raise TextPlanError("pinned phonemizer text and token phonemes disagree")
+    tokens, expansions = expand_technical_paths(
+        tokens, lambda word: pipeline.g2p(word)[0], technical_mode)
     chunks = plan_tokens(spoken_text, tokens, vocab, set(counts))
     return {
         "schema": SCHEMA,
@@ -252,7 +319,11 @@ def prepare(text: str, config_path: Path, bundle_path: Path) -> dict:
         "input_text": text,
         "source_text": spoken_text,
         "full_reference_phonemes": reference_phonemes,
-        "normalizations": (["trimmed boundary whitespace"] if text != spoken_text else []),
+        "planned_phonemes": _phonemes(tokens),
+        "technical_mode": technical_mode,
+        "pronunciation_expansions": expansions,
+        "normalizations": (["trimmed boundary whitespace"] if text != spoken_text else []) +
+                          (["explicit technical path pronunciation"] if expansions else []),
         "bundle_manifest_sha256": manifest_hash,
         "bundle_identity_sha256": manifest.get("bundle_identity_sha256"),
         "frontend_sha256": PINNED_SHA256,
@@ -269,11 +340,14 @@ def main() -> int:
     source.add_argument("--text-file", type=Path)
     parser.add_argument("--config", required=True, type=Path)
     parser.add_argument("--bundle-dir", required=True, type=Path)
+    parser.add_argument("--technical-mode", choices=("natural", "exact"),
+                        default="natural")
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
     try:
         text = args.text if args.text is not None else args.text_file.read_text()
-        plan = prepare(text, args.config, args.bundle_dir)
+        plan = prepare(text, args.config, args.bundle_dir,
+                       technical_mode=args.technical_mode)
         serialized = json.dumps(plan, ensure_ascii=False, indent=2) + "\n"
         descriptor = os.open(args.output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(descriptor, "w", encoding="utf-8") as stream:

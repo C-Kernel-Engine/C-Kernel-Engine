@@ -138,6 +138,58 @@ class KokoroAccessibilityTextPlanTest(unittest.TestCase):
         chunks = planner.plan_tokens(text, tokens, VOCAB, set(range(3, 49)))
         self.assertTrue(all(chunk["valid_token_count"] <=
                             planner.PREFERRED_REQUEST_IDS for chunk in chunks))
+
+    def test_technical_path_keeps_source_spans_and_checked_ids(self):
+        path = "/data/cke/runs/nemotron-two-client-20k-20261104/acceptance-20261104/"
+        text = "Read " + path + " on Ryzen."
+        tokens = [SimpleNamespace(text="Read", whitespace=" ", phonemes="a"),
+                  SimpleNamespace(text="/", whitespace="", phonemes=""),
+                  SimpleNamespace(text=path[1:], whitespace=" ", phonemes="ignored"),
+                  SimpleNamespace(text="on", whitespace=" ", phonemes="a"),
+                  SimpleNamespace(text="Ryzen", whitespace="", phonemes="a"),
+                  SimpleNamespace(text=".", whitespace="", phonemes=".")]
+
+        def pronounce(word):
+            return "a" * 47 if word == "20261104" else "a"
+
+        for mode in ("natural", "exact"):
+            with self.subTest(mode=mode):
+                spoken, expansions = planner.expand_technical_paths(
+                    tokens, pronounce, mode)
+                self.assertEqual("".join(token.text + token.whitespace
+                                         for token in spoken), text)
+                self.assertEqual("".join(text[item["source_start"]:item["source_end"]]
+                                         for item in expansions), path)
+                self.assertEqual(expansions[0]["spoken_text"].split()[:2],
+                                 ["root", "slash"])
+                self.assertIn("slash", expansions[-1]["spoken_text"])
+                self.assertNotIn("ignored", planner._phonemes(spoken))
+                self.assertNotIn("20261104", [token.text for token in spoken])
+                chunks = planner.plan_tokens(text, spoken, VOCAB, set(range(3, 49)))
+                self.assertEqual("".join(text[item["source_start"]:item["source_end"]]
+                                         for item in chunks), text)
+                self.assertTrue(all(item["valid_token_count"] <= 48
+                                    for item in chunks))
+                self.assertTrue(any(item["source_start"] > text.index(path) and
+                                    item["source_start"] < text.index(path) + len(path)
+                                    for item in chunks))
+        with self.assertRaisesRegex(planner.TextPlanError, "unsupported character"):
+            planner.expand_technical_paths(
+                [SimpleNamespace(text="data/@file", whitespace="", phonemes="")],
+                pronounce)
+        with self.assertRaisesRegex(planner.TextPlanError, "unsupported character"):
+            planner.expand_technical_paths(
+                [SimpleNamespace(text="https://example.com", whitespace="",
+                                 phonemes="")], pronounce)
+        with self.assertRaisesRegex(planner.TextPlanError, "technical path mode"):
+            planner.expand_technical_paths(tokens, pronounce, "loose")
+        nearby = "/models/model_v2.1/bin--debug"
+        _, expansions = planner.expand_technical_paths(
+            [SimpleNamespace(text=nearby, whitespace="", phonemes="")],
+            pronounce)
+        self.assertEqual(expansions[0]["source_text"], nearby)
+        for separator in ("root slash", "underscore", "dot", "dash"):
+            self.assertIn(separator, expansions[0]["spoken_text"])
         self.assertEqual("".join(text[chunk["source_start"]:chunk["source_end"]]
                                  for chunk in chunks), text)
 
@@ -203,6 +255,19 @@ class KokoroAccessibilityTextPlanTest(unittest.TestCase):
         with self.assertRaisesRegex(planner.TextPlanError, "unspoken source token"):
             planner.prepare("The price is $1.25.", Path(os.environ[required[0]]),
                             Path(os.environ[required[1]]))
+        path_text = ("Read /data/cke/runs/nemotron-two-client-20k-20261104/"
+                     "acceptance-20261104/ on Ryzen.")
+        for mode in ("natural", "exact"):
+            with self.subTest(technical_mode=mode):
+                plan = planner.prepare(path_text, Path(os.environ[required[0]]),
+                                       Path(os.environ[required[1]]),
+                                       technical_mode=mode)
+                self.assertEqual("".join(path_text[chunk["source_start"]:
+                                                 chunk["source_end"]]
+                                         for chunk in plan["chunks"]), path_text)
+                self.assertTrue(plan["pronunciation_expansions"])
+                self.assertTrue(all(chunk["valid_token_count"] <= 48
+                                    for chunk in plan["chunks"]))
         _case("live-pinned-oracle", "pass", cases=len(CASES))
 
     @unittest.skipUnless(os.environ.get("CKE_TTS_RUN_ACCESSIBILITY_TEXT_AUDIO"),
