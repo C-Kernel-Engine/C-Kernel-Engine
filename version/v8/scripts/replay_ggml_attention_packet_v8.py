@@ -153,10 +153,10 @@ def _substitute_observed_operands(
         raise BundleError("observed capture has no unambiguous query position")
     token = int(match.group(1))
     q, k, v = (tensors[role] for role in ("Qcur_rope", "Kcache_post_store", "Vcache_post_store"))
-    if (token != q.shape[0] - 1 or k.shape != v.shape or k.shape[0] != q.shape[0] or
+    if (token >= q.shape[0] or k.shape != v.shape or k.shape[0] != q.shape[0] or
             q.shape[1:] != (geometry["heads"], geometry["dim"]) or
             k.shape[1:] != (geometry["kv_heads"], geometry["dim"]) or
-            geometry["keys"] < k.shape[0] or geometry["queries"] > q.shape[0]):
+            geometry["keys"] < token + 1 or geometry["queries"] > token + 1):
         raise BundleError("observed query/cache geometry does not match the CKE packet")
     query_start = token + 1 - geometry["queries"]
     paths = {}
@@ -173,11 +173,13 @@ def _substitute_observed_operands(
                                              q[query_start:token + 1])
             view[0] = q[query_start:token + 1].transpose(1, 0, 2)
         elif role == "k":
-            operand_metrics[role] = _metrics(view[0, :, :token + 1].transpose(1, 0, 2), k)
-            view[0, :, :token + 1] = k.transpose(1, 0, 2)
+            operand_metrics[role] = _metrics(view[0, :, :token + 1].transpose(1, 0, 2),
+                                             k[:token + 1])
+            view[0, :, :token + 1] = k[:token + 1].transpose(1, 0, 2)
         elif role == "v":
-            operand_metrics[role] = _metrics(view[0, :, :, :token + 1].transpose(2, 0, 1), v)
-            view[0, :, :, :token + 1] = v.transpose(1, 2, 0)
+            operand_metrics[role] = _metrics(view[0, :, :, :token + 1].transpose(2, 0, 1),
+                                             v[:token + 1])
+            view[0, :, :, :token + 1] = v[:token + 1].transpose(1, 2, 0)
         else:
             for row in range(geometry["queries"]):
                 position = query_start + row
@@ -286,6 +288,18 @@ def summarize_cache_history(
     }
 
 
+def _observed_segment_plan(plan: list[dict], segments: list[int], valid: int,
+                           queries: int) -> list[dict]:
+    if [entry.get("rows") for entry in plan] != segments:
+        raise BundleError("cache segment plan differs from the verified CKE packet")
+    observed = [entry for entry in plan
+                if entry["physical_start"] + entry["rows"] <= valid]
+    if (not observed or sum(entry["rows"] for entry in observed) != valid or
+            observed[-1]["rows"] != queries):
+        raise BundleError("observed query does not end at a verified segment boundary")
+    return observed
+
+
 def compare_observed_cke_operands(
     tree: Path, dump_dir: Path, name: str, bundle: Path, *,
     scale: float, alibi: float, threads: int, parity_report: Path,
@@ -330,8 +344,8 @@ def compare_observed_cke_operands(
         ggml_on_cke = np.fromfile(output, dtype="<f4").reshape(
             geometry["queries"], geometry["heads"], geometry["dim"])
     plan = json.loads(parity_report.read_text(encoding="utf-8"))["dump_compare"]["prefill_segments"]
-    if [entry.get("rows") for entry in plan] != segments:
-        raise BundleError("cache segment plan differs from the verified CKE packet")
+    valid = extent["valid_cache_positions"][1]
+    observed_plan = _observed_segment_plan(plan, segments, valid, geometry["queries"])
     oracle_k = np.ndarray(tuple(reversed(specs["k"]["ne"])), dtype="<f2",
                           buffer=(dump_dir / f"{name}.nonflash_k.bin").read_bytes(),
                           strides=tuple(reversed(specs["k"]["nb"])))[0]
@@ -339,15 +353,16 @@ def compare_observed_cke_operands(
                           buffer=(dump_dir / f"{name}.nonflash_v.bin").read_bytes(),
                           strides=tuple(reversed(specs["v"]["nb"])))[0]
     cache_history = summarize_cache_history(
-        {"K": oracle_k[:, :len(tensors["Kcache_post_store"])].transpose(1, 0, 2),
-         "V": oracle_v[:, :, :len(tensors["Vcache_post_store"])].transpose(2, 0, 1)},
-        {"K": tensors["Kcache_post_store"], "V": tensors["Vcache_post_store"]},
-        plan, layer=layer,
+        {"K": oracle_k[:, :valid].transpose(1, 0, 2),
+         "V": oracle_v[:, :, :valid].transpose(2, 0, 1)},
+        {"K": tensors["Kcache_post_store"][:valid],
+         "V": tensors["Vcache_post_store"][:valid]},
+        observed_plan, layer=layer,
         cke_pre_store={
             "K": ("Kcur_rope", _unique_tensor(dumps, layer, "Kcur_rope").reshape(
-                tensors["Kcache_post_store"].shape)),
+                tensors["Kcache_post_store"].shape)[:valid]),
             "V": ("Vcur_normed", _unique_tensor(dumps, layer, "Vcur_normed").reshape(
-                tensors["Vcache_post_store"].shape)),
+                tensors["Vcache_post_store"].shape)[:valid]),
         },
     )
     start = extent["query_start"]
