@@ -211,10 +211,10 @@ class AccessibleVoiceTest(unittest.TestCase):
         recorder.write_text(
             "#!/usr/bin/env python3\n"
             "import time,wave\nfrom pathlib import Path\n"
-            f"Path({str(marker)!r}).write_text('started')\n"
             "with wave.open(__import__('sys').argv[-1], 'wb') as out:\n"
             " out.setnchannels(1); out.setsampwidth(2); out.setframerate(16000)\n"
             " out.writeframes(b'\\x00\\x00' * 160)\n"
+            f" Path({str(marker)!r}).write_text('started')\n"
             " try: time.sleep(30)\n"
             " except KeyboardInterrupt: pass\n")
         recorder.chmod(0o700)
