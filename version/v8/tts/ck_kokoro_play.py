@@ -8,6 +8,7 @@ in the generated runtime invoked by speak_kokoro_text.py.
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
 import os
@@ -47,7 +48,10 @@ class _Playing:
 
     def stop(self):
         if self.child.poll() is None:
-            self.child.kill()
+            try:
+                self.child.kill()
+            except ProcessLookupError:
+                pass
         self.thread.join()
 
 
@@ -138,12 +142,15 @@ def _exchange(worker: subprocess.Popen, command: str, prefix: str) -> list[str]:
 
 
 def play_incremental(text: str, config: Path, bundle: Path, player: Path,
-                     *, seed: int = 7, prepare_plan=None) -> dict:
-    """Play checked chunks in order while the same worker synthesizes ahead."""
+                     *, seed: int = 7, synthesis_workers: int = 1,
+                     prepare_plan=None) -> dict:
+    """Play checked chunks in order with a bounded number of loaded workers."""
     if not player.is_file() or not os.access(player, os.X_OK):
         raise PlaybackError("selected audio player is unavailable")
     if seed < 0 or seed > (1 << 64) - 1:
         raise PlaybackError("seed must be an unsigned 64-bit integer")
+    if type(synthesis_workers) is not int or not 1 <= synthesis_workers <= 3:
+        raise PlaybackError("synthesis workers must be an integer in 1..3")
     if prepare_plan is None:
         sys.path.insert(0, str(Path(__file__).resolve().parent))
         try:
@@ -155,23 +162,32 @@ def play_incremental(text: str, config: Path, bundle: Path, player: Path,
     chunks = plan["chunks"]
     if not chunks or len(chunks) > 512 or seed > (1 << 64) - len(chunks):
         raise PlaybackError("incremental request exceeds checked chunk or seed capacity")
+    if any(type(chunk.get("index")) is not int or chunk["index"] != position
+           for position, chunk in enumerate(chunks)):
+        raise PlaybackError("incremental chunks must have consecutive indices")
     dispatcher = bundle / "native-kokoro-dispatch"
     if not dispatcher.is_file():
         raise PlaybackError("native Kokoro dispatcher unavailable")
+    active_workers = min(synthesis_workers, len(chunks))
     with tempfile.TemporaryDirectory(prefix="cke-kokoro-incremental-") as folder:
-        worker = subprocess.Popen([str(dispatcher), str(bundle), "--session"],
-                                  stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                  stderr=subprocess.PIPE, text=True, bufsize=1)
+        workers = []
+        executor = ThreadPoolExecutor(max_workers=active_workers)
         playing = None
         total_samples = 0
         played = []
+        first_play = None
         try:
-            assert worker.stdout is not None
-            if worker.stdout.readline().strip() != "READY\tloads=1":
-                raise PlaybackError("native Kokoro session did not become ready")
-            first_play = None
-            previous_end = None
-            for chunk in chunks:
+            for _ in range(active_workers):
+                workers.append(subprocess.Popen(
+                    [str(dispatcher), str(bundle), "--session"],
+                    stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE, text=True, bufsize=1))
+            for worker in workers:
+                assert worker.stdout is not None
+                if worker.stdout.readline().strip() != "READY\tloads=1":
+                    raise PlaybackError("native Kokoro session did not become ready")
+
+            def synthesize(chunk: dict, worker: subprocess.Popen) -> tuple:
                 index = chunk["index"]
                 output = Path(folder) / f"chunk-{index}.wav"
                 ids = ",".join(map(str, chunk["phoneme_ids"]))
@@ -185,7 +201,19 @@ def play_incremental(text: str, config: Path, bundle: Path, player: Path,
                 except ValueError as error:
                     raise PlaybackError("native chunk response has invalid sample count") from error
                 _checked_wav(output, samples)
-                ready = time.monotonic()
+                wav_sha256 = hashlib.sha256(output.read_bytes()).hexdigest()
+                return output, samples, synthesis_started, time.monotonic(), wav_sha256
+
+            pending = {index: executor.submit(synthesize, chunks[index], workers[index])
+                       for index in range(active_workers)}
+            previous_end = None
+            for index, chunk in enumerate(chunks):
+                output, samples, synthesis_started, ready, wav_sha256 = (
+                    pending.pop(index).result())
+                following = index + active_workers
+                if following < len(chunks):
+                    pending[following] = executor.submit(
+                        synthesize, chunks[following], workers[index % active_workers])
                 if playing is not None:
                     previous_end = playing.finish()
                     playing.wav.unlink()
@@ -198,6 +226,7 @@ def play_incremental(text: str, config: Path, bundle: Path, player: Path,
                                "source_end": chunk["source_end"],
                                "source_text": chunk["source_text"],
                                "samples": samples, "audio_seconds": samples / 24000,
+                               "wav_sha256": wav_sha256,
                                "synthesis_seconds": ready - synthesis_started,
                                "playback_gap_seconds": (max(0.0, launched - previous_end)
                                                         if previous_end is not None else None)})
@@ -205,28 +234,43 @@ def play_incremental(text: str, config: Path, bundle: Path, player: Path,
                 playing.finish()
                 playing.wav.unlink()
                 playing = None
-            assert worker.stdin is not None
-            worker.stdin.write("QUIT\n")
-            worker.stdin.flush()
-            worker.stdin.close()
-            if worker.wait(timeout=10):
-                raise PlaybackError("native Kokoro worker exited with failure")
-        finally:
-            if playing is not None:
-                playing.stop()
-            if worker.poll() is None:
-                worker.kill()
-                worker.wait()
-            if worker.stdin and not worker.stdin.closed:
+            for worker in workers:
+                assert worker.stdin is not None
+                worker.stdin.write("QUIT\n")
+                worker.stdin.flush()
                 worker.stdin.close()
-            if worker.stdout:
-                worker.stdout.close()
-            if worker.stderr:
-                worker.stderr.close()
+            for worker in workers:
+                if worker.wait(timeout=10):
+                    raise PlaybackError("native Kokoro worker exited with failure")
+        finally:
+            try:
+                if playing is not None:
+                    playing.stop()
+            finally:
+                for worker in workers:
+                    if worker.poll() is None:
+                        try:
+                            worker.kill()
+                        except ProcessLookupError:
+                            pass
+                        worker.wait()
+                executor.shutdown(wait=True, cancel_futures=True)
+                for worker in workers:
+                    if worker.stdin and not worker.stdin.closed:
+                        try:
+                            worker.stdin.close()
+                        except BrokenPipeError:
+                            pass
+                    if worker.stdout:
+                        worker.stdout.close()
+                    if worker.stderr:
+                        worker.stderr.close()
     return {"status": "execution_pass", "source_sha256": hashlib.sha256(
                 plan["source_text"].encode("utf-8")).hexdigest(),
             "bundle_identity_sha256": plan["bundle_identity_sha256"],
             "bundle_manifest_sha256": plan.get("bundle_manifest_sha256"),
+            "synthesis_workers": active_workers,
+            "native_model_loads": len(workers),
             "chunks": played, "sample_count": total_samples,
             "audio_seconds": total_samples / 24000,
             "playback_gap_total_seconds": sum(
@@ -243,6 +287,8 @@ def main() -> int:
     parser.add_argument("--player", type=Path, required=True)
     parser.add_argument("--incremental", action="store_true",
                         help="play checked chunks while preparing subsequent chunks")
+    parser.add_argument("--synthesis-workers", type=int, default=1,
+                        help="1..3 loaded native workers for incremental playback")
     parser.add_argument("--report", type=Path,
                         help="write completed playback metrics and source spans")
     parser.add_argument("text")
@@ -253,10 +299,16 @@ def main() -> int:
 
     signal.signal(signal.SIGTERM, interrupted)
     try:
+        if not 1 <= args.synthesis_workers <= 3:
+            raise PlaybackError("synthesis workers must be in 1..3")
+        if not args.incremental and args.synthesis_workers != 1:
+            raise PlaybackError("multiple synthesis workers require --incremental")
         if args.report and (args.report.exists() or args.report.is_symlink()):
             raise PlaybackError("report already exists")
         result = (play_incremental(args.text, args.config, args.bundle_dir,
-                                   args.player) if args.incremental else
+                                   args.player,
+                                   synthesis_workers=args.synthesis_workers)
+                  if args.incremental else
                   play(args.text, args.config, args.bundle_dir, args.player))
         if args.report:
             _write_private_report(args.report, result)

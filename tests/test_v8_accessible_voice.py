@@ -211,10 +211,10 @@ class AccessibleVoiceTest(unittest.TestCase):
         recorder.write_text(
             "#!/usr/bin/env python3\n"
             "import time,wave\nfrom pathlib import Path\n"
-            f"Path({str(marker)!r}).write_text('started')\n"
             "with wave.open(__import__('sys').argv[-1], 'wb') as out:\n"
             " out.setnchannels(1); out.setsampwidth(2); out.setframerate(16000)\n"
             " out.writeframes(b'\\x00\\x00' * 160)\n"
+            f" Path({str(marker)!r}).write_text('started')\n"
             " try: time.sleep(30)\n"
             " except KeyboardInterrupt: pass\n")
         recorder.chmod(0o700)
@@ -358,6 +358,36 @@ class AccessibleVoiceTest(unittest.TestCase):
         self.assertEqual(kwargs["arguments"], (
             "--config", "/pinned/config.json", "--bundle-dir", "/pinned/bundle",
             "--player", "/usr/bin/aplay", "--incremental"))
+        with mock.patch.object(voice, "confirm", return_value="Read status"), \
+             mock.patch.object(voice, "speak_and_control") as speak:
+            status = voice.main([
+                "--text", "Read status", "--agent-id", "cke",
+                "--project-id", "engine", "--server-url", self.url,
+                "--journal", str(self.journal),
+                "--kokoro-config", "/pinned/config.json",
+                "--kokoro-bundle-dir", "/pinned/bundle",
+                "--audio-player", "/usr/bin/aplay",
+                "--kokoro-incremental", "--kokoro-synthesis-workers", "3",
+            ])
+        self.assertEqual(status, 0)
+        self.assertEqual(speak.call_args.kwargs["arguments"], (
+            "--config", "/pinned/config.json", "--bundle-dir", "/pinned/bundle",
+            "--player", "/usr/bin/aplay", "--incremental",
+            "--synthesis-workers", "3"))
+
+    def test_parallel_kokoro_requires_incremental_before_submission(self):
+        with mock.patch.object(voice, "submit") as submit, \
+             mock.patch("sys.stderr", new_callable=io.StringIO):
+            with self.assertRaises(SystemExit):
+                voice.main([
+                    "--text", "Read status", "--agent-id", "cke",
+                    "--project-id", "engine", "--journal", str(self.journal),
+                    "--kokoro-config", "/pinned/config.json",
+                    "--kokoro-bundle-dir", "/pinned/bundle",
+                    "--audio-player", "/usr/bin/aplay",
+                    "--kokoro-synthesis-workers", "3",
+                ])
+        submit.assert_not_called()
 
 
 if __name__ == "__main__":
