@@ -11,12 +11,14 @@ import hashlib
 import json
 import secrets
 import subprocess
+import sys
 import time
 from pathlib import Path
 from urllib.request import urlopen
 
 
 SCHEMA = "cke.deepagents_edit_acceptance.v1"
+VALIDATOR_OUTPUT = "PASS: add(2, 3) == 5\n"
 
 
 def digest(data: bytes) -> str:
@@ -29,6 +31,37 @@ def loaded_identity(endpoint: str) -> dict:
     if value.get("schema") != "cke.loaded_serving_identity.v1":
         raise ValueError("loaded identity schema mismatch")
     return value
+
+
+def validate_fixture(root: Path) -> dict:
+    """Run the trusted assertion and report only after its whole script returns."""
+    program = (
+        "import contextlib, io, json, runpy, sys\n"
+        "from pathlib import Path\n"
+        "root = Path(sys.argv[1])\n"
+        "sys.path.insert(0, str(root))\n"
+        "capture = io.StringIO()\n"
+        "try:\n"
+        "    with contextlib.redirect_stdout(capture):\n"
+        "        runpy.run_path(str(root / 'test_module.py'), run_name='__main__')\n"
+        "except BaseException as exc:\n"
+        "    print(json.dumps({'assertion_completed': False, 'error_type': type(exc).__name__}))\n"
+        "    sys.exit(1)\n"
+        "print(json.dumps({'assertion_completed': True, 'output': capture.getvalue()}))\n"
+    )
+    process = subprocess.run([sys.executable, "-I", "-c", program, str(root)],
+                             cwd=root, capture_output=True, text=True, timeout=15)
+    try:
+        result = json.loads(process.stdout)
+        if not isinstance(result, dict):
+            raise ValueError("validator returned a non-object")
+    except (ValueError, TypeError):
+        result = {"assertion_completed": False, "error_type": "invalid_validator_report"}
+    return {"exit_code": process.returncode,
+            "assertion_completed": result.get("assertion_completed") is True,
+            "output": result.get("output", ""),
+            "error_type": result.get("error_type"),
+            "stderr": process.stderr}
 
 
 def assess(report: dict, expected_value: str) -> list[str]:
@@ -49,24 +82,47 @@ def assess(report: dict, expected_value: str) -> list[str]:
         errors.append("edit_before_read")
     if "edit_fixture" in names and "run_validator" in names and names.index("run_validator") < names.index("edit_fixture"):
         errors.append("validator_before_edit")
-    emitted_names = [call.get("name") for message in messages
+    emitted_calls = [call for message in messages
                      if isinstance(message, dict) for call in (message.get("tool_calls") or [])
                      if isinstance(call, dict)]
-    if emitted_names != names:
+    if [call.get("name") for call in emitted_calls] != names:
         errors.append("tool_execution_mismatch")
-    for index, message in enumerate(messages):
+    for call, execution in zip(emitted_calls, calls):
+        if (not isinstance(execution, dict)
+                or not isinstance(call.get("args"), dict)
+                or not isinstance(execution.get("arguments"), dict)
+                or call.get("args") != execution.get("arguments")):
+            errors.append("tool_arguments_mismatch")
+    pending: set[str] = set()
+    seen: set[str] = set()
+    for message in messages:
         if not isinstance(message, dict):
             errors.append("malformed_message")
             break
-        for tool_call in message.get("tool_calls") or []:
-            if message.get("type") != "AIMessage" or not isinstance(tool_call, dict) or not tool_call.get("id"):
-                errors.append("malformed_tool_call")
-                continue
-            match = [later for later in messages[index + 1:]
-                     if isinstance(later, dict) and later.get("type") == "ToolMessage"
-                     and later.get("tool_call_id") == tool_call["id"]]
-            if len(match) != 1:
-                errors.append("missing_or_duplicate_tool_result")
+        if message.get("type") == "AIMessage":
+            if pending:
+                errors.append("unresolved_tool_call_before_next_turn")
+            for tool_call in message.get("tool_calls") or []:
+                if not isinstance(tool_call, dict) or not isinstance(tool_call.get("id"), str) or not tool_call["id"]:
+                    errors.append("malformed_tool_call")
+                    continue
+                call_id = tool_call["id"]
+                if call_id in seen:
+                    errors.append("reused_tool_call_id")
+                seen.add(call_id)
+                pending.add(call_id)
+        elif message.get("tool_calls"):
+            errors.append("tool_call_outside_assistant_message")
+        if message.get("type") == "ToolMessage":
+            call_id = message.get("tool_call_id")
+            if not isinstance(call_id, str) or call_id not in pending:
+                errors.append("orphan_or_duplicate_tool_result")
+            else:
+                pending.remove(call_id)
+        elif message.get("tool_call_id"):
+            errors.append("tool_result_outside_tool_message")
+    if pending:
+        errors.append("unresolved_tool_call")
     if messages:
         final = messages[-1]
         if (not isinstance(final, dict) or final.get("type") != "AIMessage"
@@ -78,10 +134,14 @@ def assess(report: dict, expected_value: str) -> list[str]:
     else:
         errors.append("missing_final_answer")
     validation = report.get("validation") or {}
-    if validation.get("exit_code") != 0 or not any(
+    if ((validation.get("exit_code") != 0
+            or validation.get("assertion_completed") is not True
+            or validation.get("stdout") != VALIDATOR_OUTPUT) or not any(
             isinstance(item, dict) and item.get("name") == "run_validator"
             and isinstance(item.get("outcome"), dict)
-            and item["outcome"].get("exit_code") == 0 for item in calls):
+            and item["outcome"].get("exit_code") == 0
+            and item["outcome"].get("assertion_completed") is True
+            and item["outcome"].get("output") == VALIDATOR_OUTPUT for item in calls)):
         errors.append("validator_not_passed_by_agent")
     if report.get("validator_sha256_after") != report.get("validator_sha256_before"):
         errors.append("validator_modified")
@@ -145,23 +205,21 @@ def run(args: argparse.Namespace) -> dict:
         def edit_fixture(path: str, old: str, new: str) -> str:
             """Replace one exact piece of module.py in the disposable coding workspace."""
             if path != "module.py" or not old or old == new:
-                record("edit_fixture", {"path": path}, "rejected")
+                record("edit_fixture", {"path": path, "old": old, "new": new}, "rejected")
                 return "ERROR: invalid edit"
             original = (root / path).read_text()
             if original.count(old) != 1:
-                record("edit_fixture", {"path": path}, "rejected")
+                record("edit_fixture", {"path": path, "old": old, "new": new}, "rejected")
                 return "ERROR: old text must occur exactly once"
             (root / path).write_text(original.replace(old, new, 1))
-            record("edit_fixture", {"path": path}, digest((root / path).read_bytes()))
+            record("edit_fixture", {"path": path, "old": old, "new": new},
+                   digest((root / path).read_bytes()))
             return "Edited module.py"
 
         @tool
         def run_validator() -> str:
             """Run the deterministic Python test in the disposable coding workspace."""
-            process = subprocess.run(["python3", "test_module.py"], cwd=root,
-                                     capture_output=True, text=True, timeout=15)
-            outcome = {"exit_code": process.returncode,
-                       "output": process.stdout + process.stderr}
+            outcome = validate_fixture(root)
             record("run_validator", {}, outcome)
             return json.dumps(outcome)
 
@@ -189,10 +247,10 @@ def run(args: argparse.Namespace) -> dict:
             "finish_reason": (getattr(message, "response_metadata", {}) or {}).get("finish_reason"),
             "usage_metadata": getattr(message, "usage_metadata", None),
         } for message in result.get("messages") or []]
-        valid = subprocess.run(["python3", "test_module.py"], cwd=root,
-                               capture_output=True, text=True, timeout=15)
-        report["validation"] = {"exit_code": valid.returncode,
-                                "stdout": valid.stdout, "stderr": valid.stderr,
+        valid = validate_fixture(root)
+        report["validation"] = {"exit_code": valid["exit_code"],
+                                "assertion_completed": valid["assertion_completed"],
+                                "stdout": valid["output"], "stderr": valid["stderr"],
                                 "module_sha256": digest((root / "module.py").read_bytes())}
         report["validator_sha256_after"] = digest((root / "test_module.py").read_bytes())
         report["errors"] = assess(report, value)
