@@ -360,6 +360,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="local player accepting one 24 kHz mono PCM16 WAV path")
     parser.add_argument("--kokoro-incremental", action="store_true",
                         help="play checked Kokoro chunks as they are synthesized")
+    parser.add_argument("--kokoro-synthesis-workers", type=int, default=1,
+                        help="1..3 loaded workers for incremental Kokoro playback")
     args = parser.parse_args(argv)
     try:
         if (args.wav or args.record) and (not args.encoder_run_dir or not args.decoder_run_dir):
@@ -373,6 +375,10 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("Kokoro requires --kokoro-config, --kokoro-bundle-dir and --audio-player")
         if args.kokoro_incremental and not all(kokoro_options):
             parser.error("--kokoro-incremental requires Kokoro options")
+        if not 1 <= args.kokoro_synthesis_workers <= 3:
+            parser.error("--kokoro-synthesis-workers must be in 1..3")
+        if args.kokoro_synthesis_workers != 1 and not args.kokoro_incremental:
+            parser.error("multiple Kokoro synthesis workers require --kokoro-incremental")
         if args.record:
             with tempfile.TemporaryDirectory(prefix="cke-voice-capture-") as folder:
                 wav = Path(folder) / "microphone.wav"
@@ -406,6 +412,9 @@ def main(argv: list[str] | None = None) -> int:
                          "--player", str(args.audio_player))
             if args.kokoro_incremental:
                 arguments += ("--incremental",)
+                if args.kokoro_synthesis_workers != 1:
+                    arguments += ("--synthesis-workers",
+                                  str(args.kokoro_synthesis_workers))
             speak_and_control(answer, adapter,
                               arguments=arguments,
                               label="CKE Kokoro")

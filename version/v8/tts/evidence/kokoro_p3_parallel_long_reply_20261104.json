@@ -1,0 +1,93 @@
+{
+  "schema": "cke.kokoro.p3_bounded_parallel_playback.v1",
+  "host": "P3, Intel Core i7-14700T, 61 GiB RAM",
+  "source_base_revision": "96b29cb24",
+  "candidate_adapter_sha256": "d829dc347e388e6d52d30bf8caa0556e6743b1b4f828eb5fb82579f74ffc49ac",
+  "bundle": {
+    "conv_provider": "avx2_parallel",
+    "conv_workers": 8,
+    "generated_library_sha256": "53708cd716edd1b6655d6dea828a958655479a362f64c6e21b113203c173b314",
+    "model_weights_sha256": "556a82f8116091d386ccab9d8218030d124ff286e0fb8e2ebc8d0cc8a5598148",
+    "voice_bank_sha256": "50a2b7d543cc5a9bdefb3217e3bf1a8d87e947dd5b4e8babf685c0bc4b3b4177",
+    "bundle_manifest_sha256": "a8c0a8eef775c8a69f124a5c4e4a1439e798f13a6812d62b390e6154b68356e8"
+  },
+  "frontend": "Pinned Kokoro 0.9.4 / Misaki 0.9.4 via /data/cke/oracles/kokoro-pinned-20261003 site-packages and Python 3.13.15; config /data/cke/models/kokoro-82m-e8a90b4/config.json",
+  "player": "Non-audible local executable validates 24 kHz mono PCM16 WAV and sleeps for its exact sample duration; this is not a Sony listening verdict.",
+  "input_pattern": "Hello, this is CKE. repeated 13, 50 or 250 times; exact text is bounded by the 8192-byte planner limit.",
+  "fifty_two_words": {
+    "one_worker": {
+      "total_seconds": 68.198,
+      "first_playback_start_seconds": 8.444,
+      "playback_gap_total_seconds": 32.429,
+      "sample_count": 647400,
+      "peak_process_tree_pss_mib": 2825.9
+    },
+    "three_workers": {
+      "total_seconds": 36.264,
+      "first_playback_start_seconds": 8.909,
+      "playback_gap_total_seconds": 0.012,
+      "sample_count": 647400,
+      "peak_process_tree_pss_mib": 7600.1
+    },
+    "chunks": 13,
+    "all_chunk_wav_hashes_equal": true,
+    "source_sha256": "831876dc73c6afc56c47dff7b2e8439c2c34ac18c392a0ee87a3e9425cf0ec79"
+  },
+  "two_hundred_words": {
+    "chunks": 50,
+    "samples": 2490000,
+    "audio_seconds": 103.75,
+    "first_playback_start_seconds": 8.877282046712935,
+    "playback_gap_total_seconds": 0.05108671262860298,
+    "total_seconds": 113.74285954423249,
+    "source_sha256": "0cd084a4e3cef8d3f95b159f3120fc677a339cfa80ada57da1178de12f310e6b"
+  },
+  "one_thousand_words": {
+    "chunks": 250,
+    "words": 1000,
+    "sample_count": 12450000,
+    "audio_seconds": 518.75,
+    "first_playback_start_seconds": 8.752746493555605,
+    "playback_gap_total_seconds": 0.2563780276104808,
+    "max_gap_seconds": 0.0037750815972685814,
+    "total_seconds": 532.2602006886154,
+    "peak_process_tree_pss_mib": 7602.1,
+    "source_sha256": "fe8ed903c0934eba3b0720a9a9909081735a45b785076bc65b81460c8aa47ccf",
+    "sample_counts_match_chunks": true,
+    "consecutive_indices": true,
+    "contiguous_source_spans": true
+  },
+  "cancellation": {
+    "synthesis": {
+      "returncode": 130,
+      "stop_to_release_seconds": 0.566,
+      "native_workers_at_stop": 3,
+      "player_at_stop": false,
+      "live_descendants_after": [],
+      "completion_report_published": false
+    },
+    "playback": {
+      "returncode": 130,
+      "stop_to_release_seconds": 0.767,
+      "native_workers_at_stop": 3,
+      "player_at_stop": true,
+      "live_descendants_after": [],
+      "completion_report_published": false
+    }
+  },
+  "limitations": [
+    "Connected PyTorch waveform numerical parity remains fail_unresolved.",
+    "Timed test player made no audible output; natural chunk joins and Sony headset playback remain NOT_TESTED.",
+    "The repeated known phrase does not certify arbitrary technical prose or 10,000 words.",
+    "Three independently loaded sessions cost approximately 7.6 GiB peak process-tree PSS on P3; the default remains one worker."
+  ],
+  "timed_player_sha256": "5b55f0710d4b75dcb0da6585c50e68ed5ff08869158ef4590c717c29259e987d",
+  "reproduction": {
+    "run_template": "PYTHONPATH=<pinned-site-packages> <pinned-python-3.13> version/v8/tts/ck_kokoro_play.py --config <pinned-config> --bundle-dir <tile32-runtime-bundle> --player <timed-player> --incremental --synthesis-workers 3 --report <new-report.json> <text-argument>",
+    "text_argument": "Hello, this is CKE. repeated 250 times with one separating space and no trailing space",
+    "player_behavior": "Validate 24 kHz mono PCM16 WAV and sleep for the valid sample count divided by 24000; no audible output.",
+    "nightly": "python3 scripts/nightly_runner.py --tests tts_kokoro_voice_playback accessible_voice_control --ci --require-executed"
+  },
+  "measured_adapter_sha256": "3ede58ce679004a83441def02bf2648cb2312641e0407ae9fd24538a29d3bab7",
+  "post_measurement_change": "Final candidate adds cleanup even if player stop raises and CLI worker-range rejection; the registered nightly suites were rerun after this change. Asset-backed timings and WAV hashes were captured with measured_adapter_sha256."
+}
