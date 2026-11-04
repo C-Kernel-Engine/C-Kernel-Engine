@@ -67,6 +67,40 @@ void audio_conv1d_compute_avx2(const ck_audio_conv1d_job *job, void *unused) {
         size_t frame = 0;
         for (; frame < job->output_frames;) {
             const int64_t first = (int64_t)frame - (int64_t)job->padding;
+            /* Four independent vectors reuse each weight broadcast. Each lane
+             * still visits input channels and taps in the scalar FMA order. */
+            if (frame + 32 <= job->output_frames && first >= 0 &&
+                first + 31 + (int64_t)final_tap < (int64_t)job->input_frames) {
+                __m256 sums0 = _mm256_set1_ps(job->bias[oc]);
+                __m256 sums1 = sums0;
+                __m256 sums2 = sums0;
+                __m256 sums3 = sums0;
+                for (size_t ic = 0; ic < job->input_channels; ++ic) {
+                    const float *row = job->weight +
+                        (oc * job->input_channels + ic) * job->kernel_size;
+                    const float *input = job->input + ic * job->input_stride +
+                        (size_t)first;
+                    for (size_t tap = 0; tap < job->kernel_size; ++tap) {
+                        const float *values = input + tap * job->dilation;
+                        const __m256 coefficient = _mm256_set1_ps(row[tap]);
+                        sums0 = _mm256_fmadd_ps(_mm256_loadu_ps(values),
+                                                 coefficient, sums0);
+                        sums1 = _mm256_fmadd_ps(_mm256_loadu_ps(values + 8),
+                                                 coefficient, sums1);
+                        sums2 = _mm256_fmadd_ps(_mm256_loadu_ps(values + 16),
+                                                 coefficient, sums2);
+                        sums3 = _mm256_fmadd_ps(_mm256_loadu_ps(values + 24),
+                                                 coefficient, sums3);
+                    }
+                }
+                float *staged = job->staged + oc * job->output_frames + frame;
+                _mm256_storeu_ps(staged, sums0);
+                _mm256_storeu_ps(staged + 8, sums1);
+                _mm256_storeu_ps(staged + 16, sums2);
+                _mm256_storeu_ps(staged + 24, sums3);
+                frame += 32;
+                continue;
+            }
             const int64_t last = first + 7 + (int64_t)final_tap;
             if (frame + 8 <= job->output_frames && first >= 0 &&
                 last < (int64_t)job->input_frames) {
