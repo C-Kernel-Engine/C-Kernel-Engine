@@ -16,7 +16,8 @@ var ckernel__engine_8h =
       [ "CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA", "ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea115dd6cf8ca1bbc5a7689a88c5d28463", null ],
       [ "CK_ATTN_REDUCTION_F16_REGULAR_NOSCALE", "ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea78eef0509b737da7c60e385ff47b9858", null ],
       [ "CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64_REGULAR_TAIL_NOSCALE", "ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea293c836a8b2382e6539db16341508435", null ],
-      [ "CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64_APPEND_TILED", "ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010eab4895eee7b51930ef1643f980de6b984", null ]
+      [ "CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64_APPEND_TILED", "ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010eab4895eee7b51930ef1643f980de6b984", null ],
+      [ "CK_ATTN_REDUCTION_F16_Q_PROB_ROUND_QTILE64_REGULAR_TAIL_NOSCALE", "ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea6d1800c3397121e03bd15a492cefe745", null ]
     ] ],
     [ "ck_attention_status_t", "ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67", [
       [ "CK_ATTENTION_STATUS_OK", "ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67abea27a79c4c94ac03dfe2ab71fb2cdf1", null ],

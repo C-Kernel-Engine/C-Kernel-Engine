@@ -1,5 +1,6 @@
 var NAVTREEINDEX16 =
 {
+"globals_func.html":[2,1,1,0],
 "globals_func.html":[2,1,1],
 "globals_func_a.html":[2,1,1,1],
 "globals_func_b.html":[2,1,1,2],
@@ -248,6 +249,5 @@ var NAVTREEINDEX16 =
 "mega__fused__attention_8h.html#af5a9a3482344942ff204ca604ac1715b":[2,0,0,63,0],
 "mega__fused__attention_8h_source.html":[2,0,0,63],
 "mega__fused__attention__avx_8c.html":[2,0,1,1,0,3],
-"mega__fused__attention__avx_8c.html#a0493a1e92829e37919fe80374ddf06d9":[2,0,1,1,0,3,7],
-"mega__fused__attention__avx_8c.html#a0dfb0d638f2eaaba130772508d90f5e8":[2,0,1,1,0,3,10]
+"mega__fused__attention__avx_8c.html#a0493a1e92829e37919fe80374ddf06d9":[2,0,1,1,0,3,7]
 };

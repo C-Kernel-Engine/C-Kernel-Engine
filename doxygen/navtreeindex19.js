@@ -1,5 +1,6 @@
 var NAVTREEINDEX19 =
 {
+"runtime__extent_8c.html#aafb5911cb55ad85cb3102bb703a77e74":[2,0,1,1,125,1],
 "runtime__extent_8c_source.html":[2,0,1,1,125],
 "rwkv7__decode_8c.html":[2,0,1,1,126],
 "rwkv7__decode_8c.html#a06cd318c6cd148188cafec9975688063":[2,0,1,1,126,3],
@@ -248,6 +249,5 @@ var NAVTREEINDEX19 =
 "structCKKernelId.html#aaa58279e743ef1ec7a4c9cce3dc67c79":[1,0,37,1],
 "structCKKernelId.html#ab2cebeabdb83297de77f4926e9994ac9":[1,0,37,0],
 "structCKKernelSpec.html":[1,0,38],
-"structCKKernelSpec.html#a19f87171754de66c10e0d6a0968489e2":[1,0,38,2],
-"structCKKernelSpec.html#a702e1368abaa202d24597a58f2f5c751":[1,0,38,5]
+"structCKKernelSpec.html#a19f87171754de66c10e0d6a0968489e2":[1,0,38,2]
 };
