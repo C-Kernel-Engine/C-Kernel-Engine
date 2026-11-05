@@ -64,7 +64,7 @@ def validate_fixture(root: Path) -> dict:
             "stderr": process.stderr}
 
 
-def assess(report: dict, expected_value: str) -> list[str]:
+def assess(report: dict, expected_value: str, *, expect_read_recovery: bool = False) -> list[str]:
     """Check objective work and chronological, correlated tool events."""
     errors: list[str] = []
     before, after = report.get("identity_before"), report.get("identity_after")
@@ -75,6 +75,18 @@ def assess(report: dict, expected_value: str) -> list[str]:
     if not isinstance(calls, list) or not isinstance(messages, list):
         return errors + ["missing_trace"]
     names = [item.get("name") for item in calls if isinstance(item, dict)]
+    if expect_read_recovery:
+        failures = [(index, item) for index, item in enumerate(calls)
+                    if isinstance(item, dict) and item.get("name") == "read_fixture"
+                    and item.get("outcome") == "injected_failure"]
+        if (len(failures) != 1 or failures[0][0] != 0
+                or not any(isinstance(item, dict)
+                           and item.get("name") == "read_fixture"
+                           and item.get("arguments") == failures[0][1].get("arguments")
+                           and isinstance(item.get("outcome"), str)
+                           and item["outcome"] not in {"injected_failure", "rejected"}
+                           for item in calls[1:])):
+            errors.append("read_failure_not_recovered")
     if not {"read_fixture", "edit_fixture", "run_validator"} <= set(names):
         errors.append("required_tool_missing")
     if ("read_fixture" in names and "edit_fixture" in names
@@ -85,6 +97,15 @@ def assess(report: dict, expected_value: str) -> list[str]:
     emitted_calls = [call for message in messages
                      if isinstance(message, dict) for call in (message.get("tool_calls") or [])
                      if isinstance(call, dict)]
+    if expect_read_recovery:
+        failed_id = emitted_calls[0].get("id") if emitted_calls else None
+        if not isinstance(failed_id, str) or not any(
+                isinstance(message, dict)
+                and message.get("type") == "ToolMessage"
+                and message.get("tool_call_id") == failed_id
+                and "ERROR: temporary read failure" in str(message.get("content", ""))
+                for message in messages):
+            errors.append("read_failure_result_missing")
     if [call.get("name") for call in emitted_calls] != names:
         errors.append("tool_execution_mismatch")
     for call, execution in zip(emitted_calls, calls):
@@ -165,6 +186,7 @@ def run(args: argparse.Namespace) -> dict:
         "fixture_sha256": {name: digest((root / name).read_bytes())
                            for name in ("note.txt", "module.py", "test_module.py")},
         "validator_sha256_before": validator_hash, "calls": [], "messages": [], "errors": [],
+        "inject_first_read_error": args.inject_first_read_error,
     }
     report_path = root / "report.json"
 
@@ -197,6 +219,9 @@ def run(args: argparse.Namespace) -> dict:
             if path not in ("note.txt", "module.py"):
                 record("read_fixture", {"path": path}, "rejected")
                 return "ERROR: path is not allowed"
+            if args.inject_first_read_error and not report["calls"]:
+                record("read_fixture", {"path": path}, "injected_failure")
+                return "ERROR: temporary read failure; retry the same path."
             content = (root / path).read_text()
             record("read_fixture", {"path": path}, digest(content.encode()))
             return content
@@ -224,6 +249,7 @@ def run(args: argparse.Namespace) -> dict:
             return json.dumps(outcome)
 
         prompt = ("/no_think\nRead note.txt and module.py using read_fixture. "
+                  "If a tool reports a temporary read failure, retry that read before editing. "
                   "The add function is wrong. Use edit_fixture to make add(2, 3) return 5. "
                   "Call run_validator, then report the exact note value and test result. "
                   "Use only the three supplied restricted tools. Do not claim an edit or test without executing it.")
@@ -253,7 +279,8 @@ def run(args: argparse.Namespace) -> dict:
                                 "stdout": valid["output"], "stderr": valid["stderr"],
                                 "module_sha256": digest((root / "module.py").read_bytes())}
         report["validator_sha256_after"] = digest((root / "test_module.py").read_bytes())
-        report["errors"] = assess(report, value)
+        report["errors"] = assess(report, value,
+                                  expect_read_recovery=args.inject_first_read_error)
         report["status"] = "PASS" if not report["errors"] else "FAIL"
     except Exception as exc:
         report["status"] = "FAIL"
@@ -271,6 +298,8 @@ def main() -> int:
     parser.add_argument("--run-dir", type=Path, required=True)
     parser.add_argument("--output-tokens", type=int, default=1024)
     parser.add_argument("--request-timeout", type=int, default=900)
+    parser.add_argument("--inject-first-read-error", action="store_true",
+                        help="return one deterministic transient read error and require recovery")
     args = parser.parse_args()
     if args.output_tokens < 1 or args.request_timeout < 1:
         parser.error("positive token and timeout limits are required")

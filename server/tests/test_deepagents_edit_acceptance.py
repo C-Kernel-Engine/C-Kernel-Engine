@@ -40,6 +40,30 @@ class DeepAgentsEditAcceptanceTests(unittest.TestCase):
     def test_valid_trace(self):
         self.assertEqual(assess(good_report(), "cke-value"), [])
 
+    def test_injected_read_error_must_be_retried_before_edit(self):
+        report = good_report()
+        report["calls"].insert(0, {"name": "read_fixture",
+                                   "arguments": {"path": "note.txt"},
+                                   "outcome": "injected_failure"})
+        report["messages"][:0] = [
+            {"type": "AIMessage", "tool_calls": [{"id": "failed-read",
+                "name": "read_fixture", "args": {"path": "note.txt"}}]},
+            {"type": "ToolMessage", "tool_call_id": "failed-read",
+             "content": "ERROR: temporary read failure; retry the same path."},
+        ]
+        self.assertEqual(assess(report, "cke-value", expect_read_recovery=True), [])
+        report["messages"][1]["content"] = "ordinary file content"
+        self.assertIn("read_failure_result_missing",
+                      assess(report, "cke-value", expect_read_recovery=True))
+        report["messages"][1]["content"] = "ERROR: temporary read failure; retry the same path."
+        report["calls"][1]["arguments"]["path"] = "module.py"
+        self.assertIn("read_failure_not_recovered",
+                      assess(report, "cke-value", expect_read_recovery=True))
+        report["calls"].pop(0)
+        report["messages"] = report["messages"][2:]
+        self.assertIn("read_failure_not_recovered",
+                      assess(report, "cke-value", expect_read_recovery=True))
+
     def test_missing_tool_result(self):
         report = good_report()
         report["messages"] = [m for m in report["messages"]
