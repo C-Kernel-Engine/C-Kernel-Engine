@@ -492,10 +492,79 @@ def _full_layer_plan(
             "shared_layers": shared_layers, "projection_groups": len(groups)}
 
 
+def _first_recurrent_projection_plan(
+    ops: list[dict[str, Any]], buffers: dict[str, dict[str, Any]],
+    providers: dict[str, dict[str, Any]], state: dict[str, int],
+    config: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Admit one mapped projection before the first recurrent state update.
+
+    This is deliberately a one-group contract. The gate and subsequent layers
+    execute through the ordinary sequence-local generated calls. Snapshot the
+    complete planned call-buffer extents at both cuts, including values whose
+    old contents a later operation could read after a partial write.
+    """
+    if (config.get("batch_decode_recurrent_first_projection") is not True
+            or "recurrent_conv_state_bytes" not in state or len(ops) < 7):
+        return None
+    if [op.get("op") for op in ops[:5]] != [
+        "dense_embedding_lookup", "residual_save", "attn_norm",
+        "quantize_input_0", "recurrent_qkv_proj",
+    ] or ops[4].get("layer") != 0:
+        return None
+    logits = buffers.get("logits")
+    vocab = config.get("vocab_size")
+    if (not logits or type(vocab) is not int or vocab <= 0
+            or logits.get("size") != vocab * 4):
+        return None
+    projection = _mapped_two_row_projection(ops[4], providers, buffers)
+    if projection is None:
+        return None
+    replacements = _certified_full_writes(ops, buffers)
+    before = _crossing_at(ops, 4, replacements)
+    after = _crossing_at(ops, 5, replacements)
+    refs = before | after | {projection["input"], projection["output"]}
+    if not before or not after:
+        return None
+    extents: dict[str, int] = {}
+    for ref in refs:
+        row = buffers.get(ref)
+        if (not row or row.get("lifetime") != "call" or row.get("mutable") is not True
+                or type(row.get("size")) is not int or row["size"] <= 0
+                or not re.fullmatch(r"A_[A-Z0-9_]+", str(row.get("define", "")))
+                or not _unaliased(ref, buffers)):
+            return None
+        extents[ref] = row["size"]
+    if (extents[projection["input"]] < projection["input_bytes"]
+            or extents[projection["output"]] < projection["output_bytes"]):
+        return None
+    # No hidden alias into a snapshotted buffer may bypass the planned base.
+    for op in ops:
+        for arg in op.get("args", []):
+            if (isinstance(arg, dict) and arg.get("buffer_ref") in refs
+                    and not _exact_base(arg, buffers[arg["buffer_ref"]])):
+                return None
+    return {
+        "stages": [
+            {"kind": "local", "start": 0, "stop": 4, "live_after": sorted(before)},
+            {"kind": "shared", "start": 4, "stop": 5,
+             "projections": [{"index": 4, **projection}], "live_after": sorted(after)},
+            {"kind": "local", "start": 5, "stop": len(ops)},
+        ],
+        "buffers": {ref: buffers[ref]["define"] for ref in extents},
+        "extents": extents, "layer_end": 5,
+        "shared_layers": [0], "projection_groups": 1,
+        "recurrent_state_bytes": {
+            "conv": state["recurrent_conv_state_bytes"],
+            "ssm": state["recurrent_ssm_state_bytes"],
+        },
+    }
+
+
 def resolve_two_row_batch_contract(
     ops: list[dict[str, Any]], layout: dict[str, Any], config: dict[str, Any]
 ) -> dict[str, Any] | None:
-    """Admit a KV-only decoder with two equivalent first-layer projections.
+    """Admit a checked, map-selected two-row decode projection boundary.
 
     The initial split is intentionally exact: embedding, residual save, norm,
     Q/K projections, then the rest of the normal generated decode. The two
@@ -503,8 +572,19 @@ def resolve_two_row_batch_contract(
     A second map-compatible gate/up projection can be shared after a checked
     sequence-local attention interval. Cache writes remain sequence-local.
     """
-    if resolve_sequence_state_contract(layout, config, ops) is None or len(ops) < 6:
+    state = resolve_sequence_state_contract(layout, config, ops)
+    if state is None or len(ops) < 6:
         return None
+    if "recurrent_conv_state_bytes" in state:
+        buffers = {
+            row.get("name"): row
+            for row in layout.get("memory", {}).get("activations", {}).get("buffers", [])
+            if isinstance(row, dict)
+        }
+        registry = json.loads((Path(__file__).resolve().parents[1] / "kernel_maps" / "KERNEL_REGISTRY.json").read_text())
+        providers = {item["id"]: item for item in registry["kernels"]}
+        plan = _first_recurrent_projection_plan(ops, buffers, providers, state, config)
+        return {"full_layer_plan": plan} if plan else None
     if [op.get("op") for op in ops[:5]] != [
         "dense_embedding_lookup", "residual_save", "attn_norm", "q_proj", "k_proj"
     ]:
