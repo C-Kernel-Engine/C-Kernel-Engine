@@ -229,8 +229,8 @@ $(document).ready(function(){initNavTree('gemv__fused__quant__bias_8c_source.htm
 <div class="line"><a id="l00092" name="l00092"></a><span class="lineno">   92</span>{</div>
 <div class="line"><a id="l00093" name="l00093"></a><span class="lineno">   93</span>    <span class="keyword">const</span> __m128i ax = _mm_sign_epi8(x, x);   <span class="comment">/* abs(x) */</span></div>
 <div class="line"><a id="l00094" name="l00094"></a><span class="lineno">   94</span>    <span class="keyword">const</span> __m128i sy = _mm_sign_epi8(y, x);   <span class="comment">/* y * sign(x) */</span></div>
-<div class="line"><a id="l00095" name="l00095"></a><span class="lineno">   95</span>    <span class="keyword">const</span> __m128i dot = _mm_maddubs_epi16(ax, sy);</div>
-<div class="line"><a id="l00096" name="l00096"></a><span class="lineno">   96</span>    <span class="keywordflow">return</span> _mm_madd_epi16(dot, _mm_set1_epi16(1));</div>
+<div class="line"><a id="l00095" name="l00095"></a><span class="lineno">   95</span>    <span class="keyword">const</span> __m128i <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> = _mm_maddubs_epi16(ax, sy);</div>
+<div class="line"><a id="l00096" name="l00096"></a><span class="lineno">   96</span>    <span class="keywordflow">return</span> _mm_madd_epi16(<a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a>, _mm_set1_epi16(1));</div>
 <div class="line"><a id="l00097" name="l00097"></a><span class="lineno">   97</span>}</div>
 <div class="line"><a id="l00098" name="l00098"></a><span class="lineno">   98</span><span class="comment"></span> </div>
 <div class="line"><a id="l00099" name="l00099"></a><span class="lineno">   99</span><span class="comment">/**</span></div>
@@ -685,6 +685,7 @@ $(document).ready(function(){initNavTree('gemv__fused__quant__bias_8c_source.htm
 <div class="line"><a id="l00537" name="l00537"></a><span class="lineno">  537</span><span class="preprocessor">#endif</span></div>
 <div class="line"><a id="l00538" name="l00538"></a><span class="lineno">  538</span>}</div>
 </div>
+<div class="ttc" id="aattention__cross__token__major__checked_8c_html_a8645ebc14bd224f816fa123347a1e15e"><div class="ttname"><a href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a></div><div class="ttdeci">static double dot(const float *a, const float *b, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="attention__cross__token__major__checked_8c_source.html#l00018">attention_cross_token_major_checked.c:18</a></div></div>
 <div class="ttc" id="ackernel__quant_8h_html"><div class="ttname"><a href="ckernel__quant_8h.html">ckernel_quant.h</a></div><div class="ttdoc">Quantization block structures for weight-only quantization.</div></div>
 <div class="ttc" id="ackernel__quant_8h_html_a01fd96c19126075d365d10748fb254ac"><div class="ttname"><a href="ckernel__quant_8h.html#a01fd96c19126075d365d10748fb254ac">QK5_0</a></div><div class="ttdeci">#define QK5_0</div><div class="ttdef"><b>Definition</b> <a href="ckernel__quant_8h_source.html#l00068">ckernel_quant.h:68</a></div></div>
 <div class="ttc" id="ackernel__quant_8h_html_a7edd411b02255eed928c775b91396c2a"><div class="ttname"><a href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a></div><div class="ttdeci">#define CK_FP16_TO_FP32(x)</div><div class="ttdef"><b>Definition</b> <a href="ckernel__quant_8h_source.html#l00440">ckernel_quant.h:440</a></div></div>

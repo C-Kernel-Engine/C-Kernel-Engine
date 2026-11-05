@@ -332,12 +332,12 @@ $(document).ready(function(){initNavTree('attention__flash__true_8c_source.html'
 <div class="line"><a id="l00184" name="l00184"></a><span class="lineno">  184</span>                <span class="keyword">const</span> <span class="keywordtype">int</span> t_k = t_k0 + bi;</div>
 <div class="line"><a id="l00185" name="l00185"></a><span class="lineno">  185</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> *k_head = k_base + (size_t)t_k * stride;</div>
 <div class="line"><a id="l00186" name="l00186"></a><span class="lineno">  186</span> </div>
-<div class="line"><a id="l00187" name="l00187"></a><span class="lineno">  187</span>                <span class="keywordtype">float</span> dot = 0.0f;</div>
+<div class="line"><a id="l00187" name="l00187"></a><span class="lineno">  187</span>                <span class="keywordtype">float</span> <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> = 0.0f;</div>
 <div class="line"><a id="l00188" name="l00188"></a><span class="lineno">  188</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; D_h; ++d) {</div>
-<div class="line"><a id="l00189" name="l00189"></a><span class="lineno">  189</span>                    dot += q_head[d] * k_head[d];</div>
+<div class="line"><a id="l00189" name="l00189"></a><span class="lineno">  189</span>                    <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> += q_head[d] * k_head[d];</div>
 <div class="line"><a id="l00190" name="l00190"></a><span class="lineno">  190</span>                }</div>
 <div class="line"><a id="l00191" name="l00191"></a><span class="lineno">  191</span> </div>
-<div class="line"><a id="l00192" name="l00192"></a><span class="lineno">  192</span>                <span class="keywordtype">float</span> <a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a> = dot * scale;</div>
+<div class="line"><a id="l00192" name="l00192"></a><span class="lineno">  192</span>                <span class="keywordtype">float</span> <a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a> = <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> * scale;</div>
 <div class="line"><a id="l00193" name="l00193"></a><span class="lineno">  193</span>                scores[bi] = <a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a>;</div>
 <div class="line"><a id="l00194" name="l00194"></a><span class="lineno">  194</span>                <span class="keywordflow">if</span> (<a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a> &gt; m_block) {</div>
 <div class="line"><a id="l00195" name="l00195"></a><span class="lineno">  195</span>                    m_block = <a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a>;</div>
@@ -442,11 +442,11 @@ $(document).ready(function(){initNavTree('attention__flash__true_8c_source.html'
 <div class="line"><a id="l00293" name="l00293"></a><span class="lineno">  293</span>    }</div>
 <div class="line"><a id="l00294" name="l00294"></a><span class="lineno">  294</span> </div>
 <div class="line"><a id="l00295" name="l00295"></a><span class="lineno">  295</span>    sum0 = _mm512_add_ps(sum0, sum1);</div>
-<div class="line"><a id="l00296" name="l00296"></a><span class="lineno">  296</span>    <span class="keywordtype">float</span> dot = _mm512_reduce_add_ps(sum0);</div>
+<div class="line"><a id="l00296" name="l00296"></a><span class="lineno">  296</span>    <span class="keywordtype">float</span> <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> = _mm512_reduce_add_ps(sum0);</div>
 <div class="line"><a id="l00297" name="l00297"></a><span class="lineno">  297</span>    <span class="keywordflow">for</span> (; d &lt; D_h; ++d) {</div>
-<div class="line"><a id="l00298" name="l00298"></a><span class="lineno">  298</span>        dot += q[d] * k[d];</div>
+<div class="line"><a id="l00298" name="l00298"></a><span class="lineno">  298</span>        <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> += q[d] * k[d];</div>
 <div class="line"><a id="l00299" name="l00299"></a><span class="lineno">  299</span>    }</div>
-<div class="line"><a id="l00300" name="l00300"></a><span class="lineno">  300</span>    <span class="keywordflow">return</span> dot;</div>
+<div class="line"><a id="l00300" name="l00300"></a><span class="lineno">  300</span>    <span class="keywordflow">return</span> <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a>;</div>
 <div class="line"><a id="l00301" name="l00301"></a><span class="lineno">  301</span>}</div>
 <div class="line"><a id="l00302" name="l00302"></a><span class="lineno">  302</span><span class="comment"></span> </div>
 <div class="line"><a id="l00303" name="l00303"></a><span class="lineno">  303</span><span class="comment">/**</span></div>
@@ -501,9 +501,9 @@ $(document).ready(function(){initNavTree('attention__flash__true_8c_source.html'
 <div class="line"><a id="l00352" name="l00352"></a><span class="lineno">  352</span>                <span class="keyword">const</span> <span class="keywordtype">int</span> t_k = t_k0 + bi;</div>
 <div class="line"><a id="l00353" name="l00353"></a><span class="lineno">  353</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> *k_head = k_base + (size_t)t_k * stride;</div>
 <div class="line"><a id="l00354" name="l00354"></a><span class="lineno">  354</span> </div>
-<div class="line"><a id="l00355" name="l00355"></a><span class="lineno">  355</span>                <span class="keywordtype">float</span> dot = ck_dot_f32_avx512(q_head, k_head, D_h);</div>
+<div class="line"><a id="l00355" name="l00355"></a><span class="lineno">  355</span>                <span class="keywordtype">float</span> <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> = ck_dot_f32_avx512(q_head, k_head, D_h);</div>
 <div class="line"><a id="l00356" name="l00356"></a><span class="lineno">  356</span> </div>
-<div class="line"><a id="l00357" name="l00357"></a><span class="lineno">  357</span>                <span class="keywordtype">float</span> <a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a> = dot * scale;</div>
+<div class="line"><a id="l00357" name="l00357"></a><span class="lineno">  357</span>                <span class="keywordtype">float</span> <a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a> = <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> * scale;</div>
 <div class="line"><a id="l00358" name="l00358"></a><span class="lineno">  358</span>                scores[bi] = <a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a>;</div>
 <div class="line"><a id="l00359" name="l00359"></a><span class="lineno">  359</span>                <span class="keywordflow">if</span> (<a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a> &gt; m_block) {</div>
 <div class="line"><a id="l00360" name="l00360"></a><span class="lineno">  360</span>                    m_block = <a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a>;</div>
@@ -682,11 +682,11 @@ $(document).ready(function(){initNavTree('attention__flash__true_8c_source.html'
 <div class="line"><a id="l00533" name="l00533"></a><span class="lineno">  533</span>    }</div>
 <div class="line"><a id="l00534" name="l00534"></a><span class="lineno">  534</span> </div>
 <div class="line"><a id="l00535" name="l00535"></a><span class="lineno">  535</span>    __m256 sum = _mm256_add_ps(sum0, sum1);</div>
-<div class="line"><a id="l00536" name="l00536"></a><span class="lineno">  536</span>    <span class="keywordtype">float</span> dot = hsum256_ps(sum);</div>
+<div class="line"><a id="l00536" name="l00536"></a><span class="lineno">  536</span>    <span class="keywordtype">float</span> <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> = hsum256_ps(sum);</div>
 <div class="line"><a id="l00537" name="l00537"></a><span class="lineno">  537</span>    <span class="keywordflow">for</span> (; d &lt; D_h; ++d) {</div>
-<div class="line"><a id="l00538" name="l00538"></a><span class="lineno">  538</span>        dot += q[d] * k[d];</div>
+<div class="line"><a id="l00538" name="l00538"></a><span class="lineno">  538</span>        <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> += q[d] * k[d];</div>
 <div class="line"><a id="l00539" name="l00539"></a><span class="lineno">  539</span>    }</div>
-<div class="line"><a id="l00540" name="l00540"></a><span class="lineno">  540</span>    <span class="keywordflow">return</span> dot;</div>
+<div class="line"><a id="l00540" name="l00540"></a><span class="lineno">  540</span>    <span class="keywordflow">return</span> <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a>;</div>
 <div class="line"><a id="l00541" name="l00541"></a><span class="lineno">  541</span>}</div>
 <div class="line"><a id="l00542" name="l00542"></a><span class="lineno">  542</span> </div>
 <div class="line"><a id="l00543" name="l00543"></a><span class="lineno">  543</span><span class="keyword">static</span> <span class="keywordtype">void</span> attention_flash_decode_avx(</div>
@@ -738,9 +738,9 @@ $(document).ready(function(){initNavTree('attention__flash__true_8c_source.html'
 <div class="line"><a id="l00589" name="l00589"></a><span class="lineno">  589</span>                <span class="keyword">const</span> <span class="keywordtype">int</span> t_k = t_k0 + bi;</div>
 <div class="line"><a id="l00590" name="l00590"></a><span class="lineno">  590</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> *k_head = k_base + (size_t)t_k * stride;</div>
 <div class="line"><a id="l00591" name="l00591"></a><span class="lineno">  591</span> </div>
-<div class="line"><a id="l00592" name="l00592"></a><span class="lineno">  592</span>                <span class="keywordtype">float</span> dot = ck_dot_f32_avx(q_head, k_head, D_h);</div>
+<div class="line"><a id="l00592" name="l00592"></a><span class="lineno">  592</span>                <span class="keywordtype">float</span> <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> = ck_dot_f32_avx(q_head, k_head, D_h);</div>
 <div class="line"><a id="l00593" name="l00593"></a><span class="lineno">  593</span> </div>
-<div class="line"><a id="l00594" name="l00594"></a><span class="lineno">  594</span>                <span class="keywordtype">float</span> <a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a> = dot * scale;</div>
+<div class="line"><a id="l00594" name="l00594"></a><span class="lineno">  594</span>                <span class="keywordtype">float</span> <a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a> = <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> * scale;</div>
 <div class="line"><a id="l00595" name="l00595"></a><span class="lineno">  595</span>                scores[bi] = <a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a>;</div>
 <div class="line"><a id="l00596" name="l00596"></a><span class="lineno">  596</span>                <span class="keywordflow">if</span> (<a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a> &gt; m_block) {</div>
 <div class="line"><a id="l00597" name="l00597"></a><span class="lineno">  597</span>                    m_block = <a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a>;</div>
@@ -894,6 +894,7 @@ $(document).ready(function(){initNavTree('attention__flash__true_8c_source.html'
 <div class="line"><a id="l00740" name="l00740"></a><span class="lineno">  740</span>    <span class="comment">// For future optimization: free pre-allocated buffers</span></div>
 <div class="line"><a id="l00741" name="l00741"></a><span class="lineno">  741</span>}</div>
 </div>
+<div class="ttc" id="aattention__cross__token__major__checked_8c_html_a8645ebc14bd224f816fa123347a1e15e"><div class="ttname"><a href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a></div><div class="ttdeci">static double dot(const float *a, const float *b, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="attention__cross__token__major__checked_8c_source.html#l00018">attention_cross_token_major_checked.c:18</a></div></div>
 <div class="ttc" id="aattention__flash__true_8c_html_a0a172ab2e2319c20408ffdc9e98b3b42"><div class="ttname"><a href="attention__flash__true_8c.html#a0a172ab2e2319c20408ffdc9e98b3b42">ck_flash_attn_choose_tile_k</a></div><div class="ttdeci">int ck_flash_attn_choose_tile_k(int D_h)</div><div class="ttdef"><b>Definition</b> <a href="attention__flash__true_8c_source.html#l00108">attention_flash_true.c:108</a></div></div>
 <div class="ttc" id="aattention__flash__true_8c_html_a14d143c1096a9c4a36a888d799cee620"><div class="ttname"><a href="attention__flash__true_8c.html#a14d143c1096a9c4a36a888d799cee620">attention_flash_cleanup</a></div><div class="ttdeci">void attention_flash_cleanup(void)</div><div class="ttdoc">Clean up flash attention resources.</div><div class="ttdef"><b>Definition</b> <a href="attention__flash__true_8c_source.html#l00739">attention_flash_true.c:739</a></div></div>
 <div class="ttc" id="aattention__flash__true_8c_html_a2760bf1f7501f320fef261e81553243e"><div class="ttname"><a href="attention__flash__true_8c.html#a2760bf1f7501f320fef261e81553243e">attention_flash_decode_scalar</a></div><div class="ttdeci">static void attention_flash_decode_scalar(float *out, const float *q, const float *k, const float *v, int T_q, int T_k, int H, int D_h, float scale)</div><div class="ttdoc">Scalar flash-style attention (online softmax)</div><div class="ttdef"><b>Definition</b> <a href="attention__flash__true_8c_source.html#l00142">attention_flash_true.c:142</a></div></div>

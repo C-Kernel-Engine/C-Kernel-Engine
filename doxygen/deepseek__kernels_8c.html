@@ -491,11 +491,11 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">  585</span>                    local_scores[j] = -FLT_MAX;</div>
 <div class="line"><span class="lineno">  586</span>                    <span class="keywordflow">continue</span>;</div>
 <div class="line"><span class="lineno">  587</span>                }</div>
-<div class="line"><span class="lineno">  588</span>                <span class="keywordtype">float</span> dot = 0.0f;</div>
+<div class="line"><span class="lineno">  588</span>                <span class="keywordtype">float</span> <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> = 0.0f;</div>
 <div class="line"><span class="lineno">  589</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; dim; ++d) {</div>
-<div class="line"><span class="lineno">  590</span>                    dot += q[<a class="code hl_function" href="deepseek__kernels_8c.html#a715106bc2b7b505a7b03a77a53f4485c">ds_qkv_idx</a>(tq, h, d, heads, dim)] * k[<a class="code hl_function" href="deepseek__kernels_8c.html#a715106bc2b7b505a7b03a77a53f4485c">ds_qkv_idx</a>(tk, h, d, heads, dim)];</div>
+<div class="line"><span class="lineno">  590</span>                    <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> += q[<a class="code hl_function" href="deepseek__kernels_8c.html#a715106bc2b7b505a7b03a77a53f4485c">ds_qkv_idx</a>(tq, h, d, heads, dim)] * k[<a class="code hl_function" href="deepseek__kernels_8c.html#a715106bc2b7b505a7b03a77a53f4485c">ds_qkv_idx</a>(tk, h, d, heads, dim)];</div>
 <div class="line"><span class="lineno">  591</span>                }</div>
-<div class="line"><span class="lineno">  592</span>                local_scores[j] = dot * scale;</div>
+<div class="line"><span class="lineno">  592</span>                local_scores[j] = <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> * scale;</div>
 <div class="line"><span class="lineno">  593</span>                valid++;</div>
 <div class="line"><span class="lineno">  594</span>            }</div>
 <div class="line"><span class="lineno">  595</span> </div>
@@ -523,9 +523,10 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">  617</span>        }</div>
 <div class="line"><span class="lineno">  618</span>    }</div>
 <div class="line"><span class="lineno">  619</span>}</div>
+<div class="ttc" id="aattention__cross__token__major__checked_8c_html_a8645ebc14bd224f816fa123347a1e15e"><div class="ttname"><a href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a></div><div class="ttdeci">static double dot(const float *a, const float *b, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="attention__cross__token__major__checked_8c_source.html#l00018">attention_cross_token_major_checked.c:18</a></div></div>
 <div class="ttc" id="adeepseek__kernels_8c_html_ab29890e7b4d9fa96c07ae46d8b0c96f6"><div class="ttname"><a href="deepseek__kernels_8c.html#ab29890e7b4d9fa96c07ae46d8b0c96f6">ds_softmax</a></div><div class="ttdeci">static void ds_softmax(float *x, int n)</div><div class="ttdef"><b>Definition</b> <a href="deepseek__kernels_8c_source.html#l00546">deepseek_kernels.c:546</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="deepseek__kernels_8c_source.html#l00541">ds_qkv_idx()</a>, and <a class="el" href="deepseek__kernels_8c_source.html#l00546">ds_softmax()</a>.</p>
+<p class="reference">References <a class="el" href="attention__cross__token__major__checked_8c_source.html#l00018">dot()</a>, <a class="el" href="deepseek__kernels_8c_source.html#l00541">ds_qkv_idx()</a>, and <a class="el" href="deepseek__kernels_8c_source.html#l00546">ds_softmax()</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="deepseek__kernels_8c_source.html#l00683">deepseek_hybrid_attention_f32()</a>.</p>
 
@@ -3174,15 +3175,15 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno"> 1100</span>        <span class="keywordtype">float</span> max_score = -FLT_MAX;</div>
 <div class="line"><span class="lineno"> 1101</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; cache_len; ++j) {</div>
 <div class="line"><span class="lineno"> 1102</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *k_vec = k_cache + ((size_t)kv_h * (<span class="keywordtype">size_t</span>)max_seq_len + (size_t)j) * (size_t)cache_stride;</div>
-<div class="line"><span class="lineno"> 1103</span>            <span class="keywordtype">float</span> dot = 0.0f;</div>
+<div class="line"><span class="lineno"> 1103</span>            <span class="keywordtype">float</span> <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> = 0.0f;</div>
 <div class="line"><span class="lineno"> 1104</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; qk_head_dim; ++d) {</div>
-<div class="line"><span class="lineno"> 1105</span>                dot += bf16_phases</div>
+<div class="line"><span class="lineno"> 1105</span>                <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> += bf16_phases</div>
 <div class="line"><span class="lineno"> 1106</span>                    ? <a class="code hl_function" href="deepseek__kernels_8c.html#a66957d98f0155057099dfe060c13c55f">ds_mla_bf16_round</a>(q_vec[d]) * <a class="code hl_function" href="deepseek__kernels_8c.html#a66957d98f0155057099dfe060c13c55f">ds_mla_bf16_round</a>(k_vec[d])</div>
 <div class="line"><span class="lineno"> 1107</span>                    : q_vec[d] * k_vec[d];</div>
 <div class="line"><span class="lineno"> 1108</span>            }</div>
 <div class="line"><span class="lineno"> 1109</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> <a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a> = bf16_phases</div>
-<div class="line"><span class="lineno"> 1110</span>                ? <a class="code hl_function" href="deepseek__kernels_8c.html#a66957d98f0155057099dfe060c13c55f">ds_mla_bf16_round</a>(<a class="code hl_function" href="deepseek__kernels_8c.html#a66957d98f0155057099dfe060c13c55f">ds_mla_bf16_round</a>(dot) * scale)</div>
-<div class="line"><span class="lineno"> 1111</span>                : dot * scale;</div>
+<div class="line"><span class="lineno"> 1110</span>                ? <a class="code hl_function" href="deepseek__kernels_8c.html#a66957d98f0155057099dfe060c13c55f">ds_mla_bf16_round</a>(<a class="code hl_function" href="deepseek__kernels_8c.html#a66957d98f0155057099dfe060c13c55f">ds_mla_bf16_round</a>(<a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a>) * scale)</div>
+<div class="line"><span class="lineno"> 1111</span>                : <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> * scale;</div>
 <div class="line"><span class="lineno"> 1112</span>            scores[j] = <a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a>;</div>
 <div class="line"><span class="lineno"> 1113</span>            <span class="keywordflow">if</span> (<a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a> &gt; max_score) max_score = <a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a>;</div>
 <div class="line"><span class="lineno"> 1114</span>        }</div>
@@ -3217,7 +3218,7 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno"> 1143</span>}</div>
 <div class="ttc" id="atokenizer_8h_html_a86dbad16ac00b8aa3c450398e4f8b741"><div class="ttname"><a href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a></div><div class="ttdeci">int32_t float * score</div><div class="ttdef"><b>Definition</b> <a href="tokenizer_8h_source.html#l00328">tokenizer.h:328</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="deepseek__kernels_8c_source.html#l00468">ds_mla_bf16_round()</a>, and <a class="el" href="tokenizer_8h_source.html#l00328">score</a>.</p>
+<p class="reference">References <a class="el" href="attention__cross__token__major__checked_8c_source.html#l00018">dot()</a>, <a class="el" href="deepseek__kernels_8c_source.html#l00468">ds_mla_bf16_round()</a>, and <a class="el" href="tokenizer_8h_source.html#l00328">score</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="deepseek__kernels_8c_source.html#l01156">deepseek_mla_attention_decode_bf16_phases_workspace()</a>, and <a class="el" href="deepseek__kernels_8c_source.html#l01145">deepseek_mla_attention_decode_f32_workspace()</a>.</p>
 
@@ -3346,17 +3347,17 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">  738</span>        <span class="keywordtype">float</span> max_score = -FLT_MAX;</div>
 <div class="line"><span class="lineno">  739</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt;= t; ++j) {</div>
 <div class="line"><span class="lineno">  740</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *k_vec = k + <a class="code hl_function" href="deepseek__kernels_8c.html#a72c3e7c08b9cfa387d3b6b74837b8e22">ds_mla_thd_idx</a>(j, kv_h, 0, num_kv_heads, qk_head_dim);</div>
-<div class="line"><span class="lineno">  741</span>            <span class="keywordtype">float</span> dot = 0.0f;</div>
+<div class="line"><span class="lineno">  741</span>            <span class="keywordtype">float</span> <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> = 0.0f;</div>
 <div class="line"><span class="lineno">  742</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; qk_head_dim; ++d) {</div>
-<div class="line"><span class="lineno">  743</span>                dot += bf16_phases</div>
+<div class="line"><span class="lineno">  743</span>                <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> += bf16_phases</div>
 <div class="line"><span class="lineno">  744</span>                    ? <a class="code hl_function" href="deepseek__kernels_8c.html#a66957d98f0155057099dfe060c13c55f">ds_mla_bf16_round</a>(q_vec[d]) * <a class="code hl_function" href="deepseek__kernels_8c.html#a66957d98f0155057099dfe060c13c55f">ds_mla_bf16_round</a>(k_vec[d])</div>
 <div class="line"><span class="lineno">  745</span>                    : q_vec[d] * k_vec[d];</div>
 <div class="line"><span class="lineno">  746</span>            }</div>
 <div class="line"><span class="lineno">  747</span>            <span class="comment">/* Eager BF16 attention stores the QK matmul result before scaling,</span></div>
 <div class="line"><span class="lineno">  748</span><span class="comment">             * then stores the scaled score. Keep the FP32 provider unchanged. */</span></div>
 <div class="line"><span class="lineno">  749</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> <a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a> = bf16_phases</div>
-<div class="line"><span class="lineno">  750</span>                ? <a class="code hl_function" href="deepseek__kernels_8c.html#a66957d98f0155057099dfe060c13c55f">ds_mla_bf16_round</a>(<a class="code hl_function" href="deepseek__kernels_8c.html#a66957d98f0155057099dfe060c13c55f">ds_mla_bf16_round</a>(dot) * scale)</div>
-<div class="line"><span class="lineno">  751</span>                : dot * scale;</div>
+<div class="line"><span class="lineno">  750</span>                ? <a class="code hl_function" href="deepseek__kernels_8c.html#a66957d98f0155057099dfe060c13c55f">ds_mla_bf16_round</a>(<a class="code hl_function" href="deepseek__kernels_8c.html#a66957d98f0155057099dfe060c13c55f">ds_mla_bf16_round</a>(<a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a>) * scale)</div>
+<div class="line"><span class="lineno">  751</span>                : <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> * scale;</div>
 <div class="line"><span class="lineno">  752</span>            scores[j] = <a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a>;</div>
 <div class="line"><span class="lineno">  753</span>            <span class="keywordflow">if</span> (<a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a> &gt; max_score) max_score = <a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a>;</div>
 <div class="line"><span class="lineno">  754</span>        }</div>
@@ -3388,7 +3389,7 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">  780</span>    }</div>
 <div class="line"><span class="lineno">  781</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="deepseek__kernels_8c_source.html#l00468">ds_mla_bf16_round()</a>, <a class="el" href="deepseek__kernels_8c_source.html#l00180">ds_mla_thd_idx()</a>, and <a class="el" href="tokenizer_8h_source.html#l00328">score</a>.</p>
+<p class="reference">References <a class="el" href="attention__cross__token__major__checked_8c_source.html#l00018">dot()</a>, <a class="el" href="deepseek__kernels_8c_source.html#l00468">ds_mla_bf16_round()</a>, <a class="el" href="deepseek__kernels_8c_source.html#l00180">ds_mla_thd_idx()</a>, and <a class="el" href="tokenizer_8h_source.html#l00328">score</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="deepseek__kernels_8c_source.html#l00823">deepseek_mla_attention_bf16_phases_workspace()</a>, <a class="el" href="deepseek__kernels_8c_source.html#l00800">deepseek_mla_attention_f32_workspace()</a>, and <a class="el" href="deepseek__kernels_8c_source.html#l00854">ds_mla_attention_f32_work()</a>.</p>
 
@@ -4141,18 +4142,18 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">  429</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *row_d_weights = d_weights + (size_t)t * (<span class="keywordtype">size_t</span>)k;</div>
 <div class="line"><span class="lineno">  430</span>        <span class="keywordtype">float</span> *row_d_scores = d_scores + (size_t)t * (<span class="keywordtype">size_t</span>)n_experts_or_keys;</div>
 <div class="line"><span class="lineno">  431</span> </div>
-<div class="line"><span class="lineno">  432</span>        <span class="keywordtype">float</span> dot = 0.0f;</div>
+<div class="line"><span class="lineno">  432</span>        <span class="keywordtype">float</span> <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> = 0.0f;</div>
 <div class="line"><span class="lineno">  433</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; k; ++i) {</div>
 <div class="line"><span class="lineno">  434</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> idx = row_indices[i];</div>
 <div class="line"><span class="lineno">  435</span>            <span class="keywordflow">if</span> (idx &gt;= 0 &amp;&amp; idx &lt; n_experts_or_keys) {</div>
-<div class="line"><span class="lineno">  436</span>                dot += row_weights[i] * row_d_weights[i];</div>
+<div class="line"><span class="lineno">  436</span>                <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> += row_weights[i] * row_d_weights[i];</div>
 <div class="line"><span class="lineno">  437</span>            }</div>
 <div class="line"><span class="lineno">  438</span>        }</div>
 <div class="line"><span class="lineno">  439</span> </div>
 <div class="line"><span class="lineno">  440</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; k; ++i) {</div>
 <div class="line"><span class="lineno">  441</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> idx = row_indices[i];</div>
 <div class="line"><span class="lineno">  442</span>            <span class="keywordflow">if</span> (idx &gt;= 0 &amp;&amp; idx &lt; n_experts_or_keys) {</div>
-<div class="line"><span class="lineno">  443</span>                row_d_scores[idx] += row_weights[i] * (row_d_weights[i] - dot);</div>
+<div class="line"><span class="lineno">  443</span>                row_d_scores[idx] += row_weights[i] * (row_d_weights[i] - <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a>);</div>
 <div class="line"><span class="lineno">  444</span>            }</div>
 <div class="line"><span class="lineno">  445</span>        }</div>
 <div class="line"><span class="lineno">  446</span>    }</div>

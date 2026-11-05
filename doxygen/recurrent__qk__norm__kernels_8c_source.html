@@ -240,10 +240,10 @@ $(document).ready(function(){initNavTree('recurrent__qk__norm__kernels_8c_source
 <div class="line"><a id="l00100" name="l00100"></a><span class="lineno">  100</span>            <span class="keywordtype">float</span> *dx_head = dx_row + (size_t) head * (<span class="keywordtype">size_t</span>) head_dim;</div>
 <div class="line"><a id="l00101" name="l00101"></a><span class="lineno">  101</span> </div>
 <div class="line"><a id="l00102" name="l00102"></a><span class="lineno">  102</span>            <span class="keywordtype">double</span> sum_sq = 0.0;</div>
-<div class="line"><a id="l00103" name="l00103"></a><span class="lineno">  103</span>            <span class="keywordtype">double</span> dot = 0.0;</div>
+<div class="line"><a id="l00103" name="l00103"></a><span class="lineno">  103</span>            <span class="keywordtype">double</span> <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> = 0.0;</div>
 <div class="line"><a id="l00104" name="l00104"></a><span class="lineno">  104</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; head_dim; ++col) {</div>
 <div class="line"><a id="l00105" name="l00105"></a><span class="lineno">  105</span>                sum_sq += (double) (x_head[col] * x_head[col]);</div>
-<div class="line"><a id="l00106" name="l00106"></a><span class="lineno">  106</span>                dot += (double) (d_head[col] * x_head[col]);</div>
+<div class="line"><a id="l00106" name="l00106"></a><span class="lineno">  106</span>                <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> += (double) (d_head[col] * x_head[col]);</div>
 <div class="line"><a id="l00107" name="l00107"></a><span class="lineno">  107</span>            }</div>
 <div class="line"><a id="l00108" name="l00108"></a><span class="lineno">  108</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> norm = sqrtf((<span class="keywordtype">float</span>) sum_sq);</div>
 <div class="line"><a id="l00109" name="l00109"></a><span class="lineno">  109</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> inv_norm = 1.0f / fmaxf(norm, eps);</div>
@@ -253,7 +253,7 @@ $(document).ready(function(){initNavTree('recurrent__qk__norm__kernels_8c_source
 <div class="line"><a id="l00113" name="l00113"></a><span class="lineno">  113</span>                }</div>
 <div class="line"><a id="l00114" name="l00114"></a><span class="lineno">  114</span>                <span class="keywordflow">continue</span>;</div>
 <div class="line"><a id="l00115" name="l00115"></a><span class="lineno">  115</span>            }</div>
-<div class="line"><a id="l00116" name="l00116"></a><span class="lineno">  116</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> proj_scale = inv_norm * inv_norm * inv_norm * (float) dot;</div>
+<div class="line"><a id="l00116" name="l00116"></a><span class="lineno">  116</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> proj_scale = inv_norm * inv_norm * inv_norm * (float) <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a>;</div>
 <div class="line"><a id="l00117" name="l00117"></a><span class="lineno">  117</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; head_dim; ++col) {</div>
 <div class="line"><a id="l00118" name="l00118"></a><span class="lineno">  118</span>                dx_head[col] = inv_norm * d_head[col] - proj_scale * x_head[col];</div>
 <div class="line"><a id="l00119" name="l00119"></a><span class="lineno">  119</span>            }</div>
@@ -642,6 +642,7 @@ $(document).ready(function(){initNavTree('recurrent__qk__norm__kernels_8c_source
 <div class="line"><a id="l00484" name="l00484"></a><span class="lineno">  484</span>    <a class="code hl_function" href="recurrent__qk__norm__kernels_8c.html#a0dd8cd71bd25ed57393abeea5eeec5c4">recurrent_l2_norm_rows_backward_one</a>(d_k_out, k, d_k, rows, k_dim, head_dim, eps);</div>
 <div class="line"><a id="l00485" name="l00485"></a><span class="lineno">  485</span>}</div>
 </div>
+<div class="ttc" id="aattention__cross__token__major__checked_8c_html_a8645ebc14bd224f816fa123347a1e15e"><div class="ttname"><a href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a></div><div class="ttdeci">static double dot(const float *a, const float *b, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="attention__cross__token__major__checked_8c_source.html#l00018">attention_cross_token_major_checked.c:18</a></div></div>
 <div class="ttc" id="abf16__utils_8h_html"><div class="ttname"><a href="bf16__utils_8h.html">bf16_utils.h</a></div></div>
 <div class="ttc" id="abf16__utils_8h_html_a174b16a92b3a5972230d7519fc0c5aa3"><div class="ttname"><a href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a></div><div class="ttdeci">static uint16_t float_to_bf16(float f)</div><div class="ttdef"><b>Definition</b> <a href="bf16__utils_8h_source.html#l00090">bf16_utils.h:90</a></div></div>
 <div class="ttc" id="abf16__utils_8h_html_a314c3970fd5e2770d19b1bb49aefcf94"><div class="ttname"><a href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a></div><div class="ttdeci">static float bf16_to_float(uint16_t v)</div><div class="ttdef"><b>Definition</b> <a href="bf16__utils_8h_source.html#l00038">bf16_utils.h:38</a></div></div>

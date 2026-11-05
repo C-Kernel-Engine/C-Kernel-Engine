@@ -291,13 +291,13 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">   59</span>        <span class="keywordtype">float</span> *scores = score_scratch + h * key_tokens;</div>
 <div class="line"><span class="lineno">   60</span>        <span class="keywordtype">float</span> maximum = -FLT_MAX;</div>
 <div class="line"><span class="lineno">   61</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> f = 0; f &lt; key_tokens; ++f) {</div>
-<div class="line"><span class="lineno">   62</span>            <span class="keywordtype">float</span> dot = 0.0f;</div>
+<div class="line"><span class="lineno">   62</span>            <span class="keywordtype">float</span> <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> = 0.0f;</div>
 <div class="line"><span class="lineno">   63</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> d = 0; d &lt; head_dim; ++d) {</div>
 <div class="line"><span class="lineno">   64</span>                <span class="keywordflow">if</span> (!isfinite(q[d]) || !isfinite(k[f * head_dim + d]))</div>
 <div class="line"><span class="lineno">   65</span>                    <span class="keywordflow">return</span> -4;</div>
-<div class="line"><span class="lineno">   66</span>                dot = fmaf(q[d], k[f * head_dim + d], dot);</div>
+<div class="line"><span class="lineno">   66</span>                <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> = fmaf(q[d], k[f * head_dim + d], <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a>);</div>
 <div class="line"><span class="lineno">   67</span>            }</div>
-<div class="line"><span class="lineno">   68</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> <a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a> = dot * scale;</div>
+<div class="line"><span class="lineno">   68</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> <a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a> = <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> * scale;</div>
 <div class="line"><span class="lineno">   69</span>            <span class="keywordflow">if</span> (!isfinite(<a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a>)) <span class="keywordflow">return</span> -4;</div>
 <div class="line"><span class="lineno">   70</span>            scores[f] = <a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a>;</div>
 <div class="line"><span class="lineno">   71</span>            maximum = fmaxf(maximum, <a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a>);</div>
@@ -320,11 +320,12 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">   88</span>            dst[h * frame_capacity + f] = score_scratch[h * key_tokens + f];</div>
 <div class="line"><span class="lineno">   89</span>    <span class="keywordflow">return</span> 0;</div>
 <div class="line"><span class="lineno">   90</span>}</div>
+<div class="ttc" id="aattention__cross__token__major__checked_8c_html_a8645ebc14bd224f816fa123347a1e15e"><div class="ttname"><a href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a></div><div class="ttdeci">static double dot(const float *a, const float *b, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="attention__cross__token__major__checked_8c_source.html#l00018">attention_cross_token_major_checked.c:18</a></div></div>
 <div class="ttc" id="aattention__last__query__prob__trace__f32_8c_html_a1ff0b67b2b0112baf8806263d6462586"><div class="ttname"><a href="attention__last__query__prob__trace__f32_8c.html#a1ff0b67b2b0112baf8806263d6462586">ck_mul_size</a></div><div class="ttdeci">static int ck_mul_size(size_t a, size_t b, size_t *out)</div><div class="ttdef"><b>Definition</b> <a href="attention__last__query__prob__trace__f32_8c_source.html#l00009">attention_last_query_prob_trace_f32.c:9</a></div></div>
 <div class="ttc" id="aattention__last__query__prob__trace__f32_8c_html_ac635e40f2d0917eab92bbd04325f359e"><div class="ttname"><a href="attention__last__query__prob__trace__f32_8c.html#ac635e40f2d0917eab92bbd04325f359e">ck_overlap</a></div><div class="ttdeci">static int ck_overlap(const void *a, size_t na, const void *b, size_t nb)</div><div class="ttdef"><b>Definition</b> <a href="attention__last__query__prob__trace__f32_8c_source.html#l00015">attention_last_query_prob_trace_f32.c:15</a></div></div>
 <div class="ttc" id="atokenizer_8h_html_a86dbad16ac00b8aa3c450398e4f8b741"><div class="ttname"><a href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a></div><div class="ttdeci">int32_t float * score</div><div class="ttdef"><b>Definition</b> <a href="tokenizer_8h_source.html#l00328">tokenizer.h:328</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__last__query__prob__trace__f32_8c_source.html#l00009">ck_mul_size()</a>, <a class="el" href="attention__last__query__prob__trace__f32_8c_source.html#l00015">ck_overlap()</a>, and <a class="el" href="tokenizer_8h_source.html#l00328">score</a>.</p>
+<p class="reference">References <a class="el" href="attention__last__query__prob__trace__f32_8c_source.html#l00009">ck_mul_size()</a>, <a class="el" href="attention__last__query__prob__trace__f32_8c_source.html#l00015">ck_overlap()</a>, <a class="el" href="attention__cross__token__major__checked_8c_source.html#l00018">dot()</a>, and <a class="el" href="tokenizer_8h_source.html#l00328">score</a>.</p>
 
 </div>
 </div>

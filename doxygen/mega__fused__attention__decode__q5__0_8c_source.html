@@ -234,9 +234,9 @@ $(document).ready(function(){initNavTree('mega__fused__attention__decode__q5__0_
 <div class="line"><a id="l00098" name="l00098"></a><span class="lineno">   98</span> </div>
 <div class="line"><a id="l00099" name="l00099"></a><span class="lineno">   99</span>    <span class="comment">/* Compute dot products using optimized kernel */</span></div>
 <div class="line"><a id="l00100" name="l00100"></a><span class="lineno">  100</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; M; row++) {</div>
-<div class="line"><a id="l00101" name="l00101"></a><span class="lineno">  101</span>        <span class="keywordtype">float</span> dot;</div>
-<div class="line"><a id="l00102" name="l00102"></a><span class="lineno">  102</span>        <a class="code hl_function" href="mega__fused__attention__decode__q5__0_8c.html#a8744a3b1e4d1dc928fce050f111414a6">vec_dot_q5_0_q8_0</a>(K, &amp;dot, &amp;w_blocks[row * blocks_per_row], x_q8_scratch);</div>
-<div class="line"><a id="l00103" name="l00103"></a><span class="lineno">  103</span>        out[row] = dot + (bias ? bias[row] : 0.0f);</div>
+<div class="line"><a id="l00101" name="l00101"></a><span class="lineno">  101</span>        <span class="keywordtype">float</span> <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a>;</div>
+<div class="line"><a id="l00102" name="l00102"></a><span class="lineno">  102</span>        <a class="code hl_function" href="mega__fused__attention__decode__q5__0_8c.html#a8744a3b1e4d1dc928fce050f111414a6">vec_dot_q5_0_q8_0</a>(K, &amp;<a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a>, &amp;w_blocks[row * blocks_per_row], x_q8_scratch);</div>
+<div class="line"><a id="l00103" name="l00103"></a><span class="lineno">  103</span>        out[row] = <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> + (bias ? bias[row] : 0.0f);</div>
 <div class="line"><a id="l00104" name="l00104"></a><span class="lineno">  104</span>    }</div>
 <div class="line"><a id="l00105" name="l00105"></a><span class="lineno">  105</span>}</div>
 </div>
@@ -260,9 +260,9 @@ $(document).ready(function(){initNavTree('mega__fused__attention__decode__q5__0_
 <div class="line"><a id="l00122" name="l00122"></a><span class="lineno">  122</span> </div>
 <div class="line"><a id="l00123" name="l00123"></a><span class="lineno">  123</span>    <span class="comment">/* Compute dot products */</span></div>
 <div class="line"><a id="l00124" name="l00124"></a><span class="lineno">  124</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; M; row++) {</div>
-<div class="line"><a id="l00125" name="l00125"></a><span class="lineno">  125</span>        <span class="keywordtype">float</span> dot;</div>
-<div class="line"><a id="l00126" name="l00126"></a><span class="lineno">  126</span>        <a class="code hl_function" href="mega__fused__attention__decode__q5__0_8c.html#aea5f7a52ed3f21e0c6795766cfb28751">vec_dot_q8_0_q8_0</a>(K, &amp;dot, &amp;w_blocks[row * blocks_per_row], x_q8_scratch);</div>
-<div class="line"><a id="l00127" name="l00127"></a><span class="lineno">  127</span>        out[row] = dot + (bias ? bias[row] : 0.0f);</div>
+<div class="line"><a id="l00125" name="l00125"></a><span class="lineno">  125</span>        <span class="keywordtype">float</span> <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a>;</div>
+<div class="line"><a id="l00126" name="l00126"></a><span class="lineno">  126</span>        <a class="code hl_function" href="mega__fused__attention__decode__q5__0_8c.html#aea5f7a52ed3f21e0c6795766cfb28751">vec_dot_q8_0_q8_0</a>(K, &amp;<a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a>, &amp;w_blocks[row * blocks_per_row], x_q8_scratch);</div>
+<div class="line"><a id="l00127" name="l00127"></a><span class="lineno">  127</span>        out[row] = <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> + (bias ? bias[row] : 0.0f);</div>
 <div class="line"><a id="l00128" name="l00128"></a><span class="lineno">  128</span>    }</div>
 <div class="line"><a id="l00129" name="l00129"></a><span class="lineno">  129</span>}</div>
 </div>
@@ -488,9 +488,9 @@ $(document).ready(function(){initNavTree('mega__fused__attention__decode__q5__0_
 <div class="line"><a id="l00344" name="l00344"></a><span class="lineno">  344</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_row = (H * AD) / <a class="code hl_define" href="ckernel__quant_8h.html#a01fd96c19126075d365d10748fb254ac">QK5_0</a>;</div>
 <div class="line"><a id="l00345" name="l00345"></a><span class="lineno">  345</span> </div>
 <div class="line"><a id="l00346" name="l00346"></a><span class="lineno">  346</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> e = 0; e &lt; AE; e++) {</div>
-<div class="line"><a id="l00347" name="l00347"></a><span class="lineno">  347</span>        <span class="keywordtype">float</span> dot;</div>
-<div class="line"><a id="l00348" name="l00348"></a><span class="lineno">  348</span>        <a class="code hl_function" href="mega__fused__attention__decode__q5__0_8c.html#a8744a3b1e4d1dc928fce050f111414a6">vec_dot_q5_0_q8_0</a>(H * AD, &amp;dot, &amp;wo[e * blocks_per_row], x_q8_scratch);</div>
-<div class="line"><a id="l00349" name="l00349"></a><span class="lineno">  349</span>        output[e] = dot + (bo ? bo[e] : 0.0f) + residual[e];</div>
+<div class="line"><a id="l00347" name="l00347"></a><span class="lineno">  347</span>        <span class="keywordtype">float</span> <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a>;</div>
+<div class="line"><a id="l00348" name="l00348"></a><span class="lineno">  348</span>        <a class="code hl_function" href="mega__fused__attention__decode__q5__0_8c.html#a8744a3b1e4d1dc928fce050f111414a6">vec_dot_q5_0_q8_0</a>(H * AD, &amp;<a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a>, &amp;wo[e * blocks_per_row], x_q8_scratch);</div>
+<div class="line"><a id="l00349" name="l00349"></a><span class="lineno">  349</span>        output[e] = <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> + (bo ? bo[e] : 0.0f) + residual[e];</div>
 <div class="line"><a id="l00350" name="l00350"></a><span class="lineno">  350</span>    }</div>
 <div class="line"><a id="l00351" name="l00351"></a><span class="lineno">  351</span>}</div>
 </div>
@@ -642,13 +642,14 @@ $(document).ready(function(){initNavTree('mega__fused__attention__decode__q5__0_
 <div class="line"><a id="l00496" name="l00496"></a><span class="lineno">  496</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_row = (H * AD) / <a class="code hl_define" href="ckernel__quant_8h.html#a01fd96c19126075d365d10748fb254ac">QK5_0</a>;</div>
 <div class="line"><a id="l00497" name="l00497"></a><span class="lineno">  497</span> </div>
 <div class="line"><a id="l00498" name="l00498"></a><span class="lineno">  498</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> e = 0; e &lt; AE; e++) {</div>
-<div class="line"><a id="l00499" name="l00499"></a><span class="lineno">  499</span>            <span class="keywordtype">float</span> dot;</div>
-<div class="line"><a id="l00500" name="l00500"></a><span class="lineno">  500</span>            <a class="code hl_function" href="mega__fused__attention__decode__q5__0_8c.html#a8744a3b1e4d1dc928fce050f111414a6">vec_dot_q5_0_q8_0</a>(H * AD, &amp;dot, &amp;wo[e * blocks_per_row], x_q8_scratch);</div>
-<div class="line"><a id="l00501" name="l00501"></a><span class="lineno">  501</span>            output[e] = dot + (bo ? bo[e] : 0.0f) + residual[e];</div>
+<div class="line"><a id="l00499" name="l00499"></a><span class="lineno">  499</span>            <span class="keywordtype">float</span> <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a>;</div>
+<div class="line"><a id="l00500" name="l00500"></a><span class="lineno">  500</span>            <a class="code hl_function" href="mega__fused__attention__decode__q5__0_8c.html#a8744a3b1e4d1dc928fce050f111414a6">vec_dot_q5_0_q8_0</a>(H * AD, &amp;<a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a>, &amp;wo[e * blocks_per_row], x_q8_scratch);</div>
+<div class="line"><a id="l00501" name="l00501"></a><span class="lineno">  501</span>            output[e] = <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> + (bo ? bo[e] : 0.0f) + residual[e];</div>
 <div class="line"><a id="l00502" name="l00502"></a><span class="lineno">  502</span>        }</div>
 <div class="line"><a id="l00503" name="l00503"></a><span class="lineno">  503</span>    }</div>
 <div class="line"><a id="l00504" name="l00504"></a><span class="lineno">  504</span>}</div>
 </div>
+<div class="ttc" id="aattention__cross__token__major__checked_8c_html_a8645ebc14bd224f816fa123347a1e15e"><div class="ttname"><a href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a></div><div class="ttdeci">static double dot(const float *a, const float *b, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="attention__cross__token__major__checked_8c_source.html#l00018">attention_cross_token_major_checked.c:18</a></div></div>
 <div class="ttc" id="ackernel__quant_8h_html"><div class="ttname"><a href="ckernel__quant_8h.html">ckernel_quant.h</a></div><div class="ttdoc">Quantization block structures for weight-only quantization.</div></div>
 <div class="ttc" id="ackernel__quant_8h_html_a01fd96c19126075d365d10748fb254ac"><div class="ttname"><a href="ckernel__quant_8h.html#a01fd96c19126075d365d10748fb254ac">QK5_0</a></div><div class="ttdeci">#define QK5_0</div><div class="ttdef"><b>Definition</b> <a href="ckernel__quant_8h_source.html#l00068">ckernel_quant.h:68</a></div></div>
 <div class="ttc" id="ackernel__quant_8h_html_af13e8b7fd92d0f48c1cfca7161552d4a"><div class="ttname"><a href="ckernel__quant_8h.html#af13e8b7fd92d0f48c1cfca7161552d4a">QK8_0</a></div><div class="ttdeci">#define QK8_0</div><div class="ttdef"><b>Definition</b> <a href="ckernel__quant_8h_source.html#l00102">ckernel_quant.h:102</a></div></div>

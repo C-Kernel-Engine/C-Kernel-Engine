@@ -1,5 +1,11 @@
 var NAVTREEINDEX22 =
 {
+"structCKSection.html#aa030a13ebf6b121d19344e0249786fb8":[1,0,63,9],
+"structCKSection.html#aa21574168860ae278245951028df3ff0":[1,0,63,23],
+"structCKSection.html#aac276147ba6022404e73010f3ecd203b":[1,0,63,8],
+"structCKSection.html#aaccfd552f51b90a5aa47a76b0e4be4aa":[1,0,63,6],
+"structCKSection.html#aaf13683953b54b12a83a90251eb6a881":[1,0,63,26],
+"structCKSection.html#abd9ca87b9ad74cd97d0096872749fbc8":[1,0,63,27],
 "structCKSection.html#ac6da7ff6bd601c3b82ea4a5cebced72c":[1,0,63,4],
 "structCKSection.html#acd76a9f347cf9d4551e7c7cd33ca8f30":[1,0,63,13],
 "structCKSection.html#ad5514ab0802d55a8c9890b563467f25b":[1,0,63,19],
@@ -243,11 +249,5 @@ var NAVTREEINDEX22 =
 "structNUMATopology.html":[1,0,86],
 "structNUMATopology.html#a2a61e03ff57dd6feb35b92d1e03c0cdd":[1,0,86,0],
 "structNUMATopology.html#a4f4876ca34eed1e6c7732e611a13a674":[1,0,86,1],
-"structNUMATopology.html#ab0befa19cd4b9b08a68d901f301e9de7":[1,0,86,2],
-"structNetworkInterface.html":[1,0,83],
-"structNetworkInterface.html#a156a7eee11ff7323838f53326e25d730":[1,0,83,10],
-"structNetworkInterface.html#a260f76fbda4cab4180579f1bf506bf76":[1,0,83,7],
-"structNetworkInterface.html#a3a7b2f85e17f8e861ea160f94ade4a46":[1,0,83,13],
-"structNetworkInterface.html#a4d1f0f6d6f8e5ba00f06945274ac913b":[1,0,83,4],
-"structNetworkInterface.html#a5c06474416d85a879cf5ae151eaff925":[1,0,83,8]
+"structNUMATopology.html#ab0befa19cd4b9b08a68d901f301e9de7":[1,0,86,2]
 };

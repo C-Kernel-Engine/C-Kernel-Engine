@@ -1029,14 +1029,14 @@
     </header>
     <main>
 <h1>v8 training kernel capability ledger</h1>
-<p>Generated from <code>version/v8/kernel_maps/*.json</code> by <code>version/v8/scripts/build_training_capability_ledger_v8.py</code>. Source digest: <code>fcded66240e7f616fa7635fe03f4371fb72f7ddd149396ce4849e6ba0f54a48e</code>; provider maps: 480.</p>
+<p>Generated from <code>version/v8/kernel_maps/*.json</code> by <code>version/v8/scripts/build_training_capability_ledger_v8.py</code>. Source digest: <code>7d30ff9b54892df3333adbb6433ff7806c5c6592e00f1c9ec926e329fef7a0cb</code>; provider maps: 482.</p>
 <p>This is a <strong>map inventory, not a training PASS</strong>. A backward declaration means a backward provider is registered; it does not prove matching geometry, selection by a generated circuit, or executed PyTorch parity. BF16-tagged includes storage or arithmetic tags. Quantized forward maps do not imply quantized-base gradients or QLoRA support. Direct executed evidence: <code>NOT_MEASURED_BY_MAP_INVENTORY</code>.</p>
 <p><strong>Authoring, lowering, and execution are separate.</strong> The public <code>cke.nn</code> module list below comes from its Python source. A class existing there does not establish that v8 can lower it, select a backward provider, or certify a generated training run. Exact kernel-map operation names are not automatically equivalent to Python modules.</p>
 <table class="table"><thead><tr><th>Dtype family</th><th>Provider maps</th><th>Forward or unspecified</th><th>Declared training forward</th><th>Declared backward</th><th>Backward-named without mode</th><th>Maps with registered tests</th></tr></thead><tbody>
-<tr><td>fp32-tagged</td><td>307</td><td>283</td><td>15</td><td>24</td><td>5</td><td>266</td></tr>
+<tr><td>fp32-tagged</td><td>308</td><td>284</td><td>15</td><td>24</td><td>5</td><td>267</td></tr>
 <tr><td>bf16-tagged</td><td>87</td><td>87</td><td>0</td><td>0</td><td>0</td><td>67</td></tr>
 <tr><td>quantized</td><td>64</td><td>64</td><td>0</td><td>0</td><td>0</td><td>44</td></tr>
-<tr><td>unspecified</td><td>22</td><td>22</td><td>0</td><td>0</td><td>0</td><td>16</td></tr>
+<tr><td>unspecified</td><td>23</td><td>23</td><td>0</td><td>0</td><td>0</td><td>17</td></tr>
 </tbody></table>
 <h2>Python authoring modules</h2>
 <p>Source digest: <code>3308bfeffc395b157306feabd2b5ab57055940ed4ceba2bab3f56207f4e3e506</code>. Compiler and backward linkage: <code>NOT_ASSESSED_BY_MAP_INVENTORY</code>.</p>
@@ -1105,6 +1105,7 @@
 <tr><td>fp32-tagged</td><td>assistant_layer_scale</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>attention</td><td>23</td><td>attention_backward_causal_head_major_gqa</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>attention_causal_bounded</td><td>1</td><td>—</td><td>—</td></tr>
+<tr><td>fp32-tagged</td><td>attention_cross_token_major_checked</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>attention_decode_append_checked</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>attention_full_token_major_checked</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>attention_last_query_prob_trace</td><td>1</td><td>—</td><td>—</td></tr>
@@ -1289,7 +1290,7 @@
 <tr><td>quantized</td><td>shared_relu2_expert_mlp</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>quantized</td><td>shared_swiglu_expert_mlp</td><td>3</td><td>—</td><td>—</td></tr>
 <tr><td>unspecified</td><td>attention</td><td>7</td><td>—</td><td>—</td></tr>
-<tr><td>unspecified</td><td>attention_sliding</td><td>2</td><td>—</td><td>—</td></tr>
+<tr><td>unspecified</td><td>attention_sliding</td><td>3</td><td>—</td><td>—</td></tr>
 <tr><td>unspecified</td><td>concat_i32_checked</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>unspecified</td><td>copy_i32_span_checked</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>unspecified</td><td>embedding</td><td>1</td><td>—</td><td>—</td></tr>
@@ -1304,7 +1305,7 @@
 <tr><td>unspecified</td><td>speculative_commit_or_reject</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>unspecified</td><td>tokenizer</td><td>1</td><td>—</td><td>—</td></tr>
 </tbody></table>
-<details><summary>All 480 provider maps</summary>
+<details><summary>All 482 provider maps</summary>
 <table class="table"><thead><tr><th>Map</th><th>Provider ID</th><th>Operation</th><th>Dtype family</th><th>Backward mode</th><th>Registered test</th></tr></thead><tbody>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/adamw_update_f32.json">version/v8/kernel_maps/adamw_update_f32.json</a></td><td>adamw_update_f32</td><td>optimizer</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/add_rows_checked_f32.json">version/v8/kernel_maps/add_rows_checked_f32.json</a></td><td>add_rows_checked_f32</td><td>add_rows_checked</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
@@ -1314,6 +1315,7 @@
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/assistant_layer_scale_forward.json">version/v8/kernel_maps/assistant_layer_scale_forward.json</a></td><td>assistant_layer_scale_forward</td><td>assistant_layer_scale</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/attention_backward_causal_head_major_gqa.json">version/v8/kernel_maps/attention_backward_causal_head_major_gqa.json</a></td><td>attention_backward_causal_head_major_gqa</td><td>attention</td><td>fp32-tagged</td><td>declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/attention_causal_head_major_bounded_f32.json">version/v8/kernel_maps/attention_causal_head_major_bounded_f32.json</a></td><td>attention_causal_head_major_bounded_f32</td><td>attention_causal_bounded</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/attention_cross_token_major_checked_f32.json">version/v8/kernel_maps/attention_cross_token_major_checked_f32.json</a></td><td>attention_cross_token_major_checked_f32</td><td>attention_cross_token_major_checked</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/attention_decode_append_checked_f32.json">version/v8/kernel_maps/attention_decode_append_checked_f32.json</a></td><td>attention_decode_append_checked_f32</td><td>attention_decode_append_checked</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/attention_decode_flash.json">version/v8/kernel_maps/attention_decode_flash.json</a></td><td>attention_forward_decode_head_major_gqa_flash</td><td>attention</td><td>fp32-tagged</td><td>not declared</td><td>not registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/attention_decode_flash_f16kv.json">version/v8/kernel_maps/attention_decode_flash_f16kv.json</a></td><td>attention_forward_decode_head_major_gqa_flash_f16kv</td><td>attention</td><td>fp32-tagged</td><td>not declared</td><td>not registered</td></tr>
@@ -1339,6 +1341,7 @@
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/attention_forward_causal_head_major_gqa_prefill_append_f16cache_gemma4_fp16_q_prob.json">version/v8/kernel_maps/attention_forward_causal_head_major_gqa_prefill_append_f16cache_gemma4_fp16_q_prob.json</a></td><td>attention_forward_causal_head_major_gqa_prefill_append_f16cache_gemma4_fp16_q_prob</td><td>attention</td><td>unspecified</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/attention_forward_causal_head_major_gqa_prefill_append_f16cache_single_range.json">version/v8/kernel_maps/attention_forward_causal_head_major_gqa_prefill_append_f16cache_single_range.json</a></td><td>attention_forward_causal_head_major_gqa_prefill_append_f16cache_single_range</td><td>attention</td><td>unspecified</td><td>not declared</td><td>not registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/attention_forward_causal_head_major_gqa_prefill_append_f16cache_sliding_gemma4.json">version/v8/kernel_maps/attention_forward_causal_head_major_gqa_prefill_append_f16cache_sliding_gemma4.json</a></td><td>attention_forward_causal_head_major_gqa_prefill_append_f16cache_sliding_gemma4</td><td>attention_sliding</td><td>unspecified</td><td>not declared</td><td>registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/attention_forward_causal_head_major_gqa_prefill_append_f16cache_sliding_gemma4_fp16_q_prob.json">version/v8/kernel_maps/attention_forward_causal_head_major_gqa_prefill_append_f16cache_sliding_gemma4_fp16_q_prob.json</a></td><td>attention_forward_causal_head_major_gqa_prefill_append_f16cache_sliding_gemma4_fp16_q_prob</td><td>attention_sliding</td><td>unspecified</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/attention_forward_causal_head_major_gqa_prefill_full_bf16cache_pytorch_contract.json">version/v8/kernel_maps/attention_forward_causal_head_major_gqa_prefill_full_bf16cache_pytorch_contract.json</a></td><td>attention_forward_causal_head_major_gqa_prefill_full_bf16cache_pytorch_contract</td><td>attention</td><td>bf16-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/attention_forward_causal_head_major_shared_kv_gemma4.json">version/v8/kernel_maps/attention_forward_causal_head_major_shared_kv_gemma4.json</a></td><td>attention_forward_causal_head_major_shared_kv_gemma4</td><td>attention</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/attention_forward_causal_head_major_shared_kv_sliding_gemma4.json">version/v8/kernel_maps/attention_forward_causal_head_major_shared_kv_sliding_gemma4.json</a></td><td>attention_forward_causal_head_major_shared_kv_sliding_gemma4</td><td>attention_sliding</td><td>fp32-tagged</td><td>not declared</td><td>not registered</td></tr>
