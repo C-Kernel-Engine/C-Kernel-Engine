@@ -1,4 +1,4 @@
-// Authoritative Q5_K x Q8_K parity against llama.cpp's production CPU graph.
+// Q5_K x Q8_K provider contracts against llama.cpp and decoded arithmetic.
 
 #include "ggml.h"
 #include "ggml-backend.h"
@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cfloat>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -24,6 +25,7 @@ void gemm_nt_q5_k_prepared_m4(const float *, const void *, const float *, float 
 void gemm_nt_q5_k_prepared_q8_m4_nrange(
         const void *, const void *, const float *, float *,
         int, int, int, int, int);
+const char *ck_q5_k_provider_name(void);
 void ggml_vec_dot_q5_K_q8_K(
         int, float *, size_t, const void *, size_t, const void *, size_t, int);
 }
@@ -86,6 +88,126 @@ static bool compare_f32(const char * label, const float * ck, const float * llam
     return false;
 }
 
+// Decode the serialized operands independently of either dot implementation.
+// Integer Q5/Q8 products are exact in both providers; only the superblock
+// scale/minimum products and their reduction use FP32 arithmetic. The bound
+// below allows 32 FP32 rounding units per absolute scale/minimum term: four
+// superblocks, eight live partial sums, and the final horizontal reduction.
+// It is deliberately based on operand magnitudes, so cancellation cannot
+// conceal an error and the threshold does not depend on this fixture's result.
+struct arithmetic_reference {
+    std::vector<long double> values;
+    std::vector<long double> magnitudes;
+};
+
+static void unpack_scale_min(const uint8_t *packed, int group, int &scale, int &minimum) {
+    if (group < 4) {
+        scale = packed[group] & 63;
+        minimum = packed[group + 4] & 63;
+    } else {
+        scale = (packed[group + 4] & 15) | ((packed[group - 4] >> 6) << 4);
+        minimum = (packed[group + 4] >> 4) | ((packed[group] >> 6) << 4);
+    }
+}
+
+static arithmetic_reference reference_q5_q8(
+        const std::vector<unsigned char> &weights,
+        const std::vector<unsigned char> &activations, int m, int n, int k) {
+    const int blocks = k / QK_K;
+    const auto * w = reinterpret_cast<const block_q5_K *>(weights.data());
+    const auto * x = reinterpret_cast<const block_q8_K *>(activations.data());
+    std::vector<long double> w_values(static_cast<size_t>(n) * k);
+    std::vector<long double> w_magnitudes(w_values.size());
+    std::vector<long double> x_values(static_cast<size_t>(m) * k);
+    for (int row = 0; row < n; ++row) {
+        for (int block = 0; block < blocks; ++block) {
+            const block_q5_K &wb = w[static_cast<size_t>(row) * blocks + block];
+            const long double d = ggml_fp16_to_fp32(wb.data.data.d);
+            const long double dmin = ggml_fp16_to_fp32(wb.data.data.dmin);
+            for (int group = 0; group < 8; ++group) {
+                int scale, minimum;
+                unpack_scale_min(wb.scales, group, scale, minimum);
+                for (int i = 0; i < 32; ++i) {
+                    const int packed_index = (group / 2) * 32 + i;
+                    const int low = group & 1 ? wb.qs[packed_index] >> 4
+                                              : wb.qs[packed_index] & 15;
+                    const int quant = low + ((wb.qh[i] & (1u << group)) ? 16 : 0);
+                    const long double positive = d * scale * quant;
+                    const long double negative = dmin * minimum;
+                    const size_t index = static_cast<size_t>(row) * k + block * QK_K + group * 32 + i;
+                    w_values[index] = positive - negative;
+                    w_magnitudes[index] = std::fabs(positive) + std::fabs(negative);
+                }
+            }
+        }
+    }
+    for (int row = 0; row < m; ++row) {
+        for (int block = 0; block < blocks; ++block) {
+            const block_q8_K &xb = x[static_cast<size_t>(row) * blocks + block];
+            for (int i = 0; i < QK_K; ++i) {
+                x_values[static_cast<size_t>(row) * k + block * QK_K + i] =
+                    static_cast<long double>(xb.d) * xb.qs[i];
+            }
+        }
+    }
+    arithmetic_reference result;
+    result.values.resize(static_cast<size_t>(m) * n);
+    result.magnitudes.resize(result.values.size());
+    for (int row = 0; row < m; ++row) {
+        for (int col = 0; col < n; ++col) {
+            long double sum = 0.0L, magnitude = 0.0L;
+            const size_t x_base = static_cast<size_t>(row) * k;
+            const size_t w_base = static_cast<size_t>(col) * k;
+            for (int i = 0; i < k; ++i) {
+                sum += w_values[w_base + i] * x_values[x_base + i];
+                magnitude += w_magnitudes[w_base + i] * std::fabs(x_values[x_base + i]);
+            }
+            const size_t index = static_cast<size_t>(row) * n + col;
+            result.values[index] = sum;
+            result.magnitudes[index] = magnitude;
+        }
+    }
+    return result;
+}
+
+static long double reference_limit(const arithmetic_reference &reference, size_t index) {
+    constexpr long double fp32_unit = static_cast<long double>(FLT_EPSILON) / 2;
+    return 32 * fp32_unit * reference.magnitudes[index] +
+           2 * fp32_unit * std::fabs(reference.values[index]);
+}
+
+static bool compare_reference(const char *label, const float *actual,
+                              const arithmetic_reference &reference) {
+    size_t failed = 0, worst = 0;
+    long double max_error = 0.0L, max_ratio = 0.0L, squared = 0.0L;
+    for (size_t i = 0; i < reference.values.size(); ++i) {
+        const long double error = std::fabs(static_cast<long double>(actual[i]) - reference.values[i]);
+        const long double limit = reference_limit(reference, i);
+        if (!std::isfinite(actual[i]) || error > limit) ++failed;
+        if (error > max_error) { max_error = error; worst = i; }
+        if (limit > 0 && error / limit > max_ratio) max_ratio = error / limit;
+        squared += error * error;
+    }
+    std::printf("  %-34s failures=%zu/%zu worst=%zu max_abs=%.9Lg rmse=%.9Lg "
+                "max_bound_ratio=%.4Lg [%s]\n", label, failed,
+                reference.values.size(), worst, max_error,
+                std::sqrt(squared / reference.values.size()), max_ratio,
+                failed ? "FAIL" : "PASS");
+    return failed == 0;
+}
+
+static void report_distinct_reduction(const char *label, const float *a, const float *b,
+                                      size_t count) {
+    size_t different = 0;
+    float max_abs = 0.0f;
+    for (size_t i = 0; i < count; ++i) {
+        if (std::memcmp(a + i, b + i, sizeof(float)) != 0) ++different;
+        max_abs = std::max(max_abs, std::fabs(a[i] - b[i]));
+    }
+    std::printf("  %-34s different=%zu/%zu max_abs=%.9g [DISTINCT REDUCTION]\n",
+                label, different, count, max_abs);
+}
+
 static bool llama_graph(
         const std::vector<unsigned char> & weights,
         const std::vector<float> & activations,
@@ -138,8 +260,12 @@ static bool llama_graph(
 }
 
 static bool run_case(const case_spec & spec) {
-    std::printf("\n%s M=%d N=%d K=%d threads=%s\n", spec.name, spec.m, spec.n, spec.k,
-            std::getenv("CK_NUM_THREADS") ? std::getenv("CK_NUM_THREADS") : "1");
+    const char *tiled_setting = std::getenv("GGML_CPU_TILED_MM");
+    const bool tiled_disabled = tiled_setting && std::strcmp(tiled_setting, "0") == 0;
+    std::printf("\n%s M=%d N=%d K=%d threads=%s CK_provider=%s llama_tiled_setting=%s\n",
+            spec.name, spec.m, spec.n, spec.k,
+            std::getenv("CK_NUM_THREADS") ? std::getenv("CK_NUM_THREADS") : "1",
+            ck_q5_k_provider_name(), tiled_setting ? tiled_setting : "default");
     std::vector<float> activations(static_cast<size_t>(spec.m) * spec.k);
     std::vector<float> weights_f32(static_cast<size_t>(spec.n) * spec.k);
     for (int row = 0; row < spec.m; ++row) {
@@ -226,14 +352,61 @@ static bool run_case(const case_spec & spec) {
         production = canonical;
         std::printf("  %-34s x86 Q5 uses canonical graph [SKIP]\n", "llama Q5 repack graph");
     }
-    pass &= compare_f32("llama leaf vs canonical graph", leaf.data(), canonical.data(), leaf.size());
+    const arithmetic_reference reference = reference_q5_q8(
+        weights, llama_q8, spec.m, spec.n, spec.k);
+    pass &= compare_reference("llama leaf vs math", leaf.data(), reference);
+    pass &= compare_reference("llama graph vs math", canonical.data(), reference);
     if (llama_q5_repack_selected) {
-        pass &= compare_f32("llama canonical vs repack graph", canonical.data(), production.data(), leaf.size());
+        pass &= compare_reference("llama repack vs math", production.data(), reference);
     }
-    pass &= compare_f32("CK adapter vs llama production", ck.data(), production.data(), leaf.size());
+    pass &= compare_reference("CK adapter vs math", ck.data(), reference);
+    if (spec.m < 8 || tiled_disabled) {
+        // Below the pinned llama.cpp tiled-matmul admission floor, the graph
+        // calls the same leaf reduction. Different execution strategies are
+        // compared to the mathematical reference below instead.
+        pass &= compare_f32("llama leaf vs canonical graph", leaf.data(), canonical.data(), leaf.size());
+    } else {
+        report_distinct_reduction("llama leaf vs canonical graph",
+                                  leaf.data(), canonical.data(), leaf.size());
+    }
+    if (llama_q5_repack_selected) {
+        report_distinct_reduction("llama canonical vs repack graph",
+                                  canonical.data(), production.data(), leaf.size());
+    }
+    if (spec.m == 1 && spec.k == QK_K) {
+        pass &= compare_f32("CK adapter vs llama production", ck.data(), production.data(), leaf.size());
+    } else {
+        report_distinct_reduction("CK adapter vs llama production",
+                                  ck.data(), production.data(), leaf.size());
+    }
     pass &= compare_f32("CK prepared vs established", prepared_output.data(), ck.data(), leaf.size());
     pass &= compare_f32("CK prepared M4 vs established", prepared_m4_output.data(), ck.data(), leaf.size());
     pass &= compare_f32("CK prepared N-split vs established", prepared_nsplit_output.data(), ck.data(), leaf.size());
+    const float corrupted = ck[0] + static_cast<float>(
+        std::max(0.01L, 4 * reference_limit(reference, 0)));
+    const bool detected = std::fabs(static_cast<long double>(corrupted) - reference.values[0]) >
+                          reference_limit(reference, 0);
+    std::printf("  %-34s wrong output %s\n", "math negative control",
+                detected ? "[DETECTED]" : "[FAIL]");
+    pass &= detected;
+    std::vector<unsigned char> wrong_scale_q8 = llama_q8;
+    reinterpret_cast<block_q8_K *>(wrong_scale_q8.data())[0].d *= 1.25f;
+    size_t scale_detected_at = static_cast<size_t>(spec.n);
+    for (int col = 0; col < spec.n; ++col) {
+        float wrong_scale_output;
+        ggml_vec_dot_q5_K_q8_K(spec.k, &wrong_scale_output, 0,
+                weights.data() + static_cast<size_t>(col) * q5_row, 0,
+                wrong_scale_q8.data(), 0, 1);
+        if (std::fabs(static_cast<long double>(wrong_scale_output) - reference.values[col]) >
+                reference_limit(reference, col)) {
+            scale_detected_at = static_cast<size_t>(col);
+            break;
+        }
+    }
+    std::printf("  %-34s changed Q8_K scale %s (column=%zu)\n",
+                "operand negative control", scale_detected_at < static_cast<size_t>(spec.n)
+                ? "[DETECTED]" : "[FAIL]", scale_detected_at);
+    pass &= scale_detected_at < static_cast<size_t>(spec.n);
     return pass;
 }
 
@@ -247,6 +420,7 @@ int main(int argc, char ** argv) {
         {"q8_rounding_boundary", 1, 64, 1024},
         {"qwen35_recurrent_decode", 1, 6144, 1024},
         {"short_prefill", 7, 512, 1024},
+        {"qwen35_recurrent_prefill", 33, 6144, 1024},
     };
     const case_spec full_cases[] = {
         {"decode_leaf", 1, 64, 256},
