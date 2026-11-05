@@ -4629,6 +4629,17 @@
       "position_transform": null,
       "description": "Checked ordered group-count expansion to exact row and owner indices. Invalid counts or capacities reject before either output is written."
     },
+    "attention_cross_token_major_scalar_fp64_dot_fp32_scores_fp64_softmax": {
+      "operator_family": "attention",
+      "status": "validated",
+      "storage": {"input": "fp32", "weight": "none", "output": "fp32"},
+      "compute": {"input": "fp32", "weight": "none", "accumulator": "fp64", "contraction": "disabled", "evaluation_order": "independent_query_and_memory_lengths_ascending_head_key_and_channel"},
+      "rounding": {"mode": "rne", "points": ["activation_intermediate_store", "softmax_probability_store", "output_store"]},
+      "reduction": {"kind": "sum", "order": "ascending_index", "partial_accumulator": "fp64", "merge_order": "none"},
+      "threading": {"work_partition": "serial", "split_strategy": "serial", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Checked unmasked token-major cross attention with separate query and memory lengths, FP64 dot/weighted accumulation, FP32 rounded scores and FP64 softmax denominator. Staged output remains untouched on rejection."
+    },
     "equal_i32_scalar_exact": {
       "operator_family": "equal_i32_scalar_checked",
       "status": "validated",
