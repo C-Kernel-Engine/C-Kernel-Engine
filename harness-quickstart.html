@@ -1213,6 +1213,22 @@ and reported both outcomes correctly in 702.4 seconds, with 3,044–3,167 input 
 These two bounded tasks do not establish longer-context or repeatability certification.
 Test cancellation and subagents separately. NVIDIA Dynamo is serving infrastructure,
 not the LangChain harness.</p>
+<p>A later pinned 20K run on Ryzen completed two successive restricted Deep Agents
+read → edit → validator tasks on one loaded instance, with a trusted passing
+assertion each time. A separate injected transient read failure was returned to
+the agent, retried against the same file, and followed by a successful edit and
+validator. The optional <code>scripts/local_nemotron_nightly.py</code> lane runs
+fresh → injected failure/recovery → fresh tasks against one isolated loopback
+service. Its private JSON configuration pins the bundle libraries and weights,
+service source commit, session library, model identity, client Python, context,
+threads, output allowance, and a cgroup memory cap. Invoke it with
+<code>--config /path/to/pinned.json --state-dir /path/to/state</code>; a
+<code>PAUSE</code> file in the state directory prevents startup. The lane writes
+the current attempt to <code>latest.json</code> before any work, retains every
+child report, and stops only its own service. Missing assets or insufficient
+memory are <code>NOT_TESTED</code>, while wrong identities and failed tasks are
+<code>FAIL</code>. These checks certify a bounded workflow on the pinned artifact;
+they do not establish native recurrent batching or general agent reliability.</p>
 <h3>Cohere text and LangChain</h3>
 <p>The same <code>ChatOpenAI</code> connection above can test plain chat with a deployed Cohere
 Command R7B model ID. Keep tools disabled for its selected imported chat-only template. Cohere
