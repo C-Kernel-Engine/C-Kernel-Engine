@@ -1,10 +1,10 @@
 <!-- TITLE: v8 Training Kernel Capability Ledger -->
 <h1>v8 training kernel capability ledger</h1>
-<p>Generated from <code>version/v8/kernel_maps/*.json</code> by <code>version/v8/scripts/build_training_capability_ledger_v8.py</code>. Source digest: <code>4fdfd3ba755a1c97ac4c9636126e9c2afc12fe761de134c7812d097a8bd37294</code>; provider maps: 476.</p>
+<p>Generated from <code>version/v8/kernel_maps/*.json</code> by <code>version/v8/scripts/build_training_capability_ledger_v8.py</code>. Source digest: <code>688529cdedd89dba96474ace7728daaf1608cc9f29258e20c1f6e8a023e74e5f</code>; provider maps: 477.</p>
 <p>This is a <strong>map inventory, not a training PASS</strong>. A backward declaration means a backward provider is registered; it does not prove matching geometry, selection by a generated circuit, or executed PyTorch parity. BF16-tagged includes storage or arithmetic tags. Quantized forward maps do not imply quantized-base gradients or QLoRA support. Direct executed evidence: <code>NOT_MEASURED_BY_MAP_INVENTORY</code>.</p>
 <p><strong>Authoring, lowering, and execution are separate.</strong> The public <code>cke.nn</code> module list below comes from its Python source. A class existing there does not establish that v8 can lower it, select a backward provider, or certify a generated training run. Exact kernel-map operation names are not automatically equivalent to Python modules.</p>
 <table class="table"><thead><tr><th>Dtype family</th><th>Provider maps</th><th>Forward or unspecified</th><th>Declared training forward</th><th>Declared backward</th><th>Backward-named without mode</th><th>Maps with registered tests</th></tr></thead><tbody>
-<tr><td>fp32-tagged</td><td>305</td><td>281</td><td>15</td><td>24</td><td>5</td><td>264</td></tr>
+<tr><td>fp32-tagged</td><td>306</td><td>282</td><td>15</td><td>24</td><td>5</td><td>265</td></tr>
 <tr><td>bf16-tagged</td><td>87</td><td>87</td><td>0</td><td>0</td><td>0</td><td>67</td></tr>
 <tr><td>quantized</td><td>64</td><td>64</td><td>0</td><td>0</td><td>0</td><td>44</td></tr>
 <tr><td>unspecified</td><td>20</td><td>20</td><td>0</td><td>0</td><td>0</td><td>14</td></tr>
@@ -234,6 +234,7 @@
 <tr><td>fp32-tagged</td><td>swiglu</td><td>4</td><td>swiglu_backward_exact</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>tanh_strided_checked</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>token_head_layout_checked</td><td>2</td><td>—</td><td>—</td></tr>
+<tr><td>fp32-tagged</td><td>token_span_mean_checked</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>transpose_strided_checked</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>v_norm</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>vision_patchify</td><td>2</td><td>—</td><td>—</td></tr>
@@ -272,7 +273,7 @@
 <tr><td>unspecified</td><td>speculative_commit_or_reject</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>unspecified</td><td>tokenizer</td><td>1</td><td>—</td><td>—</td></tr>
 </tbody></table>
-<details><summary>All 476 provider maps</summary>
+<details><summary>All 477 provider maps</summary>
 <table class="table"><thead><tr><th>Map</th><th>Provider ID</th><th>Operation</th><th>Dtype family</th><th>Backward mode</th><th>Registered test</th></tr></thead><tbody>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/adamw_update_f32.json">version/v8/kernel_maps/adamw_update_f32.json</a></td><td>adamw_update_f32</td><td>optimizer</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/add_rows_checked_f32.json">version/v8/kernel_maps/add_rows_checked_f32.json</a></td><td>add_rows_checked_f32</td><td>add_rows_checked</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
@@ -744,6 +745,7 @@
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/swiglu_forward_ggml.json">version/v8/kernel_maps/swiglu_forward_ggml.json</a></td><td>swiglu_forward_ggml</td><td>swiglu</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/swiglu_forward_pytorch_bf16_storage.json">version/v8/kernel_maps/swiglu_forward_pytorch_bf16_storage.json</a></td><td>swiglu_forward_pytorch_bf16_storage</td><td>swiglu</td><td>bf16-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/tanh_strided_f32_checked.json">version/v8/kernel_maps/tanh_strided_f32_checked.json</a></td><td>tanh_strided_f32_checked</td><td>tanh_strided_checked</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/token_span_mean_checked_f32.json">version/v8/kernel_maps/token_span_mean_checked_f32.json</a></td><td>token_span_mean_checked_f32</td><td>token_span_mean_checked</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/tokenizer_bpe_trie.json">version/v8/kernel_maps/tokenizer_bpe_trie.json</a></td><td>tokenizer_bpe_trie</td><td>tokenizer</td><td>unspecified</td><td>not declared</td><td>not registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/transpose_strided_f32_checked.json">version/v8/kernel_maps/transpose_strided_f32_checked.json</a></td><td>transpose_strided_f32_checked</td><td>transpose_strided_checked</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/vision_position_ids_2d_merge.json">version/v8/kernel_maps/vision_position_ids_2d_merge.json</a></td><td>vision_position_ids_2d_merge</td><td>position_ids</td><td>unspecified</td><td>not declared</td><td>registered</td></tr>

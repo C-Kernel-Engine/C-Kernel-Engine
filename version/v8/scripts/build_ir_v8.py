@@ -2144,6 +2144,10 @@ OP_DATAFLOW = {
         "inputs": {"source": "external:source"},
         "outputs": {"destination": {"slot": "copied_ids", "dtype": "i32"}},
     },
+    "token_span_mean_checked": {
+        "inputs": {"input": "external:input", "spans": "external:spans"},
+        "outputs": {"output": {"slot": "pooled_rows", "dtype": "fp32"}},
+    },
     "equal_i32_scalar_checked": {
         "inputs": {"requested": "external:requested",
                    "expected": "external:expected"},
@@ -5037,6 +5041,7 @@ TEMPLATE_TO_KERNEL_OP = {
     "repetition_penalty_last_row_checked": "repetition_penalty_last_row_checked",
     "concat_i32_checked": "concat_i32_checked",
     "copy_i32_span_checked": "copy_i32_span_checked",
+    "token_span_mean_checked": "token_span_mean_checked",
     "equal_i32_scalar_checked": "equal_i32_scalar_checked",
     "audio_duration_logits_to_frames": "audio_duration_logits_to_frames",
     "runtime_extent_sum": "runtime_extent_sum",

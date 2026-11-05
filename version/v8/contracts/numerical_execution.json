@@ -4596,6 +4596,17 @@
       "position_transform": null,
       "description": "Exact checked copy of a nonempty contiguous int32 span into disjoint caller-owned storage. Validates offsets, capacities and overlap before writes; preserves untouched destination elements. Inference only."
     },
+    "token_span_mean_fp64_accumulation_f32_output": {
+      "operator_family": "token_span_mean_checked",
+      "status": "validated",
+      "storage": {"input": "fp32", "weight": "none", "output": "fp32"},
+      "compute": {"input": "fp32", "weight": "none", "accumulator": "fp64", "contraction": "disabled", "evaluation_order": "each_span_then_each_channel_then_ascending_token_fp64_sum_then_fp32_output"},
+      "rounding": {"mode": "rne", "points": ["input_load", "reduction_update", "reduction_finalize", "output_divide", "output_store"]},
+      "reduction": {"kind": "sum", "order": "ascending_index", "partial_accumulator": "fp64", "merge_order": "none"},
+      "threading": {"work_partition": "serial", "split_strategy": "serial", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Checked half-open token-span means with FP64 accumulation and FP32 output. All spans and results are validated before writes; output padding remains untouched. Synthetic oracle evidence only; no complete Clef model claim."
+    },
     "equal_i32_scalar_exact": {
       "operator_family": "equal_i32_scalar_checked",
       "status": "validated",
