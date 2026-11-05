@@ -936,6 +936,10 @@ TEST_SUITES = {
         "Checked Token Span Mean and Generated Decision-Head Input", "kernels",
         ROOT / "tests" / "test_v8_token_span_mean_checked.py",
     ),
+    "decision_clef_flash_head_ingress": TestSuite(
+        "Clef-Flash Generated Decision-Head Ingress", "inference",
+        ROOT / "tests" / "test_v8_clef_flash_head_ingress.py",
+    ),
     "tts_equal_i32_scalar_checked": TestSuite(
         "Checked Integer Expected-State Comparison", "kernels",
         ROOT / "tests" / "test_v8_equal_i32_scalar_checked.py",

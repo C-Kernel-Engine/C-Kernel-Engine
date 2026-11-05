@@ -4607,6 +4607,17 @@
       "position_transform": null,
       "description": "Checked half-open token-span means with FP64 accumulation and FP32 output. All spans and results are validated before writes; output padding remains untouched. Synthetic oracle evidence only; no complete Clef model claim."
     },
+    "last_valid_row_checked_exact_f32": {
+      "operator_family": "last_valid_row_checked",
+      "status": "validated",
+      "storage": {"input": "fp32", "weight": "none", "output": "fp32"},
+      "compute": {"input": "fp32", "weight": "none", "accumulator": "fp32", "contraction": "disabled", "evaluation_order": "validate_final_valid_span_and_finite_row_then_copy_exact_bits"},
+      "rounding": {"mode": "none", "points": ["input_load", "output_store"]},
+      "reduction": {"kind": "none", "order": "none", "partial_accumulator": "none", "merge_order": "none"},
+      "threading": {"work_partition": "serial", "split_strategy": "serial", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Checked final valid row copy. Externally supplied span must equal [valid_tokens-1, valid_tokens); wrong but in-bounds spans reject before writes."
+    },
     "equal_i32_scalar_exact": {
       "operator_family": "equal_i32_scalar_checked",
       "status": "validated",
