@@ -3058,6 +3058,104 @@ def test_rwkv7_config_builder_derives_layer_kinds(tmp_path: Path) -> None:
     assert config["rms_eps"] == 1e-5
 
 
+def test_rwkv7_config_builder_normalizes_upstream_rank_and_norm_names(
+    tmp_path: Path,
+) -> None:
+    converter = _load_converter()
+    hf_config = {
+        "model_type": "rwkv7",
+        "num_hidden_layers": 24,
+        "hidden_size": 2048,
+        "num_attention_heads": 32,
+        "head_dim": 64,
+        "hidden_ratio": 4,
+        "vocab_size": 65536,
+        "layer_norm_epsilon": 2e-5,
+        "hidden_act": "sqrelu",
+        "decay_low_rank_dim": 96,
+        "a_low_rank_dim": 96,
+        "v_low_rank_dim": 64,
+        "gate_low_rank_dim": 256,
+    }
+    (tmp_path / "config.json").write_text(json.dumps(hf_config), encoding="utf-8")
+
+    config = converter._build_config(tmp_path, "rwkv7", None)
+
+    assert config["decay_rank"] == 96
+    assert config["key_rank"] == 96
+    assert config["value_rank"] == 64
+    assert config["gate_rank"] == 256
+    assert config["head_dim"] == 64
+    assert config["layer_norm_eps"] == 2e-5
+    assert config["rms_eps"] == 2e-5
+    assert config["activation"] == "squared_relu"
+
+
+def test_rwkv7_config_builder_derives_ranks_from_tensor_shapes(
+    tmp_path: Path,
+) -> None:
+    converter = _load_converter()
+    hf_config = {
+        "model_type": "rwkv7",
+        "num_hidden_layers": 2,
+        "hidden_size": 16,
+        "head_size": 4,
+        "num_heads": 4,
+        "hidden_ratio": 4,
+        "vocab_size": 16,
+    }
+    (tmp_path / "config.json").write_text(json.dumps(hf_config), encoding="utf-8")
+
+    def header(name: str, shape: tuple[int, ...]):
+        return converter.HeaderTensor(
+            name, "BF16", list(shape), Path("model.safetensors")
+        )
+
+    headers = {}
+    ranks = {"w": 6, "a": 7, "v": 5, "g": 9}
+    for layer in range(2):
+        for suffix, rank in ranks.items():
+            headers[f"rwkv7.blocks.{layer}.att.{suffix}1"] = header(
+                f"rwkv7.blocks.{layer}.att.{suffix}1", (16, rank)
+            )
+            headers[f"rwkv7.blocks.{layer}.att.{suffix}2"] = header(
+                f"rwkv7.blocks.{layer}.att.{suffix}2", (rank, 16)
+            )
+
+    config = converter._build_config(tmp_path, "rwkv7", None, headers)
+
+    assert config["decay_rank"] == 6
+    assert config["key_rank"] == 7
+    assert config["value_rank"] == 5
+    assert config["gate_rank"] == 9
+
+
+def test_rwkv7_config_builder_rejects_rank_shape_mismatch(tmp_path: Path) -> None:
+    converter = _load_converter()
+    hf_config = {
+        "model_type": "rwkv7",
+        "num_hidden_layers": 2,
+        "hidden_size": 16,
+        "head_size": 4,
+        "num_heads": 4,
+        "hidden_ratio": 4,
+        "vocab_size": 16,
+        "decay_rank": 6,
+    }
+    (tmp_path / "config.json").write_text(json.dumps(hf_config), encoding="utf-8")
+    headers = {
+        "rwkv7.blocks.0.att.w1": converter.HeaderTensor(
+            "rwkv7.blocks.0.att.w1", "BF16", [16, 7], Path("model.safetensors")
+        ),
+        "rwkv7.blocks.0.att.w2": converter.HeaderTensor(
+            "rwkv7.blocks.0.att.w2", "BF16", [7, 16], Path("model.safetensors")
+        ),
+    }
+
+    with pytest.raises(SystemExit, match="decay_rank"):
+        converter._build_config(tmp_path, "rwkv7", None, headers)
+
+
 def test_rwkv7_tokenizer_contract_declares_world_trie(tmp_path: Path) -> None:
     converter = _load_converter()
     tokenizer = {
@@ -3451,6 +3549,7 @@ def _write_rwkv7_synthetic_checkpoint(
     heads: int = 2,
     vocab: int = 16,
     ranks: tuple[int, int, int, int] = (2, 2, 2, 2),
+    include_ranks_in_config: bool = True,
 ) -> Path:
     torch = pytest.importorskip("torch")
     st = pytest.importorskip("safetensors.torch")
@@ -3472,6 +3571,9 @@ def _write_rwkv7_synthetic_checkpoint(
         value_rank=ranks[2],
         gate_rank=ranks[3],
     )
+    if not include_ranks_in_config:
+        for rank_key in ("decay_rank", "key_rank", "value_rank", "gate_rank"):
+            config.pop(rank_key, None)
     (checkpoint / "config.json").write_text(json.dumps(config))
     (checkpoint / "tokenizer.json").write_text(json.dumps({
         "model": {"type": "WordPiece",
@@ -3645,3 +3747,47 @@ def test_rwkv7_lower_3_binds_layer0_vgate_nulls_and_channelmix_scratch(
     assert channelmix["scratch"]["source"] == "scratch:scratch"
     assert channelmix["scratch"]["expr"] != "NULL"
     assert channelmix["scratch_elems"]["expr"].isdigit()
+
+
+def test_rwkv7_ranks_derived_from_tensor_shapes_reach_lower_3(
+    tmp_path: Path,
+) -> None:
+    ranks = (2, 3, 4, 5)
+    checkpoint = _write_rwkv7_synthetic_checkpoint(
+        tmp_path, ranks=ranks, include_ranks_in_config=False
+    )
+    output = tmp_path / "out"
+    output.mkdir()
+    subprocess.run([
+        sys.executable, str(CONVERTER_PATH), "--checkpoint", str(checkpoint),
+        "--output", str(output / "weights.bump"),
+        "--config-out", str(output / "config.json"),
+        "--manifest-out", str(output / "weights_manifest.json"),
+        "--arch", "auto",
+    ], cwd=ROOT, check=True, capture_output=True, text=True)
+
+    manifest = json.loads(
+        (output / "weights_manifest.json").read_text(encoding="utf-8")
+    )
+    assert manifest["config"]["decay_rank"] == ranks[0]
+    assert manifest["config"]["key_rank"] == ranks[1]
+    assert manifest["config"]["value_rank"] == ranks[2]
+    assert manifest["config"]["gate_rank"] == ranks[3]
+
+    run = subprocess.run([
+        sys.executable,
+        str(ROOT / "version" / "v8" / "scripts" / "build_ir_v8.py"),
+        "--manifest", str(output / "weights_manifest.json"),
+        "--mode", "prefill",
+        "--output", str(output / "ir1.json"),
+        "--layout-output", str(output / "layout.json"),
+        "--lowered-output", str(output / "lowered.json"),
+        "--call-output", str(output / "lowered_call.json"),
+        "--context-len", "8",
+        "--logits-layout", "auto",
+    ], cwd=ROOT, capture_output=True, text=True)
+    assert run.returncode == 0, run.stdout[-4000:] + run.stderr[-4000:]
+
+    call_ir = json.loads((output / "lowered_call.json").read_text(encoding="utf-8"))
+    assert call_ir.get("errors") == []
+    assert [op["idx"] for op in call_ir["operations"] if op.get("errors")] == []
