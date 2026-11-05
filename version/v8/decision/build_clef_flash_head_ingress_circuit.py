@@ -22,6 +22,9 @@ def build_circuit(*, tokens=6, questions=2, options=3, channels=4096,
         "hidden": [tokens, channels], "input_ids": [tokens],
         "question_spans": [questions, 2], "option_spans": [options, 2],
         "global_span": [1, 2],
+        "option_counts": [questions],
+        "option_row_indices": [options],
+        "option_question_indices": [options],
         "normalized_hidden": [tokens, channels],
         "lexical_token_rows": [tokens, channels],
         "question_vectors": [questions, channels],
@@ -34,6 +37,8 @@ def build_circuit(*, tokens=6, questions=2, options=3, channels=4096,
         "option_lexical_projected": [options, width],
         "option_question_projected": [questions, width],
         "global_projected": [1, width],
+        "option_context_lexical": [options, width],
+        "option_queries": [options, width],
     }
 
     def norm():
@@ -125,7 +130,55 @@ def build_circuit(*, tokens=6, questions=2, options=3, channels=4096,
                 "output_elements": channels}},
         }
 
-    header = [norm(), embedding()]
+    def option_query_join():
+        count = options * width
+        return [
+            {"id": "option_context_lexical_join", "op": "add_rows_checked",
+             "kernel": "add_rows_checked_f32", "returns_status": True,
+             "graph_slots": {"inputs": {
+                 "left": "option_context_projected",
+                 "right": "option_lexical_projected"},
+                 "outputs": {"output": "option_context_lexical"}},
+             "params": {"N": count, "call_constants": {
+                 "left_elements": count, "right_elements": count,
+                 "output_elements": count, "elements": count}}},
+            {"id": "option_question_join", "op": "indexed_sum_rows_checked",
+             "kernel": "indexed_sum_rows_checked_f32", "returns_status": True,
+             "graph_slots": {"inputs": {
+                 "left": "option_context_lexical",
+                 "right": "option_question_projected",
+                 "left_indices": "external:option_row_indices",
+                 "right_indices": "external:option_question_indices"},
+                 "outputs": {"output": "option_queries"}},
+             "params": {"L": options, "K": questions, "R": options, "C": width,
+                        "call_constants": {
+                 "left_elements": count, "left_stride": width,
+                 "left_rows": options, "right_elements": questions * width,
+                 "right_stride": width, "right_rows": questions,
+                 "left_index_elements": options,
+                 "right_index_elements": options,
+                 "output_elements": count, "output_stride": width,
+                 "rows": options, "channels": width}}},
+        ]
+
+    def option_owners():
+        return {
+            "id": "option_owners", "op": "expand_group_row_indices_checked",
+            "kernel": "expand_group_row_indices_checked_i32",
+            "returns_status": True,
+            "graph_slots": {"inputs": {
+                "group_counts": "external:option_counts"},
+                "outputs": {"row_indices": "option_row_indices",
+                            "owner_indices": "option_question_indices"}},
+            "params": {"G": questions, "R": options, "call_constants": {
+                "group_count_elements": questions,
+                "groups": questions,
+                "rows": options,
+                "row_index_elements": options,
+                "owner_index_elements": options}},
+        }
+
+    header = [option_owners(), norm(), embedding()]
     body = [
         span("question_pool", "normalized_hidden", "question_spans",
              "question_vectors", questions),
@@ -149,6 +202,7 @@ def build_circuit(*, tokens=6, questions=2, options=3, channels=4096,
                "option_question_projection"),
         linear("global_projection", "global_vector", "global_projected", 1,
                "global_projection"),
+        *option_query_join(),
     ]
     return {
         "version": 3, "name": "clef_flash_head_ingress_bounded",

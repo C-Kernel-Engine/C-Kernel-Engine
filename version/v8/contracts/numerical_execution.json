@@ -4618,6 +4618,17 @@
       "position_transform": null,
       "description": "Checked final valid row copy. Externally supplied span must equal [valid_tokens-1, valid_tokens); wrong but in-bounds spans reject before writes."
     },
+    "expand_group_row_indices_checked_exact_i32": {
+      "operator_family": "expand_group_row_indices_checked",
+      "status": "validated",
+      "storage": {"input": "int32", "weight": "none", "output": "int32"},
+      "compute": {"input": "int32", "weight": "none", "accumulator": "int32", "contraction": "disabled", "evaluation_order": "validate_positive_counts_and_exact_sum_then_expand_identity_and_owner_indices"},
+      "rounding": {"mode": "none", "points": ["input_load", "output_store"]},
+      "reduction": {"kind": "none", "order": "none", "partial_accumulator": "none", "merge_order": "none"},
+      "threading": {"work_partition": "serial", "split_strategy": "serial", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Checked ordered group-count expansion to exact row and owner indices. Invalid counts or capacities reject before either output is written."
+    },
     "equal_i32_scalar_exact": {
       "operator_family": "equal_i32_scalar_checked",
       "status": "validated",
