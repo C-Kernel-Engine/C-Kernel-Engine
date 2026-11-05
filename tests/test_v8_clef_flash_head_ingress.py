@@ -52,7 +52,9 @@ def compile_case(folder, graph, weights, *, enclosing_epsilon=1e-5,
         "max_seq_len": tokens, "vocab_size": len(weights["output_embedding.weight"]),
         "epsilon": enclosing_epsilon,
         "activation_buffer_dtypes": {name: "i32" for name in
-            ("input_ids", "question_spans", "option_spans", "global_span")}},
+            ("input_ids", "question_spans", "option_spans", "global_span",
+             "option_counts",
+             "option_row_indices", "option_question_indices")}},
         "entries": bundle["entries"], "quant_summary": {}, "template": graph}
     layout, call_ir, _library, loaded, execute = compile_native_graph(
         folder, source, circuit_path, extra_exports=extra_exports)
@@ -128,6 +130,46 @@ class ClefFlashHeadIngressTest(unittest.TestCase):
             self.assertEqual(call(), 0)
             np.testing.assert_array_equal(output[:3], source[1, :3])
 
+    def test_option_owner_kernel_boundaries(self):
+        graph = build_circuit(channels=8, width=4, vocabulary=16)
+        with tempfile.TemporaryDirectory() as temp:
+            _arena, _execute, _view, _call_ir, loaded = compile_case(
+                Path(temp), graph, weights_for(8, 4, 16),
+                extra_exports=("ck_expand_group_row_indices_checked_i32",))
+            kernel = loaded.ck_expand_group_row_indices_checked_i32
+            ptr = ctypes.POINTER(ctypes.c_int32)
+            kernel.argtypes = [ptr, ctypes.c_size_t, ctypes.c_size_t,
+                               ctypes.c_size_t, ptr, ctypes.c_size_t,
+                               ptr, ctypes.c_size_t]
+            kernel.restype = ctypes.c_int
+            counts = np.array([2, 1], dtype="i4")
+            rows = np.full(4, -51, dtype="i4")
+            owners = np.full(4, -52, dtype="i4")
+
+            def call(*, row_output=rows, owner_output=owners, row_count=3):
+                return kernel(counts.ctypes.data_as(ptr), counts.size,
+                              counts.size, row_count,
+                              row_output.ctypes.data_as(ptr), row_output.size,
+                              owner_output.ctypes.data_as(ptr), owner_output.size)
+
+            self.assertEqual(call(), 0)
+            np.testing.assert_array_equal(rows, [0, 1, 2, -51])
+            np.testing.assert_array_equal(owners, [0, 0, 1, -52])
+            for invalid in ([2, 2], [0, 3], [-1, 4]):
+                counts[:] = invalid
+                rows[:] = -51
+                owners[:] = -52
+                self.assertNotEqual(call(), 0)
+                np.testing.assert_array_equal(rows, -51)
+                np.testing.assert_array_equal(owners, -52)
+            counts[:] = [2, 1]
+            self.assertNotEqual(call(row_output=rows[:2]), 0)
+            self.assertNotEqual(call(owner_output=rows), 0)
+            np.testing.assert_array_equal(rows, -51)
+            np.testing.assert_array_equal(owners, -52)
+            self.assertEqual(call(), 0)
+            np.testing.assert_array_equal(rows[:3], [0, 1, 2])
+
     def test_connected_ingress_and_failure_propagation(self):
         channels, width, vocabulary = 8, 4, 16
         graph = build_circuit(channels=channels, width=width,
@@ -136,7 +178,7 @@ class ClefFlashHeadIngressTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             arena, execute, view, call_ir, _loaded = compile_case(
                 Path(temp), graph, weights)
-            self.assertEqual(len(call_ir["operations"]), 12)
+            self.assertEqual(len(call_ir["operations"]), 15)
             self.assertEqual(call_ir["errors"], [])
             rng = np.random.default_rng(18)
             hidden = rng.normal(0, 1, (6, channels)).astype("f4")
@@ -148,8 +190,11 @@ class ClefFlashHeadIngressTest(unittest.TestCase):
             view("question_spans")[:] = questions
             view("option_spans")[:] = options
             view("global_span")[:] = [[5, 6]]
+            view("option_counts")[:] = [2, 1]
             view("option_lexical_projected")[:] = -901
             self.assertEqual(execute(arena, len(arena)), 0)
+            np.testing.assert_array_equal(view("option_row_indices"), [0, 1, 2])
+            np.testing.assert_array_equal(view("option_question_indices"), [0, 0, 1])
             np.testing.assert_array_equal(
                 view("lexical_token_rows"), weights["output_embedding.weight"][ids])
             normalized = view("normalized_hidden").copy()
@@ -174,6 +219,13 @@ class ClefFlashHeadIngressTest(unittest.TestCase):
                 expected = (view(source).astype("f8") @ weights[weight].astype("f8").T).astype("f4")
                 np.testing.assert_allclose(view(output), expected, atol=1e-6, rtol=0)
             baseline = view("option_lexical_projected").copy()
+            query_baseline = view("option_queries").copy()
+            np.testing.assert_allclose(
+                query_baseline,
+                view("option_context_projected") +
+                view("option_lexical_projected") +
+                view("option_question_projected")[[0, 0, 1]],
+                atol=1e-6, rtol=0)
             view("input_ids")[0] = vocabulary
             view("option_lexical_projected")[:] = -901
             self.assertNotEqual(execute(arena, len(arena)), 0)
@@ -197,6 +249,20 @@ class ClefFlashHeadIngressTest(unittest.TestCase):
             view("global_span")[:] = [[5, 6]]
             self.assertEqual(execute(arena, len(arena)), 0)
             np.testing.assert_array_equal(view("global_projected"), global_baseline)
+            view("option_counts")[:] = [2, 2]
+            view("option_queries")[:] = -905
+            view("option_row_indices")[:] = -906
+            view("option_question_indices")[:] = -907
+            self.assertNotEqual(execute(arena, len(arena)), 0)
+            np.testing.assert_array_equal(view("option_queries"), -905)
+            np.testing.assert_array_equal(view("option_row_indices"), -906)
+            np.testing.assert_array_equal(view("option_question_indices"), -907)
+            view("option_counts")[:] = [2, 1]
+            self.assertEqual(execute(arena, len(arena)), 0)
+            np.testing.assert_array_equal(view("option_queries"), query_baseline)
+            view("option_counts")[:] = [1, 2]
+            self.assertEqual(execute(arena, len(arena)), 0)
+            self.assertFalse(np.array_equal(view("option_queries"), query_baseline))
 
     def test_layernorm_epsilon_is_circuit_owned(self):
         try:
@@ -221,6 +287,7 @@ class ClefFlashHeadIngressTest(unittest.TestCase):
                 view("question_spans")[:] = [[0, 2], [3, 6]]
                 view("option_spans")[:] = [[1, 3], [2, 5], [5, 6]]
                 view("global_span")[:] = [[5, 6]]
+                view("option_counts")[:] = [2, 1]
                 self.assertEqual(execute(arena, len(arena)), 0)
                 results.append(view("normalized_hidden").copy())
         np.testing.assert_array_equal(results[0], results[1])
@@ -253,6 +320,7 @@ class ClefFlashHeadIngressTest(unittest.TestCase):
             view("question_spans")[:] = questions
             view("option_spans")[:] = options
             view("global_span")[:] = [[5, 6]]
+            view("option_counts")[:] = [2, 1]
             self.assertEqual(execute(arena, len(arena)), 0)
             h = torch.from_numpy(hidden)
             normalized = functional.layer_norm(
@@ -284,6 +352,37 @@ class ClefFlashHeadIngressTest(unittest.TestCase):
             for name, reference in expected.items():
                 np.testing.assert_allclose(view(name), reference.numpy(),
                                            atol=2e-6, rtol=0, err_msg=name)
+            expected_queries = (expected["option_context_projected"] +
+                                expected["option_lexical_projected"] +
+                                expected["option_question_projected"][[0, 0, 1]])
+            np.testing.assert_allclose(view("option_queries"),
+                                       expected_queries.numpy(),
+                                       atol=2e-6, rtol=0)
+
+    def test_option_queries_with_unequal_counts(self):
+        graph = build_circuit(tokens=7, questions=3, options=5,
+                              channels=8, width=4, vocabulary=16)
+        weights = weights_for(8, 4, 16, seed=89)
+        with tempfile.TemporaryDirectory() as temp:
+            arena, execute, view, _call_ir, _loaded = compile_case(
+                Path(temp), graph, weights)
+            rng = np.random.default_rng(117)
+            view("hidden")[:] = rng.normal(0, 1, (7, 8)).astype("f4")
+            view("input_ids")[:] = [1, 2, 3, 4, 5, 6, 7]
+            view("question_spans")[:] = [[0, 2], [2, 4], [4, 7]]
+            view("option_spans")[:] = [[0, 1], [1, 2], [2, 4],
+                                       [4, 5], [5, 7]]
+            view("global_span")[:] = [[6, 7]]
+            view("option_counts")[:] = [2, 1, 2]
+            owners = np.array([0, 0, 1, 2, 2], dtype=np.int32)
+            self.assertEqual(execute(arena, len(arena)), 0)
+            np.testing.assert_array_equal(view("option_row_indices"), np.arange(5))
+            np.testing.assert_array_equal(view("option_question_indices"), owners)
+            expected = (view("option_context_projected") +
+                        view("option_lexical_projected") +
+                        view("option_question_projected")[owners])
+            np.testing.assert_allclose(view("option_queries"), expected,
+                                       atol=1e-6, rtol=0)
 
     def test_pinned_head_weights_against_pytorch(self):
         asset = os.environ.get("CKE_CLEF_FLASH_HEAD_PATH")
@@ -326,6 +425,7 @@ class ClefFlashHeadIngressTest(unittest.TestCase):
             view("question_spans")[:] = question_spans
             view("option_spans")[:] = option_spans
             view("global_span")[:] = [[5, 6]]
+            view("option_counts")[:] = [2, 1]
             self.assertEqual(execute(arena, len(arena)), 0)
             normalized = functional.layer_norm(
                 torch.from_numpy(hidden), (channels,),
@@ -348,6 +448,16 @@ class ClefFlashHeadIngressTest(unittest.TestCase):
                     source, torch.from_numpy(weights[f"{name}.weight"])).numpy()
                 np.testing.assert_allclose(view(output), reference,
                                            atol=1e-4, rtol=0, err_msg=output)
+            expected_queries = (
+                functional.linear(context, torch.from_numpy(
+                    weights["option_context_projection.weight"])) +
+                functional.linear(lexical_options, torch.from_numpy(
+                    weights["option_lexical_projection.weight"])) +
+                functional.linear(question, torch.from_numpy(
+                    weights["option_question_projection.weight"]))[[0, 0, 1]])
+            np.testing.assert_allclose(view("option_queries"),
+                                       expected_queries.numpy(),
+                                       atol=1e-4, rtol=0)
 
 
 if __name__ == "__main__":

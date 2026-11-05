@@ -39,6 +39,21 @@
         2
       ]
     },
+    "option_counts": {
+      "shape": [
+        2
+      ]
+    },
+    "option_row_indices": {
+      "shape": [
+        3
+      ]
+    },
+    "option_question_indices": {
+      "shape": [
+        3
+      ]
+    },
     "normalized_hidden": {
       "shape": [
         6,
@@ -110,6 +125,18 @@
         1,
         1024
       ]
+    },
+    "option_context_lexical": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "option_queries": {
+      "shape": [
+        3,
+        1024
+      ]
     }
   },
   "activation_bindings": {
@@ -118,6 +145,9 @@
     "question_spans": "question_spans",
     "option_spans": "option_spans",
     "global_span": "global_span",
+    "option_counts": "option_counts",
+    "option_row_indices": "option_row_indices",
+    "option_question_indices": "option_question_indices",
     "normalized_hidden": "normalized_hidden",
     "lexical_token_rows": "lexical_token_rows",
     "question_vectors": "question_vectors",
@@ -129,7 +159,9 @@
     "option_context_projected": "option_context_projected",
     "option_lexical_projected": "option_lexical_projected",
     "option_question_projected": "option_question_projected",
-    "global_projected": "global_projected"
+    "global_projected": "global_projected",
+    "option_context_lexical": "option_context_lexical",
+    "option_queries": "option_queries"
   },
   "native_entry": {
     "function": "ck_clef_head_ingress",
@@ -159,6 +191,32 @@
         "footer"
       ],
       "header": [
+        {
+          "id": "option_owners",
+          "op": "expand_group_row_indices_checked",
+          "kernel": "expand_group_row_indices_checked_i32",
+          "returns_status": true,
+          "graph_slots": {
+            "inputs": {
+              "group_counts": "external:option_counts"
+            },
+            "outputs": {
+              "row_indices": "option_row_indices",
+              "owner_indices": "option_question_indices"
+            }
+          },
+          "params": {
+            "G": 2,
+            "R": 3,
+            "call_constants": {
+              "group_count_elements": 2,
+              "groups": 2,
+              "rows": 3,
+              "row_index_elements": 3,
+              "owner_index_elements": 3
+            }
+          }
+        },
         {
           "id": "hidden_norm",
           "op": "layernorm",
@@ -549,6 +607,67 @@
               "linear_rows": 1,
               "linear_input_channels": 4096,
               "linear_output_channels": 1024
+            }
+          }
+        },
+        {
+          "id": "option_context_lexical_join",
+          "op": "add_rows_checked",
+          "kernel": "add_rows_checked_f32",
+          "returns_status": true,
+          "graph_slots": {
+            "inputs": {
+              "left": "option_context_projected",
+              "right": "option_lexical_projected"
+            },
+            "outputs": {
+              "output": "option_context_lexical"
+            }
+          },
+          "params": {
+            "N": 3072,
+            "call_constants": {
+              "left_elements": 3072,
+              "right_elements": 3072,
+              "output_elements": 3072,
+              "elements": 3072
+            }
+          }
+        },
+        {
+          "id": "option_question_join",
+          "op": "indexed_sum_rows_checked",
+          "kernel": "indexed_sum_rows_checked_f32",
+          "returns_status": true,
+          "graph_slots": {
+            "inputs": {
+              "left": "option_context_lexical",
+              "right": "option_question_projected",
+              "left_indices": "external:option_row_indices",
+              "right_indices": "external:option_question_indices"
+            },
+            "outputs": {
+              "output": "option_queries"
+            }
+          },
+          "params": {
+            "L": 3,
+            "K": 2,
+            "R": 3,
+            "C": 1024,
+            "call_constants": {
+              "left_elements": 3072,
+              "left_stride": 1024,
+              "left_rows": 3,
+              "right_elements": 2048,
+              "right_stride": 1024,
+              "right_rows": 2,
+              "left_index_elements": 3,
+              "right_index_elements": 3,
+              "output_elements": 3072,
+              "output_stride": 1024,
+              "rows": 3,
+              "channels": 1024
             }
           }
         }

@@ -83,6 +83,7 @@
         "embedding_lookup_token_major_checked": 1,
         "embedding_three_table_layer_norm": 1,
         "equal_i32_scalar_checked": 1,
+        "expand_group_row_indices_checked": 1,
         "farskip_routed_shared_combine": 3,
         "feature_concat": 1,
         "feature_concat_broadcast_rows": 1,
@@ -37071,6 +37072,206 @@
       "notes": "Checks one caller-owned scalar against expected sequence state before dependent execution. Rejected input never writes output.",
       "name": "equal_i32_scalar_checked",
       "_source_file": "equal_i32_scalar_checked.json"
+    },
+    {
+      "id": "expand_group_row_indices_checked_i32",
+      "op": "expand_group_row_indices_checked",
+      "operation_interface": "tensor.expand_group_row_indices.checked.i32.v1",
+      "variant": "ordered_positive_counts",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "equivalence_group": "tensor.expand_group_row_indices.checked.i32.v1",
+        "phases": [
+          "prefill"
+        ]
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "i32",
+        "output": "i32"
+      },
+      "inputs": [
+        {
+          "name": "group_counts",
+          "dtype": "i32",
+          "shape": [
+            "G"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "row_indices",
+          "dtype": "i32",
+          "shape": [
+            "R"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "owner_indices",
+          "dtype": "i32",
+          "shape": [
+            "R"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "G",
+        "R"
+      ],
+      "impl": {
+        "function": "ck_expand_group_row_indices_checked_i32",
+        "c_declaration": "int ck_expand_group_row_indices_checked_i32(const int32_t *group_counts, size_t group_count_elements, size_t groups, size_t rows, int32_t *row_indices, size_t row_index_elements, int32_t *owner_indices, size_t owner_index_elements);",
+        "sources": [
+          "src/kernels/expand_group_row_indices_checked.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "expand_group_row_indices_checked_exact_i32",
+          "status": "validated",
+          "phases": [
+            "prefill"
+          ],
+          "function": "ck_expand_group_row_indices_checked_i32",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "none",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "serial"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "group_counts",
+            "source": "activation:group_counts",
+            "cast": "const int32_t*",
+            "ports": [
+              "input:group_counts"
+            ]
+          },
+          {
+            "name": "group_count_elements",
+            "source": "runtime:group_count_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "groups",
+            "source": "runtime:groups",
+            "value_type": "size_t"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "row_indices",
+            "source": "output:row_indices",
+            "cast": "int32_t*",
+            "ports": [
+              "output:row_indices"
+            ]
+          },
+          {
+            "name": "row_index_elements",
+            "source": "runtime:row_index_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "owner_indices",
+            "source": "output:owner_indices",
+            "cast": "int32_t*",
+            "ports": [
+              "output:owner_indices"
+            ]
+          },
+          {
+            "name": "owner_index_elements",
+            "source": "runtime:owner_index_elements",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "G": "groups",
+          "R": "rows"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "group_counts",
+            "elements": "group_count_elements",
+            "rows": 1,
+            "width": "groups",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "row_indices",
+            "elements": "row_index_elements",
+            "rows": 1,
+            "width": "rows",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "owner_indices",
+            "elements": "owner_index_elements",
+            "rows": 1,
+            "width": "rows",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_clef_flash_head_ingress.py"
+        ],
+        "oracle": "Independent Python group expansion, rejection, unchanged output, and generated option-query composition"
+      },
+      "notes": "Model-neutral ordered group expansion. Positive counts must sum to output rows. Both outputs are caller-owned and unchanged on rejection.",
+      "name": "expand_group_row_indices_checked_i32",
+      "_source_file": "expand_group_row_indices_checked_i32.json"
     },
     {
       "id": "farskip_swiglu_shared_combine_bf16",
