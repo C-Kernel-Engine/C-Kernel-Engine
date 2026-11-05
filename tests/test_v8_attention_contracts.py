@@ -92,6 +92,39 @@ class AttentionContractV8Tests(unittest.TestCase):
     def test_kernel_overlay_matches_v8_kernel_maps(self) -> None:
         resolver.validate_kernel_overlay(copy.deepcopy(self.kernels))
 
+    def test_gemma_fp16_q_probability_candidate_is_explicit_and_not_production(self) -> None:
+        circuit_path = V8_ROOT / "circuits" / "gemma4.json"
+        circuit = resolver.load_json(circuit_path)
+        request = circuit["required_contracts"]["decoder.attention.gemma4_full"]["phases"]["prefill"]
+        request["requires"]["numerics.attention_reduction"] = (
+            "f16_q_prob_round_qtile64_regular_tail_noscale"
+        )
+        result = resolver.resolve_contract(
+            circuit, copy.deepcopy(self.contracts), copy.deepcopy(self.kernels),
+            operation="decoder.attention.gemma4_full", phase="prefill",
+            mode="bringup", source_circuit_path=circuit_path,
+        )
+        self.assertEqual(
+            result["kernel"]["id"],
+            "attention_forward_causal_head_major_gqa_prefill_append_f16cache_gemma4_fp16_q_prob",
+        )
+        selector = "CK_ATTN_REDUCTION_F16_Q_PROB_ROUND_QTILE64_REGULAR_TAIL_NOSCALE"
+        self.assertEqual(result["kernel"]["selector"], selector)
+        candidate_map = resolver.load_json(
+            V8_ROOT / "kernel_maps" /
+            "attention_forward_causal_head_major_gqa_prefill_append_f16cache_gemma4_fp16_q_prob.json"
+        )
+        reduction_arg = next(
+            arg for arg in candidate_map["call_abi"]["params"] if arg["name"] == "reduction"
+        )
+        self.assertEqual(reduction_arg["source"], f"const:{selector}")
+        with self.assertRaisesRegex(resolver.ContractError, "kernel implementation is observed"):
+            resolver.resolve_contract(
+                circuit, copy.deepcopy(self.contracts), copy.deepcopy(self.kernels),
+                operation="decoder.attention.gemma4_full", phase="prefill",
+                mode="production", source_circuit_path=circuit_path,
+            )
+
     def test_decode_providers_do_not_alias_distinct_reduction_math(self) -> None:
         legacy = self.kernels["kernels"][
             "attention_forward_decode_head_major_gqa_flash_f16cache"

@@ -2319,6 +2319,7 @@ typedef enum {
     CK_ATTN_REDUCTION_F16_REGULAR_NOSCALE = 5,
     CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64_REGULAR_TAIL_NOSCALE = 6,
     CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64_APPEND_TILED = 7,  // tiled short-Q append after a tiled prefix
+    CK_ATTN_REDUCTION_F16_Q_PROB_ROUND_QTILE64_REGULAR_TAIL_NOSCALE = 8,
 } ck_attention_reduction_t;
 
 // Research selectors for partitioning independent prefill attention outputs.
