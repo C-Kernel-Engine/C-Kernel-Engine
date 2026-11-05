@@ -940,6 +940,14 @@ TEST_SUITES = {
         "Clef-Flash Generated Decision-Head Ingress", "inference",
         ROOT / "tests" / "test_v8_clef_flash_head_ingress.py",
     ),
+    "decision_clef_flash_evidence0": TestSuite(
+        "Clef-Flash Generated First Evidence Routing Layer", "inference",
+        ROOT / "tests" / "test_v8_clef_flash_evidence0.py",
+    ),
+    "decision_attention_cross_checked": TestSuite(
+        "Checked Noncausal Cross Attention", "kernels",
+        ROOT / "tests" / "test_v8_attention_cross_token_major_checked.py",
+    ),
     "tts_equal_i32_scalar_checked": TestSuite(
         "Checked Integer Expected-State Comparison", "kernels",
         ROOT / "tests" / "test_v8_equal_i32_scalar_checked.py",

@@ -2159,6 +2159,11 @@ OP_DATAFLOW = {
             "owner_indices": {"slot": "group_owner_indices", "dtype": "i32"},
         },
     },
+    "attention_cross_token_major_checked": {
+        "inputs": {"query": "external:query", "key": "external:key",
+                   "value": "external:value"},
+        "outputs": {"output": {"slot": "cross_attention_output", "dtype": "fp32"}},
+    },
     "equal_i32_scalar_checked": {
         "inputs": {"requested": "external:requested",
                    "expected": "external:expected"},
@@ -5055,6 +5060,7 @@ TEMPLATE_TO_KERNEL_OP = {
     "token_span_mean_checked": "token_span_mean_checked",
     "last_valid_row_checked": "last_valid_row_checked",
     "expand_group_row_indices_checked": "expand_group_row_indices_checked",
+    "attention_cross_token_major_checked": "attention_cross_token_major_checked",
     "equal_i32_scalar_checked": "equal_i32_scalar_checked",
     "audio_duration_logits_to_frames": "audio_duration_logits_to_frames",
     "runtime_extent_sum": "runtime_extent_sum",
