@@ -947,6 +947,33 @@ int main(void) {
         self.assertIn("ck_multimodal_prefill_has_segment_plan(num_tokens)", emitted)
         self.assertIn(provider["implementation"]["segmented_query_provider"]["function"] + "(", emitted)
         self.assertIn(provider["impl"]["function"] + "(", emitted)
+
+        candidate_path = ROOT / "version/v8/kernel_maps/attention_forward_causal_head_major_gqa_prefill_append_f16cache_gemma4_fp16_q_prob.json"
+        candidate = json.loads(candidate_path.read_text(encoding="utf-8"))
+        candidate_op = {
+            **op,
+            "function": candidate["impl"]["function"],
+            "resolved_execution": {"implementation": candidate["implementation"]},
+            "args": [
+                {
+                    "name": arg["name"], "source": arg["source"],
+                    "expr": arg["source"].removeprefix("const:")
+                    if arg["name"] == "reduction" else arg["name"],
+                }
+                for arg in candidate["call_abi"]["params"]
+            ],
+        }
+        candidate_emitted = codegen_prefill_v8.emit_prefill_from_embedded_function(
+            [candidate_op], config
+        )
+        self.assertIn(
+            "CK_ATTN_REDUCTION_F16_Q_PROB_ROUND_QTILE64_REGULAR_TAIL_NOSCALE",
+            candidate_emitted,
+        )
+        self.assertNotIn(
+            "CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64_REGULAR_TAIL_NOSCALE",
+            candidate_emitted,
+        )
         embedding = {
             "op": "dense_embedding_lookup",
             "function": "embedding_forward_q4_k",

@@ -248,6 +248,29 @@
         "reference": "independent materialized-softmax calculation and pinned llama.cpp non-flash exact-input captures"
       }
     },
+    "f16_q_prob_round_qtile64_regular_tail_noscale": {
+      "status": "validated",
+      "q_compute": "fp16_rounded",
+      "k_compute": "fp16_rounded",
+      "score_accumulator": "fp32",
+      "softmax_statistics": "fp32",
+      "value_compute": "fp16_rounded",
+      "value_accumulator": "fp32",
+      "partial_storage": "shape_dependent_none_or_fp32",
+      "partial_merge": "shape_dependent_single_range_or_fp32_chunk_order",
+      "partition": {
+        "kind": "query_tile_threshold",
+        "threshold": 64,
+        "below_threshold": "f16_regular_fp32_noscale",
+        "at_or_above_threshold": "f16_q_prob_round_qtile64_regular_tail_noscale"
+      },
+      "description": "Unit-scale tiled attention rounds Q before QK and globally normalized probabilities before PV. Scores are recomputed in a second bounded tile pass without heap allocation.",
+      "validation": {
+        "test": "tests/test_v8_direct_layout_attention.py",
+        "cases": ["FP16 Q midpoint", "FP16 probability midpoint", "segmented prefill"],
+        "reference": "pinned llama.cpp non-flash exact-input captures"
+      }
+    },
     "f16_online_fp32_merge": {
       "status": "validated",
       "q_compute": "fp16_rounded",
