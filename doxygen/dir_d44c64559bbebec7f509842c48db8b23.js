@@ -58,6 +58,7 @@ var dir_d44c64559bbebec7f509842c48db8b23 =
     [ "ckernel_section_layout.h", "ckernel__section__layout_8h.html", "ckernel__section__layout_8h" ],
     [ "ckernel_select_next_id_checked.h", "ckernel__select__next__id__checked_8h.html", "ckernel__select__next__id__checked_8h" ],
     [ "ckernel_strided_unary_checked.h", "ckernel__strided__unary__checked_8h.html", "ckernel__strided__unary__checked_8h" ],
+    [ "ckernel_token_span_mean.h", "ckernel__token__span__mean_8h.html", "ckernel__token__span__mean_8h" ],
     [ "ckernel_transformer_rows_checked.h", "ckernel__transformer__rows__checked_8h.html", "ckernel__transformer__rows__checked_8h" ],
     [ "ckernel_tts.h", "ckernel__tts_8h.html", "ckernel__tts_8h" ],
     [ "cpu_features.h", "cpu__features_8h.html", "cpu__features_8h" ],

@@ -136,6 +136,7 @@ var dir_40856f0cdd4bcafd28810d9265a200f7 =
     [ "strided_unary_checked.c", "strided__unary__checked_8c.html", "strided__unary__checked_8c" ],
     [ "swiglu_kernels.c", "swiglu__kernels_8c.html", "swiglu__kernels_8c" ],
     [ "swiglu_kernels_bf16.c", "swiglu__kernels__bf16_8c.html", "swiglu__kernels__bf16_8c" ],
+    [ "token_span_mean_checked.c", "token__span__mean__checked_8c.html", "token__span__mean__checked_8c" ],
     [ "topk_kernels.c", "topk__kernels_8c.html", "topk__kernels_8c" ],
     [ "transformer_rows_checked.c", "transformer__rows__checked_8c.html", "transformer__rows__checked_8c" ],
     [ "vision_kernels.c", "vision__kernels_8c.html", "vision__kernels_8c" ],
