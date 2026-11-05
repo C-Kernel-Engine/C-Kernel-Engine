@@ -495,14 +495,15 @@ def _full_layer_plan(
 def _first_recurrent_projection_plan(
     ops: list[dict[str, Any]], buffers: dict[str, dict[str, Any]],
     providers: dict[str, dict[str, Any]], state: dict[str, int],
-    config: dict[str, Any],
+    config: dict[str, Any], row_buffers: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any] | None:
     """Admit one mapped projection before the first recurrent state update.
 
     This is deliberately a one-group contract. The gate and subsequent layers
     execute through the ordinary sequence-local generated calls. Snapshot the
-    complete planned call-buffer extents at both cuts, including values whose
-    old contents a later operation could read after a partial write.
+    complete decode-row extents at both cuts, including values whose old
+    contents a later operation could read after a partial write. In a combined
+    runtime the prefill arena may be much larger than the decode-row plan.
     """
     if (config.get("batch_decode_recurrent_first_projection") is not True
             or "recurrent_conv_state_bytes" not in state or len(ops) < 7):
@@ -529,12 +530,19 @@ def _first_recurrent_projection_plan(
     extents: dict[str, int] = {}
     for ref in refs:
         row = buffers.get(ref)
+        decode_row = row_buffers.get(ref) if row_buffers is not None else row
         if (not row or row.get("lifetime") != "call" or row.get("mutable") is not True
                 or type(row.get("size")) is not int or row["size"] <= 0
                 or not re.fullmatch(r"A_[A-Z0-9_]+", str(row.get("define", "")))
-                or not _unaliased(ref, buffers)):
+                or not _unaliased(ref, buffers)
+                or not decode_row or decode_row.get("lifetime") != "call"
+                or decode_row.get("mutable") is not True
+                or decode_row.get("define") != row["define"]
+                or type(decode_row.get("size")) is not int
+                or not 0 < decode_row["size"] <= row["size"]
+                or (row_buffers is not None and not _unaliased(ref, row_buffers))):
             return None
-        extents[ref] = row["size"]
+        extents[ref] = decode_row["size"]
     if (extents[projection["input"]] < projection["input_bytes"]
             or extents[projection["output"]] < projection["output_bytes"]):
         return None
@@ -562,7 +570,8 @@ def _first_recurrent_projection_plan(
 
 
 def resolve_two_row_batch_contract(
-    ops: list[dict[str, Any]], layout: dict[str, Any], config: dict[str, Any]
+    ops: list[dict[str, Any]], layout: dict[str, Any], config: dict[str, Any],
+    *, row_layout: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     """Admit a checked, map-selected two-row decode projection boundary.
 
@@ -583,7 +592,15 @@ def resolve_two_row_batch_contract(
         }
         registry = json.loads((Path(__file__).resolve().parents[1] / "kernel_maps" / "KERNEL_REGISTRY.json").read_text())
         providers = {item["id"]: item for item in registry["kernels"]}
-        plan = _first_recurrent_projection_plan(ops, buffers, providers, state, config)
+        row_buffers = None
+        if row_layout is not None:
+            row_buffers = {
+                row.get("name"): row
+                for row in row_layout.get("memory", {}).get("activations", {}).get("buffers", [])
+                if isinstance(row, dict)
+            }
+        plan = _first_recurrent_projection_plan(
+            ops, buffers, providers, state, config, row_buffers)
         return {"full_layer_plan": plan} if plan else None
     if [op.get("op") for op in ops[:5]] != [
         "dense_embedding_lookup", "residual_save", "attn_norm", "q_proj", "k_proj"
