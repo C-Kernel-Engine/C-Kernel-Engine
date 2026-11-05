@@ -79,12 +79,12 @@ def prepare(view, hidden):
     view("option_counts")[:] = [2, 1]
 
 
-def torch_layer(queries, memory, weights, heads):
+def torch_layer(queries, memory, weights, heads, prefix=PREFIX):
     import torch
     import torch.nn.functional as functional
 
     def tensor(name):
-        return torch.from_numpy(weights[f"{PREFIX}.{name}"])
+        return torch.from_numpy(weights[f"{prefix}.{name}"])
 
     def norm(x, name):
         return functional.layer_norm(x, (x.shape[-1],),
