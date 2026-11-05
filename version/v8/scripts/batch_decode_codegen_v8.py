@@ -31,6 +31,20 @@ def emit_full_layer_batch_api(plan: dict[str, Any], *,
     total = (total + 2 * compact_input_bytes + 63) & ~63
     compact_output_offset = total
     total = (total + 2 * compact_output_bytes + 63) & ~63
+    recurrent_overlap = ""
+    if plan.get("recurrent_state_bytes"):
+        state_bytes = plan["recurrent_state_bytes"]
+        recurrent_overlap = "\n".join(
+            f"""        if (ck_batch_ranges_overlap(workspace, {total}u, live->{name},
+                                    (size_t){state_bytes[name]}u) != 0 ||
+            ck_batch_ranges_overlap(rows, 2 * sizeof(*rows), live->{name},
+                                    (size_t){state_bytes[name]}u) != 0 ||
+            ck_batch_ranges_overlap(rows[0].logits, output_bytes, live->{name},
+                                    (size_t){state_bytes[name]}u) != 0 ||
+            ck_batch_ranges_overlap(rows[1].logits, output_bytes, live->{name},
+                                    (size_t){state_bytes[name]}u) != 0) return -2;"""
+            for name in ("conv", "ssm")
+        )
     work: list[str] = []
     previous_live: list[str] = []
     snapshot_copy_bytes = 0
@@ -208,6 +222,7 @@ CK_EXPORT size_t ck_model_batch_decode_packing_copy_bytes(void) {{
                                     (size_t)KV_CACHE_SIZE) != 0 ||
             ck_batch_ranges_overlap(rows[1].logits, output_bytes, live->kv,
                                     (size_t)KV_CACHE_SIZE) != 0) return -2;
+{recurrent_overlap}
     }}
     for (size_t i = 0; i < 2; ++i) {{
         if (ck_batch_ranges_overlap(rows[i].logits, output_bytes, rows,
