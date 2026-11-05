@@ -4237,6 +4237,7 @@ def generate(
     strict_contracts: bool = False,
     minimum_total_size: int = 0,
     layout_override: Optional[Dict] = None,
+    batch_row_layout: Optional[Dict] = None,
     prefill_continuation_ops: Optional[List[Dict]] = None,
     prefill_tail_ops: Optional[List[Dict]] = None,
 ) -> str:
@@ -4582,7 +4583,17 @@ CK_EXPORT int ck_model_decode_prefill_phase(int32_t token, float *output) {
             resolve_two_row_batch_contract, resolve_mixed_prefill_local_stages)
         from batch_decode_codegen_v8 import emit_two_row_batch_api, emit_full_layer_batch_api
 
-        batch_contract = resolve_two_row_batch_contract(ops, layout, config)
+        # The combined arena uses prefill-sized buffers, while this entry runs
+        # one decode row. Retain the separately planned decode-row capacities
+        # for checked recurrent snapshots; the combined layout still owns the
+        # actual pointer defines and persistent-state contract.
+        if batch_row_layout is None:
+            with open(layout_path) as row_layout_file:
+                row_layout = json.load(row_layout_file)
+        else:
+            row_layout = batch_row_layout
+        batch_contract = resolve_two_row_batch_contract(
+            ops, layout, config, row_layout=row_layout)
         if batch_contract:
             full_layer = batch_contract.get("full_layer_plan")
             if full_layer:

@@ -136,6 +136,7 @@ def _emit_runtime_capability_api(
     generation_config: Dict[str, Any] | None = None,
     *,
     has_mixed_prefill: bool = False,
+    row_layout_obj: Dict[str, Any] | None = None,
 ) -> str:
     """Emit a versioned descriptor from declared IR/configuration semantics."""
     config = dict(ir_obj.get("config", {}) or {})
@@ -186,7 +187,9 @@ def _emit_runtime_capability_api(
         from batch_decode_contract_v8 import resolve_two_row_batch_contract
         if (
             codegen_core_v8._infer_logits_layout(sequence_config, layout_obj) == "last"
-            and resolve_two_row_batch_contract(operations, layout_obj, sequence_config)
+            and resolve_two_row_batch_contract(
+                operations, layout_obj, sequence_config,
+                row_layout=row_layout_obj)
         ):
             capabilities.append("CK_MODEL_CAP_BATCH_DECODE_TWO_ROWS")
     if buffers:
@@ -2744,6 +2747,7 @@ def main(argv: list[str] | None = None) -> int:
         ir_obj = _patch_codegen_config(json.load(f))
     with open(args.layout, "r", encoding="utf-8") as f:
         layout_obj = _patch_codegen_config(json.load(f))
+    decode_row_layout_obj = copy.deepcopy(layout_obj)
     if (ir_obj.get("config") or {}).get("runtime_extent_contract"):
         if not ir_obj.get("entry"):
             raise RuntimeError("bounded call IR is missing its circuit-declared native entry")
@@ -2896,6 +2900,7 @@ def main(argv: list[str] | None = None) -> int:
             profile=args.profile,
             dump=emit_parity_dumps,
             strict_contracts=args.strict_contracts,
+            batch_row_layout=decode_row_layout_obj,
             prefill_continuation_ops=prefill_continuation_ops,
             prefill_tail_ops=prefill_tail_ops if prefill_obj is not None and
                 prefill_obj["config"].get("prefill_tail_continuation_entry") else None,
@@ -2982,6 +2987,7 @@ def main(argv: list[str] | None = None) -> int:
             generation_config_obj,
             has_mixed_prefill=bool(prefill_code) or sequential_mixed_bridge_emitted or
             str(layout_obj.get("mode", "")).lower() == "prefill",
+            row_layout_obj=decode_row_layout_obj,
         )
         generation_policy_api = ""
         if str((ir_obj.get("config") or {}).get("artifact_scope") or "").lower() != "encoder_only":

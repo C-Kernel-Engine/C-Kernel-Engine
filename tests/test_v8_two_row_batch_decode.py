@@ -150,6 +150,21 @@ def _recurrent_fixture() -> tuple[list[dict], dict, dict]:
                           "layer_recurrent_policy": ["recurrent"]}
 
 
+def _hybrid_recurrent_layout(row_layout: dict) -> dict:
+    """Make prefill-sized call arenas with the same checked decode graph."""
+    combined = copy.deepcopy(row_layout)
+    offset = 4096
+    for row in combined["memory"]["activations"]["buffers"]:
+        if row["lifetime"] != "call":
+            continue
+        if row["name"] != "logits":
+            row["size"] *= 8192
+        row["abs_offset"] = offset
+        offset += row["size"] + 64
+    combined["memory"]["arena"]["total_size"] = offset
+    return combined
+
+
 def _layer_fixture() -> tuple[list[dict], dict, dict]:
     ops, layout, config = _fixture()
     def arg(name: str, expr: str, ref: str | None = None, source: str = "dim:test") -> dict:
@@ -279,9 +294,46 @@ class BatchContractTests(unittest.TestCase):
                     self.assertIsNone(resolve_two_row_batch_contract(
                         bad_ops, bad_layout, config))
 
+    def test_hybrid_recurrent_snapshots_use_checked_decode_row_extents(self) -> None:
+        ops, row_layout, config = _recurrent_fixture()
+        combined = _hybrid_recurrent_layout(row_layout)
+        resolved = resolve_two_row_batch_contract(
+            ops, combined, config, row_layout=row_layout)
+        self.assertIsNotNone(resolved)
+        plan = resolved["full_layer_plan"]
+        self.assertEqual(plan["extents"], {
+            "embedded_input": 1024, "residual": 1024,
+            "main_stream_q8": 292, "recurrent_packed": 64,
+        })
+        emitted = emit_full_layer_batch_api(plan)
+        self.assertIn("return 9488u;", emitted)  # two snapshots at each cut
+        self.assertNotIn("8388608u", emitted)
+        capability = _emit_runtime_capability_api(
+            {"config": config, "operations": ops}, combined, None,
+            row_layout_obj=row_layout)
+        self.assertIn("CK_MODEL_CAP_BATCH_DECODE_TWO_ROWS", capability)
+
+        # A mismatched row plan must never advertise the optimized entry.
+        for label, change in (
+            ("missing row", lambda rows: rows.pop("residual")),
+            ("wrong define", lambda rows: rows["residual"].update(define="A_OTHER")),
+            ("undersized input", lambda rows: rows["main_stream_q8"].update(size=291)),
+            ("oversized row", lambda rows: rows["recurrent_packed"].update(size=999999999)),
+        ):
+            with self.subTest(label=label):
+                bad_layout = copy.deepcopy(row_layout)
+                rows = {row["name"]: row for row in bad_layout["memory"]["activations"]["buffers"]}
+                change(rows)
+                if label == "missing row":
+                    bad_layout["memory"]["activations"]["buffers"] = list(rows.values())
+                self.assertIsNone(resolve_two_row_batch_contract(
+                    ops, combined, config, row_layout=bad_layout))
+
     def test_recurrent_generated_entry_matches_isolated_state(self) -> None:
-        ops, layout, config = _recurrent_fixture()
-        plan = resolve_two_row_batch_contract(ops, layout, config)["full_layer_plan"]
+        ops, row_layout, config = _recurrent_fixture()
+        combined = _hybrid_recurrent_layout(row_layout)
+        plan = resolve_two_row_batch_contract(
+            ops, combined, config, row_layout=row_layout)["full_layer_plan"]
         emitted = emit_full_layer_batch_api(plan)
         source_text = r'''
 #define _POSIX_C_SOURCE 200809L
