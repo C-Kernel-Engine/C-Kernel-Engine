@@ -368,12 +368,13 @@ class AccessibleVoiceTest(unittest.TestCase):
                 "--kokoro-bundle-dir", "/pinned/bundle",
                 "--audio-player", "/usr/bin/aplay",
                 "--kokoro-incremental", "--kokoro-synthesis-workers", "3",
+                "--kokoro-technical-mode", "exact",
             ])
         self.assertEqual(status, 0)
         self.assertEqual(speak.call_args.kwargs["arguments"], (
             "--config", "/pinned/config.json", "--bundle-dir", "/pinned/bundle",
             "--player", "/usr/bin/aplay", "--incremental",
-            "--synthesis-workers", "3"))
+            "--synthesis-workers", "3", "--technical-mode", "exact"))
 
     def test_parallel_kokoro_requires_incremental_before_submission(self):
         with mock.patch.object(voice, "submit") as submit, \
@@ -386,6 +387,15 @@ class AccessibleVoiceTest(unittest.TestCase):
                     "--kokoro-bundle-dir", "/pinned/bundle",
                     "--audio-player", "/usr/bin/aplay",
                     "--kokoro-synthesis-workers", "3",
+                ])
+        submit.assert_not_called()
+        with mock.patch.object(voice, "submit") as submit, \
+             mock.patch("sys.stderr", new_callable=io.StringIO):
+            with self.assertRaises(SystemExit):
+                voice.main([
+                    "--text", "Read status", "--agent-id", "cke",
+                    "--project-id", "engine", "--journal", str(self.journal),
+                    "--kokoro-technical-mode", "exact",
                 ])
         submit.assert_not_called()
 

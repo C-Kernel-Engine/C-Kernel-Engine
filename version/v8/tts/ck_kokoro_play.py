@@ -100,7 +100,8 @@ def _write_private_report(path: Path, result: dict) -> None:
 
 
 def play(text: str, config: Path, bundle: Path, player: Path,
-         *, synthesizer: Path | None = None) -> dict:
+         *, synthesizer: Path | None = None,
+         technical_mode: str = "natural") -> dict:
     if not text.strip() or "\x00" in text:
         raise PlaybackError("spoken text is empty or invalid")
     if not player.is_file() or not os.access(player, os.X_OK):
@@ -111,9 +112,12 @@ def play(text: str, config: Path, bundle: Path, player: Path,
         source, output, report = (root / "text.txt", root / "speech.wav",
                                   root / "report.json")
         source.write_text(text, encoding="utf-8")
-        _run([sys.executable, str(synthesizer), "--text-file", str(source),
-              "--config", str(config), "--bundle-dir", str(bundle),
-              "--output", str(output), "--report", str(report)], capture=True)
+        command = [sys.executable, str(synthesizer), "--text-file", str(source),
+                   "--config", str(config), "--bundle-dir", str(bundle),
+                   "--output", str(output), "--report", str(report)]
+        if technical_mode != "natural":
+            command.extend(("--technical-mode", technical_mode))
+        _run(command, capture=True)
         try:
             result = json.loads(report.read_text(encoding="utf-8"))
             _checked_wav(output, result["sample_count"])
@@ -143,6 +147,7 @@ def _exchange(worker: subprocess.Popen, command: str, prefix: str) -> list[str]:
 
 def play_incremental(text: str, config: Path, bundle: Path, player: Path,
                      *, seed: int = 7, synthesis_workers: int = 1,
+                     technical_mode: str = "natural",
                      prepare_plan=None) -> dict:
     """Play checked chunks in order with a bounded number of loaded workers."""
     if not player.is_file() or not os.access(player, os.X_OK):
@@ -158,7 +163,9 @@ def play_incremental(text: str, config: Path, bundle: Path, player: Path,
         finally:
             sys.path.pop(0)
     started = time.monotonic()
-    plan = prepare_plan(text, config, bundle)
+    plan = (prepare_plan(text, config, bundle)
+            if technical_mode == "natural" else
+            prepare_plan(text, config, bundle, technical_mode=technical_mode))
     chunks = plan["chunks"]
     if not chunks or len(chunks) > 512 or seed > (1 << 64) - len(chunks):
         raise PlaybackError("incremental request exceeds checked chunk or seed capacity")
@@ -269,6 +276,8 @@ def play_incremental(text: str, config: Path, bundle: Path, player: Path,
                 plan["source_text"].encode("utf-8")).hexdigest(),
             "bundle_identity_sha256": plan["bundle_identity_sha256"],
             "bundle_manifest_sha256": plan.get("bundle_manifest_sha256"),
+            "technical_mode": technical_mode,
+            "pronunciation_expansions": plan.get("pronunciation_expansions", []),
             "synthesis_workers": active_workers,
             "native_model_loads": len(workers),
             "chunks": played, "sample_count": total_samples,
@@ -289,9 +298,14 @@ def main() -> int:
                         help="play checked chunks while preparing subsequent chunks")
     parser.add_argument("--synthesis-workers", type=int, default=1,
                         help="1..3 loaded native workers for incremental playback")
+    parser.add_argument("--technical-mode", choices=("natural", "exact"),
+                        default="natural",
+                        help="pronounce path components naturally or spell each character")
     parser.add_argument("--report", type=Path,
                         help="write completed playback metrics and source spans")
-    parser.add_argument("text")
+    parser.add_argument("--text-file", type=Path,
+                        help="read the complete reply from a UTF-8 file")
+    parser.add_argument("text", nargs="?")
     args = parser.parse_args()
 
     def interrupted(_signum: int, _frame: object) -> None:
@@ -299,17 +313,22 @@ def main() -> int:
 
     signal.signal(signal.SIGTERM, interrupted)
     try:
+        if (args.text is None) == (args.text_file is None):
+            raise PlaybackError("provide text or --text-file, but not both")
         if not 1 <= args.synthesis_workers <= 3:
             raise PlaybackError("synthesis workers must be in 1..3")
         if not args.incremental and args.synthesis_workers != 1:
             raise PlaybackError("multiple synthesis workers require --incremental")
         if args.report and (args.report.exists() or args.report.is_symlink()):
             raise PlaybackError("report already exists")
-        result = (play_incremental(args.text, args.config, args.bundle_dir,
+        text = args.text_file.read_text(encoding="utf-8") if args.text_file else args.text
+        result = (play_incremental(text, args.config, args.bundle_dir,
                                    args.player,
-                                   synthesis_workers=args.synthesis_workers)
+                                   synthesis_workers=args.synthesis_workers,
+                                   technical_mode=args.technical_mode)
                   if args.incremental else
-                  play(args.text, args.config, args.bundle_dir, args.player))
+                  play(text, args.config, args.bundle_dir, args.player,
+                       technical_mode=args.technical_mode))
         if args.report:
             _write_private_report(args.report, result)
         print(f"CKE Kokoro played {result['sample_count']} samples", flush=True)

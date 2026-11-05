@@ -362,6 +362,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="play checked Kokoro chunks as they are synthesized")
     parser.add_argument("--kokoro-synthesis-workers", type=int, default=1,
                         help="1..3 loaded workers for incremental Kokoro playback")
+    parser.add_argument("--kokoro-technical-mode", choices=("natural", "exact"),
+                        default="natural", help="how Kokoro speaks technical paths")
     args = parser.parse_args(argv)
     try:
         if (args.wav or args.record) and (not args.encoder_run_dir or not args.decoder_run_dir):
@@ -375,6 +377,8 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("Kokoro requires --kokoro-config, --kokoro-bundle-dir and --audio-player")
         if args.kokoro_incremental and not all(kokoro_options):
             parser.error("--kokoro-incremental requires Kokoro options")
+        if args.kokoro_technical_mode != "natural" and not all(kokoro_options):
+            parser.error("--kokoro-technical-mode requires Kokoro options")
         if not 1 <= args.kokoro_synthesis_workers <= 3:
             parser.error("--kokoro-synthesis-workers must be in 1..3")
         if args.kokoro_synthesis_workers != 1 and not args.kokoro_incremental:
@@ -415,6 +419,8 @@ def main(argv: list[str] | None = None) -> int:
                 if args.kokoro_synthesis_workers != 1:
                     arguments += ("--synthesis-workers",
                                   str(args.kokoro_synthesis_workers))
+            if args.kokoro_technical_mode != "natural":
+                arguments += ("--technical-mode", args.kokoro_technical_mode)
             speak_and_control(answer, adapter,
                               arguments=arguments,
                               label="CKE Kokoro")

@@ -24,6 +24,27 @@ SPEC.loader.exec_module(adapter)
 
 
 class KokoroVoicePlaybackTest(unittest.TestCase):
+    def test_cli_accepts_private_text_file_and_rejects_duplicate_source(self):
+        with tempfile.TemporaryDirectory() as folder:
+            source = Path(folder) / "reply.txt"
+            source.write_text("Read /data/cke/report.txt.", encoding="utf-8")
+            base = ["ck_kokoro_play.py", "--config", "config", "--bundle-dir",
+                    "bundle", "--player", "player", "--incremental",
+                    "--text-file", str(source)]
+            original_handler = signal.getsignal(signal.SIGTERM)
+            try:
+                with mock.patch.object(adapter, "play_incremental",
+                                       return_value={"sample_count": 5}) as play, \
+                     mock.patch.object(sys, "argv", base):
+                    self.assertEqual(adapter.main(), 0)
+                self.assertEqual(play.call_args.args[0], source.read_text())
+                with mock.patch.object(adapter, "play_incremental") as play, \
+                     mock.patch.object(sys, "argv", base + ["duplicate"]):
+                    self.assertEqual(adapter.main(), 2)
+                play.assert_not_called()
+            finally:
+                signal.signal(signal.SIGTERM, original_handler)
+
     def test_private_report_rejects_existing_path(self):
         with tempfile.TemporaryDirectory() as folder:
             report = Path(folder) / "report.json"
@@ -125,10 +146,20 @@ class KokoroVoicePlaybackTest(unittest.TestCase):
             self.assertEqual(one["synthesis_workers"], 1)
             self.assertEqual(one["native_model_loads"], 1)
             self.assertEqual(len(launches.read_text().splitlines()), 11)
+            exact_plan = mock.Mock(side_effect=lambda text, config, bundle,
+                                   *, technical_mode:
+                                   {**plan(text, config, bundle),
+                                    "pronunciation_expansions":
+                                        [{"mode": technical_mode}]})
+            exact = adapter.play_incremental("a", root, bundle, player,
+                technical_mode="exact", prepare_plan=exact_plan)
+            self.assertEqual(exact_plan.call_args.kwargs, {"technical_mode": "exact"})
+            self.assertEqual(exact["technical_mode"], "exact")
+            self.assertEqual(exact["pronunciation_expansions"], [{"mode": "exact"}])
             with self.assertRaisesRegex(adapter.PlaybackError, "integer in 1..3"):
                 adapter.play_incremental("a", root, bundle, player,
                                          synthesis_workers=4, prepare_plan=plan)
-            self.assertEqual(len(launches.read_text().splitlines()), 11)
+            self.assertEqual(len(launches.read_text().splitlines()), 12)
 
     def test_parallel_sigterm_reaps_workers_and_active_player(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -207,6 +238,7 @@ class KokoroVoicePlaybackTest(unittest.TestCase):
                 "p=argparse.ArgumentParser()\n"
                 "for name in ('text-file','config','bundle-dir','output','report'):\n"
                 " p.add_argument('--'+name)\n"
+                "p.add_argument('--technical-mode',default='natural')\n"
                 "a=p.parse_args()\n"
                 "text=Path(a.text_file).read_text()\n"
                 "with wave.open(a.output,'wb') as w:\n"
@@ -214,7 +246,8 @@ class KokoroVoicePlaybackTest(unittest.TestCase):
                 " w.writeframes(b'\\0\\0'*8)\n"
                 "Path(a.report).write_text(json.dumps({'status':'execution_pass',"
                 "'sample_count': 9 if text == 'bad' else 8,"
-                "'source_sha256': hashlib.sha256(text.strip().encode()).hexdigest()}))\n",
+                "'source_sha256': hashlib.sha256(text.strip().encode()).hexdigest(),"
+                "'technical_mode':a.technical_mode}))\n",
                 encoding="utf-8")
             player.write_text(
                 "#!/usr/bin/env python3\nimport sys\nfrom pathlib import Path\n"
@@ -223,10 +256,15 @@ class KokoroVoicePlaybackTest(unittest.TestCase):
             player.chmod(0o700)
             result = adapter.play("Hello.", root, root, player, synthesizer=synth)
             self.assertEqual(result["sample_count"], 8)
+            self.assertEqual(result["technical_mode"], "natural")
             self.assertFalse(Path(marker.read_text()).exists())
             marker.unlink()
             adapter.play(" Hello. ", root, root, player, synthesizer=synth)
             self.assertTrue(marker.exists())
+            marker.unlink()
+            exact = adapter.play("/data/file", root, root, player,
+                                 synthesizer=synth, technical_mode="exact")
+            self.assertEqual(exact["technical_mode"], "exact")
             marker.unlink()
             with self.assertRaises(adapter.PlaybackError):
                 adapter.play("bad", root, root, player, synthesizer=synth)
