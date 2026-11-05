@@ -932,6 +932,10 @@ TEST_SUITES = {
         "Checked Integer Span State Copy", "kernels",
         ROOT / "tests" / "test_v8_copy_i32_span_checked.py",
     ),
+    "decision_token_span_mean_checked": TestSuite(
+        "Checked Token Span Mean and Generated Decision-Head Input", "kernels",
+        ROOT / "tests" / "test_v8_token_span_mean_checked.py",
+    ),
     "tts_equal_i32_scalar_checked": TestSuite(
         "Checked Integer Expected-State Comparison", "kernels",
         ROOT / "tests" / "test_v8_equal_i32_scalar_checked.py",
