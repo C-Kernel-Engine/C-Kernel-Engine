@@ -944,6 +944,10 @@ TEST_SUITES = {
         "Clef-Flash Generated First Evidence Routing Layer", "inference",
         ROOT / "tests" / "test_v8_clef_flash_evidence0.py",
     ),
+    "decision_clef_flash_evidence_complete": TestSuite(
+        "Clef-Flash Generated Complete Evidence Routing", "inference",
+        ROOT / "tests" / "test_v8_clef_flash_evidence_complete.py",
+    ),
     "decision_attention_cross_checked": TestSuite(
         "Checked Noncausal Cross Attention", "kernels",
         ROOT / "tests" / "test_v8_attention_cross_token_major_checked.py",
