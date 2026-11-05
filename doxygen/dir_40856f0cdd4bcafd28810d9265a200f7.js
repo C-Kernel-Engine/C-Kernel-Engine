@@ -91,6 +91,7 @@ var dir_40856f0cdd4bcafd28810d9265a200f7 =
     [ "indexed_sum_rows_checked.c", "indexed__sum__rows__checked_8c.html", "indexed__sum__rows__checked_8c" ],
     [ "kokoro_shape_bounds.c", "kokoro__shape__bounds_8c.html", "kokoro__shape__bounds_8c" ],
     [ "kv_cache_kernels.c", "kv__cache__kernels_8c.html", "kv__cache__kernels_8c" ],
+    [ "last_valid_row_checked.c", "last__valid__row__checked_8c.html", "last__valid__row__checked_8c" ],
     [ "layernorm_kernels.c", "layernorm__kernels_8c.html", "layernorm__kernels_8c" ],
     [ "layernorm_kernels_bf16.c", "layernorm__kernels__bf16_8c.html", "layernorm__kernels__bf16_8c" ],
     [ "layernorm_rows_checked.c", "layernorm__rows__checked_8c.html", "layernorm__rows__checked_8c" ],
