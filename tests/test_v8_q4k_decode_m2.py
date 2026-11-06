@@ -28,14 +28,17 @@ def _cpu_flags() -> set[str]:
 class Q4KDecodeM2Tests(unittest.TestCase):
     def test_packed_two_row_decode_matches_one_row_contract(self) -> None:
         flags = _cpu_flags()
-        lanes = (
+        lanes = [
             ("portable", (), True),
-            ("avx2", ("-mavx2", "-mfma", "-mf16c"),
-             {"avx2", "fma", "f16c"} <= flags),
-            ("avx512", ("-mavx512f", "-mavx512bw", "-mavx512vl",
-                        "-mavx512vnni", "-mavx2", "-mfma", "-mf16c"),
-             {"avx512f", "avx512bw", "avx512vl", "avx512_vnni", "fma", "f16c"} <= flags),
-        )
+        ]
+        if platform.machine().lower() in {"x86_64", "amd64", "i386", "i686"}:
+            lanes.extend([
+                ("avx2", ("-mavx2", "-mfma", "-mf16c"),
+                 {"avx2", "fma", "f16c"} <= flags),
+                ("avx512", ("-mavx512f", "-mavx512bw", "-mavx512vl",
+                            "-mavx512vnni", "-mavx2", "-mfma", "-mf16c"),
+                 {"avx512f", "avx512bw", "avx512vl", "avx512_vnni", "fma", "f16c"} <= flags),
+            ])
         with tempfile.TemporaryDirectory(prefix="cke-q4k-m2-") as directory:
             for name, isa, supported in lanes:
                 with self.subTest(isa=name):
