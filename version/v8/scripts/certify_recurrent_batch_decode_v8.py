@@ -220,14 +220,29 @@ def certify(bundle: Path, *, swap_row_order: bool = False,
         compare('b', 4, b_out)
         for handle in (handles['b'], handles['c']):
             check(model.ck_model_sequence_state_destroy(handle), 'destroy')
+        engine = c.CDLL(str(bundle / 'libckernel_engine.so'))
+        engine.ck_threadpool_global.argtypes = []
+        engine.ck_threadpool_global.restype = c.c_void_p
+        engine.ck_threadpool_n_threads.argtypes = [c.c_void_p]
+        engine.ck_threadpool_n_threads.restype = c.c_int
+        resolved_workers = engine.ck_threadpool_n_threads(engine.ck_threadpool_global())
+        if resolved_workers < 1:
+            raise AssertionError('invalid loaded thread-pool width')
+        weights_path = bundle / 'weights.bump'
+        with weights_path.open('rb') as weights_file:
+            weights_sha256 = hashlib.file_digest(weights_file, 'sha256').hexdigest()
         return {'status': 'PASS', 'source_sha256': hashlib.sha256(source).hexdigest(),
                 'loaded_libraries': libraries,
-                'weights_path': str((bundle / 'weights.bump').resolve()),
-                'weights_bytes': (bundle / 'weights.bump').stat().st_size,
+                'weights_path': str(weights_path.resolve()),
+                'weights_bytes': weights_path.stat().st_size,
+                'weights_sha256': weights_sha256,
+                'weights_manifest_sha256': hashlib.sha256(
+                    (bundle / 'weights_manifest.json').read_bytes()).hexdigest(),
                 'layout_sha256': hashlib.sha256((bundle / 'layout_decode.json').read_bytes()).hexdigest(),
                 'tokens': tokens, 'row_order': list(order),
                 'projection_groups': actual_groups,
-                'threads': os.getenv('CK_NUM_THREADS'),
+                'requested_threads': os.getenv('CK_NUM_THREADS'),
+                'resolved_threads': resolved_workers,
                 'cpu': next((line.partition(':')[2].strip() for line in
                              Path('/proc/cpuinfo').read_text().splitlines()
                              if line.startswith('model name')), platform.processor()),
