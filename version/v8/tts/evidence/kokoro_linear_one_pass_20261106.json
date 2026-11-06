@@ -1,0 +1,61 @@
+{
+  "schema": "cke.kokoro.linear_one_pass_performance.v1",
+  "date_utc": "2026-11-06",
+  "host_cpu": "Intel Core i7-14700T",
+  "baseline_source_sha256": "459e1255bf7074606ef2bb4b9115c0cdee5800a7a480c1c5cb517741dc66f830",
+  "optimized_source_sha256": "2e7ed28b7fec0c7f1a614f23c6c7a119e4067207ac510800d77abca6155fa14b",
+  "baseline_generated_library_sha256": "53708cd716edd1b6655d6dea828a958655479a362f64c6e21b113203c173b314",
+  "optimized_generated_library_sha256": "13c615169d93bc84fd79675037a055e4721ed95efeee9a61ed63f02322c31723",
+  "bundle_identity_sha256": "24f4b2428aa0099a618677e27fc4aea48c4f271d7a45256dfaf815bb2b612ac3",
+  "bundle_conv_provider": "avx2_parallel",
+  "bundle_conv_workers": 8,
+  "change": "A validated absolute bound permits one FP64 dot pass for ordinary finite inputs. Extreme values retain the existing two-pass result staging. Dot arithmetic and output publication order are unchanged.",
+  "kernel_fixture": {
+    "shape": [
+      36,
+      128,
+      768
+    ],
+    "compile_flags": [
+      "-O2",
+      "-ffp-contract=off"
+    ],
+    "repetitions": 20,
+    "baseline_median_ms": 4.2248,
+    "optimized_median_ms": 2.1458,
+    "bitwise_equal": true
+  },
+  "native_session": {
+    "sample_counts": [
+      56400,
+      66600
+    ],
+    "baseline_elapsed_seconds": [
+      13.5087,
+      13.4525
+    ],
+    "optimized_elapsed_seconds": [
+      11.1428,
+      11.0564
+    ],
+    "baseline_median_seconds": 13.4806,
+    "optimized_median_seconds": 11.0996,
+    "time_reduction_percent": 17.66,
+    "wav_sha256": [
+      "b1a64fb48db2d1ffeb518926306c34eeeda7be786bc313bdd9cb6269adde649f",
+      "0440e115f7085bd104cd990fa57de695a07720d6f98876b9e8a385e71e9222d8"
+    ],
+    "all_wav_hashes_match": true
+  },
+  "validation": [
+    "python3 -m unittest tests.test_v8_linear_rows_oracle: 5 passed, 1 PyTorch live skip",
+    "TMPDIR=/run/user/1000 python3 -m unittest tests.test_v8_kokoro_generated_projection tests.test_v8_kokoro_runtime_header: 7 passed, 1 asset skip",
+    "two paired full generated native sessions on the same model package and voice",
+    "TMPDIR=/run/user/1000 python3 -m unittest tests.test_v8_kokoro_generated_f0_source tests.test_v8_kokoro_generated_albert_layer: 8 passed, 1 asset skip"
+  ],
+  "limitations": [
+    "two session timings per variant on one Intel host",
+    "complete waveform is byte-identical to CKE baseline, not independently certified against pinned PyTorch by this test",
+    "no headset first-audio or Ryzen/P3 timing in this experiment"
+  ]
+}

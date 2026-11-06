@@ -77,6 +77,43 @@ class LinearRowsOracleTest(unittest.TestCase):
         self.assertTrue(np.all(out[:, 2:] == -777.))
         self.assertEqual(self.call(x, w, b, out, 2, 3, 2, 4, 4, 4), 0)
 
+    def test_fp64_order_on_ordinary_nonzero_rows(self):
+        rng = np.random.default_rng(37)
+        x = rng.standard_normal((3, 17)).astype(np.float32)
+        w = rng.standard_normal((7, 17)).astype(np.float32)
+        b = rng.standard_normal(7).astype(np.float32)
+        out = np.full((3, 9), -777., dtype=np.float32)
+        self.assertEqual(self.call(x, w, b, out, 3, 17, 7, ys=9), 0)
+        expected = np.empty((3, 7), dtype=np.float32)
+        for row in range(3):
+            for channel in range(7):
+                acc = float(b[channel])
+                for column in range(17):
+                    acc += float(x[row, column]) * float(w[channel, column])
+                expected[row, channel] = np.float32(acc)
+        np.testing.assert_array_equal(out[:, :7], expected)
+        self.assertTrue(np.all(out[:, 7:] == -777.))
+
+    def test_extreme_cancellation_and_late_overflow_staging(self):
+        x = np.array([[1e38, 1e38], [1., 1.]], dtype=np.float32)
+        w = np.array([[1e38, -1e38]], dtype=np.float32)
+        b = np.array([0.], dtype=np.float32)
+        out = np.array([[-777.], [-777.]], dtype=np.float32)
+        # The absolute bound is inconclusive, but the exact result is finite.
+        self.assertEqual(self.call(x, w, b, out, 2, 2, 1), 0)
+        np.testing.assert_array_equal(out, np.zeros((2, 1), dtype=np.float32))
+
+        x = np.array([[1., 1.], [1e38, 1e38]], dtype=np.float32)
+        w = np.array([[1., 1.], [1e38, 1e38]], dtype=np.float32)
+        b = np.array([0., 0.], dtype=np.float32)
+        out = np.full((2, 2), -777., dtype=np.float32)
+        # A later result exceeds FP32 after earlier results would have passed.
+        self.assertNotEqual(self.call(x, w, b, out, 2, 2, 2), 0)
+        self.assertTrue(np.all(out == -777.))
+        w[1] = [1., 1.]
+        self.assertEqual(self.call(x, w, b, out, 2, 2, 2), 0)
+        self.assertTrue(np.isfinite(out).all())
+
     def test_rejections_leave_output_unchanged(self):
         x = np.array([1., 2., 3., 4.], dtype=np.float32)
         w = np.array([1., 2., 3., 4.], dtype=np.float32)
