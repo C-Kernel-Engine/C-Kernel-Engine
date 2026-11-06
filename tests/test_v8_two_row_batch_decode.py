@@ -228,6 +228,28 @@ def _recurrent_three_group_fixture() -> tuple[list[dict], dict, dict]:
     return ops, layout, config
 
 
+def _recurrent_six_group_fixture() -> tuple[list[dict], dict, dict]:
+    ops, layout, config = _recurrent_three_group_fixture()
+    for row in layout["memory"]["activations"]["buffers"]:
+        if row["name"] in ("recurrent_conv_state", "recurrent_ssm_state"):
+            row["shape"] = "[2, 8]"
+    second = copy.deepcopy(ops[1:9])
+    for op in second:
+        op["layer"] = 1
+        for arg in op.get("args", []):
+            arg["expr"] = arg["expr"].replace("W_LAYER_0_", "W_LAYER_1_")
+            for name in ("RECURRENT_CONV_STATE", "RECURRENT_SSM_STATE"):
+                arg["expr"] = arg["expr"].replace(
+                    f"model->bump + A_{name})",
+                    f"model->bump + (A_{name} + 32))")
+    ops[9]["layer"] = 2
+    ops[9:9] = second
+    config["num_layers"] = 2
+    config["layer_recurrent_policy"] = ["recurrent", "recurrent"]
+    config["batch_decode_recurrent_shared_layers"] = 2
+    return ops, layout, config
+
+
 def _layer_fixture() -> tuple[list[dict], dict, dict]:
     ops, layout, config = _fixture()
     def arg(name: str, expr: str, ref: str | None = None, source: str = "dim:test") -> dict:
@@ -475,6 +497,92 @@ class BatchContractTests(unittest.TestCase):
                 change(bad_ops, bad_layout)
                 self.assertIsNone(resolve_two_row_batch_contract(
                     bad_ops, bad_layout, config, row_layout=row_layout))
+
+    def test_two_recurrent_layers_share_only_mapped_projection_cuts(self) -> None:
+        ops, row_layout, config = _recurrent_six_group_fixture()
+        combined = _hybrid_recurrent_layout(row_layout)
+        admitted = resolve_two_row_batch_contract(
+            ops, combined, config, row_layout=row_layout)
+        self.assertIsNotNone(admitted)
+        plan = admitted["full_layer_plan"]
+        self.assertEqual(plan["shared_layers"], [0, 1])
+        self.assertEqual(plan["projection_groups"], 6)
+        self.assertEqual([stage["kind"] for stage in plan["stages"]],
+                         ["local", "shared", "local", "shared", "local",
+                          "shared", "local", "shared", "local"])
+        self.assertEqual([len(stage["projections"]) for stage in plan["stages"]
+                          if stage["kind"] == "shared"], [2, 1, 2, 1])
+        self.assertIn("recurrent_z", plan["stages"][5]["live_after"])
+        self.assertIn("W_LAYER_1_ATTN_GATE", emit_full_layer_batch_api(plan))
+        self.assertIsNone(resolve_two_row_batch_contract(
+            ops, combined, {**config, "batch_decode_recurrent_shared_layers": 3},
+            row_layout=row_layout))
+        for label, mutation in (
+            ("missing second QKV", lambda o: o[12].update(op="unsupported_qkv")),
+            ("wrong second gate binding", lambda o: o[13]["call_abi"].update(
+                kernel_id="gemv_q5_k")),
+            ("noncontiguous layer", lambda o: o[14].update(layer=0)),
+            ("layer order resumes earlier layer", lambda o: o[17].update(layer=0)),
+            ("wrong layer state slice", lambda o: next(
+                arg for arg in o[14]["args"] if arg["name"] == "conv").update(
+                    expr="(float*)(model->bump + A_RECURRENT_CONV_STATE)")),
+        ):
+            with self.subTest(label=label):
+                bad = copy.deepcopy(ops)
+                mutation(bad)
+                self.assertIsNone(resolve_two_row_batch_contract(
+                    bad, combined, config, row_layout=row_layout))
+        # A value produced after the first gate and used in layer 1 must be
+        # preserved at the intervening cuts. An unproven extent fails closed.
+        bad = copy.deepcopy(ops)
+        bad[7]["args"].append({"name": "extra", "source": "output:extra",
+            "expr": "(float*)(model->bump + A_UNPROVEN)", "buffer_ref": "unproven"})
+        bad[14]["args"].append({"name": "extra", "source": "activation:extra",
+            "expr": "(const float*)(model->bump + A_UNPROVEN)", "buffer_ref": "unproven"})
+        self.assertIsNone(resolve_two_row_batch_contract(
+            bad, combined, config, row_layout=row_layout))
+
+    def test_two_recurrent_layers_execute_generated_entry(self) -> None:
+        ops, row_layout, config = _recurrent_six_group_fixture()
+        plan = resolve_two_row_batch_contract(
+            ops, _hybrid_recurrent_layout(row_layout), config,
+            row_layout=row_layout)["full_layer_plan"]
+        fixture = (ROOT / "tests/fixtures/recurrent_two_layer_entry.c").read_text()
+        emitted = emit_full_layer_batch_api(plan)
+        self.assertIn("return 6;", emitted)
+        self.assertIn("return 2;", emitted)
+        source = fixture.replace("/* BATCH_API */", emitted)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "entry.c"
+            binary = Path(directory) / "entry"
+
+            def run(text: str) -> subprocess.CompletedProcess[str]:
+                path.write_text(text)
+                built = subprocess.run(
+                    ["cc", "-std=c11", "-O0", "-Wall", "-Werror",
+                     "-Wno-unused-function", "-Wno-unused-variable",
+                     str(path), "-o", str(binary)], capture_output=True, text=True)
+                self.assertEqual(built.returncode, 0, built.stderr)
+                return subprocess.run([str(binary)], capture_output=True, text=True)
+
+            result = run(source)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            restores = list(re.finditer(
+                r"(?m)^        ck_batch_memcpy\(g_model->bump \+ A_RECURRENT_Z, base \+ [^\n]+\n",
+                source))
+            self.assertGreaterEqual(len(restores), 2)
+            missing_layer_one_gate = (source[:restores[-1].start()]
+                                      + source[restores[-1].end():])
+            self.assertNotEqual(run(missing_layer_one_gate).returncode, 0)
+            wrong_owner = source.replace(
+                "static void ck_batch_stage_6(CKModel *model, int token) {\n"
+                "    (void)token;\n"
+                "    CKSequenceStateV8 *s = g_active_sequence;",
+                "static void ck_batch_stage_6(CKModel *model, int token) {\n"
+                "    (void)token;\n"
+                "    CKSequenceStateV8 *s = &g_sequence_states[0];")
+            self.assertNotEqual(wrong_owner, source)
+            self.assertNotEqual(run(wrong_owner).returncode, 0)
 
     def test_recurrent_generated_entry_matches_isolated_state(self) -> None:
         ops, row_layout, config = _recurrent_fixture()
