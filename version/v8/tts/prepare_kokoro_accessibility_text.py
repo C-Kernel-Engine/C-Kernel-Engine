@@ -16,6 +16,7 @@ import os
 from pathlib import Path
 import re
 import sys
+import threading
 from types import SimpleNamespace
 
 
@@ -27,6 +28,7 @@ PREFERRED_REQUEST_IDS = 40  # Reserve 41..48 for an indivisible G2P token.
 PINNED_SHA256 = {
     "config": "5abb01e2403b072bf03d04fde160443e209d7a0dad49a423be15196b9b43c17f",
     "misaki_en": "a9c36c90a3fa6c6084e9042fd8e19f6049add4f1435d8fe5ca1b77f3529a98f4",
+    "misaki_espeak": "ebc39e807eeae7b99322109d8477aa16b605427f9cc852a4b1f6f72c45806a09",
     "kokoro_pipeline": "499982bbc23a1019681cdb4c327c1d911e7034e240721b95686ff1a8f15c2a9a",
     "us_gold": "dc414872a49a28ae6c141463d502fd945f3b2fde040484fdc47d00cc4612686f",
     "espeak_library": "b15ce0803b26254e8a0d088c6b9281a2637b2b02613147cc320cfdefaf2c3ccf",
@@ -36,10 +38,22 @@ PATH_SEPARATORS = {"/": "slash", "-": "dash", "_": "underscore",
                    ".": "dot"}
 EMBEDDED_VERSION = re.compile(r"([A-Za-z]+)([0-9]+\.[0-9]+)\Z")
 SIGNED_DECIMAL = re.compile(r"([+-])([0-9]+\.[0-9]+)\Z")
+_PINNED_PIPELINE_LOCK = threading.RLock()
+_PINNED_PIPELINE = None
+_PINNED_PIPELINE_PID = None
 
 
 class TextPlanError(ValueError):
     """Input cannot be represented safely by this pinned Kokoro frontend."""
+
+
+def _build_pinned_pipeline(pipeline_type, fallback_type):
+    candidate = pipeline_type(lang_code="a", model=False,
+                              repo_id="hexgrad/Kokoro-82M")
+    fallback = getattr(getattr(candidate, "g2p", None), "fallback", None)
+    if not isinstance(fallback, fallback_type):
+        raise TextPlanError("pinned English EspeakFallback unavailable")
+    return candidate
 
 
 def sha256(path: Path) -> str:
@@ -339,6 +353,7 @@ def plan_tokens(text: str, tokens: list, vocab: dict[str, int],
 
 def prepare(text: str, config_path: Path, bundle_path: Path,
             *, technical_mode: str = "natural") -> dict:
+    global _PINNED_PIPELINE, _PINNED_PIPELINE_PID
     spoken_text = text.strip()
     if not spoken_text:
         raise TextPlanError("empty text")
@@ -359,7 +374,7 @@ def prepare(text: str, config_path: Path, bundle_path: Path,
     try:
         import espeakng_loader
         from kokoro.pipeline import KPipeline
-        from misaki import en
+        from misaki import en, espeak
         import spacy
     except ImportError as error:
         raise TextPlanError(f"pinned text frontend dependency unavailable: {error}") from error
@@ -367,6 +382,7 @@ def prepare(text: str, config_path: Path, bundle_path: Path,
         raise TextPlanError("pinned en_core_web_sm package unavailable")
     paths = {
         "misaki_en": Path(inspect.getfile(en)),
+        "misaki_espeak": Path(inspect.getfile(espeak)),
         "kokoro_pipeline": Path(inspect.getfile(KPipeline)),
         "us_gold": Path(inspect.getfile(en)).parent / "data/us_gold.json",
         "espeak_library": Path(espeakng_loader.get_library_path()),
@@ -381,17 +397,25 @@ def prepare(text: str, config_path: Path, bundle_path: Path,
     if importlib.metadata.version("en_core_web_sm") != "3.8.0":
         raise TextPlanError("pinned en_core_web_sm version mismatch")
 
-    pipeline = KPipeline(lang_code="a", model=False,
-                         repo_id="hexgrad/Kokoro-82M")
-    if pipeline.g2p.fallback is None:
-        raise TextPlanError("pinned English G2P fallback unavailable")
-    reference_phonemes, tokens = pipeline.g2p(spoken_text)
-    if reference_phonemes != _phonemes(tokens):
-        raise TextPlanError("pinned phonemizer text and token phonemes disagree")
-    tokens, decimal_expansions = expand_technical_decimals(
-        tokens, lambda word: pipeline.g2p(word)[0])
-    tokens, path_expansions = expand_technical_paths(
-        tokens, lambda word: pipeline.g2p(word)[0], technical_mode)
+    # KPipeline silently switches to a neural fallback if constructing a new
+    # EspeakFallback fails (for example, when its temporary library copy hits
+    # disk quota). Reuse the checked instance within this process and reject
+    # any different fallback instead of changing pronunciation mid-session.
+    with _PINNED_PIPELINE_LOCK:
+        if _PINNED_PIPELINE is None or _PINNED_PIPELINE_PID != os.getpid():
+            _PINNED_PIPELINE = _build_pinned_pipeline(
+                KPipeline, espeak.EspeakFallback)
+            _PINNED_PIPELINE_PID = os.getpid()
+        pipeline = _PINNED_PIPELINE
+        if not isinstance(pipeline.g2p.fallback, espeak.EspeakFallback):
+            raise TextPlanError("pinned English EspeakFallback changed")
+        reference_phonemes, tokens = pipeline.g2p(spoken_text)
+        if reference_phonemes != _phonemes(tokens):
+            raise TextPlanError("pinned phonemizer text and token phonemes disagree")
+        tokens, decimal_expansions = expand_technical_decimals(
+            tokens, lambda word: pipeline.g2p(word)[0])
+        tokens, path_expansions = expand_technical_paths(
+            tokens, lambda word: pipeline.g2p(word)[0], technical_mode)
     expansions = decimal_expansions + path_expansions
     chunks = plan_tokens(spoken_text, tokens, vocab, set(counts))
     return {
@@ -412,6 +436,7 @@ def prepare(text: str, config_path: Path, bundle_path: Path,
         "bundle_manifest_sha256": manifest_hash,
         "bundle_identity_sha256": manifest.get("bundle_identity_sha256"),
         "frontend_sha256": PINNED_SHA256,
+        "g2p_fallback": "misaki.espeak.EspeakFallback",
         "spacy_model_version": "3.8.0",
         "max_request_ids": MAX_REQUEST_IDS,
         "chunks": chunks,
