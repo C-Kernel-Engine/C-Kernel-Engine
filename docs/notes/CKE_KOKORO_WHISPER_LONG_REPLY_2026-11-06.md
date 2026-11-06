@@ -2,8 +2,10 @@
 
 This run used CKE-generated Kokoro audio and CKE-generated Whisper base. It did
 not use LinuxUtilities or a reference model to synthesize or transcribe audio.
-The input was a varied 1,133-word technical reply beginning with the current
-264-word `server_summary.txt` snapshot. Its raw SHA-256 was
+The input was the committed
+`version/v8/test_assets/kokoro_long_reply/technical_summary_20261106.txt`,
+a varied 1,133-word technical reply beginning with the then-current 264-word
+`server_summary.txt` snapshot. Its raw SHA-256 was
 `0bbca9d04ece5e012929adcd8093f6e8117e2c9e93a6489e54b0c4e65eb4bdf7`.
 
 | Boundary | Result |

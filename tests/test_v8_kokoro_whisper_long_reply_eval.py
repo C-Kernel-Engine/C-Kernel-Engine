@@ -14,6 +14,15 @@ SCRIPT = (Path(__file__).resolve().parents[1] / "version/v8/tts"
 SPEC = importlib.util.spec_from_file_location("kokoro_whisper_long_reply", SCRIPT)
 evaluator = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(evaluator)
+SOURCE_FIXTURE = (Path(__file__).resolve().parents[1] / "version/v8/test_assets"
+                  / "kokoro_long_reply/technical_summary_20261106.txt")
+
+
+def test_retained_real_source_has_expected_identity():
+    source = SOURCE_FIXTURE.read_bytes()
+    assert hashlib.sha256(source).hexdigest() == (
+        "0bbca9d04ece5e012929adcd8093f6e8117e2c9e93a6489e54b0c4e65eb4bdf7")
+    assert len(source.decode("utf-8").split()) == 1133
 
 
 def _write_json(path, value):
