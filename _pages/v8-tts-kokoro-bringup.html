@@ -15,6 +15,30 @@
 <p><a href="index.html">C-Kernel-Engine</a> / TTS bring-up</p>
 <h1>Kokoro TTS bring-up</h1>
 <h2>Current generated execution status</h2>
+<p><strong>Long-document planning, asset-free contract:</strong>
+<code>version/v8/tts/prepare_kokoro_document.py</code> partitions up to
+1,000,000 UTF-8 bytes at checked sentence or whitespace boundaries, delegates
+every window to the existing pinned Kokoro text planner, and maps every speech
+chunk back to an absolute original-document span. It rejects unsupported
+windows and changed frontend/bundle identities before playback.
+<code>ck_kokoro_play.py --incremental --document</code> then uses the existing
+bounded audio spool and keeps its native worker loaded across document chunks.
+The source-coverage test includes a synthetic document over 10,000 words; it
+does not claim that a real 10,000-word document was synthesized or heard.
+An optional private progress file records only chunks whose player has exited
+successfully. <code>--resume</code> rechecks document, seed, frontend, voice and
+bundle identities, then restarts at the next chunk. An interrupted sentence
+may replay when its completion was not acknowledged. Audio files stay in a
+bounded temporary spool; the whole document WAV is never held in memory.
+Continuous listening is not certified while synthesis may be slower than
+audio playback. For a local asset-backed trial, use
+<code>ck_kokoro_play.py --incremental --document --text-file DOCUMENT
+--config CONFIG --bundle-dir BUNDLE --player PLAYER --progress-file PROGRESS
+--session-id DOCUMENT-SESSION</code>, adding <code>--resume</code> after an
+interruption. Keep a new report path for each invocation.
+Run <code>python3 scripts/nightly_runner.py --tests tts_kokoro_document_plan
+tts_kokoro_voice_playback</code> for the asset-free contracts. A real Sony
+headset trial and connected waveform parity remain separate gates.</p>
 <p><strong>Local accessible voice control, first slice:</strong>
 <code>version/v8/scripts/ck_accessible_voice.py</code> can explicitly record a
 16 kHz mono WAV from a selected ALSA input, run CKE Whisper, show an editable
