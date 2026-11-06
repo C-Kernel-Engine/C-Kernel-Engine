@@ -160,13 +160,17 @@ def _boundary_rank(token: object) -> int:
     return 0
 
 
-def _legal_boundary(tokens: list, first: int, end: int) -> bool:
+_CONNECTORS = {"and", "or", "but", "to", "of", "the", "a", "an"}
+
+
+def _legal_boundary(tokens: list, first: int, end: int,
+                    *, allow_connector_tail: bool = False) -> bool:
     if end == len(tokens):
         return True
     last, following = tokens[end - 1], tokens[end]
     if following.phonemes in (".", ",", "!", "?", ";", ":") and not last.whitespace:
         return False
-    if last.text.strip().casefold() in {"and", "or", "but", "to", "of", "the", "a", "an"}:
+    if not allow_connector_tail and last.text.strip().casefold() in _CONNECTORS:
         return False
     # A list number and its dot belong to the following list item.
     if (last.text == "." and end - first >= 2 and
@@ -197,9 +201,12 @@ def plan_tokens(text: str, tokens: list, vocab: dict[str, int],
     if max(supported_counts) > MAX_REQUEST_IDS:
         raise TextPlanError(f"bundle exceeds the native {MAX_REQUEST_IDS}-ID request contract")
 
-    chunks = []
-    first = 0
-    while first < len(tokens):
+    # A locally attractive boundary can strand a connector before a long
+    # indivisible number/name. Compute suffix feasibility before selecting
+    # each chunk. Relax connector-tail boundaries only when a complete plan
+    # requires them; punctuation and list-item guards remain mandatory.
+    candidate_cache = []
+    for first in range(len(tokens)):
         overlong_token = len(_phonemes(tokens[first:first + 1])) + 2 > PREFERRED_REQUEST_IDS
         request_limit = MAX_REQUEST_IDS if overlong_token else PREFERRED_REQUEST_IDS
         candidates = []
@@ -208,8 +215,32 @@ def plan_tokens(text: str, tokens: list, vocab: dict[str, int],
             count = len(ps) + 2
             if count > request_limit:
                 break
-            if count in supported_counts and _legal_boundary(tokens, first, end):
-                candidates.append((end, ps, _boundary_rank(tokens[end - 1]), count))
+            if count in supported_counts and _legal_boundary(
+                    tokens, first, end, allow_connector_tail=True):
+                forced_connector = (end < len(tokens) and
+                    tokens[end - 1].text.strip().casefold() in _CONNECTORS)
+                starts_connector = (end < len(tokens) and
+                    tokens[end].text.strip().casefold() in _CONNECTORS)
+                candidates.append((end, ps, _boundary_rank(tokens[end - 1]),
+                                   count, int(forced_connector), int(starts_connector)))
+        candidate_cache.append(candidates)
+    best_cost = [None] * (len(tokens) + 1)
+    best_cost[-1] = (0, 0)
+    for first in range(len(tokens) - 1, -1, -1):
+        costs = [(candidate[4] + best_cost[candidate[0]][0],
+                  candidate[5] + best_cost[candidate[0]][1])
+                 for candidate in candidate_cache[first]
+                 if best_cost[candidate[0]] is not None]
+        if costs:
+            best_cost[first] = min(costs)
+
+    chunks = []
+    first = 0
+    while first < len(tokens):
+        candidates = [candidate for candidate in candidate_cache[first]
+                      if best_cost[candidate[0]] is not None and
+                      (candidate[4] + best_cost[candidate[0]][0],
+                       candidate[5] + best_cost[candidate[0]][1]) == best_cost[first]]
         if not candidates:
             raise TextPlanError(
                 f"no supported chunk ending after {tokens[first].text!r}; "
@@ -220,12 +251,13 @@ def plan_tokens(text: str, tokens: list, vocab: dict[str, int],
         # resulting chunks instead of stranding its last word.
         strong = [item for item in candidates if item[2] == 2]
         weak = [item for item in candidates if item[2] == 1 and item[3] >= 20]
+        overlong_token = len(_phonemes(tokens[first:first + 1])) + 2 > PREFERRED_REQUEST_IDS
         if overlong_token:
             # Keep a long number/name by itself, attaching punctuation only
             # when the source-span boundary would otherwise be invalid.
-            end, ps, _, _ = min(candidates, key=lambda item: item[0])
+            end, ps, _, _ = min(candidates, key=lambda item: item[0])[:4]
         elif strong or weak:
-            end, ps, _, _ = max(strong or weak, key=lambda item: item[0])
+            end, ps, _, _ = max(strong or weak, key=lambda item: item[0])[:4]
         else:
             natural_end = first + 1
             while (natural_end < len(tokens) and
@@ -235,7 +267,7 @@ def plan_tokens(text: str, tokens: list, vocab: dict[str, int],
             target = (remaining_count / 2 if remaining_count <= 2 * MAX_REQUEST_IDS
                       else MAX_REQUEST_IDS)
             end, ps, _, _ = min(
-                candidates, key=lambda item: (abs(item[3] - target), -item[3]))
+                candidates, key=lambda item: (abs(item[3] - target), -item[3]))[:4]
         start_char, end_char = spans[first][0], spans[end - 1][1]
         chunk_text = text[start_char:end_char].strip()
         ids = [0] + [vocab[char] for char in ps] + [0]
