@@ -541,6 +541,48 @@ class BatchContractTests(unittest.TestCase):
         self.assertIsNone(resolve_two_row_batch_contract(
             bad, combined, config, row_layout=row_layout))
 
+    def test_two_recurrent_layers_execute_generated_entry(self) -> None:
+        ops, row_layout, config = _recurrent_six_group_fixture()
+        plan = resolve_two_row_batch_contract(
+            ops, _hybrid_recurrent_layout(row_layout), config,
+            row_layout=row_layout)["full_layer_plan"]
+        fixture = (ROOT / "tests/fixtures/recurrent_two_layer_entry.c").read_text()
+        emitted = emit_full_layer_batch_api(plan)
+        self.assertIn("return 6;", emitted)
+        self.assertIn("return 2;", emitted)
+        source = fixture.replace("/* BATCH_API */", emitted)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "entry.c"
+            binary = Path(directory) / "entry"
+
+            def run(text: str) -> subprocess.CompletedProcess[str]:
+                path.write_text(text)
+                built = subprocess.run(
+                    ["cc", "-std=c11", "-O0", "-Wall", "-Werror",
+                     "-Wno-unused-function", "-Wno-unused-variable",
+                     str(path), "-o", str(binary)], capture_output=True, text=True)
+                self.assertEqual(built.returncode, 0, built.stderr)
+                return subprocess.run([str(binary)], capture_output=True, text=True)
+
+            result = run(source)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            restores = list(re.finditer(
+                r"(?m)^        ck_batch_memcpy\(g_model->bump \+ A_RECURRENT_Z, base \+ [^\n]+\n",
+                source))
+            self.assertGreaterEqual(len(restores), 2)
+            missing_layer_one_gate = (source[:restores[-1].start()]
+                                      + source[restores[-1].end():])
+            self.assertNotEqual(run(missing_layer_one_gate).returncode, 0)
+            wrong_owner = source.replace(
+                "static void ck_batch_stage_6(CKModel *model, int token) {\n"
+                "    (void)token;\n"
+                "    CKSequenceStateV8 *s = g_active_sequence;",
+                "static void ck_batch_stage_6(CKModel *model, int token) {\n"
+                "    (void)token;\n"
+                "    CKSequenceStateV8 *s = &g_sequence_states[0];")
+            self.assertNotEqual(wrong_owner, source)
+            self.assertNotEqual(run(wrong_owner).returncode, 0)
+
     def test_recurrent_generated_entry_matches_isolated_state(self) -> None:
         ops, row_layout, config = _recurrent_fixture()
         combined = _hybrid_recurrent_layout(row_layout)
