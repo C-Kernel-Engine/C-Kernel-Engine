@@ -97,6 +97,18 @@ def test_changed_sign_fails_critical_fact_even_when_wer_passes(tmp_path):
     assert result["unexpected_exact_numbers"] == ["+3.5"]
 
 
+def test_identifier_hyphen_is_not_a_negative_number(tmp_path):
+    paths = _fixture(tmp_path)
+    report = json.loads(paths[5].read_text())
+    report["decoder"]["transcript_text"] = (
+        "PR-1035 changed the value from -3.5 to +3.5.")
+    _write_json(paths[5], report)
+    result = evaluator.evaluate(*paths)
+    assert result["transcript_fidelity"] == "pass"
+    assert result["exact_number_fidelity"] == "pass"
+    assert result["missing_exact_numbers"] == []
+
+
 @pytest.mark.parametrize("mutation", ["fixed_window", "early_end", "wrong_audio",
                                          "text_gap", "wrong_resample_hash"])
 def test_incomplete_or_mixed_run_is_rejected(tmp_path, mutation):

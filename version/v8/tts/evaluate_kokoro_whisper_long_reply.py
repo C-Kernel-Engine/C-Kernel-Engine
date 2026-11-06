@@ -16,8 +16,11 @@ import re
 import wave
 
 
-WORDS = re.compile(r"[+-]?\d+(?:[,.]\d+)*|[a-z]+(?:'[a-z]+)?")
-NUMBERS = re.compile(r"[+-]?\d+(?:[,.]\d+)*")
+# A sign is meaningful after whitespace or punctuation, but the hyphen in
+# identifiers such as PR-1035 must not turn 1035 into a negative quantity.
+NUMBER_PATTERN = r"(?<![A-Za-z0-9])[-+]\d+(?:[,.]\d+)*|\d+(?:[,.]\d+)*"
+WORDS = re.compile(NUMBER_PATTERN + r"|[a-z]+(?:'[a-z]+)?")
+NUMBERS = re.compile(NUMBER_PATTERN)
 
 
 def _sha256(path: Path) -> str:
