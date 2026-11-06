@@ -241,6 +241,26 @@ class KokoroAccessibilityTextPlanTest(unittest.TestCase):
             planner.expand_technical_decimals(tokens, lambda word:
                 None if word == "point" else sounds.get(word))
 
+    def test_compound_number_words_stay_in_one_speech_chunk(self):
+        pieces = (("If", " ", "ˌɪf"), ("the", " ", "ði"),
+                  ("image", " ", "ˈɪmɪʤ"), ("says", " ", "sˈɛz"),
+                  ("forty", " ", "fˈɔɹTi"), ("two", " ", "tˈu"),
+                  ("but", " ", "bˌʌt"), ("vision", " ", "vˈɪʒən"),
+                  ("reads", " ", "ɹˈidz"), ("forty", " ", "fˈɔɹTi"),
+                  ("seven", "", "sˈɛvən"), (".", "", "."))
+        tokens = [SimpleNamespace(text=word, whitespace=space, phonemes=sound)
+                  for word, space, sound in pieces]
+        text = "".join(word + space for word, space, _ in pieces)
+        self.assertFalse(planner._legal_boundary(tokens, 0, 5,
+                                                 allow_connector_tail=True))
+        self.assertFalse(planner._legal_boundary(tokens, 6, 10,
+                                                 allow_connector_tail=True))
+        chunks = planner.plan_tokens(text, tokens, VOCAB, set(range(3, 41)))
+        self.assertEqual("".join(text[c["source_start"]:c["source_end"]]
+                                 for c in chunks), text)
+        self.assertTrue(any("forty two" in c["source_text"] for c in chunks))
+        self.assertTrue(any("forty seven" in c["source_text"] for c in chunks))
+
     def test_rejects_dropped_source_and_unsupported_geometry(self):
         with self.assertRaisesRegex(planner.TextPlanError, "unspoken source token"):
             planner.plan_tokens("🧪", [SimpleNamespace(text="🧪", whitespace="",
@@ -327,6 +347,17 @@ class KokoroAccessibilityTextPlanTest(unittest.TestCase):
         self.assertEqual(decimal_plan["planned_phonemes"].count("pˈYnt"), 3)
         self.assertEqual("".join(decimal_text[row["source_start"]:row["source_end"]]
                                  for row in decimal_plan["chunks"]), decimal_text)
+        long_source = (ROOT / "version/v8/test_assets/kokoro_long_reply"
+                       / "technical_summary_20261106.txt").read_text().strip()
+        long_plan = planner.prepare(long_source,
+                                    Path(os.environ[required[0]]),
+                                    Path(os.environ[required[1]]))
+        self.assertEqual(len(long_plan["chunks"]), 316)
+        for phrase in ("forty two", "forty seven"):
+            self.assertTrue(any(phrase in row["source_text"]
+                                for row in long_plan["chunks"]))
+        self.assertEqual("".join(long_source[row["source_start"]:row["source_end"]]
+                                 for row in long_plan["chunks"]), long_source)
         _case("live-pinned-oracle", "pass", cases=len(CASES))
 
     @unittest.skipUnless(os.environ.get("CKE_TTS_RUN_ACCESSIBILITY_TEXT_AUDIO"),
