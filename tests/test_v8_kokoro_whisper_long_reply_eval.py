@@ -37,7 +37,7 @@ def _wav(path, rate, frames):
         audio.writeframes(b"\0\0" * frames)
 
 
-def _fixture(tmp_path):
+def _fixture(tmp_path, text="PR 1035 changed the value from -3.5 to +3.5."):
     source = tmp_path / "source.txt"
     plan = tmp_path / "plan.json"
     tts = tmp_path / "tts.json"
@@ -45,7 +45,6 @@ def _fixture(tmp_path):
     asr_wav = tmp_path / "asr.wav"
     asr = tmp_path / "asr.json"
     resample = tmp_path / "resample.json"
-    text = "PR 1035 changed the value from -3.5 to +3.5."
     source.write_text(text, encoding="utf-8")
     _wav(wav, 24000, 24000)
     _wav(asr_wav, 16000, 16000)
@@ -56,7 +55,8 @@ def _fixture(tmp_path):
         {"source_start": 22, "source_end": len(text),
          "source_text": text[22:], "valid_token_count": 20, "voice_row": 17},
     ]
-    _write_json(plan, {"source_text": text, "chunks": planned_chunks})
+    _write_json(plan, {"source_text": text, "max_request_ids": 40,
+                       "chunks": planned_chunks})
     _write_json(tts, {"status": "execution_pass", "source_sha256":
                         hashlib.sha256(text.encode()).hexdigest(),
                         "wav_sha256": sha(wav), "chunks": [
@@ -138,6 +138,76 @@ def test_intact_spoken_compounds_match_digits_but_split_numbers_fail():
     assert evaluator._number_facts("forty two, then forty-seven") == ["42", "47"]
     assert evaluator._number_facts("42, then 47") == ["42", "47"]
     assert evaluator._number_facts("40, two; then 40. Seven") != ["42", "47"]
+    assert evaluator._number_facts("minus forty two, then plus forty-seven") == [
+        "-42", "+47"]
+
+
+def test_lost_spoken_sign_fails_even_when_transcript_wer_passes(tmp_path):
+    paths = _fixture(tmp_path, "The value is minus forty two.")
+    report = json.loads(paths[5].read_text())
+    report["decoder"]["transcript_text"] = "The value is forty two."
+    _write_json(paths[5], report)
+    result = evaluator.evaluate(*paths, maximum_wer=0.2)
+    assert result["transcript_fidelity"] == "pass"
+    assert result["exact_number_fidelity"] == "fail"
+    assert result["missing_exact_numbers"] == ["-42"]
+    assert result["unexpected_exact_numbers"] == ["42"]
+
+
+def test_unsupported_spoken_number_is_incomplete(tmp_path):
+    paths = _fixture(tmp_path, "The value is one hundred and forty two.")
+    result = evaluator.evaluate(*paths)
+    assert result["exact_number_fidelity"] == "incomplete"
+    assert "hundred" in result["unsupported_number_phrases"]
+    assert evaluator._unsupported_number_phrases("minus three point five")
+    assert evaluator._unsupported_number_phrases("+ forty two")
+
+
+def test_missing_capacity_or_wrong_voice_row_rule_is_rejected(tmp_path):
+    paths = _fixture(tmp_path)
+    plan = json.loads(paths[1].read_text())
+    del plan["max_request_ids"]
+    _write_json(paths[1], plan)
+    with pytest.raises(ValueError, match="request capacity"):
+        evaluator.evaluate(*paths)
+    plan["max_request_ids"] = 40
+    plan["chunks"][0]["voice_row"] = 14
+    tts = json.loads(paths[2].read_text())
+    tts["chunks"][0]["voice_row"] = 14
+    _write_json(paths[1], plan)
+    _write_json(paths[2], tts)
+    with pytest.raises(ValueError, match="invalid span"):
+        evaluator.evaluate(*paths)
+
+
+@pytest.mark.parametrize("field", ["source_start", "source_end", "source_text",
+                                    "valid_token_count", "voice_row"])
+def test_missing_or_invalid_metadata_on_both_sides_is_rejected(tmp_path, field):
+    paths = _fixture(tmp_path)
+    plan = json.loads(paths[1].read_text())
+    tts = json.loads(paths[2].read_text())
+    del plan["chunks"][0][field]
+    del tts["chunks"][0][field]
+    _write_json(paths[1], plan)
+    _write_json(paths[2], tts)
+    with pytest.raises(ValueError):
+        evaluator.evaluate(*paths)
+    plan["chunks"][0][field] = True
+    tts["chunks"][0][field] = True
+    _write_json(paths[1], plan)
+    _write_json(paths[2], tts)
+    with pytest.raises(ValueError):
+        evaluator.evaluate(*paths)
+
+
+def test_matching_but_forged_chunk_text_is_rejected(tmp_path):
+    paths = _fixture(tmp_path)
+    for path in (paths[1], paths[2]):
+        report = json.loads(path.read_text())
+        report["chunks"][0]["source_text"] = "forged"
+        _write_json(path, report)
+    with pytest.raises(ValueError, match="invalid span"):
+        evaluator.evaluate(*paths)
 
 
 @pytest.mark.parametrize("mutation", ["fixed_window", "early_end", "wrong_audio",

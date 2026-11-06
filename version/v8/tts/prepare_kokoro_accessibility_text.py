@@ -213,7 +213,8 @@ def _legal_boundary(tokens: list, first: int, end: int,
         return False
     # Splitting an English compound number introduces an audible pause and
     # can make ASR render "forty two" as two separate quantities.
-    if (last.text.strip().casefold() in _COMPOUND_TENS and
+    if ("\n" not in last.whitespace and "\r" not in last.whitespace and
+            last.text.strip().casefold() in _COMPOUND_TENS and
             following.text.strip().casefold() in _COMPOUND_UNITS):
         return False
     if not allow_connector_tail and last.text.strip().casefold() in _CONNECTORS:

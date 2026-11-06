@@ -23,8 +23,28 @@ TENS = {"twenty": 20, "thirty": 30, "forty": 40, "fifty": 50,
         "sixty": 60, "seventy": 70, "eighty": 80, "ninety": 90}
 UNITS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
          "six": 6, "seven": 7, "eight": 8, "nine": 9}
-SPOKEN_COMPOUND = re.compile(
-    r"\b(" + "|".join(TENS) + r")[ -]+(" + "|".join(UNITS) + r")\b",
+SPOKEN_NUMBER = re.compile(
+    r"\b(?:(minus|negative|plus|positive)\s+)?("
+    + "|".join(TENS) + r")(?:[ -]+(" + "|".join(UNITS) + r"))?\b",
+    re.IGNORECASE,
+)
+SPOKEN_SIGN_DIGITS = re.compile(
+    r"\b(minus|negative|plus|positive)\s+(\d+(?:[,.]\d+)*)\b",
+    re.IGNORECASE,
+)
+UNSUPPORTED_NUMBER_WORDS = re.compile(
+    r"\b(?:hundred|thousand|million|billion|trillion)\b|"
+    r"\b(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|"
+    r"twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|"
+    r"twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|\d+)"
+    r"\s+point\s+(?:zero|one|two|three|four|five|six|seven|eight|nine|\d+)\b",
+    re.IGNORECASE,
+)
+SPACED_SIGN = re.compile(r"(?<!\w)[+-]\s+(?=\d)")
+SYMBOL_SIGN_WORD = re.compile(
+    r"(?<!\w)[+-]\s*(?=zero|one|two|three|four|five|six|seven|eight|nine|"
+    r"ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|"
+    r"eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)\b",
     re.IGNORECASE,
 )
 
@@ -48,14 +68,40 @@ def _tokens(text: str) -> list[str]:
 
 
 def _number_facts(text: str) -> list[str]:
-    # Equivalent intact English compounds are accepted; a pause rendered as
-    # "40, two" is deliberately not merged into 42.
-    normalized = SPOKEN_COMPOUND.sub(
-        lambda match: str(TENS[match.group(1).casefold()] +
-                          UNITS[match.group(2).casefold()]),
-        _identifier_aware(text),
-    )
+    # This deliberately supports only tens and optional units. A pause
+    # rendered as "40, two" is not merged into 42.
+    def spoken_value(match: re.Match[str]) -> str:
+        value = TENS[match.group(2).casefold()]
+        if match.group(3):
+            value += UNITS[match.group(3).casefold()]
+        sign = match.group(1)
+        if not sign:
+            return str(value)
+        prefix = "-" if sign.casefold() in ("minus", "negative") else "+"
+        return prefix + str(value)
+
+    normalized = SPOKEN_NUMBER.sub(spoken_value, _identifier_aware(text))
+    normalized = SPOKEN_SIGN_DIGITS.sub(
+        lambda match: ("-" if match.group(1).casefold() in ("minus", "negative")
+                       else "+") + match.group(2), normalized)
     return NUMBERS.findall(normalized)
+
+
+def _unsupported_number_phrases(text: str) -> list[str]:
+    # Do not certify a trailing supported fragment of "one hundred and
+    # forty two", or silently discard an unparsed spoken decimal/sign.
+    phrases = [match.group() for match in UNSUPPORTED_NUMBER_WORDS.finditer(text)]
+    phrases.extend(match.group() for match in SPACED_SIGN.finditer(text))
+    phrases.extend(match.group() for match in SYMBOL_SIGN_WORD.finditer(text))
+    normalized = SPOKEN_NUMBER.sub("42", _identifier_aware(text))
+    normalized = SPOKEN_SIGN_DIGITS.sub("-42", normalized)
+    unsupported_sign = re.compile(
+        r"\b(?:minus|negative|plus|positive)\s+"
+        r"(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|"
+        r"eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|"
+        r"eighteen|nineteen|\d+)\b", re.IGNORECASE)
+    phrases.extend(match.group() for match in unsupported_sign.finditer(normalized))
+    return phrases
 
 
 def _distance(reference: list[str], candidate: list[str]) -> int:
@@ -96,11 +142,23 @@ def evaluate(source_path: Path, plan_path: Path, tts_path: Path, wav_path: Path,
     asr_wav_hash = _sha256(asr_wav_path)
     source_hash = hashlib.sha256(source.encode("utf-8")).hexdigest()
 
+    max_request_ids = plan.get("max_request_ids")
+    if type(max_request_ids) is not int or not 3 <= max_request_ids <= 48:
+        raise ValueError("text plan lacks a valid request capacity")
     chunks = plan.get("chunks", [])
     cursor = 0
     for index, chunk in enumerate(chunks):
-        start, end = chunk.get("source_start"), chunk.get("source_end")
-        if start != cursor or not isinstance(end, int) or end <= start or end > len(source):
+        if (not isinstance(chunk, dict) or
+                any(type(chunk.get(field)) is not int for field in
+                    ("source_start", "source_end", "valid_token_count", "voice_row")) or
+                not isinstance(chunk.get("source_text"), str)):
+            raise ValueError(f"text chunk {index} lacks required typed metadata")
+        start, end = chunk["source_start"], chunk["source_end"]
+        if (start != cursor or end <= start or end > len(source) or
+                not chunk["source_text"] or
+                chunk["source_text"] != source[start:end].strip() or
+                not 3 <= chunk["valid_token_count"] <= max_request_ids or
+                chunk["voice_row"] != chunk["valid_token_count"] - 3):
             raise ValueError(f"text chunk {index} leaves a gap, overlap, or invalid span")
         cursor = end
     if not chunks or cursor != len(source) or plan.get("source_text") != source:
@@ -115,11 +173,15 @@ def evaluate(source_path: Path, plan_path: Path, tts_path: Path, wav_path: Path,
         raise ValueError("TTS report or WAV does not match the source and plan")
     sample_total = 0
     for index, (planned, rendered) in enumerate(zip(chunks, tts["chunks"])):
-        if (rendered.get("index") != index or
-                any(rendered.get(field) != planned.get(field) for field in
+        if (not isinstance(rendered, dict) or
+                any(type(rendered.get(field)) is not int for field in
+                    ("index", "source_start", "source_end", "valid_token_count",
+                     "voice_row", "samples")) or
+                not isinstance(rendered.get("source_text"), str) or
+                rendered["index"] != index or
+                any(rendered[field] != planned[field] for field in
                     ("source_start", "source_end", "source_text",
                      "valid_token_count", "voice_row")) or
-                type(rendered.get("samples")) is not int or
                 rendered["samples"] <= 0):
             raise ValueError(f"TTS chunk {index} does not match its planned request")
         sample_total += rendered["samples"]
@@ -168,6 +230,8 @@ def evaluate(source_path: Path, plan_path: Path, tts_path: Path, wav_path: Path,
     wer = _distance(expected, observed) / len(expected)
     expected_numbers = _number_facts(source)
     observed_numbers = _number_facts(transcript)
+    unsupported_numbers = (_unsupported_number_phrases(source) +
+                           _unsupported_number_phrases(transcript))
     missing_numbers = list((Counter(expected_numbers) - Counter(observed_numbers)).elements())
     unexpected_numbers = list((Counter(observed_numbers) - Counter(expected_numbers)).elements())
     number_sequence_match = expected_numbers == observed_numbers
@@ -190,9 +254,11 @@ def evaluate(source_path: Path, plan_path: Path, tts_path: Path, wav_path: Path,
         "missing_exact_numbers": missing_numbers,
         "unexpected_exact_numbers": unexpected_numbers,
         "number_sequence_match": number_sequence_match,
+        "unsupported_number_phrases": unsupported_numbers,
         "execution": "pass",
         "transcript_fidelity": "pass" if wer <= maximum_wer else "fail",
-        "exact_number_fidelity": "pass" if number_sequence_match else "fail",
+        "exact_number_fidelity": ("incomplete" if unsupported_numbers else
+                                  "pass" if number_sequence_match else "fail"),
         "waveform_numerical_parity": tts.get("numerical_waveform_parity", "not_tested"),
         "known_connected_waveform_parity": tts.get("known_connected_waveform_parity", "not_tested"),
         "human_listening": "not_tested",
