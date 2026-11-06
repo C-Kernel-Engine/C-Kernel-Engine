@@ -176,6 +176,10 @@ void gemm_nt_q6_k_q8_k_segmented_singleton_tail_parallel_dispatch(
 void gemv_q4_k_q8_k_repacked_parallel_dispatch(
     float *y, const void *W, const void *x_q8, int N, int K);
 
+void gemm_nt_q4_k_q8_k_decode_m2(
+    const void *A_q8, const void *B, const float *bias, float *C,
+    int M, int N, int K);
+
 void gemm_nt_q4_k_q8_k_gateup_swiglu_x16_parallel_dispatch(
     const void *A, const void *B, const float *bias, float *C,
     int M, int D, int K);

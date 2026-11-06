@@ -520,9 +520,19 @@ def _first_recurrent_projection_plan(
     first = _mapped_two_row_projection(ops[4], providers, buffers)
     if first is None:
         return None
-    replacements = _certified_full_writes(ops, buffers)
-    cuts = (4, 5)
     projections = [(4, first)]
+    gate_setting = config.get("batch_decode_recurrent_gate_projection", False)
+    if type(gate_setting) is not bool:
+        return None
+    if gate_setting:
+        if len(ops) < 7 or ops[5].get("op") != "recurrent_gate_proj" or ops[5].get("layer") != 0:
+            return None
+        gate = _mapped_two_row_projection(ops[5], providers, buffers)
+        if (gate is None or gate["input"] != first["input"]
+                or gate["input_bytes"] != first["input_bytes"]
+                or gate["output"] == first["output"]):
+            return None
+        projections.append((5, gate))
     second_setting = config.get("batch_decode_recurrent_output_projection", False)
     if type(second_setting) is not bool:
         return None
@@ -540,7 +550,17 @@ def _first_recurrent_projection_plan(
         if second is None:
             return None
         projections.append((index, second))
-        cuts += (index, index + 1)
+    groups: list[list[tuple[int, dict[str, Any]]]] = []
+    for index, projection in projections:
+        if (groups and index == groups[-1][-1][0] + 1
+                and projection["input"] == groups[-1][0][1]["input"]
+                and projection["input_bytes"] == groups[-1][0][1]["input_bytes"]):
+            groups[-1].append((index, projection))
+        else:
+            groups.append([(index, projection)])
+    cuts = sorted({cut for group in groups
+                   for cut in (group[0][0], group[-1][0] + 1)})
+    replacements = _certified_full_writes(ops, buffers)
     crossing = {cut: _crossing_at(ops, cut, replacements) for cut in cuts}
     persistent = {"recurrent_conv_state", "recurrent_ssm_state"}
     if (any(not crossing[cut] for cut in cuts)
@@ -581,17 +601,20 @@ def _first_recurrent_projection_plan(
                 return None
     stages = []
     cursor = 0
-    for index, projection in projections:
-        stages.append({"kind": "local", "start": cursor, "stop": index,
-                       "live_after": live[index]})
-        stages.append({"kind": "shared", "start": index, "stop": index + 1,
-                       "projections": [{"index": index, **projection}],
-                       "live_after": live[index + 1]})
-        cursor = index + 1
+    for group in groups:
+        start, stop = group[0][0], group[-1][0] + 1
+        if cursor < start:
+            stages.append({"kind": "local", "start": cursor, "stop": start,
+                           "live_after": live[start]})
+        stages.append({"kind": "shared", "start": start, "stop": stop,
+                       "projections": [{"index": index, **projection}
+                                       for index, projection in group],
+                       "live_after": live[stop]})
+        cursor = stop
     stages.append({"kind": "local", "start": cursor, "stop": len(ops)})
-    if any(projection["input"] not in live[index]
-           or projection["output"] not in live[index + 1]
-           for index, projection in projections):
+    if any(projection["input"] not in live[group[0][0]]
+           or projection["output"] not in live[group[-1][0] + 1]
+           for group in groups for _, projection in group):
         return None
     return {
         "stages": stages,

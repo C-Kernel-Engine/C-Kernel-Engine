@@ -252,6 +252,9 @@ extern void gemm_nt_q4_k_packed_meta_x16_q8_k_llama_order(
 extern void gemm_nt_q4_k_packed_meta_x8_q8_k_gemv_order(
     const void *A_q8, const void *B_packed_x8, const float *bias, float *C,
     int M, int N, int K);
+extern void gemm_nt_q4_k_packed_meta_x8_q8_k_gemv_order_m2_strided(
+        const void *A_q8, const void *B_packed_x8, const float *bias, float *C,
+        int M, int N, int K, int output_stride);
 extern void gemm_nt_q4_k_packed_meta_x16_q8_k_threaded_mreuse(const void *A_q8,
                                                               const void *B_packed_x16,
                                                               const float *bias,
@@ -2799,6 +2802,26 @@ static void work_gemv_q4_k_q8_k_repacked(int ith, int nth, void *args)
     );
 }
 
+static void work_gemv_q4_k_q8_k_repacked_m2(int ith, int nth, void *args)
+{
+    const q4k_repacked_gemv_args_t *a = (const q4k_repacked_gemv_args_t *)args;
+    const int groups = (a->N + 7) / 8;
+    const int dg = (groups + nth - 1) / nth;
+    const int g0 = dg * ith;
+    const int g1 = ck_min_int(g0 + dg, groups);
+    if (g0 >= groups) return;
+
+    const int n0 = g0 * 8;
+    const int n1 = ck_min_int(g1 * 8, a->N);
+    const size_t packed_group_bytes =
+            (size_t)(a->K / QK_K) * q4_k_packed_meta_x8_block_size();
+    gemm_nt_q4_k_packed_meta_x8_q8_k_gemv_order_m2_strided(
+        a->A,
+        (const char *)a->B_packed_x8 + (size_t)g0 * packed_group_bytes,
+        a->bias ? a->bias + n0 : NULL,
+        a->C + n0, 2, n1 - n0, a->K, a->N);
+}
+
 static void work_gemv_q4_k_q8_k_repacked_x16(int ith, int nth, void *args)
 {
     const q4k_repacked_gemv_args_t *a =
@@ -3842,6 +3865,40 @@ void gemv_q4_k_q8_k_repacked_parallel_dispatch(
     ck_threadpool_t *pool = ck_threadpool_global();
     run_gemv_q4_k_q8_k_repacked_parallel(
             pool, x_q8, packed_x8, NULL, y, N, K, 0);
+}
+
+/* Map-selected decode-only two-row provider. The existing weight-identity
+ * cache owns the x8 packed view for the lifetime of the loaded model. The
+ * generated batch entry supplies checked row extents and nonaliasing output. */
+void gemm_nt_q4_k_q8_k_decode_m2(
+    const void *A_q8, const void *B, const float *bias, float *C,
+    int M, int N, int K)
+{
+    if (!A_q8 || !B || !C || M != 2 || N <= 0 || K <= 0 || (K % QK_K) != 0) return;
+    void *packed_x8 = ck_get_q4k_packed_meta_x8_cached(B, N, K);
+    if (!packed_x8) {
+        fprintf(stderr, "Q4_K two-row decode contract: weight packing failed\n");
+        abort();
+    }
+    q4k_repacked_gemv_args_t args = {
+        .A = A_q8,
+        .B_packed_x8 = packed_x8,
+        .bias = bias,
+        .C = C,
+        .M = 2,
+        .N = N,
+        .K = K,
+        .A_row_bytes = (size_t)(K / QK_K) * sizeof(block_q8_K),
+    };
+    ck_threadpool_t *pool = ck_threadpool_global();
+    const int groups = (N + 7) / 8;
+    int active = pool ? ck_threadpool_n_threads(pool) : 1;
+    if (active > groups) active = groups;
+    if (active <= 1 || !pool) {
+        work_gemv_q4_k_q8_k_repacked_m2(0, 1, &args);
+    } else {
+        ck_threadpool_dispatch_n(pool, active, work_gemv_q4_k_q8_k_repacked_m2, &args);
+    }
 }
 
 /* A prefill continuation has one query row but must retain the full-prefill

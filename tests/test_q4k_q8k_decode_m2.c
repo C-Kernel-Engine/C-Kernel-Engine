@@ -13,6 +13,15 @@ void gemm_nt_q4_k_packed_meta_x8_q8_k_gemv_order(
     const void *, const void *, const float *, float *, int, int, int);
 void gemm_nt_q4_k_packed_meta_x8_q8_k_gemv_order_m2(
     const void *, const void *, const float *, float *, int, int, int);
+void gemm_nt_q4_k_packed_meta_x8_q8_k_gemv_order_m2_strided(
+    const void *, const void *, const float *, float *, int, int, int, int);
+#if defined(__AVX512VNNI__)
+size_t q4_k_packed_vnni_x16_block_size(void);
+int ck_q4k_packed_vnni_x16_available(void);
+void pack_q4_k_to_packed_vnni_x16(const void *, void *, int, int);
+void gemm_nt_q4_k_packed_vnni_x16_q8_k_gemv_order(
+    const void *, const void *, const float *, float *, int, int, int);
+#endif
 
 static uint32_t next_u32(uint32_t *state) {
     *state ^= *state << 13;
@@ -90,15 +99,17 @@ static int run_case(int n, int k, int with_bias) {
     float *guarded = calloc((size_t)2 * (size_t)n + 2, sizeof(*guarded));
     float *actual = guarded ? guarded + 1 : NULL;
     float *changed = calloc((size_t)2 * (size_t)n, sizeof(*changed));
+    const int stride = n + 5;
+    float *strided = malloc((size_t)2 * (size_t)stride * sizeof(*strided));
     block_q4_K *weight_copy = malloc(weight_count * sizeof(*weight_copy));
     block_q8_K *activation_copy = malloc(activation_bytes);
     void *packed_copy = malloc(packed_bytes);
     float *bias = with_bias ? calloc((size_t)n, sizeof(*bias)) : NULL;
-    if (!weights || !x || !packed || !expected || !oracle || !guarded || !changed ||
+    if (!weights || !x || !packed || !expected || !oracle || !guarded || !changed || !strided ||
         !weight_copy || !activation_copy || !packed_copy ||
         (with_bias && !bias)) {
         free(weights); free(x); free(packed); free(expected);
-        free(oracle); free(guarded); free(changed); free(bias);
+        free(oracle); free(guarded); free(changed); free(strided); free(bias);
         free(weight_copy); free(activation_copy); free(packed_copy);
         return 0;
     }
@@ -156,6 +167,34 @@ static int run_case(int n, int k, int with_bias) {
         fprintf(stderr, "raw Q4_K reference differs: N=%d K=%d bias=%d\n", n, k, with_bias);
         pass = 0;
     }
+#if defined(__AVX512VNNI__)
+    if (ck_q4k_packed_vnni_x16_available()) {
+        const size_t x16_bytes = (size_t)((n + 15) / 16) * (size_t)blocks *
+                                 q4_k_packed_vnni_x16_block_size();
+        void *packed_x16 = calloc(1, x16_bytes);
+        float *x16_output = calloc((size_t)2 * (size_t)n, sizeof(float));
+        if (!packed_x16 || !x16_output) pass = 0;
+        else {
+            pack_q4_k_to_packed_vnni_x16(weights, packed_x16, n, k);
+            gemm_nt_q4_k_packed_vnni_x16_q8_k_gemv_order(
+                x, packed_x16, bias, x16_output, 2, n, k);
+            if (memcmp(x16_output, actual, output_bytes) != 0) {
+                fprintf(stderr, "prepared x16 decode differs: N=%d K=%d bias=%d\n",
+                        n, k, with_bias);
+                pass = 0;
+            }
+        }
+        free(packed_x16); free(x16_output);
+    }
+#endif
+    for (int i = 0; i < 2 * stride; ++i) strided[i] = 77.0f;
+    gemm_nt_q4_k_packed_meta_x8_q8_k_gemv_order_m2_strided(
+        x, packed, bias, strided, 2, n, k, stride);
+    for (int row = 0; row < 2; ++row) {
+        pass &= memcmp(strided + row * stride, expected + row * n,
+                       (size_t)n * sizeof(float)) == 0;
+        for (int col = n; col < stride; ++col) pass &= strided[row * stride + col] == 77.0f;
+    }
     /* Alter one request's quantized row: the other output must stay exact,
      * while the changed row must be observably different. */
     x[blocks].qs[0] = (int8_t)(x[blocks].qs[0] ^ 0x5a);
@@ -178,6 +217,8 @@ static int run_case(int n, int k, int with_bias) {
     gemm_nt_q4_k_packed_meta_x8_q8_k_gemv_order_m2(NULL, packed, bias, actual, 2, n, k);
     gemm_nt_q4_k_packed_meta_x8_q8_k_gemv_order_m2(x, NULL, bias, actual, 2, n, k);
     gemm_nt_q4_k_packed_meta_x8_q8_k_gemv_order_m2(x, packed, bias, NULL, 2, n, k);
+    gemm_nt_q4_k_packed_meta_x8_q8_k_gemv_order_m2_strided(
+        x, packed, bias, actual, 2, n, k, n - 1);
     for (int i = 0; i < 2 * n; ++i) pass &= actual[i] == 123.0f;
     pass &= guarded[0] == 81.25f && guarded[(size_t)2 * (size_t)n + 1] == -43.5f;
     pass &= memcmp(weights, weight_copy, weight_count * sizeof(*weight_copy)) == 0;
@@ -186,7 +227,7 @@ static int run_case(int n, int k, int with_bias) {
     if (!pass) fprintf(stderr, "decode M=2 contract failed: N=%d K=%d bias=%d\n",
                        n, k, with_bias);
     free(weights); free(x); free(packed); free(expected);
-    free(oracle); free(guarded); free(changed); free(bias);
+    free(oracle); free(guarded); free(changed); free(strided); free(bias);
     free(weight_copy); free(activation_copy); free(packed_copy);
     return pass;
 }

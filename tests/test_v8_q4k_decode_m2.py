@@ -26,6 +26,32 @@ def _cpu_flags() -> set[str]:
 
 
 class Q4KDecodeM2Tests(unittest.TestCase):
+    def test_real_cache_backed_threaded_wrapper(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="cke-q4k-m2-wrapper-") as directory:
+            binary = Path(directory) / "wrapper"
+            command = [
+                os.environ.get("CC", "cc"), "-O2", "-std=c11",
+                "-ffunction-sections", "-fdata-sections",
+                "-I", str(ROOT / "include"),
+                "-I", str(ROOT / "version/v8/src"),
+                "-Wl,--gc-sections", "-Wl,--wrap=pack_q4_k_to_packed_meta_x8",
+                str(ROOT / "version/v8/src/ck_parallel_prefill_v8.c"),
+                str(ROOT / "src/kernels/gemm_kernels_q4k_q8k_vnni.c"),
+                str(ROOT / "src/ck_threadpool.c"),
+                str(ROOT / "tests/test_q4k_q8k_decode_m2_wrapper.c"),
+                "-pthread", "-lm", "-o", str(binary),
+            ]
+            subprocess.run(command, check=True, capture_output=True, text=True)
+            for workers in (1, 4, 16):
+                with self.subTest(workers=workers):
+                    result = subprocess.run([str(binary), str(workers)], check=True,
+                                            capture_output=True, text=True)
+                    self.assertIn("real M=2 wrapper: PASS", result.stdout)
+                    resolved = int(result.stdout.split("resolved_workers=")[1].splitlines()[0])
+                    if (workers > 1 and hasattr(os, "sched_getaffinity")
+                            and len(os.sched_getaffinity(0)) > 1):
+                        self.assertGreater(resolved, 1)
+
     def test_packed_two_row_decode_matches_one_row_contract(self) -> None:
         flags = _cpu_flags()
         lanes = [
