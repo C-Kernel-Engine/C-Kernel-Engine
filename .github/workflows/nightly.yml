@@ -105,7 +105,9 @@ jobs:
         with:
           fetch-depth: 0
       - name: Test documentation policy
-        run: python3 -m unittest discover -s tests -p test_documentation_policy.py
+        run: |
+          python3 -m unittest discover -s tests -p test_documentation_policy.py
+          python3 -m unittest discover -s tests -p test_v8_vision_status_page.py
       - name: Audit committed documentation
         if: always()
         env:
