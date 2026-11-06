@@ -156,10 +156,69 @@ class KokoroVoicePlaybackTest(unittest.TestCase):
             self.assertEqual(exact_plan.call_args.kwargs, {"technical_mode": "exact"})
             self.assertEqual(exact["technical_mode"], "exact")
             self.assertEqual(exact["pronunciation_expansions"], [{"mode": "exact"}])
+            document = adapter.play_incremental("a", root, bundle, player,
+                document=True, prepare_plan=plan)
+            self.assertEqual(document["sample_count"], 8)
+            self.assertEqual(document["native_model_loads"], 1)
+            progress_path = root / "progress.json"
+            def durable_plan(text, config, bundle):
+                return {**plan(text, config, bundle),
+                        "bundle_manifest_sha256": "manifest",
+                        "frontend_sha256": {"pinned": "frontend"},
+                        "voice": "af_heart"}
+            durable = adapter.play_incremental("a", root, bundle, player,
+                document=True, prepare_plan=durable_plan,
+                progress_file=progress_path, session_id="document-1")
+            self.assertEqual(durable["completed_samples"], 8)
+            self.assertEqual(json.loads(progress_path.read_text())[
+                "last_completed_chunk"], 0)
+            launches_before_resume = len(launches.read_text().splitlines())
+            done = adapter.play_incremental("a", root, bundle, player,
+                document=True, prepare_plan=durable_plan,
+                progress_file=progress_path, session_id="document-1", resume=True)
+            self.assertEqual(done["status"], "already_complete")
+            self.assertEqual(len(launches.read_text().splitlines()),
+                             launches_before_resume)
+            malformed_path = root / "malformed-progress.json"
+            malformed_path.write_text("[]", encoding="utf-8")
+            with self.assertRaisesRegex(adapter.PlaybackError, "progress file is invalid"):
+                adapter.play_incremental("a", root, bundle, player,
+                    document=True, prepare_plan=durable_plan,
+                    progress_file=malformed_path, resume=True)
+            with self.assertRaisesRegex(adapter.PlaybackError, "identity differs"):
+                adapter.play_incremental("a", root, bundle, player,
+                    document=True, prepare_plan=durable_plan,
+                    progress_file=progress_path, session_id="document-1",
+                    seed=8, resume=True)
+            with self.assertRaisesRegex(adapter.PlaybackError, "identity differs"):
+                adapter.play_incremental("b", root, bundle, player,
+                    document=True, prepare_plan=durable_plan,
+                    progress_file=progress_path, session_id="document-1",
+                    resume=True)
+            interrupted_path = root / "interrupted-progress.json"
+            fail.touch()
+            with self.assertRaisesRegex(adapter.PlaybackError, "sample count"):
+                adapter.play_incremental("aaaa", root, bundle, player,
+                    document=True, synthesis_workers=3,
+                    prepare_plan=durable_plan, progress_file=interrupted_path,
+                    session_id="document-2")
+            interrupted = json.loads(interrupted_path.read_text())
+            self.assertEqual(interrupted["last_completed_chunk"], 0)
+            fail.unlink()
+            played.unlink()
+            resumed = adapter.play_incremental("aaaa", root, bundle, player,
+                document=True, synthesis_workers=3,
+                prepare_plan=durable_plan, progress_file=interrupted_path,
+                session_id="document-2", resume=True)
+            self.assertEqual(resumed["resume_from_chunk"], 1)
+            self.assertEqual([row["index"] for row in resumed["chunks"]],
+                             [1, 2, 3])
+            self.assertEqual(json.loads(interrupted_path.read_text())[
+                "last_completed_chunk"], 3)
             with self.assertRaisesRegex(adapter.PlaybackError, "integer in 1..3"):
                 adapter.play_incremental("a", root, bundle, player,
                                          synthesis_workers=4, prepare_plan=plan)
-            self.assertEqual(len(launches.read_text().splitlines()), 12)
+            self.assertEqual(len(launches.read_text().splitlines()), 20)
 
     def test_parallel_sigterm_reaps_workers_and_active_player(self):
         with tempfile.TemporaryDirectory() as folder:

@@ -1496,6 +1496,10 @@ TEST_SUITES = {
         "Checked Kokoro Whole-Text WAV Playback Adapter", "inference",
         ROOT / "tests" / "test_v8_kokoro_voice_playback.py",
     ),
+    "tts_kokoro_document_plan": TestSuite(
+        "Checked Kokoro Long-Document Source Coverage", "inference",
+        ROOT / "tests" / "test_v8_kokoro_document_plan.py",
+    ),
     "tts_audio_harmonic_source_generated": TestSuite(
         "Checked Harmonic Source Normal-Compiler Generated Graph", "inference",
         ROOT / "tests" / "test_v8_audio_harmonic_source_generated.py",
