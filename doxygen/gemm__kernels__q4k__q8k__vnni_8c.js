@@ -33,6 +33,7 @@ var gemm__kernels__q4k__q8k__vnni_8c =
     [ "gemm_nt_q4_k_packed_meta_x8_q8_k", "gemm__kernels__q4k__q8k__vnni_8c.html#a254aa095b0ce97719a619c71771da3ea", null ],
     [ "gemm_nt_q4_k_packed_meta_x8_q8_k_gemv_order", "gemm__kernels__q4k__q8k__vnni_8c.html#a5c4e0dcbc1e9733deb44031b4e08c503", null ],
     [ "gemm_nt_q4_k_packed_meta_x8_q8_k_gemv_order_m2", "gemm__kernels__q4k__q8k__vnni_8c.html#a47a1ea3ff8211ada32953b9ad1b4e556", null ],
+    [ "gemm_nt_q4_k_packed_meta_x8_q8_k_gemv_order_m2_strided", "gemm__kernels__q4k__q8k__vnni_8c.html#a90bcc4dba3c084dc44214042b090411d", null ],
     [ "gemm_nt_q4_k_packed_meta_x8_q8_k_split_min_threaded_4m", "gemm__kernels__q4k__q8k__vnni_8c.html#a34448660adfcee824aa0fa498d0c248d", null ],
     [ "gemm_nt_q4_k_packed_meta_x8_q8_k_split_min_threaded_8m", "gemm__kernels__q4k__q8k__vnni_8c.html#a90e491ec65dd34bc1c88e6416b9f2afb", null ],
     [ "gemm_nt_q4_k_packed_meta_x8_q8_k_split_min_threaded_mreuse", "gemm__kernels__q4k__q8k__vnni_8c.html#a820462d2ffc54e475e7c39dbb290f2d0", null ],

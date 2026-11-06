@@ -1,5 +1,6 @@
 var NAVTREEINDEX24 =
 {
+"swiglu__kernels_8c.html#a2f11fffb4367674cd2d81a375fef8067":[2,0,1,1,137,2],
 "swiglu__kernels_8c.html#a369266c24eacffb87046522897a570d5":[2,0,1,1,137,0],
 "swiglu__kernels_8c.html#a4d4e4e82751b575680dda192237167da":[2,0,1,1,137,4],
 "swiglu__kernels_8c.html#a771ec9e8b054416576cf1788ea8d3747":[2,0,1,1,137,8],
@@ -248,6 +249,5 @@ var NAVTREEINDEX24 =
 "true__bpe_8c.html#a08f555c94935c343bcfb7ec35a88a7b6":[2,0,1,3,6,51],
 "true__bpe_8c.html#a09465c383cd23828e94d37fdbccd498c":[2,0,1,3,6,31],
 "true__bpe_8c.html#a11af45a409593cf28602d2cbfb3df00e":[2,0,1,3,6,11],
-"true__bpe_8c.html#a136114a1da9e0646aff5e045c91cffff":[2,0,1,3,6,39],
-"true__bpe_8c.html#a2575ccc3febd74fd764ead2153ac9c11":[2,0,1,3,6,13]
+"true__bpe_8c.html#a136114a1da9e0646aff5e045c91cffff":[2,0,1,3,6,39]
 };

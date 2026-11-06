@@ -1,5 +1,6 @@
 var NAVTREEINDEX23 =
 {
+"structNUMATopology.html#a2a61e03ff57dd6feb35b92d1e03c0cdd":[1,0,86,0],
 "structNUMATopology.html#a4f4876ca34eed1e6c7732e611a13a674":[1,0,86,1],
 "structNUMATopology.html#ab0befa19cd4b9b08a68d901f301e9de7":[1,0,86,2],
 "structNetworkInterface.html":[1,0,83],
@@ -248,6 +249,5 @@ var NAVTREEINDEX23 =
 "swiglu__kernels_8c.html#a102617ea5d170076dc9e1d6ac167617c":[2,0,1,1,137,10],
 "swiglu__kernels_8c.html#a18063a61725eeeeb371d7c9f1e0d410d":[2,0,1,1,137,13],
 "swiglu__kernels_8c.html#a26369aa07808fb6aae4502d54a1ba650":[2,0,1,1,137,9],
-"swiglu__kernels_8c.html#a2d1ada314dda9d7788371a08067917d6":[2,0,1,1,137,7],
-"swiglu__kernels_8c.html#a2f11fffb4367674cd2d81a375fef8067":[2,0,1,1,137,2]
+"swiglu__kernels_8c.html#a2d1ada314dda9d7788371a08067917d6":[2,0,1,1,137,7]
 };
