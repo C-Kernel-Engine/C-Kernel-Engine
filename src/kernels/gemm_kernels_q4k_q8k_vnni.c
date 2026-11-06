@@ -1463,6 +1463,91 @@ static inline void accum_q4_k_packed_meta_x8_q8_k_gemv_block(
 #endif
 }
 
+/* Decode-order M=2: unpack each weight segment once for both activation rows.
+ * Keep the integer superblock sum and FP32 FMA boundaries of the M=1 GEMV. */
+static inline void accum_q4_k_packed_meta_x8_q8_k_gemv_block_m2(
+        float acc[2][8], float acc_min[2][8],
+        const block_q4_K_packed_meta_x8 *w, int active,
+        const block_q8_K *x0, const block_q8_K *x1)
+{
+    const block_q8_K *x[2] = {x0, x1};
+    int32_t iacc[2][8] = {{0}};
+    int32_t iacc_min[2][8] = {{0}};
+    for (int j = 0, is = 0, q_offset = 0;
+         j < QK_K; j += 64, is += 2, q_offset += 32) {
+        int32_t bsum_lo[2], bsum_hi[2];
+#if defined(__AVX2__)
+        __m256i q8_lo[2], q8_hi[2];
+#endif
+        for (int row = 0; row < 2; ++row) {
+            bsum_lo[row] = (int32_t)x[row]->bsums[j / 16] +
+                           (int32_t)x[row]->bsums[j / 16 + 1];
+            bsum_hi[row] = (int32_t)x[row]->bsums[(j + 32) / 16] +
+                           (int32_t)x[row]->bsums[(j + 32) / 16 + 1];
+#if defined(__AVX2__)
+            q8_lo[row] = _mm256_loadu_si256((const __m256i *)&x[row]->qs[j]);
+            q8_hi[row] = _mm256_loadu_si256((const __m256i *)&x[row]->qs[j + 32]);
+#endif
+        }
+        for (int lane = 0; lane < active; ++lane) {
+            const uint8_t *qs = &w->qs[lane][q_offset];
+#if defined(__AVX512VNNI__) && defined(__AVX512VL__)
+            const __m256i packed = _mm256_loadu_si256((const __m256i *)qs);
+            const __m256i q4_lo = q4_k_unpack_32_vnni_bytes(packed, 0);
+            const __m256i q4_hi = q4_k_unpack_32_vnni_bytes(packed, 1);
+#elif defined(__AVX2__)
+            const __m256i packed = _mm256_loadu_si256((const __m256i *)qs);
+            const __m256i q4_lo = q4_k_unpack_32_avx2_bytes(packed, 0);
+            const __m256i q4_hi = q4_k_unpack_32_avx2_bytes(packed, 1);
+#endif
+            for (int row = 0; row < 2; ++row) {
+#if defined(__AVX512VNNI__) && defined(__AVX512VL__)
+                const int32_t sum_lo = dot_q4_k_q8_k_32_vnni_q4v_q8v(q4_lo, q8_lo[row]);
+                const int32_t sum_hi = dot_q4_k_q8_k_32_vnni_q4v_q8v(q4_hi, q8_hi[row]);
+#elif defined(__AVX2__)
+                const int32_t sum_lo = dot_q4_k_q8_k_32_avx2_q4v_q8v(q4_lo, q8_lo[row]);
+                const int32_t sum_hi = dot_q4_k_q8_k_32_avx2_q4v_q8v(q4_hi, q8_hi[row]);
+#else
+                int32_t sum_lo = 0, sum_hi = 0;
+                for (int l = 0; l < 32; ++l) {
+                    sum_lo += (int32_t)(qs[l] & 0x0f) * (int32_t)x[row]->qs[j + l];
+                    sum_hi += (int32_t)(qs[l] >> 4) * (int32_t)x[row]->qs[j + 32 + l];
+                }
+#endif
+                iacc[row][lane] += (int32_t)w->sc[lane][is] * sum_lo +
+                                    (int32_t)w->sc[lane][is + 1] * sum_hi;
+                iacc_min[row][lane] += (int32_t)w->m[lane][is] * bsum_lo[row] +
+                                        (int32_t)w->m[lane][is + 1] * bsum_hi[row];
+            }
+        }
+    }
+    for (int row = 0; row < 2; ++row) {
+#if defined(__AVX2__)
+        float d[8] = {0}, dmin[8] = {0};
+        for (int lane = 0; lane < active; ++lane) {
+            d[lane] = CK_FP16_TO_FP32(w->d[lane]);
+            dmin[lane] = CK_FP16_TO_FP32(w->dmin[lane]);
+        }
+        const __m256 xd = _mm256_set1_ps(x[row]->d);
+        const __m256 value = _mm256_fmadd_ps(
+                _mm256_cvtepi32_ps(_mm256_loadu_si256((const __m256i *)iacc[row])),
+                _mm256_mul_ps(_mm256_loadu_ps(d), xd), _mm256_loadu_ps(acc[row]));
+        const __m256 minimum = _mm256_fmadd_ps(
+                _mm256_cvtepi32_ps(_mm256_loadu_si256((const __m256i *)iacc_min[row])),
+                _mm256_mul_ps(_mm256_loadu_ps(dmin), xd), _mm256_loadu_ps(acc_min[row]));
+        _mm256_storeu_ps(acc[row], value);
+        _mm256_storeu_ps(acc_min[row], minimum);
+#else
+        for (int lane = 0; lane < active; ++lane) {
+            const float d = CK_FP16_TO_FP32(w->d[lane]) * x[row]->d;
+            const float dmin = CK_FP16_TO_FP32(w->dmin[lane]) * x[row]->d;
+            acc[row][lane] = fmaf((float)iacc[row][lane], d, acc[row][lane]);
+            acc_min[row][lane] = fmaf((float)iacc_min[row][lane], dmin, acc_min[row][lane]);
+        }
+#endif
+    }
+}
+
 
 
 
@@ -2086,6 +2171,55 @@ void gemm_nt_q4_k_packed_meta_x8_q8_k_gemv_order(
 #endif
             for (int lane = 0; lane < active; ++lane) {
                 c_row[n0 + lane] = values[lane] + (bias ? bias[n0 + lane] : 0.0f);
+            }
+        }
+    }
+}
+
+/* Internal unchecked primitive, not a success/failure API. B must contain
+ * ceil(N/8) * (K/256) packed-meta-x8 blocks made by the matching Q4_K packer;
+ * A is two contiguous Q8_K rows and C has room for two contiguous FP32 rows.
+ * A, B, bias and C must not alias. The caller owns all storage and guarantees
+ * extents/alignment. Invalid pointers or dimensions return without writing C;
+ * a generated provider must validate the full capacity contract separately. */
+void gemm_nt_q4_k_packed_meta_x8_q8_k_gemv_order_m2(
+        const void *A_q8, const void *B_packed_x8, const float *bias, float *C,
+        int M, int N, int K)
+{
+    if (!A_q8 || !B_packed_x8 || !C || M != 2 || N <= 0 ||
+        K <= 0 || (K % QK_K) != 0) {
+        return;
+    }
+    const block_q8_K *A = (const block_q8_K *)A_q8;
+    const block_q4_K_packed_meta_x8 *W =
+            (const block_q4_K_packed_meta_x8 *)B_packed_x8;
+    const int blocks_per_row = K / QK_K;
+    const int groups = (N + 7) / 8;
+    for (int g = 0; g < groups; ++g) {
+        const int n0 = g * 8;
+        const int active = (n0 + 8 <= N) ? 8 : (N - n0);
+        float acc[2][8] = {{0}};
+        float acc_min[2][8] = {{0}};
+        for (int b = 0; b < blocks_per_row; ++b) {
+            const block_q4_K_packed_meta_x8 *w_group =
+                    W + (size_t)g * (size_t)blocks_per_row + (size_t)b;
+            accum_q4_k_packed_meta_x8_q8_k_gemv_block_m2(
+                    acc, acc_min, w_group, active,
+                    &A[b], &A[(size_t)blocks_per_row + (size_t)b]);
+        }
+        for (int row = 0; row < 2; ++row) {
+            float values[8];
+#if defined(__AVX2__)
+            _mm256_storeu_ps(values, _mm256_sub_ps(
+                    _mm256_loadu_ps(acc[row]), _mm256_loadu_ps(acc_min[row])));
+#else
+            for (int lane = 0; lane < active; ++lane) {
+                values[lane] = acc[row][lane] - acc_min[row][lane];
+            }
+#endif
+            for (int lane = 0; lane < active; ++lane) {
+                C[(size_t)row * (size_t)N + (size_t)n0 + (size_t)lane] =
+                        values[lane] + (bias ? bias[n0 + lane] : 0.0f);
             }
         }
     }
