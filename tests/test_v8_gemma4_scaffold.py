@@ -354,7 +354,8 @@ class V8Gemma4ScaffoldTests(unittest.TestCase):
         self.assertEqual(contract["turn_prefix"], "<|turn>{role}\n")
         self.assertEqual(contract["turn_suffix"], "<turn|>\n")
         self.assertEqual(contract["assistant_generation_prefix"], "<|turn>model\n")
-        self.assertEqual(contract["token_stop_markers"], ["<turn|>"])
+        self.assertEqual(contract["token_stop_markers"], ["<turn|>", "<eos>"])
+        self.assertEqual(contract["stop_text_markers"], ["<turn|>", "<eos>"])
 
     def test_gemma4_uses_q8_activation_logits_by_default(self) -> None:
         gemma4 = _apply_circuit_runtime_defaults(

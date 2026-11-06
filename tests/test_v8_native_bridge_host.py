@@ -1658,6 +1658,19 @@ class V8NativeBridgeHostTests(unittest.TestCase):
         self.assertEqual(policy["stop_ids"], [151643, 151645])
         self.assertEqual(policy["stop_markers"], ["<|im_end|>", "<|eot_id|>"])
 
+    def test_gemma4_stop_policy_includes_both_end_of_generation_tokens(self) -> None:
+        class FakeTokenizer:
+            eos_id = 106
+            token_to_id = {"<turn|>": 106, "<eos>": 1}
+
+        for circuit in ("gemma4", "gemma4_assistant"):
+            with self.subTest(circuit=circuit):
+                contract = bridge_runner_v8._load_builtin_chat_contract(circuit)
+                policy = bridge_runner_v8._resolve_stop_token_policy(FakeTokenizer(), contract)
+
+                self.assertEqual(policy["stop_ids"], [1, 106])
+                self.assertEqual(policy["stop_markers"], ["<turn|>", "<eos>"])
+
     def test_bridge_runner_auto_formats_prompt_from_decoder_arch(self) -> None:
         with tempfile.TemporaryDirectory(prefix="v8_native_bridge_prompt_") as tmpdir:
             tmp = Path(tmpdir)
