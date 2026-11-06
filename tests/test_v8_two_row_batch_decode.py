@@ -201,6 +201,33 @@ def _recurrent_two_group_fixture() -> tuple[list[dict], dict, dict]:
     return ops, layout, config
 
 
+def _recurrent_three_group_fixture() -> tuple[list[dict], dict, dict]:
+    ops, layout, config = _recurrent_two_group_fixture()
+    config["batch_decode_recurrent_gate_projection"] = True
+    layout["memory"]["activations"]["buffers"].append({
+        "name": "recurrent_z", "size": 64, "abs_offset": 3200,
+        "define": "A_RECURRENT_Z", "lifetime": "call", "mutable": True,
+    })
+    layout["memory"]["arena"]["total_size"] = 3328
+    ops.insert(5, {"op": "recurrent_gate_proj", "layer": 0,
+                   "function": "gemv_q4_k_q8_k_repacked_parallel_dispatch",
+                   "call_abi": {"kernel_id": "gemv_q4_k_q8_k"}, "args": [
+        {"name": "y", "expr": "(float*)(model->bump + A_RECURRENT_Z)",
+         "source": "output:y", "buffer_ref": "recurrent_z"},
+        {"name": "W", "expr": "(const void*)(model->bump + W_LAYER_0_ATTN_GATE)",
+         "source": "weight:_first_weight"},
+        {"name": "x_q8", "expr": "(void*)(model->bump + A_MAIN_STREAM_Q8)",
+         "source": "activation:x", "buffer_ref": "main_stream_q8"},
+        {"name": "M", "expr": "16", "source": "dim:_output_dim"},
+        {"name": "K", "expr": "256", "source": "dim:_input_dim"},
+    ]})
+    ops[6]["args"].append({
+        "name": "gate", "expr": "(const float*)(model->bump + A_RECURRENT_Z)",
+        "source": "activation:gate", "buffer_ref": "recurrent_z",
+    })
+    return ops, layout, config
+
+
 def _layer_fixture() -> tuple[list[dict], dict, dict]:
     ops, layout, config = _fixture()
     def arg(name: str, expr: str, ref: str | None = None, source: str = "dim:test") -> dict:
@@ -405,6 +432,47 @@ class BatchContractTests(unittest.TestCase):
             with self.subTest(label=label):
                 bad_ops, bad_layout = copy.deepcopy(ops), copy.deepcopy(combined)
                 mutation(bad_ops, bad_layout)
+                self.assertIsNone(resolve_two_row_batch_contract(
+                    bad_ops, bad_layout, config, row_layout=row_layout))
+
+    def test_recurrent_gate_uses_map_selected_decode_order_provider(self) -> None:
+        ops, row_layout, config = _recurrent_three_group_fixture()
+        combined = _hybrid_recurrent_layout(row_layout)
+        admitted = resolve_two_row_batch_contract(
+            ops, combined, config, row_layout=row_layout)
+        self.assertIsNotNone(admitted)
+        plan = admitted["full_layer_plan"]
+        self.assertEqual(plan["projection_groups"], 3)
+        self.assertEqual([(stage["kind"], stage["start"], stage["stop"])
+                          for stage in plan["stages"]],
+                         [("local", 0, 4), ("shared", 4, 6),
+                          ("local", 6, 8), ("shared", 8, 9),
+                          ("local", 9, 10)])
+        self.assertEqual([p["function"] for p in plan["stages"][1]["projections"]],
+                         ["gemm_nt_q6_k_q8_k_m2", "gemm_nt_q4_k_q8_k_decode_m2"])
+        self.assertIn("recurrent_z", plan["stages"][1]["live_after"])
+        self.assertIn("gemm_nt_q4_k_q8_k_decode_m2", emit_full_layer_batch_api(plan))
+        without_gate = resolve_two_row_batch_contract(
+            ops, combined, {**config, "batch_decode_recurrent_gate_projection": False},
+            row_layout=row_layout)
+        self.assertEqual(without_gate["full_layer_plan"]["projection_groups"], 2)
+        self.assertIsNone(resolve_two_row_batch_contract(
+            ops, combined, {**config, "batch_decode_recurrent_gate_projection": "true"},
+            row_layout=row_layout))
+        for label, change in (
+            ("unmapped gate", lambda o, l: o[5]["call_abi"].update(kernel_id="gemv_q5_k")),
+            ("wrong gate layer", lambda o, l: o[5].update(layer=1)),
+            ("offset input", lambda o, l: o[5]["args"][2].update(
+                expr="(void*)(model->bump + (A_MAIN_STREAM_Q8 + 1))")),
+            ("overlapping gate output", lambda o, l: next(
+                b for b in l["memory"]["activations"]["buffers"]
+                if b["name"] == "recurrent_z").update(abs_offset=next(
+                    b["abs_offset"] for b in l["memory"]["activations"]["buffers"]
+                    if b["name"] == "recurrent_packed"))),
+        ):
+            with self.subTest(label=label):
+                bad_ops, bad_layout = copy.deepcopy(ops), copy.deepcopy(combined)
+                change(bad_ops, bad_layout)
                 self.assertIsNone(resolve_two_row_batch_contract(
                     bad_ops, bad_layout, config, row_layout=row_layout))
 
@@ -732,6 +800,58 @@ int main(void) {
                 "if (ck_model_decode_batch2(rows,2,workspace,bytes)) return 5;",
                 "g_owner_fault=1; if (ck_model_decode_batch2(rows,2,workspace,bytes)) return 5;")
             self.assertNotEqual(run(wrong_owner).returncode, 0)
+
+            # The same compiled fixture now executes the real emitted
+            # three-projection split: QKV and gate share one packed input,
+            # then the stateful core remains sequence-local.
+            three_ops, three_layout, three_config = _recurrent_three_group_fixture()
+            three_plan = resolve_two_row_batch_contract(
+                three_ops, _hybrid_recurrent_layout(three_layout), three_config,
+                row_layout=three_layout)["full_layer_plan"]
+            three_emitted = emit_full_layer_batch_api(three_plan)
+            three_source = source_text.replace(emitted, three_emitted)
+            three_source = three_source.replace(
+                "#define A_RECURRENT_NORMED 3008",
+                "#define A_RECURRENT_NORMED 3008\n#define A_RECURRENT_Z 3200\n"
+                "#define W_LAYER_0_ATTN_GATE 3416")
+            three_source = three_source.replace(
+                "static void ck_batch_stage_2(CKModel *model, int token) {",
+                """static void gemm_nt_q4_k_q8_k_decode_m2(
+    const void *input, const void *weight, const float *bias, float *output,
+    int rows, int channels, int width) {
+    (void)bias; (void)width;
+    for (int row=0;row<rows;++row) for (int col=0;col<channels;++col)
+        output[row*channels+col]=(float)(((const uint8_t *)input)[row*292]+col+
+                                            ((const uint8_t *)weight)[0]);
+}
+static void ck_batch_stage_2(CKModel *model, int token) {""")
+            three_source = three_source.replace(
+                "float *packed=(float *)(model->bump+A_RECURRENT_PACKED);",
+                "float *packed=(float *)(model->bump+A_RECURRENT_PACKED);\n"
+                "    float *gate=(float *)(model->bump+A_RECURRENT_Z);")
+            three_source = three_source.replace(
+                "normed[j]=packed[j%16]+(float)g_active_sequence->conv[0]+(float)g_active_sequence->ssm[0];",
+                "normed[j]=packed[j%16]+gate[j%16]+(float)g_active_sequence->conv[0]+(float)g_active_sequence->ssm[0];")
+            three_source = three_source.replace(
+                "    ck_batch_stage_2(g_model,token);",
+                "    gemm_nt_q4_k_q8_k_decode_m2(g_model->bump+A_MAIN_STREAM_Q8,\n"
+                "        g_model->bump+W_LAYER_0_ATTN_GATE,NULL,\n"
+                "        (float *)(g_model->bump+A_RECURRENT_Z),1,16,256);\n"
+                "    ck_batch_stage_2(g_model,token);")
+            three_source = three_source.replace(
+                "g_model->bump[W_LAYER_0_SSM_OUT]=5;",
+                "g_model->bump[W_LAYER_0_SSM_OUT]=5;\n"
+                "    g_model->bump[W_LAYER_0_ATTN_GATE]=9;")
+            three_source = three_source.replace(
+                "ck_model_batch_decode_projection_groups()!=2",
+                "ck_model_batch_decode_projection_groups()!=3")
+            self.assertNotEqual(three_source, source_text)
+            self.assertEqual(run(three_source).returncode, 0)
+            missing_gate = re.sub(
+                r"(?m)^        ck_batch_memcpy\(g_model->bump \+ A_RECURRENT_Z, base \+ [^\n]+\n",
+                "", three_source, count=1)
+            self.assertNotEqual(missing_gate, three_source)
+            self.assertNotEqual(run(missing_gate).returncode, 0)
 
     def test_recurrent_q6_two_row_provider_matches_selected_decode(self) -> None:
         import random

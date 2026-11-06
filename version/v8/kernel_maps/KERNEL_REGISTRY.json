@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 483,
+      "total": 484,
       "by_op": {
         "add_backward": 1,
         "add_rows_checked": 1,
@@ -100,7 +100,7 @@
         "gated_shared_swiglu_expert_mlp": 4,
         "geglu": 7,
         "gelu": 10,
-        "gemm": 25,
+        "gemm": 26,
         "gemm_backward": 1,
         "gemma4_per_layer_embed": 1,
         "gemma4_per_layer_prepare": 2,
@@ -46310,6 +46310,152 @@
       "_source_file": "gemm_nt_q4_k_q8_k.json"
     },
     {
+      "id": "gemm_nt_q4_k_q8_k_decode_m2",
+      "op": "gemm",
+      "variant": "q4_k_w_q8_k_a_decode_order_m2",
+      "contract_schema_version": 1,
+      "physical_contract_version": 1,
+      "numerical_contract": "q4_k_x_q8_k_repacked_matvec_fp32",
+      "selection": {
+        "status": "candidate",
+        "priority": 0,
+        "equivalence_group": "q4_k_x_q8_k_repacked_matvec_fp32",
+        "phases": [
+          "decode"
+        ]
+      },
+      "batch_decode_two_rows": {
+        "decode_provider_id": "gemv_q4_k_q8_k",
+        "decode_function": "gemv_q4_k_q8_k_repacked_parallel_dispatch",
+        "function": "gemm_nt_q4_k_q8_k_decode_m2",
+        "input_dtype": "q8_k",
+        "max_input_dim": 8192,
+        "numerical_contract": "q4_k_x_q8_k_repacked_matvec_fp32",
+        "rows": 2
+      },
+      "quant": {
+        "weight": "q4_k",
+        "activation": "q8_k",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "A_q8",
+          "dtype": "q8_k",
+          "shape": [
+            "M",
+            "K"
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "B",
+          "dtype": "q4_k",
+          "shape": [
+            "N",
+            "K"
+          ],
+          "layout": "opaque_packed",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "bias",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "layout": "feature_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "optional",
+          "optional": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "C",
+          "dtype": "fp32",
+          "shape": [
+            "M",
+            "N"
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "M",
+        "N",
+        "K"
+      ],
+      "constraints": {
+        "alignment": {
+          "K": 256
+        },
+        "notes": "Only M=2 and K divisible by 256. Generated batch entry owns row extents and nonaliasing checks."
+      },
+      "impl": {
+        "function": "gemm_nt_q4_k_q8_k_decode_m2",
+        "c_declaration": "void gemm_nt_q4_k_q8_k_decode_m2(const void *A_q8, const void *B, const float *bias, float *C, int M, int N, int K);",
+        "sources": [
+          "version/v8/src/ck_parallel_prefill_v8.c",
+          "src/kernels/gemm_kernels_q4k_q8k_vnni.c"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "A_q8",
+            "source": "activation:a",
+            "cast": "const void*"
+          },
+          {
+            "name": "B",
+            "source": "weight:_first_weight"
+          },
+          {
+            "name": "bias",
+            "source": "weight_f:_bias"
+          },
+          {
+            "name": "C",
+            "source": "output:c",
+            "cast": "float*"
+          },
+          {
+            "name": "M",
+            "source": "dim:_m"
+          },
+          {
+            "name": "N",
+            "source": "dim:_output_dim"
+          },
+          {
+            "name": "K",
+            "source": "dim:_input_dim"
+          }
+        ]
+      },
+      "notes": "Opt-in generated two-row decode provider. Reuses the M=1 weight-identity cache; does not alter ordinary prefill or one-row decode selection. Packed-cache allocation failure follows the existing M=1 abort contract.",
+      "name": "gemm_nt_q4_k_q8_k_decode_m2",
+      "_source_file": "gemm_nt_q4_k_q8_k_decode_m2.json"
+    },
+    {
       "id": "gemm_nt_q5_0",
       "op": "gemm",
       "variant": "q5_0_w_fp32_a_fp32_out",
@@ -49812,6 +49958,9 @@
     },
     {
       "id": "gemv_q4_k_q8_k",
+      "batch_decode_two_rows": {
+        "provider_id": "gemm_nt_q4_k_q8_k_decode_m2"
+      },
       "op": "gemv",
       "prefill_continuation": {
         "function": "gemv_q4_k_q8_k_prefill_order_parallel_dispatch",
