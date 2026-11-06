@@ -165,6 +165,42 @@ def _hybrid_recurrent_layout(row_layout: dict) -> dict:
     return combined
 
 
+def _recurrent_two_group_fixture() -> tuple[list[dict], dict, dict]:
+    ops, layout, config = _recurrent_fixture()
+    config["batch_decode_recurrent_output_projection"] = True
+    layout["memory"]["activations"]["buffers"].append({
+        "name": "recurrent_normed", "size": 128, "abs_offset": 3008,
+        "define": "A_RECURRENT_NORMED", "lifetime": "call", "mutable": True,
+    })
+    layout["memory"]["arena"]["total_size"] = 3200
+    output = next(arg for arg in ops[5]["args"] if arg["name"] == "output")
+    output["buffer_ref"] = "recurrent_normed"
+    output["expr"] = "(float*)(model->bump + A_RECURRENT_NORMED)"
+    ops[6:6] = [
+        {"op": "recurrent_norm_gate", "layer": 0, "args": [
+            {"name": "x", "expr": "(const float*)(model->bump + A_RECURRENT_NORMED)",
+             "source": "activation:x", "buffer_ref": "recurrent_normed"},
+            {"name": "out", "expr": "(float*)(model->bump + A_RECURRENT_NORMED)",
+             "source": "output:out", "buffer_ref": "recurrent_normed"}]},
+        {"op": "recurrent_out_proj", "layer": 0,
+         "function": "gemv_q8_0_q8_0_contract",
+         "call_abi": {"kernel_id": "gemv_q8_0_q8_0_contract"}, "args": [
+            {"name": "x", "expr": "(const float*)(model->bump + A_RECURRENT_NORMED)",
+             "source": "activation:x", "buffer_ref": "recurrent_normed"},
+            {"name": "y", "expr": "(float*)(model->bump + A_EMBEDDED_INPUT)",
+             "source": "output:y", "buffer_ref": "embedded_input"},
+            {"name": "W", "expr": "(const void*)(model->bump + W_LAYER_0_SSM_OUT)",
+             "source": "weight:W"},
+            {"name": "M", "expr": "16", "source": "dim:M"},
+            {"name": "K", "expr": "32", "source": "dim:K"}]},
+    ]
+    ops[8]["args"].append({
+        "name": "residual", "expr": "(const float*)(model->bump + A_RESIDUAL)",
+        "source": "activation:residual", "buffer_ref": "residual",
+    })
+    return ops, layout, config
+
+
 def _layer_fixture() -> tuple[list[dict], dict, dict]:
     ops, layout, config = _fixture()
     def arg(name: str, expr: str, ref: str | None = None, source: str = "dim:test") -> dict:
@@ -329,6 +365,49 @@ class BatchContractTests(unittest.TestCase):
                 self.assertIsNone(resolve_two_row_batch_contract(
                     ops, combined, config, row_layout=bad_layout))
 
+    def test_second_recurrent_projection_preserves_all_live_values(self) -> None:
+        ops, row_layout, config = _recurrent_two_group_fixture()
+        combined = _hybrid_recurrent_layout(row_layout)
+        plan = resolve_two_row_batch_contract(
+            ops, combined, config, row_layout=row_layout)["full_layer_plan"]
+        self.assertEqual(plan["projection_groups"], 2)
+        self.assertEqual([(s["kind"], s["start"], s["stop"])
+                          for s in plan["stages"]],
+                         [("local", 0, 4), ("shared", 4, 5),
+                          ("local", 5, 7), ("shared", 7, 8),
+                          ("local", 8, 9)])
+        self.assertIn("recurrent_normed", plan["stages"][2]["live_after"])
+        self.assertIn("residual", plan["stages"][3]["live_after"])
+        self.assertIn("gemm_nt_q8_0_q8_0_contract_m2",
+                      emit_full_layer_batch_api(plan))
+        self.assertEqual(resolve_two_row_batch_contract(
+            ops, combined, {**config, "batch_decode_recurrent_output_projection": False},
+            row_layout=row_layout)["full_layer_plan"]["projection_groups"], 1)
+        self.assertIsNone(resolve_two_row_batch_contract(
+            ops, combined, {**config, "batch_decode_recurrent_output_projection": "true"},
+            row_layout=row_layout))
+
+        for label, mutation in (
+            ("unmapped output", lambda o, l: o[7]["call_abi"].update(
+                kernel_id="gemv_q4_k_q8_k")),
+            ("wrong layer", lambda o, l: o[7].update(layer=1)),
+            ("missing core", lambda o, l: o[5].update(op="other")),
+            ("hidden live value", lambda o, l: (
+                o[6]["args"].append({
+                    "name": "extra", "expr": "(float*)(model->bump + A_MISSING)",
+                    "source": "output:extra", "buffer_ref": "missing"}),
+                o[8]["args"].append({
+                    "name": "extra", "expr": "(const float*)(model->bump + A_MISSING)",
+                    "source": "activation:extra", "buffer_ref": "missing"}))),
+            ("offset input", lambda o, l: o[7]["args"][0].update(
+                expr="(const float*)(model->bump + (A_RECURRENT_NORMED + 4))")),
+        ):
+            with self.subTest(label=label):
+                bad_ops, bad_layout = copy.deepcopy(ops), copy.deepcopy(combined)
+                mutation(bad_ops, bad_layout)
+                self.assertIsNone(resolve_two_row_batch_contract(
+                    bad_ops, bad_layout, config, row_layout=row_layout))
+
     def test_recurrent_generated_entry_matches_isolated_state(self) -> None:
         ops, row_layout, config = _recurrent_fixture()
         combined = _hybrid_recurrent_layout(row_layout)
@@ -356,6 +435,7 @@ typedef struct { int occupied, pos; uint64_t handle; uint8_t *kv, *conv, *ssm; }
 static CKModel object, *g_model=&object;
 static CKSequenceStateV8 g_sequence_states[3], *g_active_sequence;
 static int g_ck_skip_decode_logits;
+static int g_owner_fault;
 static CKSequenceStateV8 *ck_sequence_find(uint64_t handle) {
     for (int i=0;i<3;++i) if (g_sequence_states[i].occupied && g_sequence_states[i].handle==handle) return &g_sequence_states[i];
     return NULL;
@@ -386,7 +466,7 @@ static void ck_batch_stage_2(CKModel *model, int token) {
     float *residual=(float *)(model->bump+A_RESIDUAL);
     g_active_sequence->conv[0]+=(uint8_t)packed[0];
     g_active_sequence->ssm[0]+=(uint8_t)residual[0];
-    g_active_sequence->kv[model->pos]=(uint8_t)token;
+    (g_owner_fault ? &g_sequence_states[0] : g_active_sequence)->kv[model->pos]=(uint8_t)token;
     for (int j=0;j<VOCAB_SIZE;++j)
         model->logits[j]=packed[j]+(float)g_active_sequence->conv[0]+
                          (float)g_active_sequence->ssm[0]+residual[0];
@@ -477,9 +557,180 @@ int main(void) {
             self.assertNotEqual(missing_restore, source_text)
             self.assertNotEqual(run(missing_restore).returncode, 0)
             wrong_owner = source_text.replace(
-                "g_active_sequence->kv[model->pos]=(uint8_t)token;",
-                "g_sequence_states[0].kv[model->pos]=(uint8_t)token;")
+                "if (ck_model_decode_batch2(rows,2,workspace,bytes)) return 5;",
+                "g_owner_fault=1; if (ck_model_decode_batch2(rows,2,workspace,bytes)) return 5;")
             self.assertNotEqual(wrong_owner, source_text)
+            self.assertNotEqual(run(wrong_owner).returncode, 0)
+
+    def test_recurrent_two_group_generated_entry_matches_isolated_state(self) -> None:
+        ops, row_layout, config = _recurrent_two_group_fixture()
+        plan = resolve_two_row_batch_contract(
+            ops, _hybrid_recurrent_layout(row_layout), config,
+            row_layout=row_layout)["full_layer_plan"]
+        emitted = emit_full_layer_batch_api(plan)
+        source_text = r'''
+#define _POSIX_C_SOURCE 200809L
+#include <stdint.h>
+#include <stddef.h>
+#include <stdlib.h>
+#include <string.h>
+#define CK_EXPORT
+#define VOCAB_SIZE 16
+#define MAX_SEQ_LEN 16
+#define KV_CACHE_SIZE 64
+#define A_EMBEDDED_INPUT 128
+#define A_RESIDUAL 1152
+#define A_MAIN_STREAM_Q8 2176
+#define A_RECURRENT_PACKED 2496
+#define A_RECURRENT_NORMED 3008
+#define W_LAYER_0_ATTN_QKV 3400
+#define W_LAYER_0_SSM_OUT 3408
+typedef struct { uint64_t sequence_handle; int token, position; size_t row_offset, token_count; float *logits; } CKModelBatchDecodeRowV8;
+typedef struct { uint8_t *bump; size_t bump_size; int pos; float logits[VOCAB_SIZE]; } CKModel;
+typedef struct { int occupied, pos; uint64_t handle; uint8_t *kv, *conv, *ssm; } CKSequenceStateV8;
+static CKModel object, *g_model=&object;
+static CKSequenceStateV8 g_sequence_states[3], *g_active_sequence;
+static int g_ck_skip_decode_logits;
+static int g_owner_fault;
+static CKSequenceStateV8 *ck_sequence_find(uint64_t handle) {
+    for (int i=0;i<3;++i) if (g_sequence_states[i].occupied && g_sequence_states[i].handle==handle) return &g_sequence_states[i];
+    return NULL;
+}
+static int ck_model_sequence_state_activate(uint64_t handle) {
+    CKSequenceStateV8 *next=ck_sequence_find(handle);
+    if (!next) return -1;
+    if (g_active_sequence) g_active_sequence->pos=g_model->pos;
+    g_model->pos=next->pos; g_active_sequence=next;
+    return 0;
+}
+static int ck_model_cancel_requested(void) { return 0; }
+static void ck_batch_stage_0(CKModel *model, int token) {
+    ((float *)(model->bump+A_EMBEDDED_INPUT))[0]=(float)(token*2);
+    ((float *)(model->bump+A_RESIDUAL))[0]=(float)(token+20);
+    model->bump[A_MAIN_STREAM_Q8]=(uint8_t)(token+1);
+}
+static void gemm_nt_q6_k_q8_k_m2(const void *input, const void *weight,
+                                  const float *bias, float *output,
+                                  int rows, int channels, int width) {
+    (void)bias; (void)width;
+    for (int row=0;row<rows;++row) for (int col=0;col<channels;++col)
+        output[row*channels+col]=(float)(((const uint8_t *)input)[row*292]+col+
+                                            ((const uint8_t *)weight)[0]);
+}
+static void ck_batch_stage_2(CKModel *model, int token) {
+    (void)token;
+    float *packed=(float *)(model->bump+A_RECURRENT_PACKED);
+    float *residual=(float *)(model->bump+A_RESIDUAL);
+    float *normed=(float *)(model->bump+A_RECURRENT_NORMED);
+    g_active_sequence->conv[0]+=(uint8_t)packed[0];
+    g_active_sequence->ssm[0]+=(uint8_t)residual[0];
+    for (int j=0;j<32;++j)
+        normed[j]=packed[j%16]+(float)g_active_sequence->conv[0]+(float)g_active_sequence->ssm[0];
+}
+static void gemm_nt_q8_0_q8_0_contract_m2(const float *input, const void *weight,
+                                           const float *bias, float *output,
+                                           int rows, int channels, int width) {
+    (void)bias;
+    for (int row=0;row<rows;++row) for (int col=0;col<channels;++col)
+        output[row*channels+col]=input[row*width+col]+((const uint8_t *)weight)[0];
+}
+static void ck_batch_stage_4(CKModel *model, int token) {
+    float *output=(float *)(model->bump+A_EMBEDDED_INPUT);
+    float *residual=(float *)(model->bump+A_RESIDUAL);
+    (g_owner_fault ? &g_sequence_states[0] : g_active_sequence)->kv[model->pos]=(uint8_t)token;
+    for (int j=0;j<VOCAB_SIZE;++j)
+        model->logits[j]=output[j]+residual[0]+(float)g_active_sequence->conv[0];
+    model->pos++;
+}
+''' + emitted + r'''
+static void isolated(int token) {
+    ck_batch_stage_0(g_model,token);
+    gemm_nt_q6_k_q8_k_m2(g_model->bump+A_MAIN_STREAM_Q8,
+                          g_model->bump+W_LAYER_0_ATTN_QKV,NULL,
+                          (float *)(g_model->bump+A_RECURRENT_PACKED),1,16,256);
+    ck_batch_stage_2(g_model,token);
+    gemm_nt_q8_0_q8_0_contract_m2((float *)(g_model->bump+A_RECURRENT_NORMED),
+                                   g_model->bump+W_LAYER_0_SSM_OUT,NULL,
+                                   (float *)(g_model->bump+A_EMBEDDED_INPUT),1,16,32);
+    ck_batch_stage_4(g_model,token);
+}
+int main(void) {
+    g_model->bump=calloc(1,4096); g_model->bump_size=4096;
+    if (!g_model->bump) return 1;
+    g_model->bump[W_LAYER_0_ATTN_QKV]=3;
+    g_model->bump[W_LAYER_0_SSM_OUT]=5;
+    static uint8_t kv[3][64]={{0}},conv[3][64]={{0}},ssm[3][64]={{0}};
+    for (int i=0;i<3;++i) {
+        g_sequence_states[i]=(CKSequenceStateV8){.occupied=1,.pos=i,.handle=(uint64_t)(i+1),
+            .kv=kv[i],.conv=conv[i],.ssm=ssm[i]};
+        conv[i][0]=(uint8_t)(i+1); ssm[i][0]=(uint8_t)(i+4);
+    }
+    float expected[2][VOCAB_SIZE],actual[2][VOCAB_SIZE]={{0}};
+    uint8_t expected_kv[3][64],expected_conv[3][64],expected_ssm[3][64];
+    int expected_pos[3];
+    for (int i=0;i<2;++i) {
+        if (ck_model_sequence_state_activate((uint64_t)(i+1))) return 2;
+        isolated(i ? 7 : 3);
+        memcpy(expected[i],g_model->logits,sizeof(expected[i]));
+    }
+    if (g_active_sequence) g_active_sequence->pos=g_model->pos;
+    memcpy(expected_kv,kv,sizeof(kv)); memcpy(expected_conv,conv,sizeof(conv));
+    memcpy(expected_ssm,ssm,sizeof(ssm));
+    for (int i=0;i<3;++i) expected_pos[i]=g_sequence_states[i].pos;
+    memset(kv,0,sizeof(kv)); memset(conv,0,sizeof(conv)); memset(ssm,0,sizeof(ssm));
+    for (int i=0;i<3;++i) {
+        g_sequence_states[i].pos=i; conv[i][0]=(uint8_t)(i+1); ssm[i][0]=(uint8_t)(i+4);
+    }
+    g_active_sequence=NULL; g_model->pos=0;
+    CKModelBatchDecodeRowV8 rows[2]={
+        {.sequence_handle=1,.token=3,.position=0,.row_offset=0,.token_count=1,.logits=actual[0]},
+        {.sequence_handle=2,.token=7,.position=1,.row_offset=1,.token_count=1,.logits=actual[1]}
+    };
+    size_t bytes=0,alignment=0;
+    if (ck_model_batch_decode_projection_groups()!=2 ||
+        ck_model_batch_decode_workspace(&bytes,&alignment) || alignment!=64) return 3;
+    void *workspace=aligned_alloc(alignment,(bytes+alignment-1)/alignment*alignment);
+    if (!workspace) return 4;
+    if (ck_model_decode_batch2(rows,2,workspace,bytes)) return 5;
+    if (g_active_sequence) g_active_sequence->pos=g_model->pos;
+    for (int i=0;i<3;++i) {
+        if (g_sequence_states[i].pos!=expected_pos[i] ||
+            memcmp(kv[i],expected_kv[i],64) ||
+            memcmp(conv[i],expected_conv[i],64) ||
+            memcmp(ssm[i],expected_ssm[i],64)) return 6+i;
+        if (i<2 && memcmp(actual[i],expected[i],sizeof(expected[i]))) return 10+i;
+    }
+    free(workspace); free(g_model->bump);
+    return 0;
+}
+'''
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "two_groups.c"
+            binary = Path(directory) / "two_groups"
+            def run(text: str) -> subprocess.CompletedProcess[str]:
+                source.write_text(text)
+                built = subprocess.run(
+                    ["cc", "-std=c11", "-O0", "-Wall", "-Werror",
+                     "-Wno-unused-function", "-Wno-unused-variable",
+                     str(source), "-o", str(binary)], capture_output=True, text=True)
+                self.assertEqual(built.returncode, 0, built.stderr)
+                return subprocess.run([str(binary)], capture_output=True, text=True)
+
+            self.assertEqual(run(source_text).returncode, 0)
+            restore = list(re.finditer(
+                r"(?m)^        ck_batch_memcpy\(g_model->bump \+ A_EMBEDDED_INPUT, base \+ [^\n]+\n",
+                source_text))
+            self.assertGreaterEqual(len(restore), 2)
+            bad = source_text[:restore[-1].start()] + source_text[restore[-1].end():]
+            self.assertNotEqual(run(bad).returncode, 0)
+            missing_intermediate = re.sub(
+                r"(?m)^        ck_batch_memcpy\(base \+ [^\n]+g_model->bump \+ A_RECURRENT_NORMED, [^\n]+\n",
+                "", source_text, count=1)
+            self.assertNotEqual(missing_intermediate, source_text)
+            self.assertNotEqual(run(missing_intermediate).returncode, 0)
+            wrong_owner = source_text.replace(
+                "if (ck_model_decode_batch2(rows,2,workspace,bytes)) return 5;",
+                "g_owner_fault=1; if (ck_model_decode_batch2(rows,2,workspace,bytes)) return 5;")
             self.assertNotEqual(run(wrong_owner).returncode, 0)
 
     def test_recurrent_q6_two_row_provider_matches_selected_decode(self) -> None:

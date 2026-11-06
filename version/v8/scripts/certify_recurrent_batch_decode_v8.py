@@ -57,7 +57,8 @@ def bind(model):
         fn = getattr(model, name)
         fn.argtypes, fn.restype = args, result
 
-def certify(bundle: Path, *, swap_row_order: bool = False) -> dict:
+def certify(bundle: Path, *, swap_row_order: bool = False,
+            expected_projection_groups: int = 1) -> dict:
     layout = json.loads((bundle / 'layout_decode.json').read_text())
     sizes = {row['name']: int(row['size']) for row in layout['memory']['activations']['buffers'] if row['name'] in NAMES}
     assert set(sizes) == set(NAMES), sizes
@@ -80,7 +81,11 @@ def certify(bundle: Path, *, swap_row_order: bool = False) -> dict:
         raise AssertionError('loaded generated-source identity mismatch')
     check(model.ck_model_init(str(bundle / 'weights.bump').encode()), 'init')
     try:
-        assert model.ck_model_batch_decode_projection_groups() == 1
+        actual_groups = model.ck_model_batch_decode_projection_groups()
+        if actual_groups != expected_projection_groups:
+            raise AssertionError(
+                f'expected {expected_projection_groups} shared projection groups, '
+                f'loaded entry has {actual_groups}')
         assert model.ck_model_get_capabilities() & (1 << 17)
         vocab = model.ck_model_get_vocab_size()
         if vocab <= 300:
@@ -221,6 +226,7 @@ def certify(bundle: Path, *, swap_row_order: bool = False) -> dict:
                 'weights_bytes': (bundle / 'weights.bump').stat().st_size,
                 'layout_sha256': hashlib.sha256((bundle / 'layout_decode.json').read_bytes()).hexdigest(),
                 'tokens': tokens, 'row_order': list(order),
+                'projection_groups': actual_groups,
                 'threads': os.getenv('CK_NUM_THREADS'),
                 'cpu': next((line.partition(':')[2].strip() for line in
                              Path('/proc/cpuinfo').read_text().splitlines()
@@ -241,13 +247,17 @@ def main() -> int:
     parser.add_argument('--bundle', required=True, type=Path)
     parser.add_argument('--report', type=Path)
     parser.add_argument('--swap-row-order', action='store_true')
+    parser.add_argument('--expected-projection-groups', type=int,
+                        choices=(1, 2), default=1)
     args = parser.parse_args()
     if not args.bundle.is_dir():
         report = {'status': 'NOT_TESTED', 'bundle': str(args.bundle),
                   'reason': 'bundle directory unavailable'}
     else:
         try:
-            report = certify(args.bundle.resolve(), swap_row_order=args.swap_row_order)
+            report = certify(
+                args.bundle.resolve(), swap_row_order=args.swap_row_order,
+                expected_projection_groups=args.expected_projection_groups)
         except (OSError, ValueError, AssertionError, RuntimeError) as error:
             report = {'status': 'FAIL', 'bundle': str(args.bundle),
                       'error': f'{type(error).__name__}: {error}'}
