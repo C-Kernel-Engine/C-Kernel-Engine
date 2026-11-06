@@ -131,6 +131,7 @@ static void ck_batch_stage_6(CKModel *model, int token) {
 static void ck_batch_stage_8(CKModel *model, int token) {
     (void)token;
     CKSequenceStateV8 *s = g_active_sequence;
+    memset(model->logits, 0, sizeof(model->logits));
     model->logits[0] = ((float *)(model->bump + A_EMBEDDED_INPUT))[0];
     model->logits[1] = (float)s->conv[0] + (float)s->conv[32];
     model->logits[2] = (float)s->ssm[0] + (float)s->ssm[32];
@@ -168,12 +169,28 @@ static void isolated_step(int token) {
     ck_batch_stage_8(g_model, token);
 }
 
+static void seed_states(uint8_t kv[2][64], uint8_t conv[2][64],
+                        uint8_t ssm[2][64]) {
+    for (int i = 0; i < 2; ++i) {
+        for (int j = 0; j < 64; ++j) {
+            kv[i][j] = (uint8_t)(3 + i * 17 + j % 7);
+            conv[i][j] = (uint8_t)(5 + i * 19 + j % 11);
+            ssm[i][j] = (uint8_t)(7 + i * 23 + j % 13);
+        }
+        g_sequence_states[i].pos = i == 0 ? 2 : 5;
+    }
+    g_active_sequence = NULL;
+    g_model->pos = 0;
+}
+
 int main(void) {
     uint8_t kv[2][64] = {{0}}, conv[2][64] = {{0}}, ssm[2][64] = {{0}};
-    uint8_t expected_kv[2][64], expected_conv[2][64], expected_ssm[2][64];
-    float isolated[2][VOCAB_SIZE] = {{0}}, batched[2][VOCAB_SIZE] = {{0}};
-    int expected_position[2];
-    const int tokens[2] = {3, 7};
+    uint8_t expected_kv[3][2][64], expected_conv[3][2][64];
+    uint8_t expected_ssm[3][2][64];
+    float isolated[3][2][VOCAB_SIZE] = {{{0}}};
+    float batched[3][2][VOCAB_SIZE] = {{{0}}};
+    int expected_position[3][2];
+    const int tokens[3][2] = {{3, 7}, {5, 11}, {9, 4}};
     for (int i = 0; i < 2; ++i)
         g_sequence_states[i] = (CKSequenceStateV8){
             .occupied = 1, .handle = (uint64_t)(i + 1),
@@ -184,38 +201,48 @@ int main(void) {
     g_model->bump[W_LAYER_1_ATTN_QKV] = 4;
     g_model->bump[W_LAYER_1_ATTN_GATE] = 5;
     g_model->bump[W_LAYER_1_SSM_OUT] = 6;
-    for (int i = 0; i < 2; ++i) {
-        if (ck_model_sequence_state_activate((uint64_t)(i + 1))) return 1;
-        isolated_step(tokens[i]);
-        memcpy(isolated[i], g_model->logits, sizeof(isolated[i]));
-        memcpy(expected_kv[i], kv[i], 64);
-        memcpy(expected_conv[i], conv[i], 64);
-        memcpy(expected_ssm[i], ssm[i], 64);
-        expected_position[i] = g_model->pos;
+    seed_states(kv, conv, ssm);
+    for (int step = 0; step < 3; ++step) {
+        for (int i = 0; i < 2; ++i) {
+            if (ck_model_sequence_state_activate((uint64_t)(i + 1))) return 1;
+            isolated_step(tokens[step][i]);
+            memcpy(isolated[step][i], g_model->logits,
+                   sizeof(isolated[step][i]));
+            memcpy(expected_kv[step][i], kv[i], 64);
+            memcpy(expected_conv[step][i], conv[i], 64);
+            memcpy(expected_ssm[step][i], ssm[i], 64);
+            expected_position[step][i] = g_model->pos;
+        }
     }
-    memset(kv, 0, sizeof(kv)); memset(conv, 0, sizeof(conv));
-    memset(ssm, 0, sizeof(ssm));
-    for (int i = 0; i < 2; ++i) g_sequence_states[i].pos = 0;
-    g_active_sequence = NULL; g_model->pos = 0;
-    CKModelBatchDecodeRowV8 rows[2] = {
-        {.sequence_handle = 1, .token = 3, .position = 0,
-         .row_offset = 0, .token_count = 1, .logits = batched[0]},
-        {.sequence_handle = 2, .token = 7, .position = 0,
-         .row_offset = 1, .token_count = 1, .logits = batched[1]},
-    };
+    seed_states(kv, conv, ssm);
     size_t bytes = 0, alignment = 0;
     if (ck_model_batch_decode_workspace(&bytes, &alignment) || alignment != 64)
         return 2;
     void *workspace = aligned_alloc(alignment,
         (bytes + alignment - 1) / alignment * alignment);
-    if (!workspace || ck_model_decode_batch2(rows, 2, workspace, bytes)) return 3;
-    for (int i = 0; i < 2; ++i) {
-        if (ck_model_sequence_state_activate((uint64_t)(i + 1)) ||
-            memcmp(isolated[i], batched[i], sizeof(isolated[i])) ||
-            memcmp(expected_kv[i], kv[i], 64) ||
-            memcmp(expected_conv[i], conv[i], 64) ||
-            memcmp(expected_ssm[i], ssm[i], 64) ||
-            g_model->pos != expected_position[i]) return 4 + i;
+    if (!workspace) return 3;
+    for (int step = 0; step < 3; ++step) {
+        CKModelBatchDecodeRowV8 rows[2];
+        for (int row = 0; row < 2; ++row) {
+            int i = step % 2 ? 1 - row : row;
+            rows[row] = (CKModelBatchDecodeRowV8){
+                .sequence_handle = (uint64_t)(i + 1),
+                .token = tokens[step][i],
+                .position = g_sequence_states[i].pos,
+                .row_offset = (size_t)row, .token_count = 1,
+                .logits = batched[step][i]};
+        }
+        if (ck_model_decode_batch2(rows, 2, workspace, bytes)) return 3;
+        for (int i = 0; i < 2; ++i) {
+            if (ck_model_sequence_state_activate((uint64_t)(i + 1)) ||
+                memcmp(isolated[step][i], batched[step][i],
+                       sizeof(isolated[step][i])) ||
+                memcmp(expected_kv[step][i], kv[i], 64) ||
+                memcmp(expected_conv[step][i], conv[i], 64) ||
+                memcmp(expected_ssm[step][i], ssm[i], 64) ||
+                g_model->pos != expected_position[step][i])
+                return 4 + step * 2 + i;
+        }
     }
     free(workspace);
     return 0;
