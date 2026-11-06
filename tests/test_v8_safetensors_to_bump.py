@@ -3296,7 +3296,7 @@ def test_rwkv7_providers_certify_every_declared_phase() -> None:
             capability_phases,
         )
         checked += 1
-    assert checked == 8
+    assert checked == 9
 
 
 def test_rwkv7_prefill_uses_token_serial_decode_path() -> None:
@@ -3662,7 +3662,7 @@ def test_rwkv7_kernel_maps_use_real_config_dims_and_scratch() -> None:
     assert scratch["scratch"]["size_bytes"] == "(H + I) * 4"
     params = {p["name"]: p for p in channelmix["call_abi"]["params"]}
     assert params["scratch"]["source"] == "scratch:scratch"
-    assert params["scratch_elems"]["source"] == "runtime:scratch_elems"
+    assert params["scratch_elems"]["source"] == "scratch_elements:scratch"
 
     config = {
         "embed_dim": 128,
@@ -3695,8 +3695,9 @@ def test_rwkv7_wkv_binds_rk_as_per_layer_weight() -> None:
     assert build_ir.OP_DATAFLOW["rwkv7_wkv_decode"]["inputs"].get("rk") is None
 
 
+@pytest.mark.parametrize("layout_mode", ["region", "packed"])
 def test_rwkv7_lower_3_binds_layer0_vgate_nulls_and_channelmix_scratch(
-    tmp_path: Path,
+    tmp_path: Path, layout_mode: str,
 ) -> None:
     checkpoint = _write_rwkv7_synthetic_checkpoint(tmp_path)
     output = tmp_path / "out"
@@ -3719,6 +3720,7 @@ def test_rwkv7_lower_3_binds_layer0_vgate_nulls_and_channelmix_scratch(
         "--lowered-output", str(output / "lowered.json"),
         "--call-output", str(output / "lowered_call.json"),
         "--context-len", "8",
+        "--layout-mode", layout_mode,
         "--logits-layout", "auto",
     ], cwd=ROOT, capture_output=True, text=True)
     assert run.returncode == 0, run.stderr[-4000:]
@@ -3746,7 +3748,40 @@ def test_rwkv7_lower_3_binds_layer0_vgate_nulls_and_channelmix_scratch(
     channelmix = args_of("rwkv7_channelmix_decode", 0)
     assert channelmix["scratch"]["source"] == "scratch:scratch"
     assert channelmix["scratch"]["expr"] != "NULL"
-    assert channelmix["scratch_elems"]["expr"].isdigit()
+    assert channelmix["scratch_elems"]["expr"] == "40"  # C=8, I=32
+    # Each layer owns its recurrent slice; v_first is shared within a token.
+    lowered = json.loads((output / "lowered.json").read_text())
+    def lowered_op(name, layer):
+        return next(op for op in lowered["operations"] if op["op"] == name and op["layer"] == layer)
+    for name, port, stride in (
+        ("rwkv7_time_mix_shifts", "shift_in", 8 * 4),
+        ("rwkv7_channelmix_decode", "shift_in", 8 * 4),
+        ("rwkv7_wkv_decode", "state_in", 2 * 4 * 4 * 4),
+    ):
+        offsets = [lowered_op(name, layer)["activations"][port]["activation_offset"] for layer in (0, 1)]
+        assert offsets[1] - offsets[0] == stride, (name, offsets)
+    producer = lowered_op("rwkv7_vgate_produce", 0)["outputs"]["v_first_out"]
+    consumer = lowered_op("rwkv7_vgate_vmix", 1)["activations"]["v_first"]
+    assert producer["activation_offset"] == consumer["activation_offset"]
+    assert args_of("rwkv7_wkv_decode", 0)["state_in"]["expr"] != args_of("rwkv7_wkv_decode", 1)["state_in"]["expr"]
+
+    # Capacity belongs to the named scratch only, never to other scratch regions.
+    import copy
+    build_ir = _load_build_ir()
+    candidate = copy.deepcopy(lowered)
+    cm = next(op for op in candidate["operations"] if op["op"] == "rwkv7_channelmix_decode")
+    cm["scratch"].append({"name": "unrelated", "size": 4096, "dtype": "fp32", "scratch_offset": 0})
+    def capacity_call():
+        result = build_ir.generate_ir_lower_3(candidate, "prefill")
+        return next(op for op in result["operations"] if op["idx"] == cm["idx"])
+    call = capacity_call()
+    assert not call["errors"]
+    assert next(arg["expr"] for arg in call["args"] if arg["name"] == "scratch_elems") == "40"
+    named = next(item for item in cm["scratch"] if item["name"] == "scratch")
+    named["size"] = 159
+    assert any("invalid scratch byte extent" in error for error in capacity_call()["errors"])
+    cm["scratch"].remove(named)
+    assert any("missing scratch elements" in error for error in capacity_call()["errors"])
 
 
 def test_rwkv7_ranks_derived_from_tensor_shapes_reach_lower_3(
@@ -3791,3 +3826,33 @@ def test_rwkv7_ranks_derived_from_tensor_shapes_reach_lower_3(
     call_ir = json.loads((output / "lowered_call.json").read_text(encoding="utf-8"))
     assert call_ir.get("errors") == []
     assert [op["idx"] for op in call_ir["operations"] if op.get("errors")] == []
+
+@pytest.mark.parametrize("declaration", [
+    {"shape": [2, 8], "scope": "unknown"},
+    {"shape": [3, 8], "scope": "layer"},
+    {"shape": [2], "scope": "layer"},
+])
+def test_declared_layer_scope_rejects_invalid_geometry(declaration):
+    with pytest.raises(RuntimeError, match="CIRCUIT BUFFER"):
+        _load_build_ir()._template_activation_buffer_specs(
+            {"activation_buffers": {"state": declaration}}, {"num_layers": 2}
+        )
+
+
+def test_rwkv7_rank_alias_conflict_is_rejected():
+    converter = _load_converter()
+    with pytest.raises(SystemExit, match="conflicting config aliases"):
+        converter._resolve_rwkv7_ranks(
+            {"embed_dim": 8}, {"decay_rank": 2, "decay_lora_rank": 3}, {}, None, 2
+        )
+
+
+@pytest.mark.parametrize("shape", [(8,), (8, 2, 1), (7, 2), (8, 0)])
+def test_rwkv7_rank_tensor_geometry_is_checked(shape):
+    from types import SimpleNamespace
+    converter = _load_converter()
+    with pytest.raises(SystemExit, match="invalid low-rank tensor geometry"):
+        converter._rwkv7_shape_ranks(
+            {"rwkv7.blocks.0.att.w1": SimpleNamespace(shape=shape)},
+            1, (("att.w1", -1),), 8,
+        )

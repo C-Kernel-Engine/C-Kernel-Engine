@@ -1,0 +1,212 @@
+{
+  "arithmetic": {
+    "deterministic": true,
+    "merge_order": "none",
+    "partial_accumulator": "fp32",
+    "split_strategy": "serial",
+    "thread_count_changes_arithmetic_order": false
+  },
+  "call_abi": {
+    "params": [
+      {
+        "name": "v_in",
+        "source": "activation:v_in",
+        "cast": "const float*",
+        "ports": [
+          "input:v_in"
+        ]
+      },
+      {
+        "name": "v_first",
+        "source": "null",
+        "cast": "const float*"
+      },
+      {
+        "name": "xv",
+        "source": "null",
+        "cast": "const float*"
+      },
+      {
+        "name": "v1",
+        "source": "null",
+        "cast": "const float*"
+      },
+      {
+        "name": "v2",
+        "source": "null",
+        "cast": "const float*"
+      },
+      {
+        "name": "v0",
+        "source": "null",
+        "cast": "const float*"
+      },
+      {
+        "name": "dim",
+        "source": "dim:embed_dim"
+      },
+      {
+        "name": "rank_v",
+        "source": "dim:value_rank"
+      },
+      {
+        "name": "v_out",
+        "source": "output:v_out",
+        "cast": "float*",
+        "ports": [
+          "output:v_out"
+        ]
+      },
+      {
+        "name": "v_first_out",
+        "source": "output:v_first_out",
+        "cast": "float*",
+        "ports": [
+          "output:v_first_out"
+        ]
+      },
+      {
+        "name": "v_gate",
+        "source": "output:v_gate",
+        "cast": "float*",
+        "ports": [
+          "output:v_gate"
+        ]
+      }
+    ],
+    "version": 1
+  },
+  "dims": [
+    "C",
+    "embed_dim",
+    "value_rank"
+  ],
+  "id": "rwkv7_vgate_produce_f32",
+  "provider_numerical_contract_schema": 1,
+  "numerical_contract": {
+    "id": "rwkv7_vgate_vmix_fp32",
+    "circuit_binding_required": true
+  },
+  "constraints": {},
+  "impl": {
+    "c_declaration": "int ck_rwkv7_vgate_vmix(const float *v_in, const float *v_first, const float *xv, const float *v1, const float *v2, const float *v0, int dim, int rank_v, float *v_out, float *v_first_out, float *v_gate);",
+    "function": "ck_rwkv7_vgate_vmix",
+    "sources": [
+      "src/kernels/rwkv7_decode.c"
+    ]
+  },
+  "inputs": [
+    {
+      "access": "read",
+      "consumption": "required",
+      "dtype": "fp32",
+      "layout": "feature_contiguous",
+      "name": "v_in",
+      "placement": "local",
+      "shape": [
+        "C"
+      ],
+      "storage_class": "activation"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "access": "write",
+      "consumption": "required",
+      "dtype": "fp32",
+      "layout": "feature_contiguous",
+      "name": "v_out",
+      "placement": "local",
+      "shape": [
+        "C"
+      ],
+      "storage_class": "activation"
+    },
+    {
+      "access": "write",
+      "consumption": "required",
+      "dtype": "fp32",
+      "layout": "feature_contiguous",
+      "name": "v_first_out",
+      "placement": "local",
+      "shape": [
+        "C"
+      ],
+      "storage_class": "activation"
+    },
+    {
+      "access": "write",
+      "consumption": "optional",
+      "dtype": "fp32",
+      "layout": "feature_contiguous",
+      "name": "v_gate",
+      "placement": "local",
+      "shape": [
+        "C"
+      ],
+      "storage_class": "activation"
+    }
+  ],
+  "modes": {
+    "backward": false,
+    "inference": true,
+    "training": false
+  },
+  "notes": "Layer-zero value producer: unused gate inputs are NULL by map contract. Reuses the checked value-mix provider copy branch.",
+  "numerical_capabilities": [
+    {
+      "arithmetic": {
+        "deterministic": true,
+        "merge_order": "none",
+        "partial_accumulator": "fp32",
+        "split_strategy": "serial",
+        "thread_count_changes_arithmetic_order": false
+      },
+      "contract_id": "rwkv7_vgate_vmix_fp32",
+      "explicit_selector": true,
+      "function": "ck_rwkv7_vgate_vmix",
+      "implementation": {
+        "isa_dispatch": "scalar",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": [
+            "serial"
+          ],
+          "dispatch": [
+            "inline"
+          ],
+          "reduction_order_effect": "contract_defined"
+        }
+      },
+      "phases": [
+        "decode",
+        "prefill"
+      ],
+      "status": "observed"
+    }
+  ],
+  "op": "rwkv7_vgate_produce",
+  "operation_interface": "rwkv7.vgate_produce.token_major.fp32.v1",
+  "quant": {
+    "activation": "fp32",
+    "output": "fp32",
+    "weight": "fp32"
+  },
+  "selection": {
+    "equivalence_group": "rwkv7_vgate_produce_f32",
+    "phases": [
+      "decode",
+      "prefill"
+    ],
+    "priority": 100,
+    "status": "candidate"
+  },
+  "tests": {
+    "oracle": "unittest/test_rwkv_decode.py and unittest/test_rwkv7_block.py vs torch reference; scalar serial contract.",
+    "unit": [
+      "unittest/test_rwkv7_block.py"
+    ]
+  },
+  "variant": "first_layer_value_copy_fp32"
+}

@@ -1675,6 +1675,7 @@ def _rwkv7_shape_ranks(
     headers: dict[str, HeaderTensor],
     num_layers: int,
     tensors: tuple[tuple[str, int], ...],
+    embed_dim: int,
 ) -> dict[int, str]:
     """Read authoritative LoRA ranks from checkpoint tensor shapes."""
     found: dict[int, str] = {}
@@ -1684,12 +1685,13 @@ def _rwkv7_shape_ranks(
             if header is None:
                 continue
             shape = list(header.shape or [])
-            rank_axis = axis if axis >= 0 else len(shape) + axis
-            if rank_axis < 0 or rank_axis >= len(shape):
-                continue
+            rank_axis = axis % 2
+            if (len(shape) != 2 or any(int(x) <= 0 for x in shape)
+                    or int(shape[1 - rank_axis]) != embed_dim):
+                raise SystemExit(
+                    f"RWKV-7 invalid low-rank tensor geometry: rwkv7.blocks.{layer}.{suffix}{tuple(shape)}"
+                )
             value = int(shape[rank_axis])
-            if value <= 0:
-                continue
             found.setdefault(
                 value,
                 f"rwkv7.blocks.{layer}.{suffix}{tuple(shape)}",
@@ -1714,16 +1716,18 @@ def _resolve_rwkv7_ranks(
     authoritative source and config values must agree with them.
     """
     for canonical, spec in _RWKV7_RANK_CONTRACT.items():
-        configured = _first_config_value(text, hf, spec["aliases"])
-        explicit = (
-            None
-            if configured is None
-            else _rwkv7_positive_rank(configured, canonical)
-        )
+        configured = {
+            _rwkv7_positive_rank(source[key], key)
+            for source in (text, hf) for key in spec["aliases"]
+            if source.get(key) is not None
+        }
+        if len(configured) > 1:
+            raise SystemExit(f"RWKV-7 {canonical} has conflicting config aliases")
+        explicit = next(iter(configured), None)
         shaped = (
             {}
             if headers is None
-            else _rwkv7_shape_ranks(headers, num_layers, spec["tensors"])
+            else _rwkv7_shape_ranks(headers, num_layers, spec["tensors"], int(cfg["embed_dim"]))
         )
         if len(shaped) > 1:
             raise SystemExit(

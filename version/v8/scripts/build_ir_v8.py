@@ -4500,6 +4500,15 @@ def _template_activation_buffer_specs(
         size = elem_bytes
         for extent in shape:
             size *= extent
+        scope = declaration.get("scope", "shared")
+        if scope not in {"shared", "layer"}:
+            raise RuntimeError(f"HARD CIRCUIT BUFFER FAULT: invalid scope for {name}")
+        if scope == "layer" and (
+            len(shape) < 2 or shape[0] != int(config.get("num_layers", 0))
+        ):
+            raise RuntimeError(
+                f"HARD CIRCUIT BUFFER FAULT: layer-scoped {name} requires leading num_layers extent"
+            )
         result[name] = {
             "name": name,
             "size": size,
@@ -4507,6 +4516,7 @@ def _template_activation_buffer_specs(
             "dtype": dtype,
             "lifetime": lifetime,
             "mutable": mutable,
+            "layer_stride_bytes": size // shape[0] if scope == "layer" else 0,
         }
     return result
 
@@ -4966,6 +4976,8 @@ def build_activation_specs(
             )
         add(spec["name"], spec["size"], spec["shape"], spec["dtype"],
             spec["lifetime"], spec["mutable"])
+        if spec["layer_stride_bytes"]:
+            specs[spec["name"]]["layer_stride_bytes"] = spec["layer_stride_bytes"]
 
     return specs
 
@@ -5191,7 +5203,7 @@ TEMPLATE_TO_KERNEL_OP = {
     "rwkv7_k_proj": "matmul",
     "rwkv7_v_proj": "matmul",
     "rwkv7_lora_gates": "rwkv7_lora_gates",
-    "rwkv7_vgate_produce": "rwkv7_vgate_vmix",
+    "rwkv7_vgate_produce": "rwkv7_vgate_produce",
     "rwkv7_vgate_vmix": "rwkv7_vgate_vmix",
     "rwkv7_kk_factor": "rwkv7_kk_factor",
     "rwkv7_norm_kk": "rwkv7_norm_kk",
@@ -7187,6 +7199,10 @@ def _apply_layer_quant_entry_fallback(
     tensor.
     """
     effective = dict(layer_quant or {})
+    # Existing summaries own provider selection (including architecture aliases).
+    # Only synthesize a summary when the manifest supplies none for this layer.
+    if effective:
+        return effective
     token = str(layer_idx)
     for canonical, candidates in WEIGHT_PATTERNS.items():
         if canonical in effective:
@@ -12422,7 +12438,7 @@ def generate_ir_lower_1(
             str(param.get("source", "")).split(":", 1)[1]
             for param in (kernel_map.get("call_abi", {}).get("params", []) or [])
             if isinstance(param, dict)
-            and str(param.get("source", "")).startswith(("scratch:", "scratch_size:"))
+            and str(param.get("source", "")).startswith(("scratch:", "scratch_size:", "scratch_elements:"))
         }
         for scratch in kernel_map.get("scratch", []):
             scratch_name = str(scratch.get("name", "") or "")
@@ -14179,6 +14195,8 @@ def generate_memory_layout(
             )
         add_buffer(spec["name"], spec["size"], spec["shape"], spec["dtype"],
                    spec["lifetime"], spec["mutable"])
+        if spec["layer_stride_bytes"]:
+            activation_buffers[-1]["layer_stride_bytes"] = spec["layer_stride_bytes"]
         allocated_names.add(spec["name"])
 
     total_activation_size = current_offset
@@ -14402,6 +14420,8 @@ def generate_memory_layout_packed(
             "mutable": spec["mutable"],
             "define": f"A_{_sanitize_macro(name)}",
         })
+        if spec.get("layer_stride_bytes"):
+            activation_buffers[-1]["layer_stride_bytes"] = spec["layer_stride_bytes"]
         act_offset = off + spec["size"]
 
     # Allocate all weights first (in order of first use)
@@ -14415,6 +14435,8 @@ def generate_memory_layout_packed(
     # allocator does not recognize the operation names that use them.  This is
     # what permits a new multi-stream circuit to lower without an architecture
     # branch in the allocator.
+    for name in template_doc.get("activation_buffers", {}):
+        alloc_act(name)
     for target in _template_activation_bindings(template_doc).values():
         alloc_act(target)
 
@@ -14785,6 +14807,12 @@ def generate_ir_lower_2(
     }
 
     def scoped_activation_offset(buf_name: str, base_offset: int, op: Dict[str, Any]) -> int:
+        stride = int(activation_buffers.get(buf_name, {}).get("layer_stride_bytes", 0))
+        if stride:
+            layer = int(op.get("layer", -1))
+            if not 0 <= layer < int(config.get("num_layers", 0)):
+                raise RuntimeError(f"HARD CIRCUIT BUFFER FAULT: invalid layer {layer} for {buf_name}")
+            return int(base_offset) + layer * stride
         if buf_name not in {"cross_k_cache", "cross_v_cache"}:
             return int(base_offset)
         layer = int(op.get("layer", -1))
@@ -16922,6 +16950,7 @@ _CALL_ABI_SOURCE_KINDS = {
     "runtime",
     "scratch",
     "scratch_size",
+    "scratch_elements",
     "weight",
     "weight_f",
 }
@@ -17575,23 +17604,18 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
 
             if src.startswith("activation:"):
                 key = src.split(":", 1)[1]
-                if op_name == "rwkv7_vgate_produce" and key in ("v_first", "xv"):
-                    # Layer-0 produce path has no v_first/xv inputs; C selects the
-                    # produce branch only when xv is NULL.
+                info = select_from_dict(key, activations, act_aliases)
+                if not info:
+                    op_errors.append(f"{func}.{name}: missing activation '{key}'")
                     expr = "NULL"
                 else:
-                    info = select_from_dict(key, activations, act_aliases)
-                    if not info:
-                        op_errors.append(f"{func}.{name}: missing activation '{key}'")
-                        expr = "NULL"
+                    offset = info.get("activation_offset", 0)
+                    buf_name = info.get("buffer", key)
+                    if use_bump_base:
+                        off_expr = activation_off_expr(buf_name, offset)
+                        expr = ptr_expr("model->bump", off_expr, cast or "const float*")
                     else:
-                        offset = info.get("activation_offset", 0)
-                        buf_name = info.get("buffer", key)
-                        if use_bump_base:
-                            off_expr = activation_off_expr(buf_name, offset)
-                            expr = ptr_expr("model->bump", off_expr, cast or "const float*")
-                        else:
-                            expr = ptr_expr("ACT", offset, cast or "const float*")
+                        expr = ptr_expr("ACT", offset, cast or "const float*")
 
             elif src.startswith("output:"):
                 key = src.split(":", 1)[1]
@@ -17652,6 +17676,26 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
                 else:
                     expr = str(int(info.get("size", 0) or 0))
 
+            elif src.startswith("scratch_elements:"):
+                key = src.split(":", 1)[1]
+                info = scratch.get(key)
+                if not info:
+                    op_errors.append(f"{func}.{name}: missing scratch elements '{key}'")
+                    expr = "0"
+                else:
+                    size = int(info.get("size", 0) or 0)
+                    dtype = str(info.get("dtype", ""))
+                    if dtype not in {"fp32", "bf16", "fp16", "i32", "int32"}:
+                        op_errors.append(f"{func}.{name}: unsupported scratch element dtype '{dtype}'")
+                        expr = "0"
+                    else:
+                        item_size = _dtype_size_bytes(dtype)
+                        if size <= 0 or size % item_size:
+                            op_errors.append(f"{func}.{name}: invalid scratch byte extent '{key}'")
+                            expr = "0"
+                        else:
+                            expr = str(size // item_size)
+
             elif src.startswith("weight_f:"):
                 key = src.split(":", 1)[1]
                 alt = param.get("alt", None)
@@ -17673,24 +17717,21 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
 
             elif src.startswith("weight:"):
                 key = src.split(":", 1)[1]
-                if op_name == "rwkv7_vgate_produce" and key in ("v1", "v2", "v0"):
+                sel = select_weight(key, weights, param.get("alt", None))
+                if not sel:
+                    op_errors.append(f"{func}.{name}: missing weight '{key}'")
                     expr = "NULL"
                 else:
-                    sel = select_weight(key, weights, param.get("alt", None))
-                    if not sel:
-                        op_errors.append(f"{func}.{name}: missing weight '{key}'")
-                        expr = "NULL"
+                    _, winfo = sel
+                    offset = winfo.get("bump_offset", 0)
+                    wname = winfo.get("name")
+                    resolved_weight_ref = wname or resolved_weight_ref
+                    macro = weight_define.get(wname)
+                    if use_bump_base:
+                        off_expr = macro if macro else str(weights_base + int(offset))
+                        expr = ptr_expr("model->bump", off_expr, cast or "const void*")
                     else:
-                        _, winfo = sel
-                        offset = winfo.get("bump_offset", 0)
-                        wname = winfo.get("name")
-                        resolved_weight_ref = wname or resolved_weight_ref
-                        macro = weight_define.get(wname)
-                        if use_bump_base:
-                            off_expr = macro if macro else str(weights_base + int(offset))
-                            expr = ptr_expr("model->bump", off_expr, cast or "const void*")
-                        else:
-                            expr = ptr_expr("model->bump_weights", offset, cast or "const void*")
+                        expr = ptr_expr("model->bump_weights", offset, cast or "const void*")
 
             elif src.startswith("dim:"):
                 key = src.split(":", 1)[1]
@@ -17879,17 +17920,7 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
                     expr = "NULL"
                 elif key in ("multimodal_num_segments", "multimodal_singleton_tail"):
                     expr = "0"
-                elif key == "scratch_elems":
-                    if not scratch:
-                        op_errors.append(f"{func}.{name}: missing scratch storage for '{key}'")
-                        expr = "0"
-                    else:
-                        total_elems = 0
-                        for info in scratch.values():
-                            total_elems += int(info.get("size", 0) or 0) // _dtype_size_bytes(
-                                str(info.get("dtype", "fp32"))
-                            )
-                        expr = str(total_elems)
+
                 else:
                     op_errors.append(f"{func}.{name}: unknown runtime '{key}'")
                     expr = "0"

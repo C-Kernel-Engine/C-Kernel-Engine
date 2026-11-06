@@ -26,28 +26,57 @@
   },
   "activation_buffers": {
     "att_shift": {
-      "shape": [{"config": "num_layers"}, {"config": "embed_dim"}],
+      "shape": [
+        {
+          "config": "num_layers"
+        },
+        {
+          "config": "embed_dim"
+        }
+      ],
       "lifetime": "sequence",
-      "mutable": true
+      "mutable": true,
+      "scope": "layer"
     },
     "ffn_shift": {
-      "shape": [{"config": "num_layers"}, {"config": "embed_dim"}],
+      "shape": [
+        {
+          "config": "num_layers"
+        },
+        {
+          "config": "embed_dim"
+        }
+      ],
       "lifetime": "sequence",
-      "mutable": true
+      "mutable": true,
+      "scope": "layer"
     },
     "wkv": {
       "shape": [
-        {"config": "num_layers"},
-        {"config": "num_heads"},
-        {"config": "head_dim"},
-        {"config": "head_dim"}
+        {
+          "config": "num_layers"
+        },
+        {
+          "config": "num_heads"
+        },
+        {
+          "config": "head_dim"
+        },
+        {
+          "config": "head_dim"
+        }
       ],
       "lifetime": "sequence",
-      "mutable": true
+      "mutable": true,
+      "scope": "layer"
     },
     "v_first": {
-      "shape": [{"config": "num_layers"}, {"config": "embed_dim"}],
-      "lifetime": "sequence",
+      "shape": [
+        {
+          "config": "embed_dim"
+        }
+      ],
+      "lifetime": "call",
       "mutable": true
     }
   },
@@ -156,7 +185,7 @@
         "att_shift": {"source": "att_shift_out", "index": "runtime.layer"},
         "ffn_shift": {"source": "ffn_shift_out", "index": "runtime.layer"},
         "wkv": {"source": "wkv_out_state", "index": "runtime.layer"},
-        "v_first": {"source": "v_first_out", "index": "runtime.layer"}
+        "v_first": {"source": "v_first_out", "index": "current_token"}
       },
       "state_reads": {
         "att_shift": {"range": "full"},
@@ -218,9 +247,37 @@
         "axis_names": ["token", "channel"]
       }
     },
+    "decoder.rwkv7_vgate_produce": {
+      "op": "rwkv7_vgate_produce",
+      "template_ops": [
+        "rwkv7_vgate_produce"
+      ],
+      "operation_interface": "rwkv7.vgate_produce.token_major.fp32.v1",
+      "phases": {
+        "prefill": {
+          "contract_id": "rwkv7_vgate_vmix_fp32",
+          "validation": "observed",
+          "evidence": "Layer-0 produce path selected by omitting optional xv/v_first ports; strict NULL rule enforced in C."
+        },
+        "decode": {
+          "contract_id": "rwkv7_vgate_vmix_fp32",
+          "validation": "observed",
+          "evidence": "unittest/test_rwkv7_block.py layer-0 produce-only vs layer>0 consume wiring."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.rwkv7_vgate.output",
+        "producer": "rwkv7_vgate_produce",
+        "logical_layout": "token_major",
+        "axis_names": [
+          "token",
+          "channel"
+        ]
+      }
+    },
     "decoder.rwkv7_vgate": {
       "op": "rwkv7_vgate_vmix",
-      "template_ops": ["rwkv7_vgate_produce", "rwkv7_vgate_vmix"],
+      "template_ops": ["rwkv7_vgate_vmix"],
       "operation_interface": "rwkv7.vgate_vmix.token_major.fp32.v1",
       "phases": {
         "prefill": {
