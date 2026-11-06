@@ -46417,39 +46417,6 @@
           "src/kernels/gemm_kernels_q4k_q8k_vnni.c"
         ]
       },
-      "numerical_capabilities": [
-        {
-          "contract_id": "q4_k_x_q8_k_repacked_matvec_fp32",
-          "status": "validated",
-          "phases": [
-            "decode"
-          ],
-          "function": "gemm_nt_q4_k_q8_k_decode_m2",
-          "explicit_selector": true,
-          "implementation": {
-            "isa_dispatch": "compile_time",
-            "threading": {
-              "runtime": "ck_threadpool",
-              "work_partition": [
-                "serial",
-                "output_groups"
-              ],
-              "dispatch": [
-                "inline",
-                "ck_threadpool_dispatch_n"
-              ],
-              "reduction_order_effect": "none"
-            }
-          },
-          "arithmetic": {
-            "partial_accumulator": "fp32",
-            "merge_order": "decode_superblock_order",
-            "deterministic": true,
-            "thread_count_changes_arithmetic_order": false,
-            "split_strategy": "independent_outputs"
-          }
-        }
-      ],
       "call_abi": {
         "version": 1,
         "params": [
