@@ -34,6 +34,8 @@ PINNED_SHA256 = {
 }
 PATH_SEPARATORS = {"/": "slash", "-": "dash", "_": "underscore",
                    ".": "dot"}
+EMBEDDED_VERSION = re.compile(r"([A-Za-z]+)([0-9]+\.[0-9]+)\Z")
+SIGNED_DECIMAL = re.compile(r"([+-])([0-9]+\.[0-9]+)\Z")
 
 
 class TextPlanError(ValueError):
@@ -89,6 +91,41 @@ def _source_spans(text: str, tokens: list) -> list[tuple[int, int]]:
 def _phonemes(tokens: list) -> str:
     return "".join(token.phonemes + (" " if token.whitespace else "")
                    for token in tokens).strip()
+
+
+def expand_technical_decimals(tokens: list, pronounce) -> tuple[list, list[dict]]:
+    """Say embedded versions and signed decimals with an audible point.
+
+    The pinned G2P currently elides the point in ``Qwen3.8`` and ``+3.5``.
+    This declared frontend adaptation retains the original token and span.
+    """
+    expanded, changes = [], []
+    cursor = 0
+    for token in tokens:
+        raw = token.text
+        version = EMBEDDED_VERSION.fullmatch(raw)
+        signed = SIGNED_DECIMAL.fullmatch(raw)
+        if version:
+            major, minor = version.group(2).split(".", 1)
+            parts = (version.group(1), major, "point", minor)
+        elif signed:
+            major, minor = signed.group(2).split(".", 1)
+            parts = ("minus" if signed.group(1) == "-" else "plus",
+                     major, "point", minor)
+        else:
+            expanded.append(token)
+            cursor += len(raw + token.whitespace)
+            continue
+        sounds = [pronounce(part) for part in parts]
+        if any(not sound for sound in sounds):
+            raise TextPlanError(f"decimal pronunciation is incomplete for {raw!r}")
+        expanded.append(SimpleNamespace(text=raw, whitespace=token.whitespace,
+                                        phonemes=" ".join(sounds)))
+        changes.append({"source_start": cursor, "source_end": cursor + len(raw),
+                        "source_text": raw, "spoken_text": " ".join(parts),
+                        "kind": "embedded_version" if version else "signed_decimal"})
+        cursor += len(raw + token.whitespace)
+    return expanded, changes
 
 
 def expand_technical_paths(tokens: list, pronounce,
@@ -341,8 +378,11 @@ def prepare(text: str, config_path: Path, bundle_path: Path,
     reference_phonemes, tokens = pipeline.g2p(spoken_text)
     if reference_phonemes != _phonemes(tokens):
         raise TextPlanError("pinned phonemizer text and token phonemes disagree")
-    tokens, expansions = expand_technical_paths(
+    tokens, decimal_expansions = expand_technical_decimals(
+        tokens, lambda word: pipeline.g2p(word)[0])
+    tokens, path_expansions = expand_technical_paths(
         tokens, lambda word: pipeline.g2p(word)[0], technical_mode)
+    expansions = decimal_expansions + path_expansions
     chunks = plan_tokens(spoken_text, tokens, vocab, set(counts))
     return {
         "schema": SCHEMA,
@@ -355,7 +395,10 @@ def prepare(text: str, config_path: Path, bundle_path: Path,
         "technical_mode": technical_mode,
         "pronunciation_expansions": expansions,
         "normalizations": (["trimmed boundary whitespace"] if text != spoken_text else []) +
-                          (["explicit technical path pronunciation"] if expansions else []),
+                          (["explicit technical decimal pronunciation"]
+                           if decimal_expansions else []) +
+                          (["explicit technical path pronunciation"]
+                           if path_expansions else []),
         "bundle_manifest_sha256": manifest_hash,
         "bundle_identity_sha256": manifest.get("bundle_identity_sha256"),
         "frontend_sha256": PINNED_SHA256,

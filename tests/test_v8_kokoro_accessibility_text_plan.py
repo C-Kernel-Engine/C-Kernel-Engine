@@ -214,6 +214,33 @@ class KokoroAccessibilityTextPlanTest(unittest.TestCase):
         self.assertEqual("".join(text[chunk["source_start"]:chunk["source_end"]]
                                  for chunk in chunks), text)
 
+    def test_technical_decimal_expansion_preserves_source_and_point(self):
+        text = "Qwen3.8 changes -3.5 to +3.5."
+        tokens = [SimpleNamespace(text=word, whitespace=space, phonemes="old")
+                  for word, space in (("Qwen3.8", " "), ("changes", " "),
+                                      ("-3.5", " "), ("to", " "),
+                                      ("+3.5", ""), (".", ""))]
+        sounds = {"Qwen": "qwen", "3": "three", "8": "eight",
+                  "5": "five", "plus": "plus", "minus": "minus",
+                  "point": "point"}
+        expanded, changes = planner.expand_technical_decimals(
+            tokens, sounds.get)
+        self.assertEqual("".join(token.text + token.whitespace
+                                 for token in expanded), text)
+        self.assertEqual([item["source_text"] for item in changes],
+                         ["Qwen3.8", "-3.5", "+3.5"])
+        self.assertEqual([item["spoken_text"] for item in changes],
+                         ["Qwen 3 point 8", "minus 3 point 5",
+                          "plus 3 point 5"])
+        self.assertEqual([expanded[i].phonemes for i in (0, 2, 4)],
+                         ["qwen three point eight", "minus three point five",
+                          "plus three point five"])
+        self.assertEqual("".join(text[item["source_start"]:item["source_end"]]
+                                 for item in changes), "Qwen3.8-3.5+3.5")
+        with self.assertRaisesRegex(planner.TextPlanError, "incomplete"):
+            planner.expand_technical_decimals(tokens, lambda word:
+                None if word == "point" else sounds.get(word))
+
     def test_rejects_dropped_source_and_unsupported_geometry(self):
         with self.assertRaisesRegex(planner.TextPlanError, "unspoken source token"):
             planner.plan_tokens("🧪", [SimpleNamespace(text="🧪", whitespace="",
@@ -289,6 +316,17 @@ class KokoroAccessibilityTextPlanTest(unittest.TestCase):
                 self.assertTrue(plan["pronunciation_expansions"])
                 self.assertTrue(all(chunk["valid_token_count"] <= 48
                                     for chunk in plan["chunks"]))
+        decimal_text = "Qwen3.8 has -3.5, not +3.5."
+        decimal_plan = planner.prepare(decimal_text,
+                                       Path(os.environ[required[0]]),
+                                       Path(os.environ[required[1]]))
+        self.assertEqual(decimal_plan["source_text"], decimal_text)
+        self.assertEqual([row["source_text"] for row in
+                          decimal_plan["pronunciation_expansions"]],
+                         ["Qwen3.8", "-3.5", "+3.5"])
+        self.assertEqual(decimal_plan["planned_phonemes"].count("pˈYnt"), 3)
+        self.assertEqual("".join(decimal_text[row["source_start"]:row["source_end"]]
+                                 for row in decimal_plan["chunks"]), decimal_text)
         _case("live-pinned-oracle", "pass", cases=len(CASES))
 
     @unittest.skipUnless(os.environ.get("CKE_TTS_RUN_ACCESSIBILITY_TEXT_AUDIO"),
