@@ -1,5 +1,6 @@
 """Pinned English text conversion and capacity-bounded Kokoro chunk tests."""
 
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -48,6 +49,18 @@ def _case(name, status, reason="", **details):
 
 
 class KokoroAccessibilityTextPlanTest(unittest.TestCase):
+    def test_pinned_pipeline_rejects_fallback_substitution(self):
+        class ExpectedFallback:
+            pass
+
+        class PipelineWithWrongFallback:
+            def __init__(self, **kwargs):
+                self.g2p = SimpleNamespace(fallback=object())
+
+        with self.assertRaisesRegex(planner.TextPlanError, "EspeakFallback unavailable"):
+            planner._build_pinned_pipeline(PipelineWithWrongFallback,
+                                           ExpectedFallback)
+
     def test_committed_independent_phonemes_and_chunk_join(self):
         for case in CASES:
             with self.subTest(text=case["text"][:40]):
@@ -381,6 +394,13 @@ class KokoroAccessibilityTextPlanTest(unittest.TestCase):
                                     Path(os.environ[required[0]]),
                                     Path(os.environ[required[1]]))
         self.assertTrue(long_plan["chunks"])
+        self.assertEqual(len(long_plan["chunks"]), 316)
+        phoneme_hash = hashlib.sha256(
+            long_plan["full_reference_phonemes"].encode()).hexdigest()
+        self.assertEqual(phoneme_hash,
+                         "e9e858ad412a1c0bf0d7ca7ad31be84752c75087617f2cdfe41d706eb1e72fbc")
+        self.assertEqual(long_plan["g2p_fallback"],
+                         "misaki.espeak.EspeakFallback")
         self.assertTrue(all(3 <= row["valid_token_count"] <= 48 and
                             row["voice_row"] == row["valid_token_count"] - 3
                             for row in long_plan["chunks"]))
@@ -389,6 +409,13 @@ class KokoroAccessibilityTextPlanTest(unittest.TestCase):
                                 for row in long_plan["chunks"]))
         self.assertEqual("".join(long_source[row["source_start"]:row["source_end"]]
                                  for row in long_plan["chunks"]), long_source)
+        planner.prepare(CASES[0]["text"], Path(os.environ[required[0]]),
+                        Path(os.environ[required[1]]))
+        replay = planner.prepare(long_source, Path(os.environ[required[0]]),
+                                 Path(os.environ[required[1]]))
+        self.assertEqual(replay["full_reference_phonemes"],
+                         long_plan["full_reference_phonemes"])
+        self.assertEqual(replay["chunks"], long_plan["chunks"])
         _case("live-pinned-oracle", "pass", cases=len(CASES))
 
     @unittest.skipUnless(os.environ.get("CKE_TTS_RUN_ACCESSIBILITY_TEXT_AUDIO"),
