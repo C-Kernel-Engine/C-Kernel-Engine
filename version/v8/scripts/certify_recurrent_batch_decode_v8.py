@@ -47,6 +47,7 @@ def bind(model):
         'ck_model_get_named_activation_ptr': ([c.c_char_p], c.c_size_t),
         'ck_model_batch_decode_workspace': ([c.POINTER(c.c_size_t), c.POINTER(c.c_size_t)], c.c_int),
         'ck_model_batch_decode_projection_groups': ([], c.c_int),
+        'ck_model_batch_decode_shared_layers': ([], c.c_int),
         'ck_model_batch_decode_snapshot_copy_bytes': ([], c.c_size_t),
         'ck_model_batch_decode_packing_copy_bytes': ([], c.c_size_t),
         'ck_model_batch_decode_last_copy_ns': ([], c.c_uint64),
@@ -58,7 +59,8 @@ def bind(model):
         fn.argtypes, fn.restype = args, result
 
 def certify(bundle: Path, *, swap_row_order: bool = False,
-            expected_projection_groups: int = 1) -> dict:
+            expected_projection_groups: int = 1,
+            expected_shared_layers: int = 1) -> dict:
     layout = json.loads((bundle / 'layout_decode.json').read_text())
     sizes = {row['name']: int(row['size']) for row in layout['memory']['activations']['buffers'] if row['name'] in NAMES}
     assert set(sizes) == set(NAMES), sizes
@@ -86,6 +88,11 @@ def certify(bundle: Path, *, swap_row_order: bool = False,
             raise AssertionError(
                 f'expected {expected_projection_groups} shared projection groups, '
                 f'loaded entry has {actual_groups}')
+        actual_layers = model.ck_model_batch_decode_shared_layers()
+        if actual_layers != expected_shared_layers:
+            raise AssertionError(
+                f'expected {expected_shared_layers} shared layers, '
+                f'loaded entry has {actual_layers}')
         assert model.ck_model_get_capabilities() & (1 << 17)
         vocab = model.ck_model_get_vocab_size()
         if vocab <= 300:
@@ -241,6 +248,7 @@ def certify(bundle: Path, *, swap_row_order: bool = False,
                 'layout_sha256': hashlib.sha256((bundle / 'layout_decode.json').read_bytes()).hexdigest(),
                 'tokens': tokens, 'row_order': list(order),
                 'projection_groups': actual_groups,
+                'shared_layers': actual_layers,
                 'requested_threads': os.getenv('CK_NUM_THREADS'),
                 'resolved_threads': resolved_workers,
                 'cpu': next((line.partition(':')[2].strip() for line in
@@ -263,7 +271,9 @@ def main() -> int:
     parser.add_argument('--report', type=Path)
     parser.add_argument('--swap-row-order', action='store_true')
     parser.add_argument('--expected-projection-groups', type=int,
-                        choices=(1, 2, 3), default=1)
+                        choices=(1, 2, 3, 4, 5, 6), default=1)
+    parser.add_argument('--expected-shared-layers', type=int,
+                        choices=(1, 2), default=1)
     args = parser.parse_args()
     if not args.bundle.is_dir():
         report = {'status': 'NOT_TESTED', 'bundle': str(args.bundle),
@@ -272,7 +282,8 @@ def main() -> int:
         try:
             report = certify(
                 args.bundle.resolve(), swap_row_order=args.swap_row_order,
-                expected_projection_groups=args.expected_projection_groups)
+                expected_projection_groups=args.expected_projection_groups,
+                expected_shared_layers=args.expected_shared_layers)
         except (OSError, ValueError, AssertionError, RuntimeError) as error:
             report = {'status': 'FAIL', 'bundle': str(args.bundle),
                       'error': f'{type(error).__name__}: {error}'}

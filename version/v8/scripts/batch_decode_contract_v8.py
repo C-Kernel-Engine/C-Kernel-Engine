@@ -497,10 +497,10 @@ def _first_recurrent_projection_plan(
     providers: dict[str, dict[str, Any]], state: dict[str, int],
     config: dict[str, Any], row_buffers: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any] | None:
-    """Admit mapped projections around the first recurrent state update.
+    """Admit mapped projections across a bounded recurrent layer prefix.
 
-    The second group is separately opted in and must follow a sequence-local
-    recurrent core. All other operations use ordinary sequence-local calls.
+    Output groups follow sequence-local recurrent cores. All other operations
+    use ordinary sequence-local calls.
     Snapshot the complete decode-row extents at every cut, including values
     whose old contents a later operation could read after a partial write.
     """
@@ -519,6 +519,9 @@ def _first_recurrent_projection_plan(
         return None
     first = _mapped_two_row_projection(ops[4], providers, buffers)
     if first is None:
+        return None
+    requested_layers = config.get("batch_decode_recurrent_shared_layers", 1)
+    if type(requested_layers) is not int or requested_layers not in (1, 2):
         return None
     projections = [(4, first)]
     gate_setting = config.get("batch_decode_recurrent_gate_projection", False)
@@ -550,6 +553,40 @@ def _first_recurrent_projection_plan(
         if second is None:
             return None
         projections.append((index, second))
+    if requested_layers == 2:
+        # Derive the next layer's projection cuts from the ordered IR. No
+        # operation between them is moved: recurrent state updates stay local.
+        second_layer = [i for i, op in enumerate(ops) if op.get("layer") == 1]
+        if (not second_layer or second_layer != list(range(second_layer[0], second_layer[-1] + 1))
+                or second_layer[0] <= projections[-1][0]):
+            return None
+        layer_ops = [(i, ops[i]) for i in second_layer]
+        qkv = [i for i, op in layer_ops if op.get("op") == "recurrent_qkv_proj"]
+        core = [i for i, op in layer_ops if op.get("op") == "recurrent_core"]
+        if len(qkv) != 1 or len(core) != 1 or qkv[0] <= second_layer[0] or core[0] <= qkv[0]:
+            return None
+        next_first = _mapped_two_row_projection(ops[qkv[0]], providers, buffers)
+        if next_first is None:
+            return None
+        projections.append((qkv[0], next_first))
+        if gate_setting:
+            gates = [i for i, op in layer_ops if op.get("op") == "recurrent_gate_proj"]
+            if len(gates) != 1 or gates[0] != qkv[0] + 1:
+                return None
+            gate = _mapped_two_row_projection(ops[gates[0]], providers, buffers)
+            if (gate is None or gate["input"] != next_first["input"]
+                    or gate["input_bytes"] != next_first["input_bytes"]
+                    or gate["output"] == next_first["output"]):
+                return None
+            projections.append((gates[0], gate))
+        if second_enabled:
+            outputs = [i for i, op in layer_ops if op.get("op") == "recurrent_out_proj"]
+            if len(outputs) != 1 or outputs[0] <= core[0]:
+                return None
+            next_output = _mapped_two_row_projection(ops[outputs[0]], providers, buffers)
+            if next_output is None:
+                return None
+            projections.append((outputs[0], next_output))
     groups: list[list[tuple[int, dict[str, Any]]]] = []
     for index, projection in projections:
         if (groups and index == groups[-1][-1][0] + 1
@@ -620,7 +657,8 @@ def _first_recurrent_projection_plan(
         "stages": stages,
         "buffers": {ref: buffers[ref]["define"] for ref in extents},
         "extents": extents, "layer_end": cursor,
-        "shared_layers": [0], "projection_groups": len(projections),
+        "shared_layers": list(range(requested_layers)),
+        "projection_groups": len(projections),
         "recurrent_state_bytes": {
             "conv": state["recurrent_conv_state_bytes"],
             "ssm": state["recurrent_ssm_state_bytes"],
