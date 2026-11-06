@@ -1449,6 +1449,10 @@ TEST_SUITES = {
             "tests.test_v8_kokoro_whisper_roundtrip.KokoroWhisperRoundTripTest.test_generated_speech_round_trip",
         ),
     ),
+    "tts_kokoro_whisper_long_reply_eval": TestSuite(
+        "Kokoro to Whisper Long-Reply Integrity and Critical-Fact Evaluation", "inference",
+        ROOT / "tests" / "test_v8_kokoro_whisper_long_reply_eval.py",
+    ),
     "whisper_public_audio_spawn": TestSuite(
         "Whisper Public Audio Spawn Contract", "inference",
         ROOT / "tests" / "test_v8_kokoro_whisper_roundtrip.py",
