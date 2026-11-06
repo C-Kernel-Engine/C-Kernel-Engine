@@ -2803,6 +2803,12 @@ def _emit_prefill_gemm_fp32_override(op: Dict, seq_idx: int, config: Dict, *, de
     if profile:
         lines.append(f'        CK_PROFILE_END("prefill", "{func}", "{op.get("op", "unknown")}", {layer});')
     lines.append("    }")
+    if str(op.get("op", "")) == "mlp_gate_up":
+        raw_expr = c_expr.replace("(float*)", "").replace("(void*)", "").strip()
+        lines.append(
+            f'    ck_debug_export_hidden(model, {layer}, "mlp_gate_up", '
+            f'(const float*){raw_expr}, ({m_expr}) * ({n_expr}));'
+        )
     if dump:
         raw_expr = c_expr.replace("(float*)", "").replace("(void*)", "").strip()
         lines.append("    #ifdef CK_PARITY_DUMP")

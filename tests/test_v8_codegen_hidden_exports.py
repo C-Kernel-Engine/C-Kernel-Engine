@@ -50,6 +50,46 @@ def _arg(name: str, expr: str) -> dict[str, str]:
 
 
 class HiddenExportExtentTests(unittest.TestCase):
+    def test_quantized_gate_up_override_exports_full_valid_grid(self) -> None:
+        op = {
+            "op": "mlp_gate_up",
+            "function": "gemm_nt_q4_k_q8_k_pairwise_split_min_parallel_dispatch",
+            "layer": 2,
+            "resolved_execution": {
+                "numerical_contract": "q4_k_x_q8_k_repacked_matmul_fp32",
+                "implementation": {
+                    "weight_storage": {
+                        "format": "q4_k", "block_elements": 256, "block_bytes": 144,
+                    },
+                    "activation_storage": {"format": "q8_k", "block_elements": 256},
+                    "diagnostic_providers": {
+                        "fp32_activation": "gemm_nt_q4_k",
+                        "row_quantized": "gemv_q4_k_q8_k",
+                    },
+                },
+                "reference": {
+                    "function": "gemm_nt_q4_k_q8_k_pairwise_split_min_parallel_dispatch",
+                },
+                "production": {
+                    "function": "gemm_nt_q4_k_q8_k_pairwise_split_min_parallel_dispatch",
+                },
+            },
+            "args": [
+                _arg("A", "Q8"), _arg("B", "WEIGHT"), _arg("bias", "BIAS"),
+                _arg("C", "GATE_UP"), _arg("M", "num_tokens"),
+                _arg("N", "8"), _arg("K", "256"),
+            ],
+        }
+        emitted = prefill_codegen._emit_prefill_gemm_fp32_override(
+            op, 1, {}, debug_flag_name="debug_fp32",
+            debug_input_name="debug_input",
+        )
+        self.assertIn(
+            '"mlp_gate_up", (const float*)GATE_UP, (num_tokens) * (8)', emitted,
+        )
+        self.assertLess(emitted.index('    }\n    ck_debug_export_hidden'),
+                        emitted.index('"mlp_gate_up"'))
+
     def test_dynamic_prefill_ffn_exports_full_valid_grid(self) -> None:
         compiler = shutil.which("cc")
         if compiler is None:
