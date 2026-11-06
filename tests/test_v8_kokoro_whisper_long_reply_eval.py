@@ -50,13 +50,18 @@ def _fixture(tmp_path):
     _wav(wav, 24000, 24000)
     _wav(asr_wav, 16000, 16000)
     sha = lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
-    _write_json(plan, {"source_text": text, "chunks": [
-        {"source_start": 0, "source_end": 22},
-        {"source_start": 22, "source_end": len(text)},
-    ]})
+    planned_chunks = [
+        {"source_start": 0, "source_end": 22,
+         "source_text": text[:22], "valid_token_count": 18, "voice_row": 15},
+        {"source_start": 22, "source_end": len(text),
+         "source_text": text[22:], "valid_token_count": 20, "voice_row": 17},
+    ]
+    _write_json(plan, {"source_text": text, "chunks": planned_chunks})
     _write_json(tts, {"status": "execution_pass", "source_sha256":
                         hashlib.sha256(text.encode()).hexdigest(),
-                        "wav_sha256": sha(wav), "chunks": [{}, {}],
+                        "wav_sha256": sha(wav), "chunks": [
+                            {"index": index, **chunk, "samples": 12000}
+                            for index, chunk in enumerate(planned_chunks)],
                         "sample_count": 24000, "sample_rate": 24000,
                         "numerical_waveform_parity": "not_tested_this_run",
                         "known_connected_waveform_parity": "fail_unresolved"})
@@ -116,8 +121,28 @@ def test_identifier_rule_does_not_hide_subtraction_signs():
         "1035", "+3.5"]
 
 
+def test_swapped_numbers_fail_even_when_the_multiset_matches(tmp_path):
+    paths = _fixture(tmp_path)
+    report = json.loads(paths[5].read_text())
+    report["decoder"]["transcript_text"] = (
+        "PR 1035 changed the value from +3.5 to -3.5.")
+    _write_json(paths[5], report)
+    result = evaluator.evaluate(*paths)
+    assert result["missing_exact_numbers"] == []
+    assert result["unexpected_exact_numbers"] == []
+    assert result["number_sequence_match"] is False
+    assert result["exact_number_fidelity"] == "fail"
+
+
+def test_intact_spoken_compounds_match_digits_but_split_numbers_fail():
+    assert evaluator._number_facts("forty two, then forty-seven") == ["42", "47"]
+    assert evaluator._number_facts("42, then 47") == ["42", "47"]
+    assert evaluator._number_facts("40, two; then 40. Seven") != ["42", "47"]
+
+
 @pytest.mark.parametrize("mutation", ["fixed_window", "early_end", "wrong_audio",
-                                         "text_gap", "wrong_resample_hash"])
+                                         "text_gap", "wrong_resample_hash",
+                                         "wrong_voice_row", "short_chunk_total"])
 def test_incomplete_or_mixed_run_is_rejected(tmp_path, mutation):
     paths = _fixture(tmp_path)
     if mutation == "text_gap":
@@ -128,6 +153,13 @@ def test_incomplete_or_mixed_run_is_rejected(tmp_path, mutation):
         path = paths[6]
         value = json.loads(path.read_text())
         value["target_sha256"] = "wrong"
+    elif mutation in ("wrong_voice_row", "short_chunk_total"):
+        path = paths[2]
+        value = json.loads(path.read_text())
+        if mutation == "wrong_voice_row":
+            value["chunks"][1]["voice_row"] += 1
+        else:
+            value["chunks"][1]["samples"] -= 1
     else:
         path = paths[5]
         value = json.loads(path.read_text())

@@ -19,6 +19,14 @@ import wave
 WORDS = re.compile(r"[+-]?\d+(?:[,.]\d+)*|[a-z]+(?:'[a-z]+)?")
 NUMBERS = re.compile(r"[+-]?\d+(?:[,.]\d+)*")
 IDENTIFIER_HYPHEN = re.compile(r"\b(PR|issue|RFC)[-–](?=\d)", re.IGNORECASE)
+TENS = {"twenty": 20, "thirty": 30, "forty": 40, "fifty": 50,
+        "sixty": 60, "seventy": 70, "eighty": 80, "ninety": 90}
+UNITS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+         "six": 6, "seven": 7, "eight": 8, "nine": 9}
+SPOKEN_COMPOUND = re.compile(
+    r"\b(" + "|".join(TENS) + r")[ -]+(" + "|".join(UNITS) + r")\b",
+    re.IGNORECASE,
+)
 
 
 def _identifier_aware(text: str) -> str:
@@ -37,6 +45,17 @@ def _sha256(path: Path) -> str:
 
 def _tokens(text: str) -> list[str]:
     return WORDS.findall(_identifier_aware(text).casefold())
+
+
+def _number_facts(text: str) -> list[str]:
+    # Equivalent intact English compounds are accepted; a pause rendered as
+    # "40, two" is deliberately not merged into 42.
+    normalized = SPOKEN_COMPOUND.sub(
+        lambda match: str(TENS[match.group(1).casefold()] +
+                          UNITS[match.group(2).casefold()]),
+        _identifier_aware(text),
+    )
+    return NUMBERS.findall(normalized)
 
 
 def _distance(reference: list[str], candidate: list[str]) -> int:
@@ -94,6 +113,18 @@ def evaluate(source_path: Path, plan_path: Path, tts_path: Path, wav_path: Path,
             tts.get("sample_rate") != wav["sample_rate"] or
             wav["channels"] != 1 or wav["sample_width"] != 2):
         raise ValueError("TTS report or WAV does not match the source and plan")
+    sample_total = 0
+    for index, (planned, rendered) in enumerate(zip(chunks, tts["chunks"])):
+        if (rendered.get("index") != index or
+                any(rendered.get(field) != planned.get(field) for field in
+                    ("source_start", "source_end", "source_text",
+                     "valid_token_count", "voice_row")) or
+                type(rendered.get("samples")) is not int or
+                rendered["samples"] <= 0):
+            raise ValueError(f"TTS chunk {index} does not match its planned request")
+        sample_total += rendered["samples"]
+    if sample_total != wav["sample_count"]:
+        raise ValueError("TTS chunk sample counts do not match the WAV")
     if (resample.get("source_sha256") != wav_hash or
             resample.get("target_sha256") != asr_wav_hash or
             resample.get("source_frames") != wav["sample_count"] or
@@ -135,10 +166,11 @@ def evaluate(source_path: Path, plan_path: Path, tts_path: Path, wav_path: Path,
     expected = _tokens(source)
     observed = _tokens(transcript)
     wer = _distance(expected, observed) / len(expected)
-    expected_numbers = NUMBERS.findall(_identifier_aware(source))
-    observed_numbers = NUMBERS.findall(_identifier_aware(transcript))
+    expected_numbers = _number_facts(source)
+    observed_numbers = _number_facts(transcript)
     missing_numbers = list((Counter(expected_numbers) - Counter(observed_numbers)).elements())
     unexpected_numbers = list((Counter(observed_numbers) - Counter(expected_numbers)).elements())
+    number_sequence_match = expected_numbers == observed_numbers
     return {
         "schema": "cke.kokoro_whisper.long_reply_diagnostic.v1",
         "source_file_sha256": _sha256(source_path),
@@ -157,9 +189,10 @@ def evaluate(source_path: Path, plan_path: Path, tts_path: Path, wav_path: Path,
         "maximum_word_error_rate": maximum_wer,
         "missing_exact_numbers": missing_numbers,
         "unexpected_exact_numbers": unexpected_numbers,
+        "number_sequence_match": number_sequence_match,
         "execution": "pass",
         "transcript_fidelity": "pass" if wer <= maximum_wer else "fail",
-        "exact_number_fidelity": "pass" if not missing_numbers and not unexpected_numbers else "fail",
+        "exact_number_fidelity": "pass" if number_sequence_match else "fail",
         "waveform_numerical_parity": tts.get("numerical_waveform_parity", "not_tested"),
         "known_connected_waveform_parity": tts.get("known_connected_waveform_parity", "not_tested"),
         "human_listening": "not_tested",

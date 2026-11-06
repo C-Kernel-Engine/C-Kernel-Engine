@@ -198,6 +198,10 @@ def _boundary_rank(token: object) -> int:
 
 
 _CONNECTORS = {"and", "or", "but", "to", "of", "the", "a", "an"}
+_COMPOUND_TENS = {"twenty", "thirty", "forty", "fifty", "sixty",
+                  "seventy", "eighty", "ninety"}
+_COMPOUND_UNITS = {"one", "two", "three", "four", "five",
+                   "six", "seven", "eight", "nine"}
 
 
 def _legal_boundary(tokens: list, first: int, end: int,
@@ -206,6 +210,11 @@ def _legal_boundary(tokens: list, first: int, end: int,
         return True
     last, following = tokens[end - 1], tokens[end]
     if following.phonemes in (".", ",", "!", "?", ";", ":") and not last.whitespace:
+        return False
+    # Splitting an English compound number introduces an audible pause and
+    # can make ASR render "forty two" as two separate quantities.
+    if (last.text.strip().casefold() in _COMPOUND_TENS and
+            following.text.strip().casefold() in _COMPOUND_UNITS):
         return False
     if not allow_connector_tail and last.text.strip().casefold() in _CONNECTORS:
         return False
