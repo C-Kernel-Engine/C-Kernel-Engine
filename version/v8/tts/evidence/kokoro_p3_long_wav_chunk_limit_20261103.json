@@ -1,0 +1,36 @@
+{
+  "schema": "cke.kokoro.long_wav_chunk_limit.v1",
+  "baseline_revision": "dce3d9058053edd78d3a3cad43198ae7884d5d1f",
+  "host": "P3, Intel Core i7-14700T",
+  "provider": "avx2_parallel, four workers",
+  "generated_library_sha256": "cc26e6bf0113510781d0c2950d4242060cca9a44cd9e1ea0b1f820eb03369d36",
+  "rebuilt_native_host_sha256": "c95114e95a2eba5a1ca4d73ae8cd4811f0158fe92a9ed8f2726a52a6ec418972",
+  "synthetic_plan": {
+    "text": "Hello, this is CKE. repeated 250 times",
+    "source_sha256": "fe8ed903c0934eba3b0720a9a9909081735a45b785076bc65b81460c8aa47ccf",
+    "words": 1000,
+    "utf8_bytes": 4999,
+    "checked_chunks": 250,
+    "maximum_valid_ids_per_chunk": 25,
+    "source_span_coverage": "complete",
+    "status": "text_plan_pass; synthesis_not_tested"
+  },
+  "native_replay": {
+    "input": "65 identical three-ID requests with independent seeds, one loaded native session",
+    "chunks": 65,
+    "valid_samples": 819000,
+    "sample_rate": 24000,
+    "elapsed_seconds": 95.14,
+    "wav_sha256": "136ad5c3b53ac0a45ee97cf61afe98a183dcfd24a3aa63774628ec6ebafed68e",
+    "status": "generated_execution_pass; waveform_oracle_not_tested; listening_not_tested"
+  },
+  "real_summary_limit": {
+    "words": 359,
+    "first_rejected_token": "35,136",
+    "token_phoneme_symbols": 46,
+    "maximum_request_ids": 40,
+    "status": "text_plan_fail",
+    "reason": "single pinned-G2P source token exceeds the request limit"
+  },
+  "scope": "Raises only aggregate WAV chunk count from 64 to the existing 512-chunk frontend bound. It does not raise the 8192-byte text limit, 40-ID per-request limit, WAV container limit, or synthesis throughput. The 1000-word test is repetitive text and only proves planning capacity."
+}

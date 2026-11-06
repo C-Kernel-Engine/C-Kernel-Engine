@@ -24,44 +24,56 @@ ROOT = Path(__file__).resolve().parents[3]
 COMPILER = ROOT / "version/v8/scripts/build_ir_v8.py"
 CODEGEN = ROOT / "version/v8/scripts/codegen_v8.py"
 HOST = ROOT / "version/v8/tts/native_kokoro_wav_host.c"
-CONV_PROVIDERS = ("scalar", "avx2_fma")
+CONV_PROVIDERS = ("scalar", "avx2_fma", "avx2_parallel")
 
 
-def select_conv_provider(graph: dict, provider: str) -> int:
+def select_conv_provider(graph: dict, provider: str, workers: int = 4) -> int:
     """Select a declared provider in Kokoro authoring, never in generic lowering."""
     if provider not in CONV_PROVIDERS:
         raise ValueError(f"unsupported Kokoro Conv1D provider: {provider}")
+    if isinstance(workers, bool) or not isinstance(workers, int) or not 1 <= workers <= 16:
+        raise ValueError("Conv1D worker count must be an integer in 1..16")
     if provider == "scalar":
         return 0
+    suffix = "avx2_parallel" if provider == "avx2_parallel" else "avx2_fma"
     replacements = {
         "audio_conv1d_checked_channel_major_f32":
-            "audio_conv1d_checked_channel_major_f32_avx2_fma",
+            f"audio_conv1d_checked_channel_major_f32_{suffix}",
         "audio_conv1d_dilated_checked_channel_major_f32":
-            "audio_conv1d_dilated_checked_channel_major_f32_avx2_fma",
+            f"audio_conv1d_dilated_checked_channel_major_f32_{suffix}",
     }
     selected = 0
     for block in graph["block_types"].values():
         for op in block["header"] + block["body"]["ops"] + block["footer"]:
             if op.get("kernel") in replacements:
                 op["kernel"] = replacements[op["kernel"]]
+                if provider == "avx2_parallel":
+                    op.setdefault("params", {})["conv_worker_pool"] = "worker_pool"
+                    op["params"]["conv_worker_count"] = workers
                 selected += 1
     if selected == 0:
         raise ValueError("Kokoro circuit contains no selectable Conv1D operations")
     graph["required_numerical_contracts"]["audio_conv1d_checked"][
         "phases"]["prefill"]["contract_id"] = (
+            "audio_conv1d_checked_x86_avx2_parallel_fp32" if
+            provider == "avx2_parallel" else
             "audio_conv1d_checked_x86_avx2_fma_fp32")
+    if provider == "avx2_parallel":
+        graph["native_entry"]["params"].append(
+            {"c_type": "void *", "name": "worker_pool"})
     return selected
 
 
 def compiler_manifest(bump_dir: Path, tokens: int,
                       bindings_path: Path = DEFAULT_BINDINGS,
                       conv_provider: str = "scalar",
-                      runtime_lengths: bool = False) -> dict:
+                      runtime_lengths: bool = False,
+                      conv_workers: int = 4) -> dict:
     """Make virtual graph-weight metadata; payloads stay in the source BUMP."""
     if runtime_lengths and tokens != 64:
         raise ValueError("runtime waveform circuit requires 64-token capacity")
     graph = build_runtime_circuit() if runtime_lengths else build_circuit(tokens)
-    selected_conv_calls = select_conv_provider(graph, conv_provider)
+    selected_conv_calls = select_conv_provider(graph, conv_provider, conv_workers)
     bindings = json.loads(bindings_path.read_text())
     if bindings.get("schema") != "cke.kokoro.request_weight_bindings.v1":
         raise ValueError("unsupported request weight binding schema")
@@ -120,6 +132,7 @@ def compiler_manifest(bump_dir: Path, tokens: int,
         },
     }
     config["kokoro_conv_provider"] = conv_provider
+    config["kokoro_conv_workers"] = conv_workers if conv_provider == "avx2_parallel" else 0
     config["kokoro_selected_conv_calls"] = selected_conv_calls
     if runtime_lengths:
         config["activation_buffer_dtypes"].update({
@@ -145,12 +158,13 @@ def _run(argv: list[str], *, log: Path | None = None) -> None:
 def build_runtime(bump_dir: Path, output: Path, tokens: int,
                   bindings_path: Path = DEFAULT_BINDINGS,
                   conv_provider: str = "scalar",
-                  runtime_lengths: bool = False) -> dict:
+                  runtime_lengths: bool = False,
+                  conv_workers: int = 4) -> dict:
     if output.exists() and any(output.iterdir()):
         raise ValueError("output directory must be empty")
     output.mkdir(parents=True, exist_ok=True)
     manifest = compiler_manifest(bump_dir, tokens, bindings_path,
-                                 conv_provider, runtime_lengths)
+                                 conv_provider, runtime_lengths, conv_workers)
     manifest_path = output / "compiler_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
     _run([sys.executable, str(COMPILER), "--manifest", str(manifest_path),
@@ -171,8 +185,11 @@ def build_runtime(bump_dir: Path, output: Path, tokens: int,
                       for source in registry[op["call_abi"]["kernel_id"]]
                       ["impl"]["sources"]})
     entry = manifest["template"]["native_entry"]["function"]
+    exports = [entry]
+    if conv_provider == "avx2_parallel":
+        exports.extend(("ck_threadpool_create", "ck_threadpool_destroy"))
     (output / "exports.map").write_text(
-        "{ global: " + entry + "; local: *; };\n")
+        "{ global: " + "; ".join(exports) + "; local: *; };\n")
     generated = output / "generated.c"
     _run(["cc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic",
           "-fsyntax-only", str(generated), "-I", str(ROOT / "include")],
@@ -192,6 +209,8 @@ def build_runtime(bump_dir: Path, output: Path, tokens: int,
             (ROOT / "src/kernels/checked_float_buffer.h", "checked_float_buffer.h"),
             (ROOT / "include/ckernel_tts.h", "ckernel_tts.h")):
         shutil.copy2(source, output / name)
+    if conv_provider == "avx2_parallel":
+        shutil.copy2(ROOT / "include/ck_threadpool.h", output / "ck_threadpool.h")
     host_command = ["cc", "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror",
         "-pedantic", f"-DCK_TTS_COMPILED_TOKEN_COUNT={tokens}",
         f'-DCK_TTS_EXPECTED_LIBRARY_SHA256="{library_sha256}"',
@@ -201,6 +220,9 @@ def build_runtime(bump_dir: Path, output: Path, tokens: int,
         "-o", str(output / "native-kokoro-wav")]
     if runtime_lengths:
         host_command.insert(7, "-DCK_TTS_RUNTIME_WAVEFORM")
+    if conv_provider == "avx2_parallel":
+        host_command.insert(7, "-DCK_TTS_PARALLEL_CONV")
+        host_command.insert(8, f"-DCK_TTS_CONV_WORKERS={conv_workers}")
     _run(host_command, log=output / "host-compile.log")
     package = package_request(output / "layout.json", bump_dir,
                               output / "request.cktts", bindings_path,
@@ -209,6 +231,7 @@ def build_runtime(bump_dir: Path, output: Path, tokens: int,
               "phoneme_count": tokens, "generated_operations": len(calls["operations"]),
               "runtime_lengths": runtime_lengths,
               "conv_provider": conv_provider,
+              "conv_workers": conv_workers if conv_provider == "avx2_parallel" else 0,
               "selected_conv_calls": manifest["config"]["kokoro_selected_conv_calls"],
               "selected_providers": sorted({op["call_abi"]["kernel_id"]
                                             for op in calls["operations"]}),
@@ -238,12 +261,15 @@ def main() -> None:
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--conv-provider", choices=CONV_PROVIDERS,
                         default="scalar")
+    parser.add_argument("--conv-workers", type=int, default=4,
+                        help="caller-owned worker pool size for avx2_parallel")
     parser.add_argument("--runtime-lengths", action="store_true",
                         help="compile the 64-token-capacity runtime waveform graph")
     args = parser.parse_args()
     print(json.dumps(build_runtime(args.bump_dir, args.output_dir, args.tokens,
                                    conv_provider=args.conv_provider,
-                                   runtime_lengths=args.runtime_lengths), indent=2))
+                                   runtime_lengths=args.runtime_lengths,
+                                   conv_workers=args.conv_workers), indent=2))
 
 
 if __name__ == "__main__":

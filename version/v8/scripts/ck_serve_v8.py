@@ -296,6 +296,10 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         help="Optional rendered-prompt UTF-8 byte limit, independent of model token capacity",
     )
     parser.add_argument(
+        "--prefix-checkpoint-cache-bytes", type=int, default=None,
+        help="Opt in to one exact-token prefix checkpoint with this total byte budget; requires a certified append bundle",
+    )
+    parser.add_argument(
         "--batch-http-extra-bytes", type=int, default=None,
         help="Opt in to two-slot generated HTTP decode with this native+host memory budget",
     )
@@ -649,6 +653,7 @@ def main(argv: list[str] | None = None) -> int:
             auto_bos_token_text=auto_bos_token_text,
             allow_untemplated=args.no_chat_template and args.allow_raw_prompt,
             batch_http=batch_http,
+            prefix_cache_bytes=args.prefix_checkpoint_cache_bytes,
         )
     except Exception:
         if batch_http is not None:

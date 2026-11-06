@@ -14,13 +14,16 @@ import inspect
 import json
 import os
 from pathlib import Path
+import re
 import sys
+from types import SimpleNamespace
 
 
 SCHEMA = "cke.kokoro.accessibility-text-plan.v1"
 MAX_TEXT_BYTES = 8192
-MAX_CHUNKS = 64
-MAX_REQUEST_IDS = 40
+MAX_CHUNKS = 512  # Shared bound for incremental playback and aggregate WAV.
+MAX_REQUEST_IDS = 48
+PREFERRED_REQUEST_IDS = 40  # Reserve 41..48 for an indivisible G2P token.
 PINNED_SHA256 = {
     "config": "5abb01e2403b072bf03d04fde160443e209d7a0dad49a423be15196b9b43c17f",
     "misaki_en": "a9c36c90a3fa6c6084e9042fd8e19f6049add4f1435d8fe5ca1b77f3529a98f4",
@@ -29,6 +32,8 @@ PINNED_SHA256 = {
     "espeak_library": "b15ce0803b26254e8a0d088c6b9281a2637b2b02613147cc320cfdefaf2c3ccf",
     "espeak_data": "e1a4e7c181fdfb2042e3d7c8da98a4f9f8390d471d833eff9c15340eb9f033bc",
 }
+PATH_SEPARATORS = {"/": "slash", "-": "dash", "_": "underscore",
+                   ".": "dot"}
 
 
 class TextPlanError(ValueError):
@@ -86,6 +91,66 @@ def _phonemes(tokens: list) -> str:
                    for token in tokens).strip()
 
 
+def expand_technical_paths(tokens: list, pronounce,
+                           mode: str = "natural") -> tuple[list, list[dict]]:
+    """Give path characters explicit speech while retaining exact source spans.
+
+    `pronounce` is the pinned G2P, supplied by prepare(). The same adapter can
+    be exercised without model assets using a deterministic test G2P.
+    """
+    if mode not in ("natural", "exact"):
+        raise TextPlanError("technical path mode must be natural or exact")
+    expanded, changes = [], []
+    cursor = 0
+    for index, token in enumerate(tokens):
+        raw = token.text
+        next_token = tokens[index + 1] if index + 1 < len(tokens) else None
+        if "/" not in raw:
+            expanded.append(token)
+            cursor += len(raw + token.whitespace)
+            continue
+        if mode == "exact":
+            parts = list(raw)
+        else:
+            parts = re.findall(r"[A-Za-z0-9]+|[/._-]", raw)
+        if "".join(parts) != raw:
+            raise TextPlanError(f"unsupported character in technical path {raw!r}")
+        root = raw.startswith("/") and (
+            len(raw) > 1 or
+            (next_token is not None and not token.whitespace and
+             "/" in next_token.text))
+        spoken = []
+        for part in parts:
+            if part in PATH_SEPARATORS:
+                term = "root slash" if part == "/" and root else PATH_SEPARATORS[part]
+                root = False
+                pieces = [(part, term)]
+            elif mode == "exact":
+                pieces = [(part, part.upper() + "." if part.isalpha() else part)]
+            else:
+                sound = pronounce(part)
+                if not sound:
+                    raise TextPlanError(f"unspoken technical path component {part!r}")
+                pieces = ([(letter, letter.upper() + "." if letter.isalpha()
+                            else letter) for letter in part]
+                          if len(sound) + 2 > MAX_REQUEST_IDS else [(part, part)])
+            for source, word in pieces:
+                sound = pronounce(word)
+                if not sound or len(sound) + 2 > MAX_REQUEST_IDS:
+                    raise TextPlanError(f"unspoken or oversized technical path part {source!r}")
+                spoken.append(word)
+                expanded.append(SimpleNamespace(text=source, whitespace="",
+                                                phonemes=sound + " "))
+        expanded[-1].whitespace = token.whitespace
+        if token.whitespace:
+            expanded[-1].phonemes = expanded[-1].phonemes.rstrip()
+        changes.append({"source_start": cursor, "source_end": cursor + len(raw),
+                        "source_text": raw, "mode": mode,
+                        "spoken_text": " ".join(spoken)})
+        cursor += len(raw + token.whitespace)
+    return expanded, changes
+
+
 def _boundary_rank(token: object) -> int:
     sound = token.phonemes
     if sound in (".", "!", "?", "…", ";", ":"):
@@ -130,16 +195,18 @@ def plan_tokens(text: str, tokens: list, vocab: dict[str, int],
     if not supported_counts or min(supported_counts) < 3:
         raise TextPlanError("bundle has no valid supported phoneme counts")
     if max(supported_counts) > MAX_REQUEST_IDS:
-        raise TextPlanError("bundle exceeds the native 40-ID request contract")
+        raise TextPlanError(f"bundle exceeds the native {MAX_REQUEST_IDS}-ID request contract")
 
     chunks = []
     first = 0
     while first < len(tokens):
+        overlong_token = len(_phonemes(tokens[first:first + 1])) + 2 > PREFERRED_REQUEST_IDS
+        request_limit = MAX_REQUEST_IDS if overlong_token else PREFERRED_REQUEST_IDS
         candidates = []
         for end in range(first + 1, len(tokens) + 1):
             ps = _phonemes(tokens[first:end])
             count = len(ps) + 2
-            if count > MAX_REQUEST_IDS:
+            if count > request_limit:
                 break
             if count in supported_counts and _legal_boundary(tokens, first, end):
                 candidates.append((end, ps, _boundary_rank(tokens[end - 1]), count))
@@ -153,7 +220,11 @@ def plan_tokens(text: str, tokens: list, vocab: dict[str, int],
         # resulting chunks instead of stranding its last word.
         strong = [item for item in candidates if item[2] == 2]
         weak = [item for item in candidates if item[2] == 1 and item[3] >= 20]
-        if strong or weak:
+        if overlong_token:
+            # Keep a long number/name by itself, attaching punctuation only
+            # when the source-span boundary would otherwise be invalid.
+            end, ps, _, _ = min(candidates, key=lambda item: item[0])
+        elif strong or weak:
             end, ps, _, _ = max(strong or weak, key=lambda item: item[0])
         else:
             natural_end = first + 1
@@ -187,7 +258,8 @@ def plan_tokens(text: str, tokens: list, vocab: dict[str, int],
     return chunks
 
 
-def prepare(text: str, config_path: Path, bundle_path: Path) -> dict:
+def prepare(text: str, config_path: Path, bundle_path: Path,
+            *, technical_mode: str = "natural") -> dict:
     spoken_text = text.strip()
     if not spoken_text:
         raise TextPlanError("empty text")
@@ -237,6 +309,8 @@ def prepare(text: str, config_path: Path, bundle_path: Path) -> dict:
     reference_phonemes, tokens = pipeline.g2p(spoken_text)
     if reference_phonemes != _phonemes(tokens):
         raise TextPlanError("pinned phonemizer text and token phonemes disagree")
+    tokens, expansions = expand_technical_paths(
+        tokens, lambda word: pipeline.g2p(word)[0], technical_mode)
     chunks = plan_tokens(spoken_text, tokens, vocab, set(counts))
     return {
         "schema": SCHEMA,
@@ -245,7 +319,11 @@ def prepare(text: str, config_path: Path, bundle_path: Path) -> dict:
         "input_text": text,
         "source_text": spoken_text,
         "full_reference_phonemes": reference_phonemes,
-        "normalizations": (["trimmed boundary whitespace"] if text != spoken_text else []),
+        "planned_phonemes": _phonemes(tokens),
+        "technical_mode": technical_mode,
+        "pronunciation_expansions": expansions,
+        "normalizations": (["trimmed boundary whitespace"] if text != spoken_text else []) +
+                          (["explicit technical path pronunciation"] if expansions else []),
         "bundle_manifest_sha256": manifest_hash,
         "bundle_identity_sha256": manifest.get("bundle_identity_sha256"),
         "frontend_sha256": PINNED_SHA256,
@@ -262,11 +340,14 @@ def main() -> int:
     source.add_argument("--text-file", type=Path)
     parser.add_argument("--config", required=True, type=Path)
     parser.add_argument("--bundle-dir", required=True, type=Path)
+    parser.add_argument("--technical-mode", choices=("natural", "exact"),
+                        default="natural")
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
     try:
         text = args.text if args.text is not None else args.text_file.read_text()
-        plan = prepare(text, args.config, args.bundle_dir)
+        plan = prepare(text, args.config, args.bundle_dir,
+                       technical_mode=args.technical_mode)
         serialized = json.dumps(plan, ensure_ascii=False, indent=2) + "\n"
         descriptor = os.open(args.output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(descriptor, "w", encoding="utf-8") as stream:

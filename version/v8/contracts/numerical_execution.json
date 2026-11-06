@@ -4596,6 +4596,50 @@
       "position_transform": null,
       "description": "Exact checked copy of a nonempty contiguous int32 span into disjoint caller-owned storage. Validates offsets, capacities and overlap before writes; preserves untouched destination elements. Inference only."
     },
+    "token_span_mean_fp64_accumulation_f32_output": {
+      "operator_family": "token_span_mean_checked",
+      "status": "validated",
+      "storage": {"input": "fp32", "weight": "none", "output": "fp32"},
+      "compute": {"input": "fp32", "weight": "none", "accumulator": "fp64", "contraction": "disabled", "evaluation_order": "each_span_then_each_channel_then_ascending_token_fp64_sum_then_fp32_output"},
+      "rounding": {"mode": "rne", "points": ["input_load", "reduction_update", "reduction_finalize", "output_divide", "output_store"]},
+      "reduction": {"kind": "sum", "order": "ascending_index", "partial_accumulator": "fp64", "merge_order": "none"},
+      "threading": {"work_partition": "serial", "split_strategy": "serial", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Checked half-open token-span means with FP64 accumulation and FP32 output. All spans and results are validated before writes; output padding remains untouched. Synthetic oracle evidence only; no complete Clef model claim."
+    },
+    "last_valid_row_checked_exact_f32": {
+      "operator_family": "last_valid_row_checked",
+      "status": "validated",
+      "storage": {"input": "fp32", "weight": "none", "output": "fp32"},
+      "compute": {"input": "fp32", "weight": "none", "accumulator": "fp32", "contraction": "disabled", "evaluation_order": "validate_final_valid_span_and_finite_row_then_copy_exact_bits"},
+      "rounding": {"mode": "none", "points": ["input_load", "output_store"]},
+      "reduction": {"kind": "none", "order": "none", "partial_accumulator": "none", "merge_order": "none"},
+      "threading": {"work_partition": "serial", "split_strategy": "serial", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Checked final valid row copy. Externally supplied span must equal [valid_tokens-1, valid_tokens); wrong but in-bounds spans reject before writes."
+    },
+    "expand_group_row_indices_checked_exact_i32": {
+      "operator_family": "expand_group_row_indices_checked",
+      "status": "validated",
+      "storage": {"input": "int32", "weight": "none", "output": "int32"},
+      "compute": {"input": "int32", "weight": "none", "accumulator": "int32", "contraction": "disabled", "evaluation_order": "validate_positive_counts_and_exact_sum_then_expand_identity_and_owner_indices"},
+      "rounding": {"mode": "none", "points": ["input_load", "output_store"]},
+      "reduction": {"kind": "none", "order": "none", "partial_accumulator": "none", "merge_order": "none"},
+      "threading": {"work_partition": "serial", "split_strategy": "serial", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Checked ordered group-count expansion to exact row and owner indices. Invalid counts or capacities reject before either output is written."
+    },
+    "attention_cross_token_major_scalar_fp64_dot_fp32_scores_fp64_softmax": {
+      "operator_family": "attention",
+      "status": "validated",
+      "storage": {"input": "fp32", "weight": "none", "output": "fp32"},
+      "compute": {"input": "fp32", "weight": "none", "accumulator": "fp64", "contraction": "disabled", "evaluation_order": "independent_query_and_memory_lengths_ascending_head_key_and_channel"},
+      "rounding": {"mode": "rne", "points": ["activation_intermediate_store", "softmax_probability_store", "output_store"]},
+      "reduction": {"kind": "sum", "order": "ascending_index", "partial_accumulator": "fp64", "merge_order": "none"},
+      "threading": {"work_partition": "serial", "split_strategy": "serial", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Checked unmasked token-major cross attention with separate query and memory lengths, FP64 dot/weighted accumulation, FP32 rounded scores and FP64 softmax denominator. Staged output remains untouched on rejection."
+    },
     "equal_i32_scalar_exact": {
       "operator_family": "equal_i32_scalar_checked",
       "status": "validated",

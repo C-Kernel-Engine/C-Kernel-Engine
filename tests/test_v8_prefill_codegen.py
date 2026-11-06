@@ -157,7 +157,8 @@ int main(void) {
             self.skipTest("C compiler unavailable")
         source = codegen_core_v8.emit_model_and_api(
             layout={"memory": {"activations": {"buffers": []}}},
-            config={"prefill_append_row_group": 4},
+            config={"prefill_append_row_group": 4, "prefill_append_min_prefix": 64,
+                    "prefill_append_alignment": 64},
         )
         ordinary = codegen_core_v8.emit_model_and_api(
             layout={"memory": {"activations": {"buffers": []}}}, config={},
@@ -171,6 +172,20 @@ int main(void) {
                     layout={"memory": {"activations": {"buffers": []}}},
                     config={"prefill_append_row_group": bad},
                 )
+        for bad in (-1, 1.5, "64", True):
+            with self.subTest(min_prefix=bad), self.assertRaisesRegex(
+                    RuntimeError, "minimum prefix must be nonnegative"):
+                codegen_core_v8.emit_model_and_api(
+                    layout={"memory": {"activations": {"buffers": []}}},
+                    config={"prefill_append_min_prefix": bad},
+                )
+        for bad in (0, -1, 1.5, "64", True):
+            with self.subTest(alignment=bad), self.assertRaisesRegex(
+                    RuntimeError, "append alignment must be positive"):
+                codegen_core_v8.emit_model_and_api(
+                    layout={"memory": {"activations": {"buffers": []}}},
+                    config={"prefill_append_alignment": bad},
+                )
         api = source[
             source.index("CK_EXPORT int ck_model_prefill_append_row_group(void)"):
             source.index("/* Forward pass (after embed_tokens) */")
@@ -180,6 +195,7 @@ int main(void) {
 #include <stdlib.h>
 #define CK_EXPORT
 #define CK_HAS_PREFILL 1
+#define MAX_SEQ_LEN 256
 typedef struct { int pos; int state; } CKModel;
 static CKModel storage;
 static CKModel *g_model = &storage;
@@ -206,13 +222,24 @@ static void ck_decode(CKModel *model, int32_t token) {
 int main(void) {
     const int32_t token = 7;
     if (ck_model_prefill_append_row_group() != 4) return 1;
+    if (ck_model_prefill_append_min_prefix() != 64) return 6;
+    if (ck_model_prefill_append_alignment() != 64) return 9;
+    storage.pos = 255; storage.state = 91;
+    if (ck_model_embed_tokens(&token, 2) != -3 || storage.pos != 255 ||
+        storage.state != 91 || prefill_calls || decode_calls) return 8;
+    storage.pos = 60; storage.state = 91;
+    if (ck_model_embed_tokens(&token, 2) != -3 || storage.pos != 60 ||
+        storage.state != 91 || prefill_calls || decode_calls) return 7;
+    storage.pos = 65;
+    if (ck_model_embed_tokens(&token, 2) != -3 || storage.pos != 65 ||
+        storage.state != 91 || prefill_calls || decode_calls) return 10;
     storage.pos = 127; storage.state = 91;
     if (ck_model_embed_tokens(&token, 1) != -3 || storage.pos != 127 ||
         storage.state != 91 || prefill_calls || decode_calls) return 2;
     if (ck_model_embed_tokens(&token, 2) != -3 || storage.state != 91 ||
         prefill_calls || decode_calls) return 3;
-    storage.pos = 124;
-    if (ck_model_embed_tokens(&token, 1) != 0 || storage.pos != 125 ||
+    storage.pos = 128;
+    if (ck_model_embed_tokens(&token, 1) != 0 || storage.pos != 129 ||
         prefill_calls != 1 || decode_calls) return 4;
     storage.pos = 0;
     if (ck_model_embed_tokens(&token, 1) != 0 || storage.pos != 1 ||
@@ -920,6 +947,38 @@ int main(void) {
         self.assertIn("ck_multimodal_prefill_has_segment_plan(num_tokens)", emitted)
         self.assertIn(provider["implementation"]["segmented_query_provider"]["function"] + "(", emitted)
         self.assertIn(provider["impl"]["function"] + "(", emitted)
+
+        for map_name, op_name in (
+            ("attention_forward_causal_head_major_gqa_prefill_append_f16cache_gemma4_fp16_q_prob", "attn"),
+            ("attention_forward_causal_head_major_gqa_prefill_append_f16cache_sliding_gemma4_fp16_q_prob", "attn_sliding"),
+        ):
+            candidate_path = ROOT / "version/v8/kernel_maps" / f"{map_name}.json"
+            candidate = json.loads(candidate_path.read_text(encoding="utf-8"))
+            candidate_op = {
+                **op,
+                "op": op_name,
+                "function": candidate["impl"]["function"],
+                "resolved_execution": {"implementation": candidate["implementation"]},
+                "args": [
+                    {
+                        "name": arg["name"], "source": arg["source"],
+                        "expr": arg["source"].removeprefix("const:")
+                        if arg["name"] == "reduction" else arg["name"],
+                    }
+                    for arg in candidate["call_abi"]["params"]
+                ],
+            }
+            candidate_emitted = codegen_prefill_v8.emit_prefill_from_embedded_function(
+                [candidate_op], config
+            )
+            self.assertIn(
+                "CK_ATTN_REDUCTION_F16_Q_PROB_ROUND_QTILE64_REGULAR_TAIL_NOSCALE",
+                candidate_emitted,
+            )
+            self.assertNotIn(
+                "CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64_REGULAR_TAIL_NOSCALE",
+                candidate_emitted,
+            )
         embedding = {
             "op": "dense_embedding_lookup",
             "function": "embedding_forward_q4_k",

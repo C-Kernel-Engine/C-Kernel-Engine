@@ -16,8 +16,8 @@ SCHEMA = ROOT / "version" / "v8" / "schemas" / "kernel_call_abi.schema.json"
 REGISTRY = MAPS / "KERNEL_REGISTRY.json"
 EXCLUDED = {"KERNEL_REGISTRY.json", "kernel_bindings.json", "kernel_bindings.overlay.json"}
 BUILD_IR = ROOT / "version" / "v8" / "scripts" / "build_ir_v8.py"
-EXPECTED_GOVERNED_MAP_COUNT = 254
-EXPECTED_MAP_OWNED_ABI_COUNT = 349
+EXPECTED_GOVERNED_MAP_COUNT = 260
+EXPECTED_MAP_OWNED_ABI_COUNT = 355
 GLM4_PARITY_PROVIDERS = {
     "rope_forward_qk_pairwise_llama_cpu",
     "rope_precompute_cache_llama_cpu",
@@ -63,6 +63,38 @@ def load_json(path: Path) -> dict:
 
 
 class V8KernelCallABITests(unittest.TestCase):
+    def test_in_place_fp16_prior_cache_requires_exact_state_binding(self) -> None:
+        kernel_id = "attention_forward_causal_head_major_gqa_prefill_append_f16cache_flash_auto_qtile64"
+        provider = load_json(MAPS / f"{kernel_id}.json")
+        registry = build_ir_v8.load_kernel_registry()
+        self.assertEqual(provider["prefill_append_min_prefix"], 64)
+        self.assertEqual(provider["prefill_append_alignment"], 64)
+        self.assertEqual(build_ir_v8.load_kernel_call_abis()[kernel_id]
+                         ["prefill_append_min_prefix"], 64)
+        self.assertEqual(build_ir_v8.load_kernel_call_abis()[kernel_id]
+                         ["prefill_append_alignment"], 64)
+        for semantic in ("k", "v"):
+            self.assertEqual(build_ir_v8._attention_input_port_name(
+                registry, kernel_id, semantic), f"{semantic}_cache")
+            broken = json.loads(json.dumps(provider))
+            next(param for param in broken["call_abi"]["params"]
+                 if param["name"] == f"{semantic}_cache")["source"] = (
+                     f"runtime:kv_cache_{semantic}_layer")
+            original_lookup = build_ir_v8._kernel_map_by_id
+            try:
+                build_ir_v8._kernel_map_by_id = lambda _registry, _id: broken
+                with self.assertRaisesRegex(RuntimeError, "in-place FP16 cache binding"):
+                    build_ir_v8._attention_input_port_name(
+                        registry, kernel_id, semantic)
+            finally:
+                build_ir_v8._kernel_map_by_id = original_lookup
+        broken = json.loads(json.dumps(provider))
+        broken["prefill_append_min_prefix"] = "64"
+        with tempfile.TemporaryDirectory() as temp:
+            Path(temp, f"{kernel_id}.json").write_text(json.dumps(broken))
+            with self.assertRaisesRegex(RuntimeError, "prefill_append_min_prefix"):
+                build_ir_v8.load_kernel_call_abis(Path(temp), legacy_bindings={})
+
     def test_muse_prior_cache_ports_and_call_order(self) -> None:
         registry = build_ir_v8.load_kernel_registry()
         names = (

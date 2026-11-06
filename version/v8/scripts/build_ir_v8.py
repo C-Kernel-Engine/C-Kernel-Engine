@@ -366,6 +366,20 @@ def _attention_input_port_name(
             if f"input:{prior}" in param.get("ports", [])
         ]
         expected_source = "runtime:kv_cache_k_layer" if semantic == "k" else "runtime:kv_cache_v_layer"
+        in_place = provider.get("prior_cache_binding")
+        if in_place is not None:
+            if (in_place != {"mode": "in_place_store_before_attention",
+                             "store_kernel": "kv_cache_store_batch_f16"}
+                    or set(matches) != {prior}
+                    or prior_port.get("dtype") != "fp16"
+                    or prior_port.get("storage_class") != "state"
+                    or prior_port.get("access") != "read"
+                    or len(prior_bindings) != 1
+                    or prior_bindings[0].get("source") != expected_source + "_f16"):
+                raise RuntimeError(
+                    f"HARD PHYSICAL CONTRACT FAULT: prior-cache attention provider {kernel_id!r} "
+                    "has no proven in-place FP16 cache binding.")
+            return prior
         if (set(matches) != {current, prior}
                 or prior_port.get("storage_class") != "state"
                 or prior_port.get("access") != "read"
@@ -2129,6 +2143,26 @@ OP_DATAFLOW = {
     "copy_i32_span_checked": {
         "inputs": {"source": "external:source"},
         "outputs": {"destination": {"slot": "copied_ids", "dtype": "i32"}},
+    },
+    "token_span_mean_checked": {
+        "inputs": {"input": "external:input", "spans": "external:spans"},
+        "outputs": {"output": {"slot": "pooled_rows", "dtype": "fp32"}},
+    },
+    "last_valid_row_checked": {
+        "inputs": {"input": "external:input", "span": "external:span"},
+        "outputs": {"output": {"slot": "final_valid_row", "dtype": "fp32"}},
+    },
+    "expand_group_row_indices_checked": {
+        "inputs": {"group_counts": "external:group_counts"},
+        "outputs": {
+            "row_indices": {"slot": "group_row_indices", "dtype": "i32"},
+            "owner_indices": {"slot": "group_owner_indices", "dtype": "i32"},
+        },
+    },
+    "attention_cross_token_major_checked": {
+        "inputs": {"query": "external:query", "key": "external:key",
+                   "value": "external:value"},
+        "outputs": {"output": {"slot": "cross_attention_output", "dtype": "fp32"}},
     },
     "equal_i32_scalar_checked": {
         "inputs": {"requested": "external:requested",
@@ -5022,6 +5056,10 @@ TEMPLATE_TO_KERNEL_OP = {
     "repetition_penalty_last_row_checked": "repetition_penalty_last_row_checked",
     "concat_i32_checked": "concat_i32_checked",
     "copy_i32_span_checked": "copy_i32_span_checked",
+    "token_span_mean_checked": "token_span_mean_checked",
+    "last_valid_row_checked": "last_valid_row_checked",
+    "expand_group_row_indices_checked": "expand_group_row_indices_checked",
+    "attention_cross_token_major_checked": "attention_cross_token_major_checked",
     "equal_i32_scalar_checked": "equal_i32_scalar_checked",
     "audio_duration_logits_to_frames": "audio_duration_logits_to_frames",
     "runtime_extent_sum": "runtime_extent_sum",
@@ -12943,6 +12981,20 @@ def generate_ir_lower_1(
                     kv_read_layer = _kv_read_layer_for(int(layer))
                     op["_kv_cache_read_layer"] = kv_read_layer
                     _bind_attention_cache_inputs(op, kv_read_layer)
+                selected_attention_id = prefill_attention_kernel_by_layer.get(int(layer))
+                selected_attention = (
+                    _kernel_map_by_id(registry, selected_attention_id)
+                    if selected_attention_id else {}
+                )
+                in_place_history = selected_attention.get("prior_cache_binding")
+                if in_place_history is not None and (
+                    not append_before_attention or kv_batch_copy_op is None
+                    or kv_batch_copy_op.get("kernel") != in_place_history.get("store_kernel")
+                    or not uses_kv_cache or kv_read_layer != int(layer)
+                ):
+                    raise RuntimeError(
+                        "HARD PHYSICAL CONTRACT FAULT: in-place prior-cache attention "
+                        "requires a same-layer current-token KV store before attention.")
                 if append_before_attention:
                     # Append providers consume current K/V through the persistent
                     # cache. Commit the current token block before invoking them.
@@ -17018,6 +17070,22 @@ def load_kernel_call_abis(
         prefill_continuation = doc.get("prefill_continuation")
         prefill_row_reduction = doc.get("prefill_row_reduction")
         prefill_row_group = doc.get("prefill_row_group")
+        prefill_append_min_prefix = doc.get("prefill_append_min_prefix")
+        prefill_append_alignment = doc.get("prefill_append_alignment")
+        if prefill_append_min_prefix is not None and (
+                prefill_history_scope != "prior_cache" or
+                type(prefill_append_min_prefix) is not int or
+                prefill_append_min_prefix < 1):
+            raise RuntimeError(
+                f"HARD CALL ABI FAULT: kernel {kernel_id!r} has an invalid "
+                "prefill_append_min_prefix contract.")
+        if prefill_append_alignment is not None and (
+                prefill_history_scope != "prior_cache" or
+                type(prefill_append_alignment) is not int or
+                prefill_append_alignment < 1):
+            raise RuntimeError(
+                f"HARD CALL ABI FAULT: kernel {kernel_id!r} has an invalid "
+                "prefill_append_alignment contract.")
         if prefill_row_reduction is not None and (
                 doc.get("op") != "gemm" or
                 not isinstance(prefill_row_reduction, str) or
@@ -17099,6 +17167,10 @@ def load_kernel_call_abis(
                if prefill_row_reduction else {}),
             **({"prefill_row_group": prefill_row_group}
                if prefill_row_group else {}),
+            **({"prefill_append_min_prefix": prefill_append_min_prefix}
+               if prefill_append_min_prefix else {}),
+            **({"prefill_append_alignment": prefill_append_alignment}
+               if prefill_append_alignment else {}),
             **({"numerical_reduction_order": numerical_reduction_order}
                if isinstance(numerical_reduction_order, str) and numerical_reduction_order else {}),
         }
@@ -17968,6 +18040,12 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
         if call_abi_entry and call_abi_entry.get("prefill_row_group"):
             call_op["prefill_row_group"] = (
                 call_abi_entry["prefill_row_group"])
+        if call_abi_entry and call_abi_entry.get("prefill_append_min_prefix"):
+            call_op["prefill_append_min_prefix"] = (
+                call_abi_entry["prefill_append_min_prefix"])
+        if call_abi_entry and call_abi_entry.get("prefill_append_alignment"):
+            call_op["prefill_append_alignment"] = (
+                call_abi_entry["prefill_append_alignment"])
         if call_abi_entry and call_abi_entry.get("numerical_reduction_order"):
             call_op["numerical_reduction_order"] = (
                 call_abi_entry["numerical_reduction_order"])

@@ -7,6 +7,7 @@ import argparse
 import json
 import math
 import os
+import re
 import subprocess
 import tempfile
 from pathlib import Path
@@ -15,12 +16,14 @@ import numpy as np
 
 if __package__:
     from .replay_attention_from_dumps_v8 import (
-        _load_resolved_bundle, _metrics, _sha256, replay_resolved_segmented_prefill,
+        _load_resolved_bundle, _metrics, _sha256, _unique_tensor,
+        replay_resolved_segmented_prefill,
     )
     from .xray_operation_bundle_v8 import BundleError, load_bundle
 else:
     from replay_attention_from_dumps_v8 import (
-        _load_resolved_bundle, _metrics, _sha256, replay_resolved_segmented_prefill,
+        _load_resolved_bundle, _metrics, _sha256, _unique_tensor,
+        replay_resolved_segmented_prefill,
     )
     from xray_operation_bundle_v8 import BundleError, load_bundle
 
@@ -139,6 +142,253 @@ def replay_observed_oracle(
                 **({"parity_report": _sha256(parity_report)} if parity_report else {}),
             },
             "oracle_graph": identity}
+
+
+def _substitute_observed_operands(
+    dump_dir: Path, name: str, specs: dict, geometry: dict,
+    tensors: dict[str, np.ndarray], output_dir: Path,
+) -> tuple[dict[str, Path], dict]:
+    match = re.search(r"-token-(\d+)-occ-000$", name)
+    if match is None:
+        raise BundleError("observed capture has no unambiguous query position")
+    token = int(match.group(1))
+    q, k, v = (tensors[role] for role in ("Qcur_rope", "Kcache_post_store", "Vcache_post_store"))
+    if (token >= q.shape[0] or k.shape != v.shape or k.shape[0] != q.shape[0] or
+            q.shape[1:] != (geometry["heads"], geometry["dim"]) or
+            k.shape[1:] != (geometry["kv_heads"], geometry["dim"]) or
+            geometry["keys"] < token + 1 or geometry["queries"] > token + 1):
+        raise BundleError("observed query/cache geometry does not match the CKE packet")
+    query_start = token + 1 - geometry["queries"]
+    paths = {}
+    operand_metrics = {}
+    for role in ("q", "k", "v", "mask"):
+        raw = (dump_dir / f"{name}.nonflash_{role}.bin").read_bytes()
+        spec = specs[role]
+        dtype = np.dtype("<f4" if role in ("q", "mask") else "<f2")
+        storage = bytearray(raw)
+        view = np.ndarray(tuple(reversed(spec["ne"])), dtype=dtype, buffer=storage,
+                          strides=tuple(reversed(spec["nb"])))
+        if role == "q":
+            operand_metrics[role] = _metrics(view[0].transpose(1, 0, 2),
+                                             q[query_start:token + 1])
+            view[0] = q[query_start:token + 1].transpose(1, 0, 2)
+        elif role == "k":
+            operand_metrics[role] = _metrics(view[0, :, :token + 1].transpose(1, 0, 2),
+                                             k[:token + 1])
+            view[0, :, :token + 1] = k[:token + 1].transpose(1, 0, 2)
+        elif role == "v":
+            operand_metrics[role] = _metrics(view[0, :, :, :token + 1].transpose(2, 0, 1),
+                                             v[:token + 1])
+            view[0, :, :, :token + 1] = v[:token + 1].transpose(1, 2, 0)
+        else:
+            for row in range(geometry["queries"]):
+                position = query_start + row
+                if (not np.all(view[0, 0, row, :position + 1] == 0) or
+                        not np.isneginf(view[0, 0, row, position + 1:]).all()):
+                    raise BundleError("observed mask is not the CKE causal valid-key contract")
+        path = output_dir / f"{role}.bin"
+        path.write_bytes(storage)
+        paths[role] = path
+    return paths, {"query_start": query_start, "query_end": token,
+                   "valid_cache_positions": [0, token + 1],
+                   "operand_metrics": operand_metrics}
+
+
+def summarize_cache_history(
+    oracle: dict[str, np.ndarray], cke: dict[str, np.ndarray],
+    segments: list[dict], *, layer: int,
+    cke_pre_store: dict[str, tuple[str, np.ndarray]] | None = None,
+) -> dict:
+    """Compare only logical post-store FP16 rows, in position/head/channel order."""
+    if set(oracle) != {"K", "V"} or set(cke) != {"K", "V"}:
+        raise BundleError("cache comparison requires both K and V")
+    shape = oracle["K"].shape
+    if (len(shape) != 3 or shape[0] < 1 or shape[1] < 1 or shape[2] < 1 or
+            any(array.shape != shape or array.dtype != np.dtype("<f2")
+                for array in (*oracle.values(), *cke.values()))):
+        raise BundleError("post-store caches must have identical FP16 logical geometry")
+    offset = 0
+    names = set()
+    for segment in segments:
+        if (not isinstance(segment, dict) or type(segment.get("rows")) is not int or
+                segment["rows"] < 1 or segment.get("physical_start") != offset or
+                not isinstance(segment.get("name"), str) or not segment["name"] or
+                segment["name"] in names):
+            raise BundleError("cache segment plan is missing or noncontiguous")
+        names.add(segment["name"])
+        offset += segment["rows"]
+    if offset != shape[0]:
+        raise BundleError("cache segment plan does not cover the valid extent")
+
+    def origin(position: int) -> str:
+        return next(segment["name"] for segment in segments
+                    if segment["physical_start"] <= position <
+                    segment["physical_start"] + segment["rows"])
+
+    def coordinate(kind: str, index: tuple[int, int, int]) -> dict:
+        position, head, channel = (int(value) for value in index)
+        left = oracle[kind][index]
+        right = cke[kind][index]
+        return {
+            "layer": layer, "kind": kind, "position": position,
+            "origin": origin(position), "head": head, "channel": channel,
+            "oracle": {"value": float(left), "raw_le_hex": left.tobytes().hex()},
+            "cke": {"value": float(right), "raw_le_hex": right.tobytes().hex()},
+            "absolute_difference": abs(float(left) - float(right)),
+        }
+
+    by_kind = {}
+    for kind in ("K", "V"):
+        left, right = oracle[kind], cke[kind]
+        unequal = left.view(np.uint16) != right.view(np.uint16)
+        if not np.isfinite(left).all() or not np.isfinite(right).all():
+            raise BundleError("nonfinite valid cache element")
+        diff = np.abs(left.astype(np.float32) - right.astype(np.float32))
+        first = tuple(np.argwhere(unequal)[0]) if unequal.any() else None
+        worst = tuple(np.unravel_index(np.argmax(diff), shape))
+        first_detail = coordinate(kind, first) if first is not None else None
+        largest_detail = coordinate(kind, worst) if first is not None else None
+        producer = None
+        if cke_pre_store is not None:
+            if kind not in cke_pre_store:
+                raise BundleError("pre-store producer is missing for a cache kind")
+            name, values = cke_pre_store[kind]
+            if (not isinstance(name, str) or not name or values.shape != shape or
+                    values.dtype != np.dtype("<f4") or not np.isfinite(values).all()):
+                raise BundleError("invalid pre-store producer capture")
+            rounded = values.astype("<f2")
+            producer = {"capture": name,
+                        "fp16_store_matches": bool(np.array_equal(
+                            rounded.view(np.uint16), right.view(np.uint16)))}
+            for target, index in ((first_detail, first), (largest_detail, worst)):
+                if target is not None:
+                    target["cke_pre_store"] = {
+                        "value": float(values[index]),
+                        "rounded_raw_le_hex": rounded[index].tobytes().hex(),
+                        "capture": name,
+                    }
+        by_kind[kind] = {
+            "differing_elements": int(np.count_nonzero(unequal)),
+            "first": first_detail,
+            "largest": largest_detail,
+            "cke_producer": producer,
+            "segments": {segment["name"]: int(np.count_nonzero(
+                unequal[segment["physical_start"]:segment["physical_start"] + segment["rows"]]))
+                for segment in segments},
+        }
+    candidates = [item["first"] for item in by_kind.values() if item["first"] is not None]
+    return {
+        "dtype": "fp16", "logical_axes": ["position", "kv_head", "channel"],
+        "valid_extent": {"positions": shape[0], "kv_heads": shape[1], "channels": shape[2]},
+        "first": min(candidates, key=lambda item: (item["position"], item["kind"]))
+        if candidates else None,
+        "by_kind": by_kind,
+        "producer_evidence": ("CKE pre-store from the same packet; oracle pre-store not bound"
+                              if cke_pre_store is not None else "post-store inputs only"),
+    }
+
+
+def _observed_segment_plan(plan: list[dict], segments: list[int], valid: int,
+                           queries: int) -> list[dict]:
+    if [entry.get("rows") for entry in plan] != segments:
+        raise BundleError("cache segment plan differs from the verified CKE packet")
+    observed = [entry for entry in plan
+                if entry["physical_start"] + entry["rows"] <= valid]
+    if (not observed or sum(entry["rows"] for entry in observed) != valid or
+            observed[-1]["rows"] != queries):
+        raise BundleError("observed query does not end at a verified segment boundary")
+    return observed
+
+
+def compare_observed_cke_operands(
+    tree: Path, dump_dir: Path, name: str, bundle: Path, *,
+    scale: float, alibi: float, threads: int, parity_report: Path,
+) -> dict:
+    manifest, tensors = load_bundle(bundle)
+    if (manifest.get("context", {}).get("source_sha256", {}).get("parity_report") !=
+            _sha256(parity_report)):
+        raise BundleError("CKE packet and oracle capture must share the same parity report")
+    dumps, layer, call, segments, engine = _load_resolved_bundle(bundle)
+    validate_oracle_contract(manifest, call, segments)
+    fidelity = replay_resolved_segmented_prefill(dumps, layer, call, segments, engine)
+    if fidelity["status"] != "pass":
+        raise BundleError("CKE replay fidelity or direct cache reconstruction failed")
+    observed = replay_observed_oracle(tree, dump_dir, name, scale=scale, alibi=alibi,
+                                      threads=threads, parity_report=parity_report)
+    if observed["oracle_replay_fidelity"] != "pass":
+        raise BundleError("oracle replay does not reproduce the captured output")
+    specs, geometry = _observed_capture(dump_dir, name)
+    if (not math.isfinite(scale) or scale != 1.0 or alibi != 0.0 or
+            geometry["heads"] != call["num_heads"] or
+            geometry["kv_heads"] != call["num_kv_heads"] or
+            geometry["dim"] != call["head_dim"]):
+        raise BundleError("observed oracle arithmetic or geometry differs from the resolved CKE contract")
+    with tempfile.TemporaryDirectory(prefix="cke-ggml-identical-attn-") as temp:
+        root = Path(temp)
+        paths, extent = _substitute_observed_operands(
+            dump_dir, name, specs, geometry, tensors, root,
+        )
+        operand_metrics = extent.pop("operand_metrics")
+        executable = root / "replay"
+        output = root / "out.f32"
+        resolved = _compile_ggml_source(tree, OBSERVED_SOURCE, executable)
+        args = [str(executable), *(str(paths[role]) for role in ("q", "k", "v", "mask")),
+                str(output), *(str(geometry[key]) for key in
+                ("queries", "keys", "heads", "kv_heads", "dim"))]
+        args.extend(str(specs[role]["nb"][axis]) for role, axis in (
+            ("q", 1), ("q", 2), ("k", 1), ("k", 2),
+            ("v", 1), ("v", 2), ("mask", 1)))
+        args.extend((str(scale), str(alibi), str(threads)))
+        subprocess.run(args, env=dict(os.environ, LD_LIBRARY_PATH=str(tree / "build" / "bin")),
+                       check=True, capture_output=True, text=True)
+        ggml_on_cke = np.fromfile(output, dtype="<f4").reshape(
+            geometry["queries"], geometry["heads"], geometry["dim"])
+    plan = json.loads(parity_report.read_text(encoding="utf-8"))["dump_compare"]["prefill_segments"]
+    valid = extent["valid_cache_positions"][1]
+    observed_plan = _observed_segment_plan(plan, segments, valid, geometry["queries"])
+    oracle_k = np.ndarray(tuple(reversed(specs["k"]["ne"])), dtype="<f2",
+                          buffer=(dump_dir / f"{name}.nonflash_k.bin").read_bytes(),
+                          strides=tuple(reversed(specs["k"]["nb"])))[0]
+    oracle_v = np.ndarray(tuple(reversed(specs["v"]["ne"])), dtype="<f2",
+                          buffer=(dump_dir / f"{name}.nonflash_v.bin").read_bytes(),
+                          strides=tuple(reversed(specs["v"]["nb"])))[0]
+    cache_history = summarize_cache_history(
+        {"K": oracle_k[:, :valid].transpose(1, 0, 2),
+         "V": oracle_v[:, :, :valid].transpose(2, 0, 1)},
+        {"K": tensors["Kcache_post_store"][:valid],
+         "V": tensors["Vcache_post_store"][:valid]},
+        observed_plan, layer=layer,
+        cke_pre_store={
+            "K": ("Kcur_rope", _unique_tensor(dumps, layer, "Kcur_rope").reshape(
+                tensors["Kcache_post_store"].shape)[:valid]),
+            "V": ("Vcur_normed", _unique_tensor(dumps, layer, "Vcur_normed").reshape(
+                tensors["Vcache_post_store"].shape)[:valid]),
+        },
+    )
+    start = extent["query_start"]
+    cke = tensors["kqv_out"][start:extent["query_end"] + 1]
+    oracle = np.fromfile(geometry["output"], dtype="<f4").reshape(cke.shape)
+    if not np.isfinite(ggml_on_cke).all():
+        raise BundleError("identical-input GGML replay produced nonfinite output")
+    return {
+        "status": "diagnostic_only",
+        "interpretation": "Self-replays passed; identical CKE operands isolate implementation differences, not contract violations",
+        "cke_replay_fidelity": "pass", "oracle_replay_fidelity": "pass",
+        "bundle_sha256": _sha256(bundle), "capture_sha256": observed["capture_sha256"],
+        "engine_so_sha256": fidelity["engine_so_sha256"],
+        "oracle_graph": {**observed["oracle_graph"], "resolved_libraries": resolved},
+        "attention_contract": {
+            "cke_provider": fidelity["provider"], "cke_reduction": fidelity["reduction_selector"],
+            "oracle_mode": "non_flash", "scale": scale, "alibi": alibi,
+            "threads": threads, "physical_cache_positions": geometry["keys"],
+        },
+        "query_extent": extent,
+        "operand_metrics": operand_metrics,
+        "cache_history": cache_history,
+        "cke_vs_ggml_identical_inputs": _metrics(cke, ggml_on_cke),
+        "ggml_cke_inputs_vs_native_oracle": _metrics(ggml_on_cke, oracle),
+        "cke_vs_native_oracle": _metrics(cke, oracle),
+    }
 
 
 def validate_oracle_contract(manifest: dict, call: dict, segments: list[int]) -> None:
@@ -374,6 +624,8 @@ def main() -> int:
     mode.add_argument("--oracle-dump-dir", type=Path)
     parser.add_argument("--oracle-dump-name")
     parser.add_argument("--parity-report", type=Path)
+    parser.add_argument("--observed-cke-bundle", type=Path,
+                        help="Compare a verified CKE packet on the captured oracle graph geometry/mask")
     parser.add_argument("--scale", type=float)
     parser.add_argument("--alibi", type=float)
     parser.add_argument("--threads", type=int)
@@ -385,15 +637,24 @@ def main() -> int:
                                  args.alibi is None or args.threads is None):
         parser.error("observed oracle replay requires capture report, dump name, scale, alibi, and threads")
     if args.bundle and (args.oracle_dump_name or args.parity_report or args.scale is not None or
-                        args.alibi is not None or args.threads is not None):
+                        args.alibi is not None or args.threads is not None or args.observed_cke_bundle):
         parser.error("observed oracle options cannot be combined with a CKE bundle")
+    if args.observed_cke_bundle and (not args.oracle_dump_dir or not args.oracle_dump_name):
+        parser.error("--observed-cke-bundle requires an observed oracle capture")
     try:
         if args.oracle_dump_dir:
-            report = replay_observed_oracle(
-                args.llama_tree, args.oracle_dump_dir, args.oracle_dump_name,
-                scale=args.scale, alibi=args.alibi, threads=args.threads,
-                parity_report=args.parity_report,
-            )
+            if args.observed_cke_bundle:
+                report = compare_observed_cke_operands(
+                    args.llama_tree, args.oracle_dump_dir, args.oracle_dump_name,
+                    args.observed_cke_bundle, scale=args.scale, alibi=args.alibi,
+                    threads=args.threads, parity_report=args.parity_report,
+                )
+            else:
+                report = replay_observed_oracle(
+                    args.llama_tree, args.oracle_dump_dir, args.oracle_dump_name,
+                    scale=args.scale, alibi=args.alibi, threads=args.threads,
+                    parity_report=args.parity_report,
+                )
         else:
             report = compare_packet(args.bundle, args.llama_tree)
     except (BundleError, ValueError, KeyError, OSError, subprocess.CalledProcessError) as exc:

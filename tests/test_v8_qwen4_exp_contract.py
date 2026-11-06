@@ -125,7 +125,7 @@ def test_qwen4_exp_quantized_prefill_keeps_flash_auto_reduction() -> None:
     )
     assert prefill["requirements"]["execution.prefill_batching"] == "batch_append"
     assert prefill["reduction"]["id"] == "f16_flash_auto_qtile64"
-    assert prefill["kernel"]["selector"] == "CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64"
+    assert prefill["kernel"]["selector"] == "CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64_APPEND_TILED"
     assert decode["reduction"]["id"] == "f16_online_fp32_merge"
 
     wrong_phase = copy.deepcopy(circuit)
@@ -141,7 +141,7 @@ def test_qwen4_exp_quantized_prefill_keeps_flash_auto_reduction() -> None:
 
 
 def test_qwen4_exp_flash_selector_reaches_emitted_prefill_call() -> None:
-    """Retained call-ready IR from the 4K artifact exercises the real emitter."""
+    """The Flash consumer's FP16 store precedes its map-selected attention."""
     circuit = json.loads(CIRCUIT.read_text(encoding="utf-8"))
     resolved = attention_resolver.resolve_contract(
         circuit,
@@ -153,7 +153,18 @@ def test_qwen4_exp_flash_selector_reaches_emitted_prefill_call() -> None:
     provider = _load(
         "attention_forward_causal_head_major_gqa_prefill_append_f16cache_flash_auto_qtile64.json"
     )
-    call = json.loads((ROOT / "tests/fixtures/qwen4_exp_flash/prefill_attention_call.json").read_text())
+    fixture = ROOT / "tests/fixtures/qwen4_exp_flash"
+    lowered = json.loads((fixture / "prefill_store_attention_lowered.json").read_text())
+    regenerated = build_ir_v8.generate_ir_lower_3(lowered, "prefill")["operations"]
+    assert regenerated == json.loads((fixture / "prefill_store_attention_calls.json").read_text())
+    assert [op["op"] for op in regenerated] == ["kv_cache_store_batch_f16", "attn"]
+    store, call = regenerated
+    assert not store["errors"] and not call["errors"]
+    assert call == json.loads((fixture / "prefill_attention_call.json").read_text())
+    store_args = {arg["name"]: arg["expr"] for arg in store["args"]}
+    call_args = {arg["name"]: arg["expr"] for arg in call["args"]}
+    assert store_args["kv_cache_k"] == call_args["k_cache"].replace("const ", "")
+    assert store_args["kv_cache_v"] == call_args["v_cache"].replace("const ", "")
     assert call["call_abi"]["kernel_id"] == resolved["kernel"]["id"] == provider["id"]
     assert call["function"] == resolved["kernel"]["function"] == provider["impl"]["function"]
     assert [(arg["name"], arg["source"]) for arg in call["args"]] == [

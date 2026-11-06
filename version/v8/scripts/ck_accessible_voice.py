@@ -296,6 +296,15 @@ def speak_and_control(text: str, speech_exe: Path, read=input,
         raise VoiceError(f"speech executable unavailable: {speech_exe}")
     print(f"{label} backend selected.", flush=True)
     child = None
+
+    def signal_group(sig: signal.Signals) -> None:
+        # The group can exit between the control callback and this signal.
+        # Signal even if the leader exited: a speech worker may still live.
+        try:
+            os.killpg(child.pid, sig)
+        except ProcessLookupError:
+            pass
+
     try:
         while True:
             if child is None:
@@ -303,23 +312,24 @@ def speak_and_control(text: str, speech_exe: Path, read=input,
                                          start_new_session=True)
             choice = read("Speech: enter=finish, repeat=restart, stop=silence: ").strip().lower()
             if choice == "":
-                if child.wait() != 0:
+                returncode = child.wait()
+                child = None
+                if returncode != 0:
                     raise VoiceError(f"{label} failed")
                 return
-            if child.poll() is None:
-                os.killpg(child.pid, signal.SIGTERM)
-                try:
-                    child.wait(timeout=1)
-                except subprocess.TimeoutExpired:
-                    os.killpg(child.pid, signal.SIGKILL)
-                    child.wait()
+            signal_group(signal.SIGTERM)
+            try:
+                child.wait(timeout=1)
+            except subprocess.TimeoutExpired:
+                signal_group(signal.SIGKILL)
+                child.wait()
             child = None
             if choice == "repeat":
                 continue
             return
     finally:
-        if child is not None and child.poll() is None:
-            os.killpg(child.pid, signal.SIGKILL)
+        if child is not None:
+            signal_group(signal.SIGKILL)
             child.wait()
 
 
@@ -348,6 +358,12 @@ def main(argv: list[str] | None = None) -> int:
                         help="verified Kokoro generated runtime bundle")
     parser.add_argument("--audio-player", type=Path,
                         help="local player accepting one 24 kHz mono PCM16 WAV path")
+    parser.add_argument("--kokoro-incremental", action="store_true",
+                        help="play checked Kokoro chunks as they are synthesized")
+    parser.add_argument("--kokoro-synthesis-workers", type=int, default=1,
+                        help="1..3 loaded workers for incremental Kokoro playback")
+    parser.add_argument("--kokoro-technical-mode", choices=("natural", "exact"),
+                        default="natural", help="how Kokoro speaks technical paths")
     args = parser.parse_args(argv)
     try:
         if (args.wav or args.record) and (not args.encoder_run_dir or not args.decoder_run_dir):
@@ -359,6 +375,14 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("--speech-exe cannot be combined with Kokoro options")
         if any(kokoro_options) and not all(kokoro_options):
             parser.error("Kokoro requires --kokoro-config, --kokoro-bundle-dir and --audio-player")
+        if args.kokoro_incremental and not all(kokoro_options):
+            parser.error("--kokoro-incremental requires Kokoro options")
+        if args.kokoro_technical_mode != "natural" and not all(kokoro_options):
+            parser.error("--kokoro-technical-mode requires Kokoro options")
+        if not 1 <= args.kokoro_synthesis_workers <= 3:
+            parser.error("--kokoro-synthesis-workers must be in 1..3")
+        if args.kokoro_synthesis_workers != 1 and not args.kokoro_incremental:
+            parser.error("multiple Kokoro synthesis workers require --kokoro-incremental")
         if args.record:
             with tempfile.TemporaryDirectory(prefix="cke-voice-capture-") as folder:
                 wav = Path(folder) / "microphone.wav"
@@ -387,10 +411,18 @@ def main(argv: list[str] | None = None) -> int:
             speak_and_control(answer, args.speech_exe)
         elif all(kokoro_options):
             adapter = Path(__file__).resolve().parents[1] / "tts/ck_kokoro_play.py"
+            arguments = ("--config", str(args.kokoro_config),
+                         "--bundle-dir", str(args.kokoro_bundle_dir),
+                         "--player", str(args.audio_player))
+            if args.kokoro_incremental:
+                arguments += ("--incremental",)
+                if args.kokoro_synthesis_workers != 1:
+                    arguments += ("--synthesis-workers",
+                                  str(args.kokoro_synthesis_workers))
+            if args.kokoro_technical_mode != "natural":
+                arguments += ("--technical-mode", args.kokoro_technical_mode)
             speak_and_control(answer, adapter,
-                              arguments=("--config", str(args.kokoro_config),
-                                         "--bundle-dir", str(args.kokoro_bundle_dir),
-                                         "--player", str(args.audio_player)),
+                              arguments=arguments,
                               label="CKE Kokoro")
         else:
             print("No speech executable selected; answer was displayed only.", flush=True)

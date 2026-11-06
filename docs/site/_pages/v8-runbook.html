@@ -2152,6 +2152,39 @@ python3 server/gemma_antigravity_acceptance.py \
         environment value in these examples; the older settings profile alone did not
         constrain its output request in a bounded local probe.
     </p>
+    <h4>Isolated dense Qwen3.8 prefix-reuse acceptance</h4>
+    <p>Build a separate resolved 32K dense Qwen3.8 bundle from the intended source revision;
+        verify its generated source, runtime libraries, tokenizer and weights with
+        <code>GET /v1/cke/loaded-identity</code>. The example below uses the tested
+        Ryzen budget for one 2.36 GB checkpoint. Choose a budget from the loaded
+        artifact's reported checkpoint requirement and available memory. It does not
+        change an existing serving process.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>CK_BUNDLE=/path/to/resolved-dense-qwen38-32k-bundle
+CK_NUM_THREADS=16 OMP_NUM_THREADS=1 CK_V8_FORCE_BATCHED_PREFILL=1 \
+python3 version/v8/scripts/ck_serve_v8.py "$CK_BUNDLE" --run "$CK_BUNDLE" \
+  --no-build --host 127.0.0.1 --port 8206 \
+  --model-name qwen38-dense-prefix-32k-main-test \
+  --request-output-cap 2048 --max-tokens 2048 --temperature 0 \
+  --prefix-checkpoint-cache-bytes 2500000000
+
+# On the client, forward only this isolated loopback endpoint.
+ssh -N -L 127.0.0.1:18236:127.0.0.1:8206 ryzen</pre>
+    </div>
+    <p>Use Qwen Code 0.25.1 normal mode with a client settings file declaring
+        <code>contextWindowSize: 32768</code>, a 2,048-token output allowance and an
+        explicit wall-time budget. Run <code>server/qwen_harness_acceptance.py</code>
+        with <code>--qwen-profile normal</code>, <code>--settings</code>, and both
+        expected loaded hashes. Retain every empty per-attempt workspace, including
+        incomplete attempts. Compare cache-on and cache-off runs on the same bundle,
+        thread count and frozen fixture, alternating trial order; check file content,
+        validator result, tool IDs, loaded identity, actual input and reused token
+        counts separately from elapsed time. The opt-in cache saves exact processed
+        token prefixes, and exact-prefix requests without a suffix use fresh prefill
+        because checkpoints do not contain logits. HTTP execution remains
+        single-flight: this cache does not enable recurrent batching or concurrent
+        native calls.</p>
     <h4>Repeated Qwen and Gemma harness acceptance</h4>
     <p>Run <code>server/harness_repeatability.py</code> from a client machine that can
         reach both endpoints through localhost tunnels. It invokes the existing
@@ -2160,7 +2193,8 @@ python3 server/gemma_antigravity_acceptance.py \
         the intended loaded serving and session-library SHA-256 values. Use a Python
         environment with the server test dependencies for the coordinator, and name
         a separate Python environment containing <code>google-antigravity==0.1.20</code>
-        for the Gemma client. The Qwen executable must report version 0.24.6.</p>
+        for the Gemma client. Pin the installed Qwen Code version in each client
+        entry; the runner currently accepts 0.24.6 and 0.25.1.</p>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
 <pre>{
@@ -2244,6 +2278,19 @@ python3 server/harness_repeatability.py \
         time, complete server request time, and time outside native generation. Client tool execution
         occurs between requests and must be timed separately.
     </p>
+    <h4>Experimental exact-prefix checkpoints</h4>
+    <p>On a separately certified native-session bundle, opt in with
+        <code>--prefix-checkpoint-cache-bytes BYTES</code>. The server keeps one
+        exact-token checkpoint per request owner under a global byte budget;
+        a changed prefix falls back to ordinary prefill. The initial snapshot
+        leaves a bounded tail outside the checkpoint so client-edited trailing
+        prompt items do not invalidate the reusable earlier prefix. Snapshots
+        contain state but no logits, so an exact-prefix hit also takes the
+        ordinary path. The tested 32K Qwen3.8 bundle needs about 2.36 GB per
+        checkpoint. One retained Qwen Code read/edit/test trial passed with
+        35,136 reused input tokens and 737 versus 1,442 seconds on the same
+        pinned Ryzen bundle. Keep this opt-in on an isolated endpoint while
+        repeatability and other workloads are certified.</p>
     <h4>Optional local harness nightly</h4>
     <p>On a client host with active, identified Qwen and Gemma endpoints and an HTTP client environment containing <code>httpx</code>, run the
         same repeatability config through <code>scripts/local_harness_nightly.py</code>.
@@ -2261,6 +2308,18 @@ python3 server/harness_repeatability.py \
 # After verifying the one-off command, schedule it on the client host:
 0 2 * * * cd /path/to/C-Kernel-Engine &amp;&amp; .venv/bin/python3 scripts/local_harness_nightly.py --config /path/to/local-serving-matrix.json --state-dir /path/to/private-harness-nightly-state &gt;&gt; /path/to/private-harness-nightly-state/cron.log 2&gt;&amp;1</pre>
     </div>
+    <p class="mini-note">To add exact-prefix numerical certification on an asset-equipped
+        host, pass <code>--prefix-cert-config /path/to/private-prefix-cert.json</code>
+        to that same command. The private JSON uses schema
+        <code>cke.local_prefix_cert.v1</code> with <code>bundle</code>,
+        <code>session_library</code>, <code>ids</code>, a pinned
+        <code>artifact_sha256</code> map for the six bundle files reported by
+        the probe, <code>session_sha256</code>, <code>ids_sha256</code>, and
+        <code>cases</code> such as <code>[{"prefix":128,"suffix":9}]</code>.
+        Missing assets remain <code>NOT_TESTED</code>; a mismatched loaded artifact or
+        numerical report is <code>FAIL</code>. The default per-case time budget is
+        two hours; <code>max_seconds</code> can extend it. Run this lane away from a production
+        endpoint because it loads its own model and checkpoint memory.</p>
     <p class="mini-note">For a scheduled run against current main, use a dedicated clean,
         detached worktree and add <code>--refresh-main</code>. After publishing the
         current run as <code>INCOMPLETE</code>, the runner fetches

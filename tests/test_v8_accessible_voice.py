@@ -211,10 +211,10 @@ class AccessibleVoiceTest(unittest.TestCase):
         recorder.write_text(
             "#!/usr/bin/env python3\n"
             "import time,wave\nfrom pathlib import Path\n"
-            f"Path({str(marker)!r}).write_text('started')\n"
             "with wave.open(__import__('sys').argv[-1], 'wb') as out:\n"
             " out.setnchannels(1); out.setsampwidth(2); out.setframerate(16000)\n"
             " out.writeframes(b'\\x00\\x00' * 160)\n"
+            f" Path({str(marker)!r}).write_text('started')\n"
             " try: time.sleep(30)\n"
             " except KeyboardInterrupt: pass\n")
         recorder.chmod(0o700)
@@ -262,6 +262,82 @@ class AccessibleVoiceTest(unittest.TestCase):
         with self.assertRaises(ProcessLookupError):
             os.kill(pid, 0)
 
+    def test_stop_terminates_speech_worker_descendant(self):
+        marker = Path(self.temp.name) / "descendant.pid"
+        executable = Path(self.temp.name) / "speech-with-worker"
+        executable.write_text(
+            "#!/usr/bin/env python3\n"
+            "import subprocess,sys\nfrom pathlib import Path\n"
+            "child=subprocess.Popen([sys.executable,'-c','import time;time.sleep(30)'])\n"
+            f"Path({str(marker)!r}).write_text(str(child.pid))\n"
+            "child.wait()\n")
+        executable.chmod(0o700)
+
+        def stop_when_started(_prompt):
+            deadline = time.monotonic() + 3
+            while not marker.exists() and time.monotonic() < deadline:
+                time.sleep(0.01)
+            self.assertTrue(marker.exists())
+            return "stop"
+
+        voice.speak_and_control("Hello.", executable, stop_when_started)
+        pid = int(marker.read_text())
+        # A killed worker may remain a zombie until the local init reaps it.
+        def state() -> str | None:
+            try:
+                return Path(f"/proc/{pid}/stat").read_text().split()[2]
+            except FileNotFoundError:
+                return None
+
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline:
+            if state() in (None, "Z"):
+                break
+            time.sleep(0.01)
+        self.assertIn(state(), (None, "Z"), "speech worker remained live after stop")
+
+    def test_stop_handles_process_group_exit_before_signal(self):
+        executable = Path(self.temp.name) / "speech-exits"
+        executable.write_text("#!/bin/sh\nexit 0\n")
+        executable.chmod(0o700)
+        child = mock.Mock(pid=12345)
+        child.wait.return_value = 0
+        with mock.patch.object(voice.subprocess, "Popen", return_value=child), \
+             mock.patch.object(voice.os, "killpg", side_effect=ProcessLookupError):
+            voice.speak_and_control("Hello.", executable, lambda _prompt: "stop")
+        child.wait.assert_called_once_with(timeout=1)
+
+    def test_stop_terminates_descendant_after_leader_exits(self):
+        marker = Path(self.temp.name) / "orphan.pid"
+        executable = Path(self.temp.name) / "speech-exits-with-worker"
+        executable.write_text(
+            "#!/usr/bin/env python3\n"
+            "import subprocess,sys\nfrom pathlib import Path\n"
+            "child=subprocess.Popen([sys.executable,'-c','import time;time.sleep(30)'])\n"
+            f"Path({str(marker)!r}).write_text(str(child.pid))\n")
+        executable.chmod(0o700)
+
+        def stop_after_leader_exit(_prompt):
+            deadline = time.monotonic() + 3
+            while not marker.exists() and time.monotonic() < deadline:
+                time.sleep(0.01)
+            self.assertTrue(marker.exists())
+            time.sleep(0.05)
+            return "stop"
+
+        voice.speak_and_control("Hello.", executable, stop_after_leader_exit)
+        pid = int(marker.read_text())
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline:
+            try:
+                state = Path(f"/proc/{pid}/stat").read_text().split()[2]
+            except FileNotFoundError:
+                state = None
+            if state in (None, "Z"):
+                break
+            time.sleep(0.01)
+        self.assertIn(state, (None, "Z"), "orphaned speech worker remained live")
+
     def test_kokoro_answer_uses_checked_playback_adapter(self):
         with mock.patch.object(voice, "confirm", return_value="Read status"), \
              mock.patch.object(voice, "speak_and_control") as speak:
@@ -272,6 +348,7 @@ class AccessibleVoiceTest(unittest.TestCase):
                 "--kokoro-config", "/pinned/config.json",
                 "--kokoro-bundle-dir", "/pinned/bundle",
                 "--audio-player", "/usr/bin/aplay",
+                "--kokoro-incremental",
             ])
         self.assertEqual(status, 0)
         args, kwargs = speak.call_args
@@ -280,7 +357,47 @@ class AccessibleVoiceTest(unittest.TestCase):
         self.assertEqual(kwargs["label"], "CKE Kokoro")
         self.assertEqual(kwargs["arguments"], (
             "--config", "/pinned/config.json", "--bundle-dir", "/pinned/bundle",
-            "--player", "/usr/bin/aplay"))
+            "--player", "/usr/bin/aplay", "--incremental"))
+        with mock.patch.object(voice, "confirm", return_value="Read status"), \
+             mock.patch.object(voice, "speak_and_control") as speak:
+            status = voice.main([
+                "--text", "Read status", "--agent-id", "cke",
+                "--project-id", "engine", "--server-url", self.url,
+                "--journal", str(self.journal),
+                "--kokoro-config", "/pinned/config.json",
+                "--kokoro-bundle-dir", "/pinned/bundle",
+                "--audio-player", "/usr/bin/aplay",
+                "--kokoro-incremental", "--kokoro-synthesis-workers", "3",
+                "--kokoro-technical-mode", "exact",
+            ])
+        self.assertEqual(status, 0)
+        self.assertEqual(speak.call_args.kwargs["arguments"], (
+            "--config", "/pinned/config.json", "--bundle-dir", "/pinned/bundle",
+            "--player", "/usr/bin/aplay", "--incremental",
+            "--synthesis-workers", "3", "--technical-mode", "exact"))
+
+    def test_parallel_kokoro_requires_incremental_before_submission(self):
+        with mock.patch.object(voice, "submit") as submit, \
+             mock.patch("sys.stderr", new_callable=io.StringIO):
+            with self.assertRaises(SystemExit):
+                voice.main([
+                    "--text", "Read status", "--agent-id", "cke",
+                    "--project-id", "engine", "--journal", str(self.journal),
+                    "--kokoro-config", "/pinned/config.json",
+                    "--kokoro-bundle-dir", "/pinned/bundle",
+                    "--audio-player", "/usr/bin/aplay",
+                    "--kokoro-synthesis-workers", "3",
+                ])
+        submit.assert_not_called()
+        with mock.patch.object(voice, "submit") as submit, \
+             mock.patch("sys.stderr", new_callable=io.StringIO):
+            with self.assertRaises(SystemExit):
+                voice.main([
+                    "--text", "Read status", "--agent-id", "cke",
+                    "--project-id", "engine", "--journal", str(self.journal),
+                    "--kokoro-technical-mode", "exact",
+                ])
+        submit.assert_not_called()
 
 
 if __name__ == "__main__":

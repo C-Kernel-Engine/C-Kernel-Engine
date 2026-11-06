@@ -92,6 +92,40 @@ class AttentionContractV8Tests(unittest.TestCase):
     def test_kernel_overlay_matches_v8_kernel_maps(self) -> None:
         resolver.validate_kernel_overlay(copy.deepcopy(self.kernels))
 
+    def test_gemma_fp16_q_probability_candidate_is_explicit_and_not_production(self) -> None:
+        circuit_path = V8_ROOT / "circuits" / "gemma4.json"
+        selector = "CK_ATTN_REDUCTION_F16_Q_PROB_ROUND_QTILE64_REGULAR_TAIL_NOSCALE"
+        for operation, map_id in (
+            ("decoder.attention.gemma4_full",
+             "attention_forward_causal_head_major_gqa_prefill_append_f16cache_gemma4_fp16_q_prob"),
+            ("decoder.attention.gemma4_sliding",
+             "attention_forward_causal_head_major_gqa_prefill_append_f16cache_sliding_gemma4_fp16_q_prob"),
+        ):
+            circuit = resolver.load_json(circuit_path)
+            request = circuit["required_contracts"][operation]["phases"]["prefill"]
+            request["requires"]["numerics.attention_reduction"] = (
+                "f16_q_prob_round_qtile64_regular_tail_noscale"
+            )
+            result = resolver.resolve_contract(
+                circuit, copy.deepcopy(self.contracts), copy.deepcopy(self.kernels),
+                operation=operation, phase="prefill", mode="bringup",
+                source_circuit_path=circuit_path,
+            )
+            self.assertEqual(result["kernel"]["id"], map_id)
+            self.assertEqual(result["kernel"]["selector"], selector)
+            candidate_map = resolver.load_json(V8_ROOT / "kernel_maps" / f"{map_id}.json")
+            reduction_arg = next(
+                arg for arg in candidate_map["call_abi"]["params"]
+                if arg["name"] == "reduction"
+            )
+            self.assertEqual(reduction_arg["source"], f"const:{selector}")
+            with self.assertRaisesRegex(resolver.ContractError, "kernel implementation is observed"):
+                resolver.resolve_contract(
+                    circuit, copy.deepcopy(self.contracts), copy.deepcopy(self.kernels),
+                    operation=operation, phase="prefill", mode="production",
+                    source_circuit_path=circuit_path,
+                )
+
     def test_decode_providers_do_not_alias_distinct_reduction_math(self) -> None:
         legacy = self.kernels["kernels"][
             "attention_forward_decode_head_major_gqa_flash_f16cache"
@@ -237,7 +271,7 @@ class AttentionContractV8Tests(unittest.TestCase):
         )
         self.assertEqual(
             result["kernel"]["selector"],
-            "CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64",
+            "CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64_APPEND_TILED",
         )
         threading = self.kernels["kernels"][result["kernel"]["id"]][
             "implementation"

@@ -1,0 +1,99 @@
+{
+  "schema": "cke.kokoro.conv1d_avx2_tile32_measurement.v1",
+  "host": "P3, Intel Core i7-14700T, Ubuntu GCC 15.2.0",
+  "baseline_revision": "c446207047605771ab0d30d47d1365568a76a80d",
+  "candidate_base_revision": "5050c6a4cf573de8c58b562968bcfc3be9048371",
+  "candidate_kernel_source_sha256": "95b81c1ef2ef56c6c2dc8267abdaad15f5453cff4ba3a7792bb389dfc0a35092",
+  "configuration": {
+    "conv_provider": "avx2_parallel",
+    "conv_workers": 8,
+    "runtime_lengths": true,
+    "runtime_experimental_range": true,
+    "generated_operations": 557,
+    "selected_conv_calls": 88,
+    "seed": 7,
+    "phoneme_ids": [
+      0,
+      62,
+      65,
+      156,
+      86,
+      56,
+      62,
+      51,
+      16,
+      62,
+      65,
+      156,
+      86,
+      56,
+      62,
+      51,
+      16,
+      61,
+      156,
+      102,
+      53,
+      61,
+      4,
+      156,
+      25,
+      0
+    ]
+  },
+  "artifacts": {
+    "baseline": {
+      "bundle_manifest_sha256": "a3f1041e0138525ae56e028b5072e600a2df659e8471797ee05a2856a447f60c",
+      "generated_library_sha256": "3504f226fc77f5d36639b8ac1b80a97378183b1364e9c494c447b5a53d0a66fe",
+      "generated_c_sha256": "2726acfabb22c114905701a5e295490d0e5aa00a6c82d7f64e01cfbef0d2adaf",
+      "model_weights_sha256": "556a82f8116091d386ccab9d8218030d124ff286e0fb8e2ebc8d0cc8a5598148",
+      "voice_bank_sha256": "50a2b7d543cc5a9bdefb3217e3bf1a8d87e947dd5b4e8babf685c0bc4b3b4177",
+      "binding_catalog_sha256": "a6d59ecf20b5170cec0bade49338f1b5d03320426201cd170999ac431922f554"
+    },
+    "tile32": {
+      "bundle_manifest_sha256": "a8c0a8eef775c8a69f124a5c4e4a1439e798f13a6812d62b390e6154b68356e8",
+      "generated_library_sha256": "53708cd716edd1b6655d6dea828a958655479a362f64c6e21b113203c173b314",
+      "generated_c_sha256": "2726acfabb22c114905701a5e295490d0e5aa00a6c82d7f64e01cfbef0d2adaf",
+      "model_weights_sha256": "556a82f8116091d386ccab9d8218030d124ff286e0fb8e2ebc8d0cc8a5598148",
+      "voice_bank_sha256": "50a2b7d543cc5a9bdefb3217e3bf1a8d87e947dd5b4e8babf685c0bc4b3b4177",
+      "binding_catalog_sha256": "a6d59ecf20b5170cec0bade49338f1b5d03320426201cd170999ac431922f554"
+    }
+  },
+  "warm_loaded_session": {
+    "baseline": {
+      "seconds": [
+        5.547,
+        5.504,
+        5.545,
+        5.591
+      ],
+      "median_seconds": 5.546,
+      "valid_samples": 51600,
+      "wav_sha256": "3035e4772edab9cbb6babdd72653d8dfd501e9c1725013de78391f15e613bec2"
+    },
+    "tile32": {
+      "seconds": [
+        4.944,
+        4.909,
+        4.884,
+        4.918
+      ],
+      "median_seconds": 4.9135,
+      "valid_samples": 51600,
+      "wav_sha256": "3035e4772edab9cbb6babdd72653d8dfd501e9c1725013de78391f15e613bec2"
+    }
+  },
+  "single_process_34_ids": {
+    "baseline_seconds": 7.807,
+    "tile32_seconds": 7.167,
+    "wav_sha256_both": "52382d627906cfe2d2dc8cec2717a5bfce5f243e881fa57a0f893f87c4d2a642",
+    "valid_samples": 58800
+  },
+  "validation": "Registered tts_audio_conv_hardware_fma, tts_audio_conv_parallel, and tts_audio_conv_parallel_generated suites pass; eight-/32-frame, padding, dilation, tails, overflow output preservation, unsupported CPU and recovery controls remain active.",
+  "scope": "Warm RUN timing includes generated synthesis and WAV writing, excludes model loading, text frontend and playback. Four alternating warm runs per variant on one 26-ID request; one process run per variant on a 34-ID request. Baseline and candidate share model, voice, generated C and compiler manifest identities; the base-commit difference is vision-only. Identical WAV hashes establish provider-equivalent CKE output, not pinned PyTorch waveform parity or listening quality.",
+  "reproduction": {
+    "build": "python3 version/v8/tts/build_kokoro_dispatch_bundle.py --bump-dir /data/cke/models/kokoro-82m-e8a90b4-bump --voice-bank /data/cke/kokoro-runtime-text-range-probe-20261019/af_heart.ckvoice --output-dir <empty-bundle-dir> --conv-provider avx2_parallel --conv-workers 8 --runtime-lengths --runtime-experimental-range",
+    "run": "<bundle-dir>/native-kokoro-dispatch <bundle-dir> --session; send RUN\\t<output.wav>\\t7\\t<comma-separated phoneme_ids> then QUIT",
+    "nightly": "python3 scripts/nightly_runner.py --tests tts_audio_conv_hardware_fma tts_audio_conv_parallel tts_audio_conv_parallel_generated --ci --require-executed"
+  }
+}

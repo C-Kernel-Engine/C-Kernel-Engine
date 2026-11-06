@@ -422,6 +422,98 @@ class DirectLayoutAttentionTests(unittest.TestCase):
                 )
                 self.assertAlmostEqual(sliding[head * stride + d], expected, delta=2e-4)
 
+    def test_gemma4_tiled_fp16_q_probability_contract(self):
+        tokens, dim = 64, 8
+        q = np.zeros((1, tokens, dim), dtype=np.float32)
+        q[0, :, :] = np.float32(0.3841)
+        q[0, -1, :] = np.array(
+            [1.0003, -0.7003, 0.5003, -0.3003, 0.2503, -0.1253, 0.7503, -0.6253],
+            dtype=np.float32,
+        )
+        k = np.array(
+            [[math.sin((t + 1) * (d + 2) * 0.13) * 0.7 for d in range(dim)]
+             for t in range(tokens)], dtype=np.float16,
+        )
+        v = np.array(
+            [[math.cos((t + 3) * (d + 1) * 0.17) * 3.0 for d in range(dim)]
+             for t in range(tokens)], dtype=np.float16,
+        )
+        workspace = np.zeros(2 * dim, dtype=np.float32)
+
+        def execute(reduction):
+            output = np.zeros_like(q)
+            status = self._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_gemma4_workspace(
+                q.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+                k.view(np.uint16).ctypes.data_as(ctypes.POINTER(ctypes.c_uint16)),
+                v.view(np.uint16).ctypes.data_as(ctypes.POINTER(ctypes.c_uint16)),
+                output.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+                1, 1, tokens, 0, tokens, dim, dim, reduction,
+                workspace.ctypes.data_as(ctypes.POINTER(ctypes.c_float)), workspace.nbytes,
+            )
+            self.assertEqual(status, 0)
+            return output[0, -1]
+
+        candidate = execute(8)
+        baseline = execute(6)
+        q_half = q[0, -1].astype(np.float16).astype(np.float32)
+        scores = k.astype(np.float32) @ q_half
+        weights = np.exp(scores - scores.max())
+        probabilities = weights / weights.sum()
+        expected = probabilities.astype(np.float16).astype(np.float32) @ v.astype(np.float32)
+        np.testing.assert_allclose(candidate, expected, rtol=2e-4, atol=2e-4)
+        self.assertGreater(float(np.max(np.abs(candidate - baseline))), 1e-5)
+        q_only = probabilities @ v.astype(np.float32)
+        raw_scores = k.astype(np.float32) @ q[0, -1]
+        raw_weights = np.exp(raw_scores - raw_scores.max())
+        prob_only = (
+            (raw_weights / raw_weights.sum()).astype(np.float16).astype(np.float32)
+            @ v.astype(np.float32)
+        )
+        self.assertGreater(float(np.max(np.abs(expected - q_only))), 1e-5)
+        self.assertGreater(float(np.max(np.abs(expected - prob_only))), 1e-5)
+
+    def test_gemma4_fp16_q_probability_segmented_tails(self):
+        heads, tokens, dim = 2, 70, 8
+        q = np.array(
+            [math.sin(i * 0.17) * 0.8 + 0.0003 for i in range(heads * tokens * dim)],
+            dtype=np.float32,
+        ).reshape(heads, tokens, dim)
+        k = np.array(
+            [math.cos(i * 0.11) * 0.7 for i in range(tokens * dim)],
+            dtype=np.float16,
+        )
+        v = np.array(
+            [math.sin(i * 0.19) * 2.0 for i in range(tokens * dim)],
+            dtype=np.float16,
+        )
+        plan = (ctypes.c_int * 3)(3, 64, 3)
+        workspace = np.zeros(2 * heads * dim, dtype=np.float32)
+        fp = ctypes.POINTER(ctypes.c_float)
+        hp = ctypes.POINTER(ctypes.c_uint16)
+
+        def execute(reduction, workspace_bytes=None):
+            output = np.full_like(q, 123.0)
+            status = self._lib.attention_forward_causal_head_major_gqa_prefill_segmented_f16cache_sliding_gemma4_workspace(
+                q.ctypes.data_as(fp), k.view(np.uint16).ctypes.data_as(hp),
+                v.view(np.uint16).ctypes.data_as(hp), output.ctypes.data_as(fp),
+                heads, 1, tokens, 0, tokens, dim, dim, 0, reduction,
+                workspace.ctypes.data_as(fp),
+                workspace.nbytes if workspace_bytes is None else workspace_bytes,
+                plan, len(plan),
+            )
+            return status, output
+
+        status, baseline = execute(6)
+        self.assertEqual(status, 0)
+        status, candidate = execute(8)
+        self.assertEqual(status, 0)
+        np.testing.assert_array_equal(candidate[:, :3], baseline[:, :3])
+        np.testing.assert_array_equal(candidate[:, 67:], baseline[:, 67:])
+        self.assertGreater(float(np.max(np.abs(candidate[:, 3:67] - baseline[:, 3:67]))), 1e-5)
+        status, untouched = execute(8, workspace.nbytes - 1)
+        self.assertNotEqual(status, 0)
+        np.testing.assert_array_equal(untouched, np.full_like(q, 123.0))
+
     def test_gemma4_f16cache_matches_independent_rounding_oracle(self):
         heads, kv_heads = 6, 2
         past_tokens, q_tokens, capacity = 3, 5, 11
@@ -1145,6 +1237,46 @@ class DirectLayoutAttentionTests(unittest.TestCase):
         call_ir["operations"][0]["required_contract"]["tensor.kv.dtype"] = "bf16"
         with self.assertRaisesRegex(ValueError, "storage/layout"):
             replay._resolved_segmented_call(call_ir, 0)
+
+
+    def test_z_flash_consumer_short_append_matches_fresh_tiled_prefix(self):
+        """The shared Flash map must keep the stored-KV tail's reduction."""
+        heads, kv_heads, dim, total, prefix = 2, 1, 16, 65, 64
+        q = array("f", (math.sin(i * 0.137 + 0.31)
+                        for i in range(heads * total * dim)))
+        def half(value):
+            return int.from_bytes(struct.pack("<e", value), "little")
+        k = array("H", (half(math.cos(i * 0.113 + 0.19))
+                        for i in range(kv_heads * total * dim)))
+        v = array("H", (half(math.sin(i * 0.171 + 0.27))
+                        for i in range(kv_heads * total * dim)))
+        tail_q = array("f", (value for head in range(heads)
+                             for value in q[(head * total + prefix) * dim:
+                                            (head * total + prefix + 1) * dim]))
+        token_workspace = array("f", [0.0]) * (2 * heads * dim)
+        def fp(values):
+            return (ctypes.c_float * len(values)).from_buffer(values)
+        def hp(values):
+            return (ctypes.c_uint16 * len(values)).from_buffer(values)
+        def run(query, rows, past, reduction):
+            out = array("f", [0.0]) * (heads * rows * dim)
+            status = self._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_auto_workspace(
+                fp(query), hp(k), hp(v), fp(out), heads, kv_heads, rows,
+                past, total, dim, dim, reduction, fp(token_workspace),
+                len(token_workspace) * 4, None, 0,
+                24, 4, 256, 4096, 8192, 16, 128, 4,
+            )
+            self.assertEqual(status, 0)
+            return out
+        full = run(q, total, 0, 7)
+        staged = run(tail_q, 1, prefix, 7)
+        expected = array("f", (value for head in range(heads)
+                               for value in full[(head * total + prefix) * dim:
+                                                 (head * total + prefix + 1) * dim]))
+        self.assertEqual(staged.tobytes(), expected.tobytes())
+        # The old selector's short-query online path is a real negative
+        # control, not just a changed map string.
+        self.assertNotEqual(run(tail_q, 1, prefix, 3).tobytes(), expected.tobytes())
 
 
 if __name__ == "__main__":

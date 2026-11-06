@@ -4,14 +4,19 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import numpy as np
 
 from version.v8.scripts.replay_ggml_attention_packet_v8 import (
     FLASH_SOURCE, OBSERVED_SOURCE, _compile_ggml_source, _observed_capture,
+    _observed_segment_plan,
+    _substitute_observed_operands,
+    compare_observed_cke_operands,
     fp64_full_flash_reference_rows,
     fp64_reference, pinned_tree_identity, run_ggml, run_ggml_flash_rows,
     replay_observed_oracle, validate_oracle_contract,
+    summarize_cache_history,
 )
 from version.v8.scripts.xray_operation_bundle_v8 import BundleError
 
@@ -98,6 +103,114 @@ class GgmlAttentionPacketTests(unittest.TestCase):
                     Path("unused"), root, name, scale=1, alibi=0, threads=1,
                     parity_report=report_path,
                 )
+
+    def test_substitute_observed_operands_preserves_physical_mask_and_rejects_wrong_extent(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            name, _, mask = self._synthetic_observed_capture(root)
+            specs, geometry = _observed_capture(root, name)
+            tensors = {
+                "Qcur_rope": np.arange(16, dtype="<f4").reshape(2, 2, 4),
+                "Kcache_post_store": np.arange(8, dtype="<f2").reshape(2, 1, 4),
+                "Vcache_post_store": np.arange(8, dtype="<f2").reshape(2, 1, 4) + 20,
+            }
+            output = root / "substituted"
+            output.mkdir()
+            paths, extent = _substitute_observed_operands(
+                root, name, specs, geometry, tensors, output,
+            )
+            self.assertEqual(extent["valid_cache_positions"], [0, 2])
+            self.assertGreater(extent["operand_metrics"]["q"]["max_abs"], 1)
+            self.assertEqual(paths["mask"].read_bytes(), mask.tobytes())
+            self.assertTrue(np.array_equal(
+                np.frombuffer(paths["q"].read_bytes(), dtype="<f4").reshape(2, 2, 4),
+                tensors["Qcur_rope"],
+            ))
+            self.assertTrue(np.array_equal(
+                np.frombuffer(paths["k"].read_bytes(), dtype="<f2").reshape(1, 32, 4)[0, :2],
+                tensors["Kcache_post_store"][:, 0],
+            ))
+            longer = {key: np.concatenate((value, value + 100), axis=0)
+                      for key, value in tensors.items()}
+            paths, extent = _substitute_observed_operands(
+                root, name, specs, geometry, longer, output,
+            )
+            self.assertEqual(extent["query_start"], 0)
+            self.assertEqual(extent["valid_cache_positions"], [0, 2])
+            self.assertTrue(np.array_equal(
+                np.frombuffer(paths["k"].read_bytes(), dtype="<f2").reshape(1, 32, 4)[0, :2],
+                tensors["Kcache_post_store"][:, 0],
+            ))
+            wrong = {**tensors, "Qcur_rope": tensors["Qcur_rope"][:1]}
+            with self.assertRaisesRegex(BundleError, "geometry"):
+                _substitute_observed_operands(root, name, specs, geometry, wrong, output)
+            mask_path = root / f"{name}.nonflash_mask.bin"
+            changed = mask.copy()
+            changed[1, 0] = -np.inf
+            mask_path.write_bytes(changed.tobytes())
+            with self.assertRaisesRegex(BundleError, "mask"):
+                _substitute_observed_operands(root, name, specs, geometry, tensors, output)
+
+    def test_identical_input_replay_rejects_stale_parity_report(self):
+        with tempfile.TemporaryDirectory() as temp:
+            report = Path(temp) / "parity.json"
+            report.write_text("{}", encoding="ascii")
+            with patch(
+                "version.v8.scripts.replay_ggml_attention_packet_v8.load_bundle",
+                return_value=({"context": {"source_sha256": {"parity_report": "stale"}}}, {}),
+            ):
+                with self.assertRaisesRegex(BundleError, "same parity report"):
+                    compare_observed_cke_operands(
+                        Path("unused"), Path(temp), "kqv_out-0-token-000001-occ-000",
+                        Path("unused"), scale=1, alibi=0, threads=1,
+                        parity_report=report,
+                    )
+
+    def test_partial_observed_replay_requires_complete_segment(self):
+        plan = [{"name": "text_before", "rows": 2, "physical_start": 0},
+                {"name": "visual", "rows": 3, "physical_start": 2},
+                {"name": "text_after", "rows": 1, "physical_start": 5}]
+        self.assertEqual(_observed_segment_plan(plan, [2, 3, 1], 5, 3), plan[:2])
+        with self.assertRaisesRegex(BundleError, "segment boundary"):
+            _observed_segment_plan(plan, [2, 3, 1], 4, 2)
+        with self.assertRaisesRegex(BundleError, "segment boundary"):
+            _observed_segment_plan(plan, [2, 3, 1], 5, 2)
+        with self.assertRaisesRegex(BundleError, "differs"):
+            _observed_segment_plan(plan, [3, 2, 1], 5, 3)
+
+    def test_cache_history_reports_first_logical_row_and_segment(self):
+        oracle = {kind: np.zeros((4, 2, 3), dtype="<f2") for kind in ("K", "V")}
+        cke = {kind: values.copy() for kind, values in oracle.items()}
+        cke["V"][0, 1, 2] = np.float16(0.0001)
+        cke["K"][2, 0, 1] = np.float16(0.5)
+        plan = [{"name": "text_before", "rows": 1, "physical_start": 0},
+                {"name": "visual", "rows": 2, "physical_start": 1},
+                {"name": "text_after", "rows": 1, "physical_start": 3}]
+        pre_store = {kind: (f"{kind}_producer", values.astype("<f4"))
+                     for kind, values in cke.items()}
+        report = summarize_cache_history(oracle, cke, plan, layer=7,
+                                         cke_pre_store=pre_store)
+        self.assertEqual(report["first"]["kind"], "V")
+        self.assertEqual((report["first"]["layer"], report["first"]["position"],
+                          report["first"]["head"], report["first"]["channel"]),
+                         (7, 0, 1, 2))
+        self.assertEqual(report["first"]["origin"], "text_before")
+        self.assertEqual(report["by_kind"]["K"]["largest"]["origin"], "visual")
+        self.assertEqual(report["by_kind"]["V"]["first"]["cke"]["raw_le_hex"],
+                         cke["V"][0, 1, 2].tobytes().hex())
+        self.assertTrue(report["by_kind"]["V"]["cke_producer"]["fp16_store_matches"])
+        self.assertEqual(report["first"]["cke_pre_store"]["capture"], "V_producer")
+        exact = summarize_cache_history(oracle, oracle, plan, layer=7)
+        self.assertIsNone(exact["first"])
+        self.assertIsNone(exact["by_kind"]["K"]["largest"])
+        with self.assertRaisesRegex(BundleError, "segment plan"):
+            summarize_cache_history(oracle, cke, plan[:-1], layer=7)
+        with self.assertRaisesRegex(BundleError, "segment plan"):
+            summarize_cache_history(oracle, cke,
+                                    [plan[0], {**plan[1], "name": "text_before"}, plan[2]],
+                                    layer=7)
+        with self.assertRaisesRegex(BundleError, "both K and V"):
+            summarize_cache_history({"K": oracle["K"]}, cke, plan, layer=7)
 
     def test_observed_nonflash_ggml_replay_detects_wrong_mask(self):
         tree = Path(os.environ.get("CK_PINNED_LLAMA_TREE", str(ROOT / "llama.cpp")))

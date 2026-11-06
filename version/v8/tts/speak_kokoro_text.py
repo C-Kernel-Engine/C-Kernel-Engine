@@ -19,7 +19,7 @@ import tempfile
 import time
 import wave
 
-from prepare_kokoro_accessibility_text import TextPlanError, prepare
+from prepare_kokoro_accessibility_text import MAX_CHUNKS, TextPlanError, prepare
 
 
 class SpeechError(RuntimeError):
@@ -60,13 +60,15 @@ def _sha256(path: Path) -> str:
 
 
 def synthesize(text: str, config: Path, bundle: Path, output: Path,
-               seed: int) -> dict:
+               seed: int, *, technical_mode: str = "natural") -> dict:
     if seed < 0 or seed > (1 << 64) - 1:
         raise SpeechError("seed must be an unsigned 64-bit integer")
     if output.exists() or output.is_symlink():
         raise SpeechError("output already exists")
     start = time.monotonic()
-    plan = prepare(text, config, bundle)
+    plan = prepare(text, config, bundle, technical_mode=technical_mode)
+    if len(plan["chunks"]) > MAX_CHUNKS:
+        raise SpeechError(f"aggregate WAV supports at most {MAX_CHUNKS} chunks")
     if seed > (1 << 64) - len(plan["chunks"]):
         raise SpeechError("seed range exceeds unsigned 64-bit integer")
     planned = time.monotonic()
@@ -91,8 +93,15 @@ def synthesize(text: str, config: Path, bundle: Path, output: Path,
             first = None
             for chunk in plan["chunks"]:
                 ids = ",".join(map(str, chunk["phoneme_ids"]))
-                fields = _exchange(worker, f"APPEND\t{seed + chunk['index']}\t{ids}",
-                                   "CHUNK_READY")
+                try:
+                    fields = _exchange(worker,
+                                       f"APPEND\t{seed + chunk['index']}\t{ids}",
+                                       "CHUNK_READY")
+                except SpeechError as error:
+                    raise SpeechError(
+                        f"chunk {chunk['index']} source span "
+                        f"{chunk['source_start']}:{chunk['source_end']}: {error}"
+                    ) from error
                 if len(fields) != 3:
                     raise SpeechError("invalid native chunk response")
                 count, cumulative = map(int, fields[1:])
@@ -142,6 +151,8 @@ def synthesize(text: str, config: Path, bundle: Path, output: Path,
             "total_seconds": done - start,
             "bundle_identity_sha256": plan["bundle_identity_sha256"],
             "bundle_manifest_sha256": plan["bundle_manifest_sha256"],
+            "technical_mode": technical_mode,
+            "pronunciation_expansions": plan.get("pronunciation_expansions", []),
             "output": str(output)}
 
 
@@ -154,6 +165,8 @@ def main() -> int:
     parser.add_argument("--bundle-dir", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--seed", type=int, default=7)
+    parser.add_argument("--technical-mode", choices=("natural", "exact"),
+                        default="natural")
     parser.add_argument("--report", type=Path)
     args = parser.parse_args()
     def interrupted(_signum: int, _frame: object) -> None:
@@ -165,7 +178,7 @@ def main() -> int:
             raise SpeechError("report already exists")
         text = args.text_file.read_text() if args.text_file else sys.stdin.read()
         report = synthesize(text, args.config, args.bundle_dir, args.output,
-                            args.seed)
+                            args.seed, technical_mode=args.technical_mode)
         if args.report:
             with args.report.open("x", encoding="utf-8") as stream:
                 json.dump(report, stream, indent=2)

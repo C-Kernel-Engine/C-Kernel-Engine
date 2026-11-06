@@ -2,6 +2,7 @@
 
 import importlib.util
 from pathlib import Path
+import re
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -10,9 +11,22 @@ import wave
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "version/v8/tts/speak_kokoro_text.py"
+HOST = ROOT / "version/v8/tts/native_kokoro_wav_host.c"
 
 
 class WholeTextWavTest(unittest.TestCase):
+    def test_native_chunk_limit_matches_text_planner(self):
+        match = re.search(r"#define CK_TTS_MAX_SEQUENCE_CHUNKS (\d+)u",
+                          HOST.read_text())
+        self.assertIsNotNone(match)
+        import sys
+        sys.path.insert(0, str(SOURCE.parent))
+        try:
+            from prepare_kokoro_accessibility_text import MAX_CHUNKS
+        finally:
+            sys.path.pop(0)
+        self.assertEqual(int(match.group(1)), MAX_CHUNKS)
+
     def test_many_chunks_and_worker_failure(self):
         import sys
         sys.path.insert(0, str(SOURCE.parent))
@@ -72,7 +86,30 @@ for line in sys.stdin:
                 with wave.open(str(output), "rb") as audio:
                     self.assertEqual(audio.getnframes(), 60)
                 self.assertEqual(list(root.glob(".kokoro-speech-*")), [])
-                with self.assertRaisesRegex(module.SpeechError, "native worker rejected APPEND"):
+                long_text = "x" * 250
+                long_plan = {**plan, "source_text": long_text,
+                    "chunks": [{"index": index, "source_start": index,
+                                "source_end": index + 1, "source_text": "x",
+                                "phoneme_ids": [0, 50, 0],
+                                "valid_token_count": 3, "voice_row": 0}
+                               for index in range(250)]}
+                with patch.object(module, "prepare", return_value=long_plan):
+                    long_output = root / "long.wav"
+                    long_result = module.synthesize(long_text, root / "config",
+                                                    bundle, long_output, 1000)
+                self.assertEqual(len(long_result["chunks"]), 250)
+                self.assertEqual(long_result["sample_count"], 5000)
+                self.assertEqual(long_result["chunks"][-1]["source_end"], 250)
+                with wave.open(str(long_output), "rb") as audio:
+                    self.assertEqual(audio.getnframes(), 5000)
+                with patch.object(module, "prepare", return_value={
+                        **plan, "chunks": plan["chunks"] * 171}):
+                    with self.assertRaisesRegex(module.SpeechError, "at most 512 chunks"):
+                        module.synthesize("abc", root / "config", bundle,
+                                          root / "too-long.wav", 7)
+                self.assertFalse((root / "too-long.wav").exists())
+                with self.assertRaisesRegex(module.SpeechError,
+                        "chunk 2 source span 2:3: native worker rejected APPEND"):
                     module.synthesize("abc", root / "config", bundle,
                                       root / "failed.wav", 97)
                 self.assertFalse((root / "failed.wav").exists())

@@ -1,0 +1,122 @@
+{
+  "config": {},
+  "memory": {
+    "arena": {
+      "mode": "region",
+      "weights_base": 0,
+      "activations_base": 0
+    },
+    "activations": {
+      "buffers": [
+        {
+          "name": "q_scratch",
+          "offset": 64,
+          "define": "A_Q_SCRATCH"
+        },
+        {
+          "name": "k_scratch",
+          "offset": 128,
+          "define": "A_K_SCRATCH"
+        },
+        {
+          "name": "v_scratch",
+          "offset": 256,
+          "define": "A_V_SCRATCH"
+        },
+        {
+          "name": "attn_scratch",
+          "offset": 4096,
+          "define": "A_ATTN_SCRATCH"
+        },
+        {
+          "name": "token_workspace",
+          "offset": 8192,
+          "define": "A_TOKEN_WORKSPACE"
+        },
+        {
+          "name": "gqa_workspace",
+          "offset": 57344,
+          "define": "A_GQA_WORKSPACE"
+        }
+      ]
+    }
+  },
+  "operations": [
+    {
+      "idx": 93,
+      "kernel": "kv_cache_store_batch_f16",
+      "function": "kv_cache_store_batch_f16",
+      "op": "kv_cache_store_batch_f16",
+      "layer": 3,
+      "section": "body",
+      "params": {
+        "num_heads": 24,
+        "num_kv_heads": 4,
+        "seq_len": 4096,
+        "max_seq_len": 4096,
+        "head_dim": 256
+      },
+      "activations": {
+        "k_src": {
+          "activation_offset": 128,
+          "buffer": "k_scratch"
+        },
+        "v_src": {
+          "activation_offset": 256,
+          "buffer": "v_scratch"
+        }
+      },
+      "resolved_contract": {
+        "function": "kv_cache_store_batch_f16",
+        "kernel_id": "kv_cache_store_batch_f16",
+        "operation": "decoder.kv_store"
+      }
+    },
+    {
+      "idx": 94,
+      "kernel": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_flash_auto_qtile64",
+      "function": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_auto_workspace",
+      "op": "attn",
+      "layer": 3,
+      "section": "body",
+      "params": {
+        "num_heads": 24,
+        "num_kv_heads": 4,
+        "seq_len": 4096,
+        "max_seq_len": 4096,
+        "head_dim": 256
+      },
+      "outputs": {
+        "out": {
+          "activation_offset": 4096,
+          "buffer": "attn_scratch"
+        }
+      },
+      "scratch": [
+        {
+          "name": "q_scratch",
+          "buffer": "q_scratch",
+          "scratch_offset": 64,
+          "size": 25165824
+        },
+        {
+          "name": "token_workspace",
+          "buffer": "token_workspace",
+          "scratch_offset": 8192,
+          "size": 49152
+        },
+        {
+          "name": "gqa_workspace",
+          "buffer": "gqa_workspace",
+          "scratch_offset": 57344,
+          "size": 33554432
+        }
+      ],
+      "resolved_contract": {
+        "function": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_auto_workspace",
+        "kernel_id": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_flash_auto_qtile64",
+        "operation": "decoder.attention"
+      }
+    }
+  ]
+}

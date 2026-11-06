@@ -393,8 +393,9 @@ def run_budget_boundary(identity: dict, cases: list[dict]) -> None:
     """Reject a request beyond the declared capacity, then serve another.
 
     A configured output cap changes an oversized reservation into a smaller
-    effective allowance. In that mode test an explicitly configured rendered
-    byte limit; it is separate from the model's token-context boundary.
+    effective allowance. Test a configured rendered-byte limit when present;
+    otherwise construct a token-count overflow without relying on the output
+    reservation to exceed context.
     """
     effective = identity.get("effective_serving") or {}
     capacity = effective.get("active_context_limit")
@@ -406,10 +407,16 @@ def run_budget_boundary(identity: dict, cases: list[dict]) -> None:
         allowance = capacity
     else:
         byte_cap = effective.get("request_prompt_byte_cap")
-        if type(byte_cap) is not int or not 1 <= byte_cap <= 262144:
-            raise RuntimeError("capped output requires an explicit, bounded prompt byte cap for this probe")
-        mode = "rendered_byte_limit"
-        prompt = "x" * (byte_cap + 1)
+        if byte_cap is not None and (type(byte_cap) is not int or not 1 <= byte_cap <= 262144):
+            raise RuntimeError("loaded prompt byte cap is outside the supported probe range")
+        if byte_cap is None:
+            if capacity > 262144:
+                raise RuntimeError("loaded context exceeds the bounded token-overflow probe range")
+            mode = "counted_token_limit"
+            prompt = "🙂 " * (capacity + 1)
+        else:
+            mode = "rendered_byte_limit"
+            prompt = "x" * (byte_cap + 1)
         allowance = 1
     response = request("POST", "/responses", payload={
         "model": MODEL, "input": prompt, "max_output_tokens": allowance,
@@ -423,8 +430,8 @@ def run_budget_boundary(identity: dict, cases: list[dict]) -> None:
            "requested_output_tokens": allowance, "compiled_capacity": capacity}
     cases.append(row)
     expected_status, expected_error = (
-        (400, "context_length_exceeded") if mode == "output_reservation" else
-        (413, "prompt_bytes_limit_exceeded"))
+        (413, "prompt_bytes_limit_exceeded") if mode == "rendered_byte_limit" else
+        (400, "context_length_exceeded"))
     if response.status_code != expected_status or error_code != expected_error:
         raise RuntimeError(f"context-boundary: overflow was not rejected: {row}")
     row["counted_token_exceedance_proven"] = error_code == "context_length_exceeded"

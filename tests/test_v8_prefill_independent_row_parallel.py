@@ -252,6 +252,28 @@ class PrefillIndependentRowParallelTests(unittest.TestCase):
         )
         np.testing.assert_array_equal(parallel, serial)
 
+    def test_q8_k_full_grid_midpoint_and_tail(self) -> None:
+        rows, width = 6, 2560
+        scale = np.float32(0.0690993)
+        source = np.zeros((rows, width), dtype=np.float32)
+        source[:, 3 * 256 + 1] = np.float32(127) * scale
+        source[:, 3 * 256 + 42] = np.float32(-24.5 + 2e-5) * scale
+        source[3, 3 * 256 + 42] = np.float32(-24.5 - 2e-5) * scale
+        source[5, 3 * 256 + 42] = np.float32(-24.5 - 2e-5) * scale
+        row_bytes = (width // 256) * 292
+        serial = np.empty(rows * row_bytes, dtype=np.uint8)
+        parallel = np.empty_like(serial)
+
+        self.quant_serial(source.ctypes.data_as(FLOAT_PTR), serial.ctypes.data, rows, width)
+        self.quant_parallel(source.ctypes.data_as(FLOAT_PTR), parallel.ctypes.data, rows, width)
+        np.testing.assert_array_equal(parallel, serial)
+
+        q_offset = 3 * 292 + 4 + 42
+        quantized = parallel.view(np.int8).reshape(rows, row_bytes)[:, q_offset]
+        # Q8_K stores a signed scale, so these negative inputs have positive codes.
+        np.testing.assert_array_equal(quantized, [24, 24, 24, 25, 24, 25])
+        self.assertFalse(np.array_equal(parallel[:row_bytes], parallel[3 * row_bytes:4 * row_bytes]))
+
     def test_canonical_q8_k_rows_are_byte_exact(self) -> None:
         rows, width = 259, 10240
         rng = np.random.default_rng(17)

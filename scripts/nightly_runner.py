@@ -932,6 +932,26 @@ TEST_SUITES = {
         "Checked Integer Span State Copy", "kernels",
         ROOT / "tests" / "test_v8_copy_i32_span_checked.py",
     ),
+    "decision_token_span_mean_checked": TestSuite(
+        "Checked Token Span Mean and Generated Decision-Head Input", "kernels",
+        ROOT / "tests" / "test_v8_token_span_mean_checked.py",
+    ),
+    "decision_clef_flash_head_ingress": TestSuite(
+        "Clef-Flash Generated Decision-Head Ingress", "inference",
+        ROOT / "tests" / "test_v8_clef_flash_head_ingress.py",
+    ),
+    "decision_clef_flash_evidence0": TestSuite(
+        "Clef-Flash Generated First Evidence Routing Layer", "inference",
+        ROOT / "tests" / "test_v8_clef_flash_evidence0.py",
+    ),
+    "decision_clef_flash_evidence_complete": TestSuite(
+        "Clef-Flash Generated Complete Evidence Routing", "inference",
+        ROOT / "tests" / "test_v8_clef_flash_evidence_complete.py",
+    ),
+    "decision_attention_cross_checked": TestSuite(
+        "Checked Noncausal Cross Attention", "kernels",
+        ROOT / "tests" / "test_v8_attention_cross_token_major_checked.py",
+    ),
     "tts_equal_i32_scalar_checked": TestSuite(
         "Checked Integer Expected-State Comparison", "kernels",
         ROOT / "tests" / "test_v8_equal_i32_scalar_checked.py",
@@ -1475,6 +1495,10 @@ TEST_SUITES = {
     "tts_kokoro_voice_playback": TestSuite(
         "Checked Kokoro Whole-Text WAV Playback Adapter", "inference",
         ROOT / "tests" / "test_v8_kokoro_voice_playback.py",
+    ),
+    "tts_kokoro_document_plan": TestSuite(
+        "Checked Kokoro Long-Document Source Coverage", "inference",
+        ROOT / "tests" / "test_v8_kokoro_document_plan.py",
     ),
     "tts_audio_harmonic_source_generated": TestSuite(
         "Checked Harmonic Source Normal-Compiler Generated Graph", "inference",
@@ -2514,6 +2538,7 @@ NIGHTLY_PROFILES = {
         "v8_artifact_compile_matrix",
         "v8_muse_glimmer_contracts",
         "v8_qwen38_dense_contracts",
+        "v8_qwen38_flash_contracts",
         "v8_multimodal_ocr_contracts",
         "v8_command_a_plus_nvfp4",
         "v8_dsl_policy",

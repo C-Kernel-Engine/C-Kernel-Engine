@@ -17,6 +17,14 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#define CK_TTS_MAX_REQUEST_IDS 48u
+#define CK_TTS_MAX_SEQUENCE_CHUNKS 512u
+#ifdef CK_TTS_PARALLEL_CONV
+#include "ck_threadpool.h"
+#if !defined(CK_TTS_CONV_WORKERS) || CK_TTS_CONV_WORKERS < 1 || CK_TTS_CONV_WORKERS > 16
+#error "parallel Conv1D requires a declared 1..16 worker count"
+#endif
+#endif
 #ifdef CK_TTS_RUNTIME_WAVEFORM
 #define CK_TTS_GENERATED_ENTRY ck_kokoro_runtime_waveform_bounded
 #define CK_TTS_GENERATED_SYMBOL "ck_kokoro_runtime_waveform_bounded"
@@ -70,10 +78,18 @@ static int verify_loaded_library(void) {
 
 #ifdef CK_TTS_RUNTIME_WAVEFORM
 extern int CK_TTS_GENERATED_ENTRY(uint8_t *, size_t, int32_t *, int32_t *,
-    int32_t *, int32_t *, int32_t *, int32_t *, int32_t *, int32_t *, int32_t *);
+    int32_t *, int32_t *, int32_t *, int32_t *, int32_t *, int32_t *, int32_t *
+#ifdef CK_TTS_PARALLEL_CONV
+    , void *
+#endif
+    );
 #else
 extern int CK_TTS_GENERATED_ENTRY(uint8_t *, size_t, int32_t *, int32_t *,
-    int32_t *, int32_t *, int32_t *, int32_t *, int32_t *);
+    int32_t *, int32_t *, int32_t *, int32_t *, int32_t *
+#ifdef CK_TTS_PARALLEL_CONV
+    , void *
+#endif
+    );
 #endif
 
 static int read_u32(FILE *stream, uint32_t *value) {
@@ -104,7 +120,7 @@ static int overlaps(uint64_t a, uint64_t a_bytes,
 }
 
 static int parse_phoneme_ids(const char *text, int32_t *ids, size_t count) {
-    if (count < 3 || count > 40 || !text) return 0;
+    if (count < 3 || count > CK_TTS_MAX_REQUEST_IDS || !text) return 0;
     const char *cursor = text;
     for (size_t i = 0; i < count; ++i) {
         if (*cursor < '0' || *cursor > '9') return 0;
@@ -128,8 +144,9 @@ static int parse_runtime_phoneme_ids(const char *text, int32_t ids[64],
     if (!text || !*text) return 0;
     size_t count = 1;
     for (const char *cursor = text; *cursor; ++cursor)
-        if (*cursor == ',' && ++count > 40) return 0;
-    if (count < 3 || count > 40 || !parse_phoneme_ids(text, ids, count))
+        if (*cursor == ',' && ++count > CK_TTS_MAX_REQUEST_IDS) return 0;
+    if (count < 3 || count > CK_TTS_MAX_REQUEST_IDS ||
+        !parse_phoneme_ids(text, ids, count))
         return 0;
     for (size_t index = count; index < 64; ++index) ids[index] = 178;
     *valid_count = count;
@@ -228,6 +245,7 @@ typedef struct {
     uint64_t ids_offset, ids_count;
     uint64_t predictor_offset, decoder_offset, request_length_offset;
     int runtime_request, native_noise, request;
+    void *worker_pool;
 } loaded_package;
 
 static int synthesize(loaded_package *package, const char *output,
@@ -275,6 +293,9 @@ static int synthesize(loaded_package *package, const char *output,
         &lengths[4], &lengths[5], &lengths[6]
 #ifdef CK_TTS_RUNTIME_WAVEFORM
         , &lengths[7], &lengths[8]
+#endif
+#ifdef CK_TTS_PARALLEL_CONV
+        , package->worker_pool
 #endif
         );
 #ifdef CK_TTS_RUNTIME_WAVEFORM
@@ -401,7 +422,8 @@ static int serve(loaded_package *package, const char *voice_path) {
         char *ids = seed ? strchr(seed, '\t') : NULL;
         if (ids) *ids++ = 0;
         if (!seed || !ids || (!append && !*output) || !*seed || !*ids ||
-            (append && (!sequence.stream || sequence.chunks >= 64))) {
+            (append && (!sequence.stream ||
+                        sequence.chunks >= CK_TTS_MAX_SEQUENCE_CHUNKS))) {
             if (append) abort_sequence(&sequence);
             puts("ERROR\tinvalid request");
             fflush(stdout);
@@ -545,8 +567,16 @@ int main(int argc, char **argv) {
         .runtime_request = runtime_request,
         .native_noise = native_noise, .request = request,
     };
+#ifdef CK_TTS_PARALLEL_CONV
+    ck_threadpool_t *pool = ck_threadpool_create(CK_TTS_CONV_WORKERS);
+    if (!pool) { free(arena); return 5; }
+    package.worker_pool = pool;
+#endif
     if (session_mode) {
         const int result = serve(&package, argv[3]);
+#ifdef CK_TTS_PARALLEL_CONV
+        ck_threadpool_destroy(pool);
+#endif
         free(arena);
         return result;
     }
@@ -555,6 +585,9 @@ int main(int argc, char **argv) {
                                   argc >= 4 ? argv[3] : NULL,
                                   argc == 6 ? argv[4] : NULL,
                                   argc == 6 ? argv[5] : NULL, NULL, &samples);
+#ifdef CK_TTS_PARALLEL_CONV
+    ck_threadpool_destroy(pool);
+#endif
     free(arena);
     if (!result) printf("wrote %zu samples at 24000 Hz\n", samples);
     return result;

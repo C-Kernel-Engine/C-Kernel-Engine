@@ -1,0 +1,41 @@
+{
+  "schema": "cke.kokoro.parallel_bundle_measurement.v1",
+  "baseline_revision": "868853aec4496b16293167549e9b3d3b049bda20",
+  "host": "P3, Intel Core i7-14700T, Ubuntu GCC 15.2.0",
+  "model_weights_sha256": "556a82f8116091d386ccab9d8218030d124ff286e0fb8e2ebc8a5598148",
+  "voice_bank_sha256": "50a2b7d543cc5a9bdefb3217e3bf1a8d87e947dd5b4e8babf685c0bc4b3b4177",
+  "serial_generated_library_sha256": "7b57a48117f2009722a38c3e31b42fac6b66d6368d38263dcbbee46e9f0e00df",
+  "parallel_generated_library_sha256": "cc26e6bf0113510781d0c2950d4242060cca9a44cd9e1ea0b1f820eb03369d36",
+  "parallel_workers": 4,
+  "parallel_selected_conv_calls": 88,
+  "rejection_recovery": "Two-ID request returned ERROR 4 and wrote no WAV; a following 25-ID request in the same loaded session returned WAV_READY 49800 and the expected e95fc703... hash.",
+  "runtime": "one loaded process per provider, 64-token capacity, request-local seed 7",
+  "requests": [
+    {
+      "name": "A1",
+      "phoneme_ids": 25,
+      "valid_samples": 49800,
+      "serial_seconds": 11.179,
+      "parallel_seconds": 6.143,
+      "wav_sha256_both": "e95fc7037336d52b06f8fe49d4f4704b51d9f77d2986b395c125ec93878afb2b"
+    },
+    {
+      "name": "B",
+      "phoneme_ids": 8,
+      "valid_samples": 33000,
+      "serial_seconds": 7.074,
+      "parallel_seconds": 3.564,
+      "wav_sha256_both": "8af6556997def39155947e4d15cdc62798ffa62902373b49e473e8354b904b04"
+    },
+    {
+      "name": "A2",
+      "phoneme_ids": 25,
+      "valid_samples": 49800,
+      "serial_seconds": 11.168,
+      "parallel_seconds": 6.121,
+      "wav_sha256_both": "e95fc7037336d52b06f8fe49d4f4704b51d9f77d2986b395c125ec93878afb2b"
+    }
+  ],
+  "build_command": "python3 version/v8/tts/build_kokoro_dispatch_bundle.py --bump-dir /data/cke/models/kokoro-82m-e8a90b4-bump --voice-bank /data/cke/kokoro-runtime-text-range-probe-20261019/af_heart.ckvoice --output-dir /tmp/cke-kokoro-p3-parallel-bundle-20261103 --conv-provider avx2_parallel --conv-workers 4 --runtime-lengths --runtime-experimental-range",
+  "measurement_scope": "Warm native RUN commands from one loaded process; includes generated synthesis and WAV writing, excludes cold bundle build, model loading, text preparation and playback. Three sequential timings per provider are insufficient to characterize variance. WAV equality certifies CKE provider equivalence for these requests, not pinned-PyTorch connected waveform parity or listening quality."
+}

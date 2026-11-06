@@ -59,9 +59,11 @@ enum CKSessionRequestFlagsV8 {
     CK_SESSION_REQUEST_TIMESTAMPS = UINT32_C(1) << 2,
     /* Requests reset generated recurrent/KV state by default. Continuation
      * requires RAW_PROMPT, a completed prior forward or successful restore,
-     * and exactly one raw suffix token whose tokenization is bound by the caller to the
-     * saved exact prefix. Existing position + suffix + output reservation
-     * must fit the selected context; overflow is rejected before mutation. */
+     * and a raw suffix whose exact token IDs are bound by the caller to the
+     * saved prefix. Multi-token continuation additionally requires a loaded
+     * provider that exports a checked append alignment and minimum prefix.
+     * Existing position + suffix + output reservation must fit the context;
+     * unsupported cuts and overflow are rejected before mutation. */
     CK_SESSION_REQUEST_CONTINUE_STATE = UINT32_C(1) << 3,
     /* Fail the request instead of silently truncating a prompt that does not
      * fit the remaining context budget. Serving layers set this so their
@@ -188,6 +190,37 @@ int ck_session_v8_generate(
     ck_session_token_callback_v8 callback,
     void *user_data,
     CKSessionGenerateResultV8 *result);
+
+/* Same request and sampling contract as generate, with exact caller-supplied
+ * prompt IDs. Requires RAW_PROMPT; IDs are copied before execution. This is
+ * the continuation path when a rendered suffix is not independently
+ * round-trippable through text tokenization. */
+int ck_session_v8_generate_ids(
+    CKSessionV8 *session,
+    const CKSessionGenerateRequestV8 *request,
+    const int32_t *prompt_ids, int32_t prompt_id_count,
+    ck_session_token_callback_v8 callback,
+    void *user_data,
+    CKSessionGenerateResultV8 *result);
+
+/* Process exact token IDs to a completed, checkpointable prefill boundary.
+ * The host owns the IDs and serializes this call with generate/save/restore.
+ * A fresh call resets state; CONTINUE requires a successful prior prefill or
+ * restore. The resulting position must satisfy the loaded provider's append
+ * minimum and alignment. `reserved_tokens` covers the later suffix and output
+ * budget. Every rejected argument leaves state untouched. A failed native
+ * execution resets the affected state and clears checkpoint readiness.
+ * This API emits no logits or sampled tokens. */
+enum CKSessionPrefillFlagsV8 {
+    CK_SESSION_PREFILL_CONTINUE_STATE = UINT32_C(1) << 0
+};
+int ck_session_v8_prefill_ids(CKSessionV8 *session,
+                              const int32_t *tokens, int32_t token_count,
+                              int32_t reserved_tokens, uint32_t flags);
+int ck_session_v8_prefill_contract(CKSessionV8 *session,
+                                   int32_t *minimum_prefix,
+                                   int32_t *alignment,
+                                   int32_t *row_group);
 
 void ck_session_v8_cancel(CKSessionV8 *session);
 int ck_session_v8_get_progress(CKSessionV8 *session, CKSessionProgressV8 *progress);
