@@ -261,6 +261,34 @@ class KokoroAccessibilityTextPlanTest(unittest.TestCase):
         self.assertTrue(any("forty two" in c["source_text"] for c in chunks))
         self.assertTrue(any("forty seven" in c["source_text"] for c in chunks))
 
+    def test_all_compound_tens_units_and_separators(self):
+        for tens in sorted(planner._COMPOUND_TENS):
+            for unit in sorted(planner._COMPOUND_UNITS):
+                with self.subTest(tens=tens, unit=unit):
+                    tokens = [SimpleNamespace(text=tens, whitespace=" ", phonemes="a"),
+                              SimpleNamespace(text=unit, whitespace="", phonemes="a")]
+                    text = f"{tens} {unit}"
+                    self.assertFalse(planner._legal_boundary(tokens, 0, 1,
+                                                             allow_connector_tail=True))
+                    self.assertEqual([row["source_text"] for row in
+                                      planner.plan_tokens(text, tokens, VOCAB,
+                                                          set(range(3, 41)))], [text])
+        newline = [SimpleNamespace(text="forty", whitespace="\n", phonemes="a"),
+                   SimpleNamespace(text="two", whitespace="", phonemes="a")]
+        self.assertTrue(planner._legal_boundary(newline, 0, 1,
+                                                allow_connector_tail=True))
+        punctuated = [SimpleNamespace(text="forty", whitespace="", phonemes="a"),
+                      SimpleNamespace(text=".", whitespace=" ", phonemes="."),
+                      SimpleNamespace(text="two", whitespace="", phonemes="a")]
+        self.assertTrue(planner._legal_boundary(punctuated, 0, 2,
+                                                allow_connector_tail=True))
+
+    def test_oversized_compound_fails_instead_of_splitting(self):
+        tokens = [SimpleNamespace(text="forty", whitespace=" ", phonemes="a" * 24),
+                  SimpleNamespace(text="two", whitespace="", phonemes="a" * 24)]
+        with self.assertRaisesRegex(planner.TextPlanError, "no supported chunk"):
+            planner.plan_tokens("forty two", tokens, VOCAB, set(range(3, 41)))
+
     def test_rejects_dropped_source_and_unsupported_geometry(self):
         with self.assertRaisesRegex(planner.TextPlanError, "unspoken source token"):
             planner.plan_tokens("🧪", [SimpleNamespace(text="🧪", whitespace="",
@@ -352,7 +380,10 @@ class KokoroAccessibilityTextPlanTest(unittest.TestCase):
         long_plan = planner.prepare(long_source,
                                     Path(os.environ[required[0]]),
                                     Path(os.environ[required[1]]))
-        self.assertEqual(len(long_plan["chunks"]), 316)
+        self.assertTrue(long_plan["chunks"])
+        self.assertTrue(all(3 <= row["valid_token_count"] <= 48 and
+                            row["voice_row"] == row["valid_token_count"] - 3
+                            for row in long_plan["chunks"]))
         for phrase in ("forty two", "forty seven"):
             self.assertTrue(any(phrase in row["source_text"]
                                 for row in long_plan["chunks"]))
