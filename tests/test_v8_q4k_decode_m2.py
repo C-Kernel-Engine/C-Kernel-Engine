@@ -58,6 +58,7 @@ class Q4KDecodeM2Tests(unittest.TestCase):
                     result = subprocess.run([str(binary)], check=True,
                                             capture_output=True, text=True)
                     self.assertIn("PASS", result.stdout)
+                    print(f"{name} Q4_K/Q8_K M=2 lane: EXECUTED PASS")
 
 
 if __name__ == "__main__":

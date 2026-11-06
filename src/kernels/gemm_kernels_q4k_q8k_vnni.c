@@ -2176,6 +2176,12 @@ void gemm_nt_q4_k_packed_meta_x8_q8_k_gemv_order(
     }
 }
 
+/* Internal unchecked primitive, not a success/failure API. B must contain
+ * ceil(N/8) * (K/256) packed-meta-x8 blocks made by the matching Q4_K packer;
+ * A is two contiguous Q8_K rows and C has room for two contiguous FP32 rows.
+ * A, B, bias and C must not alias. The caller owns all storage and guarantees
+ * extents/alignment. Invalid pointers or dimensions return without writing C;
+ * a generated provider must validate the full capacity contract separately. */
 void gemm_nt_q4_k_packed_meta_x8_q8_k_gemv_order_m2(
         const void *A_q8, const void *B_packed_x8, const float *bias, float *C,
         int M, int N, int K)
