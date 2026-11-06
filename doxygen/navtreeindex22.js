@@ -1,5 +1,7 @@
 var NAVTREEINDEX22 =
 {
+"structCKSection.html#a77177dc1f5d94b91942e9dd199556661":[1,0,63,14],
+"structCKSection.html#a970402cf9743b507254e92ecdb06b224":[1,0,63,1],
 "structCKSection.html#aa030a13ebf6b121d19344e0249786fb8":[1,0,63,9],
 "structCKSection.html#aa21574168860ae278245951028df3ff0":[1,0,63,23],
 "structCKSection.html#aac276147ba6022404e73010f3ecd203b":[1,0,63,8],
@@ -247,7 +249,5 @@ var NAVTREEINDEX22 =
 "structNUMANode.html#abe328366c0632dadc801508c6bbc44df":[1,0,85,1],
 "structNUMANode.html#ad207fd0ff088689dc91e40729dc9c60a":[1,0,85,2],
 "structNUMATopology.html":[1,0,86],
-"structNUMATopology.html#a2a61e03ff57dd6feb35b92d1e03c0cdd":[1,0,86,0],
-"structNUMATopology.html#a4f4876ca34eed1e6c7732e611a13a674":[1,0,86,1],
-"structNUMATopology.html#ab0befa19cd4b9b08a68d901f301e9de7":[1,0,86,2]
+"structNUMATopology.html#a2a61e03ff57dd6feb35b92d1e03c0cdd":[1,0,86,0]
 };
