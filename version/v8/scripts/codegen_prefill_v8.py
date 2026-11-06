@@ -1562,8 +1562,10 @@ def emit_prefill_op(
         )
         _emit_hidden_last(_hidden_arg("output", "out", "x", "y"), "post_attn_norm", "EMBED_DIM")
     elif op_type == "ffn_norm":
+        _emit_hidden_full(_hidden_arg("output", "out", "x", "y"), "ffn_norm", _hidden_mul("num_tokens", "EMBED_DIM"))
         _emit_hidden_last(_hidden_arg("output", "out", "x", "y"), "ffn_norm", "EMBED_DIM")
     elif op_type == "post_ffn_norm":
+        _emit_hidden_full(_hidden_arg("output", "out", "x", "y"), "post_ffn_norm", _hidden_mul("num_tokens", "EMBED_DIM"))
         _emit_hidden_last(_hidden_arg("output", "out", "x", "y"), "post_ffn_norm", "EMBED_DIM")
     elif op_type == "moe_router":
         width = _hidden_arg("N", "n", "n_experts") or "N_ROUTED_EXPERTS"
@@ -1609,6 +1611,7 @@ def emit_prefill_op(
         out_expr = _hidden_arg("output", "out", "c", "y")
         total_expr = _hidden_arg("n") or "(2 * INTERMEDIATE_DIM)"
         half_expr = f"(({total_expr}) / 2)"
+        _emit_hidden_full(out_expr, "mlp_gate_up", _hidden_mul("num_tokens", total_expr))
         _emit_hidden_last(out_expr, "mlp_gate", half_expr, total_expr)
         raw = _hidden_raw(out_expr)
         if raw:
@@ -1618,7 +1621,10 @@ def emit_prefill_op(
                 f'{half_expr});'
             )
     elif op_type == "geglu":
-        _emit_hidden_last(_hidden_arg("output", "out", "x", "y", "data"), "mlp_geglu", _hidden_arg("dim") or "INTERMEDIATE_DIM")
+        output = _hidden_arg("output", "out", "x", "y", "data")
+        width = _hidden_arg("dim") or "INTERMEDIATE_DIM"
+        _emit_hidden_full(output, "mlp_geglu", _hidden_mul("num_tokens", width))
+        _emit_hidden_last(output, "mlp_geglu", width)
     elif op_type in ("silu_mul", "swiglu"):
         width_expr = _hidden_arg("dim", "n", "intermediate_dim") or "INTERMEDIATE_DIM"
         _emit_hidden_full(
@@ -2797,6 +2803,12 @@ def _emit_prefill_gemm_fp32_override(op: Dict, seq_idx: int, config: Dict, *, de
     if profile:
         lines.append(f'        CK_PROFILE_END("prefill", "{func}", "{op.get("op", "unknown")}", {layer});')
     lines.append("    }")
+    if str(op.get("op", "")) == "mlp_gate_up":
+        raw_expr = c_expr.replace("(float*)", "").replace("(void*)", "").strip()
+        lines.append(
+            f'    ck_debug_export_hidden(model, {layer}, "mlp_gate_up", '
+            f'(const float*){raw_expr}, ({m_expr}) * ({n_expr}));'
+        )
     if dump:
         raw_expr = c_expr.replace("(float*)", "").replace("(void*)", "").strip()
         lines.append("    #ifdef CK_PARITY_DUMP")

@@ -50,6 +50,153 @@ def _arg(name: str, expr: str) -> dict[str, str]:
 
 
 class HiddenExportExtentTests(unittest.TestCase):
+    def test_quantized_gate_up_override_exports_full_valid_grid(self) -> None:
+        op = {
+            "op": "mlp_gate_up",
+            "function": "gemm_nt_q4_k_q8_k_pairwise_split_min_parallel_dispatch",
+            "layer": 2,
+            "resolved_execution": {
+                "numerical_contract": "q4_k_x_q8_k_repacked_matmul_fp32",
+                "implementation": {
+                    "weight_storage": {
+                        "format": "q4_k", "block_elements": 256, "block_bytes": 144,
+                    },
+                    "activation_storage": {"format": "q8_k", "block_elements": 256},
+                    "diagnostic_providers": {
+                        "fp32_activation": "gemm_nt_q4_k",
+                        "row_quantized": "gemv_q4_k_q8_k",
+                    },
+                },
+                "reference": {
+                    "function": "gemm_nt_q4_k_q8_k_pairwise_split_min_parallel_dispatch",
+                },
+                "production": {
+                    "function": "gemm_nt_q4_k_q8_k_pairwise_split_min_parallel_dispatch",
+                },
+            },
+            "args": [
+                _arg("A", "Q8"), _arg("B", "WEIGHT"), _arg("bias", "BIAS"),
+                _arg("C", "GATE_UP"), _arg("M", "num_tokens"),
+                _arg("N", "8"), _arg("K", "256"),
+            ],
+        }
+        emitted = prefill_codegen._emit_prefill_gemm_fp32_override(
+            op, 1, {}, debug_flag_name="debug_fp32",
+            debug_input_name="debug_input",
+        )
+        self.assertIn(
+            '"mlp_gate_up", (const float*)GATE_UP, (num_tokens) * (8)', emitted,
+        )
+        self.assertLess(emitted.index('    }\n    ck_debug_export_hidden'),
+                        emitted.index('"mlp_gate_up"'))
+
+    def test_dynamic_prefill_ffn_exports_full_valid_grid(self) -> None:
+        compiler = shutil.which("cc")
+        if compiler is None:
+            self.skipTest("C compiler unavailable")
+        ops = [
+            ("ffn_norm", "fake_norm", [
+                _arg("x", "input"), _arg("out", "normed"),
+                _arg("tokens", "num_tokens"), _arg("dim", "4"),
+            ]),
+            ("mlp_gate_up", "fake_gate_up", [
+                _arg("x", "normed"), _arg("out", "gate_up"),
+                _arg("M", "num_tokens"), _arg("N", "8"), _arg("K", "4"),
+            ]),
+            ("geglu", "fake_geglu", [
+                _arg("x", "gate_up"), _arg("out", "compact"),
+                _arg("tokens", "num_tokens"), _arg("dim", "4"),
+            ]),
+            ("post_ffn_norm", "fake_post_norm", [
+                _arg("x", "compact"), _arg("out", "post"),
+                _arg("tokens", "num_tokens"), _arg("dim", "4"),
+            ]),
+        ]
+        emitted = "\n".join(
+            prefill_codegen.emit_prefill_op(
+                {"op": op, "function": function, "layer": 0, "args": args},
+                index, {},
+            )
+            for index, (op, function, args) in enumerate(ops)
+        )
+        source = r'''
+#include <stddef.h>
+#include <string.h>
+#define EMBED_DIM 4
+static float captured[4][24];
+static int seen[4], capture_enabled;
+static void fake_norm(const float *x, float *y, int rows, int dim) {
+    for (int i = 0; i < rows * dim; ++i) y[i] = 2.0f * x[i] + 1.0f;
+}
+static void fake_gate_up(const float *x, float *y, int rows, int width, int input_dim) {
+    for (int row = 0; row < rows; ++row)
+        for (int col = 0; col < width; ++col)
+            y[row * width + col] = x[row * input_dim + col % input_dim] + (float)(col * 10);
+}
+static void fake_geglu(const float *x, float *y, int rows, int dim) {
+    for (int row = 0; row < rows; ++row)
+        for (int col = 0; col < dim; ++col)
+            y[row * dim + col] = x[row * 2 * dim + col] + x[row * 2 * dim + dim + col];
+}
+static void fake_post_norm(const float *x, float *y, int rows, int dim) {
+    for (int i = 0; i < rows * dim; ++i) y[i] = x[i] * 0.5f;
+}
+static void ck_debug_export_hidden(void *model, int layer, const char *name,
+        const float *src, size_t count) {
+    (void)model;
+    if (!capture_enabled) return;
+    const char *names[] = {"ffn_norm", "mlp_gate_up", "mlp_geglu", "post_ffn_norm"};
+    const size_t counts[] = {12, 24, 12, 12};
+    for (int i = 0; i < 4; ++i) {
+        if (strcmp(name, names[i]) == 0) {
+            if (layer != 0 || count != counts[i]) { seen[i] = -100; return; }
+            memcpy(captured[i], src, count * sizeof(float));
+            seen[i]++;
+            return;
+        }
+    }
+}
+int main(void) {
+    const int num_tokens = 3;
+    void *model = NULL;
+    float input[20], normed[20], gate_up[40], compact[20], post[20], baseline[12];
+    for (int i = 0; i < 20; ++i) input[i] = (float)(i + 1);
+    for (int pass = 0; pass < 2; ++pass) {
+        capture_enabled = pass;
+        for (int i = 0; i < 20; ++i) normed[i] = compact[i] = post[i] = -777.0f;
+        for (int i = 0; i < 40; ++i) gate_up[i] = -777.0f;
+        memset(seen, 0, sizeof(seen));
+EMITTED
+        if (pass == 0) memcpy(baseline, post, sizeof(baseline));
+        else {
+            const float *stages[] = {normed, gate_up, compact, post};
+            const int counts[] = {12, 24, 12, 12};
+            for (int stage = 0; stage < 4; ++stage) {
+                if (seen[stage] != 1) return 1;
+                for (int i = 0; i < counts[stage]; ++i)
+                    if (captured[stage][i] != stages[stage][i]) return 2;
+            }
+            if (memcmp(baseline, post, sizeof(baseline)) != 0) return 3;
+        }
+        for (int i = 12; i < 20; ++i)
+            if (normed[i] != -777.0f || compact[i] != -777.0f || post[i] != -777.0f) return 4;
+        for (int i = 24; i < 40; ++i)
+            if (gate_up[i] != -777.0f) return 5;
+    }
+    return 0;
+}
+'''.replace("EMITTED", emitted)
+        with tempfile.TemporaryDirectory(prefix="prefill_ffn_capture_") as tmpdir:
+            path = Path(tmpdir)
+            (path / "fixture.c").write_text(source, encoding="utf-8")
+            compiled = subprocess.run(
+                [compiler, "-std=c11", "-Wall", "-Werror", str(path / "fixture.c"),
+                 "-o", str(path / "fixture")],
+                capture_output=True, text=True,
+            )
+            self.assertEqual(compiled.returncode, 0, compiled.stderr)
+            subprocess.run([str(path / "fixture")], check=True, capture_output=True)
+
     def test_geglu_capture_executes_full_grid_and_last_row(self) -> None:
         compiler = shutil.which("cc")
         if compiler is None:
