@@ -139,6 +139,27 @@ class KokoroAccessibilityTextPlanTest(unittest.TestCase):
         self.assertTrue(all(chunk["valid_token_count"] <=
                             planner.PREFERRED_REQUEST_IDS for chunk in chunks))
 
+    def test_connector_before_long_number_has_complete_checked_plan(self):
+        # Captured from the pinned full-context G2P of server_summary.txt.
+        text = "141 affected tests and 2,634 subtests passed locally."
+        tokens = [SimpleNamespace(text=word, whitespace=space, phonemes=sound)
+                  for word, space, sound in (
+                      ("141", " ", "wˈʌn hˈʌndɹəd fˈɔɹTi wˈʌn"),
+                      ("affected", " ", "əfˈɛktᵻd"),
+                      ("tests", " ", "tˈɛsts"),
+                      ("and", " ", "ænd"),
+                      ("2,634", " ", "tˈu θˈWzᵊnd sˈɪks hˈʌndɹəd θˈɜɹTi fˈɔɹ"),
+                      ("subtests", " ", "sˈʌbtɪsts"),
+                      ("passed", " ", "pˈæst"),
+                      ("locally", "", "lˈOkəli"),
+                      (".", "", "."))]
+        chunks = planner.plan_tokens(text, tokens, VOCAB, set(range(3, 49)))
+        self.assertEqual("".join(text[row["source_start"]:row["source_end"]]
+                                 for row in chunks), text)
+        self.assertTrue(any(row["source_text"].endswith("and") for row in chunks))
+        self.assertFalse(any(row["source_text"] == "and" for row in chunks))
+        self.assertTrue(all(row["valid_token_count"] <= 48 for row in chunks))
+
     def test_technical_path_keeps_source_spans_and_checked_ids(self):
         path = "/data/cke/runs/nemotron-two-client-20k-20261104/acceptance-20261104/"
         text = "Read " + path + " on Ryzen."
