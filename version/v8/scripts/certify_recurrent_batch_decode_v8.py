@@ -248,7 +248,7 @@ def main() -> int:
     parser.add_argument('--report', type=Path)
     parser.add_argument('--swap-row-order', action='store_true')
     parser.add_argument('--expected-projection-groups', type=int,
-                        choices=(1, 2), default=1)
+                        choices=(1, 2, 3), default=1)
     args = parser.parse_args()
     if not args.bundle.is_dir():
         report = {'status': 'NOT_TESTED', 'bundle': str(args.bundle),
