@@ -4577,6 +4577,7 @@ test-v8-dsl-policy: test-source-integrity test-v8-rwkv7-lowering
 	@$(PYTHON) -m unittest tests.test_v8_sequence_state_contract -v
 	@$(PYTHON) -m unittest tests.test_v8_sequence_checkpoint -v
 	@$(PYTHON) -m unittest tests.test_v8_two_row_batch_decode -v
+	@$(PYTHON) -m unittest tests.test_v8_q4k_decode_m2 -v
 	@$(PYTHON) -m unittest tests.test_v8_dsl_nightly_registration -v
 
 test-v8-dsl: test-v8-dsl-policy test-numerical-contracts test-v8-template-circuit-audit
