@@ -497,13 +497,12 @@ def _first_recurrent_projection_plan(
     providers: dict[str, dict[str, Any]], state: dict[str, int],
     config: dict[str, Any], row_buffers: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any] | None:
-    """Admit one mapped projection before the first recurrent state update.
+    """Admit mapped projections around the first recurrent state update.
 
-    This is deliberately a one-group contract. The gate and subsequent layers
-    execute through the ordinary sequence-local generated calls. Snapshot the
-    complete decode-row extents at both cuts, including values whose old
-    contents a later operation could read after a partial write. In a combined
-    runtime the prefill arena may be much larger than the decode-row plan.
+    The second group is separately opted in and must follow a sequence-local
+    recurrent core. All other operations use ordinary sequence-local calls.
+    Snapshot the complete decode-row extents at every cut, including values
+    whose old contents a later operation could read after a partial write.
     """
     if (config.get("batch_decode_recurrent_first_projection") is not True
             or "recurrent_conv_state_bytes" not in state or len(ops) < 7):
@@ -518,15 +517,42 @@ def _first_recurrent_projection_plan(
     if (not logits or type(vocab) is not int or vocab <= 0
             or logits.get("size") != vocab * 4):
         return None
-    projection = _mapped_two_row_projection(ops[4], providers, buffers)
-    if projection is None:
+    first = _mapped_two_row_projection(ops[4], providers, buffers)
+    if first is None:
         return None
     replacements = _certified_full_writes(ops, buffers)
-    before = _crossing_at(ops, 4, replacements)
-    after = _crossing_at(ops, 5, replacements)
-    refs = before | after | {projection["input"], projection["output"]}
-    if not before or not after:
+    cuts = (4, 5)
+    projections = [(4, first)]
+    second_setting = config.get("batch_decode_recurrent_output_projection", False)
+    if type(second_setting) is not bool:
         return None
+    second_enabled = second_setting
+    if second_enabled:
+        candidates = [i for i, op in enumerate(ops[5:], 5)
+                      if op.get("op") == "recurrent_out_proj" and op.get("layer") == 0]
+        if len(candidates) != 1:
+            return None
+        index = candidates[0]
+        if (index < 7 or any(op.get("layer") != 0 for op in ops[5:index + 1])
+                or not any(op.get("op") == "recurrent_core" for op in ops[5:index])):
+            return None
+        second = _mapped_two_row_projection(ops[index], providers, buffers)
+        if second is None:
+            return None
+        projections.append((index, second))
+        cuts += (index, index + 1)
+    crossing = {cut: _crossing_at(ops, cut, replacements) for cut in cuts}
+    persistent = {"recurrent_conv_state", "recurrent_ssm_state"}
+    if (any(not crossing[cut] for cut in cuts)
+            or any(ref not in buffers for values in crossing.values() for ref in values)
+            or any(buffers[ref].get("lifetime") != "call" and ref not in persistent
+                   for values in crossing.values() for ref in values)):
+        return None
+    live = {cut: sorted(ref for ref in crossing[cut]
+                         if buffers[ref].get("lifetime") == "call") for cut in cuts}
+    refs = set().union(*(set(values) for values in live.values()))
+    refs.update(ref for _, projection in projections
+                for ref in (projection["input"], projection["output"]))
     extents: dict[str, int] = {}
     for ref in refs:
         row = buffers.get(ref)
@@ -543,8 +569,9 @@ def _first_recurrent_projection_plan(
                 or (row_buffers is not None and not _unaliased(ref, row_buffers))):
             return None
         extents[ref] = decode_row["size"]
-    if (extents[projection["input"]] < projection["input_bytes"]
-            or extents[projection["output"]] < projection["output_bytes"]):
+    if any(extents[projection["input"]] < projection["input_bytes"]
+           or extents[projection["output"]] < projection["output_bytes"]
+           for _, projection in projections):
         return None
     # No hidden alias into a snapshotted buffer may bypass the planned base.
     for op in ops:
@@ -552,16 +579,25 @@ def _first_recurrent_projection_plan(
             if (isinstance(arg, dict) and arg.get("buffer_ref") in refs
                     and not _exact_base(arg, buffers[arg["buffer_ref"]])):
                 return None
+    stages = []
+    cursor = 0
+    for index, projection in projections:
+        stages.append({"kind": "local", "start": cursor, "stop": index,
+                       "live_after": live[index]})
+        stages.append({"kind": "shared", "start": index, "stop": index + 1,
+                       "projections": [{"index": index, **projection}],
+                       "live_after": live[index + 1]})
+        cursor = index + 1
+    stages.append({"kind": "local", "start": cursor, "stop": len(ops)})
+    if any(projection["input"] not in live[index]
+           or projection["output"] not in live[index + 1]
+           for index, projection in projections):
+        return None
     return {
-        "stages": [
-            {"kind": "local", "start": 0, "stop": 4, "live_after": sorted(before)},
-            {"kind": "shared", "start": 4, "stop": 5,
-             "projections": [{"index": 4, **projection}], "live_after": sorted(after)},
-            {"kind": "local", "start": 5, "stop": len(ops)},
-        ],
+        "stages": stages,
         "buffers": {ref: buffers[ref]["define"] for ref in extents},
-        "extents": extents, "layer_end": 5,
-        "shared_layers": [0], "projection_groups": 1,
+        "extents": extents, "layer_end": cursor,
+        "shared_layers": [0], "projection_groups": len(projections),
         "recurrent_state_bytes": {
             "conv": state["recurrent_conv_state_bytes"],
             "ssm": state["recurrent_ssm_state_bytes"],
