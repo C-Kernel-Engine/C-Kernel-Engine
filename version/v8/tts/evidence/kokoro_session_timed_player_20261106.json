@@ -1,0 +1,68 @@
+{
+  "schema": "cke.kokoro.session_timed_player.v1",
+  "date_utc": "2026-11-06",
+  "host_cpu": "Intel Core i7-14700T",
+  "text": "Dr. Smith has 12 words. Then check 2 + 2 = 4.",
+  "source_sha256": "e77be79ab147a71c5c17e52825ff08f6a693783fb4f4a03b1f883bee15a819f3",
+  "bundle_identity_sha256": "24f4b2428aa0099a618677e27fc4aea48c4f271d7a45256dfaf815bb2b612ac3",
+  "bundle_manifest_sha256": "a8c0a8eef775c8a69f124a5c4e4a1439e798f13a6812d62b390e6154b68356e8",
+  "bundle_conv_provider": "avx2_parallel",
+  "bundle_conv_workers": 8,
+  "player": "non-audible executable sleeps for WAV duration",
+  "one_worker": {
+    "synthesis_workers": 1,
+    "native_model_loads": 1,
+    "total_chunk_count": 2,
+    "sample_count": 123000,
+    "audio_seconds": 5.125,
+    "plan_seconds": 2.53560487087816,
+    "worker_startup_seconds": 1.0560378897935152,
+    "first_playback_start_seconds": 9.40819982625544,
+    "playback_gap_total_seconds": 4.443655484355986,
+    "synthesis_underrun_total_seconds": 4.4425485180690885,
+    "handoff_delay_total_seconds": 0.0011069662868976593,
+    "total_seconds": 19.130034281872213,
+    "first_audible_audio": "not_measured",
+    "chunk_sha256": [
+      "b1a64fb48db2d1ffeb518926306c34eeeda7be786bc313bdd9cb6269adde649f",
+      "0440e115f7085bd104cd990fa57de695a07720d6f98876b9e8a385e71e9222d8"
+    ],
+    "chunk_source_text": [
+      "Dr. Smith has 12 words.",
+      "Then check 2 + 2 = 4."
+    ]
+  },
+  "two_workers": {
+    "synthesis_workers": 2,
+    "native_model_loads": 2,
+    "total_chunk_count": 2,
+    "sample_count": 123000,
+    "audio_seconds": 5.125,
+    "plan_seconds": 2.5639067171141505,
+    "worker_startup_seconds": 1.0915421126410365,
+    "first_playback_start_seconds": 9.685557750053704,
+    "playback_gap_total_seconds": 0.0008224528282880783,
+    "synthesis_underrun_total_seconds": 0.0,
+    "handoff_delay_total_seconds": 0.0008224528282880783,
+    "total_seconds": 14.976351618766785,
+    "first_audible_audio": "not_measured",
+    "chunk_sha256": [
+      "b1a64fb48db2d1ffeb518926306c34eeeda7be786bc313bdd9cb6269adde649f",
+      "0440e115f7085bd104cd990fa57de695a07720d6f98876b9e8a385e71e9222d8"
+    ],
+    "chunk_source_text": [
+      "Dr. Smith has 12 words.",
+      "Then check 2 + 2 = 4."
+    ]
+  },
+  "chunk_hashes_match": true,
+  "limitations": [
+    "single timing observation per worker count",
+    "no headset or audible-onset measurement",
+    "peak memory not measured in this run",
+    "connected waveform parity remains fail_unresolved"
+  ],
+  "reproduction": "CKE_TTS pinned venv python version/v8/tts/ck_kokoro_play.py --config <pinned-config> --bundle-dir <bundle> --player <timed-player> --incremental --synthesis-workers {1,2} --report <private-json> \"Dr. Smith has 12 words. Then check 2 + 2 = 4.\"",
+  "source_revision_base": "6e723bb3c",
+  "changes_under_test": "private player process group and split gap timing on branch codex/kokoro-session-latency-20261106"
+}

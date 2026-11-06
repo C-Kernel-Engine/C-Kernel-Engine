@@ -100,6 +100,15 @@ class KokoroVoicePlaybackTest(unittest.TestCase):
                                               prepare_plan=plan)
             self.assertEqual(result["sample_count"], 640)
             self.assertEqual(len(result["chunks"]), 80)
+            self.assertEqual(result["first_audible_audio"], "not_measured")
+            self.assertGreaterEqual(result["plan_seconds"], 0)
+            self.assertGreaterEqual(result["worker_startup_seconds"], 0)
+            self.assertTrue(all(row["player_process_seconds"] >= 0
+                                for row in result["chunks"]))
+            self.assertAlmostEqual(
+                result["playback_gap_total_seconds"],
+                result["synthesis_underrun_total_seconds"] +
+                result["handoff_delay_total_seconds"], places=5)
             self.assertEqual(len(launches.read_text().splitlines()), 1)
             self.assertEqual(played.read_text().splitlines(),
                              [f"chunk-{i}" for i in range(80)])
@@ -226,12 +235,18 @@ class KokoroVoicePlaybackTest(unittest.TestCase):
             bundle = root / "bundle"
             bundle.mkdir()
             worker_pids = root / "worker-pids"
+            worker_child_pids = root / "worker-child-pids"
             player_pid = root / "player-pid"
             finished = root / "finished"
             worker = bundle / "native-kokoro-dispatch"
             worker.write_text(
-                "#!/usr/bin/env python3\nimport os,sys,time,wave\nfrom pathlib import Path\n"
+                "#!/usr/bin/env python3\nimport os,subprocess,sys,time,wave\n"
+                "from pathlib import Path\n"
                 f"with Path({str(worker_pids)!r}).open('a') as f:f.write(str(os.getpid())+'\\n')\n"
+                "child=subprocess.Popen([sys.executable,'-c',"
+                "'import time;time.sleep(30)'])\n"
+                f"with Path({str(worker_child_pids)!r}).open('a') as f:"
+                "f.write(str(child.pid)+'\\n')\n"
                 "print('READY\\tloads=1',flush=True)\n"
                 "for line in sys.stdin:\n"
                 " parts=line.strip().split('\\t')\n"
@@ -280,10 +295,57 @@ class KokoroVoicePlaybackTest(unittest.TestCase):
                             int(player_pid.read_text())]:
                     with self.assertRaises(ProcessLookupError):
                         os.kill(pid, 0)
+                for pid in map(int, worker_child_pids.read_text().splitlines()):
+                    deadline = time.monotonic() + 2
+                    while time.monotonic() < deadline:
+                        state_file = Path(f"/proc/{pid}/stat")
+                        if (not state_file.exists() or
+                                state_file.read_text().split()[2] == "Z"):
+                            break
+                        time.sleep(0.01)
+                    else:
+                        self.fail("native worker child remained active after stop")
             finally:
                 if child.poll() is None:
                     child.kill()
                     child.wait()
+
+    @unittest.skipUnless(sys.platform.startswith("linux"),
+                         "player process-group contract uses Linux /proc")
+    def test_stop_kills_player_wrapper_and_its_audio_child(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            child_pid_file = root / "audio-child-pid"
+            player = root / "player-wrapper"
+            player.write_text(
+                "#!/usr/bin/env python3\nimport subprocess,sys,time\n"
+                "from pathlib import Path\n"
+                "child=subprocess.Popen([sys.executable,'-c',"
+                "'import time;time.sleep(30)'])\n"
+                f"Path({str(child_pid_file)!r}).write_text(str(child.pid))\n"
+                "time.sleep(30)\n")
+            player.chmod(0o700)
+            playing = adapter._Playing(player, root / "ignored.wav")
+            try:
+                deadline = time.monotonic() + 5
+                while not child_pid_file.exists() and time.monotonic() < deadline:
+                    self.assertIsNone(playing.child.poll(), "player exited early")
+                    time.sleep(0.01)
+                self.assertTrue(child_pid_file.exists(), "audio child did not start")
+                child_pid = int(child_pid_file.read_text())
+                playing.stop()
+                self.assertIsNotNone(playing.child.poll())
+                deadline = time.monotonic() + 2
+                while time.monotonic() < deadline:
+                    state_file = Path(f"/proc/{child_pid}/stat")
+                    if not state_file.exists() or state_file.read_text().split()[2] == "Z":
+                        break
+                    time.sleep(0.01)
+                else:
+                    self.fail("player child remained active after stop")
+                playing.stop()
+            finally:
+                playing.stop()
 
     def test_checked_wav_plays_and_invalid_output_never_reaches_player(self):
         with tempfile.TemporaryDirectory() as folder:

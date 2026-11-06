@@ -31,8 +31,10 @@ class _Playing:
     def __init__(self, player: Path, wav: Path):
         self.wav = wav
         self.child = subprocess.Popen([str(player), str(wav)],
-                                      stdin=subprocess.DEVNULL)
+                                      stdin=subprocess.DEVNULL,
+                                      start_new_session=True)
         self.ended = None
+        self._stopped = False
         self.thread = threading.Thread(target=self._wait, daemon=True)
         self.thread.start()
 
@@ -48,9 +50,13 @@ class _Playing:
         return self.ended
 
     def stop(self):
-        if self.child.poll() is None:
+        # A configured player may be a wrapper that starts a child audio
+        # process. Stop its whole private session so no descendant keeps
+        # speaking after the request has been cancelled.
+        if not self._stopped:
+            self._stopped = True
             try:
-                self.child.kill()
+                os.killpg(self.child.pid, signal.SIGKILL)
             except ProcessLookupError:
                 pass
         self.thread.join()
@@ -247,6 +253,7 @@ def play_incremental(text: str, config: Path, bundle: Path, player: Path,
     plan = (prepare_plan(text, config, bundle)
             if technical_mode == "natural" else
             prepare_plan(text, config, bundle, technical_mode=technical_mode))
+    planned_at = time.monotonic()
     chunks = plan["chunks"]
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     try:
@@ -287,16 +294,20 @@ def play_incremental(text: str, config: Path, bundle: Path, player: Path,
         completed_samples = progress["completed_samples"] if progress else 0
         played = []
         first_play = None
+        previous_launch = None
         try:
+            worker_spawn_started = time.monotonic()
             for _ in range(active_workers):
                 workers.append(subprocess.Popen(
                     [str(dispatcher), str(bundle), "--session"],
                     stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE, text=True, bufsize=1))
+                    stderr=subprocess.PIPE, text=True, bufsize=1,
+                    start_new_session=True))
             for worker in workers:
                 assert worker.stdout is not None
                 if worker.stdout.readline().strip() != "READY\tloads=1":
                     raise PlaybackError("native Kokoro session did not become ready")
+            workers_ready = time.monotonic()
 
             def synthesize(chunk: dict, worker: subprocess.Popen) -> tuple:
                 index = chunk["index"]
@@ -331,6 +342,7 @@ def play_incremental(text: str, config: Path, bundle: Path, player: Path,
                         workers[(index - first_chunk) % active_workers])
                 if playing is not None:
                     previous_end = playing.finish()
+                    played[-1]["player_process_seconds"] = previous_end - previous_launch
                     playing.wav.unlink()
                     completed_samples += played[-1]["samples"]
                     if progress is not None:
@@ -341,6 +353,12 @@ def play_incremental(text: str, config: Path, bundle: Path, player: Path,
                 launched = time.monotonic()
                 if first_play is None:
                     first_play = launched
+                gap = (max(0.0, launched - previous_end)
+                       if previous_end is not None else None)
+                synthesis_underrun = (max(0.0, ready - previous_end)
+                                        if previous_end is not None else None)
+                handoff_delay = (max(0.0, launched - max(previous_end, ready))
+                                 if previous_end is not None else None)
                 total_samples += samples
                 played.append({"index": index, "source_start": chunk["source_start"],
                                "source_end": chunk["source_end"],
@@ -348,10 +366,13 @@ def play_incremental(text: str, config: Path, bundle: Path, player: Path,
                                "samples": samples, "audio_seconds": samples / 24000,
                                "wav_sha256": wav_sha256,
                                "synthesis_seconds": ready - synthesis_started,
-                               "playback_gap_seconds": (max(0.0, launched - previous_end)
-                                                        if previous_end is not None else None)})
+                               "playback_gap_seconds": gap,
+                               "synthesis_underrun_seconds": synthesis_underrun,
+                               "handoff_delay_seconds": handoff_delay})
+                previous_launch = launched
             if playing is not None:
-                playing.finish()
+                ended = playing.finish()
+                played[-1]["player_process_seconds"] = ended - previous_launch
                 playing.wav.unlink()
                 completed_samples += played[-1]["samples"]
                 if progress is not None:
@@ -375,7 +396,7 @@ def play_incremental(text: str, config: Path, bundle: Path, player: Path,
                 for worker in workers:
                     if worker.poll() is None:
                         try:
-                            worker.kill()
+                            os.killpg(worker.pid, signal.SIGKILL)
                         except ProcessLookupError:
                             pass
                         worker.wait()
@@ -404,9 +425,16 @@ def play_incremental(text: str, config: Path, bundle: Path, player: Path,
             "resume_from_chunk": first_chunk,
             "total_chunk_count": len(chunks),
             "audio_seconds": total_samples / 24000,
+            "plan_seconds": planned_at - started,
+            "worker_startup_seconds": workers_ready - worker_spawn_started,
             "playback_gap_total_seconds": sum(
                 item["playback_gap_seconds"] or 0.0 for item in played),
+            "synthesis_underrun_total_seconds": sum(
+                item["synthesis_underrun_seconds"] or 0.0 for item in played),
+            "handoff_delay_total_seconds": sum(
+                item["handoff_delay_seconds"] or 0.0 for item in played),
             "first_playback_start_seconds": first_play - started,
+            "first_audible_audio": "not_measured",
             "total_seconds": time.monotonic() - started,
             "known_connected_waveform_parity": "fail_unresolved"}
 
