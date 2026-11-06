@@ -1,0 +1,79 @@
+<!-- TITLE: v8 Vision Capability Status -->
+<!-- NAV: architecture-links -->
+
+<style>
+.vision-status-intro { max-width: 76rem; }
+.vision-status-meta { color: var(--text-secondary); font-size: 0.88rem; }
+.vision-status-table-wrap { overflow-x: auto; margin: 1rem 0 1.5rem; }
+.vision-status-table { border-collapse: collapse; min-width: 960px; width: 100%; }
+.vision-status-table th, .vision-status-table td {
+    border-bottom: 1px solid var(--grey); padding: 0.65rem 0.55rem;
+    text-align: left; vertical-align: top; font-size: 0.88rem;
+}
+.vision-status-table th { font-size: 0.78rem; white-space: nowrap; }
+.vision-status-table th:first-child, .vision-status-table td:first-child { min-width: 9rem; }
+.vision-status-table td:last-child { min-width: 13rem; }
+.vision-status-table small { display: block; color: var(--text-secondary); line-height: 1.4; margin-top: 0.25rem; }
+.vision-status-label { display: inline-block; font-weight: 700; white-space: nowrap; }
+.vision-status-label.pass { color: #79d2a2; }
+.vision-status-label.fail { color: #f28c86; }
+.vision-status-label.pending { color: #e7bd76; }
+.vision-status-label.none { color: #b6c7d5; }
+.vision-status-next { border-top: 1px solid var(--grey); padding-top: 0.7rem; }
+</style>
+
+<h1>v8 Vision Capability Status</h1>
+<p class="vision-status-intro">Artifact-specific status for generated image execution. Encoder numerics, decoder numerics, task quality, and live serving are separate gates. A passing shared-prefix decoder test does not certify image preprocessing or the encoder.</p>
+<p class="vision-status-meta"><strong>Evidence reviewed:</strong> 2026-11-06. This is a curated snapshot, not a live nightly result. Links identify the result and its scope; a newer build needs its own evidence.</p>
+
+<div class="alert alert-warning"><strong>No full vision artifact is certified for the HTTP harness yet.</strong> Generated image paths run, but independent numerical, task-quality, and live-serving gates have not all passed on one pinned artifact. Unsupported bundles should continue rejecting image requests.</div>
+
+<div class="vision-status-table-wrap" role="region" aria-label="Vision artifact status" tabindex="0">
+<table class="vision-status-table">
+<thead><tr><th scope="col">CKE artifact</th><th scope="col">Encoder vs llama.cpp</th><th scope="col">Decoder vs llama.cpp</th><th scope="col">PyTorch</th><th scope="col">Image tasks</th><th scope="col">HTTP / harness</th><th scope="col">First unresolved boundary</th></tr></thead>
+<tbody>
+<tr>
+  <th scope="row">Qwen3-VL<br><small><code>qwen3_vl_vision</code> + <code>qwen3vl</code></small></th>
+  <td><span class="vision-status-label fail">FAIL: strict prefix gate</span><small>Production-flash comparison retains a concentrated outlier; older aggregate passes do not satisfy the current maximum-error contract. <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/pull/889">#889</a></small></td>
+  <td><span class="vision-status-label pending">Historical scoped PASS</span><small>Shared-prefix decoder campaigns passed under older artifacts and oracle settings. Current independent-prefix certification is open. <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/pull/506">#506</a></small></td>
+  <td><span class="vision-status-label none">NOT TESTED</span><small>No complete independent PyTorch encoder-to-decoder verdict recorded here.</small></td>
+  <td><span class="vision-status-label pending">NOT CERTIFIED</span><small>Current independent image-to-answer and broader quality gates remain open.</small></td>
+  <td><span class="vision-status-label none">NOT CONNECTED</span><small>Image upload and tool continuation are not promoted. <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/issues/894">#894</a></small></td>
+  <td>Late visual-prefix row outlier; its first causal layer is unresolved. <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/issues/893">Track</a></td>
+</tr>
+<tr>
+  <th scope="row">Qwen3.6-VL<br><small><code>qwen36vl</code></small></th>
+  <td><span class="vision-status-label fail">FAIL: strict prefix gate</span><small>Retained public case: maximum 0.0490 against 0.01; RMSE 0.000427 against 0.001. <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/pull/949">#949</a></small></td>
+  <td><span class="vision-status-label fail">FAIL: numerical trajectory</span><small>Independent prefixes matched token choices in one case, but step-3 logit RMSE reached 0.501. Shared-prefix and independent-prefix lanes remain distinct. <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/pull/949">#949</a></small></td>
+  <td><span class="vision-status-label none">NOT TESTED</span><small>No complete independent PyTorch verdict recorded here.</small></td>
+  <td><span class="vision-status-label pass">SCOPED PASS</span><small>One public clean-text image produced the expected answer; this is not corpus or general-vision certification. <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/pull/949">#949</a></small></td>
+  <td><span class="vision-status-label none">NOT CONNECTED</span><small>No promoted image-capable bundle.</small></td>
+  <td>Encoder outlier origin unresolved; decoder numerical divergence persists even in a shared-prefix diagnostic.</td>
+</tr>
+<tr>
+  <th scope="row">Gemma4<br><small><code>gemma4_vision</code> + <code>gemma4</code></small></th>
+  <td><span class="vision-status-label pass">SCOPED PASS</span><small>Public table case: 72 visual tokens, RMSE 0.000467 and maximum 0.007234 within the declared 0.001 / 0.01 limits. Not a family-wide verdict. <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/pull/970">#970</a></small></td>
+  <td><span class="vision-status-label fail">NUMERICAL MISMATCH</span><small>Same run: shared-prefix first-logit RMSE 0.312, maximum 2.186; independent-prefix RMSE 0.384, maximum 2.411. Matching top token is not parity. <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/pull/970">#970</a></small></td>
+  <td><span class="vision-status-label none">NOT TESTED</span><small>No complete PyTorch decoder comparison recorded here.</small></td>
+  <td><span class="vision-status-label pending">LIMITED EXECUTION</span><small>Image-fed answers have been generated; broader scored quality remains open. The EOS output-contract fix is separate. <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/pull/1040">#1040</a></small></td>
+  <td><span class="vision-status-label none">NOT CONNECTED</span><small>Generated bridge execution is not an HTTP harness PASS.</small></td>
+  <td>Layer-0 attention output is the first observed decoder mismatch on the cited case (maximum 0.00419). Its locally introduced cause is not proven. <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/issues/892">Track</a></td>
+</tr>
+<tr>
+  <th scope="row">Cohere Compass<br><small><code>cohere_compass_vision</code></small></th>
+  <td><span class="vision-status-label pending">IMPLEMENTED, NOT CERTIFIED</span><small>A vision circuit exists; a complete pinned generated-prefix verdict is not recorded. <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/circuits/cohere_compass_vision.json">Circuit</a></small></td>
+  <td><span class="vision-status-label none">NOT TESTED</span></td>
+  <td><span class="vision-status-label pending">PARTIAL</span><small>Official-PyTorch X-Ray evidence is cited for selected operations, not a complete artifact-level encoder comparison. <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/circuits/cohere_compass_vision.json">Contract</a></small></td>
+  <td><span class="vision-status-label none">NOT TESTED</span></td>
+  <td><span class="vision-status-label none">NOT CONNECTED</span></td>
+  <td>Fresh generated encoder, bridge, and independent-oracle evidence are needed before naming a numerical layer.</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h2>Inventory boundary</h2>
+<p><code>qwen35</code>, <code>qwen38</code>, <code>instella_moe</code>, and <code>nemotron_h</code> are text/recurrent circuits in this inventory. Their text compatibility does not certify a vision encoder. An exact vision-capable artifact and a connected CKE path must be identified before adding a numerical verdict for them.</p>
+
+<h2>Next acceptance gate</h2>
+<p class="vision-status-next">For Gemma4, freeze the already compared visual prefix and forced tokens. Replay the first differing decoder operation on identical operands, distinguishing the first observed attention-output mismatch from a proven local cause. After a justified fix, rerun shared-prefix logits, independent-prefix logits, and scored image answers separately. Keep <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/issues/851">the tracking issue</a> open until one exact artifact completes the image-to-answer and live-serving gates.</p>
