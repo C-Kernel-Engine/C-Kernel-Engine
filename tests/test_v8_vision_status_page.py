@@ -23,6 +23,9 @@ class VisionStatusPageTests(unittest.TestCase):
                          "Image tasks", "HTTP / harness", "First unresolved boundary"):
             self.assertIn(boundary, body)
         self.assertIn("No full vision artifact is certified", body)
+        qwen3vl_row = body.split('<th scope="row">Qwen3-VL', 1)[1].split("</tr>", 1)[0]
+        self.assertIn("INCOMPLETE: no maximum bound", qwen3vl_row)
+        self.assertNotIn("FAIL: strict prefix gate", qwen3vl_row)
         self.assertNotIn("/data/cke/", body)
         self.assertNotIn("/home/", body)
 
