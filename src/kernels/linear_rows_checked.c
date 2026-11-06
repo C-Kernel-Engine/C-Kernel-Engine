@@ -36,14 +36,44 @@ int linear_rows_checked_f32(
         (bias ? bias_elements < output_channels : bias_elements != 0))
         return -1;
 
-    /* Validate every accessed value and every result before the first write. */
+    /* Validate every accessed value before the first write. A conservative
+     * absolute bound permits one compute pass for ordinary model values.
+     * Values near the FP32 limit retain the exact two-pass staging path. */
+    double max_input = 0.0;
+    double max_weight_l1 = 0.0;
+    double max_bias = 0.0;
     for (size_t r = 0; r < rows; ++r)
         for (size_t c = 0; c < input_channels; ++c)
-            if (!isfinite(input[r * input_stride + c])) return -1;
+        {
+            const float value = input[r * input_stride + c];
+            if (!isfinite(value)) return -1;
+            const double absolute = fabs((double)value);
+            if (absolute > max_input) max_input = absolute;
+        }
     for (size_t o = 0; o < output_channels; ++o) {
         if (bias && !isfinite(bias[o])) return -1;
+        if (bias && fabs((double)bias[o]) > max_bias)
+            max_bias = fabs((double)bias[o]);
+        double weight_l1 = 0.0;
         for (size_t c = 0; c < input_channels; ++c)
-            if (!isfinite(weight[o * weight_stride + c])) return -1;
+        {
+            const float value = weight[o * weight_stride + c];
+            if (!isfinite(value)) return -1;
+            weight_l1 += fabs((double)value);
+        }
+        if (weight_l1 > max_weight_l1) max_weight_l1 = weight_l1;
+    }
+    /* At most UINT32_MAX positive terms keep FP64 summation error far below
+     * the 4x guard, including error in the L1 bound. Every result therefore
+     * fits FP32 and publishing cannot fail after the first output write. */
+    if (input_channels <= (SIZE_MAX / 4) && input_channels <= UINT32_MAX &&
+        max_input * max_weight_l1 + max_bias <= (double)FLT_MAX / 4.0) {
+        for (size_t r = 0; r < rows; ++r)
+            for (size_t o = 0; o < output_channels; ++o)
+                output[r * output_stride + o] = (float)dot_bias(
+                    input + r * input_stride, weight + o * weight_stride,
+                    input_channels, bias ? bias[o] : 0.0f);
+        return 0;
     }
     for (size_t r = 0; r < rows; ++r)
         for (size_t o = 0; o < output_channels; ++o) {

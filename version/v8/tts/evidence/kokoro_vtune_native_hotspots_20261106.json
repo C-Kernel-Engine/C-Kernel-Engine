@@ -1,0 +1,65 @@
+{
+  "schema": "cke.kokoro.vtune_native_hotspots.v1",
+  "date_utc": "2026-11-06",
+  "source_revision": "475fbc64449356154d8679a5da8dda3d22ff0ced",
+  "host_cpu": "Intel Core i7-14700T",
+  "profiler": "Intel VTune 2026.0.0 build 631999",
+  "bundle_identity_sha256": "24f4b2428aa0099a618677e27fc4aea48c4f271d7a45256dfaf815bb2b612ac3",
+  "bundle_manifest_sha256": "a8c0a8eef775c8a69f124a5c4e4a1439e798f13a6812d62b390e6154b68356e8",
+  "bundle_conv_provider": "avx2_parallel",
+  "bundle_conv_workers": 8,
+  "requests": [
+    {
+      "phoneme_ids": 34,
+      "seed": 7,
+      "valid_samples": 56400,
+      "wav_sha256": "b1a64fb48db2d1ffeb518926306c34eeeda7be786bc313bdd9cb6269adde649f"
+    },
+    {
+      "phoneme_ids": 39,
+      "seed": 8,
+      "valid_samples": 66600,
+      "wav_sha256": "0440e115f7085bd104cd990fa57de695a07720d6f98876b9e8a385e71e9222d8"
+    }
+  ],
+  "hotspots": {
+    "elapsed_seconds": 14.089131,
+    "cpu_seconds": 20.039831,
+    "thread_count": 8,
+    "functions": [
+      {
+        "name": "audio_conv1d_compute_avx2",
+        "cpu_seconds": 6.989859,
+        "cpu_percent": 34.9
+      },
+      {
+        "name": "linear_rows_checked_f32",
+        "cpu_seconds": 5.109907,
+        "cpu_percent": 25.5
+      },
+      {
+        "name": "dense_deconv_checked",
+        "cpu_seconds": 2.640124,
+        "cpu_percent": 13.2
+      }
+    ],
+    "vtune_summary_sha256": "45da634c99da132bb135b87bf9e4b07d30253559a009e31dbc867cd7355bc395"
+  },
+  "microarchitecture": {
+    "elapsed_seconds": 14.086082,
+    "p_core_retiring_percent": 54.1,
+    "p_core_front_end_bound_percent": 4.8,
+    "p_core_back_end_bound_percent": 43.1,
+    "p_core_memory_bound_percent": 7.1,
+    "p_core_core_bound_percent": 36.1,
+    "vtune_summary_sha256": "98a853438a7acb59527f4d9c597a6f05acef2de536efb517bbdcadd10fef4ce5"
+  },
+  "comparison": "Both profiled WAV hashes match the unprofiled two-chunk session WAV hashes in kokoro_session_timed_player_20261106.json.",
+  "next_experiment": "Benchmark an explicitly selected reusable linear-rows provider against the scalar FP64 contract, with local error, full-WAV output, rejection staging and whole-request latency. Keep scalar as baseline.",
+  "limitations": [
+    "one two-request sample on one Intel host",
+    "profile excludes frontend planning and audible playback",
+    "no P3 or Ryzen measurement",
+    "connected pinned-model waveform parity unresolved"
+  ]
+}
