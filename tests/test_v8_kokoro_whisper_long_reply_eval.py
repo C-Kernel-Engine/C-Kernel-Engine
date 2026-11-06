@@ -109,6 +109,13 @@ def test_identifier_hyphen_is_not_a_negative_number(tmp_path):
     assert result["missing_exact_numbers"] == []
 
 
+def test_identifier_rule_does_not_hide_subtraction_signs():
+    assert evaluator.NUMBERS.findall(evaluator._identifier_aware("PR-1035 x-3.5")) == [
+        "1035", "-3.5"]
+    assert evaluator.NUMBERS.findall(evaluator._identifier_aware("PR-1035 x+3.5")) == [
+        "1035", "+3.5"]
+
+
 @pytest.mark.parametrize("mutation", ["fixed_window", "early_end", "wrong_audio",
                                          "text_gap", "wrong_resample_hash"])
 def test_incomplete_or_mixed_run_is_rejected(tmp_path, mutation):

@@ -16,11 +16,15 @@ import re
 import wave
 
 
-# A sign is meaningful after whitespace or punctuation, but the hyphen in
-# identifiers such as PR-1035 must not turn 1035 into a negative quantity.
-NUMBER_PATTERN = r"(?<![A-Za-z0-9])[-+]\d+(?:[,.]\d+)*|\d+(?:[,.]\d+)*"
-WORDS = re.compile(NUMBER_PATTERN + r"|[a-z]+(?:'[a-z]+)?")
-NUMBERS = re.compile(NUMBER_PATTERN)
+WORDS = re.compile(r"[+-]?\d+(?:[,.]\d+)*|[a-z]+(?:'[a-z]+)?")
+NUMBERS = re.compile(r"[+-]?\d+(?:[,.]\d+)*")
+IDENTIFIER_HYPHEN = re.compile(r"\b(PR|issue|RFC)[-–](?=\d)", re.IGNORECASE)
+
+
+def _identifier_aware(text: str) -> str:
+    # PR-1035 is an identifier. A general x-3.5 expression still keeps its
+    # minus sign; only declared identifier prefixes receive this normalization.
+    return IDENTIFIER_HYPHEN.sub(lambda match: match.group(1) + " ", text)
 
 
 def _sha256(path: Path) -> str:
@@ -32,7 +36,7 @@ def _sha256(path: Path) -> str:
 
 
 def _tokens(text: str) -> list[str]:
-    return WORDS.findall(text.casefold())
+    return WORDS.findall(_identifier_aware(text).casefold())
 
 
 def _distance(reference: list[str], candidate: list[str]) -> int:
@@ -131,8 +135,8 @@ def evaluate(source_path: Path, plan_path: Path, tts_path: Path, wav_path: Path,
     expected = _tokens(source)
     observed = _tokens(transcript)
     wer = _distance(expected, observed) / len(expected)
-    expected_numbers = NUMBERS.findall(source)
-    observed_numbers = NUMBERS.findall(transcript)
+    expected_numbers = NUMBERS.findall(_identifier_aware(source))
+    observed_numbers = NUMBERS.findall(_identifier_aware(transcript))
     missing_numbers = list((Counter(expected_numbers) - Counter(observed_numbers)).elements())
     unexpected_numbers = list((Counter(observed_numbers) - Counter(expected_numbers)).elements())
     return {
