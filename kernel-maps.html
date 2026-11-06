@@ -1961,6 +1961,24 @@ migration ratchet tracks.</p>
   })();
 </script>
 
+<h2 id="declared-state-slices">Declared state slices and scratch capacities</h2>
+<p>A circuit can declare an activation buffer with <code>scope: "layer"</code>.
+Its leading shape extent must equal <code>num_layers</code>; lowering selects that
+layer's byte slice for both reads and writes. The default <code>shared</code> scope
+uses one buffer across layers. RWKV-7 uses layer-scoped attention shifts, FFN shifts,
+and WKV state, while its first-layer value is shared for the current token.
+Both region and packed layouts retain the slice metadata.</p>
+<p>Kernel ABIs use <code>scratch_size:name</code> for bytes and
+<code>scratch_elements:name</code> for the element count of a named typed scratch
+region. Element capacity rejects missing storage and misaligned byte extents;
+unrelated scratch allocations must not increase the advertised capacity.
+Unused arguments belong in a provider map as explicit <code>null</code> sources,
+rather than model-specific conditions in generic call lowering.</p>
+<p>RWKV-7's rank, state-slice, and call-ABI tests establish conversion and lowering
+contracts. Primitive PyTorch comparisons are separate evidence. The native
+<code>rwkv_world_trie</code> tokenizer and full generated model execution remain
+uncertified; these tests do not establish a usable RWKV chat server.</p>
+
 <p>Related: <a href="v8-numerical-contracts.html">v8 Numerical Contracts</a>, <a href="architecture.html">System Architecture</a>, <a href="kernel-architecture.html#composite-circuits">Composite Circuits</a> (components + stitch), <a href="codegen.html">Code Generation</a>, <a href="gguf-bump.html">GGUF to Bump</a>, and <a href="architecture-links.html">Architecture Links</a>.</p>
     </main>
 
