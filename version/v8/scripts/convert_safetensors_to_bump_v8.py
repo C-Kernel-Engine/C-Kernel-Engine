@@ -1604,7 +1604,160 @@ def _build_gemma4_attention_plan_from_hf(text: dict[str, Any], headers: dict[str
     }
 
 
-def _build_config(model_dir: Path, arch: str, config_template: Path | None) -> dict[str, Any]:
+_RWKV7_RANK_CONTRACT: dict[str, dict[str, Any]] = {
+    "decay_rank": {
+        "aliases": (
+            "decay_rank",
+            "decay_lora_rank",
+            "lora_rank_decay",
+            "decay_low_rank_dim",
+        ),
+        "tensors": (("att.w1", -1), ("att.w2", 0)),
+    },
+    "key_rank": {
+        "aliases": (
+            "key_rank",
+            "iclr_rank",
+            "iclr_lora_rank",
+            "lora_rank_iclr",
+            "a_low_rank_dim",
+        ),
+        "tensors": (("att.a1", -1), ("att.a2", 0)),
+    },
+    "value_rank": {
+        "aliases": (
+            "value_rank",
+            "value_residual_mix_lora_rank",
+            "lora_rank_value_residual_mix",
+            "v_low_rank_dim",
+        ),
+        "tensors": (("att.v1", -1), ("att.v2", 0)),
+    },
+    "gate_rank": {
+        "aliases": (
+            "gate_rank",
+            "gate_lora_rank",
+            "lora_rank_gate",
+            "gate_low_rank_dim",
+        ),
+        "tensors": (("att.g1", -1), ("att.g2", 0)),
+    },
+}
+
+
+def _first_config_value(
+    text: dict[str, Any], hf: dict[str, Any], keys: tuple[str, ...]
+) -> Any:
+    for source in (text, hf):
+        for key in keys:
+            value = source.get(key)
+            if value is not None:
+                return value
+    return None
+
+
+def _rwkv7_positive_rank(value: Any, label: str) -> int:
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        raise SystemExit(f"RWKV-7 {label} must be a positive integer") from None
+    if (
+        isinstance(value, bool)
+        or not math.isfinite(numeric)
+        or int(numeric) != numeric
+        or int(numeric) <= 0
+    ):
+        raise SystemExit(f"RWKV-7 {label} must be a positive integer")
+    return int(numeric)
+
+
+def _rwkv7_shape_ranks(
+    headers: dict[str, HeaderTensor],
+    num_layers: int,
+    tensors: tuple[tuple[str, int], ...],
+    embed_dim: int,
+) -> dict[int, str]:
+    """Read authoritative LoRA ranks from checkpoint tensor shapes."""
+    found: dict[int, str] = {}
+    for layer in range(num_layers):
+        for suffix, axis in tensors:
+            header = headers.get(f"rwkv7.blocks.{layer}.{suffix}")
+            if header is None:
+                continue
+            shape = list(header.shape or [])
+            rank_axis = axis % 2
+            if (len(shape) != 2 or any(int(x) <= 0 for x in shape)
+                    or int(shape[1 - rank_axis]) != embed_dim):
+                raise SystemExit(
+                    f"RWKV-7 invalid low-rank tensor geometry: rwkv7.blocks.{layer}.{suffix}{tuple(shape)}"
+                )
+            value = int(shape[rank_axis])
+            found.setdefault(
+                value,
+                f"rwkv7.blocks.{layer}.{suffix}{tuple(shape)}",
+            )
+    return found
+
+
+def _resolve_rwkv7_ranks(
+    cfg: dict[str, Any],
+    text: dict[str, Any],
+    hf: dict[str, Any],
+    headers: dict[str, HeaderTensor] | None,
+    num_layers: int,
+) -> None:
+    """Normalize upstream RWKV-7 rank names and validate them against weights.
+
+    Upstream RWKV-7 configs expose the four LoRA ranks under different names
+    (``decay_lora_rank``, ``iclr_rank``, ``lora_rank_decay``,
+    ``*_low_rank_dim``, ...) and some checkpoints omit them entirely, letting
+    the reference implementation derive defaults. CKE's kernel maps always
+    consume the canonical names, so resolve those here. Tensor shapes are the
+    authoritative source and config values must agree with them.
+    """
+    for canonical, spec in _RWKV7_RANK_CONTRACT.items():
+        configured = {
+            _rwkv7_positive_rank(source[key], key)
+            for source in (text, hf) for key in spec["aliases"]
+            if source.get(key) is not None
+        }
+        if len(configured) > 1:
+            raise SystemExit(f"RWKV-7 {canonical} has conflicting config aliases")
+        explicit = next(iter(configured), None)
+        shaped = (
+            {}
+            if headers is None
+            else _rwkv7_shape_ranks(headers, num_layers, spec["tensors"], int(cfg["embed_dim"]))
+        )
+        if len(shaped) > 1:
+            raise SystemExit(
+                f"RWKV-7 {canonical} is inconsistent across checkpoint tensors: "
+                + ", ".join(sorted(shaped.values()))
+            )
+        derived = next(iter(shaped), None)
+        if explicit is not None and derived is not None and explicit != derived:
+            raise SystemExit(
+                f"RWKV-7 {canonical} config ({explicit}) disagrees with "
+                f"checkpoint tensor shape ({derived})"
+            )
+        resolved = explicit if explicit is not None else derived
+        if resolved is None:
+            if headers is None:
+                # Config-only call sites keep the historical optional behavior.
+                continue
+            raise SystemExit(
+                f"RWKV-7 {canonical} is missing from both config and checkpoint "
+                "tensor shapes; add it to config.json or provide the RWKV-7 rank tensors"
+            )
+        cfg[canonical] = resolved
+
+
+def _build_config(
+    model_dir: Path,
+    arch: str,
+    config_template: Path | None,
+    headers: dict[str, HeaderTensor] | None = None,
+) -> dict[str, Any]:
     hf = _hf_config(model_dir)
     base = _load_runtime_config_template(config_template)
     text = hf.get("text_config") if isinstance(hf.get("text_config"), dict) else hf
@@ -2705,7 +2858,8 @@ def _build_config(model_dir: Path, arch: str, config_template: Path | None) -> d
         hidden_size = int(text.get("hidden_size") or hf.get("hidden_size") or 0)
         if num_layers <= 0 or hidden_size <= 0:
             raise SystemExit("RWKV-7 config missing num_hidden_layers/hidden_size")
-        head_size = int(text.get("head_size") or hf.get("head_size") or 0)
+        head_size_value = _first_config_value(text, hf, ("head_size", "head_dim"))
+        head_size = int(head_size_value or 0)
         num_heads = int(
             text.get("num_heads")
             or text.get("num_attention_heads")
@@ -2746,7 +2900,9 @@ def _build_config(model_dir: Path, arch: str, config_template: Path | None) -> d
         if not math.isfinite(hidden_ratio) or hidden_ratio <= 0 or hidden_size * hidden_ratio != intermediate_size:
             raise SystemExit("RWKV-7 hidden_ratio disagrees with intermediate_size")
         activation = str(text.get("hidden_act") or "squared_relu")
-        if activation != "squared_relu":
+        if activation in ("sqrelu", "squared_relu"):
+            activation = "squared_relu"
+        else:
             raise SystemExit("RWKV-7 circuit requires squared_relu activation")
         if text.get("tie_word_embeddings", False):
             raise SystemExit("RWKV-7 importer requires an explicit untied head.weight")
@@ -2763,7 +2919,10 @@ def _build_config(model_dir: Path, arch: str, config_template: Path | None) -> d
         if context_length <= 0:
             context_length = 4096
         layer_kinds = ["layer_0"] + ["layer_gt0"] * max(0, num_layers - 1)
-        layer_eps = float(text.get("layer_norm_eps", text.get("norm_eps", 1e-5)))
+        layer_eps_value = _first_config_value(
+            text, hf, ("layer_norm_eps", "layer_norm_epsilon", "norm_eps")
+        )
+        layer_eps = float(1e-5 if layer_eps_value is None else layer_eps_value)
         if not math.isfinite(layer_eps) or layer_eps <= 0:
             raise SystemExit("RWKV-7 layer norm epsilon must be finite and positive")
         cfg.update({
@@ -2795,14 +2954,7 @@ def _build_config(model_dir: Path, arch: str, config_template: Path | None) -> d
             "rms_eps": layer_eps,
             "rms_norm_eps": layer_eps,
         })
-        for rank_key in ("decay_rank", "key_rank", "value_rank", "gate_rank"):
-            rank_value = text.get(rank_key)
-            if rank_value is None:
-                rank_value = hf.get(rank_key)
-            if rank_value is not None:
-                if isinstance(rank_value, bool) or int(rank_value) != rank_value or int(rank_value) <= 0:
-                    raise SystemExit(f"RWKV-7 {rank_key} must be a positive integer")
-                cfg[rank_key] = int(rank_value)
+        _resolve_rwkv7_ranks(cfg, text, hf, headers, num_layers)
     cfg = _inject_runtime_config_defaults(cfg, arch)
     if arch == "gemma4" and "layer_kinds" not in cfg:
         raise SystemExit("Gemma4 safetensors conversion currently requires --config-template with explicit layer_kinds/shared KV policy")
@@ -3373,7 +3525,7 @@ def main() -> int:
     if arch == "auto":
         arch = _infer_arch(hf)
 
-    config = _build_config(model_dir, arch, args.config_template)
+    config = _build_config(model_dir, arch, args.config_template, headers)
     _apply_linear_weight_runtime_config(
         config, _safetensors_arch_contract(arch), args.linear_weight_dtype
     )

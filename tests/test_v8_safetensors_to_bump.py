@@ -2965,6 +2965,16 @@ def _load_index_audit():
     return module
 
 
+def _load_codegen():
+    path = ROOT / "version" / "v8" / "scripts" / "codegen_v8.py"
+    spec = importlib.util.spec_from_file_location("codegen_v8_rwkv7_prefill_test", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 def test_rwkv7_contract_covers_1p5b_inventory() -> None:
     converter = _load_converter()
     names = _rwkv7_inventory_names()
@@ -3046,6 +3056,104 @@ def test_rwkv7_config_builder_derives_layer_kinds(tmp_path: Path) -> None:
     assert config["tie_word_embeddings"] is False
     assert config["decay_rank"] == 32
     assert config["rms_eps"] == 1e-5
+
+
+def test_rwkv7_config_builder_normalizes_upstream_rank_and_norm_names(
+    tmp_path: Path,
+) -> None:
+    converter = _load_converter()
+    hf_config = {
+        "model_type": "rwkv7",
+        "num_hidden_layers": 24,
+        "hidden_size": 2048,
+        "num_attention_heads": 32,
+        "head_dim": 64,
+        "hidden_ratio": 4,
+        "vocab_size": 65536,
+        "layer_norm_epsilon": 2e-5,
+        "hidden_act": "sqrelu",
+        "decay_low_rank_dim": 96,
+        "a_low_rank_dim": 96,
+        "v_low_rank_dim": 64,
+        "gate_low_rank_dim": 256,
+    }
+    (tmp_path / "config.json").write_text(json.dumps(hf_config), encoding="utf-8")
+
+    config = converter._build_config(tmp_path, "rwkv7", None)
+
+    assert config["decay_rank"] == 96
+    assert config["key_rank"] == 96
+    assert config["value_rank"] == 64
+    assert config["gate_rank"] == 256
+    assert config["head_dim"] == 64
+    assert config["layer_norm_eps"] == 2e-5
+    assert config["rms_eps"] == 2e-5
+    assert config["activation"] == "squared_relu"
+
+
+def test_rwkv7_config_builder_derives_ranks_from_tensor_shapes(
+    tmp_path: Path,
+) -> None:
+    converter = _load_converter()
+    hf_config = {
+        "model_type": "rwkv7",
+        "num_hidden_layers": 2,
+        "hidden_size": 16,
+        "head_size": 4,
+        "num_heads": 4,
+        "hidden_ratio": 4,
+        "vocab_size": 16,
+    }
+    (tmp_path / "config.json").write_text(json.dumps(hf_config), encoding="utf-8")
+
+    def header(name: str, shape: tuple[int, ...]):
+        return converter.HeaderTensor(
+            name, "BF16", list(shape), Path("model.safetensors")
+        )
+
+    headers = {}
+    ranks = {"w": 6, "a": 7, "v": 5, "g": 9}
+    for layer in range(2):
+        for suffix, rank in ranks.items():
+            headers[f"rwkv7.blocks.{layer}.att.{suffix}1"] = header(
+                f"rwkv7.blocks.{layer}.att.{suffix}1", (16, rank)
+            )
+            headers[f"rwkv7.blocks.{layer}.att.{suffix}2"] = header(
+                f"rwkv7.blocks.{layer}.att.{suffix}2", (rank, 16)
+            )
+
+    config = converter._build_config(tmp_path, "rwkv7", None, headers)
+
+    assert config["decay_rank"] == 6
+    assert config["key_rank"] == 7
+    assert config["value_rank"] == 5
+    assert config["gate_rank"] == 9
+
+
+def test_rwkv7_config_builder_rejects_rank_shape_mismatch(tmp_path: Path) -> None:
+    converter = _load_converter()
+    hf_config = {
+        "model_type": "rwkv7",
+        "num_hidden_layers": 2,
+        "hidden_size": 16,
+        "head_size": 4,
+        "num_heads": 4,
+        "hidden_ratio": 4,
+        "vocab_size": 16,
+        "decay_rank": 6,
+    }
+    (tmp_path / "config.json").write_text(json.dumps(hf_config), encoding="utf-8")
+    headers = {
+        "rwkv7.blocks.0.att.w1": converter.HeaderTensor(
+            "rwkv7.blocks.0.att.w1", "BF16", [16, 7], Path("model.safetensors")
+        ),
+        "rwkv7.blocks.0.att.w2": converter.HeaderTensor(
+            "rwkv7.blocks.0.att.w2", "BF16", [7, 16], Path("model.safetensors")
+        ),
+    }
+
+    with pytest.raises(SystemExit, match="decay_rank"):
+        converter._build_config(tmp_path, "rwkv7", None, headers)
 
 
 def test_rwkv7_tokenizer_contract_declares_world_trie(tmp_path: Path) -> None:
@@ -3152,6 +3260,78 @@ def test_rwkv7_kernel_weight_ports_are_bound() -> None:
             ), f"{op} cannot bind kernel weight port {port!r}: {weight_keys}"
             checked += 1
     assert checked >= 20
+
+
+def test_rwkv7_providers_certify_every_declared_phase() -> None:
+    build_ir = _load_build_ir()
+    circuit = json.loads(
+        (ROOT / "version" / "v8" / "circuits" / "rwkv7.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    requirements = circuit["contract"]["provider_numerical_requirements"]
+    kernel_maps = ROOT / "version" / "v8" / "kernel_maps"
+
+    kernel_ops = {
+        build_ir.TEMPLATE_TO_KERNEL_OP[op] for op in requirements
+    }
+    assert "rwkv7_wkv_decode" in kernel_ops
+
+    checked = 0
+    for kernel_op in sorted(kernel_ops):
+        if not str(kernel_op).startswith("rwkv7_"):
+            continue
+        path = kernel_maps / f"{kernel_op}_f32.json"
+        assert path.exists(), f"missing kernel map: {path}"
+        kernel = json.loads(path.read_text(encoding="utf-8"))
+        selection_phases = set(kernel["selection"]["phases"])
+        capability_phases = set(kernel["numerical_capabilities"][0]["phases"])
+        # The circuit declares decode and prefill for every RWKV-7 provider;
+        # the selection gate only reads ``selection.phases``, so a capability
+        # promoted for prefill must also be promoted for selection.
+        assert {"decode", "prefill"} <= selection_phases, (kernel_op, selection_phases)
+        assert selection_phases == capability_phases, (
+            kernel_op,
+            selection_phases,
+            capability_phases,
+        )
+        checked += 1
+    assert checked == 9
+
+
+def test_rwkv7_prefill_uses_token_serial_decode_path() -> None:
+    converter = _load_converter()
+    build_ir = _load_build_ir()
+    codegen = _load_codegen()
+    circuit = json.loads(
+        (ROOT / "version" / "v8" / "circuits" / "rwkv7.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    contract = converter._safetensors_arch_contract("rwkv7")
+
+    # T=1 RWKV-7 ops are reused token-serially; any other policy value makes
+    # codegen take the generated batched-prefill path.
+    assert circuit["flags"]["prefill_policy"] == "sequential_decode"
+    assert contract["config"]["prefill_policy"] == "sequential_decode"
+    assert (
+        codegen._uses_generated_batched_prefill({"config": contract["config"]})
+        is False
+    )
+    assert (
+        codegen._uses_generated_batched_prefill({"config": circuit["flags"]})
+        is False
+    )
+    assert (
+        codegen._uses_generated_batched_prefill(
+            {"config": {"prefill_policy": "batched"}}
+        )
+        is True
+    )
+
+    manifest: dict[str, object] = {"config": {}}
+    build_ir._apply_prefill_policy_override(manifest, "sequential_decode")
+    assert manifest["config"]["prefill_policy"] == "sequential_decode"
 
 
 def test_rwkv7_circuit_uses_canonical_matmul_ports_and_alias_safe_residuals() -> None:
@@ -3359,3 +3539,320 @@ def test_rwkv7_missing_required_weight_fails_closed(missing):
     headers = _rwkv7_headers(converter, _rwkv7_inventory_names(2) - {missing})
     with pytest.raises(SystemExit, match="Missing required safetensors tensor"):
         converter._refs_from_safetensors_contract("rwkv7", {"num_layers": 2}, headers)
+
+
+def _write_rwkv7_synthetic_checkpoint(
+    tmp_path: Path,
+    *,
+    layers: int = 2,
+    hidden: int = 8,
+    heads: int = 2,
+    vocab: int = 16,
+    ranks: tuple[int, int, int, int] = (2, 2, 2, 2),
+    include_ranks_in_config: bool = True,
+) -> Path:
+    torch = pytest.importorskip("torch")
+    st = pytest.importorskip("safetensors.torch")
+    import math
+
+    checkpoint = tmp_path / "checkpoint"
+    checkpoint.mkdir()
+    head_size = hidden // heads
+    config = dict(
+        model_type="rwkv7",
+        num_hidden_layers=layers,
+        hidden_size=hidden,
+        head_size=head_size,
+        num_heads=heads,
+        hidden_ratio=4,
+        vocab_size=vocab,
+        decay_rank=ranks[0],
+        key_rank=ranks[1],
+        value_rank=ranks[2],
+        gate_rank=ranks[3],
+    )
+    if not include_ranks_in_config:
+        for rank_key in ("decay_rank", "key_rank", "value_rank", "gate_rank"):
+            config.pop(rank_key, None)
+    (checkpoint / "config.json").write_text(json.dumps(config))
+    (checkpoint / "tokenizer.json").write_text(json.dumps({
+        "model": {"type": "WordPiece",
+                  "vocab": {chr(65 + i): i for i in range(vocab)}}}))
+    (checkpoint / "tokenizer_config.json").write_text(
+        json.dumps({"backend": "rwkv_world_trie"}))
+
+    tensors = {}
+    rank_for = {".w1": ranks[0], ".w2": ranks[0],
+                ".a1": ranks[1], ".a2": ranks[1],
+                ".g1": ranks[3], ".g2": ranks[3],
+                ".v1": ranks[2], ".v2": ranks[2]}
+    for index, name in enumerate(sorted(_rwkv7_inventory_names(layers))):
+        shape = (hidden,)
+        if name in ("head.weight", "rwkv7.emb.weight"):
+            shape = (vocab, hidden)
+        elif name.endswith(("receptance.weight", "att.key.weight",
+                            "att.value.weight", "output.weight")):
+            shape = (hidden, hidden)
+        elif name.endswith("ffn.key.weight"):
+            shape = (hidden * 4, hidden)
+        elif name.endswith("ffn.value.weight"):
+            shape = (hidden, hidden * 4)
+        elif name.endswith(tuple(rank_for)) and name.endswith((".w1", ".a1", ".v1", ".g1")):
+            shape = (hidden, rank_for[name[-3:]])
+        elif name.endswith(tuple(rank_for)) and name.endswith((".w2", ".a2", ".v2", ".g2")):
+            shape = (rank_for[name[-3:]], hidden)
+        elif name.endswith(".r_k"):
+            shape = (heads, head_size)
+        tensors[name] = (
+            (torch.arange(math.prod(shape)).reshape(shape) - 7) / 16 + index / 8
+        ).to(torch.bfloat16)
+    st.save_file(tensors, checkpoint / "model.safetensors")
+    return checkpoint
+
+
+def test_rwkv7_kernel_maps_use_real_config_dims_and_scratch() -> None:
+    build_ir = _load_build_ir()
+    kernel_maps = ROOT / "version" / "v8" / "kernel_maps"
+    expected_dim_sources = {
+        "rwkv7_time_mix_shifts_f32.json": {"dim": "embed_dim"},
+        "rwkv7_kk_factor_f32.json": {"dim": "embed_dim"},
+        "rwkv7_scale_k_f32.json": {"dim": "embed_dim"},
+        "rwkv7_lora_gates_f32.json": {
+            "dim": "embed_dim",
+            "rank_w": "decay_rank",
+            "rank_a": "key_rank",
+            "rank_g": "gate_rank",
+        },
+        "rwkv7_vgate_vmix_f32.json": {
+            "dim": "embed_dim",
+            "rank_v": "value_rank",
+        },
+        "rwkv7_channelmix_decode_f32.json": {
+            "dim": "embed_dim",
+            "hidden_dim": "intermediate_size",
+        },
+        "rwkv7_wkv_decode_f32.json": {
+            "norm_eps": "layer_norm_eps",
+        },
+    }
+    forbidden = {"dim", "rank_w", "rank_a", "rank_g", "rank_v",
+                 "hidden_dim", "normalization_epsilon"}
+    for filename, mapping in expected_dim_sources.items():
+        kernel = json.loads((kernel_maps / filename).read_text(encoding="utf-8"))
+        params = {
+            param["name"]: param
+            for param in kernel.get("call_abi", {}).get("params", [])
+        }
+        for port, config_key in mapping.items():
+            source = params[port]["source"]
+            assert source == f"dim:{config_key}", (filename, port, source)
+        for param in params.values():
+            source = str(param.get("source", ""))
+            if not source.startswith("dim:"):
+                continue
+            key = source.split(":", 1)[1]
+            if key in forbidden:
+                raise AssertionError(f"{filename} still uses stale dim source {source!r}")
+
+    channelmix = json.loads(
+        (kernel_maps / "rwkv7_channelmix_decode_f32.json").read_text(encoding="utf-8")
+    )
+    scratch = {entry["name"]: entry for entry in channelmix["scratch"]}
+    assert scratch["scratch"]["size_resolution"] == "required"
+    assert scratch["scratch"]["size_bytes"] == "(H + I) * 4"
+    params = {p["name"]: p for p in channelmix["call_abi"]["params"]}
+    assert params["scratch"]["source"] == "scratch:scratch"
+    assert params["scratch_elems"]["source"] == "scratch_elements:scratch"
+
+    config = {
+        "embed_dim": 128,
+        "num_heads": 2,
+        "head_dim": 64,
+        "intermediate_size": 512,
+        "vocab_size": 32,
+    }
+    for op in (
+        "rwkv7_r_proj",
+        "rwkv7_k_proj",
+        "rwkv7_v_proj",
+        "rwkv7_out_proj",
+    ):
+        assert build_ir.compute_matmul_dims(op, config) == (128, 128)
+
+
+def test_rwkv7_wkv_binds_rk_as_per_layer_weight() -> None:
+    build_ir = _load_build_ir()
+    kernel = json.loads(
+        (ROOT / "version" / "v8" / "kernel_maps"
+         / "rwkv7_wkv_decode_f32.json").read_text(encoding="utf-8")
+    )
+    param = next(p for p in kernel["call_abi"]["params"] if p["name"] == "rk")
+    assert param["source"] == "weight:rk"
+    assert param["ports"] == ["weight:rk"]
+    assert "rk" not in {entry["name"] for entry in kernel["inputs"]}
+    assert "rk" in {entry["name"] for entry in kernel["weights"]}
+    assert build_ir.WEIGHT_TO_KERNEL_INPUT["attn_wkv_rk"] == "rk"
+    assert build_ir.OP_DATAFLOW["rwkv7_wkv_decode"]["inputs"].get("rk") is None
+
+
+@pytest.mark.parametrize("layout_mode", ["region", "packed"])
+def test_rwkv7_lower_3_binds_layer0_vgate_nulls_and_channelmix_scratch(
+    tmp_path: Path, layout_mode: str,
+) -> None:
+    checkpoint = _write_rwkv7_synthetic_checkpoint(tmp_path)
+    output = tmp_path / "out"
+    output.mkdir()
+    subprocess.run([
+        sys.executable, str(CONVERTER_PATH), "--checkpoint", str(checkpoint),
+        "--output", str(output / "weights.bump"),
+        "--config-out", str(output / "config.json"),
+        "--manifest-out", str(output / "weights_manifest.json"),
+        "--arch", "auto",
+    ], cwd=ROOT, check=True, capture_output=True, text=True)
+
+    run = subprocess.run([
+        sys.executable,
+        str(ROOT / "version" / "v8" / "scripts" / "build_ir_v8.py"),
+        "--manifest", str(output / "weights_manifest.json"),
+        "--mode", "prefill",
+        "--output", str(output / "ir1.json"),
+        "--layout-output", str(output / "layout.json"),
+        "--lowered-output", str(output / "lowered.json"),
+        "--call-output", str(output / "lowered_call.json"),
+        "--context-len", "8",
+        "--layout-mode", layout_mode,
+        "--logits-layout", "auto",
+    ], cwd=ROOT, capture_output=True, text=True)
+    assert run.returncode == 0, run.stderr[-4000:]
+
+    call_ir = json.loads((output / "lowered_call.json").read_text(encoding="utf-8"))
+    assert call_ir.get("errors") == []
+    assert [op["idx"] for op in call_ir["operations"] if op.get("errors")] == []
+
+    def args_of(op_name: str, layer: int) -> dict[str, dict]:
+        op = next(
+            item for item in call_ir["operations"]
+            if item["op"] == op_name and item["layer"] == layer
+        )
+        return {arg["name"]: arg for arg in op["args"]}
+
+    layer0_vgate = args_of("rwkv7_vgate_produce", 0)
+    for port in ("v_first", "xv", "v1", "v2", "v0"):
+        assert layer0_vgate[port]["expr"] == "NULL", (port, layer0_vgate[port])
+
+    wkv_args = args_of("rwkv7_wkv_decode", 0)
+    assert wkv_args["rk"]["source"] == "weight:rk"
+    assert "W_RWKV7_BLOCKS_0_ATT_R_K" in wkv_args["rk"]["expr"]
+    assert wkv_args["state_in"]["source"] == "activation:state_in"
+
+    channelmix = args_of("rwkv7_channelmix_decode", 0)
+    assert channelmix["scratch"]["source"] == "scratch:scratch"
+    assert channelmix["scratch"]["expr"] != "NULL"
+    assert channelmix["scratch_elems"]["expr"] == "40"  # C=8, I=32
+    # Each layer owns its recurrent slice; v_first is shared within a token.
+    lowered = json.loads((output / "lowered.json").read_text())
+    def lowered_op(name, layer):
+        return next(op for op in lowered["operations"] if op["op"] == name and op["layer"] == layer)
+    for name, port, stride in (
+        ("rwkv7_time_mix_shifts", "shift_in", 8 * 4),
+        ("rwkv7_channelmix_decode", "shift_in", 8 * 4),
+        ("rwkv7_wkv_decode", "state_in", 2 * 4 * 4 * 4),
+    ):
+        offsets = [lowered_op(name, layer)["activations"][port]["activation_offset"] for layer in (0, 1)]
+        assert offsets[1] - offsets[0] == stride, (name, offsets)
+    producer = lowered_op("rwkv7_vgate_produce", 0)["outputs"]["v_first_out"]
+    consumer = lowered_op("rwkv7_vgate_vmix", 1)["activations"]["v_first"]
+    assert producer["activation_offset"] == consumer["activation_offset"]
+    assert args_of("rwkv7_wkv_decode", 0)["state_in"]["expr"] != args_of("rwkv7_wkv_decode", 1)["state_in"]["expr"]
+
+    # Capacity belongs to the named scratch only, never to other scratch regions.
+    import copy
+    build_ir = _load_build_ir()
+    candidate = copy.deepcopy(lowered)
+    cm = next(op for op in candidate["operations"] if op["op"] == "rwkv7_channelmix_decode")
+    cm["scratch"].append({"name": "unrelated", "size": 4096, "dtype": "fp32", "scratch_offset": 0})
+    def capacity_call():
+        result = build_ir.generate_ir_lower_3(candidate, "prefill")
+        return next(op for op in result["operations"] if op["idx"] == cm["idx"])
+    call = capacity_call()
+    assert not call["errors"]
+    assert next(arg["expr"] for arg in call["args"] if arg["name"] == "scratch_elems") == "40"
+    named = next(item for item in cm["scratch"] if item["name"] == "scratch")
+    named["size"] = 159
+    assert any("invalid scratch byte extent" in error for error in capacity_call()["errors"])
+    cm["scratch"].remove(named)
+    assert any("missing scratch elements" in error for error in capacity_call()["errors"])
+
+
+def test_rwkv7_ranks_derived_from_tensor_shapes_reach_lower_3(
+    tmp_path: Path,
+) -> None:
+    ranks = (2, 3, 4, 5)
+    checkpoint = _write_rwkv7_synthetic_checkpoint(
+        tmp_path, ranks=ranks, include_ranks_in_config=False
+    )
+    output = tmp_path / "out"
+    output.mkdir()
+    subprocess.run([
+        sys.executable, str(CONVERTER_PATH), "--checkpoint", str(checkpoint),
+        "--output", str(output / "weights.bump"),
+        "--config-out", str(output / "config.json"),
+        "--manifest-out", str(output / "weights_manifest.json"),
+        "--arch", "auto",
+    ], cwd=ROOT, check=True, capture_output=True, text=True)
+
+    manifest = json.loads(
+        (output / "weights_manifest.json").read_text(encoding="utf-8")
+    )
+    assert manifest["config"]["decay_rank"] == ranks[0]
+    assert manifest["config"]["key_rank"] == ranks[1]
+    assert manifest["config"]["value_rank"] == ranks[2]
+    assert manifest["config"]["gate_rank"] == ranks[3]
+
+    run = subprocess.run([
+        sys.executable,
+        str(ROOT / "version" / "v8" / "scripts" / "build_ir_v8.py"),
+        "--manifest", str(output / "weights_manifest.json"),
+        "--mode", "prefill",
+        "--output", str(output / "ir1.json"),
+        "--layout-output", str(output / "layout.json"),
+        "--lowered-output", str(output / "lowered.json"),
+        "--call-output", str(output / "lowered_call.json"),
+        "--context-len", "8",
+        "--logits-layout", "auto",
+    ], cwd=ROOT, capture_output=True, text=True)
+    assert run.returncode == 0, run.stdout[-4000:] + run.stderr[-4000:]
+
+    call_ir = json.loads((output / "lowered_call.json").read_text(encoding="utf-8"))
+    assert call_ir.get("errors") == []
+    assert [op["idx"] for op in call_ir["operations"] if op.get("errors")] == []
+
+@pytest.mark.parametrize("declaration", [
+    {"shape": [2, 8], "scope": "unknown"},
+    {"shape": [3, 8], "scope": "layer"},
+    {"shape": [2], "scope": "layer"},
+])
+def test_declared_layer_scope_rejects_invalid_geometry(declaration):
+    with pytest.raises(RuntimeError, match="CIRCUIT BUFFER"):
+        _load_build_ir()._template_activation_buffer_specs(
+            {"activation_buffers": {"state": declaration}}, {"num_layers": 2}
+        )
+
+
+def test_rwkv7_rank_alias_conflict_is_rejected():
+    converter = _load_converter()
+    with pytest.raises(SystemExit, match="conflicting config aliases"):
+        converter._resolve_rwkv7_ranks(
+            {"embed_dim": 8}, {"decay_rank": 2, "decay_lora_rank": 3}, {}, None, 2
+        )
+
+
+@pytest.mark.parametrize("shape", [(8,), (8, 2, 1), (7, 2), (8, 0)])
+def test_rwkv7_rank_tensor_geometry_is_checked(shape):
+    from types import SimpleNamespace
+    converter = _load_converter()
+    with pytest.raises(SystemExit, match="invalid low-rank tensor geometry"):
+        converter._rwkv7_shape_ranks(
+            {"rwkv7.blocks.0.att.w1": SimpleNamespace(shape=shape)},
+            1, (("att.w1", -1),), 8,
+        )

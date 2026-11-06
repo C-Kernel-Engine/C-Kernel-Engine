@@ -15,10 +15,10 @@
       { "name": "kk", "source": "activation:kk", "cast": "const float*", "ports": ["input:kk"] },
       { "name": "a", "source": "activation:a", "cast": "const float*", "ports": ["input:a"] },
       { "name": "g", "source": "activation:g", "cast": "const float*", "ports": ["input:g"] },
-      { "name": "rk", "source": "activation:rk", "cast": "const float*", "ports": ["input:rk"] },
+      { "name": "rk", "source": "weight:rk", "cast": "const float*", "ports": ["weight:rk"] },
       { "name": "ln_w", "source": "weight:ln_w", "cast": "const float*", "ports": ["weight:ln_w"] },
       { "name": "ln_b", "source": "weight:ln_b", "cast": "const float*", "ports": ["weight:ln_b"] },
-      { "name": "norm_eps", "source": "dim:normalization_epsilon" },
+      { "name": "norm_eps", "source": "dim:layer_norm_eps" },
       { "name": "state_in", "source": "activation:state_in", "cast": "const float*", "ports": ["input:state_in"] },
       { "name": "state_out", "source": "output:state_out", "cast": "float*", "ports": ["output:state_out"] },
       { "name": "y_out", "source": "output:y", "cast": "float*", "ports": ["output:y"] },
@@ -27,7 +27,7 @@
     ],
     "version": 1
   },
-  "dims": ["C", "H", "N", "num_heads", "head_dim", "normalization_epsilon"],
+  "dims": ["C", "H", "N", "num_heads", "head_dim", "layer_norm_eps"],
   "id": "rwkv7_wkv_decode_f32",
   "provider_numerical_contract_schema": 1,
   "numerical_contract": {
@@ -121,16 +121,6 @@
       "consumption": "required",
       "dtype": "fp32",
       "layout": "head_major_row_major",
-      "name": "rk",
-      "placement": "local",
-      "shape": ["H", "N"],
-      "storage_class": "activation"
-    },
-    {
-      "access": "read",
-      "consumption": "required",
-      "dtype": "fp32",
-      "layout": "head_major_row_major",
       "name": "state_in",
       "placement": "local",
       "shape": ["H", "N", "N"],
@@ -138,6 +128,16 @@
     }
   ],
   "weights": [
+    {
+      "access": "read",
+      "consumption": "required",
+      "dtype": "fp32",
+      "layout": "head_major_row_major",
+      "name": "rk",
+      "placement": "local",
+      "shape": ["H", "N"],
+      "storage_class": "weight"
+    },
     {
       "access": "read",
       "consumption": "required",
@@ -214,7 +214,7 @@
   "quant": { "activation": "fp32", "output": "fp32", "weight": "fp32" },
   "selection": {
     "equivalence_group": "rwkv7_wkv_decode_fp32",
-    "phases": ["decode"],
+    "phases": ["decode", "prefill"],
     "priority": 100,
     "status": "candidate"
   },

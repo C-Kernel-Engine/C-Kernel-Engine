@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 482,
+      "total": 483,
       "by_op": {
         "add_backward": 1,
         "add_rows_checked": 1,
@@ -186,6 +186,7 @@
         "rwkv7_norm_kk": 1,
         "rwkv7_scale_k": 1,
         "rwkv7_time_mix_shifts": 1,
+        "rwkv7_vgate_produce": 1,
         "rwkv7_vgate_vmix": 1,
         "rwkv7_wkv_decode": 1,
         "select_next_id_checked": 1,
@@ -87953,11 +87954,11 @@
           },
           {
             "name": "dim",
-            "source": "dim:dim"
+            "source": "dim:embed_dim"
           },
           {
             "name": "hidden_dim",
-            "source": "dim:hidden_dim"
+            "source": "dim:intermediate_size"
           },
           {
             "name": "scratch",
@@ -87966,15 +87967,15 @@
           },
           {
             "name": "scratch_elems",
-            "source": "runtime:scratch_elems"
+            "source": "scratch_elements:scratch"
           }
         ],
         "version": 1
       },
       "dims": [
         "C",
-        "dim",
-        "hidden_dim",
+        "embed_dim",
+        "intermediate_size",
         "scratch_elems"
       ],
       "id": "rwkv7_channelmix_decode_f32",
@@ -88086,6 +88087,15 @@
           "storage_class": "activation"
         }
       ],
+      "scratch": [
+        {
+          "name": "scratch",
+          "dtype": "fp32",
+          "size_bytes": "(H + I) * 4",
+          "size_resolution": "required",
+          "desc": "xk [dim] followed by hidden [hidden_dim] for token-serial channelmix"
+        }
+      ],
       "modes": {
         "backward": false,
         "inference": true,
@@ -88186,14 +88196,14 @@
           },
           {
             "name": "dim",
-            "source": "dim:dim"
+            "source": "dim:embed_dim"
           }
         ],
         "version": 1
       },
       "dims": [
         "C",
-        "dim"
+        "embed_dim"
       ],
       "id": "rwkv7_kk_factor_f32",
       "provider_numerical_contract_schema": 1,
@@ -88418,19 +88428,19 @@
           },
           {
             "name": "dim",
-            "source": "dim:dim"
+            "source": "dim:embed_dim"
           },
           {
             "name": "rank_w",
-            "source": "dim:rank_w"
+            "source": "dim:decay_rank"
           },
           {
             "name": "rank_a",
-            "source": "dim:rank_a"
+            "source": "dim:key_rank"
           },
           {
             "name": "rank_g",
-            "source": "dim:rank_g"
+            "source": "dim:gate_rank"
           },
           {
             "name": "w_log",
@@ -88461,10 +88471,10 @@
       },
       "dims": [
         "C",
-        "dim",
-        "rank_w",
-        "rank_a",
-        "rank_g"
+        "embed_dim",
+        "decay_rank",
+        "key_rank",
+        "gate_rank"
       ],
       "id": "rwkv7_lora_gates_f32",
       "provider_numerical_contract_schema": 1,
@@ -88931,14 +88941,14 @@
           },
           {
             "name": "dim",
-            "source": "dim:dim"
+            "source": "dim:embed_dim"
           }
         ],
         "version": 1
       },
       "dims": [
         "C",
-        "dim"
+        "embed_dim"
       ],
       "id": "rwkv7_scale_k_f32",
       "provider_numerical_contract_schema": 1,
@@ -89204,14 +89214,14 @@
           },
           {
             "name": "dim",
-            "source": "dim:dim"
+            "source": "dim:embed_dim"
           }
         ],
         "version": 1
       },
       "dims": [
         "C",
-        "dim"
+        "embed_dim"
       ],
       "id": "rwkv7_time_mix_shifts_f32",
       "provider_numerical_contract_schema": 1,
@@ -89500,6 +89510,220 @@
           },
           {
             "name": "v_first",
+            "source": "null",
+            "cast": "const float*"
+          },
+          {
+            "name": "xv",
+            "source": "null",
+            "cast": "const float*"
+          },
+          {
+            "name": "v1",
+            "source": "null",
+            "cast": "const float*"
+          },
+          {
+            "name": "v2",
+            "source": "null",
+            "cast": "const float*"
+          },
+          {
+            "name": "v0",
+            "source": "null",
+            "cast": "const float*"
+          },
+          {
+            "name": "dim",
+            "source": "dim:embed_dim"
+          },
+          {
+            "name": "rank_v",
+            "source": "dim:value_rank"
+          },
+          {
+            "name": "v_out",
+            "source": "output:v_out",
+            "cast": "float*",
+            "ports": [
+              "output:v_out"
+            ]
+          },
+          {
+            "name": "v_first_out",
+            "source": "output:v_first_out",
+            "cast": "float*",
+            "ports": [
+              "output:v_first_out"
+            ]
+          },
+          {
+            "name": "v_gate",
+            "source": "output:v_gate",
+            "cast": "float*",
+            "ports": [
+              "output:v_gate"
+            ]
+          }
+        ],
+        "version": 1
+      },
+      "dims": [
+        "C",
+        "embed_dim",
+        "value_rank"
+      ],
+      "id": "rwkv7_vgate_produce_f32",
+      "provider_numerical_contract_schema": 1,
+      "numerical_contract": {
+        "id": "rwkv7_vgate_vmix_fp32",
+        "circuit_binding_required": true
+      },
+      "constraints": {},
+      "impl": {
+        "c_declaration": "int ck_rwkv7_vgate_vmix(const float *v_in, const float *v_first, const float *xv, const float *v1, const float *v2, const float *v0, int dim, int rank_v, float *v_out, float *v_first_out, float *v_gate);",
+        "function": "ck_rwkv7_vgate_vmix",
+        "sources": [
+          "src/kernels/rwkv7_decode.c"
+        ]
+      },
+      "inputs": [
+        {
+          "access": "read",
+          "consumption": "required",
+          "dtype": "fp32",
+          "layout": "feature_contiguous",
+          "name": "v_in",
+          "placement": "local",
+          "shape": [
+            "C"
+          ],
+          "storage_class": "activation"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "access": "write",
+          "consumption": "required",
+          "dtype": "fp32",
+          "layout": "feature_contiguous",
+          "name": "v_out",
+          "placement": "local",
+          "shape": [
+            "C"
+          ],
+          "storage_class": "activation"
+        },
+        {
+          "access": "write",
+          "consumption": "required",
+          "dtype": "fp32",
+          "layout": "feature_contiguous",
+          "name": "v_first_out",
+          "placement": "local",
+          "shape": [
+            "C"
+          ],
+          "storage_class": "activation"
+        },
+        {
+          "access": "write",
+          "consumption": "optional",
+          "dtype": "fp32",
+          "layout": "feature_contiguous",
+          "name": "v_gate",
+          "placement": "local",
+          "shape": [
+            "C"
+          ],
+          "storage_class": "activation"
+        }
+      ],
+      "modes": {
+        "backward": false,
+        "inference": true,
+        "training": false
+      },
+      "notes": "Layer-zero value producer: unused gate inputs are NULL by map contract. Reuses the checked value-mix provider copy branch.",
+      "numerical_capabilities": [
+        {
+          "arithmetic": {
+            "deterministic": true,
+            "merge_order": "none",
+            "partial_accumulator": "fp32",
+            "split_strategy": "serial",
+            "thread_count_changes_arithmetic_order": false
+          },
+          "contract_id": "rwkv7_vgate_vmix_fp32",
+          "explicit_selector": true,
+          "function": "ck_rwkv7_vgate_vmix",
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "contract_defined"
+            }
+          },
+          "phases": [
+            "decode",
+            "prefill"
+          ],
+          "status": "observed"
+        }
+      ],
+      "op": "rwkv7_vgate_produce",
+      "operation_interface": "rwkv7.vgate_produce.token_major.fp32.v1",
+      "quant": {
+        "activation": "fp32",
+        "output": "fp32",
+        "weight": "fp32"
+      },
+      "selection": {
+        "equivalence_group": "rwkv7_vgate_produce_f32",
+        "phases": [
+          "decode",
+          "prefill"
+        ],
+        "priority": 100,
+        "status": "candidate"
+      },
+      "tests": {
+        "oracle": "unittest/test_rwkv_decode.py and unittest/test_rwkv7_block.py vs torch reference; scalar serial contract.",
+        "unit": [
+          "unittest/test_rwkv7_block.py"
+        ]
+      },
+      "variant": "first_layer_value_copy_fp32",
+      "name": "rwkv7_vgate_produce_f32",
+      "_source_file": "rwkv7_vgate_produce_f32.json"
+    },
+    {
+      "arithmetic": {
+        "deterministic": true,
+        "merge_order": "none",
+        "partial_accumulator": "fp32",
+        "split_strategy": "serial",
+        "thread_count_changes_arithmetic_order": false
+      },
+      "call_abi": {
+        "params": [
+          {
+            "name": "v_in",
+            "source": "activation:v_in",
+            "cast": "const float*",
+            "ports": [
+              "input:v_in"
+            ]
+          },
+          {
+            "name": "v_first",
             "source": "activation:v_first",
             "cast": "const float*",
             "ports": [
@@ -89540,11 +89764,11 @@
           },
           {
             "name": "dim",
-            "source": "dim:dim"
+            "source": "dim:embed_dim"
           },
           {
             "name": "rank_v",
-            "source": "dim:rank_v"
+            "source": "dim:value_rank"
           },
           {
             "name": "v_out",
@@ -89575,8 +89799,8 @@
       },
       "dims": [
         "C",
-        "dim",
-        "rank_v"
+        "embed_dim",
+        "value_rank"
       ],
       "id": "rwkv7_vgate_vmix_f32",
       "provider_numerical_contract_schema": 1,
@@ -89843,10 +90067,10 @@
           },
           {
             "name": "rk",
-            "source": "activation:rk",
+            "source": "weight:rk",
             "cast": "const float*",
             "ports": [
-              "input:rk"
+              "weight:rk"
             ]
           },
           {
@@ -89867,7 +90091,7 @@
           },
           {
             "name": "norm_eps",
-            "source": "dim:normalization_epsilon"
+            "source": "dim:layer_norm_eps"
           },
           {
             "name": "state_in",
@@ -89910,7 +90134,7 @@
         "N",
         "num_heads",
         "head_dim",
-        "normalization_epsilon"
+        "layer_norm_eps"
       ],
       "id": "rwkv7_wkv_decode_f32",
       "provider_numerical_contract_schema": 1,
@@ -90027,19 +90251,6 @@
           "consumption": "required",
           "dtype": "fp32",
           "layout": "head_major_row_major",
-          "name": "rk",
-          "placement": "local",
-          "shape": [
-            "H",
-            "N"
-          ],
-          "storage_class": "activation"
-        },
-        {
-          "access": "read",
-          "consumption": "required",
-          "dtype": "fp32",
-          "layout": "head_major_row_major",
           "name": "state_in",
           "placement": "local",
           "shape": [
@@ -90051,6 +90262,19 @@
         }
       ],
       "weights": [
+        {
+          "access": "read",
+          "consumption": "required",
+          "dtype": "fp32",
+          "layout": "head_major_row_major",
+          "name": "rk",
+          "placement": "local",
+          "shape": [
+            "H",
+            "N"
+          ],
+          "storage_class": "weight"
+        },
         {
           "access": "read",
           "consumption": "required",
@@ -90155,7 +90379,8 @@
       "selection": {
         "equivalence_group": "rwkv7_wkv_decode_fp32",
         "phases": [
-          "decode"
+          "decode",
+          "prefill"
         ],
         "priority": 100,
         "status": "candidate"

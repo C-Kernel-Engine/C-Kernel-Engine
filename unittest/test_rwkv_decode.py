@@ -382,12 +382,21 @@ def run_channelmix_case(C, K, seed):
     do = float(np.max(np.abs(out - ref)))
     ds = float(np.max(np.abs(shift_out - x)))
 
-    # fail-closed guards: in-place shift, null/short/aliased scratch
-    bad_shift = lib.ck_rwkv7_channelmix_decode(
-        numpy_to_ptr(x), numpy_to_ptr(x), numpy_to_ptr(mu),
+    # In-place carry (shift_out == shift_in) is supported by the circuit's
+    # ffn_shift buffer; per-index read-before-write keeps it exact.
+    inplace_shift = shift.copy()
+    inplace_out = np.zeros(C, dtype=np.float32)
+    inplace = lib.ck_rwkv7_channelmix_decode(
+        numpy_to_ptr(x), numpy_to_ptr(inplace_shift), numpy_to_ptr(mu),
         numpy_to_ptr(Wk), numpy_to_ptr(Wv),
-        numpy_to_ptr(x), numpy_to_ptr(out), C, K,
+        numpy_to_ptr(inplace_shift), numpy_to_ptr(inplace_out), C, K,
         numpy_to_ptr(scratch), C + K)
+    inplace_ok = (
+        inplace == 0
+        and float(np.max(np.abs(inplace_shift - x))) == 0.0
+        and float(np.max(np.abs(inplace_out - ref))) <= 1e-5
+    )
+    # fail-closed guards: null/short/aliased scratch
     no_scratch = lib.ck_rwkv7_channelmix_decode(
         numpy_to_ptr(x), numpy_to_ptr(shift), numpy_to_ptr(mu),
         numpy_to_ptr(Wk), numpy_to_ptr(Wv),
@@ -403,9 +412,9 @@ def run_channelmix_case(C, K, seed):
         numpy_to_ptr(shift_out), numpy_to_ptr(out), C, K,
         numpy_to_ptr(x), C + K)
     print(f"channelmix C={C} K={K}: out={do:.2e} shift={ds:.2e} "
-          f"guards={bad_shift},{no_scratch},{short},{aliased}")
-    ok = do <= 1e-5 and ds == 0.0 \
-        and (bad_shift, no_scratch, short, aliased) == (-1, -1, -1, -1)
+          f"inplace={inplace_ok} guards={no_scratch},{short},{aliased}")
+    ok = do <= 1e-5 and ds == 0.0 and inplace_ok \
+        and (no_scratch, short, aliased) == (-1, -1, -1)
     print("  ->", "PASS" if ok else "FAIL")
     return ok
 

@@ -4561,7 +4561,14 @@ test-source-integrity:
 	@$(PYTHON) scripts/check_source_integrity.py --json-out build/source_integrity_report.json
 	@$(PYTHON) -m unittest tests.test_source_integrity -v
 
-test-v8-dsl-policy: test-source-integrity
+# Standard DSL/nightly coverage: fail if the synthetic checkpoint dependencies
+# are absent rather than turning RWKV lowering into a skipped PASS.
+.PHONY: test-v8-rwkv7-lowering
+test-v8-rwkv7-lowering:
+	@$(PYTHON) -c "import torch, safetensors"
+	@$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_safetensors_to_bump.py -k "rwkv7 or declared_layer_scope"
+
+test-v8-dsl-policy: test-source-integrity test-v8-rwkv7-lowering
 	@echo "Running v8 zero-hardcoding DSL policy tests..."
 	@$(PYTHON) version/v8/scripts/audit_dsl_policy_v8.py --json-out build/v8/dsl_policy_report.json
 	@$(PYTHON) -m unittest tests.test_v8_dsl_policy -v

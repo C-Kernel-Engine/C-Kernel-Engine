@@ -444,9 +444,6 @@ int ck_rwkv7_channelmix_decode(const float *x,
         hidden_dim <= 0 || hidden_dim > 8192) {
         return -1;
     }
-    if (shift_out == shift_in) {
-        return -1;
-    }
     if (!scratch ||
         scratch_elems < (size_t)dim + (size_t)hidden_dim ||
         scratch == (const float *)x || scratch == (const float *)shift_in ||
@@ -465,6 +462,7 @@ int ck_rwkv7_channelmix_decode(const float *x,
     for (int j = 0; j < 5; ++j) {
         if (overlaps(scratch, scratch_bytes, inputs[j], sizes[j])) return -1;
         if (!(j == 0 && shift_out == x) &&
+            !(j == 1 && shift_out == shift_in) &&
             overlaps(shift_out, bytes, inputs[j], sizes[j])) return -1;
         if (!(j == 0 && out == x) &&
             overlaps(out, bytes, inputs[j], sizes[j])) return -1;
@@ -472,6 +470,7 @@ int ck_rwkv7_channelmix_decode(const float *x,
     if (overlaps(scratch, scratch_bytes, out, bytes) ||
         overlaps(scratch, scratch_bytes, shift_out, bytes)) return -1;
     /* Hoisted token-shift mix; per-index read-before-write keeps
+     * shift_out == shift_in (the circuit's in-place carry) and
      * shift_out == x aliasing safe. */
     float *xk = scratch;
     float *hidden = scratch + dim;

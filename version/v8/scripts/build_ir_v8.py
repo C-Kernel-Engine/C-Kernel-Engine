@@ -2619,7 +2619,6 @@ OP_DATAFLOW = {
             "kk": "kk_vec",
             "a": "a_vec",
             "g": "g_vec",
-            "rk": "external:rwkv7_time_mix_rk",
             "state_in": "wkv",
         },
         "outputs": {
@@ -4501,6 +4500,15 @@ def _template_activation_buffer_specs(
         size = elem_bytes
         for extent in shape:
             size *= extent
+        scope = declaration.get("scope", "shared")
+        if scope not in {"shared", "layer"}:
+            raise RuntimeError(f"HARD CIRCUIT BUFFER FAULT: invalid scope for {name}")
+        if scope == "layer" and (
+            len(shape) < 2 or shape[0] != int(config.get("num_layers", 0))
+        ):
+            raise RuntimeError(
+                f"HARD CIRCUIT BUFFER FAULT: layer-scoped {name} requires leading num_layers extent"
+            )
         result[name] = {
             "name": name,
             "size": size,
@@ -4508,6 +4516,7 @@ def _template_activation_buffer_specs(
             "dtype": dtype,
             "lifetime": lifetime,
             "mutable": mutable,
+            "layer_stride_bytes": size // shape[0] if scope == "layer" else 0,
         }
     return result
 
@@ -4967,6 +4976,8 @@ def build_activation_specs(
             )
         add(spec["name"], spec["size"], spec["shape"], spec["dtype"],
             spec["lifetime"], spec["mutable"])
+        if spec["layer_stride_bytes"]:
+            specs[spec["name"]]["layer_stride_bytes"] = spec["layer_stride_bytes"]
 
     return specs
 
@@ -5192,7 +5203,7 @@ TEMPLATE_TO_KERNEL_OP = {
     "rwkv7_k_proj": "matmul",
     "rwkv7_v_proj": "matmul",
     "rwkv7_lora_gates": "rwkv7_lora_gates",
-    "rwkv7_vgate_produce": "rwkv7_vgate_vmix",
+    "rwkv7_vgate_produce": "rwkv7_vgate_produce",
     "rwkv7_vgate_vmix": "rwkv7_vgate_vmix",
     "rwkv7_kk_factor": "rwkv7_kk_factor",
     "rwkv7_norm_kk": "rwkv7_norm_kk",
@@ -5323,6 +5334,7 @@ WEIGHT_TO_KERNEL_INPUT = {
     "attn_lora_g1": "g1", "attn_lora_g2": "g2",
     "attn_lora_v1": "v1", "attn_lora_v2": "v2", "attn_lora_v0": "v0",
     "attn_k_k": "k_k", "attn_k_a": "k_a",
+    "attn_wkv_rk": "rk",
     "attn_wkv_ln_w": "ln_w", "attn_wkv_ln_b": "ln_b",
     "ffn_mu": "mu", "ffn_Wk": "Wk", "ffn_Wv": "Wv",
     "final_hyper_norm": "norm_weight",
@@ -7172,6 +7184,39 @@ def _apply_layer_quant_aliases(
     return effective
 
 
+def _apply_layer_quant_entry_fallback(
+    layer_quant: Dict[str, Any],
+    entry_dtype: Dict[str, str],
+    layer_idx: int,
+) -> Dict[str, Any]:
+    """Resolve canonical layer weight-slot dtypes from the manifest entries.
+
+    Manifests whose per-layer tensors are not named ``layer.{L}.*`` (RWKV-7
+    keeps ``rwkv7.blocks.{L}.*``) carry no ``layer.{L}`` quant summary. Without
+    this fallback provider selection defaults every slot to fp32 while the
+    binder still maps the real entry, so selection and stored dtype disagree.
+    Reuse the binder's ``WEIGHT_PATTERNS`` so both always resolve the same
+    tensor.
+    """
+    effective = dict(layer_quant or {})
+    # Existing summaries own provider selection (including architecture aliases).
+    # Only synthesize a summary when the manifest supplies none for this layer.
+    if effective:
+        return effective
+    token = str(layer_idx)
+    for canonical, candidates in WEIGHT_PATTERNS.items():
+        if canonical in effective:
+            continue
+        for candidate in candidates:
+            if "{L}" not in candidate:
+                continue
+            dtype = entry_dtype.get(candidate.replace("{L}", token))
+            if dtype:
+                effective[canonical] = str(dtype).lower()
+                break
+    return effective
+
+
 def _apply_header_quant_aliases(
     header_quant: Dict[str, Any],
     entry_dtype: Dict[str, str],
@@ -7252,6 +7297,13 @@ def compute_matmul_dims(op_name: str, config: Dict) -> Tuple[Optional[int], Opti
         return embed, attn_out
     if op_name in ("recurrent_out_proj",):
         return embed, int(config.get("ssm_inner_size", attn_out))
+    if op_name in (
+        "rwkv7_r_proj",
+        "rwkv7_k_proj",
+        "rwkv7_v_proj",
+        "rwkv7_out_proj",
+    ):
+        return embed, embed
     if op_name in ("mamba_in_proj",):
         return int(config.get("mamba_projection_size", 0) or 0) or None, embed
     if op_name in ("mamba_out_proj",):
@@ -10729,6 +10781,11 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                         config,
                         layer_idx,
                     )
+                    layer_quant = _apply_layer_quant_entry_fallback(
+                        layer_quant,
+                        entry_dtype,
+                        layer_idx,
+                    )
                     # Reset instance counts for each layer
                     pass1_instance_counts = {k: v for k, v in pass1_instance_counts.items()
                                              if k[0] != layer_idx}
@@ -12381,7 +12438,7 @@ def generate_ir_lower_1(
             str(param.get("source", "")).split(":", 1)[1]
             for param in (kernel_map.get("call_abi", {}).get("params", []) or [])
             if isinstance(param, dict)
-            and str(param.get("source", "")).startswith(("scratch:", "scratch_size:"))
+            and str(param.get("source", "")).startswith(("scratch:", "scratch_size:", "scratch_elements:"))
         }
         for scratch in kernel_map.get("scratch", []):
             scratch_name = str(scratch.get("name", "") or "")
@@ -13121,10 +13178,6 @@ WEIGHT_PATTERNS = {
     "b2": ["layer.{L}.b2", "layers.{L}.feed_forward.b2", "v.blk.{L}.ffn_down.bias"],
 
     # Layer norms
-    "ln1_gamma": ["layer.{L}.ln1_gamma", "layers.{L}.attention_norm.weight", "layer.{L}.attn_norm", "layer.{L}.block_norm", "rwkv7.blocks.{L}.ln1.weight"],
-    "ln2_gamma": ["layer.{L}.ln2_gamma", "layers.{L}.ffn_norm.weight", "layer.{L}.post_attention_norm", "rwkv7.blocks.{L}.ln2.weight"],
-    "ln1_beta": ["layer.{L}.ln1_beta", "layers.{L}.attention_norm.bias", "v.blk.{L}.ln1.bias", "rwkv7.blocks.{L}.ln1.bias"],
-    "ln2_beta": ["layer.{L}.ln2_beta", "layers.{L}.ffn_norm.bias", "v.blk.{L}.ln2.bias", "rwkv7.blocks.{L}.ln2.bias"],
     "post_attention_norm": ["layer.{L}.post_attention_norm", "layers.{L}.post_attention_norm.weight"],
     "post_ffn_norm": ["layer.{L}.post_ffn_norm", "layer.{L}.post_ffw_norm", "layers.{L}.post_ffn_norm.weight"],
     "per_layer_token_emb": ["per_layer_token_emb"],
@@ -13210,10 +13263,10 @@ WEIGHT_PATTERNS = {
     "assistant_pre_projection": ["assistant.pre_projection"],
     "assistant_post_projection": ["assistant.post_projection"],
     "attn_qkv": ["layer.{L}.attn_qkv", "layer.{L}.attn_qkv.weight", "v.blk.{L}.attn_qkv.weight"],
-    "ln1_gamma": ["layer.{L}.ln1_gamma", "layers.{L}.attention_norm.weight", "layer.{L}.attn_norm", "layer.{L}.block_norm", "v.blk.{L}.ln1.weight"],
-    "ln2_gamma": ["layer.{L}.ln2_gamma", "layers.{L}.ffn_norm.weight", "layer.{L}.post_attention_norm", "v.blk.{L}.ln2.weight"],
-    "ln1_beta": ["layer.{L}.ln1_beta", "layers.{L}.attention_norm.bias", "v.blk.{L}.ln1.bias"],
-    "ln2_beta": ["layer.{L}.ln2_beta", "layers.{L}.ffn_norm.bias", "v.blk.{L}.ln2.bias"],
+    "ln1_gamma": ["layer.{L}.ln1_gamma", "layers.{L}.attention_norm.weight", "layer.{L}.attn_norm", "layer.{L}.block_norm", "v.blk.{L}.ln1.weight", "rwkv7.blocks.{L}.ln1.weight"],
+    "ln2_gamma": ["layer.{L}.ln2_gamma", "layers.{L}.ffn_norm.weight", "layer.{L}.post_attention_norm", "v.blk.{L}.ln2.weight", "rwkv7.blocks.{L}.ln2.weight"],
+    "ln1_beta": ["layer.{L}.ln1_beta", "layers.{L}.attention_norm.bias", "v.blk.{L}.ln1.bias", "rwkv7.blocks.{L}.ln1.bias"],
+    "ln2_beta": ["layer.{L}.ln2_beta", "layers.{L}.ffn_norm.bias", "v.blk.{L}.ln2.bias", "rwkv7.blocks.{L}.ln2.bias"],
     "wo": ["layer.{L}.wo", "layers.{L}.attention.wo", "layer.{L}.attn_output", "layer.{L}.attn_o", "layer.{L}.mla_out_proj", "v.blk.{L}.attn_out.weight"],
     "bo": ["layer.{L}.bo", "layers.{L}.attention.bo", "v.blk.{L}.attn_out.bias"],
     "w1": ["layer.{L}.w1", "layers.{L}.feed_forward.w1", "layer.{L}.ffn_gate", "layer.{L}.mlp_gate", "v.blk.{L}.ffn_gate.weight"],
@@ -14142,6 +14195,8 @@ def generate_memory_layout(
             )
         add_buffer(spec["name"], spec["size"], spec["shape"], spec["dtype"],
                    spec["lifetime"], spec["mutable"])
+        if spec["layer_stride_bytes"]:
+            activation_buffers[-1]["layer_stride_bytes"] = spec["layer_stride_bytes"]
         allocated_names.add(spec["name"])
 
     total_activation_size = current_offset
@@ -14365,6 +14420,8 @@ def generate_memory_layout_packed(
             "mutable": spec["mutable"],
             "define": f"A_{_sanitize_macro(name)}",
         })
+        if spec.get("layer_stride_bytes"):
+            activation_buffers[-1]["layer_stride_bytes"] = spec["layer_stride_bytes"]
         act_offset = off + spec["size"]
 
     # Allocate all weights first (in order of first use)
@@ -14378,6 +14435,8 @@ def generate_memory_layout_packed(
     # allocator does not recognize the operation names that use them.  This is
     # what permits a new multi-stream circuit to lower without an architecture
     # branch in the allocator.
+    for name in template_doc.get("activation_buffers", {}):
+        alloc_act(name)
     for target in _template_activation_bindings(template_doc).values():
         alloc_act(target)
 
@@ -14748,6 +14807,12 @@ def generate_ir_lower_2(
     }
 
     def scoped_activation_offset(buf_name: str, base_offset: int, op: Dict[str, Any]) -> int:
+        stride = int(activation_buffers.get(buf_name, {}).get("layer_stride_bytes", 0))
+        if stride:
+            layer = int(op.get("layer", -1))
+            if not 0 <= layer < int(config.get("num_layers", 0)):
+                raise RuntimeError(f"HARD CIRCUIT BUFFER FAULT: invalid layer {layer} for {buf_name}")
+            return int(base_offset) + layer * stride
         if buf_name not in {"cross_k_cache", "cross_v_cache"}:
             return int(base_offset)
         layer = int(op.get("layer", -1))
@@ -16885,6 +16950,7 @@ _CALL_ABI_SOURCE_KINDS = {
     "runtime",
     "scratch",
     "scratch_size",
+    "scratch_elements",
     "weight",
     "weight_f",
 }
@@ -17610,6 +17676,26 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
                 else:
                     expr = str(int(info.get("size", 0) or 0))
 
+            elif src.startswith("scratch_elements:"):
+                key = src.split(":", 1)[1]
+                info = scratch.get(key)
+                if not info:
+                    op_errors.append(f"{func}.{name}: missing scratch elements '{key}'")
+                    expr = "0"
+                else:
+                    size = int(info.get("size", 0) or 0)
+                    dtype = str(info.get("dtype", ""))
+                    if dtype not in {"fp32", "bf16", "fp16", "i32", "int32"}:
+                        op_errors.append(f"{func}.{name}: unsupported scratch element dtype '{dtype}'")
+                        expr = "0"
+                    else:
+                        item_size = _dtype_size_bytes(dtype)
+                        if size <= 0 or size % item_size:
+                            op_errors.append(f"{func}.{name}: invalid scratch byte extent '{key}'")
+                            expr = "0"
+                        else:
+                            expr = str(size // item_size)
+
             elif src.startswith("weight_f:"):
                 key = src.split(":", 1)[1]
                 alt = param.get("alt", None)
@@ -17834,6 +17920,7 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
                     expr = "NULL"
                 elif key in ("multimodal_num_segments", "multimodal_singleton_tail"):
                     expr = "0"
+
                 else:
                     op_errors.append(f"{func}.{name}: unknown runtime '{key}'")
                     expr = "0"

@@ -15,7 +15,7 @@
     "activation": "squared_relu",
     "rope": "none",
     "tokenizer": "rwkv_world_trie",
-    "prefill_policy": "sequential_scan",
+    "prefill_policy": "sequential_decode",
     "hybrid_block_pattern": "config.layer_kinds"
   },
   "activation_bindings": {
@@ -23,6 +23,62 @@
     "normalized_stream": "layer_input",
     "post_attention_stream": "embedded_input",
     "channelmix_output": "layer_output"
+  },
+  "activation_buffers": {
+    "att_shift": {
+      "shape": [
+        {
+          "config": "num_layers"
+        },
+        {
+          "config": "embed_dim"
+        }
+      ],
+      "lifetime": "sequence",
+      "mutable": true,
+      "scope": "layer"
+    },
+    "ffn_shift": {
+      "shape": [
+        {
+          "config": "num_layers"
+        },
+        {
+          "config": "embed_dim"
+        }
+      ],
+      "lifetime": "sequence",
+      "mutable": true,
+      "scope": "layer"
+    },
+    "wkv": {
+      "shape": [
+        {
+          "config": "num_layers"
+        },
+        {
+          "config": "num_heads"
+        },
+        {
+          "config": "head_dim"
+        },
+        {
+          "config": "head_dim"
+        }
+      ],
+      "lifetime": "sequence",
+      "mutable": true,
+      "scope": "layer"
+    },
+    "v_first": {
+      "shape": [
+        {
+          "config": "embed_dim"
+        }
+      ],
+      "lifetime": "call",
+      "mutable": true
+    }
   },
   "contract": {
     "tokenizer_contract": {
@@ -97,7 +153,7 @@
       "activation": "squared_relu",
       "qkv_bias": false,
       "tail_order": "lora_gates -> vgate -> kk_factor -> norm_kk -> scale_k -> wkv_decode",
-      "bonus_weights": "rk, k_k, k_a are per-layer time-mix weights sourced from the manifest; rk reaches wkv_decode via an external slot"
+      "bonus_weights": "rk, k_k, k_a are per-layer time-mix weights sourced from the manifest; rk binds the wkv_decode bonus port directly from its per-layer checkpoint weight"
     },
     "logits_contract": {
       "final_norm": "layernorm",
@@ -109,6 +165,17 @@
       "activation_dtype": "fp32",
       "per_tensor_mixed_quant": false
     },
+    "weight_policy": {
+      "ignore": [
+        {
+          "pattern": "rwkv7.blocks.0.att.v[012]",
+          "reason": "layer 0 sets v_first from v_in, so the v-gate LoRA operands are called with NULL and their checkpoint weights are unused"
+        }
+      ]
+    },
+    "runtime_defaults": {
+      "external_activation_slots": ["att_shift", "ffn_shift", "wkv", "v_first"]
+    },
     "runtime_invariants": {
       "required_call_args": {}
     },
@@ -118,7 +185,7 @@
         "att_shift": {"source": "att_shift_out", "index": "runtime.layer"},
         "ffn_shift": {"source": "ffn_shift_out", "index": "runtime.layer"},
         "wkv": {"source": "wkv_out_state", "index": "runtime.layer"},
-        "v_first": {"source": "v_first_out", "index": "runtime.layer"}
+        "v_first": {"source": "v_first_out", "index": "current_token"}
       },
       "state_reads": {
         "att_shift": {"range": "full"},
@@ -180,9 +247,37 @@
         "axis_names": ["token", "channel"]
       }
     },
+    "decoder.rwkv7_vgate_produce": {
+      "op": "rwkv7_vgate_produce",
+      "template_ops": [
+        "rwkv7_vgate_produce"
+      ],
+      "operation_interface": "rwkv7.vgate_produce.token_major.fp32.v1",
+      "phases": {
+        "prefill": {
+          "contract_id": "rwkv7_vgate_vmix_fp32",
+          "validation": "observed",
+          "evidence": "Layer-0 produce path selected by omitting optional xv/v_first ports; strict NULL rule enforced in C."
+        },
+        "decode": {
+          "contract_id": "rwkv7_vgate_vmix_fp32",
+          "validation": "observed",
+          "evidence": "unittest/test_rwkv7_block.py layer-0 produce-only vs layer>0 consume wiring."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.rwkv7_vgate.output",
+        "producer": "rwkv7_vgate_produce",
+        "logical_layout": "token_major",
+        "axis_names": [
+          "token",
+          "channel"
+        ]
+      }
+    },
     "decoder.rwkv7_vgate": {
       "op": "rwkv7_vgate_vmix",
-      "template_ops": ["rwkv7_vgate_produce", "rwkv7_vgate_vmix"],
+      "template_ops": ["rwkv7_vgate_vmix"],
       "operation_interface": "rwkv7.vgate_vmix.token_major.fp32.v1",
       "phases": {
         "prefill": {
@@ -280,7 +375,7 @@
         "prefill": {
           "contract_id": "rwkv7_wkv_decode_fp32",
           "validation": "observed",
-          "evidence": "Pinned fixture tests/fixtures/rwkv7/decode_torch.json; prefill reuses one-step math token-serially."
+          "evidence": "Pinned fixture tests/fixtures/rwkv7/decode_torch.json; prefill_policy=sequential_decode reuses the one-step math token-serially, and the provider is certified for prefill."
         },
         "decode": {
           "contract_id": "rwkv7_wkv_decode_fp32",
@@ -346,7 +441,7 @@
             {"op": "rwkv7_kk_factor", "graph_slots": {"inputs": {"k": "k_raw_vec"}, "outputs": {"kk_raw": "kk_raw_vec"}}},
             {"op": "rwkv7_norm_kk", "graph_slots": {"inputs": {"kk_in": "kk_raw_vec"}, "outputs": {"kk_out": "kk_vec"}}},
             {"op": "rwkv7_scale_k", "graph_slots": {"inputs": {"k_in": "k_raw_vec", "a": "a_vec"}, "outputs": {"k_out": "k_scaled_vec"}}},
-            {"op": "rwkv7_wkv_decode", "graph_slots": {"inputs": {"r": "r_vec", "w_log": "w_log_vec", "k": "k_scaled_vec", "v": "v_mix_vec", "kk": "kk_vec", "a": "a_vec", "g": "g_vec", "rk": "external:rwkv7_time_mix_rk", "state_in": "wkv"}, "outputs": {"y": "wkv_out", "state_out": "wkv"}}},
+            {"op": "rwkv7_wkv_decode", "graph_slots": {"inputs": {"r": "r_vec", "w_log": "w_log_vec", "k": "k_scaled_vec", "v": "v_mix_vec", "kk": "kk_vec", "a": "a_vec", "g": "g_vec", "state_in": "wkv"}, "outputs": {"y": "wkv_out", "state_out": "wkv"}}},
             {"op": "rwkv7_out_proj", "graph_slots": {"inputs": {"A": "wkv_out"}, "outputs": {"C": "post_attention_stream"}}},
             {"op": "residual_add", "graph_slots": {"inputs": {"a": "main_stream", "b": "post_attention_stream"}, "outputs": {"out": "main_stream"}}},
             {"op": "layernorm", "graph_slots": {"inputs": {"input": "main_stream"}, "outputs": {"output": "normalized_stream"}}},
@@ -364,7 +459,7 @@
             {"op": "rwkv7_kk_factor", "graph_slots": {"inputs": {"k": "k_raw_vec"}, "outputs": {"kk_raw": "kk_raw_vec"}}},
             {"op": "rwkv7_norm_kk", "graph_slots": {"inputs": {"kk_in": "kk_raw_vec"}, "outputs": {"kk_out": "kk_vec"}}},
             {"op": "rwkv7_scale_k", "graph_slots": {"inputs": {"k_in": "k_raw_vec", "a": "a_vec"}, "outputs": {"k_out": "k_scaled_vec"}}},
-            {"op": "rwkv7_wkv_decode", "graph_slots": {"inputs": {"r": "r_vec", "w_log": "w_log_vec", "k": "k_scaled_vec", "v": "v_mix_vec", "kk": "kk_vec", "a": "a_vec", "g": "g_vec", "rk": "external:rwkv7_time_mix_rk", "state_in": "wkv"}, "outputs": {"y": "wkv_out", "state_out": "wkv"}}},
+            {"op": "rwkv7_wkv_decode", "graph_slots": {"inputs": {"r": "r_vec", "w_log": "w_log_vec", "k": "k_scaled_vec", "v": "v_mix_vec", "kk": "kk_vec", "a": "a_vec", "g": "g_vec", "state_in": "wkv"}, "outputs": {"y": "wkv_out", "state_out": "wkv"}}},
             {"op": "rwkv7_out_proj", "graph_slots": {"inputs": {"A": "wkv_out"}, "outputs": {"C": "post_attention_stream"}}},
             {"op": "residual_add", "graph_slots": {"inputs": {"a": "main_stream", "b": "post_attention_stream"}, "outputs": {"out": "main_stream"}}},
             {"op": "layernorm", "graph_slots": {"inputs": {"input": "main_stream"}, "outputs": {"output": "normalized_stream"}}},
