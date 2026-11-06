@@ -522,6 +522,7 @@ class BatchContractTests(unittest.TestCase):
             ("wrong second gate binding", lambda o: o[13]["call_abi"].update(
                 kernel_id="gemv_q5_k")),
             ("noncontiguous layer", lambda o: o[14].update(layer=0)),
+            ("layer order resumes earlier layer", lambda o: o[17].update(layer=0)),
             ("wrong layer state slice", lambda o: next(
                 arg for arg in o[14]["args"] if arg["name"] == "conv").update(
                     expr="(float*)(model->bump + A_RECURRENT_CONV_STATE)")),

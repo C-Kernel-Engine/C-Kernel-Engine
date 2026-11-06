@@ -556,6 +556,10 @@ def _first_recurrent_projection_plan(
     if requested_layers == 2:
         # Derive the next layer's projection cuts from the ordered IR. No
         # operation between them is moved: recurrent state updates stay local.
+        numbered_layers = [op["layer"] for op in ops
+                           if type(op.get("layer")) is int and op["layer"] >= 0]
+        if numbered_layers != sorted(numbered_layers):
+            return None
         second_layer = [i for i, op in enumerate(ops) if op.get("layer") == 1]
         if (not second_layer or second_layer != list(range(second_layer[0], second_layer[-1] + 1))
                 or second_layer[0] <= projections[-1][0]):
