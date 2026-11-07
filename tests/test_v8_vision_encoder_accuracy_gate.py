@@ -38,6 +38,45 @@ def _load_suite():
 
 
 class VisionEncoderAccuracyGateTests(unittest.TestCase):
+    def test_encoder_metrics_reject_invalid_captures_before_thresholds(self) -> None:
+        import numpy as np
+        spec = importlib.util.spec_from_file_location(
+            "encoder_metrics_invalid",
+            ROOT / "version/v8/scripts/compare_qwen3vl_bf16_vision_hidden_v8.py",
+        )
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        valid = np.array([1.0, -2.0], dtype=np.float32)
+        for value in (np.nan, np.inf, -np.inf):
+            invalid = np.array([value, -2.0], dtype=np.float32)
+            for ref, got in ((valid, invalid), (invalid, valid), (invalid, invalid.copy())):
+                with self.subTest(value=value, ref=ref, got=got):
+                    with self.assertRaisesRegex(RuntimeError, "finite tensors"):
+                        module._metrics(ref, got)
+        with self.assertRaisesRegex(RuntimeError, "nonempty"):
+            module._metrics(np.array([], dtype=np.float32), np.array([], dtype=np.float32))
+        with self.assertRaisesRegex(RuntimeError, "shape mismatch"):
+            module._metrics(valid, valid.reshape(1, 2))
+
+    def test_encoder_metrics_do_not_overflow_on_finite_fp32(self) -> None:
+        import numpy as np
+        spec = importlib.util.spec_from_file_location(
+            "encoder_metrics_large",
+            ROOT / "version/v8/scripts/compare_qwen3vl_bf16_vision_hidden_v8.py",
+        )
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        maximum = np.finfo(np.float32).max
+        ref = np.array([maximum, -maximum], dtype=np.float32)
+        with np.errstate(over="raise", invalid="raise"):
+            metrics = module._metrics(ref, -ref)
+        self.assertTrue(all(np.isfinite(value) for value in metrics.values()))
+        self.assertAlmostEqual(metrics["relative_rmse"], 2.0)
+        self.assertAlmostEqual(metrics["cosine"], -1.0)
+        self.assertEqual(metrics["max_abs"], 2.0 * float(maximum))
+        self.assertFalse(metrics["byte_exact"])
+        self.assertEqual(module._metrics(ref, ref.copy())["cosine"], 1.0)
+
     def test_nested_numeric_failure_is_preserved_in_summary_reason(self) -> None:
         suite = _load_suite()
         gate = _load_gate()

@@ -1936,6 +1936,11 @@ TEST_SUITES = {
         "parity",
         ROOT / "tests" / "test_v8_numeric_parity_qwen3vl_mmproj.py",
     ),
+    "vision_encoder_accuracy_contract": TestSuite(
+        "Vision Encoder Accuracy Contract",
+        "parity",
+        ROOT / "tests" / "test_v8_vision_encoder_accuracy_gate.py",
+    ),
     "mtmd_capture_layout": TestSuite(
         "MTMD Strided Capture Layout",
         "parity",

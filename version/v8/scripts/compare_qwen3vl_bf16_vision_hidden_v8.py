@@ -31,11 +31,18 @@ def _import_numeric_parity() -> Any:
 def _metrics(ref: np.ndarray, got: np.ndarray) -> dict[str, float | bool]:
     if ref.shape != got.shape:
         raise RuntimeError(f"shape mismatch: ref={ref.shape} got={got.shape}")
+    if not ref.size:
+        raise RuntimeError("encoder comparison requires nonempty tensors")
+    if not np.isfinite(ref).all() or not np.isfinite(got).all():
+        raise RuntimeError("encoder comparison requires finite tensors")
     byte_exact = bool(np.array_equal(ref.view(np.uint8), got.view(np.uint8)))
-    diff = got.astype(np.float32, copy=False) - ref.astype(np.float32, copy=False)
-    denom = float(np.linalg.norm(ref) * np.linalg.norm(got))
-    rmse = float(math.sqrt(float(np.mean(diff * diff)))) if diff.size else 0.0
-    ref_rms = float(math.sqrt(float(np.mean(ref.astype(np.float32, copy=False) ** 2)))) if ref.size else 0.0
+    # Metric accumulation must not overflow on finite FP32 captures.
+    ref64 = ref.astype(np.float64, copy=False)
+    got64 = got.astype(np.float64, copy=False)
+    diff = got64 - ref64
+    denom = float(np.linalg.norm(ref64) * np.linalg.norm(got64))
+    rmse = float(math.sqrt(float(np.mean(diff * diff))))
+    ref_rms = float(math.sqrt(float(np.mean(ref64 ** 2))))
     return {
         "max_abs": float(np.max(np.abs(diff))) if diff.size else 0.0,
         "mean_abs": float(np.mean(np.abs(diff))) if diff.size else 0.0,
@@ -44,7 +51,7 @@ def _metrics(ref: np.ndarray, got: np.ndarray) -> dict[str, float | bool]:
         "relative_rmse": rmse / ref_rms if ref_rms > 0.0 else (0.0 if rmse == 0.0 else float("inf")),
         # A float32 norm/dot can round an exact high-dimensional tensor below
         # one. Exact identity is stronger evidence than that derived metric.
-        "cosine": 1.0 if byte_exact else (float(np.dot(ref.reshape(-1), got.reshape(-1)) / denom) if denom > 0.0 else 0.0),
+        "cosine": 1.0 if byte_exact else (float(np.dot(ref64.reshape(-1), got64.reshape(-1)) / denom) if denom > 0.0 else 0.0),
         "byte_exact": byte_exact,
     }
 
