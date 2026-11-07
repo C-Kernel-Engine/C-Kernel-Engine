@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -1134,18 +1135,97 @@ def _bridge_head_group_macro(head_group: Any) -> str:
     return "CK_ROPE_NUM_HEADS"
 
 
+def _declared_training_call(op, kernel, args, pools, tensors, tensor_numel, variables):
+    """Resolve a bounded map ABI without legacy pointer/scalar guessing.
+
+    Opt-in for fixed-capacity training graphs. Only FP32 buffers and literal
+    scalar bindings are supported here; checked/status-returning calls require
+    a separate failure-propagation contract and are rejected.
+    """
+    phase = "backward" if str(op.get("phase", "")).startswith("backward") else "training"
+    if kernel.get("modes", {}).get(phase) is not True:
+        raise ValueError("map call does not support phase " + phase)
+    declaration = kernel.get("impl", {}).get("c_declaration", "")
+    if not declaration.strip().startswith("void "):
+        raise ValueError("training map call requires a void ABI")
+    abi = kernel.get("call_abi", {})
+    params = abi.get("params", [])
+    if abi.get("version") != 1 or [p.get("name") for p in params] != [n for _, n in args]:
+        raise ValueError("training map ABI does not match declaration")
+    constants = op.get("params", {}).get("call_constants", {})
+    scalars, pointers, expressions = {}, {}, []
+    for (ctype, name), binding in zip(args, params):
+        source = binding.get("source", "")
+        category, _, key = source.partition(":")
+        if "*" in ctype:
+            if ctype.replace(" ", "") not in ("float*", "constfloat*"):
+                raise ValueError("training map call supports FP32 pointers only")
+            tid = pools.get(category, {}).get(key)
+            if not tid or tid not in variables or tensors.get(tid, {}).get("dtype") != "fp32":
+                raise ValueError("missing or incompatible training map buffer: " + source)
+            if ("const" not in ctype) != (category == "output"):
+                raise ValueError("training map buffer access mismatch: " + source)
+            pointers[name] = tid
+            expressions.append(variables[tid])
+        else:
+            value = (constants.get(key) if category == "runtime" else
+                     op.get("params", {}).get(key) if category == "param" else None)
+            if ctype == "int":
+                if type(value) is not int or not 0 < value <= 2147483647:
+                    raise ValueError("invalid bounded integer for " + name)
+                expressions.append(str(value))
+            elif ctype == "float":
+                if type(value) not in (int, float) or not math.isfinite(value) or not 1.40129846e-45 <= value <= 3.4028234e38:
+                    raise ValueError("invalid positive FP32 scalar for " + name)
+                expressions.append("%.9ef" % value)
+            else:
+                raise ValueError("unsupported training map scalar: " + ctype)
+            scalars[name] = value
+    contract = kernel.get("training_contract", {})
+    if contract.get("version") != 1 or contract.get("layout") != "contiguous":
+        raise ValueError("unsupported training map buffer contract")
+    for name, limits in contract.get("scalar_bounds", {}).items():
+        value = scalars.get(name)
+        if value is None or not limits["min"] <= value <= limits["max"]:
+            raise ValueError("training map scalar outside provider bounds: " + name)
+    spans = contract.get("buffer_spans", [])
+    if {span.get("pointer") for span in spans} != set(pointers) or len(spans) != len(pointers):
+        raise ValueError("training map must bound every pointer exactly once")
+    def extent(value):
+        result = scalars.get(value) if isinstance(value, str) else value
+        if type(result) is not int or result <= 0:
+            raise ValueError("invalid map span extent")
+        return result
+    for span in spans:
+        tid = pointers[span["pointer"]]
+        rows, width = extent(span["rows"]), extent(span["width"])
+        if rows * width > min(tensor_numel[tid], 2147483647):
+            raise ValueError("training map buffer capacity exceeded: " + tid)
+        shape = tensors[tid].get("shape")
+        if shape not in ([rows, width], [rows * width]):
+            raise ValueError("training map requires contiguous declared shape: " + tid)
+    writable = [pointers[n] for (t, n) in args if "*" in t and "const" not in t]
+    readable = {pointers[name] for ctype, name in args if "const" in ctype and "*" in ctype}
+    if len(writable) != len(set(writable)) or set(writable) & readable:
+        raise ValueError("training map writable buffers must not alias")
+    return expressions
+
+
 def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional[Dict[str, Any]] = None, layout: Optional[Dict[str, Any]] = None, exec_plan: Optional[Dict[str, Any]] = None) -> Tuple[str, Dict[str, Any]]:
+    identity = {"ir2": ir2, "manifest": manifest or {}, "layout": layout or {}, "exec_plan": exec_plan or {}}
+    declared_ids = set()
+    for op in list(ir2.get("forward", [])) + list(ir2.get("backward", [])):
+        if "map_call" in op and type(op["map_call"]) is not bool:
+            raise ValueError("map_call must be boolean")
+        if op.get("map_call"):
+            declared_ids.add(op.get("kernel_id"))
+    if declared_ids:
+        maps = _kernel_registry_map(registry)
+        if any(kid not in maps for kid in declared_ids):
+            raise ValueError("training map call has no registered provider")
+        identity["training_map_contracts"] = {kid: maps[kid] for kid in sorted(declared_ids)}
     runtime_contract_sha256 = hashlib.sha256(
-        json.dumps(
-            {
-                "ir2": ir2,
-                "manifest": manifest or {},
-                "layout": layout or {},
-                "exec_plan": exec_plan or {},
-            },
-            sort_keys=True,
-            separators=(",", ":"),
-        ).encode("utf-8")
+        json.dumps(identity, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
     cfg = dict(ir2.get("config") or {})
     bridge_lowering = str(ir2.get("bridge_lowering", "legacy") or "legacy").strip().lower()
@@ -3438,6 +3518,8 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
 
             resolved = used_decl.get(kid)
             if resolved is None:
+                if op.get("map_call"):
+                    raise ValueError("training map call has no callable declaration: " + kid)
                 skipped_ops.append("op_id=%s kernel_id=%s no callable declaration" % (op_id, kid))
                 ap("    /* skip op_id=%s (%s): kernel `%s` has no callable declaration */" % (op_id, op_name, kid))
                 idx += 1
@@ -4110,7 +4192,15 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                     psource = param.get("source")
                     if isinstance(pname, str) and isinstance(psource, str):
                         binding_param_sources[pname.lower()] = psource
-            for atype, aname in args:
+            if op.get("map_call"):
+                call_args = _declared_training_call(
+                    op, kernel_map[kid], args,
+                    {"activation": io_inputs, "output": io_outputs, "weight": io_weights},
+                    tensors, tensor_numel, tvars_f32)
+                bounds_checks = [(tvars_f32[tid], tensor_numel[tid])
+                                 for tid in list(io_inputs.values()) + list(io_outputs.values()) + list(io_weights.values())
+                                 if tid in tvars_f32]
+            for atype, aname in ([] if op.get("map_call") else args):
                 is_ptr = "*" in atype
                 if is_ptr:
                     if kid == "gemm_blocked_serial":

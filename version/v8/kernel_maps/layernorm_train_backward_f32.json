@@ -1,0 +1,306 @@
+{
+  "id": "layernorm_train_backward_f32",
+  "op": "layernorm",
+  "variant": "fp32_cached_stats",
+  "operation_interface": "layernorm_train_backward_f32.v1",
+  "modes": {
+    "inference": false,
+    "training": true,
+    "backward": true
+  },
+  "quant": {
+    "weight": "fp32",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "in_0",
+      "dtype": "fp32",
+      "shape": [
+        "R",
+        "C"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "in_1",
+      "dtype": "fp32",
+      "shape": [
+        "R",
+        "C"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "in_2",
+      "dtype": "fp32",
+      "shape": [
+        "C"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "in_3",
+      "dtype": "fp32",
+      "shape": [
+        "R"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "in_4",
+      "dtype": "fp32",
+      "shape": [
+        "R"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "d_input",
+      "dtype": "fp32",
+      "shape": [
+        "R",
+        "C"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "d_gamma",
+      "dtype": "fp32",
+      "shape": [
+        "C"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "d_beta",
+      "dtype": "fp32",
+      "shape": [
+        "C"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "scratch": [],
+  "dims": [
+    "R",
+    "C"
+  ],
+  "impl": {
+    "function": "layernorm_backward_kernel",
+    "c_declaration": "void layernorm_backward_kernel(const float *d_output, const float *input, const float *gamma, const float *mean, const float *rstd, float *d_input, float *d_gamma, float *d_beta, int rows, int d_model, int aligned_embed_dim);",
+    "sources": [
+      "src/kernels/layernorm_kernels.c"
+    ]
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "d_output",
+        "source": "activation:in_0",
+        "cast": "const float *",
+        "ports": [
+          "input:in_0"
+        ]
+      },
+      {
+        "name": "input",
+        "source": "activation:in_1",
+        "cast": "const float *",
+        "ports": [
+          "input:in_1"
+        ]
+      },
+      {
+        "name": "gamma",
+        "source": "activation:in_2",
+        "cast": "const float *",
+        "ports": [
+          "input:in_2"
+        ]
+      },
+      {
+        "name": "mean",
+        "source": "activation:in_3",
+        "cast": "const float *",
+        "ports": [
+          "input:in_3"
+        ]
+      },
+      {
+        "name": "rstd",
+        "source": "activation:in_4",
+        "cast": "const float *",
+        "ports": [
+          "input:in_4"
+        ]
+      },
+      {
+        "name": "d_input",
+        "source": "output:d_input",
+        "cast": "float *",
+        "ports": [
+          "output:d_input"
+        ]
+      },
+      {
+        "name": "d_gamma",
+        "source": "output:d_gamma",
+        "cast": "float *",
+        "ports": [
+          "output:d_gamma"
+        ]
+      },
+      {
+        "name": "d_beta",
+        "source": "output:d_beta",
+        "cast": "float *",
+        "ports": [
+          "output:d_beta"
+        ]
+      },
+      {
+        "name": "rows",
+        "source": "runtime:rows"
+      },
+      {
+        "name": "d_model",
+        "source": "runtime:channels"
+      },
+      {
+        "name": "aligned_embed_dim",
+        "source": "runtime:channels"
+      }
+    ]
+  },
+  "training_contract": {
+    "layout": "contiguous",
+    "buffer_spans": [
+      {
+        "pointer": "d_output",
+        "rows": "rows",
+        "width": "d_model"
+      },
+      {
+        "pointer": "input",
+        "rows": "rows",
+        "width": "d_model"
+      },
+      {
+        "pointer": "gamma",
+        "rows": 1,
+        "width": "d_model"
+      },
+      {
+        "pointer": "mean",
+        "rows": "rows",
+        "width": 1
+      },
+      {
+        "pointer": "rstd",
+        "rows": "rows",
+        "width": 1
+      },
+      {
+        "pointer": "d_input",
+        "rows": "rows",
+        "width": "d_model"
+      },
+      {
+        "pointer": "d_gamma",
+        "rows": 1,
+        "width": "d_model"
+      },
+      {
+        "pointer": "d_beta",
+        "rows": 1,
+        "width": "d_model"
+      }
+    ],
+    "version": 1,
+    "scalar_bounds": {
+      "d_model": {
+        "min": 1,
+        "max": 2147483639
+      }
+    }
+  },
+  "constraints": {
+    "notes": "Bounded contiguous FP32 caller buffers; rows and channels are positive signed-int bounds. Outputs must not alias. Training emitter validates all map spans before generating a call. Epsilon is an operation-local positive FP32 literal. Finite operands are a caller precondition; this legacy void provider does not promise atomic rejection of nonfinite data."
+  },
+  "notes": "Reuses existing native arithmetic. Forward caches the actual FP32 mean/rstd. Backward consumes these statistics, overwrites d_input, and accumulates d_gamma/d_beta into zeroed temporary gradient buffers; graph accumulation owns shared-parameter sums. Not BF16 or complete Clef training. Backward reduces dY*gamma and dY*gamma*xhat across channels in FP32; reduces d_gamma/d_beta across rows in ascending order. Compiler contraction is build-dependent; no cross-compiler bitwise claim.",
+  "tests": {
+    "unit": [
+      "tests/test_v8_layernorm_training.py"
+    ],
+    "oracle": "Independent PyTorch FP32 autograd, full native optimizer trajectory and finite differences on a bounded nonzero normalization/projection composition."
+  },
+  "numerical_capabilities": [
+    {
+      "contract_id": "layernorm_cached_backward_fp32_v1",
+      "status": "validated",
+      "phases": [
+        "backward"
+      ],
+      "function": "layernorm_backward_kernel",
+      "explicit_selector": true,
+      "implementation": {
+        "isa_dispatch": "compile_time",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": [
+            "serial"
+          ],
+          "dispatch": [
+            "inline"
+          ],
+          "reduction_order_effect": "contract_defined"
+        }
+      },
+      "arithmetic": {
+        "partial_accumulator": "fp32",
+        "merge_order": "none",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false,
+        "split_strategy": "serial"
+      }
+    }
+  ]
+}
