@@ -1,0 +1,46 @@
+{
+  "schema": "cke.control.v1",
+  "status": "initial implementation; no external consumer agreement claimed",
+  "request": {
+    "required": ["schema", "request_id", "operation", "node_id", "params"],
+    "identifiers": "1-64 ASCII letters, digits, dot, underscore or hyphen",
+    "encoding": "single UTF-8 JSON object in one ZeroMQ frame",
+    "max_bytes": 8192
+  },
+  "response": {
+    "required": ["schema", "request_id", "node_id", "adapter_boot_id", "observed_at", "ok", "data", "error"],
+    "observed_at": "UTC ISO-8601 timestamp; observation time, not last native progress",
+    "request_id": "echo valid ID; null if not recoverable from malformed input",
+    "adapter_boot_id": "random 128-bit identity per adapter process, not worker identity"
+  },
+  "operations": {
+    "node.describe": {"params": {}, "data": ["adapter_health", "cke_revision", "transport", "worker_discovery", "worker_count"]},
+    "workers.list": {"params": {}, "data": {"workers": [{"worker_id": "configured-id"}]}},
+    "worker.status": {"params": {"worker_id": "configured-id"}, "data": "worker_observation"},
+    "worker.capabilities": {"params": {"worker_id": "configured-id"}, "data": "worker_observation"}
+  },
+  "worker_observation": {
+    "worker_id": "configured stable identifier",
+    "observed_at": "UTC timestamp when probe began",
+    "observation_status": "available or unavailable",
+    "observation_error": "null, WORKER_TIMEOUT or WORKER_UNAVAILABLE",
+    "boot_id": null,
+    "cke_revision": null,
+    "capabilities_status": "unsupported",
+    "capabilities": null,
+    "ready": "boolean from health endpoint or null",
+    "busy": "boolean derived from active field or null",
+    "queued": "nonnegative integer from health endpoint or null",
+    "worker_generation": "nonnegative local generation counter or null; not globally unique boot identity"
+  },
+  "errors": ["MALFORMED_MESSAGE", "INVALID_REQUEST", "INVALID_PARAMS", "UNSUPPORTED_OPERATION", "WORKER_NOT_FOUND"],
+  "semantics": [
+    "ok means control operation succeeded, not worker readiness or model numerical certification",
+    "Absent worker measurements remain null; registration never certifies capabilities",
+    "No cached worker observations; clients retain their own last-success and freshness",
+    "Oversized frames are disconnected by libzmq; multipart is rejected by socket reset, without a response",
+    "Clients must close and recreate REQ sockets after timeout",
+    "Remote exposure is unsupported; authentication and approved-peer policy are required before adding it"
+  ],
+  "limits": {"workers": 32, "queue_hwm_per_peer": 16, "http_body_bytes": 8192, "http_timeout_ms": 500, "send_timeout_ms": 200}
+}

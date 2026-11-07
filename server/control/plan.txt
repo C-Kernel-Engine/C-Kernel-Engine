@@ -1,0 +1,19 @@
+CKE read-only node adapter — action plan
+
+1. Contract: publish cke.control.v1 operations, null semantics, errors and fixtures.
+   No dependency on Antsand; external consumers can independently test the fixtures.
+2. Adapter: separate C/libzmq process. Explicit local worker registrations, bounded
+   HTTP health probes, allowlisted output fields, loopback binding only.
+3. Acceptance: real ZeroMQ discovery/status; malformed/oversized input; unavailable
+   worker, timeout recovery, restart and new adapter boot identity. Add dedicated PR CI.
+4. Practical P3 check: observe existing speech workers read-only. Do not restart or
+   reconfigure inference services. Retain sanitized observations, not paths/secrets.
+5. Consumer integration: consumer owns pools/groups, access policy, freshness and UI.
+   External acceptance remains pending until consumer displays observations, detects
+   adapter loss and recovers. Do not claim Antsand integration from standalone tests.
+6. Later bounded work: worker-native boot identity and capability exports, authenticated
+   remote transport and peer authorization. Workload scheduling/control require separate
+   contracts and tests; no training, shell, load or cancellation commands in this version.
+
+Speech performance work remains separate in speech-single-row-20261107; do not deploy
+that unreviewed candidate as part of this adapter change.
