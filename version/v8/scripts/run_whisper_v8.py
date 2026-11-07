@@ -600,6 +600,38 @@ def forced_decoder_prefix(
     return prefix
 
 
+MAX_VOCABULARY_HINT_BYTES = 1024
+MAX_VOCABULARY_HINT_TOKENS = 64
+
+
+def vocabulary_decoder_prefix(generation, config, tokenizer, language, task,
+                              hint, max_tokens, *, timestamps=False):
+    """Whisper previous-context prompt, not forced transcript output.
+
+    Follows OpenAI Whisper DecodingTask._get_initial_tokens: sot_prev,
+    encoded leading-space context, then language/task SOT sequence. Reject
+    overflow rather than silently truncating the user's vocabulary.
+    """
+    if not isinstance(hint, str) or "\x00" in hint or len(hint.encode("utf-8")) > MAX_VOCABULARY_HINT_BYTES:
+        raise ValueError("invalid vocabulary hint or byte limit exceeded")
+    prefix = forced_decoder_prefix(generation, language, task, timestamps=timestamps)
+    if not hint.strip():
+        return prefix
+    ids = tokenizer.encode(" " + hint.strip(), add_special_tokens=False).ids
+    previous = tokenizer.token_to_id("<|startofprev|>")
+    eos = int(generation["eos_token_id"])
+    if previous is None or not ids or any(type(t) is not int or t < 0 or t >= eos for t in ids):
+        raise ValueError("vocabulary hint must contain ordinary text tokens only")
+    capacity = int(config["context_length"])
+    limit = min(MAX_VOCABULARY_HINT_TOKENS, capacity // 2 - 1)
+    if len(ids) > limit:
+        raise ValueError("vocabulary hint exceeds token limit")
+    result = [previous, *ids, *prefix]
+    if type(max_tokens) is not int or max_tokens <= 0 or len(result) + max_tokens > capacity:
+        raise ValueError("vocabulary hint and generation exceed decoder capacity")
+    return result
+
+
 def plan_audio_windows(
     source_frames: int,
     source_sample_rate: int,
@@ -766,6 +798,18 @@ def _decoder_worker(
     encoder_memory = np.load(args.encoder_output).astype(np.float32, copy=False)
     trace_output = getattr(args, "attention_trace_output", None)
 
+    hint = getattr(args, "vocabulary_hint", "")
+    if hint:
+        if tokenizer is None:
+            from tokenizers import Tokenizer
+            tokenizer = Tokenizer.from_file(str(tokenizer_path))
+        prefix = vocabulary_decoder_prefix(
+            generation, json.loads((run_dir / "config.json").read_text()), tokenizer,
+            args.language, args.task, hint, args.max_tokens, timestamps=args.timestamps)
+    else:
+        prefix = forced_decoder_prefix(generation, args.language, args.task,
+                                       timestamps=args.timestamps)
+
     owns_model = model is None
     init_seconds = 0.0
     if model is None:
@@ -821,12 +865,6 @@ def _decoder_worker(
         )
         if status != 0:
             raise RuntimeError(f"encoder-memory binding failed with code {status}")
-        prefix = forced_decoder_prefix(
-            generation,
-            args.language,
-            args.task,
-            timestamps=args.timestamps,
-        )
         prefix_array = (ctypes.c_int32 * len(prefix))(*prefix)
         if trace_buffer is not None:
             trace_buffer.fill(np.nan)
@@ -911,6 +949,9 @@ def _decoder_worker(
         json.dumps(
             {
                 "forced_prefix": prefix,
+                "vocabulary_hint_applied": bool(hint.strip()),
+                "vocabulary_hint_token_count": max(0, len(prefix) - len(forced_decoder_prefix(
+                    generation, args.language, args.task, timestamps=args.timestamps)) - 1),
                 "timestamps": bool(args.timestamps),
                 "generated_tokens": tokens,
                 "generated_count": len(tokens),
@@ -1299,6 +1340,7 @@ def _run_segment(
         "timestamps": args.timestamps,
         "worker_report": decoder_report,
         "attention_trace_output": trace_output,
+        "vocabulary_hint": getattr(args, "vocabulary_hint", ""),
     }
     encoder_started = time.perf_counter()
     if encoder_worker is not None and decoder_worker is not None:
@@ -1353,6 +1395,8 @@ def _run_segment(
                 "--max-tokens",
                 str(args.max_tokens),
                 *(["--timestamps"] if args.timestamps else []),
+                *(["--vocabulary-hint", args.vocabulary_hint]
+                  if getattr(args, "vocabulary_hint", "") else []),
                 *(["--attention-trace-output", str(trace_output)]
                   if trace_output else []),
                 "--worker-report",
@@ -1797,6 +1841,7 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument("--encoder-run-dir", type=Path, required=True)
     run.add_argument("--decoder-run-dir", type=Path, required=True)
     run.add_argument("--wav", type=Path, required=True)
+    run.add_argument("--vocabulary-hint", default="", help="Short optional terminology context; not transcript replacement")
     run.add_argument("--language", default="en")
     run.add_argument("--task", choices=("transcribe", "translate"), default="transcribe")
     run.add_argument("--max-tokens", type=int, default=128)
@@ -1851,6 +1896,7 @@ def _parser() -> argparse.ArgumentParser:
     decoder = subparsers.add_parser("_decoder", help=argparse.SUPPRESS)
     decoder.add_argument("--decoder-run-dir", type=Path, required=True)
     decoder.add_argument("--encoder-output", type=Path, required=True)
+    decoder.add_argument("--vocabulary-hint", default="")
     decoder.add_argument("--language", required=True)
     decoder.add_argument("--task", required=True)
     decoder.add_argument("--max-tokens", type=int, required=True)

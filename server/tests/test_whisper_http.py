@@ -399,3 +399,30 @@ def test_shutdown_deadline_with_blocked_factory_and_full_queue():
         release.set()
         owner._thread.join(timeout=2)
     assert not owner._thread.is_alive() and backend.closed
+
+
+def test_vocabulary_context_is_request_local_and_never_rewrites_text():
+    seen = []
+    class Backend(_FakeBackend):
+        def run(self, data, *, vocabulary_hint=''):
+            seen.append(vocabulary_hint)
+            return {'text': 'Jupiter notebook', 'stop': 'eos', 'inference_seconds': .01}
+    def validate(hint):
+        if len(hint.encode()) > 1024 or '\x00' in hint:
+            raise ValueError('invalid hint')
+    with TestClient(create_app(lambda: Backend(1), vocabulary_validator=validate)) as client:
+        for hint in ('Jupyter Notebook, Antsand, Kokoro', ''):
+            result = client.post('/audio/transcriptions', params={'vocabulary_hint': hint},
+                                 content=_wav(1), headers={'content-type':'audio/wav'})
+            assert result.status_code == 200
+            assert result.json()['text'] == 'Jupiter notebook'
+        assert seen == ['Jupyter Notebook, Antsand, Kokoro', '']
+        for hint in ('x'*1025, 'x\x00'):
+            assert client.post('/audio/transcriptions', params={'vocabulary_hint':hint},
+                               content=_wav(1), headers={'content-type':'audio/wav'}).status_code == 400
+        assert len(seen) == 2
+        assert client.post('/audio/transcriptions?vocabulary_hint=a&vocabulary_hint=b',
+                           content=_wav(1), headers={'content-type':'audio/wav'}).status_code == 400
+    with TestClient(create_app(lambda: Backend(1))) as client:
+        assert client.post('/audio/transcriptions', params={'vocabulary_hint':'Kokoro'},
+                           content=_wav(1), headers={'content-type':'audio/wav'}).status_code == 501
