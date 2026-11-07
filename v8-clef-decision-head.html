@@ -1036,6 +1036,48 @@
 
 <p>Model topology lives in the circuit builders here. Kernels implement arithmetic; maps describe ABI, scratch and numerical contracts. Generic operation catalogue entries do not inspect the model name.</p>
 
+<section id="normalization-training">
+<h2>Cached-statistics LayerNorm training composition</h2>
+<p>The next trainable composition is fixed features → trainable projection → affine LayerNorm →
+trainable scores → cross-entropy. Existing native LayerNorm forward/backward arithmetic is reused;
+no new normalization kernel or model-specific compiler branch is introduced. The forward provider
+publishes its actual FP32 mean and reciprocal standard deviation, which automatic backward lowering
+passes to the existing VJP. Epsilon belongs to the operation, independently of the enclosing model.</p>
+<p>Shared training code generation now accepts an opt-in, map-owned ABI for bounded contiguous FP32
+buffers and literal scalar parameters. It rejects missing ports/providers, reordered ABIs, unsupported
+phases/dtypes, invalid scalars, insufficient capacities, incorrect shapes and writable aliases instead
+of guessing argument bindings. The selected maps participate in runtime/checkpoint identity. This
+path currently accepts void providers only: finite inputs remain a caller precondition, and it does
+not claim atomic rejection of nonfinite values. Checked status-returning providers need a separate
+failure-propagation contract before joining this path.</p>
+<table class="table"><thead><tr><th>FP32 native AdamW, 40 updates</th><th>Initial → final loss</th><th>Gradient / weight / moment maximum absolute error</th></tr></thead><tbody>
+<tr><td>Trainable affine, epsilon 1e-5</td><td>1.29325175 → 0.00443579</td><td>1.98e-7 / 9.54e-7 / 5.59e-8</td></tr>
+<tr><td>Frozen affine, epsilon 0.03</td><td>1.31046605 → 0.05293253</td><td>8.95e-8 / 6.26e-7 / 3.36e-8</td></tr>
+</tbody></table>
+<p>Measured on 2026-11-07 against PyTorch 2.12.1 CPU, seed 837. Every trainable gradient, weight
+and AdamW moment is compared at every update. Frozen weights remain byte-identical; an upstream
+finite difference checks gradient flow. Resetting and restoring a step-20 v8 checkpoint reproduces
+remaining updates exactly, and final-weight reload reproduces forward-only logits. A deliberately
+swapped mean/rstd capture fails the gradient oracle. Direct native VJPs also cover widths 1, 7, 512,
+513 and 4096. These are synthetic operands, not released Clef-head training or backbone features.</p>
+<p>Numerical ceilings retain absolute 3e-5 and relative 3e-4 for gradients, weights and logits;
+moments use absolute 3e-6 and relative 3e-4. They are empirical fixture bounds. The existing forward
+uses compile-target-dependent FP32 SIMD variance partials and FP64 merging; backward reduces in FP32.
+Neither cross-compiler bitwise agreement nor BF16 optimizer certification is claimed.</p>
+<pre><code>make -j4 build/libckernel_engine.so
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python3 -m unittest \
+  tests.test_v8_layernorm_training tests.test_v8_selective_training -v
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python3 scripts/nightly_runner.py \
+  --tests training_layernorm_composition training_selective_parameters --ci --require-executed</code></pre>
+<p>This change also aligns the shared v7 attention-score derivative scratch shape with the saved
+attention tensor, matching the v8 rule. It resolves the inherited attention-rematerialization shape
+assertion reported in the earlier selective-training sweep.</p>
+<p><strong>This does not yet make the complete Clef head trainable through cke.v8.compile.</strong>
+It extends the existing backend, maps and v8 derivative rules. Remaining work includes head authoring
+into the training IR, noncausal attention, indexed/scoring derivatives, grouped losses and complete
+head parameter/optimizer/export comparisons. BF16 head trajectories and LoRA/QLoRA follow that baseline.</p>
+</section>
+
 <section id="selective-training">
 <h2>Selective FP32 training prerequisite</h2>
 <p>The shared v7/v8 backward lowerer now honors boolean parameter <code>requires_grad</code>
