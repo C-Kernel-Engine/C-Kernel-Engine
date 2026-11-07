@@ -33,6 +33,7 @@ var dir_d44c64559bbebec7f509842c48db8b23 =
     [ "ckernel_codegen_v2.h", "ckernel__codegen__v2_8h.html", "ckernel__codegen__v2_8h" ],
     [ "ckernel_concat_i32.h", "ckernel__concat__i32_8h.html", "ckernel__concat__i32_8h" ],
     [ "ckernel_copy_i32_span.h", "ckernel__copy__i32__span_8h.html", "ckernel__copy__i32__span_8h" ],
+    [ "ckernel_decision_tensor_ops.h", "ckernel__decision__tensor__ops_8h.html", "ckernel__decision__tensor__ops_8h" ],
     [ "ckernel_dtype.h", "ckernel__dtype_8h.html", "ckernel__dtype_8h" ],
     [ "ckernel_embedding_checked.h", "ckernel__embedding__checked_8h.html", "ckernel__embedding__checked_8h" ],
     [ "ckernel_engine.h", "ckernel__engine_8h.html", "ckernel__engine_8h" ],

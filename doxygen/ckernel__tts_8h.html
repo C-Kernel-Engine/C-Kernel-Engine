@@ -777,10 +777,10 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">   74</span>    }</div>
 <div class="line"><span class="lineno">   75</span> </div>
 <div class="line"><span class="lineno">   76</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> padded_samples = output_samples + n_fft;</div>
-<div class="line"><span class="lineno">   77</span>    <span class="keywordtype">float</span> *overlap = scratch;</div>
-<div class="line"><span class="lineno">   78</span>    <span class="keywordtype">float</span> *window_sum = overlap + padded_samples;</div>
+<div class="line"><span class="lineno">   77</span>    <span class="keywordtype">float</span> *<a class="code hl_function" href="decision__tensor__ops_8c.html#a455abd42d7d4b5a968634525610bdb7b">overlap</a> = scratch;</div>
+<div class="line"><span class="lineno">   78</span>    <span class="keywordtype">float</span> *window_sum = <a class="code hl_function" href="decision__tensor__ops_8c.html#a455abd42d7d4b5a968634525610bdb7b">overlap</a> + padded_samples;</div>
 <div class="line"><span class="lineno">   79</span>    <span class="keywordtype">float</span> *window = window_sum + padded_samples;</div>
-<div class="line"><span class="lineno">   80</span>    memset(overlap, 0, padded_samples * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">   80</span>    memset(<a class="code hl_function" href="decision__tensor__ops_8c.html#a455abd42d7d4b5a968634525610bdb7b">overlap</a>, 0, padded_samples * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
 <div class="line"><span class="lineno">   81</span>    memset(window_sum, 0, padded_samples * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
 <div class="line"><span class="lineno">   82</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> tau = 6.2831853071795864769f;</div>
 <div class="line"><span class="lineno">   83</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> n = 0; n &lt; n_fft; ++n)</div>
@@ -803,7 +803,7 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">  100</span>                acc += 2.0f * (real * cosf(angle) - imag * sinf(angle));</div>
 <div class="line"><span class="lineno">  101</span>            }</div>
 <div class="line"><span class="lineno">  102</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> w = window[n];</div>
-<div class="line"><span class="lineno">  103</span>            overlap[offset + n] += acc * inverse_n * w;</div>
+<div class="line"><span class="lineno">  103</span>            <a class="code hl_function" href="decision__tensor__ops_8c.html#a455abd42d7d4b5a968634525610bdb7b">overlap</a>[offset + n] += acc * inverse_n * w;</div>
 <div class="line"><span class="lineno">  104</span>            window_sum[offset + n] += w * w;</div>
 <div class="line"><span class="lineno">  105</span>        }</div>
 <div class="line"><span class="lineno">  106</span>    }</div>
@@ -813,18 +813,19 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">  110</span>        <span class="keyword">const</span> <span class="keywordtype">size_t</span> pos = left_trim + i;</div>
 <div class="line"><span class="lineno">  111</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> norm = window_sum[pos];</div>
 <div class="line"><span class="lineno">  112</span>        <span class="keywordflow">if</span> (!(norm &gt; 1e-11f)) <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__tts_8h.html#ac33d7dced18028940945c35c42dadf91a69b700acd95d7ca6a720a4d885ab53a4">CK_AUDIO_EXTENT_INVALID</a>;</div>
-<div class="line"><span class="lineno">  113</span>        <span class="keywordflow">if</span> (!isfinite(overlap[pos] / norm)) <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__tts_8h.html#ac33d7dced18028940945c35c42dadf91a69b700acd95d7ca6a720a4d885ab53a4">CK_AUDIO_EXTENT_INVALID</a>;</div>
+<div class="line"><span class="lineno">  113</span>        <span class="keywordflow">if</span> (!isfinite(<a class="code hl_function" href="decision__tensor__ops_8c.html#a455abd42d7d4b5a968634525610bdb7b">overlap</a>[pos] / norm)) <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__tts_8h.html#ac33d7dced18028940945c35c42dadf91a69b700acd95d7ca6a720a4d885ab53a4">CK_AUDIO_EXTENT_INVALID</a>;</div>
 <div class="line"><span class="lineno">  114</span>    }</div>
 <div class="line"><span class="lineno">  115</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; output_samples; ++i) {</div>
 <div class="line"><span class="lineno">  116</span>        <span class="keyword">const</span> <span class="keywordtype">size_t</span> pos = left_trim + i;</div>
-<div class="line"><span class="lineno">  117</span>        output[i] = overlap[pos] / window_sum[pos];</div>
+<div class="line"><span class="lineno">  117</span>        output[i] = <a class="code hl_function" href="decision__tensor__ops_8c.html#a455abd42d7d4b5a968634525610bdb7b">overlap</a>[pos] / window_sum[pos];</div>
 <div class="line"><span class="lineno">  118</span>    }</div>
 <div class="line"><span class="lineno">  119</span>    <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__tts_8h.html#ac33d7dced18028940945c35c42dadf91ace4d803def1b18836a5cbd7fbd659af1">CK_AUDIO_EXTENT_OK</a>;</div>
 <div class="line"><span class="lineno">  120</span>}</div>
 <div class="ttc" id="aaudio__istft__mag__phase_8c_html_a5d20ffbb3739001f22b58f8e23526d50"><div class="ttname"><a href="audio__istft__mag__phase_8c.html#a5d20ffbb3739001f22b58f8e23526d50">audio_istft_mag_phase_plan_f32</a></div><div class="ttdeci">int audio_istft_mag_phase_plan_f32(size_t frames, size_t n_fft, size_t hop, size_t *spectral_elements, size_t *output_samples, size_t *scratch_elements)</div><div class="ttdef"><b>Definition</b> <a href="audio__istft__mag__phase_8c_source.html#l00019">audio_istft_mag_phase.c:19</a></div></div>
+<div class="ttc" id="adecision__tensor__ops_8c_html_a455abd42d7d4b5a968634525610bdb7b"><div class="ttname"><a href="decision__tensor__ops_8c.html#a455abd42d7d4b5a968634525610bdb7b">overlap</a></div><div class="ttdeci">static int overlap(const void *a, size_t n, const void *b, size_t m)</div><div class="ttdef"><b>Definition</b> <a href="decision__tensor__ops_8c_source.html#l00011">decision_tensor_ops.c:11</a></div></div>
 <div class="ttc" id="autf8_8c_html_a204a3f4fa39b9c007f9784d3e4af4667"><div class="ttname"><a href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a></div><div class="ttdeci">uint32_t end</div><div class="ttdef"><b>Definition</b> <a href="utf8_8c_source.html#l00215">utf8.c:215</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="audio__istft__mag__phase_8c_source.html#l00019">audio_istft_mag_phase_plan_f32()</a>, <a class="el" href="ckernel__tts_8h_source.html#l00042">CK_AUDIO_EXTENT_INVALID</a>, <a class="el" href="ckernel__tts_8h_source.html#l00043">CK_AUDIO_EXTENT_LIMIT</a>, <a class="el" href="ckernel__tts_8h_source.html#l00041">CK_AUDIO_EXTENT_OK</a>, and <a class="el" href="utf8_8c_source.html#l00215">end</a>.</p>
+<p class="reference">References <a class="el" href="audio__istft__mag__phase_8c_source.html#l00019">audio_istft_mag_phase_plan_f32()</a>, <a class="el" href="ckernel__tts_8h_source.html#l00042">CK_AUDIO_EXTENT_INVALID</a>, <a class="el" href="ckernel__tts_8h_source.html#l00043">CK_AUDIO_EXTENT_LIMIT</a>, <a class="el" href="ckernel__tts_8h_source.html#l00041">CK_AUDIO_EXTENT_OK</a>, <a class="el" href="utf8_8c_source.html#l00215">end</a>, and <a class="el" href="decision__tensor__ops_8c_source.html#l00011">overlap()</a>.</p>
 
 </div>
 </div>
