@@ -1,0 +1,71 @@
+CKE resident Kokoro HTTP — experimental P3 service, 2026-11-07
+
+Scope
+-----
+This opt-in localhost service is separate from text serving and Whisper ASR.
+One generated Kokoro native session stays loaded across accepted speech
+requests. The service admits one synthesis request at a time and queues at
+most two more by default. It streams newline-delimited JSON records with
+ordered WAV chunks; it does not play audio on P3. LinuxUtilities on the laptop
+owns playback, stop/replacement and discarding obsolete chunks.
+
+Bundle requirement
+------------------
+Use a rebuilt runtime-length Kokoro bundle whose native dispatcher supports
+--session and whose 64/generated.so is loaded in the native host. Historical
+P3 bundles at /data/cke/kokoro-runtime-text-final-20261018 and
+/data/cke/kokoro-runtime-text-range-probe-20261019 advertise runtime lengths
+in their manifests, but their dispatcher executables reject --session. Those historical bundles are unsuitable for this endpoint. A newer session-capable bundle was subsequently located under /tmp.
+
+Launch
+------
+Choose the pinned text frontend config and a verified generated bundle. Run
+the server with a separate CPU budget from Whisper:
+
+  CK_NUM_THREADS=4 OPENBLAS_NUM_THREADS=1 python3 -m server.kokoro_http \
+    --config "$KOKORO_CONFIG" --bundle-dir "$KOKORO_BUNDLE" \
+    --port 8111 --max-waiters 2 --worker-timeout-seconds 600
+
+From the laptop, forward the localhost port:
+
+  ssh -N -L 8111:127.0.0.1:8111 p3
+
+Then stream an accepted request:
+
+  curl -N -H 'Content-Type: application/json' \
+    -H 'X-CKE-Request-ID: speech-001' \
+    -d '{"text":"Hello from CKE.","seed":7}' \
+    http://127.0.0.1:8111/audio/speech
+
+The first record identifies the loaded dispatcher, generated library,
+request package and voice. Each chunk record includes request ID, index,
+source text span, audio sample offsets, sample count, SHA-256 and base64 WAV.
+The final complete record gives chunk count and total samples. Preserve order
+and reject a chunk whose request ID or source identity differs from the active
+playback request. Never play a late chunk after stop or replacement.
+
+POST /audio/speech/speech-001/cancel stops a queued or active request. An
+active cancellation kills and replaces the native session; a queued
+cancellation leaves the healthy resident model intact. Queue overflow returns
+429. Input is bounded to 8192 UTF-8 text bytes, and each audio chunk is
+bounded to 8 MiB before base64 encoding. The model can still take time to
+synthesize; worker execution has a configurable timeout.
+
+Acceptance still needed
+-----------------------
+Rebuild a current-main session-capable bundle, then run A -> B -> A with
+measured native load count, real synthesis and output identity. Run the full
+summary through a laptop headset, including stop, replace and recovery.
+Record first audible speech, playback gaps, peak memory and waveform limits.
+The connected Kokoro waveform-parity gate remains unresolved and must stay
+visible independently of HTTP transport success.
+
+P3 deployment trial
+-------------------
+The current trial uses /tmp/cke-kokoro-p3-tile32-w8-bundle-20261104 and
+/tmp/cke-kokoro-model-pinned/config.json. Its pinned frontend Python is
+/tmp/cke-kokoro-pinned-venv-20261106/bin/python. HTTP dependencies are isolated
+in /dev/shm/cke-kokoro-http-deps. The cke-kokoro-http user systemd unit binds
+localhost 8111, with an eight-core CPU quota and 4 GiB memory limit.
+This temporary deployment does not survive a reboot. Real headset playback
+and audible stop latency require the laptop accessibility agent.
