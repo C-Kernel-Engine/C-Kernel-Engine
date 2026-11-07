@@ -1,0 +1,229 @@
+{
+  "schema": "cke.control.consumer-fixtures.v1",
+  "scope": "synthetic sanitized fixtures, not Antsand integration evidence",
+  "sequence": [
+    "node.describe",
+    "workers.list",
+    "worker.status",
+    "worker.capabilities",
+    "node.describe"
+  ],
+  "request": {
+    "schema": "cke.control.v1",
+    "request_id": "fixture-request",
+    "node_id": "fixture-node",
+    "operation": "node.describe",
+    "params": {}
+  },
+  "responses": {
+    "node.describe": {
+      "schema": "cke.control.v1",
+      "request_id": "fixture-request",
+      "node_id": "fixture-node",
+      "adapter_boot_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "observed_at": "2026-11-07T00:00:00Z",
+      "ok": true,
+      "error": null,
+      "data": {
+        "adapter_health": "ready",
+        "cke_revision": "unknown",
+        "transport": "loopback-only",
+        "worker_discovery": "explicit-registration",
+        "worker_count": 1
+      }
+    },
+    "workers.list": {
+      "schema": "cke.control.v1",
+      "request_id": "fixture-request",
+      "node_id": "fixture-node",
+      "adapter_boot_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "observed_at": "2026-11-07T00:00:00Z",
+      "ok": true,
+      "error": null,
+      "data": {
+        "workers": [
+          {
+            "worker_id": "speech"
+          }
+        ]
+      }
+    },
+    "worker.status": {
+      "schema": "cke.control.v1",
+      "request_id": "fixture-request",
+      "node_id": "fixture-node",
+      "adapter_boot_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "observed_at": "2026-11-07T00:00:00Z",
+      "ok": true,
+      "error": null,
+      "data": {
+        "worker_id": "speech",
+        "observed_at": "2026-11-07T00:00:00Z",
+        "observation_status": "available",
+        "observation_error": null,
+        "boot_id": null,
+        "cke_revision": null,
+        "capabilities_status": "unsupported",
+        "capabilities": null,
+        "ready": true,
+        "busy": false,
+        "queued": 0,
+        "worker_generation": 1
+      }
+    },
+    "worker.capabilities": {
+      "schema": "cke.control.v1",
+      "request_id": "fixture-request",
+      "node_id": "fixture-node",
+      "adapter_boot_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "observed_at": "2026-11-07T00:00:00Z",
+      "ok": true,
+      "error": null,
+      "data": {
+        "worker_id": "speech",
+        "observed_at": "2026-11-07T00:00:00Z",
+        "observation_status": "available",
+        "observation_error": null,
+        "boot_id": null,
+        "cke_revision": null,
+        "capabilities_status": "unsupported",
+        "capabilities": null,
+        "ready": true,
+        "busy": false,
+        "queued": 0,
+        "worker_generation": 1
+      }
+    }
+  },
+  "cases": [
+    {
+      "name": "unknown capabilities and boot identity preserved",
+      "expected_status": "PASS"
+    },
+    {
+      "name": "wrong correlation",
+      "mutate_exchange": 2,
+      "path": [
+        "request_id"
+      ],
+      "value": "other",
+      "expected_status": "FAIL",
+      "expected_error": "CORRELATION_MISMATCH"
+    },
+    {
+      "name": "wrong node",
+      "mutate_exchange": 3,
+      "path": [
+        "node_id"
+      ],
+      "value": "other",
+      "expected_status": "FAIL",
+      "expected_error": "CORRELATION_MISMATCH"
+    },
+    {
+      "name": "wrong schema",
+      "mutate_exchange": 1,
+      "path": [
+        "schema"
+      ],
+      "value": "cke.control.v2",
+      "expected_status": "FAIL",
+      "expected_error": "CORRELATION_MISMATCH"
+    },
+    {
+      "name": "mid-pass adapter restart",
+      "mutate_exchange": 3,
+      "path": [
+        "adapter_boot_id"
+      ],
+      "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "expected_status": "FAIL",
+      "expected_error": "ADAPTER_RESTARTED"
+    },
+    {
+      "name": "final-fence restart",
+      "mutate_exchange": 5,
+      "path": [
+        "adapter_boot_id"
+      ],
+      "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "expected_status": "FAIL",
+      "expected_error": "ADAPTER_RESTARTED"
+    },
+    {
+      "name": "wrong field type",
+      "mutate_exchange": 3,
+      "path": [
+        "data",
+        "ready"
+      ],
+      "value": "yes",
+      "expected_status": "FAIL",
+      "expected_error": "INVALID_RESPONSE"
+    },
+    {
+      "name": "wrong worker",
+      "mutate_exchange": 3,
+      "path": [
+        "data",
+        "worker_id"
+      ],
+      "value": "other",
+      "expected_status": "FAIL",
+      "expected_error": "WORKER_MISMATCH"
+    },
+    {
+      "name": "duplicate registration",
+      "mutate_exchange": 2,
+      "path": [
+        "data",
+        "workers"
+      ],
+      "value": [
+        {
+          "worker_id": "speech"
+        },
+        {
+          "worker_id": "speech"
+        }
+      ],
+      "expected_status": "FAIL",
+      "expected_error": "DUPLICATE_WORKER"
+    },
+    {
+      "name": "worker count drift",
+      "mutate_exchange": 1,
+      "path": [
+        "data",
+        "worker_count"
+      ],
+      "value": 2,
+      "expected_status": "FAIL",
+      "expected_error": "WORKER_SET_CHANGED"
+    },
+    {
+      "name": "unsupported capability invented",
+      "mutate_exchange": 4,
+      "path": [
+        "data",
+        "capabilities"
+      ],
+      "value": {
+        "inference": true
+      },
+      "expected_status": "FAIL",
+      "expected_error": "INVALID_RESPONSE"
+    },
+    {
+      "name": "unknown worker boot became known mid-pass",
+      "mutate_exchange": 4,
+      "path": [
+        "data",
+        "boot_id"
+      ],
+      "value": "cccccccccccccccccccccccccccccccc",
+      "expected_status": "FAIL",
+      "expected_error": "WORKER_RESTARTED"
+    }
+  ]
+}
