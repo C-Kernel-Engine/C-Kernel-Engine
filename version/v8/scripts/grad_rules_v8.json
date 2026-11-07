@@ -730,6 +730,47 @@
           ]
         }
       ]
+    },
+    "layernorm_cached_backward": {
+      "status": "ready",
+      "requires_saved": [
+        "input",
+        "gamma",
+        "mean_cache",
+        "rstd_cache"
+      ],
+      "extra_saved": [],
+      "backward_ops": [
+        {
+          "role": "core",
+          "kernel_id": "layernorm_train_backward_f32",
+          "map_call": true,
+          "reads": [
+            "grad:output",
+            "saved:input",
+            "saved_weight:gamma",
+            "saved:mean_cache",
+            "saved:rstd_cache"
+          ],
+          "writes": [
+            {
+              "name": "d_input",
+              "kind": "grad_activation",
+              "target_input": "input"
+            },
+            {
+              "name": "d_gamma",
+              "kind": "tmp_grad_weight",
+              "target_weight": "gamma"
+            },
+            {
+              "name": "d_beta",
+              "kind": "tmp_grad_weight",
+              "target_weight": "beta"
+            }
+          ]
+        }
+      ]
     }
   },
   "template_op_to_rule": {

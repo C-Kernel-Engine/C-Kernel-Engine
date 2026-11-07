@@ -904,7 +904,7 @@ def synthesize_ir2_backward(
 
             if kernel_id not in kernels:
                 issues.append("Missing kernel `%s` for backward op=%s" % (kernel_id, fwd.get("op")))
-            if kernel_id not in bindings:
+            if kernel_id not in bindings and not (spec.get("map_call") and kernels.get(kernel_id, {}).get("call_abi")):
                 issues.append("Missing bindings `%s` for backward op=%s" % (kernel_id, fwd.get("op")))
 
             bwd_inputs: Dict[str, Dict[str, Any]] = {}
@@ -1129,6 +1129,9 @@ def synthesize_ir2_backward(
                     "dataflow": {"inputs": bwd_inputs, "outputs": bwd_outputs},
                 }
             )
+            if spec.get("map_call"):
+                core["map_call"] = True
+                core["params"] = deepcopy(fwd.get("params", {}))
             attach_backward_bridge_plan(
                 core,
                 kernel_id=kernel_id,

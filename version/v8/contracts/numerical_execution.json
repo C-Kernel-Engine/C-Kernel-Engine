@@ -5468,6 +5468,76 @@
       },
       "position_transform": null,
       "description": "Exact BF16 expansion, existing FP32 VJP stages, final RNE BF16 store. Recompute forward FP32 probabilities using ordered FP64 reductions. dProbability dot and weighted mean use FP64, dProbability and scaled dLogit stored FP32. Direct/value and score paths use separate FP32 products then FP32 sum; field gradients sum FP64 ascending options. Both output gradients publish atomically."
+    },
+    "layernorm_cached_forward_fp32_v1": {
+      "status": "validated",
+      "operator_family": "layernorm",
+      "storage": {
+        "input": "fp32",
+        "weight": "fp32",
+        "output": "fp32"
+      },
+      "compute": {
+        "input": "fp32",
+        "weight": "fp32",
+        "accumulator": "fp32",
+        "contraction": "enabled",
+        "evaluation_order": "mean_then_centered_variance_then_scale_affine"
+      },
+      "rounding": {
+        "mode": "none",
+        "points": []
+      },
+      "reduction": {
+        "kind": "normalization",
+        "order": "contract_defined_chunks",
+        "partial_accumulator": "fp32",
+        "merge_order": "ascending_chunk"
+      },
+      "threading": {
+        "work_partition": "independent_rows",
+        "split_strategy": "independent_outputs",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Existing matched LayerNorm arithmetic with operation-local epsilon and exposed FP32 mean/rstd caches. Contiguous bounded training ABI; finite operands are a caller precondition. No checked-rejection or cross-build bitwise guarantee."
+    },
+    "layernorm_cached_backward_fp32_v1": {
+      "operator_family": "layernorm",
+      "status": "validated",
+      "storage": {
+        "input": "fp32",
+        "weight": "fp32",
+        "output": "fp32"
+      },
+      "compute": {
+        "input": "fp32",
+        "weight": "fp32",
+        "accumulator": "fp32",
+        "contraction": "enabled",
+        "evaluation_order": "ascending_channel_dy_gamma_sums_then_dx_and_ascending_row_affine_sums_using_saved_fp32_mean_rstd"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": [
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "sum",
+        "order": "ascending_index",
+        "partial_accumulator": "fp32",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "serial",
+        "split_strategy": "serial",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Existing layernorm_backward_kernel. Consume actual forward FP32 mean/rstd; overwrite d_input, accumulate d_gamma/d_beta in ascending row order into zeroed temporary gradients. Graph accumulation handles sharing. Build contraction may affect rounding; tested FP32 autograd/optimizer tolerances are not bitwise guarantees."
     }
   }
 }

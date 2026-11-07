@@ -932,6 +932,11 @@ TEST_SUITES = {
         "Checked Integer Span State Copy", "kernels",
         ROOT / "tests" / "test_v8_copy_i32_span_checked.py",
     ),
+    "training_layernorm_composition": TestSuite(
+        "FP32 LayerNorm Cached-Statistics Training and Native AdamW", "training",
+        ROOT / "tests" / "test_v8_layernorm_training.py",
+        unittest_targets=("tests.test_v8_layernorm_training",),
+    ),
     "training_selective_parameters": TestSuite(
         "Selective FP32 Training, Frozen Gradient Flow and Native AdamW", "training",
         ROOT / "tests" / "test_v8_selective_training.py",
