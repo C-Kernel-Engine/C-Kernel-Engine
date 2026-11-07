@@ -346,3 +346,56 @@ def test_socket_disconnect_aborts_and_follow_up_succeeds() -> None:
         server.should_exit = True
         thread.join(timeout=5)
         assert not thread.is_alive()
+
+
+def test_cancel_queued_releases_capacity_before_active_finishes():
+    from server.whisper_http import _Owner, _Job, TranscriptionCancelled
+    backend = _FakeBackend(1, block=True)
+    owner = _Owner(lambda: backend, max_waiters=1, preload=False)
+    owner.start()
+    a = _Job('a', _wav(1), time.monotonic())
+    b = _Job('b', _wav(2), time.monotonic())
+    c = _Job('c', _wav(3), time.monotonic())
+    try:
+        assert owner.submit(a) and backend.started.wait(2)
+        assert owner.submit(b)
+        assert owner.cancel('b')
+        assert isinstance(b.result.exception(timeout=0.2), TranscriptionCancelled)
+        assert owner.submit(c)
+        assert not a.result.done() and not backend.closed
+        backend.released.set()
+        assert a.result.result(timeout=2)['id'] == 'a'
+        assert c.result.result(timeout=2)['id'] == 'c'
+    finally:
+        owner.close()
+
+
+def test_shutdown_deadline_with_blocked_factory_and_full_queue():
+    from server.whisper_http import _Owner, _Job, TranscriptionCancelled
+    entered, release = threading.Event(), threading.Event()
+    backend = _FakeBackend(1)
+
+    def factory():
+        entered.set()
+        release.wait(5)
+        return backend
+
+    owner = _Owner(factory, max_waiters=1, preload=True, shutdown_timeout=0.05)
+    owner.start()
+    assert entered.wait(2)
+    queued = _Job('queued', _wav(1), time.monotonic())
+    assert owner.submit(queued)
+    started = time.monotonic()
+    try:
+        try:
+            owner.close()
+        except RuntimeError as error:
+            assert 'deadline exceeded' in str(error)
+        else:
+            raise AssertionError('blocked initialization must report incomplete shutdown')
+        assert time.monotonic() - started < 0.5
+        assert isinstance(queued.result.exception(timeout=0.2), TranscriptionCancelled)
+    finally:
+        release.set()
+        owner._thread.join(timeout=2)
+    assert not owner._thread.is_alive() and backend.closed

@@ -64,3 +64,13 @@ measure cold load and warm latency, and confirm the laptop microphone/SSH
 forward before promoting this to an accessibility workflow. Kokoro requires a
 separate resident service and playback cancellation trial. This ASR service
 does not certify Kokoro or the complete speak/listen loop.
+
+Lifecycle review follow-up
+--------------------------
+Queued cancellation now completes immediately and releases the waiting slot.
+At most two uploads are accumulated concurrently before queue admission.
+Shutdown signals the owner independently of queue capacity and waits at most
+ten seconds. If initialization or cleanup remains blocked, shutdown raises an
+explicit deadline error. A backend returned after shutdown is closed by the
+owner; this does not claim that Python can forcibly interrupt an arbitrary
+factory. Native worker startup retains its configured response timeout.

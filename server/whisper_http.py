@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 import io
 import json
 from pathlib import Path
-import queue
+from collections import deque
 import re
 import tempfile
 import threading
@@ -156,12 +156,15 @@ class _WhisperBackend:
 
 class _Owner:
     def __init__(self, factory: Callable[[], Any], *, max_waiters: int,
-                 preload: bool) -> None:
+                 preload: bool, shutdown_timeout: float = 10.0) -> None:
         if max_waiters < 1:
             raise ValueError("max_waiters must be positive")
         self._factory = factory
-        self._queue: queue.Queue[_Job | None] = queue.Queue(maxsize=max_waiters)
+        self._queue: deque[_Job] = deque()
+        self._max_waiters = max_waiters
+        self._shutdown_timeout = shutdown_timeout
         self._lock = threading.Lock()
+        self._condition = threading.Condition(self._lock)
         self._jobs: dict[str, _Job] = {}
         self._active: _Job | None = None
         self._running_native = False
@@ -181,18 +184,18 @@ class _Owner:
         with self._lock:
             return {"ready": self._backend is not None and not self._closed,
                     "active": self._active.request_id if self._active else None,
-                    "queued": self._queue.qsize(), "worker_generation": self._generation,
+                    "queued": len(self._queue), "worker_generation": self._generation,
                     "startup_error": self._startup_error}
 
     def submit(self, job: _Job) -> bool:
         with self._lock:
             if self._closed or job.request_id in self._jobs:
                 return False
-            try:
-                self._queue.put_nowait(job)
-            except queue.Full:
+            if len(self._queue) >= self._max_waiters:
                 return False
+            self._queue.append(job)
             self._jobs[job.request_id] = job
+            self._condition.notify()
             return True
 
     def cancel(self, request_id: str) -> bool:
@@ -203,6 +206,11 @@ class _Owner:
             if job.result.done():
                 return False
             job.cancelled.set()
+            if self._active is not job:
+                self._queue.remove(job)
+                self._jobs.pop(request_id)
+                job.result.set_exception(TranscriptionCancelled())
+                return True
             active = self._active is job and self._running_native
             backend = self._backend if active else None
         if backend is not None:
@@ -228,10 +236,11 @@ class _Owner:
             except Exception as error:
                 self._startup_error = str(error)
         while True:
-            job = self._queue.get()
-            if job is None:
-                break
-            with self._lock:
+            with self._condition:
+                self._condition.wait_for(lambda: self._closed or self._queue)
+                if self._closed:
+                    break
+                job = self._queue.popleft()
                 self._active = job
             entered_native = False
             try:
@@ -270,25 +279,24 @@ class _Owner:
                 with self._lock:
                     self._jobs.pop(job.request_id, None)
                     self._active = None
-                self._queue.task_done()
         self._discard_backend()
 
     def close(self) -> None:
         with self._lock:
             self._closed = True
             ids = list(self._jobs)
+            self._condition.notify_all()
         for request_id in ids:
             self.cancel(request_id)
-        self._queue.put(None)
-        self._thread.join(timeout=10)
+        self._thread.join(timeout=self._shutdown_timeout)
         if self._thread.is_alive():
-            raise RuntimeError("Whisper owner did not stop")
+            raise RuntimeError("Whisper shutdown deadline exceeded; initialization or cleanup is still pending")
 
 
 def create_app(factory: Callable[[], Any], *, max_upload_bytes: int = 1024 * 1024,
                max_seconds: float = 30.0, max_waiters: int = 2,
-               preload: bool = False) -> FastAPI:
-    if max_upload_bytes < 44 or max_seconds <= 0:
+               preload: bool = False, max_uploads: int = 2) -> FastAPI:
+    if max_upload_bytes < 44 or max_seconds <= 0 or max_uploads < 1:
         raise ValueError("invalid audio resource limits")
     owner = _Owner(factory, max_waiters=max_waiters, preload=preload)
 
@@ -301,6 +309,7 @@ def create_app(factory: Callable[[], Any], *, max_upload_bytes: int = 1024 * 102
             await asyncio.to_thread(owner.close)
 
     app = FastAPI(lifespan=lifespan)
+    uploads = threading.BoundedSemaphore(max_uploads)
 
     @app.get("/health")
     async def health():
@@ -310,14 +319,19 @@ def create_app(factory: Callable[[], Any], *, max_upload_bytes: int = 1024 * 102
     async def transcribe(request: Request):
         if request.headers.get("content-type", "").split(";", 1)[0] != "audio/wav":
             raise HTTPException(415, "expected audio/wav request body")
-        chunks = []
-        total = 0
-        async for chunk in request.stream():
-            total += len(chunk)
-            if total > max_upload_bytes:
-                raise HTTPException(413, "audio upload exceeds byte limit")
-            chunks.append(chunk)
-        wav = b"".join(chunks)
+        if not uploads.acquire(blocking=False):
+            raise HTTPException(429, "audio upload concurrency limit reached")
+        try:
+            chunks = []
+            total = 0
+            async for chunk in request.stream():
+                total += len(chunk)
+                if total > max_upload_bytes:
+                    raise HTTPException(413, "audio upload exceeds byte limit")
+                chunks.append(chunk)
+            wav = b"".join(chunks)
+        finally:
+            uploads.release()
         try:
             _wav_frames(wav, max_bytes=max_upload_bytes, max_seconds=max_seconds)
         except ValueError as error:
