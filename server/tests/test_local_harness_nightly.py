@@ -374,3 +374,25 @@ def test_refresh_requires_clean_detached_checkout_and_fetches_main(tmp_path, mon
     git("push", str(origin), "main", cwd=source)
     assert lane._refresh_main() == git("rev-parse", "HEAD", cwd=source)
     assert (worker / "fixture.txt").read_text() == "new\n"
+
+
+def test_speech_lane_failure_preserved(tmp_path, monkeypatch):
+    monkeypatch.setattr(lane, '_source_commit', lambda: 'c' * 40)
+    def invoke(command, **kwargs):
+        output = Path(command[command.index('--output') + 1])
+        output.write_text(json.dumps({'status': 'FAIL', 'reason': 'old library'}))
+        return 1
+    monkeypatch.setattr(lane, '_invoke', invoke)
+    report = lane.run(tmp_path / 'missing-harness.json', tmp_path / 'state',
+                      speech_perf_config=tmp_path / 'speech.json')
+    assert report['status'] == 'FAIL'
+    assert report['speech_performance']['reason'] == 'old library'
+
+
+def test_speech_lane_missing_report_is_failure(tmp_path, monkeypatch):
+    monkeypatch.setattr(lane, '_source_commit', lambda: 'c' * 40)
+    monkeypatch.setattr(lane, '_invoke', lambda *a, **k: 1)
+    report = lane.run(tmp_path / 'missing-harness.json', tmp_path / 'state',
+                      speech_perf_config=tmp_path / 'speech.json')
+    assert report['status'] == 'FAIL'
+    assert report['failure_stage'] == 'speech_performance'
