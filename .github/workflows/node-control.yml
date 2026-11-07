@@ -1,0 +1,15 @@
+name: Node control contract
+on:
+  pull_request:
+    paths:
+      - 'server/control/**'
+      - '.github/workflows/node-control.yml'
+  workflow_dispatch:
+jobs:
+  real-socket:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y libzmq3-dev libjson-c-dev libcurl4-openssl-dev python3-zmq
+      - run: make -C server/control
+      - run: CKE_NODE_ADAPTER="$PWD/server/control/node-adapter" /usr/bin/python3 -m unittest discover -s server/control -p 'test_*.py' -v

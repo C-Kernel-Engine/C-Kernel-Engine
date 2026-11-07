@@ -1213,6 +1213,22 @@ and reported both outcomes correctly in 702.4 seconds, with 3,044–3,167 input 
 These two bounded tasks do not establish longer-context or repeatability certification.
 Test cancellation and subagents separately. NVIDIA Dynamo is serving infrastructure,
 not the LangChain harness.</p>
+<p>A later pinned 20K run on Ryzen completed two successive restricted Deep Agents
+read → edit → validator tasks on one loaded instance, with a trusted passing
+assertion each time. A separate injected transient read failure was returned to
+the agent, retried against the same file, and followed by a successful edit and
+validator. The optional <code>scripts/local_nemotron_nightly.py</code> lane runs
+fresh → injected failure/recovery → fresh tasks against one isolated loopback
+service. Its private JSON configuration pins the bundle libraries and weights,
+service source commit, session library, model identity, client Python, context,
+threads, output allowance, and a cgroup memory cap. Invoke it with
+<code>--config /path/to/pinned.json --state-dir /path/to/state</code>; a
+<code>PAUSE</code> file in the state directory prevents startup. The lane writes
+the current attempt to <code>latest.json</code> before any work, retains every
+child report, and stops only its own service. Missing assets or insufficient
+memory are <code>NOT_TESTED</code>, while wrong identities and failed tasks are
+<code>FAIL</code>. These checks certify a bounded workflow on the pinned artifact;
+they do not establish native recurrent batching or general agent reliability.</p>
 <h3>Cohere text and LangChain</h3>
 <p>The same <code>ChatOpenAI</code> connection above can test plain chat with a deployed Cohere
 Command R7B model ID. Keep tools disabled for its selected imported chat-only template. Cohere
@@ -1242,6 +1258,42 @@ request on the same server; and numerical/state evidence under the provider cont
 missing asset-backed run is <strong>NOT_TESTED</strong>, not PASS. Queueing and two-slot batched
 decode are separate from whether a harness task succeeds. See the
 <a href="serving.html">serving architecture page</a> for the execution modes.</p>
+
+<section id="node-control">
+<h2>Read-only node discovery over ZeroMQ</h2>
+<p>The optional C node adapter is separate from inference. Any application can consume
+<code>cke.control.v1</code>; CKE has no dependency on a studio, registry or gateway.
+The consumer owns groups, pools, authorization and freshness display. This first version
+supports <code>node.describe</code>, <code>workers.list</code>,
+<code>worker.capabilities</code> and <code>worker.status</code>.</p>
+<pre>sudo apt-get install libzmq3-dev libjson-c-dev libcurl4-openssl-dev python3-zmq
+make -C server/control
+server/control/node-adapter p3 8120 whisper=8110 kokoro=8111
+python3 server/control/client.py --node-id p3 --operation workers.list
+python3 server/control/client.py --node-id p3 --operation worker.status --worker-id whisper</pre>
+<p>Registrations are explicit local HTTP ports, not network discovery. The adapter binds
+only to 127.0.0.1. It observes existing <code>/health</code> routes; it cannot load a model,
+execute a shell command, submit training or cancel inference. Do not expose it remotely:
+authenticated approved peers and resource admission must be implemented first. Loopback
+access assumes trusted local users; this version is not a hostile multi-tenant service.</p>
+<p>Each request is a single JSON frame, at most 8 KiB. There are at most 32 registered
+workers, per-peer ZeroMQ queue high-water marks of 16, a 500 ms worker probe deadline,
+and an 8 KiB HTTP response limit. Excess-size frames are disconnected; multipart requests
+reset the transport. Clients must recreate their REQ socket after timeout. These limits
+do not establish a global bound on arbitrarily many local peer connections.</p>
+<p>Adapter health and worker health are separate. An offline worker is a successful
+observation with <code>observation_status=unavailable</code> and unknown readiness.
+Capabilities and worker boot identity remain null until the worker exports trustworthy
+information. A local generation counter is not a boot identity. No raw paths, exception
+text, tokens or request identifiers are forwarded. Adapter revision identifies the build,
+not the worker's loaded artifacts. Registration and reachability do not certify numerical
+correctness or model support.</p>
+<p>The machine-readable contract, example fixtures, standalone client and action plan
+are in <code>server/control/</code>. Run real-socket tests with
+<code>CKE_NODE_ADAPTER=$PWD/server/control/node-adapter python3 -m unittest discover -s server/control</code>.
+A dedicated PR workflow builds the native adapter and executes these tests. External
+registry/UI integration and authenticated remote deployment remain separate acceptance gates.</p>
+</section>
     </main>
 
     <!-- SVG Viewer Overlay (shared across all pages) -->
@@ -1491,7 +1543,7 @@ decode are separate from whether a harness task succeeds. See the
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-11-03</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-11-07</p>
             </div>
         </div>
     </footer>

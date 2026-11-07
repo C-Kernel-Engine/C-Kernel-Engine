@@ -1,0 +1,109 @@
+{
+  "scope": "read-only live P3 health observations; no inference invoked; adapter stopped afterward",
+  "source_base": "39b9bda0aa1c253f81b40ca3dcfbc09920357f4d",
+  "adapter_source_sha256": "e638aa988e4d060498d1e63c6d2080303f752cfe5e1e3685a5b0ef0692bb3fc6",
+  "binary_sha256": "1c9f01a4ce414712d70c8896976d2642826e801ee9bcc9eb4e6c0cba4dc2c46a",
+  "exchanges": [
+    {
+      "operation": "node.describe",
+      "params": {},
+      "response": {
+        "schema": "cke.control.v1",
+        "request_id": "p3-smoke",
+        "node_id": "p3",
+        "adapter_boot_id": "45694b3eb981315d314d5103c2e518a0",
+        "observed_at": "2026-11-07T19:47:20Z",
+        "ok": true,
+        "data": {
+          "adapter_health": "ready",
+          "cke_revision": "39b9bda0aa1c253f81b40ca3dcfbc09920357f4d",
+          "transport": "loopback-only",
+          "worker_discovery": "explicit-registration",
+          "worker_count": 2
+        },
+        "error": null
+      }
+    },
+    {
+      "operation": "workers.list",
+      "params": {},
+      "response": {
+        "schema": "cke.control.v1",
+        "request_id": "p3-smoke",
+        "node_id": "p3",
+        "adapter_boot_id": "45694b3eb981315d314d5103c2e518a0",
+        "observed_at": "2026-11-07T19:47:20Z",
+        "ok": true,
+        "data": {
+          "workers": [
+            {
+              "worker_id": "whisper"
+            },
+            {
+              "worker_id": "kokoro"
+            }
+          ]
+        },
+        "error": null
+      }
+    },
+    {
+      "operation": "worker.status",
+      "params": {
+        "worker_id": "whisper"
+      },
+      "response": {
+        "schema": "cke.control.v1",
+        "request_id": "p3-smoke",
+        "node_id": "p3",
+        "adapter_boot_id": "45694b3eb981315d314d5103c2e518a0",
+        "observed_at": "2026-11-07T19:47:20Z",
+        "ok": true,
+        "data": {
+          "worker_id": "whisper",
+          "observed_at": "2026-11-07T19:47:20Z",
+          "boot_id": null,
+          "cke_revision": null,
+          "capabilities_status": "unsupported",
+          "capabilities": null,
+          "ready": true,
+          "busy": false,
+          "queued": 0,
+          "worker_generation": 1,
+          "observation_status": "available",
+          "observation_error": null
+        },
+        "error": null
+      }
+    },
+    {
+      "operation": "worker.status",
+      "params": {
+        "worker_id": "kokoro"
+      },
+      "response": {
+        "schema": "cke.control.v1",
+        "request_id": "p3-smoke",
+        "node_id": "p3",
+        "adapter_boot_id": "45694b3eb981315d314d5103c2e518a0",
+        "observed_at": "2026-11-07T19:47:20Z",
+        "ok": true,
+        "data": {
+          "worker_id": "kokoro",
+          "observed_at": "2026-11-07T19:47:20Z",
+          "boot_id": null,
+          "cke_revision": null,
+          "capabilities_status": "unsupported",
+          "capabilities": null,
+          "ready": true,
+          "busy": false,
+          "queued": 0,
+          "worker_generation": 1,
+          "observation_status": "available",
+          "observation_error": null
+        },
+        "error": null
+      }
+    }
+  ]
+}
