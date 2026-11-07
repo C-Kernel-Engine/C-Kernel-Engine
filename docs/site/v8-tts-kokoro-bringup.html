@@ -1043,13 +1043,77 @@
 <p><a href="index.html">C-Kernel-Engine</a> / TTS bring-up</p>
 <h1>Kokoro TTS bring-up</h1>
 <h2>Current generated execution status</h2>
+<p><strong>Long-document planning, asset-free contract:</strong>
+<code>version/v8/tts/prepare_kokoro_document.py</code> partitions up to
+1,000,000 UTF-8 bytes at checked sentence or whitespace boundaries, delegates
+every window to the existing pinned Kokoro text planner, and maps every speech
+chunk back to an absolute original-document span. It rejects unsupported
+windows and changed frontend/bundle identities before playback.
+<code>ck_kokoro_play.py --incremental --document</code> then uses the existing
+bounded audio spool and keeps its native worker loaded across document chunks.
+The source-coverage test includes a synthetic document over 10,000 words; it
+does not claim that a real 10,000-word document was synthesized or heard.
+An optional private progress file records only chunks whose player has exited
+successfully. <code>--resume</code> rechecks document, seed, frontend, voice and
+bundle identities, then restarts at the next chunk. An interrupted sentence
+may replay when its completion was not acknowledged. Audio files stay in a
+bounded temporary spool; the whole document WAV is never held in memory.
+Continuous listening is not certified while synthesis may be slower than
+audio playback. For a local asset-backed trial, use
+<code>ck_kokoro_play.py --incremental --document --text-file DOCUMENT
+--config CONFIG --bundle-dir BUNDLE --player PLAYER --progress-file PROGRESS
+--session-id DOCUMENT-SESSION</code>, adding <code>--resume</code> after an
+interruption. Keep a new report path for each invocation.
+Run <code>python3 scripts/nightly_runner.py --tests tts_kokoro_document_plan
+tts_kokoro_voice_playback</code> for the asset-free contracts. A real Sony
+headset trial and connected waveform parity remain separate gates.</p>
+<p><strong>Local accessible voice control, first slice:</strong>
+<code>version/v8/scripts/ck_accessible_voice.py</code> can explicitly record a
+16 kHz mono WAV from a selected ALSA input, run CKE Whisper, show an editable
+transcript, require confirmation, submit it to one local CKE Responses server,
+and speak the correlated answer through a local system-voice command. The
+client journals submission intent before network delivery and distinguishes a
+server acceptance ID, completion, explicit rejection and uncertain delivery.
+It never retries uncertain delivery automatically. The system voice is announced
+and can be stopped or repeated; this is not Kokoro or Qwen generated speech.
+The local request targets one configured CKE chat server. It does not route to
+coding-agent sessions or establish a LinuxUtilities integration.</p>
+<pre><code>python3 version/v8/scripts/ck_accessible_voice.py \
+  --record --capture-device &lt;explicit-ALSA-Sony-source&gt; \
+  --encoder-run-dir &lt;Whisper-encoder-run-dir&gt; \
+  --decoder-run-dir &lt;Whisper-decoder-run-dir&gt; \
+  --server-url http://127.0.0.1:8080 --model ck-v8 \
+  --agent-id cke-chat --project-id cke \
+  --journal &lt;private-local-journal.jsonl&gt; \
+  --speech-exe &lt;local-system-speech-executable&gt;</code></pre>
+<p>Recording starts only after Enter and the temporary microphone WAV is
+deleted after transcription. <code>--wav</code> accepts an already recorded file;
+<code>--text</code> exercises the confirmation and server path without audio.
+The speech executable must accept the answer as one argument and block while
+speaking. The user must select the desired output device in the local audio
+configuration. The fake-device/HTTP nightly suite tests control contracts;
+real Sony input, playback, latency and ten-turn acceptance remain NOT_TESTED.</p>
 <p><strong>Whole-text WAV command (bounded, diagnostic):</strong> <code>version/v8/tts/speak_kokoro_text.py</code> accepts a text file or standard input, runs one full-context pinned English phonemization pass, and sends its checked chunks to one persistent native host. The host appends only returned valid PCM samples and publishes one 24 kHz mono WAV after all chunks succeed. It discards partial output after a rejected chunk; the next sequence can run without reloading weights. Python owns text preparation and chunk requests; circuits and generated C still own all neural stages. This is not streaming playback or certified connected waveform parity. The output remains diagnostic until listening and independent waveform checks pass. Reproduce with <code>PYTHONPATH=&lt;pinned-frontend-site-packages&gt; &lt;pinned-python&gt; version/v8/tts/speak_kokoro_text.py --text-file server_summary.txt --config &lt;pinned-kokoro-config&gt; --bundle-dir &lt;current-runtime-range-bundle&gt; --output /tmp/kokoro-summary.wav --report /tmp/kokoro-summary.json</code>. A bundle built before persistent-session support must be rebuilt from the pinned model assets; the command verifies the bundle through its native dispatcher and reports each source span and sample count. Run the cheap contract lane with <code>python3 scripts/nightly_runner.py --tests tts_native_kokoro_wav_host tts_kokoro_whole_text_wav</code>.</p>
-<p><strong>Pinned text preparation and chunk planning:</strong> <code>version/v8/tts/prepare_kokoro_accessibility_text.py</code> uses pinned Kokoro 0.9.4/Misaki 0.9.4 English G2P, its US lexicon and eSpeak fallback to turn ordinary text into phoneme-ID requests. It checks code, dictionary, eSpeak library/data, vocabulary and bundle identities; keeps every source span; and rejects unspoken or unsupported input. The first committed reference cases cover the previously rejected “words,” an abbreviation, numbers, technical terms, a list, an equation and a multi-sentence reply. The current pinned frontend leaves the dollar sign in “$1.25” unspoken, so the planner rejects that expression rather than silently speaking a different amount. A range bundle permits individual requests of 3–40 IDs; the planner records each chunk's source text, IDs and voice row. The cheap fixture test is registered in standard nightly; live pinned-oracle and two-chunk generated-audio checks run only with their assets and otherwise report NOT_TESTED. The two-chunk local run produced 56,400 and 66,600 samples at 24 kHz, with about 14 and 16 seconds of synthesis on that host; these are execution measurements, not a latency target. Reproduce the cheap lane with <code>python3 scripts/nightly_runner.py --tests tts_kokoro_accessibility_text_plan</code>, or enable the live/audio lanes with <code>CKE_TTS_RUN_PINNED_ACCESSIBILITY_TEXT=1 CKE_TTS_RUN_ACCESSIBILITY_TEXT_AUDIO=1 CKE_TTS_ACCESSIBILITY_CONFIG=&lt;pinned-config&gt; CKE_TTS_ACCESSIBILITY_BUNDLE=&lt;range-bundle&gt; python3 -m unittest tests.test_v8_kokoro_accessibility_text_plan</code> in the pinned frontend environment. That older test produces a plan and individual WAVs. The whole-text command above uses one retained native worker and one aggregate WAV. Queued playback, Sony device handling and in-graph cancellation remain unestablished. Connected waveform numerical parity remains FAIL. Python performs declared text conversion only; the model's neural schedule remains in generated C.</p>
+<p><strong>Technical decimal pronunciation:</strong> The pinned G2P can omit the audible decimal point inside a version-shaped token such as <code>Qwen3.8</code> and after a leading plus sign such as <code>+3.5</code>. The checked text frontend now records an explicit pronunciation expansion for embedded versions and signed decimals, preserving each original source span and rejecting incomplete pronunciations before synthesis. The 1,133-word technical reply still plans into 316 chunks within the declared ID capacity. In a short, same-model, same-seed generated-audio comparison, CKE Whisper transcribed the old <code>Qwen3.8 bundle.</code> WAV as “Q and 3, 8 bundle” and the expanded WAV as “QN 3.8 bundle.” Both old and new signed-decimal WAVs transcribed as “minus 3.5, not plus 3.5”; this is evidence of a corrected phoneme contract, not a demonstrated ASR improvement for that phrase. The full long-reply WAV and its exact-number score have not been rerun with the changed frontend. Waveform numerical parity and human listening remain separate.</p>
+<p><strong>Local Kokoro playback adapter:</strong> the confirmed voice client can now select <code>--kokoro-config &lt;pinned-config&gt; --kokoro-bundle-dir &lt;range-bundle&gt; --audio-player &lt;local-player&gt;</code> in place of <code>--speech-exe</code>. It sends the complete answer to CKE's checked whole-text command, verifies its report and PCM WAV before starting the player, and owns both processes in the client's stoppable group. This provides a bounded local playback trial, not streaming audio: the entire WAV is synthesized before playback. Each selected native worker keeps its weights loaded across its assigned chunks of one answer; the adapter starts fresh workers for the next answer. Asset-free playback and invalid-output checks run in standard nightly as <code>tts_kokoro_voice_playback</code>. Sony playback, full-reply latency and connected waveform parity remain separate acceptance gates.</p>
+<p><strong>Native Kokoro VTune profile (2026-11-06):</strong> Profiling two generated native requests on an Intel i7-14700T, with the pinned af_heart bundle and the selected eight-worker AVX2 Conv1D provider, produced the same WAV hashes as the unprofiled session. VTune attributed 34.9% of sampled CPU time to Conv1D, 25.5% to checked linear projections, and 13.2% to dense transposed convolution. The P-core top-down sample reported 7.1% memory bound and 36.1% core bound; these figures identify a compute-focused experiment on this host, not a general roofline conclusion. The next bounded experiment is an explicitly selected reusable linear provider, benchmarked against the existing scalar FP64 reduction contract with complete-WAV and rejection parity. No performance improvement or headset result is claimed by this profile. The retained measurements and limitations are in <code>version/v8/tts/evidence/kokoro_vtune_native_hotspots_20261106.json</code>.</p>
+<p><strong>Checked linear one-pass optimization:</strong> The reusable FP64 linear provider now checks all inputs and a conservative absolute output bound before computing each output once. When the bound cannot prove safety, the original two-pass result staging remains; rejected calls still leave output untouched. On the pinned 36-by-128-to-768 projection fixture, median kernel time fell from 4.2248 to 2.1458 ms with bitwise-identical output. Two paired native Kokoro sessions using the same loaded model package, voice, seeds and phoneme IDs took 13.5087/13.4525 seconds before and 11.1428/11.0564 seconds after, a 17.66% reduction in median elapsed time. Both complete WAV hashes matched exactly. These are two samples on one Intel host, not a long-document or headset latency result. Evidence and limitations are retained in <code>version/v8/tts/evidence/kokoro_linear_one_pass_20261106.json</code>.</p>
+<p><strong>Incremental long-reply execution:</strong> <code>--kokoro-incremental</code> keeps the existing one-worker path by default. <code>--kokoro-synthesis-workers 3</code> opts into three independently loaded native workers for a long reply. The adapter submits at most one checked chunk per worker, validates each 24 kHz PCM16 WAV, retains source spans and WAV hashes, and plays chunks in source order. It reports first playback start, valid samples, gaps and actual model loads through <code>ck_kokoro_play.py --report &lt;private-report.json&gt;</code>. A failed chunk stops publication; SIGTERM during synthesis or playback kills the owned workers and player. The planner retains its 8,192-byte and 512-chunk bounds.</p>
+<p><strong>Incremental reader identity:</strong> Each completed chunk report now binds its checked source-codepoint span and source text to the whole-source SHA-256, bundle identity, optional agent/request/session IDs, and start/end sample offsets in the concatenated PCM timeline. Resume keeps the prior completed-sample offset and rejects a changed agent or request identity. The optional IDs are limited to letters, digits, underscore and hyphen; both must be supplied together. This gives a reader enough identity to reject late audio or stale highlighted text from an older reply. These offsets describe generated PCM order, not measured audible onset; headset timing still requires a device-backed trial. On 2026-11-07 the current 319-word <code>server_summary.txt</code> (SHA-256 <code>a0134675eadebe16ebc938eb70213fe6eb84630c5505ca979b90fe592eec5a18</code>) planned into 87 checked chunks spanning every source character with 5–40 phoneme IDs per chunk. This is a planning PASS; P3 synthesis and Sony playback were NOT_TESTED because <code>p3</code> did not resolve from this host. The plan identity and limits are retained in <code>version/v8/tts/evidence/kokoro_319word_summary_plan_20261107.json</code>.</p>
+<p><strong>Playback stop and latency diagnostics:</strong> The incremental player and each native worker now run in private process groups. Cancellation stops the groups, including audio or synthesis children started by wrappers. Asset-free regressions verify that parent and child processes stop. The report separates planning, native-worker startup, synthesis underrun gaps, controller/player handoff delay, and player-process lifetime. <code>first_playback_start_seconds</code> is a process-launch timestamp, not a measured first audible sample; the report explicitly marks <code>first_audible_audio</code> as <code>not_measured</code>. Real headset listening and audible stop latency still need device-backed measurement. On this Intel i7-14700T host, a two-chunk generated request produced 5.125 seconds of audio. With a non-audible player timed to each WAV, one loaded worker took 19.130 seconds end to end with a 4.444-second gap, of which 4.443 seconds was synthesis underrun; two loaded workers took 14.976 seconds with a 0.001-second gap. First player launch was 9.408 versus 9.686 seconds, and both chunk WAV hashes matched. These are single observations, not a headset or sustained-throughput certificate. <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/tts/evidence/kokoro_session_timed_player_20261106.json">The retained timing report</a> records the bundle and limitations.</p>
+<p>On P3 with the eight-worker AVX2 Conv1D bundle, the same 52-word repeated phrase produced 647,400 samples and identical WAV hashes with one or three synthesis workers. Three workers reduced wall time from 68.2 to 36.3 seconds and simulated playback gaps from 32.43 to 0.012 seconds; first playback began at 8.91 versus 8.44 seconds. Peak process-tree PSS rose from 2.83 to 7.60 GiB. A 200-word trial completed 50 ordered chunks, 103.75 audio seconds and 0.051 seconds of simulated gaps. A 1,000-word trial completed 250 contiguous source spans, 12,450,000 samples (518.75 audio seconds) in 532.26 seconds, with 0.256 seconds of total gaps and a 0.0038-second maximum gap. Measured stop-to-process-release times were 0.566 seconds during synthesis and 0.767 seconds during playback, with no live descendants or completion report. <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/tts/evidence/kokoro_p3_parallel_long_reply_20261104.json">The scoped P3 evidence</a> records identities and limits; <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/tts/evidence/kokoro_p3_incremental_playback_20261102.json">the earlier one-worker trial</a> remains historical.</p>
+<p>The player in these measurements was <strong>non-audible</strong> and slept for each WAV's exact duration. The input repeated one known phrase; it does not certify natural sentence joins, arbitrary technical text, Sony headset playback, 10,000 words or connected PyTorch waveform parity. That numerical verdict remains FAIL. The three-worker option is an explicit memory tradeoff, not the default accessibility setting.</p>
+<p><strong>Technical paths:</strong> the pinned G2P left the leading slash in the real server summary unspoken and represented its remaining path as one 230-phoneme token, beyond the 48-ID native request limit. The text frontend now applies an explicit path pronunciation policy before checked chunk planning. Natural mode speaks path components and separator names, spelling a component when its pinned pronunciation exceeds one request; <code>--technical-mode exact</code> spells each path character. A leading slash is spoken as “root slash.” Each pronunciation expansion records its original source span, and every chunk still passes the native ID-capacity check. The current 387-word summary snapshot plans into 111 natural-mode or 116 exact-mode chunks with complete source-span coverage. Natural-mode generated execution played 6,044,400 samples (251.85 audio seconds) through a non-audible duration-matched player in 263.40 seconds wall time, with first simulated playback at 9.27 seconds and 0.131 seconds of total gaps. Use <code>ck_kokoro_play.py --text-file server_summary.txt --config &lt;pinned-config&gt; --bundle-dir &lt;verified-bundle&gt; --player &lt;audio-player&gt; --incremental --synthesis-workers 3</code>; the <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/tts/evidence/kokoro_p3_technical_paths_20261104.json">scoped P3 evidence</a> retains identities and limits without committing the private summary text. This is execution evidence; URL syntax, unsupported symbols, natural listening quality, Sony playback and connected waveform parity remain separate checks. The same mode is available as <code>--kokoro-technical-mode exact</code> in the confirmed voice client.</p>
+<p><strong>Measured parallel Conv1D bundle option:</strong> the offline bundle builder can select the existing checked <code>avx2_parallel</code> Conv1D map with <code>--conv-provider avx2_parallel --conv-workers 4</code>. The native host creates one worker pool per loaded session and passes it into the circuit-declared generated entry; generic lowering and Kokoro arithmetic are unchanged. On P3, one loaded 64-token-capacity library produced byte-identical serial AVX2 and four-worker WAVs for 25-ID → 8-ID → 25-ID requests. Warm 25-ID synthesis and WAV writing took 11.18 seconds serial versus 6.14 seconds parallel; the 8-ID request took 7.07 versus 3.56 seconds. The build identities, request timings and WAV hashes are retained in <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/tts/evidence/kokoro_p3_parallel_bundle_20261103.json">the P3 measurement</a>. This remains slower than real time and does not certify pinned-PyTorch waveform parity, headset playback or a 1,000-word trial.</p>
+<p><strong>Pinned text preparation and chunk planning:</strong> <code>version/v8/tts/prepare_kokoro_accessibility_text.py</code> uses pinned Kokoro 0.9.4/Misaki 0.9.4 English G2P, its US lexicon and eSpeak fallback to turn ordinary text into phoneme-ID requests. It checks code, dictionary, eSpeak library/data, vocabulary and bundle identities; keeps every source span; and rejects unspoken or unsupported input. The first committed reference cases cover the previously rejected “words,” an abbreviation, numbers, technical terms, a list, an equation and a multi-sentence reply. The current pinned frontend leaves the dollar sign in “$1.25” unspoken, so the planner rejects that expression rather than silently speaking a different amount. An opt-in range bundle permits individual requests of 3–48 IDs; the planner records each chunk's source text, IDs and voice row. The cheap fixture test is registered in standard nightly; live pinned-oracle and two-chunk generated-audio checks run only with their assets and otherwise report NOT_TESTED. The two-chunk local run produced 56,400 and 66,600 samples at 24 kHz, with about 14 and 16 seconds of synthesis on that host; these are execution measurements, not a latency target. Reproduce the cheap lane with <code>python3 scripts/nightly_runner.py --tests tts_kokoro_accessibility_text_plan</code>, or enable the live/audio lanes with <code>CKE_TTS_RUN_PINNED_ACCESSIBILITY_TEXT=1 CKE_TTS_RUN_ACCESSIBILITY_TEXT_AUDIO=1 CKE_TTS_ACCESSIBILITY_CONFIG=&lt;pinned-config&gt; CKE_TTS_ACCESSIBILITY_BUNDLE=&lt;range-bundle&gt; python3 -m unittest tests.test_v8_kokoro_accessibility_text_plan</code> in the pinned frontend environment. That older test produces a plan and individual WAVs. The whole-text command above uses one retained native worker and one aggregate WAV. Queued playback, Sony device handling and in-graph cancellation remain unestablished. Connected waveform numerical parity remains FAIL. Python performs declared text conversion only; the model's neural schedule remains in generated C.</p>
 <p><strong>Bounded native number preparation:</strong> the dictionary frontend now expands isolated unsigned cardinals 0–20 to their English words, then obtains phoneme IDs from the hash-pinned Misaki US gold dictionary. It rejects leading zeros, decimals, grouped digits, larger values, attached letters, unknown words and over-capacity requests with explicit reasons before dispatch. All 21 number spellings have a cheap routing test in standard nightly. In an optional asset-backed lane, “I have 2.” produces a 39,000-sample native generated WAV and CKE's public generated Whisper path returns “I have two.” A second asset-backed session case cancels a longer request, then synthesizes this number phrase twice with the retained seeded WAV hash. These check bounded execution, transcript fidelity, process-level synthesis interruption and recovery; they do not prove full context-sensitive Misaki G2P or independent Kokoro waveform parity. Other abbreviations and longer replies remain unsupported until their normalization and segmentation contracts are verified. Run the optional cases with the standard nightly selection <code>CKE_TTS_RUN_WHISPER_ROUNDTRIP=1 CKE_TTS_RUN_NUMBER_TEXT_FULL=1 CKE_TTS_RUN_NUMBER_SESSION_FULL=1 CKE_TTS_ROUNDTRIP_BUNDLE_DIR=&lt;range-bundle&gt; CKE_TTS_ROUNDTRIP_FRONTEND_DIR=&lt;fresh-number-frontend&gt; CKE_TTS_ROUNDTRIP_WHISPER_ENCODER_DIR=&lt;generated-encoder&gt; CKE_TTS_ROUNDTRIP_WHISPER_DECODER_DIR=&lt;generated-decoder&gt; python3 scripts/nightly_runner.py --tests tts_kokoro_native_speech_session tts_kokoro_whisper_roundtrip</code>.</p>
+<p><strong>Opt-in long-token and real-summary P3 trial:</strong> a pinned 359-word local summary planned into 90 checked chunks with complete source-span coverage. Normal multi-token chunks stayed at or below 40 IDs; only the indivisible “35,136” number and a commit hash used 48 and 47 IDs. The prior 77-chunk plan had let an ordinary 46-ID phrase reach generated execution, where it returned <code>CK_AUDIO_EXTENT_LIMIT</code>; its partial WAV was discarded. Every revised chunk passed isolated native preflight. One loaded generated session then produced one 4,905,000-sample, 24 kHz mono WAV (204.375 seconds of audio) in 647.011 seconds, including 2.71 seconds of text planning. Selected PCM segments at the first, number, hash and final chunk matched fresh single-request execution byte for byte. The <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/tts/evidence/kokoro_p3_long_token_range_20261103.json">retained evidence</a> records artifact and input hashes; the local summary text itself is not committed. Counts 41–48 remain execution-only; connected PyTorch waveform parity is still FAIL, and headset listening is NOT_TESTED. This run is substantially slower than playback and does not establish 10,000-word support.</p>
 <p><strong>Known-text Kokoro → Whisper round trip:</strong> an optional asset-backed standard-nightly suite passes the actual native Kokoro WAV through CKE's public <code>audio</code> command to its generated Whisper encoder and decoder. The public entry imports the Whisper runtime by its importable module name so persistent worker processes can start under Python's spawn method. With the pinned af_heart voice and seed 7, “Hello.” (8 phoneme IDs, 32,400 samples) transcribes as “Hello.” and “Hello there.” (12 IDs, 36,000 samples) transcribes as “Hello there.” The suite checks canonical 24 kHz mono PCM16 geometry, input WAV hash, generated-library identities, and exact transcript text after trimming outer whitespace and case-folding. It reports TTS execution, ASR execution, and transcript fidelity as separate cases; missing assets report NOT_TESTED. A separate cheap nightly case tests the public worker import contract without model assets. This is a small known-text integration test, not independent Kokoro waveform parity, a full G2P test, or general speech intelligibility certification. The connected waveform comparisons described below still FAIL their pinned PyTorch numerical ceiling. Run <code>CKE_TTS_RUN_WHISPER_ROUNDTRIP=1 CKE_TTS_ROUNDTRIP_BUNDLE_DIR=&lt;range-bundle&gt; CKE_TTS_ROUNDTRIP_FRONTEND_DIR=&lt;pinned-frontend&gt; CKE_TTS_ROUNDTRIP_WHISPER_ENCODER_DIR=&lt;generated-encoder&gt; CKE_TTS_ROUNDTRIP_WHISPER_DECODER_DIR=&lt;generated-decoder&gt; python3 -m unittest tests.test_v8_kokoro_whisper_roundtrip</code>.</p>
+<p><strong>Long technical-reply diagnostic (2026-11-06):</strong> The retained <code>version/v8/test_assets/kokoro_long_reply/technical_summary_20261106.txt</code> contains 1,133 varied words, including the then-current 264-word server summary. Its SHA-256 is <code>0bbca9d04ece5e012929adcd8093f6e8117e2c9e93a6489e54b0c4e65eb4bdf7</code>. The pinned planner covered every source span in 316 checked chunks of at most 40 IDs. One persistent generated Kokoro worker produced 667.825 seconds of mono 24 kHz PCM16 audio (SHA-256 <code>6ee6c534329b01d42a40e1f72248d70701a3bd26159c44ba561d69ae5daa5483</code>) in 1,608.12 seconds; the first chunk took 9.33 seconds. Native CKE resampling supplied 16 kHz audio to generated Whisper base. Fixed 30-second decoding returned 766 words and 37.44% normalized WER. Timestamp-seek decoding covered the complete audio in 25 contiguous windows, returning 1,150 words and 6.24% WER under identifier-aware normalization. Exact-number fidelity still FAILS: two <code>3.8</code> occurrences were absent, while other unmatched numbers appeared. <code>PR-1035</code> is treated as an identifier, not a negative number. The small known-text round trip remains separate. <code>version/v8/tts/evaluate_kokoro_whisper_long_reply.py</code> verifies source spans, artifact hashes, resampling linkage, window coverage, WER and exact numbers; its ten asset-free integrity controls run in standard nightly. The full run is diagnostic, with connected Kokoro waveform parity unresolved and human listening NOT_TESTED. The audio and model assets are not committed; their identities are retained in the evaluator report on P3. Timestamp decoding should be used for long-audio diagnosis, and aggregate WER cannot override a critical-number failure.</p>
+<p><strong>Long-reply decimal rerun and compound-number boundary:</strong> On merged main after explicit version pronunciation, the same 1,133-word source again planned into 316 checked chunks and produced 16,031,400 samples (667.975 seconds) through one persistent generated Kokoro worker in 1,600.95 seconds. The new WAV SHA-256 is <code>08f4367079ac6710f00504e2ca2c96a13c5d425f6b879f8a34adb80b058a55fc</code>. Its 314 unaffected chunks match the previous WAV byte for byte when aligned by chunk; only the two <code>Qwen3.8</code> chunks changed. Generated timestamp-mode CKE Whisper consumed the complete resampled audio in 24 windows and returned 1,158 words with 6.15% normalized WER. Both <code>3.8</code> occurrences are present, but exact-number fidelity still fails. The remaining text says “forty two” and “forty seven”; the planner split each tens/unit pair across a chunk boundary, and Whisper rendered them as “40, two” and “40. Seven.” The checked planner now keeps such pairs in one chunk. In a same-text, same-model generated-audio comparison, CKE Whisper changed from “40, 2” and “40. 7” to “42” and “47.” The evaluator accepts intact spoken compounds as their digit values while rejecting split or changed values, and checks chunk voice rows, source spans, sample totals and numeric order. The complete document was then regenerated after this second boundary fix: 316 chunks, 16,035,000 samples (668.125 seconds), WAV SHA-256 <code>768df814039b1ec881df554ae138a066ccfcdb746f9869f8920af87981440510</code>, and 1,603.53 seconds of synthesis. Only four boundary-adjacent chunks changed; the other 312 remained byte-identical to the decimal-only run. Generated CKE Whisper consumed all 24 timestamp windows and returned 1,156 words with 6.41% normalized WER. The exact-number sequence now matches the source, with no missing or unexpected values. This is an execution and transcript-fidelity pass, while human listening is not tested in this run and pinned connected waveform parity remains an unresolved failure. The evaluator now requires typed per-chunk metadata and binds each planned text field to its source slice, so matching omissions cannot produce PASS. Its exact-number gate recognizes a bounded signed tens/unit grammar; unsupported higher-order or spoken-decimal constructions are reported as incomplete rather than certified. The 316/317-chunk variation was traced to a second pinned KPipeline construction: its EspeakFallback initialization hit a temporary-library disk-quota error, and Kokoro silently selected a different neural fallback. The frontend now reuses one checked Espeak pipeline per process, pins the Espeak Python adapter identity, and rejects fallback substitution rather than changing phonemes. A pinned long → other request → long replay yields identical phonemes and chunks. The retained WAV remains bound to its hashed 316-chunk plan; first-time Espeak initialization can still fail explicitly when host resources are exhausted.</p>
 <p><strong>Current variable-length diagnostic waveform:</strong> the circuit now composes the second generator residual pool, final activation, post convolution, magnitude/phase head and inverse STFT after CKE-generated upstream features. One generated native entry returns checked sample counts to a native PCM16 WAV host. The same loaded library is tested with real 8-, 13- and 36-ID af_heart requests and short → intermediate → long → short replay; the 13-ID Hello there. case has an independently captured pinned full-model reference. The 13-ID standalone WAV uses captured Gaussian input; its listenable artifact is <code>tests/fixtures/tts/kokoro_runtime_waveform_hello_there_13_diagnostic.wav</code>, with model, code, generated-library, package and output hashes in <code>version/v8/tts/evidence/kokoro_runtime_waveform_20261018.json</code>. <strong>Execution and safety PASS; connected numerical parity FAILS.</strong> Eight-, 13- and 36-ID waveform maximum differences are 0.010313, 0.002095 and 0.007652 against direct pinned PyTorch 2.8 captures, under the unchanged 2e-4 diagnostic ceiling. Their waveform RMSE values are 3.38e-4, 8.15e-5 and 2.42e-4 respectively; those aggregate measures do not erase the worst-case failures. The host validates the returned valid sample count separately from its allocated waveform capacity. Set <code>CKE_TTS_RETAIN_DIR=/path/to/output</code> when running the waveform suite to retain the generated library, sparse input package, WAV and reproduction manifest for listening. The native package contains weights and declared external inputs only; the generated entry computes all intermediate neural tensors. This captured-noise lane is a diagnostic phoneme-to-WAV path; the separate native seeded request lane below is not certified arbitrary-text speech. Reproduce with <code>python3 version/v8/tts/build_kokoro_runtime_waveform_circuit.py --check</code> and <code>python3 -m unittest tests.test_v8_kokoro_runtime_waveform</code>; this suite runs in standard nightly.</p>
 <p><strong>Native variable-length text trial:</strong> the offline bundle builder packages pinned BUMP weights, the af_heart voice bank and one 64-token-capacity generated waveform library. The native dispatcher accepts the separately captured 8-, 13- and 36-ID request lengths and rejects other counts. A small test lexicon reproduces the captured 8-, 13- and 36-ID request tensors. The pinned full US-gold dictionary maps “Hello there.” to an unsupported 12-ID request, which is rejected explicitly; “Hello, there.” maps to a supported 13-ID request and produces a native WAV. The C host selects the corresponding voice row, binds the valid token length, fills request-owned seeded Gaussian noise, and writes only the returned sample count. Local AVX2/FMA text runs produced 32,400, 36,600 and 61,800 samples at 24 kHz; 8 → 13 → 36 → 8 replay matched retained CKE seeded WAV hashes. The speech supervisor has a process-level stop, error and recovery path. Each request starts a new host process, so weights and library mappings are reloaded; persistent loading and headset playback remain future work. These supported phrases demonstrate execution, not arbitrary English coverage or independent waveform parity. Reproduce the bundle with <code>python3 version/v8/tts/build_kokoro_dispatch_bundle.py --bump-dir &lt;pinned-bump&gt; --voice-bank &lt;af-heart.ckvoice&gt; --output-dir &lt;new-bundle&gt; --runtime-lengths --conv-provider avx2_fma</code>, then run the optional asset-backed test with <code>CKE_TTS_RUN_RUNTIME_TEXT_FULL=1 CKE_TTS_RUNTIME_TEXT_BUNDLE_DIR=&lt;new-bundle&gt; python3 -m unittest tests.test_v8_kokoro_native_lexicon_text</code>. The test's small lexicon preserves pinned IDs but does not claim full Misaki context-dependent pronunciation.</p>
-<p><strong>Experimental short-text length coverage:</strong> the runtime bundle can opt in to individual additional phoneme counts with <code>--runtime-lengths --experimental-count 12</code>, or to the bounded 3–40 count range with <code>--runtime-lengths --runtime-experimental-range</code>. Both modes reuse the same generated 64-token-capacity graph and CKTTS004 package; the builder checks that the pinned voice bank contains every selected row. The default remains 8, 13 and 36 IDs. The bundle manifest separates captured counts from execution-only counts. With the pinned dictionary, “Hello there.” yields 12 IDs and produced two identical native seeded 36,000-sample WAVs using the generated library; the 12-ID waveform hash was <code>53dc2fa85f9cf190bc59e51689e45206ca213daad87a71f9024c1bc8b5cafa13</code>. This is bounded execution and deterministic replay, not direct pinned-model numerical parity or full English G2P. Unsupported words, counts outside 3–40, and requests exceeding predicted frame/sample capacity still reject. The optional asset-backed test runs through standard nightly when supplied a range bundle and pinned frontend; without them it reports NOT_TESTED with a reason. Reproduce with <code>python3 version/v8/tts/build_kokoro_dispatch_bundle.py --bump-dir &lt;pinned-bump&gt; --voice-bank &lt;af-heart.ckvoice&gt; --output-dir &lt;new-bundle&gt; --runtime-lengths --runtime-experimental-range --conv-provider avx2_fma</code>.</p>
+<p><strong>Experimental short-text length coverage:</strong> the runtime bundle can opt in to individual additional phoneme counts with <code>--runtime-lengths --experimental-count 12</code>, or to the bounded 3–48 count range with <code>--runtime-lengths --runtime-experimental-range</code>. Both modes reuse the same generated 64-token-capacity graph and CKTTS004 package; the builder checks that the pinned voice bank contains every selected row. The default remains 8, 13 and 36 IDs. The bundle manifest separates captured counts from execution-only counts. With the pinned dictionary, “Hello there.” yields 12 IDs and produced two identical native seeded 36,000-sample WAVs using the generated library; the 12-ID waveform hash was <code>53dc2fa85f9cf190bc59e51689e45206ca213daad87a71f9024c1bc8b5cafa13</code>. This is bounded execution and deterministic replay, not direct pinned-model numerical parity or full English G2P. Unsupported words, counts outside 3–48, and requests exceeding predicted frame/sample capacity still reject. The optional asset-backed test runs through standard nightly when supplied a range bundle and pinned frontend; without them it reports NOT_TESTED with a reason. Reproduce with <code>python3 version/v8/tts/build_kokoro_dispatch_bundle.py --bump-dir &lt;pinned-bump&gt; --voice-bank &lt;af-heart.ckvoice&gt; --output-dir &lt;new-bundle&gt; --runtime-lengths --runtime-experimental-range --conv-provider avx2_fma</code>.</p>
 <p><strong>Earlier variable-length second source join:</strong> one loaded generated native entry carries 8-ID and 36-ID phoneme requests through the second source convolution, style-conditioned source residual block and join with CKE's own reflected main branch. Both branches consume the checked 6,481/12,361-frame extent with a separate 15,361-frame physical capacity. Short → long → short replay, exact native branch addition, untouched padding, nonfinite-input and over-capacity rejection, and recovery pass. Direct pinned PyTorch 2.8 full-model checkpoints show connected join maximum errors of 0.02531 and 0.04074 under a 2e-4 diagnostic ceiling, so <strong>connected numerical parity FAILS</strong>. Captured Gaussian remains diagnostic; the second-stage residual pool, spectral head and variable-length WAV remain unfinished. Reproduce with <code>python3 version/v8/tts/build_kokoro_runtime_stage1_source_join_circuit.py --check</code> and <code>python3 -m unittest tests.test_v8_kokoro_runtime_stage1_source_join</code>; the suite is registered in standard nightly.</p>
 <p><strong>Earlier variable-length second generator ingress:</strong> one loaded generated native entry now carries 8-ID and 36-ID phoneme requests through the first residual pool, second-stage LeakyReLU, checked sixfold dense transposed convolution and one-frame left reflection. The two requests publish 6,480/6,481 and 12,360/12,361 valid deconvolution/reflection frames while preserving separate 15,360/15,361 physical capacities. Short → long → short replay, exact reflected layout, untouched padding, nonfinite-input and over-capacity rejection, and recovery pass. Direct pinned PyTorch 2.8 captures show connected reflection maximum errors of 0.01083 and 0.01718 under a 2e-4 diagnostic ceiling, so <strong>connected numerical parity FAILS</strong>. Captured Gaussian remains diagnostic; the second-stage residual pool, spectral head and variable-length WAV remain unfinished. Reproduce with <code>python3 version/v8/tts/build_kokoro_runtime_stage1_ingress_circuit.py --check</code> and <code>python3 -m unittest tests.test_v8_kokoro_runtime_stage1_ingress</code>; the suite is registered in standard nightly.</p>
 <p><strong>Earlier variable-length first generator residual pool:</strong> one generated native entry now continues from phoneme IDs and request-specific af_heart conditioning through the first main/source join, all three first-stage main residual blocks and their three-way mean. The same loaded library runs 8 → 36 → 8 IDs at checked 1,080/2,060-frame extents with a separate 2,560-frame physical capacity. Native sum/mean checks, finite output, untouched mean padding, repeated output, nonfinite-input rejection and recovery pass. Pinned PyTorch 2.8 direct block captures and their explicit mean remain independent oracle evidence: connected mean errors are 0.11312 and 0.23652 maximum under a 2e-4 diagnostic ceiling, so <strong>connected numerical parity FAILS</strong>. Captured Gaussian remains a diagnostic input; later generator stages and variable-length WAV are unfinished. Reproduce with <code>python3 version/v8/tts/build_kokoro_runtime_stage0_pool_circuit.py --check</code> and <code>python3 -m unittest tests.test_v8_kokoro_runtime_stage0_pool</code>; the suite is registered in standard nightly.</p>
@@ -1252,7 +1316,7 @@ versions and hashes; the selected voice ID and asset hash are also open.</p>
 <td>Qwen3-TTS 0.6B CustomVoice, 12 Hz — first CKE comparison target</td>
 <td><a href="https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice/tree/85e237c12c027371202489a0ec509ded67b5e4b5"><code>Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice@85e237c</code></a>, Apache 2.0</td>
 <td>The pinned <a href="https://github.com/QwenLM/Qwen3-TTS/commit/022e286b98fbec7e1e916cb940cdf532cd9f488e">reference code</a> tokenizes text, applies a preset speaker and language, runs a 28-layer talker and 5-layer code predictor, then decodes the 16-group codec tokens into 24 kHz PCM. The CKE oracle capture records text token IDs, codec tokens and waveform.</td>
-<td>CKE now connects pinned text, language, speaker and codec prompt IDs through native embedding, text projection and the first talker block in one generated entry. A separate reference-code-fed codec entry executes all eight pre-transformer layers, both factor-2 vocoder upsamples, both complete ConvNeXt blocks, the channel-changing causal decoder ingress, all four decoder upsampling/residual blocks, and the final bounded 24 kHz PCM waveform. The 8- and 46-code-frame codec graphs are separately compiled. The remaining 27 talker blocks, code predictor, autonomous code generation and complete text-to-speech remain NOT_TESTED. This 0.6B CustomVoice variant ignores style instructions. Generated cache state, EOS and sampling remain to be contracted.</td>
+<td>CKE connects pinned prompt IDs through generated embedding, text projection and all 28 talker prefill blocks. The bounded generated loop reaches natural EOS after 46 frames, with all 46 × 16 code IDs matching the committed reference. The generated loop now feeds the complete codec on the same planned arena and produces 88,320 FP32 samples at 24 kHz; maximum error against the pinned waveform is 1.33e-6. This certifies one pinned prompt-ID-to-PCM trajectory. Runtime text preparation, varied requests, sampled generation, a WAV host and speech-session behavior remain NOT_TESTED. This 0.6B CustomVoice variant ignores style instructions.</td>
 </tr>
 <tr>
 <td>Kokoro v1.0</td>
@@ -1274,6 +1338,42 @@ versions and hashes; the selected voice ID and asset hash are also open.</p>
 </tr>
 </tbody>
 </table>
+<p><strong>Qwen3-TTS technical-text reference diagnostic:</strong> P3 runs of
+the pinned 0.6B CustomVoice model distinguish a model stop from a generation
+budget. The literal path and signed-number case
+<code>Read /home/antshiv/Workspace/C-Kernel-Engine/server_summary.txt. The value is -3.5, not +3.5.</code>
+reached a 320-token cap under deterministic greedy decoding, with 319 audio
+frames and no EOS; the replay reproduced the original diagnostic WAV SHA-256
+exactly. A plain sentence under the same greedy policy stopped at
+EOS. The pinned generation configuration defaults to sampling, while the
+earlier oracle capture requested greedy decoding. The sampled policy stopped
+on the literal case after 142
+audio frames, yielding 11.36 seconds of 24 kHz audio in 32.35 seconds on P3.
+The other six retained technical cases also reached EOS under sampled decoding.
+This identifies a text-and-policy interaction in the reference, not a CKE
+kernel defect. The retained technical-text corpus preserves source text and
+labels optional pronunciation expansions explicitly. The asset-backed
+<code>version/v8/tts/evaluate_qwen3_tts_accessibility_reference.py</code>
+records raw talker EOS, output hashes, model/reference identities, memory and
+timing; its cheap corpus/stop contract runs in standard nightly. Human
+listening, native CKE generation, and true
+first-audio latency remain separate unpassed gates. The official wrapper
+returns a complete waveform even when its text-input simulation mode is used;
+it does not establish streamed audio delivery. On the sampled diagnostic WAV,
+CKE Whisper Base recognized “not plus 3.5” but missed the minus sign and full
+path; this is supporting transcript evidence, not a human listening verdict
+or waveform-parity result. With an explicitly selected spoken expansion for
+the signed-number sentence, CKE Whisper recognized “minus 3.5, not plus 3.5.”
+That check uses different spoken input and still needs listening confirmation.
+Run the following in the pinned reference Python
+environment, with the verified model and reference checkouts set in the two
+environment variables:</p>
+<pre>PYTHONPATH="$CKE_QWEN3_TTS_REFERENCE_ROOT" python \
+  version/v8/tts/evaluate_qwen3_tts_accessibility_reference.py \
+  --model-dir "$CKE_QWEN3_TTS_MODEL_DIR" \
+  --case plain_update --case literal_path_signed \
+  --policy sampled --max-new-tokens 320 --require-eos \
+  --output-dir /tmp/cke-qwen3-accessibility-sampled</pre>
 <p><strong>Qwen3-TTS generated talker prefill:</strong> the committed CPU oracle for
 <code>Hello, this is CKE.</code> contains 15 text token IDs, 46 codec frames with 16
 code groups per frame, and 88,320 waveform samples at 24 kHz. The model snapshot
@@ -1307,10 +1407,279 @@ so repeated-layer stitching remains tested without the model asset. The tests ar
 <code>tests/test_v8_indexed_sum_rows_checked.py</code> and
 <code>tests/test_v8_qwen3_tts_prompt_first_block.py</code> and
 <code>tests/test_v8_qwen3_tts_talker_prefill.py</code> and
-<code>tests/test_v8_qwen3_tts_talker_continuation.py</code>. Full code
-predictor, autonomous code production and text-to-waveform execution remain.
-On the
-decoder side, one checked generated entry reconstructs all 16 split-RVQ
+<code>tests/test_v8_qwen3_tts_talker_continuation.py</code>.</p>
+<p><strong>Qwen3-TTS code-predictor frame:</strong> the pinned CPU reference
+captures the first speech frame's two-token prefill, then fourteen one-token
+continuations. A generated five-layer prefill seeds caller-owned KV state;
+generated five-layer continuation calls append positions 2 through 15 with
+the declared codebook head for each step. With identical reference-supplied
+projected embeddings, all 15 greedy codebook IDs match, the largest newly
+appended KV-row difference is 2.46e-5, and the largest logit difference is
+6.49e-5. This certifies teacher-forced predictor arithmetic and cache
+progression, not autonomous code production. An intermediate layer-2 MLP
+output differs by 0.03125 on a value near 50,000, while its gate and up
+projections differ by at most 1.83e-4; the numerical diagnostics remain
+visible. Tests: <code>tests/test_v8_qwen3_tts_code_predictor_prefill.py</code>.
+The teacher-forced suite remains a separate identical-input arithmetic lane.</p>
+<p><strong>Generated predictor feedback:</strong> a second circuit connects
+the prefill logits to checked final-row argmax, exact token-major codebook
+embedding, fourteen five-layer continuations and a final checked ID selection.
+One generated native entry emits all 15 predictor IDs in the pinned first
+speech frame, matching the reference sequence exactly. Maximum logit error
+across the continuation heads is 6.49e-5. The graph clears its valid-code
+count at the start of each invocation and publishes 15 only after the final
+selection succeeds. A late invalid embedding row leaves that count zero;
+restoring the weight permits reuse without reloading. This is autonomous
+<em>within the predictor frame</em>, starting from reference-supplied initial
+embeddings. The first talker code, complete talker generation, codec join,
+EOS/sampling and text-to-WAV remain unconnected. The cheap synthetic graph
+also tests alternate IDs and short → different → short reuse without model
+assets. Tests: <code>tests/test_v8_qwen3_tts_predictor_feedback.py</code>.</p>
+<p><strong>Connected first speech frame:</strong> a third circuit joins the
+generated 28-layer talker prompt prefill to the predictor frame. Checked
+final-row selection emits first codec ID 1995. An exact embedding lookup and
+indexed row assembly pass the talker's final hidden row and selected first-code
+embedding into the predictor. The connected native entry emits the same 15
+predictor IDs as the pinned reference; the two-row predictor input differs by
+at most 3.27e-5. The complete-frame count is cleared before the talker runs,
+so malformed prompt or bridge inputs cannot leave a previous frame valid.
+The asset-free graph test exercises alternate inputs, a deliberately wrong row,
+rejection, and recovery. The host still supplies the declared prompt and
+bridge index plans; it does not supply neural intermediates. This certifies
+one pinned first frame, not continuation, EOS handling, codec-to-waveform
+composition, or complete text-to-speech. Tests:
+<code>tests/test_v8_qwen3_tts_talker_predictor_frame.py</code>.</p>
+<p><strong>Connected first frame to PCM:</strong> the generated ID scalars feed
+the matching 16 codec inputs as circuit edges, then the existing codec graph
+produces 1,920 finite samples at 24 kHz in the same native entry. The generated
+samples differ from a direct pinned one-frame PyTorch decoder capture by at
+most 9.55e-9. Waveform validity is cleared before talker execution and
+published only after the codec succeeds; an invalid selected codec table row
+prevents publication and permits recovery on the next call. The retained
+sample is about 80 ms and near silence. It is a numerical connection test,
+not intelligible Qwen speech. Producing later frames, EOS handling, a useful
+utterance, and a cancellable text-to-speech session remain. Tests:
+<code>tests/test_v8_qwen3_tts_first_frame_waveform.py</code>.</p>
+<p><strong>Generated first talker continuation:</strong> a bounded circuit seeds
+the 28-layer talker KV cache immediately after prompt prefill, then carries
+the first generated 16-codebook frame into the next talker input. The first
+codec ID uses the talker's embedding table; each of the remaining 15 IDs uses
+its own predictor codebook table. Circuit-declared FP32 sums combine those
+rows with the projected TTS pad row before one checked continuation step.
+This tests the feedback edge that the first-frame PCM graph does not execute.
+For the pinned utterance, all 16 generated IDs match; the next input has
+maximum absolute error 1.49e-8 and continuation logits 5.42e-5 against direct
+reference captures. The continuation position now comes from a checked
+request step index, with supported positions 18 through 20. An asset-free
+generated test proves the selected KV row, capacity rejection, untouched
+logits and recovery. Direct pinned-model parity remains established at
+position 18; positions 19 and 20 currently have safety evidence only because
+the graph still feeds back the first generated frame.
+This first-continuation circuit does not itself generate a second complete
+speech frame or loop to EOS. Test:
+<code>tests/test_v8_qwen3_tts_generated_talker_continuation.py</code>.</p>
+<p><strong>Connected second speech-code frame:</strong> the generated first-frame
+feedback produces the next talker logits, from which the same native entry
+selects the next codec ID, embeds it, assembles a two-row predictor input, and
+executes the five-layer predictor through all 15 remaining codebook selections.
+The pinned greedy case matches all 16 reference IDs in frame two; its predictor
+bridge has maximum absolute error 7.63e-5. A small generated test rejects an
+invalid bridge and over-capacity continuation before publishing the second
+frame count, preserves its selected output on failure, and recovers. This
+is connected generated execution from pinned text IDs, not an oracle-fed
+second frame. Selection now follows the pinned minimum-length and suppressed-ID
+parts of the greedy stop policy: the
+model's 2048–3071 suppressed ID range is excluded except for EOS 2150 after
+two emitted frames, and budget exhaustion has a separate positive status.
+Generated checked calls propagate stop status and skip dependent predictor
+work. The second-frame graph now applies the reference's sign-dependent
+repetition penalty to the first CKE-generated code ID before selection. It
+penalizes duplicate history IDs once, with a declared 105/100 factor and
+checked output preservation. The pinned adjusted-logit checkpoint has maximum
+absolute error 5.41e-5. The connected fixture exercises minimum-length
+EOS suppression; synthetic generated tests exercise actual EOS, budget
+short-circuits, and invalid penalty history. The rolling frame entry below
+adds bounded later-frame history; an autonomous generation loop and useful
+text-to-WAV remain. Tests:
+<code>tests/test_v8_select_next_id_checked.py</code>,
+<code>tests/test_v8_repetition_penalty_checked.py</code>, and
+<code>tests/test_v8_qwen3_tts_second_generated_frame.py</code>.</p>
+<p><strong>Qwen3-TTS bounded rolling-frame entry:</strong> one lowered circuit
+now emits a checked prefill function and a repeatable frame function
+against the same compiler-planned arena. The existing full-call entry remains
+as a checked wrapper over those functions, so the canonical graph is shared
+rather than copied. Circuit-declared state slots carry the previous frame's
+16 code IDs, the first-code history, the expected step index and the talker KV
+cache. The frame entry checks state validity and exact step order, clears output
+validity, performs fresh codebook embedding
+lookups, appends KV at a checked position, generates the next 16 IDs and
+commits state only after those checks pass. A failed frame invalidates state
+until a new prefill. The pinned full-weight test matches all 16 reference IDs
+for both frame two and frame three and checks that the immutable first-frame
+IDs remain available to the two-frame PCM graph. Later positions have
+execution and capacity evidence only. The cache supports positions 18–80;
+the caller still
+supplies the step index, which generated C compares with its stored expected
+index before modifying KV state. This is a repeatable bounded step, not an autonomous
+EOS loop or a useful utterance. A model-neutral generated state-copy test
+checks repeated calls, rejection and recovery. Tests:
+<code>tests/test_v8_copy_i32_span_checked.py</code>,
+<code>tests/test_v8_checked_multi_entry.py</code> and
+<code>tests/test_v8_qwen3_tts_two_phase_speech.py</code>.</p>
+<p><strong>Qwen3-TTS bounded generation shell:</strong> the rolling circuit now
+declares capacity for up to 64 generated code frames, including the corresponding
+talker KV rows and first-code history. A model-neutral native loop invokes the
+generated prefill and frame entries on one arena, reads their declared code
+slots, and stops on the checked EOS status or frame budget. It stages codec IDs
+in caller-owned memory and publishes them only on EOS; rejection and budget
+exhaustion leave the output buffer unchanged and its valid-frame count zero.
+Asset-free tests exercise generated EOS and budget paths, output preservation,
+repeated invocation and malformed offsets. The asset-backed test runs the
+pinned full-weight graph to natural EOS at 46 frames and compares all 16 code IDs
+per frame with the committed reference. Its arena is about 3.74 GB. The
+talker-step limit is circuit-produced and bound to the generic checked extent
+provider; the previous inherited limit of 14 rejected talker step 15. This proves
+one complete greedy code trajectory, not varied-text or sampled generation.
+Tests: <code>tests/test_v8_checked_frame_loop.py</code> and
+<code>tests/test_v8_qwen3_tts_full_code_loop.py</code>.</p>
+<p><strong>Qwen3-TTS checked code-to-codec handoff:</strong> a new bounded
+circuit declares the frame-major code buffer, each codebook packing edge, and
+the complete codec schedule. A generic native shell accepts only a generated
+EOS with the exact frame and codebook geometry selected for that codec segment;
+it then executes the generated codec on the same planned arena and publishes
+finite PCM samples only after the sample count is checked. The asset-free
+synthetic test compiles all three segments through normal lowering and codegen,
+checks codebook order, rejects a wrong length or failing codec without
+publishing PCM, and verifies recovery on the same arena. The synthetic test
+forces EOS at two frames; it checks generic handoff and failure behavior. The
+separate pinned connected test below checks the complete model trajectory.
+The existing fixed-code codec oracle remains an independent numerical lane. Test:
+<code>tests/test_v8_qwen3_tts_loop_codec.py</code>.</p>
+<p><strong>Qwen3-TTS pinned prompt-ID-to-PCM trajectory:</strong> one checked
+native call invokes circuit-declared generated prefill, frame and codec
+segments. It uses the pinned prompt IDs and weights to generate 46 code frames, stops
+at natural EOS, packs all 16 codebooks per frame, and runs the complete codec
+on the same planned arena. The 736 generated IDs match the pinned reference
+exactly. The output has 88,320 finite FP32 samples at 24 kHz; maximum absolute
+waveform error is 1.33e-6 and RMSE is 7.23e-8 against the direct pinned-model
+capture. The measured generated run took 338.64 seconds for 3.68 seconds of
+audio on this bring-up host, so this is not yet interactive speech. An
+undersized arena rejects without publishing samples, and output
+padding remains untouched. The model assets are required for this test; their
+absence is NOT_TESTED. The test does not perform runtime text tokenization,
+support arbitrary text or lengths, write a WAV, or provide a cancellable speech
+session. Test: <code>tests/test_v8_qwen3_tts_full_generated_waveform.py</code>.</p>
+<p><strong>Qwen3-TTS codec Conv1D provider profile:</strong> on an Intel
+Core i7-14700T, segment timing of the pinned generated entry attributed about
+215 of 339 warm execution seconds to codec decoding. A codec-only CPU sample
+profile placed the checked scalar Conv1D path ahead of dense deconvolution.
+Selecting the existing checked AVX2/FMA Conv1D map for codec calls in the
+circuit reduced the codec segment to 72.37 seconds in a repeat profile and
+the measured full generated execution to 197.43 and 196.20 seconds;
+all 736 generated code IDs and the FP32 waveform SHA-256 remained identical to
+the scalar run, and the pinned PyTorch waveform comparison retained its
+1.33e-6 maximum error. This is one host and one pinned utterance, not a
+general latency guarantee. The scalar map remains the default; set
+<code>CKE_QWEN3_TTS_CODEC_CONV_PROVIDER=avx2_fma</code> for the optional
+asset-backed test. The provider is selected in circuit authoring, with normal
+map resolution and generated execution. Reproduce segment timings with
+<code>version/v8/tts/evidence/profile_qwen3_tts_generated.py</code> and the
+pinned model directory in <code>CKE_QWEN3_TTS_MODEL_DIR</code>. This does not
+provide variable text, a persistent request session or audio streaming.</p>
+<p><strong>Qwen3-TTS pinned native speech session:</strong> the bounded
+<code>version/v8/tts/qwen3_tts_pinned_session.py</code> command verifies the
+pinned model files, derives the certified prompt IDs with the model tokenizer,
+compiles the ordinary circuit, loads weights once, and invokes the checked
+native frame-to-codec shell for repeated requests. It clears planned mutable
+activations between requests, retains weights and the generated library, and
+writes a 24 kHz mono PCM16 WAV only after a valid sample count is published.
+Run from the repository root with the pinned model snapshot:</p>
+<pre><code>python version/v8/tts/qwen3_tts_pinned_session.py \
+  --model-dir /path/to/85e237c12c027371202489a0ec509ded67b5e4b5 \
+  --text 'Hello, this is CKE.' --output /tmp/qwen3-cke.wav --repeat 2</code></pre>
+<p>The command accepts nonempty, control-free English text that the pinned
+tokenizer encodes to exactly seven context tokens, with Ryan conditioning and
+up to 46 generated codec frames. It rejects other token lengths and requests
+that exhaust the frame budget. The original prompt produces 46 frames;
+<code>Yes, this is CKE.</code> produces 40 frames with matching reference code
+IDs and a 1.68e-6 maximum waveform difference in the asset-backed test. The
+second capture uses PyTorch 2.12.1+cpu; its manifest records the model,
+reference-code and runtime identities separately from the older fixture.
+This is a bounded two-text numerical demonstration, not arbitrary assistant
+replies, streaming or conversational latency. The persistent Python session
+now exposes <code>stop()</code>: the generic native shell checks it before
+prefill and between generated frames, and withholds valid PCM after a stop.
+An in-progress generated frame or codec entry runs to its next checked
+boundary; this does not yet establish prompt stop latency during codec work
+or playback cancellation. The host prepares
+input IDs and packages PCM; the circuit and generated native entries execute
+the neural graph. The registered session suite covers text rejection and WAV
+integrity; the asset-backed run checks cancellation recovery, A→B→A state
+reset and direct reference parity.</p>
+<p><strong>Qwen3-TTS runtime prompt-row prefix:</strong> one generated entry
+now accepts checked context lengths from one to seven tokens through text
+projection and the first talker block. The seven-token prompt and a two-token
+<code>Hi.</code> prompt execute short→long→short on the same loaded entry.
+The short prompt has a direct pinned-model first-block capture; its final
+block output differs by at most 9.54e-6 in the measured CPU lane. This is
+prefill-prefix evidence. The continuation position now consumes the checked
+prompt length in the generated runtime circuit described below.</p>
+<p><strong>Qwen3-TTS runtime prefill cache:</strong> the same checked row extent
+now drives all 28 talker layers and their per-layer K/V cache seeds. One
+generated entry runs two-token → seven-token → two-token text requests with
+capacity-strided cache storage. The seven-token logits match the pinned
+full-prefill capture within the existing 1.5e-4 bound; the short first-layer
+K/V rows match a separate direct capture within 8e-5. Cache copying, output
+padding, invalid lengths and repeated execution are checked separately.
+The continuation circuit now checks that the request length agrees with the
+prefill length before it appends to the cache.</p>
+<p><strong>Qwen3-TTS checked runtime continuation and short speech:</strong>
+the generated prefill and continuation segments derive attention position from
+the request's checked text-token count. A model-neutral extent operation and
+existing equality provider reject changed context between segments. Direct
+pinned captures for two- and seven-token prompts match generated prefill,
+first continuation logits and K/V rows; a synthetic generated test covers the
+next continuation position, invalid lengths and recovery. The same generated
+speech/codec library produces a 20-frame, 38,400-sample WAV for the three-token
+<code>Thank you.</code> request. All 320 generated code IDs match the pinned
+reference, and the PCM16 result differs by at most one quantization unit at
+27 samples. Without reloading or recompiling, the same library then produces
+the seven-token <code>Hello, this is CKE.</code> reference: all 736 codebook
+IDs match, and PCM16 differs by at most one unit at 91 of 88,320 samples.
+The measured three-token run took 131.74 seconds after a 137.50-second cold
+load on the bring-up host. The separate two-token <code>Hi.</code> request
+exhausted the bounded generation budget without publishing audio; the pinned
+reference also did not emit EOS within 64 new tokens. Thus the bounded
+variable-length path is demonstrated, while general short-text stopping,
+latency and interactive accessibility speech remain unfinished.</p>
+<p><strong>Qwen3-TTS expanded prompt capacity:</strong> circuit authoring now
+derives cache and projection storage from a checked capacity of 16 spoken-text
+tokens. A generated 3 → 16 → 3 synthetic sequence checks the maximum extent,
+cache writes and untouched padding. The eight-token
+<code>Yes, I can hear you now.</code> request naturally stops at 39 code
+frames: all 624 generated IDs match a direct pinned full-model capture, and
+the 74,880-sample PCM16 output differs by at most one unit at 106 samples.
+The measured run took 179.89 seconds warm after a 138.43-second cold load on
+the bring-up host. Sixteen-token execution currently has safety evidence;
+full-model numerical evidence reaches eight tokens. The output remains bound
+to 46 code frames, so longer or non-stopping text is rejected without a WAV.
+This is not general assistant-reply coverage or interactive latency.</p>
+<pre><code>python version/v8/tts/qwen3_tts_pinned_session.py \
+  --model-dir /path/to/85e237c12c027371202489a0ec509ded67b5e4b5 \
+  --runtime-prompts --text 'Yes, I can hear you now.' \
+  --output /tmp/qwen3-eight.wav</code></pre>
+<p><strong>Two generated frames to PCM:</strong> a checked, model-neutral integer
+span concatenation provider packs each pair of CKE-generated codebook IDs
+into a two-frame input for the existing generated codec. The same generated
+entry then produces 3,840 FP32 samples at 24 kHz. The direct pinned decoder
+capture for these two frames is a separate oracle; the connected test matches
+all 32 IDs and has 8.85e-9 maximum waveform error. It preserves output
+validity on rejection and replays after recovery. This 160 ms fixed non-EOS
+prefix is diagnostic.
+It does not implement a generation loop, natural stopping, a useful utterance,
+or a speech session. Tests: <code>tests/test_v8_concat_i32_checked.py</code>
+and <code>tests/test_v8_qwen3_tts_two_frame_waveform.py</code>.</p>
+<p>On the decoder side, one checked generated entry reconstructs all 16 split-RVQ
 codebooks, transposes the resulting features, applies exact left zero padding,
 and executes the causal pre-convolution with pinned weights. It then transposes
 the result into token-major order, performs the pre-transformer input projection
@@ -1951,6 +2320,34 @@ matched. The hosts reported AVX512 and AVX2 capability, which does not prove the
 last 128 columns and the decoder receives its first 128. The generated manifest
 marks any missing hook explicitly.</p></section>
 </div>
+
+<section id="ordered-linear-simd">
+<h2>Ordered FP64 projection optimization trial — 2026-11-07</h2>
+<p>P3 VTune sampling of resident Kokoro identified convolution, checked linear
+projections and dense transposed convolution as major native costs. The checked
+linear provider now dispatches four independent rows through AVX2 when available,
+preserving the scalar FP64 product/add order, bias, FP32 output conversion and
+scalar tails. It uses no horizontal reduction, FMA or heap allocation. Unsupported
+ISAs and overlapping buffers retain the previous scalar path.</p>
+<p>A rebuilt baseline and candidate generated Kokoro graph, using identical request
+packages, weights, eight-worker convolution and seed, produced identical WAV hashes
+for three chunks across three alternating paired trials. Median synthesis was
+10.641 versus 9.736 seconds for 5.55 seconds of audio, about 8.5% lower latency.
+These are shared-host exploratory measurements, not a reliable real-time guarantee.
+The live endpoint was not replaced by this candidate. Published waveform parity
+limitations remain; matching the previous CKE output does not resolve them.</p>
+<p>Independent ordered-reference tests cover nonzero distinct rows, biased and
+bias-free execution, row-group tails, padding, late nonfinite input and insufficient
+output capacity. Generated Kokoro and Qwen composition tests remain separate gates.
+<a href="assets/speech-linear-simd-20261107.json">Retained timing and WAV-hash report</a>.
+Pinned Qwen TTS full-waveform validation also passed: 46 code frames and
+88,320 waveform samples retain the existing code and waveform hashes, with
+reference maximum absolute error 1.3262e-6. Native synthesis took 147.15 seconds
+for 3.68 seconds of audio; no matched baseline speed claim is made. This is not
+practical conversational latency. A sampled generation interval attributed 97.82%
+of cycles to checked linear projection, including weight validation and scalar
+row work. That is the next optimization target, not evidence of full-run savings.</p>
+</section>
     </main>
 
     <!-- SVG Viewer Overlay (shared across all pages) -->
@@ -2200,7 +2597,7 @@ marks any missing hook explicitly.</p></section>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-10-25</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-11-07</p>
             </div>
         </div>
     </footer>

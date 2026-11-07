@@ -17,7 +17,7 @@
   ],
   "scratch": [],
   "dims": ["input_elements", "input_stride", "weight_elements", "weight_stride", "bias_elements", "output_elements", "output_stride", "rows", "input_channels", "output_channels"],
-  "constraints": {"notes": "M, K, N positive; checked physical spans; nonaliasing caller-owned buffers; all accessed inputs and results finite. Rejection leaves all output unchanged. No allocation or global state."},
+  "constraints": {"notes": "Runtime AVX2 dispatch may process four independent rows with the identical ordered FP64 multiply/add sequence; scalar tails and unsupported ISAs preserve the same historical numerical contract ID. No FMA or horizontal reduction is introduced. M, K, N positive; checked physical spans; nonaliasing caller-owned buffers; all accessed inputs and results finite. Rejection leaves all output unchanged. No allocation or global state."},
   "impl": {
     "function": "linear_rows_checked_f32",
     "c_declaration": "int linear_rows_checked_f32(const float *input, size_t input_elements, size_t input_stride, const float *weight, size_t weight_elements, size_t weight_stride, const float *bias, size_t bias_elements, float *output, size_t output_elements, size_t output_stride, size_t rows, size_t input_channels, size_t output_channels);",
@@ -37,7 +37,7 @@
     "contract_id": "linear_rows_checked_f32_scalar_fp64_accumulation",
     "status": "validated", "phases": ["prefill"],
     "function": "linear_rows_checked_f32", "explicit_selector": true,
-    "implementation": {"isa_dispatch": "scalar", "threading": {"runtime": "serial", "work_partition": ["serial"], "dispatch": ["inline"], "reduction_order_effect": "none"}},
+    "implementation": {"isa_dispatch": "runtime", "threading": {"runtime": "serial", "work_partition": ["serial"], "dispatch": ["inline"], "reduction_order_effect": "none"}},
     "arithmetic": {"partial_accumulator": "fp64", "merge_order": "none", "deterministic": true, "thread_count_changes_arithmetic_order": false, "split_strategy": "serial"}
   }],
   "call_abi": {"version": 1, "params": [
