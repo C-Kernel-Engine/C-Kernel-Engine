@@ -286,7 +286,7 @@ class AccessibleVoiceTest(unittest.TestCase):
         def state() -> str | None:
             try:
                 return Path(f"/proc/{pid}/stat").read_text().split()[2]
-            except FileNotFoundError:
+            except (FileNotFoundError, ProcessLookupError):
                 return None
 
         deadline = time.monotonic() + 3
