@@ -2320,6 +2320,34 @@ matched. The hosts reported AVX512 and AVX2 capability, which does not prove the
 last 128 columns and the decoder receives its first 128. The generated manifest
 marks any missing hook explicitly.</p></section>
 </div>
+
+<section id="ordered-linear-simd">
+<h2>Ordered FP64 projection optimization trial — 2026-11-07</h2>
+<p>P3 VTune sampling of resident Kokoro identified convolution, checked linear
+projections and dense transposed convolution as major native costs. The checked
+linear provider now dispatches four independent rows through AVX2 when available,
+preserving the scalar FP64 product/add order, bias, FP32 output conversion and
+scalar tails. It uses no horizontal reduction, FMA or heap allocation. Unsupported
+ISAs and overlapping buffers retain the previous scalar path.</p>
+<p>A rebuilt baseline and candidate generated Kokoro graph, using identical request
+packages, weights, eight-worker convolution and seed, produced identical WAV hashes
+for three chunks across three alternating paired trials. Median synthesis was
+10.641 versus 9.736 seconds for 5.55 seconds of audio, about 8.5% lower latency.
+These are shared-host exploratory measurements, not a reliable real-time guarantee.
+The live endpoint was not replaced by this candidate. Published waveform parity
+limitations remain; matching the previous CKE output does not resolve them.</p>
+<p>Independent ordered-reference tests cover nonzero distinct rows, biased and
+bias-free execution, row-group tails, padding, late nonfinite input and insufficient
+output capacity. Generated Kokoro and Qwen composition tests remain separate gates.
+<a href="assets/speech-linear-simd-20261107.json">Retained timing and WAV-hash report</a>.
+Pinned Qwen TTS full-waveform validation also passed: 46 code frames and
+88,320 waveform samples retain the existing code and waveform hashes, with
+reference maximum absolute error 1.3262e-6. Native synthesis took 147.15 seconds
+for 3.68 seconds of audio; no matched baseline speed claim is made. This is not
+practical conversational latency. A sampled generation interval attributed 97.82%
+of cycles to checked linear projection, including weight validation and scalar
+row work. That is the next optimization target, not evidence of full-run savings.</p>
+</section>
     </main>
 
     <!-- SVG Viewer Overlay (shared across all pages) -->
