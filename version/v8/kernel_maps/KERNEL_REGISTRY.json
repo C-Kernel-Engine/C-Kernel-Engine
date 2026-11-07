@@ -58357,7 +58357,7 @@
         "output_channels"
       ],
       "constraints": {
-        "notes": "M, K, N positive; checked physical spans; nonaliasing caller-owned buffers; all accessed inputs and results finite. Rejection leaves all output unchanged. No allocation or global state."
+        "notes": "Runtime AVX2 dispatch may process four independent rows with the identical ordered FP64 multiply/add sequence; scalar tails and unsupported ISAs preserve the same historical numerical contract ID. No FMA or horizontal reduction is introduced. M, K, N positive; checked physical spans; nonaliasing caller-owned buffers; all accessed inputs and results finite. Rejection leaves all output unchanged. No allocation or global state."
       },
       "impl": {
         "function": "linear_rows_checked_f32",
@@ -58423,7 +58423,7 @@
           "function": "linear_rows_checked_f32",
           "explicit_selector": true,
           "implementation": {
-            "isa_dispatch": "scalar",
+            "isa_dispatch": "runtime",
             "threading": {
               "runtime": "serial",
               "work_partition": [
@@ -58634,7 +58634,7 @@
         "output_channels"
       ],
       "constraints": {
-        "notes": "M, K, N positive; checked physical spans; nonaliasing caller-owned buffers; all accessed inputs and results finite. Rejection leaves all output unchanged. No allocation or global state."
+        "notes": "Runtime AVX2 dispatch may process four independent rows with the identical ordered FP64 multiply/add sequence; scalar tails and unsupported ISAs preserve the same historical numerical contract ID. No FMA or horizontal reduction is introduced. M, K, N positive; checked physical spans; nonaliasing caller-owned buffers; all accessed inputs and results finite. Rejection leaves all output unchanged. No allocation or global state."
       },
       "impl": {
         "function": "linear_rows_checked_f32",
@@ -58693,7 +58693,7 @@
           "function": "linear_rows_checked_f32",
           "explicit_selector": true,
           "implementation": {
-            "isa_dispatch": "scalar",
+            "isa_dispatch": "runtime",
             "threading": {
               "runtime": "serial",
               "work_partition": [
