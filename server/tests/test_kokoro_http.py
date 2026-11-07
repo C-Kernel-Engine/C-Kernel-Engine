@@ -172,3 +172,133 @@ def test_queued_cancel_and_overflow_preserve_active_worker() -> None:
             assert _events(queued.result(timeout=3))[-1]["type"] == "cancelled"
         assert _events(post("next", "fourth"))[0]["worker_generation"] == 1
         assert len(backends) == 1 and not backends[0].closed
+
+
+def test_completion_and_cancel_are_one_atomic_transition() -> None:
+    """Pause after enqueue but before put returns: cancel must observe completion."""
+    import queue
+    from server.kokoro_http import _Owner, _Job
+
+    entered, release = threading.Event(), threading.Event()
+
+    class PausedQueue(queue.Queue):
+        def put(self, item, block=True, timeout=None):
+            super().put(item, block, timeout)
+            entered.set()
+            assert release.wait(3)
+
+    owner = _Owner(lambda: None, 1)
+    job = _Job('race', 'hello', 7, 'natural', time.monotonic())
+    job.events = PausedQueue(2)
+    backend = Backend(1)
+    owner.backend, owner.active, owner.running_native = backend, job, True
+    owner.jobs[job.request_id] = job
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        publishing = pool.submit(owner._emit, job, {'type': 'complete'})
+        try:
+            assert entered.wait(2)
+            assert owner.lock.locked(), "completion must hold admission lock through publication"
+            cancelling = pool.submit(owner.cancel, job.request_id)
+        finally:
+            release.set()
+        publishing.result(timeout=3)
+        assert cancelling.result(timeout=3) is False
+    assert job.completed.is_set()
+    assert not job.cancelled.is_set()
+    assert not backend.closed
+    assert job.events.get_nowait()['type'] == 'complete'
+    assert job.events.empty()
+
+
+def test_backend_must_finish_with_exactly_one_terminal_event() -> None:
+    class MissingComplete(Backend):
+        def run(self, text, seed, mode, emit, cancelled):
+            return
+
+    class AfterComplete(Backend):
+        def run(self, text, seed, mode, emit, cancelled):
+            emit({'type': 'complete', 'total_chunks': 0})
+            raise RuntimeError('failure after terminal')
+
+    from server.kokoro_http import _Owner, _Job
+    for bad, expected in ((MissingComplete, 'error'), (AfterComplete, 'complete')):
+        backends = []
+        def factory():
+            b = bad(1) if not backends else Backend(2)
+            backends.append(b)
+            return b
+        owner = _Owner(factory, 1)
+        owner.start()
+        try:
+            job = _Job('first', 'hello', 7, 'natural', time.monotonic())
+            assert owner.submit(job)
+            assert job.finished.wait(3)
+            events = []
+            while not job.events.empty():
+                events.append(job.events.get_nowait())
+            assert [e['type'] for e in events if e['type'] in ('complete', 'error', 'cancelled')] == [expected]
+            followup = _Job('next', 'hello', 7, 'natural', time.monotonic())
+            assert owner.submit(followup)
+            received = []
+            while True:
+                event = followup.events.get(timeout=3)
+                received.append(event)
+                if event['type'] in ('complete', 'error', 'cancelled'):
+                    break
+            assert received[-1]['type'] == 'complete'
+            assert followup.finished.wait(3)
+            assert len(backends) == 2
+        finally:
+            owner.close()
+
+
+def test_cancel_pins_active_backend_until_abort_signal_is_sent() -> None:
+    from server.kokoro_http import _Owner, _Job
+    owner = _Owner(lambda: None, 1)
+    job = _Job('active', 'hello', 7, 'natural', time.monotonic())
+
+    class SignalBackend(Backend):
+        def abort(self):
+            assert owner.lock.locked(), 'next request must not activate before this signal'
+            assert owner.active is job and job.cancelled.is_set()
+            super().abort()
+
+    backend = SignalBackend(1)
+    owner.backend, owner.active, owner.running_native = backend, job, True
+    owner.jobs[job.request_id] = job
+    assert owner.cancel(job.request_id)
+    assert backend.closed
+
+
+def test_repeated_stalled_readers_release_owner_and_followup_recovers() -> None:
+    from server.kokoro_http import _Owner, _Job
+    backends = []
+    def factory():
+        b = Backend(len(backends) + 1)
+        backends.append(b)
+        return b
+    owner = _Owner(factory, 1, delivery_timeout_seconds=.05)
+    owner.start()
+    try:
+        for i in range(3):
+            job = _Job(f'slow-{i}', 'one two three', 7, 'natural', time.monotonic())
+            assert owner.submit(job)
+            # Do not read: started and first chunk fill the bounded queue.
+            assert job.finished.wait(2)
+            assert job.events.qsize() == 1
+            assert job.events.get_nowait()['type'] == 'cancelled'
+            assert backends[-1].closed
+            assert not owner.jobs and owner.active is None
+        followup = _Job('next', 'good', 7, 'natural', time.monotonic())
+        assert owner.submit(followup)
+        events = []
+        while True:
+            event = followup.events.get(timeout=2)
+            events.append(event)
+            if event['type'] in ('complete', 'error', 'cancelled'):
+                break
+        assert events[-1]['type'] == 'complete'
+        assert followup.finished.wait(2)
+        assert len(backends) == 4
+    finally:
+        owner.close()
