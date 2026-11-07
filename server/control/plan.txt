@@ -17,3 +17,10 @@ CKE read-only node adapter — action plan
 
 Speech performance work remains separate in speech-single-row-20261107; do not deploy
 that unreviewed candidate as part of this adapter change.
+
+Simulated consumer follow-up:
+- consumer_probe.py implements the full sequence plus a final adapter identity fence.
+- Last successful pass is independent of latest attempt and latest error.
+- Sanitized fixtures include expected negative-control verdicts for external consumers.
+- Completion claim: adapter passes simulated-consumer contract. Actual application
+  connection, registry and UI acceptance are not established by this probe.

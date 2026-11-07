@@ -149,7 +149,14 @@ rebind:
         int more=zmq_msg_more(&m); json_object *q=(!more && n<=LIMIT)?parse(zmq_msg_data(&m),(size_t)n):NULL;
         zmq_msg_close(&m);
         /* Multipart is outside this protocol. Reset socket rather than unbounded drain. */
-        if(more) { json_object_put(q); if(stopped) break; zmq_close(s); goto rebind; }
+        if(more) {
+            json_object_put(q); if(stopped) break;
+            zmq_close(s);
+            /* close is asynchronous: terminate the old context before rebinding
+             * so its I/O thread has released the listener. */
+            zmq_ctx_term(ctx); ctx=zmq_ctx_new(); if(!ctx) return 2;
+            goto rebind;
+        }
         json_object *r=response(q,q?NULL:"MALFORMED_MESSAGE");
         const char *encoded=json_object_to_json_string_ext(r,JSON_C_TO_STRING_PLAIN);
         int sent=zmq_send(s,encoded,strlen(encoded),0); json_object_put(r); json_object_put(q);

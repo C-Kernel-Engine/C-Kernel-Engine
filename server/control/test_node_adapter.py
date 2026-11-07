@@ -157,13 +157,15 @@ class Adapter(unittest.TestCase):
         self.assertNotEqual(old, self.call()['adapter_boot_id'])
 
     def test_multipart_rejection_and_recovery(self):
-        s = self.ctx.socket(zmq.REQ)
-        s.setsockopt(zmq.LINGER, 0)
-        s.connect(f'tcp://127.0.0.1:{self.port}')
-        s.send_multipart([b'{}', b'{}'])
-        time.sleep(.1)
-        s.close()
-        self.assertTrue(self.call()['ok'])
+        for _ in range(12):
+            s = self.ctx.socket(zmq.REQ)
+            s.setsockopt(zmq.LINGER, 0)
+            s.connect(f'tcp://127.0.0.1:{self.port}')
+            s.send_multipart([b'{}', b'{}'])
+            time.sleep(.05)
+            s.close()
+            self.assertTrue(self.call()['ok'])
+
 
 
 if __name__ == '__main__':

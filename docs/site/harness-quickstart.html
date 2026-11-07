@@ -1294,6 +1294,38 @@ are in <code>server/control/</code>. Run real-socket tests with
 A dedicated PR workflow builds the native adapter and executes these tests. External
 registry/UI integration and authenticated remote deployment remain separate acceptance gates.</p>
 </section>
+
+<section id="node-consumer-contract">
+<h2>Simulated-consumer acceptance</h2>
+<p>The independent probe runs <code>node.describe → workers.list → worker.status +
+worker.capabilities</code> for each worker, then repeats <code>node.describe</code> as a final
+identity check. Every response must match schema, request ID and node ID. The adapter boot
+ID must remain constant across the entire pass. A restart, changed worker list count,
+malformed response, wrong field type or duplicate worker rejects the pass.</p>
+<pre>python3 server/control/consumer_probe.py --node-id p3 --port 8120 \
+  --state /tmp/cke-p3-observations.json</pre>
+<p>The state file is single-writer and local to the consumer. Each run atomically publishes
+INCOMPLETE before discovery and then PASS or FAIL. <code>last_success</code> retains the last
+complete validated pass; <code>last_attempt</code> is always the current attempt, and
+<code>last_error</code> retains the most recent failure even after recovery. An old success
+is historical evidence, never a current health verdict. A process crash can leave INCOMPLETE;
+consumers must apply their own freshness deadline. Filesystem write failure is a command
+failure and cannot guarantee publication.</p>
+<p>A PASS means the adapter passes the simulated-consumer contract. It does not mean every
+worker is ready: a correctly reported unavailable worker is a valid observation. Unknown
+capabilities and worker boot identities remain null. The generation counter must not be
+substituted for a worker boot ID. Known worker boot identity changing between status and
+capability queries rejects that pass; unknown IDs cannot prove worker continuity.</p>
+<p>The probe uses fresh REQ sockets after timeouts, checks response size and frame count,
+and stores only validated fields. It does not retain raw malformed responses or exception
+text. Synthetic sanitized request/response templates and fault mutations with expected
+outcomes live in <code>server/control/fixtures/consumer-contract.json</code>. External clients
+can replay these without CKE model weights. Real-socket tests also stop/restart the actual
+adapter and test malformed peer replies. The existing node-control PR workflow runs them.</p>
+<p>This is a contract acceptance tool, not a central registry or production poller. Antsand
+integration, UI freshness, cross-group access control and remote authentication remain
+separate acceptance tests. No inference or workload commands are added.</p>
+</section>
     </main>
 
     <!-- SVG Viewer Overlay (shared across all pages) -->
