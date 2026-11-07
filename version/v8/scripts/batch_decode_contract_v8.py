@@ -521,7 +521,7 @@ def _first_recurrent_projection_plan(
     if first is None:
         return None
     requested_layers = config.get("batch_decode_recurrent_shared_layers", 1)
-    if type(requested_layers) is not int or requested_layers not in (1, 2):
+    if type(requested_layers) is not int or requested_layers not in (1, 2, 3):
         return None
     projections = [(4, first)]
     gate_setting = config.get("batch_decode_recurrent_gate_projection", False)
@@ -553,44 +553,47 @@ def _first_recurrent_projection_plan(
         if second is None:
             return None
         projections.append((index, second))
-    if requested_layers == 2:
-        # Derive the next layer's projection cuts from the ordered IR. No
+    if requested_layers > 1:
+        # Derive each additional layer's projection cuts from ordered IR. No
         # operation between them is moved: recurrent state updates stay local.
         numbered_layers = [op["layer"] for op in ops
                            if type(op.get("layer")) is int and op["layer"] >= 0]
         if numbered_layers != sorted(numbered_layers):
             return None
-        second_layer = [i for i, op in enumerate(ops) if op.get("layer") == 1]
-        if (not second_layer or second_layer != list(range(second_layer[0], second_layer[-1] + 1))
-                or second_layer[0] <= projections[-1][0]):
-            return None
-        layer_ops = [(i, ops[i]) for i in second_layer]
-        qkv = [i for i, op in layer_ops if op.get("op") == "recurrent_qkv_proj"]
-        core = [i for i, op in layer_ops if op.get("op") == "recurrent_core"]
-        if len(qkv) != 1 or len(core) != 1 or qkv[0] <= second_layer[0] or core[0] <= qkv[0]:
-            return None
-        next_first = _mapped_two_row_projection(ops[qkv[0]], providers, buffers)
-        if next_first is None:
-            return None
-        projections.append((qkv[0], next_first))
-        if gate_setting:
-            gates = [i for i, op in layer_ops if op.get("op") == "recurrent_gate_proj"]
-            if len(gates) != 1 or gates[0] != qkv[0] + 1:
+        for layer in range(1, requested_layers):
+            layer_indices = [i for i, op in enumerate(ops) if op.get("layer") == layer]
+            if (not layer_indices
+                    or layer_indices != list(range(layer_indices[0], layer_indices[-1] + 1))
+                    or layer_indices[0] <= projections[-1][0]):
                 return None
-            gate = _mapped_two_row_projection(ops[gates[0]], providers, buffers)
-            if (gate is None or gate["input"] != next_first["input"]
-                    or gate["input_bytes"] != next_first["input_bytes"]
-                    or gate["output"] == next_first["output"]):
+            layer_ops = [(i, ops[i]) for i in layer_indices]
+            qkv = [i for i, op in layer_ops if op.get("op") == "recurrent_qkv_proj"]
+            core = [i for i, op in layer_ops if op.get("op") == "recurrent_core"]
+            if (len(qkv) != 1 or len(core) != 1
+                    or qkv[0] <= layer_indices[0] or core[0] <= qkv[0]):
                 return None
-            projections.append((gates[0], gate))
-        if second_enabled:
-            outputs = [i for i, op in layer_ops if op.get("op") == "recurrent_out_proj"]
-            if len(outputs) != 1 or outputs[0] <= core[0]:
+            next_first = _mapped_two_row_projection(ops[qkv[0]], providers, buffers)
+            if next_first is None:
                 return None
-            next_output = _mapped_two_row_projection(ops[outputs[0]], providers, buffers)
-            if next_output is None:
-                return None
-            projections.append((outputs[0], next_output))
+            projections.append((qkv[0], next_first))
+            if gate_setting:
+                gates = [i for i, op in layer_ops if op.get("op") == "recurrent_gate_proj"]
+                if len(gates) != 1 or gates[0] != qkv[0] + 1:
+                    return None
+                gate = _mapped_two_row_projection(ops[gates[0]], providers, buffers)
+                if (gate is None or gate["input"] != next_first["input"]
+                        or gate["input_bytes"] != next_first["input_bytes"]
+                        or gate["output"] == next_first["output"]):
+                    return None
+                projections.append((gates[0], gate))
+            if second_enabled:
+                outputs = [i for i, op in layer_ops if op.get("op") == "recurrent_out_proj"]
+                if len(outputs) != 1 or outputs[0] <= core[0]:
+                    return None
+                next_output = _mapped_two_row_projection(ops[outputs[0]], providers, buffers)
+                if next_output is None:
+                    return None
+                projections.append((outputs[0], next_output))
     groups: list[list[tuple[int, dict[str, Any]]]] = []
     for index, projection in projections:
         if (groups and index == groups[-1][-1][0] + 1
