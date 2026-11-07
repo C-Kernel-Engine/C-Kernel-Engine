@@ -1073,20 +1073,73 @@ permutation, malformed IDs/spans/counts/type IDs, nonfinite hidden input, unders
 corrupted scoring weight, and A→B→A recovery. A model-neutral six-operation generated circuit exercises
 all new providers independently of Clef topology.</p>
 </section>
+<section id="backward-primitives">
+<h2>First generated backward composition</h2>
+<p>Three reusable FP32 vector-Jacobian products now cover token-span means, exact erf GELU,
+and grouped query-conditioned weighted pooling. They are backward providers, not inference aliases.
+Their maps own strides, capacities, scratch, numerical contracts and status propagation.
+The checked-call emitter now accepts an explicit backward phase and rejects providers used in the wrong phase.
+No model-name dispatch or second training workflow is introduced.</p>
+<p>The model-neutral regression executes one generated forward entry for span pooling → erf GELU →
+grouped pooling, then one generated backward entry for the reverse chain. Only native-produced forward
+intermediates enter that backward entry. This is an explicitly authored VJP circuit, not automatic
+backward synthesis through <code>cke.v8.compile</code>. It does not contain trainable parameters,
+a loss, optimizer updates, or the remaining complete-head derivatives.</p>
+<ul>
+<li>Span gradients sum all overlapping contributions in ascending span order with FP64 accumulation.
+Unreferenced valid tokens become zero; inactive token rows and padding remain unchanged.</li>
+<li>Erf GELU uses its analytic derivative in FP64, distinct from the existing tanh-approximation derivative.</li>
+<li>Grouped pooling differentiates both value and score paths, recomputing the forward provider's FP32
+probabilities. Ordered FP64 reductions and explicit FP32 intermediate stores are declared in its map.
+The options and query gradients publish together only after all checks succeed.</li>
+<li>Each VJP overwrites its valid output gradient. Overlapping contributions inside a VJP accumulate;
+fan-out across separate graph operations still requires an explicit gradient-accumulation operation.</li>
+<li>All outputs and scratch must be disjoint from read buffers and one another. Scratch may change on
+rejection; that kernel's gradient outputs do not. A later operation failure can leave earlier graph
+intermediates written, so the entry status must be checked. Tests inject a final-operation failure and
+verify that the final token gradient remains untouched, then recover.</li>
+</ul>
+<p>Tests cover independent ordered arithmetic oracles, optional PyTorch autograd, finite differences
+for both grouped-pooling inputs, unequal and singleton groups, padded strides, null/misaligned/overlapping
+regions, capacity and finite-overflow rejection, and A→B→A recovery. Generated execution and scalar
+oracles require no model assets or PyTorch. PyTorch absence is an explicit SKIP for the autograd comparison.</p>
+<pre><code>OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python3 -m unittest tests.test_v8_head_backward -v
+python3 scripts/nightly_runner.py --tests decision_head_backward --ci --require-executed
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python3 version/v8/scripts/run_training_composition_v8.py \
+  --run-root version/v8/.cache/clef-backward-decoder-regression</code></pre>
+<table class="table"><thead><tr><th>FP32 gradient versus PyTorch 2.12.1 CPU (2026-11-07)</th><th>Maximum absolute error</th><th>RMSE</th></tr></thead><tbody>
+<tr><td>Overlapping-span input</td><td>2.98023e-8</td><td>6.23360e-9</td></tr>
+<tr><td>Erf GELU input</td><td>5.96046e-8</td><td>3.12435e-8</td></tr>
+<tr><td>Grouped pooling options (both paths)</td><td>4.47035e-8</td><td>1.70069e-8</td></tr>
+<tr><td>Grouped pooling query</td><td>1.02445e-8</td><td>4.22744e-9</td></tr>
+</tbody></table>
+<p>These are measured small, nonzero synthetic cases, not universal error bounds or released-head gradient
+certification. Regression comparisons use absolute 4e-7 / relative 3e-6 against PyTorch, and exact checks
+for the explicitly ordered span/grouped arithmetic oracle. The focused 9-test suite passes; the four
+selected standard-nightly suites pass with no skips, including the hash-checked released-head forward
+comparison. Both existing decoder compositions (<code>2l_dense</code>, <code>2l_gqa_tail</code>)
+also pass 10 native AdamW updates, trajectory/gradient/weight/moment comparisons, fresh-process resume
+and inference export. Their aggregate report was <code>/tmp/clef-backward-decoder-regression.json</code>.
+The full repository nightly is not a local result.</p>
+<p><strong>Complete Clef head training remains NOT_TESTED.</strong> Next integrate checked biased-linear,
+LayerNorm and noncausal attention derivatives, indexed/scoring derivatives and branch accumulation into
+the existing v8 backward workflow. Then certify all head gradients, grouped loss, AdamW updates,
+frozen-backbone identity, checkpoint/resume and generated inference reload. Existing decoder training
+is a shared-consumer regression, not evidence that this head can already train.</p>
+</section>
 <section id="backward-audit">
 <h2>Backward audit and next training gate</h2>
 <p>Shared-consumer check on 2026-11-07: <code>run_training_composition_v8.py</code> completed both <code>2l_dense</code> and <code>2l_gqa_tail</code> with PASS. These existing generated decoder training certifications do not certify Clef backward execution.</p>
-<p><strong>Forward passes; head training remains NOT_TESTED.</strong> None of the new checked maps advertises
-backward support. Extend <code>cke.v8.compile</code> and the existing generated-C optimizer,
+<p><strong>Forward passes; head training remains NOT_TESTED.</strong> The full forward head is not yet linked to automatic backward execution. Extend <code>cke.v8.compile</code> and the existing generated-C optimizer,
 checkpoint/resume and inference-export workflow. Do not add a second model executor.</p>
 <table class="table"><thead><tr><th>Head computation</th><th>Existing implementation</th><th>Missing contract/certification</th></tr></thead><tbody>
 <tr><td>Linear projections, biases</td><td><code>gemm_backward_f32.json</code> maps <code>fc2_backward_kernel</code>; <code>gemm_backward_bf16_mixed</code> exists in <code>gemm_kernels_bf16.c</code>.</td><td>Bind checked head geometry and saved tensors; certify dX, dW and db, selective parameter gradients and accumulation.</td></tr>
 <tr><td>LayerNorm</td><td><code>layernorm_backward_kernel</code> in <code>layernorm_kernels.c</code>; BF16 variant in <code>layernorm_kernels_bf16.c</code>.</td><td>The current checked head forward map is inference-only. Preserve the forward mean/rstd and local epsilon, register the matching backward ABI and compare dX/dGamma/dBeta.</td></tr>
-<tr><td>Erf GELU</td><td><code>gelu_backward_exact</code> and BF16 variants currently differentiate the tanh approximation.</td><td>Add or identify and certify an erf derivative provider. The name “exact” is not proof of matching this forward activation.</td></tr>
+<tr><td>Erf GELU</td><td>Checked erf derivative now has FP32 VJP and generated-chain evidence; earlier <code>gelu_backward_exact</code> differentiates tanh.</td><td>Wire the erf provider into automatic head backward; BF16 remains separate.</td></tr>
 <tr><td>Unmasked self/cross-attention</td><td><code>attention_backward_causal_head_major_gqa.json</code> and native BF16 causal backward exist.</td><td>Causal attention is not a substitute for full noncausal cross-attention with unequal query/memory counts. Declare saved probabilities/recomputation, layouts and dQ/dK/dV.</td></tr>
-<tr><td>Token-span pooling and last-token selection</td><td>Checked forward providers.</td><td>Scatter gradients into overlapping spans and the final valid row; reject invalid spans. Repeated use must accumulate rather than overwrite.</td></tr>
+<tr><td>Token-span pooling and last-token selection</td><td>Checked span VJP accumulates overlapping spans with generated-chain evidence.</td><td>Wire automatic backward and final-row selection, with explicit accumulation for separate branches.</td></tr>
 <tr><td>Embedding/gather and residual branches</td><td><code>embedding_backward_f32.json</code>, native BF16 embedding scatter, <code>residual_add_backward_f32.json</code>, gradient-accumulation providers.</td><td>Wire type-embedding gradients, indexed-owner scatter and broadcast reductions. Frozen output embeddings need no updates, while required hidden-feature gradient paths remain explicit.</td></tr>
-<tr><td>Grouped softmax-weighted pooling</td><td>Checked forward only.</td><td>Differentiate both query logits and weighted values; option rows contribute through both routes. Compare unequal groups and repeated references.</td></tr>
+<tr><td>Grouped softmax-weighted pooling</td><td>Checked options/query VJP covers both score and value paths, unequal and singleton groups.</td><td>Connect to full-head backward synthesis and loss; the tested isolated chain is not head training.</td></tr>
 <tr><td>Cosine, pair features, scalar transforms</td><td>New checked forward providers.</td><td>Define epsilon/clamp subgradients, absolute-value behavior at zero, repeated-index accumulation and scalar reductions. Certify the pinned framework's derivative semantics separately from forward algebra.</td></tr>
 <tr><td>Loss and optimizer</td><td><code>softmax_cross_entropy_loss.json</code> and <code>adamw_update_f32.json</code>; existing trajectory/resume/export machinery.</td><td>Declare one label per question and loss reduction over unequal option counts, then verify every trainable parameter, frozen hashes, optimizer moments and restart equivalence.</td></tr>
 </tbody></table>

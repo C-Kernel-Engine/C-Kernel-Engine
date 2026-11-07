@@ -45,6 +45,9 @@ def emit_checked_calls(call_ir: dict, root: Path) -> str:
     IR Lower 3, plus a small `entry` declaration for the host ABI. No provider
     selection or model-family behavior occurs here.
     """
+    phase = call_ir.get("mode", "prefill")
+    if phase not in {"init", "prefill", "decode", "backward"}:
+        raise CheckedCallCodegenError(f"unsupported checked execution phase: {phase!r}")
     entry = call_ir.get("entry")
     ops = call_ir.get("operations")
     contract = call_ir.get("runtime_extent_contract")
@@ -184,8 +187,12 @@ def emit_checked_calls(call_ir: dict, root: Path) -> str:
             raise CheckedCallCodegenError("bounded graph requires checked provider status")
         kernel_id = (op.get("call_abi") or {}).get("kernel_id")
         kernel = _kernel_map(root, kernel_id)
-        if not kernel.get("modes", {}).get("inference", False):
-            raise CheckedCallCodegenError(f"{kernel_id} is not an inference provider")
+        required_mode = "backward" if phase == "backward" else "inference"
+        if kernel.get("modes", {}).get(required_mode) is not True:
+            raise CheckedCallCodegenError(f"{kernel_id} is not a {required_mode} provider")
+        phases = kernel.get("selection", {}).get("phases")
+        if phases is not None and phase not in phases:
+            raise CheckedCallCodegenError(f"{kernel_id} is not certified for {phase}")
         if kernel.get("impl", {}).get("function") != op.get("function"):
             raise CheckedCallCodegenError(f"resolved function differs from {kernel_id} map")
         declaration = kernel.get("impl", {}).get("c_declaration", "")

@@ -2168,6 +2168,22 @@ OP_DATAFLOW = {
         "inputs": {"input": "external:input", "gain": "external:gain"},
         "outputs": {"output": {"slot": "scale_vector_checked_output", "dtype": "fp32"}},
     },
+    "token_span_mean_backward_checked": {
+        "inputs": {"d_output": "external:d_output", "spans": "external:spans"},
+        "outputs": {"d_input": {"slot": "token_span_mean_backward_d_input", "dtype": "fp32"}},
+    },
+    "gelu_erf_backward_checked": {
+        "inputs": {"input": "external:input", "d_output": "external:d_output"},
+        "outputs": {"d_input": {"slot": "gelu_erf_backward_d_input", "dtype": "fp32"}},
+    },
+    "grouped_weighted_rows_backward_checked": {
+        "inputs": {"options": "external:options", "fields": "external:fields",
+                   "group_counts": "external:group_counts", "d_output": "external:d_output"},
+        "outputs": {
+            "d_options": {"slot": "grouped_weighted_rows_backward_d_options", "dtype": "fp32"},
+            "d_fields": {"slot": "grouped_weighted_rows_backward_d_fields", "dtype": "fp32"},
+        },
+    },
     "grouped_softmax_weighted_rows_checked": {
         "inputs": {"options": "external:options", "fields": "external:fields",
                    "group_counts": "external:group_counts"},
@@ -5103,6 +5119,9 @@ TEMPLATE_TO_KERNEL_OP = {
     "scalar_exp_clamped_checked": "scalar_exp_clamped_checked",
     "scalar_sigmoid_checked": "scalar_sigmoid_checked",
     "scale_vector_checked": "scale_vector_checked",
+    "token_span_mean_backward_checked": "token_span_mean_backward_checked",
+    "gelu_erf_backward_checked": "gelu_erf_backward_checked",
+    "grouped_weighted_rows_backward_checked": "grouped_weighted_rows_backward_checked",
     "grouped_softmax_weighted_rows_checked": "grouped_softmax_weighted_rows_checked",
     "token_span_mean_checked": "token_span_mean_checked",
     "last_valid_row_checked": "last_valid_row_checked",
