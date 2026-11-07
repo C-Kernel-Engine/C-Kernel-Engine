@@ -176,29 +176,59 @@ $(document).ready(function(){initNavTree('linear__rows__checked_8c_source.html',
 <div class="line"><a id="l00036" name="l00036"></a><span class="lineno">   36</span>        (bias ? bias_elements &lt; output_channels : bias_elements != 0))</div>
 <div class="line"><a id="l00037" name="l00037"></a><span class="lineno">   37</span>        <span class="keywordflow">return</span> -1;</div>
 <div class="line"><a id="l00038" name="l00038"></a><span class="lineno">   38</span> </div>
-<div class="line"><a id="l00039" name="l00039"></a><span class="lineno">   39</span>    <span class="comment">/* Validate every accessed value and every result before the first write. */</span></div>
-<div class="line"><a id="l00040" name="l00040"></a><span class="lineno">   40</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> r = 0; r &lt; rows; ++r)</div>
-<div class="line"><a id="l00041" name="l00041"></a><span class="lineno">   41</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> c = 0; c &lt; input_channels; ++c)</div>
-<div class="line"><a id="l00042" name="l00042"></a><span class="lineno">   42</span>            <span class="keywordflow">if</span> (!isfinite(input[r * input_stride + c])) <span class="keywordflow">return</span> -1;</div>
-<div class="line"><a id="l00043" name="l00043"></a><span class="lineno">   43</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> o = 0; o &lt; output_channels; ++o) {</div>
-<div class="line"><a id="l00044" name="l00044"></a><span class="lineno">   44</span>        <span class="keywordflow">if</span> (bias &amp;&amp; !isfinite(bias[o])) <span class="keywordflow">return</span> -1;</div>
-<div class="line"><a id="l00045" name="l00045"></a><span class="lineno">   45</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> c = 0; c &lt; input_channels; ++c)</div>
-<div class="line"><a id="l00046" name="l00046"></a><span class="lineno">   46</span>            <span class="keywordflow">if</span> (!isfinite(weight[o * weight_stride + c])) <span class="keywordflow">return</span> -1;</div>
-<div class="line"><a id="l00047" name="l00047"></a><span class="lineno">   47</span>    }</div>
-<div class="line"><a id="l00048" name="l00048"></a><span class="lineno">   48</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> r = 0; r &lt; rows; ++r)</div>
-<div class="line"><a id="l00049" name="l00049"></a><span class="lineno">   49</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> o = 0; o &lt; output_channels; ++o) {</div>
-<div class="line"><a id="l00050" name="l00050"></a><span class="lineno">   50</span>            <span class="keyword">const</span> <span class="keywordtype">double</span> result = <a class="code hl_function" href="linear__rows__checked_8c.html#ae7816c3478a9999aad8dddcdce467cc7">dot_bias</a>(input + r * input_stride,</div>
-<div class="line"><a id="l00051" name="l00051"></a><span class="lineno">   51</span>                                           weight + o * weight_stride,</div>
-<div class="line"><a id="l00052" name="l00052"></a><span class="lineno">   52</span>                                           input_channels, bias ? bias[o] : 0.0f);</div>
-<div class="line"><a id="l00053" name="l00053"></a><span class="lineno">   53</span>            <span class="keywordflow">if</span> (!isfinite(result) || fabs(result) &gt; FLT_MAX) <span class="keywordflow">return</span> -1;</div>
-<div class="line"><a id="l00054" name="l00054"></a><span class="lineno">   54</span>        }</div>
-<div class="line"><a id="l00055" name="l00055"></a><span class="lineno">   55</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> r = 0; r &lt; rows; ++r)</div>
-<div class="line"><a id="l00056" name="l00056"></a><span class="lineno">   56</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> o = 0; o &lt; output_channels; ++o)</div>
-<div class="line"><a id="l00057" name="l00057"></a><span class="lineno">   57</span>            output[r * output_stride + o] = (<span class="keywordtype">float</span>)<a class="code hl_function" href="linear__rows__checked_8c.html#ae7816c3478a9999aad8dddcdce467cc7">dot_bias</a>(</div>
-<div class="line"><a id="l00058" name="l00058"></a><span class="lineno">   58</span>                input + r * input_stride, weight + o * weight_stride,</div>
-<div class="line"><a id="l00059" name="l00059"></a><span class="lineno">   59</span>                input_channels, bias ? bias[o] : 0.0f);</div>
-<div class="line"><a id="l00060" name="l00060"></a><span class="lineno">   60</span>    <span class="keywordflow">return</span> 0;</div>
-<div class="line"><a id="l00061" name="l00061"></a><span class="lineno">   61</span>}</div>
+<div class="line"><a id="l00039" name="l00039"></a><span class="lineno">   39</span>    <span class="comment">/* Validate every accessed value before the first write. A conservative</span></div>
+<div class="line"><a id="l00040" name="l00040"></a><span class="lineno">   40</span><span class="comment">     * absolute bound permits one compute pass for ordinary model values.</span></div>
+<div class="line"><a id="l00041" name="l00041"></a><span class="lineno">   41</span><span class="comment">     * Values near the FP32 limit retain the exact two-pass staging path. */</span></div>
+<div class="line"><a id="l00042" name="l00042"></a><span class="lineno">   42</span>    <span class="keywordtype">double</span> max_input = 0.0;</div>
+<div class="line"><a id="l00043" name="l00043"></a><span class="lineno">   43</span>    <span class="keywordtype">double</span> max_weight_l1 = 0.0;</div>
+<div class="line"><a id="l00044" name="l00044"></a><span class="lineno">   44</span>    <span class="keywordtype">double</span> max_bias = 0.0;</div>
+<div class="line"><a id="l00045" name="l00045"></a><span class="lineno">   45</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> r = 0; r &lt; rows; ++r)</div>
+<div class="line"><a id="l00046" name="l00046"></a><span class="lineno">   46</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> c = 0; c &lt; input_channels; ++c)</div>
+<div class="line"><a id="l00047" name="l00047"></a><span class="lineno">   47</span>        {</div>
+<div class="line"><a id="l00048" name="l00048"></a><span class="lineno">   48</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> value = input[r * input_stride + c];</div>
+<div class="line"><a id="l00049" name="l00049"></a><span class="lineno">   49</span>            <span class="keywordflow">if</span> (!isfinite(value)) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><a id="l00050" name="l00050"></a><span class="lineno">   50</span>            <span class="keyword">const</span> <span class="keywordtype">double</span> absolute = fabs((<span class="keywordtype">double</span>)value);</div>
+<div class="line"><a id="l00051" name="l00051"></a><span class="lineno">   51</span>            <span class="keywordflow">if</span> (absolute &gt; max_input) max_input = absolute;</div>
+<div class="line"><a id="l00052" name="l00052"></a><span class="lineno">   52</span>        }</div>
+<div class="line"><a id="l00053" name="l00053"></a><span class="lineno">   53</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> o = 0; o &lt; output_channels; ++o) {</div>
+<div class="line"><a id="l00054" name="l00054"></a><span class="lineno">   54</span>        <span class="keywordflow">if</span> (bias &amp;&amp; !isfinite(bias[o])) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><a id="l00055" name="l00055"></a><span class="lineno">   55</span>        <span class="keywordflow">if</span> (bias &amp;&amp; fabs((<span class="keywordtype">double</span>)bias[o]) &gt; max_bias)</div>
+<div class="line"><a id="l00056" name="l00056"></a><span class="lineno">   56</span>            max_bias = fabs((<span class="keywordtype">double</span>)bias[o]);</div>
+<div class="line"><a id="l00057" name="l00057"></a><span class="lineno">   57</span>        <span class="keywordtype">double</span> weight_l1 = 0.0;</div>
+<div class="line"><a id="l00058" name="l00058"></a><span class="lineno">   58</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> c = 0; c &lt; input_channels; ++c)</div>
+<div class="line"><a id="l00059" name="l00059"></a><span class="lineno">   59</span>        {</div>
+<div class="line"><a id="l00060" name="l00060"></a><span class="lineno">   60</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> value = weight[o * weight_stride + c];</div>
+<div class="line"><a id="l00061" name="l00061"></a><span class="lineno">   61</span>            <span class="keywordflow">if</span> (!isfinite(value)) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><a id="l00062" name="l00062"></a><span class="lineno">   62</span>            weight_l1 += fabs((<span class="keywordtype">double</span>)value);</div>
+<div class="line"><a id="l00063" name="l00063"></a><span class="lineno">   63</span>        }</div>
+<div class="line"><a id="l00064" name="l00064"></a><span class="lineno">   64</span>        <span class="keywordflow">if</span> (weight_l1 &gt; max_weight_l1) max_weight_l1 = weight_l1;</div>
+<div class="line"><a id="l00065" name="l00065"></a><span class="lineno">   65</span>    }</div>
+<div class="line"><a id="l00066" name="l00066"></a><span class="lineno">   66</span>    <span class="comment">/* At most UINT32_MAX positive terms keep FP64 summation error far below</span></div>
+<div class="line"><a id="l00067" name="l00067"></a><span class="lineno">   67</span><span class="comment">     * the 4x guard, including error in the L1 bound. Every result therefore</span></div>
+<div class="line"><a id="l00068" name="l00068"></a><span class="lineno">   68</span><span class="comment">     * fits FP32 and publishing cannot fail after the first output write. */</span></div>
+<div class="line"><a id="l00069" name="l00069"></a><span class="lineno">   69</span>    <span class="keywordflow">if</span> (input_channels &lt;= (SIZE_MAX / 4) &amp;&amp; input_channels &lt;= UINT32_MAX &amp;&amp;</div>
+<div class="line"><a id="l00070" name="l00070"></a><span class="lineno">   70</span>        max_input * max_weight_l1 + max_bias &lt;= (<span class="keywordtype">double</span>)FLT_MAX / 4.0) {</div>
+<div class="line"><a id="l00071" name="l00071"></a><span class="lineno">   71</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> r = 0; r &lt; rows; ++r)</div>
+<div class="line"><a id="l00072" name="l00072"></a><span class="lineno">   72</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> o = 0; o &lt; output_channels; ++o)</div>
+<div class="line"><a id="l00073" name="l00073"></a><span class="lineno">   73</span>                output[r * output_stride + o] = (<span class="keywordtype">float</span>)<a class="code hl_function" href="linear__rows__checked_8c.html#ae7816c3478a9999aad8dddcdce467cc7">dot_bias</a>(</div>
+<div class="line"><a id="l00074" name="l00074"></a><span class="lineno">   74</span>                    input + r * input_stride, weight + o * weight_stride,</div>
+<div class="line"><a id="l00075" name="l00075"></a><span class="lineno">   75</span>                    input_channels, bias ? bias[o] : 0.0f);</div>
+<div class="line"><a id="l00076" name="l00076"></a><span class="lineno">   76</span>        <span class="keywordflow">return</span> 0;</div>
+<div class="line"><a id="l00077" name="l00077"></a><span class="lineno">   77</span>    }</div>
+<div class="line"><a id="l00078" name="l00078"></a><span class="lineno">   78</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> r = 0; r &lt; rows; ++r)</div>
+<div class="line"><a id="l00079" name="l00079"></a><span class="lineno">   79</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> o = 0; o &lt; output_channels; ++o) {</div>
+<div class="line"><a id="l00080" name="l00080"></a><span class="lineno">   80</span>            <span class="keyword">const</span> <span class="keywordtype">double</span> result = <a class="code hl_function" href="linear__rows__checked_8c.html#ae7816c3478a9999aad8dddcdce467cc7">dot_bias</a>(input + r * input_stride,</div>
+<div class="line"><a id="l00081" name="l00081"></a><span class="lineno">   81</span>                                           weight + o * weight_stride,</div>
+<div class="line"><a id="l00082" name="l00082"></a><span class="lineno">   82</span>                                           input_channels, bias ? bias[o] : 0.0f);</div>
+<div class="line"><a id="l00083" name="l00083"></a><span class="lineno">   83</span>            <span class="keywordflow">if</span> (!isfinite(result) || fabs(result) &gt; FLT_MAX) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><a id="l00084" name="l00084"></a><span class="lineno">   84</span>        }</div>
+<div class="line"><a id="l00085" name="l00085"></a><span class="lineno">   85</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> r = 0; r &lt; rows; ++r)</div>
+<div class="line"><a id="l00086" name="l00086"></a><span class="lineno">   86</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> o = 0; o &lt; output_channels; ++o)</div>
+<div class="line"><a id="l00087" name="l00087"></a><span class="lineno">   87</span>            output[r * output_stride + o] = (<span class="keywordtype">float</span>)<a class="code hl_function" href="linear__rows__checked_8c.html#ae7816c3478a9999aad8dddcdce467cc7">dot_bias</a>(</div>
+<div class="line"><a id="l00088" name="l00088"></a><span class="lineno">   88</span>                input + r * input_stride, weight + o * weight_stride,</div>
+<div class="line"><a id="l00089" name="l00089"></a><span class="lineno">   89</span>                input_channels, bias ? bias[o] : 0.0f);</div>
+<div class="line"><a id="l00090" name="l00090"></a><span class="lineno">   90</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><a id="l00091" name="l00091"></a><span class="lineno">   91</span>}</div>
 </div>
 <div class="ttc" id="aaudio__spectral__head_8c_html_a6cbb018b1e755f86de9d2dd05d164a53"><div class="ttname"><a href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a></div><div class="ttdeci">static int product(size_t a, size_t b, size_t *out)</div><div class="ttdef"><b>Definition</b> <a href="audio__spectral__head_8c_source.html#l00006">audio_spectral_head.c:6</a></div></div>
 <div class="ttc" id="ackernel__linear__checked_8h_html"><div class="ttname"><a href="ckernel__linear__checked_8h.html">ckernel_linear_checked.h</a></div></div>
