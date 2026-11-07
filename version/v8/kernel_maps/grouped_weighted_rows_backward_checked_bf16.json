@@ -1,0 +1,399 @@
+{
+  "id": "grouped_weighted_rows_backward_checked_bf16",
+  "op": "grouped_weighted_rows_backward_checked",
+  "operation_interface": "grouped.weighted.rows.backward.checked.bf16.v1",
+  "variant": "checked_bf16_storage_fp32_workspace_fp64_reductions",
+  "selection": {
+    "status": "candidate",
+    "priority": 100,
+    "equivalence_group": "grouped_weighted_rows_backward_checked_bf16",
+    "phases": [
+      "backward"
+    ]
+  },
+  "quant": {
+    "weight": "none",
+    "activation": "bf16",
+    "output": "bf16"
+  },
+  "inputs": [
+    {
+      "name": "options",
+      "dtype": "bf16",
+      "shape": [
+        "O",
+        "C"
+      ],
+      "layout": "row_major_strided",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required",
+      "alignment": 2
+    },
+    {
+      "name": "fields",
+      "dtype": "bf16",
+      "shape": [
+        "G",
+        "C"
+      ],
+      "layout": "row_major_strided",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required",
+      "alignment": 2
+    },
+    {
+      "name": "group_counts",
+      "dtype": "i32",
+      "shape": [
+        "G"
+      ],
+      "layout": "row_major_strided",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "d_output",
+      "dtype": "bf16",
+      "shape": [
+        "G",
+        "C"
+      ],
+      "layout": "row_major_strided",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required",
+      "alignment": 2
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "d_options",
+      "dtype": "bf16",
+      "shape": [
+        "O",
+        "C"
+      ],
+      "layout": "row_major_strided",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required",
+      "alignment": 2
+    },
+    {
+      "name": "d_fields",
+      "dtype": "bf16",
+      "shape": [
+        "G",
+        "C"
+      ],
+      "layout": "row_major_strided",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required",
+      "alignment": 2
+    }
+  ],
+  "scratch": [
+    {
+      "name": "scratch",
+      "dtype": "fp32",
+      "shape": [
+        "X"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read_write",
+      "storage_class": "scratch",
+      "consumption": "required",
+      "lifetime": "kernel_call",
+      "alignment": 64,
+      "desc": "FP32 conversion, output staging and underlying VJP scratch. Required floats: 3*option_rows*channels + 6*groups*channels + 2*option_rows.",
+      "size_bytes": "4 * X",
+      "size_resolution": "required"
+    }
+  ],
+  "dims": [
+    "option_elements",
+    "option_stride",
+    "field_elements",
+    "field_stride",
+    "count_elements",
+    "d_output_elements",
+    "d_output_stride",
+    "d_options_elements",
+    "d_options_stride",
+    "d_fields_elements",
+    "d_fields_stride",
+    "scratch_elements",
+    "groups",
+    "option_rows",
+    "channels"
+  ],
+  "constraints": {
+    "notes": "BF16 float ports are 2-byte aligned; counts/spans and FP32 scratch are 4-byte aligned. All *_elements and *_stride counts use the pointed-to dtype, not bytes. Reject BF16 rounding overflow before publishing any output. Checked capacities, strides, alignment, finite operands/results and disjoint writable regions. Rejection leaves every gradient output unchanged; scratch unspecified. Overwrite valid gradients, do not accumulate prior calls. Nondifferentiable spans/counts. No allocations. Recompute forward FP32 probabilities using ordered FP64 reductions. dProbability dot and weighted mean use FP64, dProbability and scaled dLogit stored FP32. Direct/value and score paths use separate FP32 products then FP32 sum; field gradients sum FP64 ascending options. Both output gradients publish atomically."
+  },
+  "impl": {
+    "function": "ck_grouped_weighted_rows_backward_bf16",
+    "c_declaration": "int ck_grouped_weighted_rows_backward_bf16( const uint16_t *options, size_t option_elements, size_t option_stride, const uint16_t *fields, size_t field_elements, size_t field_stride, const int32_t *group_counts, size_t count_elements, const uint16_t *d_output, size_t d_output_elements, size_t d_output_stride, uint16_t *d_options, size_t d_options_elements, size_t d_options_stride, uint16_t *d_fields, size_t d_fields_elements, size_t d_fields_stride, float *scratch, size_t scratch_elements, size_t groups, size_t option_rows, size_t channels);",
+    "sources": [
+      "src/kernels/head_backward_bf16.c",
+      "src/kernels/head_backward.c",
+      "src/kernels/grouped_weighted_rows.c"
+    ]
+  },
+  "modes": {
+    "inference": false,
+    "training": true,
+    "backward": true
+  },
+  "call_constant_contract": {
+    "shape_symbols": {
+      "O": "option_rows",
+      "G": "groups",
+      "C": "channels",
+      "X": "scratch_elements"
+    },
+    "buffer_spans": [
+      {
+        "pointer": "options",
+        "elements": "option_elements",
+        "rows": "option_rows",
+        "width": "channels",
+        "element_bytes": 2,
+        "stride": "option_stride",
+        "physical_row_stride": true
+      },
+      {
+        "pointer": "fields",
+        "elements": "field_elements",
+        "rows": "groups",
+        "width": "channels",
+        "element_bytes": 2,
+        "stride": "field_stride",
+        "physical_row_stride": true
+      },
+      {
+        "pointer": "group_counts",
+        "elements": "count_elements",
+        "rows": "groups",
+        "width": 1,
+        "element_bytes": 4
+      },
+      {
+        "pointer": "d_output",
+        "elements": "d_output_elements",
+        "rows": "groups",
+        "width": "channels",
+        "element_bytes": 2,
+        "stride": "d_output_stride",
+        "physical_row_stride": true
+      },
+      {
+        "pointer": "d_options",
+        "elements": "d_options_elements",
+        "rows": "option_rows",
+        "width": "channels",
+        "element_bytes": 2,
+        "stride": "d_options_stride",
+        "physical_row_stride": true
+      },
+      {
+        "pointer": "d_fields",
+        "elements": "d_fields_elements",
+        "rows": "groups",
+        "width": "channels",
+        "element_bytes": 2,
+        "stride": "d_fields_stride",
+        "physical_row_stride": true
+      },
+      {
+        "pointer": "scratch",
+        "elements": "scratch_elements",
+        "rows": "scratch_elements",
+        "width": 1,
+        "element_bytes": 4
+      }
+    ]
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "options",
+        "source": "activation:options",
+        "cast": "const uint16_t *",
+        "ports": [
+          "input:options"
+        ]
+      },
+      {
+        "name": "option_elements",
+        "source": "runtime:option_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "option_stride",
+        "source": "runtime:option_stride",
+        "value_type": "size_t"
+      },
+      {
+        "name": "fields",
+        "source": "activation:fields",
+        "cast": "const uint16_t *",
+        "ports": [
+          "input:fields"
+        ]
+      },
+      {
+        "name": "field_elements",
+        "source": "runtime:field_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "field_stride",
+        "source": "runtime:field_stride",
+        "value_type": "size_t"
+      },
+      {
+        "name": "group_counts",
+        "source": "activation:group_counts",
+        "cast": "const int32_t *",
+        "ports": [
+          "input:group_counts"
+        ]
+      },
+      {
+        "name": "count_elements",
+        "source": "runtime:count_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "d_output",
+        "source": "activation:d_output",
+        "cast": "const uint16_t *",
+        "ports": [
+          "input:d_output"
+        ]
+      },
+      {
+        "name": "d_output_elements",
+        "source": "runtime:d_output_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "d_output_stride",
+        "source": "runtime:d_output_stride",
+        "value_type": "size_t"
+      },
+      {
+        "name": "d_options",
+        "source": "output:d_options",
+        "cast": "uint16_t *",
+        "ports": [
+          "output:d_options"
+        ]
+      },
+      {
+        "name": "d_options_elements",
+        "source": "runtime:d_options_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "d_options_stride",
+        "source": "runtime:d_options_stride",
+        "value_type": "size_t"
+      },
+      {
+        "name": "d_fields",
+        "source": "output:d_fields",
+        "cast": "uint16_t *",
+        "ports": [
+          "output:d_fields"
+        ]
+      },
+      {
+        "name": "d_fields_elements",
+        "source": "runtime:d_fields_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "d_fields_stride",
+        "source": "runtime:d_fields_stride",
+        "value_type": "size_t"
+      },
+      {
+        "name": "scratch",
+        "source": "scratch:scratch",
+        "cast": "float *"
+      },
+      {
+        "name": "scratch_elements",
+        "source": "runtime:scratch_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "groups",
+        "source": "runtime:groups",
+        "value_type": "size_t"
+      },
+      {
+        "name": "option_rows",
+        "source": "runtime:option_rows",
+        "value_type": "size_t"
+      },
+      {
+        "name": "channels",
+        "source": "runtime:channels",
+        "value_type": "size_t"
+      }
+    ]
+  },
+  "numerical_capabilities": [
+    {
+      "contract_id": "grouped_weighted_rows_backward_bf16_storage_fp64_reductions_v1",
+      "status": "validated",
+      "phases": [
+        "backward"
+      ],
+      "function": "ck_grouped_weighted_rows_backward_bf16",
+      "explicit_selector": true,
+      "implementation": {
+        "isa_dispatch": "scalar",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": [
+            "serial"
+          ],
+          "dispatch": [
+            "inline"
+          ],
+          "reduction_order_effect": "none"
+        }
+      },
+      "arithmetic": {
+        "partial_accumulator": "fp64",
+        "merge_order": "none",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false,
+        "split_strategy": "serial"
+      }
+    }
+  ],
+  "tests": {
+    "unit": [
+      "tests/test_v8_head_backward_bf16.py"
+    ],
+    "oracle": "Independent dequantized-input FP32 arithmetic/autograd with RNE BF16 gradient stores; explicit PyTorch skip; BF16 rounding, rejection and generated-chain checks."
+  },
+  "notes": "BF16-storage VJP: exactly expand BF16 operands, execute the existing FP32-compute VJP, RNE-round gradients to BF16. No intermediate BF16 rounding inside the VJP. This is not parity with arbitrary PyTorch BF16/autocast forward graphs, full BF16 head training, or a speed claim. Generated VJP building block; not automatic head-backward synthesis or full trainer certification. Recompute forward FP32 probabilities using ordered FP64 reductions. dProbability dot and weighted mean use FP64, dProbability and scaled dLogit stored FP32. Direct/value and score paths use separate FP32 products then FP32 sum; field gradients sum FP64 ascending options. Both output gradients publish atomically."
+}

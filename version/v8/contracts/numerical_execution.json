@@ -5248,6 +5248,226 @@
       },
       "position_transform": null,
       "description": "Separate FP32 multiplication of each element and one finite scalar gain. Nonoverlapping caller buffers; rejected calls leave output unchanged. No fast-math."
+    },
+    "token_span_mean_backward_ordered_fp64_f32_v1": {
+      "operator_family": "token_span_mean_backward_checked",
+      "status": "validated",
+      "storage": {
+        "input": "fp32",
+        "weight": "none",
+        "output": "fp32"
+      },
+      "compute": {
+        "input": "fp32",
+        "weight": "none",
+        "accumulator": "fp64",
+        "contraction": "disabled",
+        "evaluation_order": "token_span_mean_backward_ascending_index"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": [
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "sum",
+        "order": "ascending_index",
+        "partial_accumulator": "fp64",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "serial",
+        "split_strategy": "serial",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Ascending spans: sum d_output/span_length in FP64 per valid token/channel, one FP32 store. Overlaps accumulate; untouched inactive token rows and padding."
+    },
+    "gelu_erf_backward_ordered_fp64_f32_v1": {
+      "operator_family": "gelu_erf_backward_checked",
+      "status": "validated",
+      "storage": {
+        "input": "fp32",
+        "weight": "none",
+        "output": "fp32"
+      },
+      "compute": {
+        "input": "fp32",
+        "weight": "none",
+        "accumulator": "fp64",
+        "contraction": "disabled",
+        "evaluation_order": "gelu_erf_backward_ascending_index"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": [
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "sum",
+        "order": "ascending_index",
+        "partial_accumulator": "fp64",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "serial",
+        "split_strategy": "serial",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Exact erf GELU derivative evaluated in FP64, multiplied by upstream gradient in FP64, one FP32 store. This is not tanh GELU."
+    },
+    "grouped_weighted_rows_backward_ordered_fp64_f32_v1": {
+      "operator_family": "grouped_weighted_rows_backward_checked",
+      "status": "validated",
+      "storage": {
+        "input": "fp32",
+        "weight": "none",
+        "output": "fp32"
+      },
+      "compute": {
+        "input": "fp32",
+        "weight": "none",
+        "accumulator": "fp64",
+        "contraction": "disabled",
+        "evaluation_order": "grouped_weighted_rows_backward_ascending_index"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": [
+          "activation_intermediate_store",
+          "softmax_probability_store",
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "sum",
+        "order": "ascending_index",
+        "partial_accumulator": "fp64",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "serial",
+        "split_strategy": "serial",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Recompute forward FP32 probabilities using ordered FP64 reductions. dProbability dot and weighted mean use FP64, dProbability and scaled dLogit stored FP32. Direct/value and score paths use separate FP32 products then FP32 sum; field gradients sum FP64 ascending options. Both output gradients publish atomically."
+    },
+    "token_span_mean_backward_bf16_storage_fp64_reductions_v1": {
+      "operator_family": "token_span_mean_backward_checked",
+      "status": "validated",
+      "storage": {
+        "input": "bf16",
+        "weight": "none",
+        "output": "bf16"
+      },
+      "compute": {
+        "input": "fp32",
+        "weight": "none",
+        "accumulator": "fp64",
+        "contraction": "disabled",
+        "evaluation_order": "bf16_expand_token_span_mean_backward_fp32_compute_then_bf16_rne"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": [
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "sum",
+        "order": "ascending_index",
+        "partial_accumulator": "fp64",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "serial",
+        "split_strategy": "serial",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Exact BF16 expansion, existing FP32 VJP stages, final RNE BF16 store. Ascending spans: sum d_output/span_length in FP64 per valid token/channel, one FP32 store. Overlaps accumulate; untouched inactive token rows and padding."
+    },
+    "gelu_erf_backward_bf16_storage_fp64_reductions_v1": {
+      "operator_family": "gelu_erf_backward_checked",
+      "status": "validated",
+      "storage": {
+        "input": "bf16",
+        "weight": "none",
+        "output": "bf16"
+      },
+      "compute": {
+        "input": "fp32",
+        "weight": "none",
+        "accumulator": "fp64",
+        "contraction": "disabled",
+        "evaluation_order": "bf16_expand_gelu_erf_backward_fp32_compute_then_bf16_rne"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": [
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "sum",
+        "order": "ascending_index",
+        "partial_accumulator": "fp64",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "serial",
+        "split_strategy": "serial",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Exact BF16 expansion, existing FP32 VJP stages, final RNE BF16 store. Exact erf GELU derivative evaluated in FP64, multiplied by upstream gradient in FP64, one FP32 store. This is not tanh GELU."
+    },
+    "grouped_weighted_rows_backward_bf16_storage_fp64_reductions_v1": {
+      "operator_family": "grouped_weighted_rows_backward_checked",
+      "status": "validated",
+      "storage": {
+        "input": "bf16",
+        "weight": "none",
+        "output": "bf16"
+      },
+      "compute": {
+        "input": "fp32",
+        "weight": "none",
+        "accumulator": "fp64",
+        "contraction": "disabled",
+        "evaluation_order": "bf16_expand_grouped_weighted_rows_backward_fp32_compute_then_bf16_rne"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": [
+          "activation_intermediate_store",
+          "softmax_probability_store",
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "sum",
+        "order": "ascending_index",
+        "partial_accumulator": "fp64",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "serial",
+        "split_strategy": "serial",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Exact BF16 expansion, existing FP32 VJP stages, final RNE BF16 store. Recompute forward FP32 probabilities using ordered FP64 reductions. dProbability dot and weighted mean use FP64, dProbability and scaled dLogit stored FP32. Direct/value and score paths use separate FP32 products then FP32 sum; field gradients sum FP64 ascending options. Both output gradients publish atomically."
     }
   }
 }

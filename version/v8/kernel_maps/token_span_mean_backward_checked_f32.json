@@ -1,0 +1,274 @@
+{
+  "id": "token_span_mean_backward_checked_f32",
+  "op": "token_span_mean_backward_checked",
+  "operation_interface": "token.span.mean.backward.checked.fp32.v1",
+  "variant": "checked_backward_fp64_fp32_storage",
+  "selection": {
+    "status": "candidate",
+    "priority": 100,
+    "equivalence_group": "token_span_mean_backward_checked_f32",
+    "phases": [
+      "backward"
+    ]
+  },
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "d_output",
+      "dtype": "fp32",
+      "shape": [
+        "S",
+        "C"
+      ],
+      "layout": "row_major_strided",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "spans",
+      "dtype": "i32",
+      "shape": [
+        "S",
+        2
+      ],
+      "layout": "row_major_strided",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "d_input",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "C"
+      ],
+      "layout": "row_major_strided",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "scratch": [
+    {
+      "name": "scratch",
+      "dtype": "fp32",
+      "shape": [
+        "X"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read_write",
+      "storage_class": "scratch",
+      "consumption": "required",
+      "lifetime": "kernel_call",
+      "alignment": 64,
+      "desc": "At least valid_tokens*channels floats.",
+      "size_bytes": "4 * X",
+      "size_resolution": "required"
+    }
+  ],
+  "dims": [
+    "d_output_elements",
+    "d_output_stride",
+    "span_elements",
+    "span_count",
+    "d_input_elements",
+    "d_input_stride",
+    "scratch_elements",
+    "token_capacity",
+    "valid_tokens",
+    "channels"
+  ],
+  "constraints": {
+    "notes": "Checked capacities, strides, alignment, finite operands/results and disjoint writable regions. Rejection leaves every gradient output unchanged; scratch unspecified. Overwrite valid gradients, do not accumulate prior calls. Nondifferentiable spans/counts. No allocations. Ascending spans: sum d_output/span_length in FP64 per valid token/channel, one FP32 store. Overlaps accumulate; untouched inactive token rows and padding."
+  },
+  "impl": {
+    "function": "ck_token_span_mean_backward_f32",
+    "c_declaration": "int ck_token_span_mean_backward_f32( const float *d_output, size_t d_output_elements, size_t d_output_stride, const int32_t *spans, size_t span_elements, size_t span_count, float *d_input, size_t d_input_elements, size_t d_input_stride, float *scratch, size_t scratch_elements, size_t token_capacity, size_t valid_tokens, size_t channels);",
+    "sources": [
+      "src/kernels/head_backward.c",
+      "src/kernels/grouped_weighted_rows.c"
+    ]
+  },
+  "modes": {
+    "inference": false,
+    "training": true,
+    "backward": true
+  },
+  "call_constant_contract": {
+    "shape_symbols": {
+      "S": "span_count",
+      "T": "token_capacity",
+      "C": "channels",
+      "X": "scratch_elements"
+    },
+    "buffer_spans": [
+      {
+        "pointer": "d_output",
+        "elements": "d_output_elements",
+        "rows": "span_count",
+        "width": "channels",
+        "element_bytes": 4,
+        "stride": "d_output_stride",
+        "physical_row_stride": true
+      },
+      {
+        "pointer": "spans",
+        "elements": "span_elements",
+        "rows": "span_count",
+        "width": 2,
+        "element_bytes": 4
+      },
+      {
+        "pointer": "d_input",
+        "elements": "d_input_elements",
+        "rows": "token_capacity",
+        "width": "channels",
+        "element_bytes": 4,
+        "stride": "d_input_stride",
+        "physical_row_stride": true
+      },
+      {
+        "pointer": "scratch",
+        "elements": "scratch_elements",
+        "rows": "scratch_elements",
+        "width": 1,
+        "element_bytes": 4
+      }
+    ]
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "d_output",
+        "source": "activation:d_output",
+        "cast": "const float *",
+        "ports": [
+          "input:d_output"
+        ]
+      },
+      {
+        "name": "d_output_elements",
+        "source": "runtime:d_output_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "d_output_stride",
+        "source": "runtime:d_output_stride",
+        "value_type": "size_t"
+      },
+      {
+        "name": "spans",
+        "source": "activation:spans",
+        "cast": "const int32_t *",
+        "ports": [
+          "input:spans"
+        ]
+      },
+      {
+        "name": "span_elements",
+        "source": "runtime:span_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "span_count",
+        "source": "runtime:span_count",
+        "value_type": "size_t"
+      },
+      {
+        "name": "d_input",
+        "source": "output:d_input",
+        "cast": "float *",
+        "ports": [
+          "output:d_input"
+        ]
+      },
+      {
+        "name": "d_input_elements",
+        "source": "runtime:d_input_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "d_input_stride",
+        "source": "runtime:d_input_stride",
+        "value_type": "size_t"
+      },
+      {
+        "name": "scratch",
+        "source": "scratch:scratch",
+        "cast": "float *"
+      },
+      {
+        "name": "scratch_elements",
+        "source": "runtime:scratch_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "token_capacity",
+        "source": "runtime:token_capacity",
+        "value_type": "size_t"
+      },
+      {
+        "name": "valid_tokens",
+        "source": "runtime:valid_tokens",
+        "value_type": "size_t"
+      },
+      {
+        "name": "channels",
+        "source": "runtime:channels",
+        "value_type": "size_t"
+      }
+    ]
+  },
+  "numerical_capabilities": [
+    {
+      "contract_id": "token_span_mean_backward_ordered_fp64_f32_v1",
+      "status": "validated",
+      "phases": [
+        "backward"
+      ],
+      "function": "ck_token_span_mean_backward_f32",
+      "explicit_selector": true,
+      "implementation": {
+        "isa_dispatch": "scalar",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": [
+            "serial"
+          ],
+          "dispatch": [
+            "inline"
+          ],
+          "reduction_order_effect": "none"
+        }
+      },
+      "arithmetic": {
+        "partial_accumulator": "fp64",
+        "merge_order": "none",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false,
+        "split_strategy": "serial"
+      }
+    }
+  ],
+  "tests": {
+    "unit": [
+      "tests/test_v8_head_backward.py"
+    ],
+    "oracle": "Explicit ordered FP64/FP32-stage oracle, PyTorch autograd (explicit SKIP when unavailable), and finite differences."
+  },
+  "notes": "Generated VJP building block; not automatic head-backward synthesis or full trainer certification. Ascending spans: sum d_output/span_length in FP64 per valid token/channel, one FP32 store. Overlaps accumulate; untouched inactive token rows and padding."
+}
