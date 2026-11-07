@@ -5076,11 +5076,11 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">  159</span><span class="preprocessor">#endif</span></div>
 <div class="line"><span class="lineno">  160</span>        y[i].<a class="code hl_variable" href="structblock__q8__0.html#a0bc77a0a0101bc89b05749157bf1514e">d</a> = <a class="code hl_define" href="ckernel__quant_8h.html#aa217c07d43400999fb76ccfcdda2a47d">CK_FP32_TO_FP16</a>(d);</div>
 <div class="line"><span class="lineno">  161</span> </div>
-<div class="line"><span class="lineno">  162</span>        <span class="keyword">const</span> __m256 mul = _mm256_set1_ps(<span class="keywordtype">id</span>);</div>
-<div class="line"><span class="lineno">  163</span>        v0 = _mm256_mul_ps(v0, mul);</div>
-<div class="line"><span class="lineno">  164</span>        v1 = _mm256_mul_ps(v1, mul);</div>
-<div class="line"><span class="lineno">  165</span>        v2 = _mm256_mul_ps(v2, mul);</div>
-<div class="line"><span class="lineno">  166</span>        v3 = _mm256_mul_ps(v3, mul);</div>
+<div class="line"><span class="lineno">  162</span>        <span class="keyword">const</span> __m256 <a class="code hl_function" href="head__backward_8c.html#ae6a8e3a1b9707894c2f132dbaf465a99">mul</a> = _mm256_set1_ps(<span class="keywordtype">id</span>);</div>
+<div class="line"><span class="lineno">  163</span>        v0 = _mm256_mul_ps(v0, <a class="code hl_function" href="head__backward_8c.html#ae6a8e3a1b9707894c2f132dbaf465a99">mul</a>);</div>
+<div class="line"><span class="lineno">  164</span>        v1 = _mm256_mul_ps(v1, <a class="code hl_function" href="head__backward_8c.html#ae6a8e3a1b9707894c2f132dbaf465a99">mul</a>);</div>
+<div class="line"><span class="lineno">  165</span>        v2 = _mm256_mul_ps(v2, <a class="code hl_function" href="head__backward_8c.html#ae6a8e3a1b9707894c2f132dbaf465a99">mul</a>);</div>
+<div class="line"><span class="lineno">  166</span>        v3 = _mm256_mul_ps(v3, <a class="code hl_function" href="head__backward_8c.html#ae6a8e3a1b9707894c2f132dbaf465a99">mul</a>);</div>
 <div class="line"><span class="lineno">  167</span> </div>
 <div class="line"><span class="lineno">  168</span>        <span class="comment">/* Match llama.cpp x86 Q8 quantization: nearest-even rounding. */</span></div>
 <div class="line"><span class="lineno">  169</span>        v0 = _mm256_round_ps(v0, _MM_ROUND_NEAREST);</div>
@@ -5154,6 +5154,7 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">  237</span>}</div>
 <div class="ttc" id="ackernel__quant_8h_html_aa217c07d43400999fb76ccfcdda2a47d"><div class="ttname"><a href="ckernel__quant_8h.html#aa217c07d43400999fb76ccfcdda2a47d">CK_FP32_TO_FP16</a></div><div class="ttdeci">#define CK_FP32_TO_FP16(x)</div><div class="ttdef"><b>Definition</b> <a href="ckernel__quant_8h_source.html#l00441">ckernel_quant.h:441</a></div></div>
 <div class="ttc" id="agemm__kernels__q8__0_8c_html_a5159297f36ea1f0911125aa2f7774884"><div class="ttname"><a href="gemm__kernels__q8__0_8c.html#a5159297f36ea1f0911125aa2f7774884">ck_nearest_int_q8_0</a></div><div class="ttdeci">static int ck_nearest_int_q8_0(float fval)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q8__0_8c_source.html#l00075">gemm_kernels_q8_0.c:75</a></div></div>
+<div class="ttc" id="ahead__backward_8c_html_ae6a8e3a1b9707894c2f132dbaf465a99"><div class="ttname"><a href="head__backward_8c.html#ae6a8e3a1b9707894c2f132dbaf465a99">mul</a></div><div class="ttdeci">static int mul(size_t a, size_t b, size_t *out)</div><div class="ttdef"><b>Definition</b> <a href="head__backward_8c_source.html#l00007">head_backward.c:7</a></div></div>
 <div class="ttc" id="astructblock__q8__0_html_a0bc77a0a0101bc89b05749157bf1514e"><div class="ttname"><a href="structblock__q8__0.html#a0bc77a0a0101bc89b05749157bf1514e">block_q8_0::d</a></div><div class="ttdeci">ck_half d</div><div class="ttdef"><b>Definition</b> <a href="ckernel__quant_8h_source.html#l00105">ckernel_quant.h:105</a></div></div>
 <div class="ttc" id="astructblock__q8__0_html_ac6f2ca6c9108456b6630b7f1bf874488"><div class="ttname"><a href="structblock__q8__0.html#ac6f2ca6c9108456b6630b7f1bf874488">block_q8_0::qs</a></div><div class="ttdeci">int8_t qs[32]</div><div class="ttdef"><b>Definition</b> <a href="ckernel__quant_8h_source.html#l00106">ckernel_quant.h:106</a></div></div>
 <div class="ttc" id="atokenizer_8h_html_a2708c0bbb6f926149707c2c61fe43c3e"><div class="ttname"><a href="tokenizer_8h.html#a2708c0bbb6f926149707c2c61fe43c3e">id</a></div><div class="ttdeci">int32_t id</div><div class="ttdef"><b>Definition</b> <a href="tokenizer_8h_source.html#l00316">tokenizer.h:316</a></div></div>
