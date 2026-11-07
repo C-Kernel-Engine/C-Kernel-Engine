@@ -27,4 +27,28 @@ int ck_grouped_weighted_rows_backward_f32(
     float *d_fields, size_t d_fields_elements, size_t d_fields_stride,
     float *scratch, size_t scratch_elements,
     size_t groups, size_t option_rows, size_t channels);
+/* BF16 storage VJPs. Saved operands, incoming and outgoing gradients use
+ * BF16; scratch uses FP32. Exact expansion, existing FP32 VJP arithmetic,
+ * then round-to-nearest-even. Reject BF16 rounding overflow before publishing
+ * either output. This is not a BF16 optimizer/master-weight contract. */
+int ck_token_span_mean_backward_bf16(
+    const uint16_t *d_output, size_t d_output_elements, size_t d_output_stride,
+    const int32_t *spans, size_t span_elements, size_t span_count,
+    uint16_t *d_input, size_t d_input_elements, size_t d_input_stride,
+    float *scratch, size_t scratch_elements,
+    size_t token_capacity, size_t valid_tokens, size_t channels);
+int ck_gelu_erf_backward_bf16(
+    const uint16_t *input, size_t input_elements, size_t input_stride,
+    const uint16_t *d_output, size_t d_output_elements, size_t d_output_stride,
+    uint16_t *d_input, size_t d_input_elements, size_t d_input_stride,
+    float *scratch, size_t scratch_elements, size_t rows, size_t channels);
+int ck_grouped_weighted_rows_backward_bf16(
+    const uint16_t *options, size_t option_elements, size_t option_stride,
+    const uint16_t *fields, size_t field_elements, size_t field_stride,
+    const int32_t *group_counts, size_t count_elements,
+    const uint16_t *d_output, size_t d_output_elements, size_t d_output_stride,
+    uint16_t *d_options, size_t d_options_elements, size_t d_options_stride,
+    uint16_t *d_fields, size_t d_fields_elements, size_t d_fields_stride,
+    float *scratch, size_t scratch_elements,
+    size_t groups, size_t option_rows, size_t channels);
 #endif

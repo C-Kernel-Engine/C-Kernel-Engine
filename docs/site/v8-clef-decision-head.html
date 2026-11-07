@@ -1127,6 +1127,55 @@ the existing v8 backward workflow. Then certify all head gradients, grouped loss
 frozen-backbone identity, checkpoint/resume and generated inference reload. Existing decoder training
 is a shared-consumer regression, not evidence that this head can already train.</p>
 </section>
+<section id="bf16-backward">
+<h2>BF16-storage backward providers</h2>
+<p>The same three VJPs now also have explicit BF16-storage maps. Saved floating-point operands,
+incoming gradients and outgoing gradients use BF16; spans/counts remain INT32. Caller-owned FP32
+workspace expands BF16 operands exactly, invokes the existing FP32 VJP arithmetic, then rounds each
+output gradient to BF16 using round-to-nearest-even. The FP64 reductions and FP32 intermediate
+stores inside the FP32 providers are preserved. There is no intermediate BF16 rounding inside a VJP.</p>
+<p>This is a particular mixed-precision derivative contract, <strong>not</strong> a claim of parity with
+an arbitrary BF16/autocast forward graph. Grouped probabilities are recomputed using the existing FP32
+forward semantics on expanded BF16 saved operands. Independent autograd runs FP32 computation on
+identical dequantized operands and rounds its gradients to BF16. The tested gradients match that
+oracle exactly after rounding; this is not a universal bit-identity guarantee.</p>
+<table class="table"><thead><tr><th>Provider</th><th>Required FP32 workspace (floats)</th></tr></thead><tbody>
+<tr><td>Span mean</td><td>(span_count + token_capacity + valid_tokens) × channels</td></tr>
+<tr><td>Erf GELU</td><td>4 × rows × channels</td></tr>
+<tr><td>Grouped weighted pooling</td><td>3 × option_rows × channels + 6 × groups × channels + 2 × option_rows</td></tr>
+</tbody></table>
+<p>Element counts and row strides use the pointed-to dtype, not bytes. BF16 buffers require two-byte
+alignment; INT32 spans/counts and FP32 scratch require four-byte alignment. Outputs and scratch must
+be disjoint from all reads and each other. Input padding is ignored, output padding/inactive rows
+stay untouched, and rejected calls publish no outputs. In particular, a finite FP32 gradient that
+rounds to BF16 infinity rejects the call before either grouped gradient is published.</p>
+<p>The model-neutral generated backward entry composes all three BF16 providers through ordinary maps,
+lowering and memory planning. Tests include odd channel counts, unequal/singleton groups, ordered
+oracles at O0/O3, exact/one-short capacities, two-byte-aligned buffers, mixed-width partial overlaps,
+nonfinite input, FP32 and BF16-only overflow, RNE midpoint ties, subnormal values, final-operation
+failure propagation, and A→B→A recovery. Saved inputs in this test are synthetic; this does not execute
+a complete BF16 Clef forward/backward pair. PyTorch absence skips only the independent autograd test.</p>
+<pre><code>OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python3 -m unittest tests.test_v8_head_backward_bf16 tests.test_v8_head_backward -v
+python3 scripts/nightly_runner.py --tests decision_head_backward_bf16 decision_head_backward --ci --require-executed</code></pre>
+<p>Local validation on 2026-11-07: nine BF16 tests and 138 combined BF16/FP32, ABI, numerical-resolution,
+provider-selection, ledger and documentation tests pass. Three selected standard-nightly suites pass
+without skips, including the pinned complete FP32 Clef head forward comparison. DSL policy and
+interface/allocation audits pass. Full repository nightly and BF16 full-head training were not run.</p>
+<p><strong>Correctness baseline, not a speed claim.</strong> These portable conversion adapters need no
+BF16 ISA but add conversion work and workspace. Benchmark a complete training step before claiming
+latency or peak-memory improvement. Complete BF16 head training, gradient accumulation precision,
+FP32 master weights/optimizer state, loss scaling policy and checkpoint dtypes remain separate contracts.</p>
+<h3>Next training evidence</h3>
+<p>The next completion gate is a small nonzero trainable head composition through the existing v8
+workflow: verify every parameter gradient, demonstrate several native AdamW updates and loss reduction,
+prove frozen-weight identity, then save/reload and reproduce the updated scores. Expand this to the
+complete head once normalization, noncausal attention, projection and scoring derivatives are wired.
+The current primitive tests do not establish a trained decision model.</p>
+<p>After FP32 head training, certify BF16 training and declarative LoRA independently. Quantized LoRA
+requires a selected frozen-base format with a tested backward-input path; inference Q4/INT8 kernels
+alone do not establish QLoRA. Keep model topology/trainability in graph declarations and optimizer
+arithmetic in the existing generated native workflow.</p>
+</section>
 <section id="backward-audit">
 <h2>Backward audit and next training gate</h2>
 <p>Shared-consumer check on 2026-11-07: <code>run_training_composition_v8.py</code> completed both <code>2l_dense</code> and <code>2l_gqa_tail</code> with PASS. These existing generated decoder training certifications do not certify Clef backward execution.</p>

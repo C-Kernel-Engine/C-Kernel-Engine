@@ -932,6 +932,10 @@ TEST_SUITES = {
         "Checked Integer Span State Copy", "kernels",
         ROOT / "tests" / "test_v8_copy_i32_span_checked.py",
     ),
+    "decision_head_backward_bf16": TestSuite(
+        "BF16 Decision-Head VJPs and Generated Backward Chain", "kernels",
+        ROOT / "tests" / "test_v8_head_backward_bf16.py",
+    ),
     "decision_head_backward": TestSuite(
         "Checked Decision-Head VJPs and Generated Backward Chain", "kernels",
         ROOT / "tests" / "test_v8_head_backward.py",
