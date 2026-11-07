@@ -343,6 +343,28 @@ def synthesize_ir2_backward(
     forward_ops = deepcopy(ir1.get("ops", []))
     tensors: Dict[str, Dict[str, Any]] = deepcopy(ir1.get("tensors", {}))
 
+    # Parameter trainability is global: a shared weight cannot be frozen in one
+    # use and updated through another. Missing declarations preserve legacy
+    # training behavior; explicit declarations must be boolean and agree.
+    weight_trainability: Dict[str, bool] = {}
+    for op in forward_ops:
+        for ref in (op.get("weights") or {}).values():
+            if not isinstance(ref, dict):
+                continue
+            tid = str(ref.get("tensor", ""))
+            if not tid:
+                continue
+            meta = tensors.get(tid, {})
+            for declaration in (meta, ref):
+                if "requires_grad" not in declaration:
+                    continue
+                value = declaration["requires_grad"]
+                if type(value) is not bool:
+                    raise ValueError("Weight requires_grad must be boolean: %s" % tid)
+                if tid in weight_trainability and weight_trainability[tid] != value:
+                    raise ValueError("Conflicting weight trainability: %s" % tid)
+                weight_trainability[tid] = value
+
     backward_ops: List[Dict[str, Any]] = []
     issues: List[str] = []
     warnings: List[str] = []
@@ -1030,11 +1052,17 @@ def synthesize_ir2_backward(
                     src_wmeta = tensors.get(src_wtid) if isinstance(src_wtid, str) else None
                     src_wshape = src_wmeta.get("shape") if isinstance(src_wmeta, dict) else None
                     src_wnumel = _tensor_numel(tensors, src_wtid)
+                    # Legacy fused backward ABIs require a writable dW buffer
+                    # even when only dX is needed. Retain scratch, but never
+                    # publish/accumulate a frozen parameter gradient. The memory
+                    # planner and optimizer therefore allocate no moments for it.
+                    grad_kind = ("tmp_grad_weight" if weight_trainability.get(src_wtid, True)
+                                 else "discarded_grad_weight")
                     _ensure_tensor(
                         tensors,
                         tensor_id=tmp_tensor,
                         dtype="fp32",
-                        kind="tmp_grad_weight",
+                        kind=grad_kind,
                         requires_grad=False,
                         persistent=False,
                         producer={"op_id": next_op_id, "output_name": out_name},
@@ -1043,7 +1071,7 @@ def synthesize_ir2_backward(
                     )
                     bwd_outputs[out_name] = {
                         "tensor": tmp_tensor,
-                        "kind": "tmp_grad_weight",
+                        "kind": grad_kind,
                         "target_weight": target_weight,
                         "param_name": param_name,
                     }
