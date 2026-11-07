@@ -1036,6 +1036,46 @@
 
 <p>Model topology lives in the circuit builders here. Kernels implement arithmetic; maps describe ABI, scratch and numerical contracts. Generic operation catalogue entries do not inspect the model name.</p>
 
+<section id="selective-training">
+<h2>Selective FP32 training prerequisite</h2>
+<p>The shared v7/v8 backward lowerer now honors boolean parameter <code>requires_grad</code>
+declarations without cutting activation gradients through a frozen operation. Conflicting declarations
+on the same shared weight are rejected before emission. Undeclared weights retain legacy trainable
+behavior. Operation differentiability remains separate from parameter trainability: a frozen projection
+between trainable operations must still participate in backward execution.</p>
+<p>Frozen parameters have no canonical parameter gradient, optimizer moment allocation or AdamW update.
+Existing fused GEMM backward providers still require temporary dW/db output buffers, so these derivatives
+are computed into discard scratch. This is a correctness contract, not a claim that all unnecessary
+backward arithmetic or scratch has been eliminated.</p>
+<p>A small generic linear decision fixture executes fixed feature lookup → trainable projection → frozen
+projection → trainable scores → cross-entropy through the existing training IR, memory planner,
+generated C and native AdamW. This fixture is not the complete Clef head and is not a new public
+feature-head authoring API. No Python code updates CKE weights.</p>
+<p>On 2026-11-07, 40 FP32 native updates reduced loss from <code>1.42433834</code> to
+<code>0.04014646</code>. Every trainable gradient, updated weight and optimizer moment was compared
+with independent PyTorch CPU execution. An upstream finite difference verifies gradient flow through
+the frozen middle projection; feature and bridge weights remain byte-identical. The existing v8
+checkpoint format restores step 20 into a reset runtime and reproduces the remaining 20 steps exactly.
+Reloading final weights reproduces inference logits. Observed maximum absolute errors against PyTorch
+were 7.08e-8 for gradients, 7.31e-7 for updated weights and 2.24e-8 for moments.
+Regression ceilings are absolute 3e-5 for gradients/weights/logits and 3e-6 for moments, with relative
+3e-4. These are bounded fixture contracts, not universal error guarantees. This test does not claim fresh-process resume
+or released-head training. PyTorch or native-library absence is an explicit skip.</p>
+<pre><code>make -j4 build/libckernel_engine.so
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python3 tests/test_v8_selective_training.py
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python3 scripts/nightly_runner.py \
+  --tests training_selective_parameters --ci --require-executed</code></pre>
+<p>Eight focused tests and the registered nightly lane pass. Both existing decoder training compositions
+(<code>2l_dense</code>, <code>2l_gqa_tail</code>) pass gradients, ten updates, checkpoint/resume
+and inference export. A broader 47-test sweep had 46 passes and one attention-rematerialization
+shape assertion failure; the same failure was reproduced with the unchanged main lowerer.
+Full repository nightly has not been run locally.</p>
+<p>Next: connect the remaining complete-head derivatives and grouped loss to this existing training
+workflow, then certify head gradients, updates and export. BF16 VJP providers are independently tested;
+this FP32 optimizer trajectory does not certify BF16 head training. LoRA and quantized frozen-base
+training remain separate, later gates.</p>
+</section>
+
 <section id="complete-forward">
 <h2>Complete bounded head forward pass</h2>
 <p><code>build_clef_flash_complete_head_circuit.py</code> executes 140 operations in one generated entry:
