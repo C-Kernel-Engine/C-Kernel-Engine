@@ -8,7 +8,74 @@
 
 <p>Model topology lives in the circuit builders here. Kernels implement arithmetic; maps describe ABI, scratch and numerical contracts. Generic operation catalogue entries do not inspect the model name.</p>
 
-<h2>Current executed boundary</h2>
+<section id="complete-forward">
+<h2>Complete bounded head forward pass</h2>
+<p><code>build_clef_flash_complete_head_circuit.py</code> executes 140 operations in one generated entry:
+head ingress → two evidence-routing layers → option summaries → field assembly → four pre-norm
+self/cross-attention decoder layers → field/option normalization → prior, cosine and residual scoring
+→ raw option logits. The host supplies hidden features, output-embedding rows, token IDs, checked spans,
+option counts and question types. It does not schedule the layers.</p>
+<p>Question types index the released three-row type embedding. Consecutive option groups retain their
+question/option order; tests reorder entire questions with their option blocks and type identities.
+No softmax decision policy is imposed on the final raw scores. There is no generated-backbone or
+complete service certification in this milestone.</p>
+<p>Six reusable checked operations close the scoring gaps: row broadcast addition, indexed pair features
+(left, right, product, absolute difference), indexed cosine reduction, clamped scalar exponential,
+stable scalar sigmoid and scalar vector multiplication. Their maps declare sizes, scratch, numerical
+semantics and status propagation. Generic compiler changes are operation catalogue entries only.</p>
+<table class="table"><thead><tr><th>Pinned head, synthetic inputs</th><th>Worst decoder-block absolute error</th><th>Final logit maximum / RMSE</th></tr></thead><tbody>
+<tr><td>6 tokens, counts [2,1]</td><td>3.81470e-6</td><td>1.19209e-7 / 9.73340e-8</td></tr>
+<tr><td>8 tokens, counts [1,2]</td><td>5.72205e-6</td><td>1.78814e-7 / 1.06067e-7</td></tr>
+</tbody></table>
+<p>Measured 2026-11-07 with PyTorch 2.12.1 CPU, the hash-verified released head and its direct forward
+implementation. Both sides receive identical synthetic hidden features and synthetic output embeddings.
+These are two separately compiled bounded geometries, not a dynamic serving interface or captured
+backbone trajectories. Intermediate absolute regression ceilings are 1e-5; final logits use 2e-6.
+These empirical bounds do not establish training or other precision contracts.</p>
+<pre><code>python3 version/v8/decision/build_clef_flash_complete_head_circuit.py --check
+python3 -m unittest tests.test_v8_decision_tensor_ops tests.test_v8_clef_flash_complete_head -v
+export CKE_CLEF_FLASH_HEAD_PATH=/path/to/joint_head.safetensors
+export CKE_CLEF_FLASH_REFERENCE_SOURCE=/path/to/joint_schema_model.py
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python3 scripts/nightly_runner.py \
+  --tests decision_tensor_ops decision_clef_flash_complete_head --ci --require-executed</code></pre>
+<p>The independent comparisons require PyTorch; pinned comparisons additionally require safetensors,
+the reference source dependencies and the two hash-checked assets. Missing dependencies/assets are
+explicit skips. Synthetic tests cover intermediate logits, two lengths, unequal groups, question
+permutation, malformed IDs/spans/counts/type IDs, nonfinite hidden input, undersized arena, a deliberately
+corrupted scoring weight, and A→B→A recovery. A model-neutral six-operation generated circuit exercises
+all new providers independently of Clef topology.</p>
+</section>
+<section id="backward-audit">
+<h2>Backward audit and next training gate</h2>
+<p>Shared-consumer check on 2026-11-07: <code>run_training_composition_v8.py</code> completed both <code>2l_dense</code> and <code>2l_gqa_tail</code> with PASS. These existing generated decoder training certifications do not certify Clef backward execution.</p>
+<p><strong>Forward passes; head training remains NOT_TESTED.</strong> None of the new checked maps advertises
+backward support. Extend <code>cke.v8.compile</code> and the existing generated-C optimizer,
+checkpoint/resume and inference-export workflow. Do not add a second model executor.</p>
+<table class="table"><thead><tr><th>Head computation</th><th>Existing implementation</th><th>Missing contract/certification</th></tr></thead><tbody>
+<tr><td>Linear projections, biases</td><td><code>gemm_backward_f32.json</code> maps <code>fc2_backward_kernel</code>; <code>gemm_backward_bf16_mixed</code> exists in <code>gemm_kernels_bf16.c</code>.</td><td>Bind checked head geometry and saved tensors; certify dX, dW and db, selective parameter gradients and accumulation.</td></tr>
+<tr><td>LayerNorm</td><td><code>layernorm_backward_kernel</code> in <code>layernorm_kernels.c</code>; BF16 variant in <code>layernorm_kernels_bf16.c</code>.</td><td>The current checked head forward map is inference-only. Preserve the forward mean/rstd and local epsilon, register the matching backward ABI and compare dX/dGamma/dBeta.</td></tr>
+<tr><td>Erf GELU</td><td><code>gelu_backward_exact</code> and BF16 variants currently differentiate the tanh approximation.</td><td>Add or identify and certify an erf derivative provider. The name “exact” is not proof of matching this forward activation.</td></tr>
+<tr><td>Unmasked self/cross-attention</td><td><code>attention_backward_causal_head_major_gqa.json</code> and native BF16 causal backward exist.</td><td>Causal attention is not a substitute for full noncausal cross-attention with unequal query/memory counts. Declare saved probabilities/recomputation, layouts and dQ/dK/dV.</td></tr>
+<tr><td>Token-span pooling and last-token selection</td><td>Checked forward providers.</td><td>Scatter gradients into overlapping spans and the final valid row; reject invalid spans. Repeated use must accumulate rather than overwrite.</td></tr>
+<tr><td>Embedding/gather and residual branches</td><td><code>embedding_backward_f32.json</code>, native BF16 embedding scatter, <code>residual_add_backward_f32.json</code>, gradient-accumulation providers.</td><td>Wire type-embedding gradients, indexed-owner scatter and broadcast reductions. Frozen output embeddings need no updates, while required hidden-feature gradient paths remain explicit.</td></tr>
+<tr><td>Grouped softmax-weighted pooling</td><td>Checked forward only.</td><td>Differentiate both query logits and weighted values; option rows contribute through both routes. Compare unequal groups and repeated references.</td></tr>
+<tr><td>Cosine, pair features, scalar transforms</td><td>New checked forward providers.</td><td>Define epsilon/clamp subgradients, absolute-value behavior at zero, repeated-index accumulation and scalar reductions. Certify the pinned framework's derivative semantics separately from forward algebra.</td></tr>
+<tr><td>Loss and optimizer</td><td><code>softmax_cross_entropy_loss.json</code> and <code>adamw_update_f32.json</code>; existing trajectory/resume/export machinery.</td><td>Declare one label per question and loss reduction over unequal option counts, then verify every trainable parameter, frozen hashes, optimizer moments and restart equivalence.</td></tr>
+</tbody></table>
+<p><code>version/v8/scripts/run_training_workflow_v8.py:_apply_semantic_model</code> currently admits
+FP32, bias-free SwiGLU/RMSNorm decoder configurations at selected depths. Clef requires biased linear
+operations, LayerNorm, erf GELU, branches, span pooling and grouped outputs. Removing that validation
+alone would not implement their backward graph. Extend the responsible contracts while retaining the
+existing decoder certification suite.</p>
+<p>Start with FP32 head-only training on a small nonzero graph and frozen backbone features. Compare
+loss, feature gradients, every head parameter gradient, one AdamW update, a short deterministic
+trajectory, checkpoint/resume and inference reload. Then use released head geometry. BF16 kernel
+availability is not composed BF16 head-training evidence; BF16, adapters and quantized-base training
+remain separate later gates. End-to-end backbone decisions also need actual generated features and
+output embeddings, rather than synthetic ones.</p>
+</section>
+
+<h2>Earlier option-summary milestone</h2>
 
 <p><code>build_clef_flash_option_summary_circuit.py</code> extends the canonical ingress and both evidence-routing layers through grouped option pooling and <code>option_summary_norm</code>. Its single generated entry executes 43 operations. Question option counts partition consecutive routed option rows. Each question&#x27;s projected vector supplies its pooling query. Normalization declares epsilon <code>1e-5</code> locally, independently of the enclosing model configuration.</p>
 
@@ -30,17 +97,6 @@ export CKE_CLEF_FLASH_REFERENCE_SOURCE=/path/to/joint_schema_model.py</code></pr
 <p>On 2026-11-07, PyTorch 2.8.0 CPU comparisons passed for six tokens with option counts <code>[2,1]</code> and eight tokens with <code>[1,2]</code>. Maximum absolute errors were <code>1.90735e-6</code> / <code>1.43051e-6</code> for raw summaries and <code>1.31130e-6</code> / <code>1.19209e-6</code> for normalized summaries; normalized RMSE was <code>2.63926e-7</code> / <code>3.13428e-7</code>. These are fixed compiled geometries, not proof of a dynamic serving interface. The declared pinned-prefix absolute regression ceiling is <code>1e-5</code>.</p>
 
 <p>Synthetic tests also cover reordered options within groups, A→B→A reuse, invalid counts before parity, undersized arenas, and rejection followed by successful execution. Model-neutral tests compare explicit FP64/FP32-stage arithmetic at O0/O3, including singleton groups, unequal groups and padded strides.</p>
-
-<h2>Remaining completion gates</h2>
-
-<ol>
-<li>Assemble fields from the summary, question/global projections and type embeddings.</li>
-<li>Connect the four question-interaction decoder layers, final normalization,    prior and joint scoring, and raw question/option logits.</li>
-<li>Compare the complete head with the pinned implementation, then connect the    actual generated backbone with the correct output embeddings.</li>
-<li>Extend the existing v8 training workflow: audit backward providers, add only    missing contracts, freeze backbone parameters, compare gradients and AdamW    updates, then verify checkpoint/resume and inference export.</li>
-</ol>
-
-<p>The current head prefix establishes forward composition. It does not establish complete Clef decisions, head training, adapters, or backbone fine-tuning.</p>
 
 <p>Related: <a href="kernel-architecture.html">kernel architecture</a>, <a href="v8-training-capability-ledger.html">training capability ledger</a>.</p>
 

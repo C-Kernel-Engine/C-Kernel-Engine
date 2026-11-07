@@ -1,0 +1,283 @@
+{
+  "id": "indexed_cosine_rows_checked_f32",
+  "op": "indexed_cosine_rows_checked",
+  "operation_interface": "tensor.indexed_cosine_rows_checked.fp32.v1",
+  "variant": "checked_scalar",
+  "selection": {
+    "status": "candidate",
+    "priority": 100,
+    "equivalence_group": "tensor.indexed_cosine_rows_checked.fp32.v1",
+    "phases": [
+      "prefill"
+    ]
+  },
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "left",
+      "dtype": "fp32",
+      "shape": [
+        "G",
+        "C"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "right",
+      "dtype": "fp32",
+      "shape": [
+        "R",
+        "C"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "indices",
+      "dtype": "i32",
+      "shape": [
+        "R"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "output",
+      "dtype": "fp32",
+      "shape": [
+        "R"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "scratch": [
+    {
+      "name": "scratch",
+      "dtype": "fp32",
+      "shape": [
+        "X"
+      ],
+      "size_bytes": "4 * X",
+      "size_resolution": "required",
+      "lifetime": "kernel_call",
+      "alignment": 64,
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read_write",
+      "storage_class": "scratch",
+      "consumption": "required"
+    }
+  ],
+  "dims": [
+    "G",
+    "R",
+    "C",
+    "X"
+  ],
+  "constraints": {
+    "notes": "Positive dimensions and exact valid contiguous extents. All finite inputs; output/scratch disjoint from all inputs and each other. Rejection leaves output unchanged."
+  },
+  "impl": {
+    "function": "ck_indexed_cosine_rows_f32",
+    "c_declaration": "int ck_indexed_cosine_rows_f32(const float *left, size_t left_elements, const float *right, size_t right_elements, const int32_t *indices, size_t indices_elements, float *output, size_t output_elements, float *scratch, size_t scratch_elements, size_t groups, size_t rows, size_t channels, float epsilon);",
+    "sources": [
+      "src/kernels/decision_tensor_ops.c"
+    ]
+  },
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
+  "numerical_capabilities": [
+    {
+      "contract_id": "indexed_cosine_rows_checked_ordered_f32_v1",
+      "status": "validated",
+      "phases": [
+        "prefill"
+      ],
+      "function": "ck_indexed_cosine_rows_f32",
+      "explicit_selector": true,
+      "implementation": {
+        "isa_dispatch": "scalar",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": [
+            "serial"
+          ],
+          "dispatch": [
+            "inline"
+          ],
+          "reduction_order_effect": "none"
+        }
+      },
+      "arithmetic": {
+        "partial_accumulator": "fp64",
+        "merge_order": "none",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false,
+        "split_strategy": "serial"
+      }
+    }
+  ],
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "left",
+        "source": "activation:left",
+        "cast": "const float*",
+        "ports": [
+          "input:left"
+        ]
+      },
+      {
+        "name": "left_elements",
+        "source": "runtime:left_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "right",
+        "source": "activation:right",
+        "cast": "const float*",
+        "ports": [
+          "input:right"
+        ]
+      },
+      {
+        "name": "right_elements",
+        "source": "runtime:right_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "indices",
+        "source": "activation:indices",
+        "cast": "const int32_t*",
+        "ports": [
+          "input:indices"
+        ]
+      },
+      {
+        "name": "indices_elements",
+        "source": "runtime:indices_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "output",
+        "source": "output:output",
+        "cast": "float*",
+        "ports": [
+          "output:output"
+        ]
+      },
+      {
+        "name": "output_elements",
+        "source": "runtime:output_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "scratch",
+        "source": "scratch:scratch",
+        "cast": "float*"
+      },
+      {
+        "name": "scratch_elements",
+        "source": "runtime:scratch_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "groups",
+        "source": "runtime:groups",
+        "value_type": "size_t"
+      },
+      {
+        "name": "rows",
+        "source": "runtime:rows",
+        "value_type": "size_t"
+      },
+      {
+        "name": "channels",
+        "source": "runtime:channels",
+        "value_type": "size_t"
+      },
+      {
+        "name": "epsilon",
+        "source": "param:epsilon"
+      }
+    ]
+  },
+  "call_constant_contract": {
+    "shape_symbols": {
+      "G": "groups",
+      "R": "rows",
+      "C": "channels",
+      "X": "scratch_elements"
+    },
+    "buffer_spans": [
+      {
+        "pointer": "left",
+        "elements": "left_elements",
+        "rows": 1,
+        "width": "left_elements",
+        "element_bytes": 4
+      },
+      {
+        "pointer": "right",
+        "elements": "right_elements",
+        "rows": 1,
+        "width": "right_elements",
+        "element_bytes": 4
+      },
+      {
+        "pointer": "indices",
+        "elements": "indices_elements",
+        "rows": 1,
+        "width": "indices_elements",
+        "element_bytes": 4
+      },
+      {
+        "pointer": "output",
+        "elements": "output_elements",
+        "rows": 1,
+        "width": "output_elements",
+        "element_bytes": 4
+      },
+      {
+        "pointer": "scratch",
+        "elements": "scratch_elements",
+        "rows": 1,
+        "width": "scratch_elements",
+        "element_bytes": 4
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "tests/test_v8_decision_tensor_ops.py",
+      "tests/test_v8_clef_flash_complete_head.py"
+    ],
+    "oracle": "Independent PyTorch operations and pinned complete head; bounds and rejection/recovery tests."
+  },
+  "notes": "FP64 ascending squared-norm sums, sqrt rounded FP32, clamp each norm by explicit positive epsilon, FP32 normalization and pair products, ascending FP64 sum rounded FP32. Inference only; no backward provider claimed."
+}

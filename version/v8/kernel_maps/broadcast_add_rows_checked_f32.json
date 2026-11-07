@@ -1,0 +1,241 @@
+{
+  "id": "broadcast_add_rows_checked_f32",
+  "op": "broadcast_add_rows_checked",
+  "operation_interface": "tensor.broadcast_add_rows_checked.fp32.v1",
+  "variant": "checked_scalar",
+  "selection": {
+    "status": "candidate",
+    "priority": 100,
+    "equivalence_group": "tensor.broadcast_add_rows_checked.fp32.v1",
+    "phases": [
+      "prefill"
+    ]
+  },
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "left",
+      "dtype": "fp32",
+      "shape": [
+        "R",
+        "C"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "right",
+      "dtype": "fp32",
+      "shape": [
+        1,
+        "C"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "output",
+      "dtype": "fp32",
+      "shape": [
+        "R",
+        "C"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "scratch": [
+    {
+      "name": "scratch",
+      "dtype": "fp32",
+      "shape": [
+        "X"
+      ],
+      "size_bytes": "4 * X",
+      "size_resolution": "required",
+      "lifetime": "kernel_call",
+      "alignment": 64,
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read_write",
+      "storage_class": "scratch",
+      "consumption": "required"
+    }
+  ],
+  "dims": [
+    "R",
+    "C",
+    "X"
+  ],
+  "constraints": {
+    "notes": "Positive dimensions and exact valid contiguous extents. All finite inputs; output/scratch disjoint from all inputs and each other. Rejection leaves output unchanged."
+  },
+  "impl": {
+    "function": "ck_broadcast_add_rows_f32",
+    "c_declaration": "int ck_broadcast_add_rows_f32(const float *left, size_t left_elements, const float *right, size_t right_elements, float *output, size_t output_elements, float *scratch, size_t scratch_elements, size_t rows, size_t channels);",
+    "sources": [
+      "src/kernels/decision_tensor_ops.c"
+    ]
+  },
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
+  "numerical_capabilities": [
+    {
+      "contract_id": "broadcast_add_rows_checked_ordered_f32_v1",
+      "status": "validated",
+      "phases": [
+        "prefill"
+      ],
+      "function": "ck_broadcast_add_rows_f32",
+      "explicit_selector": true,
+      "implementation": {
+        "isa_dispatch": "scalar",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": [
+            "serial"
+          ],
+          "dispatch": [
+            "inline"
+          ],
+          "reduction_order_effect": "none"
+        }
+      },
+      "arithmetic": {
+        "partial_accumulator": "none",
+        "merge_order": "none",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false,
+        "split_strategy": "serial"
+      }
+    }
+  ],
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "left",
+        "source": "activation:left",
+        "cast": "const float*",
+        "ports": [
+          "input:left"
+        ]
+      },
+      {
+        "name": "left_elements",
+        "source": "runtime:left_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "right",
+        "source": "activation:right",
+        "cast": "const float*",
+        "ports": [
+          "input:right"
+        ]
+      },
+      {
+        "name": "right_elements",
+        "source": "runtime:right_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "output",
+        "source": "output:output",
+        "cast": "float*",
+        "ports": [
+          "output:output"
+        ]
+      },
+      {
+        "name": "output_elements",
+        "source": "runtime:output_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "scratch",
+        "source": "scratch:scratch",
+        "cast": "float*"
+      },
+      {
+        "name": "scratch_elements",
+        "source": "runtime:scratch_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "rows",
+        "source": "runtime:rows",
+        "value_type": "size_t"
+      },
+      {
+        "name": "channels",
+        "source": "runtime:channels",
+        "value_type": "size_t"
+      }
+    ]
+  },
+  "call_constant_contract": {
+    "shape_symbols": {
+      "R": "rows",
+      "C": "channels",
+      "X": "scratch_elements"
+    },
+    "buffer_spans": [
+      {
+        "pointer": "left",
+        "elements": "left_elements",
+        "rows": 1,
+        "width": "left_elements",
+        "element_bytes": 4
+      },
+      {
+        "pointer": "right",
+        "elements": "right_elements",
+        "rows": 1,
+        "width": "right_elements",
+        "element_bytes": 4
+      },
+      {
+        "pointer": "output",
+        "elements": "output_elements",
+        "rows": 1,
+        "width": "output_elements",
+        "element_bytes": 4
+      },
+      {
+        "pointer": "scratch",
+        "elements": "scratch_elements",
+        "rows": 1,
+        "width": "scratch_elements",
+        "element_bytes": 4
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "tests/test_v8_decision_tensor_ops.py",
+      "tests/test_v8_clef_flash_complete_head.py"
+    ],
+    "oracle": "Independent PyTorch operations and pinned complete head; bounds and rejection/recovery tests."
+  },
+  "notes": "FP32 add of each row and a shared channel vector. Inference only; no backward provider claimed."
+}

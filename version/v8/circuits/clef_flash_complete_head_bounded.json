@@ -1,0 +1,5697 @@
+{
+  "version": 3,
+  "name": "clef_flash_complete_head_bounded",
+  "family": "decision_head",
+  "checked_native_entry": true,
+  "contract": {
+    "runtime_invariants": {
+      "inference_only": true,
+      "production_kernel_heap_allocation": false
+    }
+  },
+  "activation_buffers": {
+    "hidden": {
+      "shape": [
+        6,
+        4096
+      ]
+    },
+    "input_ids": {
+      "shape": [
+        6
+      ]
+    },
+    "question_spans": {
+      "shape": [
+        2,
+        2
+      ]
+    },
+    "option_spans": {
+      "shape": [
+        3,
+        2
+      ]
+    },
+    "global_span": {
+      "shape": [
+        1,
+        2
+      ]
+    },
+    "option_counts": {
+      "shape": [
+        2
+      ]
+    },
+    "option_row_indices": {
+      "shape": [
+        3
+      ]
+    },
+    "option_question_indices": {
+      "shape": [
+        3
+      ]
+    },
+    "normalized_hidden": {
+      "shape": [
+        6,
+        4096
+      ]
+    },
+    "lexical_token_rows": {
+      "shape": [
+        6,
+        4096
+      ]
+    },
+    "question_vectors": {
+      "shape": [
+        2,
+        4096
+      ]
+    },
+    "option_context_vectors": {
+      "shape": [
+        3,
+        4096
+      ]
+    },
+    "lexical_option_vectors": {
+      "shape": [
+        3,
+        4096
+      ]
+    },
+    "global_vector": {
+      "shape": [
+        1,
+        4096
+      ]
+    },
+    "memory": {
+      "shape": [
+        6,
+        1024
+      ]
+    },
+    "question_projected": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "option_context_projected": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "option_lexical_projected": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "option_question_projected": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "global_projected": {
+      "shape": [
+        1,
+        1024
+      ]
+    },
+    "option_context_lexical": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "option_queries": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "evidence0_query_norm": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "evidence0_memory_norm": {
+      "shape": [
+        6,
+        1024
+      ]
+    },
+    "evidence0_q": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "evidence0_k": {
+      "shape": [
+        6,
+        1024
+      ]
+    },
+    "evidence0_v": {
+      "shape": [
+        6,
+        1024
+      ]
+    },
+    "evidence0_context": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "evidence0_attn_out": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "evidence0_attn_residual": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "evidence0_ff_norm": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "evidence0_ff1": {
+      "shape": [
+        3,
+        4096
+      ]
+    },
+    "evidence0_gelu": {
+      "shape": [
+        3,
+        4096
+      ]
+    },
+    "evidence0_ff2": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "evidence0_output": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "evidence1_query_norm": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "evidence1_memory_norm": {
+      "shape": [
+        6,
+        1024
+      ]
+    },
+    "evidence1_q": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "evidence1_k": {
+      "shape": [
+        6,
+        1024
+      ]
+    },
+    "evidence1_v": {
+      "shape": [
+        6,
+        1024
+      ]
+    },
+    "evidence1_context": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "evidence1_attn_out": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "evidence1_attn_residual": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "evidence1_ff_norm": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "evidence1_ff1": {
+      "shape": [
+        3,
+        4096
+      ]
+    },
+    "evidence1_gelu": {
+      "shape": [
+        3,
+        4096
+      ]
+    },
+    "evidence1_ff2": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "evidence1_output": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "option_summary_raw": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "option_summary_normalized": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "question_type_ids": {
+      "shape": [
+        2
+      ]
+    },
+    "type_embedding": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields_summary": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields_global": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields_input": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields0_norm1": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields0_self_q": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields0_self_k": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields0_self_v": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields0_self_context": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields0_self_out": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields0_self_residual": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields0_norm2": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields0_cross_q": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields0_cross_k": {
+      "shape": [
+        6,
+        1024
+      ]
+    },
+    "fields0_cross_v": {
+      "shape": [
+        6,
+        1024
+      ]
+    },
+    "fields0_cross_context": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields0_cross_out": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields0_cross_residual": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields0_norm3": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields0_ff1": {
+      "shape": [
+        2,
+        4096
+      ]
+    },
+    "fields0_gelu": {
+      "shape": [
+        2,
+        4096
+      ]
+    },
+    "fields0_ff2": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields0_output": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields1_norm1": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields1_self_q": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields1_self_k": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields1_self_v": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields1_self_context": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields1_self_out": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields1_self_residual": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields1_norm2": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields1_cross_q": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields1_cross_k": {
+      "shape": [
+        6,
+        1024
+      ]
+    },
+    "fields1_cross_v": {
+      "shape": [
+        6,
+        1024
+      ]
+    },
+    "fields1_cross_context": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields1_cross_out": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields1_cross_residual": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields1_norm3": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields1_ff1": {
+      "shape": [
+        2,
+        4096
+      ]
+    },
+    "fields1_gelu": {
+      "shape": [
+        2,
+        4096
+      ]
+    },
+    "fields1_ff2": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields1_output": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields2_norm1": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields2_self_q": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields2_self_k": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields2_self_v": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields2_self_context": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields2_self_out": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields2_self_residual": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields2_norm2": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields2_cross_q": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields2_cross_k": {
+      "shape": [
+        6,
+        1024
+      ]
+    },
+    "fields2_cross_v": {
+      "shape": [
+        6,
+        1024
+      ]
+    },
+    "fields2_cross_context": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields2_cross_out": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields2_cross_residual": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields2_norm3": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields2_ff1": {
+      "shape": [
+        2,
+        4096
+      ]
+    },
+    "fields2_gelu": {
+      "shape": [
+        2,
+        4096
+      ]
+    },
+    "fields2_ff2": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields2_output": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields3_norm1": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields3_self_q": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields3_self_k": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields3_self_v": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields3_self_context": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields3_self_out": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields3_self_residual": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields3_norm2": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields3_cross_q": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields3_cross_k": {
+      "shape": [
+        6,
+        1024
+      ]
+    },
+    "fields3_cross_v": {
+      "shape": [
+        6,
+        1024
+      ]
+    },
+    "fields3_cross_context": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields3_cross_out": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields3_cross_residual": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields3_norm3": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields3_ff1": {
+      "shape": [
+        2,
+        4096
+      ]
+    },
+    "fields3_gelu": {
+      "shape": [
+        2,
+        4096
+      ]
+    },
+    "fields3_ff2": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "fields3_output": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "final_fields": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "final_options": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "prior_anchor": {
+      "shape": [
+        2,
+        4096
+      ]
+    },
+    "prior_cosine": {
+      "shape": [
+        3
+      ]
+    },
+    "joint_cosine": {
+      "shape": [
+        3
+      ]
+    },
+    "scorer_features": {
+      "shape": [
+        3,
+        4096
+      ]
+    },
+    "scorer_hidden": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "scorer_gelu": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "scorer_residual": {
+      "shape": [
+        3,
+        1
+      ]
+    },
+    "prior_scale": {
+      "shape": [
+        1
+      ]
+    },
+    "joint_scale": {
+      "shape": [
+        1
+      ]
+    },
+    "residual_mix": {
+      "shape": [
+        1
+      ]
+    },
+    "prior_scores": {
+      "shape": [
+        3
+      ]
+    },
+    "scaled_joint_cosine": {
+      "shape": [
+        3
+      ]
+    },
+    "joint_scores": {
+      "shape": [
+        3,
+        1
+      ]
+    },
+    "gated_joint_scores": {
+      "shape": [
+        3
+      ]
+    },
+    "option_logits": {
+      "shape": [
+        3,
+        1
+      ]
+    }
+  },
+  "activation_bindings": {
+    "hidden": "hidden",
+    "input_ids": "input_ids",
+    "question_spans": "question_spans",
+    "option_spans": "option_spans",
+    "global_span": "global_span",
+    "option_counts": "option_counts",
+    "option_row_indices": "option_row_indices",
+    "option_question_indices": "option_question_indices",
+    "normalized_hidden": "normalized_hidden",
+    "lexical_token_rows": "lexical_token_rows",
+    "question_vectors": "question_vectors",
+    "option_context_vectors": "option_context_vectors",
+    "lexical_option_vectors": "lexical_option_vectors",
+    "global_vector": "global_vector",
+    "memory": "memory",
+    "question_projected": "question_projected",
+    "option_context_projected": "option_context_projected",
+    "option_lexical_projected": "option_lexical_projected",
+    "option_question_projected": "option_question_projected",
+    "global_projected": "global_projected",
+    "option_context_lexical": "option_context_lexical",
+    "option_queries": "option_queries",
+    "evidence0_query_norm": "evidence0_query_norm",
+    "evidence0_memory_norm": "evidence0_memory_norm",
+    "evidence0_q": "evidence0_q",
+    "evidence0_k": "evidence0_k",
+    "evidence0_v": "evidence0_v",
+    "evidence0_context": "evidence0_context",
+    "evidence0_attn_out": "evidence0_attn_out",
+    "evidence0_attn_residual": "evidence0_attn_residual",
+    "evidence0_ff_norm": "evidence0_ff_norm",
+    "evidence0_ff1": "evidence0_ff1",
+    "evidence0_gelu": "evidence0_gelu",
+    "evidence0_ff2": "evidence0_ff2",
+    "evidence0_output": "evidence0_output",
+    "evidence1_query_norm": "evidence1_query_norm",
+    "evidence1_memory_norm": "evidence1_memory_norm",
+    "evidence1_q": "evidence1_q",
+    "evidence1_k": "evidence1_k",
+    "evidence1_v": "evidence1_v",
+    "evidence1_context": "evidence1_context",
+    "evidence1_attn_out": "evidence1_attn_out",
+    "evidence1_attn_residual": "evidence1_attn_residual",
+    "evidence1_ff_norm": "evidence1_ff_norm",
+    "evidence1_ff1": "evidence1_ff1",
+    "evidence1_gelu": "evidence1_gelu",
+    "evidence1_ff2": "evidence1_ff2",
+    "evidence1_output": "evidence1_output",
+    "option_summary_raw": "option_summary_raw",
+    "option_summary_normalized": "option_summary_normalized",
+    "question_type_ids": "question_type_ids",
+    "type_embedding": "type_embedding",
+    "fields_summary": "fields_summary",
+    "fields_global": "fields_global",
+    "fields_input": "fields_input",
+    "fields0_norm1": "fields0_norm1",
+    "fields0_self_q": "fields0_self_q",
+    "fields0_self_k": "fields0_self_k",
+    "fields0_self_v": "fields0_self_v",
+    "fields0_self_context": "fields0_self_context",
+    "fields0_self_out": "fields0_self_out",
+    "fields0_self_residual": "fields0_self_residual",
+    "fields0_norm2": "fields0_norm2",
+    "fields0_cross_q": "fields0_cross_q",
+    "fields0_cross_k": "fields0_cross_k",
+    "fields0_cross_v": "fields0_cross_v",
+    "fields0_cross_context": "fields0_cross_context",
+    "fields0_cross_out": "fields0_cross_out",
+    "fields0_cross_residual": "fields0_cross_residual",
+    "fields0_norm3": "fields0_norm3",
+    "fields0_ff1": "fields0_ff1",
+    "fields0_gelu": "fields0_gelu",
+    "fields0_ff2": "fields0_ff2",
+    "fields0_output": "fields0_output",
+    "fields1_norm1": "fields1_norm1",
+    "fields1_self_q": "fields1_self_q",
+    "fields1_self_k": "fields1_self_k",
+    "fields1_self_v": "fields1_self_v",
+    "fields1_self_context": "fields1_self_context",
+    "fields1_self_out": "fields1_self_out",
+    "fields1_self_residual": "fields1_self_residual",
+    "fields1_norm2": "fields1_norm2",
+    "fields1_cross_q": "fields1_cross_q",
+    "fields1_cross_k": "fields1_cross_k",
+    "fields1_cross_v": "fields1_cross_v",
+    "fields1_cross_context": "fields1_cross_context",
+    "fields1_cross_out": "fields1_cross_out",
+    "fields1_cross_residual": "fields1_cross_residual",
+    "fields1_norm3": "fields1_norm3",
+    "fields1_ff1": "fields1_ff1",
+    "fields1_gelu": "fields1_gelu",
+    "fields1_ff2": "fields1_ff2",
+    "fields1_output": "fields1_output",
+    "fields2_norm1": "fields2_norm1",
+    "fields2_self_q": "fields2_self_q",
+    "fields2_self_k": "fields2_self_k",
+    "fields2_self_v": "fields2_self_v",
+    "fields2_self_context": "fields2_self_context",
+    "fields2_self_out": "fields2_self_out",
+    "fields2_self_residual": "fields2_self_residual",
+    "fields2_norm2": "fields2_norm2",
+    "fields2_cross_q": "fields2_cross_q",
+    "fields2_cross_k": "fields2_cross_k",
+    "fields2_cross_v": "fields2_cross_v",
+    "fields2_cross_context": "fields2_cross_context",
+    "fields2_cross_out": "fields2_cross_out",
+    "fields2_cross_residual": "fields2_cross_residual",
+    "fields2_norm3": "fields2_norm3",
+    "fields2_ff1": "fields2_ff1",
+    "fields2_gelu": "fields2_gelu",
+    "fields2_ff2": "fields2_ff2",
+    "fields2_output": "fields2_output",
+    "fields3_norm1": "fields3_norm1",
+    "fields3_self_q": "fields3_self_q",
+    "fields3_self_k": "fields3_self_k",
+    "fields3_self_v": "fields3_self_v",
+    "fields3_self_context": "fields3_self_context",
+    "fields3_self_out": "fields3_self_out",
+    "fields3_self_residual": "fields3_self_residual",
+    "fields3_norm2": "fields3_norm2",
+    "fields3_cross_q": "fields3_cross_q",
+    "fields3_cross_k": "fields3_cross_k",
+    "fields3_cross_v": "fields3_cross_v",
+    "fields3_cross_context": "fields3_cross_context",
+    "fields3_cross_out": "fields3_cross_out",
+    "fields3_cross_residual": "fields3_cross_residual",
+    "fields3_norm3": "fields3_norm3",
+    "fields3_ff1": "fields3_ff1",
+    "fields3_gelu": "fields3_gelu",
+    "fields3_ff2": "fields3_ff2",
+    "fields3_output": "fields3_output",
+    "final_fields": "final_fields",
+    "final_options": "final_options",
+    "prior_anchor": "prior_anchor",
+    "prior_cosine": "prior_cosine",
+    "joint_cosine": "joint_cosine",
+    "scorer_features": "scorer_features",
+    "scorer_hidden": "scorer_hidden",
+    "scorer_gelu": "scorer_gelu",
+    "scorer_residual": "scorer_residual",
+    "prior_scale": "prior_scale",
+    "joint_scale": "joint_scale",
+    "residual_mix": "residual_mix",
+    "prior_scores": "prior_scores",
+    "scaled_joint_cosine": "scaled_joint_cosine",
+    "joint_scores": "joint_scores",
+    "gated_joint_scores": "gated_joint_scores",
+    "option_logits": "option_logits"
+  },
+  "native_entry": {
+    "function": "ck_clef_complete_head",
+    "params": [
+      {
+        "c_type": "uint8_t *",
+        "name": "arena"
+      },
+      {
+        "c_type": "size_t",
+        "name": "arena_bytes"
+      }
+    ],
+    "arena": {
+      "pointer": "arena",
+      "bytes": "arena_bytes"
+    }
+  },
+  "sequence": [
+    "head_ingress",
+    "evidence0",
+    "evidence1",
+    "option_summary",
+    "field_assembly",
+    "fields0",
+    "fields1",
+    "fields2",
+    "fields3",
+    "decision_scoring"
+  ],
+  "block_types": {
+    "head_ingress": {
+      "sequence": [
+        "header",
+        "body",
+        "footer"
+      ],
+      "header": [
+        {
+          "id": "option_owners",
+          "op": "expand_group_row_indices_checked",
+          "kernel": "expand_group_row_indices_checked_i32",
+          "returns_status": true,
+          "graph_slots": {
+            "inputs": {
+              "group_counts": "external:option_counts"
+            },
+            "outputs": {
+              "row_indices": "option_row_indices",
+              "owner_indices": "option_question_indices"
+            }
+          },
+          "params": {
+            "G": 2,
+            "R": 3,
+            "call_constants": {
+              "group_count_elements": 2,
+              "groups": 2,
+              "rows": 3,
+              "row_index_elements": 3,
+              "owner_index_elements": 3
+            }
+          }
+        },
+        {
+          "id": "hidden_norm",
+          "op": "layernorm",
+          "kernel": "layernorm_rows_checked_param_epsilon_f32",
+          "returns_status": true,
+          "weight_refs": {
+            "gamma": "hidden_norm.weight",
+            "beta": "hidden_norm.bias"
+          },
+          "graph_slots": {
+            "inputs": {
+              "input": "external:hidden"
+            },
+            "outputs": {
+              "output": "normalized_hidden"
+            }
+          },
+          "params": {
+            "M": 6,
+            "C": 4096,
+            "epsilon": 1e-05,
+            "Q": 24588,
+            "call_constants": {
+              "norm_input_elements": 24576,
+              "norm_input_stride": 4096,
+              "norm_gamma_elements": 4096,
+              "norm_beta_elements": 4096,
+              "norm_output_elements": 24576,
+              "norm_output_stride": 4096,
+              "norm_scratch_elements": 24588,
+              "norm_rows": 6,
+              "norm_channels": 4096
+            }
+          }
+        },
+        {
+          "id": "output_embedding_lookup",
+          "op": "embedding_lookup_token_major_checked",
+          "kernel": "audio_text_embedding_token_major_f32",
+          "returns_status": true,
+          "weight_refs": {
+            "table": "output_embedding.weight"
+          },
+          "graph_slots": {
+            "inputs": {
+              "ids": "external:input_ids"
+            },
+            "outputs": {
+              "output": "lexical_token_rows"
+            }
+          },
+          "params": {
+            "T": 6,
+            "V": 16,
+            "C": 4096,
+            "call_constants": {
+              "id_elements": 6,
+              "table_elements": 65536,
+              "vocabulary": 16,
+              "channels": 4096,
+              "table_stride": 4096,
+              "output_elements": 24576,
+              "tokens": 6,
+              "output_stride": 4096
+            }
+          }
+        }
+      ],
+      "body": {
+        "type": "dense",
+        "ops": [
+          {
+            "id": "question_pool",
+            "op": "token_span_mean_checked",
+            "kernel": "token_span_mean_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "normalized_hidden",
+                "spans": "external:question_spans"
+              },
+              "outputs": {
+                "output": "question_vectors"
+              }
+            },
+            "params": {
+              "T": 6,
+              "S": 2,
+              "C": 4096,
+              "call_constants": {
+                "input_elements": 24576,
+                "input_stride": 4096,
+                "token_capacity": 6,
+                "valid_tokens": 6,
+                "channels": 4096,
+                "span_elements": 4,
+                "span_count": 2,
+                "output_elements": 8192,
+                "output_stride": 4096
+              }
+            }
+          },
+          {
+            "id": "option_context_pool",
+            "op": "token_span_mean_checked",
+            "kernel": "token_span_mean_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "normalized_hidden",
+                "spans": "external:option_spans"
+              },
+              "outputs": {
+                "output": "option_context_vectors"
+              }
+            },
+            "params": {
+              "T": 6,
+              "S": 3,
+              "C": 4096,
+              "call_constants": {
+                "input_elements": 24576,
+                "input_stride": 4096,
+                "token_capacity": 6,
+                "valid_tokens": 6,
+                "channels": 4096,
+                "span_elements": 6,
+                "span_count": 3,
+                "output_elements": 12288,
+                "output_stride": 4096
+              }
+            }
+          },
+          {
+            "id": "option_lexical_pool",
+            "op": "token_span_mean_checked",
+            "kernel": "token_span_mean_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "lexical_token_rows",
+                "spans": "external:option_spans"
+              },
+              "outputs": {
+                "output": "lexical_option_vectors"
+              }
+            },
+            "params": {
+              "T": 6,
+              "S": 3,
+              "C": 4096,
+              "call_constants": {
+                "input_elements": 24576,
+                "input_stride": 4096,
+                "token_capacity": 6,
+                "valid_tokens": 6,
+                "channels": 4096,
+                "span_elements": 6,
+                "span_count": 3,
+                "output_elements": 12288,
+                "output_stride": 4096
+              }
+            }
+          },
+          {
+            "id": "global_final_row",
+            "op": "last_valid_row_checked",
+            "kernel": "last_valid_row_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "normalized_hidden",
+                "span": "external:global_span"
+              },
+              "outputs": {
+                "output": "global_vector"
+              }
+            },
+            "params": {
+              "T": 6,
+              "C": 4096,
+              "call_constants": {
+                "input_elements": 24576,
+                "input_stride": 4096,
+                "token_capacity": 6,
+                "valid_tokens": 6,
+                "channels": 4096,
+                "span_elements": 2,
+                "output_elements": 4096
+              }
+            }
+          }
+        ]
+      },
+      "footer": [
+        {
+          "id": "memory_projection",
+          "op": "linear_rows_checked_no_bias",
+          "kernel": "linear_rows_checked_no_bias_f32",
+          "returns_status": true,
+          "weight_refs": {
+            "weight": "memory_projection.weight"
+          },
+          "graph_slots": {
+            "inputs": {
+              "input": "normalized_hidden"
+            },
+            "outputs": {
+              "output": "memory"
+            }
+          },
+          "params": {
+            "M": 6,
+            "K": 4096,
+            "N": 1024,
+            "call_constants": {
+              "linear_input_elements": 24576,
+              "linear_input_stride": 4096,
+              "linear_weight_elements": 4194304,
+              "linear_weight_stride": 4096,
+              "linear_output_elements": 6144,
+              "linear_output_stride": 1024,
+              "linear_rows": 6,
+              "linear_input_channels": 4096,
+              "linear_output_channels": 1024
+            }
+          }
+        },
+        {
+          "id": "question_projection",
+          "op": "linear_rows_checked_no_bias",
+          "kernel": "linear_rows_checked_no_bias_f32",
+          "returns_status": true,
+          "weight_refs": {
+            "weight": "question_projection.weight"
+          },
+          "graph_slots": {
+            "inputs": {
+              "input": "question_vectors"
+            },
+            "outputs": {
+              "output": "question_projected"
+            }
+          },
+          "params": {
+            "M": 2,
+            "K": 4096,
+            "N": 1024,
+            "call_constants": {
+              "linear_input_elements": 8192,
+              "linear_input_stride": 4096,
+              "linear_weight_elements": 4194304,
+              "linear_weight_stride": 4096,
+              "linear_output_elements": 2048,
+              "linear_output_stride": 1024,
+              "linear_rows": 2,
+              "linear_input_channels": 4096,
+              "linear_output_channels": 1024
+            }
+          }
+        },
+        {
+          "id": "option_context_projection",
+          "op": "linear_rows_checked_no_bias",
+          "kernel": "linear_rows_checked_no_bias_f32",
+          "returns_status": true,
+          "weight_refs": {
+            "weight": "option_context_projection.weight"
+          },
+          "graph_slots": {
+            "inputs": {
+              "input": "option_context_vectors"
+            },
+            "outputs": {
+              "output": "option_context_projected"
+            }
+          },
+          "params": {
+            "M": 3,
+            "K": 4096,
+            "N": 1024,
+            "call_constants": {
+              "linear_input_elements": 12288,
+              "linear_input_stride": 4096,
+              "linear_weight_elements": 4194304,
+              "linear_weight_stride": 4096,
+              "linear_output_elements": 3072,
+              "linear_output_stride": 1024,
+              "linear_rows": 3,
+              "linear_input_channels": 4096,
+              "linear_output_channels": 1024
+            }
+          }
+        },
+        {
+          "id": "option_lexical_projection",
+          "op": "linear_rows_checked_no_bias",
+          "kernel": "linear_rows_checked_no_bias_f32",
+          "returns_status": true,
+          "weight_refs": {
+            "weight": "option_lexical_projection.weight"
+          },
+          "graph_slots": {
+            "inputs": {
+              "input": "lexical_option_vectors"
+            },
+            "outputs": {
+              "output": "option_lexical_projected"
+            }
+          },
+          "params": {
+            "M": 3,
+            "K": 4096,
+            "N": 1024,
+            "call_constants": {
+              "linear_input_elements": 12288,
+              "linear_input_stride": 4096,
+              "linear_weight_elements": 4194304,
+              "linear_weight_stride": 4096,
+              "linear_output_elements": 3072,
+              "linear_output_stride": 1024,
+              "linear_rows": 3,
+              "linear_input_channels": 4096,
+              "linear_output_channels": 1024
+            }
+          }
+        },
+        {
+          "id": "option_question_projection",
+          "op": "linear_rows_checked_no_bias",
+          "kernel": "linear_rows_checked_no_bias_f32",
+          "returns_status": true,
+          "weight_refs": {
+            "weight": "option_question_projection.weight"
+          },
+          "graph_slots": {
+            "inputs": {
+              "input": "question_vectors"
+            },
+            "outputs": {
+              "output": "option_question_projected"
+            }
+          },
+          "params": {
+            "M": 2,
+            "K": 4096,
+            "N": 1024,
+            "call_constants": {
+              "linear_input_elements": 8192,
+              "linear_input_stride": 4096,
+              "linear_weight_elements": 4194304,
+              "linear_weight_stride": 4096,
+              "linear_output_elements": 2048,
+              "linear_output_stride": 1024,
+              "linear_rows": 2,
+              "linear_input_channels": 4096,
+              "linear_output_channels": 1024
+            }
+          }
+        },
+        {
+          "id": "global_projection",
+          "op": "linear_rows_checked_no_bias",
+          "kernel": "linear_rows_checked_no_bias_f32",
+          "returns_status": true,
+          "weight_refs": {
+            "weight": "global_projection.weight"
+          },
+          "graph_slots": {
+            "inputs": {
+              "input": "global_vector"
+            },
+            "outputs": {
+              "output": "global_projected"
+            }
+          },
+          "params": {
+            "M": 1,
+            "K": 4096,
+            "N": 1024,
+            "call_constants": {
+              "linear_input_elements": 4096,
+              "linear_input_stride": 4096,
+              "linear_weight_elements": 4194304,
+              "linear_weight_stride": 4096,
+              "linear_output_elements": 1024,
+              "linear_output_stride": 1024,
+              "linear_rows": 1,
+              "linear_input_channels": 4096,
+              "linear_output_channels": 1024
+            }
+          }
+        },
+        {
+          "id": "option_context_lexical_join",
+          "op": "add_rows_checked",
+          "kernel": "add_rows_checked_f32",
+          "returns_status": true,
+          "graph_slots": {
+            "inputs": {
+              "left": "option_context_projected",
+              "right": "option_lexical_projected"
+            },
+            "outputs": {
+              "output": "option_context_lexical"
+            }
+          },
+          "params": {
+            "N": 3072,
+            "call_constants": {
+              "left_elements": 3072,
+              "right_elements": 3072,
+              "output_elements": 3072,
+              "elements": 3072
+            }
+          }
+        },
+        {
+          "id": "option_question_join",
+          "op": "indexed_sum_rows_checked",
+          "kernel": "indexed_sum_rows_checked_f32",
+          "returns_status": true,
+          "graph_slots": {
+            "inputs": {
+              "left": "option_context_lexical",
+              "right": "option_question_projected",
+              "left_indices": "external:option_row_indices",
+              "right_indices": "external:option_question_indices"
+            },
+            "outputs": {
+              "output": "option_queries"
+            }
+          },
+          "params": {
+            "L": 3,
+            "K": 2,
+            "R": 3,
+            "C": 1024,
+            "call_constants": {
+              "left_elements": 3072,
+              "left_stride": 1024,
+              "left_rows": 3,
+              "right_elements": 2048,
+              "right_stride": 1024,
+              "right_rows": 2,
+              "left_index_elements": 3,
+              "right_index_elements": 3,
+              "output_elements": 3072,
+              "output_stride": 1024,
+              "rows": 3,
+              "channels": 1024
+            }
+          }
+        }
+      ]
+    },
+    "evidence0": {
+      "sequence": [
+        "header",
+        "body",
+        "footer"
+      ],
+      "header": [
+        {
+          "id": "evidence0_query_norm_op",
+          "op": "layernorm",
+          "kernel": "layernorm_rows_checked_param_epsilon_f32",
+          "returns_status": true,
+          "weight_refs": {
+            "gamma": "evidence_layers.0.query_norm.weight",
+            "beta": "evidence_layers.0.query_norm.bias"
+          },
+          "graph_slots": {
+            "inputs": {
+              "input": "option_queries"
+            },
+            "outputs": {
+              "output": "evidence0_query_norm"
+            }
+          },
+          "params": {
+            "M": 3,
+            "C": 1024,
+            "Q": 3078,
+            "epsilon": 1e-05,
+            "call_constants": {
+              "norm_input_elements": 3072,
+              "norm_input_stride": 1024,
+              "norm_gamma_elements": 1024,
+              "norm_beta_elements": 1024,
+              "norm_output_elements": 3072,
+              "norm_output_stride": 1024,
+              "norm_scratch_elements": 3078,
+              "norm_rows": 3,
+              "norm_channels": 1024
+            }
+          }
+        },
+        {
+          "id": "evidence0_memory_norm_op",
+          "op": "layernorm",
+          "kernel": "layernorm_rows_checked_param_epsilon_f32",
+          "returns_status": true,
+          "weight_refs": {
+            "gamma": "evidence_layers.0.memory_norm.weight",
+            "beta": "evidence_layers.0.memory_norm.bias"
+          },
+          "graph_slots": {
+            "inputs": {
+              "input": "memory"
+            },
+            "outputs": {
+              "output": "evidence0_memory_norm"
+            }
+          },
+          "params": {
+            "M": 6,
+            "C": 1024,
+            "Q": 6156,
+            "epsilon": 1e-05,
+            "call_constants": {
+              "norm_input_elements": 6144,
+              "norm_input_stride": 1024,
+              "norm_gamma_elements": 1024,
+              "norm_beta_elements": 1024,
+              "norm_output_elements": 6144,
+              "norm_output_stride": 1024,
+              "norm_scratch_elements": 6156,
+              "norm_rows": 6,
+              "norm_channels": 1024
+            }
+          }
+        }
+      ],
+      "body": {
+        "type": "dense",
+        "ops": [
+          {
+            "id": "evidence0_q_projection",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "weight_refs": {
+              "weight": "evidence_layers.0.attention.q_proj.weight",
+              "bias": "evidence_layers.0.attention.q_proj.bias"
+            },
+            "graph_slots": {
+              "inputs": {
+                "input": "evidence0_query_norm"
+              },
+              "outputs": {
+                "output": "evidence0_q"
+              }
+            },
+            "params": {
+              "M": 3,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 3072,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 3072,
+                "linear_output_stride": 1024,
+                "linear_rows": 3,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            }
+          },
+          {
+            "id": "evidence0_k_projection",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "weight_refs": {
+              "weight": "evidence_layers.0.attention.k_proj.weight",
+              "bias": "evidence_layers.0.attention.k_proj.bias"
+            },
+            "graph_slots": {
+              "inputs": {
+                "input": "evidence0_memory_norm"
+              },
+              "outputs": {
+                "output": "evidence0_k"
+              }
+            },
+            "params": {
+              "M": 6,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 6144,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 6144,
+                "linear_output_stride": 1024,
+                "linear_rows": 6,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            }
+          },
+          {
+            "id": "evidence0_v_projection",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "weight_refs": {
+              "weight": "evidence_layers.0.attention.v_proj.weight",
+              "bias": "evidence_layers.0.attention.v_proj.bias"
+            },
+            "graph_slots": {
+              "inputs": {
+                "input": "evidence0_memory_norm"
+              },
+              "outputs": {
+                "output": "evidence0_v"
+              }
+            },
+            "params": {
+              "M": 6,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 6144,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 6144,
+                "linear_output_stride": 1024,
+                "linear_rows": 6,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            }
+          },
+          {
+            "id": "evidence0_cross_attention",
+            "op": "attention_cross_token_major_checked",
+            "kernel": "attention_cross_token_major_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "query": "evidence0_q",
+                "key": "evidence0_k",
+                "value": "evidence0_v"
+              },
+              "outputs": {
+                "output": "evidence0_context"
+              }
+            },
+            "params": {
+              "Q": 3,
+              "S": 6,
+              "H": 16,
+              "D": 64,
+              "X": 3078,
+              "call_constants": {
+                "query_elements": 3072,
+                "key_elements": 6144,
+                "value_elements": 6144,
+                "output_elements": 3072,
+                "scratch_elements": 3078,
+                "query_tokens": 3,
+                "memory_tokens": 6,
+                "heads": 16,
+                "head_dim": 64
+              }
+            }
+          },
+          {
+            "id": "evidence0_output_projection",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "weight_refs": {
+              "weight": "evidence_layers.0.attention.out_proj.weight",
+              "bias": "evidence_layers.0.attention.out_proj.bias"
+            },
+            "graph_slots": {
+              "inputs": {
+                "input": "evidence0_context"
+              },
+              "outputs": {
+                "output": "evidence0_attn_out"
+              }
+            },
+            "params": {
+              "M": 3,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 3072,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 3072,
+                "linear_output_stride": 1024,
+                "linear_rows": 3,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            }
+          },
+          {
+            "id": "evidence0_attention_residual",
+            "op": "add_rows_checked",
+            "kernel": "add_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "left": "option_queries",
+                "right": "evidence0_attn_out"
+              },
+              "outputs": {
+                "output": "evidence0_attn_residual"
+              }
+            },
+            "params": {
+              "N": 3072,
+              "call_constants": {
+                "left_elements": 3072,
+                "right_elements": 3072,
+                "output_elements": 3072,
+                "elements": 3072
+              }
+            }
+          },
+          {
+            "id": "evidence0_feedforward_norm_op",
+            "op": "layernorm",
+            "kernel": "layernorm_rows_checked_param_epsilon_f32",
+            "returns_status": true,
+            "weight_refs": {
+              "gamma": "evidence_layers.0.feedforward_norm.weight",
+              "beta": "evidence_layers.0.feedforward_norm.bias"
+            },
+            "graph_slots": {
+              "inputs": {
+                "input": "evidence0_attn_residual"
+              },
+              "outputs": {
+                "output": "evidence0_ff_norm"
+              }
+            },
+            "params": {
+              "M": 3,
+              "C": 1024,
+              "Q": 3078,
+              "epsilon": 1e-05,
+              "call_constants": {
+                "norm_input_elements": 3072,
+                "norm_input_stride": 1024,
+                "norm_gamma_elements": 1024,
+                "norm_beta_elements": 1024,
+                "norm_output_elements": 3072,
+                "norm_output_stride": 1024,
+                "norm_scratch_elements": 3078,
+                "norm_rows": 3,
+                "norm_channels": 1024
+              }
+            }
+          },
+          {
+            "id": "evidence0_feedforward1",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "weight_refs": {
+              "weight": "evidence_layers.0.feedforward.0.weight",
+              "bias": "evidence_layers.0.feedforward.0.bias"
+            },
+            "graph_slots": {
+              "inputs": {
+                "input": "evidence0_ff_norm"
+              },
+              "outputs": {
+                "output": "evidence0_ff1"
+              }
+            },
+            "params": {
+              "M": 3,
+              "K": 1024,
+              "N": 4096,
+              "call_constants": {
+                "linear_input_elements": 3072,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 4194304,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 4096,
+                "linear_output_elements": 12288,
+                "linear_output_stride": 4096,
+                "linear_rows": 3,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 4096
+              }
+            }
+          },
+          {
+            "id": "evidence0_gelu_op",
+            "op": "gelu",
+            "kernel": "gelu_rows_erf_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "evidence0_ff1"
+              },
+              "outputs": {
+                "output": "evidence0_gelu"
+              }
+            },
+            "params": {
+              "M": 3,
+              "C": 4096,
+              "Q": 12288,
+              "call_constants": {
+                "gelu_input_elements": 12288,
+                "gelu_input_stride": 4096,
+                "gelu_output_elements": 12288,
+                "gelu_output_stride": 4096,
+                "gelu_scratch_elements": 12288,
+                "gelu_rows": 3,
+                "gelu_channels": 4096
+              }
+            }
+          },
+          {
+            "id": "evidence0_feedforward2",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "weight_refs": {
+              "weight": "evidence_layers.0.feedforward.3.weight",
+              "bias": "evidence_layers.0.feedforward.3.bias"
+            },
+            "graph_slots": {
+              "inputs": {
+                "input": "evidence0_gelu"
+              },
+              "outputs": {
+                "output": "evidence0_ff2"
+              }
+            },
+            "params": {
+              "M": 3,
+              "K": 4096,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 12288,
+                "linear_input_stride": 4096,
+                "linear_weight_elements": 4194304,
+                "linear_weight_stride": 4096,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 3072,
+                "linear_output_stride": 1024,
+                "linear_rows": 3,
+                "linear_input_channels": 4096,
+                "linear_output_channels": 1024
+              }
+            }
+          }
+        ]
+      },
+      "footer": [
+        {
+          "id": "evidence0_feedforward_residual",
+          "op": "add_rows_checked",
+          "kernel": "add_rows_checked_f32",
+          "returns_status": true,
+          "graph_slots": {
+            "inputs": {
+              "left": "evidence0_attn_residual",
+              "right": "evidence0_ff2"
+            },
+            "outputs": {
+              "output": "evidence0_output"
+            }
+          },
+          "params": {
+            "N": 3072,
+            "call_constants": {
+              "left_elements": 3072,
+              "right_elements": 3072,
+              "output_elements": 3072,
+              "elements": 3072
+            }
+          }
+        }
+      ]
+    },
+    "evidence1": {
+      "sequence": [
+        "header",
+        "body",
+        "footer"
+      ],
+      "header": [
+        {
+          "id": "evidence1_query_norm_op",
+          "op": "layernorm",
+          "kernel": "layernorm_rows_checked_param_epsilon_f32",
+          "returns_status": true,
+          "weight_refs": {
+            "gamma": "evidence_layers.1.query_norm.weight",
+            "beta": "evidence_layers.1.query_norm.bias"
+          },
+          "graph_slots": {
+            "inputs": {
+              "input": "evidence0_output"
+            },
+            "outputs": {
+              "output": "evidence1_query_norm"
+            }
+          },
+          "params": {
+            "M": 3,
+            "C": 1024,
+            "Q": 3078,
+            "epsilon": 1e-05,
+            "call_constants": {
+              "norm_input_elements": 3072,
+              "norm_input_stride": 1024,
+              "norm_gamma_elements": 1024,
+              "norm_beta_elements": 1024,
+              "norm_output_elements": 3072,
+              "norm_output_stride": 1024,
+              "norm_scratch_elements": 3078,
+              "norm_rows": 3,
+              "norm_channels": 1024
+            }
+          }
+        },
+        {
+          "id": "evidence1_memory_norm_op",
+          "op": "layernorm",
+          "kernel": "layernorm_rows_checked_param_epsilon_f32",
+          "returns_status": true,
+          "weight_refs": {
+            "gamma": "evidence_layers.1.memory_norm.weight",
+            "beta": "evidence_layers.1.memory_norm.bias"
+          },
+          "graph_slots": {
+            "inputs": {
+              "input": "memory"
+            },
+            "outputs": {
+              "output": "evidence1_memory_norm"
+            }
+          },
+          "params": {
+            "M": 6,
+            "C": 1024,
+            "Q": 6156,
+            "epsilon": 1e-05,
+            "call_constants": {
+              "norm_input_elements": 6144,
+              "norm_input_stride": 1024,
+              "norm_gamma_elements": 1024,
+              "norm_beta_elements": 1024,
+              "norm_output_elements": 6144,
+              "norm_output_stride": 1024,
+              "norm_scratch_elements": 6156,
+              "norm_rows": 6,
+              "norm_channels": 1024
+            }
+          }
+        }
+      ],
+      "body": {
+        "type": "dense",
+        "ops": [
+          {
+            "id": "evidence1_q_projection",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "weight_refs": {
+              "weight": "evidence_layers.1.attention.q_proj.weight",
+              "bias": "evidence_layers.1.attention.q_proj.bias"
+            },
+            "graph_slots": {
+              "inputs": {
+                "input": "evidence1_query_norm"
+              },
+              "outputs": {
+                "output": "evidence1_q"
+              }
+            },
+            "params": {
+              "M": 3,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 3072,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 3072,
+                "linear_output_stride": 1024,
+                "linear_rows": 3,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            }
+          },
+          {
+            "id": "evidence1_k_projection",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "weight_refs": {
+              "weight": "evidence_layers.1.attention.k_proj.weight",
+              "bias": "evidence_layers.1.attention.k_proj.bias"
+            },
+            "graph_slots": {
+              "inputs": {
+                "input": "evidence1_memory_norm"
+              },
+              "outputs": {
+                "output": "evidence1_k"
+              }
+            },
+            "params": {
+              "M": 6,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 6144,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 6144,
+                "linear_output_stride": 1024,
+                "linear_rows": 6,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            }
+          },
+          {
+            "id": "evidence1_v_projection",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "weight_refs": {
+              "weight": "evidence_layers.1.attention.v_proj.weight",
+              "bias": "evidence_layers.1.attention.v_proj.bias"
+            },
+            "graph_slots": {
+              "inputs": {
+                "input": "evidence1_memory_norm"
+              },
+              "outputs": {
+                "output": "evidence1_v"
+              }
+            },
+            "params": {
+              "M": 6,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 6144,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 6144,
+                "linear_output_stride": 1024,
+                "linear_rows": 6,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            }
+          },
+          {
+            "id": "evidence1_cross_attention",
+            "op": "attention_cross_token_major_checked",
+            "kernel": "attention_cross_token_major_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "query": "evidence1_q",
+                "key": "evidence1_k",
+                "value": "evidence1_v"
+              },
+              "outputs": {
+                "output": "evidence1_context"
+              }
+            },
+            "params": {
+              "Q": 3,
+              "S": 6,
+              "H": 16,
+              "D": 64,
+              "X": 3078,
+              "call_constants": {
+                "query_elements": 3072,
+                "key_elements": 6144,
+                "value_elements": 6144,
+                "output_elements": 3072,
+                "scratch_elements": 3078,
+                "query_tokens": 3,
+                "memory_tokens": 6,
+                "heads": 16,
+                "head_dim": 64
+              }
+            }
+          },
+          {
+            "id": "evidence1_output_projection",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "weight_refs": {
+              "weight": "evidence_layers.1.attention.out_proj.weight",
+              "bias": "evidence_layers.1.attention.out_proj.bias"
+            },
+            "graph_slots": {
+              "inputs": {
+                "input": "evidence1_context"
+              },
+              "outputs": {
+                "output": "evidence1_attn_out"
+              }
+            },
+            "params": {
+              "M": 3,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 3072,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 3072,
+                "linear_output_stride": 1024,
+                "linear_rows": 3,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            }
+          },
+          {
+            "id": "evidence1_attention_residual",
+            "op": "add_rows_checked",
+            "kernel": "add_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "left": "evidence0_output",
+                "right": "evidence1_attn_out"
+              },
+              "outputs": {
+                "output": "evidence1_attn_residual"
+              }
+            },
+            "params": {
+              "N": 3072,
+              "call_constants": {
+                "left_elements": 3072,
+                "right_elements": 3072,
+                "output_elements": 3072,
+                "elements": 3072
+              }
+            }
+          },
+          {
+            "id": "evidence1_feedforward_norm_op",
+            "op": "layernorm",
+            "kernel": "layernorm_rows_checked_param_epsilon_f32",
+            "returns_status": true,
+            "weight_refs": {
+              "gamma": "evidence_layers.1.feedforward_norm.weight",
+              "beta": "evidence_layers.1.feedforward_norm.bias"
+            },
+            "graph_slots": {
+              "inputs": {
+                "input": "evidence1_attn_residual"
+              },
+              "outputs": {
+                "output": "evidence1_ff_norm"
+              }
+            },
+            "params": {
+              "M": 3,
+              "C": 1024,
+              "Q": 3078,
+              "epsilon": 1e-05,
+              "call_constants": {
+                "norm_input_elements": 3072,
+                "norm_input_stride": 1024,
+                "norm_gamma_elements": 1024,
+                "norm_beta_elements": 1024,
+                "norm_output_elements": 3072,
+                "norm_output_stride": 1024,
+                "norm_scratch_elements": 3078,
+                "norm_rows": 3,
+                "norm_channels": 1024
+              }
+            }
+          },
+          {
+            "id": "evidence1_feedforward1",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "weight_refs": {
+              "weight": "evidence_layers.1.feedforward.0.weight",
+              "bias": "evidence_layers.1.feedforward.0.bias"
+            },
+            "graph_slots": {
+              "inputs": {
+                "input": "evidence1_ff_norm"
+              },
+              "outputs": {
+                "output": "evidence1_ff1"
+              }
+            },
+            "params": {
+              "M": 3,
+              "K": 1024,
+              "N": 4096,
+              "call_constants": {
+                "linear_input_elements": 3072,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 4194304,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 4096,
+                "linear_output_elements": 12288,
+                "linear_output_stride": 4096,
+                "linear_rows": 3,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 4096
+              }
+            }
+          },
+          {
+            "id": "evidence1_gelu_op",
+            "op": "gelu",
+            "kernel": "gelu_rows_erf_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "evidence1_ff1"
+              },
+              "outputs": {
+                "output": "evidence1_gelu"
+              }
+            },
+            "params": {
+              "M": 3,
+              "C": 4096,
+              "Q": 12288,
+              "call_constants": {
+                "gelu_input_elements": 12288,
+                "gelu_input_stride": 4096,
+                "gelu_output_elements": 12288,
+                "gelu_output_stride": 4096,
+                "gelu_scratch_elements": 12288,
+                "gelu_rows": 3,
+                "gelu_channels": 4096
+              }
+            }
+          },
+          {
+            "id": "evidence1_feedforward2",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "weight_refs": {
+              "weight": "evidence_layers.1.feedforward.3.weight",
+              "bias": "evidence_layers.1.feedforward.3.bias"
+            },
+            "graph_slots": {
+              "inputs": {
+                "input": "evidence1_gelu"
+              },
+              "outputs": {
+                "output": "evidence1_ff2"
+              }
+            },
+            "params": {
+              "M": 3,
+              "K": 4096,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 12288,
+                "linear_input_stride": 4096,
+                "linear_weight_elements": 4194304,
+                "linear_weight_stride": 4096,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 3072,
+                "linear_output_stride": 1024,
+                "linear_rows": 3,
+                "linear_input_channels": 4096,
+                "linear_output_channels": 1024
+              }
+            }
+          }
+        ]
+      },
+      "footer": [
+        {
+          "id": "evidence1_feedforward_residual",
+          "op": "add_rows_checked",
+          "kernel": "add_rows_checked_f32",
+          "returns_status": true,
+          "graph_slots": {
+            "inputs": {
+              "left": "evidence1_attn_residual",
+              "right": "evidence1_ff2"
+            },
+            "outputs": {
+              "output": "evidence1_output"
+            }
+          },
+          "params": {
+            "N": 3072,
+            "call_constants": {
+              "left_elements": 3072,
+              "right_elements": 3072,
+              "output_elements": 3072,
+              "elements": 3072
+            }
+          }
+        }
+      ]
+    },
+    "option_summary": {
+      "sequence": [
+        "header",
+        "body",
+        "footer"
+      ],
+      "header": [],
+      "body": {
+        "type": "dense",
+        "ops": [
+          {
+            "id": "option_summary_pool",
+            "op": "grouped_softmax_weighted_rows_checked",
+            "kernel": "grouped_softmax_weighted_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "options": "evidence1_output",
+                "fields": "question_projected",
+                "group_counts": "external:option_counts"
+              },
+              "outputs": {
+                "output": "option_summary_raw"
+              }
+            },
+            "params": {
+              "G": 2,
+              "O": 3,
+              "C": 1024,
+              "X": 2051,
+              "call_constants": {
+                "option_elements": 3072,
+                "option_stride": 1024,
+                "field_elements": 2048,
+                "field_stride": 1024,
+                "count_elements": 2,
+                "output_elements": 2048,
+                "output_stride": 1024,
+                "scratch_elements": 2051,
+                "groups": 2,
+                "option_rows": 3,
+                "channels": 1024
+              }
+            }
+          }
+        ]
+      },
+      "footer": [
+        {
+          "id": "option_summary_norm",
+          "op": "layernorm",
+          "kernel": "layernorm_rows_checked_param_epsilon_f32",
+          "returns_status": true,
+          "weight_refs": {
+            "gamma": "option_summary_norm.weight",
+            "beta": "option_summary_norm.bias"
+          },
+          "graph_slots": {
+            "inputs": {
+              "input": "option_summary_raw"
+            },
+            "outputs": {
+              "output": "option_summary_normalized"
+            }
+          },
+          "params": {
+            "M": 2,
+            "C": 1024,
+            "Q": 2052,
+            "epsilon": 1e-05,
+            "call_constants": {
+              "norm_input_elements": 2048,
+              "norm_input_stride": 1024,
+              "norm_gamma_elements": 1024,
+              "norm_beta_elements": 1024,
+              "norm_output_elements": 2048,
+              "norm_output_stride": 1024,
+              "norm_scratch_elements": 2052,
+              "norm_rows": 2,
+              "norm_channels": 1024
+            }
+          }
+        }
+      ]
+    },
+    "field_assembly": {
+      "sequence": [
+        "header",
+        "body",
+        "footer"
+      ],
+      "header": [],
+      "body": {
+        "type": "dense",
+        "ops": [
+          {
+            "id": "type_embedding",
+            "op": "embedding_lookup_token_major_checked",
+            "kernel": "audio_text_embedding_token_major_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "ids": "external:question_type_ids"
+              },
+              "outputs": {
+                "output": "type_embedding"
+              }
+            },
+            "params": {
+              "T": 2,
+              "V": 3,
+              "C": 1024,
+              "call_constants": {
+                "id_elements": 2,
+                "table_elements": 3072,
+                "vocabulary": 3,
+                "channels": 1024,
+                "table_stride": 1024,
+                "output_elements": 2048,
+                "tokens": 2,
+                "output_stride": 1024
+              }
+            },
+            "weight_refs": {
+              "table": "type_embedding.weight"
+            }
+          },
+          {
+            "id": "fields_summary",
+            "op": "add_rows_checked",
+            "kernel": "add_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "left": "question_projected",
+                "right": "option_summary_normalized"
+              },
+              "outputs": {
+                "output": "fields_summary"
+              }
+            },
+            "params": {
+              "N": 2048,
+              "call_constants": {
+                "left_elements": 2048,
+                "right_elements": 2048,
+                "output_elements": 2048,
+                "elements": 2048
+              }
+            }
+          },
+          {
+            "id": "fields_global",
+            "op": "broadcast_add_rows_checked",
+            "kernel": "broadcast_add_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "left": "fields_summary",
+                "right": "global_projected"
+              },
+              "outputs": {
+                "output": "fields_global"
+              }
+            },
+            "params": {
+              "R": 2,
+              "C": 1024,
+              "X": 2048,
+              "call_constants": {
+                "left_elements": 2048,
+                "right_elements": 1024,
+                "output_elements": 2048,
+                "scratch_elements": 2048,
+                "rows": 2,
+                "channels": 1024
+              }
+            }
+          },
+          {
+            "id": "fields_input",
+            "op": "add_rows_checked",
+            "kernel": "add_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "left": "fields_global",
+                "right": "type_embedding"
+              },
+              "outputs": {
+                "output": "fields_input"
+              }
+            },
+            "params": {
+              "N": 2048,
+              "call_constants": {
+                "left_elements": 2048,
+                "right_elements": 2048,
+                "output_elements": 2048,
+                "elements": 2048
+              }
+            }
+          }
+        ]
+      },
+      "footer": []
+    },
+    "fields0": {
+      "sequence": [
+        "header",
+        "body",
+        "footer"
+      ],
+      "header": [],
+      "body": {
+        "type": "dense",
+        "ops": [
+          {
+            "id": "fields0_norm1",
+            "op": "layernorm",
+            "kernel": "layernorm_rows_checked_param_epsilon_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields_input"
+              },
+              "outputs": {
+                "output": "fields0_norm1"
+              }
+            },
+            "params": {
+              "M": 2,
+              "C": 1024,
+              "Q": 2052,
+              "epsilon": 1e-05,
+              "call_constants": {
+                "norm_input_elements": 2048,
+                "norm_input_stride": 1024,
+                "norm_gamma_elements": 1024,
+                "norm_beta_elements": 1024,
+                "norm_output_elements": 2048,
+                "norm_output_stride": 1024,
+                "norm_scratch_elements": 2052,
+                "norm_rows": 2,
+                "norm_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "gamma": "layers.0.norm1.weight",
+              "beta": "layers.0.norm1.bias"
+            }
+          },
+          {
+            "id": "fields0_self_q",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields0_norm1"
+              },
+              "outputs": {
+                "output": "fields0_self_q"
+              }
+            },
+            "params": {
+              "M": 2,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 2048,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 2048,
+                "linear_output_stride": 1024,
+                "linear_rows": 2,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.0.self_attn.q_proj.weight",
+              "bias": "layers.0.self_attn.q_proj.bias"
+            }
+          },
+          {
+            "id": "fields0_self_k",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields0_norm1"
+              },
+              "outputs": {
+                "output": "fields0_self_k"
+              }
+            },
+            "params": {
+              "M": 2,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 2048,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 2048,
+                "linear_output_stride": 1024,
+                "linear_rows": 2,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.0.self_attn.k_proj.weight",
+              "bias": "layers.0.self_attn.k_proj.bias"
+            }
+          },
+          {
+            "id": "fields0_self_v",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields0_norm1"
+              },
+              "outputs": {
+                "output": "fields0_self_v"
+              }
+            },
+            "params": {
+              "M": 2,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 2048,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 2048,
+                "linear_output_stride": 1024,
+                "linear_rows": 2,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.0.self_attn.v_proj.weight",
+              "bias": "layers.0.self_attn.v_proj.bias"
+            }
+          },
+          {
+            "id": "fields0_self_context",
+            "op": "attention_cross_token_major_checked",
+            "kernel": "attention_cross_token_major_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "query": "fields0_self_q",
+                "key": "fields0_self_k",
+                "value": "fields0_self_v"
+              },
+              "outputs": {
+                "output": "fields0_self_context"
+              }
+            },
+            "params": {
+              "Q": 2,
+              "S": 2,
+              "H": 16,
+              "D": 64,
+              "X": 2050,
+              "call_constants": {
+                "query_elements": 2048,
+                "key_elements": 2048,
+                "value_elements": 2048,
+                "output_elements": 2048,
+                "scratch_elements": 2050,
+                "query_tokens": 2,
+                "memory_tokens": 2,
+                "heads": 16,
+                "head_dim": 64
+              }
+            }
+          },
+          {
+            "id": "fields0_self_out",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields0_self_context"
+              },
+              "outputs": {
+                "output": "fields0_self_out"
+              }
+            },
+            "params": {
+              "M": 2,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 2048,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 2048,
+                "linear_output_stride": 1024,
+                "linear_rows": 2,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.0.self_attn.out_proj.weight",
+              "bias": "layers.0.self_attn.out_proj.bias"
+            }
+          },
+          {
+            "id": "fields0_self_residual",
+            "op": "add_rows_checked",
+            "kernel": "add_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "left": "fields_input",
+                "right": "fields0_self_out"
+              },
+              "outputs": {
+                "output": "fields0_self_residual"
+              }
+            },
+            "params": {
+              "N": 2048,
+              "call_constants": {
+                "left_elements": 2048,
+                "right_elements": 2048,
+                "output_elements": 2048,
+                "elements": 2048
+              }
+            }
+          },
+          {
+            "id": "fields0_norm2",
+            "op": "layernorm",
+            "kernel": "layernorm_rows_checked_param_epsilon_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields0_self_residual"
+              },
+              "outputs": {
+                "output": "fields0_norm2"
+              }
+            },
+            "params": {
+              "M": 2,
+              "C": 1024,
+              "Q": 2052,
+              "epsilon": 1e-05,
+              "call_constants": {
+                "norm_input_elements": 2048,
+                "norm_input_stride": 1024,
+                "norm_gamma_elements": 1024,
+                "norm_beta_elements": 1024,
+                "norm_output_elements": 2048,
+                "norm_output_stride": 1024,
+                "norm_scratch_elements": 2052,
+                "norm_rows": 2,
+                "norm_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "gamma": "layers.0.norm2.weight",
+              "beta": "layers.0.norm2.bias"
+            }
+          },
+          {
+            "id": "fields0_cross_q",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields0_norm2"
+              },
+              "outputs": {
+                "output": "fields0_cross_q"
+              }
+            },
+            "params": {
+              "M": 2,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 2048,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 2048,
+                "linear_output_stride": 1024,
+                "linear_rows": 2,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.0.multihead_attn.q_proj.weight",
+              "bias": "layers.0.multihead_attn.q_proj.bias"
+            }
+          },
+          {
+            "id": "fields0_cross_k",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "memory"
+              },
+              "outputs": {
+                "output": "fields0_cross_k"
+              }
+            },
+            "params": {
+              "M": 6,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 6144,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 6144,
+                "linear_output_stride": 1024,
+                "linear_rows": 6,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.0.multihead_attn.k_proj.weight",
+              "bias": "layers.0.multihead_attn.k_proj.bias"
+            }
+          },
+          {
+            "id": "fields0_cross_v",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "memory"
+              },
+              "outputs": {
+                "output": "fields0_cross_v"
+              }
+            },
+            "params": {
+              "M": 6,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 6144,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 6144,
+                "linear_output_stride": 1024,
+                "linear_rows": 6,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.0.multihead_attn.v_proj.weight",
+              "bias": "layers.0.multihead_attn.v_proj.bias"
+            }
+          },
+          {
+            "id": "fields0_cross_context",
+            "op": "attention_cross_token_major_checked",
+            "kernel": "attention_cross_token_major_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "query": "fields0_cross_q",
+                "key": "fields0_cross_k",
+                "value": "fields0_cross_v"
+              },
+              "outputs": {
+                "output": "fields0_cross_context"
+              }
+            },
+            "params": {
+              "Q": 2,
+              "S": 6,
+              "H": 16,
+              "D": 64,
+              "X": 2054,
+              "call_constants": {
+                "query_elements": 2048,
+                "key_elements": 6144,
+                "value_elements": 6144,
+                "output_elements": 2048,
+                "scratch_elements": 2054,
+                "query_tokens": 2,
+                "memory_tokens": 6,
+                "heads": 16,
+                "head_dim": 64
+              }
+            }
+          },
+          {
+            "id": "fields0_cross_out",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields0_cross_context"
+              },
+              "outputs": {
+                "output": "fields0_cross_out"
+              }
+            },
+            "params": {
+              "M": 2,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 2048,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 2048,
+                "linear_output_stride": 1024,
+                "linear_rows": 2,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.0.multihead_attn.out_proj.weight",
+              "bias": "layers.0.multihead_attn.out_proj.bias"
+            }
+          },
+          {
+            "id": "fields0_cross_residual",
+            "op": "add_rows_checked",
+            "kernel": "add_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "left": "fields0_self_residual",
+                "right": "fields0_cross_out"
+              },
+              "outputs": {
+                "output": "fields0_cross_residual"
+              }
+            },
+            "params": {
+              "N": 2048,
+              "call_constants": {
+                "left_elements": 2048,
+                "right_elements": 2048,
+                "output_elements": 2048,
+                "elements": 2048
+              }
+            }
+          },
+          {
+            "id": "fields0_norm3",
+            "op": "layernorm",
+            "kernel": "layernorm_rows_checked_param_epsilon_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields0_cross_residual"
+              },
+              "outputs": {
+                "output": "fields0_norm3"
+              }
+            },
+            "params": {
+              "M": 2,
+              "C": 1024,
+              "Q": 2052,
+              "epsilon": 1e-05,
+              "call_constants": {
+                "norm_input_elements": 2048,
+                "norm_input_stride": 1024,
+                "norm_gamma_elements": 1024,
+                "norm_beta_elements": 1024,
+                "norm_output_elements": 2048,
+                "norm_output_stride": 1024,
+                "norm_scratch_elements": 2052,
+                "norm_rows": 2,
+                "norm_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "gamma": "layers.0.norm3.weight",
+              "beta": "layers.0.norm3.bias"
+            }
+          },
+          {
+            "id": "fields0_ff1",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields0_norm3"
+              },
+              "outputs": {
+                "output": "fields0_ff1"
+              }
+            },
+            "params": {
+              "M": 2,
+              "K": 1024,
+              "N": 4096,
+              "call_constants": {
+                "linear_input_elements": 2048,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 4194304,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 4096,
+                "linear_output_elements": 8192,
+                "linear_output_stride": 4096,
+                "linear_rows": 2,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 4096
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.0.linear1.weight",
+              "bias": "layers.0.linear1.bias"
+            }
+          },
+          {
+            "id": "fields0_gelu",
+            "op": "gelu",
+            "kernel": "gelu_rows_erf_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields0_ff1"
+              },
+              "outputs": {
+                "output": "fields0_gelu"
+              }
+            },
+            "params": {
+              "M": 2,
+              "C": 4096,
+              "Q": 8192,
+              "call_constants": {
+                "gelu_input_elements": 8192,
+                "gelu_input_stride": 4096,
+                "gelu_output_elements": 8192,
+                "gelu_output_stride": 4096,
+                "gelu_scratch_elements": 8192,
+                "gelu_rows": 2,
+                "gelu_channels": 4096
+              }
+            }
+          },
+          {
+            "id": "fields0_ff2",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields0_gelu"
+              },
+              "outputs": {
+                "output": "fields0_ff2"
+              }
+            },
+            "params": {
+              "M": 2,
+              "K": 4096,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 8192,
+                "linear_input_stride": 4096,
+                "linear_weight_elements": 4194304,
+                "linear_weight_stride": 4096,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 2048,
+                "linear_output_stride": 1024,
+                "linear_rows": 2,
+                "linear_input_channels": 4096,
+                "linear_output_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.0.linear2.weight",
+              "bias": "layers.0.linear2.bias"
+            }
+          },
+          {
+            "id": "fields0_output",
+            "op": "add_rows_checked",
+            "kernel": "add_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "left": "fields0_cross_residual",
+                "right": "fields0_ff2"
+              },
+              "outputs": {
+                "output": "fields0_output"
+              }
+            },
+            "params": {
+              "N": 2048,
+              "call_constants": {
+                "left_elements": 2048,
+                "right_elements": 2048,
+                "output_elements": 2048,
+                "elements": 2048
+              }
+            }
+          }
+        ]
+      },
+      "footer": []
+    },
+    "fields1": {
+      "sequence": [
+        "header",
+        "body",
+        "footer"
+      ],
+      "header": [],
+      "body": {
+        "type": "dense",
+        "ops": [
+          {
+            "id": "fields1_norm1",
+            "op": "layernorm",
+            "kernel": "layernorm_rows_checked_param_epsilon_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields0_output"
+              },
+              "outputs": {
+                "output": "fields1_norm1"
+              }
+            },
+            "params": {
+              "M": 2,
+              "C": 1024,
+              "Q": 2052,
+              "epsilon": 1e-05,
+              "call_constants": {
+                "norm_input_elements": 2048,
+                "norm_input_stride": 1024,
+                "norm_gamma_elements": 1024,
+                "norm_beta_elements": 1024,
+                "norm_output_elements": 2048,
+                "norm_output_stride": 1024,
+                "norm_scratch_elements": 2052,
+                "norm_rows": 2,
+                "norm_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "gamma": "layers.1.norm1.weight",
+              "beta": "layers.1.norm1.bias"
+            }
+          },
+          {
+            "id": "fields1_self_q",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields1_norm1"
+              },
+              "outputs": {
+                "output": "fields1_self_q"
+              }
+            },
+            "params": {
+              "M": 2,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 2048,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 2048,
+                "linear_output_stride": 1024,
+                "linear_rows": 2,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.1.self_attn.q_proj.weight",
+              "bias": "layers.1.self_attn.q_proj.bias"
+            }
+          },
+          {
+            "id": "fields1_self_k",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields1_norm1"
+              },
+              "outputs": {
+                "output": "fields1_self_k"
+              }
+            },
+            "params": {
+              "M": 2,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 2048,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 2048,
+                "linear_output_stride": 1024,
+                "linear_rows": 2,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.1.self_attn.k_proj.weight",
+              "bias": "layers.1.self_attn.k_proj.bias"
+            }
+          },
+          {
+            "id": "fields1_self_v",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields1_norm1"
+              },
+              "outputs": {
+                "output": "fields1_self_v"
+              }
+            },
+            "params": {
+              "M": 2,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 2048,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 2048,
+                "linear_output_stride": 1024,
+                "linear_rows": 2,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.1.self_attn.v_proj.weight",
+              "bias": "layers.1.self_attn.v_proj.bias"
+            }
+          },
+          {
+            "id": "fields1_self_context",
+            "op": "attention_cross_token_major_checked",
+            "kernel": "attention_cross_token_major_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "query": "fields1_self_q",
+                "key": "fields1_self_k",
+                "value": "fields1_self_v"
+              },
+              "outputs": {
+                "output": "fields1_self_context"
+              }
+            },
+            "params": {
+              "Q": 2,
+              "S": 2,
+              "H": 16,
+              "D": 64,
+              "X": 2050,
+              "call_constants": {
+                "query_elements": 2048,
+                "key_elements": 2048,
+                "value_elements": 2048,
+                "output_elements": 2048,
+                "scratch_elements": 2050,
+                "query_tokens": 2,
+                "memory_tokens": 2,
+                "heads": 16,
+                "head_dim": 64
+              }
+            }
+          },
+          {
+            "id": "fields1_self_out",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields1_self_context"
+              },
+              "outputs": {
+                "output": "fields1_self_out"
+              }
+            },
+            "params": {
+              "M": 2,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 2048,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 2048,
+                "linear_output_stride": 1024,
+                "linear_rows": 2,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.1.self_attn.out_proj.weight",
+              "bias": "layers.1.self_attn.out_proj.bias"
+            }
+          },
+          {
+            "id": "fields1_self_residual",
+            "op": "add_rows_checked",
+            "kernel": "add_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "left": "fields0_output",
+                "right": "fields1_self_out"
+              },
+              "outputs": {
+                "output": "fields1_self_residual"
+              }
+            },
+            "params": {
+              "N": 2048,
+              "call_constants": {
+                "left_elements": 2048,
+                "right_elements": 2048,
+                "output_elements": 2048,
+                "elements": 2048
+              }
+            }
+          },
+          {
+            "id": "fields1_norm2",
+            "op": "layernorm",
+            "kernel": "layernorm_rows_checked_param_epsilon_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields1_self_residual"
+              },
+              "outputs": {
+                "output": "fields1_norm2"
+              }
+            },
+            "params": {
+              "M": 2,
+              "C": 1024,
+              "Q": 2052,
+              "epsilon": 1e-05,
+              "call_constants": {
+                "norm_input_elements": 2048,
+                "norm_input_stride": 1024,
+                "norm_gamma_elements": 1024,
+                "norm_beta_elements": 1024,
+                "norm_output_elements": 2048,
+                "norm_output_stride": 1024,
+                "norm_scratch_elements": 2052,
+                "norm_rows": 2,
+                "norm_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "gamma": "layers.1.norm2.weight",
+              "beta": "layers.1.norm2.bias"
+            }
+          },
+          {
+            "id": "fields1_cross_q",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields1_norm2"
+              },
+              "outputs": {
+                "output": "fields1_cross_q"
+              }
+            },
+            "params": {
+              "M": 2,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 2048,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 2048,
+                "linear_output_stride": 1024,
+                "linear_rows": 2,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.1.multihead_attn.q_proj.weight",
+              "bias": "layers.1.multihead_attn.q_proj.bias"
+            }
+          },
+          {
+            "id": "fields1_cross_k",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "memory"
+              },
+              "outputs": {
+                "output": "fields1_cross_k"
+              }
+            },
+            "params": {
+              "M": 6,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 6144,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 6144,
+                "linear_output_stride": 1024,
+                "linear_rows": 6,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.1.multihead_attn.k_proj.weight",
+              "bias": "layers.1.multihead_attn.k_proj.bias"
+            }
+          },
+          {
+            "id": "fields1_cross_v",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "memory"
+              },
+              "outputs": {
+                "output": "fields1_cross_v"
+              }
+            },
+            "params": {
+              "M": 6,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 6144,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 6144,
+                "linear_output_stride": 1024,
+                "linear_rows": 6,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.1.multihead_attn.v_proj.weight",
+              "bias": "layers.1.multihead_attn.v_proj.bias"
+            }
+          },
+          {
+            "id": "fields1_cross_context",
+            "op": "attention_cross_token_major_checked",
+            "kernel": "attention_cross_token_major_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "query": "fields1_cross_q",
+                "key": "fields1_cross_k",
+                "value": "fields1_cross_v"
+              },
+              "outputs": {
+                "output": "fields1_cross_context"
+              }
+            },
+            "params": {
+              "Q": 2,
+              "S": 6,
+              "H": 16,
+              "D": 64,
+              "X": 2054,
+              "call_constants": {
+                "query_elements": 2048,
+                "key_elements": 6144,
+                "value_elements": 6144,
+                "output_elements": 2048,
+                "scratch_elements": 2054,
+                "query_tokens": 2,
+                "memory_tokens": 6,
+                "heads": 16,
+                "head_dim": 64
+              }
+            }
+          },
+          {
+            "id": "fields1_cross_out",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields1_cross_context"
+              },
+              "outputs": {
+                "output": "fields1_cross_out"
+              }
+            },
+            "params": {
+              "M": 2,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 2048,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 2048,
+                "linear_output_stride": 1024,
+                "linear_rows": 2,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.1.multihead_attn.out_proj.weight",
+              "bias": "layers.1.multihead_attn.out_proj.bias"
+            }
+          },
+          {
+            "id": "fields1_cross_residual",
+            "op": "add_rows_checked",
+            "kernel": "add_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "left": "fields1_self_residual",
+                "right": "fields1_cross_out"
+              },
+              "outputs": {
+                "output": "fields1_cross_residual"
+              }
+            },
+            "params": {
+              "N": 2048,
+              "call_constants": {
+                "left_elements": 2048,
+                "right_elements": 2048,
+                "output_elements": 2048,
+                "elements": 2048
+              }
+            }
+          },
+          {
+            "id": "fields1_norm3",
+            "op": "layernorm",
+            "kernel": "layernorm_rows_checked_param_epsilon_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields1_cross_residual"
+              },
+              "outputs": {
+                "output": "fields1_norm3"
+              }
+            },
+            "params": {
+              "M": 2,
+              "C": 1024,
+              "Q": 2052,
+              "epsilon": 1e-05,
+              "call_constants": {
+                "norm_input_elements": 2048,
+                "norm_input_stride": 1024,
+                "norm_gamma_elements": 1024,
+                "norm_beta_elements": 1024,
+                "norm_output_elements": 2048,
+                "norm_output_stride": 1024,
+                "norm_scratch_elements": 2052,
+                "norm_rows": 2,
+                "norm_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "gamma": "layers.1.norm3.weight",
+              "beta": "layers.1.norm3.bias"
+            }
+          },
+          {
+            "id": "fields1_ff1",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields1_norm3"
+              },
+              "outputs": {
+                "output": "fields1_ff1"
+              }
+            },
+            "params": {
+              "M": 2,
+              "K": 1024,
+              "N": 4096,
+              "call_constants": {
+                "linear_input_elements": 2048,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 4194304,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 4096,
+                "linear_output_elements": 8192,
+                "linear_output_stride": 4096,
+                "linear_rows": 2,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 4096
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.1.linear1.weight",
+              "bias": "layers.1.linear1.bias"
+            }
+          },
+          {
+            "id": "fields1_gelu",
+            "op": "gelu",
+            "kernel": "gelu_rows_erf_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields1_ff1"
+              },
+              "outputs": {
+                "output": "fields1_gelu"
+              }
+            },
+            "params": {
+              "M": 2,
+              "C": 4096,
+              "Q": 8192,
+              "call_constants": {
+                "gelu_input_elements": 8192,
+                "gelu_input_stride": 4096,
+                "gelu_output_elements": 8192,
+                "gelu_output_stride": 4096,
+                "gelu_scratch_elements": 8192,
+                "gelu_rows": 2,
+                "gelu_channels": 4096
+              }
+            }
+          },
+          {
+            "id": "fields1_ff2",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields1_gelu"
+              },
+              "outputs": {
+                "output": "fields1_ff2"
+              }
+            },
+            "params": {
+              "M": 2,
+              "K": 4096,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 8192,
+                "linear_input_stride": 4096,
+                "linear_weight_elements": 4194304,
+                "linear_weight_stride": 4096,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 2048,
+                "linear_output_stride": 1024,
+                "linear_rows": 2,
+                "linear_input_channels": 4096,
+                "linear_output_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.1.linear2.weight",
+              "bias": "layers.1.linear2.bias"
+            }
+          },
+          {
+            "id": "fields1_output",
+            "op": "add_rows_checked",
+            "kernel": "add_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "left": "fields1_cross_residual",
+                "right": "fields1_ff2"
+              },
+              "outputs": {
+                "output": "fields1_output"
+              }
+            },
+            "params": {
+              "N": 2048,
+              "call_constants": {
+                "left_elements": 2048,
+                "right_elements": 2048,
+                "output_elements": 2048,
+                "elements": 2048
+              }
+            }
+          }
+        ]
+      },
+      "footer": []
+    },
+    "fields2": {
+      "sequence": [
+        "header",
+        "body",
+        "footer"
+      ],
+      "header": [],
+      "body": {
+        "type": "dense",
+        "ops": [
+          {
+            "id": "fields2_norm1",
+            "op": "layernorm",
+            "kernel": "layernorm_rows_checked_param_epsilon_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields1_output"
+              },
+              "outputs": {
+                "output": "fields2_norm1"
+              }
+            },
+            "params": {
+              "M": 2,
+              "C": 1024,
+              "Q": 2052,
+              "epsilon": 1e-05,
+              "call_constants": {
+                "norm_input_elements": 2048,
+                "norm_input_stride": 1024,
+                "norm_gamma_elements": 1024,
+                "norm_beta_elements": 1024,
+                "norm_output_elements": 2048,
+                "norm_output_stride": 1024,
+                "norm_scratch_elements": 2052,
+                "norm_rows": 2,
+                "norm_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "gamma": "layers.2.norm1.weight",
+              "beta": "layers.2.norm1.bias"
+            }
+          },
+          {
+            "id": "fields2_self_q",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields2_norm1"
+              },
+              "outputs": {
+                "output": "fields2_self_q"
+              }
+            },
+            "params": {
+              "M": 2,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 2048,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 2048,
+                "linear_output_stride": 1024,
+                "linear_rows": 2,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.2.self_attn.q_proj.weight",
+              "bias": "layers.2.self_attn.q_proj.bias"
+            }
+          },
+          {
+            "id": "fields2_self_k",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields2_norm1"
+              },
+              "outputs": {
+                "output": "fields2_self_k"
+              }
+            },
+            "params": {
+              "M": 2,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 2048,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 2048,
+                "linear_output_stride": 1024,
+                "linear_rows": 2,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.2.self_attn.k_proj.weight",
+              "bias": "layers.2.self_attn.k_proj.bias"
+            }
+          },
+          {
+            "id": "fields2_self_v",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields2_norm1"
+              },
+              "outputs": {
+                "output": "fields2_self_v"
+              }
+            },
+            "params": {
+              "M": 2,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 2048,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 2048,
+                "linear_output_stride": 1024,
+                "linear_rows": 2,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.2.self_attn.v_proj.weight",
+              "bias": "layers.2.self_attn.v_proj.bias"
+            }
+          },
+          {
+            "id": "fields2_self_context",
+            "op": "attention_cross_token_major_checked",
+            "kernel": "attention_cross_token_major_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "query": "fields2_self_q",
+                "key": "fields2_self_k",
+                "value": "fields2_self_v"
+              },
+              "outputs": {
+                "output": "fields2_self_context"
+              }
+            },
+            "params": {
+              "Q": 2,
+              "S": 2,
+              "H": 16,
+              "D": 64,
+              "X": 2050,
+              "call_constants": {
+                "query_elements": 2048,
+                "key_elements": 2048,
+                "value_elements": 2048,
+                "output_elements": 2048,
+                "scratch_elements": 2050,
+                "query_tokens": 2,
+                "memory_tokens": 2,
+                "heads": 16,
+                "head_dim": 64
+              }
+            }
+          },
+          {
+            "id": "fields2_self_out",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields2_self_context"
+              },
+              "outputs": {
+                "output": "fields2_self_out"
+              }
+            },
+            "params": {
+              "M": 2,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 2048,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 2048,
+                "linear_output_stride": 1024,
+                "linear_rows": 2,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.2.self_attn.out_proj.weight",
+              "bias": "layers.2.self_attn.out_proj.bias"
+            }
+          },
+          {
+            "id": "fields2_self_residual",
+            "op": "add_rows_checked",
+            "kernel": "add_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "left": "fields1_output",
+                "right": "fields2_self_out"
+              },
+              "outputs": {
+                "output": "fields2_self_residual"
+              }
+            },
+            "params": {
+              "N": 2048,
+              "call_constants": {
+                "left_elements": 2048,
+                "right_elements": 2048,
+                "output_elements": 2048,
+                "elements": 2048
+              }
+            }
+          },
+          {
+            "id": "fields2_norm2",
+            "op": "layernorm",
+            "kernel": "layernorm_rows_checked_param_epsilon_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields2_self_residual"
+              },
+              "outputs": {
+                "output": "fields2_norm2"
+              }
+            },
+            "params": {
+              "M": 2,
+              "C": 1024,
+              "Q": 2052,
+              "epsilon": 1e-05,
+              "call_constants": {
+                "norm_input_elements": 2048,
+                "norm_input_stride": 1024,
+                "norm_gamma_elements": 1024,
+                "norm_beta_elements": 1024,
+                "norm_output_elements": 2048,
+                "norm_output_stride": 1024,
+                "norm_scratch_elements": 2052,
+                "norm_rows": 2,
+                "norm_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "gamma": "layers.2.norm2.weight",
+              "beta": "layers.2.norm2.bias"
+            }
+          },
+          {
+            "id": "fields2_cross_q",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields2_norm2"
+              },
+              "outputs": {
+                "output": "fields2_cross_q"
+              }
+            },
+            "params": {
+              "M": 2,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 2048,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 2048,
+                "linear_output_stride": 1024,
+                "linear_rows": 2,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.2.multihead_attn.q_proj.weight",
+              "bias": "layers.2.multihead_attn.q_proj.bias"
+            }
+          },
+          {
+            "id": "fields2_cross_k",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "memory"
+              },
+              "outputs": {
+                "output": "fields2_cross_k"
+              }
+            },
+            "params": {
+              "M": 6,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 6144,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 6144,
+                "linear_output_stride": 1024,
+                "linear_rows": 6,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.2.multihead_attn.k_proj.weight",
+              "bias": "layers.2.multihead_attn.k_proj.bias"
+            }
+          },
+          {
+            "id": "fields2_cross_v",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "memory"
+              },
+              "outputs": {
+                "output": "fields2_cross_v"
+              }
+            },
+            "params": {
+              "M": 6,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 6144,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 6144,
+                "linear_output_stride": 1024,
+                "linear_rows": 6,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.2.multihead_attn.v_proj.weight",
+              "bias": "layers.2.multihead_attn.v_proj.bias"
+            }
+          },
+          {
+            "id": "fields2_cross_context",
+            "op": "attention_cross_token_major_checked",
+            "kernel": "attention_cross_token_major_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "query": "fields2_cross_q",
+                "key": "fields2_cross_k",
+                "value": "fields2_cross_v"
+              },
+              "outputs": {
+                "output": "fields2_cross_context"
+              }
+            },
+            "params": {
+              "Q": 2,
+              "S": 6,
+              "H": 16,
+              "D": 64,
+              "X": 2054,
+              "call_constants": {
+                "query_elements": 2048,
+                "key_elements": 6144,
+                "value_elements": 6144,
+                "output_elements": 2048,
+                "scratch_elements": 2054,
+                "query_tokens": 2,
+                "memory_tokens": 6,
+                "heads": 16,
+                "head_dim": 64
+              }
+            }
+          },
+          {
+            "id": "fields2_cross_out",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields2_cross_context"
+              },
+              "outputs": {
+                "output": "fields2_cross_out"
+              }
+            },
+            "params": {
+              "M": 2,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 2048,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 2048,
+                "linear_output_stride": 1024,
+                "linear_rows": 2,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.2.multihead_attn.out_proj.weight",
+              "bias": "layers.2.multihead_attn.out_proj.bias"
+            }
+          },
+          {
+            "id": "fields2_cross_residual",
+            "op": "add_rows_checked",
+            "kernel": "add_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "left": "fields2_self_residual",
+                "right": "fields2_cross_out"
+              },
+              "outputs": {
+                "output": "fields2_cross_residual"
+              }
+            },
+            "params": {
+              "N": 2048,
+              "call_constants": {
+                "left_elements": 2048,
+                "right_elements": 2048,
+                "output_elements": 2048,
+                "elements": 2048
+              }
+            }
+          },
+          {
+            "id": "fields2_norm3",
+            "op": "layernorm",
+            "kernel": "layernorm_rows_checked_param_epsilon_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields2_cross_residual"
+              },
+              "outputs": {
+                "output": "fields2_norm3"
+              }
+            },
+            "params": {
+              "M": 2,
+              "C": 1024,
+              "Q": 2052,
+              "epsilon": 1e-05,
+              "call_constants": {
+                "norm_input_elements": 2048,
+                "norm_input_stride": 1024,
+                "norm_gamma_elements": 1024,
+                "norm_beta_elements": 1024,
+                "norm_output_elements": 2048,
+                "norm_output_stride": 1024,
+                "norm_scratch_elements": 2052,
+                "norm_rows": 2,
+                "norm_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "gamma": "layers.2.norm3.weight",
+              "beta": "layers.2.norm3.bias"
+            }
+          },
+          {
+            "id": "fields2_ff1",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields2_norm3"
+              },
+              "outputs": {
+                "output": "fields2_ff1"
+              }
+            },
+            "params": {
+              "M": 2,
+              "K": 1024,
+              "N": 4096,
+              "call_constants": {
+                "linear_input_elements": 2048,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 4194304,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 4096,
+                "linear_output_elements": 8192,
+                "linear_output_stride": 4096,
+                "linear_rows": 2,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 4096
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.2.linear1.weight",
+              "bias": "layers.2.linear1.bias"
+            }
+          },
+          {
+            "id": "fields2_gelu",
+            "op": "gelu",
+            "kernel": "gelu_rows_erf_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields2_ff1"
+              },
+              "outputs": {
+                "output": "fields2_gelu"
+              }
+            },
+            "params": {
+              "M": 2,
+              "C": 4096,
+              "Q": 8192,
+              "call_constants": {
+                "gelu_input_elements": 8192,
+                "gelu_input_stride": 4096,
+                "gelu_output_elements": 8192,
+                "gelu_output_stride": 4096,
+                "gelu_scratch_elements": 8192,
+                "gelu_rows": 2,
+                "gelu_channels": 4096
+              }
+            }
+          },
+          {
+            "id": "fields2_ff2",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields2_gelu"
+              },
+              "outputs": {
+                "output": "fields2_ff2"
+              }
+            },
+            "params": {
+              "M": 2,
+              "K": 4096,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 8192,
+                "linear_input_stride": 4096,
+                "linear_weight_elements": 4194304,
+                "linear_weight_stride": 4096,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 2048,
+                "linear_output_stride": 1024,
+                "linear_rows": 2,
+                "linear_input_channels": 4096,
+                "linear_output_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.2.linear2.weight",
+              "bias": "layers.2.linear2.bias"
+            }
+          },
+          {
+            "id": "fields2_output",
+            "op": "add_rows_checked",
+            "kernel": "add_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "left": "fields2_cross_residual",
+                "right": "fields2_ff2"
+              },
+              "outputs": {
+                "output": "fields2_output"
+              }
+            },
+            "params": {
+              "N": 2048,
+              "call_constants": {
+                "left_elements": 2048,
+                "right_elements": 2048,
+                "output_elements": 2048,
+                "elements": 2048
+              }
+            }
+          }
+        ]
+      },
+      "footer": []
+    },
+    "fields3": {
+      "sequence": [
+        "header",
+        "body",
+        "footer"
+      ],
+      "header": [],
+      "body": {
+        "type": "dense",
+        "ops": [
+          {
+            "id": "fields3_norm1",
+            "op": "layernorm",
+            "kernel": "layernorm_rows_checked_param_epsilon_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields2_output"
+              },
+              "outputs": {
+                "output": "fields3_norm1"
+              }
+            },
+            "params": {
+              "M": 2,
+              "C": 1024,
+              "Q": 2052,
+              "epsilon": 1e-05,
+              "call_constants": {
+                "norm_input_elements": 2048,
+                "norm_input_stride": 1024,
+                "norm_gamma_elements": 1024,
+                "norm_beta_elements": 1024,
+                "norm_output_elements": 2048,
+                "norm_output_stride": 1024,
+                "norm_scratch_elements": 2052,
+                "norm_rows": 2,
+                "norm_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "gamma": "layers.3.norm1.weight",
+              "beta": "layers.3.norm1.bias"
+            }
+          },
+          {
+            "id": "fields3_self_q",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields3_norm1"
+              },
+              "outputs": {
+                "output": "fields3_self_q"
+              }
+            },
+            "params": {
+              "M": 2,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 2048,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 2048,
+                "linear_output_stride": 1024,
+                "linear_rows": 2,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.3.self_attn.q_proj.weight",
+              "bias": "layers.3.self_attn.q_proj.bias"
+            }
+          },
+          {
+            "id": "fields3_self_k",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields3_norm1"
+              },
+              "outputs": {
+                "output": "fields3_self_k"
+              }
+            },
+            "params": {
+              "M": 2,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 2048,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 2048,
+                "linear_output_stride": 1024,
+                "linear_rows": 2,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.3.self_attn.k_proj.weight",
+              "bias": "layers.3.self_attn.k_proj.bias"
+            }
+          },
+          {
+            "id": "fields3_self_v",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields3_norm1"
+              },
+              "outputs": {
+                "output": "fields3_self_v"
+              }
+            },
+            "params": {
+              "M": 2,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 2048,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 2048,
+                "linear_output_stride": 1024,
+                "linear_rows": 2,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.3.self_attn.v_proj.weight",
+              "bias": "layers.3.self_attn.v_proj.bias"
+            }
+          },
+          {
+            "id": "fields3_self_context",
+            "op": "attention_cross_token_major_checked",
+            "kernel": "attention_cross_token_major_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "query": "fields3_self_q",
+                "key": "fields3_self_k",
+                "value": "fields3_self_v"
+              },
+              "outputs": {
+                "output": "fields3_self_context"
+              }
+            },
+            "params": {
+              "Q": 2,
+              "S": 2,
+              "H": 16,
+              "D": 64,
+              "X": 2050,
+              "call_constants": {
+                "query_elements": 2048,
+                "key_elements": 2048,
+                "value_elements": 2048,
+                "output_elements": 2048,
+                "scratch_elements": 2050,
+                "query_tokens": 2,
+                "memory_tokens": 2,
+                "heads": 16,
+                "head_dim": 64
+              }
+            }
+          },
+          {
+            "id": "fields3_self_out",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields3_self_context"
+              },
+              "outputs": {
+                "output": "fields3_self_out"
+              }
+            },
+            "params": {
+              "M": 2,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 2048,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 2048,
+                "linear_output_stride": 1024,
+                "linear_rows": 2,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.3.self_attn.out_proj.weight",
+              "bias": "layers.3.self_attn.out_proj.bias"
+            }
+          },
+          {
+            "id": "fields3_self_residual",
+            "op": "add_rows_checked",
+            "kernel": "add_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "left": "fields2_output",
+                "right": "fields3_self_out"
+              },
+              "outputs": {
+                "output": "fields3_self_residual"
+              }
+            },
+            "params": {
+              "N": 2048,
+              "call_constants": {
+                "left_elements": 2048,
+                "right_elements": 2048,
+                "output_elements": 2048,
+                "elements": 2048
+              }
+            }
+          },
+          {
+            "id": "fields3_norm2",
+            "op": "layernorm",
+            "kernel": "layernorm_rows_checked_param_epsilon_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields3_self_residual"
+              },
+              "outputs": {
+                "output": "fields3_norm2"
+              }
+            },
+            "params": {
+              "M": 2,
+              "C": 1024,
+              "Q": 2052,
+              "epsilon": 1e-05,
+              "call_constants": {
+                "norm_input_elements": 2048,
+                "norm_input_stride": 1024,
+                "norm_gamma_elements": 1024,
+                "norm_beta_elements": 1024,
+                "norm_output_elements": 2048,
+                "norm_output_stride": 1024,
+                "norm_scratch_elements": 2052,
+                "norm_rows": 2,
+                "norm_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "gamma": "layers.3.norm2.weight",
+              "beta": "layers.3.norm2.bias"
+            }
+          },
+          {
+            "id": "fields3_cross_q",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields3_norm2"
+              },
+              "outputs": {
+                "output": "fields3_cross_q"
+              }
+            },
+            "params": {
+              "M": 2,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 2048,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 2048,
+                "linear_output_stride": 1024,
+                "linear_rows": 2,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.3.multihead_attn.q_proj.weight",
+              "bias": "layers.3.multihead_attn.q_proj.bias"
+            }
+          },
+          {
+            "id": "fields3_cross_k",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "memory"
+              },
+              "outputs": {
+                "output": "fields3_cross_k"
+              }
+            },
+            "params": {
+              "M": 6,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 6144,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 6144,
+                "linear_output_stride": 1024,
+                "linear_rows": 6,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.3.multihead_attn.k_proj.weight",
+              "bias": "layers.3.multihead_attn.k_proj.bias"
+            }
+          },
+          {
+            "id": "fields3_cross_v",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "memory"
+              },
+              "outputs": {
+                "output": "fields3_cross_v"
+              }
+            },
+            "params": {
+              "M": 6,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 6144,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 6144,
+                "linear_output_stride": 1024,
+                "linear_rows": 6,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.3.multihead_attn.v_proj.weight",
+              "bias": "layers.3.multihead_attn.v_proj.bias"
+            }
+          },
+          {
+            "id": "fields3_cross_context",
+            "op": "attention_cross_token_major_checked",
+            "kernel": "attention_cross_token_major_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "query": "fields3_cross_q",
+                "key": "fields3_cross_k",
+                "value": "fields3_cross_v"
+              },
+              "outputs": {
+                "output": "fields3_cross_context"
+              }
+            },
+            "params": {
+              "Q": 2,
+              "S": 6,
+              "H": 16,
+              "D": 64,
+              "X": 2054,
+              "call_constants": {
+                "query_elements": 2048,
+                "key_elements": 6144,
+                "value_elements": 6144,
+                "output_elements": 2048,
+                "scratch_elements": 2054,
+                "query_tokens": 2,
+                "memory_tokens": 6,
+                "heads": 16,
+                "head_dim": 64
+              }
+            }
+          },
+          {
+            "id": "fields3_cross_out",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields3_cross_context"
+              },
+              "outputs": {
+                "output": "fields3_cross_out"
+              }
+            },
+            "params": {
+              "M": 2,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 2048,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 2048,
+                "linear_output_stride": 1024,
+                "linear_rows": 2,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.3.multihead_attn.out_proj.weight",
+              "bias": "layers.3.multihead_attn.out_proj.bias"
+            }
+          },
+          {
+            "id": "fields3_cross_residual",
+            "op": "add_rows_checked",
+            "kernel": "add_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "left": "fields3_self_residual",
+                "right": "fields3_cross_out"
+              },
+              "outputs": {
+                "output": "fields3_cross_residual"
+              }
+            },
+            "params": {
+              "N": 2048,
+              "call_constants": {
+                "left_elements": 2048,
+                "right_elements": 2048,
+                "output_elements": 2048,
+                "elements": 2048
+              }
+            }
+          },
+          {
+            "id": "fields3_norm3",
+            "op": "layernorm",
+            "kernel": "layernorm_rows_checked_param_epsilon_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields3_cross_residual"
+              },
+              "outputs": {
+                "output": "fields3_norm3"
+              }
+            },
+            "params": {
+              "M": 2,
+              "C": 1024,
+              "Q": 2052,
+              "epsilon": 1e-05,
+              "call_constants": {
+                "norm_input_elements": 2048,
+                "norm_input_stride": 1024,
+                "norm_gamma_elements": 1024,
+                "norm_beta_elements": 1024,
+                "norm_output_elements": 2048,
+                "norm_output_stride": 1024,
+                "norm_scratch_elements": 2052,
+                "norm_rows": 2,
+                "norm_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "gamma": "layers.3.norm3.weight",
+              "beta": "layers.3.norm3.bias"
+            }
+          },
+          {
+            "id": "fields3_ff1",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields3_norm3"
+              },
+              "outputs": {
+                "output": "fields3_ff1"
+              }
+            },
+            "params": {
+              "M": 2,
+              "K": 1024,
+              "N": 4096,
+              "call_constants": {
+                "linear_input_elements": 2048,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 4194304,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 4096,
+                "linear_output_elements": 8192,
+                "linear_output_stride": 4096,
+                "linear_rows": 2,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 4096
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.3.linear1.weight",
+              "bias": "layers.3.linear1.bias"
+            }
+          },
+          {
+            "id": "fields3_gelu",
+            "op": "gelu",
+            "kernel": "gelu_rows_erf_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields3_ff1"
+              },
+              "outputs": {
+                "output": "fields3_gelu"
+              }
+            },
+            "params": {
+              "M": 2,
+              "C": 4096,
+              "Q": 8192,
+              "call_constants": {
+                "gelu_input_elements": 8192,
+                "gelu_input_stride": 4096,
+                "gelu_output_elements": 8192,
+                "gelu_output_stride": 4096,
+                "gelu_scratch_elements": 8192,
+                "gelu_rows": 2,
+                "gelu_channels": 4096
+              }
+            }
+          },
+          {
+            "id": "fields3_ff2",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields3_gelu"
+              },
+              "outputs": {
+                "output": "fields3_ff2"
+              }
+            },
+            "params": {
+              "M": 2,
+              "K": 4096,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 8192,
+                "linear_input_stride": 4096,
+                "linear_weight_elements": 4194304,
+                "linear_weight_stride": 4096,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 2048,
+                "linear_output_stride": 1024,
+                "linear_rows": 2,
+                "linear_input_channels": 4096,
+                "linear_output_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "weight": "layers.3.linear2.weight",
+              "bias": "layers.3.linear2.bias"
+            }
+          },
+          {
+            "id": "fields3_output",
+            "op": "add_rows_checked",
+            "kernel": "add_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "left": "fields3_cross_residual",
+                "right": "fields3_ff2"
+              },
+              "outputs": {
+                "output": "fields3_output"
+              }
+            },
+            "params": {
+              "N": 2048,
+              "call_constants": {
+                "left_elements": 2048,
+                "right_elements": 2048,
+                "output_elements": 2048,
+                "elements": 2048
+              }
+            }
+          }
+        ]
+      },
+      "footer": []
+    },
+    "decision_scoring": {
+      "sequence": [
+        "header",
+        "body",
+        "footer"
+      ],
+      "header": [],
+      "body": {
+        "type": "dense",
+        "ops": [
+          {
+            "id": "final_fields",
+            "op": "layernorm",
+            "kernel": "layernorm_rows_checked_param_epsilon_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "fields3_output"
+              },
+              "outputs": {
+                "output": "final_fields"
+              }
+            },
+            "params": {
+              "M": 2,
+              "C": 1024,
+              "Q": 2052,
+              "epsilon": 1e-05,
+              "call_constants": {
+                "norm_input_elements": 2048,
+                "norm_input_stride": 1024,
+                "norm_gamma_elements": 1024,
+                "norm_beta_elements": 1024,
+                "norm_output_elements": 2048,
+                "norm_output_stride": 1024,
+                "norm_scratch_elements": 2052,
+                "norm_rows": 2,
+                "norm_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "gamma": "field_norm.weight",
+              "beta": "field_norm.bias"
+            }
+          },
+          {
+            "id": "final_options",
+            "op": "layernorm",
+            "kernel": "layernorm_rows_checked_param_epsilon_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "evidence1_output"
+              },
+              "outputs": {
+                "output": "final_options"
+              }
+            },
+            "params": {
+              "M": 3,
+              "C": 1024,
+              "Q": 3078,
+              "epsilon": 1e-05,
+              "call_constants": {
+                "norm_input_elements": 3072,
+                "norm_input_stride": 1024,
+                "norm_gamma_elements": 1024,
+                "norm_beta_elements": 1024,
+                "norm_output_elements": 3072,
+                "norm_output_stride": 1024,
+                "norm_scratch_elements": 3078,
+                "norm_rows": 3,
+                "norm_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "gamma": "option_norm.weight",
+              "beta": "option_norm.bias"
+            }
+          },
+          {
+            "id": "prior_anchor",
+            "op": "broadcast_add_rows_checked",
+            "kernel": "broadcast_add_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "left": "question_vectors",
+                "right": "global_vector"
+              },
+              "outputs": {
+                "output": "prior_anchor"
+              }
+            },
+            "params": {
+              "R": 2,
+              "C": 4096,
+              "X": 8192,
+              "call_constants": {
+                "left_elements": 8192,
+                "right_elements": 4096,
+                "output_elements": 8192,
+                "scratch_elements": 8192,
+                "rows": 2,
+                "channels": 4096
+              }
+            }
+          },
+          {
+            "id": "prior_cosine",
+            "op": "indexed_cosine_rows_checked",
+            "kernel": "indexed_cosine_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "left": "prior_anchor",
+                "right": "lexical_option_vectors",
+                "indices": "option_question_indices"
+              },
+              "outputs": {
+                "output": "prior_cosine"
+              }
+            },
+            "params": {
+              "G": 2,
+              "R": 3,
+              "C": 4096,
+              "X": 3,
+              "call_constants": {
+                "left_elements": 8192,
+                "right_elements": 12288,
+                "indices_elements": 3,
+                "output_elements": 3,
+                "scratch_elements": 3,
+                "groups": 2,
+                "rows": 3,
+                "channels": 4096
+              },
+              "epsilon": 1e-12
+            }
+          },
+          {
+            "id": "joint_cosine",
+            "op": "indexed_cosine_rows_checked",
+            "kernel": "indexed_cosine_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "left": "final_fields",
+                "right": "final_options",
+                "indices": "option_question_indices"
+              },
+              "outputs": {
+                "output": "joint_cosine"
+              }
+            },
+            "params": {
+              "G": 2,
+              "R": 3,
+              "C": 1024,
+              "X": 3,
+              "call_constants": {
+                "left_elements": 2048,
+                "right_elements": 3072,
+                "indices_elements": 3,
+                "output_elements": 3,
+                "scratch_elements": 3,
+                "groups": 2,
+                "rows": 3,
+                "channels": 1024
+              },
+              "epsilon": 1e-08
+            }
+          },
+          {
+            "id": "scorer_features",
+            "op": "indexed_pair_features_checked",
+            "kernel": "indexed_pair_features_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "left": "final_fields",
+                "right": "final_options",
+                "indices": "option_question_indices"
+              },
+              "outputs": {
+                "output": "scorer_features"
+              }
+            },
+            "params": {
+              "G": 2,
+              "R": 3,
+              "C": 1024,
+              "X": 12288,
+              "call_constants": {
+                "left_elements": 2048,
+                "right_elements": 3072,
+                "indices_elements": 3,
+                "output_elements": 12288,
+                "scratch_elements": 12288,
+                "groups": 2,
+                "rows": 3,
+                "channels": 1024
+              }
+            }
+          },
+          {
+            "id": "scorer_hidden",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "scorer_features"
+              },
+              "outputs": {
+                "output": "scorer_hidden"
+              }
+            },
+            "params": {
+              "M": 3,
+              "K": 4096,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 12288,
+                "linear_input_stride": 4096,
+                "linear_weight_elements": 4194304,
+                "linear_weight_stride": 4096,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 3072,
+                "linear_output_stride": 1024,
+                "linear_rows": 3,
+                "linear_input_channels": 4096,
+                "linear_output_channels": 1024
+              }
+            },
+            "weight_refs": {
+              "weight": "residual_scorer.0.weight",
+              "bias": "residual_scorer.0.bias"
+            }
+          },
+          {
+            "id": "scorer_gelu",
+            "op": "gelu",
+            "kernel": "gelu_rows_erf_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "scorer_hidden"
+              },
+              "outputs": {
+                "output": "scorer_gelu"
+              }
+            },
+            "params": {
+              "M": 3,
+              "C": 1024,
+              "Q": 3072,
+              "call_constants": {
+                "gelu_input_elements": 3072,
+                "gelu_input_stride": 1024,
+                "gelu_output_elements": 3072,
+                "gelu_output_stride": 1024,
+                "gelu_scratch_elements": 3072,
+                "gelu_rows": 3,
+                "gelu_channels": 1024
+              }
+            }
+          },
+          {
+            "id": "scorer_residual",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "scorer_gelu"
+              },
+              "outputs": {
+                "output": "scorer_residual"
+              }
+            },
+            "params": {
+              "M": 3,
+              "K": 1024,
+              "N": 1,
+              "call_constants": {
+                "linear_input_elements": 3072,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1024,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1,
+                "linear_output_elements": 3,
+                "linear_output_stride": 1,
+                "linear_rows": 3,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1
+              }
+            },
+            "weight_refs": {
+              "weight": "residual_scorer.3.weight",
+              "bias": "residual_scorer.3.bias"
+            }
+          },
+          {
+            "id": "prior_scale",
+            "op": "scalar_exp_clamped_checked",
+            "kernel": "scalar_exp_clamped_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {},
+              "outputs": {
+                "output": "prior_scale"
+              }
+            },
+            "params": {
+              "call_constants": {
+                "input_elements": 1,
+                "output_elements": 1
+              },
+              "maximum": 4.605170185988092
+            },
+            "weight_refs": {
+              "input": "prior_logit_scale"
+            }
+          },
+          {
+            "id": "joint_scale",
+            "op": "scalar_exp_clamped_checked",
+            "kernel": "scalar_exp_clamped_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {},
+              "outputs": {
+                "output": "joint_scale"
+              }
+            },
+            "params": {
+              "call_constants": {
+                "input_elements": 1,
+                "output_elements": 1
+              },
+              "maximum": 4.605170185988092
+            },
+            "weight_refs": {
+              "input": "joint_logit_scale"
+            }
+          },
+          {
+            "id": "residual_mix",
+            "op": "scalar_sigmoid_checked",
+            "kernel": "scalar_sigmoid_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {},
+              "outputs": {
+                "output": "residual_mix"
+              }
+            },
+            "params": {
+              "call_constants": {
+                "input_elements": 1,
+                "output_elements": 1
+              }
+            },
+            "weight_refs": {
+              "input": "residual_gate"
+            }
+          },
+          {
+            "id": "prior_scores",
+            "op": "scale_vector_checked",
+            "kernel": "scale_vector_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "prior_cosine",
+                "gain": "prior_scale"
+              },
+              "outputs": {
+                "output": "prior_scores"
+              }
+            },
+            "params": {
+              "R": 3,
+              "X": 3,
+              "call_constants": {
+                "input_elements": 3,
+                "gain_elements": 1,
+                "output_elements": 3,
+                "scratch_elements": 3,
+                "rows": 3
+              }
+            }
+          },
+          {
+            "id": "scaled_joint_cosine",
+            "op": "scale_vector_checked",
+            "kernel": "scale_vector_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "joint_cosine",
+                "gain": "joint_scale"
+              },
+              "outputs": {
+                "output": "scaled_joint_cosine"
+              }
+            },
+            "params": {
+              "R": 3,
+              "X": 3,
+              "call_constants": {
+                "input_elements": 3,
+                "gain_elements": 1,
+                "output_elements": 3,
+                "scratch_elements": 3,
+                "rows": 3
+              }
+            }
+          },
+          {
+            "id": "joint_scores",
+            "op": "add_rows_checked",
+            "kernel": "add_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "left": "scaled_joint_cosine",
+                "right": "scorer_residual"
+              },
+              "outputs": {
+                "output": "joint_scores"
+              }
+            },
+            "params": {
+              "N": 3,
+              "call_constants": {
+                "left_elements": 3,
+                "right_elements": 3,
+                "output_elements": 3,
+                "elements": 3
+              }
+            }
+          },
+          {
+            "id": "gated_joint_scores",
+            "op": "scale_vector_checked",
+            "kernel": "scale_vector_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "joint_scores",
+                "gain": "residual_mix"
+              },
+              "outputs": {
+                "output": "gated_joint_scores"
+              }
+            },
+            "params": {
+              "R": 3,
+              "X": 3,
+              "call_constants": {
+                "input_elements": 3,
+                "gain_elements": 1,
+                "output_elements": 3,
+                "scratch_elements": 3,
+                "rows": 3
+              }
+            }
+          },
+          {
+            "id": "option_logits",
+            "op": "add_rows_checked",
+            "kernel": "add_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "left": "prior_scores",
+                "right": "gated_joint_scores"
+              },
+              "outputs": {
+                "output": "option_logits"
+              }
+            },
+            "params": {
+              "N": 3,
+              "call_constants": {
+                "left_elements": 3,
+                "right_elements": 3,
+                "output_elements": 3,
+                "elements": 3
+              }
+            }
+          }
+        ]
+      },
+      "footer": []
+    }
+  },
+  "runtime_constants": {},
+  "runtime_lengths": {}
+}
