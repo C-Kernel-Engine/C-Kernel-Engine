@@ -944,6 +944,14 @@ TEST_SUITES = {
         "Clef-Flash Generated First Evidence Routing Layer", "inference",
         ROOT / "tests" / "test_v8_clef_flash_evidence0.py",
     ),
+    "decision_grouped_weighted_rows": TestSuite(
+        "Checked Grouped Softmax Weighted Rows", "kernels",
+        ROOT / "tests" / "test_v8_grouped_weighted_rows.py",
+    ),
+    "decision_clef_flash_option_summary": TestSuite(
+        "Clef-Flash Generated Option Summary", "inference",
+        ROOT / "tests" / "test_v8_clef_flash_option_summary.py",
+    ),
     "decision_clef_flash_evidence_complete": TestSuite(
         "Clef-Flash Generated Complete Evidence Routing", "inference",
         ROOT / "tests" / "test_v8_clef_flash_evidence_complete.py",

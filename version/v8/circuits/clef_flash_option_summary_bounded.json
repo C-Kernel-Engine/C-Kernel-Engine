@@ -1,0 +1,1845 @@
+{
+  "version": 3,
+  "name": "clef_flash_option_summary_bounded",
+  "family": "decision_head",
+  "checked_native_entry": true,
+  "contract": {
+    "runtime_invariants": {
+      "inference_only": true,
+      "production_kernel_heap_allocation": false
+    }
+  },
+  "activation_buffers": {
+    "hidden": {
+      "shape": [
+        6,
+        4096
+      ]
+    },
+    "input_ids": {
+      "shape": [
+        6
+      ]
+    },
+    "question_spans": {
+      "shape": [
+        2,
+        2
+      ]
+    },
+    "option_spans": {
+      "shape": [
+        3,
+        2
+      ]
+    },
+    "global_span": {
+      "shape": [
+        1,
+        2
+      ]
+    },
+    "option_counts": {
+      "shape": [
+        2
+      ]
+    },
+    "option_row_indices": {
+      "shape": [
+        3
+      ]
+    },
+    "option_question_indices": {
+      "shape": [
+        3
+      ]
+    },
+    "normalized_hidden": {
+      "shape": [
+        6,
+        4096
+      ]
+    },
+    "lexical_token_rows": {
+      "shape": [
+        6,
+        4096
+      ]
+    },
+    "question_vectors": {
+      "shape": [
+        2,
+        4096
+      ]
+    },
+    "option_context_vectors": {
+      "shape": [
+        3,
+        4096
+      ]
+    },
+    "lexical_option_vectors": {
+      "shape": [
+        3,
+        4096
+      ]
+    },
+    "global_vector": {
+      "shape": [
+        1,
+        4096
+      ]
+    },
+    "memory": {
+      "shape": [
+        6,
+        1024
+      ]
+    },
+    "question_projected": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "option_context_projected": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "option_lexical_projected": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "option_question_projected": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "global_projected": {
+      "shape": [
+        1,
+        1024
+      ]
+    },
+    "option_context_lexical": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "option_queries": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "evidence0_query_norm": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "evidence0_memory_norm": {
+      "shape": [
+        6,
+        1024
+      ]
+    },
+    "evidence0_q": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "evidence0_k": {
+      "shape": [
+        6,
+        1024
+      ]
+    },
+    "evidence0_v": {
+      "shape": [
+        6,
+        1024
+      ]
+    },
+    "evidence0_context": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "evidence0_attn_out": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "evidence0_attn_residual": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "evidence0_ff_norm": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "evidence0_ff1": {
+      "shape": [
+        3,
+        4096
+      ]
+    },
+    "evidence0_gelu": {
+      "shape": [
+        3,
+        4096
+      ]
+    },
+    "evidence0_ff2": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "evidence0_output": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "evidence1_query_norm": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "evidence1_memory_norm": {
+      "shape": [
+        6,
+        1024
+      ]
+    },
+    "evidence1_q": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "evidence1_k": {
+      "shape": [
+        6,
+        1024
+      ]
+    },
+    "evidence1_v": {
+      "shape": [
+        6,
+        1024
+      ]
+    },
+    "evidence1_context": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "evidence1_attn_out": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "evidence1_attn_residual": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "evidence1_ff_norm": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "evidence1_ff1": {
+      "shape": [
+        3,
+        4096
+      ]
+    },
+    "evidence1_gelu": {
+      "shape": [
+        3,
+        4096
+      ]
+    },
+    "evidence1_ff2": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "evidence1_output": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "option_summary_raw": {
+      "shape": [
+        2,
+        1024
+      ]
+    },
+    "option_summary_normalized": {
+      "shape": [
+        2,
+        1024
+      ]
+    }
+  },
+  "activation_bindings": {
+    "hidden": "hidden",
+    "input_ids": "input_ids",
+    "question_spans": "question_spans",
+    "option_spans": "option_spans",
+    "global_span": "global_span",
+    "option_counts": "option_counts",
+    "option_row_indices": "option_row_indices",
+    "option_question_indices": "option_question_indices",
+    "normalized_hidden": "normalized_hidden",
+    "lexical_token_rows": "lexical_token_rows",
+    "question_vectors": "question_vectors",
+    "option_context_vectors": "option_context_vectors",
+    "lexical_option_vectors": "lexical_option_vectors",
+    "global_vector": "global_vector",
+    "memory": "memory",
+    "question_projected": "question_projected",
+    "option_context_projected": "option_context_projected",
+    "option_lexical_projected": "option_lexical_projected",
+    "option_question_projected": "option_question_projected",
+    "global_projected": "global_projected",
+    "option_context_lexical": "option_context_lexical",
+    "option_queries": "option_queries",
+    "evidence0_query_norm": "evidence0_query_norm",
+    "evidence0_memory_norm": "evidence0_memory_norm",
+    "evidence0_q": "evidence0_q",
+    "evidence0_k": "evidence0_k",
+    "evidence0_v": "evidence0_v",
+    "evidence0_context": "evidence0_context",
+    "evidence0_attn_out": "evidence0_attn_out",
+    "evidence0_attn_residual": "evidence0_attn_residual",
+    "evidence0_ff_norm": "evidence0_ff_norm",
+    "evidence0_ff1": "evidence0_ff1",
+    "evidence0_gelu": "evidence0_gelu",
+    "evidence0_ff2": "evidence0_ff2",
+    "evidence0_output": "evidence0_output",
+    "evidence1_query_norm": "evidence1_query_norm",
+    "evidence1_memory_norm": "evidence1_memory_norm",
+    "evidence1_q": "evidence1_q",
+    "evidence1_k": "evidence1_k",
+    "evidence1_v": "evidence1_v",
+    "evidence1_context": "evidence1_context",
+    "evidence1_attn_out": "evidence1_attn_out",
+    "evidence1_attn_residual": "evidence1_attn_residual",
+    "evidence1_ff_norm": "evidence1_ff_norm",
+    "evidence1_ff1": "evidence1_ff1",
+    "evidence1_gelu": "evidence1_gelu",
+    "evidence1_ff2": "evidence1_ff2",
+    "evidence1_output": "evidence1_output",
+    "option_summary_raw": "option_summary_raw",
+    "option_summary_normalized": "option_summary_normalized"
+  },
+  "native_entry": {
+    "function": "ck_clef_option_summary",
+    "params": [
+      {
+        "c_type": "uint8_t *",
+        "name": "arena"
+      },
+      {
+        "c_type": "size_t",
+        "name": "arena_bytes"
+      }
+    ],
+    "arena": {
+      "pointer": "arena",
+      "bytes": "arena_bytes"
+    }
+  },
+  "sequence": [
+    "head_ingress",
+    "evidence0",
+    "evidence1",
+    "option_summary"
+  ],
+  "block_types": {
+    "head_ingress": {
+      "sequence": [
+        "header",
+        "body",
+        "footer"
+      ],
+      "header": [
+        {
+          "id": "option_owners",
+          "op": "expand_group_row_indices_checked",
+          "kernel": "expand_group_row_indices_checked_i32",
+          "returns_status": true,
+          "graph_slots": {
+            "inputs": {
+              "group_counts": "external:option_counts"
+            },
+            "outputs": {
+              "row_indices": "option_row_indices",
+              "owner_indices": "option_question_indices"
+            }
+          },
+          "params": {
+            "G": 2,
+            "R": 3,
+            "call_constants": {
+              "group_count_elements": 2,
+              "groups": 2,
+              "rows": 3,
+              "row_index_elements": 3,
+              "owner_index_elements": 3
+            }
+          }
+        },
+        {
+          "id": "hidden_norm",
+          "op": "layernorm",
+          "kernel": "layernorm_rows_checked_param_epsilon_f32",
+          "returns_status": true,
+          "weight_refs": {
+            "gamma": "hidden_norm.weight",
+            "beta": "hidden_norm.bias"
+          },
+          "graph_slots": {
+            "inputs": {
+              "input": "external:hidden"
+            },
+            "outputs": {
+              "output": "normalized_hidden"
+            }
+          },
+          "params": {
+            "M": 6,
+            "C": 4096,
+            "epsilon": 1e-05,
+            "Q": 24588,
+            "call_constants": {
+              "norm_input_elements": 24576,
+              "norm_input_stride": 4096,
+              "norm_gamma_elements": 4096,
+              "norm_beta_elements": 4096,
+              "norm_output_elements": 24576,
+              "norm_output_stride": 4096,
+              "norm_scratch_elements": 24588,
+              "norm_rows": 6,
+              "norm_channels": 4096
+            }
+          }
+        },
+        {
+          "id": "output_embedding_lookup",
+          "op": "embedding_lookup_token_major_checked",
+          "kernel": "audio_text_embedding_token_major_f32",
+          "returns_status": true,
+          "weight_refs": {
+            "table": "output_embedding.weight"
+          },
+          "graph_slots": {
+            "inputs": {
+              "ids": "external:input_ids"
+            },
+            "outputs": {
+              "output": "lexical_token_rows"
+            }
+          },
+          "params": {
+            "T": 6,
+            "V": 16,
+            "C": 4096,
+            "call_constants": {
+              "id_elements": 6,
+              "table_elements": 65536,
+              "vocabulary": 16,
+              "channels": 4096,
+              "table_stride": 4096,
+              "output_elements": 24576,
+              "tokens": 6,
+              "output_stride": 4096
+            }
+          }
+        }
+      ],
+      "body": {
+        "type": "dense",
+        "ops": [
+          {
+            "id": "question_pool",
+            "op": "token_span_mean_checked",
+            "kernel": "token_span_mean_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "normalized_hidden",
+                "spans": "external:question_spans"
+              },
+              "outputs": {
+                "output": "question_vectors"
+              }
+            },
+            "params": {
+              "T": 6,
+              "S": 2,
+              "C": 4096,
+              "call_constants": {
+                "input_elements": 24576,
+                "input_stride": 4096,
+                "token_capacity": 6,
+                "valid_tokens": 6,
+                "channels": 4096,
+                "span_elements": 4,
+                "span_count": 2,
+                "output_elements": 8192,
+                "output_stride": 4096
+              }
+            }
+          },
+          {
+            "id": "option_context_pool",
+            "op": "token_span_mean_checked",
+            "kernel": "token_span_mean_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "normalized_hidden",
+                "spans": "external:option_spans"
+              },
+              "outputs": {
+                "output": "option_context_vectors"
+              }
+            },
+            "params": {
+              "T": 6,
+              "S": 3,
+              "C": 4096,
+              "call_constants": {
+                "input_elements": 24576,
+                "input_stride": 4096,
+                "token_capacity": 6,
+                "valid_tokens": 6,
+                "channels": 4096,
+                "span_elements": 6,
+                "span_count": 3,
+                "output_elements": 12288,
+                "output_stride": 4096
+              }
+            }
+          },
+          {
+            "id": "option_lexical_pool",
+            "op": "token_span_mean_checked",
+            "kernel": "token_span_mean_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "lexical_token_rows",
+                "spans": "external:option_spans"
+              },
+              "outputs": {
+                "output": "lexical_option_vectors"
+              }
+            },
+            "params": {
+              "T": 6,
+              "S": 3,
+              "C": 4096,
+              "call_constants": {
+                "input_elements": 24576,
+                "input_stride": 4096,
+                "token_capacity": 6,
+                "valid_tokens": 6,
+                "channels": 4096,
+                "span_elements": 6,
+                "span_count": 3,
+                "output_elements": 12288,
+                "output_stride": 4096
+              }
+            }
+          },
+          {
+            "id": "global_final_row",
+            "op": "last_valid_row_checked",
+            "kernel": "last_valid_row_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "normalized_hidden",
+                "span": "external:global_span"
+              },
+              "outputs": {
+                "output": "global_vector"
+              }
+            },
+            "params": {
+              "T": 6,
+              "C": 4096,
+              "call_constants": {
+                "input_elements": 24576,
+                "input_stride": 4096,
+                "token_capacity": 6,
+                "valid_tokens": 6,
+                "channels": 4096,
+                "span_elements": 2,
+                "output_elements": 4096
+              }
+            }
+          }
+        ]
+      },
+      "footer": [
+        {
+          "id": "memory_projection",
+          "op": "linear_rows_checked_no_bias",
+          "kernel": "linear_rows_checked_no_bias_f32",
+          "returns_status": true,
+          "weight_refs": {
+            "weight": "memory_projection.weight"
+          },
+          "graph_slots": {
+            "inputs": {
+              "input": "normalized_hidden"
+            },
+            "outputs": {
+              "output": "memory"
+            }
+          },
+          "params": {
+            "M": 6,
+            "K": 4096,
+            "N": 1024,
+            "call_constants": {
+              "linear_input_elements": 24576,
+              "linear_input_stride": 4096,
+              "linear_weight_elements": 4194304,
+              "linear_weight_stride": 4096,
+              "linear_output_elements": 6144,
+              "linear_output_stride": 1024,
+              "linear_rows": 6,
+              "linear_input_channels": 4096,
+              "linear_output_channels": 1024
+            }
+          }
+        },
+        {
+          "id": "question_projection",
+          "op": "linear_rows_checked_no_bias",
+          "kernel": "linear_rows_checked_no_bias_f32",
+          "returns_status": true,
+          "weight_refs": {
+            "weight": "question_projection.weight"
+          },
+          "graph_slots": {
+            "inputs": {
+              "input": "question_vectors"
+            },
+            "outputs": {
+              "output": "question_projected"
+            }
+          },
+          "params": {
+            "M": 2,
+            "K": 4096,
+            "N": 1024,
+            "call_constants": {
+              "linear_input_elements": 8192,
+              "linear_input_stride": 4096,
+              "linear_weight_elements": 4194304,
+              "linear_weight_stride": 4096,
+              "linear_output_elements": 2048,
+              "linear_output_stride": 1024,
+              "linear_rows": 2,
+              "linear_input_channels": 4096,
+              "linear_output_channels": 1024
+            }
+          }
+        },
+        {
+          "id": "option_context_projection",
+          "op": "linear_rows_checked_no_bias",
+          "kernel": "linear_rows_checked_no_bias_f32",
+          "returns_status": true,
+          "weight_refs": {
+            "weight": "option_context_projection.weight"
+          },
+          "graph_slots": {
+            "inputs": {
+              "input": "option_context_vectors"
+            },
+            "outputs": {
+              "output": "option_context_projected"
+            }
+          },
+          "params": {
+            "M": 3,
+            "K": 4096,
+            "N": 1024,
+            "call_constants": {
+              "linear_input_elements": 12288,
+              "linear_input_stride": 4096,
+              "linear_weight_elements": 4194304,
+              "linear_weight_stride": 4096,
+              "linear_output_elements": 3072,
+              "linear_output_stride": 1024,
+              "linear_rows": 3,
+              "linear_input_channels": 4096,
+              "linear_output_channels": 1024
+            }
+          }
+        },
+        {
+          "id": "option_lexical_projection",
+          "op": "linear_rows_checked_no_bias",
+          "kernel": "linear_rows_checked_no_bias_f32",
+          "returns_status": true,
+          "weight_refs": {
+            "weight": "option_lexical_projection.weight"
+          },
+          "graph_slots": {
+            "inputs": {
+              "input": "lexical_option_vectors"
+            },
+            "outputs": {
+              "output": "option_lexical_projected"
+            }
+          },
+          "params": {
+            "M": 3,
+            "K": 4096,
+            "N": 1024,
+            "call_constants": {
+              "linear_input_elements": 12288,
+              "linear_input_stride": 4096,
+              "linear_weight_elements": 4194304,
+              "linear_weight_stride": 4096,
+              "linear_output_elements": 3072,
+              "linear_output_stride": 1024,
+              "linear_rows": 3,
+              "linear_input_channels": 4096,
+              "linear_output_channels": 1024
+            }
+          }
+        },
+        {
+          "id": "option_question_projection",
+          "op": "linear_rows_checked_no_bias",
+          "kernel": "linear_rows_checked_no_bias_f32",
+          "returns_status": true,
+          "weight_refs": {
+            "weight": "option_question_projection.weight"
+          },
+          "graph_slots": {
+            "inputs": {
+              "input": "question_vectors"
+            },
+            "outputs": {
+              "output": "option_question_projected"
+            }
+          },
+          "params": {
+            "M": 2,
+            "K": 4096,
+            "N": 1024,
+            "call_constants": {
+              "linear_input_elements": 8192,
+              "linear_input_stride": 4096,
+              "linear_weight_elements": 4194304,
+              "linear_weight_stride": 4096,
+              "linear_output_elements": 2048,
+              "linear_output_stride": 1024,
+              "linear_rows": 2,
+              "linear_input_channels": 4096,
+              "linear_output_channels": 1024
+            }
+          }
+        },
+        {
+          "id": "global_projection",
+          "op": "linear_rows_checked_no_bias",
+          "kernel": "linear_rows_checked_no_bias_f32",
+          "returns_status": true,
+          "weight_refs": {
+            "weight": "global_projection.weight"
+          },
+          "graph_slots": {
+            "inputs": {
+              "input": "global_vector"
+            },
+            "outputs": {
+              "output": "global_projected"
+            }
+          },
+          "params": {
+            "M": 1,
+            "K": 4096,
+            "N": 1024,
+            "call_constants": {
+              "linear_input_elements": 4096,
+              "linear_input_stride": 4096,
+              "linear_weight_elements": 4194304,
+              "linear_weight_stride": 4096,
+              "linear_output_elements": 1024,
+              "linear_output_stride": 1024,
+              "linear_rows": 1,
+              "linear_input_channels": 4096,
+              "linear_output_channels": 1024
+            }
+          }
+        },
+        {
+          "id": "option_context_lexical_join",
+          "op": "add_rows_checked",
+          "kernel": "add_rows_checked_f32",
+          "returns_status": true,
+          "graph_slots": {
+            "inputs": {
+              "left": "option_context_projected",
+              "right": "option_lexical_projected"
+            },
+            "outputs": {
+              "output": "option_context_lexical"
+            }
+          },
+          "params": {
+            "N": 3072,
+            "call_constants": {
+              "left_elements": 3072,
+              "right_elements": 3072,
+              "output_elements": 3072,
+              "elements": 3072
+            }
+          }
+        },
+        {
+          "id": "option_question_join",
+          "op": "indexed_sum_rows_checked",
+          "kernel": "indexed_sum_rows_checked_f32",
+          "returns_status": true,
+          "graph_slots": {
+            "inputs": {
+              "left": "option_context_lexical",
+              "right": "option_question_projected",
+              "left_indices": "external:option_row_indices",
+              "right_indices": "external:option_question_indices"
+            },
+            "outputs": {
+              "output": "option_queries"
+            }
+          },
+          "params": {
+            "L": 3,
+            "K": 2,
+            "R": 3,
+            "C": 1024,
+            "call_constants": {
+              "left_elements": 3072,
+              "left_stride": 1024,
+              "left_rows": 3,
+              "right_elements": 2048,
+              "right_stride": 1024,
+              "right_rows": 2,
+              "left_index_elements": 3,
+              "right_index_elements": 3,
+              "output_elements": 3072,
+              "output_stride": 1024,
+              "rows": 3,
+              "channels": 1024
+            }
+          }
+        }
+      ]
+    },
+    "evidence0": {
+      "sequence": [
+        "header",
+        "body",
+        "footer"
+      ],
+      "header": [
+        {
+          "id": "evidence0_query_norm_op",
+          "op": "layernorm",
+          "kernel": "layernorm_rows_checked_param_epsilon_f32",
+          "returns_status": true,
+          "weight_refs": {
+            "gamma": "evidence_layers.0.query_norm.weight",
+            "beta": "evidence_layers.0.query_norm.bias"
+          },
+          "graph_slots": {
+            "inputs": {
+              "input": "option_queries"
+            },
+            "outputs": {
+              "output": "evidence0_query_norm"
+            }
+          },
+          "params": {
+            "M": 3,
+            "C": 1024,
+            "Q": 3078,
+            "epsilon": 1e-05,
+            "call_constants": {
+              "norm_input_elements": 3072,
+              "norm_input_stride": 1024,
+              "norm_gamma_elements": 1024,
+              "norm_beta_elements": 1024,
+              "norm_output_elements": 3072,
+              "norm_output_stride": 1024,
+              "norm_scratch_elements": 3078,
+              "norm_rows": 3,
+              "norm_channels": 1024
+            }
+          }
+        },
+        {
+          "id": "evidence0_memory_norm_op",
+          "op": "layernorm",
+          "kernel": "layernorm_rows_checked_param_epsilon_f32",
+          "returns_status": true,
+          "weight_refs": {
+            "gamma": "evidence_layers.0.memory_norm.weight",
+            "beta": "evidence_layers.0.memory_norm.bias"
+          },
+          "graph_slots": {
+            "inputs": {
+              "input": "memory"
+            },
+            "outputs": {
+              "output": "evidence0_memory_norm"
+            }
+          },
+          "params": {
+            "M": 6,
+            "C": 1024,
+            "Q": 6156,
+            "epsilon": 1e-05,
+            "call_constants": {
+              "norm_input_elements": 6144,
+              "norm_input_stride": 1024,
+              "norm_gamma_elements": 1024,
+              "norm_beta_elements": 1024,
+              "norm_output_elements": 6144,
+              "norm_output_stride": 1024,
+              "norm_scratch_elements": 6156,
+              "norm_rows": 6,
+              "norm_channels": 1024
+            }
+          }
+        }
+      ],
+      "body": {
+        "type": "dense",
+        "ops": [
+          {
+            "id": "evidence0_q_projection",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "weight_refs": {
+              "weight": "evidence_layers.0.attention.q_proj.weight",
+              "bias": "evidence_layers.0.attention.q_proj.bias"
+            },
+            "graph_slots": {
+              "inputs": {
+                "input": "evidence0_query_norm"
+              },
+              "outputs": {
+                "output": "evidence0_q"
+              }
+            },
+            "params": {
+              "M": 3,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 3072,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 3072,
+                "linear_output_stride": 1024,
+                "linear_rows": 3,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            }
+          },
+          {
+            "id": "evidence0_k_projection",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "weight_refs": {
+              "weight": "evidence_layers.0.attention.k_proj.weight",
+              "bias": "evidence_layers.0.attention.k_proj.bias"
+            },
+            "graph_slots": {
+              "inputs": {
+                "input": "evidence0_memory_norm"
+              },
+              "outputs": {
+                "output": "evidence0_k"
+              }
+            },
+            "params": {
+              "M": 6,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 6144,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 6144,
+                "linear_output_stride": 1024,
+                "linear_rows": 6,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            }
+          },
+          {
+            "id": "evidence0_v_projection",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "weight_refs": {
+              "weight": "evidence_layers.0.attention.v_proj.weight",
+              "bias": "evidence_layers.0.attention.v_proj.bias"
+            },
+            "graph_slots": {
+              "inputs": {
+                "input": "evidence0_memory_norm"
+              },
+              "outputs": {
+                "output": "evidence0_v"
+              }
+            },
+            "params": {
+              "M": 6,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 6144,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 6144,
+                "linear_output_stride": 1024,
+                "linear_rows": 6,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            }
+          },
+          {
+            "id": "evidence0_cross_attention",
+            "op": "attention_cross_token_major_checked",
+            "kernel": "attention_cross_token_major_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "query": "evidence0_q",
+                "key": "evidence0_k",
+                "value": "evidence0_v"
+              },
+              "outputs": {
+                "output": "evidence0_context"
+              }
+            },
+            "params": {
+              "Q": 3,
+              "S": 6,
+              "H": 16,
+              "D": 64,
+              "X": 3078,
+              "call_constants": {
+                "query_elements": 3072,
+                "key_elements": 6144,
+                "value_elements": 6144,
+                "output_elements": 3072,
+                "scratch_elements": 3078,
+                "query_tokens": 3,
+                "memory_tokens": 6,
+                "heads": 16,
+                "head_dim": 64
+              }
+            }
+          },
+          {
+            "id": "evidence0_output_projection",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "weight_refs": {
+              "weight": "evidence_layers.0.attention.out_proj.weight",
+              "bias": "evidence_layers.0.attention.out_proj.bias"
+            },
+            "graph_slots": {
+              "inputs": {
+                "input": "evidence0_context"
+              },
+              "outputs": {
+                "output": "evidence0_attn_out"
+              }
+            },
+            "params": {
+              "M": 3,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 3072,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 3072,
+                "linear_output_stride": 1024,
+                "linear_rows": 3,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            }
+          },
+          {
+            "id": "evidence0_attention_residual",
+            "op": "add_rows_checked",
+            "kernel": "add_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "left": "option_queries",
+                "right": "evidence0_attn_out"
+              },
+              "outputs": {
+                "output": "evidence0_attn_residual"
+              }
+            },
+            "params": {
+              "N": 3072,
+              "call_constants": {
+                "left_elements": 3072,
+                "right_elements": 3072,
+                "output_elements": 3072,
+                "elements": 3072
+              }
+            }
+          },
+          {
+            "id": "evidence0_feedforward_norm_op",
+            "op": "layernorm",
+            "kernel": "layernorm_rows_checked_param_epsilon_f32",
+            "returns_status": true,
+            "weight_refs": {
+              "gamma": "evidence_layers.0.feedforward_norm.weight",
+              "beta": "evidence_layers.0.feedforward_norm.bias"
+            },
+            "graph_slots": {
+              "inputs": {
+                "input": "evidence0_attn_residual"
+              },
+              "outputs": {
+                "output": "evidence0_ff_norm"
+              }
+            },
+            "params": {
+              "M": 3,
+              "C": 1024,
+              "Q": 3078,
+              "epsilon": 1e-05,
+              "call_constants": {
+                "norm_input_elements": 3072,
+                "norm_input_stride": 1024,
+                "norm_gamma_elements": 1024,
+                "norm_beta_elements": 1024,
+                "norm_output_elements": 3072,
+                "norm_output_stride": 1024,
+                "norm_scratch_elements": 3078,
+                "norm_rows": 3,
+                "norm_channels": 1024
+              }
+            }
+          },
+          {
+            "id": "evidence0_feedforward1",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "weight_refs": {
+              "weight": "evidence_layers.0.feedforward.0.weight",
+              "bias": "evidence_layers.0.feedforward.0.bias"
+            },
+            "graph_slots": {
+              "inputs": {
+                "input": "evidence0_ff_norm"
+              },
+              "outputs": {
+                "output": "evidence0_ff1"
+              }
+            },
+            "params": {
+              "M": 3,
+              "K": 1024,
+              "N": 4096,
+              "call_constants": {
+                "linear_input_elements": 3072,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 4194304,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 4096,
+                "linear_output_elements": 12288,
+                "linear_output_stride": 4096,
+                "linear_rows": 3,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 4096
+              }
+            }
+          },
+          {
+            "id": "evidence0_gelu_op",
+            "op": "gelu",
+            "kernel": "gelu_rows_erf_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "evidence0_ff1"
+              },
+              "outputs": {
+                "output": "evidence0_gelu"
+              }
+            },
+            "params": {
+              "M": 3,
+              "C": 4096,
+              "Q": 12288,
+              "call_constants": {
+                "gelu_input_elements": 12288,
+                "gelu_input_stride": 4096,
+                "gelu_output_elements": 12288,
+                "gelu_output_stride": 4096,
+                "gelu_scratch_elements": 12288,
+                "gelu_rows": 3,
+                "gelu_channels": 4096
+              }
+            }
+          },
+          {
+            "id": "evidence0_feedforward2",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "weight_refs": {
+              "weight": "evidence_layers.0.feedforward.3.weight",
+              "bias": "evidence_layers.0.feedforward.3.bias"
+            },
+            "graph_slots": {
+              "inputs": {
+                "input": "evidence0_gelu"
+              },
+              "outputs": {
+                "output": "evidence0_ff2"
+              }
+            },
+            "params": {
+              "M": 3,
+              "K": 4096,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 12288,
+                "linear_input_stride": 4096,
+                "linear_weight_elements": 4194304,
+                "linear_weight_stride": 4096,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 3072,
+                "linear_output_stride": 1024,
+                "linear_rows": 3,
+                "linear_input_channels": 4096,
+                "linear_output_channels": 1024
+              }
+            }
+          }
+        ]
+      },
+      "footer": [
+        {
+          "id": "evidence0_feedforward_residual",
+          "op": "add_rows_checked",
+          "kernel": "add_rows_checked_f32",
+          "returns_status": true,
+          "graph_slots": {
+            "inputs": {
+              "left": "evidence0_attn_residual",
+              "right": "evidence0_ff2"
+            },
+            "outputs": {
+              "output": "evidence0_output"
+            }
+          },
+          "params": {
+            "N": 3072,
+            "call_constants": {
+              "left_elements": 3072,
+              "right_elements": 3072,
+              "output_elements": 3072,
+              "elements": 3072
+            }
+          }
+        }
+      ]
+    },
+    "evidence1": {
+      "sequence": [
+        "header",
+        "body",
+        "footer"
+      ],
+      "header": [
+        {
+          "id": "evidence1_query_norm_op",
+          "op": "layernorm",
+          "kernel": "layernorm_rows_checked_param_epsilon_f32",
+          "returns_status": true,
+          "weight_refs": {
+            "gamma": "evidence_layers.1.query_norm.weight",
+            "beta": "evidence_layers.1.query_norm.bias"
+          },
+          "graph_slots": {
+            "inputs": {
+              "input": "evidence0_output"
+            },
+            "outputs": {
+              "output": "evidence1_query_norm"
+            }
+          },
+          "params": {
+            "M": 3,
+            "C": 1024,
+            "Q": 3078,
+            "epsilon": 1e-05,
+            "call_constants": {
+              "norm_input_elements": 3072,
+              "norm_input_stride": 1024,
+              "norm_gamma_elements": 1024,
+              "norm_beta_elements": 1024,
+              "norm_output_elements": 3072,
+              "norm_output_stride": 1024,
+              "norm_scratch_elements": 3078,
+              "norm_rows": 3,
+              "norm_channels": 1024
+            }
+          }
+        },
+        {
+          "id": "evidence1_memory_norm_op",
+          "op": "layernorm",
+          "kernel": "layernorm_rows_checked_param_epsilon_f32",
+          "returns_status": true,
+          "weight_refs": {
+            "gamma": "evidence_layers.1.memory_norm.weight",
+            "beta": "evidence_layers.1.memory_norm.bias"
+          },
+          "graph_slots": {
+            "inputs": {
+              "input": "memory"
+            },
+            "outputs": {
+              "output": "evidence1_memory_norm"
+            }
+          },
+          "params": {
+            "M": 6,
+            "C": 1024,
+            "Q": 6156,
+            "epsilon": 1e-05,
+            "call_constants": {
+              "norm_input_elements": 6144,
+              "norm_input_stride": 1024,
+              "norm_gamma_elements": 1024,
+              "norm_beta_elements": 1024,
+              "norm_output_elements": 6144,
+              "norm_output_stride": 1024,
+              "norm_scratch_elements": 6156,
+              "norm_rows": 6,
+              "norm_channels": 1024
+            }
+          }
+        }
+      ],
+      "body": {
+        "type": "dense",
+        "ops": [
+          {
+            "id": "evidence1_q_projection",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "weight_refs": {
+              "weight": "evidence_layers.1.attention.q_proj.weight",
+              "bias": "evidence_layers.1.attention.q_proj.bias"
+            },
+            "graph_slots": {
+              "inputs": {
+                "input": "evidence1_query_norm"
+              },
+              "outputs": {
+                "output": "evidence1_q"
+              }
+            },
+            "params": {
+              "M": 3,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 3072,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 3072,
+                "linear_output_stride": 1024,
+                "linear_rows": 3,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            }
+          },
+          {
+            "id": "evidence1_k_projection",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "weight_refs": {
+              "weight": "evidence_layers.1.attention.k_proj.weight",
+              "bias": "evidence_layers.1.attention.k_proj.bias"
+            },
+            "graph_slots": {
+              "inputs": {
+                "input": "evidence1_memory_norm"
+              },
+              "outputs": {
+                "output": "evidence1_k"
+              }
+            },
+            "params": {
+              "M": 6,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 6144,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 6144,
+                "linear_output_stride": 1024,
+                "linear_rows": 6,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            }
+          },
+          {
+            "id": "evidence1_v_projection",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "weight_refs": {
+              "weight": "evidence_layers.1.attention.v_proj.weight",
+              "bias": "evidence_layers.1.attention.v_proj.bias"
+            },
+            "graph_slots": {
+              "inputs": {
+                "input": "evidence1_memory_norm"
+              },
+              "outputs": {
+                "output": "evidence1_v"
+              }
+            },
+            "params": {
+              "M": 6,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 6144,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 6144,
+                "linear_output_stride": 1024,
+                "linear_rows": 6,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            }
+          },
+          {
+            "id": "evidence1_cross_attention",
+            "op": "attention_cross_token_major_checked",
+            "kernel": "attention_cross_token_major_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "query": "evidence1_q",
+                "key": "evidence1_k",
+                "value": "evidence1_v"
+              },
+              "outputs": {
+                "output": "evidence1_context"
+              }
+            },
+            "params": {
+              "Q": 3,
+              "S": 6,
+              "H": 16,
+              "D": 64,
+              "X": 3078,
+              "call_constants": {
+                "query_elements": 3072,
+                "key_elements": 6144,
+                "value_elements": 6144,
+                "output_elements": 3072,
+                "scratch_elements": 3078,
+                "query_tokens": 3,
+                "memory_tokens": 6,
+                "heads": 16,
+                "head_dim": 64
+              }
+            }
+          },
+          {
+            "id": "evidence1_output_projection",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "weight_refs": {
+              "weight": "evidence_layers.1.attention.out_proj.weight",
+              "bias": "evidence_layers.1.attention.out_proj.bias"
+            },
+            "graph_slots": {
+              "inputs": {
+                "input": "evidence1_context"
+              },
+              "outputs": {
+                "output": "evidence1_attn_out"
+              }
+            },
+            "params": {
+              "M": 3,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 3072,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 3072,
+                "linear_output_stride": 1024,
+                "linear_rows": 3,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            }
+          },
+          {
+            "id": "evidence1_attention_residual",
+            "op": "add_rows_checked",
+            "kernel": "add_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "left": "evidence0_output",
+                "right": "evidence1_attn_out"
+              },
+              "outputs": {
+                "output": "evidence1_attn_residual"
+              }
+            },
+            "params": {
+              "N": 3072,
+              "call_constants": {
+                "left_elements": 3072,
+                "right_elements": 3072,
+                "output_elements": 3072,
+                "elements": 3072
+              }
+            }
+          },
+          {
+            "id": "evidence1_feedforward_norm_op",
+            "op": "layernorm",
+            "kernel": "layernorm_rows_checked_param_epsilon_f32",
+            "returns_status": true,
+            "weight_refs": {
+              "gamma": "evidence_layers.1.feedforward_norm.weight",
+              "beta": "evidence_layers.1.feedforward_norm.bias"
+            },
+            "graph_slots": {
+              "inputs": {
+                "input": "evidence1_attn_residual"
+              },
+              "outputs": {
+                "output": "evidence1_ff_norm"
+              }
+            },
+            "params": {
+              "M": 3,
+              "C": 1024,
+              "Q": 3078,
+              "epsilon": 1e-05,
+              "call_constants": {
+                "norm_input_elements": 3072,
+                "norm_input_stride": 1024,
+                "norm_gamma_elements": 1024,
+                "norm_beta_elements": 1024,
+                "norm_output_elements": 3072,
+                "norm_output_stride": 1024,
+                "norm_scratch_elements": 3078,
+                "norm_rows": 3,
+                "norm_channels": 1024
+              }
+            }
+          },
+          {
+            "id": "evidence1_feedforward1",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "weight_refs": {
+              "weight": "evidence_layers.1.feedforward.0.weight",
+              "bias": "evidence_layers.1.feedforward.0.bias"
+            },
+            "graph_slots": {
+              "inputs": {
+                "input": "evidence1_ff_norm"
+              },
+              "outputs": {
+                "output": "evidence1_ff1"
+              }
+            },
+            "params": {
+              "M": 3,
+              "K": 1024,
+              "N": 4096,
+              "call_constants": {
+                "linear_input_elements": 3072,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 4194304,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 4096,
+                "linear_output_elements": 12288,
+                "linear_output_stride": 4096,
+                "linear_rows": 3,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 4096
+              }
+            }
+          },
+          {
+            "id": "evidence1_gelu_op",
+            "op": "gelu",
+            "kernel": "gelu_rows_erf_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "evidence1_ff1"
+              },
+              "outputs": {
+                "output": "evidence1_gelu"
+              }
+            },
+            "params": {
+              "M": 3,
+              "C": 4096,
+              "Q": 12288,
+              "call_constants": {
+                "gelu_input_elements": 12288,
+                "gelu_input_stride": 4096,
+                "gelu_output_elements": 12288,
+                "gelu_output_stride": 4096,
+                "gelu_scratch_elements": 12288,
+                "gelu_rows": 3,
+                "gelu_channels": 4096
+              }
+            }
+          },
+          {
+            "id": "evidence1_feedforward2",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "weight_refs": {
+              "weight": "evidence_layers.1.feedforward.3.weight",
+              "bias": "evidence_layers.1.feedforward.3.bias"
+            },
+            "graph_slots": {
+              "inputs": {
+                "input": "evidence1_gelu"
+              },
+              "outputs": {
+                "output": "evidence1_ff2"
+              }
+            },
+            "params": {
+              "M": 3,
+              "K": 4096,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 12288,
+                "linear_input_stride": 4096,
+                "linear_weight_elements": 4194304,
+                "linear_weight_stride": 4096,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 3072,
+                "linear_output_stride": 1024,
+                "linear_rows": 3,
+                "linear_input_channels": 4096,
+                "linear_output_channels": 1024
+              }
+            }
+          }
+        ]
+      },
+      "footer": [
+        {
+          "id": "evidence1_feedforward_residual",
+          "op": "add_rows_checked",
+          "kernel": "add_rows_checked_f32",
+          "returns_status": true,
+          "graph_slots": {
+            "inputs": {
+              "left": "evidence1_attn_residual",
+              "right": "evidence1_ff2"
+            },
+            "outputs": {
+              "output": "evidence1_output"
+            }
+          },
+          "params": {
+            "N": 3072,
+            "call_constants": {
+              "left_elements": 3072,
+              "right_elements": 3072,
+              "output_elements": 3072,
+              "elements": 3072
+            }
+          }
+        }
+      ]
+    },
+    "option_summary": {
+      "sequence": [
+        "header",
+        "body",
+        "footer"
+      ],
+      "header": [],
+      "body": {
+        "type": "dense",
+        "ops": [
+          {
+            "id": "option_summary_pool",
+            "op": "grouped_softmax_weighted_rows_checked",
+            "kernel": "grouped_softmax_weighted_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "options": "evidence1_output",
+                "fields": "question_projected",
+                "group_counts": "external:option_counts"
+              },
+              "outputs": {
+                "output": "option_summary_raw"
+              }
+            },
+            "params": {
+              "G": 2,
+              "O": 3,
+              "C": 1024,
+              "X": 2051,
+              "call_constants": {
+                "option_elements": 3072,
+                "option_stride": 1024,
+                "field_elements": 2048,
+                "field_stride": 1024,
+                "count_elements": 2,
+                "output_elements": 2048,
+                "output_stride": 1024,
+                "scratch_elements": 2051,
+                "groups": 2,
+                "option_rows": 3,
+                "channels": 1024
+              }
+            }
+          }
+        ]
+      },
+      "footer": [
+        {
+          "id": "option_summary_norm",
+          "op": "layernorm",
+          "kernel": "layernorm_rows_checked_param_epsilon_f32",
+          "returns_status": true,
+          "weight_refs": {
+            "gamma": "option_summary_norm.weight",
+            "beta": "option_summary_norm.bias"
+          },
+          "graph_slots": {
+            "inputs": {
+              "input": "option_summary_raw"
+            },
+            "outputs": {
+              "output": "option_summary_normalized"
+            }
+          },
+          "params": {
+            "M": 2,
+            "C": 1024,
+            "Q": 2052,
+            "epsilon": 1e-05,
+            "call_constants": {
+              "norm_input_elements": 2048,
+              "norm_input_stride": 1024,
+              "norm_gamma_elements": 1024,
+              "norm_beta_elements": 1024,
+              "norm_output_elements": 2048,
+              "norm_output_stride": 1024,
+              "norm_scratch_elements": 2052,
+              "norm_rows": 2,
+              "norm_channels": 1024
+            }
+          }
+        }
+      ]
+    }
+  },
+  "runtime_constants": {},
+  "runtime_lengths": {}
+}

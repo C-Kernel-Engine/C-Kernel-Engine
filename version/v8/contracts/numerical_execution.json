@@ -4988,6 +4988,44 @@
       },
       "position_transform": null,
       "description": "Checked single-query grouped attention over caller-owned capacity-strided KV. FP32 stored scores and selected maximum, FP64 exponentials and weighted sums. Source-score workspace may change on failure; KV and final output do not."
+    },
+    "grouped_softmax_weighted_rows_ordered_fp64_f32_stages": {
+      "operator_family": "grouped_softmax_weighted_rows_checked",
+      "status": "validated",
+      "storage": {
+        "input": "fp32",
+        "weight": "none",
+        "output": "fp32"
+      },
+      "compute": {
+        "input": "fp32",
+        "weight": "none",
+        "accumulator": "fp64",
+        "contraction": "disabled",
+        "evaluation_order": "ascending_channels_dot_then_ascending_group_options_softmax_and_weighted_sum"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": [
+          "activation_intermediate_store",
+          "softmax_probability_store",
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "sum",
+        "order": "ascending_index",
+        "partial_accumulator": "fp64",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "serial",
+        "split_strategy": "serial",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Grouped weighted pooling: separate ordered FP64 dot products scaled by 1/sqrt(C), FP32 logits, FP64 exp rounded to FP32 before ordered FP64 denominator, FP32 probabilities, ordered separate FP64 weighted products and sums, FP32 output. Positive consecutive counts partition all option rows. Atomic output publication on success; default round-to-nearest and no fast-math required."
     }
   }
 }
