@@ -944,6 +944,14 @@ TEST_SUITES = {
         "Clef-Flash Generated First Evidence Routing Layer", "inference",
         ROOT / "tests" / "test_v8_clef_flash_evidence0.py",
     ),
+    "decision_tensor_ops": TestSuite(
+        "Checked Decision Tensor Operations", "kernels",
+        ROOT / "tests" / "test_v8_decision_tensor_ops.py",
+    ),
+    "decision_clef_flash_complete_head": TestSuite(
+        "Clef-Flash Complete Generated Decision Head", "inference",
+        ROOT / "tests" / "test_v8_clef_flash_complete_head.py",
+    ),
     "decision_grouped_weighted_rows": TestSuite(
         "Checked Grouped Softmax Weighted Rows", "kernels",
         ROOT / "tests" / "test_v8_grouped_weighted_rows.py",
@@ -1943,6 +1951,11 @@ TEST_SUITES = {
         "Qwen3-VL Encoder Input Contract",
         "parity",
         ROOT / "tests" / "test_v8_numeric_parity_qwen3vl_mmproj.py",
+    ),
+    "vision_encoder_accuracy_contract": TestSuite(
+        "Vision Encoder Accuracy Contract",
+        "parity",
+        ROOT / "tests" / "test_v8_vision_encoder_accuracy_gate.py",
     ),
     "mtmd_capture_layout": TestSuite(
         "MTMD Strided Capture Layout",

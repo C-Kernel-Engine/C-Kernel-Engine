@@ -53,7 +53,7 @@ def compile_case(folder, graph, weights, *, enclosing_epsilon=1e-5,
         "epsilon": enclosing_epsilon,
         "activation_buffer_dtypes": {name: "i32" for name in
             ("input_ids", "question_spans", "option_spans", "global_span",
-             "option_counts",
+             "option_counts", "question_type_ids",
              "option_row_indices", "option_question_indices")}},
         "entries": bundle["entries"], "quant_summary": {}, "template": graph}
     layout, call_ir, _library, loaded, execute = compile_native_graph(

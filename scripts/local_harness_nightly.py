@@ -236,7 +236,8 @@ def _prefix_certification(config_path: Path, run_dir: Path,
 
 
 def run(config_path: Path, state_dir: Path, *, refresh_main: bool = False,
-        prefix_cert_config: Path | None = None) -> dict:
+        prefix_cert_config: Path | None = None,
+        speech_perf_config: Path | None = None) -> dict:
     state_dir.mkdir(parents=True, exist_ok=True)
     started = datetime.now(timezone.utc)
     run_dir = state_dir / "runs" / (started.strftime("%Y%m%dT%H%M%S%fZ"))
@@ -365,6 +366,26 @@ def run(config_path: Path, state_dir: Path, *, refresh_main: bool = False,
             else:
                 report["status"] = harness_status
             publish()
+        if speech_perf_config is not None:
+            stage = "speech_performance"
+            previous = report["status"]
+            report["status"] = "INCOMPLETE" if previous != "FAIL" else "FAIL"
+            publish()
+            if (state_dir / "PAUSE").exists():
+                speech = {"status": "NOT_TESTED", "reason": "paused before speech startup"}
+            else:
+                destination = run_dir / "whisper-performance.json"
+                code = _invoke([sys.executable, str(ROOT / "scripts/whisper_service_benchmark.py"),
+                                "--config", str(speech_perf_config), "--output", str(destination)],
+                               cwd=ROOT, log=run_dir / "whisper-performance.log", deadline=None)
+                speech = json.loads(destination.read_text())
+                if code != 0 and speech.get("status") == "PASS":
+                    speech = {"status": "FAIL", "reason": "benchmark exit disagrees with report"}
+            report["speech_performance"] = speech
+            status = speech.get("status", "FAIL")
+            report["status"] = ("FAIL" if "FAIL" in (previous, status) else
+                                "PASS" if previous == status == "PASS" else "INCOMPLETE")
+            publish()
     except Exception as exc:
         report.update(status="FAIL", reason=f"{stage} failed: {type(exc).__name__}: {exc}",
                       error_type=type(exc).__name__, failure_stage=stage)
@@ -384,6 +405,8 @@ def main() -> int:
                         help="fetch origin/main in a clean detached worktree before testing")
     parser.add_argument("--prefix-cert-config", type=Path,
                         help="optional pinned exact-prefix native certification matrix")
+    parser.add_argument("--speech-perf-config", type=Path,
+                        help="optional same-host pinned Whisper HTTP latency baseline")
     args = parser.parse_args()
     args.state_dir.mkdir(parents=True, exist_ok=True)
     with (args.state_dir / "LOCK").open("a+") as lock:
@@ -394,7 +417,8 @@ def main() -> int:
             return 2
         try:
             result = run(args.config, args.state_dir, refresh_main=args.refresh_main,
-                         prefix_cert_config=args.prefix_cert_config)
+                         prefix_cert_config=args.prefix_cert_config,
+                         speech_perf_config=args.speech_perf_config)
         except (OSError, ValueError, json.JSONDecodeError) as exc:
             print(f"local harness nightly configuration or report error: {exc}")
             return 1

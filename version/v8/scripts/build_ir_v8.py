@@ -2144,6 +2144,30 @@ OP_DATAFLOW = {
         "inputs": {"source": "external:source"},
         "outputs": {"destination": {"slot": "copied_ids", "dtype": "i32"}},
     },
+    "broadcast_add_rows_checked": {
+        "inputs": {"left": "external:left", "right": "external:right"},
+        "outputs": {"output": {"slot": "broadcast_add_rows_checked_output", "dtype": "fp32"}},
+    },
+    "indexed_pair_features_checked": {
+        "inputs": {"left": "external:left", "right": "external:right", "indices": "external:indices"},
+        "outputs": {"output": {"slot": "indexed_pair_features_checked_output", "dtype": "fp32"}},
+    },
+    "indexed_cosine_rows_checked": {
+        "inputs": {"left": "external:left", "right": "external:right", "indices": "external:indices"},
+        "outputs": {"output": {"slot": "indexed_cosine_rows_checked_output", "dtype": "fp32"}},
+    },
+    "scalar_exp_clamped_checked": {
+        "inputs": {},
+        "outputs": {"output": {"slot": "scalar_exp_clamped_checked_output", "dtype": "fp32"}},
+    },
+    "scalar_sigmoid_checked": {
+        "inputs": {},
+        "outputs": {"output": {"slot": "scalar_sigmoid_checked_output", "dtype": "fp32"}},
+    },
+    "scale_vector_checked": {
+        "inputs": {"input": "external:input", "gain": "external:gain"},
+        "outputs": {"output": {"slot": "scale_vector_checked_output", "dtype": "fp32"}},
+    },
     "grouped_softmax_weighted_rows_checked": {
         "inputs": {"options": "external:options", "fields": "external:fields",
                    "group_counts": "external:group_counts"},
@@ -5073,6 +5097,12 @@ TEMPLATE_TO_KERNEL_OP = {
     "repetition_penalty_last_row_checked": "repetition_penalty_last_row_checked",
     "concat_i32_checked": "concat_i32_checked",
     "copy_i32_span_checked": "copy_i32_span_checked",
+    "broadcast_add_rows_checked": "broadcast_add_rows_checked",
+    "indexed_pair_features_checked": "indexed_pair_features_checked",
+    "indexed_cosine_rows_checked": "indexed_cosine_rows_checked",
+    "scalar_exp_clamped_checked": "scalar_exp_clamped_checked",
+    "scalar_sigmoid_checked": "scalar_sigmoid_checked",
+    "scale_vector_checked": "scale_vector_checked",
     "grouped_softmax_weighted_rows_checked": "grouped_softmax_weighted_rows_checked",
     "token_span_mean_checked": "token_span_mean_checked",
     "last_valid_row_checked": "last_valid_row_checked",
