@@ -106,7 +106,9 @@ def _write_private_report(path: Path, result: dict) -> None:
         raise
 
 
-def _progress_identity(plan: dict, mode: str, seed: int) -> dict:
+def _progress_identity(plan: dict, mode: str, seed: int,
+                       agent_id: str | None = None,
+                       request_id: str | None = None) -> dict:
     identity = {"source_sha256": hashlib.sha256(
                     plan["source_text"].encode("utf-8")).hexdigest(),
                 "bundle_identity_sha256": plan.get("bundle_identity_sha256"),
@@ -119,6 +121,9 @@ def _progress_identity(plan: dict, mode: str, seed: int) -> dict:
     if not all(isinstance(value, str) and value for key, value in identity.items()
                if key not in ("total_chunks", "seed")):
         raise PlaybackError("durable progress requires complete CKE plan identity")
+    if agent_id is not None:
+        identity["agent_id"] = agent_id
+        identity["request_id"] = request_id
     return identity
 
 
@@ -158,6 +163,8 @@ def _resume_progress(path: Path, identity: dict, session_id: str | None,
             raise PlaybackError("resume progress file is invalid")
         if (progress.get("schema") != "cke.kokoro.playback-progress.v1" or
                 any(progress.get(key) != value for key, value in identity.items()) or
+                progress.get("agent_id") != identity.get("agent_id") or
+                progress.get("request_id") != identity.get("request_id") or
                 (session_id is not None and progress.get("session_id") != session_id)):
             raise PlaybackError("resume progress identity differs from document or bundle")
         completed = progress.get("last_completed_chunk")
@@ -226,7 +233,9 @@ def play_incremental(text: str, config: Path, bundle: Path, player: Path,
                      technical_mode: str = "natural",
                      prepare_plan=None, document: bool = False,
                      progress_file: Path | None = None, resume: bool = False,
-                     session_id: str | None = None) -> dict:
+                     session_id: str | None = None,
+                     agent_id: str | None = None,
+                     request_id: str | None = None) -> dict:
     """Play checked chunks in order with a bounded number of loaded workers."""
     if not player.is_file() or not os.access(player, os.X_OK):
         raise PlaybackError("selected audio player is unavailable")
@@ -240,6 +249,14 @@ def play_incremental(text: str, config: Path, bundle: Path, player: Path,
                                    any(char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"
                                        for char in session_id)):
         raise PlaybackError("session ID contains unsupported characters")
+    if (agent_id is None) != (request_id is None):
+        raise PlaybackError("agent ID and request ID must be supplied together")
+    for label, value in (("agent ID", agent_id), ("request ID", request_id)):
+        if value is not None and (not isinstance(value, str) or
+                not 1 <= len(value) <= 128 or
+                any(char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"
+                    for char in value)):
+            raise PlaybackError(f"{label} contains unsupported characters")
     if prepare_plan is None:
         sys.path.insert(0, str(Path(__file__).resolve().parent))
         try:
@@ -270,15 +287,32 @@ def play_incremental(text: str, config: Path, bundle: Path, player: Path,
     if any(type(chunk.get("index")) is not int or chunk["index"] != position
            for position, chunk in enumerate(chunks)):
         raise PlaybackError("incremental chunks must have consecutive indices")
+    source_text = plan.get("source_text")
+    if not isinstance(source_text, str) or not source_text:
+        raise PlaybackError("incremental plan has no source text")
+    boundary = 0
+    for chunk in chunks:
+        start, end = chunk.get("source_start"), chunk.get("source_end")
+        if (type(start) is not int or type(end) is not int or
+                start != boundary or not start < end <= len(source_text) or
+                chunk.get("source_text") != source_text[start:end].strip()):
+            raise PlaybackError("incremental chunk source span is invalid")
+        boundary = end
+    if boundary != len(source_text):
+        raise PlaybackError("incremental plan does not cover the source text")
+    source_sha256 = hashlib.sha256(source_text.encode("utf-8")).hexdigest()
     progress = None
     first_chunk = 0
     if progress_file is not None:
         progress, first_chunk = _resume_progress(
-            progress_file, _progress_identity(plan, technical_mode, seed), session_id,
+            progress_file, _progress_identity(plan, technical_mode, seed,
+                                              agent_id, request_id), session_id,
             resume)
     if first_chunk == len(chunks):
-        return {"status": "already_complete", "source_sha256": hashlib.sha256(
-                    plan["source_text"].encode("utf-8")).hexdigest(),
+        return {"status": "already_complete", "source_sha256": source_sha256,
+                "agent_id": agent_id, "request_id": request_id,
+                "bundle_identity_sha256": plan["bundle_identity_sha256"],
+                "sample_rate_hz": 24000,
                 "session_id": progress["session_id"], "total_chunk_count": len(chunks),
                 "resume_from_chunk": first_chunk, "chunks": [], "sample_count": 0,
                 "completed_samples": progress["completed_samples"]}
@@ -292,6 +326,7 @@ def play_incremental(text: str, config: Path, bundle: Path, player: Path,
         playing = None
         total_samples = 0
         completed_samples = progress["completed_samples"] if progress else 0
+        resume_sample_offset = completed_samples
         played = []
         first_play = None
         previous_launch = None
@@ -359,10 +394,17 @@ def play_incremental(text: str, config: Path, bundle: Path, player: Path,
                                         if previous_end is not None else None)
                 handoff_delay = (max(0.0, launched - max(previous_end, ready))
                                  if previous_end is not None else None)
+                audio_start_sample = resume_sample_offset + total_samples
                 total_samples += samples
                 played.append({"index": index, "source_start": chunk["source_start"],
                                "source_end": chunk["source_end"],
                                "source_text": chunk["source_text"],
+                               "source_sha256": source_sha256,
+                               "bundle_identity_sha256": plan["bundle_identity_sha256"],
+                               "agent_id": agent_id, "request_id": request_id,
+                               "session_id": progress["session_id"] if progress else session_id,
+                               "audio_start_sample": audio_start_sample,
+                               "audio_end_sample": resume_sample_offset + total_samples,
                                "samples": samples, "audio_seconds": samples / 24000,
                                "wav_sha256": wav_sha256,
                                "synthesis_seconds": ready - synthesis_started,
@@ -411,8 +453,9 @@ def play_incremental(text: str, config: Path, bundle: Path, player: Path,
                         worker.stdout.close()
                     if worker.stderr:
                         worker.stderr.close()
-    return {"status": "execution_pass", "source_sha256": hashlib.sha256(
-                plan["source_text"].encode("utf-8")).hexdigest(),
+    return {"status": "execution_pass", "source_sha256": source_sha256,
+            "agent_id": agent_id, "request_id": request_id,
+            "sample_rate_hz": 24000,
             "bundle_identity_sha256": plan["bundle_identity_sha256"],
             "bundle_manifest_sha256": plan.get("bundle_manifest_sha256"),
             "technical_mode": technical_mode,
@@ -421,7 +464,7 @@ def play_incremental(text: str, config: Path, bundle: Path, player: Path,
             "native_model_loads": len(workers),
             "chunks": played, "sample_count": total_samples,
             "completed_samples": completed_samples,
-            "session_id": progress["session_id"] if progress else None,
+            "session_id": progress["session_id"] if progress else session_id,
             "resume_from_chunk": first_chunk,
             "total_chunk_count": len(chunks),
             "audio_seconds": total_samples / 24000,
@@ -461,6 +504,8 @@ def main() -> int:
                         help="resume after the last acknowledged completed chunk")
     parser.add_argument("--session-id",
                         help="stable local speech-session identity for progress validation")
+    parser.add_argument("--agent-id", help="originating agent identity in chunk reports")
+    parser.add_argument("--request-id", help="originating request identity in chunk reports")
     parser.add_argument("--text-file", type=Path,
                         help="read the complete reply from a UTF-8 file")
     parser.add_argument("text", nargs="?")
@@ -477,6 +522,9 @@ def main() -> int:
             raise PlaybackError("synthesis workers must be in 1..3")
         if not args.incremental and args.synthesis_workers != 1:
             raise PlaybackError("multiple synthesis workers require --incremental")
+        if not args.incremental and (args.agent_id is not None or
+                                     args.request_id is not None):
+            raise PlaybackError("request identity requires --incremental")
         if args.document and not args.incremental:
             raise PlaybackError("document playback requires --incremental")
         if args.progress_file and not args.incremental:
@@ -488,7 +536,9 @@ def main() -> int:
                               "technical_mode": args.technical_mode,
                               "progress_file": args.progress_file,
                               "resume": args.resume,
-                              "session_id": args.session_id}
+                              "session_id": args.session_id,
+                              "agent_id": args.agent_id,
+                              "request_id": args.request_id}
         if args.document:
             incremental_kwargs["document"] = True
         result = (play_incremental(text, args.config, args.bundle_dir,
