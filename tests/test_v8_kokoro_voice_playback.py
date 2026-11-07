@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -23,13 +24,39 @@ adapter = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(adapter)
 
 
+def _proc_state(pid: int) -> str | None:
+    try:
+        return Path(f"/proc/{pid}/stat").read_text().split()[2]
+    except (FileNotFoundError, ProcessLookupError):
+        return None
+
+
 class KokoroVoicePlaybackTest(unittest.TestCase):
+    def test_rejects_incomplete_or_unsafe_request_identity(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            player = root / "player"
+            player.write_text("#!/bin/sh\nexit 0\n")
+            player.chmod(0o700)
+            for identity in ({"agent_id": "agent"},
+                             {"request_id": "request"},
+                             {"agent_id": "agent", "request_id": "bad\nrequest"},
+                             {"agent_id": "a" * 129, "request_id": "request"}):
+                with self.subTest(identity=identity):
+                    with self.assertRaises(adapter.PlaybackError):
+                        adapter.play_incremental(
+                            "Hello.", root, root, player,
+                            prepare_plan=lambda *_: self.fail("planner ran"),
+                            **identity)
+
     def test_cli_accepts_private_text_file_and_rejects_duplicate_source(self):
         with tempfile.TemporaryDirectory() as folder:
             source = Path(folder) / "reply.txt"
             source.write_text("Read /data/cke/report.txt.", encoding="utf-8")
             base = ["ck_kokoro_play.py", "--config", "config", "--bundle-dir",
                     "bundle", "--player", "player", "--incremental",
+                    "--agent-id", "cke-agent", "--request-id", "req-1",
+                    "--session-id", "speech-1",
                     "--text-file", str(source)]
             original_handler = signal.getsignal(signal.SIGTERM)
             try:
@@ -38,8 +65,19 @@ class KokoroVoicePlaybackTest(unittest.TestCase):
                      mock.patch.object(sys, "argv", base):
                     self.assertEqual(adapter.main(), 0)
                 self.assertEqual(play.call_args.args[0], source.read_text())
+                self.assertEqual(play.call_args.kwargs["agent_id"], "cke-agent")
+                self.assertEqual(play.call_args.kwargs["request_id"], "req-1")
+                self.assertEqual(play.call_args.kwargs["session_id"], "speech-1")
                 with mock.patch.object(adapter, "play_incremental") as play, \
                      mock.patch.object(sys, "argv", base + ["duplicate"]):
+                    self.assertEqual(adapter.main(), 2)
+                play.assert_not_called()
+                with mock.patch.object(adapter, "play") as play, \
+                     mock.patch.object(sys, "argv", [
+                         "ck_kokoro_play.py", "--config", "config",
+                         "--bundle-dir", "bundle", "--player", "player",
+                         "--agent-id", "cke-agent", "--request-id", "req-1",
+                         "Hello."]):
                     self.assertEqual(adapter.main(), 2)
                 play.assert_not_called()
             finally:
@@ -99,7 +137,17 @@ class KokoroVoicePlaybackTest(unittest.TestCase):
             result = adapter.play_incremental("a" * 80, root, bundle, player,
                                               prepare_plan=plan)
             self.assertEqual(result["sample_count"], 640)
+            self.assertEqual(result["sample_rate_hz"], 24000)
             self.assertEqual(len(result["chunks"]), 80)
+            self.assertEqual([row["audio_start_sample"] for row in result["chunks"]],
+                             list(range(0, 640, 8)))
+            self.assertEqual([row["audio_end_sample"] for row in result["chunks"]],
+                             list(range(8, 641, 8)))
+            self.assertTrue(all(row["source_sha256"] ==
+                                hashlib.sha256(b"a" * 80).hexdigest()
+                                for row in result["chunks"]))
+            self.assertTrue(all(row["bundle_identity_sha256"] == "synthetic"
+                                for row in result["chunks"]))
             self.assertEqual(result["first_audible_audio"], "not_measured")
             self.assertGreaterEqual(result["plan_seconds"], 0)
             self.assertGreaterEqual(result["worker_startup_seconds"], 0)
@@ -116,8 +164,17 @@ class KokoroVoicePlaybackTest(unittest.TestCase):
             self.assertEqual(result["native_model_loads"], 1)
             played.unlink()
             result = adapter.play_incremental("a" * 80, root, bundle, player,
-                                              synthesis_workers=3, prepare_plan=plan)
+                                              synthesis_workers=3, prepare_plan=plan,
+                                              agent_id="cke-agent", request_id="req-1",
+                                              session_id="speech-1")
             self.assertEqual(result["sample_count"], 640)
+            self.assertEqual((result["agent_id"], result["request_id"],
+                              result["session_id"]),
+                             ("cke-agent", "req-1", "speech-1"))
+            self.assertTrue(all((row["agent_id"], row["request_id"],
+                                 row["session_id"]) ==
+                                ("cke-agent", "req-1", "speech-1")
+                                for row in result["chunks"]))
             self.assertEqual(result["synthesis_workers"], 3)
             self.assertEqual(result["native_model_loads"], 3)
             self.assertEqual(len({item["wav_sha256"] for item in result["chunks"]}), 80)
@@ -137,6 +194,18 @@ class KokoroVoicePlaybackTest(unittest.TestCase):
                         "source_text": "aa", "chunks": [
                             {"index": 0, "phoneme_ids": [0, 1, 0]},
                             {"index": 0, "phoneme_ids": [0, 1, 0]}]})
+            for invalid in (
+                    {"source_start": 0, "source_end": 2, "source_text": "wrong"},
+                    {"source_start": 1, "source_end": 2, "source_text": "a"},
+                    {"source_start": 0, "source_end": 3, "source_text": "aa"}):
+                with self.subTest(invalid=invalid):
+                    with self.assertRaisesRegex(adapter.PlaybackError,
+                                                "source span is invalid"):
+                        adapter.play_incremental("aa", root, bundle, player,
+                            prepare_plan=lambda *_: {
+                                "source_text": "aa", "chunks": [
+                                    {"index": 0, "phoneme_ids": [0, 1, 0],
+                                     **invalid}]})
             self.assertEqual(len(launches.read_text().splitlines()), 7)
             played.unlink()
             with mock.patch.object(adapter, "_exchange", side_effect=KeyboardInterrupt):
@@ -177,15 +246,18 @@ class KokoroVoicePlaybackTest(unittest.TestCase):
                         "voice": "af_heart"}
             durable = adapter.play_incremental("a", root, bundle, player,
                 document=True, prepare_plan=durable_plan,
-                progress_file=progress_path, session_id="document-1")
+                progress_file=progress_path, session_id="document-1",
+                agent_id="cke-agent", request_id="req-1")
             self.assertEqual(durable["completed_samples"], 8)
             self.assertEqual(json.loads(progress_path.read_text())[
                 "last_completed_chunk"], 0)
             launches_before_resume = len(launches.read_text().splitlines())
             done = adapter.play_incremental("a", root, bundle, player,
                 document=True, prepare_plan=durable_plan,
-                progress_file=progress_path, session_id="document-1", resume=True)
+                progress_file=progress_path, session_id="document-1", resume=True,
+                agent_id="cke-agent", request_id="req-1")
             self.assertEqual(done["status"], "already_complete")
+            self.assertEqual(done["sample_rate_hz"], 24000)
             self.assertEqual(len(launches.read_text().splitlines()),
                              launches_before_resume)
             malformed_path = root / "malformed-progress.json"
@@ -198,9 +270,19 @@ class KokoroVoicePlaybackTest(unittest.TestCase):
                 adapter.play_incremental("a", root, bundle, player,
                     document=True, prepare_plan=durable_plan,
                     progress_file=progress_path, session_id="document-1",
-                    seed=8, resume=True)
+                    seed=8, resume=True, agent_id="cke-agent", request_id="req-1")
             with self.assertRaisesRegex(adapter.PlaybackError, "identity differs"):
-                adapter.play_incremental("b", root, bundle, player,
+                adapter.play_incremental("aaaa", root, bundle, player,
+                    document=True, prepare_plan=durable_plan,
+                    progress_file=progress_path, session_id="document-1",
+                    resume=True, agent_id="cke-agent", request_id="req-1")
+            with self.assertRaisesRegex(adapter.PlaybackError, "identity differs"):
+                adapter.play_incremental("a", root, bundle, player,
+                    document=True, prepare_plan=durable_plan,
+                    progress_file=progress_path, session_id="document-1",
+                    resume=True, agent_id="cke-agent", request_id="req-2")
+            with self.assertRaisesRegex(adapter.PlaybackError, "identity differs"):
+                adapter.play_incremental("a", root, bundle, player,
                     document=True, prepare_plan=durable_plan,
                     progress_file=progress_path, session_id="document-1",
                     resume=True)
@@ -210,7 +292,8 @@ class KokoroVoicePlaybackTest(unittest.TestCase):
                 adapter.play_incremental("aaaa", root, bundle, player,
                     document=True, synthesis_workers=3,
                     prepare_plan=durable_plan, progress_file=interrupted_path,
-                    session_id="document-2")
+                    session_id="document-2", agent_id="cke-agent",
+                    request_id="req-2")
             interrupted = json.loads(interrupted_path.read_text())
             self.assertEqual(interrupted["last_completed_chunk"], 0)
             fail.unlink()
@@ -218,10 +301,15 @@ class KokoroVoicePlaybackTest(unittest.TestCase):
             resumed = adapter.play_incremental("aaaa", root, bundle, player,
                 document=True, synthesis_workers=3,
                 prepare_plan=durable_plan, progress_file=interrupted_path,
-                session_id="document-2", resume=True)
+                session_id="document-2", resume=True,
+                agent_id="cke-agent", request_id="req-2")
             self.assertEqual(resumed["resume_from_chunk"], 1)
             self.assertEqual([row["index"] for row in resumed["chunks"]],
                              [1, 2, 3])
+            self.assertEqual([row["audio_start_sample"] for row in resumed["chunks"]],
+                             [8, 16, 24])
+            self.assertEqual([row["audio_end_sample"] for row in resumed["chunks"]],
+                             [16, 24, 32])
             self.assertEqual(json.loads(interrupted_path.read_text())[
                 "last_completed_chunk"], 3)
             with self.assertRaisesRegex(adapter.PlaybackError, "integer in 1..3"):
@@ -298,9 +386,7 @@ class KokoroVoicePlaybackTest(unittest.TestCase):
                 for pid in map(int, worker_child_pids.read_text().splitlines()):
                     deadline = time.monotonic() + 2
                     while time.monotonic() < deadline:
-                        state_file = Path(f"/proc/{pid}/stat")
-                        if (not state_file.exists() or
-                                state_file.read_text().split()[2] == "Z"):
+                        if _proc_state(pid) in (None, "Z"):
                             break
                         time.sleep(0.01)
                     else:
@@ -337,8 +423,7 @@ class KokoroVoicePlaybackTest(unittest.TestCase):
                 self.assertIsNotNone(playing.child.poll())
                 deadline = time.monotonic() + 2
                 while time.monotonic() < deadline:
-                    state_file = Path(f"/proc/{child_pid}/stat")
-                    if not state_file.exists() or state_file.read_text().split()[2] == "Z":
+                    if _proc_state(child_pid) in (None, "Z"):
                         break
                     time.sleep(0.01)
                 else:
