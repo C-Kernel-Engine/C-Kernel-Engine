@@ -5026,6 +5026,228 @@
       },
       "position_transform": null,
       "description": "Grouped weighted pooling: separate ordered FP64 dot products scaled by 1/sqrt(C), FP32 logits, FP64 exp rounded to FP32 before ordered FP64 denominator, FP32 probabilities, ordered separate FP64 weighted products and sums, FP32 output. Positive consecutive counts partition all option rows. Atomic output publication on success; default round-to-nearest and no fast-math required."
+    },
+    "broadcast_add_rows_checked_ordered_f32_v1": {
+      "operator_family": "broadcast_add_rows_checked",
+      "status": "validated",
+      "storage": {
+        "input": "fp32",
+        "weight": "none",
+        "output": "fp32"
+      },
+      "compute": {
+        "input": "fp32",
+        "weight": "none",
+        "accumulator": "fp32",
+        "contraction": "disabled",
+        "evaluation_order": "ascending_rows_channels_separate_multiply_add"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": [
+          "activation_intermediate_store",
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "none",
+        "order": "ascending_index",
+        "partial_accumulator": "none",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "serial",
+        "split_strategy": "serial",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "FP32 add of each row and a shared channel vector. Nonoverlapping caller buffers; rejected calls leave output unchanged. No fast-math."
+    },
+    "indexed_pair_features_checked_ordered_f32_v1": {
+      "operator_family": "indexed_pair_features_checked",
+      "status": "validated",
+      "storage": {
+        "input": "fp32",
+        "weight": "none",
+        "output": "fp32"
+      },
+      "compute": {
+        "input": "fp32",
+        "weight": "none",
+        "accumulator": "fp32",
+        "contraction": "disabled",
+        "evaluation_order": "ascending_rows_channels_separate_multiply_add"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": [
+          "activation_intermediate_store",
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "none",
+        "order": "ascending_index",
+        "partial_accumulator": "none",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "serial",
+        "split_strategy": "serial",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Gather left row by index; concatenate left, right, FP32 product, absolute FP32 difference in that order. Nonoverlapping caller buffers; rejected calls leave output unchanged. No fast-math."
+    },
+    "indexed_cosine_rows_checked_ordered_f32_v1": {
+      "operator_family": "indexed_cosine_rows_checked",
+      "status": "validated",
+      "storage": {
+        "input": "fp32",
+        "weight": "none",
+        "output": "fp32"
+      },
+      "compute": {
+        "input": "fp32",
+        "weight": "none",
+        "accumulator": "fp64",
+        "contraction": "disabled",
+        "evaluation_order": "ascending_rows_channels_separate_multiply_add"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": [
+          "activation_intermediate_store",
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "sum",
+        "order": "ascending_index",
+        "partial_accumulator": "fp64",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "serial",
+        "split_strategy": "serial",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "FP64 ascending squared-norm sums, sqrt rounded FP32, clamp each norm by explicit positive epsilon, FP32 normalization and pair products, ascending FP64 sum rounded FP32. Nonoverlapping caller buffers; rejected calls leave output unchanged. No fast-math."
+    },
+    "scalar_exp_clamped_checked_ordered_f32_v1": {
+      "operator_family": "scalar_exp_clamped_checked",
+      "status": "validated",
+      "storage": {
+        "input": "fp32",
+        "weight": "fp32",
+        "output": "fp32"
+      },
+      "compute": {
+        "input": "fp32",
+        "weight": "fp32",
+        "accumulator": "fp32",
+        "contraction": "disabled",
+        "evaluation_order": "ascending_rows_channels_separate_multiply_add"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": [
+          "activation_intermediate_store",
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "none",
+        "order": "ascending_index",
+        "partial_accumulator": "none",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "serial",
+        "split_strategy": "serial",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Finite scalar expf(fminf(input,maximum)); explicit finite maximum and finite output required. Nonoverlapping caller buffers; rejected calls leave output unchanged. No fast-math."
+    },
+    "scalar_sigmoid_checked_ordered_f32_v1": {
+      "operator_family": "scalar_sigmoid_checked",
+      "status": "validated",
+      "storage": {
+        "input": "fp32",
+        "weight": "fp32",
+        "output": "fp32"
+      },
+      "compute": {
+        "input": "fp32",
+        "weight": "fp32",
+        "accumulator": "fp32",
+        "contraction": "disabled",
+        "evaluation_order": "ascending_rows_channels_separate_multiply_add"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": [
+          "activation_intermediate_store",
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "none",
+        "order": "ascending_index",
+        "partial_accumulator": "none",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "serial",
+        "split_strategy": "serial",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Stable FP32 sigmoid using expf and sign-dependent formula. Nonoverlapping caller buffers; rejected calls leave output unchanged. No fast-math."
+    },
+    "scale_vector_checked_ordered_f32_v1": {
+      "operator_family": "scale_vector_checked",
+      "status": "validated",
+      "storage": {
+        "input": "fp32",
+        "weight": "none",
+        "output": "fp32"
+      },
+      "compute": {
+        "input": "fp32",
+        "weight": "none",
+        "accumulator": "fp32",
+        "contraction": "disabled",
+        "evaluation_order": "ascending_rows_channels_separate_multiply_add"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": [
+          "activation_intermediate_store",
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "none",
+        "order": "ascending_index",
+        "partial_accumulator": "none",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "serial",
+        "split_strategy": "serial",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Separate FP32 multiplication of each element and one finite scalar gain. Nonoverlapping caller buffers; rejected calls leave output unchanged. No fast-math."
     }
   }
 }
