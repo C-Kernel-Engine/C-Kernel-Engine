@@ -2144,6 +2144,11 @@ OP_DATAFLOW = {
         "inputs": {"source": "external:source"},
         "outputs": {"destination": {"slot": "copied_ids", "dtype": "i32"}},
     },
+    "grouped_softmax_weighted_rows_checked": {
+        "inputs": {"options": "external:options", "fields": "external:fields",
+                   "group_counts": "external:group_counts"},
+        "outputs": {"output": {"slot": "weighted_group_rows", "dtype": "fp32"}},
+    },
     "token_span_mean_checked": {
         "inputs": {"input": "external:input", "spans": "external:spans"},
         "outputs": {"output": {"slot": "pooled_rows", "dtype": "fp32"}},
@@ -5068,6 +5073,7 @@ TEMPLATE_TO_KERNEL_OP = {
     "repetition_penalty_last_row_checked": "repetition_penalty_last_row_checked",
     "concat_i32_checked": "concat_i32_checked",
     "copy_i32_span_checked": "copy_i32_span_checked",
+    "grouped_softmax_weighted_rows_checked": "grouped_softmax_weighted_rows_checked",
     "token_span_mean_checked": "token_span_mean_checked",
     "last_valid_row_checked": "last_valid_row_checked",
     "expand_group_row_indices_checked": "expand_group_row_indices_checked",

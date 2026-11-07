@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 484,
+      "total": 485,
       "by_op": {
         "add_backward": 1,
         "add_rows_checked": 1,
@@ -106,6 +106,7 @@
         "gemma4_per_layer_prepare": 2,
         "gemv": 15,
         "group_limited_topk_router": 2,
+        "grouped_softmax_weighted_rows_checked": 1,
         "hyper_connection_final_mix": 2,
         "hyper_connection_mix": 3,
         "hyper_stream_expand": 2,
@@ -51910,6 +51911,309 @@
       "notes": "Applies FP32 sigmoid to router logits before correction bias, group selection, top-k normalization, and routed scaling.",
       "name": "group_limited_topk_router_sigmoid_f32",
       "_source_file": "group_limited_topk_router_sigmoid_f32.json"
+    },
+    {
+      "id": "grouped_softmax_weighted_rows_checked_f32",
+      "op": "grouped_softmax_weighted_rows_checked",
+      "operation_interface": "tensor.grouped_softmax_weighted_rows.checked.fp32.v1",
+      "variant": "ordered_fp64_reductions_fp32_intermediates",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "equivalence_group": "tensor.grouped_softmax_weighted_rows.checked.fp32.v1",
+        "phases": [
+          "prefill"
+        ]
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "options",
+          "dtype": "fp32",
+          "shape": [
+            "O",
+            "C"
+          ],
+          "layout": "row_major_option_stride",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "fields",
+          "dtype": "fp32",
+          "shape": [
+            "G",
+            "C"
+          ],
+          "layout": "row_major_field_stride",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "group_counts",
+          "dtype": "i32",
+          "shape": [
+            "G"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "G",
+            "C"
+          ],
+          "layout": "row_major_output_stride",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "scratch",
+          "dtype": "fp32",
+          "shape": [
+            "X"
+          ],
+          "size_bytes": "4 * X",
+          "size_resolution": "required",
+          "lifetime": "kernel_call",
+          "alignment": 64,
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read_write",
+          "storage_class": "scratch",
+          "consumption": "required"
+        }
+      ],
+      "dims": [
+        "G",
+        "O",
+        "C",
+        "X"
+      ],
+      "constraints": {
+        "notes": "Positive consecutive group counts sum to O. Strides >= C. Scratch X >= O+G*C. Read buffers may alias each other; output and scratch must not overlap any other buffer. Rejection preserves output; scratch unspecified."
+      },
+      "impl": {
+        "function": "ck_grouped_softmax_weighted_rows_f32",
+        "c_declaration": "int ck_grouped_softmax_weighted_rows_f32(const float *options, size_t option_elements, size_t option_stride, const float *fields, size_t field_elements, size_t field_stride, const int32_t *group_counts, size_t count_elements, float *output, size_t output_elements, size_t output_stride, float *scratch, size_t scratch_elements, size_t groups, size_t option_rows, size_t channels);",
+        "sources": [
+          "src/kernels/grouped_weighted_rows.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "grouped_softmax_weighted_rows_ordered_fp64_f32_stages",
+          "status": "validated",
+          "phases": [
+            "prefill"
+          ],
+          "function": "ck_grouped_softmax_weighted_rows_f32",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp64",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "serial"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "options",
+            "source": "activation:options",
+            "cast": "const float*",
+            "ports": [
+              "input:options"
+            ]
+          },
+          {
+            "name": "option_elements",
+            "source": "runtime:option_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "option_stride",
+            "source": "runtime:option_stride",
+            "value_type": "size_t"
+          },
+          {
+            "name": "fields",
+            "source": "activation:fields",
+            "cast": "const float*",
+            "ports": [
+              "input:fields"
+            ]
+          },
+          {
+            "name": "field_elements",
+            "source": "runtime:field_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "field_stride",
+            "source": "runtime:field_stride",
+            "value_type": "size_t"
+          },
+          {
+            "name": "group_counts",
+            "source": "activation:group_counts",
+            "cast": "const int32_t*",
+            "ports": [
+              "input:group_counts"
+            ]
+          },
+          {
+            "name": "count_elements",
+            "source": "runtime:count_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output_stride",
+            "source": "runtime:output_stride",
+            "value_type": "size_t"
+          },
+          {
+            "name": "scratch",
+            "source": "scratch:scratch",
+            "cast": "float*"
+          },
+          {
+            "name": "scratch_elements",
+            "source": "runtime:scratch_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "groups",
+            "source": "runtime:groups",
+            "value_type": "size_t"
+          },
+          {
+            "name": "option_rows",
+            "source": "runtime:option_rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "channels",
+            "source": "runtime:channels",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "G": "groups",
+          "O": "option_rows",
+          "C": "channels",
+          "X": "scratch_elements"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "options",
+            "elements": "option_elements",
+            "rows": "option_rows",
+            "width": "channels",
+            "element_bytes": 4,
+            "stride": "option_stride",
+            "physical_row_stride": true
+          },
+          {
+            "pointer": "fields",
+            "elements": "field_elements",
+            "rows": "groups",
+            "width": "channels",
+            "element_bytes": 4,
+            "stride": "field_stride",
+            "physical_row_stride": true
+          },
+          {
+            "pointer": "group_counts",
+            "elements": "count_elements",
+            "rows": "groups",
+            "width": 1,
+            "element_bytes": 4
+          },
+          {
+            "pointer": "output",
+            "elements": "output_elements",
+            "rows": "groups",
+            "width": "channels",
+            "element_bytes": 4,
+            "stride": "output_stride",
+            "physical_row_stride": true
+          },
+          {
+            "pointer": "scratch",
+            "elements": "scratch_elements",
+            "rows": 1,
+            "width": "scratch_elements",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_grouped_weighted_rows.py",
+          "tests/test_v8_clef_flash_option_summary.py"
+        ],
+        "oracle": "Explicit sequential FP64/FP32-stage oracle; optional independent PyTorch grouped softmax and weighted sums. Generated connected head comparison."
+      },
+      "notes": "Generic grouped query-conditioned weighted pooling. Inference only; no backward provider claimed. Groups retain input order, with one query and one output per group. Ascending channels: separate FP64 multiply/add; scale by FP64 1/sqrt(C), round logits to FP32. Stable exp in FP64 rounded to FP32; ascending FP64 sum of rounded exponentials; probabilities rounded to FP32. Ascending options: separate FP64 weighted multiply/add, FP32 output. No fast-math.",
+      "name": "grouped_softmax_weighted_rows_checked_f32",
+      "_source_file": "grouped_softmax_weighted_rows_checked_f32.json"
     },
     {
       "id": "hyper_connection_final_mix_bf16",
