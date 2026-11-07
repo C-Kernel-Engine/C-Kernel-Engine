@@ -1,0 +1,47 @@
+<!-- TITLE: Clef-Flash Decision-Head Bring-up -->
+
+<!-- NAV: architecture -->
+
+<div class="container">
+
+<h1>Clef-Flash decision-head bring-up</h1>
+
+<p>Model topology lives in the circuit builders here. Kernels implement arithmetic; maps describe ABI, scratch and numerical contracts. Generic operation catalogue entries do not inspect the model name.</p>
+
+<h2>Current executed boundary</h2>
+
+<p><code>build_clef_flash_option_summary_circuit.py</code> extends the canonical ingress and both evidence-routing layers through grouped option pooling and <code>option_summary_norm</code>. Its single generated entry executes 43 operations. Question option counts partition consecutive routed option rows. Each question&#x27;s projected vector supplies its pooling query. Normalization declares epsilon <code>1e-5</code> locally, independently of the enclosing model configuration.</p>
+
+<p>The grouped provider validates positive counts and exact coverage, finite valid inputs, physical strides, capacities, alignment and disjoint writable buffers. Caller-owned scratch stages the result, so rejection does not publish partial output. Read-only buffers may alias each other. Padding is neither consumed nor written. Arithmetic follows the registered ordered FP64 reductions with FP32 intermediate storage; no backward capability is advertised.</p>
+
+<h2>Reproduction</h2>
+
+<pre><code>python3 version/v8/decision/build_clef_flash_option_summary_circuit.py --check
+python3 -m unittest tests.test_v8_grouped_weighted_rows tests.test_v8_clef_flash_option_summary -v
+python3 scripts/nightly_runner.py --tests decision_grouped_weighted_rows decision_clef_flash_option_summary --ci --require-executed</code></pre>
+
+<p>Use a Python environment with NumPy; independent oracle tests additionally need PyTorch. The released-head comparison also needs safetensors and the dependencies imported by the pinned reference source. Enable that comparison with:</p>
+
+<pre><code>export CKE_CLEF_FLASH_HEAD_PATH=/path/to/joint_head.safetensors
+export CKE_CLEF_FLASH_REFERENCE_SOURCE=/path/to/joint_schema_model.py</code></pre>
+
+<p>Both assets are hash-checked against <code>tests/fixtures/decision/clef_flash/identity.json</code>. Missing oracle packages or assets are explicit test skips. The reference test runs the pinned head&#x27;s actual forward method and captures its summary normalization boundary; it does not inject reference evidence outputs into CKE. The host supplies synthetic hidden states, synthetic output-embedding rows, IDs and spans. Both implementations use the same inputs and released head weights. This is <strong>not</strong> a generated-backbone or complete-decision test.</p>
+
+<p>On 2026-11-07, PyTorch 2.8.0 CPU comparisons passed for six tokens with option counts <code>[2,1]</code> and eight tokens with <code>[1,2]</code>. Maximum absolute errors were <code>1.90735e-6</code> / <code>1.43051e-6</code> for raw summaries and <code>1.31130e-6</code> / <code>1.19209e-6</code> for normalized summaries; normalized RMSE was <code>2.63926e-7</code> / <code>3.13428e-7</code>. These are fixed compiled geometries, not proof of a dynamic serving interface. The declared pinned-prefix absolute regression ceiling is <code>1e-5</code>.</p>
+
+<p>Synthetic tests also cover reordered options within groups, A→B→A reuse, invalid counts before parity, undersized arenas, and rejection followed by successful execution. Model-neutral tests compare explicit FP64/FP32-stage arithmetic at O0/O3, including singleton groups, unequal groups and padded strides.</p>
+
+<h2>Remaining completion gates</h2>
+
+<ol>
+<li>Assemble fields from the summary, question/global projections and type embeddings.</li>
+<li>Connect the four question-interaction decoder layers, final normalization,    prior and joint scoring, and raw question/option logits.</li>
+<li>Compare the complete head with the pinned implementation, then connect the    actual generated backbone with the correct output embeddings.</li>
+<li>Extend the existing v8 training workflow: audit backward providers, add only    missing contracts, freeze backbone parameters, compare gradients and AdamW    updates, then verify checkpoint/resume and inference export.</li>
+</ol>
+
+<p>The current head prefix establishes forward composition. It does not establish complete Clef decisions, head training, adapters, or backbone fine-tuning.</p>
+
+<p>Related: <a href="kernel-architecture.html">kernel architecture</a>, <a href="v8-training-capability-ledger.html">training capability ledger</a>.</p>
+
+</div>

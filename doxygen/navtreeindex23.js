@@ -1,5 +1,14 @@
 var NAVTREEINDEX23 =
 {
+"structMemorySlot.html#af95b0bc9c39a80072ba71c88506125d3":[1,0,82,0],
+"structMemorySlot.html#afed85487a039a8b26e3e1b92453c6f59":[1,0,82,6],
+"structNUMANode.html":[1,0,85],
+"structNUMANode.html#a0c71fe04154d6a80d08829e547f5145d":[1,0,85,0],
+"structNUMANode.html#a11cae96c43efc187a78bb509aa86355b":[1,0,85,3],
+"structNUMANode.html#aad2dccb35d57507ce243031012618337":[1,0,85,4],
+"structNUMANode.html#abe328366c0632dadc801508c6bbc44df":[1,0,85,1],
+"structNUMANode.html#ad207fd0ff088689dc91e40729dc9c60a":[1,0,85,2],
+"structNUMATopology.html":[1,0,86],
 "structNUMATopology.html#a2a61e03ff57dd6feb35b92d1e03c0cdd":[1,0,86,0],
 "structNUMATopology.html#a4f4876ca34eed1e6c7732e611a13a674":[1,0,86,1],
 "structNUMATopology.html#ab0befa19cd4b9b08a68d901f301e9de7":[1,0,86,2],
@@ -240,14 +249,5 @@ var NAVTREEINDEX23 =
 "structck__threadpool__profile__t.html#abe00d835b6f0d89c4d809d32921c4f7b":[1,0,20,2],
 "structck__threadpool__profile__t.html#ad41c003f93d8a0942620e09d199b185b":[1,0,20,3],
 "structggml__init__params.html":[1,0,80],
-"structggml__init__params.html#a5b4bf877ba8af2df9bb60e82d7c1cf01":[1,0,80,2],
-"structggml__init__params.html#a5ede508e399874a98eeca731d71a7e0b":[1,0,80,1],
-"structggml__init__params.html#abe8bc32cccaebad17a238bd3055eac68":[1,0,80,0],
-"swiglu__kernels_8c.html":[2,0,1,1,137],
-"swiglu__kernels_8c.html#a0bb7e831dcfc9a3c707104b1de07a9b1":[2,0,1,1,137,3],
-"swiglu__kernels_8c.html#a0bf1546bf3001e047de6a2e40461fdc2":[2,0,1,1,137,1],
-"swiglu__kernels_8c.html#a102617ea5d170076dc9e1d6ac167617c":[2,0,1,1,137,10],
-"swiglu__kernels_8c.html#a18063a61725eeeeb371d7c9f1e0d410d":[2,0,1,1,137,13],
-"swiglu__kernels_8c.html#a26369aa07808fb6aae4502d54a1ba650":[2,0,1,1,137,9],
-"swiglu__kernels_8c.html#a2d1ada314dda9d7788371a08067917d6":[2,0,1,1,137,7]
+"structggml__init__params.html#a5b4bf877ba8af2df9bb60e82d7c1cf01":[1,0,80,2]
 };

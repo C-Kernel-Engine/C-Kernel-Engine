@@ -88,6 +88,7 @@ var dir_40856f0cdd4bcafd28810d9265a200f7 =
     [ "gemv_omp.c", "gemv__omp_8c.html", "gemv__omp_8c" ],
     [ "gemv_omp.h", "gemv__omp_8h.html", "gemv__omp_8h" ],
     [ "ggml_runtime_compat.h", "ggml__runtime__compat_8h.html", "ggml__runtime__compat_8h" ],
+    [ "grouped_weighted_rows.c", "grouped__weighted__rows_8c.html", "grouped__weighted__rows_8c" ],
     [ "hybrid_attention_kernels.c", "hybrid__attention__kernels_8c.html", "hybrid__attention__kernels_8c" ],
     [ "hyper_connection_kernels.c", "hyper__connection__kernels_8c.html", "hyper__connection__kernels_8c" ],
     [ "indexed_sum_rows_checked.c", "indexed__sum__rows__checked_8c.html", "indexed__sum__rows__checked_8c" ],

@@ -37,5 +37,6 @@ var searchData=
   ['gemv_5ffused_5fquant_5fbias_2ec_34',['gemv_fused_quant_bias.c',['../gemv__fused__quant__bias_8c.html',1,'']]],
   ['gemv_5fomp_2ec_35',['gemv_omp.c',['../gemv__omp_8c.html',1,'']]],
   ['gemv_5fomp_2eh_36',['gemv_omp.h',['../gemv__omp_8h.html',1,'']]],
-  ['ggml_5fruntime_5fcompat_2eh_37',['ggml_runtime_compat.h',['../ggml__runtime__compat_8h.html',1,'']]]
+  ['ggml_5fruntime_5fcompat_2eh_37',['ggml_runtime_compat.h',['../ggml__runtime__compat_8h.html',1,'']]],
+  ['grouped_5fweighted_5frows_2ec_38',['grouped_weighted_rows.c',['../grouped__weighted__rows_8c.html',1,'']]]
 ];
