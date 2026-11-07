@@ -1,0 +1,66 @@
+CKE resident Whisper HTTP — bounded P3 trial, 2026-11-07
+
+Scope
+-----
+This opt-in service is separate from text serving and any Kokoro process. It
+keeps one generated encoder and one generated decoder worker loaded, admits one
+recording at a time, and queues at most two additional recordings by default.
+It currently accepts raw mono 16 kHz PCM16 WAV bodies, up to 30 seconds and
+1 MiB. It is not an OpenAI multipart transcription endpoint. LinuxUtilities
+should confirm the transcript before sending it as an agent instruction.
+
+Launch on P3 from a clean current-main checkout
+------------------------------------------------
+Set ENCODER_BUNDLE and DECODER_BUNDLE to the matching, verified generated
+Whisper bundle directories. Reserve CPU resources for this process; keep
+Kokoro on a separate process and core budget. For example:
+
+  CK_NUM_THREADS=4 OPENBLAS_NUM_THREADS=1 python3 -m server.whisper_http \
+    --encoder-run-dir "$ENCODER_BUNDLE" \
+    --decoder-run-dir "$DECODER_BUNDLE" \
+    --port 8110 --max-seconds 30 --max-upload-bytes 1048576 --max-waiters 2
+
+The service binds only 127.0.0.1. From the laptop, use an SSH forward:
+
+  ssh -N -L 8110:127.0.0.1:8110 p3
+
+Then send a confirmed 16 kHz mono PCM16 WAV over the forward:
+
+  curl -H 'Content-Type: audio/wav' -H 'X-CKE-Request-ID: mic-001' \
+    --data-binary @recording.wav http://127.0.0.1:8110/audio/transcriptions
+
+The response contains the request ID, text, queue and native inference time,
+worker generation, and loaded model/engine/weight-manifest/weight identities.
+GET /health reports readiness, queue depth, active request, and generation.
+POST /audio/transcriptions/mic-001/cancel cancels queued or active work.
+Disconnect also cancels an active recording. The next request starts a fresh
+worker pair after an active cancellation or worker failure.
+
+Admission and recovery
+----------------------
+Malformed, unsupported, oversized, or overlong audio rejects before generated
+model execution. Queue overflow returns HTTP 429. Cancellation returns HTTP
+409 to the original client. Worker failure returns HTTP 503 and discards that
+worker pair; the next valid request reloads it. Exact request IDs must be
+unique while active or queued. The server never treats an HTTP upload as an
+agent command; LinuxUtilities owns user confirmation.
+
+Retained local trial
+--------------------
+The isolated P3 Whisper Base trial used existing generated bundles under
+~/.cache/ck-engine-v8/models/openai--whisper-base-current. Two identical
+synthetic 0.1-second WAV requests returned on the same encoder and decoder
+worker PIDs/generation, each taking about 26.3 seconds of inference with four
+CKE threads. A cancelled native request returned HTTP 409 promptly; the next
+request succeeded on generation 2. A disconnected request released its worker;
+the following request succeeded on generation 3. The synthetic clips produced
+"you" and therefore do not establish transcription quality or silence handling.
+Use a real headset recording for the practical acceptance gate.
+
+Next boundary
+-------------
+Run a real spoken A -> B -> A recording set, compare against a pinned oracle,
+measure cold load and warm latency, and confirm the laptop microphone/SSH
+forward before promoting this to an accessibility workflow. Kokoro requires a
+separate resident service and playback cancellation trial. This ASR service
+does not certify Kokoro or the complete speak/listen loop.
