@@ -106,10 +106,10 @@ class _KokoroBackend:
                 if len(fields) != 3 or fields[2] != str(output):
                     raise RuntimeError("native chunk response has wrong output path")
                 samples = int(fields[1])
+                if output.stat().st_size > 8 * 1024 * 1024:
+                    raise RuntimeError("native audio chunk exceeds delivery limit")
                 self._checked_wav(output, samples)
                 audio = output.read_bytes()
-                if len(audio) > 8 * 1024 * 1024:
-                    raise RuntimeError("native audio chunk exceeds delivery limit")
                 total += samples
                 emit({"type": "chunk", "index": index,
                       "source_start": chunk["source_start"],
@@ -242,7 +242,10 @@ class _Owner:
             job.events.put_nowait(event)
         except queue.Full:
             # Preserve the terminal verdict even if delivery is backed up.
-            job.events.get_nowait()
+            try:
+                job.events.get_nowait()
+            except queue.Empty:
+                pass
             job.events.put_nowait(event)
 
     def _run(self) -> None:
