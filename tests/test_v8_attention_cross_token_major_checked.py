@@ -36,6 +36,7 @@ class CrossAttentionCheckedTest(unittest.TestCase):
         subprocess.run([
             "cc", "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror",
             "-shared", "-fPIC", "-ffp-contract=off",
+            "-I" + str(ROOT / "include"),
             str(ROOT / "src/kernels/attention_cross_token_major_checked.c"),
             "-lm", "-o", str(path)], check=True, capture_output=True)
         cls.library = ctypes.CDLL(str(path))

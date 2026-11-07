@@ -932,6 +932,11 @@ TEST_SUITES = {
         "Checked Integer Span State Copy", "kernels",
         ROOT / "tests" / "test_v8_copy_i32_span_checked.py",
     ),
+    "training_attention_composition": TestSuite(
+        "FP32 Noncausal Attention Gradients, Native AdamW and Failure Recovery", "training",
+        ROOT / "tests" / "test_v8_attention_training.py",
+        unittest_targets=("tests.test_v8_attention_training", "tests.test_v8_attention_cross_backward"),
+    ),
     "training_layernorm_composition": TestSuite(
         "FP32 LayerNorm Cached-Statistics Training and Native AdamW", "training",
         ROOT / "tests" / "test_v8_layernorm_training.py",

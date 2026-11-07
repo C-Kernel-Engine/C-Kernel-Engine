@@ -27,6 +27,20 @@ int ck_grouped_weighted_rows_backward_f32(
     float *d_fields, size_t d_fields_elements, size_t d_fields_stride,
     float *scratch, size_t scratch_elements,
     size_t groups, size_t option_rows, size_t channels);
+/* Full unmasked token-major attention VJP. Packed heads; independent query and
+ * memory lengths. Scratch: Q*H*D + 2*S*H*D + 2*S floats. Three gradients are
+ * overwritten atomically; caller owns branch accumulation. */
+int ck_attention_cross_backward_f32(
+    const float *query, size_t query_elements,
+    const float *key, size_t key_elements,
+    const float *value, size_t value_elements,
+    const float *d_output, size_t d_output_elements,
+    float *d_query, size_t d_query_elements,
+    float *d_key, size_t d_key_elements,
+    float *d_value, size_t d_value_elements,
+    float *scratch, size_t scratch_elements,
+    size_t query_tokens, size_t memory_tokens, size_t heads, size_t head_dim);
+
 /* BF16 storage VJPs. Saved operands, incoming and outgoing gradients use
  * BF16; scratch uses FP32. Exact expansion, existing FP32 VJP arithmetic,
  * then round-to-nearest-even. Reject BF16 rounding overflow before publishing
