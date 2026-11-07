@@ -116,6 +116,53 @@ class KokoroGeneratedProjectionTest(unittest.TestCase):
     def tearDownClass(cls):
         cls.temp.cleanup()
 
+    def test_checked_projection_group_tail_and_rejection(self):
+        """Independent ordered FP64 reference, including distinct SIMD lanes."""
+        function = self.loaded.linear_rows_checked_f32
+        function.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_size_t,
+                             ctypes.c_void_p, ctypes.c_size_t, ctypes.c_size_t,
+                             ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p,
+                             ctypes.c_size_t, ctypes.c_size_t, ctypes.c_size_t,
+                             ctypes.c_size_t, ctypes.c_size_t]
+        function.restype = ctypes.c_int
+        rng = np.random.default_rng(173)
+        for rows in (1, 3, 4, 5, 7, 8, 9):
+            for width in (1, 7, 31):
+                for biased in (False, True):
+                    with self.subTest(rows=rows, width=width, bias=biased):
+                        channels = 11
+                        x = rng.standard_normal((rows, width + 3)).astype(np.float32)
+                        w = rng.standard_normal((channels, width + 2)).astype(np.float32)
+                        # Mixed magnitudes and cancellation retain scalar reduction order.
+                        x[:, :width:3] *= np.float32(1e12)
+                        w[:, :width:3] *= np.float32(1e-12)
+                        bias = rng.standard_normal(channels).astype(np.float32)
+                        output = np.full((rows, channels + 4), -777, dtype=np.float32)
+                        expected = np.zeros((rows, channels), dtype=np.float64)
+                        if biased:
+                            expected[:] = bias
+                        for c in range(width):
+                            expected += (x[:, c].astype(np.float64)[:, None] *
+                                         w[:, c].astype(np.float64)[None, :])
+                        args = [x.ctypes.data, x.size, width + 3,
+                                w.ctypes.data, w.size, width + 2,
+                                bias.ctypes.data if biased else None,
+                                channels if biased else 0,
+                                output.ctypes.data, output.size, channels + 4,
+                                rows, width, channels]
+                        self.assertEqual(function(*args), 0)
+                        np.testing.assert_array_equal(output[:, :channels].view(np.uint32),
+                                                      expected.astype(np.float32).view(np.uint32))
+                        self.assertTrue(np.all(output[:, channels:] == -777))
+                        output.fill(-777)
+                        x[-1, width - 1] = np.nan
+                        self.assertEqual(function(*args), -1)
+                        self.assertTrue(np.all(output == -777))
+                        x[-1, width - 1] = 1
+                        args[9] = (rows - 1) * (channels + 4) + channels - 1
+                        self.assertEqual(function(*args), -1)
+                        self.assertTrue(np.all(output == -777))
+
     def vector(self, arena, name, dtype, count):
         return np.ndarray((count,), dtype=dtype, buffer=arena,
                           offset=self.activations[name]["abs_offset"])
