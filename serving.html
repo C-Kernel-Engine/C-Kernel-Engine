@@ -1302,6 +1302,39 @@ batch-N ABI, memory pool and paged KV do not exist yet.</p>
     4a4be7279 by source inspection; runtime claims rest on the cited tests, not on new
     benchmarks run for this page.</p>
 </div>
+
+<section id="speech-performance-regression">
+<h2>Local speech performance regression</h2>
+<p>Whisper latency depends on the loaded generated bundle, not only server source.
+On P3 (Intel i7-14700T), switching the resident HTTP service from the older
+whisper-base-current bundle to the retained attention-cross-head-parallel-v3 bundle
+reduced one identical 20-second recording from 35.155 seconds to a 2.057-second
+median (three trials, 2026-11-07). Text and EOS termination matched. Both services
+used four native threads and a four-core quota. This is a deployment correction,
+not a new kernel optimization or an independent accuracy certification.</p>
+<p><code>scripts/whisper_service_benchmark.py</code> accepts a private JSON configuration
+with endpoint, exact CPU model, repeat count (3–20), expected worker environment,
+and encoder/decoder library, manifest and weight SHA-256 identities. Each case
+specifies name, WAV path, WAV SHA-256, expected text and maximum median latency.
+Inputs must be mono 16 kHz PCM16. Keep recordings and transcripts private.</p>
+<pre>python3 scripts/whisper_service_benchmark.py   --config /private/speech-baseline.json --output /private/current-attempt.json
+python3 scripts/local_harness_nightly.py   --config /private/harness.json --state-dir /private/nightly   --speech-perf-config /private/speech-baseline.json</pre>
+<p>The existing nightly lock and PAUSE control apply. PAUSE prevents lane startup;
+it does not interrupt a running request. The helper retains warm-up and every
+measured response, worker identity, host load, queue, inference and client wall
+timing. It replaces stale PASS before reading configuration. Wrong transcripts,
+changed artifacts, worker restarts and exceeded latency budgets fail; unavailable
+or busy endpoints are incomplete. A different CPU cannot reuse this timing baseline.
+Native environment is verified through local /proc worker records, so run this
+lane on the service host.</p>
+<p>The initial P3 guard uses five seconds per clip, intentionally detecting a return
+to the obsolete 26–35 second path rather than claiming sensitivity to small regressions.
+Do not apply it across different machines or workloads. Short clips and one 20-second
+sample do not certify all speech. Warm request timing excludes cold model startup;
+loaded identity retains model initialization time separately. Kokoro currently has
+separate profiling evidence and no equivalent performance gate. First HTTP audio
+is not first audible headset output. Qwen TTS was not tested.</p>
+</section>
     </main>
 
     <!-- SVG Viewer Overlay (shared across all pages) -->
