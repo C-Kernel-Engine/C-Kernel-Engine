@@ -15,6 +15,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import queue
@@ -170,7 +171,11 @@ class _Job:
 
 
 class _Owner:
-    def __init__(self, factory: Callable[[], Any], max_waiters: int) -> None:
+    def __init__(self, factory: Callable[[], Any], max_waiters: int,
+                 delivery_timeout_seconds: float = 10.0) -> None:
+        if not math.isfinite(delivery_timeout_seconds) or delivery_timeout_seconds <= 0:
+            raise ValueError("delivery timeout must be finite and positive")
+        self.delivery_timeout_seconds = delivery_timeout_seconds
         self.factory = factory
         self.waiting: deque[_Job] = deque()
         self.max_waiters = max_waiters
@@ -210,27 +215,40 @@ class _Owner:
                 self._terminal(job, {"type": "cancelled"})
                 job.finished.set()
                 return True
-            backend = self.backend if self.active is job and self.running_native else None
-        if backend is not None:
-            backend.abort()
-        return True
+            backend = self.backend if self.running_native else None
+            # abort() is a nonblocking signal only. Keep the selected owner pinned
+            # until it is sent; cleanup/next-request activation use this lock too.
+            if backend is not None:
+                backend.abort()
+            return True
 
     def _emit(self, job: _Job, event: dict[str, Any]) -> None:
         event["id"] = job.request_id
-        deadline = time.monotonic() + 10.0
-        while not job.cancelled.is_set():
-            try:
-                job.events.put(event, timeout=0.1)
-                if event["type"] == "complete":
-                    job.completed.set()
-                return
-            except queue.Full:
-                if time.monotonic() >= deadline:
-                    job.cancelled.set()
+        deadline = time.monotonic() + self.delivery_timeout_seconds
+        while True:
+            with self.lock:
+                if job.cancelled.is_set():
                     break
+                if job.completed.is_set():
+                    raise RuntimeError("backend emitted after completion")
+                try:
+                    # Never wait for delivery while holding the owner lock.
+                    job.events.put_nowait(event)
+                except queue.Full:
+                    pass
+                else:
+                    if event["type"] == "complete":
+                        job.completed.set()
+                    return
+            if time.monotonic() >= deadline:
+                job.cancelled.set()
+                break
+            job.cancelled.wait(0.1)
         raise SpeechCancelled()
 
     def _terminal(self, job: _Job, event: dict[str, Any]) -> None:
+        if job.completed.is_set():
+            return  # A published completion cannot be replaced by a later error.
         event["id"] = job.request_id
         if job.cancelled.is_set():
             while True:
@@ -276,6 +294,8 @@ class _Owner:
                     entered_native = True
                 self.backend.run(job.text, job.seed, job.mode,
                                  lambda event: self._emit(job, event), job.cancelled)
+                if not job.completed.is_set():
+                    raise RuntimeError("backend returned without completion")
             except BaseException as error:
                 if self.backend is not None and (entered_native or
                                                  not isinstance(error, SpeechCancelled)):
