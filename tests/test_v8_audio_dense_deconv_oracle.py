@@ -188,6 +188,61 @@ class AudioDenseDeconvOracleTest(unittest.TestCase):
             self.assertEqual(workspace(SIZE(-1).value, 3,
                                        ctypes.byref(required)), -4)
 
+    def test_ordered_fma_bits_across_vector_and_crop_boundaries(self):
+        # Output-coordinate oracle is independent of the kernel's scatter loop.
+        # libm fmaf rounds once to FP32, including signed-zero behavior.
+        import ctypes.util
+        fma = ctypes.CDLL(ctypes.util.find_library('m')).fmaf
+        fma.argtypes = [ctypes.c_float] * 3
+        fma.restype = ctypes.c_float
+        rng = np.random.default_rng(7129)
+        for kernel, stride, padding, extra in ((7, 3, 2, 1), (8, 4, 3, 0),
+                (9, 3, 4, 2), (15, 5, 7, 1), (16, 8, 4, 0),
+                (17, 6, 8, 3), (20, 10, 5, 0), (12, 6, 3, 0)):
+            inputs, channels, frames = 3, 5, 7
+            width = (frames - 1) * stride + kernel - 2 * padding + extra
+            x = rng.uniform(-1, 1, (inputs, frames + 3)).astype(np.float32)
+            w = rng.uniform(-1, 1, (inputs, channels, kernel)).astype(np.float32)
+            w[0] *= np.float32(1e-4)
+            w[1] *= np.float32(1e4)
+            b = rng.uniform(-1, 1, channels).astype(np.float32)
+            b[0] = np.float32(-0.0)
+            expected = np.full((channels, width + 4), -91, np.float32)
+            for oc in range(channels):
+                for pos in range(width):
+                    value = float(b[oc])
+                    for ic in range(inputs):
+                        for frame in range(frames):
+                            tap = pos + padding - frame * stride
+                            if 0 <= tap < kernel:
+                                value = fma(float(x[ic, frame]), float(w[ic, oc, tap]), value)
+                    expected[oc, pos] = value
+            for run, _ in self.functions:
+                with self.subTest(kernel=kernel, stride=stride, padding=padding):
+                    actual = np.full_like(expected, -91)
+                    scratch = np.empty(channels * width, np.float32)
+                    self.assertEqual(run(self.ptr(x), x.size, x.shape[1],
+                        self.ptr(w), w.size, self.ptr(b), b.size,
+                        self.ptr(actual), actual.size, actual.shape[1],
+                        self.ptr(scratch), scratch.size, inputs, channels, frames,
+                        kernel, stride, padding, extra, width), 0)
+                    np.testing.assert_array_equal(actual.view(np.uint32), expected.view(np.uint32))
+
+    def test_fused_rounding_is_not_replaced_by_multiply_add(self):
+        x = np.array([1.0 + 2.0**-23], np.float32)
+        w = np.full(12, 1.0 - 2.0**-23, np.float32)
+        b = np.array([-1.0], np.float32)
+        expected = np.full(12, -2.0**-46, np.float32)
+        unfused = np.float32(np.float32(x[0] * w[0]) + b[0])
+        self.assertNotEqual(unfused.view(np.uint32), expected[0].view(np.uint32))
+        for run, _ in self.functions:
+            output = np.full(12, -91, np.float32)
+            scratch = np.empty_like(output)
+            self.assertEqual(run(self.ptr(x), 1, 1, self.ptr(w), 12,
+                self.ptr(b), 1, self.ptr(output), 12, 12,
+                self.ptr(scratch), 12, 1, 1, 1, 12, 1, 0, 0, 12), 0)
+            np.testing.assert_array_equal(output.view(np.uint32), expected.view(np.uint32))
+
     def test_live_pytorch_oracle_if_available(self):
         try:
             import torch

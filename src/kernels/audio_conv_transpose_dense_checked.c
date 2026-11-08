@@ -5,6 +5,52 @@
 #include <stdint.h>
 #include <string.h>
 
+#if (defined(__x86_64__) || defined(__i386__)) && (defined(__GNUC__) || defined(__clang__))
+#include <immintrin.h>
+#define CK_DECONV_AVX2 1
+/* Channels are independent. Within each channel retain input-channel then
+ * input-frame order; SIMD tap lanes update distinct output positions. */
+__attribute__((target("avx2,fma"), noinline))
+static void dense_deconv_compute_avx2(const float *input, size_t input_stride,
+    const float *weight, float *scratch, size_t input_channels,
+    size_t output_channels, size_t input_frames, size_t kernel_size,
+    size_t stride, size_t padding, size_t output_frames) {
+    const size_t limit = padding + output_frames;
+    for (size_t oc = 0; oc < output_channels; ++oc) {
+        float *out = scratch + oc * output_frames;
+        for (size_t ic = 0; ic < input_channels; ++ic) {
+            const float *w = weight + (ic * output_channels + oc) * kernel_size;
+            for (size_t frame = 0; frame < input_frames; ++frame) {
+                const size_t base = frame * stride;
+                if (base >= limit) continue;
+                size_t tap = base < padding ? padding - base : 0;
+                size_t end = limit - base;
+                if (end > kernel_size) end = kernel_size;
+                const float value = input[ic * input_stride + frame];
+                const __m256 x = _mm256_set1_ps(value);
+                for (; tap < end && end - tap >= 8; tap += 8) {
+                    float *dest = out + (base + tap - padding);
+                    _mm256_storeu_ps(dest, _mm256_fmadd_ps(x,
+                        _mm256_loadu_ps(w + tap), _mm256_loadu_ps(dest)));
+                }
+                const __m128 x4 = _mm_set1_ps(value);
+                for (; tap < end && end - tap >= 4; tap += 4) {
+                    float *dest = out + (base + tap - padding);
+                    _mm_storeu_ps(dest, _mm_fmadd_ps(x4,
+                        _mm_loadu_ps(w + tap), _mm_loadu_ps(dest)));
+                }
+                for (; tap < end; ++tap) {
+                    const size_t pos = base + tap - padding;
+                    out[pos] = fmaf(value, w[tap], out[pos]);
+                }
+            }
+        }
+    }
+}
+#else
+#define CK_DECONV_AVX2 0
+#endif
+
 int audio_conv_transpose1d_dense_f32_workspace(
     size_t output_channels, size_t output_frames, size_t *scratch_elements) {
     if (!scratch_elements || !output_channels || !output_frames ||
@@ -77,21 +123,31 @@ static int dense_deconv_checked(
     for (size_t oc = 0; oc < output_channels; ++oc)
         for (size_t frame = 0; frame < output_frames; ++frame)
             scratch[oc * output_frames + frame] = bias[oc];
-    for (size_t ic = 0; ic < input_channels; ++ic)
-        for (size_t frame = 0; frame < input_frames; ++frame)
-            for (size_t tap = 0; tap < kernel_size; ++tap) {
-                size_t target = frame * stride + tap;
-                if (target < padding || target - padding >= output_frames)
-                    continue;
-                size_t out_frame = target - padding;
-                float value = input[ic * input_stride + frame];
-                for (size_t oc = 0; oc < output_channels; ++oc) {
-                    size_t index = oc * output_frames + out_frame;
-                    scratch[index] = fmaf(value,
-                        weight[(ic * output_channels + oc) * kernel_size + tap],
-                        scratch[index]);
+#if CK_DECONV_AVX2
+    __builtin_cpu_init();
+    if (__builtin_cpu_supports("avx2") && __builtin_cpu_supports("fma")) {
+        dense_deconv_compute_avx2(input, input_stride, weight, scratch,
+            input_channels, output_channels, input_frames, kernel_size,
+            stride, padding, output_frames);
+    } else
+#endif
+    {
+        for (size_t ic = 0; ic < input_channels; ++ic)
+            for (size_t frame = 0; frame < input_frames; ++frame)
+                for (size_t tap = 0; tap < kernel_size; ++tap) {
+                    size_t target = frame * stride + tap;
+                    if (target < padding || target - padding >= output_frames)
+                        continue;
+                    size_t out_frame = target - padding;
+                    float value = input[ic * input_stride + frame];
+                    for (size_t oc = 0; oc < output_channels; ++oc) {
+                        size_t index = oc * output_frames + out_frame;
+                        scratch[index] = fmaf(value,
+                            weight[(ic * output_channels + oc) * kernel_size + tap],
+                            scratch[index]);
+                    }
                 }
-            }
+    }
     if (!ck_checked_finite(scratch, scratch_need))
         return CK_AUDIO_DECONV_DENSE_NONFINITE;
     for (size_t oc = 0; oc < output_channels; ++oc)

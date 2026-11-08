@@ -1,0 +1,360 @@
+{
+  "schema": "cke.speech.performance_comparison.v1",
+  "date": "2026-11-08",
+  "status": "PASS",
+  "cpu": "Intel Core i7-14700T (P3)",
+  "scope": "Three fixed Kokoro chunks, warm resident native workers; no HTTP or playback timing; no Ryzen or Qwen TTS speed claim",
+  "baseline_bundle_revision": "39b9bda0a",
+  "candidate_source_base": "486990625",
+  "kernel": "src/kernels/audio_conv_transpose_dense_checked.c",
+  "kernel_sha256": "fe8c119e366e4dadac454d0897d9d1b4ef7811ff9ffe38dcb0f26c77f03c6df7",
+  "generated_source_sha256": "2726acfabb22c114905701a5e295490d0e5aa00a6c82d7f64e01cfbef0d2adaf",
+  "request_sha256": "f818d416a741434a0746ea3983cdbcb6547040dfce7c469087e0813bbfdceff4",
+  "voice_sha256": "50a2b7d543cc5a9bdefb3217e3bf1a8d87e947dd5b4e8babf685c0bc4b3b4177",
+  "builds": {
+    "base": {
+      "library_sha256": "d4934fc02394583d720d9fb5f2751ee03dd81fe50fcf852c04ab2b95587343a8",
+      "compile_command": [
+        "cc",
+        "-std=c11",
+        "-O2",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-shared",
+        "-fPIC",
+        "-ffp-contract=off",
+        "-ffunction-sections",
+        "-fdata-sections",
+        "-Wl,--gc-sections",
+        "-Wl,--no-undefined",
+        "-Wl,--version-script=/data/cke/speech-roofline-20261108/conv-base/64/exports.map",
+        "/data/cke/speech-roofline-20261108/conv-base/64/generated.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/ck_threadpool.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/ckernel_strict.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/attention_full_token_major.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_adain_instance_norm.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_adaptive_layer_norm.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_concat_channels_checked.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_conv1d_checked.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_conv1d_parallel.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_conv_transpose_dense_checked.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_duration_expand_token_major.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_duration_logits.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_harmonic_source_checked.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_istft_mag_phase.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_kernels.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_lstm_scan.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_prosody_upsample_checked.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_reflect_pad_checked.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_scaled_sum_strided.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_snake_checked.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_spectral_head.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_stft_mag_phase_checked.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_text_embedding.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/embedding_three_table_layer_norm.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/feature_concat_broadcast_rows.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/gelu_kernels.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/gelu_rows_tanh_checked.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/layernorm_kernels.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/layernorm_rows_checked.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/linear_rows_checked.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/runtime_extent.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/strided_unary_checked.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/vision_kernels.c",
+        "-I",
+        "/data/cke/kokoro-deploy-1063-20261107/include",
+        "-lm",
+        "-lpthread",
+        "-ldl",
+        "-o",
+        "/data/cke/speech-roofline-20261108/conv-base/64/generated.so"
+      ]
+    },
+    "candidate": {
+      "library_sha256": "6d9786b069731113bb33d513f4450b250f91f159fb36f8740a9c84cf773e5ac5",
+      "compile_command": [
+        "cc",
+        "-std=c11",
+        "-O2",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-shared",
+        "-fPIC",
+        "-ffp-contract=off",
+        "-ffunction-sections",
+        "-fdata-sections",
+        "-Wl,--gc-sections",
+        "-Wl,--no-undefined",
+        "-Wl,--version-script=/data/cke/speech-roofline-20261108/conv-candidate/64/exports.map",
+        "/data/cke/speech-roofline-20261108/conv-candidate/64/generated.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/ck_threadpool.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/ckernel_strict.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/attention_full_token_major.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_adain_instance_norm.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_adaptive_layer_norm.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_concat_channels_checked.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_conv1d_checked.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_conv1d_parallel.c",
+        "/data/cke/kokoro-conv-reuse-20261108/src/kernels/audio_conv_transpose_dense_checked.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_duration_expand_token_major.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_duration_logits.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_harmonic_source_checked.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_istft_mag_phase.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_kernels.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_lstm_scan.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_prosody_upsample_checked.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_reflect_pad_checked.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_scaled_sum_strided.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_snake_checked.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_spectral_head.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_stft_mag_phase_checked.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_text_embedding.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/embedding_three_table_layer_norm.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/feature_concat_broadcast_rows.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/gelu_kernels.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/gelu_rows_tanh_checked.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/layernorm_kernels.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/layernorm_rows_checked.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/linear_rows_checked.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/runtime_extent.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/strided_unary_checked.c",
+        "/data/cke/kokoro-deploy-1063-20261107/src/kernels/vision_kernels.c",
+        "-I",
+        "/data/cke/kokoro-deploy-1063-20261107/include",
+        "-lm",
+        "-lpthread",
+        "-ldl",
+        "-o",
+        "/data/cke/speech-roofline-20261108/conv-candidate/64/generated.so"
+      ]
+    }
+  },
+  "threads": {
+    "CK_NUM_THREADS": 8,
+    "OMP_NUM_THREADS": 8,
+    "OPENBLAS_NUM_THREADS": 1
+  },
+  "compiler": "cc -std=c11 -O2 -ffp-contract=off; full commands in builds",
+  "audio_seconds": 5.55,
+  "baseline_median_seconds": 9.779480630531907,
+  "candidate_median_seconds": 6.616677493788302,
+  "latency_reduction_percent": 32.34121786456854,
+  "speed_ratio": 1.4780047296717764,
+  "all_wav_hashes_equal": true,
+  "trials": [
+    {
+      "trial": 0,
+      "provider": "base",
+      "chunks": [
+        {
+          "seconds": 2.8090467834845185,
+          "sha256": "74548ccfdf4cda8531f4afd4820b9dfa22554b0740fc505cf8e7fe8b2979fbc9"
+        },
+        {
+          "seconds": 2.7323438273742795,
+          "sha256": "3043620d5d4cd2aa39e8f8ad3c7f97adf34f1e2b88a9fba923f8931d9881f76a"
+        },
+        {
+          "seconds": 4.400414299219847,
+          "sha256": "913efc1387b84e399476683a21fca7b9854108b5e9551b088e7a5c82cf436bee"
+        }
+      ],
+      "seconds": 9.957025066949427
+    },
+    {
+      "trial": 0,
+      "provider": "candidate",
+      "chunks": [
+        {
+          "seconds": 1.944196262396872,
+          "sha256": "74548ccfdf4cda8531f4afd4820b9dfa22554b0740fc505cf8e7fe8b2979fbc9"
+        },
+        {
+          "seconds": 1.7886735275387764,
+          "sha256": "3043620d5d4cd2aa39e8f8ad3c7f97adf34f1e2b88a9fba923f8931d9881f76a"
+        },
+        {
+          "seconds": 2.883220897987485,
+          "sha256": "913efc1387b84e399476683a21fca7b9854108b5e9551b088e7a5c82cf436bee"
+        }
+      ],
+      "seconds": 6.616677493788302
+    },
+    {
+      "trial": 1,
+      "provider": "candidate",
+      "chunks": [
+        {
+          "seconds": 1.8264521267265081,
+          "sha256": "74548ccfdf4cda8531f4afd4820b9dfa22554b0740fc505cf8e7fe8b2979fbc9"
+        },
+        {
+          "seconds": 1.7874577408656478,
+          "sha256": "3043620d5d4cd2aa39e8f8ad3c7f97adf34f1e2b88a9fba923f8931d9881f76a"
+        },
+        {
+          "seconds": 2.9368670154362917,
+          "sha256": "913efc1387b84e399476683a21fca7b9854108b5e9551b088e7a5c82cf436bee"
+        }
+      ],
+      "seconds": 6.551313153468072
+    },
+    {
+      "trial": 1,
+      "provider": "base",
+      "chunks": [
+        {
+          "seconds": 2.6286755623295903,
+          "sha256": "74548ccfdf4cda8531f4afd4820b9dfa22554b0740fc505cf8e7fe8b2979fbc9"
+        },
+        {
+          "seconds": 2.617549318820238,
+          "sha256": "3043620d5d4cd2aa39e8f8ad3c7f97adf34f1e2b88a9fba923f8931d9881f76a"
+        },
+        {
+          "seconds": 4.339727813377976,
+          "sha256": "913efc1387b84e399476683a21fca7b9854108b5e9551b088e7a5c82cf436bee"
+        }
+      ],
+      "seconds": 9.586618715897202
+    },
+    {
+      "trial": 2,
+      "provider": "base",
+      "chunks": [
+        {
+          "seconds": 2.757395409978926,
+          "sha256": "74548ccfdf4cda8531f4afd4820b9dfa22554b0740fc505cf8e7fe8b2979fbc9"
+        },
+        {
+          "seconds": 2.632267785258591,
+          "sha256": "3043620d5d4cd2aa39e8f8ad3c7f97adf34f1e2b88a9fba923f8931d9881f76a"
+        },
+        {
+          "seconds": 4.389313792809844,
+          "sha256": "913efc1387b84e399476683a21fca7b9854108b5e9551b088e7a5c82cf436bee"
+        }
+      ],
+      "seconds": 9.779480630531907
+    },
+    {
+      "trial": 2,
+      "provider": "candidate",
+      "chunks": [
+        {
+          "seconds": 1.9250021623447537,
+          "sha256": "74548ccfdf4cda8531f4afd4820b9dfa22554b0740fc505cf8e7fe8b2979fbc9"
+        },
+        {
+          "seconds": 1.9037899477407336,
+          "sha256": "3043620d5d4cd2aa39e8f8ad3c7f97adf34f1e2b88a9fba923f8931d9881f76a"
+        },
+        {
+          "seconds": 2.85810074955225,
+          "sha256": "913efc1387b84e399476683a21fca7b9854108b5e9551b088e7a5c82cf436bee"
+        }
+      ],
+      "seconds": 6.68742061406374
+    }
+  ],
+  "requests": [
+    {
+      "index": 0,
+      "seed": 7,
+      "phoneme_ids": [
+        0,
+        58,
+        54,
+        156,
+        51,
+        68,
+        16,
+        65,
+        156,
+        24,
+        62,
+        4,
+        0
+      ]
+    },
+    {
+      "index": 1,
+      "seed": 8,
+      "phoneme_ids": [
+        0,
+        157,
+        25,
+        16,
+        53,
+        72,
+        56,
+        16,
+        50,
+        156,
+        86,
+        54,
+        58,
+        0
+      ]
+    },
+    {
+      "index": 2,
+      "seed": 9,
+      "phoneme_ids": [
+        0,
+        52,
+        63,
+        16,
+        56,
+        156,
+        39,
+        4,
+        16,
+        81,
+        83,
+        16,
+        61,
+        156,
+        87,
+        123,
+        64,
+        83,
+        123,
+        16,
+        102,
+        68,
+        16,
+        123,
+        156,
+        86,
+        46,
+        51,
+        4,
+        0
+      ]
+    }
+  ],
+  "limitations": [
+    "Three alternating pairs, not a long-run distribution or complete model certification",
+    "Time includes native protocol and WAV writing; excludes process load and frontend planning",
+    "No new roofline verdict; sampled CPU shares do not measure critical-path wall time",
+    "No changes to live services; requires rebuilding generated libraries",
+    "Optional pinned Qwen asset checks unavailable in local suite remain SKIP"
+  ],
+  "wall_profile": {
+    "scope": "Instrumented baseline generated entry, final 2.45-second audio chunk",
+    "total_seconds": 4.271222470328212,
+    "dense_transposed_convolution_seconds": 1.916220602,
+    "ordinary_and_dilated_convolution_seconds": 0.584604375,
+    "linear_seconds": 0.699908411,
+    "snake_seconds": 0.454208711
+  },
+  "reproduction": {
+    "retained_host_directory": "/data/cke/speech-roofline-20261108",
+    "build": "python3 build_pair.py",
+    "run": "python3 bench_pair.py",
+    "tests": "python -m unittest tests.test_v8_audio_dense_deconv_oracle tests.test_v8_audio_dense_deconv_generated tests.test_v8_audio_dense_deconv_crop_right tests.test_v8_audio_dense_deconv_crop_right_generated"
+  }
+}
