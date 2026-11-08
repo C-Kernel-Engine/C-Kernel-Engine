@@ -51,6 +51,39 @@ class LinearRowsOracleTest(unittest.TestCase):
                        out.size if y_capacity is None else y_capacity,
                        n if ys is None else ys, m, k, n)
 
+    def test_channel_vector_keeps_ordered_fp64_cancellation(self):
+        for rows in (1, 2, 3, 4, 5, 7):
+            x = np.tile(np.array([2.0**60, 1.0, -2.0**60, 0.0], np.float32), (rows, 1))
+            x[:, 3] = np.arange(rows, dtype=np.float32) / 8
+            w = np.ones((5, 4), np.float32)
+            bias = np.zeros(5, np.float32)
+            output = np.full((rows, 5), -777, np.float32)
+            expected = np.repeat(x[:, 3:4], 5, axis=1)
+            self.assertEqual(self.call(x, w, bias, output, rows, 4, 5), 0)
+            np.testing.assert_array_equal(output.view(np.uint32), expected.view(np.uint32))
+            # Horizontal reassociation gives 1, not the contracted first-row 0.
+            reassociated = ((float(x[0, 0]) + float(x[0, 2])) +
+                            (float(x[0, 1]) + float(x[0, 3])))
+            self.assertEqual(reassociated, 1.0)
+            self.assertNotEqual(float(output[0, 0]), reassociated)
+
+    def test_simd_validation_preserves_large_cancellation_and_atomic_overflow(self):
+        x = np.full((1, 4), np.float32(1e30), dtype=np.float32)
+        w = np.tile(np.array([1e10, -1e10, 1e10, -1e10], dtype=np.float32), (5, 1))
+        bias = np.arange(5, dtype=np.float32)
+        out = np.full((1, 5), -777., dtype=np.float32)
+        # The conservative L1 bound requires the two-pass path, while ordered
+        # cancellation still produces representable results.
+        expected = bias.astype(np.float64)[None, :].copy()
+        for c in range(4):
+            expected += x[:, c].astype(np.float64)[:, None] * w[:, c].astype(np.float64)[None, :]
+        self.assertEqual(self.call(x, w, bias, out, 1, 4, 5), 0)
+        np.testing.assert_array_equal(out.view(np.uint32), expected.astype(np.float32).view(np.uint32))
+        out.fill(-777.)
+        w[-1, :] = np.float32(1e10)
+        self.assertEqual(self.call(x, w, bias, out, 1, 4, 5), -1)
+        self.assertTrue(np.all(out == -777.))
+
     def test_pinned_kokoro_projection_against_pytorch(self):
         x, w, b, expected = (self.fixture[key] for key in ("input", "weight", "bias", "expected"))
         out = np.full(expected.shape, -777., dtype=np.float32)
