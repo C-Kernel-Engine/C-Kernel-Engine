@@ -825,3 +825,37 @@ of hint tokens from transcript output and HTTP request isolation. The tests run 
 Whisper runner and Server Protocol and Lifecycle lanes. No default hint or transcript rewrite
 is enabled, and deploying the feature requires restarting a server built from the new source.</p>
 </section>
+
+<section id="resident-usage-telemetry">
+<h2>Resident transcription usage telemetry</h2>
+<p><code>GET /telemetry</code> exposes bounded JSON aggregates for the resident Whisper
+process. It does not retain audio, transcripts, vocabulary strings, request IDs or exception
+text. The existing loopback binding applies. Polling telemetry or health, and calling the
+cancel route, do not count as transcription submissions.</p>
+<pre>curl --fail http://127.0.0.1:8110/telemetry</pre>
+<p>The <code>cke.whisper.usage.v1</code> response includes a process boot identity, start time,
+uptime, received/finished/inflight HTTP requests, response status classes, observed disconnects,
+consumed upload bytes, admitted requests and audio seconds, hint-bearing admissions, and native
+job success/failure/cancellation counts. Duplicate cancellation does not settle a job twice.
+Rejected uploads do not count as admitted audio.</p>
+<p>Successful audio duration and backend-reported inference/queue totals are separate from
+admitted audio. Inference time uses the existing backend <code>inference_seconds</code>, which
+includes worker dispatch; it is not a kernel-only timer. Queue time includes waiting until
+execution begins, including cold initialization where applicable. Fixed, noncumulative
+histograms cover HTTP wall time and successful inference time; a null final upper bound means
+infinity. No per-request samples or unbounded labels are stored.</p>
+<p>HTTP response status means the server began that response, not that a client received it.
+Disconnect counts include ASGI disconnect events actually observed; transport cancellation
+without such an event can instead appear as a no-response completion. A successful native job
+can coexist with a disconnected client. These counters must not be conflated.</p>
+<p>Metrics reset on process restart. An external collector should retain snapshots with their
+boot ID and timestamp, compute deltas only within one boot, and mark stale/unavailable polls
+explicitly. The endpoint does not reconstruct historical usage or persist daily totals. During
+execution, admission and HTTP completion snapshots can differ briefly; settled counts converge
+after requests finish. No Antsand dependency is introduced.</p>
+<p>Tests cover response classes, rejection, queue cancellation, privacy, restart reset,
+invalid timing inputs, observed disconnects and concurrent updates. The
+<a href="assets/whisper-usage-20261108.json">isolated P3 smoke report</a> records one successful
+hinted transcription and one rejected request. Those are test counts, not production history.
+The ordinary endpoint needs deployment of this telemetry change before this route is available.</p>
+</section>
