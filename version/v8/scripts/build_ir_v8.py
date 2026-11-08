@@ -2168,6 +2168,18 @@ OP_DATAFLOW = {
         "inputs": {"input": "external:input", "gain": "external:gain"},
         "outputs": {"output": {"slot": "scale_vector_checked_output", "dtype": "fp32"}},
     },
+    "indexed_pair_features_backward_checked": {
+        "inputs": {"left": "external:left", "right": "external:right", "indices": "external:indices", "d_output": "external:d_output"},
+        "outputs": {"d_left": {"slot": "indexed_pair_features_backward_d_left", "dtype": "fp32"}, "d_right": {"slot": "indexed_pair_features_backward_d_right", "dtype": "fp32"}},
+    },
+    "indexed_normalized_dot_backward_checked": {
+        "inputs": {"left": "external:left", "right": "external:right", "indices": "external:indices", "d_output": "external:d_output"},
+        "outputs": {"d_left": {"slot": "indexed_normalized_dot_backward_d_left", "dtype": "fp32"}, "d_right": {"slot": "indexed_normalized_dot_backward_d_right", "dtype": "fp32"}},
+    },
+    "indexed_cosine_rows_backward_checked": {
+        "inputs": {"left": "external:left", "right": "external:right", "indices": "external:indices", "d_output": "external:d_output"},
+        "outputs": {"d_left": {"slot": "indexed_cosine_rows_backward_d_left", "dtype": "fp32"}, "d_right": {"slot": "indexed_cosine_rows_backward_d_right", "dtype": "fp32"}},
+    },
     "token_span_mean_backward_checked": {
         "inputs": {"d_output": "external:d_output", "spans": "external:spans"},
         "outputs": {"d_input": {"slot": "token_span_mean_backward_d_input", "dtype": "fp32"}},
@@ -5119,6 +5131,9 @@ TEMPLATE_TO_KERNEL_OP = {
     "scalar_exp_clamped_checked": "scalar_exp_clamped_checked",
     "scalar_sigmoid_checked": "scalar_sigmoid_checked",
     "scale_vector_checked": "scale_vector_checked",
+    "indexed_pair_features_backward_checked": "indexed_pair_features_backward_checked",
+    "indexed_normalized_dot_backward_checked": "indexed_normalized_dot_backward_checked",
+    "indexed_cosine_rows_backward_checked": "indexed_cosine_rows_backward_checked",
     "token_span_mean_backward_checked": "token_span_mean_backward_checked",
     "gelu_erf_backward_checked": "gelu_erf_backward_checked",
     "grouped_weighted_rows_backward_checked": "grouped_weighted_rows_backward_checked",

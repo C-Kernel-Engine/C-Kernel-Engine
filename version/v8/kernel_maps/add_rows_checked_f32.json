@@ -8,7 +8,8 @@
     "priority": 100,
     "equivalence_group": "add.rows.checked.fp32.v1",
     "phases": [
-      "prefill"
+      "prefill",
+      "backward"
     ]
   },
   "quant": {
@@ -71,7 +72,7 @@
   "modes": {
     "inference": true,
     "training": false,
-    "backward": false
+    "backward": true
   },
   "call_abi": {
     "version": 1,
@@ -124,7 +125,8 @@
   },
   "tests": {
     "unit": [
-      "tests/test_v8_qwen3_tts_first_block.py"
+      "tests/test_v8_qwen3_tts_first_block.py",
+      "tests/test_v8_decision_scoring_backward.py"
     ]
   },
   "notes": "Checked exact FP32 residual add with no heap allocation.",

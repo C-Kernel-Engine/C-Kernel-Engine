@@ -41,6 +41,28 @@ int ck_attention_cross_backward_f32(
     float *scratch, size_t scratch_elements,
     size_t query_tokens, size_t memory_tokens, size_t heads, size_t head_dim);
 
+/* Indexed scoring VJPs. Contiguous operands, owner index per option row.
+ * Scratch: groups*channels + 2*rows*channels floats. Overwrite both gradients
+ * atomically; repeated owners accumulate in ascending option-row order.
+ * normalized_dot: clamp derivative zero below epsilon, one at equality.
+ * cosine_rows: PyTorch 2.12.1 cosine_similarity NoGrad norm-clamp semantics.
+ * pair_features: [a,b,a*b,abs(a-b)], abs derivative zero at equality. */
+int ck_indexed_pair_features_backward_f32(
+    const float *left, size_t left_elements, const float *right, size_t right_elements,
+    const int32_t *indices, size_t indices_elements, const float *d_output, size_t d_output_elements,
+    float *d_left, size_t d_left_elements, float *d_right, size_t d_right_elements,
+    float *scratch, size_t scratch_elements, size_t groups, size_t rows, size_t channels);
+int ck_indexed_normalized_dot_backward_f32(
+    const float *left, size_t left_elements, const float *right, size_t right_elements,
+    const int32_t *indices, size_t indices_elements, const float *d_output, size_t d_output_elements,
+    float *d_left, size_t d_left_elements, float *d_right, size_t d_right_elements,
+    float *scratch, size_t scratch_elements, size_t groups, size_t rows, size_t channels, float epsilon);
+int ck_indexed_cosine_rows_backward_f32(
+    const float *left, size_t left_elements, const float *right, size_t right_elements,
+    const int32_t *indices, size_t indices_elements, const float *d_output, size_t d_output_elements,
+    float *d_left, size_t d_left_elements, float *d_right, size_t d_right_elements,
+    float *scratch, size_t scratch_elements, size_t groups, size_t rows, size_t channels, float epsilon);
+
 /* BF16 storage VJPs. Saved operands, incoming and outgoing gradients use
  * BF16; scratch uses FP32. Exact expansion, existing FP32 VJP arithmetic,
  * then round-to-nearest-even. Reject BF16 rounding overflow before publishing
