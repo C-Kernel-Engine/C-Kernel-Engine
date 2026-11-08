@@ -1379,3 +1379,31 @@ they do not resolve the separate publisher-waveform comparison. Pinned Whisper l
 was rechecked independently: short clips about 1.67 seconds and the retained 20-second
 recording about 2.05 seconds, with matching transcript and loaded-artifact checks.</p>
 </section>
+
+<section id="projection-lanes-20261108">
+<h2>Measured projection improvements, 8 November 2026</h2>
+<p>The checked linear provider now vectorizes independent output channels for
+one-to-three-row tails and uses contiguous loads for complete row groups. Weight
+validation also processes independent rows together. Each dot product retains
+ordered FP64 multiplication and addition without FMA; validation, bounded memory,
+and atomic rejection remain unchanged.</p>
+<p>On P3, the pinned Qwen3-TTS 0.6B utterance took 105.10 seconds on the baseline
+and 63.48 / 63.51 seconds on the candidate: about 39.6% less native synthesis time.
+All 46 by 16 code IDs and 88,320 FP32 waveform samples were identical. This is one
+3.68-second utterance, not conversational-speed or general speech certification.</p>
+<p>With the earlier deconvolution improvement present in both variants, three paired
+Kokoro runs improved from median 6.445 to 6.079 seconds for 5.55 seconds of audio,
+a further 5.7% reduction with identical WAV hashes. Do not combine measurements from
+different windows into a controlled cumulative speedup. No live endpoint was changed.</p>
+<p>AMD uProf IBS ran successfully on Ryzen. A cache-resident, single-core projection
+probe improved from 2.796 to 0.753 milliseconds; this is not full-model Ryzen timing.
+The installed roofline mode rejected the CPU configuration. P3 perf sampling during
+native Qwen generation attributed 57.54% of cycles to projection computation and
+39.83% to weight validation. Sampled cycles are not guaranteed removable wall time.
+Advisor did not supply a completed roofline result.</p>
+<p>The <a href="assets/speech-projection-performance-20261108.json">retained report</a>
+records source and loaded-library hashes, compile commands, trials and limitations.
+Regression tests cover distinct rows, group and dimension tails, ordered-reduction
+negative controls, finite-input cancellation and late invalid weights without writes.
+The affected generated Kokoro and Qwen suites remain part of existing testing.</p>
+</section>
