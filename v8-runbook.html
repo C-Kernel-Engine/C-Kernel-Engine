@@ -1208,6 +1208,62 @@
     </div>
 </div>
 
+<section id="training-backend-contract">
+<h2>Antsand training backend: discovery and validation proposal</h2>
+<p><code>server/training/contract.py</code> implements the first handoff boundary only:
+capability discovery and side-effect-free configuration validation. It does not create a job, compile
+code, train weights, download assets, reserve resources or deploy a service. A saved Antsand draft is
+not a submission. The independent simulated consumer lives in <code>server/training/consumer.py</code>;
+it does not import producer validators. No real Antsand system was contacted.</p>
+<p>The versioned proposal is <code>cke.training.v1</code>. Its local JSON-lines command accepts
+<code>discover</code> and <code>validate</code>. Each response binds the request ID/hash, worker boot
+ID and current capability hash. Discovery includes the CKE checkout commit, v8 workflow source hash,
+explicit unloaded-runtime status, recipe definitions, immutable dataset hashes, split counts, tokenizer,
+optimizer, method, stages and limits. This is a source-checkout adapter, not proof of an installed
+native training runtime. It does not add endpoints to <code>cke.control.v1</code>.</p>
+<table class="table"><thead><tr><th>Boundary</th><th>Advertised scope</th></tr></thead><tbody>
+<tr><td>Recipes</td><td>Explicit <code>svg_tiny_v8</code> and <code>english_tiny_v8</code> bindings to committed v8 corpus specs. No implicit v7 recipe conversion.</td></tr>
+<tr><td>Shape</td><td>4 layers; model width 32; hidden width 64; 4 query/KV heads; vocabulary 256; sequence length 32. Other shapes are rejected in this adapter, even if another workflow supports them.</td></tr>
+<tr><td>Training settings</td><td>FP32, AdamW, full tiny-decoder training, UTF-8 byte tokenizer; epochs 1–10 and gradient accumulation 1–8.</td></tr>
+<tr><td>Dataset references</td><td>Opaque registered ID + version + SHA-256; train/validation split names. Worker-owned paths never appear in requests or replies.</td></tr>
+<tr><td>Resources</td><td>Unknown admission is a warning; explicitly unavailable resources reject validation. A successful plan never reserves memory/CPU or promises execution feasibility.</td></tr>
+<tr><td>Unsupported operations</td><td>Submit, observe, artifact retrieval, cancellation, LoRA/QLoRA and Clef-head training through this adapter. This does not deny existing CKE component training evidence.</td></tr>
+</tbody></table>
+<p>Dataset registration recomputes the corpus spec/hash, full split hashes, expected Git blob identities,
+byte-token counts and text/SVG format checks without executing the training workflow. SVG is restricted
+to the existing fixture's safe svg/rect/circle elements and attributes. Quality/generalization remain
+NOT_TESTED; the SVG validation document is a near duplicate and only establishes machinery coverage.
+A changed registry changes the capability hash; old plans must be revalidated. Arbitrary paths,
+commands, output directories and unknown configuration keys are rejected.</p>
+<p>Validation requires all fields explicitly: recipe, dataset reference, tokenizer, shape, dtype,
+optimizer, method, epochs and grad_accum. It returns a canonical plan/hash with
+<code>submittable=false</code> and <code>execution=disabled</code>, or field-addressed errors with no
+plan. Errors and warnings use fixed codes. The independent consumer checks the exact discovered
+capability snapshot, plan hash, supported config and correlated identities. Failed, late or cancelled
+responses cannot become its current accepted plan; publication rechecks the monotonic deadline under
+a lock. This local consumer does not interrupt a blocked transport. A network deadline/authentication
+contract is future work.</p>
+<pre><code># One read-only discovery request; no service is installed.
+printf '%s\n' '{"schema":"cke.training.v1","request_id":"inspect","operation":"discover"}' \
+  | python3 -S -m server.training.contract
+# Keep the same process alive for discovery followed by validation: boot IDs change on restart.
+python3 -m unittest server.tests.test_training_contract -v
+python3 scripts/nightly_runner.py --tests training_backend_contract --ci --require-executed</code></pre>
+<p>Copyable versioned examples are in <code>server/training/fixtures/validation_v1.json</code>.
+They are explicitly simulated, with fixed boot/capability identities; do not submit them to a new
+worker without discovery. The tests include a separate stdlib-only worker subprocess and independent
+client, accepted/rejected configs, v7/unknown recipes, invalid dimensions/splits, modified datasets,
+missing metadata, forged plan identities, stale workers, unavailable resources, strict bounded JSON,
+late responses and cancellation recovery. They assert validation cannot launch a subprocess, execute
+a shell command or write files. Messages are limited to 16 KiB. No real training is executed here.</p>
+<p><strong>Next gate:</strong> agree the proposal with Antsand, then add explicit authorized submission
+of the exact validated plan and one small SVG job using the existing v8 workflow. Persist job and
+idempotency identities; recheck inputs and resources on submission. Progress, artifact retrieval,
+cross-identity authorization, reconnect recovery and confirmed cancellation require their own tested
+implementation. None is implied by an accepted validation response. SVG/HTML reports must be isolated
+or sanitized by any future UI rather than injected into Antsand's authenticated origin.</p>
+</section>
+
 <h2 id="certified-fp32-training">Training: Certified FP32 Starter</h2>
 
 <div class="card card-green">
