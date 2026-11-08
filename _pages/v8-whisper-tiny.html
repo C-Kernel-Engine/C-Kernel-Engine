@@ -780,3 +780,48 @@ make test-whisper-pytorch-e2e-auto</code></pre>
   arguments, long-audio window progress, and timestamp bounds. The short JFK
   artifact gate remains available for exact token and EOS comparison.
 </p>
+
+<section id="vocabulary-context">
+<h2>Optional technical vocabulary context</h2>
+<p>The generated Whisper runner accepts <code>--vocabulary-hint</code>. It follows
+<a href="https://github.com/openai/whisper/blob/main/whisper/decoding.py">Whisper's decoder prompt ordering</a>:
+<code>startofprev → ordinary context tokens → startoftranscript → language → task</code>,
+followed by the usual timestamp policy. These tokens condition native decoder execution;
+they are not appended to, or substituted into, the recognized transcript.</p>
+<p>The resident HTTP service accepts a request-local <code>vocabulary_hint</code> query parameter
+on its existing raw-WAV route. The CLI-created app validates it against the loaded decoder
+configuration and tokenizer before admission or encoder work. An embedded app must supply
+a vocabulary validator; otherwise nonempty hints return 501 instead of being ignored.</p>
+<pre>import json, urllib.parse, urllib.request
+from pathlib import Path
+hint = "Jupyter Notebook, Antsand, C-Kernel-Engine, Kokoro, quantization"
+url = "http://127.0.0.1:8110/audio/transcriptions?" + urllib.parse.urlencode({"vocabulary_hint": hint})
+request = urllib.request.Request(url, data=Path("recording.wav").read_bytes(),
+                                 headers={"Content-Type": "audio/wav"})
+with urllib.request.urlopen(request, timeout=300) as response:
+    print(json.load(response))</pre>
+<p>Use 16 kHz mono PCM16 WAV as before. Hints are limited to 1,024 UTF-8 bytes and at most
+64 ordinary tokens, with an additional decoder context/capacity check. Special-token text,
+NUL, over-capacity hints and duplicate parameters are rejected. Oversized context is rejected
+rather than silently truncated. The response reports <code>vocabulary_hint_applied</code>
+and <code>vocabulary_hint_token_count</code>. Empty hints preserve ordinary execution.
+Each recording resets decoder state; a subsequent request does not inherit prior hints.
+For long CLI recordings, the explicitly supplied hint applies independently to each window.</p>
+<p>Hints are lexical context, not guaranteed spelling corrections or fine-tuning. Keep them
+short and relevant. Query strings can appear in HTTP access logs; use terminology, not secrets.
+A personal dictionary and user-confirmed correction history belong in the client. Preserve
+the original ASR text and display suggested corrections rather than silently replacing
+ambiguous words. CKE does not learn from corrections automatically.</p>
+<p>The <a href="assets/whisper-vocabulary-20261107.json">retained P3 probe</a> shows native
+prompt delivery and request isolation. A 33-token hint changed “cash lines” to “cache lines”
+and “threat pools” to “thread pools” in a retained technical recording, but also changed
+“queues” to “Qs”. “Please wait” stayed unchanged, and subsequent unprompted runs reproduced
+the baseline. This is mixed behavioral evidence, not certified accuracy improvement.
+Both silence runs produced a spurious word; silence detection remains a separate gate.</p>
+<p>The technical recording took about 2.09 seconds without hints and 2.11 seconds with hints
+in this single paired run. This is not a controlled performance claim. Unit tests cover
+prompt ordering, special-token rejection, capacity checks before decoder mutation, exclusion
+of hint tokens from transcript output and HTTP request isolation. The tests run in the existing
+Whisper runner and Server Protocol and Lifecycle lanes. No default hint or transcript rewrite
+is enabled, and deploying the feature requires restarting a server built from the new source.</p>
+</section>
