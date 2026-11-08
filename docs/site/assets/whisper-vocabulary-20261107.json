@@ -1,0 +1,132 @@
+{
+  "schema": "cke.whisper.vocabulary_probe.v1",
+  "source_base": "afeef05d514f754b842b1a158d077ea3416e5cfa",
+  "source_sha256": {
+    "server/whisper_http.py": "ea5bad8fe041dd4fe45c7a0375881baa8a2839d52ed68c8319cf51634378b897",
+    "version/v8/scripts/run_whisper_v8.py": "9c0e228f402832a638984fa70c63d4c18c4b413bd421f9bedadbfc031f54c2a5"
+  },
+  "plumbing": "PASS",
+  "request_isolation": "PASS",
+  "accuracy": "NOT_CERTIFIED",
+  "silence_spurious_speech": "OBSERVED_WITH_AND_WITHOUT_HINT",
+  "notes": [
+    "Eight requests on one isolated P3 service; no full private transcripts or audio published.",
+    "Technical changes included cash lines to cache lines and threat pools to thread pools, but queues changed to Qs. No human-labelled word-error-rate claim.",
+    "Ordinary Please wait remained unchanged. Both post-hint unprompted requests matched their initial baseline.",
+    "Silence returned you without hints and You with hints. Vocabulary prompting does not solve silence hallucinations.",
+    "No Qwen or Kokoro synthesis changes; ordinary Whisper service untouched. Candidate service stopped after test."
+  ],
+  "identity": {
+    "schema": "cke.whisper.loaded.v1",
+    "encoder": {
+      "libraries": {
+        "libmodel.so": "386d2b47cf122a89f2fc10c5a88c96c973a8377c9b26edd3d5a3baa3cc14aec0",
+        "libckernel_engine.so": "f0cc7d2a8a7c926a5b574c08439506a335a7e379dffe2c84bbb05c5666259a97"
+      },
+      "manifest_sha256": "f9d31ecceb748b60d5e2e5602427e57e47bb789510e7cb9f7e5db048123ed962",
+      "weights_sha256": "e0da3059387b083090e7a895a6e6ff5b83b7d83dd1db2bb4979246556ffd9eb4",
+      "model_init_seconds": 0.06185633782297373,
+      "worker_pid": 4166644
+    },
+    "decoder": {
+      "libraries": {
+        "libmodel.so": "a203fe6a3d02eca0b0b83e504c4d6669ba5ec2c15ed1aee3665f89e786f1f8d9",
+        "libckernel_engine.so": "f0cc7d2a8a7c926a5b574c08439506a335a7e379dffe2c84bbb05c5666259a97"
+      },
+      "manifest_sha256": "e9691e9378cd68d6383043d47ff34f65bf4d03a59714565157bbb121f1197a76",
+      "weights_sha256": "b9cee6bd15e65ff9b9015ee5490b3aeef297e35c5b39b4aebde817061b7cff35",
+      "model_init_seconds": 0.263068868778646,
+      "worker_pid": 4166648
+    }
+  },
+  "cases": [
+    {
+      "case": "ordinary-plain",
+      "wav_sha256": "9873357d9db8024c60bc05bf54fc2a85f9b77dbc8f6154981776f2bfb64e6726",
+      "hint": "",
+      "seconds": 1.723734239116311,
+      "hint_applied": false,
+      "hint_token_count": 0,
+      "stop": "eos",
+      "worker_generation": 1,
+      "text_sha256": "840b4bc9445b120413fc2eb12c5b40bcf05f0d2bc990613eadebb04ce1dff579"
+    },
+    {
+      "case": "ordinary-hinted",
+      "wav_sha256": "9873357d9db8024c60bc05bf54fc2a85f9b77dbc8f6154981776f2bfb64e6726",
+      "hint": "Jupyter Notebook, Antsand, C-Kernel-Engine, Kokoro, quantization, cache lines, thread pools, numerical.",
+      "seconds": 1.7276969822123647,
+      "hint_applied": true,
+      "hint_token_count": 33,
+      "stop": "eos",
+      "worker_generation": 1,
+      "text_sha256": "840b4bc9445b120413fc2eb12c5b40bcf05f0d2bc990613eadebb04ce1dff579"
+    },
+    {
+      "case": "ordinary-plain-after",
+      "wav_sha256": "9873357d9db8024c60bc05bf54fc2a85f9b77dbc8f6154981776f2bfb64e6726",
+      "hint": "",
+      "seconds": 1.6872774343937635,
+      "hint_applied": false,
+      "hint_token_count": 0,
+      "stop": "eos",
+      "worker_generation": 1,
+      "text_sha256": "840b4bc9445b120413fc2eb12c5b40bcf05f0d2bc990613eadebb04ce1dff579"
+    },
+    {
+      "case": "technical-plain",
+      "wav_sha256": "e3f2406b90557d3f75c40e2c33c6239585179165f4763466e3be7dd539d2d847",
+      "hint": "",
+      "seconds": 2.0943428622558713,
+      "hint_applied": false,
+      "hint_token_count": 0,
+      "stop": "eos",
+      "worker_generation": 1,
+      "text_sha256": "c5c6ca0bb70555e51266aacc22a9922209dc3c74fb4c33659452a32bfae49f7b"
+    },
+    {
+      "case": "technical-hinted",
+      "wav_sha256": "e3f2406b90557d3f75c40e2c33c6239585179165f4763466e3be7dd539d2d847",
+      "hint": "Jupyter Notebook, Antsand, C-Kernel-Engine, Kokoro, quantization, cache lines, thread pools, numerical.",
+      "seconds": 2.1113575091585517,
+      "hint_applied": true,
+      "hint_token_count": 33,
+      "stop": "eos",
+      "worker_generation": 1,
+      "text_sha256": "f3d88bc344b46bc7d18a1d244680a0baef15ffaab1105068b90fd173fa0fecbe"
+    },
+    {
+      "case": "technical-plain-after",
+      "wav_sha256": "e3f2406b90557d3f75c40e2c33c6239585179165f4763466e3be7dd539d2d847",
+      "hint": "",
+      "seconds": 2.0763250160962343,
+      "hint_applied": false,
+      "hint_token_count": 0,
+      "stop": "eos",
+      "worker_generation": 1,
+      "text_sha256": "c5c6ca0bb70555e51266aacc22a9922209dc3c74fb4c33659452a32bfae49f7b"
+    },
+    {
+      "case": "silence-plain",
+      "wav_sha256": "643f8a8dc8bd9c19225afffad2becfec5426180b3749cb208abdf1a6c8354efc",
+      "hint": "",
+      "seconds": 1.6626187665387988,
+      "hint_applied": false,
+      "hint_token_count": 0,
+      "stop": "eos",
+      "worker_generation": 1,
+      "text_sha256": "225affe3c0c665135796ea21aeca7853afcbaf2f53ab120a2d302dbc1f7c2eb6"
+    },
+    {
+      "case": "silence-hinted",
+      "wav_sha256": "643f8a8dc8bd9c19225afffad2becfec5426180b3749cb208abdf1a6c8354efc",
+      "hint": "Jupyter Notebook, Antsand, C-Kernel-Engine, Kokoro, quantization, cache lines, thread pools, numerical.",
+      "seconds": 1.7101232409477234,
+      "hint_applied": true,
+      "hint_token_count": 33,
+      "stop": "eos",
+      "worker_generation": 1,
+      "text_sha256": "e51f21336a874d561a38362a7449685b47f72613c0e21dd3ca60514148adb8c3"
+    }
+  ]
+}

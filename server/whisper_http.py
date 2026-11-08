@@ -38,6 +38,7 @@ class _Job:
     queued_at: float
     result: Future[dict[str, Any]] = field(default_factory=Future)
     cancelled: threading.Event = field(default_factory=threading.Event)
+    vocabulary_hint: str = ""
 
 
 def _wav_frames(data: bytes, *, max_bytes: int, max_seconds: float) -> int:
@@ -113,7 +114,7 @@ class _WhisperBackend:
             }
         return identity
 
-    def run(self, wav: bytes) -> dict[str, Any]:
+    def run(self, wav: bytes, *, vocabulary_hint: str = "") -> dict[str, Any]:
         if _wav_frames(wav, max_bytes=len(wav),
                        max_seconds=self.max_frames / 16000) > self.max_frames:
             raise ValueError("recording exceeds encoder capacity")
@@ -125,7 +126,7 @@ class _WhisperBackend:
             path.write_bytes(wav)
             args = argparse.Namespace(language="en", task="transcribe",
                                       max_tokens=128, timestamps=False,
-                                      attention_trace_dir=None)
+                                      attention_trace_dir=None, vocabulary_hint=vocabulary_hint)
             encoder, decoder = whisper._run_segment(
                 args, common=[], encoder_dir=self.encoder_dir,
                 decoder_dir=self.decoder_dir, wav_path=path, temp=temp,
@@ -134,6 +135,8 @@ class _WhisperBackend:
             return {
                 "text": str(decoder["transcript_text"]),
                 "stop": str(decoder["stop"]),
+                "vocabulary_hint_applied": decoder.get("vocabulary_hint_applied", False),
+                "vocabulary_hint_token_count": decoder.get("vocabulary_hint_token_count", 0),
                 "inference_seconds": (float(encoder["worker_wall_seconds"])
                                       + float(decoder["worker_wall_seconds"])),
             }
@@ -256,7 +259,8 @@ class _Owner:
                     self._running_native = True
                     entered_native = True
                 started = time.monotonic()
-                response = self._backend.run(job.wav)
+                response = (self._backend.run(job.wav, vocabulary_hint=job.vocabulary_hint)
+                            if job.vocabulary_hint else self._backend.run(job.wav))
                 with self._lock:
                     self._running_native = False
                     if job.cancelled.is_set():
@@ -295,7 +299,8 @@ class _Owner:
 
 def create_app(factory: Callable[[], Any], *, max_upload_bytes: int = 1024 * 1024,
                max_seconds: float = 30.0, max_waiters: int = 2,
-               preload: bool = False, max_uploads: int = 2) -> FastAPI:
+               preload: bool = False, max_uploads: int = 2,
+               vocabulary_validator: Callable[[str], Any] | None = None) -> FastAPI:
     if max_upload_bytes < 44 or max_seconds <= 0 or max_uploads < 1:
         raise ValueError("invalid audio resource limits")
     owner = _Owner(factory, max_waiters=max_waiters, preload=preload)
@@ -317,6 +322,16 @@ def create_app(factory: Callable[[], Any], *, max_upload_bytes: int = 1024 * 102
 
     @app.post("/audio/transcriptions")
     async def transcribe(request: Request):
+        hint = request.query_params.get("vocabulary_hint", "")
+        if len(request.query_params.getlist("vocabulary_hint")) > 1:
+            raise HTTPException(400, "duplicate vocabulary hint")
+        if hint:
+            if vocabulary_validator is None:
+                raise HTTPException(501, "vocabulary prompting is unavailable")
+            try:
+                vocabulary_validator(hint)
+            except ValueError as error:
+                raise HTTPException(400, "invalid or over-capacity vocabulary hint") from error
         if request.headers.get("content-type", "").split(";", 1)[0] != "audio/wav":
             raise HTTPException(415, "expected audio/wav request body")
         if not uploads.acquire(blocking=False):
@@ -339,7 +354,7 @@ def create_app(factory: Callable[[], Any], *, max_upload_bytes: int = 1024 * 102
         request_id = request.headers.get("x-cke-request-id") or uuid.uuid4().hex
         if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", request_id):
             raise HTTPException(400, "invalid request ID")
-        job = _Job(request_id, wav, time.monotonic())
+        job = _Job(request_id, wav, time.monotonic(), vocabulary_hint=hint)
         if not owner.submit(job):
             raise HTTPException(429, "transcription queue is full or request ID is active")
         waiting = asyncio.wrap_future(job.result)
@@ -396,12 +411,21 @@ def main() -> None:
     if (int(config["audio_sample_rate"]) != 16000
             or args.max_seconds > int(config["audio_sample_extent"]) / 16000):
         parser.error("recording limit exceeds the 16 kHz encoder capacity")
+    from tokenizers import Tokenizer
+    from version.v8.scripts.run_whisper_v8 import vocabulary_decoder_prefix
+    tokenizer = Tokenizer.from_file(str(args.decoder_run_dir / "tokenizer.json"))
+    generation = json.loads((args.decoder_run_dir / "generation_config.json").read_text())
+    decoder_config = json.loads((args.decoder_run_dir / "config.json").read_text())
+    def vocabulary_validator(hint):
+        return vocabulary_decoder_prefix(generation, decoder_config, tokenizer,
+                                         "en", "transcribe", hint, 128)
     factory = lambda: _WhisperBackend(args.encoder_run_dir, args.decoder_run_dir,
                                       args.worker_timeout_seconds, None)
     import uvicorn
     uvicorn.run(create_app(factory, max_upload_bytes=args.max_upload_bytes,
                            max_seconds=args.max_seconds,
-                           max_waiters=args.max_waiters, preload=True),
+                           max_waiters=args.max_waiters, preload=True,
+                           vocabulary_validator=vocabulary_validator),
                 host="127.0.0.1", port=args.port)
 
 

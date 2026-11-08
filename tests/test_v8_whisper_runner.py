@@ -1165,3 +1165,122 @@ def test_whisper_base_jfk_exact_transcript_when_artifacts_are_configured(
             "you, ask what you can do for your country."
         ),
     )
+
+
+def test_vocabulary_prompt_matches_reference_order_and_limits():
+    runner = _module()
+    generation = {'decoder_start_token_id': 100, 'lang_to_id': {'<|en|>': 101},
+                  'task_to_id': {'transcribe': 102}, 'no_timestamps_token_id': 103,
+                  'eos_token_id': 99}
+    config = {'context_length': 448}
+    class Tokenizer:
+        ids = [12, 21, 35]
+        def encode(self, text, add_special_tokens):
+            assert text == ' Jupyter Notebook, Kokoro'
+            assert add_special_tokens is False
+            return SimpleNamespace(ids=self.ids)
+        def token_to_id(self, text):
+            assert text == '<|startofprev|>'
+            return 104
+    tokenizer = Tokenizer()
+    call = lambda hint='Jupyter Notebook, Kokoro', cfg=config: runner.vocabulary_decoder_prefix(
+        generation, cfg, tokenizer, 'en', 'transcribe', hint, 128)
+    assert call() == [104, 12, 21, 35, 100, 101, 102, 103]
+    assert call('') == [100, 101, 102, 103]
+    assert call('   ') == [100, 101, 102, 103]
+    for hint in ('x\x00', 'x'*1025):
+        with pytest.raises(ValueError): call(hint)
+    tokenizer.ids = [12]*65
+    with pytest.raises(ValueError, match='token limit'): call()
+    tokenizer.ids = [104]
+    with pytest.raises(ValueError, match='ordinary'): call()
+    tokenizer.ids = [12]
+    with pytest.raises(ValueError, match='capacity'): call(cfg={'context_length': 132})
+
+
+def test_vocabulary_hint_rejected_before_decoder_mutation(tmp_path, monkeypatch):
+    runner = _module()
+    run_dir = tmp_path / 'decoder'
+    run_dir.mkdir()
+    (run_dir / 'generation_config.json').write_text(json.dumps({
+        'decoder_start_token_id': 100, 'lang_to_id': {'<|en|>': 101},
+        'task_to_id': {'transcribe': 102}, 'no_timestamps_token_id': 103,
+        'eos_token_id': 99}))
+    (run_dir / 'tokenizer.json').write_text('{}')
+    (run_dir / 'config.json').write_text(json.dumps({'context_length': 448}))
+    np.save(tmp_path / 'encoder.npy', np.zeros((2, 3), dtype=np.float32))
+    monkeypatch.setattr(runner, '_require_artifact', lambda _: None)
+    class Tokenizer:
+        def encode(self, *a, **k): return SimpleNamespace(ids=[1]*65)
+        def token_to_id(self, _): return 104
+    class Model:
+        def __getattr__(self, _): raise AssertionError('invalid hint touched decoder')
+    args = SimpleNamespace(decoder_run_dir=run_dir, encoder_output=tmp_path/'encoder.npy',
+                           language='en', task='transcribe', max_tokens=128,
+                           timestamps=False, vocabulary_hint='too many tokens')
+    with pytest.raises(ValueError, match='token limit'):
+        runner._decoder_worker(args, model=Model(), tokenizer=Tokenizer(), execution_topology={})
+
+
+def test_vocabulary_tokens_reach_prefill_but_not_transcript(tmp_path, monkeypatch):
+    runner = _module()
+    directory = tmp_path / 'decoder'
+    directory.mkdir()
+    (directory/'generation_config.json').write_text(json.dumps({
+        'decoder_start_token_id': 100, 'lang_to_id': {'<|en|>': 101},
+        'task_to_id': {'transcribe': 102}, 'no_timestamps_token_id': 103,
+        'eos_token_id': 99}))
+    (directory/'config.json').write_text(json.dumps({'context_length':448}))
+    (directory/'tokenizer.json').write_text('{}')
+    np.save(tmp_path/'encoder.npy', np.zeros((2, 3), dtype=np.float32))
+    monkeypatch.setattr(runner, '_require_artifact', lambda _: None)
+    captured = []
+    class Model:
+        def ck_model_kv_cache_reset(self): captured.append('reset')
+        def ck_model_set_encoder_memory(self, *args): return 0
+        def ck_model_embed_tokens(self, ids, n): captured.append(list(ids[:n]));return 0
+        def ck_model_get_vocab_size(self): return 105
+        def ck_model_get_logits(self):
+            values = [0.0]*105;values[99]=1.0
+            return (runner.ctypes.c_float*105)(*values)
+    class Tokenizer:
+        def encode(self, *args, **kwargs): return SimpleNamespace(ids=[12, 21])
+        def token_to_id(self, _): return 104
+        def decode(self, ids, **kwargs):
+            assert ids == [], 'hint tokens must never be decoded as recognized speech'
+            return ''
+    args = SimpleNamespace(decoder_run_dir=directory, encoder_output=tmp_path/'encoder.npy',
+                           language='en',task='transcribe',timestamps=False,max_tokens=1,
+                           vocabulary_hint='Kokoro',worker_report=tmp_path/'report.json')
+    runner._decoder_worker(args,model=Model(),tokenizer=Tokenizer(),execution_topology={})
+    assert captured == ['reset',[104,12,21,100,101,102,103]]
+    report=json.loads(args.worker_report.read_text())
+    assert report['transcript_text']=='' and report['generated_tokens']==[]
+    assert report['vocabulary_hint_applied'] and report['vocabulary_hint_token_count']==2
+
+
+@pytest.mark.parametrize('hint', ['--no-cache', '-O3', '--no-cache, Jupyter Notebook'])
+def test_subprocess_vocabulary_hint_preserves_leading_dash(tmp_path, hint):
+    runner = _module()
+    # Use the real parser in fresh child processes, replacing only model execution.
+    driver = tmp_path / 'parse_worker.py'
+    driver.write_text(
+        'import json, runpy\n'
+        f'namespace = runpy.run_path({str(SCRIPT)!r})\n'
+        'args = namespace["_parser"]().parse_args()\n'
+        'args.worker_report.write_text(json.dumps({"hint": getattr(args, "vocabulary_hint", "")}))\n'
+    )
+    args = runner._parser().parse_args([
+        'run', '--encoder-run-dir', str(tmp_path / 'encoder'),
+        '--decoder-run-dir', str(tmp_path / 'decoder'), '--wav', str(tmp_path / 'audio.wav'),
+        f'--vocabulary-hint={hint}',
+    ])
+    assert args.vocabulary_hint == hint
+    encoder, decoder = runner._run_segment(
+        args, common=[sys.executable, str(driver)],
+        encoder_dir=args.encoder_run_dir, decoder_dir=args.decoder_run_dir,
+        wav_path=args.wav, temp=tmp_path, index=0, window_start_frame=0,
+        worker_env=os.environ.copy(),
+    )
+    assert encoder['hint'] == ''
+    assert decoder['hint'] == hint
