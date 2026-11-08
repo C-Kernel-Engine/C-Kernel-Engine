@@ -10,7 +10,10 @@ import threading
 import time
 import unittest
 import uuid
+from types import SimpleNamespace
+from unittest.mock import patch
 
+from server.decision import consumer as consumer_module
 from server.decision import contract as wire
 from server.decision.consumer import Consumer, InvalidResult, LoopbackHTTP, validate
 
@@ -162,6 +165,60 @@ class DecisionEvaluationTests(unittest.TestCase):
         t=threading.Thread(target=run);t.start();self.assertTrue(ready.wait(1))
         result=c.evaluate(new,self.exchange,True);release.set();t.join(2)
         self.assertEqual(errors,['STALE_RESULT']);self.assertEqual(c.current,result)
+
+    def test_validation_delay_cannot_publish_expired_result(self):
+        q=self.server.request();q['timeout_ms']=20
+        reply=self.server.evaluate(q)[1]
+        for elapsed,expired in ((.019,False),(.020,True),(.050,True)):
+            with self.subTest(validation_seconds=elapsed):
+                clock=[100.];c=Consumer()
+                def delayed_validate(*args):
+                    result=validate(*args)
+                    clock[0]=100.+elapsed
+                    return result
+                with patch.object(consumer_module,'time',SimpleNamespace(monotonic=lambda:clock[0])), patch.object(consumer_module,'validate',side_effect=delayed_validate):
+                    if expired:
+                        with self.assertRaisesRegex(InvalidResult,'DEADLINE_EXCEEDED'):c.evaluate(q,lambda _:reply,True)
+                        self.assertIsNone(c.current)
+                    else:
+                        result=c.evaluate(q,lambda _:reply,True)
+                        self.assertEqual(c.current,result)
+                # An expired attempt does not poison the next request.
+                self.run_request(consumer=c)
+
+    def test_publication_lock_wait_cannot_publish_expired_result(self):
+        q=self.server.request();q['timeout_ms']=20;reply=self.server.evaluate(q)[1]
+        clock=[100.];validated=threading.Event();release_validation=threading.Event();attempted=threading.Event()
+        class ObservedLock:
+            def __init__(self):self.raw=threading.Lock();self.entries=0
+            def __enter__(self):
+                self.entries+=1
+                if self.entries==2:attempted.set()
+                self.raw.acquire()
+            def __exit__(self,*args):self.raw.release()
+        c=Consumer();lock=ObservedLock();c._lock=lock;errors=[]
+        def delayed_validate(*args):
+            result=validate(*args);validated.set()
+            if not release_validation.wait(2):raise AssertionError('validation barrier timed out')
+            return result
+        def run():
+            try:c.evaluate(q,lambda _:reply,True)
+            except Exception as exc:errors.append(exc)
+        with patch.object(consumer_module,'time',SimpleNamespace(monotonic=lambda:clock[0])), patch.object(consumer_module,'validate',side_effect=delayed_validate):
+            worker=threading.Thread(target=run);worker.start()
+            try:
+                self.assertTrue(validated.wait(2))
+                with lock.raw:
+                    release_validation.set()
+                    self.assertTrue(attempted.wait(2))
+                    # Expire only after the worker reaches the contended lock.
+                    clock[0]=100.050
+            finally:
+                release_validation.set();worker.join(2)
+        self.assertFalse(worker.is_alive());self.assertEqual(len(errors),1)
+        self.assertIsInstance(errors[0],InvalidResult)
+        self.assertEqual(str(errors[0]),'DEADLINE_EXCEEDED');self.assertIsNone(c.current)
+        self.run_request(consumer=c)
 
     def test_slow_body_obeys_total_deadline(self):
         self.server.drip=True;q=self.server.request();q['timeout_ms']=50;c=Consumer();start=time.monotonic()
