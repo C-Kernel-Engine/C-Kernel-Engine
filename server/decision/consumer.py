@@ -98,15 +98,17 @@ class Consumer:
         q=copy.deepcopy(q)
         with self._lock:self._generation+=1;generation=self._generation;self.current=None
         validate_expected(q)
-        started=time.monotonic()
+        deadline=time.monotonic()+q['timeout_ms']/1000
         try:
             reply=exchange(q)
-            check((time.monotonic()-started)*1000<=q['timeout_ms'],'DEADLINE_EXCEEDED')
+            check(time.monotonic()<deadline,'DEADLINE_EXCEEDED')
             result=validate(reply,q,allow_simulation)
         except InvalidResult:raise
         except Exception:raise InvalidResult('TRANSPORT_ERROR') from None
         with self._lock:
             check(generation==self._generation,'STALE_RESULT')
+            # Validation and lock acquisition consume the same attempt budget.
+            check(time.monotonic()<deadline,'DEADLINE_EXCEEDED')
             self.current=result
         return copy.deepcopy(result)
 

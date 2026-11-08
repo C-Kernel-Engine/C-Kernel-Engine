@@ -1063,18 +1063,22 @@ option. Exact top ties abstain; a below-policy margin abstains; candidate order 
 tie-breaking action. Registered artifact IDs are not host paths and do not grant access.</p>
 <p>The independent consumer in <code>server/decision/consumer.py</code> does not import producer
 validators. It rejects simulation by default, invalidates old results on cancellation/replacement,
-and publishes only a correlated response within its monotonic deadline. Socket shutdown enforces the
+and publishes only a correlated response strictly before its absolute monotonic deadline. The same
+deadline is checked after exchange and inside the publication lock, after validation and lock wait.
+Generation/cancellation checks remain in that lock. Socket shutdown enforces the
 total HTTP attempt deadline, including a slow response body. Old adapter/worker boot IDs require a
 fresh discovery step. Cancellation is local result suppression; worker compute cancellation remains
 unsupported. No user/group authorization is inferred from scores. The test responder logs no request
 bodies and is defined only in the test module.</p>
 <pre><code>python3 -m unittest server.tests.test_decision_evaluate -v
 python3 scripts/nightly_runner.py --tests decision_evaluate_contract --ci --require-executed</code></pre>
-<p>These tests create temporary loopback sockets and launch an independent consumer process. Twelve
+<p>These tests create temporary loopback sockets and launch an independent consumer process. Fourteen
 cases cover fixture integrity, ordered ID permutation, A→B→A, simulation opt-in, malformed/missing
 fields, unknown artifacts/models/tasks, invalid shape fields, duplicate/empty IDs, oversized input,
 nonfinite scores, ties, policy abstention, restarts, one-slot backpressure, deadline expiration,
-slow-body timeout, cancellation and replacement with a late old reply. The smoke process exits rather
+slow-body timeout, cancellation and replacement with a late old reply. Controlled-clock regressions
+cover validation delay and an actual contended publication lock; removing the publication deadline
+check makes both fail. Expired attempts leave current unset and subsequent requests succeed. The smoke process exits rather
 than leaving a service running. To inspect the consumer CLI: <code>python3 -m server.decision.consumer
 --help</code>. No production connection command is available yet.</p>
 <p>Separate native evidence was rerun on base <code>19a733d1c</code>: all three complete-head tests
