@@ -26,6 +26,8 @@ from typing import Any, Callable
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
+from server.speech_usage import SpeechUsage, SpeechUsageMiddleware
+
 
 class TranscriptionCancelled(Exception):
     pass
@@ -314,6 +316,13 @@ def create_app(factory: Callable[[], Any], *, max_upload_bytes: int = 1024 * 102
             await asyncio.to_thread(owner.close)
 
     app = FastAPI(lifespan=lifespan)
+    usage = SpeechUsage()
+    app.add_middleware(SpeechUsageMiddleware, usage=usage)
+
+    @app.get("/telemetry")
+    async def telemetry():
+        return usage.snapshot()
+
     uploads = threading.BoundedSemaphore(max_uploads)
 
     @app.get("/health")
@@ -348,7 +357,7 @@ def create_app(factory: Callable[[], Any], *, max_upload_bytes: int = 1024 * 102
         finally:
             uploads.release()
         try:
-            _wav_frames(wav, max_bytes=max_upload_bytes, max_seconds=max_seconds)
+            audio_frames = _wav_frames(wav, max_bytes=max_upload_bytes, max_seconds=max_seconds)
         except ValueError as error:
             raise HTTPException(400, str(error)) from error
         request_id = request.headers.get("x-cke-request-id") or uuid.uuid4().hex
@@ -357,6 +366,8 @@ def create_app(factory: Callable[[], Any], *, max_upload_bytes: int = 1024 * 102
         job = _Job(request_id, wav, time.monotonic(), vocabulary_hint=hint)
         if not owner.submit(job):
             raise HTTPException(429, "transcription queue is full or request ID is active")
+        usage.admit(audio_frames, bool(hint.strip()))
+        job.result.add_done_callback(lambda result: usage.settled(result, TranscriptionCancelled, audio_frames))
         waiting = asyncio.wrap_future(job.result)
 
         def consume_after_disconnect(future: asyncio.Future) -> None:
