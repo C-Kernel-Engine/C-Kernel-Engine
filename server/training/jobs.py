@@ -36,7 +36,7 @@ class Jobs:
     def __init__(self,store,*,principals,python=sys.executable,root=ROOT,min_free_bytes=2*1024**3):
         require(principals and all(ident(p) for p in principals),'INVALID_PRINCIPALS')
         self.principals=frozenset(principals);self.root=Path(root);self.backend=Backend(self.root)
-        self.python=str(Path(python).resolve());self.min_free_bytes=min_free_bytes
+        self.python=str(Path(python).absolute());self.min_free_bytes=min_free_bytes
         self.store=Path(store).resolve();self.store.mkdir(parents=True,exist_ok=True,mode=0o700)
         require(self.store.stat().st_uid==os.getuid() and self.store.stat().st_mode&0o077==0,'PRIVATE_STORE_REQUIRED')
         self.lockfile=open(self.store/'worker.lock','a+')
@@ -129,7 +129,8 @@ class Jobs:
             args.extend(['--'+flag.replace('_','-'),str(value)])
         return args
     def _execute(self,command,folder):
-        env=os.environ.copy();env.update(OMP_NUM_THREADS='1',MKL_NUM_THREADS='1',OPENBLAS_NUM_THREADS='1')
+        env=os.environ.copy();env.pop('PYTHONHOME',None);env.pop('PYTHONPATH',None)
+        env.update(OMP_NUM_THREADS='1',MKL_NUM_THREADS='1',OPENBLAS_NUM_THREADS='1',PYTHONNOUSERSITE='1')
         # Require an unchanged tracked implementation at execution; preparation itself
         # never invokes git, a compiler, subprocess, or training arithmetic.
         clean=subprocess.run(['git','diff','--quiet','HEAD','--','src','include','version/v7','version/v8','server/training'],cwd=self.root)

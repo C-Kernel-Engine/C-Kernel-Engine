@@ -78,6 +78,16 @@ class TrainingJobsTest(unittest.TestCase):
         p=self.prepare();body=copy.deepcopy(p['plan']);body['seed']=999
         with self.jobs.db:self.jobs.db.execute('UPDATE plans SET body=? WHERE hash=?',(json.dumps(body),p['plan_sha256']))
         with self.assertRaisesRegex(JobError,'PLAN_CHANGED'):self.jobs.submit('alice',p['plan_sha256'],'new',start=False)
+    def test_interpreter_symlink_keeps_environment_identity(self):
+        import sys
+        alias=Path(self.tmp.name)/'venv/bin/python';alias.parent.mkdir(parents=True);alias.symlink_to(sys.executable)
+        other=SimulatedJobs(Path(self.tmp.name)/'other',principals={'alice'},python=alias)
+        try:
+            self.assertEqual(other.python,str(alias))
+            p=other.prepare('alice',self.config,'experiment',1)
+            self.assertEqual(other._command(p['plan'],other.store/'job')[0],str(alias))
+        finally:other.close()
+
     def test_command_uses_bounded_workflow_and_resource_gate(self):
         p=self.prepare();cmd=self.jobs._command(p['plan'],self.jobs.store/'example')
         self.assertIn('svg_single_document_v1.json',' '.join(cmd));self.assertIn('--epochs',cmd);self.assertNotIn('shell',cmd)
