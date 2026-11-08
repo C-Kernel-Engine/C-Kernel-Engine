@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 499,
+      "total": 500,
       "by_op": {
         "add_backward": 1,
         "add_rows_checked": 1,
@@ -15,7 +15,7 @@
         "assistant_layer_scale": 1,
         "attention": 40,
         "attention_causal_bounded": 1,
-        "attention_cross_token_major_checked": 1,
+        "attention_cross_token_major_checked": 2,
         "attention_decode_append_checked": 1,
         "attention_full_token_major_checked": 1,
         "attention_last_query_prob_trace": 1,
@@ -1506,6 +1506,398 @@
       "_source_file": "attention_causal_head_major_bounded_f32.json"
     },
     {
+      "id": "attention_cross_backward_checked_f32",
+      "op": "attention_cross_token_major_checked",
+      "operation_interface": "attention.cross_unmasked.backward.token_major.fp32.checked.v1",
+      "variant": "scalar_fp64_dot_fp32_scores_fp64_softmax",
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "in_0",
+          "dtype": "fp32",
+          "shape": [
+            "Q",
+            "H*D"
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "in_1",
+          "dtype": "fp32",
+          "shape": [
+            "S",
+            "H*D"
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "in_2",
+          "dtype": "fp32",
+          "shape": [
+            "S",
+            "H*D"
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "in_3",
+          "dtype": "fp32",
+          "shape": [
+            "Q",
+            "H*D"
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "d_query",
+          "dtype": "fp32",
+          "shape": [
+            "Q",
+            "H*D"
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "d_key",
+          "dtype": "fp32",
+          "shape": [
+            "S",
+            "H*D"
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "d_value",
+          "dtype": "fp32",
+          "shape": [
+            "S",
+            "H*D"
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "scratch",
+          "dtype": "fp32",
+          "shape": [
+            "X"
+          ],
+          "size_bytes": "4 * X",
+          "size_resolution": "required",
+          "lifetime": "kernel_call",
+          "alignment": 64,
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read_write",
+          "storage_class": "scratch",
+          "consumption": "required"
+        }
+      ],
+      "dims": [
+        "Q",
+        "S",
+        "H",
+        "D",
+        "X"
+      ],
+      "constraints": {
+        "notes": "Batch one; distinct query and memory valid lengths; full unmasked attention. Caller-owned nonaliasing inputs, output and scratch; all finite, checked capacity and unchanged output on rejection."
+      },
+      "impl": {
+        "function": "ck_attention_cross_backward_f32",
+        "c_declaration": "int ck_attention_cross_backward_f32(const float *query, size_t query_elements, const float *key, size_t key_elements, const float *value, size_t value_elements, const float *d_output, size_t d_output_elements, float *d_query, size_t d_query_elements, float *d_key, size_t d_key_elements, float *d_value, size_t d_value_elements, float *scratch, size_t scratch_elements, size_t query_tokens, size_t memory_tokens, size_t heads, size_t head_dim);",
+        "sources": [
+          "src/kernels/attention_cross_token_major_checked.c"
+        ]
+      },
+      "modes": {
+        "inference": false,
+        "training": true,
+        "backward": true
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "attention_cross_backward_fp64_ordered_v1",
+          "status": "validated",
+          "phases": [
+            "backward"
+          ],
+          "function": "ck_attention_cross_backward_f32",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp64",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "serial"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "query",
+            "source": "activation:in_0",
+            "cast": "const float *",
+            "ports": [
+              "input:in_0"
+            ]
+          },
+          {
+            "name": "query_elements",
+            "source": "runtime:query_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "key",
+            "source": "activation:in_1",
+            "cast": "const float *",
+            "ports": [
+              "input:in_1"
+            ]
+          },
+          {
+            "name": "key_elements",
+            "source": "runtime:key_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "value",
+            "source": "activation:in_2",
+            "cast": "const float *",
+            "ports": [
+              "input:in_2"
+            ]
+          },
+          {
+            "name": "value_elements",
+            "source": "runtime:value_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "d_output",
+            "source": "activation:in_3",
+            "cast": "const float *",
+            "ports": [
+              "input:in_3"
+            ]
+          },
+          {
+            "name": "d_output_elements",
+            "source": "runtime:query_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "d_query",
+            "source": "output:d_query",
+            "cast": "float *",
+            "ports": [
+              "output:d_query"
+            ]
+          },
+          {
+            "name": "d_query_elements",
+            "source": "runtime:query_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "d_key",
+            "source": "output:d_key",
+            "cast": "float *",
+            "ports": [
+              "output:d_key"
+            ]
+          },
+          {
+            "name": "d_key_elements",
+            "source": "runtime:key_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "d_value",
+            "source": "output:d_value",
+            "cast": "float *",
+            "ports": [
+              "output:d_value"
+            ]
+          },
+          {
+            "name": "d_value_elements",
+            "source": "runtime:value_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "scratch",
+            "source": "scratch:scratch",
+            "cast": "float *"
+          },
+          {
+            "name": "scratch_elements",
+            "source": "runtime:backward_scratch_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "query_tokens",
+            "source": "runtime:query_tokens",
+            "value_type": "size_t"
+          },
+          {
+            "name": "memory_tokens",
+            "source": "runtime:memory_tokens",
+            "value_type": "size_t"
+          },
+          {
+            "name": "heads",
+            "source": "runtime:heads",
+            "value_type": "size_t"
+          },
+          {
+            "name": "head_dim",
+            "source": "runtime:head_dim",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_attention_cross_token_major_checked.py",
+          "tests/test_v8_attention_cross_backward.py",
+          "tests/test_v8_attention_training.py"
+        ],
+        "oracle": "Independent ordered scalar FP64/FP32 oracle, PyTorch explicit softmax attention autograd, native forward finite differences, generated native AdamW trajectory and rejection recovery."
+      },
+      "notes": "Full unmasked batch-one VJP; recomputes forward scores/exponentials with FP64 ascending dot products and FP32 stores. dS stores FP32; dQ reduces FP64; dK/dV accumulate in ascending query order with FP32 store after each query. Scratch: Q*H*D + 2*S*H*D + 2*S floats. All gradient outputs publish atomically. No mask/dropout or BF16 training.",
+      "training_contract": {
+        "batch_policy": "fixed",
+        "version": 1,
+        "layout": "contiguous",
+        "return_status": "zero_success",
+        "buffer_spans": [
+          {
+            "pointer": "query",
+            "rows": "query_tokens",
+            "width": [
+              "heads",
+              "head_dim"
+            ],
+            "elements": "query_elements"
+          },
+          {
+            "pointer": "key",
+            "rows": "memory_tokens",
+            "width": [
+              "heads",
+              "head_dim"
+            ],
+            "elements": "key_elements"
+          },
+          {
+            "pointer": "value",
+            "rows": "memory_tokens",
+            "width": [
+              "heads",
+              "head_dim"
+            ],
+            "elements": "value_elements"
+          },
+          {
+            "pointer": "d_output",
+            "rows": "query_tokens",
+            "width": [
+              "heads",
+              "head_dim"
+            ],
+            "elements": "d_output_elements"
+          },
+          {
+            "pointer": "d_query",
+            "rows": "query_tokens",
+            "width": [
+              "heads",
+              "head_dim"
+            ],
+            "elements": "d_query_elements"
+          },
+          {
+            "pointer": "d_key",
+            "rows": "memory_tokens",
+            "width": [
+              "heads",
+              "head_dim"
+            ],
+            "elements": "d_key_elements"
+          },
+          {
+            "pointer": "d_value",
+            "rows": "memory_tokens",
+            "width": [
+              "heads",
+              "head_dim"
+            ],
+            "elements": "d_value_elements"
+          },
+          {
+            "pointer": "scratch",
+            "rows": 1,
+            "width": "scratch_elements",
+            "elements": "scratch_elements"
+          }
+        ]
+      },
+      "name": "attention_cross_backward_checked_f32",
+      "_source_file": "attention_cross_backward_checked_f32.json"
+    },
+    {
       "id": "attention_cross_token_major_checked_f32",
       "op": "attention_cross_token_major_checked",
       "operation_interface": "attention.cross_unmasked.token_major.fp32.checked.v1",
@@ -1615,9 +2007,59 @@
           "src/kernels/attention_cross_token_major_checked.c"
         ]
       },
+      "training_contract": {
+        "batch_policy": "fixed",
+        "version": 1,
+        "layout": "contiguous",
+        "return_status": "zero_success",
+        "buffer_spans": [
+          {
+            "pointer": "query",
+            "rows": "query_tokens",
+            "width": [
+              "heads",
+              "head_dim"
+            ],
+            "elements": "query_elements"
+          },
+          {
+            "pointer": "key",
+            "rows": "memory_tokens",
+            "width": [
+              "heads",
+              "head_dim"
+            ],
+            "elements": "key_elements"
+          },
+          {
+            "pointer": "value",
+            "rows": "memory_tokens",
+            "width": [
+              "heads",
+              "head_dim"
+            ],
+            "elements": "value_elements"
+          },
+          {
+            "pointer": "output",
+            "rows": "query_tokens",
+            "width": [
+              "heads",
+              "head_dim"
+            ],
+            "elements": "output_elements"
+          },
+          {
+            "pointer": "scratch",
+            "rows": 1,
+            "width": "scratch_elements",
+            "elements": "scratch_elements"
+          }
+        ]
+      },
       "modes": {
         "inference": true,
-        "training": false,
+        "training": true,
         "backward": false
       },
       "numerical_capabilities": [
@@ -1786,7 +2228,9 @@
       },
       "tests": {
         "unit": [
-          "tests/test_v8_attention_cross_token_major_checked.py"
+          "tests/test_v8_attention_cross_token_major_checked.py",
+          "tests/test_v8_attention_cross_backward.py",
+          "tests/test_v8_attention_training.py"
         ],
         "oracle": "Independent PyTorch query/key/value attention with unequal lengths; bounds, nonfinite, overlap and unchanged output on rejection"
       },

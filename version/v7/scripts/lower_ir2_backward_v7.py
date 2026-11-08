@@ -1090,6 +1090,12 @@ def synthesize_ir2_backward(
                         aux_shape = resolved_shape
                     if isinstance(resolved_numel, int) and resolved_numel > 0:
                         aux_numel = resolved_numel
+                    if "numel_from_forward_param" in w:
+                        key = w["numel_from_forward_param"]
+                        value = fwd.get("params", {}).get("call_constants", {}).get(key)
+                        if type(value) is not int or not 0 < value <= (2**63 - 1) // 4:
+                            raise ValueError("invalid backward workspace extent: " + str(key))
+                        aux_numel, aux_shape = value, [value]
                     _ensure_tensor(
                         tensors,
                         tensor_id=aux_tensor,

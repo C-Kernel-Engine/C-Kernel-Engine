@@ -1135,23 +1135,29 @@ def _bridge_head_group_macro(head_group: Any) -> str:
     return "CK_ROPE_NUM_HEADS"
 
 
-def _declared_training_call(op, kernel, args, pools, tensors, tensor_numel, variables):
+def _declared_training_call(op, kernel, args, pools, tensors, tensor_numel, variables, *, fixed_batch=False):
     """Resolve a bounded map ABI without legacy pointer/scalar guessing.
 
     Opt-in for fixed-capacity training graphs. Only FP32 buffers and literal
-    scalar bindings are supported here; checked/status-returning calls require
-    a separate failure-propagation contract and are rejected.
+    scalar bindings are supported here. Checked providers must explicitly declare
+    zero-success status; the generated step stops before optimizer execution.
     """
     phase = "backward" if str(op.get("phase", "")).startswith("backward") else "training"
     if kernel.get("modes", {}).get(phase) is not True:
         raise ValueError("map call does not support phase " + phase)
     declaration = kernel.get("impl", {}).get("c_declaration", "")
-    if not declaration.strip().startswith("void "):
-        raise ValueError("training map call requires a void ABI")
+    return_status = kernel.get("training_contract", {}).get("return_status")
+    if declaration.strip().startswith("int "):
+        if return_status != "zero_success":
+            raise ValueError("training int ABI requires zero_success status")
+    elif not declaration.strip().startswith("void ") or return_status is not None:
+        raise ValueError("unsupported training map return contract")
     abi = kernel.get("call_abi", {})
     params = abi.get("params", [])
     if abi.get("version") != 1 or [p.get("name") for p in params] != [n for _, n in args]:
         raise ValueError("training map ABI does not match declaration")
+    if kernel.get("training_contract", {}).get("batch_policy") == "fixed" and not fixed_batch:
+        raise ValueError("provider requires a declared fixed training batch")
     constants = op.get("params", {}).get("call_constants", {})
     scalars, pointers, expressions = {}, {}, []
     for (ctype, name), binding in zip(args, params):
@@ -1163,15 +1169,16 @@ def _declared_training_call(op, kernel, args, pools, tensors, tensor_numel, vari
             tid = pools.get(category, {}).get(key)
             if not tid or tid not in variables or tensors.get(tid, {}).get("dtype") != "fp32":
                 raise ValueError("missing or incompatible training map buffer: " + source)
-            if ("const" not in ctype) != (category == "output"):
+            if ("const" not in ctype) != (category in ("output", "scratch")):
                 raise ValueError("training map buffer access mismatch: " + source)
             pointers[name] = tid
             expressions.append(variables[tid])
         else:
             value = (constants.get(key) if category == "runtime" else
                      op.get("params", {}).get(key) if category == "param" else None)
-            if ctype == "int":
-                if type(value) is not int or not 0 < value <= 2147483647:
+            if ctype in ("int", "size_t"):
+                bound = 2147483647 if ctype == "int" else (2**64 - 1) // 4
+                if type(value) is not int or not 0 < value <= bound:
                     raise ValueError("invalid bounded integer for " + name)
                 expressions.append(str(value))
             elif ctype == "float":
@@ -1192,7 +1199,10 @@ def _declared_training_call(op, kernel, args, pools, tensors, tensor_numel, vari
     if {span.get("pointer") for span in spans} != set(pointers) or len(spans) != len(pointers):
         raise ValueError("training map must bound every pointer exactly once")
     def extent(value):
-        result = scalars.get(value) if isinstance(value, str) else value
+        if isinstance(value, list) and value:
+            result = math.prod(extent(term) for term in value)
+        else:
+            result = scalars.get(value) if isinstance(value, str) else value
         if type(result) is not int or result <= 0:
             raise ValueError("invalid map span extent")
         return result
@@ -1201,6 +1211,10 @@ def _declared_training_call(op, kernel, args, pools, tensors, tensor_numel, vari
         rows, width = extent(span["rows"]), extent(span["width"])
         if rows * width > min(tensor_numel[tid], 2147483647):
             raise ValueError("training map buffer capacity exceeded: " + tid)
+        if "elements" in span:
+            capacity = extent(span["elements"])
+            if not rows * width <= capacity <= tensor_numel[tid]:
+                raise ValueError("training map advertised capacity invalid: " + tid)
         shape = tensors[tid].get("shape")
         if shape not in ([rows, width], [rows * width]):
             raise ValueError("training map requires contiguous declared shape: " + tid)
@@ -1228,6 +1242,8 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
         json.dumps(identity, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
     cfg = dict(ir2.get("config") or {})
+    if cfg.get("train_batch_policy") not in (None, "fixed"):
+        raise ValueError("unsupported training batch policy")
     bridge_lowering = str(ir2.get("bridge_lowering", "legacy") or "legacy").strip().lower()
     bindings_doc = _load_json(DEFAULT_BINDINGS) if DEFAULT_BINDINGS.exists() else {}
     kernel_bindings = dict(bindings_doc.get("bindings") or {})
@@ -1493,9 +1509,16 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("static const char *CK_TRAIN_BUILD_IDENTITY = CK_TRAIN_BUILD_IDENTITY_SHA256;")
     ap("const char *ck_train_get_build_identity_sha256(void) { return CK_TRAIN_BUILD_IDENTITY; }")
     ap("")
+    fixed_tokens = cfg.get("train_tokens") if cfg.get("train_batch_policy") == "fixed" else None
+    if cfg.get("train_batch_policy") == "fixed" and (type(fixed_tokens) is not int or not 0 < fixed_tokens <= 2147483647):
+        raise ValueError("fixed training batch requires bounded train_tokens")
     ap("#ifndef CK_NUM_TOKENS")
-    ap("#define CK_NUM_TOKENS 1")
+    ap("#define CK_NUM_TOKENS %d" % (fixed_tokens or 1))
     ap("#endif")
+    if fixed_tokens is not None:
+        ap("#if CK_NUM_TOKENS != %d" % fixed_tokens)
+        ap('#error "CK_NUM_TOKENS disagrees with fixed graph capacity"')
+        ap("#endif")
     ap("#ifndef CK_GRAD_ACCUM_STEPS")
     ap("#define CK_GRAD_ACCUM_STEPS 1")
     ap("#endif")
@@ -4195,8 +4218,8 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
             if op.get("map_call"):
                 call_args = _declared_training_call(
                     op, kernel_map[kid], args,
-                    {"activation": io_inputs, "output": io_outputs, "weight": io_weights},
-                    tensors, tensor_numel, tvars_f32)
+                    {"activation": io_inputs, "output": io_outputs, "weight": io_weights, "scratch": io_outputs},
+                    tensors, tensor_numel, tvars_f32, fixed_batch=cfg.get("train_batch_policy") == "fixed")
                 bounds_checks = [(tvars_f32[tid], tensor_numel[tid])
                                  for tid in list(io_inputs.values()) + list(io_outputs.values()) + list(io_weights.values())
                                  if tid in tvars_f32]
@@ -4450,7 +4473,10 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                 # Keep IR/kernel id stable while allowing runtime CE backend selection
                 # via CK_TRAIN_USE_CE_PTREF for parity diagnostics.
                 call_fn = "ck_train_ce_dispatch"
-            ap("    %s(%s);" % (call_fn, ", ".join(call_args)))
+            if op.get("map_call") and kernel_map[kid].get("training_contract", {}).get("return_status") == "zero_success":
+                ap("    if (%s(%s) != 0) return -7000 - %s;" % (call_fn, ", ".join(call_args), op_id))
+            else:
+                ap("    %s(%s);" % (call_fn, ", ".join(call_args)))
             if phase.startswith("backward"):
                 inj_tid: Optional[str] = None
                 for _k, _tid in _sorted_pool_items(io_outputs):
@@ -4620,6 +4646,12 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("}")
     ap("")
     ap("int ck_train_set_batch_ex(const int32_t *token_ids, const int32_t *targets, int valid_tokens) {")
+    if cfg.get("train_batch_policy") == "fixed":
+        vocab = int(cfg.get("vocab_size", 0))
+        if vocab <= 0:
+            raise ValueError("fixed training batch requires positive vocabulary capacity")
+        ap("    if (!token_ids || !targets || valid_tokens != CK_NUM_TOKENS) return -2;")
+        ap("    for (int i = 0; i < CK_NUM_TOKENS; ++i) if (token_ids[i] < 0 || token_ids[i] >= %d || targets[i] < 0 || targets[i] >= %d) return -2;" % (vocab, vocab))
     ap("    const int active = ck_clamp_active_tokens(valid_tokens);")
     ap("    if (token_ids != NULL) {")
     if token_input_i32_vars:
@@ -4650,7 +4682,10 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
 
     ap("int ck_train_step_ex(const int32_t *token_ids, const int32_t *targets, int valid_tokens, float *loss_out, float lr) {")
     ap("    double t_step0 = ck_now_ms();")
-    ap("    ck_train_set_batch_ex(token_ids, targets, valid_tokens);")
+    ap("    g_last_opt_applied = 0;")
+    ap("    g_last_opt_calls = 0;")
+    ap("    int batch_status = ck_train_set_batch_ex(token_ids, targets, valid_tokens);")
+    ap("    if (batch_status < 0) return batch_status;")
     ap("    /*")
     ap("     * Grad-accum window contract (must match PyTorch):")
     ap("     * - zero grads once at window start")
@@ -4669,6 +4704,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("    if (CK_RUNTIME_CANARY_CHECKS) ck_train_plant_canaries();")
     ap("    double t_fwd0 = ck_now_ms();")
     ap("    int fwd = ck_train_forward_step();")
+    ap("    if (fwd < 0) { ck_zero_grad(); g_accum_step = 0; g_accum_tokens = 0; return fwd; }")
     ap("    double t_fwd1 = ck_now_ms();")
     ap("    if (CK_RUNTIME_CANARY_CHECKS && ck_train_check_canaries(\"step_forward\", &first) != 0) return -1000 - first;")
     ap("    double t_bwd0 = ck_now_ms();")
@@ -4680,6 +4716,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
             ap("        for (size_t gi = 0; gi < (size_t)%d; ++gi) %s[gi] *= old_scale;" % (int(numel), gvar))
         ap("    }")
     ap("    int bwd = ck_train_backward_step();")
+    ap("    if (bwd < 0) { ck_zero_grad(); g_accum_step = 0; g_accum_tokens = 0; return bwd; }")
     if opt_pairs:
         ap("    {")
         ap("        const int64_t total_tokens = g_accum_tokens + (int64_t)g_active_tokens;")

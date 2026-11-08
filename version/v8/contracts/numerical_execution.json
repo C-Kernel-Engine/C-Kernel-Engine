@@ -3,6 +3,44 @@
   "schema_version": 1,
   "engine_contract_version": "8",
   "contracts": {
+    "attention_cross_backward_fp64_ordered_v1": {
+      "operator_family": "attention",
+      "status": "validated",
+      "storage": {
+        "input": "fp32",
+        "weight": "none",
+        "output": "fp32"
+      },
+      "compute": {
+        "input": "fp32",
+        "weight": "none",
+        "accumulator": "fp64",
+        "contraction": "disabled",
+        "evaluation_order": "independent_query_and_memory_lengths_ascending_head_key_and_channel"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": [
+          "activation_intermediate_store",
+          "reduction_update",
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "sum",
+        "order": "ascending_index",
+        "partial_accumulator": "fp64",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "serial",
+        "split_strategy": "serial",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Full unmasked batch-one VJP; recomputes forward scores/exponentials with FP64 ascending dot products and FP32 stores. dS stores FP32; dQ reduces FP64; dK/dV accumulate in ascending query order with FP32 store after each query. Scratch: Q*H*D + 2*S*H*D + 2*S floats. All gradient outputs publish atomically. No mask/dropout or BF16 training."
+    },
     "rwkv7_wkv_decode_fp32": {
       "operator_family": "rwkv7_wkv_decode",
       "status": "validated",

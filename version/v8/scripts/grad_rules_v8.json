@@ -2,6 +2,50 @@
   "version": 1,
   "description": "v7 gradient rules for IR2 backward synthesis. 'ready' rules can lower today; 'todo' rules fail-fast unless partial mode is enabled.",
   "rules": {
+    "attention_cross_backward": {
+      "requires_saved": [
+        "query",
+        "key",
+        "value"
+      ],
+      "backward_ops": [
+        {
+          "kernel_id": "attention_cross_backward_checked_f32",
+          "map_call": true,
+          "reads": [
+            "saved:query",
+            "saved:key",
+            "saved:value",
+            "grad:output"
+          ],
+          "writes": [
+            {
+              "name": "d_query",
+              "kind": "grad_activation",
+              "target_input": "query"
+            },
+            {
+              "name": "d_key",
+              "kind": "grad_activation",
+              "target_input": "key"
+            },
+            {
+              "name": "d_value",
+              "kind": "grad_activation",
+              "target_input": "value"
+            },
+            {
+              "name": "scratch",
+              "kind": "aux",
+              "numel_from_forward_param": "backward_scratch_elements"
+            }
+          ],
+          "role": "core"
+        }
+      ],
+      "status": "ready",
+      "extra_saved": []
+    },
     "dense_embedding_lookup_backward": {
       "status": "ready",
       "requires_saved": [

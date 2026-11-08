@@ -1036,6 +1036,49 @@
 
 <p>Model topology lives in the circuit builders here. Kernels implement arithmetic; maps describe ABI, scratch and numerical contracts. Generic operation catalogue entries do not inspect the model name.</p>
 
+<section id="attention-training">
+<h2>Noncausal attention backward and native training</h2>
+<p>A bounded generic composition now trains through feature lookup → trainable projection →
+Q/K/V projections → full noncausal attention → residual → scores → cross-entropy. Automatic backward
+lowering declares every branch accumulation and native AdamW updates the selected parameters.
+The new provider handles unequal query/memory lengths, packed token-major heads and caller-owned
+scratch. It does not implement masking, dropout or BF16 attention backward.</p>
+<p>Forward arithmetic remains FP64 ascending dot products with FP32 score/exponential stores.
+Backward recomputes those scores; dS stores FP32, dQ reduces FP64, and shared dK/dV accumulate in
+ascending query order with an FP32 store after each query. All three gradient outputs are staged
+until validation and arithmetic succeed. Scratch is Q·H·D + 2·S·H·D + 2·S floats.</p>
+<p>The shared trainer now propagates map-declared zero-success status. A checked kernel failure
+stops the step before AdamW, leaves weights/moments untouched, clears the incomplete accumulation
+window and leaves the caller's loss output untouched. This is not general rollback for arbitrary
+void providers. The fixed-batch contract rejects partial batches rather than allowing padding into
+unmasked softmax; native kernel tests cover unequal Q/S, while the composed training fixture uses
+four tokens. Variable-length masked training remains a separate contract.</p>
+<table class="table"><thead><tr><th>FP32 native AdamW, 40 updates</th><th>Initial → final loss</th><th>Gradient / weight / moment max absolute error</th></tr></thead><tbody>
+<tr><td>All Q/K/V trainable</td><td>1.32838511 → 0.00033159</td><td>1.75e-7 / 9.54e-7 / 5.22e-8</td></tr>
+<tr><td>Frozen K projection</td><td>1.32838511 → 0.00041567</td><td>1.20e-7 / 9.54e-7 / 3.73e-8</td></tr>
+</tbody></table>
+<p>Measured 2026-11-07 with PyTorch 2.12.1+cpu and seed 837. The oracle uses explicit independent
+softmax attention and autograd, not Unsloth. Ordered scalar FP64/FP32 comparisons at O0/O3 and native
+forward finite differences provide additional checks. Gradient/weight ceilings remain 3e-5 absolute,
+3e-4 relative; optimizer moments 3e-6 absolute, 3e-4 relative. These are bounded empirical checks,
+not a universal error bound or bitwise PyTorch claim. Reports retain engine, generated-C and runtime-contract hashes.</p>
+<p>Checkpoint reset/resume and trained-weight inference reload pass. Frozen K weights remain
+byte-identical while gradients reach the upstream trainable projection. Swapping the saved K input
+with V fails the gradient comparison. An injected late backward failure after one successful
+microstep clears partial gradients; two subsequent microsteps exactly match a clean two-microstep
+baseline. Null/invalid IDs, labels, batch lengths, undersized capacities, nonfinite operands, aliases,
+misalignment and finite accumulation overflow have rejection coverage.</p>
+<pre><code>make -j4 build/libckernel_engine.so
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python3 -m unittest \
+  tests.test_v8_attention_cross_backward tests.test_v8_attention_training -v
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python3 scripts/nightly_runner.py \
+  --tests training_attention_composition --ci --require-executed</code></pre>
+<p><strong>Complete Clef-head training remains NOT_TESTED.</strong> This certifies a synthetic
+attention/projection/residual training composition. Next: connect existing head VJPs and the remaining
+indexed/scoring derivatives and grouped loss, then certify every released-head gradient and update.
+BF16 optimizer trajectories, LoRA and quantized-base training are separate milestones.</p>
+</section>
+
 <section id="normalization-training">
 <h2>Cached-statistics LayerNorm training composition</h2>
 <p>The next trainable composition is fixed features → trainable projection → affine LayerNorm →
@@ -1046,10 +1089,8 @@ passes to the existing VJP. Epsilon belongs to the operation, independently of t
 <p>Shared training code generation now accepts an opt-in, map-owned ABI for bounded contiguous FP32
 buffers and literal scalar parameters. It rejects missing ports/providers, reordered ABIs, unsupported
 phases/dtypes, invalid scalars, insufficient capacities, incorrect shapes and writable aliases instead
-of guessing argument bindings. The selected maps participate in runtime/checkpoint identity. This
-path currently accepts void providers only: finite inputs remain a caller precondition, and it does
-not claim atomic rejection of nonfinite values. Checked status-returning providers need a separate
-failure-propagation contract before joining this path.</p>
+of guessing argument bindings. The selected maps participate in runtime/checkpoint identity. The legacy LayerNorm providers remain void: finite operands are their caller precondition.
+Checked providers now use the separate zero-success failure contract described above.</p>
 <table class="table"><thead><tr><th>FP32 native AdamW, 40 updates</th><th>Initial → final loss</th><th>Gradient / weight / moment maximum absolute error</th></tr></thead><tbody>
 <tr><td>Trainable affine, epsilon 1e-5</td><td>1.29325175 → 0.00443579</td><td>1.98e-7 / 9.54e-7 / 5.59e-8</td></tr>
 <tr><td>Frozen affine, epsilon 0.03</td><td>1.31046605 → 0.05293253</td><td>8.95e-8 / 6.26e-7 / 3.36e-8</td></tr>
@@ -1074,7 +1115,7 @@ attention tensor, matching the v8 rule. It resolves the inherited attention-rema
 assertion reported in the earlier selective-training sweep.</p>
 <p><strong>This does not yet make the complete Clef head trainable through cke.v8.compile.</strong>
 It extends the existing backend, maps and v8 derivative rules. Remaining work includes head authoring
-into the training IR, noncausal attention, indexed/scoring derivatives, grouped losses and complete
+into the training IR, integration of the certified noncausal attention VJP, indexed/scoring derivatives, grouped losses and complete
 head parameter/optimizer/export comparisons. BF16 head trajectories and LoRA/QLoRA follow that baseline.</p>
 </section>
 
@@ -1265,9 +1306,9 @@ arithmetic in the existing generated native workflow.</p>
 checkpoint/resume and inference-export workflow. Do not add a second model executor.</p>
 <table class="table"><thead><tr><th>Head computation</th><th>Existing implementation</th><th>Missing contract/certification</th></tr></thead><tbody>
 <tr><td>Linear projections, biases</td><td><code>gemm_backward_f32.json</code> maps <code>fc2_backward_kernel</code>; <code>gemm_backward_bf16_mixed</code> exists in <code>gemm_kernels_bf16.c</code>.</td><td>Bind checked head geometry and saved tensors; certify dX, dW and db, selective parameter gradients and accumulation.</td></tr>
-<tr><td>LayerNorm</td><td><code>layernorm_backward_kernel</code> in <code>layernorm_kernels.c</code>; BF16 variant in <code>layernorm_kernels_bf16.c</code>.</td><td>The current checked head forward map is inference-only. Preserve the forward mean/rstd and local epsilon, register the matching backward ABI and compare dX/dGamma/dBeta.</td></tr>
+<tr><td>LayerNorm</td><td><code>layernorm_backward_kernel</code> in <code>layernorm_kernels.c</code>; BF16 variant in <code>layernorm_kernels_bf16.c</code>.</td><td>Cached-statistics training maps and native optimizer composition now pass; wire them into the complete head while preserving operation-local epsilon.</td></tr>
 <tr><td>Erf GELU</td><td>Checked erf derivative now has FP32 VJP and generated-chain evidence; earlier <code>gelu_backward_exact</code> differentiates tanh.</td><td>Wire the erf provider into automatic head backward; BF16 remains separate.</td></tr>
-<tr><td>Unmasked self/cross-attention</td><td><code>attention_backward_causal_head_major_gqa.json</code> and native BF16 causal backward exist.</td><td>Causal attention is not a substitute for full noncausal cross-attention with unequal query/memory counts. Declare saved probabilities/recomputation, layouts and dQ/dK/dV.</td></tr>
+<tr><td>Unmasked self/cross-attention</td><td>Checked FP32 noncausal dQ/dK/dV with ordered oracle, PyTorch autograd and native optimizer composition now pass.</td><td>Integrate the provider into the complete head. Masked and BF16 attention training are separate; existing causal providers are not substitutes.</td></tr>
 <tr><td>Token-span pooling and last-token selection</td><td>Checked span VJP accumulates overlapping spans with generated-chain evidence.</td><td>Wire automatic backward and final-row selection, with explicit accumulation for separate branches.</td></tr>
 <tr><td>Embedding/gather and residual branches</td><td><code>embedding_backward_f32.json</code>, native BF16 embedding scatter, <code>residual_add_backward_f32.json</code>, gradient-accumulation providers.</td><td>Wire type-embedding gradients, indexed-owner scatter and broadcast reductions. Frozen output embeddings need no updates, while required hidden-feature gradient paths remain explicit.</td></tr>
 <tr><td>Grouped softmax-weighted pooling</td><td>Checked options/query VJP covers both score and value paths, unequal and singleton groups.</td><td>Connect to full-head backward synthesis and loss; the tested isolated chain is not head training.</td></tr>
