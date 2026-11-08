@@ -932,6 +932,11 @@ TEST_SUITES = {
         "Checked Integer Span State Copy", "kernels",
         ROOT / "tests" / "test_v8_copy_i32_span_checked.py",
     ),
+    "training_backend_contract": TestSuite(
+        "Training Capability Discovery and Side-Effect-Free Plan Validation", "training",
+        ROOT / "server" / "tests" / "test_training_contract.py",
+        unittest_targets=("server.tests.test_training_contract",),
+    ),
     "decision_evaluate_contract": TestSuite(
         "Decision Evaluation Contract and Independent Simulated Consumer", "inference",
         ROOT / "server" / "tests" / "test_decision_evaluate.py",
