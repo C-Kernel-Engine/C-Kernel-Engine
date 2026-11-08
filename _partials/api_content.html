@@ -4281,7 +4281,7 @@ test_softmax.py::TestSoftmaxForward::test_exact_vs_fast</p>
 
 
 <details open>
-    <summary>Attention (197)</summary>
+    <summary>Attention (199)</summary>
     <div class="accordion-content">
 
 
@@ -5125,6 +5125,16 @@ test_attention.py::TestAttentionForward::test_flash_decode</p>
 
         <div class="card" style="margin-bottom: 1rem;">
             <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">attention_scores</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int attention_scores(const float * q, const float * key, size_t memory_tokens, size_t width, size_t head, size_t dim, float * scores, double * denominator)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">attention_sliding_bounded_checked_f32</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
@@ -5190,6 +5200,16 @@ test_attention.py::TestAttentionForward::test_flash_decode</p>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void ck_attention_causal_f16kv_work(int ith, int nth, void * opaque)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_attention_cross_backward_f32</code>
+                <span class="badge badge-blue" style="margin-left: 0.5rem;">Backward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int ck_attention_cross_backward_f32(const float * query, size_t query_elements, const float * key, size_t key_elements, const float * value, size_t value_elements, const float * d_output, size_t d_output_elements, float * d_query, size_t d_query_elements, float * d_key, size_t d_key_elements, float * d_value, size_t d_value_elements, float * scratch, size_t scratch_elements, size_t query_tokens, size_t memory_tokens, size_t heads, size_t head_dim)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Backward pass / gradient computation</p>
         </div>
 
 

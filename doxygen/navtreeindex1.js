@@ -1,5 +1,7 @@
 var NAVTREEINDEX1 =
 {
+"attention__kernels__sliding_8c.html#a588e0b4751afb347018327d907f28852":[2,0,1,1,9,0],
+"attention__kernels__sliding_8c.html#a5c5b435d153c3e7d24d113374c6a60ab":[2,0,1,1,9,2],
 "attention__kernels__sliding_8c.html#a7d2f80b73d7c7a8c95cd87a05a6c8b8e":[2,0,1,1,9,1],
 "attention__kernels__sliding_8c.html#a95873850abeb008b5b667852e457f507":[2,0,1,1,9,5],
 "attention__kernels__sliding_8c.html#a9d02ee81426f42c962f04362b2e1a138":[2,0,1,1,9,16],
@@ -247,7 +249,5 @@ var NAVTREEINDEX1 =
 "audio__noise__counter_8c.html#af034071a1d0bdf1a6f7b9331d8a60dac":[2,0,1,1,28,0],
 "audio__noise__counter_8c_source.html":[2,0,1,1,28],
 "audio__prosody__upsample__checked_8c.html":[2,0,1,1,29],
-"audio__prosody__upsample__checked_8c.html#a52df11a4d48bdc36f10a9bacba440b18":[2,0,1,1,29,0],
-"audio__prosody__upsample__checked_8c.html#aad1bdd62adfec6d24ed7afe27e19edbc":[2,0,1,1,29,1],
-"audio__prosody__upsample__checked_8c_source.html":[2,0,1,1,29]
+"audio__prosody__upsample__checked_8c.html#a52df11a4d48bdc36f10a9bacba440b18":[2,0,1,1,29,0]
 };

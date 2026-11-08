@@ -137,6 +137,8 @@ $(document).ready(function(){initNavTree('ckernel__head__backward_8h.html',''); 
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="func-members" name="func-members"></a>
 Functions</h2></td></tr>
+<tr class="memitem:a9a8b721e45fc611bb1d13ba8bf42a806" id="r_a9a8b721e45fc611bb1d13ba8bf42a806"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__head__backward_8h.html#a9a8b721e45fc611bb1d13ba8bf42a806">ck_attention_cross_backward_f32</a> (const float *query, size_t query_elements, const float *key, size_t key_elements, const float *value, size_t value_elements, const float *d_output, size_t d_output_elements, float *d_query, size_t d_query_elements, float *d_key, size_t d_key_elements, float *d_value, size_t d_value_elements, float *scratch, size_t scratch_elements, size_t query_tokens, size_t memory_tokens, size_t heads, size_t head_dim)</td></tr>
+<tr class="separator:a9a8b721e45fc611bb1d13ba8bf42a806"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a7d99b72a311398a55492652dcb4b73a2" id="r_a7d99b72a311398a55492652dcb4b73a2"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__head__backward_8h.html#a7d99b72a311398a55492652dcb4b73a2">ck_gelu_erf_backward_bf16</a> (const uint16_t *input, size_t input_elements, size_t input_stride, const uint16_t *d_output, size_t d_output_elements, size_t d_output_stride, uint16_t *d_input, size_t d_input_elements, size_t d_input_stride, float *scratch, size_t scratch_elements, size_t rows, size_t channels)</td></tr>
 <tr class="separator:a7d99b72a311398a55492652dcb4b73a2"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a1d5db8117fd940706459fea847f5300e" id="r_a1d5db8117fd940706459fea847f5300e"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__head__backward_8h.html#a1d5db8117fd940706459fea847f5300e">ck_gelu_erf_backward_f32</a> (const float *input, size_t input_elements, size_t input_stride, const float *d_output, size_t d_output_elements, size_t d_output_stride, float *d_input, size_t d_input_elements, size_t d_input_stride, float *scratch, size_t scratch_elements, size_t rows, size_t channels)</td></tr>
@@ -151,6 +153,227 @@ Functions</h2></td></tr>
 <tr class="separator:ac1eb7292fe2a8641b5ccfea67f400c40"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <h2 class="groupheader">Function Documentation</h2>
+<a id="a9a8b721e45fc611bb1d13ba8bf42a806" name="a9a8b721e45fc611bb1d13ba8bf42a806"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a9a8b721e45fc611bb1d13ba8bf42a806">&#9670;&#160;</a></span>ck_attention_cross_backward_f32()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int ck_attention_cross_backward_f32 </td>
+          <td>(</td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>query</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>query_elements</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>key</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>key_elements</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>value</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>value_elements</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>d_output</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>d_output_elements</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>d_query</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>d_query_elements</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>d_key</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>d_key_elements</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>d_value</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>d_value_elements</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>scratch</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>scratch_elements</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>query_tokens</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>memory_tokens</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>heads</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>head_dim</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="attention__cross__token__major__checked_8c_source.html#l00116">116</a> of file <a class="el" href="attention__cross__token__major__checked_8c_source.html">attention_cross_token_major_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  125</span>                                                                              {</div>
+<div class="line"><span class="lineno">  126</span>    <span class="keywordflow">if</span> (!query_tokens || !memory_tokens || !heads || !head_dim || heads &gt; SIZE_MAX / head_dim) <span class="keywordflow">return</span> -2;</div>
+<div class="line"><span class="lineno">  127</span>    <span class="keywordtype">size_t</span> width = heads * head_dim;</div>
+<div class="line"><span class="lineno">  128</span>    <span class="keywordflow">if</span> (query_tokens &gt; SIZE_MAX / width || memory_tokens &gt; SIZE_MAX / width) <span class="keywordflow">return</span> -2;</div>
+<div class="line"><span class="lineno">  129</span>    <span class="keywordtype">size_t</span> nq = query_tokens * width, nm = memory_tokens * width;</div>
+<div class="line"><span class="lineno">  130</span>    <span class="keywordflow">if</span> (nm &gt; (SIZE_MAX - nq) / 2) <span class="keywordflow">return</span> -2;</div>
+<div class="line"><span class="lineno">  131</span>    <span class="keywordtype">size_t</span> staged = nq + 2 * nm;</div>
+<div class="line"><span class="lineno">  132</span>    <span class="keywordflow">if</span> (memory_tokens &gt; (SIZE_MAX - staged) / 2) <span class="keywordflow">return</span> -2;</div>
+<div class="line"><span class="lineno">  133</span>    <span class="keywordtype">size_t</span> needed = staged + 2 * memory_tokens;</div>
+<div class="line"><span class="lineno">  134</span>    <span class="keywordflow">if</span> (query_elements &lt; nq || key_elements &lt; nm || value_elements &lt; nm ||</div>
+<div class="line"><span class="lineno">  135</span>        d_output_elements &lt; nq || d_query_elements &lt; nq || d_key_elements &lt; nm ||</div>
+<div class="line"><span class="lineno">  136</span>        d_value_elements &lt; nm || scratch_elements &lt; needed) <span class="keywordflow">return</span> -2;</div>
+<div class="line"><span class="lineno">  137</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> *readers[] = {query, key, value, d_output};</div>
+<div class="line"><span class="lineno">  138</span>    <span class="keywordtype">size_t</span> nr[] = {query_elements, key_elements, value_elements, d_output_elements};</div>
+<div class="line"><span class="lineno">  139</span>    <span class="keywordtype">float</span> *writers[] = {d_query, d_key, d_value, scratch};</div>
+<div class="line"><span class="lineno">  140</span>    <span class="keywordtype">size_t</span> nw[] = {d_query_elements, d_key_elements, d_value_elements, scratch_elements};</div>
+<div class="line"><span class="lineno">  141</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; 4; ++i) {</div>
+<div class="line"><span class="lineno">  142</span>        <span class="keywordflow">if</span> (!<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(readers[i], nr[i]) || !<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(writers[i], nw[i])) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  143</span>    }</div>
+<div class="line"><span class="lineno">  144</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; 4; ++i) {</div>
+<div class="line"><span class="lineno">  145</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> j = 0; j &lt; 4; ++j)</div>
+<div class="line"><span class="lineno">  146</span>            <span class="keywordflow">if</span> (<a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(writers[i], nw[i], readers[j], nr[j])) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  147</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> j = 0; j &lt; i; ++j)</div>
+<div class="line"><span class="lineno">  148</span>            <span class="keywordflow">if</span> (<a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(writers[i], nw[i], writers[j], nw[j])) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  149</span>    }</div>
+<div class="line"><span class="lineno">  150</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a>(query, nq) || !<a class="code hl_function" href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a>(key, nm) ||</div>
+<div class="line"><span class="lineno">  151</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a>(value, nm) || !<a class="code hl_function" href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a>(d_output, nq)) <span class="keywordflow">return</span> -3;</div>
+<div class="line"><span class="lineno">  152</span>    <span class="keywordtype">float</span> *dq = scratch, *dk = dq + nq, *dv = dk + nm;</div>
+<div class="line"><span class="lineno">  153</span>    <span class="keywordtype">float</span> *scores = dv + nm, *ds = scores + memory_tokens;</div>
+<div class="line"><span class="lineno">  154</span>    memset(scratch, 0, staged * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  155</span>    <span class="keywordtype">double</span> scale = 1.0 / sqrt((<span class="keywordtype">double</span>)head_dim);</div>
+<div class="line"><span class="lineno">  156</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> t = 0; t &lt; query_tokens; ++t) {</div>
+<div class="line"><span class="lineno">  157</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> h = 0; h &lt; heads; ++h) {</div>
+<div class="line"><span class="lineno">  158</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *q = query + t * width + h * head_dim;</div>
+<div class="line"><span class="lineno">  159</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *dy = d_output + t * width + h * head_dim;</div>
+<div class="line"><span class="lineno">  160</span>            <span class="keywordtype">double</span> denominator;</div>
+<div class="line"><span class="lineno">  161</span>            <span class="keywordflow">if</span> (<a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a50e5e3660a1eef3fed506ae08274bf15">attention_scores</a>(q, key, memory_tokens, width, h, head_dim, scores, &amp;denominator)) <span class="keywordflow">return</span> -4;</div>
+<div class="line"><span class="lineno">  162</span>            <span class="keywordtype">double</span> weighted = 0.0;</div>
+<div class="line"><span class="lineno">  163</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> k = 0; k &lt; memory_tokens; ++k) {</div>
+<div class="line"><span class="lineno">  164</span>                <span class="keywordtype">double</span> dp = <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a>(dy, value + k * width + h * head_dim, head_dim);</div>
+<div class="line"><span class="lineno">  165</span>                <span class="keyword">volatile</span> <span class="keywordtype">double</span> term = ((double)scores[k] / denominator) * dp;</div>
+<div class="line"><span class="lineno">  166</span>                weighted += term;</div>
+<div class="line"><span class="lineno">  167</span>            }</div>
+<div class="line"><span class="lineno">  168</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> k = 0; k &lt; memory_tokens; ++k) {</div>
+<div class="line"><span class="lineno">  169</span>                <span class="keywordtype">double</span> dp = <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a>(dy, value + k * width + h * head_dim, head_dim);</div>
+<div class="line"><span class="lineno">  170</span>                <span class="keywordtype">double</span> result = ((double)scores[k] / denominator) * (dp - weighted) * scale;</div>
+<div class="line"><span class="lineno">  171</span>                <span class="keywordflow">if</span> (!isfinite(result) || fabs(result) &gt; FLT_MAX) <span class="keywordflow">return</span> -4;</div>
+<div class="line"><span class="lineno">  172</span>                ds[k] = (float)result;</div>
+<div class="line"><span class="lineno">  173</span>            }</div>
+<div class="line"><span class="lineno">  174</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> d = 0; d &lt; head_dim; ++d) {</div>
+<div class="line"><span class="lineno">  175</span>                <span class="keywordtype">double</span> sum = 0.0;</div>
+<div class="line"><span class="lineno">  176</span>                <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> k = 0; k &lt; memory_tokens; ++k) {</div>
+<div class="line"><span class="lineno">  177</span>                    <span class="keyword">volatile</span> <span class="keywordtype">double</span> term = (double)ds[k] * (<span class="keywordtype">double</span>)key[k * width + h * head_dim + d];</div>
+<div class="line"><span class="lineno">  178</span>                    sum += term;</div>
+<div class="line"><span class="lineno">  179</span>                }</div>
+<div class="line"><span class="lineno">  180</span>                <span class="keywordflow">if</span> (!isfinite(sum) || fabs(sum) &gt; FLT_MAX) <span class="keywordflow">return</span> -4;</div>
+<div class="line"><span class="lineno">  181</span>                dq[t * width + h * head_dim + d] = (float)sum;</div>
+<div class="line"><span class="lineno">  182</span>            }</div>
+<div class="line"><span class="lineno">  183</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> k = 0; k &lt; memory_tokens; ++k) {</div>
+<div class="line"><span class="lineno">  184</span>                <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> d = 0; d &lt; head_dim; ++d) {</div>
+<div class="line"><span class="lineno">  185</span>                    <span class="keywordtype">size_t</span> index = k * width + h * head_dim + d;</div>
+<div class="line"><span class="lineno">  186</span>                    <span class="keyword">volatile</span> <span class="keywordtype">double</span> kp = (double)ds[k] * (<span class="keywordtype">double</span>)q[d];</div>
+<div class="line"><span class="lineno">  187</span>                    <span class="keyword">volatile</span> <span class="keywordtype">double</span> vp = ((double)scores[k] / denominator) * (double)dy[d];</div>
+<div class="line"><span class="lineno">  188</span>                    <span class="keywordtype">double</span> kg = (double)dk[index] + kp, vg = (<span class="keywordtype">double</span>)dv[index] + vp;</div>
+<div class="line"><span class="lineno">  189</span>                    <span class="keywordflow">if</span> (!isfinite(kg) || !isfinite(vg) || fabs(kg) &gt; FLT_MAX || fabs(vg) &gt; FLT_MAX) <span class="keywordflow">return</span> -4;</div>
+<div class="line"><span class="lineno">  190</span>                    dk[index] = (float)kg;</div>
+<div class="line"><span class="lineno">  191</span>                    dv[index] = (float)vg;</div>
+<div class="line"><span class="lineno">  192</span>                }</div>
+<div class="line"><span class="lineno">  193</span>            }</div>
+<div class="line"><span class="lineno">  194</span>        }</div>
+<div class="line"><span class="lineno">  195</span>    }</div>
+<div class="line"><span class="lineno">  196</span>    memcpy(d_query, dq, nq * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  197</span>    memcpy(d_key, dk, nm * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  198</span>    memcpy(d_value, dv, nm * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  199</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  200</span>}</div>
+<div class="ttc" id="aattention__cross__token__major__checked_8c_html_a50e5e3660a1eef3fed506ae08274bf15"><div class="ttname"><a href="attention__cross__token__major__checked_8c.html#a50e5e3660a1eef3fed506ae08274bf15">attention_scores</a></div><div class="ttdeci">static int attention_scores(const float *q, const float *key, size_t memory_tokens, size_t width, size_t head, size_t dim, float *scores, double *denominator)</div><div class="ttdef"><b>Definition</b> <a href="attention__cross__token__major__checked_8c_source.html#l00031">attention_cross_token_major_checked.c:31</a></div></div>
+<div class="ttc" id="aattention__cross__token__major__checked_8c_html_a8645ebc14bd224f816fa123347a1e15e"><div class="ttname"><a href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a></div><div class="ttdeci">static double dot(const float *a, const float *b, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="attention__cross__token__major__checked_8c_source.html#l00021">attention_cross_token_major_checked.c:21</a></div></div>
+<div class="ttc" id="achecked__float__buffer_8h_html_a1b266161b71bde9ca8d45c2fb5ac889a"><div class="ttname"><a href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a></div><div class="ttdeci">static int ck_checked_finite(const float *ptr, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00019">checked_float_buffer.h:19</a></div></div>
+<div class="ttc" id="achecked__float__buffer_8h_html_ada07e31487d86edb37408386003ac841"><div class="ttname"><a href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a></div><div class="ttdeci">static int ck_checked_region(const float *ptr, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00011">checked_float_buffer.h:11</a></div></div>
+<div class="ttc" id="achecked__float__buffer_8h_html_af87b7012571dc9a40b8e31c52e773abe"><div class="ttname"><a href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a></div><div class="ttdeci">static int ck_checked_overlap(const float *a, size_t na, const float *b, size_t nb)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00015">checked_float_buffer.h:15</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="attention__cross__token__major__checked_8c_source.html#l00031">attention_scores()</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00019">ck_checked_finite()</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00015">ck_checked_overlap()</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00011">ck_checked_region()</a>, and <a class="el" href="attention__cross__token__major__checked_8c_source.html#l00021">dot()</a>.</p>
+
+</div>
+</div>
 <a id="a7d99b72a311398a55492652dcb4b73a2" name="a7d99b72a311398a55492652dcb4b73a2"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a7d99b72a311398a55492652dcb4b73a2">&#9670;&#160;</a></span>ck_gelu_erf_backward_bf16()</h2>
 
