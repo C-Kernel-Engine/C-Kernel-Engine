@@ -20,13 +20,18 @@ def observe(value,*,worker_boot_id,owner,job_id,plan_sha256,experiment_id,draft_
     check(j['status'] in ('queued','running','succeeded','failed','recovery_required'))
     check(j['stage']=={'queued':'admission','running':'workflow','succeeded':'complete','failed':'complete','recovery_required':'unknown'}[j['status']])
     check(j['execution_kind']=='native_generated_workflow' or (allow_simulation and j['execution_kind']=='contract_simulation'))
-    check(j['progress'] is None and j['metrics']==[]) # not zero-filled or fabricated
+    check(j['progress'] is None and type(j['metrics']) is list and len(j['metrics'])<=2)
+    for metric in j['metrics']:
+        check(type(metric) is dict and set(metric)=={'name','step','step_kind','value','unit','observed_at'})
+        check(metric['name'] in ('training_cross_entropy','validation_cross_entropy') and type(metric['step']) is int and metric['step']>=2 and metric['step_kind']=='epoch' and metric['unit']=='nats/token')
+        check(type(metric['value']) in (int,float) and math.isfinite(metric['value']) and metric['value']>=0)
+        check(type(metric['observed_at']) in (int,float) and j['created_at']<=metric['observed_at']<=value['observed_at'])
     check(type(j['artifacts']) is list and len(j['artifacts'])<=16)
     ids=[]
     for a in j['artifacts']:
         check(type(a) is dict and set(a)=={'artifact_id','type','bytes','sha256'})
         check(hexid(a['artifact_id'],32) and hexid(a['sha256'],64) and type(a['bytes']) is int and 0<a['bytes']<=16*1024**2)
-        check(a['type'] in ('execution_plan','training_report','checkpoint_manifest'));ids.append(a['artifact_id'])
+        check(a['type'] in ('execution_plan','training_report','checkpoint_manifest','training_plan','training_pipeline'));ids.append(a['artifact_id'])
     check(len(ids)==len(set(ids)))
     if j['status']=='succeeded':check(j['error_code'] is None and {'training_report','execution_plan'}<={a['type'] for a in j['artifacts']})
     elif j['status'] in ('failed','recovery_required'):check(type(j['error_code']) is str and bool(j['error_code']))

@@ -18,6 +18,7 @@ class SimulatedJobs(Jobs):
     def _execute(self,command,folder):
         self.calls+=1
         checks={k:{'passed':True} for k in ('learning','pytorch_trajectory','fresh_process_resume','checkpoint_compatibility','inference_export','runtime_provenance','training_ir_visualizer')}
+        checks['learning'].update(last_epoch_loss=1.0,heldout_loss_after=1.5)
         atomic_json(folder/'report.json',dict(status='PASS',passed=True,checks=checks,evidence='contract_simulation'))
         return 0
 
@@ -71,6 +72,17 @@ class TrainingJobsTest(unittest.TestCase):
         p2=self.prepare();j2=self.jobs.submit('alice',p2['plan_sha256'],'fail',start=False)['job']
         with patch.object(self.jobs,'_execute',return_value=0):self.jobs.run_job('alice',j2['job_id'])
         self.assertEqual(self.jobs.observe('alice',j2['job_id'])['job']['status'],'failed')
+    def test_incomplete_success_report_and_completed_restart(self):
+        p=self.prepare();j=self.jobs.submit('alice',p['plan_sha256'],'bad-report',start=False)['job']
+        def incomplete(command,folder):atomic_json(folder/'report.json',dict(status='PASS',passed=True,checks={}));return 0
+        with patch.object(self.jobs,'_execute',incomplete):self.jobs.run_job('alice',j['job_id'])
+        self.assertEqual(self.jobs.observe('alice',j['job_id'])['job']['status'],'failed')
+        good=self.jobs.submit('alice',p['plan_sha256'],'good-report',start=False)['job'];self.jobs.run_job('alice',good['job_id'])
+        self.jobs.close();self.jobs=SimulatedJobs(Path(self.tmp.name)/'store',principals={'alice','bob'})
+        self.assertEqual(self.jobs.observe('alice',good['job_id'])['job']['status'],'succeeded')
+        self.assertEqual(self.jobs.submit('alice',p['plan_sha256'],'good-report')['job']['job_id'],good['job_id'])
+        self.assertEqual(self.jobs.calls,0)
+
     def test_recheck_before_execute_and_reject_changed_plan(self):
         p=self.prepare();j=self.jobs.submit('alice',p['plan_sha256'],'key',start=False)['job']
         with patch.object(self.jobs.backend,'capabilities',return_value={'sha256':'0'*64}):self.jobs.run_job('alice',j['job_id'])
@@ -112,5 +124,14 @@ class IndependentJobConsumerTest(unittest.TestCase):
                 broken=copy.deepcopy(done);broken['job']['artifacts']=[]
                 with self.assertRaises(InvalidObservation):observe(broken,**expected)
             finally:jobs.close()
+
+class RealSvgJobTest(unittest.TestCase):
+    def test_generated_workflow_job(self):
+        if os.environ.get('CKE_RUN_SVG_JOB_ACCEPTANCE')!='1':self.skipTest('real generated SVG job disabled: NOT_TESTED')
+        from version.v8.scripts.run_svg_job_acceptance_v8 import run
+        import sys
+        with tempfile.TemporaryDirectory() as tmp:
+            result=run(Path(tmp)/'store',sys.executable)
+            self.assertEqual(result['job']['status'],'succeeded');self.assertTrue(result['duplicate_same_job'])
 
 if __name__=='__main__':unittest.main()

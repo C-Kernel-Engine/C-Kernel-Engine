@@ -8,6 +8,7 @@ import copy
 import fcntl
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import signal
@@ -67,7 +68,7 @@ class Jobs:
     def capabilities(self,principal):
         self._auth(principal)
         return dict(schema='cke.training.jobs.v1',worker_boot_id=self.backend.boot,validation=self.backend.capabilities(),
-                    execution='opt_in_local_svg',operations=['prepare','submit','observe','artifact'],cancel='unsupported',
+                    execution='opt_in_local_svg',operations=['discover','prepare','submit','observe','artifact'],cancel='unsupported',
                     limits=dict(active_jobs=1,queued_backlog=0,registered_jobs=32,plan_receipts=128,log_bytes=1048576,artifact_chunk_bytes=8192,wall_seconds=600),
                     authorization='trusted_local_caller; no network authentication',resources='disk_checked; one local slot; no global reservation')
     def prepare(self,principal,config,experiment_id,draft_revision):
@@ -175,10 +176,25 @@ class Jobs:
             checks=report.get('checks',{})
             passed=(rc==0 and report.get('passed') is True and report.get('status')=='PASS' and required<=checks.keys() and all(type(v) is dict and v.get('passed') is True for v in checks.values()))
             artifacts=[]
-            for name,kind in [('validated_plan.json','execution_plan'),('report.json','training_report')]:
-                path=folder/name;artifacts.append(dict(artifact_id=uuid.uuid4().hex,type=kind,bytes=path.stat().st_size,sha256=file_hash(path),file=name))
+            files=[('validated_plan.json','execution_plan'),('report.json','training_report')]
+            for name,kind in [('run/training_plan.json','training_plan'),('run/training_pipeline_latest.json','training_pipeline')]:
+                if (folder/name).is_file():files.append((name,kind))
+            checkpoint=report.get('artifacts',{}).get('checkpoint')
+            if checkpoint:
+                path=Path(checkpoint)/'checkpoint.json'
+                require(path.resolve().is_relative_to(folder.resolve()) and path.is_file(),'INVALID_CHECKPOINT_ARTIFACT')
+                files.append((str(path.relative_to(folder)),'checkpoint_manifest'))
+            for name,kind in files:
+                path=folder/name
+                require(not path.is_symlink() and path.resolve().is_relative_to(folder.resolve()) and 0<path.stat().st_size<=16*1024**2,'INVALID_ARTIFACT')
+                artifacts.append(dict(artifact_id=uuid.uuid4().hex,type=kind,bytes=path.stat().st_size,sha256=file_hash(path),file=name))
+            metrics=[];observed=time.time()
+            for source,name in [('last_epoch_loss','training_cross_entropy'),('heldout_loss_after','validation_cross_entropy')]:
+                value=checks.get('learning',{}).get(source)
+                if type(value) in (float,int) and math.isfinite(value):
+                    metrics.append(dict(name=name,step=plan['validation_plan']['config']['epochs'],step_kind='epoch',value=value,unit='nats/token',observed_at=observed))
             with self.guard,self.db:
-                j=self._read(principal,job_id);j.update(status='succeeded' if passed else 'failed',stage='complete',updated_at=time.time(),error_code=None if passed else 'WORKFLOW_CERTIFICATION_FAILED',artifacts=artifacts);self._save(j)
+                j=self._read(principal,job_id);j.update(status='succeeded' if passed else 'failed',stage='complete',updated_at=time.time(),error_code=None if passed else 'WORKFLOW_CERTIFICATION_FAILED',artifacts=artifacts,metrics=metrics);self._save(j)
         except Exception as exc:
             code=str(exc) if isinstance(exc,JobError) else 'EXECUTION_FAILED'
             with self.guard,self.db:
