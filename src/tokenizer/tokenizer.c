@@ -326,9 +326,102 @@ CKSpacePrefixStyle ck_tokenizer_detect_space_prefix_style(CKTokenizer *tok) {
     return detected;
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+ * RWKV World tokenizer (byte-level greedy longest-match)
+ *
+ * RWKV World tokenizer.json files carry a WordPiece-shaped vocabulary whose
+ * pieces are GPT-2 ByteLevel strings. The reference implementation decodes
+ * each piece back to raw bytes, builds a byte trie, and encodes UTF-8 input
+ * with greedy longest-match (no BOS/EOS, no pretokenizer, no normalization).
+ *
+ * The vocabulary is stored in its ByteLevel form, which never contains NUL,
+ * so the existing CKTrie can be used directly. Input bytes are mapped to the
+ * same representation before matching, and decode reverses the mapping at the
+ * codepoint level.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+static bool rwkv_byte_is_identity(unsigned int byte) {
+    return (byte >= 0x21u && byte <= 0x7Eu) ||
+           (byte >= 0xA1u && byte <= 0xACu) ||
+           (byte >= 0xAEu && byte <= 0xFFu);
+}
+
+/* Number of non-identity bytes below `byte` (byte < 256). */
+static unsigned int rwkv_non_identity_rank(unsigned int byte) {
+    unsigned int rank = 0;
+    for (unsigned int candidate = 0; candidate < byte; candidate++) {
+        if (!rwkv_byte_is_identity(candidate)) rank++;
+    }
+    return rank;
+}
+
+/* Encode one raw byte as its GPT-2 ByteLevel codepoint (1-2 UTF-8 bytes). */
+static int rwkv_byte_to_utf8(unsigned char byte, char out[2]) {
+    unsigned int cp = rwkv_byte_is_identity(byte)
+        ? (unsigned int)byte
+        : 0x100u + rwkv_non_identity_rank(byte);
+    if (cp < 0x80u) {
+        out[0] = (char)cp;
+        return 1;
+    }
+    out[0] = (char)(0xC0u | (cp >> 6));
+    out[1] = (char)(0x80u | (cp & 0x3Fu));
+    return 2;
+}
+
+/* Map a ByteLevel codepoint back to a raw byte. Returns false when the
+ * codepoint is not part of the GPT-2 ByteLevel image (EOS, placeholders). */
+static bool rwkv_utf8_to_byte(unsigned int cp, unsigned char *byte) {
+    if ((cp >= 0x21u && cp <= 0x7Eu) ||
+        (cp >= 0xA1u && cp <= 0xACu) ||
+        (cp >= 0xAEu && cp <= 0xFFu)) {
+        *byte = (unsigned char)cp;
+        return true;
+    }
+    if (cp >= 0x100u && cp <= 0x143u) {
+        unsigned int want = cp - 0x100u;
+        unsigned int rank = 0;
+        for (unsigned int candidate = 0; candidate < 256u; candidate++) {
+            if (rwkv_byte_is_identity(candidate)) continue;
+            if (rank == want) {
+                *byte = (unsigned char)candidate;
+                return true;
+            }
+            rank++;
+        }
+    }
+    return false;
+}
+
+/* Encode a raw UTF-8 byte string into its GPT-2 ByteLevel representation. */
+static char *rwkv_bytelevel_encode(const char *text, size_t text_len, size_t *out_len) {
+    if (!text || text_len > (SIZE_MAX - 1) / 2) return NULL;
+    size_t capacity = text_len * 2 + 1;
+    char *encoded = (char *)malloc(capacity);
+    if (!encoded) return NULL;
+    size_t len = 0;
+    for (size_t i = 0; i < text_len; i++) {
+        char pair[2];
+        int n = rwkv_byte_to_utf8((unsigned char)text[i], pair);
+        memcpy(encoded + len, pair, (size_t)n);
+        len += (size_t)n;
+    }
+    encoded[len] = '\0';
+    if (out_len) *out_len = len;
+    return encoded;
+}
+
 /* Look up token ID */
 int32_t ck_tokenizer_lookup(const CKTokenizer *tok, const char *token) {
     if (!tok || !token) return -1;
+    if (tok->config.type == CK_TOKENIZER_RWKV_WORLD_TRIE) {
+        size_t encoded_len = 0;
+        char *encoded = rwkv_bytelevel_encode(token, strlen(token), &encoded_len);
+        if (!encoded) return tok->unk_id;
+        TokenInfo *info = (TokenInfo *)ck_tokenizer_hash_table_lookup(tok->vocab, encoded);
+        free(encoded);
+        return info ? info->id : tok->unk_id;
+    }
     TokenInfo *info = (TokenInfo *)ck_tokenizer_hash_table_lookup(tok->vocab, token);
     return info ? info->id : tok->unk_id;
 }
@@ -432,10 +525,79 @@ static int preprocess_bpe_spaces(const char *text, int text_len, char *out, int 
     return out_len;
 }
 
+/* Encode UTF-8 text with byte-level greedy longest-match (RWKV World). */
+static int rwkv_world_trie_encode(const CKTokenizer *tok, const char *text,
+                                  int text_len, int32_t *ids, int max_ids) {
+    if (!tok || !tok->vocab_trie || !text || !ids || max_ids <= 0 || text_len < 0) {
+        return 0;
+    }
+    if (text_len == 0) return 0;
+
+    size_t encoded_len = 0;
+    char *encoded = rwkv_bytelevel_encode(text, (size_t)text_len, &encoded_len);
+    if (!encoded) return 0;
+
+    int out_idx = 0;
+    size_t pos = 0;
+    while (pos < encoded_len && out_idx < max_ids) {
+        size_t match_len = 0;
+        int32_t id = ck_trie_find_longest(tok->vocab_trie, encoded, encoded_len, pos, &match_len);
+        if (match_len == 0) {
+            /* Singleton-byte invariant: skip one codepoint, not one byte. */
+            int char_len = ck_utf8_char_length((unsigned char)encoded[pos]);
+            pos += char_len > 0 ? (size_t)char_len : 1;
+            continue;
+        }
+        ids[out_idx++] = id >= 0 ? id : tok->unk_id;
+        pos += match_len;
+    }
+
+    free(encoded);
+    return out_idx;
+}
+
+/* Decode RWKV World token IDs back to raw UTF-8 text. */
+static int rwkv_world_trie_decode(const CKTokenizer *tok, const int32_t *ids,
+                                  int num_ids, char *text, int max_len) {
+    if (!tok || !ids || !text || max_len <= 0) return 0;
+    int len = 0;
+    for (int i = 0; i < num_ids; i++) {
+        int32_t id = ids[i];
+        if (id < 0) continue;
+        const char *token = ck_tokenizer_id_to_token(tok, id);
+        if (!token) continue;
+        const char *cursor = token;
+        while (*cursor) {
+            int char_len = 0;
+            int32_t cp = ck_utf8_next_char(&cursor, &char_len);
+            unsigned char byte = 0;
+            if (cp >= 0 && rwkv_utf8_to_byte((unsigned int)cp, &byte)) {
+                if (len >= max_len - 1) break;
+                text[len++] = (char)byte;
+            } else {
+                /* Codepoints outside the ByteLevel image (EOS token,
+                 * placeholders) keep their original UTF-8 bytes, matching
+                 * the reference tokenizer's raw-token fallback. */
+                const char *start = cursor - char_len;
+                for (int j = 0; j < char_len && len < max_len - 1; j++) {
+                    text[len++] = start[j];
+                }
+            }
+        }
+    }
+    text[len] = '\0';
+    return len;
+}
+
 /* Encode text to token IDs using greedy longest-match or Viterbi for SPM */
 int ck_tokenizer_encode(const CKTokenizer *tok, const char *text, int text_len, int32_t *ids, int max_ids) {
     if (!tok || !text || !ids || max_ids <= 0) return 0;
     if (text_len < 0) text_len = (int)strlen(text);
+
+    /* RWKV World uses its own byte-level trie path. */
+    if (tok->config.type == CK_TOKENIZER_RWKV_WORLD_TRIE) {
+        return rwkv_world_trie_encode(tok, text, text_len, ids, max_ids);
+    }
 
     /* SentencePiece implementation lives in tokenizer_spm.c */
     if (tok->config.type == CK_TOKENIZER_SPM) {
@@ -493,6 +655,9 @@ int ck_tokenizer_encode(const CKTokenizer *tok, const char *text, int text_len, 
 /* Decode token IDs to text */
 int ck_tokenizer_decode(const CKTokenizer *tok, const int32_t *ids, int num_ids, char *text, int max_len) {
     if (!tok || !ids || !text || max_len <= 0) return 0;
+    if (tok->config.type == CK_TOKENIZER_RWKV_WORLD_TRIE) {
+        return rwkv_world_trie_decode(tok, ids, num_ids, text, max_len);
+    }
     int len = 0;
     for (int i = 0; i < num_ids; i++) {
         int32_t id = ids[i];

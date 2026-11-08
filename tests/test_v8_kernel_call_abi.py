@@ -165,9 +165,34 @@ class V8KernelCallABITests(unittest.TestCase):
         self.assertEqual(circuit["projection_inputs"]["rwkv7_k_proj"]["A"], "xk_lane")
         self.assertEqual(circuit["projection_inputs"]["rwkv7_v_proj"]["A"], "xv_lane")
 
-    def test_unimplemented_trie_tokenizer_fails_before_emitting_c(self) -> None:
-        with self.assertRaisesRegex(ValueError, "native longest-match encoding is not implemented"):
-            build_ir_v8._generate_tokenizer_c_code("rwkv_world_trie", 65536, 0)
+    def test_rwkv_world_trie_tokenizer_emits_native_longest_match_backend(self) -> None:
+        generated = build_ir_v8._generate_tokenizer_c_code(
+            "rwkv_world_trie",
+            65536,
+            0,
+            special_tokens={
+                "eos_token_id": 0,
+                "unk_token_id": 0,
+                "pad_token_id": 0,
+            },
+        )
+        self.assertIsNotNone(generated)
+        self.assertEqual(generated["type"], "rwkv_world_trie")
+        self.assertEqual(
+            generated["struct_field"], "CKTokenizer *tokenizer;    /* RWKV World trie tokenizer */"
+        )
+        init = str(generated["init"])
+        self.assertIn("CK_TOKENIZER_RWKV_WORLD_TRIE", init)
+        self.assertIn("ck_tokenizer_set_use_trie(g_model->tokenizer, true)", init)
+        self.assertIn("ck_tokenizer_set_add_bos_eos(g_model->tokenizer, false, false)", init)
+        self.assertIn("ck_tokenizer_load_binary(", init)
+        self.assertIn("W_VOCAB_OFFSETS", init)
+        self.assertIn("W_VOCAB_STRINGS", init)
+        self.assertIn("ck_tokenizer_set_special_ids(", init)
+        api = str(generated["api_functions"])
+        self.assertIn("ck_tokenizer_encode(", api)
+        self.assertIn("ck_tokenizer_decode(", api)
+        self.assertIn("ck_model_encode_text", api)
 
     def test_lowered_scalar_booleans_are_valid_c_expressions(self) -> None:
         self.assertEqual(build_ir_v8._c_scalar_expr(True), "1")

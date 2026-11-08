@@ -3158,16 +3158,7 @@ def test_rwkv7_config_builder_rejects_rank_shape_mismatch(tmp_path: Path) -> Non
 
 def test_rwkv7_tokenizer_contract_declares_world_trie(tmp_path: Path) -> None:
     converter = _load_converter()
-    tokenizer = {
-        "model": {
-            "type": "WordPiece",
-            "vocab": {token: index for index, token in enumerate("abcd")},
-        }
-    }
-    (tmp_path / "tokenizer.json").write_text(json.dumps(tokenizer), encoding="utf-8")
-    (tmp_path / "tokenizer_config.json").write_text(
-        json.dumps({"backend": "rwkv_world_trie"}), encoding="utf-8"
-    )
+    _write_rwkv7_synthetic_tokenizer(tmp_path, 4)
 
     payloads, contract, _special = converter._tokenizer_payloads_from_json(
         tmp_path, 4
@@ -3179,6 +3170,88 @@ def test_rwkv7_tokenizer_contract_declares_world_trie(tmp_path: Path) -> None:
     assert contract["vocab_source_type"] == "wordpiece"
     payload_names = {name for name, *_rest in payloads}
     assert {"vocab_offsets", "vocab_strings"} <= payload_names
+
+
+def _rwkv7_full_byte_vocab(*, omit_byte: int | None = None) -> dict[str, int]:
+    converter = _load_converter()
+    decoder = converter._rwkv_world_byte_decoder()
+    encoder = {byte: character for character, byte in decoder.items()}
+    tokens = ["<|endoftext|>"] + [
+        encoder[byte] for byte in range(256) if byte != omit_byte
+    ]
+    return {token: index for index, token in enumerate(tokens)}
+
+
+def _write_rwkv7_tokenizer_document(tmp_path: Path, vocab: dict[str, int]) -> None:
+    (tmp_path / "tokenizer.json").write_text(
+        json.dumps({
+            "normalizer": None,
+            "pre_tokenizer": {
+                "type": "ByteLevel",
+                "add_prefix_space": False,
+                "use_regex": False,
+            },
+            "decoder": {"type": "ByteLevel"},
+            "model": {
+                "type": "WordPiece",
+                "unk_token": "<|endoftext|>",
+                "continuing_subword_prefix": "",
+                "vocab": vocab,
+            },
+        }),
+        encoding="utf-8",
+    )
+    (tmp_path / "tokenizer_config.json").write_text(
+        json.dumps({"backend": "rwkv_world_trie"}), encoding="utf-8"
+    )
+
+
+def test_rwkv7_tokenizer_validation_accepts_full_byte_vocab(tmp_path: Path) -> None:
+    converter = _load_converter()
+    vocab = _rwkv7_full_byte_vocab()
+    _write_rwkv7_tokenizer_document(tmp_path, vocab)
+
+    payloads, contract, _special = converter._tokenizer_payloads_from_json(
+        tmp_path, len(vocab)
+    )
+    assert contract is not None
+    assert contract["tokenizer_type"] == "rwkv_world_trie"
+    assert {name for name, *_rest in payloads} >= {"vocab_offsets", "vocab_strings"}
+
+
+def test_rwkv7_tokenizer_validation_rejects_missing_singleton_byte(
+    tmp_path: Path,
+) -> None:
+    converter = _load_converter()
+    vocab = _rwkv7_full_byte_vocab(omit_byte=0x00)
+    _write_rwkv7_tokenizer_document(tmp_path, vocab)
+
+    with pytest.raises(SystemExit, match="missing singleton bytes"):
+        converter._tokenizer_payloads_from_json(tmp_path, len(vocab))
+
+
+def test_rwkv7_tokenizer_validation_rejects_non_bytelevel_piece(
+    tmp_path: Path,
+) -> None:
+    converter = _load_converter()
+    vocab = {"<|endoftext|>": 0, "A": 1, "\u2603": 2}
+    _write_rwkv7_tokenizer_document(tmp_path, vocab)
+
+    with pytest.raises(SystemExit, match="not ByteLevel encoded"):
+        converter._tokenizer_payloads_from_json(tmp_path, len(vocab))
+
+
+def test_rwkv7_tokenizer_validation_rejects_prefix_rank_inversion(
+    tmp_path: Path,
+) -> None:
+    converter = _load_converter()
+    # "A" (id 2) is a proper prefix of "AB" (id 1); the reference "highest id"
+    # rule would stop at "A", so greedy longest-match is not equivalent.
+    vocab = {"<|endoftext|>": 0, "AB": 1, "A": 2}
+    _write_rwkv7_tokenizer_document(tmp_path, vocab)
+
+    with pytest.raises(SystemExit, match="longest-match encoding"):
+        converter._tokenizer_payloads_from_json(tmp_path, len(vocab))
 
 
 def test_rwkv7_circuit_declares_ln0_header_and_provider_contracts() -> None:
@@ -3486,10 +3559,7 @@ def test_rwkv7_real_conversion_preserves_nonzero_weights(tmp_path):
                   head_size=4, num_heads=2, hidden_ratio=4, vocab_size=16,
                   decay_rank=2, key_rank=2, value_rank=2, gate_rank=2)
     (checkpoint / "config.json").write_text(json.dumps(config))
-    (checkpoint / "tokenizer.json").write_text(json.dumps({
-        "model": {"type": "WordPiece", "vocab": {chr(65+i): i for i in range(16)}}}))
-    (checkpoint / "tokenizer_config.json").write_text(
-        json.dumps({"backend": "rwkv_world_trie"}))
+    _write_rwkv7_synthetic_tokenizer(checkpoint, 16)
     tensors = {}
     for index, name in enumerate(sorted(_rwkv7_inventory_names(2))):
         shape = (8,)
@@ -3541,6 +3611,33 @@ def test_rwkv7_missing_required_weight_fails_closed(missing):
         converter._refs_from_safetensors_contract("rwkv7", {"num_layers": 2}, headers)
 
 
+def _write_rwkv7_synthetic_tokenizer(
+    directory: Path, vocab: int = 16, *, backend: str = "rwkv_world_trie"
+) -> None:
+    tokens = ["<|endoftext|>"] + [chr(ord("A") + index) for index in range(vocab - 1)]
+    (directory / "tokenizer.json").write_text(
+        json.dumps({
+            "normalizer": None,
+            "pre_tokenizer": {
+                "type": "ByteLevel",
+                "add_prefix_space": False,
+                "use_regex": False,
+            },
+            "decoder": {"type": "ByteLevel"},
+            "model": {
+                "type": "WordPiece",
+                "unk_token": "<|endoftext|>",
+                "continuing_subword_prefix": "",
+                "vocab": {token: index for index, token in enumerate(tokens)},
+            },
+        }),
+        encoding="utf-8",
+    )
+    (directory / "tokenizer_config.json").write_text(
+        json.dumps({"backend": backend}), encoding="utf-8"
+    )
+
+
 def _write_rwkv7_synthetic_checkpoint(
     tmp_path: Path,
     *,
@@ -3575,11 +3672,7 @@ def _write_rwkv7_synthetic_checkpoint(
         for rank_key in ("decay_rank", "key_rank", "value_rank", "gate_rank"):
             config.pop(rank_key, None)
     (checkpoint / "config.json").write_text(json.dumps(config))
-    (checkpoint / "tokenizer.json").write_text(json.dumps({
-        "model": {"type": "WordPiece",
-                  "vocab": {chr(65 + i): i for i in range(vocab)}}}))
-    (checkpoint / "tokenizer_config.json").write_text(
-        json.dumps({"backend": "rwkv_world_trie"}))
+    _write_rwkv7_synthetic_tokenizer(checkpoint, vocab)
 
     tensors = {}
     rank_for = {".w1": ranks[0], ".w2": ranks[0],

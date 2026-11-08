@@ -450,11 +450,15 @@ make v8-training-python-authoring-smoke
         <strong>RWKV-7 inference groundwork is not executable-model certification.</strong>
         The candidate <code>rwkv7.json</code> circuit and FP32 maps describe operation
         interfaces; primitive oracle tests do not prove a generated full-model trajectory.
-        Native <code>rwkv_world_trie</code> tokenization is unsupported and fails before
-        tokenizer C emission. Weight import, recurrent-state and residual-buffer placement,
-        layer-zero value sharing, token-serial prefill, and generated multi-token parity
-        remain bring-up gates. Use the ordinary native host once those contracts are complete,
-        rather than introducing a separate model-specific CLI or hardcoded prompt formatter.
+        The converter and generated runtime now support the native
+        <code>rwkv_world_trie</code> tokenizer: ByteLevel vocabulary pieces are loaded into the
+        existing <code>CKTrie</code> and encoded with greedy longest-match (no BOS, no
+        pretokenizer, id&nbsp;0 is <code>&lt;|endoftext|&gt;</code>). The importer fails closed
+        unless the vocabulary satisfies the singleton-byte and prefix-rank invariants the trie
+        backend relies on. Weight import, recurrent-state and residual-buffer placement,
+        layer-zero value sharing, token-serial prefill, and generated multi-token parity remain
+        bring-up gates. Use the ordinary native host once those contracts are complete, rather
+        than introducing a separate model-specific CLI or hardcoded prompt formatter.
     </p>
 </div>
 

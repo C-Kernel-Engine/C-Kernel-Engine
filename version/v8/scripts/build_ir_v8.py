@@ -3880,10 +3880,143 @@ CK_EXPORT int32_t ck_model_lookup_token(const char *text) {
         }
 
     elif tokenizer_type == "rwkv_world_trie":
-        raise ValueError(
-            "Unsupported tokenizer backend 'rwkv_world_trie': native longest-match "
-            "encoding is not implemented; circuit inventory is not executable model support"
-        )
+        # RWKV World tokenizers are GPT-2 ByteLevel vocabularies encoded with
+        # greedy longest-match. There is no BOS, no pretokenizer, and no
+        # normalization; id 0 is <|endoftext|>.
+        unk_id = 0
+        eos_id = 0
+        pad_id = 0
+        bos_id = -1
+        if special_tokens:
+            def _special_id(default: int, key: str) -> int:
+                value = special_tokens.get(key)
+                if isinstance(value, int) and not isinstance(value, bool):
+                    return value
+                return default
+
+            unk_id = _special_id(unk_id, "unk_token_id")
+            eos_id = _special_id(eos_id, "eos_token_id")
+            pad_id = _special_id(pad_id, "pad_token_id")
+            bos_id = -1
+        return {
+            "type": "rwkv_world_trie",
+            "include": '#include "tokenizer/tokenizer.h"',
+            "struct_field": "CKTokenizer *tokenizer;    /* RWKV World trie tokenizer */",
+            "init": f"""
+    /* Initialize RWKV World tokenizer from bump data */
+    if (getenv("CK_DISABLE_TOKENIZER")) {{
+        g_model->tokenizer = NULL;
+    }} else {{
+        g_model->tokenizer = ck_tokenizer_create(CK_TOKENIZER_RWKV_WORLD_TRIE);
+        if (g_model->tokenizer) {{
+            /* Enable the trie before load so the vocabulary is indexed. */
+            ck_tokenizer_set_use_trie(g_model->tokenizer, true);
+            ck_tokenizer_set_add_bos_eos(g_model->tokenizer, false, false);
+            if (ck_tokenizer_load_binary(
+                    g_model->tokenizer,
+                    {vocab_size},
+                    (const int32_t*)(g_model->bump + W_VOCAB_OFFSETS),
+                    (const char*)(g_model->bump + W_VOCAB_STRINGS),
+                    0,  /* Greedy longest-match, no merge rules */
+                    NULL) != 0) {{
+                ck_tokenizer_free(g_model->tokenizer);
+                g_model->tokenizer = NULL;
+            }} else {{
+                ck_tokenizer_set_special_ids(
+                    g_model->tokenizer, {unk_id}, {bos_id}, {eos_id}, {pad_id}, -1);
+            }}
+        }}
+    }}""",
+            "free": """
+    if (g_model->tokenizer) {
+        ck_tokenizer_free(g_model->tokenizer);
+        g_model->tokenizer = NULL;
+    }""",
+            "api_functions": """
+/* ============================================================================
+ * TOKENIZER API - Encode text to tokens using C tokenizer (RWKV World)
+ * ============================================================================
+ * Returns: number of tokens written to internal buffer
+ * The tokens are written to the same buffer that prefill() reads from.
+ * After encoding, call ck_model_prefill() with the returned count.
+ */
+CK_EXPORT int ck_model_encode_text(const char *text, int text_len) {
+    if (!g_model || !g_model->tokenizer || !text) return 0;
+    if (text_len < 0) text_len = (int)strlen(text);
+    if (text_len == 0) return 0;
+
+    /* Encode directly into the token_ids buffer that prefill uses */
+    int32_t *token_buf = (int32_t*)(g_model->bump + A_TOKEN_IDS);
+    int max_tokens = MAX_SEQ_LEN;
+
+    int num_tokens = ck_tokenizer_encode(
+        g_model->tokenizer,
+        text,
+        text_len,
+        token_buf,
+        max_tokens
+    );
+
+    return num_tokens;
+}
+
+CK_EXPORT int ck_model_count_text_tokens(const char *text, int text_len) {
+    if (!g_model || !g_model->tokenizer || !text) return -1;
+    if (text_len < 0) {
+        size_t inferred = strlen(text);
+        if (inferred > (INT32_MAX - 2) / 7) return -1;
+        text_len = (int)inferred;
+    }
+    if (text_len == 0) return 0;
+    /* Each source byte becomes at most one token, so text_len plus the
+     * terminator bounds the complete output. */
+    if (text_len > (INT32_MAX - 2) / 7) return -1;
+    size_t capacity = (size_t)text_len * 7 + 2;
+    if (capacity > SIZE_MAX / sizeof(int32_t)) return -1;
+    int32_t *tokens = (int32_t *)malloc(capacity * sizeof(int32_t));
+    if (!tokens) return -1;
+    int count = ck_tokenizer_encode(g_model->tokenizer, text, text_len,
+                                    tokens, (int)capacity);
+    free(tokens);
+    return count;
+}
+
+/* Decode tokens back to text */
+CK_EXPORT int ck_model_decode_tokens(const int32_t *ids, int num_ids, char *text, int max_len) {
+    if (!g_model || !g_model->tokenizer || !ids || !text || max_len <= 0) return 0;
+    return ck_tokenizer_decode(g_model->tokenizer, ids, num_ids, text, max_len);
+}
+
+/* Check if tokenizer is available */
+CK_EXPORT int ck_model_has_tokenizer(void) {
+    return (g_model && g_model->tokenizer) ? 1 : 0;
+}
+
+/* Check if raw text encoding is available. */
+CK_EXPORT int ck_model_can_encode_text(void) {
+    return (g_model && g_model->tokenizer) ? 1 : 0;
+}
+
+/* Get pointer to token buffer (for reading encoded tokens) */
+CK_EXPORT const int32_t* ck_model_get_token_buffer(void) {
+    return g_model ? (const int32_t*)(g_model->bump + A_TOKEN_IDS) : NULL;
+}
+
+/* Lookup single token by text (returns token ID or -1 if not found)
+ * Uses DIRECT vocabulary lookup, not encoding.
+ */
+CK_EXPORT int32_t ck_model_lookup_token(const char *text) {
+    if (!g_model || !g_model->tokenizer || !text) return -1;
+    int32_t id = ck_tokenizer_lookup(g_model->tokenizer, text);
+    if (id < 0) return -1;
+    const char *token_str = ck_tokenizer_id_to_token(g_model->tokenizer, id);
+    if (token_str && strcmp(token_str, text) == 0) {
+        return id;
+    }
+    return -1;
+}
+""" + chat_contract_api
+        }
 
     # Unknown tokenizer type
     return None
