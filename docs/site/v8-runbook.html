@@ -1014,8 +1014,6 @@
                         <a href="kernel-tuning-methodology.html">Kernel Tuning Methodology<small>CPU-node performance runbook</small></a>
                         <a href="v7-profiling.html">v7 Profiling Runbook<small>Train kernels: VTune, Advisor, perf</small></a>
                         <a href="v7-runbook.html">v7 Inference + Training Runbook<small>Copy/paste train + infer workflow</small></a>
-                        <a href="sizing.html">Model Sizing Lab<small>KV, state, concurrency, six-GPU placement</small></a>
-                        <a href="serving.html">Serving &amp; Batching<small>Single-flight, batch2, continuous-batching roadmap</small></a>
                         <a href="v7-svg-dataset-runbook.html">v7 SVG Dataset Runbook<small>Pretrain + midtrain data generation</small></a>
                         <a href="testing.html">Testing<small>Numerical parity verification</small></a>
                         <a href="divergence-harness.html">Stitched Divergence Harness<small>llama.cpp/PyTorch tensor attribution</small></a>
@@ -1280,10 +1278,7 @@ make v8-training-certify-fp32
 make v8-training-workflow-fp32
 
 # CKE BPE plus 4-layer dense, 6-layer GQA, and 10-layer GQA full workflows.
-make v8-training-matrix-fp32
-
-# Two authored 2-layer circuits: dense and unequal-head GQA with width/tail variation.
-make v8-training-composition-fp32</pre>
+make v8-training-matrix-fp32</pre>
     </div>
     <table class="table">
         <thead><tr><th>Command</th><th>What a PASS proves</th><th>Primary evidence</th></tr></thead>
@@ -1303,121 +1298,8 @@ make v8-training-composition-fp32</pre>
                 <td>The same complete contract runs reduced Qwen3-style variants at 4, 6, and 10 layers, including unequal-head GQA. CKE trains a BPE tokenizer from the training split, verifies exact round trips and tokenizer quality, then gives generated C and PyTorch the same serialized token IDs. Nightly schedules the bounded 6-layer 4/2 GQA case; this command runs the complete depth sweep.</td>
                 <td><code>version/v8/.cache/reports/training_matrix_latest.json</code></td>
             </tr>
-            <tr>
-                <td><code>v8-training-composition-fp32</code></td>
-                <td>Two supported Python-authored, two-layer circuits run generated-C forward/backward/AdamW against independent PyTorch at every update using fixed elementwise FP32 tolerances. One has dense 4/4 attention; one has 4/2 GQA, a non-vector-multiple 40-wide feature dimension, 17-token sequences, and a partial final accumulation window. Reports retain each trainable tensor's worst element and reject a synthetic gradient-slot swap. Nightly runs the GQA case.</td>
-                <td><code>version/v8/.cache/reports/training_composition_latest.json</code> and each case's identity-bound <code>training_workflow.json</code></td>
-            </tr>
         </tbody>
     </table>
-</div>
-
-<div class="card" id="training-capability-ledger">
-    <h3 style="margin-top:0;">Training kernel capability ledger</h3>
-    <p>The <a href="v8-training-capability-ledger.html">capability ledger</a> lists public <code>cke.nn</code> authoring modules separately from exact v8 provider-map operations. It groups maps by FP32, BF16, quantized, and unspecified dtype tags and distinguishes declared backward providers from registered tests. These inventories do not establish that an authored module lowers to those providers or that generated training passed numerical certification. In particular, a BF16 or quantized forward map does not establish a trainable backward path or QLoRA support.</p>
-    <pre>python3 version/v8/scripts/build_training_capability_ledger_v8.py
-make v8-training-capability-ledger-check</pre>
-    <p>For executed evidence, open the current run's <code>training_workflow.json</code> and identity-bound <code>ir_report.html</code>; the ledger does not turn a registered provider into a PASS.</p>
-</div>
-
-<div class="card card-blue">
-    <h3 id="python-training-authoring" style="margin-top: 0;">Author the certified workflow from Python or Jupyter</h3>
-    <p>
-        The <code>cke.v8</code> adapter reuses the established <code>cke.nn</code> model surface.
-        Python declares the model, frozen dataset, tokenizer, AdamW settings, and numerical
-        contracts. It lowers the supported semantic graph into the existing CKE template/IR
-        machinery and launches the generated-C workflow;
-        it does not execute replacement model arithmetic or silently fall back to PyTorch.
-    </p>
-    <div class="cmd-block">
-        <button class="copy-btn" type="button">Copy</button>
-<pre># Validate the supported Python surface and kernel-map candidate inventory.
-make v8-training-python-authoring-smoke
-
-# Inspect the same frozen-English experiment without starting training.
-.venv/bin/python version/v8/examples/python_authoring_tiny_lm_v8.py \
-  --run-dir version/v8/.cache/python_authoring/english_fixture
-
-# Execute generated forward/backward, native AdamW, parity, restart, and export.
-.venv/bin/python version/v8/examples/python_authoring_tiny_lm_v8.py \
-  --run-dir version/v8/.cache/python_authoring/english_fixture --execute
-
-# Open the notebook authoring and report-inspection flow.
-.venv/bin/jupyter lab \
-  version/v8/notebooks/01_generated_training_quickstart.ipynb</pre>
-    </div>
-    <table class="table">
-        <thead><tr><th>Python object or artifact</th><th>Ownership and evidence</th></tr></thead>
-        <tbody>
-            <tr><td><code>cke.models.qwen3_tiny(...)</code></td><td>Builds the existing <code>cke.nn</code> semantic module graph. Certified depths are 4, 5, 6, and 10 layers; the five-layer notebook is the graph-lowering fixture.</td></tr>
-            <tr><td><code>cke.v8.DatasetConfig</code>, <code>TokenizerConfig</code>, <code>TrainingConfig</code></td><td>Provide one explicit experiment definition for the generated runtime, independent PyTorch oracle, reporting, and export.</td></tr>
-            <tr><td><code>experiment.preflight()</code></td><td>Inventories candidate forward/backward maps, tensor contracts, implementations, and registered tests. It does not claim provider resolution or executed numerical evidence. Missing candidates fail before training; the generated workflow performs resolution and execution.</td></tr>
-            <tr><td><code>python_training_experiment.json</code></td><td>Records the model graph, dataset hash, tokenizer policy, optimizer, tolerances, and deployment boundary.</td></tr>
-            <tr><td><code>python_training_semantic_model.json</code></td><td>Is the authoritative graph-derived model contract. It records ordered authored identities, the exact supported properties, all trainable parameter mappings, and the CKE template consumed by lowering. Generated forward and backward kernel operations retain those authored identities.</td></tr>
-            <tr><td><code>training_capability_preflight.json</code></td><td>Starts as a candidate inventory with <code>PENDING_GENERATED_WORKFLOW</code> resolution/evidence fields. A successful fresh, identity-bound workflow updates it to <code>RESOLVED_EXECUTION_PASS</code>. Registered tests and executed evidence remain separate.</td></tr>
-            <tr><td><code>training_experiment_manifest.json</code></td><td>Binds the run ID, case, commit, authored experiment, configuration, corpus and serialized token streams to the lowered graphs, executed providers, parity, checkpoint, and export artifacts. The visualizer re-hashes required files and labels the bundle <code>MATCHED</code>, <code>MISMATCH</code>, or <code>MISSING</code>.</td></tr>
-            <tr><td><code>training_batch_preview.json</code></td><td>Shows the actual serialized input IDs, causal labels, attention mask, loss mask, valid-token count, token-stream identity, and label policy for bounded batches.</td></tr>
-            <tr><td><code>training_workflow.json</code>, <code>ir_report.html</code></td><td>Contain the generated execution result, PyTorch discrepancies, checkpoint/resume evidence, inference export, and interactive data/IR views.</td></tr>
-        </tbody>
-    </table>
-    <h4>Use the notebook as an experiment controller</h4>
-    <ol>
-        <li>Launch Jupyter from the repository root and open the v8 notebook path shown above.</li>
-        <li>Run the model and preflight cells first. Inspect the authored semantic graph, parameter count, forward/backward requirements, and candidate-map rows before allocating a training run.</li>
-        <li>Leave <code>EXECUTE_TRAINING = False</code> while changing the circuit, corpus, tokenizer, or numerical contract. Set it to <code>True</code> only when <code>can_launch_generated_workflow</code> is true; only the completed workflow can produce a PASS. The equivalent environment switch is <code>CKE_NOTEBOOK_EXECUTE=1</code>.</li>
-        <li>Use <code>DatasetConfig</code> to point at a pinned corpus and bounded train/validation token counts. Keep the model vocabulary equal to <code>TokenizerConfig.vocab_size</code>.</li>
-        <li>Use 4, 5, 6, or 10 layers and supported dense/GQA head geometry. The graph controls depth, dimensions, ordered block identities, vocabulary, and a finite positive global <code>rope_theta</code>. In this uniform topology, reordered labels establish authored identity order; they do not claim executable support for nonuniform block reordering. Stage 1 fixes SwiGLU, RMSNorm epsilon 1e-6, bias-free projections, <code>normal_0p02</code> initialization, and FP32; other values fail before weight initialization.</li>
-        <li>Inspect <code>python_training_semantic_model.json</code> after preflight. Confirm that its parameter contract, ordered layer trace, and hash match the training report. The workflow rejects missing, changed, or mismatched semantic artifacts.</li>
-        <li>After execution, inspect the exact tokenizer round trips, training and held-out loss curve, optimizer-step parity curve, worst per-tensor differences, exact restart result, and multi-token inference-export result.</li>
-        <li>Open <code>RUN_DIR / "ir_report.html"</code> from the notebook for the dataset, tokenizer, forward/backward stitching, saved tensors, memory, checkpoint, and export panels. Set <code>EMBED_IR_VISUALIZER = True</code> to place that report inside the notebook.</li>
-        <li>Set <code>LOAD_EXISTING_REPORT = True</code> only for exploration. This path is read-only: it does not call preflight or replace the original experiment definition. The notebook validates the saved manifest and labels missing or mismatched evidence explicitly.</li>
-        <li>Use <code>training_workflow.json</code> as the machine-readable verdict. A generated HTML file alone is not a PASS.</li>
-    </ol>
-    <p>
-        The checked-in notebook has no stored outputs. Its code cells execute through capability
-        preflight in <code>v8-training-python-authoring-smoke</code>, so imports, model authoring,
-        report rendering, and the no-training default cannot silently drift. Loss and parity plots
-        use inline SVG and do not require a separate plotting package. A populated render fixture
-        also checks the experiment-identity and serialized-batch panels, including failed parity,
-        missing evidence, and mismatched-run states.
-    </p>
-    <p class="v8-note">
-        The notebook and CI example use the same adapter. The exported generated-C inference
-        runtime does not require Python, but the underlying workflow still reports a standalone
-        native executable as <code>NOT_CERTIFIED</code>. Qwen3.5 DeltaNet authoring remains behind
-        composition-level state and backward certification. RWKV is outside this workstream.
-    </p>
-    <p class="v8-note">
-        <strong>RWKV-7 inference groundwork is not executable-model certification.</strong>
-        The candidate <code>rwkv7.json</code> circuit and FP32 maps describe operation
-        interfaces; primitive oracle tests do not prove a generated full-model trajectory.
-        Native <code>rwkv_world_trie</code> tokenization is unsupported and fails before
-        tokenizer C emission. Weight import, recurrent-state and residual-buffer placement,
-        layer-zero value sharing, token-serial prefill, and generated multi-token parity
-        remain bring-up gates. Use the ordinary native host once those contracts are complete,
-        rather than introducing a separate model-specific CLI or hardcoded prompt formatter.
-    </p>
-</div>
-
-<div class="card" id="frozen-svg-training-fixture">
-    <h3 style="margin-top: 0;">Frozen SVG training fixture</h3>
-    <p>The second notebook uses the same <code>cke.v8.compile</code> workflow with one complete SVG document in each split. It uses exact byte token IDs, a five-layer FP32 dense/GQA graph, generated-C AdamW, PyTorch parity, fresh-process resume, and independently generated v8 inference. The source XML is checked before weight initialization and appears beside token IDs and loss curves in the identity-bound IR report.</p>
-    <pre> .venv/bin/python version/v8/examples/python_authoring_tiny_lm_v8.py \
-  --fixture svg --run-dir version/v8/.cache/python_authoring/svg_fixture --execute
-
-.venv/bin/jupyter lab version/v8/notebooks/02_frozen_svg_training_fixture.ipynb</pre>
-    <p>The corpus is pinned in <code>version/v8/training/svg_single_document_v1.json</code>. Its train and validation sources are separate, complete SVG files. Token limits that would truncate either tokenized document are rejected before weight initialization. The current target policy is cyclic causal next-token prediction within each document, including a last-to-first token transition. Validation repeats almost all training geometry and changes only colors, so falling validation loss tests the machinery rather than generalization. The report separately marks whether each 48-token generated sample is well-formed SVG and whether it exhausted the probe budget; that diagnostic does not change the numerical certification verdict. Broader SVG quality needs a separate evaluation set.</p>
-    <table class="table">
-        <thead><tr><th>Next milestone</th><th>Acceptance evidence</th></tr></thead>
-        <tbody>
-            <tr><td>Frozen SVG fixture</td><td>Pinned complete documents, validated XML, exact byte IDs, generated-C/PyTorch parity, falling train and held-out loss, exact resume, inference export, and one manifest-bound SVG panel.</td></tr>
-            <tr><td>Document-aware data path</td><td>Explicit EOS, attention boundaries, label masks, token-weighted accumulation, partial batches, and exact fresh-process restart at a document or shard boundary. Cross-document attention leakage must be an injected failure.</td></tr>
-            <tr><td>Tiny code fixture</td><td>Separate source projects, pinned tokenizer/data, a compile-and-run evaluation in a sandbox, and the same numerical training-to-export gates. Compilation success and hidden functional tests are reported separately.</td></tr>
-            <tr><td>Qwen3.5 recurrent contract</td><td>One specified DeltaNet operation first: independent forward and backward checks, state reset and gradient checks across chunk boundaries, saved-state ownership, and explicit full or truncated backpropagation. Then a mixed five-layer graph, followed by ten layers.</td></tr>
-            <tr><td>Precision and scale</td><td>BF16 provider execution and numerical contracts on Ryzen, representative-shape training throughput, then LoRA and quantized-base LoRA as separate certified extensions.</td></tr>
-        </tbody>
-    </table>
-    <p>Each additional supported graph inherits optimizer, checkpoint, parity, and exported-inference gates. The Python surface builds certified CKE graphs; it does not yet compile arbitrary <code>torch.nn</code> programs. RWKV remains outside this workstream.</p>
 </div>
 
 <div class="card">
@@ -1483,9 +1365,9 @@ python3 -m http.server 7021 --bind 127.0.0.1 --directory "$RUN"</pre>
         <strong>Implementation and coverage boundary</strong><br>
         v8 owns the command, evidence contract, export, and visualizer integration. It currently
         imports the proven v7 training IR builder, generated-runtime code generator, and PyTorch
-        oracle through explicit interfaces. Certified coverage is the reduced dense/GQA FP32 circuit,
-        including the bounded unequal-head matrix case. BF16 training, the v7 interactive plan
-        builder, frozen SVG training and gallery, additional model circuits, standalone native executables,
+        oracle through explicit interfaces. Certified coverage is the reduced dense FP32 circuit.
+        Unequal-head GQA, BF16 training, the v7 interactive plan builder, frozen SVG training and
+        gallery, additional model circuits, standalone native training/inference executables,
         LoRA/QLoRA, Muon, and training-state offload require separate executable evidence.
     </div>
 </div>
@@ -1613,36 +1495,19 @@ make test-gemma4-private-corpus-parity-auto</pre>
         satisfy their declared numerical and corpus gates.
     </p>
     <p class="v8-note">
-        Keep private manifests, images, raw reports, hashes, prompts, token IDs,
-        and tensor captures outside the checkout and nightly upload paths.
-        Redacted console output is not a publishable report. The independent
-        Qwen3-VL encoder suite redacts image paths and IDs by default; use
-        <code>--show-private-details</code> only in a trusted local terminal.
-        Private corpus targets require their configured number of selected,
-        distinct image hashes; partial selections cannot satisfy full coverage.
-    </p>
-    <div class="cmd-block">
-        <button class="copy-btn" type="button">Copy</button>
-<pre>python version/v8/scripts/export_vision_public_summary_v8.py \
-  --private-summary /data/cke/vision-certification/RUN/summary.json \
-  --public-summary /data/cke/vision-certification/RUN/public-summary.json \
-  --count-free</pre>
-    </div>
-    <p class="v8-note">
-        Publish only the exported file, never its containing private run directory.
-        The count-free exporter accepts encoder-prefix, shared-prefix decoder,
-        and image-fed OCR task-quality summaries. It publishes only the scoped
-        lane and verdict, omitting corpus identity, counts, percentages, timing,
-        sample identities, paths, text, and artifact hashes. Full counts and
-        provenance remain in private reports. OCR quality remains separate from
-        execution completion and does not certify numerical parity.
-    </p>
-    <p class="v8-note">
         At source commit <code>352108874</code>, the Qwen3-VL profile passed
         its selected private corpus across P3 AVX2 and Ryzen AVX-512; all
         generated full-vocabulary decoder rows were bit-exact to llama.cpp.
         This is shared-prefix decoder parity,
         not independent vision-encoder parity or OCR-quality certification.
+    </p>
+    <p class="v8-note">
+        For private image-fed OCR task-quality runs, require complete selection
+        of distinct inputs. Private reports separate execution from exact-field
+        passing cases. Use <code>export_vision_public_summary_v8.py --count-free</code>
+        to publish only the scoped lane and verdict; corpus identity, counts,
+        percentages, timing, sample content, and hashes remain private. This
+        task metric is not numerical parity or verified loaded-engine provenance.
     </p>
 </div>
 
@@ -2672,41 +2537,35 @@ version/v8/scripts/ck_serve_v8.py "$RUN_DIR" --run "$RUN_DIR" \
         remain open.
     </p>
     <p>
-        The generated decoder now has an optional, serialized sequence-state switch ABI for
-        layouts whose compiled activation lifetimes declare only KV as persistent mutable
-        sequence state. It permits two additional generation-tagged state IDs backed by
-        caller-owned, 64-byte-aligned KV arenas. The ABI reports the exact bytes required;
-        the caller budgets and retains each arena through retirement. KV contents and
-        positions survive switches. Recurrent, encoder, and multimodal layouts do not advertise this
-        capability. The server does not use these handles yet. An additional generated
-        <code>ck_model_decode_batch2</code> entry now admits two one-token rows only when
-        the KV-only compiled layout and kernel map declare compatible Q5_1/Q8_1
-        projections. The first layer's Q and K projections share one M=2 weight traversal;
-        the remaining layers and attention execute with separate sequence state. This is
-        actual shared generated projection work, but not a full-layer batched decoder,
-        a server scheduler, mixed prefill/decode, or continuous batching.
-        For a non-default handle, named KV pointer lookup resolves to that handle; a bump-arena
-        offset is unavailable and returns <code>-1</code>.
+        The generated decoder has an optional serialized sequence-state ABI when the compiled
+        activation lifetimes identify KV as its only mutable sequence state. Two extra
+        generation-tagged state IDs use caller-owned, 64-byte-aligned KV arenas. The ABI
+        reports the required bytes; the caller budgets and retains each arena through
+        retirement. KV contents and positions survive state switches. Recurrent, encoder,
+        and multimodal layouts do not advertise this capability. An additional generated
+        entry now admits two one-token rows for KV-only layouts
+        with a declared Q5_1/Q8_1 two-row provider. It shares the first layer's Q/K
+        projections while attention and the remaining layers retain separate state.
+        HTTP remains single-flight, so this is not continuous batching. Named KV pointer lookup
+        follows the active state, while its bump-arena offset is unavailable and returns
+        <code>-1</code> for a non-default state.
         Run <code>python3 version/v8/scripts/certify_sequence_state_v8.py --run RUN_DIR</code>
         against a freshly generated eligible bundle. A 128-token Gemma3-270M Q5_K_M build
-        passed eight exact finite-logit comparisons, including reset isolation and slot reuse; the retained JSON
-        report records the library, weights, layout, and config hashes. This bounded result
-        does not cover concurrent calls, recurrent models, cancellation, or throughput.
+        passed eight exact finite-logit comparisons, including reset isolation and slot reuse.
+        The retained report hashes the library, weights, layout, and config. Concurrent calls,
+        recurrent state, cancellation, and throughput remain untested.
     </p>
     <p>
         Run <code>python3 version/v8/scripts/certify_batch_decode_v8.py --bundle BUNDLE --generated-source MODEL_C</code>
-        against a freshly generated eligible bundle. The retained Gemma3-270M Q5_K_M
-        report compares full finite logits and complete KV bytes with isolated prefill/decode:
-        seven continuations matched exactly across unequal prompts, swapped row order,
-        one-row continuation, retired-slot reuse, pre-step cancellation, capacity rejection,
-        and rejected buffer aliases, including a third live sequence arena. Admission now checks
-        the split's crossing values and exact base-pointer expressions, and binds the M=2 provider
-        to the selected decode kernel map. The report identifies actual loaded model, engine, and
-        tokenizer mappings and checks the generated source against the loaded model's source digest.
-        CI compiles and executes a tiny generated-entry fixture and tests rejection after a loaded
-        library pathname is replaced. Its timings are diagnostic workloads, not a speedup measurement. Recurrent
-        Qwen, larger artifacts, simultaneous API calls, and HTTP request scheduling remain
-        uncertified for this batch entry.
+        for an identified eligible artifact. The retained Gemma3-270M Q5_K_M report
+        records seven exact full-logit and KV comparisons across unequal prompts,
+        swapped rows, slot reuse, and rejection/recovery cases, including an alias into a third
+        live sequence arena. Compiler admission checks crossing values, exact base pointers,
+        and the selected provider binding. Certification verifies loaded model, engine, and
+        tokenizer mappings plus the loaded generated-source digest. CI compiles and executes
+        a tiny generated-entry fixture. Timings are not a matched speedup measurement.
+        Recurrent Qwen, larger models, mixed prefill/decode,
+        and HTTP scheduling require separate certification.
     </p>
     <p>
         The next generated step shares the first layer's MLP gate/up Q5_1 projection as a
@@ -3032,7 +2891,6 @@ version/v8/scripts/cks-v8-run serve \
 <pre>OPENAI_API_KEY=cke-local-only \
 OPENAI_BASE_URL=http://127.0.0.1:8080/v1 \
 OPENAI_MODEL=qwen38-27b-q4km \
-QWEN_CODE_MAX_OUTPUT_TOKENS=2048 \
 QWEN_CODE_SYSTEM_SETTINGS_PATH="$PWD/server/qwen-code/interactive.settings.json" \
 qwen --bare \
   --auth-type openai-responses \
@@ -3047,7 +2905,6 @@ qwen --bare \
 <pre>OPENAI_API_KEY=cke-local-only \
 OPENAI_BASE_URL=http://127.0.0.1:8080/v1 \
 OPENAI_MODEL=qwen38-27b-q4km \
-QWEN_CODE_MAX_OUTPUT_TOKENS=32768 \
 QWEN_CODE_SYSTEM_SETTINGS_PATH="$PWD/server/qwen-code/overnight.settings.json" \
 qwen --bare \
   --auth-type openai-responses \
@@ -3075,111 +2932,14 @@ qwen --bare \
         pinned prompt-token comparisons are covered separately; they do not certify
         Muse-generated tool calls or a completed harness task on a current bundle.
     </p>
-    <p class="mini-note">Gemma4 references <code>gemma4-v1</code>, with a chat-only
-        default variant and an explicit <code>tools</code> variant. The default output
-        protocol is <code>none</code>: ordinary text chat can
+    <p class="mini-note">Gemma4 now references the shared <code>publisher-chat-v1</code>
+        profile. Its declared output protocol is <code>none</code>: ordinary text chat can
         resolve the publisher Jinja asset, while tool-bearing requests fail before generation.
         When HF token sidecars are absent, verified GGUF special-token IDs are matched to
         bundled <code>tokenizer.json</code> text; conflicting definitions fail at startup.
-        GGUF configs may carry <code>model_type</code> and <code>model_name</code> without a
-        <code>model</code> key; bundle resolution then checks the stamped manifest's circuit identity.
-        This declaration alone does not certify a Gemma4 artifact. Keep rendered-byte
-        parity, token-ID parity, generated chat, tool protocol and recovery as separate
-        artifact-specific results.</p>
-    <p class="mini-note">A fresh isolated Gemma4 E4B GGUF build exposed two native BPE
-        differences from the bundled publisher tokenizer: its Jinja prompt already contains
-        <code>&lt;bos&gt;</code>, and its tokenizer declares
-        <code>add_space_prefix=false</code>. Generated tokenization now honors both contracts.
-        Exact IDs matched the bundled <code>tokenizer.json</code> for single-turn,
-        multi-turn, and Unicode/multiline rendered prompts in the isolated Ryzen run.
-        The same isolated artifact passed short generated chat through Chat Completions
-        and streaming Responses. The repeatable HTTP probe also checks multi-turn recall,
-        a deliberately exhausted one-token output budget, undeclared-tool rejection and
-        a successful request afterward. The existing lifecycle probe passed cancellation,
-        disconnect, client timeout and follow-up recovery against this 2,048-token build.
-        The timing-only prefill trigger proves an in-progress request, not the exact native
-        phase at cancellation. These are bounded text-serving checks, not a harness task.</p>
-    <p class="mini-note">The imported publisher template contains Gemma4's
-        <code>&lt;|tool_call&gt;</code>, <code>&lt;tool_call|&gt;</code> and
-        <code>&lt;|tool_response&gt;</code> syntax, as described in
-        <a href="https://ai.google.dev/gemma/docs/core/prompt-formatting-gemma4">Google's Gemma4 prompt format</a>.
-        The optional <code>gemma4_dsl_v1</code> variant selects a strict parser,
-        adapts function declarations to the publisher's nested Jinja input,
-        and declares <code>&lt;|tool_response&gt;</code> and <code>&lt;eos&gt;</code>
-        output stops in the resolved bundle. One isolated Gemma4 E4B Q4_K_M
-        artifact completed real generated tool-call/result continuations through
-        both HTTP routes. The circuit default remains chat-only; selecting the
-        tools variant and testing one artifact does not certify every Gemma4 build.</p>
-    <p class="mini-note">For clients such as the pinned Antigravity SDK 0.1.20 that
-        send a very large <code>max_completion_tokens</code> upper bound, an operator
-        may explicitly start this bounded Gemma server with
-        <code>--request-output-cap 256</code>. The normal policy still rejects
-        requests whose declared allowance exceeds the loaded context. With the
-        cap enabled, the effective allowance is recorded in the response and
-        <code>/v1/cke/loaded-identity</code>; exhausting it remains an incomplete
-        response. The SDK's external OpenAI-compatible configuration must name
-        this local endpoint and the loaded model. No cloud fallback or model-name
-        substitution is part of this test.</p>
-    <div class="cmd-block">
-        <button class="copy-btn" type="button">Copy</button>
-<pre># Run an already resolved, self-contained Gemma tools bundle on Ryzen.
-# Verify serving.json selects the tools variant before starting; do not
-# silently replace the publisher template at request time.
-GEMMA_RUN_DIR=/path/to/identified/gemma4-tools-bundle
-python3 version/v8/scripts/ck_serve_v8.py "$GEMMA_RUN_DIR" \
-  --run "$GEMMA_RUN_DIR" --no-build --model-name gemma4-e4b-q4km-tools \
-  --host 127.0.0.1 --port 18205 --request-output-cap 256 \
-  --request-prompt-byte-cap 32768
-
-# On the harness machine, tunnel the localhost-only endpoint from Ryzen.
-ssh -N -L 127.0.0.1:18215:127.0.0.1:18205 ryzen
-# GET http://127.0.0.1:18215/v1/cke/loaded-identity and confirm the expected
-# model, gemma4_dsl_v1 protocol, effective cap and artifact hashes.</pre>
-    </div>
-    <p class="mini-note">On the isolated 2,048-token tools bundle, Antigravity SDK
-        0.1.20 connected directly to CKE with <code>--request-output-cap 256</code>
-        and completed a file read, two-file answer, exact HTML edit plus validator,
-        and retry after a transient tool error in two consecutive four-case runs.
-        Both reports and disposable workspace archives are retained under
-        <code>/srv/cke/profiles/gemma4-tools-20261003/</code>. Two earlier runs
-        failed the single-file answer despite a correct tool call and result;
-        those failed reports are retained too. The passing runs used a more
-        specific task prompt. This establishes a bounded successful workflow,
-        not repeated overnight reliability or larger-context capacity.
-        The HTTP cancellation/disconnect suite passed on the same server instance;
-        a fresh SDK read then succeeded without restart.</p>
-    <div class="cmd-block">
-        <button class="copy-btn" type="button">Copy</button>
-<pre># Read both SHA-256 values from /v1/cke/loaded-identity first.
-python3 server/http_lifecycle_acceptance.py \
-  --suite plain-chat --endpoint http://127.0.0.1:18204/v1 \
-  --model gemma4-e4b-q4km-test \
-  --expected-serving-identity "$SERVING_SHA" \
-  --expected-session-library-sha256 "$SESSION_SHA" \
-  --output /path/to/new-plain-chat-report.json
-
-# The same artifact can run the existing cancellation/recovery suite.
-python3 server/http_lifecycle_acceptance.py \
-  --suite lifecycle --prefill-lines 100 \
-  --endpoint http://127.0.0.1:18204/v1 \
-  --model gemma4-e4b-q4km-test \
-  --expected-serving-identity "$SERVING_SHA" \
-  --expected-session-library-sha256 "$SESSION_SHA" \
-  --output /path/to/new-lifecycle-report.json</pre>
-    </div>
-    <div class="cmd-block">
-        <button class="copy-btn" type="button">Copy</button>
-<pre># Against the explicit Gemma tools variant, with the endpoint's output cap set to 256.
-# Install google-antigravity==0.1.20 in an isolated environment on the client.
-python3 server/gemma_antigravity_acceptance.py \
-  --endpoint http://127.0.0.1:18215/v1 \
-  --model gemma4-e4b-q4km-tools \
-  --expected-serving-identity "$SERVING_SHA" \
-  --expected-session-library-sha256 "$SESSION_SHA" \
-  --case-timeout-seconds 300 \
-  --workspace /path/to/new-disposable-workspace \
-  --output /path/to/new-gemma-antigravity-report.json</pre>
-    </div>
+        This is a declaration, not a Gemma4 serving certification. Exact rendered bytes,
+        native token IDs, generated-runtime chat, and a Gemma tool protocol still need
+        artifact-specific tests.</p>
     <h4>Bounded local Qwen Code acceptance</h4>
     <p>Use the same Qwen Code client as a real contributor task in a new disposable directory.
         This command reads a small HTML file, edits one heading, runs its Python validator and
@@ -3232,124 +2992,7 @@ python3 server/gemma_antigravity_acceptance.py \
         to the client, and reserves up to 32K output tokens. It does not add mid-generation resume,
         automatic publication, commits, or deployment. On later <code>--no-build</code> starts, the
         server reads the compiled capacity from <code>layout_decode.json</code>.
-        Qwen Code 0.24.6 needs the explicit <code>QWEN_CODE_MAX_OUTPUT_TOKENS</code>
-        environment value in these examples; the older settings profile alone did not
-        constrain its output request in a bounded local probe.
     </p>
-    <h4>Isolated dense Qwen3.8 prefix-reuse acceptance</h4>
-    <p>Build a separate resolved 32K dense Qwen3.8 bundle from the intended source revision;
-        verify its generated source, runtime libraries, tokenizer and weights with
-        <code>GET /v1/cke/loaded-identity</code>. The example below uses the tested
-        Ryzen budget for one 2.36 GB checkpoint. Choose a budget from the loaded
-        artifact's reported checkpoint requirement and available memory. It does not
-        change an existing serving process.</p>
-    <div class="cmd-block">
-        <button class="copy-btn" type="button">Copy</button>
-<pre>CK_BUNDLE=/path/to/resolved-dense-qwen38-32k-bundle
-CK_NUM_THREADS=16 OMP_NUM_THREADS=1 CK_V8_FORCE_BATCHED_PREFILL=1 \
-python3 version/v8/scripts/ck_serve_v8.py "$CK_BUNDLE" --run "$CK_BUNDLE" \
-  --no-build --host 127.0.0.1 --port 8206 \
-  --model-name qwen38-dense-prefix-32k-main-test \
-  --request-output-cap 2048 --max-tokens 2048 --temperature 0 \
-  --prefix-checkpoint-cache-bytes 2500000000
-
-# On the client, forward only this isolated loopback endpoint.
-ssh -N -L 127.0.0.1:18236:127.0.0.1:8206 ryzen</pre>
-    </div>
-    <p>Use Qwen Code 0.25.1 normal mode with a client settings file declaring
-        <code>contextWindowSize: 32768</code>, a 2,048-token output allowance and an
-        explicit wall-time budget. Run <code>server/qwen_harness_acceptance.py</code>
-        with <code>--qwen-profile normal</code>, <code>--settings</code>, and both
-        expected loaded hashes. Retain every empty per-attempt workspace, including
-        incomplete attempts. Compare cache-on and cache-off runs on the same bundle,
-        thread count and frozen fixture, alternating trial order; check file content,
-        validator result, tool IDs, loaded identity, actual input and reused token
-        counts separately from elapsed time. The opt-in cache saves exact processed
-        token prefixes, and exact-prefix requests without a suffix use fresh prefill
-        because checkpoints do not contain logits. HTTP execution remains
-        single-flight: this cache does not enable recurrent batching or concurrent
-        native calls.</p>
-    <h4>Repeated Qwen and Gemma harness acceptance</h4>
-    <p>Run <code>server/harness_repeatability.py</code> from a client machine that can
-        reach both endpoints through localhost tunnels. It invokes the existing
-        black-box HTTP suites, Qwen Code runner, and Antigravity SDK runner; it
-        does not select templates or execute model arithmetic. Pin each entry to
-        the intended loaded serving and session-library SHA-256 values. Use a Python
-        environment with the server test dependencies for the coordinator, and name
-        a separate Python environment containing <code>google-antigravity==0.1.20</code>
-        for the Gemma client. Pin the installed Qwen Code version in each client
-        entry; the runner currently accepts 0.24.6 and 0.25.1.</p>
-    <div class="cmd-block">
-        <button class="copy-btn" type="button">Copy</button>
-<pre>{
-  "schema": "cke.harness_repeatability.v1",
-  "attempts": 3,
-  "clients": [
-    {
-      "name": "qwen-control", "adapter": "qwen_code",
-      "endpoint": "http://127.0.0.1:18103/v1",
-      "model": "qwen38-27b-q4km-262k",
-      "serving_identity": "&lt;64 lowercase hex characters&gt;",
-      "session_library_sha256": "&lt;64 lowercase hex characters&gt;",
-      "qwen_bin": "qwen", "qwen_version": "0.24.6",
-      "task_timeout_seconds": 1800, "prefill_lines": 100
-    },
-    {
-      "name": "gemma-control", "adapter": "antigravity_gemma",
-      "endpoint": "http://127.0.0.1:18215/v1",
-      "model": "gemma4-e4b-q4km-tools",
-      "serving_identity": "&lt;64 lowercase hex characters&gt;",
-      "session_library_sha256": "&lt;64 lowercase hex characters&gt;",
-      "python": "/path/to/pinned-antigravity-venv/bin/python",
-      "case_timeout_seconds": 300, "prefill_lines": 100
-    }
-  ]
-}</pre>
-    </div>
-    <div class="cmd-block">
-        <button class="copy-btn" type="button">Copy</button>
-<pre># Save the JSON above as /path/to/local-serving-matrix.json and replace both
-# placeholder hashes with the intended bundle/session identities.
-python3 server/harness_repeatability.py \
-  --config /path/to/local-serving-matrix.json \
-  --output-dir /path/to/new-matrix-run
-
-# If reporting logic changes, reassess completed retained reports without
-# repeating any harness tool or native generation:
-python3 server/harness_repeatability.py \
-  --reassess-dir /path/to/completed-matrix-run</pre>
-    </div>
-    <p class="mini-note">The output directory must be new. It retains the exact
-        configuration, stdout/stderr, every individual HTTP and harness report,
-        disposable workspaces, and an incrementally written summary. A failed
-        task remains failed even when the loaded identity matched; a passed task
-        does not inherit a missing protocol or recovery result. The matrix also
-        rejects a changed server-instance ID between attempts, even if the same
-        bundle is reloaded. The HTTP suites
-        test multi-turn and output-limit behavior, bounded-input rejection with
-        a successful follow-up, cancellation, disconnect, and timeout recovery.
-        For an uncapped runtime, the context probe tests an oversized output
-        reservation. The 2,048-token Gemma deployment also declares an explicit
-        32,768-byte rendered-input cap; its probe tests that separate byte limit
-        and a successful follow-up. It does not infer a token count from the
-        input's byte length. Native tokenization failures without a proven
-        capacity cause remain structured server errors, while native busy
-        responses remain HTTP 429.
-        The probe records whether an exact token-count exceedance was proven.
-        It records which boundary was exercised and does not claim that
-        the Qwen probe consumed 262K input. After a runner
-        timeout, the matrix stops submitting work to that endpoint because native
-        completion is not yet proven. The suite records failures without silently
-        retrying edits or commands. It checks outcomes after execution; a fresh
-        directory alone does not sandbox the client. Use a restricted account or
-        container when tool execution needs isolation. Reassessment writes a separate immutable
-        <code>reassessment.json</code>, pins the original summary and each child
-        report hash, and never replays a task. Older reports without child hashes
-        remain integrity-unverified. The small Gemma artifact has only 2,048 tokens
-        of compiled context and uses an explicit 256-token output cap; this matrix
-        is bounded workflow evidence, not a larger-context or unattended-reliability
-        claim. Repeat with a separately built and identified larger-context artifact
-        before advertising practical prompt/tool-schema capacity.</p>
     <p class="mini-note">
         <code>GET /v1/models/{model}</code> reports the loaded CKE context capacity. The server uses
         the native tokenizer to validate the fully rendered prompt plus requested output before
@@ -3897,7 +3540,7 @@ make v8-visualizer-vision-artifacts</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-11-08</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-09-20</p>
             </div>
         </div>
     </footer>
