@@ -41,6 +41,7 @@ var dir_40856f0cdd4bcafd28810d9265a200f7 =
     [ "checked_float_buffer.h", "checked__float__buffer_8h.html", "checked__float__buffer_8h" ],
     [ "concat_i32_checked.c", "concat__i32__checked_8c.html", "concat__i32__checked_8c" ],
     [ "copy_i32_span_checked.c", "copy__i32__span__checked_8c.html", "copy__i32__span__checked_8c" ],
+    [ "decision_scoring_backward.c", "decision__scoring__backward_8c.html", "decision__scoring__backward_8c" ],
     [ "decision_tensor_ops.c", "decision__tensor__ops_8c.html", "decision__tensor__ops_8c" ],
     [ "deepseek_kernels.c", "deepseek__kernels_8c.html", "deepseek__kernels_8c" ],
     [ "deltanet_kernels.c", "deltanet__kernels_8c.html", "deltanet__kernels_8c" ],

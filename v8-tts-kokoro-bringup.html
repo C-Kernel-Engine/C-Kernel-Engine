@@ -2348,6 +2348,35 @@ practical conversational latency. A sampled generation interval attributed 97.82
 of cycles to checked linear projection, including weight validation and scalar
 row work. That is the next optimization target, not evidence of full-run savings.</p>
 </section>
+
+<section id="http-terminal-lifecycle">
+<h2>Speech HTTP completion, cancellation and recovery</h2>
+<p>The owner now publishes a complete event and marks completion under the same lock
+used by cancellation. Cancellation cannot accept a completed request or send a delayed
+abort signal after the next request takes ownership. The backend abort operation must be
+a nonblocking signal; delivery waits remain outside the owner lock.</p>
+<p>A backend returning without a completion becomes an explicit error. A failure after
+completion discards the backend but does not publish a second terminal verdict. Repeated
+stalled readers exhaust only the existing two-event delivery queue; the ten-second delivery
+deadline cancels the request and allows subsequent requests to recover. This is separate
+from native synthesis deadlines and does not certify a global bound on concurrent uploads.</p>
+<p>The asset-free server tests include a publication barrier, abort ownership assertion,
+missing/duplicate terminal controls, repeated stalled readers and successful follow-ups.
+They run through <code>make test-server-schema</code>, already registered as Server Protocol
+and Lifecycle in nightly. These tests validate lifecycle semantics, not synthesis arithmetic.</p>
+<p>A separate P3 endpoint using the merged #1063 bundle completed A → B → A with one
+resident worker and matching A WAV hashes. Active cancellation terminated in about 118 ms;
+a subsequent request rebuilt the worker and matched the earlier WAV. The first cold request
+took 6.42 seconds, warm short requests 2.61–2.66 seconds, and recovery 3.95 seconds.
+These are diagnostic shared-host observations, not a performance regression threshold or
+a laptop audible-stop measurement. Source hashes and sanitized events are retained in
+<a href="assets/kokoro-lifecycle-20261107.json">the lifecycle report</a>.</p>
+<p>The ordinary P3 Whisper and Kokoro services were not replaced. The isolated candidate
+service was stopped after the test. Matching WAV hashes preserve the tested CKE output;
+they do not resolve the separate publisher-waveform comparison. Pinned Whisper latency
+was rechecked independently: short clips about 1.67 seconds and the retained 20-second
+recording about 2.05 seconds, with matching transcript and loaded-artifact checks.</p>
+</section>
     </main>
 
     <!-- SVG Viewer Overlay (shared across all pages) -->

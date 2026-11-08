@@ -9684,7 +9684,7 @@ test_rope.py::TestRoPECache::test_cache_values</p>
 
 
 <details open>
-    <summary>Other Functions (1610)</summary>
+    <summary>Other Functions (1615)</summary>
     <div class="accordion-content">
 
 
@@ -12432,11 +12432,41 @@ test_multi_layer_parity.py::TestMultiLayerParity::test_residual_add</p>
 
         <div class="card" style="margin-bottom: 1rem;">
             <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_indexed_cosine_rows_backward_f32</code>
+                <span class="badge badge-blue" style="margin-left: 0.5rem;">Backward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int ck_indexed_cosine_rows_backward_f32(const float * left, size_t left_elements, const float * right, size_t right_elements, const int32_t * indices, size_t indices_elements, const float * d_output, size_t d_output_elements, float * d_left, size_t d_left_elements, float * d_right, size_t d_right_elements, float * scratch, size_t scratch_elements, size_t groups, size_t rows, size_t channels, float epsilon)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Backward pass / gradient computation</p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_indexed_cosine_rows_f32</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int ck_indexed_cosine_rows_f32(const float * left, size_t left_elements, const float * right, size_t right_elements, const int32_t * indices, size_t indices_elements, float * output, size_t output_elements, float * scratch, size_t scratch_elements, size_t groups, size_t rows, size_t channels, float epsilon)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_indexed_normalized_dot_backward_f32</code>
+                <span class="badge badge-blue" style="margin-left: 0.5rem;">Backward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int ck_indexed_normalized_dot_backward_f32(const float * left, size_t left_elements, const float * right, size_t right_elements, const int32_t * indices, size_t indices_elements, const float * d_output, size_t d_output_elements, float * d_left, size_t d_left_elements, float * d_right, size_t d_right_elements, float * scratch, size_t scratch_elements, size_t groups, size_t rows, size_t channels, float epsilon)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Backward pass / gradient computation</p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_indexed_pair_features_backward_f32</code>
+                <span class="badge badge-blue" style="margin-left: 0.5rem;">Backward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int ck_indexed_pair_features_backward_f32(const float * left, size_t left_elements, const float * right, size_t right_elements, const int32_t * indices, size_t indices_elements, const float * d_output, size_t d_output_elements, float * d_left, size_t d_left_elements, float * d_right, size_t d_right_elements, float * scratch, size_t scratch_elements, size_t groups, size_t rows, size_t channels)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Backward pass / gradient computation</p>
         </div>
 
 
@@ -17726,6 +17756,16 @@ hugepage_mode
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void convert_int8_to_float(const int8_t * src, float * dst, size_t count)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">cosine_backward</code>
+                <span class="badge badge-blue" style="margin-left: 0.5rem;">Backward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int cosine_backward(const float * left, size_t left_elements, const float * right, size_t right_elements, const int32_t * indices, size_t indices_elements, const float * d_output, size_t d_output_elements, float * d_left, size_t d_left_elements, float * d_right, size_t d_right_elements, float * scratch, size_t scratch_elements, size_t groups, size_t rows, size_t channels, float epsilon, int straight_through_clamp)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Backward pass / gradient computation</p>
         </div>
 
 
@@ -25116,7 +25156,7 @@ The IR graph structure (number of layers, op types)</p>
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">store</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int store(float * p, double x)</pre>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int store(float * p, double value)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 
@@ -25607,6 +25647,16 @@ The IR graph structure (number of layers, op types)</p>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int valid_scalar(const int32_t * pointer, size_t elements)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">validate</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int validate(const float * left, size_t ln, const float * right, size_t rn, const int32_t * indices, size_t in, const float * dy, size_t yn, float * dl, size_t dln, float * dr, size_t drn, float * scratch, size_t sn, size_t groups, size_t rows, size_t channels, int pair, size_t * nl, size_t * nr)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 

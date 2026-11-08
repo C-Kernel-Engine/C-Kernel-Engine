@@ -8,6 +8,54 @@
 
 <p>Model topology lives in the circuit builders here. Kernels implement arithmetic; maps describe ABI, scratch and numerical contracts. Generic operation catalogue entries do not inspect the model name.</p>
 
+<section id="indexed-scoring-backward">
+<h2>Indexed scoring gradients: separate normalization contracts</h2>
+<p>The final scoring branches now have checked FP32 derivatives for indexed pair features
+[a, b, a·b, |a−b|], normalized-vector dot products and cosine similarity. Owner indices route each
+option to its question. Repeated owners accumulate contributions; unreferenced owners receive zero.
+Both public gradient buffers are published only after all checks and reductions succeed. Caller-owned
+scratch holds groups·channels + 2·rows·channels floats; there is no kernel allocation.</p>
+<p><strong>Forward equivalence does not establish backward equivalence.</strong> The pinned head
+uses normalize-and-dot for its prior score and cosine_similarity for its joint score. PyTorch 2.12.1
+normalization has a zero clamp derivative below epsilon, whereas its
+<a href="https://github.com/pytorch/pytorch/blob/v2.12.1/aten/src/ATen/native/Distance.cpp">cosine implementation</a>
+clamps a cloned norm under NoGrad and retains the norm derivative below epsilon. The new providers
+encode those policies separately. At zero norm, the norm VJP is zero; the direct numerator derivative
+still flows. At the normalization clamp boundary the derivative is one. Absolute difference uses zero
+subgradient at equality, including signed zero.</p>
+<p>Consequently the cosine provider's below-clamp VJP deliberately matches the pinned framework's
+backward convention, not the finite-difference derivative of its clamped forward function. Central
+differences are tested away from nonsmooth/clamped boundaries; separate autograd tests cover zero,
+below epsilon, equality and adjacent FP32 values on both operands. Future head backward authoring must
+select the explicit derivative contract. Neither forward provider identity nor epsilon alone selects it.</p>
+<table class="table"><thead><tr><th>Independent PyTorch 2.12.1 CPU comparison</th><th>Largest observed absolute gradient error</th></tr></thead><tbody>
+<tr><td>Indexed pair features</td><td>2.39e-7</td></tr>
+<tr><td>Normalized-vector dot</td><td>2.24e-8</td></tr>
+<tr><td>Cosine similarity</td><td>2.24e-8</td></tr>
+</tbody></table>
+<p>Measured 2026-11-08 on synthetic nonzero operands, widths 1, 7 and 129, with repeated and
+unreferenced owners. Primitive PyTorch ceilings are absolute 2e-6 / relative 2e-5; generated joined
+gradients use 3e-6 / 3e-5. These are empirical fixture bounds. Ordered scalar tests also cover width 64,
+O0/O3 equality and the reduction policy: each row contribution rounds FP32, then repeated-owner
+contributions sum in ascending row order in FP64 before the final FP32 store. An adversarial
+[1e8, 1, −1e8] scatter retains one; this does not claim bitwise equivalence to FP32 index-add.</p>
+<p>One ordinary generated backward entry executes pair-feature/GELU and both cosine branches,
+then joins their left/right gradients using the existing checked addition provider. It compares the
+combined VJP against PyTorch, exercises A→B→A arena reuse, rejects insufficient arena capacity and a
+late nonfinite branch, and recovers. A deliberately miswired branch join produces a detectable gradient
+error. Primitive tests cover null/misaligned pointers, every short capacity, partial writable aliases,
+invalid owners, zero/overflow dimensions, invalid epsilon and late finite scatter overflow.</p>
+<pre><code>OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python3 -m unittest \
+  tests.test_v8_decision_scoring_backward -v
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python3 scripts/nightly_runner.py \
+  --tests decision_scoring_backward --ci --require-executed</code></pre>
+<p><strong>This is generated scoring-component backward, not full-head training.</strong> The
+circuit explicitly authors the derivative branches; automatic complete-head backward, scalar/gain
+and remaining indexed derivatives, grouped losses, all-parameter AdamW trajectory, BF16 optimizer
+certification and adapters remain separate gates. Existing full-head forward and attention-training
+regressions remain independent evidence. No Clef-specific compiler branch was added.</p>
+</section>
+
 <section id="attention-training">
 <h2>Noncausal attention backward and native training</h2>
 <p>A bounded generic composition now trains through feature lookup → trainable projection →
@@ -284,7 +332,7 @@ checkpoint/resume and inference-export workflow. Do not add a second model execu
 <tr><td>Token-span pooling and last-token selection</td><td>Checked span VJP accumulates overlapping spans with generated-chain evidence.</td><td>Wire automatic backward and final-row selection, with explicit accumulation for separate branches.</td></tr>
 <tr><td>Embedding/gather and residual branches</td><td><code>embedding_backward_f32.json</code>, native BF16 embedding scatter, <code>residual_add_backward_f32.json</code>, gradient-accumulation providers.</td><td>Wire type-embedding gradients, indexed-owner scatter and broadcast reductions. Frozen output embeddings need no updates, while required hidden-feature gradient paths remain explicit.</td></tr>
 <tr><td>Grouped softmax-weighted pooling</td><td>Checked options/query VJP covers both score and value paths, unequal and singleton groups.</td><td>Connect to full-head backward synthesis and loss; the tested isolated chain is not head training.</td></tr>
-<tr><td>Cosine, pair features, scalar transforms</td><td>New checked forward providers.</td><td>Define epsilon/clamp subgradients, absolute-value behavior at zero, repeated-index accumulation and scalar reductions. Certify the pinned framework's derivative semantics separately from forward algebra.</td></tr>
+<tr><td>Cosine, pair features, scalar transforms</td><td>Indexed pair features and distinct normalized-dot/cosine FP32 VJPs now have generated branch-join evidence.</td><td>Wire automatic head backward with explicit clamp policy; add scalar/gain and remaining indexed derivatives, then certify complete scoring parameter gradients.</td></tr>
 <tr><td>Loss and optimizer</td><td><code>softmax_cross_entropy_loss.json</code> and <code>adamw_update_f32.json</code>; existing trajectory/resume/export machinery.</td><td>Declare one label per question and loss reduction over unequal option counts, then verify every trainable parameter, frozen hashes, optimizer moments and restart equivalence.</td></tr>
 </tbody></table>
 <p><code>version/v8/scripts/run_training_workflow_v8.py:_apply_semantic_model</code> currently admits
