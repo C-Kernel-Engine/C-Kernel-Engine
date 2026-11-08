@@ -22,27 +22,7 @@ sys.path.insert(0,str(ROOT/'version/v8/decision'))
 from build_clef_flash_complete_head_circuit import OUTPUT,build_circuit
 
 
-def effective_weights(graph, raw):
-    """Byte-preserving packed QKV import; no inference arithmetic."""
-    result=dict(raw)
-    for i in range(4):
-        for attention in ('self_attn','multihead_attn'):
-            stem=f'layers.{i}.{attention}'
-            w=raw[stem+'.in_proj_weight']; b=raw[stem+'.in_proj_bias']; width=w.shape[1]
-            for j,axis in enumerate(('q','k','v')):
-                result[f'{stem}.{axis}_proj.weight']=w[j*width:(j+1)*width].copy()
-                result[f'{stem}.{axis}_proj.bias']=b[j*width:(j+1)*width].copy()
-    for i in range(2):
-        stem=f'evidence_layers.{i}.attention'
-        if stem+'.in_proj_weight' in raw:
-            w=raw[stem+'.in_proj_weight']; b=raw[stem+'.in_proj_bias']; width=w.shape[1]
-            for j,axis in enumerate(('q','k','v')):
-                result[f'{stem}.{axis}_proj.weight']=w[j*width:(j+1)*width].copy()
-                result[f'{stem}.{axis}_proj.bias']=b[j*width:(j+1)*width].copy()
-    needed={v for block in graph['block_types'].values()
-            for op in block.get('header',[])+block.get('body',{}).get('ops',[])+block.get('footer',[])
-            for v in op.get('weight_refs',{}).values()}
-    return {k:np.ascontiguousarray(result[k],dtype='f4') for k in sorted(needed)}
+from version.v8.decision.package_clef_head import effective_weights
 
 
 def synthetic_weights():

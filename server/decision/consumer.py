@@ -132,7 +132,7 @@ class LoopbackHTTP:
             remaining=max(0.,q['timeout_ms']/1000-(time.monotonic()-started))
             timer=threading.Timer(remaining,expire);timer.daemon=True;timer.start()
             conn.request('POST','/evaluate',body,{'Content-Type':'application/json'})
-            response=conn.getresponse();check(response.status in (200,400,409,429,504),'HTTP_ERROR')
+            response=conn.getresponse();check(response.status in (200,400,409,429,500,504),'HTTP_ERROR')
             check(response.getheader('Content-Type')=='application/json')
             raw=response.read(MAX_BYTES+1);check(len(raw)<=MAX_BYTES,'MESSAGE_TOO_LARGE')
             def pairs(items):

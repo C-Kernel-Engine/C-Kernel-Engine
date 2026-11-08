@@ -88,7 +88,7 @@ class DecisionEvaluationTests(unittest.TestCase):
         spec=json.loads((ROOT/'server/decision/contract.json').read_text())
         self.assertEqual(spec['limits']['request_bytes'],wire.MAX_BYTES)
         self.assertEqual(spec['limits']['candidate_ids'],wire.MAX_CANDIDATES)
-        self.assertFalse(spec['implemented_boundary']['native_head_http_worker'])
+        self.assertTrue(spec['implemented_boundary']['native_head_http_worker'])
         with tempfile.TemporaryDirectory() as tmp:
             p=Path(tmp)/'request.json';p.write_bytes(wire.encode(self.server.request()))
             result=subprocess.run([sys.executable,'-m','server.decision.consumer','--url',self.server.url,'--request',str(p),'--allow-simulation'],cwd=ROOT,capture_output=True,text=True,timeout=3)

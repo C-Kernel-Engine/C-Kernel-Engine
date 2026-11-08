@@ -9,62 +9,97 @@
 <p>Model topology lives in the circuit builders here. Kernels implement arithmetic; maps describe ABI, scratch and numerical contracts. Generic operation catalogue entries do not inspect the model name.</p>
 
 <section id="antsand-evaluation-contract">
-<h2>Antsand evaluation contract proposal: simulation before service</h2>
-<p>The 2026-11-08 handoff requests contract agreement before a real service. The proposed
-<code>cke.decision.evaluate.v1</code> contract is retained in <code>server/decision/contract.json</code>.
-It is separate from the read-only <code>cke.control.v1</code> discovery protocol. No execution operation
-was added to discovery, no running service was changed, and no real Antsand system was contacted.</p>
-<table class="table"><thead><tr><th>Boundary</th><th>Evidence / support</th></tr></thead><tbody>
-<tr><td>Text tokenization + generated backbone</td><td>Not implemented in this evaluation path.</td></tr>
-<tr><td>Decision head from supplied features</td><td>Existing generated head comparison passes with pinned head weights. It is not connected to HTTP here.</td></tr>
-<tr><td>Complete text → option scores</td><td>NOT_TESTED; unsupported by this proposal's implemented path.</td></tr>
-<tr><td>Persistent production worker / approved execution adapter</td><td>Not implemented. The current adapter remains read-only.</td></tr>
-<tr><td>Versioned request, independent consumer, restarts and sockets</td><td>PASS with a test-only synthetic fixture responder; explicitly contract_simulation / fixture_replay.</td></tr>
+<h2>Registered generated head: experimental loopback evaluation</h2>
+<p>The <code>cke.decision.evaluate.v1</code> proposal now connects one registered generated
+head package to the independent simulated Antsand consumer over real HTTP. This is
+<code>head_only / native_generated</code>, not text-to-decisions. The existing synthetic fixture
+lane remains explicitly <code>contract_simulation / fixture_replay</code>. Neither executes
+business actions. The read-only <code>cke.control.v1</code> protocol is unchanged; no real Antsand
+service or running deployment is modified.</p>
+<table class="table"><thead><tr><th>Boundary</th><th>Status</th></tr></thead><tbody>
+<tr><td>Supplied features → generated complete head → raw option logits</td><td>Implemented through a persistent loaded package and one generated native entry.</td></tr>
+<tr><td>Released head weights over HTTP versus pinned reference</td><td>PASS on P3; synthetic backbone features and embedding rows, two distinct inputs and A→B→A.</td></tr>
+<tr><td>Text preparation / actual generated backbone</td><td>NOT_IMPLEMENTED in this evaluation path.</td></tr>
+<tr><td>Compute cancellation, remote authorization, real Antsand integration</td><td>NOT_IMPLEMENTED. Consumer cancellation suppresses publication; it cannot preempt C.</td></tr>
+<tr><td>Head training</td><td>Existing derivative/optimizer work is unchanged; this is forward inference integration.</td></tr>
 </tbody></table>
-<p>The initial task is one question over registered feature artifacts and ordered candidate IDs,
-not arbitrary text or uploaded tensors. Limits: 16 KiB request/response, 16 candidate IDs, 1,000 ms
-maximum attempt deadline. The retained synthetic fixture has two feature rows and three candidates;
-that is the only fixture registered by the test responder. No text tokens are accepted. One evaluation
-is admitted, concurrent requests receive BUSY, and no evaluation queue exists. This does not certify
-production connection admission limits.</p>
-<p>Requests pin model ID/revision, expected adapter and worker boot IDs, feature artifact/hash,
-ordered candidates and explicit minimum-logit-margin policy. Responses echo identity and a canonical
-request hash, report raw logits in request order, implementation stage, execution kind, measured
-latency and evidence references. They do not provide calibrated confidence or execute a selected
-option. Exact top ties abstain; a below-policy margin abstains; candidate order is never an implicit
-tie-breaking action. Registered artifact IDs are not host paths and do not grant access.</p>
-<p>The independent consumer in <code>server/decision/consumer.py</code> does not import producer
-validators. It rejects simulation by default, invalidates old results on cancellation/replacement,
-and publishes only a correlated response strictly before its absolute monotonic deadline. The same
-deadline is checked after exchange and inside the publication lock, after validation and lock wait.
-Generation/cancellation checks remain in that lock. Socket shutdown enforces the
-total HTTP attempt deadline, including a slow response body. Old adapter/worker boot IDs require a
-fresh discovery step. Cancellation is local result suppression; worker compute cancellation remains
-unsupported. No user/group authorization is inferred from scores. The test responder logs no request
-bodies and is defined only in the test module.</p>
-<pre><code>python3 -m unittest server.tests.test_decision_evaluate -v
-python3 scripts/nightly_runner.py --tests decision_evaluate_contract --ci --require-executed</code></pre>
-<p>These tests create temporary loopback sockets and launch an independent consumer process. Fourteen
-cases cover fixture integrity, ordered ID permutation, A→B→A, simulation opt-in, malformed/missing
-fields, unknown artifacts/models/tasks, invalid shape fields, duplicate/empty IDs, oversized input,
-nonfinite scores, ties, policy abstention, restarts, one-slot backpressure, deadline expiration,
-slow-body timeout, cancellation and replacement with a late old reply. Controlled-clock regressions
-cover validation delay and an actual contended publication lock; removing the publication deadline
-check makes both fail. Expired attempts leave current unset and subsequent requests succeed. The smoke process exits rather
-than leaving a service running. To inspect the consumer CLI: <code>python3 -m server.decision.consumer
---help</code>. No production connection command is available yet.</p>
-<p>Separate native evidence was rerun on base <code>19a733d1c</code>: all three complete-head tests
-passed, including pinned reference-source and weight SHA-256 checks. Shapes were 6/8 × 4096 hidden
-features, two questions and three options with counts [2,1]/[1,2]. Intermediate tolerance remains
-absolute 1e-5 and raw-logit tolerance 2e-6, relative zero; largest observed logits errors were
-1.20e-7 / 1.79e-7. Inputs are synthetic backbone features, not text-to-backbone captures. The simulated
-HTTP result correctly retains NOT_TESTED parity, null tokenizer/library identity and no native IR.</p>
-<p><strong>Next integration gate:</strong> review this proposed contract with Antsand, then connect a
-registered generated-head package and produce real per-request artifact/IR/library evidence through
-an approved execution transport. Establish authorization and compute cancellation before remote
-exposure. Preserve head-only versus end-to-end verdicts. Real Antsand consumer checks, full-model
-parity, serving lifecycle, authorization and business policy remain unproven; a reachable fixture
-responder establishes none of them. Clef training work is unchanged by this contract PR.</p>
+<p>The offline builder <code>version/v8/decision/package_clef_head.py</code> uses the ordinary
+circuit → map resolution → lowering → generated-C compiler. It packs effective FP32 weights and
+registered inputs; it performs no model arithmetic. Shared checked-graph build code now lives in
+<code>version/v8/scripts/compile_checked_bundle_v8.py</code>, with compatibility imports for existing
+tests. The worker uses only Python's standard library for request handling and byte copies; all
+head arithmetic remains in the generated entry. A subprocess test uses <code>python -S</code> to
+prove NumPy, safetensors and PyTorch are not runtime dependencies.</p>
+<p>An administrator supplies a trusted package manifest and its expected SHA-256. This is executable
+native code, not an untrusted upload interface. The manifest binds the model revision, CKE revision,
+effective weights, circuit, layout, call IR, generated source, compiler/build identity, native library and registered feature files. The loader
+checks hashes, shapes, offsets, disjoint input/output/weight regions, finite features, token IDs,
+spans, final-valid-token selection, option counts and candidate ownership before loading C. On Linux,
+it loads the exact verified library bytes from a sealed memfd. Weights load once; each request clears
+non-weight arena regions and copies all of its registered inputs. The host does not schedule neural
+operations. Packages have one compiled geometry and at most 64 registered artifacts; runtime-variable
+feature shapes and arbitrary uploads are not supported.</p>
+<p>Each registration contains <code>hidden</code>, <code>input_ids</code>,
+<code>question_spans</code>, <code>option_spans</code>, <code>global_span</code>,
+<code>option_counts</code> and <code>question_type_ids</code>, plus a selected question index and its
+stable candidate IDs. The entire multi-question context executes; one question's logits are returned.
+Reordering request candidate IDs only reorders those scores. Changing the head context requires a
+new registered artifact and hash. <code>artifact_id</code> in response evidence is the package SHA-256;
+<code>ir_id</code> is the call-IR SHA-256; <code>library_sha256</code> identifies the loaded bytes.
+The input hash binds both feature bytes and the registration metadata. No host paths are returned.</p>
+<p>The loopback worker allows one active evaluation, no evaluation queue and four connection threads.
+Concurrent evaluations return BUSY; excess connections close. A two-second absolute connection timer
+prevents slow clients from occupying threads indefinitely. Requests and responses remain bounded to
+16 KiB, 16 candidate IDs and a maximum 1,000 ms consumer attempt. The worker checks expiration before
+and after native execution and before responding. The independent consumer rechecks the same absolute
+monotonic deadline inside its publication lock, after validation and lock wait. Cancellation/replacement
+invalidates pending results immediately. A disconnected or expired native call retains its slot and
+arena until C actually returns. Closing the worker joins handlers before unloading its library.
+Remote exposure, authentication and native interruption require separate contracts.</p>
+<h3>Reproduction</h3>
+<p>Prepare a local registrations JSON list with <code>id</code>, <code>npz</code>,
+<code>question_index</code> and <code>candidate_ids</code>. Each NPZ contains exactly the seven inputs
+above, hidden FP32 and other arrays int32, matching the declared geometry. Supply pinned released head
+weights and the intended output-embedding rows as an NPY. Record whether features and embeddings are
+synthetic or actual backbone captures; a pinned head alone does not establish either.</p>
+<pre><code>python3 -m version.v8.decision.package_clef_head \
+  --head joint_head.safetensors --head-sha256 HEAD_SHA256 \
+  --embedding embedding.npy --embedding-sha256 EMBEDDING_SHA256 \
+  --registrations registrations.json --revision MODEL_REVISION \
+  --output /trusted/head-package
+python3 -S -m server.decision.native_server \
+  --package /trusted/head-package/package.json --package-sha256 PACKAGE_SHA256
+# Copy one printed bounded request object to request.json; use the printed loopback URL.
+python3 -m server.decision.consumer --url http://127.0.0.1:PORT/evaluate --request request.json
+
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python3 -m unittest \
+  server.tests.test_decision_native server.tests.test_decision_evaluate -v
+python3 scripts/nightly_runner.py --tests decision_native_head decision_evaluate_contract --ci
+# Optional independent released-head oracle lane:
+CKE_CLEF_FLASH_HEAD_PATH=/path/joint_head.safetensors \
+CKE_CLEF_FLASH_REFERENCE_SOURCE=/path/joint_schema_model.py \
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python3 -m unittest \
+  server.tests.test_decision_native.PinnedNativeDecisionTest -v</code></pre>
+<p>The server prints fresh boot IDs and example requests; a restart invalidates old IDs. Do not treat
+this local descriptor as an approved remote discovery/authentication protocol. No persistent service
+is installed. Registered features may be private; retain packages accordingly.</p>
+<h3>Evidence and remaining gates</h3>
+<p>The asset-free nonzero synthetic head test compares returned logits to an independent PyTorch
+composition at absolute tolerance 2e-6, relative zero. It covers A→B→A versus a fresh runtime,
+candidate permutation, frozen weight bytes, sealed library bytes, invalid package identity/layout,
+native failure/recovery, BUSY, deadline expiration and cancellation during actual native execution.
+The existing fixture responder continues testing malformed protocol, restart and publication-lock
+behavior. Missing PyTorch or pinned assets are explicit SKIPs. Add <code>--require-executed</code> to nightly only with the required assets configured; it correctly fails on a missing-asset subtest even when the remaining tests pass.</p>
+<p>On P3, released head/source identities from the committed Clef fixture were verified. Two distinct
+6×4096 synthetic feature arrays, synthetic 16×4096 output embeddings, two questions and three options
+ran A→B→A through the packaged worker. Returned question-zero logits had maximum absolute error
+2.39e-7 against the pinned direct reference (unchanged acceptance 2e-6); repeated A was exact.
+Native request execution was 234–265 ms in this run, excluding load/build. This is not a performance
+benchmark or end-to-end backbone result. Runtime responses always retain numerical NOT_TESTED:
+passing an independently run oracle test does not certify every subsequent request.</p>
+<p><strong>Next:</strong> agree on the execution contract with Antsand, register captured real backbone
+features and embeddings, then connect generated backbone execution. Keep head-only, full-model,
+transport, training and authorization verdicts separate. No decision score grants permission to act.</p>
 </section>
 
 <section id="indexed-scoring-backward">

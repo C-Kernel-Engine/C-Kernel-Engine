@@ -937,6 +937,11 @@ TEST_SUITES = {
         ROOT / "server" / "tests" / "test_decision_evaluate.py",
         unittest_targets=("server.tests.test_decision_evaluate",),
     ),
+    "decision_native_head": TestSuite(
+        "Registered Generated Decision Head and Independent Consumer", "inference",
+        ROOT / "server" / "tests" / "test_decision_native.py",
+        unittest_targets=("server.tests.test_decision_native",),
+    ),
     "decision_scoring_backward": TestSuite(
         "Indexed Decision Scoring VJPs and Generated Gradient Joins", "training",
         ROOT / "tests" / "test_v8_decision_scoring_backward.py",
