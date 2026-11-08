@@ -1,0 +1,78 @@
+{
+  "schema": "cke.decision.evaluate.v1",
+  "status": "proposal tested with simulated consumer; not agreed with real Antsand; no deployed evaluation service",
+  "operation": "POST /evaluate",
+  "discovery_protocol": "cke.control.v1 remains read-only and unchanged",
+  "implemented_boundary": {
+    "request_validation": true,
+    "independent_consumer_validation": true,
+    "test_only_loopback_fixture_responder": true,
+    "text_tokenization_and_backbone": false,
+    "native_head_http_worker": false,
+    "complete_text_to_scores": false,
+    "persistent_production_serving": false,
+    "approved_adapter_execution_transport": false,
+    "native_head_component_evidence": "Existing generated complete-head tests use supplied backbone features; separate from this fixture-replay contract test."
+  },
+  "limits": {
+    "request_bytes": 16384,
+    "response_bytes": 16384,
+    "candidate_ids": 16,
+    "questions_per_request": 1,
+    "max_timeout_ms": 1000,
+    "simulated_active_evaluations": 1,
+    "simulated_pending_evaluations": 0,
+    "accepted_text_tokens": 0,
+    "simulated_feature_tokens": 2
+  },
+  "request_required": [
+    "schema",
+    "request_id",
+    "adapter_boot_id",
+    "worker_boot_id",
+    "model",
+    "task",
+    "input",
+    "candidate_ids",
+    "timeout_ms",
+    "policy"
+  ],
+  "request": {
+    "model": {
+      "id": "registered identifier",
+      "revision": "pinned 40-64 lowercase hexadecimal revision"
+    },
+    "task": "registered_feature_scores",
+    "input": {
+      "artifact_id": "registered feature artifact, not a path or text",
+      "sha256": "registered feature payload SHA-256"
+    },
+    "candidate_ids": "ordered unique registered IDs; no labels or executable actions",
+    "policy": {
+      "minimum_logit_margin": "finite 0..100; explicit consumer policy, not calibrated confidence"
+    },
+    "identity": "1-64 ASCII letters/digits/dot/underscore/hyphen; boot identities are 32 lowercase hex digits",
+    "encoding": "UTF-8 JSON; duplicate keys, unknown request fields and NaN/Infinity rejected"
+  },
+  "response_required": [
+    "schema",
+    "request_id",
+    "adapter_boot_id",
+    "worker_boot_id",
+    "model",
+    "request_sha256",
+    "ok",
+    "result",
+    "error"
+  ],
+  "score_semantics": "raw logits in request candidate order; no softmax or calibrated confidence is returned",
+  "decision_semantics": "Exact top ties abstain; otherwise abstain if top-minus-second logit is below requested margin. Single candidate ranks trivially. Selection is informational, executed is always false.",
+  "identity_semantics": "Echo expected adapter/worker/model identities and canonical request hash. A restart rejects old boot IDs with RESTARTED. Clients must refresh approved discovery before another attempt; no automatic identity acceptance.",
+  "evidence": "Input hash, model revision, nullable tokenizer revision, registered evidence/IR IDs, nullable native-library SHA-256 and separately scoped numerical parity. Simulation must say contract_simulation + fixture_replay + NOT_TESTED, with no native library. Artifact retrieval requires separate authorization; responses contain no host paths.",
+  "deadline_semantics": "timeout_ms bounds the consumer attempt; socket shutdown enforces a total transport deadline, and publication checks elapsed monotonic time. Simulated worker checks deadline before publication. No native interruption guarantee exists yet.",
+  "cancellation_semantics": "Consumer cancellation/replacement invalidates pending replies immediately. There is no worker cancel endpoint; already-admitted simulation finishes and releases its slot. Native compute cancellation is NOT_IMPLEMENTED.",
+  "concurrency_semantics": "Test responder admits one evaluation, rejects concurrent admission BUSY with HTTP 429, and has no evaluation queue. This is not production connection-limit certification.",
+  "privacy_authorization": "No request bodies or prompts in routine logs. Antsand owns user/group authorization; neither score nor candidate selection grants access. Only synthetic fixture data is used. No training, model download, arbitrary commands or business actions.",
+  "connection_scope": "Consumer accepts only literal loopback HTTP /evaluate. Real remote exposure and approved adapter execution require a separate authenticated contract; this PR does not deploy or alter running services.",
+  "malformed_request_errors": "Structured JSON with recoverable request_id, otherwise null; model/request hash null because no valid request was accepted. Clients must not treat these as evaluation results."
+}
