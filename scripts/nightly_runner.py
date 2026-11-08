@@ -932,6 +932,11 @@ TEST_SUITES = {
         "Checked Integer Span State Copy", "kernels",
         ROOT / "tests" / "test_v8_copy_i32_span_checked.py",
     ),
+    "decision_evaluate_contract": TestSuite(
+        "Decision Evaluation Contract and Independent Simulated Consumer", "inference",
+        ROOT / "server" / "tests" / "test_decision_evaluate.py",
+        unittest_targets=("server.tests.test_decision_evaluate",),
+    ),
     "decision_scoring_backward": TestSuite(
         "Indexed Decision Scoring VJPs and Generated Gradient Joins", "training",
         ROOT / "tests" / "test_v8_decision_scoring_backward.py",
