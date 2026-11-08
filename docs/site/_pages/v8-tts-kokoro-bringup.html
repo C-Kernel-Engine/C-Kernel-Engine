@@ -14,6 +14,36 @@
 <div class="tts-page">
 <p><a href="index.html">C-Kernel-Engine</a> / TTS bring-up</p>
 <h1>Kokoro TTS bring-up</h1>
+<section id="deconv-performance-20261108">
+<h2>P3 transposed-convolution optimization — 2026-11-08</h2>
+<p>Three alternating pairs on the same resident Kokoro bundle measured
+<strong>9.779 seconds baseline versus 6.617 seconds candidate</strong> median
+for 5.55 seconds of speech: 32.3% less synthesis time (1.48× throughput).
+All three WAV hashes matched exactly in every attempt. These are native
+request timings including WAV writing, excluding model load and frontend
+planning. The live HTTP deployment was not changed.</p>
+<p>VTune attributed 69.3% of sampled CPU time to ordinary convolution, but
+per-operation wall timers identified dense transposed convolution as the
+larger latency target: 1.916 of 4.271 seconds on the measured 2.45-second
+chunk. Parallel CPU work and wall latency are different measurements.
+Ordinary-convolution tiling trials produced only small gains and were not
+included in this change.</p>
+<p>The checked dense transposed-convolution provider now uses AVX2/FMA where
+available, reuses channel-local output storage and vectorizes independent
+taps. Each result retains its input-channel and input-frame accumulation
+order. Validation, caller-owned scratch, atomic output commit, cropping and
+the portable scalar fallback remain intact. No model-name branch or new
+workspace is introduced. Generated libraries must be rebuilt to use it.</p>
+<p>The existing nightly dense-deconvolution test now also checks exact FP32
+FMA bits at 7/8/9 and 15/16/17-tap boundaries, padded strides, mixed magnitudes,
+and a rounding-sensitive case that detects unfused multiplication/addition.
+Existing independent PyTorch, rejection/recovery and generated Qwen codec
+consumer tests remain separate gates; unavailable pinned assets are SKIP.</p>
+<p>This short P3 workload is still slower than real time. It does not certify
+Ryzen performance, Qwen TTS speed, headset latency or equivalence to
+OpenVINO. See the <a href="assets/kokoro-deconv-performance-20261108.json">retained
+trial timings, token IDs, hashes and build commands</a>.</p>
+</section>
 <h2>Current generated execution status</h2>
 <p><strong>Long-document planning, asset-free contract:</strong>
 <code>version/v8/tts/prepare_kokoro_document.py</code> partitions up to

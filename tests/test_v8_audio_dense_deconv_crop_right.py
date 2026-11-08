@@ -42,7 +42,7 @@ class AudioDenseDeconvCropRightTest(unittest.TestCase):
 
     def test_oracle_padding_tail_rejection_and_recovery(self):
         rng = np.random.default_rng(20261024)
-        for frames, stride in ((1, 2), (3, 2), (5, 3)):
+        for frames, stride in ((1, 2), (3, 2), (5, 3), (1, 4), (3, 6), (5, 10)):
             with self.subTest(frames=frames, stride=stride):
                 kernel, crop = 2 * stride, stride
                 valid = frames * stride
