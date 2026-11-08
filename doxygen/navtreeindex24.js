@@ -1,5 +1,6 @@
 var NAVTREEINDEX24 =
 {
+"structck__audio__conv1d__job.html#a071e9c9d0a9f06bee83d76516f8ae88b":[1,0,12,13],
 "structck__audio__conv1d__job.html#a5307191c122a1a2c9c9a678c69948060":[1,0,12,8],
 "structck__audio__conv1d__job.html#a5b04f87b810ffebbd3bffca99bff0e64":[1,0,12,7],
 "structck__audio__conv1d__job.html#a71f2491973178f67ee34f99b9c441232":[1,0,12,4],
@@ -248,6 +249,5 @@ var NAVTREEINDEX24 =
 "tokenizer_8h.html#ab3c4ccc15a8a6a14e785265d58ca3a91":[2,0,0,1,3,19],
 "tokenizer_8h.html#abba2eff6b3bd59ba528a2828b636dc15":[2,0,0,1,3,46],
 "tokenizer_8h.html#ac113f9561eb6088f8142823cc33f2816":[2,0,0,1,3,15],
-"tokenizer_8h.html#acd0ec47154bf6f8b901e60a7d3cb8d58":[2,0,0,1,3,11],
-"tokenizer_8h.html#acf24f5aad70b6eec0a05064b5f95538d":[2,0,0,1,3,14]
+"tokenizer_8h.html#acd0ec47154bf6f8b901e60a7d3cb8d58":[2,0,0,1,3,11]
 };

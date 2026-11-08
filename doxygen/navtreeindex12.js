@@ -1,5 +1,6 @@
 var NAVTREEINDEX12 =
 {
+"ckernel__strict_8c.html#adcc8293c7a06a4f12c2acfccb8d3cac0":[2,0,1,27,23],
 "ckernel__strict_8c.html#ae75bb772cb709184d6f4fad5462c19b1":[2,0,1,27,7],
 "ckernel__strict_8c.html#aedf852ec498fe7db175f59f810886b9f":[2,0,1,27,5],
 "ckernel__strict_8c.html#aef8c9a331116ff9c2d77b03152aa8004":[2,0,1,27,13],
@@ -248,6 +249,5 @@ var NAVTREEINDEX12 =
 "expand__group__row__indices__checked_8c.html#a0d836fdf86463158b81d860df21253c3":[2,0,1,1,50,0],
 "expand__group__row__indices__checked_8c.html#a3eea353e35c53db4eae0daa7a2f1e776":[2,0,1,1,50,2],
 "expand__group__row__indices__checked_8c.html#a690108a0cfdde800dba1c9448d2e2909":[2,0,1,1,50,1],
-"expand__group__row__indices__checked_8c_source.html":[2,0,1,1,50],
-"feature__concat__broadcast__rows_8c.html":[2,0,1,1,51]
+"expand__group__row__indices__checked_8c_source.html":[2,0,1,1,50]
 };

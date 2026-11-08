@@ -1,5 +1,6 @@
 var NAVTREEINDEX23 =
 {
+"structCPUInfo.html#a2f0697cf41068e3a7b9acfaa03b72dc1":[1,0,78,15],
 "structCPUInfo.html#a30cb3045feb76257726fe2c7b469a070":[1,0,78,4],
 "structCPUInfo.html#a34e7cc2aa5fd5ec5cf99828837563a61":[1,0,78,32],
 "structCPUInfo.html#a49e6a0b2a711e5acbb16ab29ed9da21f":[1,0,78,42],
@@ -248,6 +249,5 @@ var NAVTREEINDEX23 =
 "structblock__q8__K.html#abb47e300e16fb14224979b2538edb966":[1,0,9,1],
 "structblock__q8__K.html#ac7219c4dba2b1f4192beca610a3999fc":[1,0,9,2],
 "structblock__q8__K.html#ad3e3b87f42780053e576d03c01ac4176":[1,0,9,0],
-"structck__audio__conv1d__job.html":[1,0,12],
-"structck__audio__conv1d__job.html#a071e9c9d0a9f06bee83d76516f8ae88b":[1,0,12,13]
+"structck__audio__conv1d__job.html":[1,0,12]
 };
