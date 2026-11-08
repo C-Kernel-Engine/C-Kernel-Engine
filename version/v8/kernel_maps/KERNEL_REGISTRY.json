@@ -43037,11 +43037,47 @@
       ],
       "tests": {
         "unit": [
-          "tests/test_v8_head_backward.py"
+          "tests/test_v8_head_backward.py",
+          "tests/test_v8_gelu_training.py"
         ],
         "oracle": "Explicit ordered FP64/FP32-stage oracle, PyTorch autograd (explicit SKIP when unavailable), and finite differences."
       },
       "notes": "Generated VJP building block; not automatic head-backward synthesis or full trainer certification. Exact erf GELU derivative evaluated in FP64, multiplied by upstream gradient in FP64, one FP32 store. This is not tanh GELU.",
+      "training_contract": {
+        "version": 1,
+        "layout": "contiguous",
+        "batch_policy": "fixed",
+        "return_status": "zero_success",
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "rows": "rows",
+            "width": "channels",
+            "elements": "input_elements",
+            "stride": "input_stride"
+          },
+          {
+            "pointer": "d_output",
+            "rows": "rows",
+            "width": "channels",
+            "elements": "d_output_elements",
+            "stride": "d_output_stride"
+          },
+          {
+            "pointer": "d_input",
+            "rows": "rows",
+            "width": "channels",
+            "elements": "d_input_elements",
+            "stride": "d_input_stride"
+          },
+          {
+            "pointer": "scratch",
+            "rows": "rows",
+            "width": "channels",
+            "elements": "scratch_elements"
+          }
+        ]
+      },
       "name": "gelu_erf_backward_checked_f32",
       "_source_file": "gelu_erf_backward_checked_f32.json"
     },
@@ -43893,7 +43929,7 @@
       },
       "modes": {
         "inference": true,
-        "training": false,
+        "training": true,
         "backward": false
       },
       "call_constant_contract": {
@@ -44024,11 +44060,40 @@
       ],
       "tests": {
         "unit": [
-          "tests/test_v8_qwen3_tts_codec_convnext_complete.py"
+          "tests/test_v8_qwen3_tts_codec_convnext_complete.py",
+          "tests/test_v8_gelu_training.py"
         ],
         "oracle": "Pinned PyTorch GELU approximate=none and independent checked row cases"
       },
       "notes": "Checked rows reuse existing FP64-erf GELU arithmetic with FP32 storage. Caller-owned staging, finite inputs/results, unchanged output on rejection; distinct from tanh GELU.",
+      "training_contract": {
+        "version": 1,
+        "layout": "contiguous",
+        "batch_policy": "fixed",
+        "return_status": "zero_success",
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "rows": "rows",
+            "width": "channels",
+            "elements": "input_elements",
+            "stride": "input_stride"
+          },
+          {
+            "pointer": "output",
+            "rows": "rows",
+            "width": "channels",
+            "elements": "output_elements",
+            "stride": "output_stride"
+          },
+          {
+            "pointer": "scratch",
+            "rows": "rows",
+            "width": "channels",
+            "elements": "scratch_elements"
+          }
+        ]
+      },
       "name": "gelu_rows_erf_checked_f32",
       "_source_file": "gelu_rows_erf_checked_f32.json"
     },

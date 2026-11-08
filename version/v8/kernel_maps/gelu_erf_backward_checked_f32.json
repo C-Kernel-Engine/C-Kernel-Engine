@@ -261,9 +261,45 @@
   ],
   "tests": {
     "unit": [
-      "tests/test_v8_head_backward.py"
+      "tests/test_v8_head_backward.py",
+      "tests/test_v8_gelu_training.py"
     ],
     "oracle": "Explicit ordered FP64/FP32-stage oracle, PyTorch autograd (explicit SKIP when unavailable), and finite differences."
   },
-  "notes": "Generated VJP building block; not automatic head-backward synthesis or full trainer certification. Exact erf GELU derivative evaluated in FP64, multiplied by upstream gradient in FP64, one FP32 store. This is not tanh GELU."
+  "notes": "Generated VJP building block; not automatic head-backward synthesis or full trainer certification. Exact erf GELU derivative evaluated in FP64, multiplied by upstream gradient in FP64, one FP32 store. This is not tanh GELU.",
+  "training_contract": {
+    "version": 1,
+    "layout": "contiguous",
+    "batch_policy": "fixed",
+    "return_status": "zero_success",
+    "buffer_spans": [
+      {
+        "pointer": "input",
+        "rows": "rows",
+        "width": "channels",
+        "elements": "input_elements",
+        "stride": "input_stride"
+      },
+      {
+        "pointer": "d_output",
+        "rows": "rows",
+        "width": "channels",
+        "elements": "d_output_elements",
+        "stride": "d_output_stride"
+      },
+      {
+        "pointer": "d_input",
+        "rows": "rows",
+        "width": "channels",
+        "elements": "d_input_elements",
+        "stride": "d_input_stride"
+      },
+      {
+        "pointer": "scratch",
+        "rows": "rows",
+        "width": "channels",
+        "elements": "scratch_elements"
+      }
+    ]
+  }
 }

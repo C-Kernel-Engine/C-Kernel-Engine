@@ -909,9 +909,14 @@ def synthesize_ir2_backward(
 
             bwd_inputs: Dict[str, Dict[str, Any]] = {}
             read_specs = list(spec.get("reads", []) or [])
+            input_names = spec.get("input_names", ["in_%d" % i for i in range(len(read_specs))])
+            if (not isinstance(input_names, list) or len(input_names) != len(read_specs)
+                    or any(not isinstance(n, str) or not n.isidentifier() for n in input_names)
+                    or len(set(input_names)) != len(input_names)):
+                raise ValueError("backward input_names must uniquely name every read")
             blocked = False
             for idx, read in enumerate(read_specs):
-                key = "in_%d" % idx
+                key = input_names[idx]
                 if not isinstance(read, str) or ":" not in read:
                     bwd_inputs[key] = {"tensor": str(read), "kind": "raw"}
                     continue
@@ -1186,7 +1191,7 @@ def synthesize_ir2_backward(
         # Strict mode only escalates unresolved rule coverage when partial mode is off.
         unresolved_ready = [
             x for x in unresolved
-            if x.get("reason") in ("grad_rule_not_ready", "grad_rule_not_found", "missing_grad_rule")
+            if x.get("reason") in ("grad_rule_not_ready", "grad_rule_not_found", "missing_grad_rule", "missing_backward_input")
         ]
         if unresolved_ready and not allow_partial:
             issues.append("Unresolved backward coverage for %d ops" % len(unresolved_ready))
