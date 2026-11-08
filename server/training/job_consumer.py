@@ -42,3 +42,23 @@ def observe(value,*,worker_boot_id,owner,job_id,plan_sha256,experiment_id,draft_
         if last['job']['status'] in ('succeeded','failed','recovery_required'):check(j==last['job'])
         if j['updated_at']==last['job']['updated_at']:check(j==last['job'])
     return value
+
+def verify_artifacts(observation,fetch):
+    """Independent bounded retrieval check; fetch accepts opaque ID and offset."""
+    import base64
+    import hashlib
+    verified=[]
+    for artifact in observation['job']['artifacts']:
+        offset=0;h=hashlib.sha256()
+        while True:
+            chunk=fetch(artifact['artifact_id'],offset)
+            check(type(chunk) is dict and set(chunk)=={'artifact_id','sha256','bytes','offset','next_offset','eof','base64'})
+            check(chunk['artifact_id']==artifact['artifact_id'] and chunk['sha256']==artifact['sha256'] and chunk['bytes']==artifact['bytes'] and chunk['offset']==offset)
+            try:raw=base64.b64decode(chunk['base64'],validate=True)
+            except (ValueError,TypeError):raise InvalidObservation('INVALID_ARTIFACT') from None
+            check(0<len(raw)<=8192 and chunk['next_offset']==offset+len(raw) and offset+len(raw)<=artifact['bytes'])
+            h.update(raw);offset+=len(raw)
+            check(type(chunk['eof']) is bool and chunk['eof']==(offset==artifact['bytes']))
+            if chunk['eof']:break
+        check(h.hexdigest()==artifact['sha256']);verified.append(artifact['artifact_id'])
+    return verified

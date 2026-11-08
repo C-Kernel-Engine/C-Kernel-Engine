@@ -90,6 +90,12 @@ class TrainingJobsTest(unittest.TestCase):
         p=self.prepare();body=copy.deepcopy(p['plan']);body['seed']=999
         with self.jobs.db:self.jobs.db.execute('UPDATE plans SET body=? WHERE hash=?',(json.dumps(body),p['plan_sha256']))
         with self.assertRaisesRegex(JobError,'PLAN_CHANGED'):self.jobs.submit('alice',p['plan_sha256'],'new',start=False)
+    def test_expired_plan_and_store_exclusivity(self):
+        p=self.prepare()
+        with patch('server.training.jobs.time.time',return_value=p['plan']['expires_at']+1):
+            with self.assertRaisesRegex(JobError,'PLAN_EXPIRED'):self.jobs.submit('alice',p['plan_sha256'],'expired',start=False)
+        with self.assertRaisesRegex(JobError,'STORE_BUSY'):SimulatedJobs(self.jobs.store,principals={'alice'})
+
     def test_interpreter_symlink_keeps_environment_identity(self):
         import sys
         alias=Path(self.tmp.name)/'venv/bin/python';alias.parent.mkdir(parents=True);alias.symlink_to(sys.executable)
@@ -109,8 +115,16 @@ class TrainingJobsTest(unittest.TestCase):
 
 
 class IndependentJobConsumerTest(unittest.TestCase):
-    def test_terminal_state_correlation_and_out_of_order(self):
+    def test_versioned_simulated_job_fixture(self):
         from server.training.job_consumer import observe,InvalidObservation
+        from server.training.contract import ROOT
+        f=json.loads((ROOT/'server/training/fixtures/job_v1.json').read_text());j=f['completed']['job']
+        expected=dict(worker_boot_id=f['completed']['worker_boot_id'],owner=j['owner'],job_id=j['job_id'],plan_sha256=j['plan_sha256'],experiment_id=j['experiment_id'],draft_revision=j['draft_revision'])
+        observe(f['completed'],last=f['queued'],allow_simulation=True,**expected)
+        with self.assertRaises(InvalidObservation):observe(f['completed'],**expected)
+
+    def test_terminal_state_correlation_and_out_of_order(self):
+        from server.training.job_consumer import observe,verify_artifacts,InvalidObservation
         with tempfile.TemporaryDirectory() as tmp:
             jobs=SimulatedJobs(Path(tmp)/'store',principals={'alice'})
             try:
@@ -118,6 +132,10 @@ class IndependentJobConsumerTest(unittest.TestCase):
                 p=jobs.prepare('alice',config,'experiment',3);first=jobs.submit('alice',p['plan_sha256'],'key',start=False);jid=first['job']['job_id']
                 expected=dict(worker_boot_id=jobs.backend.boot,owner='alice',job_id=jid,plan_sha256=p['plan_sha256'],experiment_id='experiment',draft_revision=3,allow_simulation=True)
                 observe(first,**expected);jobs.run_job('alice',jid);done=jobs.observe('alice',jid);observe(done,last=first,**expected)
+                self.assertEqual(len(verify_artifacts(done,lambda a,o:jobs.artifact('alice',jid,a,o))),2)
+                def corrupt(a,o):
+                    r=jobs.artifact('alice',jid,a,o);r['base64']='eA==';return r
+                with self.assertRaises(InvalidObservation):verify_artifacts(done,corrupt)
                 with self.assertRaises(InvalidObservation):observe(first,last=done,**expected)
                 with self.assertRaises(InvalidObservation):observe(done,**dict(expected,owner='bob'))
                 with self.assertRaises(InvalidObservation):observe(done,**dict(expected,allow_simulation=False))

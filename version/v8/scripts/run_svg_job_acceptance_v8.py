@@ -8,7 +8,7 @@ import time
 ROOT=Path(__file__).resolve().parents[3]
 sys.path.insert(0,str(ROOT))
 from server.training.jobs import Jobs,atomic_json
-from server.training.job_consumer import observe
+from server.training.job_consumer import observe,verify_artifacts
 
 
 def run(store,python):
@@ -25,7 +25,8 @@ def run(store,python):
             time.sleep(.5);last=observe(jobs.observe('local-acceptance',job_id),last=last,**expected)
         duplicate=jobs.submit('local-acceptance',plan['plan_sha256'],'svg-acceptance-v1')
         if duplicate['job']['job_id']!=job_id:raise RuntimeError('idempotency failed')
-        result=dict(schema='cke.training.job-acceptance.v1',evidence='real_generated_c_training',plan_sha256=plan['plan_sha256'],job=last['job'],duplicate_same_job=True)
+        verified=verify_artifacts(last,lambda artifact_id,offset:jobs.artifact('local-acceptance',job_id,artifact_id,offset))
+        result=dict(artifact_roundtrip_verified=verified,schema='cke.training.job-acceptance.v1',evidence='real_generated_c_training',plan_sha256=plan['plan_sha256'],job=last['job'],duplicate_same_job=True)
         atomic_json(Path(store)/'acceptance.json',result)
         return result
     finally:jobs.close()
