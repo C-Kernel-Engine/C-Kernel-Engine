@@ -1,0 +1,140 @@
+{
+  "schema": "cke.training.job-fixture.v1",
+  "evidence": "contract_simulation; no native training; static IDs are not live jobs",
+  "prepared": {
+    "plan": {
+      "schema": "cke.training.execution-plan.v1",
+      "owner": "alice",
+      "experiment_id": "example-experiment",
+      "draft_revision": 7,
+      "worker_boot_id": "5edbb02302504c9bb14c1e9cc9b56f8c",
+      "validation_plan": {
+        "schema": "cke.training.plan.v1",
+        "worker_boot_id": "5edbb02302504c9bb14c1e9cc9b56f8c",
+        "capabilities_sha256": "cddd8788ec3c8ff3ad4fe00b1a8470e45b4834c824222a0f17062ecdf3cc109c",
+        "cke_commit": "15a4b07154fa5cbd8a764b354264d40849536124",
+        "workflow_sha256": "c5dd7258a22753937ad3e11759ebe22c073777f5453fdb1d770379b91a6b377a",
+        "config": {
+          "recipe": "svg_tiny_v8",
+          "dataset": {
+            "id": "cke_svg_single_document_v1",
+            "version": "v1",
+            "sha256": "648ef303226f5ca17ce087e79f95995a8d12050ff885d00fa2a3ff95d748c6b8",
+            "train_split": "train",
+            "validation_split": "validation"
+          },
+          "tokenizer": "utf8_byte_v1",
+          "shape": {
+            "layers": 4,
+            "d_model": 32,
+            "hidden": 64,
+            "heads": 4,
+            "kv_heads": 4,
+            "vocab_size": 256,
+            "seq_len": 32
+          },
+          "dtype": "fp32",
+          "optimizer": "adamw",
+          "method": "full_tiny_decoder",
+          "epochs": 2,
+          "grad_accum": 2
+        },
+        "submittable": false,
+        "execution": "disabled"
+      },
+      "validation_plan_sha256": "77e08baf44b4786e27d4ed0c2b9eb31bd6541fb31f0283a74fb14444030b4670",
+      "executor": "v8_generated_training_workflow",
+      "python_sha256": "52e0a13e60a981d8c4b6478be2ba5176f69da07948a056bf49cf6f077e30cb41",
+      "seed": 42,
+      "optimizer": {
+        "lr": 0.0003,
+        "beta1": 0.9,
+        "beta2": 0.999,
+        "eps": 1e-08,
+        "weight_decay": 0.01
+      },
+      "submittable": true,
+      "expires_at": 1794113399
+    },
+    "plan_sha256": "e7d6e1949ba392abc6cc85ad052a346bf23a89d9f1e51d7fecbe3dbbe40fb418",
+    "submitted": false
+  },
+  "queued": {
+    "job": {
+      "schema": "cke.training.job.v1",
+      "job_id": "2bae9f1d38f844f8b530b65f9710e3f5",
+      "owner": "alice",
+      "experiment_id": "example-experiment",
+      "draft_revision": 7,
+      "submitted_worker_boot_id": "5edbb02302504c9bb14c1e9cc9b56f8c",
+      "cke_commit": "15a4b07154fa5cbd8a764b354264d40849536124",
+      "plan_sha256": "e7d6e1949ba392abc6cc85ad052a346bf23a89d9f1e51d7fecbe3dbbe40fb418",
+      "status": "queued",
+      "stage": "admission",
+      "created_at": 1794112799.0272453,
+      "updated_at": 1794112799.0272453,
+      "error_code": null,
+      "artifacts": [],
+      "metrics": [],
+      "execution_kind": "contract_simulation",
+      "progress": null
+    },
+    "worker_boot_id": "5edbb02302504c9bb14c1e9cc9b56f8c",
+    "observed_at": 1794112799.0273008,
+    "cancel_supported": false
+  },
+  "completed": {
+    "job": {
+      "artifacts": [
+        {
+          "artifact_id": "e1f6beaf17724860a469f8c932dc243d",
+          "bytes": 1341,
+          "sha256": "e7d6e1949ba392abc6cc85ad052a346bf23a89d9f1e51d7fecbe3dbbe40fb418",
+          "type": "execution_plan"
+        },
+        {
+          "artifact_id": "ab03d98ff6f04699b9d83f3103919258",
+          "bytes": 381,
+          "sha256": "5817154973ff3b13d541e6b8cbbb98e5005c73d5a577663cb3c79f7b2ab11aa0",
+          "type": "training_report"
+        }
+      ],
+      "cke_commit": "15a4b07154fa5cbd8a764b354264d40849536124",
+      "created_at": 1794112799.0272453,
+      "draft_revision": 7,
+      "error_code": null,
+      "execution_kind": "contract_simulation",
+      "experiment_id": "example-experiment",
+      "job_id": "2bae9f1d38f844f8b530b65f9710e3f5",
+      "metrics": [
+        {
+          "name": "training_cross_entropy",
+          "observed_at": 1794112799.0327132,
+          "step": 2,
+          "step_kind": "epoch",
+          "unit": "nats/token",
+          "value": 1.0
+        },
+        {
+          "name": "validation_cross_entropy",
+          "observed_at": 1794112799.0327132,
+          "step": 2,
+          "step_kind": "epoch",
+          "unit": "nats/token",
+          "value": 1.5
+        }
+      ],
+      "owner": "alice",
+      "plan_sha256": "e7d6e1949ba392abc6cc85ad052a346bf23a89d9f1e51d7fecbe3dbbe40fb418",
+      "progress": null,
+      "schema": "cke.training.job.v1",
+      "stage": "complete",
+      "status": "succeeded",
+      "submitted_worker_boot_id": "5edbb02302504c9bb14c1e9cc9b56f8c",
+      "updated_at": 1794112799.0327446
+    },
+    "worker_boot_id": "5edbb02302504c9bb14c1e9cc9b56f8c",
+    "observed_at": 1794112799.0328195,
+    "cancel_supported": false
+  }
+}
