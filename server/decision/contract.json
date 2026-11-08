@@ -1,6 +1,6 @@
 {
   "schema": "cke.decision.evaluate.v1",
-  "status": "proposal tested with simulated consumer; not agreed with real Antsand; no deployed evaluation service",
+  "status": "proposal with experimental loopback native head worker; not agreed with real Antsand",
   "operation": "POST /evaluate",
   "discovery_protocol": "cke.control.v1 remains read-only and unchanged",
   "implemented_boundary": {
@@ -8,11 +8,11 @@
     "independent_consumer_validation": true,
     "test_only_loopback_fixture_responder": true,
     "text_tokenization_and_backbone": false,
-    "native_head_http_worker": false,
+    "native_head_http_worker": true,
     "complete_text_to_scores": false,
     "persistent_production_serving": false,
     "approved_adapter_execution_transport": false,
-    "native_head_component_evidence": "Existing generated complete-head tests use supplied backbone features; separate from this fixture-replay contract test."
+    "native_head_component_evidence": "Registered generated head over HTTP; pinned released head weights with synthetic supplied backbone features and embedding rows. Runtime never infers parity from successful execution."
   },
   "limits": {
     "request_bytes": 16384,
@@ -23,7 +23,11 @@
     "simulated_active_evaluations": 1,
     "simulated_pending_evaluations": 0,
     "accepted_text_tokens": 0,
-    "simulated_feature_tokens": 2
+    "simulated_feature_tokens": 2,
+    "native_active_evaluations": 1,
+    "native_pending_evaluations": 0,
+    "native_connection_threads": 4,
+    "registered_artifacts_per_package": 64
   },
   "request_required": [
     "schema",
@@ -45,7 +49,7 @@
     "task": "registered_feature_scores",
     "input": {
       "artifact_id": "registered feature artifact, not a path or text",
-      "sha256": "registered feature payload SHA-256"
+      "sha256": "Native: canonical registered artifact metadata hash, including feature-byte hash, full input spans, selected question and candidate identities. Simulation retains its fixture payload hash."
     },
     "candidate_ids": "ordered unique registered IDs; no labels or executable actions",
     "policy": {
@@ -68,11 +72,11 @@
   "score_semantics": "raw logits in request candidate order; no softmax or calibrated confidence is returned",
   "decision_semantics": "Exact top ties abstain; otherwise abstain if top-minus-second logit is below requested margin. Single candidate ranks trivially. Selection is informational, executed is always false.",
   "identity_semantics": "Echo expected adapter/worker/model identities and canonical request hash. A restart rejects old boot IDs with RESTARTED. Clients must refresh approved discovery before another attempt; no automatic identity acceptance.",
-  "evidence": "Input hash, model revision, nullable tokenizer revision, registered evidence/IR IDs, nullable native-library SHA-256 and separately scoped numerical parity. Simulation must say contract_simulation + fixture_replay + NOT_TESTED, with no native library. Artifact retrieval requires separate authorization; responses contain no host paths.",
-  "deadline_semantics": "timeout_ms bounds the consumer attempt; socket shutdown enforces a total transport deadline, and one absolute monotonic deadline is rechecked inside the publication lock immediately before making a result current. Validation and lock wait consume the same budget; equality with the deadline is expired. Simulated worker checks deadline before publication. No native interruption guarantee exists yet.",
-  "cancellation_semantics": "Consumer cancellation/replacement invalidates pending replies immediately. There is no worker cancel endpoint; already-admitted simulation finishes and releases its slot. Native compute cancellation is NOT_IMPLEMENTED.",
-  "concurrency_semantics": "Test responder admits one evaluation, rejects concurrent admission BUSY with HTTP 429, and has no evaluation queue. This is not production connection-limit certification.",
-  "privacy_authorization": "No request bodies or prompts in routine logs. Antsand owns user/group authorization; neither score nor candidate selection grants access. Only synthetic fixture data is used. No training, model download, arbitrary commands or business actions.",
+  "evidence": "Input hash, model revision, nullable tokenizer revision, registered evidence/IR IDs, nullable native-library SHA-256 and separately scoped numerical parity. Simulation must say contract_simulation + fixture_replay + NOT_TESTED, with no native library. Artifact retrieval requires separate authorization; responses contain no host paths. Native artifact_id is the exact package manifest SHA-256; ir_id is the call-IR file SHA-256; library_sha256 identifies the sealed bytes actually loaded. Package binds weights, circuit, layout and feature files. Request permutations reorder output only; they do not change the registered head context.",
+  "deadline_semantics": "timeout_ms bounds the consumer attempt; socket shutdown enforces a total transport deadline, and one absolute monotonic deadline is rechecked inside the publication lock immediately before making a result current. Validation and lock wait consume the same budget; equality with the deadline is expired. Simulated worker checks deadline before publication. No native interruption guarantee exists yet. Native checks before and after execution and before response publication; consumer deadline remains authoritative for transport and validation.",
+  "cancellation_semantics": "Consumer cancellation/replacement suppresses publication. No native interrupt endpoint; the execution slot and arena remain owned until native C returns, even after client disconnect.",
+  "concurrency_semantics": "Native loopback worker admits one evaluation, returns BUSY for concurrent evaluation, and limits connection threads to four with two-second absolute connection deadlines; excess connections close. No evaluation queue.",
+  "privacy_authorization": "Administrator pins an executable local package hash. Not an upload interface or sandbox for untrusted native code. No request bodies logged, model downloads, training or business actions. Supplied features may be private. Remote transport and Antsand authorization remain unimplemented.",
   "connection_scope": "Consumer accepts only literal loopback HTTP /evaluate. Real remote exposure and approved adapter execution require a separate authenticated contract; this PR does not deploy or alter running services.",
-  "malformed_request_errors": "Structured JSON with recoverable request_id, otherwise null; model/request hash null because no valid request was accepted. Clients must not treat these as evaluation results."
+  "malformed_request_errors": "Native malformed requests receive only a fixed error code, without echoed private fields; independent consumer rejects them. Test fixture retains its legacy null-envelope diagnostics."
 }
