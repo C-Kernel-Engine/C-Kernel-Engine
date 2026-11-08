@@ -1,5 +1,6 @@
 var NAVTREEINDEX18 =
 {
+"optimizer__kernels_8c.html#aee22d3d7aa1487e535d06671dd921d8d":[2,0,1,1,111,14],
 "optimizer__kernels_8c.html#afe3fc98bce4b7a987ef5625790670202":[2,0,1,1,111,6],
 "optimizer__kernels_8c_source.html":[2,0,1,1,111],
 "optimizer__kernels__bf16_8c.html":[2,0,1,1,112],
@@ -248,6 +249,5 @@ var NAVTREEINDEX18 =
 "rmsnorm__qkv_8c.html#a9a068ed02d809a81a23f09e61b820baf":[2,0,1,1,0,11,1],
 "rmsnorm__qkv_8c.html#ace29bafba9f9aac796d14e6670fed9b9":[2,0,1,1,0,11,5],
 "rmsnorm__qkv_8c_source.html":[2,0,1,1,0,11],
-"rope__kernels_8c.html":[2,0,1,1,131],
-"rope__kernels_8c.html#a0384ecc7d877033fb902b9906e7ff00a":[2,0,1,1,131,51]
+"rope__kernels_8c.html":[2,0,1,1,131]
 };

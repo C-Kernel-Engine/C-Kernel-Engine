@@ -1407,3 +1407,32 @@ Regression tests cover distinct rows, group and dimension tails, ordered-reducti
 negative controls, finite-input cancellation and late invalid weights without writes.
 The affected generated Kokoro and Qwen suites remain part of existing testing.</p>
 </section>
+
+<section id="snake-preflight-20261108">
+<h2>Bounded Snake and SnakeBeta preflight</h2>
+<p>Both checked activation providers previously evaluated every sine twice: once
+to prove the output finite, then again when publishing it. A conservative bound
+now avoids the first sine when the input and periodic amplitude have ample FP32
+headroom. Frequency products and parameters remain checked. Extreme values use
+the original exact preflight; the write pass, libm calls and FP32 rounding are
+unchanged. Every input is checked before any output is modified.</p>
+<p>An instrumented compiled regression counts real libm calls, compares exact output
+bits and padding, exercises extreme-value fallback, and rejects a late invalid
+input without output writes. The previous implementation fails the intended
+call-count gate (14 calls rather than nine on the mixed ordinary/extreme fixture).
+Generated Snake/SnakeBeta and connected waveform consumers remain covered by the
+existing tests. The known Kokoro publisher-waveform diagnostic remains unresolved;
+matching the baseline waveform is not publisher fidelity certification.</p>
+<p>Three paired Kokoro trials reduced median resident task time from
+6.562 to 6.134 seconds
+(6.5% less) with identical WAV hashes. One Qwen
+full-generation pair took 63.62 and 63.87
+seconds with identical generated codes and PCM. Three subsequent codec-only replays
+had medians 19.870 and 19.672
+seconds. These codec replays do not include token generation. The small full-run sample
+does not establish a stable Qwen end-to-end speedup. Both variants include #1080;
+absolute times from separate measurement windows should not be compared.</p>
+<p>The <a href="assets/speech-activation-performance-20261108.json">activation report</a>
+retains every trial, loaded libraries, compile commands, test counts and limitations.
+No live speech service was replaced.</p>
+</section>

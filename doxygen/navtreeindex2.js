@@ -11,8 +11,9 @@ var NAVTREEINDEX2 =
 "audio__scaled__sum__strided_8c_source.html":[2,0,1,1,31],
 "audio__snake__checked_8c.html":[2,0,1,1,32],
 "audio__snake__checked_8c.html#a13ad3eed1ef63671eb1b2153de2d5542":[2,0,1,1,32,1],
-"audio__snake__checked_8c.html#a9827628d5caf8fb2a17237a47ba3278a":[2,0,1,1,32,3],
-"audio__snake__checked_8c.html#ab05f20d70ca55e32bb4440824f95c995":[2,0,1,1,32,2],
+"audio__snake__checked_8c.html#a7504d0267dde6a683f9e246d2ee8a1d7":[2,0,1,1,32,2],
+"audio__snake__checked_8c.html#a9827628d5caf8fb2a17237a47ba3278a":[2,0,1,1,32,4],
+"audio__snake__checked_8c.html#ab05f20d70ca55e32bb4440824f95c995":[2,0,1,1,32,3],
 "audio__snake__checked_8c.html#ac093580bc711f738335d22657ff17500":[2,0,1,1,32,0],
 "audio__snake__checked_8c_source.html":[2,0,1,1,32],
 "audio__spectral__head_8c.html":[2,0,1,1,33],
@@ -248,6 +249,5 @@ var NAVTREEINDEX2 =
 "ck__cli__v6_85_8c.html#a85e152c85bb47a1011074f190bce0049":[2,0,1,7,1,51],
 "ck__cli__v6_85_8c.html#a88706de5c4aff931f163e20e1a109aa4":[2,0,1,7,1,4],
 "ck__cli__v6_85_8c.html#a8e11af01f9cfb415dbaaafbc33447dfc":[2,0,1,7,1,22],
-"ck__cli__v6_85_8c.html#a95ed28babfedacb5342319a65f76e489":[2,0,1,7,1,13],
-"ck__cli__v6_85_8c.html#a97d23c9b1367e79d27112bf0efe43afa":[2,0,1,7,1,9]
+"ck__cli__v6_85_8c.html#a95ed28babfedacb5342319a65f76e489":[2,0,1,7,1,13]
 };
