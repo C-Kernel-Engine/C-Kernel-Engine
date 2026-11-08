@@ -1,0 +1,657 @@
+{
+  "schema": "cke.speech.activation_performance.v1",
+  "date": "2026-11-08",
+  "source_base": "abb70f34e",
+  "depends_on_pr": 1080,
+  "cpu": "Intel Core i7-14700T",
+  "compiler": "Ubuntu GCC 15.2.0, -O2; complete compile commands in identities",
+  "threads": {
+    "CK_NUM_THREADS": 8,
+    "OMP_NUM_THREADS": 8,
+    "OPENBLAS_NUM_THREADS": 1
+  },
+  "kernel_sha256": "4f2b77a4345c09d941bd73acb9335ea796625058aaf9cc8a63d51233f61939c3",
+  "contract": "Unchanged system sinf/expf and FP32 store arithmetic; conservative magnitude preflight, exact fallback, rejection before writes. No extra memory or threads.",
+  "kokoro": {
+    "comparison": {
+      "baseline_seconds": [
+        6.564003922045231,
+        6.562482911162078,
+        6.558104712516069
+      ],
+      "candidate_seconds": [
+        6.134485359303653,
+        6.125985857099295,
+        6.168127225711942
+      ],
+      "baseline_median_seconds": 6.562482911162078,
+      "candidate_median_seconds": 6.134485359303653,
+      "latency_reduction_percent": 6.521884439964742,
+      "speed_ratio": 1.069769104788769
+    },
+    "trials": [
+      {
+        "trial": 0,
+        "provider": "base",
+        "chunks": [
+          {
+            "seconds": 1.845922339707613,
+            "sha256": "74548ccfdf4cda8531f4afd4820b9dfa22554b0740fc505cf8e7fe8b2979fbc9"
+          },
+          {
+            "seconds": 1.8172519532963634,
+            "sha256": "3043620d5d4cd2aa39e8f8ad3c7f97adf34f1e2b88a9fba923f8931d9881f76a"
+          },
+          {
+            "seconds": 2.8851954555138946,
+            "sha256": "913efc1387b84e399476683a21fca7b9854108b5e9551b088e7a5c82cf436bee"
+          }
+        ],
+        "seconds": 6.564003922045231
+      },
+      {
+        "trial": 0,
+        "provider": "candidate",
+        "chunks": [
+          {
+            "seconds": 1.727770484983921,
+            "sha256": "74548ccfdf4cda8531f4afd4820b9dfa22554b0740fc505cf8e7fe8b2979fbc9"
+          },
+          {
+            "seconds": 1.7070110542699695,
+            "sha256": "3043620d5d4cd2aa39e8f8ad3c7f97adf34f1e2b88a9fba923f8931d9881f76a"
+          },
+          {
+            "seconds": 2.6991924000903964,
+            "sha256": "913efc1387b84e399476683a21fca7b9854108b5e9551b088e7a5c82cf436bee"
+          }
+        ],
+        "seconds": 6.134485359303653
+      },
+      {
+        "trial": 1,
+        "provider": "candidate",
+        "chunks": [
+          {
+            "seconds": 1.7280065203085542,
+            "sha256": "74548ccfdf4cda8531f4afd4820b9dfa22554b0740fc505cf8e7fe8b2979fbc9"
+          },
+          {
+            "seconds": 1.6961591430008411,
+            "sha256": "3043620d5d4cd2aa39e8f8ad3c7f97adf34f1e2b88a9fba923f8931d9881f76a"
+          },
+          {
+            "seconds": 2.693968679755926,
+            "sha256": "913efc1387b84e399476683a21fca7b9854108b5e9551b088e7a5c82cf436bee"
+          }
+        ],
+        "seconds": 6.125985857099295
+      },
+      {
+        "trial": 1,
+        "provider": "base",
+        "chunks": [
+          {
+            "seconds": 1.8516941769048572,
+            "sha256": "74548ccfdf4cda8531f4afd4820b9dfa22554b0740fc505cf8e7fe8b2979fbc9"
+          },
+          {
+            "seconds": 1.8164814859628677,
+            "sha256": "3043620d5d4cd2aa39e8f8ad3c7f97adf34f1e2b88a9fba923f8931d9881f76a"
+          },
+          {
+            "seconds": 2.8938017869368196,
+            "sha256": "913efc1387b84e399476683a21fca7b9854108b5e9551b088e7a5c82cf436bee"
+          }
+        ],
+        "seconds": 6.562482911162078
+      },
+      {
+        "trial": 2,
+        "provider": "base",
+        "chunks": [
+          {
+            "seconds": 1.8477245531976223,
+            "sha256": "74548ccfdf4cda8531f4afd4820b9dfa22554b0740fc505cf8e7fe8b2979fbc9"
+          },
+          {
+            "seconds": 1.8181637348607183,
+            "sha256": "3043620d5d4cd2aa39e8f8ad3c7f97adf34f1e2b88a9fba923f8931d9881f76a"
+          },
+          {
+            "seconds": 2.8916965182870626,
+            "sha256": "913efc1387b84e399476683a21fca7b9854108b5e9551b088e7a5c82cf436bee"
+          }
+        ],
+        "seconds": 6.558104712516069
+      },
+      {
+        "trial": 2,
+        "provider": "candidate",
+        "chunks": [
+          {
+            "seconds": 1.7252087146043777,
+            "sha256": "74548ccfdf4cda8531f4afd4820b9dfa22554b0740fc505cf8e7fe8b2979fbc9"
+          },
+          {
+            "seconds": 1.7169450307264924,
+            "sha256": "3043620d5d4cd2aa39e8f8ad3c7f97adf34f1e2b88a9fba923f8931d9881f76a"
+          },
+          {
+            "seconds": 2.71056713629514,
+            "sha256": "913efc1387b84e399476683a21fca7b9854108b5e9551b088e7a5c82cf436bee"
+          }
+        ],
+        "seconds": 6.168127225711942
+      }
+    ],
+    "audio_seconds": 5.55,
+    "exact_wav": true,
+    "identity": {
+      "base": {
+        "library_sha256": "ae868e8dbd6981f6459bf3b84db21ee148fc84edb38719333e0aa197bc39e0e6",
+        "compile_command": [
+          "cc",
+          "-std=c11",
+          "-O2",
+          "-Wall",
+          "-Wextra",
+          "-Werror",
+          "-shared",
+          "-fPIC",
+          "-ffp-contract=off",
+          "-ffunction-sections",
+          "-fdata-sections",
+          "-Wl,--gc-sections",
+          "-Wl,--no-undefined",
+          "-Wl,--version-script=/data/cke/speech-snake-20261108/kokoro-base/64/exports.map",
+          "/data/cke/speech-snake-20261108/kokoro-base/64/generated.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/ck_threadpool.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/ckernel_strict.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/attention_full_token_major.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_adain_instance_norm.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_adaptive_layer_norm.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_concat_channels_checked.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_conv1d_checked.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_conv1d_parallel.c",
+          "/data/cke/kokoro-conv-reuse-20261108/src/kernels/audio_conv_transpose_dense_checked.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_duration_expand_token_major.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_duration_logits.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_harmonic_source_checked.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_istft_mag_phase.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_kernels.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_lstm_scan.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_prosody_upsample_checked.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_reflect_pad_checked.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_scaled_sum_strided.c",
+          "/data/cke/speech-snake-20261108/baseline.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_spectral_head.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_stft_mag_phase_checked.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_text_embedding.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/embedding_three_table_layer_norm.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/feature_concat_broadcast_rows.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/gelu_kernels.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/gelu_rows_tanh_checked.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/layernorm_kernels.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/layernorm_rows_checked.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/linear_rows_checked.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/runtime_extent.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/strided_unary_checked.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/vision_kernels.c",
+          "-I",
+          "/data/cke/kokoro-deploy-1063-20261107/include",
+          "-lm",
+          "-lpthread",
+          "-ldl",
+          "-o",
+          "/data/cke/speech-snake-20261108/kokoro-base/64/generated.so"
+        ],
+        "host_compile_command": [
+          "cc",
+          "-std=c11",
+          "-O2",
+          "-Wall",
+          "-Wextra",
+          "-Werror",
+          "-pedantic",
+          "-DCK_TTS_PARALLEL_CONV",
+          "-DCK_TTS_CONV_WORKERS=8",
+          "-DCK_TTS_RUNTIME_WAVEFORM",
+          "-DCK_TTS_COMPILED_TOKEN_COUNT=64",
+          "-DCK_TTS_EXPECTED_LIBRARY_SHA256=\"ae868e8dbd6981f6459bf3b84db21ee148fc84edb38719333e0aa197bc39e0e6\"",
+          "-I",
+          "/data/cke/speech-snake-20261108/kokoro-base/64",
+          "/data/cke/speech-snake-20261108/kokoro-base/64/host.c",
+          "/data/cke/speech-snake-20261108/kokoro-base/64/audio_noise_counter.c",
+          "-L",
+          "/data/cke/speech-snake-20261108/kokoro-base/64",
+          "-l:generated.so",
+          "-Wl,-rpath,$ORIGIN",
+          "-lm",
+          "-ldl",
+          "-lcrypto",
+          "-o",
+          "/data/cke/speech-snake-20261108/kokoro-base/64/native-kokoro-wav"
+        ]
+      },
+      "candidate": {
+        "library_sha256": "98097a6de6eddcf6acbbcdc2497c57d0394f191f12f642e684a64977be4d39be",
+        "compile_command": [
+          "cc",
+          "-std=c11",
+          "-O2",
+          "-Wall",
+          "-Wextra",
+          "-Werror",
+          "-shared",
+          "-fPIC",
+          "-ffp-contract=off",
+          "-ffunction-sections",
+          "-fdata-sections",
+          "-Wl,--gc-sections",
+          "-Wl,--no-undefined",
+          "-Wl,--version-script=/data/cke/speech-snake-20261108/kokoro-candidate/64/exports.map",
+          "/data/cke/speech-snake-20261108/kokoro-candidate/64/generated.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/ck_threadpool.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/ckernel_strict.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/attention_full_token_major.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_adain_instance_norm.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_adaptive_layer_norm.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_concat_channels_checked.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_conv1d_checked.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_conv1d_parallel.c",
+          "/data/cke/kokoro-conv-reuse-20261108/src/kernels/audio_conv_transpose_dense_checked.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_duration_expand_token_major.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_duration_logits.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_harmonic_source_checked.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_istft_mag_phase.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_kernels.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_lstm_scan.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_prosody_upsample_checked.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_reflect_pad_checked.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_scaled_sum_strided.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/audio_snake_checked.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_spectral_head.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_stft_mag_phase_checked.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/audio_text_embedding.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/embedding_three_table_layer_norm.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/feature_concat_broadcast_rows.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/gelu_kernels.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/gelu_rows_tanh_checked.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/layernorm_kernels.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/layernorm_rows_checked.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/linear_rows_checked.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/runtime_extent.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/strided_unary_checked.c",
+          "/data/cke/kokoro-deploy-1063-20261107/src/kernels/vision_kernels.c",
+          "-I",
+          "/data/cke/kokoro-deploy-1063-20261107/include",
+          "-lm",
+          "-lpthread",
+          "-ldl",
+          "-o",
+          "/data/cke/speech-snake-20261108/kokoro-candidate/64/generated.so"
+        ],
+        "host_compile_command": [
+          "cc",
+          "-std=c11",
+          "-O2",
+          "-Wall",
+          "-Wextra",
+          "-Werror",
+          "-pedantic",
+          "-DCK_TTS_PARALLEL_CONV",
+          "-DCK_TTS_CONV_WORKERS=8",
+          "-DCK_TTS_RUNTIME_WAVEFORM",
+          "-DCK_TTS_COMPILED_TOKEN_COUNT=64",
+          "-DCK_TTS_EXPECTED_LIBRARY_SHA256=\"98097a6de6eddcf6acbbcdc2497c57d0394f191f12f642e684a64977be4d39be\"",
+          "-I",
+          "/data/cke/speech-snake-20261108/kokoro-candidate/64",
+          "/data/cke/speech-snake-20261108/kokoro-candidate/64/host.c",
+          "/data/cke/speech-snake-20261108/kokoro-candidate/64/audio_noise_counter.c",
+          "-L",
+          "/data/cke/speech-snake-20261108/kokoro-candidate/64",
+          "-l:generated.so",
+          "-Wl,-rpath,$ORIGIN",
+          "-lm",
+          "-ldl",
+          "-lcrypto",
+          "-o",
+          "/data/cke/speech-snake-20261108/kokoro-candidate/64/native-kokoro-wav"
+        ]
+      }
+    },
+    "exploratory_trials": [
+      {
+        "trial": 0,
+        "provider": "base",
+        "chunks": [
+          {
+            "seconds": 1.6999869141727686,
+            "sha256": "74548ccfdf4cda8531f4afd4820b9dfa22554b0740fc505cf8e7fe8b2979fbc9"
+          },
+          {
+            "seconds": 1.6453108210116625,
+            "sha256": "3043620d5d4cd2aa39e8f8ad3c7f97adf34f1e2b88a9fba923f8931d9881f76a"
+          },
+          {
+            "seconds": 2.749310528859496,
+            "sha256": "913efc1387b84e399476683a21fca7b9854108b5e9551b088e7a5c82cf436bee"
+          }
+        ],
+        "seconds": 6.095202432945371
+      },
+      {
+        "trial": 0,
+        "provider": "candidate",
+        "chunks": [
+          {
+            "seconds": 1.629049631766975,
+            "sha256": "74548ccfdf4cda8531f4afd4820b9dfa22554b0740fc505cf8e7fe8b2979fbc9"
+          },
+          {
+            "seconds": 1.5556725198403,
+            "sha256": "3043620d5d4cd2aa39e8f8ad3c7f97adf34f1e2b88a9fba923f8931d9881f76a"
+          },
+          {
+            "seconds": 2.591780082322657,
+            "sha256": "913efc1387b84e399476683a21fca7b9854108b5e9551b088e7a5c82cf436bee"
+          }
+        ],
+        "seconds": 5.776966403238475
+      },
+      {
+        "trial": 1,
+        "provider": "candidate",
+        "chunks": [
+          {
+            "seconds": 1.572147029452026,
+            "sha256": "74548ccfdf4cda8531f4afd4820b9dfa22554b0740fc505cf8e7fe8b2979fbc9"
+          },
+          {
+            "seconds": 1.5391651261597872,
+            "sha256": "3043620d5d4cd2aa39e8f8ad3c7f97adf34f1e2b88a9fba923f8931d9881f76a"
+          },
+          {
+            "seconds": 2.4776216465979815,
+            "sha256": "913efc1387b84e399476683a21fca7b9854108b5e9551b088e7a5c82cf436bee"
+          }
+        ],
+        "seconds": 5.589397045783699
+      },
+      {
+        "trial": 1,
+        "provider": "base",
+        "chunks": [
+          {
+            "seconds": 1.6710108937695622,
+            "sha256": "74548ccfdf4cda8531f4afd4820b9dfa22554b0740fc505cf8e7fe8b2979fbc9"
+          },
+          {
+            "seconds": 1.6708753099665046,
+            "sha256": "3043620d5d4cd2aa39e8f8ad3c7f97adf34f1e2b88a9fba923f8931d9881f76a"
+          },
+          {
+            "seconds": 2.9301884481683373,
+            "sha256": "913efc1387b84e399476683a21fca7b9854108b5e9551b088e7a5c82cf436bee"
+          }
+        ],
+        "seconds": 6.272522661834955
+      },
+      {
+        "trial": 2,
+        "provider": "base",
+        "chunks": [
+          {
+            "seconds": 1.8436955641955137,
+            "sha256": "74548ccfdf4cda8531f4afd4820b9dfa22554b0740fc505cf8e7fe8b2979fbc9"
+          },
+          {
+            "seconds": 1.8114258935675025,
+            "sha256": "3043620d5d4cd2aa39e8f8ad3c7f97adf34f1e2b88a9fba923f8931d9881f76a"
+          },
+          {
+            "seconds": 2.885145777836442,
+            "sha256": "913efc1387b84e399476683a21fca7b9854108b5e9551b088e7a5c82cf436bee"
+          }
+        ],
+        "seconds": 6.540704616345465
+      },
+      {
+        "trial": 2,
+        "provider": "candidate",
+        "chunks": [
+          {
+            "seconds": 1.7078432943671942,
+            "sha256": "74548ccfdf4cda8531f4afd4820b9dfa22554b0740fc505cf8e7fe8b2979fbc9"
+          },
+          {
+            "seconds": 1.7007388062775135,
+            "sha256": "3043620d5d4cd2aa39e8f8ad3c7f97adf34f1e2b88a9fba923f8931d9881f76a"
+          },
+          {
+            "seconds": 2.6985707925632596,
+            "sha256": "913efc1387b84e399476683a21fca7b9854108b5e9551b088e7a5c82cf436bee"
+          }
+        ],
+        "seconds": 6.10754643753171
+      }
+    ],
+    "exploratory_limit": "Consumer tests overlapped exploratory trials; use the subsequent paired series for the reported comparison."
+  },
+  "qwen": {
+    "model": "Qwen3-TTS-12Hz-0.6B-CustomVoice",
+    "model_revision": "85e237c12c027371202489a0ec509ded67b5e4b5",
+    "audio_seconds": 3.68,
+    "trials": [
+      {
+        "trial": 0,
+        "variant": "base",
+        "code_frames": 46,
+        "codebooks": 16,
+        "codec_conv_provider": "avx2_fma",
+        "code_sha256": "9431ba62c93b23f2327626314e6d338efdbe18ec7b733826f4fa2142f11386bf",
+        "samples": 88320,
+        "sample_rate_hz": 24000,
+        "audio_seconds": 3.68,
+        "peak": 0.38156136870384216,
+        "waveform_f32_sha256": "f9a8c5fae95a19888a3cadf8c909375f82ee9a0de28bd8aa93328ffcabed663f",
+        "max_abs": 1.3262033462524414e-06,
+        "rmse": 7.225543615043277e-08,
+        "worst_index": 16434,
+        "actual": 0.1645353138446808,
+        "reference": 0.16453664004802704,
+        "run_seconds": 63.62,
+        "library_sha256": "29bbf6a8e5383f7f513c46fcb5a87edfe77f81b9bb3581750a252e66c1f67e7d",
+        "codec_replay_seconds": [
+          19.866203090175986,
+          19.870340844616294,
+          19.89563483186066
+        ]
+      },
+      {
+        "trial": 1,
+        "variant": "candidate",
+        "code_frames": 46,
+        "codebooks": 16,
+        "codec_conv_provider": "avx2_fma",
+        "code_sha256": "9431ba62c93b23f2327626314e6d338efdbe18ec7b733826f4fa2142f11386bf",
+        "samples": 88320,
+        "sample_rate_hz": 24000,
+        "audio_seconds": 3.68,
+        "peak": 0.38156136870384216,
+        "waveform_f32_sha256": "f9a8c5fae95a19888a3cadf8c909375f82ee9a0de28bd8aa93328ffcabed663f",
+        "max_abs": 1.3262033462524414e-06,
+        "rmse": 7.225543615043277e-08,
+        "worst_index": 16434,
+        "actual": 0.1645353138446808,
+        "reference": 0.16453664004802704,
+        "run_seconds": 63.87,
+        "library_sha256": "8a42f9757a1879dd682354b19d02bbbc2ee5a6b24339d6d8dad0883b03a1e7f6",
+        "codec_replay_seconds": [
+          20.051712280139327,
+          19.672369102947414,
+          19.670043108984828
+        ]
+      }
+    ],
+    "identity": {
+      "base_kernel_sha256": "d0bb114cc2d9755f0c974e7ace70d7bdb0f0fd75c2b5a681b7396e936aa48d7b",
+      "candidate_kernel_sha256": "4f2b77a4345c09d941bd73acb9335ea796625058aaf9cc8a63d51233f61939c3",
+      "base_library_sha256": "29bbf6a8e5383f7f513c46fcb5a87edfe77f81b9bb3581750a252e66c1f67e7d",
+      "candidate_library_sha256": "8a42f9757a1879dd682354b19d02bbbc2ee5a6b24339d6d8dad0883b03a1e7f6",
+      "compile_commands": [
+        [
+          "cc",
+          "-std=gnu11",
+          "-O2",
+          "-w",
+          "-shared",
+          "-fPIC",
+          "-ffunction-sections",
+          "-fdata-sections",
+          "-Wl,--gc-sections",
+          "-Wl,--no-undefined",
+          "-fopenmp",
+          "/tmp/tmpnujbswv6/generated.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/audio_text_embedding.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/strided_unary_checked.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/indexed_sum_rows_checked.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/transformer_rows_checked.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/linear_rows_checked.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/rope_kernels.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/attention_kernels.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/softmax_kernels.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/attention_flash_true.c",
+          "/data/cke/speech-projection-lanes-20261108/src/ck_threadpool.c",
+          "/data/cke/speech-projection-lanes-20261108/src/ckernel_strict.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/attention_decode_append_checked.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/runtime_extent.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/select_next_id_checked.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/repetition_penalty_checked.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/copy_i32_span_checked.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/equal_i32_scalar_checked.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/audio_zero_pad_checked.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/audio_conv1d_checked.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/audio_conv_transpose_dense_checked.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/audio_conv1d_depthwise_checked.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/layernorm_rows_checked.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/layernorm_kernels.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/gelu_rows_erf_checked.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/gelu_kernels.c",
+          "/data/cke/speech-snake-20261108/baseline.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/audio_scaled_sum_strided.c",
+          "/data/cke/speech-projection-lanes-20261108/src/runtime/checked_frame_loop.c",
+          "/data/cke/speech-projection-lanes-20261108/src/runtime/checked_frame_codec.c",
+          "-I",
+          "/data/cke/speech-projection-lanes-20261108/include",
+          "-lm",
+          "-ldl",
+          "-lpthread",
+          "-o",
+          "/tmp/tmpnujbswv6/generated.so"
+        ],
+        [
+          "cc",
+          "-std=gnu11",
+          "-O2",
+          "-w",
+          "-shared",
+          "-fPIC",
+          "-ffunction-sections",
+          "-fdata-sections",
+          "-Wl,--gc-sections",
+          "-Wl,--no-undefined",
+          "-fopenmp",
+          "/tmp/tmpnujbswv6/generated.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/audio_text_embedding.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/strided_unary_checked.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/indexed_sum_rows_checked.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/transformer_rows_checked.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/linear_rows_checked.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/rope_kernels.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/attention_kernels.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/softmax_kernels.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/attention_flash_true.c",
+          "/data/cke/speech-projection-lanes-20261108/src/ck_threadpool.c",
+          "/data/cke/speech-projection-lanes-20261108/src/ckernel_strict.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/attention_decode_append_checked.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/runtime_extent.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/select_next_id_checked.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/repetition_penalty_checked.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/copy_i32_span_checked.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/equal_i32_scalar_checked.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/audio_zero_pad_checked.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/audio_conv1d_checked.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/audio_conv_transpose_dense_checked.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/audio_conv1d_depthwise_checked.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/layernorm_rows_checked.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/layernorm_kernels.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/gelu_rows_erf_checked.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/gelu_kernels.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/audio_snake_checked.c",
+          "/data/cke/speech-projection-lanes-20261108/src/kernels/audio_scaled_sum_strided.c",
+          "/data/cke/speech-projection-lanes-20261108/src/runtime/checked_frame_loop.c",
+          "/data/cke/speech-projection-lanes-20261108/src/runtime/checked_frame_codec.c",
+          "-I",
+          "/data/cke/speech-projection-lanes-20261108/include",
+          "-lm",
+          "-ldl",
+          "-lpthread",
+          "-o",
+          "/tmp/tmpnujbswv6/candidate.so"
+        ]
+      ],
+      "pid": 22357
+    },
+    "comparison": {
+      "baseline_seconds": [
+        63.62
+      ],
+      "candidate_seconds": [
+        63.87
+      ],
+      "baseline_median_seconds": 63.62,
+      "candidate_median_seconds": 63.87,
+      "latency_reduction_percent": -0.3929581892486711,
+      "speed_ratio": 0.996085799279787
+    },
+    "codec_replay_comparison": {
+      "baseline_seconds": [
+        19.866203090175986,
+        19.870340844616294,
+        19.89563483186066
+      ],
+      "candidate_seconds": [
+        20.051712280139327,
+        19.672369102947414,
+        19.670043108984828
+      ],
+      "baseline_median_seconds": 19.870340844616294,
+      "candidate_median_seconds": 19.672369102947414,
+      "latency_reduction_percent": 0.996317794531032,
+      "speed_ratio": 1.0100634418067735
+    },
+    "exact_codes_and_pcm": true,
+    "scope": "One autonomous full generation per variant followed by three codec-only replays from the generated code buffer. Codec replays are not additional text-to-speech runs."
+  },
+  "validation": {
+    "snake_suites": {
+      "tests": 9,
+      "skips": 0
+    },
+    "generated_consumers": {
+      "tests": 11,
+      "skips": 5
+    },
+    "negative_control": "Original preflight fails intended real-sinf-call gate: 14 != 9; ordinary values avoid duplicate sine and extreme values retain preflight. Late invalid input leaves output unchanged.",
+    "known_diagnostic": "Kokoro connected publisher-waveform comparison remains FAIL, max absolute difference 0.007651925 versus 0.0002 limit. Baseline output preservation does not resolve publisher fidelity."
+  },
+  "limits": [
+    "Small fixed workloads, shared host; timings are not portable speed guarantees.",
+    "Projection optimization is present in both variants. Do not compare absolute times from different measurement windows.",
+    "No live service deployment, full Ryzen speech timing or new roofline result.",
+    "One full Qwen pair is diagnostic timing, not a stable end-to-end speed claim."
+  ],
+  "host_evidence_directory": "/data/cke/speech-snake-20261108"
+}
