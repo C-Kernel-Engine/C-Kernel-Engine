@@ -1,0 +1,242 @@
+{
+  "evidence": "contract_simulation; no training or job submission",
+  "discovery_request": {
+    "schema": "cke.training.v1",
+    "request_id": "discover",
+    "operation": "discover"
+  },
+  "discovery_response": {
+    "schema": "cke.training.v1",
+    "request_id": "discover",
+    "request_sha256": "3c89e88e96902ad203faea89a6756c609545dda17e905c8d5a70574a05d741b3",
+    "worker_boot_id": "11111111111111111111111111111111",
+    "capabilities_sha256": "de53ccb198b5c3ce77f785844f51c09a4dae2416d17cbba308eeff84c1212ce2",
+    "ok": true,
+    "capabilities": {
+      "schema": "cke.training.v1",
+      "worker_boot_id": "11111111111111111111111111111111",
+      "cke_commit": "d0c0cceda730f21b75a1ac689547dc219660e386",
+      "runtime": {
+        "version": "v8.workflow.source",
+        "loaded": false,
+        "workflow_sha256": "c5dd7258a22753937ad3e11759ebe22c073777f5453fdb1d770379b91a6b377a"
+      },
+      "execution": "disabled",
+      "resources": "unknown",
+      "recipes": {
+        "svg_tiny_v8": {
+          "status": "validation_only",
+          "workflow": "v8_training_workflow",
+          "shape": {
+            "layers": 4,
+            "d_model": 32,
+            "hidden": 64,
+            "heads": 4,
+            "kv_heads": 4,
+            "vocab_size": 256,
+            "seq_len": 32
+          },
+          "dtype": "fp32",
+          "optimizer": "adamw",
+          "method": "full_tiny_decoder",
+          "tokenizer": "utf8_byte_v1",
+          "dataset": "cke_svg_single_document_v1"
+        },
+        "english_tiny_v8": {
+          "status": "validation_only",
+          "workflow": "v8_training_workflow",
+          "shape": {
+            "layers": 4,
+            "d_model": 32,
+            "hidden": 64,
+            "heads": 4,
+            "kv_heads": 4,
+            "vocab_size": 256,
+            "seq_len": 32
+          },
+          "dtype": "fp32",
+          "optimizer": "adamw",
+          "method": "full_tiny_decoder",
+          "tokenizer": "utf8_byte_v1",
+          "dataset": "cke_english_byte_v1"
+        }
+      },
+      "datasets": [
+        {
+          "id": "cke_svg_single_document_v1",
+          "version": "v1",
+          "format": "svg_utf8",
+          "tokenizer": "utf8_byte_v1",
+          "splits": {
+            "train": {
+              "sha256": "05d010073979a0d5e37bda00a7332953405d37adb739b71d993f58e539590aac",
+              "bytes": 352,
+              "token_count": 352,
+              "documents": 1
+            },
+            "validation": {
+              "sha256": "0fa56acde9b8bf7a63f7b0f334462878bafeeef30bdf6025dfb6b881222d8a82",
+              "bytes": 352,
+              "token_count": 352,
+              "documents": 1
+            }
+          },
+          "spec_sha256": "cd5ab8a87b5ca62e21f3348e9cba9fc1a50480744a8d4bd349198f903a916a76",
+          "qc": {
+            "integrity": "PASS",
+            "training_quality": "NOT_TESTED"
+          },
+          "limitation": "near_duplicate_geometry_with_color_changes_only; machinery fixture, not generalization evidence",
+          "sha256": "648ef303226f5ca17ce087e79f95995a8d12050ff885d00fa2a3ff95d748c6b8"
+        },
+        {
+          "id": "cke_english_byte_v1",
+          "version": "v1",
+          "format": "text_utf8",
+          "tokenizer": "utf8_byte_v1",
+          "splits": {
+            "train": {
+              "sha256": "a167143ed893b3f866fc92097a90079fea6321b9134de7cc1600ccd70ad9ff27",
+              "bytes": 10000,
+              "token_count": 10000,
+              "documents": 1
+            },
+            "validation": {
+              "sha256": "22829196497dfd763ac5c6221653f8e49d6cb6e8d684858ec9a30c349b8c7a7d",
+              "bytes": 2048,
+              "token_count": 2048,
+              "documents": 1
+            }
+          },
+          "spec_sha256": "23dc66902bce0e66ba4ec003b57c90853493787e9f0be0d50e1fbe78df62c99e",
+          "qc": {
+            "integrity": "PASS",
+            "training_quality": "NOT_TESTED"
+          },
+          "limitation": "machinery fixture; no generalization claim",
+          "sha256": "01c40f34eb0124d1b655b44e3c37fade468322e32ff9cd8764adf6a3675156b6"
+        }
+      ],
+      "stages": {
+        "discover": "supported",
+        "validate": "supported",
+        "submit": "unsupported",
+        "observe": "unsupported",
+        "artifacts": "unsupported",
+        "cancel": "unsupported"
+      },
+      "methods": {
+        "full_tiny_decoder": "validation_only",
+        "clef_head": "unsupported",
+        "lora": "unsupported",
+        "qlora": "unsupported"
+      },
+      "limits": {
+        "message_bytes": 16384,
+        "epochs": [
+          1,
+          10
+        ],
+        "grad_accum": [
+          1,
+          8
+        ],
+        "queued_jobs": 0
+      },
+      "sha256": "de53ccb198b5c3ce77f785844f51c09a4dae2416d17cbba308eeff84c1212ce2"
+    },
+    "plan": null,
+    "plan_sha256": null,
+    "errors": [],
+    "warnings": [],
+    "submitted": false
+  },
+  "validation_request": {
+    "schema": "cke.training.v1",
+    "request_id": "validate",
+    "operation": "validate",
+    "worker_boot_id": "11111111111111111111111111111111",
+    "capabilities_sha256": "de53ccb198b5c3ce77f785844f51c09a4dae2416d17cbba308eeff84c1212ce2",
+    "config": {
+      "recipe": "svg_tiny_v8",
+      "dataset": {
+        "id": "cke_svg_single_document_v1",
+        "version": "v1",
+        "sha256": "648ef303226f5ca17ce087e79f95995a8d12050ff885d00fa2a3ff95d748c6b8",
+        "train_split": "train",
+        "validation_split": "validation"
+      },
+      "tokenizer": "utf8_byte_v1",
+      "shape": {
+        "layers": 4,
+        "d_model": 32,
+        "hidden": 64,
+        "heads": 4,
+        "kv_heads": 4,
+        "vocab_size": 256,
+        "seq_len": 32
+      },
+      "dtype": "fp32",
+      "optimizer": "adamw",
+      "method": "full_tiny_decoder",
+      "epochs": 2,
+      "grad_accum": 2
+    }
+  },
+  "validation_response": {
+    "schema": "cke.training.v1",
+    "request_id": "validate",
+    "request_sha256": "8897a9b2dfdcfb12df1b4d2a75719b0bf806b8ca5a43ec88a080a806f3fe1ef8",
+    "worker_boot_id": "11111111111111111111111111111111",
+    "capabilities_sha256": "de53ccb198b5c3ce77f785844f51c09a4dae2416d17cbba308eeff84c1212ce2",
+    "ok": true,
+    "capabilities": null,
+    "plan": {
+      "schema": "cke.training.plan.v1",
+      "worker_boot_id": "11111111111111111111111111111111",
+      "capabilities_sha256": "de53ccb198b5c3ce77f785844f51c09a4dae2416d17cbba308eeff84c1212ce2",
+      "cke_commit": "d0c0cceda730f21b75a1ac689547dc219660e386",
+      "workflow_sha256": "c5dd7258a22753937ad3e11759ebe22c073777f5453fdb1d770379b91a6b377a",
+      "config": {
+        "recipe": "svg_tiny_v8",
+        "dataset": {
+          "id": "cke_svg_single_document_v1",
+          "version": "v1",
+          "sha256": "648ef303226f5ca17ce087e79f95995a8d12050ff885d00fa2a3ff95d748c6b8",
+          "train_split": "train",
+          "validation_split": "validation"
+        },
+        "tokenizer": "utf8_byte_v1",
+        "shape": {
+          "layers": 4,
+          "d_model": 32,
+          "hidden": 64,
+          "heads": 4,
+          "kv_heads": 4,
+          "vocab_size": 256,
+          "seq_len": 32
+        },
+        "dtype": "fp32",
+        "optimizer": "adamw",
+        "method": "full_tiny_decoder",
+        "epochs": 2,
+        "grad_accum": 2
+      },
+      "submittable": false,
+      "execution": "disabled"
+    },
+    "plan_sha256": "edf1f846f2d2f088200d10237f193adfdf8bd1084161c88e792874c2a24746be",
+    "errors": [],
+    "warnings": [
+      {
+        "field": "/resources",
+        "code": "ADMISSION_NOT_IMPLEMENTED"
+      },
+      {
+        "field": "/config/dataset",
+        "code": "FIXTURE_NOT_QUALITY_CERTIFICATION"
+      }
+    ],
+    "submitted": false
+  }
+}
