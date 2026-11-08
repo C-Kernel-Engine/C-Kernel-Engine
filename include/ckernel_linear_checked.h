@@ -7,7 +7,8 @@
  * bias-free projection. All buffers are caller owned and nonaliasing.
  * Physical row strides may exceed logical widths. Rejection returns -1 before
  * any output write. This inference provider accumulates in ordered FP64 without FMA.
- * Available SIMD lanes cover independent rows, preserving reduction order. */
+ * Available SIMD lanes cover independent rows or output channels, preserving
+ * reduction order. Weight validation retains per-output ordered FP64 L1 sums. */
 int linear_rows_checked_f32(
     const float *input, size_t input_elements, size_t input_stride,
     const float *weight, size_t weight_elements, size_t weight_stride,

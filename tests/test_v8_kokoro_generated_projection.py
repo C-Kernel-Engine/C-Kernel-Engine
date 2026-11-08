@@ -126,8 +126,8 @@ class KokoroGeneratedProjectionTest(unittest.TestCase):
                              ctypes.c_size_t, ctypes.c_size_t]
         function.restype = ctypes.c_int
         rng = np.random.default_rng(173)
-        for rows in (1, 3, 4, 5, 7, 8, 9):
-            for width in (1, 7, 31):
+        for rows in (1, 2, 3, 4, 5, 7, 8, 9):
+            for width in (1, 3, 4, 5, 7, 8, 9, 31):
                 for biased in (False, True):
                     with self.subTest(rows=rows, width=width, bias=biased):
                         channels = 11
@@ -154,6 +154,22 @@ class KokoroGeneratedProjectionTest(unittest.TestCase):
                         np.testing.assert_array_equal(output[:, :channels].view(np.uint32),
                                                       expected.astype(np.float32).view(np.uint32))
                         self.assertTrue(np.all(output[:, channels:] == -777))
+                        # SIMD validation must see every independent output lane
+                        # and the scalar tail, without publishing partial results.
+                        for o in (0, 1, 2, 3, 7, 8, 10):
+                            saved = w[o, width - 1]
+                            for invalid in (np.nan, np.inf, -np.inf):
+                                output.fill(-777)
+                                w[o, width - 1] = invalid
+                                self.assertEqual(function(*args), -1)
+                                self.assertTrue(np.all(output == -777))
+                            w[o, width - 1] = saved
+                            if biased:
+                                saved_bias = bias[o]
+                                bias[o] = np.nan
+                                self.assertEqual(function(*args), -1)
+                                self.assertTrue(np.all(output == -777))
+                                bias[o] = saved_bias
                         output.fill(-777)
                         x[-1, width - 1] = np.nan
                         self.assertEqual(function(*args), -1)

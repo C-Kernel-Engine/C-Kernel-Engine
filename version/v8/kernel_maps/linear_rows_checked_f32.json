@@ -17,7 +17,7 @@
   ],
   "scratch": [],
   "dims": ["input_elements", "input_stride", "weight_elements", "weight_stride", "bias_elements", "output_elements", "output_stride", "rows", "input_channels", "output_channels"],
-  "constraints": {"notes": "Runtime AVX2 dispatch may process four independent rows with the identical ordered FP64 multiply/add sequence; scalar tails and unsupported ISAs preserve the same historical numerical contract ID. No FMA or horizontal reduction is introduced. M, K, N positive; checked physical spans; nonaliasing caller-owned buffers; all accessed inputs and results finite. Rejection leaves all output unchanged. No allocation or global state."},
+  "constraints": {"notes": "Runtime AVX2 dispatch may process independent rows or output channels with the identical ordered FP64 multiply/add sequence. Weight validation preserves each output row L1 summation order. Scalar tails and unsupported ISAs preserve the same historical numerical contract ID. No FMA or horizontal reduction is introduced. M, K, N positive; checked physical spans; nonaliasing caller-owned buffers; all accessed inputs and results finite. Rejection leaves all output unchanged. No allocation or global state."},
   "impl": {
     "function": "linear_rows_checked_f32",
     "c_declaration": "int linear_rows_checked_f32(const float *input, size_t input_elements, size_t input_stride, const float *weight, size_t weight_elements, size_t weight_stride, const float *bias, size_t bias_elements, float *output, size_t output_elements, size_t output_stride, size_t rows, size_t input_channels, size_t output_channels);",
