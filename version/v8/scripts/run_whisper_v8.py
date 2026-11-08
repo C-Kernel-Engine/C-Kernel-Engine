@@ -1395,7 +1395,7 @@ def _run_segment(
                 "--max-tokens",
                 str(args.max_tokens),
                 *(["--timestamps"] if args.timestamps else []),
-                *(["--vocabulary-hint", args.vocabulary_hint]
+                *([f"--vocabulary-hint={args.vocabulary_hint}"]
                   if getattr(args, "vocabulary_hint", "") else []),
                 *(["--attention-trace-output", str(trace_output)]
                   if trace_output else []),

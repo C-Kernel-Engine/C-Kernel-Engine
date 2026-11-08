@@ -1257,3 +1257,30 @@ def test_vocabulary_tokens_reach_prefill_but_not_transcript(tmp_path, monkeypatc
     report=json.loads(args.worker_report.read_text())
     assert report['transcript_text']=='' and report['generated_tokens']==[]
     assert report['vocabulary_hint_applied'] and report['vocabulary_hint_token_count']==2
+
+
+@pytest.mark.parametrize('hint', ['--no-cache', '-O3', '--no-cache, Jupyter Notebook'])
+def test_subprocess_vocabulary_hint_preserves_leading_dash(tmp_path, hint):
+    runner = _module()
+    # Use the real parser in fresh child processes, replacing only model execution.
+    driver = tmp_path / 'parse_worker.py'
+    driver.write_text(
+        'import json, runpy\n'
+        f'namespace = runpy.run_path({str(SCRIPT)!r})\n'
+        'args = namespace["_parser"]().parse_args()\n'
+        'args.worker_report.write_text(json.dumps({"hint": getattr(args, "vocabulary_hint", "")}))\n'
+    )
+    args = runner._parser().parse_args([
+        'run', '--encoder-run-dir', str(tmp_path / 'encoder'),
+        '--decoder-run-dir', str(tmp_path / 'decoder'), '--wav', str(tmp_path / 'audio.wav'),
+        f'--vocabulary-hint={hint}',
+    ])
+    assert args.vocabulary_hint == hint
+    encoder, decoder = runner._run_segment(
+        args, common=[sys.executable, str(driver)],
+        encoder_dir=args.encoder_run_dir, decoder_dir=args.decoder_run_dir,
+        wav_path=args.wav, temp=tmp_path, index=0, window_start_frame=0,
+        worker_env=os.environ.copy(),
+    )
+    assert encoder['hint'] == ''
+    assert decoder['hint'] == hint
