@@ -1036,6 +1036,60 @@
 
 <p>Model topology lives in the circuit builders here. Kernels implement arithmetic; maps describe ABI, scratch and numerical contracts. Generic operation catalogue entries do not inspect the model name.</p>
 
+<section id="reference-backbone-capture">
+<h2>Real-feature capture preparation — backbone run still NOT_TESTED</h2>
+<p>The next gate is a released-backbone feature capture followed by the packaged generated head.
+The local P3 cache currently contains the released head and reference source, but the post-trained
+Clef 9B backbone was not found. The new tooling does not download a model or substitute ordinary
+Qwen weights. Actual real-backbone capture and its generated-head numerical comparison remain
+<strong>NOT_TESTED</strong> until the pinned assets are supplied.</p>
+<p><code>capture_clef_features.py</code> is development-only PyTorch oracle tooling. It loads a local
+release after checking an administrator-pinned file-hash lock, committed head/config/source identities,
+and every indexed backbone shard. Tokenizer and other discoverable loader files must also appear in
+the lock. The lock must come from independently verified release assets; naming a revision in an
+untrusted manifest does not prove weight provenance. No production worker imports this script.</p>
+<p>The pinned schema encoder silently truncates state at its length limit. This wrapper first encodes
+without truncation, rejects requests exceeding the declared capacity, then verifies the bounded result
+is identical. Images/video are explicitly unsupported. It retains original token IDs, question/option
+spans, stable candidate IDs and request hash. The backbone runs in BF16 with eager attention; actual
+hidden states and output-embedding rows are cast to FP32 for the same-input head comparison.
+This is not a claim of BF16 head parity or full-model FP32 parity.</p>
+<p>Only used embedding rows are retained, with their original token IDs. The head-local IDs are remapped
+without changing their span positions or values. A nonzero complete-head PyTorch test proves that this
+compaction preserves every compared intermediate and final logit exactly. Capture loading checks byte
+hashes, token reconstruction, question ownership, expected reference shapes and finite reference values
+before native replay. Private requests/features remain local artifacts, not routine logs.</p>
+<p><code>replay_clef_features.py</code> builds a package using the existing authoring and compiler path,
+then compares four field-layer outputs, final normalized fields and all raw option logits. Intermediate
+absolute tolerance stays 1e-5; raw logits stay 2e-6, relative zero. It also compares each returned question's
+scores, retaining IDs and unequal option counts. Question zero → other questions → question zero tests
+selection and reuse within one captured context; it is not a substitute for distinct real-input A→B→A
+coverage. A package still has one compiled geometry. The existing 1,000 ms worker deadline is preserved;
+a deadline rejection is reported as execution failure with numerical NOT_TESTED, not silently bypassed.</p>
+<pre><code># release-lock.json: {"model":"Cloudflare/clef-flash", "revision":"PINNED_REVISION",
+#                     "files":{"config.json":"SHA256", ...every required local file...}}
+# Obtain the lock and its expected SHA independently from verified release assets.
+python3 -m version.v8.decision.capture_clef_features \
+  --release /trusted/clef-release --release-lock /trusted/release-lock.json \
+  --release-lock-sha256 LOCK_SHA256 --request request.json \
+  --output /private/clef-capture --max-tokens 512 --threads 4
+python3 -m version.v8.decision.replay_clef_features \
+  --capture /private/clef-capture --capture-sha256 CAPTURE_JSON_SHA256 \
+  --head /trusted/clef-release/joint_head.safetensors --output /private/clef-replay
+
+# Cheap contracts; reference-source test skips explicitly when absent.
+python3 -m unittest tests.test_v8_clef_feature_capture -v
+# Real backbone gate is optional and must report SKIP without these assets:
+CKE_CLEF_RELEASE_PATH=/trusted/clef-release \
+CKE_CLEF_RELEASE_LOCK=/trusted/release-lock.json \
+CKE_CLEF_RELEASE_LOCK_SHA256=LOCK_SHA256 \
+python3 -m unittest tests.test_v8_clef_feature_capture.RealBackboneCaptureTest -v</code></pre>
+<p>The standard <code>decision_feature_capture</code> nightly lane registers both the cheap contracts
+and the explicitly asset-dependent real-backbone gate. Five local contract tests passed, including
+pinned-source truncation detection; the real-backbone test was skipped. This prepares evidence collection;
+it does not advance the CKE backbone, head training, LoRA or end-to-end decision certification.</p>
+</section>
+
 <section id="antsand-evaluation-contract">
 <h2>Registered generated head: experimental loopback evaluation</h2>
 <p>The <code>cke.decision.evaluate.v1</code> proposal now connects one registered generated

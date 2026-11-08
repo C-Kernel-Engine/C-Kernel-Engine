@@ -937,6 +937,11 @@ TEST_SUITES = {
         ROOT / "server" / "tests" / "test_decision_evaluate.py",
         unittest_targets=("server.tests.test_decision_evaluate",),
     ),
+    "decision_feature_capture": TestSuite(
+        "Clef Reference Feature Capture and Same-Input Head Replay", "inference",
+        ROOT / "tests" / "test_v8_clef_feature_capture.py",
+        unittest_targets=("tests.test_v8_clef_feature_capture",),
+    ),
     "decision_native_head": TestSuite(
         "Registered Generated Decision Head and Independent Consumer", "inference",
         ROOT / "server" / "tests" / "test_decision_native.py",
