@@ -236,6 +236,93 @@ implementation. None is implied by an accepted validation response. SVG/HTML rep
 or sanitized by any future UI rather than injected into Antsand's authenticated origin.</p>
 </section>
 
+<section id="training-job-proposal">
+<h2>Opt-in local SVG job submission</h2>
+<p><code>server/training/jobs.py</code> adds a separate <code>cke.training.jobs.v1</code> local
+adapter around the existing v8 generated-C workflow. The discovery/validation-only command above
+remains unchanged and cannot submit jobs. This adapter requires an explicit
+<code>--enable-svg-training</code> launch and accepts only the registered SVG recipe. It does not
+install a daemon or expose a network endpoint.</p>
+<p><code>prepare</code> checks the existing validation contract and persists a new
+<code>cke.training.execution-plan.v1</code> receipt. This explicitly pins the experiment/draft revision,
+trusted caller identity, worker boot, validation/capability hashes, CKE commit, workflow hash,
+interpreter binary hash, fixed optimizer settings and seed. The original validation-only plan remains
+non-submittable inside the receipt. Only the new execution receipt is submittable. It expires after
+ten minutes. At least two epochs are required because the certification workflow compares first and
+last epoch losses.</p>
+<p><code>submit</code> accepts only that exact stored receipt hash and an idempotency key. An owner/key
+retry returns the original persistent job ID, even after reconnect; changing the plan under the same
+key fails. Inputs/capabilities, interpreter identity, expiry, disk availability and the one-job slot
+are rechecked before admission; inputs are checked again before execution. No client supplies shell
+commands, Python paths, corpus paths or output paths. The trusted launcher selects the interpreter
+without resolving away its virtual environment.</p>
+<p>SQLite receipts survive worker reconnects. A private store and exclusive daemon lock admit one job,
+with no waiting backlog. The store holds at most 32 jobs and 128 plan receipts; the launcher requires
+2 GiB free disk, fixes native thread settings to one and bounds the workflow to 600 seconds. This is
+local admission, not a global CPU/RAM reservation or a filesystem quota. Stdout/stderr is drained while
+retaining at most 1 MiB of private log data. The job has queued/running/succeeded/failed states, and
+an explicit <code>recovery_required</code> state for ambiguous interrupted work.</p>
+<p>On restart, unfinished receipts are never automatically retried or labelled cancelled. They become
+recovery-required and block further admission: a child may still exist, or a completion receipt may
+have been lost. Operator investigation is required; automatic adoption, cancellation and recovery
+resolution are not implemented. Completed jobs remain readable. Observations distinguish original
+submission boot identity from the current observer boot and carry experiment/revision correlation,
+timestamps, stage and fixed error codes. Fine-grained live progress remains <code>null</code>. At completion, finite training and validation
+cross-entropy values carry epoch, unit and observation time; missing values are omitted rather than
+replaced with zero. The authoritative workflow report retains the detailed trajectory.</p>
+<p>Success requires a zero process exit <em>and</em> a passing workflow report with the required
+learning, PyTorch trajectory, resume, checkpoint, inference-export, runtime-provenance and IR-report
+gates. Incomplete or failed reports do not become success. The accepted plan, actual training report and available workflow training-plan, pipeline and
+checkpoint-manifest JSON files are registered as owner-scoped artifact IDs, sizes and SHA-256 hashes.
+The pipeline/report retain generated samples; checkpoint binary retrieval is not implemented. Retrieval uses only those IDs,
+checks the hash and returns bounded 8 KiB base64 chunks. No arbitrary path or URL is accepted. Training
+report strings, samples and any future SVG/HTML reports must not be injected into an authenticated UI.</p>
+<p>Authorization is an in-process trusted-caller boundary: the launcher supplies the principal, and
+request JSON cannot override it. Tests prove cross-principal denial inside that boundary; this is not
+network authentication or a Unix-user sandbox. Real Antsand submission requires its authenticated
+adapter to establish that identity. Cancellation remains unsupported; neither timeout nor lost contact
+is presented as accepted cancellation.</p>
+<pre><code># Persistent local JSON-lines interface; explicit administrator-chosen identity and store.
+python3 -m server.training.jobs --enable-svg-training \
+  --principal local-review --store /private/cke-svg-jobs --python /path/to/venv/bin/python
+# Request fields: schema, request_id, operation plus:
+# discover: no extra fields
+# prepare: config, experiment_id, draft_revision
+# submit: plan_sha256, idempotency_key
+# observe: job_id
+# artifact: job_id, artifact_id, offset
+
+# Explicit real acceptance; writes acceptance.json and private per-job artifacts.
+/path/to/venv/bin/python version/v8/scripts/run_svg_job_acceptance_v8.py \
+  --store /private/fresh-svg-acceptance --python /path/to/venv/bin/python
+python3 -m unittest server.tests.test_training_jobs -v
+python3 scripts/nightly_runner.py --tests training_job_lifecycle training_backend_contract --ci
+# Opt-in real workflow gate; requires the training environment, compiler and clean tracked sources.
+CKE_RUN_SVG_JOB_ACCEPTANCE=1 /path/to/venv/bin/python -m unittest \
+  server.tests.test_training_jobs.RealSvgJobTest -v</code></pre>
+<p>The independent simulated Antsand observer rejects changed identities, out-of-order observations,
+terminal state regression and a success without required artifacts. Simulated executors explicitly say
+<code>contract_simulation</code>; the real adapter says <code>native_generated_workflow</code>. The cheap
+lifecycle tests use simulation, while the real workflow test is explicitly opt-in and otherwise SKIP.
+Versioned simulated job receipts are in <code>server/training/fixtures/job_v1.json</code>; their fixed
+IDs are examples, not retrievable live jobs.</p>
+<p><strong>Measured local acceptance (2026-11-08):</strong> source <code>15a4b0715</code>, job
+<code>8e6e98a354e14b74a8674db582720b9d</code>, two epochs of the fixed SVG recipe. The existing workflow
+passed all 11 certification gates in 77.7 seconds with build caches present. Training loss fell
+5.500 → 5.370 and held-out loss 5.553 → 5.323. Five artifact hashes were independently reconstructed
+through bounded retrieval; a completed-job restart and duplicate submission retained the same result
+without launching a process. Evidence is retained in
+<code>docs/notes/TRAINING_SVG_JOB_EVIDENCE_2026-11-08.json</code>. An earlier run exposed and fixed a
+virtual-environment symlink launch bug; that failed receipt remains retained locally.</p>
+<p><strong>Quality remains separate:</strong> the 48-token generated sample exhausted its budget and
+was not well-formed SVG. The passing result certifies this tiny generated training workflow and its
+numerical/resume/export checks, not useful SVG generation or generalization. The test uses near-duplicate
+training/validation fixtures. No real Antsand integration or Clef-head training was performed.</p>
+<p><strong>Next:</strong> review the job protocol with Antsand, then wire its authorized submission and
+job-detail UI. Add bounded live metric/log observations, checkpoint/sample artifact contracts and
+confirmed cancellation separately. No LoRA/QLoRA or new training arithmetic is introduced here.</p>
+</section>
+
 <h2 id="certified-fp32-training">Training: Certified FP32 Starter</h2>
 
 <div class="card card-green">
