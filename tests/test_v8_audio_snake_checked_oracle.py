@@ -62,6 +62,70 @@ class CheckedAudioSnakeOracleTest(unittest.TestCase):
             output.size if output_capacity is None else output_capacity,
             output.shape[1], source.shape[0], frames)
 
+    def test_bounded_preflight_sine_count_extremes_and_atomic_rejection(self):
+        # Link wrapping counts real libm calls: skipping validation or replacing
+        # sinf with an approximation cannot satisfy the arithmetic and rejection
+        # assertions. The former two-pass implementation fails the ordinary count.
+        wrapper = Path(self.temporary.name) / "count_sine.c"
+        wrapper.write_text("""
+#include <stddef.h>
+#include <math.h>
+static size_t calls;
+float __real_sinf(float);
+float __wrap_sinf(float x) { ++calls; return __real_sinf(x); }
+size_t sine_calls(void) { return calls; }
+void clear_calls(void) { calls = 0; }
+""")
+        for flag in ("-O0", "-O3"):
+            libpath = Path(self.temporary.name) / f"count_sine_{flag}.so"
+            subprocess.run(["cc", "-std=c11", flag, "-ffp-contract=off",
+                "-fno-builtin-sinf", "-shared", "-fPIC", "-I", str(ROOT / "include"),
+                str(ROOT / "src/kernels/audio_snake_checked.c"), str(wrapper),
+                "-Wl,--wrap=sinf", "-lm", "-o", str(libpath)], check=True)
+            lib = ctypes.CDLL(str(libpath))
+            lib.sine_calls.restype = SIZE
+            snake = lib.audio_snake_strided_f32_checked
+            snake.argtypes = self.functions[0].argtypes
+            beta = lib.audio_snake_beta_strided_f32_checked
+            beta.argtypes = [FLOAT, SIZE, SIZE, FLOAT, SIZE, FLOAT, SIZE,
+                             FLOAT, SIZE, SIZE, SIZE, SIZE]
+            sine = ctypes.CDLL("libm.so.6").sinf
+            sine.argtypes = [ctypes.c_float]; sine.restype = ctypes.c_float
+            # The last two values require the exact fallback; their correction
+            # rounds away. Signed zero and padded cells are checked bitwise.
+            source = np.array([[0., -0., .25, -2., 4., 1e38, -1e38, np.nan]], np.float32)
+            alpha = np.array([.5], np.float32)
+            log_alpha = np.array([0.], np.float32)
+            log_beta = np.array([0.], np.float32)
+            for use_beta in (False, True):
+                def invoke(data, output):
+                    if use_beta:
+                        return beta(self.pointer(data), data.size, 8,
+                            self.pointer(log_alpha), 1, self.pointer(log_beta), 1,
+                            self.pointer(output), output.size, 9, 1, 7)
+                    return self.call(snake, data, alpha, output, 7)
+                expected = []
+                for x in source[0, :7]:
+                    argument = np.float32(x * (1. if use_beta else .5))
+                    v = np.float32(sine(float(argument)))
+                    periodic = np.float32(np.float32(1. if use_beta else 2.) * np.float32(v*v))
+                    expected.append(np.float32(x + periodic))
+                output = np.full((1, 9), -91., np.float32)
+                lib.clear_calls()
+                self.assertEqual(invoke(source, output), 0)
+                # Seven writes, plus exact preflight for two extreme values.
+                self.assertEqual(lib.sine_calls(), 9)
+                np.testing.assert_array_equal(output[0, :7].view(np.uint32),
+                    np.array(expected, np.float32).view(np.uint32))
+                np.testing.assert_array_equal(output[0, 7:], -91.)
+                invalid = source.copy(); invalid[0, 6] = np.nan
+                output.fill(-91.)
+                self.assertNotEqual(invoke(invalid, output), 0)
+                np.testing.assert_array_equal(output, -91.)
+                self.assertEqual(invoke(source, output), 0)
+                np.testing.assert_array_equal(output[0, :7].view(np.uint32),
+                    np.array(expected, np.float32).view(np.uint32))
+
     def test_committed_pytorch_oracle_padding_and_production_geometry(self):
         self.assertEqual(self.metadata['torch'], '2.8.0+cpu')
         for case in range(3):
