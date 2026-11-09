@@ -1499,6 +1499,67 @@ def _apply_circuit_runtime_defaults(
     return merged
 
 
+def _iter_template_graph_slots(node: Any):
+    """Yield every circuit-declared graph slot, including phase-specific edges."""
+    if isinstance(node, dict):
+        shared = node.get("graph_slots")
+        if isinstance(shared, dict):
+            yield from _iter_graph_slot_sections(shared)
+        by_phase = node.get("graph_slots_by_phase")
+        if isinstance(by_phase, dict):
+            for phase in by_phase.values():
+                if isinstance(phase, dict):
+                    yield from _iter_graph_slot_sections(phase)
+        for value in node.values():
+            yield from _iter_template_graph_slots(value)
+    elif isinstance(node, list):
+        for value in node:
+            yield from _iter_template_graph_slots(value)
+
+
+def _iter_graph_slot_sections(graph_slots: Dict[str, Any]):
+    for section in ("inputs", "outputs"):
+        edges = graph_slots.get(section)
+        if isinstance(edges, dict):
+            for slot in edges.values():
+                if isinstance(slot, str) and slot.strip():
+                    yield slot
+
+
+def _validate_declared_activation_slots(
+    template: Optional[Dict[str, Any]],
+    config: Dict[str, Any],
+    *,
+    source: str,
+) -> None:
+    """Fail closed when a circuit names a slot it never allocates or binds.
+
+    The memory planner answers unknown slots with its legacy A_LAYER_INPUT
+    fallback, which silently aliases unrelated graph edges.  Circuits opt into
+    this check when their graph owns every activation region.
+    """
+    if not bool(config.get("require_declared_activation_slots")):
+        return
+    if not isinstance(template, dict):
+        return
+    declared = set(_template_activation_bindings(template))
+    raw_buffers = template.get("activation_buffers")
+    if isinstance(raw_buffers, dict):
+        declared.update(str(name).strip() for name in raw_buffers)
+    declared.add("kv_cache")
+    undeclared = set()
+    for slot in _iter_template_graph_slots(template):
+        normalized = slot.split(":", 1)[1] if slot.startswith("external:") else slot
+        if normalized not in declared:
+            undeclared.add(slot)
+    if undeclared:
+        raise RuntimeError(
+            "HARD CIRCUIT ACTIVATION SLOT FAULT: "
+            f"{source} declares graph slots that are neither activation_buffers "
+            f"nor activation_bindings: {sorted(undeclared)}"
+        )
+
+
 def _validated_circuit_weight_policy(template: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     contract = template.get("contract") if isinstance(template.get("contract"), dict) else {}
     policy = contract.get("weight_policy") if isinstance(contract, dict) else None
@@ -1650,6 +1711,11 @@ def _hydrate_manifest_template(manifest: Dict[str, Any]) -> Dict[str, Any]:
     hydrated_config = _apply_circuit_runtime_defaults(
         dict(cfg),
         manifest.get("template") if isinstance(manifest.get("template"), dict) else None,
+        source=f"manifest:{template_name or '<embedded>'}",
+    )
+    _validate_declared_activation_slots(
+        manifest.get("template") if isinstance(manifest.get("template"), dict) else None,
+        hydrated_config,
         source=f"manifest:{template_name or '<embedded>'}",
     )
     hydrated_template = manifest.get("template") if isinstance(manifest.get("template"), dict) else {}
@@ -14953,7 +15019,13 @@ def generate_ir_lower_2(
     # This replaces the old ping-pong logic with explicit dataflow-based assignment
     # ═══════════════════════════════════════════════════════════════════════════════
     print("  Running memory planner...")
-    buffer_assignments = plan_memory(ir_lower_1_ops, slot_bindings=activation_bindings)
+    # Circuit-declared activation regions are authoritative.  Without this,
+    # the planner answers unknown semantic slots with the legacy A_LAYER_INPUT
+    # fallback and every intermediate edge aliases the layer input.
+    slot_bindings = dict(activation_bindings)
+    for declared_name in activation_buffers:
+        slot_bindings[declared_name] = declared_name
+    buffer_assignments = plan_memory(ir_lower_1_ops, slot_bindings=slot_bindings)
     print(f"  ✓ Memory planner assigned buffers for {len(buffer_assignments)} ops")
 
     # Helper to get buffer info from memory planner

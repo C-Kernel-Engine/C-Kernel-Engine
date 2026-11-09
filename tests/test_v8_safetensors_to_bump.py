@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import importlib.util
 import ctypes
 import json
@@ -3788,6 +3789,30 @@ def test_rwkv7_wkv_binds_rk_as_per_layer_weight() -> None:
     assert build_ir.OP_DATAFLOW["rwkv7_wkv_decode"]["inputs"].get("rk") is None
 
 
+def test_rwkv7_circuit_declares_every_graph_slot() -> None:
+    build_ir = _load_build_ir()
+    circuit = json.loads(
+        (ROOT / "version" / "v8" / "circuits" / "rwkv7.json").read_text(encoding="utf-8")
+    )
+    assert circuit["contract"]["runtime_defaults"]["require_declared_activation_slots"] is True
+    config = {"require_declared_activation_slots": True}
+    build_ir._validate_declared_activation_slots(circuit, config, source="test")
+
+    declared = set(build_ir._template_activation_bindings(circuit))
+    declared.update(circuit["activation_buffers"])
+    declared.add("kv_cache")
+    slots = {
+        slot.split(":", 1)[1] if slot.startswith("external:") else slot
+        for slot in build_ir._iter_template_graph_slots(circuit)
+    }
+    assert slots <= declared
+
+    broken = copy.deepcopy(circuit)
+    broken["activation_buffers"].pop("xr_lane")
+    with pytest.raises(RuntimeError, match="HARD CIRCUIT ACTIVATION SLOT FAULT"):
+        build_ir._validate_declared_activation_slots(broken, config, source="test")
+
+
 @pytest.mark.parametrize("layout_mode", ["region", "packed"])
 def test_rwkv7_lower_3_binds_layer0_vgate_nulls_and_channelmix_scratch(
     tmp_path: Path, layout_mode: str,
@@ -3829,6 +3854,11 @@ def test_rwkv7_lower_3_binds_layer0_vgate_nulls_and_channelmix_scratch(
         )
         return {arg["name"]: arg for arg in op["args"]}
 
+    def buffer_of(arg: dict) -> str:
+        expr = str(arg.get("expr", ""))
+        marker = expr.find("A_")
+        return expr[marker:].split(")", 1)[0].strip() if marker >= 0 else expr
+
     layer0_vgate = args_of("rwkv7_vgate_produce", 0)
     for port in ("v_first", "xv", "v1", "v2", "v0"):
         assert layer0_vgate[port]["expr"] == "NULL", (port, layer0_vgate[port])
@@ -3858,8 +3888,47 @@ def test_rwkv7_lower_3_binds_layer0_vgate_nulls_and_channelmix_scratch(
     assert producer["activation_offset"] == consumer["activation_offset"]
     assert args_of("rwkv7_wkv_decode", 0)["state_in"]["expr"] != args_of("rwkv7_wkv_decode", 1)["state_in"]["expr"]
 
+    # Every live graph edge owns a distinct activation region.  The regression
+    # this guards against collapses RWKV intermediates onto A_LAYER_INPUT.
+    time_mix = args_of("rwkv7_time_mix_shifts", 0)
+    lane_ports = ("xr", "xw", "xk", "xv", "xa", "xg")
+    lane_buffers = [buffer_of(time_mix[port]) for port in lane_ports]
+    assert len(set(lane_buffers)) == len(lane_ports), lane_buffers
+    assert all(name != buffer_of(time_mix["x"]) for name in lane_buffers)
+    assert buffer_of(time_mix["shift_out"]) == buffer_of(time_mix["shift_in"])
+
+    projection_outputs = []
+    for name, input_port in (
+        ("rwkv7_r_proj", "xr_lane"),
+        ("rwkv7_k_proj", "xk_lane"),
+        ("rwkv7_v_proj", "xv_lane"),
+    ):
+        projection = args_of(name, 0)
+        assert buffer_of(projection["C"]) != buffer_of(projection["A"]), name
+        assert buffer_of(projection["A"]) == buffer_of(time_mix[input_port[:-5]]), name
+        projection_outputs.append(buffer_of(projection["C"]))
+    assert len(set(projection_outputs)) == len(projection_outputs), projection_outputs
+
+    lora = args_of("rwkv7_lora_gates", 0)
+    lora_outputs = [buffer_of(lora[port]) for port in ("w_log", "a_out", "g_out")]
+    lora_inputs = [buffer_of(lora[port]) for port in ("xw", "xa", "xg")]
+    assert len(set(lora_outputs)) == 3, lora_outputs
+    assert not set(lora_outputs) & set(lora_inputs), (lora_inputs, lora_outputs)
+
+    wkv = args_of("rwkv7_wkv_decode", 0)
+    wkv_inputs = [buffer_of(wkv[port]) for port in ("r", "w_log", "k", "v", "kk", "a", "g")]
+    assert buffer_of(wkv["y_out"]) not in set(wkv_inputs) | {buffer_of(wkv["state_in"])}
+    assert buffer_of(wkv["state_in"]) == buffer_of(wkv["state_out"])
+
+    out_proj = args_of("rwkv7_out_proj", 0)
+    assert buffer_of(out_proj["C"]) != buffer_of(out_proj["A"])
+    assert buffer_of(out_proj["A"]) == buffer_of(wkv["y_out"])
+
+    residual = args_of("residual_add", 0)
+    assert buffer_of(residual["a"]) != buffer_of(residual["b"])
+    assert buffer_of(residual["out"]) == buffer_of(residual["a"])
+
     # Capacity belongs to the named scratch only, never to other scratch regions.
-    import copy
     build_ir = _load_build_ir()
     candidate = copy.deepcopy(lowered)
     cm = next(op for op in candidate["operations"] if op["op"] == "rwkv7_channelmix_decode")
