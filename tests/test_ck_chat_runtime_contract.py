@@ -1389,6 +1389,44 @@ class TestCKChatRuntimeContract(unittest.TestCase):
 
         self.assertEqual(model.decode.call_count, 0)
 
+    def test_chat_template_marker_support_accepts_multitoken_text_markers(self) -> None:
+        model = ck_chat.CKModel("/tmp/unused")
+        model.use_c_tokenizer = True
+        model.use_chat_template = True
+        model.chat_contract = {
+            "template_markers": ["User:", "Assistant:", "<think>"],
+        }
+        model.lib = mock.Mock()
+        model.lib.ck_model_lookup_token.return_value = -1
+        encodes = {
+            "User:": [31, 42, 5],
+            "Assistant:": [9, 8, 7, 6],
+            "<think>": [1, 2, 3],
+        }
+        decoded = {tuple(ids): text for text, ids in encodes.items()}
+        model.encode = mock.Mock(side_effect=lambda text: list(encodes[text]))
+        model.decode = mock.Mock(
+            side_effect=lambda ids, skip_special_tokens=False: decoded.get(tuple(ids), "")
+        )
+
+        with mock.patch.object(model, "_load_tokenizer_contract", return_value={}):
+            self.assertTrue(model._chat_template_markers_supported())
+
+        self.assertEqual(model.decode.call_count, len(encodes))
+
+    def test_chat_template_marker_support_rejects_multitoken_markers_without_roundtrip(self) -> None:
+        model = ck_chat.CKModel("/tmp/unused")
+        model.use_c_tokenizer = True
+        model.use_chat_template = True
+        model.chat_contract = {"template_markers": ["User:"]}
+        model.lib = mock.Mock()
+        model.lib.ck_model_lookup_token.return_value = -1
+        model.encode = mock.Mock(return_value=[31, 42, 5])
+        model.decode = mock.Mock(return_value="")
+
+        with mock.patch.object(model, "_load_tokenizer_contract", return_value={}):
+            self.assertFalse(model._chat_template_markers_supported())
+
     def test_ensure_interactive_stdin_reattaches_dev_tty_when_stdin_is_not_tty(self) -> None:
         class FakeStream:
             closed = False

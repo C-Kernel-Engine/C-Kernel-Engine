@@ -1151,23 +1151,24 @@ class CKModel:
             target.model_type = str(special["tokenizer_model"])
 
     def _chat_template_markers_supported(self) -> bool:
-        """Return True if active C tokenizer can faithfully roundtrip template markers."""
+        """Return True if the active C tokenizer can faithfully roundtrip template markers.
+
+        Markers do not have to own a single vocabulary entry.  Families whose
+        markers are ordinary text (RWKV's ``User:``/``Assistant:``/``<think>``,
+        for example) tokenize into several byte/merge tokens.  The real
+        condition is that decoding the encoded marker reproduces the exact
+        marker text, so a prompt is never silently rewritten.
+        """
         if not self.use_c_tokenizer or not self.use_chat_template:
             return True
 
         contract = normalize_chat_contract(self.chat_contract) or self._load_chat_contract()
         markers = list((contract or {}).get("template_markers") or [])
+        special = self._load_tokenizer_contract()
 
         for marker in markers:
             try:
-                token_id = int(self.lib.ck_model_lookup_token(marker.encode("utf-8")))
-            except Exception:
-                token_id = -1
-            if token_id < 0:
-                return False
-            try:
-                token_ids = self.encode(marker)
-                special = self._load_tokenizer_contract()
+                token_ids = [int(token) for token in self.encode(marker)]
                 if bool(special.get("add_bos_token", False)):
                     bos_id = special.get("bos_token_id")
                     if token_ids and bos_id is not None and token_ids[0] == int(bos_id):
@@ -1176,11 +1177,19 @@ class CKModel:
                     eos_id = special.get("eos_token_id")
                     if token_ids and eos_id is not None and token_ids[-1] == int(eos_id):
                         token_ids = token_ids[:-1]
-                if len(token_ids) != 1 or int(token_ids[0]) != token_id:
+                if not token_ids:
                     return False
-                # Some chat markers are also exported as BOS/EOS IDs. Those decode
-                # paths intentionally hide special tokens, so atomic encode parity
-                # is the real condition we care about here.
+                # Atomic special-token markers: some decode paths intentionally
+                # hide special tokens, so encode parity is the condition there.
+                try:
+                    atomic_id = int(self.lib.ck_model_lookup_token(marker.encode("utf-8")))
+                except Exception:
+                    atomic_id = -1
+                if atomic_id >= 0 and len(token_ids) == 1 and token_ids[0] == atomic_id:
+                    continue
+                # Multi-token text markers must survive a decode roundtrip.
+                if self.decode(token_ids, skip_special_tokens=False) != marker:
+                    return False
             except Exception:
                 return False
         return True
