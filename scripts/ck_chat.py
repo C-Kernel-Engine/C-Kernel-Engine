@@ -803,7 +803,13 @@ class CKModel:
         # seeing literal role markers like "assistant" instead of the intended
         # chat contract.
         if self.use_c_tokenizer and self.use_chat_template and not self._chat_template_markers_supported():
-            if not force_python_tokenizer and self._load_python_tokenizer(gguf_path=gguf_path):
+            python_ready = False
+            if not force_python_tokenizer:
+                try:
+                    python_ready = self._load_python_tokenizer(gguf_path=gguf_path)
+                except Exception as exc:
+                    print(f"Warning: failed to load Python tokenizer ({exc})")
+            if python_ready:
                 self.use_c_tokenizer = False
                 print(
                     "Switched to Python tokenizer: built-in C tokenizer does not "

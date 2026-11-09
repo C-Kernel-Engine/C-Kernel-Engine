@@ -198,6 +198,9 @@ def _prompt_cases() -> list[bytes]:
         b"x" * 5000,
         b"",
         b" ".join(f"word{index}".encode("ascii") for index in range(200)),
+        # RWKV chat contract markers are ordinary multi-token text, not
+        # single vocabulary entries.
+        b"User: Assistant: System: <think> </think>\n\n",
     ]
     # Every byte value, in a single buffer, exercises the whole ByteLevel map.
     cases.append(bytes(range(256)))
