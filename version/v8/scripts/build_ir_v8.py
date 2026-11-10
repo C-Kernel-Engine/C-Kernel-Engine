@@ -1546,7 +1546,8 @@ def _validate_declared_activation_slots(
     raw_buffers = template.get("activation_buffers")
     if isinstance(raw_buffers, dict):
         declared.update(str(name).strip() for name in raw_buffers)
-    declared.add("kv_cache")
+    # Regions the planner owns regardless of circuit declarations.
+    declared.update({"kv_cache", "logits"})
     undeclared = set()
     for slot in _iter_template_graph_slots(template):
         normalized = slot.split(":", 1)[1] if slot.startswith("external:") else slot
@@ -12467,6 +12468,44 @@ def _require_resolved_decode_attention_kernel(op: Dict[str, Any]) -> str:
             )
     return kernel_id
 
+def _declared_provider_output_ports(
+    ir_op: Dict[str, Any],
+) -> Optional[set[str]]:
+    """Return the circuit-declared provider output ports for one op.
+
+    Validated interface joins are authoritative because they were resolved
+    against the selected provider's canonical port table. Legacy circuits
+    without a hardened interface fall back to explicit graph_slots. Returning
+    None means the circuit never declared outputs, so the kernel map remains
+    the only source of truth.
+    """
+    interface_validation = ir_op.get("interface_validation")
+    if (
+        isinstance(interface_validation, dict)
+        and interface_validation.get("status") == "validated"
+    ):
+        return {str(name) for name in interface_validation.get("outputs", {})}
+    graph_slots = ir_op.get("graph_slots")
+    if isinstance(graph_slots, dict):
+        graph_outputs = graph_slots.get("outputs")
+        if isinstance(graph_outputs, dict) and graph_outputs:
+            return {str(name) for name in graph_outputs}
+    return None
+
+
+def _kernel_output_is_null_bound(
+    kernel_output: Dict[str, Any],
+    declared_output_ports: Optional[set[str]],
+) -> bool:
+    """True when an optional provider output is intentionally left unbound."""
+    if declared_output_ports is None:
+        return False
+    if str(kernel_output.get("consumption", "required") or "required") != "optional":
+        return False
+    output_name = kernel_output.get("name")
+    return bool(output_name) and str(output_name) not in declared_output_ports
+
+
 def generate_ir_lower_1(
     fused_ops: List[Dict],
     registry: Dict,
@@ -12677,12 +12716,20 @@ def generate_ir_lower_1(
                 "shape": input_shape,
             }
 
-        # Map kernel outputs
+        # Map kernel outputs. A provider may expose optional write ports that a
+        # circuit intentionally leaves unbound (for example RWKV-7's v_gate or
+        # RMSNorm's rstd). Those ports must stay NULL-bound instead of being
+        # spliced onto an unrelated live activation buffer.
+        declared_output_ports = _declared_provider_output_ports(ir_op)
+        null_outputs: List[str] = []
         for kernel_output in (kernel_map.get("outputs") or []):
             if not isinstance(kernel_output, dict):
                 continue
             output_name = kernel_output.get("name")
             if not output_name:
+                continue
+            if _kernel_output_is_null_bound(kernel_output, declared_output_ports):
+                null_outputs.append(output_name)
                 continue
             output_dtype = kernel_output.get("dtype", "fp32")
             output_shape = kernel_output.get("shape", [])
@@ -12699,6 +12746,8 @@ def generate_ir_lower_1(
 
             # Update current activation for next kernel
             current_activation = output_buffer
+        if null_outputs:
+            lowered_op["null_outputs"] = null_outputs
 
         # Map only call-bound scratch buffers. Runtime-lifetime preparation
         # caches are owned by model initialization and must not be overlaid on
@@ -15133,6 +15182,8 @@ def generate_ir_lower_2(
             )
         if isinstance(ir_op.get("graph_slots"), dict):
             lowered_op["graph_slots"] = copy.deepcopy(ir_op["graph_slots"])
+        if ir_op.get("null_outputs"):
+            lowered_op["null_outputs"] = [str(name) for name in ir_op["null_outputs"]]
         for key in ("runtime_extent_contract", "produces_runtime_lengths",
                     "consumes_runtime_lengths", "runtime_scalar_bindings",
                     "returns_status"):
@@ -17849,6 +17900,7 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
 
         activations = op.get("activations", {})
         outputs = op.get("outputs", {})
+        null_outputs = {str(name) for name in (op.get("null_outputs") or [])}
         weights = op.get("weights", {})
         scratch_list = op.get("scratch", [])
         scratch = {s.get("name"): s for s in scratch_list if s.get("name")}
@@ -17909,8 +17961,11 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
                         op_errors.append(f"{func}.{name}: missing declared output '{key}'")
                     expr = f"&runtime_extents.{runtime_result_names[0]}"
                 elif not info:
-                    op_errors.append(f"{func}.{name}: missing output '{key}'")
-                    expr = "NULL"
+                    if key in null_outputs:
+                        expr = "NULL"
+                    else:
+                        op_errors.append(f"{func}.{name}: missing output '{key}'")
+                        expr = "NULL"
                 else:
                     offset = info.get("activation_offset", 0)
                     buf_name = info.get("buffer", key)

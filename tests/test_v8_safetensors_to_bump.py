@@ -3278,6 +3278,40 @@ def test_rwkv7_circuit_declares_ln0_header_and_provider_contracts() -> None:
         assert requirements[op].startswith("rwkv7_")
 
 
+def test_optional_provider_output_ports_are_null_bound_when_circuit_omits_them() -> None:
+    build_ir = _load_build_ir()
+    validated = {
+        "interface_validation": {
+            "status": "validated",
+            "outputs": {"v_out": "v_mix_vec", "v_first_out": "v_first"},
+        }
+    }
+    declared = build_ir._declared_provider_output_ports(validated)
+    assert declared == {"v_out", "v_first_out"}
+    assert build_ir._kernel_output_is_null_bound(
+        {"name": "v_gate", "consumption": "optional"}, declared
+    )
+    assert not build_ir._kernel_output_is_null_bound(
+        {"name": "v_out", "consumption": "required"}, declared
+    )
+    assert not build_ir._kernel_output_is_null_bound(
+        {"name": "v_gate", "consumption": "required"}, declared
+    )
+
+    legacy = {"graph_slots": {"outputs": {"out": "next"}}}
+    legacy_declared = build_ir._declared_provider_output_ports(legacy)
+    assert legacy_declared == {"out"}
+    assert build_ir._kernel_output_is_null_bound(
+        {"name": "rstd", "consumption": "optional"}, legacy_declared
+    )
+
+    undeclared = build_ir._declared_provider_output_ports({})
+    assert undeclared is None
+    assert not build_ir._kernel_output_is_null_bound(
+        {"name": "rstd", "consumption": "optional"}, undeclared
+    )
+
+
 def test_rwkv7_kernel_weight_ports_are_bound() -> None:
     build_ir = _load_build_ir()
     circuit = json.loads(
@@ -3800,12 +3834,19 @@ def test_rwkv7_circuit_declares_every_graph_slot() -> None:
 
     declared = set(build_ir._template_activation_bindings(circuit))
     declared.update(circuit["activation_buffers"])
-    declared.add("kv_cache")
+    declared.update({"kv_cache", "logits"})
     slots = {
         slot.split(":", 1)[1] if slot.startswith("external:") else slot
         for slot in build_ir._iter_template_graph_slots(circuit)
     }
     assert slots <= declared
+
+    footer = circuit["block_types"]["decoder"]["footer"]
+    logits_op = next(item for item in footer if isinstance(item, dict) and item.get("op") == "logits")
+    assert logits_op["graph_slots"] == {
+        "inputs": {"A": "main_stream"},
+        "outputs": {"C": "logits"},
+    }
 
     broken = copy.deepcopy(circuit)
     broken["activation_buffers"].pop("xr_lane")

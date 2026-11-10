@@ -561,7 +561,13 @@
       "footer": [
         "layernorm",
         "lm_head",
-        {"op": "logits", "graph_slots": {"inputs": {"x": "main_stream"}}}
+        {
+          "op": "logits",
+          "graph_slots": {
+            "inputs": {"A": "main_stream"},
+            "outputs": {"C": "logits"}
+          }
+        }
       ]
     }
   }
