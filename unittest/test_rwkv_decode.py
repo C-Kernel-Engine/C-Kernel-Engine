@@ -199,7 +199,7 @@ def run_case(H, N, seed):
     rc = lib.ck_rwkv7_scale_k(
         numpy_to_ptr(k_raw), numpy_to_ptr(a), numpy_to_ptr(k_a), numpy_to_ptr(k), C)
     assert rc == 0
-    ref_k = k_raw * (1 + (k_a - 1) * a)
+    ref_k = k_raw * (1 + (a - 1) * k_a)
     dk = float(np.max(np.abs(k - ref_k)))
 
     # full wkv step
@@ -340,7 +340,7 @@ def run_lora_case(H, N, Rd, Ra, Rg, Rv, seed):
     assert rc == 0
     t_kk = (t(kk_raw) * t(k_k)).view(H, N)
     t_kk = t_kk / torch.clamp(torch.sqrt((t_kk * t_kk).sum(dim=1, keepdim=True)), min=1e-12)
-    t_ks = (t(k_raw) * (1 + (t(k_a) - 1) * t_a)).view(H, N)
+    t_ks = (t(k_raw) * (1 + (t_a - 1) * t(k_a))).view(H, N)
     t_s, t_y = torch_step(t(r).view(H, N), t_w.view(H, N), t_ks,
                           t_v.view(H, N), t_kk, t_a.view(H, N),
                           t_g, t(rk), t(ln_w), t(ln_b), t(state))
@@ -650,7 +650,7 @@ def run_timemix_tail_case(H, N, Rd, Ra, Rg, Rv, seed, layer0):
         t_vf = t(v_first)
     t_kk = (t(k_raw) * t(k_k)).view(H, N)
     t_kk = t_kk / torch.clamp(torch.sqrt((t_kk * t_kk).sum(dim=1, keepdim=True)), min=1e-12)
-    t_ks = (t(k_raw) * (1 + (t(k_a) - 1) * t_a)).view(H, N)
+    t_ks = (t(k_raw) * (1 + (t_a - 1) * t(k_a))).view(H, N)
     t_s, t_y = torch_step(t(r).view(H, N), t_w.view(H, N), t_ks,
                           t_v.view(H, N), t_kk, t_a.view(H, N),
                           t_g, t(rk), t(ln_w), t(ln_b), t(state))

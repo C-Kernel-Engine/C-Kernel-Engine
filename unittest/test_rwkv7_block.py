@@ -7,7 +7,7 @@ layer 1 consume path) using only shipped kernels:
   residual -> ln2 -> channelmix_decode -> residual -> ln_out -> head GEMV
 
 and checks hidden/logits/state against a torch oracle that uses the
-diagram-normative k-scale (k*(1+(k_a-1)*a)), plus a second step proving the
+publisher k-scale (k*(1+(a-1)*k_a)), plus a second step proving the
 recurrent carry (att/ffn shifts, wkv, v_first).
 """
 import argparse
@@ -390,7 +390,7 @@ def run_block_steps(seed, H=2, N=8, K=32, Rd=4, Ra=3, Rg=3, Rv=3,
                 v_first = v_first.clone()
             kk = (k_raw * t(par["k_k"])).view(H, N)
             kk = kk / torch.clamp(torch.sqrt((kk * kk).sum(dim=1, keepdim=True)), min=1e-12)
-            ks = (k_raw * (1 + (t(par["k_a"]) - 1) * a)).view(H, N)
+            ks = (k_raw * (1 + (a - 1) * t(par["k_a"]))).view(H, N)
             wkv[l], y_pre = torch_step(
                 r.view(H, N), w.view(H, N), ks, v.view(H, N), kk,
                 a.view(H, N), g, t(par["rk"]), t(par["lnw"]), t(par["lnb"]), wkv[l])
