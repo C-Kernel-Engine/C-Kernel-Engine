@@ -3646,10 +3646,45 @@ def test_rwkv7_missing_required_weight_fails_closed(missing):
         converter._refs_from_safetensors_contract("rwkv7", {"num_layers": 2}, headers)
 
 
+def _rwkv7_bytelevel_piece(raw: bytes) -> str:
+    """Encode raw bytes as the GPT-2 ByteLevel string the C trie stores."""
+    values = (
+        list(range(ord("!"), ord("~") + 1))
+        + list(range(ord("¡"), ord("¬") + 1))
+        + list(range(ord("®"), ord("ÿ") + 1))
+    )
+    characters = list(values)
+    extra = 0
+    for byte in range(256):
+        if byte not in values:
+            values.append(byte)
+            characters.append(256 + extra)
+            extra += 1
+    byte_to_char = {byte: chr(codepoint) for byte, codepoint in zip(values, characters)}
+    return "".join(byte_to_char[byte] for byte in raw)
+
+
+def _rwkv7_synthetic_pieces(count: int) -> list[bytes]:
+    """Return prefix-rank-safe byte pieces: all singletons, then longer ones."""
+    pieces = [bytes([byte]) for byte in range(256)]
+    length = 2
+    while len(pieces) < count:
+        for value in range(256**length):
+            raw = value.to_bytes(length, "big")
+            pieces.append(raw)
+            if len(pieces) >= count:
+                break
+        length += 1
+    return pieces[:count]
+
+
 def _write_rwkv7_synthetic_tokenizer(
     directory: Path, vocab: int = 16, *, backend: str = "rwkv_world_trie"
 ) -> None:
-    tokens = ["<|endoftext|>"] + [chr(ord("A") + index) for index in range(vocab - 1)]
+    tokens = ["<|endoftext|>"] + [
+        _rwkv7_bytelevel_piece(raw)
+        for raw in _rwkv7_synthetic_pieces(vocab - 1)
+    ]
     (directory / "tokenizer.json").write_text(
         json.dumps({
             "normalizer": None,
@@ -3736,6 +3771,19 @@ def _write_rwkv7_synthetic_checkpoint(
         ).to(torch.bfloat16)
     st.save_file(tensors, checkpoint / "model.safetensors")
     return checkpoint
+
+
+def test_rwkv7_recurrent_state_does_not_allocate_token_kv_cache() -> None:
+    build_ir = _load_build_ir()
+    circuit = json.loads(
+        (ROOT / "version" / "v8" / "circuits" / "rwkv7.json").read_text(encoding="utf-8")
+    )
+    assert build_ir._template_uses_kv_cache(circuit, {}) is False
+
+    token_cache = {
+        "contract": {"attention_contract": {"kv_layout": "token_major"}}
+    }
+    assert build_ir._template_uses_kv_cache(token_cache, {}) is True
 
 
 def test_rwkv7_kernel_maps_use_real_config_dims_and_scratch() -> None:

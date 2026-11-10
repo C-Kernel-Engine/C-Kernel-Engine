@@ -3868,7 +3868,7 @@ static int do_init(const char *weights_path) {{
 
     g_model->bump_weights = g_model->bump; /* Manifest runtime offsets are absolute. */
     g_model->activations = (float*)(g_model->bump + BUMP_ACT_OFFSET);
-#ifdef A_KV_CACHE
+#if defined(A_KV_CACHE) && A_KV_CACHE > 0
     g_model->kv_cache = (float*)(g_model->bump + A_KV_CACHE);
     g_model->kv_cache_f16 = (uint16_t*)(g_model->bump + A_KV_CACHE);
 #else
@@ -3881,7 +3881,7 @@ static int do_init(const char *weights_path) {{
 #ifdef A_RECURRENT_SSM_STATE
     g_model->recurrent_ssm_state = (float*)(g_model->bump + A_RECURRENT_SSM_STATE);
 #endif
-#ifdef A_ROPE_CACHE
+#if defined(A_ROPE_CACHE) && A_ROPE_CACHE > 0
     g_model->rope_cos = (float*)(g_model->bump + A_ROPE_CACHE);
 #else
     size_t rope_cache_elems = (size_t)MAX_SEQ_LEN * (size_t)ROTARY_DIM;
@@ -3895,7 +3895,7 @@ static int do_init(const char *weights_path) {{
     }}
 #endif
     g_model->rope_sin = g_model->rope_cos + MAX_SEQ_LEN * ROTARY_DIM / 2;
-#ifdef A_LOGITS
+#if defined(A_LOGITS) && A_LOGITS > 0
     g_model->logits = (float*)(g_model->bump + A_LOGITS);
 #else
     g_model->logits = NULL;
@@ -4019,7 +4019,7 @@ CK_EXPORT void ck_model_free(void) {{
         ck_unload_manifest_map(g_manifest);
         g_manifest = NULL;
     }}
-#ifndef A_ROPE_CACHE
+#if !defined(A_ROPE_CACHE) || A_ROPE_CACHE == 0
     free(g_model->rope_cos);
 #endif
 {sequence_state_release}    ck_bump_alloc_free(&g_model->bump_alloc);

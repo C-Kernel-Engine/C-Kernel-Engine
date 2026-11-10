@@ -7235,7 +7235,15 @@ def _template_uses_kv_cache(template: Dict[str, Any], config: Optional[Dict[str,
     contract = template.get("contract") if isinstance(template.get("contract"), dict) else {}
     attention_contract = contract.get("attention_contract") if isinstance(contract.get("attention_contract"), dict) else {}
     kv_layout = str(attention_contract.get("kv_layout", "") or "").strip().lower()
-    if kv_layout in {"none", "ephemeral_full_context", "ephemeral", "encoder_context"}:
+    if kv_layout in {
+        "none",
+        "ephemeral_full_context",
+        "ephemeral",
+        "encoder_context",
+        # RWKV-7 keeps a per-layer recurrent state, not a token-indexed K/V
+        # cache. Allocating kv_cache for it wastes hundreds of MB at 1.5B.
+        "recurrent_rwkv7_state",
+    }:
         return False
     if kv_layout:
         return True
