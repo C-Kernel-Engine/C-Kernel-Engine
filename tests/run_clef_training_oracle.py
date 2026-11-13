@@ -27,6 +27,11 @@ def main():
         action="store_true",
         help="Released head geometry/weights instead of the complete small topology",
     )
+    parser.add_argument(
+        "--same-state",
+        action="store_true",
+        help="Diagnostic only: copy native weights and AdamW state into PyTorch before each step",
+    )
     parser.add_argument("--report", required=True, type=Path)
     args = parser.parse_args()
     args.report.parent.mkdir(parents=True, exist_ok=True)
@@ -36,6 +41,7 @@ def main():
             case,
             released=args.released,
             mixed=args.mixed,
+            same_state=args.same_state,
             diagnostic=True,
             artifacts=args.report.with_suffix(""),
         )

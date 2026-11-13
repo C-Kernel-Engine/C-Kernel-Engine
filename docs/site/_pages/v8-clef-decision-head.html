@@ -8,6 +8,39 @@
 
 <p>Model topology lives in the circuit builders here. Kernels implement arithmetic; maps describe ABI, scratch and numerical contracts. Generic operation catalogue entries do not inspect the model name.</p>
 
+<section id="same-state-pytorch-oracle">
+<h2>Same-state update diagnosis: 39 of 40 comparisons pass</h2>
+<p><code>--same-state</code> copies CKE's pre-step master weights, both AdamW moments and optimizer
+step into PyTorch before each diagnostic comparison. Packed Q/K/V ownership and scalar parameters are
+restored explicitly and checked by byte-exact round trips through the effective-weight mapping.
+No oracle value is copied into CKE. The independent trajectory remains a separate required experiment.</p>
+<p>For the same small complete mixed head, only zero-based update 18 fails unchanged numerical gates.
+Maximum gradient, master-weight and moment errors are 6.748e-4, 2.578e-5 and 6.748e-5. This is still
+<strong>numerical FAIL</strong>, not complete mixed-precision certification. The earlier independent
+update-8 failure disappears when master weights and optimizer state are synchronized.</p>
+<p>The remaining first significant divergence is <code>hidden_norm → memory_projection</code>.
+With identical inputs and normalization parameters, native and PyTorch LayerNorm differ by at most
+2.384e-7. One value is 1.0976563692092896 versus 1.09765625; these round to BF16 values 1.1015625
+versus 1.09375. Replaying the projection on identical operands gives zero output error, dW error
+1.863e-9 and isolated dX error 4.657e-10. The packet retains the LayerNorm operands and the rounding
+witness. This exposes amplification at a precision boundary; it does not justify changing global tolerances.</p>
+<p>Input gradients may contain contributions from multiple branches. The diagnostic now replays the
+selected provider's dX into its own buffers rather than comparing it with the accumulated input gradient.
+A regression deliberately omits the accumulated dX to enforce this distinction.</p>
+<p>CKE's forty native losses, final master-weight hash and final optimizer-state hash are identical in
+same-state and independent runs. Checkpoint/restart remains exact. The report labels same-state comparison
+explicitly and marks independent trajectory parity NOT_TESTED in that report; the separate independent
+run remains FAIL. Production kernels, maps and compiler behavior are unchanged by this diagnostic.</p>
+<pre><code>python tests/run_clef_training_oracle.py --mixed --same-state \
+  --report /tmp/clef-oracle/same-state.json
+# Keep the independent run alongside it; both currently exit 1.
+python tests/run_clef_training_oracle.py --mixed \
+  --report /tmp/clef-oracle/independent.json</code></pre>
+<p>Evidence: <code>docs/notes/clef_same_state_oracle_20261113.json</code>. Next: evaluate the declared
+LayerNorm-to-BF16 precision boundary and a justified mixed-precision acceptance policy, preserving the
+independent FP32 and mixed trajectory checks. Do not force backend rounding history merely to obtain PASS.</p>
+</section>
+
 <section id="complete-head-pytorch-oracle">
 <h2>Complete-head PyTorch comparison: FP32 passes; mixed trajectory fails</h2>
 <p>The complete small topology now runs forty independent native/PyTorch AdamW updates with

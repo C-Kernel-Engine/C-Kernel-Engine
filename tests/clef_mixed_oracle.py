@@ -71,7 +71,14 @@ def install(test, torch, head):
 
 
 def diagnose(
-    ir, captures, activations, weights, parameter_gradients, layout, accumulation
+    ir,
+    captures,
+    activations,
+    weights,
+    parameter_gradients,
+    layout,
+    accumulation,
+    library,
 ):
     """Replay projections with actual CKE operands; never alter production inputs."""
     import numpy as np
@@ -135,11 +142,42 @@ def diagnose(
                 tb = torch.tensor(bias.reshape(-1), requires_grad=True)
                 ty = ty + tb
             ty.backward(torch.tensor(dy))
-            actual_dx = gradient(op["dataflow"]["inputs"]["input"]["tensor"]).reshape(
-                x.shape
+            # The generated input gradient may sum multiple branches. Replay the
+            # selected provider into separate buffers instead of comparing that sum.
+            import ctypes as C
+
+            sx = torch.tensor(x).bfloat16().view(torch.int16).numpy().copy()
+            sw = torch.tensor(w).bfloat16().view(torch.int16).numpy().copy()
+            actual_dx = np.empty_like(x)
+            local_dw = np.empty_like(w)
+            arrays = [dy, sx, sw, actual_dx, local_dw]
+            if bias is not None:
+                local_db = np.empty(w.shape[0], dtype="f4")
+                arrays.append(local_db)
+            scratch = np.empty(
+                x.size + w.size + (w.shape[0] if bias is not None else 0), dtype="f4"
             )
+            arrays.append(scratch)
+            fn = getattr(
+                library,
+                "ck_projection_bf16_train_"
+                + ("bias_" if bias is not None else "")
+                + "backward",
+            )
+            fn.argtypes = [t for _ in arrays for t in (C.c_void_p, C.c_size_t)] + [
+                C.c_size_t
+            ] * 3
+            fn.restype = C.c_int
+            args = [v for array in arrays for v in (array.ctypes.data, array.size)]
+            if fn(*args, x.shape[0], x.shape[1], w.shape[0]) != 0:
+                raise RuntimeError(
+                    "local projection backward replay rejected captured operands"
+                )
             item["same_input_d_input_error"] = float(
                 np.max(np.abs(actual_dx - tx.grad.numpy()))
+            )
+            item["d_input_evidence"] = (
+                "isolated provider replay, not accumulated generated gradient"
             )
             actual_dw = parameter_gradients[name].reshape(w.shape)
             item["same_input_d_weight_error"] = float(
@@ -151,6 +189,16 @@ def diagnose(
                 )
                 item["same_input_d_bias_error"] = float(
                     np.max(np.abs(actual_db - tb.grad.numpy()))
+                )
+            input_changes = np.argwhere(rounded(x).numpy() != rounded(rx).numpy())
+            if len(input_changes):
+                ix = tuple(input_changes[0])
+                item["first_rounded_input_difference"] = dict(
+                    index=list(map(int, ix)),
+                    actual=float(x[ix]),
+                    reference=float(rx[ix]),
+                    rounded_actual=float(rounded(x).numpy()[ix]),
+                    rounded_reference=float(rounded(rx).numpy()[ix]),
                 )
             changed = np.argwhere(rounded(w).numpy() != rounded(rw).numpy())
             if len(changed):
@@ -179,5 +227,60 @@ def diagnose(
                 packet.update(
                     bias=bias, d_bias=actual_db, oracle_d_bias=tb.grad.numpy()
                 )
+        if packet is not None and "upstream_layernorm" not in item:
+            input_id = op["dataflow"]["inputs"]["input"]["tensor"]
+            producers = [
+                p
+                for p in ir["ops"]
+                if p["kernel_id"] == "layernorm_train_forward_f32"
+                and any(
+                    r.get("tensor") == input_id
+                    for r in p["dataflow"]["outputs"].values()
+                )
+            ]
+            if producers:
+                producer = producers[0]
+                source = producer["dataflow"]["inputs"]["input"]["tensor"]
+                operand = (
+                    weights[source.removeprefix("weight.")]
+                    if source.startswith("weight.")
+                    else activations[source]
+                )
+                operand = operand.reshape(
+                    producer["dataflow"]["inputs"]["input"]["shape"]
+                )
+                gamma = weights[producer["weights"]["gamma"]["name"]]
+                beta = weights[producer["weights"]["beta"]["name"]]
+                eps = producer["params"]["epsilon"]
+
+                def norm(dtype):
+                    return (
+                        torch.nn.functional.layer_norm(
+                            torch.tensor(operand, dtype=dtype),
+                            [operand.shape[-1]],
+                            torch.tensor(gamma, dtype=dtype),
+                            torch.tensor(beta, dtype=dtype),
+                            eps,
+                        )
+                        .float()
+                        .numpy()
+                    )
+
+                fp32, fp64 = norm(torch.float32), norm(torch.float64)
+                item["upstream_layernorm"] = dict(
+                    op=producer["op"],
+                    same_input_torch_to_captured_reference=float(
+                        np.max(np.abs(fp32 - rx))
+                    ),
+                    native_to_fp64=float(np.max(np.abs(x - fp64))),
+                    torch_to_fp64=float(np.max(np.abs(fp32 - fp64))),
+                )
+                if not comparisons:
+                    packet.update(
+                        layernorm_input=operand,
+                        layernorm_gamma=gamma,
+                        layernorm_beta=beta,
+                        layernorm_epsilon=np.array(eps),
+                    )
         comparisons.append(item)
     return comparisons, packet

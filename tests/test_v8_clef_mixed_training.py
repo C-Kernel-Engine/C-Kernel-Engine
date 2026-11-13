@@ -111,8 +111,93 @@ class BiasedProjectionKernel(unittest.TestCase):
             for a, n in ((y, 21), (dx, 15), (dw, 35), (db, 7)):
                 np.testing.assert_array_equal(a[n:], 71.0)
 
+            # Branched inputs have accumulated gradients, not the selected VJP.
+            # No accumulated dX is provided: diagnosis must replay into fresh buffers.
+            from tests.clef_mixed_oracle import diagnose
+
+            xx = np.array([[0.25, 0.5]], dtype="f4")
+            ww = np.array([[0.5, 0.25]], dtype="f4")
+            reference_x = xx + 0.25
+            op = dict(
+                op="branch",
+                op_id=1,
+                kernel_id="projection_bf16_train_forward",
+                weights={"weight": {"name": "w"}},
+                dataflow={
+                    "inputs": {"input": {"tensor": "act.x"}},
+                    "outputs": {"output": {"tensor": "act.y"}},
+                },
+            )
+            captures = {
+                "w": [dict(input=reference_x, weight=ww, output=reference_x @ ww.T)]
+            }
+            layout = {
+                "regions": [
+                    dict(name="grads", bytes=0),
+                    dict(name="grad_activations", offset=0),
+                ],
+                "tensors": [dict(id="grad.act.act.y", offset=0, numel=1, shape=[1, 1])],
+            }
+            result, packet = diagnose(
+                {"ops": [op]},
+                captures,
+                {"act.x": xx, "act.y": xx @ ww.T},
+                {"w": ww},
+                {"w": xx},
+                layout,
+                np.ones(1, dtype="f4"),
+                lib,
+            )
+            self.assertEqual(result[0]["same_input_d_input_error"], 0.0)
+            self.assertIn("isolated provider", result[0]["d_input_evidence"])
+            np.testing.assert_array_equal(packet["d_input"], ww)
+
 
 class MixedHeadContracts(unittest.TestCase):
+    def test_same_state_restores_packed_qkv_scalar_and_moments(self):
+        try:
+            import numpy as np
+            import torch
+        except ImportError as exc:
+            self.skipTest("independent PyTorch unavailable: " + str(exc))
+        from tests.clef_same_state_oracle import synchronize
+
+        head = torch.nn.Module()
+        head.attn = torch.nn.MultiheadAttention(2, 1)
+        head.scale = torch.nn.Parameter(torch.tensor(0.0))
+        weights = {}
+        expected = {}
+        for i, (name, p) in enumerate(head.named_parameters()):
+            value = np.arange(p.numel(), dtype="f4").reshape(tuple(p.shape)) + i * 10
+            expected[name] = value
+            if name.endswith(("in_proj_weight", "in_proj_bias")):
+                suffix = "in_proj_weight" if name.endswith("weight") else "in_proj_bias"
+                leaf = "weight" if suffix.endswith("weight") else "bias"
+                for j, axis in enumerate(("q", "k", "v")):
+                    weights[name[: -len(suffix)] + axis + "_proj." + leaf] = value[
+                        j * 2 : (j + 1) * 2
+                    ].copy()
+            else:
+                weights[name] = value.reshape(1) if value.ndim == 0 else value.copy()
+        order = sorted(weights)
+        moments = np.concatenate(
+            [weights[n].ravel() + offset for offset in (100.0, 200.0) for n in order]
+        )
+        original = moments.copy()
+        opt = torch.optim.AdamW(head.parameters())
+        report = synchronize(torch, head, opt, weights, moments, order, 7)
+        self.assertEqual(report["optimizer_step"], 7)
+        for name, p in head.named_parameters():
+            np.testing.assert_array_equal(p.detach().numpy(), expected[name])
+            for key, offset in (("exp_avg", 100.0), ("exp_avg_sq", 200.0)):
+                np.testing.assert_array_equal(
+                    opt.state[p][key].numpy(), expected[name] + offset
+                )
+            self.assertEqual(opt.state[p]["step"].item(), 7)
+        np.testing.assert_array_equal(moments, original)
+        with self.assertRaises(ValueError):
+            synchronize(torch, head, opt, weights, moments[:-1], order, 7)
+
     def test_complete_topology_generates_all_parameter_gradients(self):
         ir, registry = full.FullHeadTrainingContracts.graph(self, mixed=True)
         source, report = full.FullHeadTrainingContracts.emit(self, ir, registry)

@@ -14,7 +14,15 @@ class FullHeadTraining(unittest.TestCase):
     def test_released_head_training(self):
         self.certify(released=True)
 
-    def certify(self, *, released, mixed=False, diagnostic=False, artifacts=None):
+    def certify(
+        self,
+        *,
+        released,
+        mixed=False,
+        diagnostic=False,
+        artifacts=None,
+        same_state=False,
+    ):
         import sys, os, json, ctypes, tempfile, subprocess, importlib.util, hashlib
         from pathlib import Path
         from types import SimpleNamespace as NS
@@ -286,6 +294,67 @@ class FullHeadTraining(unittest.TestCase):
                 np.testing.assert_array_equal(snapshot("weight", len(before)), before)
                 self.assertEqual(lib.ck_train_get_opt_step(), 0)
             for step in range(steps):
+                if mixed or same_state:
+                    pre_flat = snapshot("weight", summary["weight_snapshot_floats"])
+                    pre_weights = {}
+                    off = 0
+                    for name, count in zip(
+                        summary["init_weight_order"], summary["init_weight_numel"]
+                    ):
+                        pre_weights[name] = (
+                            pre_flat[off : off + count]
+                            .reshape(weights[name].shape)
+                            .copy()
+                        )
+                        off += count
+                state_evidence = None
+                if same_state:
+                    from tests.clef_same_state_oracle import synchronize
+
+                    state_evidence = synchronize(
+                        torch,
+                        head,
+                        opt,
+                        pre_weights,
+                        snapshot(
+                            "optimizer_state",
+                            summary["optimizer_state_snapshot_floats"],
+                        ),
+                        summary["parameter_gradient_order"],
+                        lib.ck_train_get_opt_step(),
+                    )
+                    self.assertEqual(state_evidence["optimizer_step"], step)
+                    restored = {
+                        n: p.detach().numpy().copy() for n, p in head.named_parameters()
+                    }
+                    restored["output_embedding.weight"] = raw["output_embedding.weight"]
+                    for name, value in effective_weights(graph, restored).items():
+                        np.testing.assert_array_equal(
+                            value.ravel().view("u4"),
+                            pre_weights[name].ravel().view("u4"),
+                        )
+                    restored_moments = []
+                    for kind in ("exp_avg", "exp_avg_sq"):
+                        values = {
+                            n: opt.state[p][kind].numpy()
+                            for n, p in head.named_parameters()
+                        }
+                        values["output_embedding.weight"] = np.zeros_like(
+                            raw["output_embedding.weight"]
+                        )
+                        effective = effective_weights(graph, values)
+                        restored_moments.extend(
+                            effective[n].ravel()
+                            for n in summary["parameter_gradient_order"]
+                        )
+                    np.testing.assert_array_equal(
+                        np.concatenate(restored_moments).view("u4"),
+                        snapshot(
+                            "optimizer_state",
+                            summary["optimizer_state_snapshot_floats"],
+                        ).view("u4"),
+                    )
+
                 opt.zero_grad()
                 if mixed:
                     projection_captures.clear()
@@ -304,19 +373,6 @@ class FullHeadTraining(unittest.TestCase):
                     / 2
                 )
                 loss.backward()
-                if mixed:
-                    pre_flat = snapshot("weight", summary["weight_snapshot_floats"])
-                    pre_weights = {}
-                    off = 0
-                    for name, count in zip(
-                        summary["init_weight_order"], summary["init_weight_numel"]
-                    ):
-                        pre_weights[name] = (
-                            pre_flat[off : off + count]
-                            .reshape(weights[name].shape)
-                            .copy()
-                        )
-                        off += count
                 nl = ctypes.c_float()
                 rc = lib.ck_train_step_with_i32_ex(
                     ids.ctypes.data_as(ip),
@@ -393,6 +449,7 @@ class FullHeadTraining(unittest.TestCase):
                         gradient_values,
                         layout,
                         snapshot("accum", lib.ck_train_get_accum_snapshot_numel()),
+                        lib,
                     )
                     first_divergence = dict(step=step, projections=first)
                     if artifacts is not None and packet is not None:
@@ -410,6 +467,7 @@ class FullHeadTraining(unittest.TestCase):
                 step_reports.append(
                     dict(
                         step=step,
+                        same_state=state_evidence,
                         native_loss=nl.value,
                         reference_loss=loss.item(),
                         worst_gradient=dict(
@@ -681,6 +739,12 @@ class FullHeadTraining(unittest.TestCase):
                     )
             report = dict(
                 schema_version=1,
+                comparison_mode=(
+                    "same_state_one_step" if same_state else "independent_trajectory"
+                ),
+                independent_trajectory_parity=(
+                    "NOT_TESTED" if same_state else ("FAIL" if failures else "PASS")
+                ),
                 seed=611,
                 policy=dict(
                     operand_rounding="rne_bf16" if mixed else "none",
@@ -718,11 +782,17 @@ class FullHeadTraining(unittest.TestCase):
                 engine_sha256=hashlib.sha256(engine.read_bytes()).hexdigest(),
                 runtime_contract_sha256=summary["runtime_contract_sha256"],
                 initial_weights_sha256=hashlib.sha256(packed.tobytes()).hexdigest(),
+                final_weights_sha256=hashlib.sha256(final.tobytes()).hexdigest(),
+                final_optimizer_state_sha256=hashlib.sha256(
+                    moments.tobytes()
+                ).hexdigest(),
                 dataset_sha256=hashlib.sha256(
                     hidden.tobytes() + metadata.tobytes()
                 ).hexdigest(),
                 released_head_training=(
-                    ("FAIL" if failures else "PASS") if released else "NOT_TESTED"
+                    ("FAIL" if failures else "PASS")
+                    if released and not same_state
+                    else "NOT_TESTED"
                 ),
                 frozen_feature_provenance="synthetic; not generated backbone",
                 head_weights_sha256=(
