@@ -1,0 +1,142 @@
+{
+  "id": "add_rows_backward_train_f32",
+  "op": "add_rows_backward_train_f32",
+  "operation_interface": "add_rows_backward_train_f32.v1",
+  "variant": "existing_native_vjp_explicit_rows",
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "d_output",
+      "shape": [
+        "N"
+      ],
+      "dtype": "fp32",
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "d_a",
+      "shape": [
+        "N"
+      ],
+      "dtype": "fp32",
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "d_b",
+      "shape": [
+        "N"
+      ],
+      "dtype": "fp32",
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "scratch": [],
+  "dims": [],
+  "modes": {
+    "inference": false,
+    "training": true,
+    "backward": true
+  },
+  "impl": {
+    "function": "ck_residual_add_backward",
+    "c_declaration": "void ck_residual_add_backward(const float *d_output, float *d_a, float *d_b, int tokens, int elements);",
+    "sources": [
+      "src/ckernel_orchestration.c"
+    ],
+    "variants": [
+      {
+        "name": "default",
+        "requires": [],
+        "compile_flags": []
+      }
+    ]
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "d_output",
+        "source": "activation:d_output",
+        "cast": "const float *",
+        "ports": [
+          "input:d_output"
+        ]
+      },
+      {
+        "name": "d_a",
+        "source": "output:d_a",
+        "cast": "float *",
+        "ports": [
+          "output:d_a"
+        ]
+      },
+      {
+        "name": "d_b",
+        "source": "output:d_b",
+        "cast": "float *",
+        "ports": [
+          "output:d_b"
+        ]
+      },
+      {
+        "name": "tokens",
+        "source": "const:1"
+      },
+      {
+        "name": "elements",
+        "source": "runtime:elements"
+      }
+    ]
+  },
+  "training_contract": {
+    "version": 1,
+    "layout": "contiguous",
+    "batch_policy": "fixed",
+    "buffer_spans": [
+      {
+        "pointer": "d_output",
+        "rows": "elements",
+        "width": 1,
+        "flatten": true
+      },
+      {
+        "pointer": "d_a",
+        "rows": "elements",
+        "width": 1,
+        "flatten": true
+      },
+      {
+        "pointer": "d_b",
+        "rows": "elements",
+        "width": 1,
+        "flatten": true
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "tests/test_v8_clef_full_training.py"
+    ],
+    "oracle": "Pinned PyTorch head autograd and independent gather/scatter arithmetic, capacity and recovery checks."
+  },
+  "notes": "Reuses the existing native training VJP with compiler-validated contiguous spans and explicit per-operation extents. The function is not a checked public pointer API. Complete-head certification enables the existing strict-parity runtime; non-strict backend numerical behavior is not newly certified here."
+}

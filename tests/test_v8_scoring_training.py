@@ -15,7 +15,7 @@ FP=C.POINTER(C.c_float)
 STEMS=('scalar_exp_clamped','scalar_sigmoid','scale_vector')
 MAPS={stem:json.loads((ROOT/'version/v8/kernel_maps'/f'{stem}_backward_checked_f32.json').read_text()) for stem in STEMS}
 REGISTRY=deepcopy(base.REGISTRY)
-NAMES=['indexed_cosine_rows_checked_f32','indexed_cosine_rows_backward_checked_f32','indexed_normalized_dot_backward_checked_f32','add_rows_checked_f32']
+NAMES=['add_rows_backward_train_f32','indexed_cosine_rows_checked_f32','indexed_cosine_rows_backward_checked_f32','indexed_normalized_dot_backward_checked_f32','add_rows_checked_f32']
 NAMES += [stem+suffix for stem in STEMS for suffix in ('_checked_f32','_backward_checked_f32')]
 REGISTRY['kernels'].extend(json.loads((ROOT/'version/v8/kernel_maps'/f'{n}.json').read_text()) for n in NAMES)
 RULES=json.loads((ROOT/'version/v8/scripts/grad_rules_v8.json').read_text())
