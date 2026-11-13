@@ -983,6 +983,12 @@ TEST_SUITES = {
         "training", ROOT / "tests" / "test_v8_clef_full_training.py",
         unittest_targets=("tests.test_v8_clef_full_training.FullHeadTraining.test_pinned_complete_head_training", "tests.test_v8_clef_full_training.FullHeadTrainingContracts", "tests.test_v8_indexed_rows_training"),
     ),
+    "training_clef_registered_recipe": TestSuite(
+        "Registered FP32 Clef Dataset, Training, Resume and Native Export",
+        "training", ROOT / "tests" / "test_v8_clef_training_recipe.py",
+        timeout_sec=600,
+        unittest_targets=("tests.test_v8_clef_training_recipe",),
+    ),
     "training_released_clef_head": TestSuite(
         "FP32 Released Clef Head Gradients, Updates and Export (Asset-backed)",
         "training", ROOT / "tests" / "test_v8_clef_full_training.py",

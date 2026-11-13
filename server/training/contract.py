@@ -73,8 +73,9 @@ def registered_dataset(root,recipe):
     return entry
 
 class Backend:
-    def __init__(self,root=ROOT,*,resources='unknown'):
+    def __init__(self,root=ROOT,*,resources='unknown',clef_packages=None):
         if resources not in ('unknown','unavailable'):raise ValueError('no resource reservation provider')
+        self.clef_packages=copy.deepcopy(clef_packages or {})
         self.root=Path(root);self.boot=uuid.uuid4().hex;self.resources=resources
     def capabilities(self):
         datasets={k:registered_dataset(self.root,k) for k in SPECS}
@@ -85,6 +86,11 @@ class Backend:
                   stages=dict(discover='supported',validate='supported',submit='unsupported',observe='unsupported',artifacts='unsupported',cancel='unsupported'),
                   methods=dict(full_tiny_decoder='validation_only',clef_head='unsupported',lora='unsupported',qlora='unsupported'),
                   limits=dict(message_bytes=MAX_BYTES,epochs=[1,10],grad_accum=[1,8],queued_jobs=0))
+        if self.clef_packages:
+            from .clef import packages, RECIPE
+            body['clef_packages']=packages(self.clef_packages)
+            body['methods']['clef_head']='validation_only'
+            body['recipes'][RECIPE]=dict(limits=dict(epochs=[1,40],grad_accum=1),status='validation_only',dtype='fp32',optimizer='adamw',method='head_only',geometry='one declared geometry per package',executor_sha256=file_hash(self.root/'version/v8/decision/train_clef_head.py'))
         body['sha256']=digest(body);return body
     def exchange(self,q):
         if len(encode(q))>MAX_BYTES:raise ValueError('MESSAGE_TOO_LARGE')
@@ -102,6 +108,15 @@ class Backend:
         if q['operation']=='discover':response.update(ok=True,capabilities=caps);return response
         if q['worker_boot_id']!=self.boot:error('/worker_boot_id','STALE_WORKER')
         if q['capabilities_sha256']!=caps['sha256']:error('/capabilities_sha256','STALE_CAPABILITIES')
+        if type(q['config']) is dict and q['config'].get('recipe')=='clef_head_fp32_v1' and self.clef_packages:
+            from .clef import validate
+            errors.extend(validate(q['config'],caps['clef_packages']))
+            if self.resources=='unavailable':error('/resources','UNAVAILABLE')
+            if not errors:
+                plan=dict(schema='cke.training.plan.v1',worker_boot_id=self.boot,capabilities_sha256=caps['sha256'],cke_commit=caps['cke_commit'],workflow_sha256=caps['recipes']['clef_head_fp32_v1']['executor_sha256'],config=copy.deepcopy(q['config']),submittable=False,execution='disabled')
+                response.update(ok=True,plan=plan,plan_sha256=digest(plan))
+                warnings.append(dict(field='/config/package_id',code='SUPPLIED_FEATURES_NOT_BACKBONE_TRAINING'))
+            return response
         cfg=q['config'];required={'recipe','dataset','tokenizer','shape','dtype','optimizer','method','epochs','grad_accum'}
         if type(cfg) is not dict:error('/config','EXPECTED_OBJECT');return response
         for field in sorted(required-set(cfg)):error('/config/'+field,'REQUIRED')
