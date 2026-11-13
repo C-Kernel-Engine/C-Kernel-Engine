@@ -1315,6 +1315,48 @@ into the training IR, integration of the certified noncausal attention VJP, inde
 head parameter/optimizer/export comparisons. BF16 head trajectories and LoRA/QLoRA follow that baseline.</p>
 </section>
 
+<section id="pooling-automatic-training">
+<h2>Automatic pooling derivatives and typed training inputs</h2>
+<p>Span means and grouped softmax-weighted pooling now use declared FP32 training contracts and v8
+derivative rules. The shared lowerer generates their VJPs and explicitly accumulates gradients from
+separate branches. Integer spans and group counts are nondifferentiable; overlapping spans sum their
+feature-gradient contributions. Existing kernel arithmetic and inference ABIs are unchanged.</p>
+<p>Fixed-batch training graphs declare <code>config.training_integer_inputs</code>, an ordered list of
+INT32 input tensor IDs. Generated summaries expose <code>integer_inputs</code> (tensor, offset, count,
+dtype) and <code>integer_input_count</code>. These bindings participate in runtime/checkpoint identity.
+The host packs metadata in that order and calls:</p>
+<pre><code>ck_train_step_with_i32_ex(token_ids, targets, valid_tokens,
+                          integer_inputs, integer_count, loss_out, learning_rate)</code></pre>
+<p>The generated runtime copies metadata for the current batch and owns the forward/backward/optimizer
+schedule. The caller retains ownership of its source buffers. The old step entry cannot silently reuse
+metadata from a previous batch: it rejects graphs requiring these inputs. Forward-only inspection uses
+<code>ck_train_set_batch_with_i32_ex</code> followed by the existing generated forward entry.</p>
+<p>Counts, alignment and exact input extents are checked before binding. Providers validate span ranges
+and positive group counts with exact option coverage. Compile-time checks reject missing metadata,
+trainable integer inputs, incompatible shapes/dtypes, wrong contiguous strides, and partial-token span
+training. This initial contract requires fixed capacities with all token rows valid; it does not certify
+arbitrary dynamic shapes. The existing generated runtime remains non-reentrant and must be serialized
+per loaded instance.</p>
+<p>The regression composes fixed features → trainable projection → overlapping spans → exact-erf GELU
+→ grouped weighted pooling → frozen projection → scores. The projection also feeds the grouped queries,
+so backward must add both branches. Six spans form unequal groups [2,1,2,1]. Forty native AdamW updates
+reduce loss from 1.40194964 to 0.16358216. Against PyTorch 2.12.1 CPU, maximum absolute differences are
+8.01e-8 for gradients, 4.77e-7 for weights and 3.36e-8 for moments. Existing fixture bounds are unchanged.</p>
+<p>Tests compare every trainable gradient, update and moment, upstream finite differences, frozen weights,
+same-process checkpoint restoration and inference reload. A wrong saved-query control fails the oracle.
+A→B→A inputs, caller-buffer mutation after binding, malformed metadata, nonfinite input and injected
+backward failure cover reuse and recovery. Admission rejection leaves the current accumulation intact;
+provider failure discards its partial accumulation window and recovery matches fresh execution.
+PyTorch absence is an explicit oracle skip.</p>
+<pre><code>make -j4 build/libckernel_engine.so
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python3 -m unittest tests.test_v8_pooling_training -v
+python3 scripts/nightly_runner.py --tests training_pooling_composition --ci --require-executed</code></pre>
+<p><strong>This does not register complete Clef training.</strong> Indexed/scalar scoring derivatives,
+grouped decision loss, full-head training authoring and released-head gradient/update/export evidence
+remain. BF16 training, LoRA/QLoRA and application submission remain separate acceptance gates.
+The existing job service continues to reject unsupported recipes.</p>
+</section>
+
 <section id="gelu-automatic-training">
 <h2>Exact-erf GELU in automatic backward lowering</h2>
 <p>The existing FP32 checked GELU forward and derivative now expose contiguous, fixed-batch training
@@ -1340,7 +1382,7 @@ with relative 3e-4. PyTorch absence explicitly skips the independent comparison.
 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python3 -m unittest tests.test_v8_gelu_training -v
 python3 scripts/nightly_runner.py --tests training_gelu_composition --ci --require-executed</code></pre>
 <p><strong>Complete Clef training remains unsupported.</strong> The complete inference circuit still
-needs automatic bindings for pooling, indexed/scalar scoring, grouped loss and their branch joins.
+needs remaining indexed/scalar derivative bindings, grouped loss and complete graph authoring.
 Training authoring must then connect that graph to the existing workflow. Only after complete gradients,
 updates and export/reload pass should the local job registry advertise a Clef head recipe.
 Backbone-feature capture and frozen-backbone execution remain separate evidence levels.</p>
@@ -1536,9 +1578,9 @@ checkpoint/resume and inference-export workflow. Do not add a second model execu
 <tr><td>LayerNorm</td><td><code>layernorm_backward_kernel</code> in <code>layernorm_kernels.c</code>; BF16 variant in <code>layernorm_kernels_bf16.c</code>.</td><td>Cached-statistics training maps and native optimizer composition now pass; wire them into the complete head while preserving operation-local epsilon.</td></tr>
 <tr><td>Erf GELU</td><td>Checked erf derivative now has FP32 VJP and generated-chain evidence; earlier <code>gelu_backward_exact</code> differentiates tanh.</td><td>Wire the erf provider into automatic head backward; BF16 remains separate.</td></tr>
 <tr><td>Unmasked self/cross-attention</td><td>Checked FP32 noncausal dQ/dK/dV with ordered oracle, PyTorch autograd and native optimizer composition now pass.</td><td>Integrate the provider into the complete head. Masked and BF16 attention training are separate; existing causal providers are not substitutes.</td></tr>
-<tr><td>Token-span pooling and last-token selection</td><td>Checked span VJP accumulates overlapping spans with generated-chain evidence.</td><td>Wire automatic backward and final-row selection, with explicit accumulation for separate branches.</td></tr>
+<tr><td>Token-span pooling and last-token selection</td><td>Checked span VJP accumulates overlapping spans with generated-chain evidence.</td><td>Automatic span VJP and branch accumulation pass in the typed-input training composition; integrate final-row selection and the complete head.</td></tr>
 <tr><td>Embedding/gather and residual branches</td><td><code>embedding_backward_f32.json</code>, native BF16 embedding scatter, <code>residual_add_backward_f32.json</code>, gradient-accumulation providers.</td><td>Wire type-embedding gradients, indexed-owner scatter and broadcast reductions. Frozen output embeddings need no updates, while required hidden-feature gradient paths remain explicit.</td></tr>
-<tr><td>Grouped softmax-weighted pooling</td><td>Checked options/query VJP covers both score and value paths, unequal and singleton groups.</td><td>Connect to full-head backward synthesis and loss; the tested isolated chain is not head training.</td></tr>
+<tr><td>Grouped softmax-weighted pooling</td><td>Checked options/query VJP covers both score and value paths, unequal and singleton groups.</td><td>Automatic VJP and shared-input branch accumulation pass in generated training; connect complete-head authoring and loss.</td></tr>
 <tr><td>Cosine, pair features, scalar transforms</td><td>Indexed pair features and distinct normalized-dot/cosine FP32 VJPs now have generated branch-join evidence.</td><td>Wire automatic head backward with explicit clamp policy; add scalar/gain and remaining indexed derivatives, then certify complete scoring parameter gradients.</td></tr>
 <tr><td>Loss and optimizer</td><td><code>softmax_cross_entropy_loss.json</code> and <code>adamw_update_f32.json</code>; existing trajectory/resume/export machinery.</td><td>Declare one label per question and loss reduction over unequal option counts, then verify every trainable parameter, frozen hashes, optimizer moments and restart equivalence.</td></tr>
 </tbody></table>
@@ -1830,7 +1872,7 @@ export CKE_CLEF_FLASH_REFERENCE_SOURCE=/path/to/joint_schema_model.py</code></pr
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-11-08</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-11-13</p>
             </div>
         </div>
     </footer>
