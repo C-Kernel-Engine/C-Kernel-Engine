@@ -33,6 +33,9 @@ def build_training_ir(
     ):
         if type(value) is not int or value <= 0:
             raise ValueError(name + " must be a positive integer")
+    for name, value in raw.items():
+        if not isinstance(value, np.ndarray) or value.dtype != np.float32:
+            raise ValueError("FP32 head training requires explicit FP32 weight arrays: " + name)
     tokens, channels = hidden.shape
     width = raw["question_projection.weight"].shape[0]
     graph = build_circuit(

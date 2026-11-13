@@ -1248,6 +1248,52 @@ def _declared_training_call(op, kernel, args, pools, tensors, tensor_numel, vari
     return expressions
 
 
+def _validate_training_storage(ir2, tensors, manifest=None):
+    """Reject storage the generated trainer cannot represent before emitting C.
+
+    The memory planner knows BF16 byte sizes, but this runtime still hydrates,
+    snapshots, accumulates and optimizes floating tensors as FP32. Leaf BF16
+    kernels do not make that ABI typed. Never reinterpret or silently skip them.
+    """
+    def canonical(dtype, where):
+        if not isinstance(dtype, str):
+            raise ValueError("invalid generated-training storage dtype at " + where)
+        value = dtype.lower()
+        if value in ("fp32", "f32"):
+            return "fp32"
+        if _dtype_is_i32(value):
+            return "i32"
+        raise ValueError("unsupported generated-training storage dtype %r at %s; "
+                         "runtime supports FP32 tensors and INT32 metadata only" % (dtype, where))
+
+    for label, config in (("IR config", ir2.get("config") or {}), ("manifest config", (manifest or {}).get("config") or {})):
+        if "dtype" in config and config["dtype"] not in ("fp32", "f32", "float32"):
+            raise ValueError("unsupported generated-training storage dtype in " + label)
+    for tid, meta in tensors.items():
+        dtype = canonical(meta.get("dtype", "fp32"), tid)
+        if dtype == "i32" and (tid.startswith(("weight.", "grad.", "tmp.grad."))
+                               or meta.get("kind") == "weight"
+                               or "grad" in str(meta.get("kind", ""))
+                               or meta.get("requires_grad") is True):
+            raise ValueError("integer training metadata cannot be a weight or gradient: " + tid)
+    ops = list(ir2.get("forward", [])) + list(ir2.get("backward", []))
+    op_by_id = {int(op["op_id"]): op for op in ops if "op_id" in op}
+    for op in ops:
+        df = op.get("dataflow", {})
+        pools = (df.get("inputs", {}), df.get("outputs", {}),
+                 op.get("weights", {}), op.get("save_for_backward", {}))
+        for pool in pools:
+            if not isinstance(pool, dict):
+                continue
+            for ref in pool.values():
+                if not isinstance(ref, dict) or "dtype" not in ref:
+                    continue
+                tid = _resolve_ref_tensor(ref, op_by_id) or ("weight." + ref["name"] if isinstance(ref.get("name"), str) else "unresolved")
+                dtype = canonical(ref["dtype"], "op %s reference %s" % (op.get("op_id"), tid))
+                if tid in tensors and dtype != canonical(tensors[tid].get("dtype", "fp32"), tid):
+                    raise ValueError("conflicting generated-training storage dtype: " + tid)
+
+
 def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional[Dict[str, Any]] = None, layout: Optional[Dict[str, Any]] = None, exec_plan: Optional[Dict[str, Any]] = None) -> Tuple[str, Dict[str, Any]]:
     identity = {"ir2": ir2, "manifest": manifest or {}, "layout": layout or {}, "exec_plan": exec_plan or {}}
     declared_ids = set()
@@ -1271,6 +1317,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     bindings_doc = _load_json(DEFAULT_BINDINGS) if DEFAULT_BINDINGS.exists() else {}
     kernel_bindings = dict(bindings_doc.get("bindings") or {})
     tensors = _collect_tensors(ir2)
+    _validate_training_storage(ir2, tensors, manifest)
     tensor_numel, missing_numel = _tensor_numel_map(tensors)
     if missing_numel:
         raise RuntimeError(
@@ -1393,7 +1440,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                 used_decl[opt_kernel] = resolved
 
     # Optimizer state (AdamW moments) for each grad.weight.* tensor.
-    # AdamW kernel here is fp32-only, so non-fp32 params are skipped.
+    # Storage admission above rejects unsupported dtypes; never skip updates.
     opt_pairs: List[Tuple[str, str, str, str, str, int]] = []
     skipped_opt_non_fp32: List[str] = []
     grad_weight_tids = sorted([tid for tid in tensors.keys() if tid.startswith("grad.weight.")])
@@ -1406,8 +1453,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
             continue
         wdtype = str((tensors.get(wtid) or {}).get("dtype", "fp32")).lower()
         if wdtype not in ("fp32", "f32"):
-            skipped_opt_non_fp32.append(wname)
-            continue
+            raise ValueError("unsupported optimizer parameter dtype: " + wname)
         mvar = _c_ident("m." + wname, prefix="m_")
         vvar = _c_ident("v." + wname, prefix="v_")
         numel = tensor_numel.get(gtid)
