@@ -17,15 +17,19 @@ AVX2/FMA and AVX2/non-FMA builds. The external llama.cpp oracle additionally che
 <h3>Bounded operating envelope</h3>
 <p>The isolated P3 candidate uses the full Large-v3 checkpoint, generated FP32 execution, eight native threads,
 one active recording and two waiting requests. It accepts mono 16 kHz PCM16 WAV, at most 30 seconds and 1 MiB,
-English greedy transcription and bounded vocabulary hints. The decoder output limit remains 128 tokens;
-consumers must inspect <code>stop</code> and not treat <code>max_tokens</code> as complete transcription.
+English greedy transcription and bounded vocabulary hints. The decoder output limit defaults to 128 tokens. Use <code>--max-output-tokens 256</code> for the Large-v3 candidate;
+startup rejects budgets that exceed the decoder context after its required prefix. Vocabulary validation
+reserves this same generation budget. Replies expose <code>complete</code> and <code>generated_tokens</code>;
+<code>stop=max_tokens</code> means a partial transcript, not a successful complete recording.
+The initial retained performance/lifecycle report used the default 128-token budget.
 This does not certify multilingual, beam-search, long-form or word-alignment HTTP behavior.
 The existing Base accessibility endpoint remains separate.</p>
 <pre>CK_NUM_THREADS=8 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
   python3 -m server.whisper_http \
   --encoder-run-dir /path/to/verified-large-v3/encoder \
   --decoder-run-dir /path/to/verified-large-v3/decoder \
-  --port 8112 --max-seconds 30 --max-waiters 2 --worker-timeout-seconds 600
+  --port 8112 --max-seconds 30 --max-waiters 2 --worker-timeout-seconds 600 \
+  --max-output-tokens 256
 
 curl --fail http://127.0.0.1:8112/health
 python3 server/examples/whisper_http_client.py \
