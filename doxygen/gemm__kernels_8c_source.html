@@ -1372,55 +1372,61 @@ $(document).ready(function(){initNavTree('gemm__kernels_8c_source.html',''); ini
 <div class="line"><a id="l01192" name="l01192"></a><span class="lineno"> 1192</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> col = index - row * N;</div>
 <div class="line"><a id="l01193" name="l01193"></a><span class="lineno"> 1193</span>        <span class="keywordflow">if</span> (grouped_reduction &amp;&amp; col == 0 &amp;&amp; N &gt;= 2 &amp;&amp;</div>
 <div class="line"><a id="l01194" name="l01194"></a><span class="lineno"> 1194</span>            (output_end - index) / N &gt;= 4) {</div>
-<div class="line"><a id="l01195" name="l01195"></a><span class="lineno"> 1195</span>            <span class="keywordtype">int</span> n = 0;</div>
-<div class="line"><a id="l01196" name="l01196"></a><span class="lineno"> 1196</span>            <span class="keywordflow">for</span> (; n + 1 &lt; N; n += 2)</div>
-<div class="line"><a id="l01197" name="l01197"></a><span class="lineno"> 1197</span>                ck_gemm_nt_f32_llama_production_m4n2_avx2(A, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, N, K, row, n);</div>
-<div class="line"><a id="l01198" name="l01198"></a><span class="lineno"> 1198</span>            <span class="keywordflow">if</span> (n &lt; N) {</div>
-<div class="line"><a id="l01199" name="l01199"></a><span class="lineno"> 1199</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; 4; ++r)</div>
-<div class="line"><a id="l01200" name="l01200"></a><span class="lineno"> 1200</span>                    <a class="code hl_function" href="gemm__kernels_8c.html#a5b6e336e88f6e42a743eaea511bb59f3">ck_gemm_nt_f32_llama_production_output</a>(</div>
-<div class="line"><a id="l01201" name="l01201"></a><span class="lineno"> 1201</span>                        A, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K, (row + r) * N + n);</div>
-<div class="line"><a id="l01202" name="l01202"></a><span class="lineno"> 1202</span>            }</div>
-<div class="line"><a id="l01203" name="l01203"></a><span class="lineno"> 1203</span>            index += 4 * N;</div>
-<div class="line"><a id="l01204" name="l01204"></a><span class="lineno"> 1204</span>            <span class="keywordflow">continue</span>;</div>
-<div class="line"><a id="l01205" name="l01205"></a><span class="lineno"> 1205</span>        }</div>
-<div class="line"><a id="l01206" name="l01206"></a><span class="lineno"> 1206</span>        <span class="keywordflow">if</span> (grouped_reduction &amp;&amp; M &gt; 1 &amp;&amp; col + 4 &lt;= N &amp;&amp; index + 4 &lt;= output_end) {</div>
-<div class="line"><a id="l01207" name="l01207"></a><span class="lineno"> 1207</span>            ck_gemm_nt_f32_llama_production_outputs4_avx2(</div>
-<div class="line"><a id="l01208" name="l01208"></a><span class="lineno"> 1208</span>                A, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, N, K, row, col);</div>
-<div class="line"><a id="l01209" name="l01209"></a><span class="lineno"> 1209</span>            index += 4;</div>
+<div class="line"><a id="l01195" name="l01195"></a><span class="lineno"> 1195</span>            <span class="comment">/* Keep a bounded activation panel hot while reusing each weight</span></div>
+<div class="line"><a id="l01196" name="l01196"></a><span class="lineno"> 1196</span><span class="comment">             * pair across its four-row microtiles. Per-output K order is unchanged. */</span></div>
+<div class="line"><a id="l01197" name="l01197"></a><span class="lineno"> 1197</span>            <span class="keywordtype">int</span> rows = (output_end - index) / N;</div>
+<div class="line"><a id="l01198" name="l01198"></a><span class="lineno"> 1198</span>            <span class="keywordflow">if</span> (rows &gt; 32) rows = 32;</div>
+<div class="line"><a id="l01199" name="l01199"></a><span class="lineno"> 1199</span>            rows -= rows % 4;</div>
+<div class="line"><a id="l01200" name="l01200"></a><span class="lineno"> 1200</span>            <span class="keywordtype">int</span> n = 0;</div>
+<div class="line"><a id="l01201" name="l01201"></a><span class="lineno"> 1201</span>            <span class="keywordflow">for</span> (; n + 1 &lt; N; n += 2)</div>
+<div class="line"><a id="l01202" name="l01202"></a><span class="lineno"> 1202</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; rows; r += 4)</div>
+<div class="line"><a id="l01203" name="l01203"></a><span class="lineno"> 1203</span>                    ck_gemm_nt_f32_llama_production_m4n2_avx2(A, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, N, K, row + r, n);</div>
+<div class="line"><a id="l01204" name="l01204"></a><span class="lineno"> 1204</span>            <span class="keywordflow">if</span> (n &lt; N) {</div>
+<div class="line"><a id="l01205" name="l01205"></a><span class="lineno"> 1205</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; rows; ++r)</div>
+<div class="line"><a id="l01206" name="l01206"></a><span class="lineno"> 1206</span>                    <a class="code hl_function" href="gemm__kernels_8c.html#a5b6e336e88f6e42a743eaea511bb59f3">ck_gemm_nt_f32_llama_production_output</a>(</div>
+<div class="line"><a id="l01207" name="l01207"></a><span class="lineno"> 1207</span>                        A, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K, (row + r) * N + n);</div>
+<div class="line"><a id="l01208" name="l01208"></a><span class="lineno"> 1208</span>            }</div>
+<div class="line"><a id="l01209" name="l01209"></a><span class="lineno"> 1209</span>            index += rows * N;</div>
 <div class="line"><a id="l01210" name="l01210"></a><span class="lineno"> 1210</span>            <span class="keywordflow">continue</span>;</div>
 <div class="line"><a id="l01211" name="l01211"></a><span class="lineno"> 1211</span>        }</div>
-<div class="line"><a id="l01212" name="l01212"></a><span class="lineno"> 1212</span><span class="preprocessor">#elif defined(__AVX512F__)</span></div>
-<div class="line"><a id="l01213" name="l01213"></a><span class="lineno"> 1213</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> row = index / N;</div>
-<div class="line"><a id="l01214" name="l01214"></a><span class="lineno"> 1214</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> col = index - row * N;</div>
-<div class="line"><a id="l01215" name="l01215"></a><span class="lineno"> 1215</span>        <span class="keywordflow">if</span> (grouped_reduction &amp;&amp; M &gt; 1 &amp;&amp; col + 4 &lt;= N &amp;&amp; index + 4 &lt;= output_end) {</div>
-<div class="line"><a id="l01216" name="l01216"></a><span class="lineno"> 1216</span>            ck_gemm_nt_f32_llama_production_outputs4_avx512(</div>
-<div class="line"><a id="l01217" name="l01217"></a><span class="lineno"> 1217</span>                A, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, N, K, row, col);</div>
-<div class="line"><a id="l01218" name="l01218"></a><span class="lineno"> 1218</span>            index += 4;</div>
-<div class="line"><a id="l01219" name="l01219"></a><span class="lineno"> 1219</span>            <span class="keywordflow">continue</span>;</div>
-<div class="line"><a id="l01220" name="l01220"></a><span class="lineno"> 1220</span>        }</div>
-<div class="line"><a id="l01221" name="l01221"></a><span class="lineno"> 1221</span><span class="preprocessor">#endif</span></div>
-<div class="line"><a id="l01222" name="l01222"></a><span class="lineno"> 1222</span>        <a class="code hl_function" href="gemm__kernels_8c.html#a5b6e336e88f6e42a743eaea511bb59f3">ck_gemm_nt_f32_llama_production_output</a>(A, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K, index);</div>
-<div class="line"><a id="l01223" name="l01223"></a><span class="lineno"> 1223</span>        ++index;</div>
-<div class="line"><a id="l01224" name="l01224"></a><span class="lineno"> 1224</span>    }</div>
-<div class="line"><a id="l01225" name="l01225"></a><span class="lineno"> 1225</span>}</div>
+<div class="line"><a id="l01212" name="l01212"></a><span class="lineno"> 1212</span>        <span class="keywordflow">if</span> (grouped_reduction &amp;&amp; M &gt; 1 &amp;&amp; col + 4 &lt;= N &amp;&amp; index + 4 &lt;= output_end) {</div>
+<div class="line"><a id="l01213" name="l01213"></a><span class="lineno"> 1213</span>            ck_gemm_nt_f32_llama_production_outputs4_avx2(</div>
+<div class="line"><a id="l01214" name="l01214"></a><span class="lineno"> 1214</span>                A, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, N, K, row, col);</div>
+<div class="line"><a id="l01215" name="l01215"></a><span class="lineno"> 1215</span>            index += 4;</div>
+<div class="line"><a id="l01216" name="l01216"></a><span class="lineno"> 1216</span>            <span class="keywordflow">continue</span>;</div>
+<div class="line"><a id="l01217" name="l01217"></a><span class="lineno"> 1217</span>        }</div>
+<div class="line"><a id="l01218" name="l01218"></a><span class="lineno"> 1218</span><span class="preprocessor">#elif defined(__AVX512F__)</span></div>
+<div class="line"><a id="l01219" name="l01219"></a><span class="lineno"> 1219</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> row = index / N;</div>
+<div class="line"><a id="l01220" name="l01220"></a><span class="lineno"> 1220</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> col = index - row * N;</div>
+<div class="line"><a id="l01221" name="l01221"></a><span class="lineno"> 1221</span>        <span class="keywordflow">if</span> (grouped_reduction &amp;&amp; M &gt; 1 &amp;&amp; col + 4 &lt;= N &amp;&amp; index + 4 &lt;= output_end) {</div>
+<div class="line"><a id="l01222" name="l01222"></a><span class="lineno"> 1222</span>            ck_gemm_nt_f32_llama_production_outputs4_avx512(</div>
+<div class="line"><a id="l01223" name="l01223"></a><span class="lineno"> 1223</span>                A, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, N, K, row, col);</div>
+<div class="line"><a id="l01224" name="l01224"></a><span class="lineno"> 1224</span>            index += 4;</div>
+<div class="line"><a id="l01225" name="l01225"></a><span class="lineno"> 1225</span>            <span class="keywordflow">continue</span>;</div>
+<div class="line"><a id="l01226" name="l01226"></a><span class="lineno"> 1226</span>        }</div>
+<div class="line"><a id="l01227" name="l01227"></a><span class="lineno"> 1227</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l01228" name="l01228"></a><span class="lineno"> 1228</span>        <a class="code hl_function" href="gemm__kernels_8c.html#a5b6e336e88f6e42a743eaea511bb59f3">ck_gemm_nt_f32_llama_production_output</a>(A, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K, index);</div>
+<div class="line"><a id="l01229" name="l01229"></a><span class="lineno"> 1229</span>        ++index;</div>
+<div class="line"><a id="l01230" name="l01230"></a><span class="lineno"> 1230</span>    }</div>
+<div class="line"><a id="l01231" name="l01231"></a><span class="lineno"> 1231</span>}</div>
 </div>
-<div class="line"><a id="l01226" name="l01226"></a><span class="lineno"> 1226</span> </div>
-<div class="foldopen" id="foldopen01227" data-start="{" data-end="}">
-<div class="line"><a id="l01227" name="l01227"></a><span class="lineno"><a class="line" href="ckernel__engine_8h.html#ae808c1ad88909d53227862259add3b52"> 1227</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="gemm__kernels_8c.html#ae808c1ad88909d53227862259add3b52">gemm_nt_f32_llama_production</a>(<span class="keyword">const</span> <span class="keywordtype">float</span> *A,</div>
-<div class="line"><a id="l01228" name="l01228"></a><span class="lineno"> 1228</span>                                  <span class="keyword">const</span> <span class="keywordtype">float</span> *B,</div>
-<div class="line"><a id="l01229" name="l01229"></a><span class="lineno"> 1229</span>                                  <span class="keyword">const</span> <span class="keywordtype">float</span> *bias,</div>
-<div class="line"><a id="l01230" name="l01230"></a><span class="lineno"> 1230</span>                                  <span class="keywordtype">float</span> *<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>,</div>
-<div class="line"><a id="l01231" name="l01231"></a><span class="lineno"> 1231</span>                                  <span class="keywordtype">int</span> M, <span class="keywordtype">int</span> N, <span class="keywordtype">int</span> K)</div>
-<div class="line"><a id="l01232" name="l01232"></a><span class="lineno"> 1232</span>{</div>
-<div class="line"><a id="l01233" name="l01233"></a><span class="lineno"> 1233</span>    <span class="keywordflow">if</span> (!A || !B || !<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a> || M &lt;= 0 || N &lt;= 0 || K &lt;= 0) {</div>
-<div class="line"><a id="l01234" name="l01234"></a><span class="lineno"> 1234</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><a id="l01235" name="l01235"></a><span class="lineno"> 1235</span>    }</div>
-<div class="line"><a id="l01236" name="l01236"></a><span class="lineno"> 1236</span> </div>
-<div class="line"><a id="l01237" name="l01237"></a><span class="lineno"> 1237</span><span class="preprocessor">#pragma omp parallel for schedule(static) if ((size_t)M * (size_t)N &gt;= 96)</span></div>
-<div class="line"><a id="l01238" name="l01238"></a><span class="lineno"> 1238</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> index = 0; index &lt; M * N; ++index) {</div>
-<div class="line"><a id="l01239" name="l01239"></a><span class="lineno"> 1239</span>        <a class="code hl_function" href="gemm__kernels_8c.html#a5b6e336e88f6e42a743eaea511bb59f3">ck_gemm_nt_f32_llama_production_output</a>(A, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K, index);</div>
-<div class="line"><a id="l01240" name="l01240"></a><span class="lineno"> 1240</span>    }</div>
-<div class="line"><a id="l01241" name="l01241"></a><span class="lineno"> 1241</span>}</div>
+<div class="line"><a id="l01232" name="l01232"></a><span class="lineno"> 1232</span> </div>
+<div class="foldopen" id="foldopen01233" data-start="{" data-end="}">
+<div class="line"><a id="l01233" name="l01233"></a><span class="lineno"><a class="line" href="ckernel__engine_8h.html#ae808c1ad88909d53227862259add3b52"> 1233</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="gemm__kernels_8c.html#ae808c1ad88909d53227862259add3b52">gemm_nt_f32_llama_production</a>(<span class="keyword">const</span> <span class="keywordtype">float</span> *A,</div>
+<div class="line"><a id="l01234" name="l01234"></a><span class="lineno"> 1234</span>                                  <span class="keyword">const</span> <span class="keywordtype">float</span> *B,</div>
+<div class="line"><a id="l01235" name="l01235"></a><span class="lineno"> 1235</span>                                  <span class="keyword">const</span> <span class="keywordtype">float</span> *bias,</div>
+<div class="line"><a id="l01236" name="l01236"></a><span class="lineno"> 1236</span>                                  <span class="keywordtype">float</span> *<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>,</div>
+<div class="line"><a id="l01237" name="l01237"></a><span class="lineno"> 1237</span>                                  <span class="keywordtype">int</span> M, <span class="keywordtype">int</span> N, <span class="keywordtype">int</span> K)</div>
+<div class="line"><a id="l01238" name="l01238"></a><span class="lineno"> 1238</span>{</div>
+<div class="line"><a id="l01239" name="l01239"></a><span class="lineno"> 1239</span>    <span class="keywordflow">if</span> (!A || !B || !<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a> || M &lt;= 0 || N &lt;= 0 || K &lt;= 0) {</div>
+<div class="line"><a id="l01240" name="l01240"></a><span class="lineno"> 1240</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><a id="l01241" name="l01241"></a><span class="lineno"> 1241</span>    }</div>
+<div class="line"><a id="l01242" name="l01242"></a><span class="lineno"> 1242</span> </div>
+<div class="line"><a id="l01243" name="l01243"></a><span class="lineno"> 1243</span><span class="preprocessor">#pragma omp parallel for schedule(static) if ((size_t)M * (size_t)N &gt;= 96)</span></div>
+<div class="line"><a id="l01244" name="l01244"></a><span class="lineno"> 1244</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> index = 0; index &lt; M * N; ++index) {</div>
+<div class="line"><a id="l01245" name="l01245"></a><span class="lineno"> 1245</span>        <a class="code hl_function" href="gemm__kernels_8c.html#a5b6e336e88f6e42a743eaea511bb59f3">ck_gemm_nt_f32_llama_production_output</a>(A, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K, index);</div>
+<div class="line"><a id="l01246" name="l01246"></a><span class="lineno"> 1246</span>    }</div>
+<div class="line"><a id="l01247" name="l01247"></a><span class="lineno"> 1247</span>}</div>
 </div>
 <div class="ttc" id="ack__threadpool_8h_html"><div class="ttname"><a href="ck__threadpool_8h.html">ck_threadpool.h</a></div><div class="ttdoc">Persistent pthread thread pool for CK-Engine inference.</div></div>
 <div class="ttc" id="ack__threadpool_8h_html_a201c68c915e80d824c95721b55c5ab83"><div class="ttname"><a href="ck__threadpool_8h.html#a201c68c915e80d824c95721b55c5ab83">ck_threadpool_parallel_for_n</a></div><div class="ttdeci">void ck_threadpool_parallel_for_n(ck_threadpool_t *pool, int active_threads, int begin, int end, int grain_size, ck_range_fn_t fn, void *args)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00576">ck_threadpool.c:576</a></div></div>
@@ -1451,7 +1457,7 @@ $(document).ready(function(){initNavTree('gemm__kernels_8c_source.html',''); ini
 <div class="ttc" id="agemm__kernels_8c_html_abab2d2aaed47f4c682c019bd77fab1ed"><div class="ttname"><a href="gemm__kernels_8c.html#abab2d2aaed47f4c682c019bd77fab1ed">gemm_fine_grained_parallel</a></div><div class="ttdeci">void gemm_fine_grained_parallel(const float *A, const float *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels_8c_source.html#l00286">gemm_kernels.c:286</a></div></div>
 <div class="ttc" id="agemm__kernels_8c_html_ad7789976472e68f59b1604811f4648f2"><div class="ttname"><a href="gemm__kernels_8c.html#ad7789976472e68f59b1604811f4648f2">ck_gemm_add_bias</a></div><div class="ttdeci">static void ck_gemm_add_bias(float *C, const float *bias, int M, int N)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels_8c_source.html#l00033">gemm_kernels.c:33</a></div></div>
 <div class="ttc" id="agemm__kernels_8c_html_ae3bc36ea7b8562f9121e527f0f408b43"><div class="ttname"><a href="gemm__kernels_8c.html#ae3bc36ea7b8562f9121e527f0f408b43">gemm_tn_blocked</a></div><div class="ttdeci">void gemm_tn_blocked(const float *A, const float *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels_8c_source.html#l00769">gemm_kernels.c:769</a></div></div>
-<div class="ttc" id="agemm__kernels_8c_html_ae808c1ad88909d53227862259add3b52"><div class="ttname"><a href="gemm__kernels_8c.html#ae808c1ad88909d53227862259add3b52">gemm_nt_f32_llama_production</a></div><div class="ttdeci">void gemm_nt_f32_llama_production(const float *A, const float *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels_8c_source.html#l01227">gemm_kernels.c:1227</a></div></div>
+<div class="ttc" id="agemm__kernels_8c_html_ae808c1ad88909d53227862259add3b52"><div class="ttname"><a href="gemm__kernels_8c.html#ae808c1ad88909d53227862259add3b52">gemm_nt_f32_llama_production</a></div><div class="ttdeci">void gemm_nt_f32_llama_production(const float *A, const float *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels_8c_source.html#l01233">gemm_kernels.c:1233</a></div></div>
 <div class="ttc" id="agemm__kernels_8c_html_af4f0e756d3ac00b45ce2c7a296b61ae3"><div class="ttname"><a href="gemm__kernels_8c.html#af4f0e756d3ac00b45ce2c7a296b61ae3">gemm_blocked_serial</a></div><div class="ttdeci">void gemm_blocked_serial(const float *A, const float *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels_8c_source.html#l00849">gemm_kernels.c:849</a></div></div>
 <div class="ttc" id="agemm__kernels_8c_html_afd447dc190bd77241a42d8972f9c5fba"><div class="ttname"><a href="gemm__kernels_8c.html#afd447dc190bd77241a42d8972f9c5fba">gemm_nn_blocked</a></div><div class="ttdeci">void gemm_nn_blocked(const float *A, const float *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels_8c_source.html#l00590">gemm_kernels.c:590</a></div></div>
 <div class="ttc" id="agemm__kernels_8c_html_afe5bf17f909def227c3e25b0c4338f93"><div class="ttname"><a href="gemm__kernels_8c.html#afe5bf17f909def227c3e25b0c4338f93">gemm_tn_avx512</a></div><div class="ttdeci">void gemm_tn_avx512(const float *A, const float *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels_8c_source.html#l00709">gemm_kernels.c:709</a></div></div>
