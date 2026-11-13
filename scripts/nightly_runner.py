@@ -967,6 +967,11 @@ TEST_SUITES = {
         ROOT / "tests" / "test_v8_attention_training.py",
         unittest_targets=("tests.test_v8_attention_training", "tests.test_v8_attention_cross_backward"),
     ),
+    "training_grouped_loss_composition": TestSuite(
+        "FP32 Grouped Decision Loss, Indexed Scorer and Native AdamW",
+        "training", ROOT / "tests" / "test_v8_grouped_loss_training.py",
+        unittest_targets=("tests.test_v8_grouped_loss_training",),
+    ),
     "training_pooling_composition": TestSuite(
         "FP32 Span and Grouped Pooling Training with Per-Batch Integer Inputs",
         "training", ROOT / "tests" / "test_v8_pooling_training.py",

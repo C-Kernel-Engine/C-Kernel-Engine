@@ -1,0 +1,289 @@
+{
+  "id": "grouped_cross_entropy_checked_f32",
+  "op": "grouped_cross_entropy_checked",
+  "operation_interface": "loss.grouped_cross_entropy.fp32.v1",
+  "variant": "ordered_fp64_fp32_storage",
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "logits",
+      "dtype": "fp32",
+      "shape": [
+        "R"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "counts",
+      "dtype": "i32",
+      "shape": [
+        "G"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "targets",
+      "dtype": "i32",
+      "shape": [
+        "G"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "d_logits",
+      "dtype": "fp32",
+      "shape": [
+        "R"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "loss_out",
+      "dtype": "fp32",
+      "shape": [
+        1
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "scratch": [
+    {
+      "name": "scratch",
+      "dtype": "fp32",
+      "shape": [
+        "X"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read_write",
+      "storage_class": "scratch",
+      "consumption": "required",
+      "lifetime": "kernel_call",
+      "alignment": 64,
+      "size_bytes": "4 * X",
+      "size_resolution": "required"
+    }
+  ],
+  "dims": [
+    "R",
+    "G",
+    "X"
+  ],
+  "impl": {
+    "function": "ck_grouped_cross_entropy_f32",
+    "c_declaration": "int ck_grouped_cross_entropy_f32(const float *logits, size_t logits_elements, const int32_t *counts, size_t count_elements, const int32_t *targets, size_t target_elements, float *d_logits, size_t gradient_elements, float *loss, size_t loss_elements, float *scratch, size_t scratch_elements, size_t groups, size_t options);",
+    "sources": [
+      "src/kernels/grouped_cross_entropy.c"
+    ]
+  },
+  "modes": {
+    "inference": false,
+    "training": true,
+    "backward": true
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "logits",
+        "source": "activation:logits",
+        "cast": "const float *",
+        "ports": [
+          "input:logits"
+        ]
+      },
+      {
+        "name": "logits_elements",
+        "source": "runtime:logits_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "counts",
+        "source": "activation:counts",
+        "cast": "const int32_t *",
+        "ports": [
+          "input:counts"
+        ]
+      },
+      {
+        "name": "count_elements",
+        "source": "runtime:count_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "targets",
+        "source": "activation:targets",
+        "cast": "const int32_t *",
+        "ports": [
+          "input:targets"
+        ]
+      },
+      {
+        "name": "target_elements",
+        "source": "runtime:target_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "d_logits",
+        "source": "output:d_logits",
+        "cast": "float *",
+        "ports": [
+          "output:d_logits"
+        ]
+      },
+      {
+        "name": "gradient_elements",
+        "source": "runtime:gradient_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "loss",
+        "source": "output:loss_out",
+        "cast": "float *",
+        "ports": [
+          "output:loss_out"
+        ]
+      },
+      {
+        "name": "loss_elements",
+        "source": "runtime:loss_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "scratch",
+        "source": "scratch:scratch",
+        "cast": "float *"
+      },
+      {
+        "name": "scratch_elements",
+        "source": "runtime:scratch_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "groups",
+        "source": "runtime:groups",
+        "value_type": "size_t"
+      },
+      {
+        "name": "options",
+        "source": "runtime:options",
+        "value_type": "size_t"
+      }
+    ]
+  },
+  "training_contract": {
+    "version": 1,
+    "layout": "contiguous",
+    "batch_policy": "fixed",
+    "return_status": "zero_success",
+    "buffer_spans": [
+      {
+        "pointer": "logits",
+        "rows": "options",
+        "width": 1,
+        "elements": "logits_elements"
+      },
+      {
+        "pointer": "counts",
+        "rows": 1,
+        "width": "groups",
+        "elements": "count_elements"
+      },
+      {
+        "pointer": "targets",
+        "rows": 1,
+        "width": "groups",
+        "elements": "target_elements"
+      },
+      {
+        "pointer": "d_logits",
+        "rows": "options",
+        "width": 1,
+        "elements": "gradient_elements"
+      },
+      {
+        "pointer": "loss",
+        "rows": 1,
+        "width": 1,
+        "elements": "loss_elements"
+      },
+      {
+        "pointer": "scratch",
+        "rows": 1,
+        "width": "scratch_elements",
+        "elements": "scratch_elements"
+      }
+    ],
+    "loss_seed": {
+      "gradient_input": "logits",
+      "gradient_output": "d_logits",
+      "value_output": "loss_out",
+      "reduction": "mean_groups"
+    }
+  },
+  "numerical_capabilities": [
+    {
+      "contract_id": "grouped_ce_ordered_fp64_fp32_v1",
+      "status": "validated",
+      "phases": [
+        "backward"
+      ],
+      "function": "ck_grouped_cross_entropy_f32",
+      "explicit_selector": true,
+      "implementation": {
+        "isa_dispatch": "scalar",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": [
+            "serial"
+          ],
+          "dispatch": [
+            "inline"
+          ],
+          "reduction_order_effect": "none"
+        }
+      },
+      "arithmetic": {
+        "partial_accumulator": "fp64",
+        "merge_order": "none",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false,
+        "split_strategy": "serial"
+      }
+    }
+  ],
+  "tests": {
+    "unit": [
+      "tests/test_v8_grouped_loss_training.py"
+    ],
+    "oracle": "Independent PyTorch per-group cross entropy, scalar log-sum-exp and finite differences."
+  },
+  "notes": "Mean over groups, relative target indices, positive counts summing exactly to options. Singleton groups contribute zero loss/gradient. FP64 max-shift exp/sum/log, FP32 output. All outputs staged before publication; reject nonfinite and overflowing loss. Scratch at least options+1 floats. No label smoothing, weights, ignore-index, BF16 or double backward."
+}

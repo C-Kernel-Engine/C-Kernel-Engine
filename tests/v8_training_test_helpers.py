@@ -14,7 +14,7 @@ import codegen_train_runtime_v7 as codegen
 import generate_train_layout_v7 as planner
 
 
-def certify_training(self, ir, registry, values, trainable, forward, *, integer_inputs=None):
+def certify_training(self, ir, registry, values, trainable, forward, *, integer_inputs=None, loss_function=None):
     try:
         import numpy as np
         import torch
@@ -64,6 +64,7 @@ def certify_training(self, ir, registry, values, trainable, forward, *, integer_
                 return lib.ck_train_set_batch_with_i32_ex(ids, targets, count, metadata_inputs.ctypes.data_as(ip), metadata_inputs.size)
         ids = np.arange(4, dtype='int32')
         labels = torch.arange(4)
+        criterion = loss_function or (lambda logits: torch.nn.functional.cross_entropy(logits, labels))
         losses = []
         errors = dict(gradient=0.0, weight=0.0, moment=0.0)
         config = dict(dtype='fp32', optimizer='AdamW', lr=.03, weight_decay=.01,
@@ -84,9 +85,12 @@ def certify_training(self, ir, registry, values, trainable, forward, *, integer_
             for step in range(40):
                 opt.zero_grad()
                 logits = forward(params)
-                loss = torch.nn.functional.cross_entropy(logits, labels)
+                loss = criterion(logits)
                 loss.backward()
-                self.assertGreater(float(params['up'].grad.abs().max()), 1e-5)
+                # Grouped objectives can converge to a zero gradient; preserve
+                # the existing decoder assertion for its original trajectory.
+                if loss_function is None or step == 0:
+                    self.assertGreater(float(params['up'].grad.abs().max()), 1e-5)
                 native_loss = ctypes.c_float()
                 self.assertGreater(native_step(ids.ctypes.data_as(ip), ids.ctypes.data_as(ip),
                                                        4, ctypes.byref(native_loss), .03), 0)
@@ -108,7 +112,7 @@ def certify_training(self, ir, registry, values, trainable, forward, *, integer_
                         w = double['up'].clone()
                         w[0, 0] += delta
                         z = forward(dict(double, up=w))
-                        return torch.nn.functional.cross_entropy(z, labels).item()
+                        return criterion(z).item()
                     finite_difference = (evaluate(1e-5) - evaluate(-1e-5)) / 2e-5
                     self.assertAlmostEqual(float(grads[sum(values[n].size for n in sorted(trainable)[:sorted(trainable).index('up')])]), finite_difference, delta=1e-6)
                 opt.step()
@@ -148,7 +152,7 @@ def certify_training(self, ir, registry, values, trainable, forward, *, integer_
             self.assertGreater(lib.ck_train_forward_step(), 0)
             activations = workflow.CERT._activation_snapshot(lib, summary)
             expected_logits = forward(params)
-            np.testing.assert_allclose(activations['act.score'].reshape(4, 4),
+            np.testing.assert_allclose(activations['act.score'].reshape(tuple(expected_logits.shape)),
                                        expected_logits.detach().numpy(), atol=3e-5, rtol=3e-4)
             self.assertEqual(lib.ck_train_get_opt_step(), 0)
             print('FP32 native AdamW: loss %.8f -> %.8f; 40 gradient/update comparisons' % (losses[0], losses[-1]))

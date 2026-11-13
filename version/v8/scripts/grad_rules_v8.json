@@ -928,6 +928,51 @@
           ]
         }
       ]
+    },
+    "indexed_pair_features_checked_backward": {
+      "status": "ready",
+      "requires_saved": [
+        "left",
+        "right",
+        "indices"
+      ],
+      "extra_saved": [],
+      "backward_ops": [
+        {
+          "role": "core",
+          "kernel_id": "indexed_pair_features_backward_checked_f32",
+          "map_call": true,
+          "reads": [
+            "saved:left",
+            "saved:right",
+            "saved:indices",
+            "grad:output"
+          ],
+          "input_names": [
+            "left",
+            "right",
+            "indices",
+            "d_output"
+          ],
+          "writes": [
+            {
+              "name": "d_left",
+              "kind": "grad_activation",
+              "target_input": "left"
+            },
+            {
+              "name": "d_right",
+              "kind": "grad_activation",
+              "target_input": "right"
+            },
+            {
+              "name": "scratch",
+              "kind": "aux",
+              "numel_from_forward_param": "scratch_elements"
+            }
+          ]
+        }
+      ]
     }
   },
   "template_op_to_rule": {

@@ -761,69 +761,130 @@ def synthesize_ir2_backward(
         if isinstance(op, dict):
             _apply_forward_checkpoint_policy(op)
 
-    # Seed backward graph from explicit CE gradient on final logits.
-    # This is the only non-reverse-traversal entrypoint for gradient flow.
-    logits_op = _last_forward_logits_op(forward_ops)
-    if logits_op is None:
-        msg = "Cannot seed backward graph: no `logits` op found in IR1"
-        if strict:
-            issues.append(msg)
-        else:
-            warnings.append(msg)
+    # A bounded declared loss seeds the ordinary reverse traversal. Legacy decoder
+    # graphs retain their existing implicit logits/CE seed below.
+    explicit_loss = ir1.get("loss")
+    if explicit_loss is not None:
+        if (not isinstance(explicit_loss, dict)
+                or set(explicit_loss) != {"kernel_id", "inputs", "params", "scratch"}):
+            raise ValueError("invalid declared scalar loss")
+        kid = explicit_loss["kernel_id"]
+        if not isinstance(kid, str) or kid not in kernels:
+            raise ValueError("declared loss provider is unavailable")
+        mapping = kernels[kid]
+        seed = mapping.get("training_contract", {}).get("loss_seed", {})
+        if (not isinstance(seed, dict) or set(seed) != {"gradient_input", "gradient_output", "value_output", "reduction"}
+                or any(not isinstance(x, str) or not x for x in seed.values())
+                or seed["gradient_output"] == seed["value_output"]):
+            raise ValueError("provider does not declare an unambiguous scalar loss seed")
+        raw_inputs = explicit_loss["inputs"]
+        expected_inputs = {x["name"] for x in mapping.get("inputs", [])}
+        if (not isinstance(raw_inputs, dict) or set(raw_inputs) != expected_inputs
+                or seed["gradient_input"] not in raw_inputs):
+            raise ValueError("declared loss inputs mismatch provider")
+        inputs = {}
+        for port, tid in raw_inputs.items():
+            if not isinstance(tid, str) or tid not in tensors:
+                raise ValueError("unknown declared loss input")
+            inputs[port] = {"tensor": tid, "kind": tensors[tid].get("kind", "activation")}
+        root = raw_inputs[seed["gradient_input"]]
+        producers = [op for op in forward_ops if any(ref.get("tensor") == root
+                     for ref in op.get("dataflow", {}).get("outputs", {}).values())]
+        if len(producers) != 1 or tensors[root].get("dtype") != "fp32":
+            raise ValueError("loss gradient target must have one FP32 forward producer")
+        if {x["name"] for x in mapping.get("outputs", [])} != {seed["gradient_output"], seed["value_output"]}:
+            raise ValueError("loss seed must expose one scalar value and one input gradient")
+        scratch = explicit_loss["scratch"]
+        if not isinstance(scratch, dict) or set(scratch) != {x["name"] for x in mapping.get("scratch", [])}:
+            raise ValueError("declared loss workspace mismatch")
+        reserved = {"aux.loss"} | {"aux.loss_workspace." + port for port in scratch}
+        if reserved.intersection(tensors):
+            raise ValueError("declared loss workspace collides with an existing tensor")
+        grad_root = canonical_grad_activation(root)
+        grad_for_tensor[root] = grad_root
+        outputs = {seed["gradient_output"]: {"tensor": grad_root, "kind": "grad_activation"}}
+        _ensure_tensor(tensors, tensor_id="aux.loss", dtype="fp32", kind="aux", requires_grad=False,
+                       persistent=False, shape=[1], numel=1)
+        outputs[seed["value_output"]] = {"tensor": "aux.loss", "kind": "aux"}
+        for port, count in scratch.items():
+            if type(count) is not int or not 0 < count <= 2147483647:
+                raise ValueError("invalid declared loss workspace")
+            tid = "aux.loss_workspace." + port
+            _ensure_tensor(tensors, tensor_id=tid, dtype="fp32", kind="aux", requires_grad=False,
+                           persistent=False, shape=[count], numel=count)
+            outputs[port] = {"tensor": tid, "kind": "aux"}
+        if not isinstance(explicit_loss["params"], dict):
+            raise ValueError("invalid declared loss parameters")
+        emit_backward_op(dict(phase="backward", op="loss_backward", kernel_id=kid, map_call=True,
+            params=deepcopy(explicit_loss["params"]), forward_ref=producers[0]["op_id"], layer=-1,
+            role="loss_seed", loss_value_tensor="aux.loss",
+            dataflow=dict(inputs=inputs, outputs=outputs)))
+        grad_writers.setdefault(grad_root, []).append(next_op_id - 1)
     else:
-        logits_tensor = _op_output_tensor(logits_op, "y")
-        if not logits_tensor:
-            issues.append("logits op found but output `y` is missing")
+        # Seed backward graph from explicit CE gradient on final logits.
+        # This is the only non-reverse-traversal entrypoint for gradient flow.
+        logits_op = _last_forward_logits_op(forward_ops)
+        if logits_op is None:
+            msg = "Cannot seed backward graph: no `logits` op found in IR1"
+            if strict:
+                issues.append(msg)
+            else:
+                warnings.append(msg)
         else:
-            loss_rule = rules.get("cross_entropy_loss", {})
-            loss_kernel_id = "softmax_cross_entropy_loss"
-            if isinstance(loss_rule, dict):
-                bwd_ops = loss_rule.get("backward_ops", []) or []
-                if bwd_ops and isinstance(bwd_ops[0], dict):
-                    loss_kernel_id = str(bwd_ops[0].get("kernel_id") or loss_kernel_id)
+            logits_tensor = _op_output_tensor(logits_op, "y")
+            if not logits_tensor:
+                issues.append("logits op found but output `y` is missing")
+            else:
+                loss_rule = rules.get("cross_entropy_loss", {})
+                loss_kernel_id = "softmax_cross_entropy_loss"
+                if isinstance(loss_rule, dict):
+                    bwd_ops = loss_rule.get("backward_ops", []) or []
+                    if bwd_ops and isinstance(bwd_ops[0], dict):
+                        loss_kernel_id = str(bwd_ops[0].get("kernel_id") or loss_kernel_id)
 
-            if loss_kernel_id not in kernels:
-                issues.append("Missing kernel `%s` required for loss seed" % loss_kernel_id)
-            if loss_kernel_id not in bindings:
-                issues.append("Missing bindings `%s` required for loss seed" % loss_kernel_id)
+                if loss_kernel_id not in kernels:
+                    issues.append("Missing kernel `%s` required for loss seed" % loss_kernel_id)
+                if loss_kernel_id not in bindings:
+                    issues.append("Missing bindings `%s` required for loss seed" % loss_kernel_id)
 
-            grad_logits = canonical_grad_activation(logits_tensor)
-            grad_for_tensor[logits_tensor] = grad_logits
-            # aux.loss is a scalar reporting output from the loss seed op.
-            # It is intentionally modeled as an aux tensor (not an activation slot)
-            # and should be excluded from strict forward activation-oracle matching.
-            _ensure_tensor(
-                tensors,
-                tensor_id="aux.loss",
-                dtype="fp32",
-                kind="aux",
-                requires_grad=False,
-                persistent=False,
-                producer={"op_id": next_op_id, "output_name": "loss_out"},
-                shape=[1],
-                numel=1,
-            )
-            emit_backward_op(
-                {
-                    "phase": "backward",
-                    "op": "loss_backward",
-                    "kernel_id": loss_kernel_id,
-                    "forward_ref": int(logits_op.get("op_id", -1)),
-                    "layer": int(logits_op.get("layer", -1)),
-                    "role": "loss_seed",
-                    "dataflow": {
-                        "inputs": {
-                            "logits": {"tensor": logits_tensor, "kind": "activation"},
-                            "targets": {"tensor": "input.targets", "kind": "input"}
-                        },
-                        "outputs": {
-                            "d_logits": {"tensor": grad_logits, "kind": "grad_activation"},
-                            "loss_out": {"tensor": "aux.loss", "kind": "aux"}
+                grad_logits = canonical_grad_activation(logits_tensor)
+                grad_for_tensor[logits_tensor] = grad_logits
+                # aux.loss is a scalar reporting output from the loss seed op.
+                # It is intentionally modeled as an aux tensor (not an activation slot)
+                # and should be excluded from strict forward activation-oracle matching.
+                _ensure_tensor(
+                    tensors,
+                    tensor_id="aux.loss",
+                    dtype="fp32",
+                    kind="aux",
+                    requires_grad=False,
+                    persistent=False,
+                    producer={"op_id": next_op_id, "output_name": "loss_out"},
+                    shape=[1],
+                    numel=1,
+                )
+                emit_backward_op(
+                    {
+                        "phase": "backward",
+                        "op": "loss_backward",
+                        "kernel_id": loss_kernel_id,
+                        "forward_ref": int(logits_op.get("op_id", -1)),
+                        "layer": int(logits_op.get("layer", -1)),
+                        "role": "loss_seed",
+                        "dataflow": {
+                            "inputs": {
+                                "logits": {"tensor": logits_tensor, "kind": "activation"},
+                                "targets": {"tensor": "input.targets", "kind": "input"}
+                            },
+                            "outputs": {
+                                "d_logits": {"tensor": grad_logits, "kind": "grad_activation"},
+                                "loss_out": {"tensor": "aux.loss", "kind": "aux"}
+                            }
                         }
                     }
-                }
-            )
-            grad_writers.setdefault(grad_logits, []).append(next_op_id - 1)
+                )
+                grad_writers.setdefault(grad_logits, []).append(next_op_id - 1)
+
 
     # Synthesize backward ops by reverse traversal.
     for fwd in reversed(forward_ops):

@@ -3,6 +3,42 @@
   "schema_version": 1,
   "engine_contract_version": "8",
   "contracts": {
+    "grouped_ce_ordered_fp64_fp32_v1": {
+      "operator_family": "grouped_cross_entropy_checked",
+      "status": "validated",
+      "storage": {
+        "input": "fp32",
+        "weight": "none",
+        "output": "fp32"
+      },
+      "compute": {
+        "input": "fp32",
+        "weight": "none",
+        "accumulator": "fp64",
+        "contraction": "disabled",
+        "evaluation_order": "ascending_groups_then_options_max_shift_log_sum_exp"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": [
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "sum",
+        "order": "ascending_index",
+        "partial_accumulator": "fp64",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "serial",
+        "split_strategy": "serial",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Mean per-group cross entropy with positive counts and relative labels. FP64 maximum-shift exponential sum in ascending option order, log, target subtraction, then ascending group mean. FP64 probabilities and VJP, FP32 output stores. Loss and gradient publish atomically after validation. Singleton groups yield zero. Fixed bounded contiguous inputs; no BF16 or double backward."
+    },
     "indexed_cosine_rows_backward_ordered_fp64_f32_v1": {
       "operator_family": "indexed_cosine_rows_checked",
       "status": "validated",

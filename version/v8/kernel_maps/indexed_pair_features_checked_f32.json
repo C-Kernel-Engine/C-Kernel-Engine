@@ -108,7 +108,7 @@
   },
   "modes": {
     "inference": true,
-    "training": false,
+    "training": true,
     "backward": false
   },
   "numerical_capabilities": [
@@ -272,9 +272,51 @@
   "tests": {
     "unit": [
       "tests/test_v8_decision_tensor_ops.py",
-      "tests/test_v8_clef_flash_complete_head.py"
+      "tests/test_v8_clef_flash_complete_head.py",
+      "tests/test_v8_grouped_loss_training.py"
     ],
     "oracle": "Independent PyTorch operations and pinned complete head; bounds and rejection/recovery tests."
   },
-  "notes": "Gather left row by index; concatenate left, right, FP32 product, absolute FP32 difference in that order. Inference only; no backward provider claimed."
+  "notes": "Gather left row by index; concatenate left, right, FP32 product, absolute FP32 difference in that order. Inference only; no backward provider claimed.",
+  "training_contract": {
+    "version": 1,
+    "layout": "contiguous",
+    "batch_policy": "fixed",
+    "return_status": "zero_success",
+    "buffer_spans": [
+      {
+        "pointer": "left",
+        "rows": "groups",
+        "width": "channels",
+        "elements": "left_elements"
+      },
+      {
+        "pointer": "right",
+        "rows": "rows",
+        "width": "channels",
+        "elements": "right_elements"
+      },
+      {
+        "pointer": "indices",
+        "rows": "rows",
+        "width": 1,
+        "elements": "indices_elements"
+      },
+      {
+        "pointer": "output",
+        "rows": "rows",
+        "width": [
+          4,
+          "channels"
+        ],
+        "elements": "output_elements"
+      },
+      {
+        "pointer": "scratch",
+        "rows": 1,
+        "width": "scratch_elements",
+        "elements": "scratch_elements"
+      }
+    ]
+  }
 }

@@ -4519,6 +4519,12 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                 ap("    if (%s(%s) != 0) return -7000 - %s;" % (call_fn, ", ".join(call_args), op_id))
             else:
                 ap("    %s(%s);" % (call_fn, ", ".join(call_args)))
+            if op.get("loss_value_tensor") is not None:
+                loss_tid = op["loss_value_tensor"]
+                if (op.get("role") != "loss_seed" or loss_tid not in io_outputs.values()
+                        or loss_tid not in tvars_f32 or tensor_numel.get(loss_tid) != 1):
+                    raise ValueError("invalid declared scalar loss publication")
+                ap("    g_loss_scalar[0] = %s[0];" % tvars_f32[loss_tid])
             if phase.startswith("backward"):
                 inj_tid: Optional[str] = None
                 for _k, _tid in _sorted_pool_items(io_outputs):
