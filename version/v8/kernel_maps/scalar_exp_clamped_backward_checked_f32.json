@@ -1,0 +1,178 @@
+{
+  "id": "scalar_exp_clamped_backward_checked_f32",
+  "op": "scalar_exp_clamped_backward_checked",
+  "operation_interface": "tensor.scalar_exp_clamped_backward_checked.fp32.v1",
+  "variant": "checked_ordered_fp64",
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "input",
+      "dtype": "fp32",
+      "shape": [
+        1
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "d_output",
+      "dtype": "fp32",
+      "shape": [
+        1
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "d_input",
+      "dtype": "fp32",
+      "shape": [
+        1
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "scratch": [],
+  "dims": [],
+  "impl": {
+    "function": "ck_scalar_exp_clamped_backward_f32",
+    "c_declaration": "int ck_scalar_exp_clamped_backward_f32(const float *input, size_t input_elements, const float *d_output, size_t d_output_elements, float *d_input, size_t d_input_elements, float maximum);",
+    "sources": [
+      "src/kernels/decision_scoring_backward.c"
+    ]
+  },
+  "modes": {
+    "inference": false,
+    "training": true,
+    "backward": true
+  },
+  "numerical_capabilities": [
+    {
+      "contract_id": "scalar_exp_clamped_backward_ordered_fp64_f32_v1",
+      "status": "validated",
+      "phases": [
+        "backward"
+      ],
+      "function": "ck_scalar_exp_clamped_backward_f32",
+      "explicit_selector": true,
+      "implementation": {
+        "isa_dispatch": "scalar",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": [
+            "serial"
+          ],
+          "dispatch": [
+            "inline"
+          ],
+          "reduction_order_effect": "none"
+        }
+      },
+      "arithmetic": {
+        "partial_accumulator": "fp64",
+        "merge_order": "none",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false,
+        "split_strategy": "serial"
+      }
+    }
+  ],
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "input",
+        "source": "activation:input",
+        "cast": "const float *",
+        "ports": [
+          "input:input"
+        ]
+      },
+      {
+        "name": "input_elements",
+        "source": "runtime:input_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "d_output",
+        "source": "activation:d_output",
+        "cast": "const float *",
+        "ports": [
+          "input:d_output"
+        ]
+      },
+      {
+        "name": "d_output_elements",
+        "source": "runtime:d_output_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "d_input",
+        "source": "output:d_input",
+        "cast": "float *",
+        "ports": [
+          "output:d_input"
+        ]
+      },
+      {
+        "name": "d_input_elements",
+        "source": "runtime:d_input_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "maximum",
+        "source": "param:maximum"
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "tests/test_v8_scoring_training.py"
+    ],
+    "oracle": "Independent PyTorch autograd, finite differences and ordered FP64 scalar reference; generated gradient/update trajectory."
+  },
+  "notes": "expf(min(x,maximum)); derivative active at equality, zero above. Reject nonfinite forward value even if derivative inactive.",
+  "training_contract": {
+    "version": 1,
+    "layout": "contiguous",
+    "batch_policy": "fixed",
+    "return_status": "zero_success",
+    "buffer_spans": [
+      {
+        "pointer": "input",
+        "rows": 1,
+        "width": 1,
+        "elements": "input_elements"
+      },
+      {
+        "pointer": "d_output",
+        "rows": 1,
+        "width": 1,
+        "elements": "d_output_elements"
+      },
+      {
+        "pointer": "d_input",
+        "rows": 1,
+        "width": 1,
+        "elements": "d_input_elements"
+      }
+    ]
+  }
+}

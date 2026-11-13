@@ -91,7 +91,7 @@
   },
   "modes": {
     "inference": true,
-    "training": false,
+    "training": true,
     "backward": false
   },
   "numerical_capabilities": [
@@ -223,9 +223,42 @@
   "tests": {
     "unit": [
       "tests/test_v8_decision_tensor_ops.py",
-      "tests/test_v8_clef_flash_complete_head.py"
+      "tests/test_v8_clef_flash_complete_head.py",
+      "tests/test_v8_scoring_training.py"
     ],
     "oracle": "Independent PyTorch operations and pinned complete head; bounds and rejection/recovery tests."
   },
-  "notes": "Separate FP32 multiplication of each element and one finite scalar gain. Inference only; no backward provider claimed."
+  "notes": "Separate FP32 multiplication of each element and one finite scalar gain. Checked fixed-capacity FP32 training binding; matching derivative map is separately registered.",
+  "training_contract": {
+    "version": 1,
+    "layout": "contiguous",
+    "batch_policy": "fixed",
+    "return_status": "zero_success",
+    "buffer_spans": [
+      {
+        "pointer": "input",
+        "rows": "rows",
+        "width": 1,
+        "elements": "input_elements"
+      },
+      {
+        "pointer": "gain",
+        "rows": 1,
+        "width": 1,
+        "elements": "gain_elements"
+      },
+      {
+        "pointer": "output",
+        "rows": "rows",
+        "width": 1,
+        "elements": "output_elements"
+      },
+      {
+        "pointer": "scratch",
+        "rows": 1,
+        "width": "scratch_elements",
+        "elements": "scratch_elements"
+      }
+    ]
+  }
 }

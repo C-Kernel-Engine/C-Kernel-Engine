@@ -464,6 +464,7 @@ SRCS    := src/backend_native.c \
 	           src/kernels/layernorm_rows_checked.c \
 	           src/kernels/decision_scoring_backward.c \
 	           src/kernels/decision_tensor_ops.c \
+	           src/kernels/transformer_rows_checked.c \
 	           src/kernels/attention_cross_token_major_checked.c \
 	           src/kernels/gelu_rows_tanh_checked.c \
 	           src/kernels/gelu_rows_erf_checked.c \

@@ -107,7 +107,7 @@
   },
   "modes": {
     "inference": true,
-    "training": false,
+    "training": true,
     "backward": false
   },
   "numerical_capabilities": [
@@ -275,9 +275,48 @@
   "tests": {
     "unit": [
       "tests/test_v8_decision_tensor_ops.py",
-      "tests/test_v8_clef_flash_complete_head.py"
+      "tests/test_v8_clef_flash_complete_head.py",
+      "tests/test_v8_scoring_training.py"
     ],
     "oracle": "Independent PyTorch operations and pinned complete head; bounds and rejection/recovery tests."
   },
-  "notes": "FP64 ascending squared-norm sums, sqrt rounded FP32, clamp each norm by explicit positive epsilon, FP32 normalization and pair products, ascending FP64 sum rounded FP32. Inference only; no backward provider claimed."
+  "notes": "FP64 ascending squared-norm sums, sqrt rounded FP32, clamp each norm by explicit positive epsilon, FP32 normalization and pair products, ascending FP64 sum rounded FP32. Fixed-capacity training binding. Choose normalized-dot or cosine-similarity VJP explicitly: their below-epsilon clamp derivatives differ.",
+  "training_contract": {
+    "version": 1,
+    "layout": "contiguous",
+    "batch_policy": "fixed",
+    "return_status": "zero_success",
+    "buffer_spans": [
+      {
+        "pointer": "left",
+        "rows": "groups",
+        "width": "channels",
+        "elements": "left_elements"
+      },
+      {
+        "pointer": "right",
+        "rows": "rows",
+        "width": "channels",
+        "elements": "right_elements"
+      },
+      {
+        "pointer": "indices",
+        "rows": "rows",
+        "width": 1,
+        "elements": "indices_elements"
+      },
+      {
+        "pointer": "output",
+        "rows": "rows",
+        "width": 1,
+        "elements": "output_elements"
+      },
+      {
+        "pointer": "scratch",
+        "rows": 1,
+        "width": "scratch_elements",
+        "elements": "scratch_elements"
+      }
+    ]
+  }
 }
