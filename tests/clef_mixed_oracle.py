@@ -1,9 +1,10 @@
 """Test-only PyTorch policy adapter; pinned reference still owns head topology."""
 
 
-def install(test, torch, head):
+def install(test, torch, head, *, fp32_weights=()):
     from unittest.mock import patch
 
+    original_linear = torch.nn.functional.linear
     captures = {}
     owners = {
         p.untyped_storage().data_ptr(): (name, p) for name, p in head.named_parameters()
@@ -27,8 +28,10 @@ def install(test, torch, head):
             return dy @ w, d.T @ xx, d.sum(0) if ctx.has_bias else None
 
     def linear(x, w, bias=None):
-        y = Linear.apply(x, w, bias)
         name, param = owners[w.untyped_storage().data_ptr()]
+        if name in fp32_weights:
+            return original_linear(x, w, bias)
+        y = Linear.apply(x, w, bias)
         parts = []
         if name.endswith("in_proj_weight"):
             width = w.shape[1]
@@ -284,3 +287,25 @@ def diagnose(
                     )
         comparisons.append(item)
     return comparisons, packet
+
+
+def projection_policy(ir, *, fp32_memory_projection=False):
+    """Bounded experiment authoring, not a compiler or public training policy."""
+    from version.v8.training.bf16_projection import use_bf16_projection
+
+    memory = [op for op in ir["ops"] if op["op"] == "memory_projection"]
+    if fp32_memory_projection and (
+        len(memory) != 1
+        or memory[0]["kernel_id"] != "linear_rows_checked_no_bias_f32"
+        or memory[0]["weights"]["weight"]["name"] != "memory_projection.weight"
+    ):
+        raise ValueError("expected one declared FP32 memory projection")
+    for op in list(ir["ops"]):
+        if op["kernel_id"] in (
+            "linear_rows_checked_f32",
+            "linear_rows_checked_no_bias_f32",
+        ):
+            if fp32_memory_projection and op["op"] == "memory_projection":
+                continue
+            ir = use_bf16_projection(ir, op["op_id"])
+    return ir

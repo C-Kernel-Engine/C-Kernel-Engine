@@ -22,6 +22,7 @@ class FullHeadTraining(unittest.TestCase):
         diagnostic=False,
         artifacts=None,
         same_state=False,
+        fp32_memory_projection=False,
     ):
         import sys, os, json, ctypes, tempfile, subprocess, importlib.util, hashlib
         from pathlib import Path
@@ -31,6 +32,8 @@ class FullHeadTraining(unittest.TestCase):
             import numpy as np, torch
         except ImportError as exc:
             self.skipTest("independent PyTorch comparison unavailable: " + str(exc))
+        if fp32_memory_projection and not mixed:
+            raise ValueError("FP32 memory exception requires the mixed experiment")
         failures = []
         step_reports = []
         first_divergence = None
@@ -126,16 +129,17 @@ class FullHeadTraining(unittest.TestCase):
             raw, hidden, questions=2, options=3, heads=heads, feedforward=feedforward
         )
         if mixed:
-            from version.v8.training.bf16_projection import use_bf16_projection
-            from tests.clef_mixed_oracle import install
+            from tests.clef_mixed_oracle import install, projection_policy
 
-            for op in list(ir["ops"]):
-                if op["kernel_id"] in (
-                    "linear_rows_checked_f32",
-                    "linear_rows_checked_no_bias_f32",
-                ):
-                    ir = use_bf16_projection(ir, op["op_id"])
-            projection_captures = install(self, torch, head)
+            ir = projection_policy(ir, fp32_memory_projection=fp32_memory_projection)
+            projection_captures = install(
+                self,
+                torch,
+                head,
+                fp32_weights=(
+                    ("memory_projection.weight",) if fp32_memory_projection else ()
+                ),
+            )
         reg = training_registry()
         o = b.synthesize_ir2_backward(
             ir,
@@ -747,6 +751,25 @@ class FullHeadTraining(unittest.TestCase):
                 ),
                 seed=611,
                 policy=dict(
+                    fp32_exception_contract=(
+                        dict(
+                            kernel="linear_rows_checked_no_bias_f32",
+                            accumulation="fp64",
+                            oracle="PyTorch FP32 linear",
+                        )
+                        if fp32_memory_projection
+                        else None
+                    ),
+                    fp32_projection_exceptions=(
+                        ["memory_projection"] if fp32_memory_projection else []
+                    ),
+                    projection_providers=[
+                        dict(op=op["op"], kernel=op["kernel_id"])
+                        for op in ir["ops"]
+                        if op["kernel_id"].startswith(
+                            ("projection_bf16_train", "linear_rows_checked")
+                        )
+                    ],
                     operand_rounding="rne_bf16" if mixed else "none",
                     projection_accumulation="ordered_fp32" if mixed else "fp64",
                     masters="fp32",
@@ -847,7 +870,7 @@ class FullHeadTrainingContracts(unittest.TestCase):
                     worker.run(path / "request.json")
                 loader.assert_not_called()
 
-    def graph(self, mixed=False):
+    def graph(self, mixed=False, fp32_memory_projection=False):
         try:
             import numpy as np
             import torch
@@ -875,14 +898,9 @@ class FullHeadTrainingContracts(unittest.TestCase):
             feedforward=16,
         )
         if mixed:
-            from version.v8.training.bf16_projection import use_bf16_projection
+            from tests.clef_mixed_oracle import projection_policy
 
-            for op in list(ir["ops"]):
-                if op["kernel_id"] in (
-                    "linear_rows_checked_f32",
-                    "linear_rows_checked_no_bias_f32",
-                ):
-                    ir = use_bf16_projection(ir, op["op_id"])
+            ir = projection_policy(ir, fp32_memory_projection=fp32_memory_projection)
         registry = training_registry()
         ir2 = backward.synthesize_ir2_backward(
             ir,
