@@ -1031,6 +1031,49 @@
 
 <h1>Whisper Tiny and Base End-to-End</h1>
 
+<section id="large-v3-serving-candidate">
+<h2>Large-v3 serving candidate: FP32 row reuse</h2>
+<p>The AVX2 production FP32 projection now reuses a pair of weight vectors across four input rows.
+Each output retains the original eight-lane accumulation, horizontal reduction and bias addition.
+Partial output ranges, odd output widths and unaligned reduction widths preserve the existing path.
+This is a shared kernel optimization; there is no Whisper-specific compiler branch, new packed-weight cache,
+or change to the AVX-512 and ARM implementations.</p>
+<p>The <a href="assets/whisper-large-serving-20261113.json">retained candidate report</a> separates
+kernel checks, complete-model equality, HTTP lifecycle acceptance and timing observations.
+The nonzero regression runs without model assets in standard nightly, including portable and available
+AVX2/FMA and AVX2/non-FMA builds. The external llama.cpp oracle additionally checks the real threaded wrapper.</p>
+<h3>Bounded operating envelope</h3>
+<p>The isolated P3 candidate uses the full Large-v3 checkpoint, generated FP32 execution, eight native threads,
+one active recording and two waiting requests. It accepts mono 16 kHz PCM16 WAV, at most 30 seconds and 1 MiB,
+English greedy transcription and bounded vocabulary hints. The decoder output limit remains 128 tokens;
+consumers must inspect <code>stop</code> and not treat <code>max_tokens</code> as complete transcription.
+This does not certify multilingual, beam-search, long-form or word-alignment HTTP behavior.
+The existing Base accessibility endpoint remains separate.</p>
+<pre>CK_NUM_THREADS=8 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
+  python3 -m server.whisper_http \
+  --encoder-run-dir /path/to/verified-large-v3/encoder \
+  --decoder-run-dir /path/to/verified-large-v3/decoder \
+  --port 8112 --max-seconds 30 --max-waiters 2 --worker-timeout-seconds 600
+
+curl --fail http://127.0.0.1:8112/health
+python3 server/examples/whisper_http_client.py \
+  --url http://127.0.0.1:8112 --audio recording.wav \
+  --vocabulary-hint='Linux, SSD, C-Kernel-Engine, Antsand' \
+  --output /private/transcription.json</pre>
+<p>Wait for <code>ready=true</code>. Inspect the service instance, worker generation, loaded library and weight
+hashes in replies. Use SSH forwarding for another machine; the service binds only to loopback.
+A client timeout does not prove native computation stopped. Cancel by request ID and wait for recovery.
+No automatic retry or silent transcript replacement is provided.</p>
+<h3>Repeatable local performance checks</h3>
+<p>Use <code>scripts/whisper_service_benchmark.py --config /private/benchmark.json --output /private/latest.json</code>
+with the exact audio hash, expected transcript, loaded artifact identities, CPU and native worker environment.
+The existing local harness nightly accepts this same configuration through <code>--speech-perf-config</code>.
+Use a reserved idle-host window. A missing endpoint produces an incomplete result rather than retaining an old pass.
+Keep private audio, hints and transcripts outside the public evidence report. A timing budget is an operational
+limit, not a cross-CPU performance comparison. Retain both a known-good bundle and a separate candidate;
+rollback by stopping the candidate and reconnecting the client to the verified Base service.</p>
+</section>
+
 <section id="base-large-parity-20261113">
 <h2>Base alignment and Large-v3: bounded execution evidence</h2>
 <p>The follow-up candidate makes the existing trace circuit reachable through the unified audio command.

@@ -116,6 +116,27 @@ static bool run_case(const case_spec & spec) {
             input.data(), weight.data(), bias_data, ck_parallel.data(),
             spec.rows, spec.outputs, spec.width);
     const int total = spec.rows * spec.outputs;
+    std::vector<float> grouped(ck.size(), 0.0f);
+    gemm_nt_f32_llama_production_output_range(
+        input.data(), weight.data(), bias_data, grouped.data(),
+        spec.rows, spec.outputs, spec.width, 0, total);
+    if (std::memcmp(ck.data(), grouped.data(), ck.size() * sizeof(float)) != 0) {
+        std::fprintf(stderr, "%s: full grouped range mismatch\n", spec.name);
+        return false;
+    }
+    if (total > 8) {
+        std::vector<float> guarded(ck.size() + 2, -1234.5f);
+        gemm_nt_f32_llama_production_output_range(
+            input.data(), weight.data(), bias_data, guarded.data() + 1,
+            spec.rows, spec.outputs, spec.width, 2, total - 3);
+        for (int i = -1; i <= total; ++i) {
+            const float expected = i >= 2 && i < total - 3 ? ck[i] : -1234.5f;
+            if (std::memcmp(&guarded[i + 1], &expected, sizeof(float)) != 0) {
+                std::fprintf(stderr, "%s: guarded partial range mismatch at %d\n", spec.name, i);
+                return false;
+            }
+        }
+    }
     const int chunk = std::max(1, (total + 6) / 7);
     for (int begin = 0; begin < total; begin += chunk) {
         gemm_nt_f32_llama_production_output_range(
@@ -166,6 +187,11 @@ int main() {
         {"prefill_four", 4, 48, 5120},
         {"prefill_chunk_tail", 65, 48, 5120},
         {"qwen35_router_chunk", 65, 256, 2048},
+        {"group_three_rows_bias", 3, 9, 32, true},
+        {"group_four_rows_bias", 4, 9, 32, true},
+        {"group_five_rows_bias", 5, 9, 32, true},
+        {"group_eight_rows_bias", 8, 17, 64, true},
+        {"group_k_tail_bias", 9, 17, 65, true},
         {"prefill_output_tail_bias", 7, 127, 128, true},
         {"prefill_reduction_tail_bias", 7, 127, 130, true},
         {"prefill_partition_tail_bias", 9, 131, 512, true},
