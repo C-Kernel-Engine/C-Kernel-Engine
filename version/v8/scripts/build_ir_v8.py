@@ -1499,6 +1499,68 @@ def _apply_circuit_runtime_defaults(
     return merged
 
 
+def _iter_template_graph_slots(node: Any):
+    """Yield every circuit-declared graph slot, including phase-specific edges."""
+    if isinstance(node, dict):
+        shared = node.get("graph_slots")
+        if isinstance(shared, dict):
+            yield from _iter_graph_slot_sections(shared)
+        by_phase = node.get("graph_slots_by_phase")
+        if isinstance(by_phase, dict):
+            for phase in by_phase.values():
+                if isinstance(phase, dict):
+                    yield from _iter_graph_slot_sections(phase)
+        for value in node.values():
+            yield from _iter_template_graph_slots(value)
+    elif isinstance(node, list):
+        for value in node:
+            yield from _iter_template_graph_slots(value)
+
+
+def _iter_graph_slot_sections(graph_slots: Dict[str, Any]):
+    for section in ("inputs", "outputs"):
+        edges = graph_slots.get(section)
+        if isinstance(edges, dict):
+            for slot in edges.values():
+                if isinstance(slot, str) and slot.strip():
+                    yield slot
+
+
+def _validate_declared_activation_slots(
+    template: Optional[Dict[str, Any]],
+    config: Dict[str, Any],
+    *,
+    source: str,
+) -> None:
+    """Fail closed when a circuit names a slot it never allocates or binds.
+
+    The memory planner answers unknown slots with its legacy A_LAYER_INPUT
+    fallback, which silently aliases unrelated graph edges.  Circuits opt into
+    this check when their graph owns every activation region.
+    """
+    if not bool(config.get("require_declared_activation_slots")):
+        return
+    if not isinstance(template, dict):
+        return
+    declared = set(_template_activation_bindings(template))
+    raw_buffers = template.get("activation_buffers")
+    if isinstance(raw_buffers, dict):
+        declared.update(str(name).strip() for name in raw_buffers)
+    # Regions the planner owns regardless of circuit declarations.
+    declared.update({"kv_cache", "logits"})
+    undeclared = set()
+    for slot in _iter_template_graph_slots(template):
+        normalized = slot.split(":", 1)[1] if slot.startswith("external:") else slot
+        if normalized not in declared:
+            undeclared.add(slot)
+    if undeclared:
+        raise RuntimeError(
+            "HARD CIRCUIT ACTIVATION SLOT FAULT: "
+            f"{source} declares graph slots that are neither activation_buffers "
+            f"nor activation_bindings: {sorted(undeclared)}"
+        )
+
+
 def _validated_circuit_weight_policy(template: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     contract = template.get("contract") if isinstance(template.get("contract"), dict) else {}
     policy = contract.get("weight_policy") if isinstance(contract, dict) else None
@@ -1650,6 +1712,11 @@ def _hydrate_manifest_template(manifest: Dict[str, Any]) -> Dict[str, Any]:
     hydrated_config = _apply_circuit_runtime_defaults(
         dict(cfg),
         manifest.get("template") if isinstance(manifest.get("template"), dict) else None,
+        source=f"manifest:{template_name or '<embedded>'}",
+    )
+    _validate_declared_activation_slots(
+        manifest.get("template") if isinstance(manifest.get("template"), dict) else None,
+        hydrated_config,
         source=f"manifest:{template_name or '<embedded>'}",
     )
     hydrated_template = manifest.get("template") if isinstance(manifest.get("template"), dict) else {}
@@ -3880,10 +3947,141 @@ CK_EXPORT int32_t ck_model_lookup_token(const char *text) {
         }
 
     elif tokenizer_type == "rwkv_world_trie":
-        raise ValueError(
-            "Unsupported tokenizer backend 'rwkv_world_trie': native longest-match "
-            "encoding is not implemented; circuit inventory is not executable model support"
-        )
+        # RWKV World tokenizers are GPT-2 ByteLevel vocabularies encoded with
+        # greedy longest-match. There is no BOS, no pretokenizer, and no
+        # normalization; id 0 is <|endoftext|>.
+        unk_id = 0
+        eos_id = 0
+        pad_id = 0
+        bos_id = -1
+        if special_tokens:
+            def _special_id(default: int, key: str) -> int:
+                value = special_tokens.get(key)
+                if isinstance(value, int) and not isinstance(value, bool):
+                    return value
+                return default
+
+            unk_id = _special_id(unk_id, "unk_token_id")
+            eos_id = _special_id(eos_id, "eos_token_id")
+            pad_id = _special_id(pad_id, "pad_token_id")
+            bos_id = -1
+        return {
+            "type": "rwkv_world_trie",
+            "include": '#include "tokenizer/tokenizer.h"',
+            "struct_field": "CKTokenizer *tokenizer;    /* RWKV World trie tokenizer */",
+            "init": f"""
+    /* Initialize RWKV World tokenizer from bump data */
+    if (getenv("CK_DISABLE_TOKENIZER")) {{
+        g_model->tokenizer = NULL;
+    }} else {{
+        g_model->tokenizer = ck_tokenizer_create(CK_TOKENIZER_RWKV_WORLD_TRIE);
+        if (g_model->tokenizer) {{
+            /* Enable the trie before load so the vocabulary is indexed. */
+            ck_tokenizer_set_use_trie(g_model->tokenizer, true);
+            ck_tokenizer_set_add_bos_eos(g_model->tokenizer, false, false);
+            if (ck_tokenizer_load_binary(
+                    g_model->tokenizer,
+                    {vocab_size},
+                    (const int32_t*)(g_model->bump + W_VOCAB_OFFSETS),
+                    (const char*)(g_model->bump + W_VOCAB_STRINGS),
+                    0,  /* Greedy longest-match, no merge rules */
+                    NULL) != 0) {{
+                ck_tokenizer_free(g_model->tokenizer);
+                g_model->tokenizer = NULL;
+            }} else {{
+                ck_tokenizer_set_special_ids(
+                    g_model->tokenizer, {unk_id}, {bos_id}, {eos_id}, {pad_id}, -1);
+            }}
+        }}
+    }}""",
+            "free": """
+    if (g_model->tokenizer) {
+        ck_tokenizer_free(g_model->tokenizer);
+        g_model->tokenizer = NULL;
+    }""",
+            "api_functions": """
+/* ============================================================================
+ * TOKENIZER API - Encode text to tokens using C tokenizer (RWKV World)
+ * ============================================================================
+ * Returns: number of tokens written to internal buffer
+ * The tokens are written to the same buffer that prefill() reads from.
+ * After encoding, call ck_model_prefill() with the returned count.
+ */
+CK_EXPORT int ck_model_encode_text(const char *text, int text_len) {
+    if (!g_model || !g_model->tokenizer || !text) return -1;
+    if (text_len < 0) {
+        size_t inferred = strlen(text);
+        if (inferred > INT32_MAX) return -1;
+        text_len = (int)inferred;
+    }
+    if (text_len == 0) return 0;
+
+    /* Encode directly into the token_ids buffer that prefill uses */
+    int32_t *token_buf = (int32_t*)(g_model->bump + A_TOKEN_IDS);
+    int max_tokens = MAX_SEQ_LEN;
+
+    int num_tokens = ck_tokenizer_encode(
+        g_model->tokenizer,
+        text,
+        text_len,
+        token_buf,
+        max_tokens
+    );
+
+    return num_tokens;
+}
+
+CK_EXPORT int ck_model_count_text_tokens(const char *text, int text_len) {
+    if (!g_model || !g_model->tokenizer || !text) return -1;
+    if (text_len < 0) {
+        size_t inferred = strlen(text);
+        if (inferred > INT32_MAX - 1) return -1;
+        text_len = (int)inferred;
+    }
+    if (text_len == 0) return 0;
+    /* Each source byte becomes at most one token, so text_len plus the
+     * terminator bounds the complete output. */
+    if (text_len > INT32_MAX - 1) return -1;
+    size_t capacity = (size_t)text_len + 1;
+    if (capacity > SIZE_MAX / sizeof(int32_t)) return -1;
+    int32_t *tokens = (int32_t *)malloc(capacity * sizeof(int32_t));
+    if (!tokens) return -1;
+    int count = ck_tokenizer_encode(g_model->tokenizer, text, text_len,
+                                    tokens, (int)capacity);
+    free(tokens);
+    return count;
+}
+
+/* Decode tokens back to text */
+CK_EXPORT int ck_model_decode_tokens(const int32_t *ids, int num_ids, char *text, int max_len) {
+    if (!g_model || !g_model->tokenizer || !ids || !text || max_len <= 0) return 0;
+    return ck_tokenizer_decode(g_model->tokenizer, ids, num_ids, text, max_len);
+}
+
+/* Check if tokenizer is available */
+CK_EXPORT int ck_model_has_tokenizer(void) {
+    return (g_model && g_model->tokenizer) ? 1 : 0;
+}
+
+/* Check if raw text encoding is available. */
+CK_EXPORT int ck_model_can_encode_text(void) {
+    return (g_model && g_model->tokenizer) ? 1 : 0;
+}
+
+/* Get pointer to token buffer (for reading encoded tokens) */
+CK_EXPORT const int32_t* ck_model_get_token_buffer(void) {
+    return g_model ? (const int32_t*)(g_model->bump + A_TOKEN_IDS) : NULL;
+}
+
+/* Lookup single token by text (returns token ID or -1 if not found)
+ * Uses DIRECT vocabulary lookup, not encoding.
+ */
+CK_EXPORT int32_t ck_model_lookup_token(const char *text) {
+    if (!g_model || !g_model->tokenizer || !text) return -1;
+    return ck_tokenizer_lookup(g_model->tokenizer, text);
+}
+""" + chat_contract_api
+        }
 
     # Unknown tokenizer type
     return None
@@ -7035,7 +7233,15 @@ def _template_uses_kv_cache(template: Dict[str, Any], config: Optional[Dict[str,
     contract = template.get("contract") if isinstance(template.get("contract"), dict) else {}
     attention_contract = contract.get("attention_contract") if isinstance(contract.get("attention_contract"), dict) else {}
     kv_layout = str(attention_contract.get("kv_layout", "") or "").strip().lower()
-    if kv_layout in {"none", "ephemeral_full_context", "ephemeral", "encoder_context"}:
+    if kv_layout in {
+        "none",
+        "ephemeral_full_context",
+        "ephemeral",
+        "encoder_context",
+        # RWKV-7 keeps a per-layer recurrent state, not a token-indexed K/V
+        # cache. Allocating kv_cache for it wastes hundreds of MB at 1.5B.
+        "recurrent_rwkv7_state",
+    }:
         return False
     if kv_layout:
         return True
@@ -12268,6 +12474,44 @@ def _require_resolved_decode_attention_kernel(op: Dict[str, Any]) -> str:
             )
     return kernel_id
 
+def _declared_provider_output_ports(
+    ir_op: Dict[str, Any],
+) -> Optional[set[str]]:
+    """Return the circuit-declared provider output ports for one op.
+
+    Validated interface joins are authoritative because they were resolved
+    against the selected provider's canonical port table. Legacy circuits
+    without a hardened interface fall back to explicit graph_slots. Returning
+    None means the circuit never declared outputs, so the kernel map remains
+    the only source of truth.
+    """
+    interface_validation = ir_op.get("interface_validation")
+    if (
+        isinstance(interface_validation, dict)
+        and interface_validation.get("status") == "validated"
+    ):
+        return {str(name) for name in interface_validation.get("outputs", {})}
+    graph_slots = ir_op.get("graph_slots")
+    if isinstance(graph_slots, dict):
+        graph_outputs = graph_slots.get("outputs")
+        if isinstance(graph_outputs, dict) and graph_outputs:
+            return {str(name) for name in graph_outputs}
+    return None
+
+
+def _kernel_output_is_null_bound(
+    kernel_output: Dict[str, Any],
+    declared_output_ports: Optional[set[str]],
+) -> bool:
+    """True when an optional provider output is intentionally left unbound."""
+    if declared_output_ports is None:
+        return False
+    if str(kernel_output.get("consumption", "required") or "required") != "optional":
+        return False
+    output_name = kernel_output.get("name")
+    return bool(output_name) and str(output_name) not in declared_output_ports
+
+
 def generate_ir_lower_1(
     fused_ops: List[Dict],
     registry: Dict,
@@ -12478,12 +12722,20 @@ def generate_ir_lower_1(
                 "shape": input_shape,
             }
 
-        # Map kernel outputs
+        # Map kernel outputs. A provider may expose optional write ports that a
+        # circuit intentionally leaves unbound (for example RWKV-7's v_gate or
+        # RMSNorm's rstd). Those ports must stay NULL-bound instead of being
+        # spliced onto an unrelated live activation buffer.
+        declared_output_ports = _declared_provider_output_ports(ir_op)
+        null_outputs: List[str] = []
         for kernel_output in (kernel_map.get("outputs") or []):
             if not isinstance(kernel_output, dict):
                 continue
             output_name = kernel_output.get("name")
             if not output_name:
+                continue
+            if _kernel_output_is_null_bound(kernel_output, declared_output_ports):
+                null_outputs.append(output_name)
                 continue
             output_dtype = kernel_output.get("dtype", "fp32")
             output_shape = kernel_output.get("shape", [])
@@ -12500,6 +12752,8 @@ def generate_ir_lower_1(
 
             # Update current activation for next kernel
             current_activation = output_buffer
+        if null_outputs:
+            lowered_op["null_outputs"] = null_outputs
 
         # Map only call-bound scratch buffers. Runtime-lifetime preparation
         # caches are owned by model initialization and must not be overlaid on
@@ -14820,7 +15074,13 @@ def generate_ir_lower_2(
     # This replaces the old ping-pong logic with explicit dataflow-based assignment
     # ═══════════════════════════════════════════════════════════════════════════════
     print("  Running memory planner...")
-    buffer_assignments = plan_memory(ir_lower_1_ops, slot_bindings=activation_bindings)
+    # Circuit-declared activation regions are authoritative.  Without this,
+    # the planner answers unknown semantic slots with the legacy A_LAYER_INPUT
+    # fallback and every intermediate edge aliases the layer input.
+    slot_bindings = dict(activation_bindings)
+    for declared_name in activation_buffers:
+        slot_bindings[declared_name] = declared_name
+    buffer_assignments = plan_memory(ir_lower_1_ops, slot_bindings=slot_bindings)
     print(f"  ✓ Memory planner assigned buffers for {len(buffer_assignments)} ops")
 
     # Helper to get buffer info from memory planner
@@ -14928,6 +15188,8 @@ def generate_ir_lower_2(
             )
         if isinstance(ir_op.get("graph_slots"), dict):
             lowered_op["graph_slots"] = copy.deepcopy(ir_op["graph_slots"])
+        if ir_op.get("null_outputs"):
+            lowered_op["null_outputs"] = [str(name) for name in ir_op["null_outputs"]]
         for key in ("runtime_extent_contract", "produces_runtime_lengths",
                     "consumes_runtime_lengths", "runtime_scalar_bindings",
                     "returns_status"):
@@ -17644,6 +17906,7 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
 
         activations = op.get("activations", {})
         outputs = op.get("outputs", {})
+        null_outputs = {str(name) for name in (op.get("null_outputs") or [])}
         weights = op.get("weights", {})
         scratch_list = op.get("scratch", [])
         scratch = {s.get("name"): s for s in scratch_list if s.get("name")}
@@ -17704,8 +17967,11 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
                         op_errors.append(f"{func}.{name}: missing declared output '{key}'")
                     expr = f"&runtime_extents.{runtime_result_names[0]}"
                 elif not info:
-                    op_errors.append(f"{func}.{name}: missing output '{key}'")
-                    expr = "NULL"
+                    if key in null_outputs:
+                        expr = "NULL"
+                    else:
+                        op_errors.append(f"{func}.{name}: missing output '{key}'")
+                        expr = "NULL"
                 else:
                     offset = info.get("activation_offset", 0)
                     buf_name = info.get("buffer", key)

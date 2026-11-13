@@ -2064,6 +2064,12 @@ TEST_SUITES = {
 
 # Make targets to run (non-Python tests)
 MAKE_TARGETS = {
+    "rwkv_world_tokenizer": {
+        "name": "RWKV World Native Trie and Capacity",
+        "category": "inference",
+        "target": "test-rwkv-world-tokenizer",
+        "timeout_sec": 180,
+    },
     "v8_native_session_ffi": {
         "name": "v8 Native Session/CLI FFI",
         "category": "inference",

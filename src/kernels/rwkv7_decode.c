@@ -133,7 +133,7 @@ int ck_rwkv7_scale_k(const float *k_in,
         return -1;
     }
     for (int i = 0; i < dim; ++i) {
-        k_out[i] = k_in[i] * (1.0f + (k_a[i] - 1.0f) * a[i]);
+        k_out[i] = k_in[i] * (1.0f + (a[i] - 1.0f) * k_a[i]);
     }
     return 0;
 }

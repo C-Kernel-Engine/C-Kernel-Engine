@@ -4571,6 +4571,10 @@ test-source-integrity:
 
 # Standard DSL/nightly coverage: fail if the synthetic checkpoint dependencies
 # are absent rather than turning RWKV lowering into a skipped PASS.
+.PHONY: test-rwkv-world-tokenizer
+test-rwkv-world-tokenizer: $(LIB_TOKENIZER)
+	@$(PYTHON) $(PYTHONFLAGS) unittest/test_rwkv_world_trie_tokenizer.py
+
 .PHONY: test-v8-rwkv7-lowering
 test-v8-rwkv7-lowering:
 	@$(PYTHON) -c "import torch, safetensors"

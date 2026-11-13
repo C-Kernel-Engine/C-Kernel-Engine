@@ -21,7 +21,6 @@
   "activation_bindings": {
     "main_stream": "embedded_input",
     "normalized_stream": "layer_input",
-    "post_attention_stream": "embedded_input",
     "channelmix_output": "layer_output"
   },
   "activation_buffers": {
@@ -76,6 +75,96 @@
           "config": "embed_dim"
         }
       ],
+      "lifetime": "call",
+      "mutable": true
+    },
+    "xr_lane": {
+      "shape": [{"config": "embed_dim"}],
+      "lifetime": "call",
+      "mutable": true
+    },
+    "xw_lane": {
+      "shape": [{"config": "embed_dim"}],
+      "lifetime": "call",
+      "mutable": true
+    },
+    "xk_lane": {
+      "shape": [{"config": "embed_dim"}],
+      "lifetime": "call",
+      "mutable": true
+    },
+    "xv_lane": {
+      "shape": [{"config": "embed_dim"}],
+      "lifetime": "call",
+      "mutable": true
+    },
+    "xa_lane": {
+      "shape": [{"config": "embed_dim"}],
+      "lifetime": "call",
+      "mutable": true
+    },
+    "xg_lane": {
+      "shape": [{"config": "embed_dim"}],
+      "lifetime": "call",
+      "mutable": true
+    },
+    "r_vec": {
+      "shape": [{"config": "embed_dim"}],
+      "lifetime": "call",
+      "mutable": true
+    },
+    "k_raw_vec": {
+      "shape": [{"config": "embed_dim"}],
+      "lifetime": "call",
+      "mutable": true
+    },
+    "v_in_vec": {
+      "shape": [{"config": "embed_dim"}],
+      "lifetime": "call",
+      "mutable": true
+    },
+    "w_log_vec": {
+      "shape": [{"config": "embed_dim"}],
+      "lifetime": "call",
+      "mutable": true
+    },
+    "a_vec": {
+      "shape": [{"config": "embed_dim"}],
+      "lifetime": "call",
+      "mutable": true
+    },
+    "g_vec": {
+      "shape": [{"config": "embed_dim"}],
+      "lifetime": "call",
+      "mutable": true
+    },
+    "v_mix_vec": {
+      "shape": [{"config": "embed_dim"}],
+      "lifetime": "call",
+      "mutable": true
+    },
+    "kk_raw_vec": {
+      "shape": [{"config": "embed_dim"}],
+      "lifetime": "call",
+      "mutable": true
+    },
+    "kk_vec": {
+      "shape": [{"config": "embed_dim"}],
+      "lifetime": "call",
+      "mutable": true
+    },
+    "k_scaled_vec": {
+      "shape": [{"config": "embed_dim"}],
+      "lifetime": "call",
+      "mutable": true
+    },
+    "wkv_out": {
+      "shape": [{"config": "embed_dim"}],
+      "lifetime": "call",
+      "mutable": true
+    },
+    "post_attention_stream": {
+      "shape": [{"config": "embed_dim"}],
       "lifetime": "call",
       "mutable": true
     }
@@ -174,7 +263,8 @@
       ]
     },
     "runtime_defaults": {
-      "external_activation_slots": ["att_shift", "ffn_shift", "wkv", "v_first"]
+      "external_activation_slots": ["att_shift", "ffn_shift", "wkv", "v_first"],
+      "require_declared_activation_slots": true
     },
     "runtime_invariants": {
       "required_call_args": {}
@@ -471,7 +561,13 @@
       "footer": [
         "layernorm",
         "lm_head",
-        {"op": "logits", "graph_slots": {"inputs": {"x": "main_stream"}}}
+        {
+          "op": "logits",
+          "graph_slots": {
+            "inputs": {"A": "main_stream"},
+            "outputs": {"C": "logits"}
+          }
+        }
       ]
     }
   }

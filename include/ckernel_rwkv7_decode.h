@@ -24,8 +24,8 @@ extern "C" {
  * output projection stays with the caller's GEMV.
  * v-mixing towards v_first and the LoRA chains are separate units below;
  * the WKV takes final w_log/k/v/kk/a/g (kk L2-normalised, k scaled by
- * 1+(k_a-1)*a per the RWKV-7-rc4a diagram's Lerp(k_a,1) box; this
- * intentionally differs from modeling_rwkv7.py:501's 1+(a-1)*k_a).
+ * 1+(a-1)*k_a per modeling_rwkv7.py's Lerp(k_a,1) box; this matches the
+ * publisher reference used by the shipped checkpoints.
  *
  * Layouts (all FP32, row-major, flat C = H*N):
  *  - vectors: [C]; rk: [H,N] (row per head)
@@ -91,7 +91,7 @@ int ck_rwkv7_norm_kk(const float *kk_in,
                          int num_heads,
                          int head_dim);
 
-/* k_out = k_in * (1 + (k_a-1) * a), elementwise over [C] (diagram Lerp(k_a,1)
+/* k_out = k_in * (1 + (a-1) * k_a), elementwise over [C] (diagram Lerp(k_a,1)
  * box with mix weight a. */
 int ck_rwkv7_scale_k(const float *k_in,
                          const float *a,

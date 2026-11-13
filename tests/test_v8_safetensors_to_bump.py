@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import importlib.util
 import ctypes
 import json
@@ -3158,16 +3159,7 @@ def test_rwkv7_config_builder_rejects_rank_shape_mismatch(tmp_path: Path) -> Non
 
 def test_rwkv7_tokenizer_contract_declares_world_trie(tmp_path: Path) -> None:
     converter = _load_converter()
-    tokenizer = {
-        "model": {
-            "type": "WordPiece",
-            "vocab": {token: index for index, token in enumerate("abcd")},
-        }
-    }
-    (tmp_path / "tokenizer.json").write_text(json.dumps(tokenizer), encoding="utf-8")
-    (tmp_path / "tokenizer_config.json").write_text(
-        json.dumps({"backend": "rwkv_world_trie"}), encoding="utf-8"
-    )
+    _write_rwkv7_synthetic_tokenizer(tmp_path, 4)
 
     payloads, contract, _special = converter._tokenizer_payloads_from_json(
         tmp_path, 4
@@ -3179,6 +3171,88 @@ def test_rwkv7_tokenizer_contract_declares_world_trie(tmp_path: Path) -> None:
     assert contract["vocab_source_type"] == "wordpiece"
     payload_names = {name for name, *_rest in payloads}
     assert {"vocab_offsets", "vocab_strings"} <= payload_names
+
+
+def _rwkv7_full_byte_vocab(*, omit_byte: int | None = None) -> dict[str, int]:
+    converter = _load_converter()
+    decoder = converter._rwkv_world_byte_decoder()
+    encoder = {byte: character for character, byte in decoder.items()}
+    tokens = ["<|endoftext|>"] + [
+        encoder[byte] for byte in range(256) if byte != omit_byte
+    ]
+    return {token: index for index, token in enumerate(tokens)}
+
+
+def _write_rwkv7_tokenizer_document(tmp_path: Path, vocab: dict[str, int]) -> None:
+    (tmp_path / "tokenizer.json").write_text(
+        json.dumps({
+            "normalizer": None,
+            "pre_tokenizer": {
+                "type": "ByteLevel",
+                "add_prefix_space": False,
+                "use_regex": False,
+            },
+            "decoder": {"type": "ByteLevel"},
+            "model": {
+                "type": "WordPiece",
+                "unk_token": "<|endoftext|>",
+                "continuing_subword_prefix": "",
+                "vocab": vocab,
+            },
+        }),
+        encoding="utf-8",
+    )
+    (tmp_path / "tokenizer_config.json").write_text(
+        json.dumps({"backend": "rwkv_world_trie"}), encoding="utf-8"
+    )
+
+
+def test_rwkv7_tokenizer_validation_accepts_full_byte_vocab(tmp_path: Path) -> None:
+    converter = _load_converter()
+    vocab = _rwkv7_full_byte_vocab()
+    _write_rwkv7_tokenizer_document(tmp_path, vocab)
+
+    payloads, contract, _special = converter._tokenizer_payloads_from_json(
+        tmp_path, len(vocab)
+    )
+    assert contract is not None
+    assert contract["tokenizer_type"] == "rwkv_world_trie"
+    assert {name for name, *_rest in payloads} >= {"vocab_offsets", "vocab_strings"}
+
+
+def test_rwkv7_tokenizer_validation_rejects_missing_singleton_byte(
+    tmp_path: Path,
+) -> None:
+    converter = _load_converter()
+    vocab = _rwkv7_full_byte_vocab(omit_byte=0x00)
+    _write_rwkv7_tokenizer_document(tmp_path, vocab)
+
+    with pytest.raises(SystemExit, match="missing singleton bytes"):
+        converter._tokenizer_payloads_from_json(tmp_path, len(vocab))
+
+
+def test_rwkv7_tokenizer_validation_rejects_non_bytelevel_piece(
+    tmp_path: Path,
+) -> None:
+    converter = _load_converter()
+    vocab = {"<|endoftext|>": 0, "A": 1, "\u2603": 2}
+    _write_rwkv7_tokenizer_document(tmp_path, vocab)
+
+    with pytest.raises(SystemExit, match="not ByteLevel encoded"):
+        converter._tokenizer_payloads_from_json(tmp_path, len(vocab))
+
+
+def test_rwkv7_tokenizer_validation_rejects_prefix_rank_inversion(
+    tmp_path: Path,
+) -> None:
+    converter = _load_converter()
+    # "A" (id 2) is a proper prefix of "AB" (id 1); the reference "highest id"
+    # rule would stop at "A", so greedy longest-match is not equivalent.
+    vocab = {"<|endoftext|>": 0, "AB": 1, "A": 2}
+    _write_rwkv7_tokenizer_document(tmp_path, vocab)
+
+    with pytest.raises(SystemExit, match="longest-match encoding"):
+        converter._tokenizer_payloads_from_json(tmp_path, len(vocab))
 
 
 def test_rwkv7_circuit_declares_ln0_header_and_provider_contracts() -> None:
@@ -3202,6 +3276,40 @@ def test_rwkv7_circuit_declares_ln0_header_and_provider_contracts() -> None:
         "rwkv7_channelmix_decode",
     ):
         assert requirements[op].startswith("rwkv7_")
+
+
+def test_optional_provider_output_ports_are_null_bound_when_circuit_omits_them() -> None:
+    build_ir = _load_build_ir()
+    validated = {
+        "interface_validation": {
+            "status": "validated",
+            "outputs": {"v_out": "v_mix_vec", "v_first_out": "v_first"},
+        }
+    }
+    declared = build_ir._declared_provider_output_ports(validated)
+    assert declared == {"v_out", "v_first_out"}
+    assert build_ir._kernel_output_is_null_bound(
+        {"name": "v_gate", "consumption": "optional"}, declared
+    )
+    assert not build_ir._kernel_output_is_null_bound(
+        {"name": "v_out", "consumption": "required"}, declared
+    )
+    assert not build_ir._kernel_output_is_null_bound(
+        {"name": "v_gate", "consumption": "required"}, declared
+    )
+
+    legacy = {"graph_slots": {"outputs": {"out": "next"}}}
+    legacy_declared = build_ir._declared_provider_output_ports(legacy)
+    assert legacy_declared == {"out"}
+    assert build_ir._kernel_output_is_null_bound(
+        {"name": "rstd", "consumption": "optional"}, legacy_declared
+    )
+
+    undeclared = build_ir._declared_provider_output_ports({})
+    assert undeclared is None
+    assert not build_ir._kernel_output_is_null_bound(
+        {"name": "rstd", "consumption": "optional"}, undeclared
+    )
 
 
 def test_rwkv7_kernel_weight_ports_are_bound() -> None:
@@ -3486,10 +3594,7 @@ def test_rwkv7_real_conversion_preserves_nonzero_weights(tmp_path):
                   head_size=4, num_heads=2, hidden_ratio=4, vocab_size=16,
                   decay_rank=2, key_rank=2, value_rank=2, gate_rank=2)
     (checkpoint / "config.json").write_text(json.dumps(config))
-    (checkpoint / "tokenizer.json").write_text(json.dumps({
-        "model": {"type": "WordPiece", "vocab": {chr(65+i): i for i in range(16)}}}))
-    (checkpoint / "tokenizer_config.json").write_text(
-        json.dumps({"backend": "rwkv_world_trie"}))
+    _write_rwkv7_synthetic_tokenizer(checkpoint, 16)
     tensors = {}
     for index, name in enumerate(sorted(_rwkv7_inventory_names(2))):
         shape = (8,)
@@ -3541,6 +3646,68 @@ def test_rwkv7_missing_required_weight_fails_closed(missing):
         converter._refs_from_safetensors_contract("rwkv7", {"num_layers": 2}, headers)
 
 
+def _rwkv7_bytelevel_piece(raw: bytes) -> str:
+    """Encode raw bytes as the GPT-2 ByteLevel string the C trie stores."""
+    values = (
+        list(range(ord("!"), ord("~") + 1))
+        + list(range(ord("¡"), ord("¬") + 1))
+        + list(range(ord("®"), ord("ÿ") + 1))
+    )
+    characters = list(values)
+    extra = 0
+    for byte in range(256):
+        if byte not in values:
+            values.append(byte)
+            characters.append(256 + extra)
+            extra += 1
+    byte_to_char = {byte: chr(codepoint) for byte, codepoint in zip(values, characters)}
+    return "".join(byte_to_char[byte] for byte in raw)
+
+
+def _rwkv7_synthetic_pieces(count: int) -> list[bytes]:
+    """Return prefix-rank-safe byte pieces: all singletons, then longer ones."""
+    pieces = [bytes([byte]) for byte in range(256)]
+    length = 2
+    while len(pieces) < count:
+        for value in range(256**length):
+            raw = value.to_bytes(length, "big")
+            pieces.append(raw)
+            if len(pieces) >= count:
+                break
+        length += 1
+    return pieces[:count]
+
+
+def _write_rwkv7_synthetic_tokenizer(
+    directory: Path, vocab: int = 16, *, backend: str = "rwkv_world_trie"
+) -> None:
+    tokens = ["<|endoftext|>"] + [
+        _rwkv7_bytelevel_piece(raw)
+        for raw in _rwkv7_synthetic_pieces(vocab - 1)
+    ]
+    (directory / "tokenizer.json").write_text(
+        json.dumps({
+            "normalizer": None,
+            "pre_tokenizer": {
+                "type": "ByteLevel",
+                "add_prefix_space": False,
+                "use_regex": False,
+            },
+            "decoder": {"type": "ByteLevel"},
+            "model": {
+                "type": "WordPiece",
+                "unk_token": "<|endoftext|>",
+                "continuing_subword_prefix": "",
+                "vocab": {token: index for index, token in enumerate(tokens)},
+            },
+        }),
+        encoding="utf-8",
+    )
+    (directory / "tokenizer_config.json").write_text(
+        json.dumps({"backend": backend}), encoding="utf-8"
+    )
+
+
 def _write_rwkv7_synthetic_checkpoint(
     tmp_path: Path,
     *,
@@ -3575,11 +3742,7 @@ def _write_rwkv7_synthetic_checkpoint(
         for rank_key in ("decay_rank", "key_rank", "value_rank", "gate_rank"):
             config.pop(rank_key, None)
     (checkpoint / "config.json").write_text(json.dumps(config))
-    (checkpoint / "tokenizer.json").write_text(json.dumps({
-        "model": {"type": "WordPiece",
-                  "vocab": {chr(65 + i): i for i in range(vocab)}}}))
-    (checkpoint / "tokenizer_config.json").write_text(
-        json.dumps({"backend": "rwkv_world_trie"}))
+    _write_rwkv7_synthetic_tokenizer(checkpoint, vocab)
 
     tensors = {}
     rank_for = {".w1": ranks[0], ".w2": ranks[0],
@@ -3608,6 +3771,19 @@ def _write_rwkv7_synthetic_checkpoint(
         ).to(torch.bfloat16)
     st.save_file(tensors, checkpoint / "model.safetensors")
     return checkpoint
+
+
+def test_rwkv7_recurrent_state_does_not_allocate_token_kv_cache() -> None:
+    build_ir = _load_build_ir()
+    circuit = json.loads(
+        (ROOT / "version" / "v8" / "circuits" / "rwkv7.json").read_text(encoding="utf-8")
+    )
+    assert build_ir._template_uses_kv_cache(circuit, {}) is False
+
+    token_cache = {
+        "contract": {"attention_contract": {"kv_layout": "token_major"}}
+    }
+    assert build_ir._template_uses_kv_cache(token_cache, {}) is True
 
 
 def test_rwkv7_kernel_maps_use_real_config_dims_and_scratch() -> None:
@@ -3695,6 +3871,37 @@ def test_rwkv7_wkv_binds_rk_as_per_layer_weight() -> None:
     assert build_ir.OP_DATAFLOW["rwkv7_wkv_decode"]["inputs"].get("rk") is None
 
 
+def test_rwkv7_circuit_declares_every_graph_slot() -> None:
+    build_ir = _load_build_ir()
+    circuit = json.loads(
+        (ROOT / "version" / "v8" / "circuits" / "rwkv7.json").read_text(encoding="utf-8")
+    )
+    assert circuit["contract"]["runtime_defaults"]["require_declared_activation_slots"] is True
+    config = {"require_declared_activation_slots": True}
+    build_ir._validate_declared_activation_slots(circuit, config, source="test")
+
+    declared = set(build_ir._template_activation_bindings(circuit))
+    declared.update(circuit["activation_buffers"])
+    declared.update({"kv_cache", "logits"})
+    slots = {
+        slot.split(":", 1)[1] if slot.startswith("external:") else slot
+        for slot in build_ir._iter_template_graph_slots(circuit)
+    }
+    assert slots <= declared
+
+    footer = circuit["block_types"]["decoder"]["footer"]
+    logits_op = next(item for item in footer if isinstance(item, dict) and item.get("op") == "logits")
+    assert logits_op["graph_slots"] == {
+        "inputs": {"A": "main_stream"},
+        "outputs": {"C": "logits"},
+    }
+
+    broken = copy.deepcopy(circuit)
+    broken["activation_buffers"].pop("xr_lane")
+    with pytest.raises(RuntimeError, match="HARD CIRCUIT ACTIVATION SLOT FAULT"):
+        build_ir._validate_declared_activation_slots(broken, config, source="test")
+
+
 @pytest.mark.parametrize("layout_mode", ["region", "packed"])
 def test_rwkv7_lower_3_binds_layer0_vgate_nulls_and_channelmix_scratch(
     tmp_path: Path, layout_mode: str,
@@ -3736,6 +3943,11 @@ def test_rwkv7_lower_3_binds_layer0_vgate_nulls_and_channelmix_scratch(
         )
         return {arg["name"]: arg for arg in op["args"]}
 
+    def buffer_of(arg: dict) -> str:
+        expr = str(arg.get("expr", ""))
+        marker = expr.find("A_")
+        return expr[marker:].split(")", 1)[0].strip() if marker >= 0 else expr
+
     layer0_vgate = args_of("rwkv7_vgate_produce", 0)
     for port in ("v_first", "xv", "v1", "v2", "v0"):
         assert layer0_vgate[port]["expr"] == "NULL", (port, layer0_vgate[port])
@@ -3765,8 +3977,47 @@ def test_rwkv7_lower_3_binds_layer0_vgate_nulls_and_channelmix_scratch(
     assert producer["activation_offset"] == consumer["activation_offset"]
     assert args_of("rwkv7_wkv_decode", 0)["state_in"]["expr"] != args_of("rwkv7_wkv_decode", 1)["state_in"]["expr"]
 
+    # Every live graph edge owns a distinct activation region.  The regression
+    # this guards against collapses RWKV intermediates onto A_LAYER_INPUT.
+    time_mix = args_of("rwkv7_time_mix_shifts", 0)
+    lane_ports = ("xr", "xw", "xk", "xv", "xa", "xg")
+    lane_buffers = [buffer_of(time_mix[port]) for port in lane_ports]
+    assert len(set(lane_buffers)) == len(lane_ports), lane_buffers
+    assert all(name != buffer_of(time_mix["x"]) for name in lane_buffers)
+    assert buffer_of(time_mix["shift_out"]) == buffer_of(time_mix["shift_in"])
+
+    projection_outputs = []
+    for name, input_port in (
+        ("rwkv7_r_proj", "xr_lane"),
+        ("rwkv7_k_proj", "xk_lane"),
+        ("rwkv7_v_proj", "xv_lane"),
+    ):
+        projection = args_of(name, 0)
+        assert buffer_of(projection["C"]) != buffer_of(projection["A"]), name
+        assert buffer_of(projection["A"]) == buffer_of(time_mix[input_port[:-5]]), name
+        projection_outputs.append(buffer_of(projection["C"]))
+    assert len(set(projection_outputs)) == len(projection_outputs), projection_outputs
+
+    lora = args_of("rwkv7_lora_gates", 0)
+    lora_outputs = [buffer_of(lora[port]) for port in ("w_log", "a_out", "g_out")]
+    lora_inputs = [buffer_of(lora[port]) for port in ("xw", "xa", "xg")]
+    assert len(set(lora_outputs)) == 3, lora_outputs
+    assert not set(lora_outputs) & set(lora_inputs), (lora_inputs, lora_outputs)
+
+    wkv = args_of("rwkv7_wkv_decode", 0)
+    wkv_inputs = [buffer_of(wkv[port]) for port in ("r", "w_log", "k", "v", "kk", "a", "g")]
+    assert buffer_of(wkv["y_out"]) not in set(wkv_inputs) | {buffer_of(wkv["state_in"])}
+    assert buffer_of(wkv["state_in"]) == buffer_of(wkv["state_out"])
+
+    out_proj = args_of("rwkv7_out_proj", 0)
+    assert buffer_of(out_proj["C"]) != buffer_of(out_proj["A"])
+    assert buffer_of(out_proj["A"]) == buffer_of(wkv["y_out"])
+
+    residual = args_of("residual_add", 0)
+    assert buffer_of(residual["a"]) != buffer_of(residual["b"])
+    assert buffer_of(residual["out"]) == buffer_of(residual["a"])
+
     # Capacity belongs to the named scratch only, never to other scratch regions.
-    import copy
     build_ir = _load_build_ir()
     candidate = copy.deepcopy(lowered)
     cm = next(op for op in candidate["operations"] if op["op"] == "rwkv7_channelmix_decode")

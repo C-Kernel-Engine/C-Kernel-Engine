@@ -3235,6 +3235,120 @@ def _write_ref(
     return out_dtype or "fp32", total, out_shape
 
 
+_RWKV_WORLD_EOS = "<|endoftext|>"
+
+
+def _rwkv_world_byte_decoder() -> dict[str, int]:
+    """GPT-2 ByteLevel character -> raw byte table."""
+    values = (
+        list(range(ord("!"), ord("~") + 1))
+        + list(range(ord("¡"), ord("¬") + 1))
+        + list(range(ord("®"), ord("ÿ") + 1))
+    )
+    characters = list(values)
+    extra = 0
+    for byte in range(256):
+        if byte not in values:
+            values.append(byte)
+            characters.append(256 + extra)
+            extra += 1
+    return {chr(codepoint): byte for byte, codepoint in zip(values, characters)}
+
+
+def _validate_rwkv_world_trie_tokenizer(tok_path: Path, vocab_size: int) -> None:
+    """Fail closed unless tokenizer.json supports native longest-match encoding.
+
+    The runtime indexes the stored ByteLevel pieces with greedy longest-match,
+    which is equivalent to the reference tokenizer's "highest id along the
+    path" rule only under the prefix-rank invariant. Validate every property
+    the C backend relies on so a different tokenizer cannot silently reach
+    codegen.
+    """
+    data = json.loads(tok_path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise SystemExit("RWKV World tokenizer.json root must be an object")
+    model = data.get("model")
+    if not isinstance(model, dict) or model.get("type") != "WordPiece":
+        raise SystemExit("RWKV World tokenizer.json must use the WordPiece vocabulary model")
+    if (
+        model.get("unk_token") != _RWKV_WORLD_EOS
+        or model.get("continuing_subword_prefix") != ""
+    ):
+        raise SystemExit("RWKV World tokenizer.json does not use exact end-of-text semantics")
+    if data.get("normalizer") is not None:
+        raise SystemExit("RWKV World tokenizer.json must not normalize text")
+    pre_tokenizer = data.get("pre_tokenizer")
+    if (
+        not isinstance(pre_tokenizer, dict)
+        or pre_tokenizer.get("type") != "ByteLevel"
+        or pre_tokenizer.get("add_prefix_space") is not False
+        or pre_tokenizer.get("use_regex") is not False
+    ):
+        raise SystemExit(
+            "RWKV World tokenizer.json must use exact ByteLevel pre-tokenization"
+        )
+    decoder = data.get("decoder")
+    if not isinstance(decoder, dict) or decoder.get("type") != "ByteLevel":
+        raise SystemExit("RWKV World tokenizer.json must use a ByteLevel decoder")
+    vocab = model.get("vocab")
+    if not isinstance(vocab, dict) or not vocab:
+        raise SystemExit("RWKV World tokenizer.json has no vocabulary")
+    if model.get("merges"):
+        raise SystemExit("RWKV World tokenizer.json must not declare BPE merges")
+
+    indices = list(vocab.values())
+    if (
+        any(type(index) is not int for index in indices)
+        or sorted(indices) != list(range(len(indices)))
+        or len(indices) != vocab_size
+    ):
+        raise SystemExit("RWKV World tokenizer.json vocabulary ids must be contiguous")
+    if vocab.get(_RWKV_WORLD_EOS) != 0:
+        raise SystemExit(
+            f"RWKV World tokenizer.json must reserve id 0 for {_RWKV_WORLD_EOS}"
+        )
+
+    byte_decoder = _rwkv_world_byte_decoder()
+    reverse: dict[bytes, int] = {}
+    for token, index in vocab.items():
+        if index == 0:
+            continue
+        if token == f"\ue000{index}\ue001":
+            # Reference tokenizer reserves these ids as undecodable placeholders.
+            continue
+        try:
+            raw = bytes(byte_decoder[character] for character in token)
+        except KeyError:
+            raise SystemExit(
+                "RWKV World tokenizer.json vocabulary is not ByteLevel encoded: "
+                f"{token!r}"
+            ) from None
+        if raw in reverse:
+            raise SystemExit(
+                f"RWKV World tokenizer.json has duplicate byte token {raw!r}"
+            )
+        reverse[raw] = index
+
+    if vocab_size >= 256:
+        # A full RWKV World vocabulary contains every single-byte token, which
+        # guarantees that greedy encoding always makes progress.
+        missing = [byte for byte in range(256) if bytes([byte]) not in reverse]
+        if missing:
+            raise SystemExit(
+                "RWKV World tokenizer.json is missing singleton bytes: "
+                + ", ".join(f"0x{byte:02X}" for byte in missing[:8])
+            )
+
+    for raw, index in reverse.items():
+        for endpoint in range(1, len(raw)):
+            prefix = reverse.get(raw[:endpoint])
+            if prefix is not None and prefix > index:
+                raise SystemExit(
+                    "RWKV World tokenizer.json token ranks do not support "
+                    "longest-match encoding"
+                )
+
+
 def _tokenizer_payloads_from_json(model_dir: Path, vocab_size: int) -> tuple[list[tuple[str, str, bytes, list[int], str]], dict[str, Any] | None, dict[str, Any]]:
     tok_path = model_dir / "tokenizer.json"
     if not tok_path.exists() or vocab_size <= 0:
@@ -3289,6 +3403,7 @@ def _tokenizer_payloads_from_json(model_dir: Path, vocab_size: int) -> tuple[lis
         # runtime contract is a longest-match trie built from the same strings.
         # Keep the vocab payloads; override the declared backend so the
         # importer does not lie about the tokenizer family.
+        _validate_rwkv_world_trie_tokenizer(tok_path, int(vocab_size))
         contract["tokenizer_type"] = "rwkv_world_trie"
         contract["backend"] = "rwkv_world_trie"
         contract["vocab_source_type"] = tok_type
