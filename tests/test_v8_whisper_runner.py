@@ -1334,6 +1334,7 @@ def test_explicit_phase_manifests_are_used_without_snapshot_replacement(tmp_path
 def test_unified_audio_forwards_trace_and_leading_dash_hint(tmp_path: Path, monkeypatch) -> None:
     import argparse
     unified = _unified_module()
+    monkeypatch.syspath_prepend(str(SCRIPT.parent))
     import run_whisper_v8
     seen = []
     monkeypatch.setattr(run_whisper_v8, 'main', lambda argv: seen.extend(argv) or 0)

@@ -1606,6 +1606,25 @@ def _check_cross_attention(name: str, heads: int, query_tokens: int, key_tokens:
     ) == 0
     assert np.array_equal(actual, serial), name
     assert np.array_equal(packed_actual, serial), name
+    # Head-local traversal must retain exclusive query-indexed scratch ownership.
+    # Use exactly the public workspace extent, with guards, across uneven workers.
+    if query_tokens > 1:
+        for workers in (1, 2, 4, 8):
+            attention_lib.ck_threadpool_global_destroy()
+            attention_lib.ck_set_num_threads(workers)
+            for replay in range(3):
+                guarded_output = np.full(query.size + 2, -12345.0, dtype=np.float32)
+                guarded_scores = np.full(query_tokens * key_tokens + 2, -12345.0, dtype=np.float32)
+                guarded_keys = np.full(heads * dim * key_tokens + 2, -12345.0, dtype=np.float32)
+                output_view = guarded_output[1:-1].reshape(query.shape)
+                assert attention_lib.attention_forward_query_key_head_major_f32_packed_k(
+                    _fptr(query), _fptr(key), _fptr(value), _fptr(output_view),
+                    _fptr(guarded_scores[1:-1]), _fptr(guarded_keys[1:-1]),
+                    heads, query_tokens, key_tokens, dim, float(scale),
+                ) == 0
+                assert np.array_equal(output_view, serial), (name, workers, replay)
+                for guarded in (guarded_output, guarded_scores, guarded_keys):
+                    assert guarded[0] == -12345.0 and guarded[-1] == -12345.0, name
     tq = torch.from_numpy(query)
     tk = torch.from_numpy(key)
     tv = torch.from_numpy(value)
@@ -1685,9 +1704,10 @@ def main() -> None:
     check_transpose()
     _check_cross_attention("audio_encoder_self_attention_equal", 6, 11, 11, 64)
     _check_cross_attention("audio_cross_attention_unequal_small", 3, 5, 17, 8)
+    _check_cross_attention("audio_cross_attention_worker_and_key_tails", 5, 33, 31, 17)
     _check_cross_attention("audio_cross_attention_whisper_decode", 6, 1, 1500, 64)
     check_tiled_f16kv_encoder_attention()
-    print("ALL TESTS PASSED (31/31)")
+    print("ALL TESTS PASSED (32/32)")
 
 
 if __name__ == "__main__":

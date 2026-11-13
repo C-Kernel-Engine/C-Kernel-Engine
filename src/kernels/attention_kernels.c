@@ -79,10 +79,12 @@ static void ck_attention_query_key_f32_work(int ith, int nth, void *opaque)
 {
     ck_attention_query_key_f32_args_t *args =
         (ck_attention_query_key_f32_args_t *)opaque;
-    for (int q_token = ith; q_token < args->query_tokens; q_token += nth) {
-        float *scores = args->score_scratch +
-            (size_t)q_token * args->key_tokens;
-        for (int head = 0; head < args->num_heads; ++head) {
+    /* Finish a head's independent query rows while its K/V remain cache-local.
+     * Each worker still owns the same query-indexed scratch and output rows. */
+    for (int head = 0; head < args->num_heads; ++head) {
+        for (int q_token = ith; q_token < args->query_tokens; q_token += nth) {
+            float *scores = args->score_scratch +
+                (size_t)q_token * args->key_tokens;
             const float *q_head = args->query +
                 (size_t)head * args->query_tokens * args->head_dim;
             const float *k_head = args->key +
