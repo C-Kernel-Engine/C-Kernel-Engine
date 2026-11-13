@@ -3008,6 +3008,29 @@ static inline void ck_attention_simd_gemm_ukernel_1x1(float *c,
     _mm512_storeu_ps(c, acc);
 }
 
+#if defined(__GNUC__) && !defined(__clang__)
+__attribute__((optimize("O3", "fp-contract=off")))
+static CK_NOINLINE void ck_attention_matmul_f32_tail(float *c,
+                                                    const float *a,
+                                                    const float *b,
+                                                    int rows, int k, int n,
+                                                    int tail)
+{
+    /* Preserve the scalar tail's non-fused K-order, vectorizing only outputs. */
+    const __mmask16 mask = (__mmask16)((1u << tail) - 1u);
+    for (int i = 0; i < rows; ++i) {
+        __m512 acc = _mm512_maskz_loadu_ps(mask, c + (size_t)i * n);
+        for (int kk = 0; kk < k; ++kk) {
+            const __m512 bv = _mm512_maskz_loadu_ps(mask, b + (size_t)kk * n);
+            const __m512 av = _mm512_set1_ps(a[(size_t)i * k + kk]);
+            const __m512 product = _mm512_maskz_mul_ps(mask, av, bv);
+            acc = _mm512_mask_add_ps(acc, mask, acc, product);
+        }
+        _mm512_mask_storeu_ps(c + (size_t)i * n, mask, acc);
+    }
+}
+#endif
+
 static CK_NOINLINE CK_OPTNONE void ck_attention_matmul_f32_accum(float *c,
                                                                  const float *a,
                                                                  const float *b,
@@ -3024,6 +3047,11 @@ static CK_NOINLINE CK_OPTNONE void ck_attention_matmul_f32_accum(float *c,
         for (; jj + 16 <= n; jj += 16) {
             ck_attention_simd_gemm_ukernel_4x1(c + jj, a, b + jj, k, n);
         }
+#if defined(__GNUC__) && !defined(__clang__)
+        if (jj < n) {
+            ck_attention_matmul_f32_tail(c + jj, a, b + jj, 4, k, n, n - jj);
+        }
+#else
         for (; jj < n; ++jj) {
             for (int i = 0; i < 4; ++i) {
                 float sum = c[(size_t) i * (size_t) n + (size_t) jj];
@@ -3034,6 +3062,7 @@ static CK_NOINLINE CK_OPTNONE void ck_attention_matmul_f32_accum(float *c,
                 c[(size_t) i * (size_t) n + (size_t) jj] = sum;
             }
         }
+#endif
         a += (size_t) 4 * (size_t) k;
         c += (size_t) 4 * (size_t) n;
     }
@@ -3046,6 +3075,11 @@ static CK_NOINLINE CK_OPTNONE void ck_attention_matmul_f32_accum(float *c,
         for (; jj + 16 <= n; jj += 16) {
             ck_attention_simd_gemm_ukernel_1x1(c + jj, a, b + jj, k, n);
         }
+#if defined(__GNUC__) && !defined(__clang__)
+        if (jj < n) {
+            ck_attention_matmul_f32_tail(c + jj, a, b + jj, 1, k, n, n - jj);
+        }
+#else
         for (; jj < n; ++jj) {
             float sum = c[jj];
             for (int kk = 0; kk < k; ++kk) {
@@ -3053,6 +3087,7 @@ static CK_NOINLINE CK_OPTNONE void ck_attention_matmul_f32_accum(float *c,
             }
             c[jj] = sum;
         }
+#endif
         a += k;
         c += n;
     }
