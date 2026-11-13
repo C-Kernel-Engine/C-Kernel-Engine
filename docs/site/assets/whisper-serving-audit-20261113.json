@@ -1,0 +1,161 @@
+{
+  "schema": "cke.whisper.consumer-audit.v1",
+  "date": "2026-11-13",
+  "scope": "Stage 1: discovery and vocabulary integration; not recognition or editing certification",
+  "source_base": "bfdb72606baca9c894318930cc13b1b03d16f70e",
+  "candidate_source_sha256": {
+    "server/whisper_http.py": "d021167d88971a6b6e1d714db09c5220a2e33e7a5e5a6abe7cdacd8ee1c07b0b",
+    "server/examples/whisper_http_client.py": "e9f33c43b2c2c8b32f83a2e35e71e7b0ebf9252d0367e3d8b087f2d61a20c423"
+  },
+  "deployed_source": "19a733d1c7d5453c93e437365ad45d15de869588",
+  "deployed_source_dirty": false,
+  "production_replaced": false,
+  "loaded_artifact": {
+    "schema": "cke.whisper.loaded.v1",
+    "encoder": {
+      "libraries": {
+        "libmodel.so": "386d2b47cf122a89f2fc10c5a88c96c973a8377c9b26edd3d5a3baa3cc14aec0",
+        "libckernel_engine.so": "f0cc7d2a8a7c926a5b574c08439506a335a7e379dffe2c84bbb05c5666259a97"
+      },
+      "manifest_sha256": "f9d31ecceb748b60d5e2e5602427e57e47bb789510e7cb9f7e5db048123ed962",
+      "weights_sha256": "e0da3059387b083090e7a895a6e6ff5b83b7d83dd1db2bb4979246556ffd9eb4",
+      "model_init_seconds": 0.026490043848752975
+    },
+    "decoder": {
+      "libraries": {
+        "libmodel.so": "a203fe6a3d02eca0b0b83e504c4d6669ba5ec2c15ed1aee3665f89e786f1f8d9",
+        "libckernel_engine.so": "f0cc7d2a8a7c926a5b574c08439506a335a7e379dffe2c84bbb05c5666259a97"
+      },
+      "manifest_sha256": "e9691e9378cd68d6383043d47ff34f65bf4d03a59714565157bbb121f1197a76",
+      "weights_sha256": "b9cee6bd15e65ff9b9015ee5490b3aeef297e35c5b39b4aebde817061b7cff35",
+      "model_init_seconds": 0.10826698690652847
+    }
+  },
+  "checkpoint_revision": "NOT_VERIFIED; loaded generated Base-shaped artifacts identified by hashes",
+  "execution": {
+    "host": "P3",
+    "CK_NUM_THREADS": 4,
+    "OMP_NUM_THREADS": 1,
+    "OPENBLAS_NUM_THREADS": 1,
+    "cpu": "Intel(R) Core(TM) i7-14700T"
+  },
+  "http_cases": [
+    {
+      "case": "baseline-a",
+      "wall_seconds": 2.1895753806456923,
+      "inference_seconds": 2.1232872381806374,
+      "queue_seconds": 0.00010514352470636368,
+      "audio_sha256": "e3f2406b90557d3f75c40e2c33c6239585179165f4763466e3be7dd539d2d847",
+      "transcript_sha256": "c5c6ca0bb70555e51266aacc22a9922209dc3c74fb4c33659452a32bfae49f7b",
+      "transcript_characters": 292,
+      "hint_applied": false,
+      "hint_tokens": 0,
+      "worker_generation": 1,
+      "service_instance_id": "75613f0ea31e406d8f0c1187af93086f",
+      "stop": "eos"
+    },
+    {
+      "case": "hinted",
+      "wall_seconds": 2.3063338734209538,
+      "inference_seconds": 2.2453390387818217,
+      "queue_seconds": 8.624326437711716e-05,
+      "audio_sha256": "e3f2406b90557d3f75c40e2c33c6239585179165f4763466e3be7dd539d2d847",
+      "transcript_sha256": "d78d21ad7d235f9a652a35f16b719572450c1da53b81cf394e52474c8b914fb2",
+      "transcript_characters": 287,
+      "hint_applied": true,
+      "hint_tokens": 55,
+      "worker_generation": 1,
+      "service_instance_id": "75613f0ea31e406d8f0c1187af93086f",
+      "stop": "eos"
+    },
+    {
+      "case": "baseline-b",
+      "wall_seconds": 2.258021558634937,
+      "inference_seconds": 2.1948835076764226,
+      "queue_seconds": 0.00012096669524908066,
+      "audio_sha256": "e3f2406b90557d3f75c40e2c33c6239585179165f4763466e3be7dd539d2d847",
+      "transcript_sha256": "c5c6ca0bb70555e51266aacc22a9922209dc3c74fb4c33659452a32bfae49f7b",
+      "transcript_characters": 292,
+      "hint_applied": false,
+      "hint_tokens": 0,
+      "worker_generation": 1,
+      "service_instance_id": "75613f0ea31e406d8f0c1187af93086f",
+      "stop": "eos"
+    },
+    {
+      "case": "silence-hinted",
+      "wall_seconds": 1.8852073019370437,
+      "inference_seconds": 1.8191691767424345,
+      "queue_seconds": 0.00011009536683559418,
+      "audio_sha256": "643f8a8dc8bd9c19225afffad2becfec5426180b3749cb208abdf1a6c8354efc",
+      "transcript_sha256": "e51f21336a874d561a38362a7449685b47f72613c0e21dd3ca60514148adb8c3",
+      "transcript_characters": 4,
+      "hint_applied": true,
+      "hint_tokens": 55,
+      "worker_generation": 1,
+      "service_instance_id": "75613f0ea31e406d8f0c1187af93086f",
+      "stop": "eos"
+    },
+    {
+      "case": "silence-plain",
+      "wall_seconds": 1.8155966699123383,
+      "inference_seconds": 1.7553875157609582,
+      "queue_seconds": 0.00010138936340808868,
+      "audio_sha256": "643f8a8dc8bd9c19225afffad2becfec5426180b3749cb208abdf1a6c8354efc",
+      "transcript_sha256": "225affe3c0c665135796ea21aeca7853afcbaf2f53ab120a2d302dbc1f7c2eb6",
+      "transcript_characters": 4,
+      "hint_applied": false,
+      "hint_tokens": 0,
+      "worker_generation": 1,
+      "service_instance_id": "75613f0ea31e406d8f0c1187af93086f",
+      "stop": "eos"
+    },
+    {
+      "case": "leading-dash",
+      "wall_seconds": 2.2274516876786947,
+      "inference_seconds": 2.1505706971511245,
+      "queue_seconds": 8.554942905902863e-05,
+      "audio_sha256": "e3f2406b90557d3f75c40e2c33c6239585179165f4763466e3be7dd539d2d847",
+      "transcript_sha256": "92650097ce6a1a4aabcc8c16834688d96c7c532e6733faaeda5289ccf4fe2bf5",
+      "transcript_characters": 290,
+      "hint_applied": true,
+      "hint_tokens": 7,
+      "worker_generation": 1,
+      "service_instance_id": "75613f0ea31e406d8f0c1187af93086f",
+      "stop": "eos"
+    }
+  ],
+  "verdicts": {
+    "hint_delivery": "PASS",
+    "baseline_hint_baseline_isolation": "PASS",
+    "leading_dash": "PASS",
+    "unsupported_options_rejected": "PASS",
+    "private_hint_absent_from_candidate_log": "PASS",
+    "silence_empty_transcript": "FAIL: both one-second zero-audio cases produced nonempty text",
+    "alignment_loaded_artifact": "UNSUPPORTED: generated decoder has no complete attention-trace buffer",
+    "timestamps_with_hint_cli": "PASS for execution only; boundary accuracy not evaluated",
+    "human_quality": "NOT_TESTED",
+    "long_recording": "NOT_TESTED",
+    "peak_memory": "NOT_MEASURED",
+    "independent_application_integration": "NOT_TESTED"
+  },
+  "cli_timestamp_probe": {
+    "status": "ok",
+    "timestamps": true,
+    "hint_tokens": 11,
+    "event_count": 8,
+    "parent_wall_seconds": 3.310665935277939
+  },
+  "tests": {
+    "passed": 84,
+    "skipped": 2,
+    "subtests_passed": 6
+  },
+  "privacy": "No audio, transcript text, vocabulary content or private filesystem paths retained here. Raw reports remain private on P3.",
+  "limitations": [
+    "Single attempts per case, not timing distributions or backend comparison.",
+    "Alignment, review and long audio exist in CLI source but are not exposed by this HTTP interface.",
+    "No human-labelled recognition or word-boundary references.",
+    "Node adapter capability forwarding remains separate work."
+  ]
+}

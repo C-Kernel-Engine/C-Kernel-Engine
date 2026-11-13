@@ -190,6 +190,7 @@ class _Owner:
             return {"ready": self._backend is not None and not self._closed,
                     "active": self._active.request_id if self._active else None,
                     "queued": len(self._queue), "worker_generation": self._generation,
+                    "running_native": self._running_native,
                     "startup_error": self._startup_error}
 
     def submit(self, job: _Job) -> bool:
@@ -302,7 +303,8 @@ class _Owner:
 def create_app(factory: Callable[[], Any], *, max_upload_bytes: int = 1024 * 1024,
                max_seconds: float = 30.0, max_waiters: int = 2,
                preload: bool = False, max_uploads: int = 2,
-               vocabulary_validator: Callable[[str], Any] | None = None) -> FastAPI:
+               vocabulary_validator: Callable[[str], Any] | None = None,
+               worker_timeout_seconds: float | None = None) -> FastAPI:
     if max_upload_bytes < 44 or max_seconds <= 0 or max_uploads < 1:
         raise ValueError("invalid audio resource limits")
     owner = _Owner(factory, max_waiters=max_waiters, preload=preload)
@@ -317,6 +319,31 @@ def create_app(factory: Callable[[], Any], *, max_upload_bytes: int = 1024 * 102
 
     app = FastAPI(lifespan=lifespan)
     usage = SpeechUsage()
+    service_instance_id = usage.boot_id
+    # This describes this HTTP interface, not every capability in the CLI or
+    # generated model. Unsupported features must never be inferred from a name.
+    from version.v8.scripts.run_whisper_v8 import (
+        MAX_VOCABULARY_HINT_BYTES, MAX_VOCABULARY_HINT_TOKENS,
+    )
+    capabilities = {
+        "schema": "cke.whisper.capabilities.v1",
+        "audio": {"format": "wav_pcm16", "sample_rate_hz": 16000, "channels": 1,
+                  "max_upload_bytes": max_upload_bytes, "max_seconds": max_seconds},
+        "decoding": {"language": "en", "task": "transcribe", "strategy": "greedy",
+                     "max_output_tokens": 128},
+        "vocabulary_hint": {"supported": vocabulary_validator is not None,
+                            "max_utf8_bytes": MAX_VOCABULARY_HINT_BYTES,
+                            "max_tokens": MAX_VOCABULARY_HINT_TOKENS,
+                            "capacity_check": "hint plus generation must fit decoder context"},
+        "segment_timestamps": False, "attention_traces": False,
+        "word_alignment": False, "editing_review": False,
+        "long_audio": False, "artifact_retrieval": False,
+        "max_waiters": max_waiters, "max_concurrent_uploads": max_uploads,
+        "worker_timeout_seconds": worker_timeout_seconds,
+        "request_deadlines": False,
+        "retry_semantics": "active IDs rejected; completed requests are not deduplicated",
+        "cancellation": "queued requests release admission; active requests signal worker abort and recover before reuse",
+    }
     app.add_middleware(SpeechUsageMiddleware, usage=usage)
 
     @app.get("/telemetry")
@@ -327,10 +354,16 @@ def create_app(factory: Callable[[], Any], *, max_upload_bytes: int = 1024 * 102
 
     @app.get("/health")
     async def health():
-        return {"status": "ok", **owner.status}
+        return {"status": "ok", "service_instance_id": service_instance_id,
+                "capabilities": capabilities, **owner.status}
 
     @app.post("/audio/transcriptions")
     async def transcribe(request: Request):
+        if any(key != "vocabulary_hint" for key in request.query_params):
+            raise HTTPException(400, {
+                "code": "unsupported_option",
+                "message": "This service accepts only vocabulary_hint; consult /health capabilities. Timestamps, alignment and long audio require a separately supported interface.",
+            })
         hint = request.query_params.get("vocabulary_hint", "")
         if len(request.query_params.getlist("vocabulary_hint")) > 1:
             raise HTTPException(400, "duplicate vocabulary hint")
@@ -379,7 +412,8 @@ def create_app(factory: Callable[[], Any], *, max_upload_bytes: int = 1024 * 102
                 done, _ = await asyncio.wait({waiting}, timeout=0.1)
                 if done:
                     result = await waiting
-                    return JSONResponse(result, headers={"X-CKE-Request-ID": request_id})
+                    return JSONResponse({**result, "service_instance_id": service_instance_id},
+                                        headers={"X-CKE-Request-ID": request_id})
                 if await request.is_disconnected():
                     waiting.add_done_callback(consume_after_disconnect)
                     owner.cancel(request_id)
@@ -436,8 +470,11 @@ def main() -> None:
     uvicorn.run(create_app(factory, max_upload_bytes=args.max_upload_bytes,
                            max_seconds=args.max_seconds,
                            max_waiters=args.max_waiters, preload=True,
-                           vocabulary_validator=vocabulary_validator),
-                host="127.0.0.1", port=args.port)
+                           vocabulary_validator=vocabulary_validator,
+                           worker_timeout_seconds=args.worker_timeout_seconds),
+                # Vocabulary travels in a query parameter for compatibility.
+                # Uvicorn access logs would otherwise retain that private text.
+                host="127.0.0.1", port=args.port, access_log=False)
 
 
 if __name__ == "__main__":

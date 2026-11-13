@@ -3,6 +3,64 @@
 
 <h1>Whisper Tiny and Base End-to-End</h1>
 
+<section id="consumer-audit-20261113">
+<h2>Resident service audit: 13 November 2026</h2>
+<p>This is the first consumer-integration stage, not a long-recording or editing certificate.
+The deployed P3 service remained on clean commit <code>19a733d1c</code> (#1071), port 8110.
+A separate candidate based on <code>bfdb72606</code> used the same generated artifacts on port 8112.
+See the <a href="assets/whisper-serving-audit-20261113.json">sanitized artifact-bound report</a>.
+Loaded model, engine, manifest and weight hashes identify this run; the original checkpoint revision was not independently established.</p>
+<table><thead><tr><th>Capability</th><th>Source / tests</th><th>Loaded artifact / CLI</th><th>HTTP and deployment</th><th>Consumer evidence this run</th></tr></thead><tbody>
+<tr><td>Vocabulary context</td><td>Existing bounded implementation; isolation and capacity tests</td><td>Supported; leading-dash forwarding retained</td><td>Already deployed; candidate adds discovery and private access-log defaults</td><td>Real HTTP: 55 hint tokens applied; subsequent unhinted transcript matches baseline</td></tr>
+<tr><td>Segment timestamp tokens</td><td>Existing runner policy and tests</td><td>Hint plus timestamps executed on the real 20-second clip</td><td>Not exposed; candidate rejects unsupported query options</td><td>CLI execution only; no human boundary validation</td></tr>
+<tr><td>Attention traces / word alignment</td><td>Existing trace, alignment and assembly pipeline; focused tests pass</td><td>Loaded decoder lacks complete trace buffer; actual trace request fails explicitly</td><td>Not exposed or deployed</td><td>Unsupported on tested artifacts</td></tr>
+<tr><td>Editing proposals</td><td>Existing source-hash and preview-approval tests pass</td><td>Requires valid alignment evidence and review</td><td>Not exposed</td><td>No listening approval, filler accuracy or edit-safety claim</td></tr>
+<tr><td>Long audio</td><td>Existing windowing and certification machinery; focused tests pass</td><td>Not exercised on a long recording here</td><td>Service limited to 30 seconds</td><td>Laptop 21:52 recording not transferred or tested</td></tr>
+<tr><td>Recovery and cancellation</td><td>Existing lifecycle tests pass</td><td>Resident workers reused for six requests</td><td>Queued cancellation releases admission; active cancellation aborts workers before reuse</td><td>No new real disconnect/restart-fault trial</td></tr>
+<tr><td>Silence, repetition and fallback</td><td>Greedy decoding; no beam search or quality-triggered decoding fallback found</td><td>One-second zero audio produced nonempty text with and without hints</td><td>No silence-quality guarantee</td><td>FAIL for this silence fixture; broader rates unmeasured</td></tr>
+</tbody></table>
+<p>The four 20-second HTTP cases took 2.19–2.31 seconds wall time (about 0.11 real-time factor),
+with four native threads. These are individual warm requests, not a comparative benchmark.
+The hint changes text, but without a human transcript this does not establish improved recognition.
+84 focused tests and six subtests passed; two asset-dependent tests skipped. Raw audio and transcripts remain private.</p>
+<h3>External client and discovery</h3>
+<p>The candidate extends existing <code>GET /health</code> with
+<code>cke.whisper.capabilities.v1</code>, a service boot identity, actual HTTP limits and explicit false values
+for unavailable alignment, timestamp and long-audio features. <code>GET /telemetry</code> uses the same boot identity.
+Successful replies retain the request ID, hint-applied flag, hint token count and loaded-artifact hashes.
+Worker generation is scoped to this service boot. The node adapter does not yet forward these capabilities.</p>
+<p>Copy <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/server/examples/whisper_http_client.py">whisper_http_client.py</a>
+to the consumer machine. It needs only Python's standard library, no CKE checkout. It discovers limits,
+checks request/boot correlation, writes a private result and never automatically retries a lost response.</p>
+<pre>python3 whisper_http_client.py --url http://127.0.0.1:8110 \
+  --audio technical-16k-mono.wav \
+  --vocabulary-hint='Jupyter Notebook, C-Kernel-Engine, CKE, Clef, Qwen, Kokoro, Antsand, ShivasNotes, Muon, AdamW, MXFP4, NVFP4, Q4_K.' \
+  --output private-transcript.json</pre>
+<p>Clients send raw PCM16 mono 16 kHz WAV with URL-encoded <code>vocabulary_hint</code> and
+<code>X-CKE-Request-ID</code>. Limits are 1 MiB upload, 30 seconds, 1,024 UTF-8 hint bytes and 64 hint tokens;
+hint plus generation must fit decoder capacity. Two uploads and two waiting jobs are allowed by default.
+English transcription, greedy decoding and 128 output tokens are fixed. Worker timeout is 600 seconds;
+there is no per-request queue/execution deadline. Completed IDs are not an idempotency cache.</p>
+<p>The old deployed service lacks this discovery schema, so the example intentionally refuses it until upgrade.
+The candidate rejects unsupported query options before upload processing instead of silently ignoring them.
+It disables Uvicorn access logs because query strings contain vocabulary. Custom launchers and proxies must
+also suppress query content; aggregate telemetry remains available. No dictionary rewrites raw output.</p>
+<h3>Deployment, rollback and next gate</h3>
+<p>Keep the existing service while reviewing this candidate. After merge, pin a clean checkout, start
+<code>python -m server.whisper_http --encoder-run-dir ENCODER --decoder-run-dir DECODER --port 8112</code>
+with the existing verified bundles and four native threads. Verify health, identity and A→hinted B→A before
+changing the user service working directory. Keep its previous checkout and unit configuration for rollback;
+rollback restores that configuration and restarts only the Whisper service. Do not replace artifacts in place.</p>
+<p>Next build a separate trace-enabled decoder using the existing
+<code>build_whisper_alignment_trace_manifest_v8.py</code> and ordinary generation path. Verify selected heads,
+prompt exclusion, global window offsets and trace bounds before exposing alignment. Preserve current transcription
+as the fallback explicitly requested by a client, never fabricate word timestamps.</p>
+<p>Consumer acceptance needs a natural technical excerpt with a human verbatim transcript, ordinary and similar-sounding
+speech, silence/quiet speech, and manually marked word boundaries. Then test the full laptop recording with its source hash.
+WER, term insertions, boundary error, filler precision/recall, peak memory and trace storage are not measured here.
+No beam search, automatic cutting or production model replacement is introduced.</p>
+</section>
+
 <h2>Word alignment bring-up boundary</h2>
 <table>
   <thead><tr><th>Stage</th><th>Current evidence</th><th>Missing alignment contract</th></tr></thead>
