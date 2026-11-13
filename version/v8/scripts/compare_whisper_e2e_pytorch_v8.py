@@ -102,7 +102,26 @@ def first_token_difference(
     return None
 
 
-def _pytorch_reference(args: argparse.Namespace) -> dict[str, object]:
+def load_attention_trace(captured: dict, token_ids: list[int], heads: list[list[int]]) -> np.ndarray:
+    """Require identity and semantic row alignment before reference comparison."""
+    path = Path(captured["path"])
+    if _sha256(path) != captured["sha256"]:
+        raise ValueError("attention trace identity changed")
+    with np.load(path, allow_pickle=False) as trace:
+        if str(trace["schema"]) != "cke.whisper_selected_attention.v2":
+            raise ValueError("unsupported attention trace schema")
+        if trace["token_ids"].tolist() != token_ids:
+            raise ValueError("attention trace token correspondence changed")
+        if trace["alignment_heads"].tolist() != heads:
+            raise ValueError("attention trace alignment heads changed")
+        actual = trace["selected_attention"].copy()
+    if (actual.ndim != 3 or actual.shape[:2] != (len(heads), len(token_ids))
+            or actual.shape[2] == 0 or not np.isfinite(actual).all()):
+        raise ValueError("attention trace has invalid shape or nonfinite values")
+    return actual
+
+
+def _pytorch_reference(args: argparse.Namespace, cke: dict | None = None) -> dict[str, object]:
     import torch
     from transformers import WhisperForConditionalGeneration, WhisperProcessor
     from transformers.utils import logging as transformers_logging
@@ -116,7 +135,8 @@ def _pytorch_reference(args: argparse.Namespace) -> dict[str, object]:
         args.checkpoint, local_files_only=True
     )
     model = WhisperForConditionalGeneration.from_pretrained(
-        args.checkpoint, local_files_only=True
+        args.checkpoint, local_files_only=True, dtype=torch.float32,
+        attn_implementation="eager",
     ).eval()
     load_elapsed = time.perf_counter() - load_started
     long_form = samples.size > int(processor.feature_extractor.n_samples)
@@ -150,9 +170,41 @@ def _pytorch_reference(args: argparse.Namespace) -> dict[str, object]:
             return_timestamps=args.timestamps,
             max_new_tokens=args.max_tokens,
             do_sample=False,
+            **({"prompt_ids": processor.get_prompt_ids(args.vocabulary_hint, return_tensors="pt")}
+               if getattr(args, "vocabulary_hint", "") else {}),
         )
     elapsed = time.perf_counter() - started
     tokens = [int(value) for value in generated[0].tolist()]
+    attention_reference = None
+    if getattr(args, "attention_trace_dir", None) is not None:
+        if cke is None or len(cke.get("segments", [])) != 1:
+            raise ValueError("attention comparison currently requires one audio window")
+        decoder = cke["segments"][0]["decoder"]
+        captured = decoder["attention_trace"]
+        prefix = decoder["forced_prefix"]
+        ids = decoder["generated_tokens"]
+        if not ids:
+            raise ValueError("attention comparison requires generated tokens")
+        heads = model.generation_config.alignment_heads
+        actual = load_attention_trace(captured, ids, heads)
+        with torch.inference_mode():
+            replay = model(inputs.input_features,
+                           decoder_input_ids=torch.tensor([prefix + ids[:-1]]),
+                           output_attentions=True)
+        expected = np.stack([
+            replay.cross_attentions[layer][0, head, len(prefix)-1:, :].cpu().numpy()
+            for layer, head in heads])
+        if actual.shape != expected.shape or not np.isfinite(actual).all() or not np.isfinite(expected).all():
+            raise ValueError("attention comparison has invalid shape or nonfinite values")
+        error = actual.astype(np.float64) - expected.astype(np.float64)
+        attention_reference = {
+            "status": "measured_not_certified", "shape": list(actual.shape),
+            "max_abs": float(np.abs(error).max()),
+            "rmse": float(np.sqrt(np.mean(error ** 2))),
+            "trace_sha256": captured["sha256"],
+            "mode": "teacher-forced eager FP32; same decoder IDs, independent frontend and encoder",
+            "limitations": "Not identical-input local replay or human boundary accuracy; no fitted tolerance.",
+        }
     return {
         "tokens": tokens,
         "text": processor.decode(
@@ -174,6 +226,9 @@ def _pytorch_reference(args: argparse.Namespace) -> dict[str, object]:
         "seconds": elapsed,
         "pytorch": torch.__version__,
         "transformers": __import__("transformers").__version__,
+        "model_dtype": str(next(model.parameters()).dtype),
+        "attention_implementation": "eager",
+        "attention_reference": attention_reference,
     }
 
 
@@ -189,6 +244,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--max-tokens", type=int, default=128)
     parser.add_argument("--timestamps", action="store_true")
+    parser.add_argument("--vocabulary-hint", default="")
+    parser.add_argument("--attention-trace-dir", type=Path,
+                        help="Retain traces and measure single-window teacher-forced reference error")
     parser.add_argument("--threads", type=int, default=1)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
@@ -223,6 +281,8 @@ def main(argv: list[str] | None = None) -> int:
                 "--max-tokens",
                 str(args.max_tokens),
                 *(["--timestamps"] if args.timestamps else []),
+                *([f"--vocabulary-hint={args.vocabulary_hint}"] if args.vocabulary_hint else []),
+                *(["--attention-trace-dir", str(args.attention_trace_dir)] if args.attention_trace_dir else []),
                 "--output",
                 str(cke_path),
             ],
@@ -230,7 +290,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         cke = json.loads(cke_path.read_text(encoding="utf-8"))
 
-    oracle = _pytorch_reference(args)
+    oracle = _pytorch_reference(args, cke)
     subject_tokens = [
         int(value) for value in cke["decoder"]["generated_tokens"]
     ]
@@ -243,6 +303,7 @@ def main(argv: list[str] | None = None) -> int:
     report = {
         "schema": "cke.whisper_e2e_pytorch_parity",
         "schema_version": 2,
+        "verdict_scope": "generated_token_trajectory",
         "status": (
             "pass"
             if difference is None and transcript_match

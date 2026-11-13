@@ -4107,3 +4107,19 @@ def test_rwkv7_rank_tensor_geometry_is_checked(shape):
             {"rwkv7.blocks.0.att.w1": SimpleNamespace(shape=shape)},
             1, (("att.w1", -1),), 8,
         )
+
+
+def test_named_tokenizer_padding_overrides_model_default(tmp_path: Path) -> None:
+    converter = _load_converter()
+    (tmp_path / "tokenizer.json").write_text(json.dumps({
+        "model": {"vocab": {"ordinary": 0, "<end>": 1}}, "added_tokens": []}))
+    (tmp_path / "tokenizer_config.json").write_text(json.dumps({"pad_token": "<end>"}))
+    (tmp_path / "config.json").write_text(json.dumps({"pad_token_id": 0}))
+    (tmp_path / "generation_config.json").write_text(json.dumps({"pad_token_id": 1}))
+    special = converter._special_tokens_from_tokenizer_config(tmp_path, "bpe", vocab_size=2)
+    assert special["pad_token_id"] == 1
+    # An internally contradictory tokenizer remains invalid.
+    (tmp_path / "tokenizer_config.json").write_text(json.dumps({
+        "pad_token": "<end>", "pad_token_id": 0}))
+    with pytest.raises(ValueError, match="pad_token ID conflicts"):
+        converter._special_tokens_from_tokenizer_config(tmp_path, "bpe", vocab_size=2)

@@ -203,6 +203,16 @@ class TestV8TokenizerCapabilityCodegen(unittest.TestCase):
         )
         self.assertIn("ck_true_bpe_set_suppress_dummy_prefix(g_model->tokenizer, false);", generated_with_prefix["init"])
 
+    def test_decoder_prefix_policy_does_not_inject_bos(self) -> None:
+        generated = build_ir_v8._generate_tokenizer_c_code(
+            "bpe", vocab_size=256, num_merges=0,
+            special_tokens={"bos_token_id": 1, "eos_token_id": 2,
+                            "add_bos_token": True, "add_eos_token": True},
+            tokenizer_contract={"bos_policy": "decoder_start_token"},
+        )
+        self.assertIn("cfg.add_bos = false;", generated["init"])
+        self.assertIn("cfg.add_eos = true;", generated["init"])
+
     def test_publisher_chat_can_suppress_gguf_implicit_bos(self) -> None:
         resolved = build_ir_v8._resolve_tokenizer_contract(
             {"contract": {"tokenizer_contract": {
