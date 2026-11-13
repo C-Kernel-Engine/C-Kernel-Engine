@@ -70,6 +70,7 @@ FALLBACK_FN_BY_KERNEL_ID: Dict[str, str] = {
 def _load_train_layout_offsets(
     layout: Optional[Dict[str, Any]],
     tensor_numel: Dict[str, int],
+    tensor_dtypes: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
     """
     Read layout_train.json and return:
@@ -104,11 +105,13 @@ def _load_train_layout_offsets(
         nbytes = row.get("bytes")
         if not isinstance(tid, str) or not isinstance(off_b, int) or not isinstance(nbytes, int):
             continue
-        if (off_b % 4) != 0 or (nbytes % 4) != 0:
-            raise RuntimeError(f"layout tensor `{tid}` has non-float-aligned offset/size")
+        itemsize = 2 if (tensor_dtypes or {}).get(tid) == "bf16" else 4
+        if (off_b % 4) != 0 or nbytes <= 0 or (nbytes % itemsize) != 0:
+            raise RuntimeError(f"layout tensor `{tid}` has invalid typed offset/size")
+        if tid in (tensor_dtypes or {}) and row.get("dtype") != tensor_dtypes[tid]:
+            raise RuntimeError("layout dtype disagrees with IR: " + tid)
 
         off_f = int(off_b // 4)
-        size_f = int(nbytes // 4)
 
         if tid.startswith("optimizer.m."):
             name = tid[len("optimizer.m.") :]
@@ -120,10 +123,10 @@ def _load_train_layout_offsets(
             continue
 
         if tid in tensor_numel:
-            expected = int(tensor_numel[tid])
-            if size_f < expected:
+            expected = int(tensor_numel[tid]) * itemsize
+            if nbytes < expected:
                 raise RuntimeError(
-                    f"layout tensor `{tid}` too small: layout={size_f} expected={expected}"
+                    f"layout tensor `{tid}` too small: bytes={nbytes} expected={expected}"
                 )
             tensor_offsets[tid] = off_f
 
@@ -145,9 +148,12 @@ def _load_train_layout_offsets(
             size_b = r.get("bytes")
             if not isinstance(name, str) or not isinstance(off_b, int) or not isinstance(size_b, int):
                 continue
-            if (off_b % 4) != 0 or (size_b % 4) != 0:
+            typed_tail = any((tensor_dtypes or {}).get(t.get("id")) == "bf16"
+                             and t.get("offset", -1) + t.get("bytes", 0) == off_b + size_b
+                             for t in tensors if isinstance(t, dict))
+            if (off_b % 4) != 0 or size_b < 0 or (size_b % 4 and not typed_tail):
                 raise RuntimeError(f"layout region `{name}` has non-float-aligned offset/size")
-            region_offsets[name] = (int(off_b // 4), int(size_b // 4))
+            region_offsets[name] = (int(off_b // 4), int((size_b + 3) // 4))
 
     return {
         "total_floats": int(total_bytes // 4),
@@ -1138,8 +1144,8 @@ def _bridge_head_group_macro(head_group: Any) -> str:
 def _declared_training_call(op, kernel, args, pools, tensors, tensor_numel, variables, *, fixed_batch=False):
     """Resolve a bounded map ABI without legacy pointer/scalar guessing.
 
-    Opt-in for fixed-capacity training graphs. FP32 buffers, read-only INT32 metadata and literal
-    scalar bindings are supported here. Checked providers must explicitly declare
+    Opt-in for fixed-capacity training graphs. FP32 buffers, typed BF16 saved
+    auxiliaries, INT32 metadata and literal scalar bindings are supported here. Checked providers must explicitly declare
     zero-success status; the generated step stops before optimizer execution.
     """
     phase = "backward" if str(op.get("phase", "")).startswith("backward") else "training"
@@ -1170,9 +1176,9 @@ def _declared_training_call(op, kernel, args, pools, tensors, tensor_numel, vari
             continue
         if "*" in ctype:
             compact_type = ctype.replace(" ", "")
-            expected_dtype = {"float*": "fp32", "constfloat*": "fp32", "constint32_t*": "i32", "int32_t*": "i32"}.get(compact_type)
+            expected_dtype = {"float*": "fp32", "constfloat*": "fp32", "constint32_t*": "i32", "int32_t*": "i32", "constuint16_t*": "bf16", "uint16_t*": "bf16"}.get(compact_type)
             if expected_dtype is None:
-                raise ValueError("training map supports FP32 and nondifferentiable INT32 pointers")
+                raise ValueError("training map supports FP32, declared BF16 auxiliaries and nondifferentiable INT32 pointers")
             tid = pools.get(category, {}).get(key)
             if expected_dtype == "i32" and tensors.get(tid, {}).get("requires_grad") is not False:
                 raise ValueError("integer training metadata must explicitly disable gradients")
@@ -1251,9 +1257,9 @@ def _declared_training_call(op, kernel, args, pools, tensors, tensor_numel, vari
 def _validate_training_storage(ir2, tensors, manifest=None):
     """Reject storage the generated trainer cannot represent before emitting C.
 
-    The memory planner knows BF16 byte sizes, but this runtime still hydrates,
-    snapshots, accumulates and optimizes floating tensors as FP32. Leaf BF16
-    kernels do not make that ABI typed. Never reinterpret or silently skip them.
+    Master weights, snapshots, gradients and optimizer state remain FP32.
+    BF16 is admitted only for explicitly produced, nonpersistent map-owned
+    auxiliaries. It is never hydrated as a weight or silently optimized.
     """
     def canonical(dtype, where):
         if not isinstance(dtype, str):
@@ -1261,16 +1267,22 @@ def _validate_training_storage(ir2, tensors, manifest=None):
         value = dtype.lower()
         if value in ("fp32", "f32"):
             return "fp32"
+        if value == "bf16":
+            return "bf16"
         if _dtype_is_i32(value):
             return "i32"
         raise ValueError("unsupported generated-training storage dtype %r at %s; "
-                         "runtime supports FP32 tensors and INT32 metadata only" % (dtype, where))
+                         "runtime supports FP32 tensors, typed BF16 auxiliaries and INT32 metadata only" % (dtype, where))
 
     for label, config in (("IR config", ir2.get("config") or {}), ("manifest config", (manifest or {}).get("config") or {})):
         if "dtype" in config and config["dtype"] not in ("fp32", "f32", "float32"):
             raise ValueError("unsupported generated-training storage dtype in " + label)
     for tid, meta in tensors.items():
         dtype = canonical(meta.get("dtype", "fp32"), tid)
+        if dtype == "bf16" and (not tid.startswith("aux.") or meta.get("kind") != "aux"
+                                or meta.get("requires_grad") is not False
+                                or meta.get("persistent") is not False):
+            raise ValueError("unsupported generated-training storage dtype: BF16 requires nonpersistent nondifferentiable aux storage")
         if dtype == "i32" and (tid.startswith(("weight.", "grad.", "tmp.grad."))
                                or meta.get("kind") == "weight"
                                or "grad" in str(meta.get("kind", ""))
@@ -1278,8 +1290,22 @@ def _validate_training_storage(ir2, tensors, manifest=None):
             raise ValueError("integer training metadata cannot be a weight or gradient: " + tid)
     ops = list(ir2.get("forward", [])) + list(ir2.get("backward", []))
     op_by_id = {int(op["op_id"]): op for op in ops if "op_id" in op}
+    bf16_ids = {tid for tid, m in tensors.items() if m.get("dtype") == "bf16"}
+    produced = set()
     for op in ops:
         df = op.get("dataflow", {})
+        for direction in ("inputs", "outputs"):
+            for ref in df.get(direction, {}).values():
+                tid = _resolve_ref_tensor(ref, op_by_id) if isinstance(ref, dict) else None
+                if tid in bf16_ids:
+                    if op.get("map_call") is not True:
+                        raise ValueError("BF16 auxiliary requires a typed map call: " + tid)
+                    if direction == "outputs":
+                        if tid in produced or str(op.get("phase", "")).startswith("backward"):
+                            raise ValueError("BF16 auxiliary requires one forward producer: " + tid)
+                        produced.add(tid)
+                    elif tid not in produced:
+                        raise ValueError("BF16 auxiliary read before forward production: " + tid)
         pools = (df.get("inputs", {}), df.get("outputs", {}),
                  op.get("weights", {}), op.get("save_for_backward", {}))
         for pool in pools:
@@ -1290,9 +1316,13 @@ def _validate_training_storage(ir2, tensors, manifest=None):
                     continue
                 tid = _resolve_ref_tensor(ref, op_by_id) or ("weight." + ref["name"] if isinstance(ref.get("name"), str) else "unresolved")
                 dtype = canonical(ref["dtype"], "op %s reference %s" % (op.get("op_id"), tid))
+                if dtype == "bf16" and tid not in bf16_ids:
+                    raise ValueError("unsupported generated-training storage dtype in reference: " + tid)
                 if tid in tensors and dtype != canonical(tensors[tid].get("dtype", "fp32"), tid):
                     raise ValueError("conflicting generated-training storage dtype: " + tid)
 
+    if bf16_ids - produced:
+        raise ValueError("BF16 auxiliary has no forward producer")
 
 def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional[Dict[str, Any]] = None, layout: Optional[Dict[str, Any]] = None, exec_plan: Optional[Dict[str, Any]] = None) -> Tuple[str, Dict[str, Any]]:
     identity = {"ir2": ir2, "manifest": manifest or {}, "layout": layout or {}, "exec_plan": exec_plan or {}}
@@ -1339,11 +1369,14 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
 
     tvars_f32: Dict[str, str] = {}
     tvars_i32: Dict[str, str] = {}
+    tvars_bf16: Dict[str, str] = {}
     for tid, meta in sorted(tensors.items(), key=lambda x: x[0]):
         ident = _c_ident(tid, prefix="t_")
         dtype = str((meta or {}).get("dtype", "fp32"))
         if _dtype_is_i32(dtype):
             tvars_i32[tid] = ident
+        elif dtype == "bf16":
+            tvars_bf16[tid] = ident
         else:
             tvars_f32[tid] = ident
 
@@ -1478,12 +1511,13 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
             raise RuntimeError("Missing positive numel for weight tensor: %s" % tid)
         init_weight_specs.append((wname, var, int(numel)))
 
-    layout_info = _load_train_layout_offsets(layout, tensor_numel)
+    layout_info = _load_train_layout_offsets(layout, tensor_numel, {tid: m.get("dtype", "fp32") for tid, m in tensors.items()})
+    typed_vars = {**tvars_f32, **tvars_bf16}
     tensor_offsets = layout_info["tensor_offsets_floats"]
     region_offsets = layout_info["region_offsets_floats"]
 
     tensor_offset_macros: Dict[str, str] = {}
-    for tid, var in sorted(tvars_f32.items(), key=lambda x: x[1]):
+    for tid, var in sorted(typed_vars.items(), key=lambda x: x[1]):
         tensor_offset_macros[tid] = "OFF_%s" % var
 
     opt_m_offset_macros: Dict[str, str] = {}
@@ -1502,12 +1536,12 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     # Keep ordering stable so a failing canary index maps to the same range/slot
     # across runs and can be decoded consistently in strict mode.
     slot_rows: List[Dict[str, Any]] = []
-    for tid, _var in sorted(tvars_f32.items(), key=lambda x: x[1]):
+    for tid, _var in sorted(typed_vars.items(), key=lambda x: x[1]):
         wf, wb = _slot_writable_flags(tid)
         slot_rows.append({
             "name": tid,
             "offset": int(tensor_offsets[tid]),
-            "numel": int(tensor_numel[tid]),
+            "numel": (int(tensor_numel[tid]) + 1) // 2 if tid in tvars_bf16 else int(tensor_numel[tid]),
             "section": _classify_slot_section(tid),
             "writable_fwd": int(wf),
             "writable_bwd": int(wb),
@@ -1694,7 +1728,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("#define CK_ROPE_ALIGNED_HEAD_DIM %d" % int(rope_aligned_head_dim))
     ap("#define CK_ROPE_ROTARY_DIM %d" % int(rope_rotary_dim))
     ap("#define CK_ROPE_THETA %.6ff" % float(rope_theta))
-    for tid, var in sorted(tvars_f32.items(), key=lambda x: x[1]):
+    for tid, var in sorted(typed_vars.items(), key=lambda x: x[1]):
         ap("#define %s ((size_t)%d)" % (tensor_offset_macros[tid], int(tensor_offsets[tid])))
     for _wname, _gvar, _wvar, mvar, vvar, _numel in sorted(opt_pairs, key=lambda x: x[0]):
         ap("#define %s ((size_t)%d)" % (opt_m_offset_macros[mvar], int(opt_m_offsets[_wname])))
@@ -1811,6 +1845,8 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
 
     for tid, var in sorted(tvars_f32.items(), key=lambda x: x[1]):
         ap("static float *%s; /* %s */" % (var, tid))
+    for tid, var in sorted(tvars_bf16.items(), key=lambda x: x[1]):
+        ap("static uint16_t *%s; /* %s: BF16 saved operands */" % (var, tid))
     for tid, var in sorted(tvars_i32.items(), key=lambda x: x[1]):
         ap("static int32_t %s[%d]; /* %s */" % (var, int(tensor_numel[tid]), tid))
     ap("")
@@ -1906,6 +1942,8 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("    g_memory_floats = alloc_floats;")
     for tid, var in sorted(tvars_f32.items(), key=lambda x: x[1]):
         ap("    %s = g_memory + %s;" % (var, tensor_offset_macros[tid]))
+    for tid, var in sorted(tvars_bf16.items()):
+        ap("    %s = (uint16_t *)(g_memory + %s);" % (var, tensor_offset_macros[tid]))
     for _wname, _gvar, _wvar, mvar, vvar, _numel in sorted(opt_pairs, key=lambda x: x[0]):
         ap("    %s = g_memory + %s;" % (mvar, opt_m_offset_macros[mvar]))
         ap("    %s = g_memory + %s;" % (vvar, opt_v_offset_macros[vvar]))
@@ -1919,7 +1957,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("        g_memory = NULL;")
     ap("    }")
     ap("    g_memory_floats = 0;")
-    for _tid, var in sorted(tvars_f32.items(), key=lambda x: x[1]):
+    for _tid, var in sorted(typed_vars.items(), key=lambda x: x[1]):
         ap("    %s = NULL;" % var)
     for _wname, _gvar, _wvar, mvar, vvar, _numel in sorted(opt_pairs, key=lambda x: x[0]):
         ap("    %s = NULL;" % mvar)
@@ -4329,7 +4367,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                 call_args = _declared_training_call(
                     op, kernel_map[kid], args,
                     {"activation": io_inputs, "output": io_outputs, "weight": io_weights, "scratch": io_outputs},
-                    tensors, tensor_numel, {**tvars_f32, **tvars_i32}, fixed_batch=cfg.get("train_batch_policy") == "fixed")
+                    tensors, tensor_numel, {**tvars_f32, **tvars_i32, **tvars_bf16}, fixed_batch=cfg.get("train_batch_policy") == "fixed")
                 bounds_checks = [(tvars_f32[tid], tensor_numel[tid])
                                  for tid in list(io_inputs.values()) + list(io_outputs.values()) + list(io_weights.values())
                                  if tid in tvars_f32]
@@ -4924,6 +4962,11 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
         "init_weight_numel": [int(_numel) for (_wname, _wvar, _numel) in init_weight_specs],
         "tensor_numel_count": len(tensor_numel),
         "memory_total_floats": int(layout_info["total_floats"]),
+        "bf16_auxiliary_storage": [
+            {"tensor": tid, "elements": tensor_numel[tid], "bytes": tensor_numel[tid] * 2,
+             "offset_bytes": tensor_offsets[tid] * 4, "checkpointed": False}
+            for tid in sorted(tvars_bf16)
+        ],
         "memory_regions": sorted(list(region_offsets.keys())),
         "tensor_slot_count": len(slot_rows),
         "canary_range_count": len(canary_ranges),

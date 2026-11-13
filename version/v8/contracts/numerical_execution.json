@@ -5910,6 +5910,84 @@
       },
       "position_transform": null,
       "description": "Existing layernorm_backward_kernel. Consume actual forward FP32 mean/rstd; overwrite d_input, accumulate d_gamma/d_beta in ascending row order into zeroed temporary gradients. Graph accumulation handles sharing. Build contraction may affect rounding; tested FP32 autograd/optimizer tolerances are not bitwise guarantees."
+    },
+    "projection_bf16_train_forward_rne_ordered_fp32_v1": {
+      "operator_family": "gemm",
+      "status": "validated",
+      "storage": {
+        "input": "fp32",
+        "weight": "fp32",
+        "output": "fp32"
+      },
+      "compute": {
+        "input": "fp32",
+        "weight": "fp32",
+        "accumulator": "fp32",
+        "contraction": "disabled",
+        "evaluation_order": "ascending_contracted_index_separate_multiply_add"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": [
+          "input_load",
+          "weighted_product",
+          "reduction_update",
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "sum",
+        "order": "ascending_index",
+        "partial_accumulator": "fp32",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "serial",
+        "split_strategy": "serial",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Primary output and output gradient are FP32; named saved_input and saved_weight ports are BF16. RNE BF16 saved operands; FP32 outputs and gradients. Identity derivative of operand rounding; VJP evaluated at rounded operands. Not default torch.autocast. Independent PyTorch FP32 matmul on explicit BF16-rounded operands; custom autograd identity rounding VJP."
+    },
+    "projection_bf16_train_backward_rne_ordered_fp32_v1": {
+      "operator_family": "gemm",
+      "status": "validated",
+      "storage": {
+        "input": "fp32",
+        "weight": "bf16",
+        "output": "fp32"
+      },
+      "compute": {
+        "input": "fp32",
+        "weight": "fp32",
+        "accumulator": "fp32",
+        "contraction": "disabled",
+        "evaluation_order": "ascending_contracted_index_separate_multiply_add"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": [
+          "input_load",
+          "weighted_product",
+          "reduction_update",
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "sum",
+        "order": "ascending_index",
+        "partial_accumulator": "fp32",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "serial",
+        "split_strategy": "serial",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Primary output and output gradient are FP32; named saved_input and saved_weight ports are BF16. RNE BF16 saved operands; FP32 outputs and gradients. Identity derivative of operand rounding; VJP evaluated at rounded operands. Not default torch.autocast. Independent PyTorch FP32 matmul on explicit BF16-rounded operands; custom autograd identity rounding VJP."
     }
   }
 }
