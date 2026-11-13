@@ -154,6 +154,79 @@ class BiasedProjectionKernel(unittest.TestCase):
 
 
 class MixedHeadContracts(unittest.TestCase):
+    def test_memory_exception_requires_mixed_experiment(self):
+        import sys
+        from unittest.mock import patch
+        from tests import run_clef_training_oracle as runner
+
+        with patch.object(
+            sys,
+            "argv",
+            ["oracle", "--fp32-memory-projection", "--report", "unused.json"],
+        ), patch.object(runner.FullHeadTraining, "certify") as execute:
+            with self.assertRaises(SystemExit) as error:
+                runner.main()
+            self.assertEqual(error.exception.code, 2)
+            execute.assert_not_called()
+
+    def test_fp32_memory_exception_changes_only_declared_projection(self):
+        ir, registry = full.FullHeadTrainingContracts.graph(
+            self, mixed=True, fp32_memory_projection=True
+        )
+        baseline, _ = full.FullHeadTrainingContracts.graph(self, mixed=True)
+        original = {op["op"]: op for op in baseline["forward"]}
+        memory = next(op for op in ir["forward"] if op["op"] == "memory_projection")
+        self.assertEqual(memory["kernel_id"], "linear_rows_checked_no_bias_f32")
+        for op in ir["forward"]:
+            if op["op"] != "memory_projection":
+                self.assertEqual(op["kernel_id"], original[op["op"]]["kernel_id"])
+        self.assertNotIn(
+            "aux.projection_%s.saved_input" % memory["op_id"], ir["tensors"]
+        )
+        _, report = full.FullHeadTrainingContracts.emit(self, ir, registry)
+        self.assertEqual(report["skipped_ops"], [])
+        self.assertEqual(len(report["parameter_gradient_order"]), 162)
+        from tests.clef_mixed_oracle import projection_policy
+
+        with self.assertRaisesRegex(ValueError, "one declared FP32 memory projection"):
+            projection_policy({"ops": []}, fp32_memory_projection=True)
+
+    def test_oracle_preserves_fp32_exception_forward_and_backward(self):
+        try:
+            import torch
+        except ImportError as exc:
+            self.skipTest("independent PyTorch unavailable: " + str(exc))
+        from tests.clef_mixed_oracle import install
+
+        head = torch.nn.Module()
+        head.memory_projection = torch.nn.Linear(2, 2, bias=False)
+        head.other = torch.nn.Linear(2, 2, bias=False)
+        with torch.no_grad():
+            for layer in (head.memory_projection, head.other):
+                layer.weight.copy_(
+                    torch.tensor([[0.123456, 0.654321], [-0.321234, 0.234567]])
+                )
+        captures = install(
+            self, torch, head, fp32_weights=("memory_projection.weight",)
+        )
+        x = torch.tensor([[0.345678, -0.765432]], requires_grad=True)
+        y = head.memory_projection(x)
+        expected = x @ head.memory_projection.weight.T
+        torch.testing.assert_close(y, expected, rtol=0, atol=0)
+        y.sum().backward()
+        torch.testing.assert_close(
+            x.grad, head.memory_projection.weight.sum(0)[None], rtol=0, atol=0
+        )
+        torch.testing.assert_close(
+            head.memory_projection.weight.grad, x.detach().expand(2, 2), rtol=0, atol=0
+        )
+        mixed = head.other(x)
+        reference = x.bfloat16().float() @ head.other.weight.bfloat16().float().T
+        torch.testing.assert_close(mixed, reference, rtol=0, atol=0)
+        self.assertNotIn("memory_projection.weight", captures)
+        self.assertIn("other.weight", captures)
+        self.assertFalse(torch.equal(y, mixed))
+
     def test_same_state_restores_packed_qkv_scalar_and_moments(self):
         try:
             import numpy as np
