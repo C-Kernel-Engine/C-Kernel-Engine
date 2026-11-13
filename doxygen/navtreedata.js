@@ -68,19 +68,19 @@ var NAVTREEINDEX =
 "gemm__kernels__bf16_8c.html#ac00859667ac5f738df005fb1f5f2f3df",
 "gemm__kernels__q5__0_8c.html#a4b1482bd60f21521ba08b497c5289770",
 "gemv__omp_8c.html",
-"kokoro__shape__bounds_8c.html",
-"optimizer__kernels_8c.html#aee22d3d7aa1487e535d06671dd921d8d",
-"rope__kernels_8c.html#a0384ecc7d877033fb902b9906e7ff00a",
-"structCKBumpHeaderV5.html#a386daca855110634a91f576358285725",
-"structCKLayerForwardParamsQ4K.html#a00e5d63076d9e3306bb3b189a47b1e14",
-"structCKModel.html#a1bc7df42afc06c33d2be8474cf75942b",
-"structCPUInfo.html#a2e9b76fe6d69b6a1b6c194cd4ca35d86",
-"structck__audio__conv1d__job.html",
-"tokenizer_8h.html#acd0ec47154bf6f8b901e60a7d3cb8d58",
-"v6_85_2test__generated_2ck-kernel-inference_8c.html#a2e2fb61b2ebf43787122c2da6123000c",
-"v6_85_2test__generated_2qwen2__int8_8c.html#a606a63ce7973b73a0a5ccad95e710bd0",
-"v6_86_2test__generated_2ck-kernel-inference_8c.html#ab7ced70f12249b755683167f3b0c90ae",
-"v6_86_2test__generated_2qwen2__int8_8c.html#ac90cd859393f39e428cce865ec2188dc"
+"indexed__sum__rows__checked_8c.html#a3030c4b39e273d50e1affc2ca54c73da",
+"optimizer__kernels_8c.html#ac43e9094fbc4956d450b5f6deb5ae899",
+"rmsnorm__qkv_8c.html#ace29bafba9f9aac796d14e6670fed9b9",
+"structCKBumpHeaderV5.html#a2a92218149c8c8944fc3ed09a19b31a5",
+"structCKLayerForwardParams.html#af592e985b232ee6a07522504bff59ff8",
+"structCKModel.html#a139ab3cacb7c652d47bf8fcb0f2d4826",
+"structCPUInfo.html#a1f7fa60b1c2d20e0eb7bc2f780461ebb",
+"structblock__q8__K.html#abb47e300e16fb14224979b2538edb966",
+"tokenizer_8h.html#ab3c4ccc15a8a6a14e785265d58ca3a91",
+"v6_85_2test__generated_2ck-kernel-inference_8c.html#a1792d3312cd268722109e47e70cb82c0",
+"v6_85_2test__generated_2qwen2__int8_8c.html#a56a1e6ed9c95375f32c056ef84069326",
+"v6_86_2test__generated_2ck-kernel-inference_8c.html#aa9166f047b7ada2d386eac689ef31419",
+"v6_86_2test__generated_2qwen2__int8_8c.html#ac07272621e6537d40ee3589dfb184e3c"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronisation';

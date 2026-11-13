@@ -90,6 +90,7 @@ var dir_40856f0cdd4bcafd28810d9265a200f7 =
     [ "gemv_omp.c", "gemv__omp_8c.html", "gemv__omp_8c" ],
     [ "gemv_omp.h", "gemv__omp_8h.html", "gemv__omp_8h" ],
     [ "ggml_runtime_compat.h", "ggml__runtime__compat_8h.html", "ggml__runtime__compat_8h" ],
+    [ "grouped_cross_entropy.c", "grouped__cross__entropy_8c.html", "grouped__cross__entropy_8c" ],
     [ "grouped_weighted_rows.c", "grouped__weighted__rows_8c.html", "grouped__weighted__rows_8c" ],
     [ "head_backward.c", "head__backward_8c.html", "head__backward_8c" ],
     [ "head_backward_bf16.c", "head__backward__bf16_8c.html", "head__backward__bf16_8c" ],
