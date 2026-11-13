@@ -378,22 +378,23 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">   26</span><span class="comment">     * the process floating-point rounding mode. */</span></div>
 <div class="line"><span class="lineno">   27</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> lower = floorf(scaled);</div>
 <div class="line"><span class="lineno">   28</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> fraction = scaled - lower;</div>
-<div class="line"><span class="lineno">   29</span>    <span class="keywordtype">float</span> rounded = lower;</div>
+<div class="line"><span class="lineno">   29</span>    <span class="keywordtype">float</span> <a class="code hl_function" href="projection__bf16__train_8c.html#afcffd05a471aca5803c90dbe134ae5ca">rounded</a> = lower;</div>
 <div class="line"><span class="lineno">   30</span>    <span class="keywordflow">if</span> (fraction &gt; 0.5f ||</div>
 <div class="line"><span class="lineno">   31</span>        (fraction == 0.5f &amp;&amp; fmodf(lower, 2.0f) != 0.0f))</div>
-<div class="line"><span class="lineno">   32</span>        rounded += 1.0f;</div>
-<div class="line"><span class="lineno">   33</span>    <span class="keywordflow">if</span> (rounded &lt; 1.0f) rounded = 1.0f;</div>
+<div class="line"><span class="lineno">   32</span>        <a class="code hl_function" href="projection__bf16__train_8c.html#afcffd05a471aca5803c90dbe134ae5ca">rounded</a> += 1.0f;</div>
+<div class="line"><span class="lineno">   33</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="projection__bf16__train_8c.html#afcffd05a471aca5803c90dbe134ae5ca">rounded</a> &lt; 1.0f) <a class="code hl_function" href="projection__bf16__train_8c.html#afcffd05a471aca5803c90dbe134ae5ca">rounded</a> = 1.0f;</div>
 <div class="line"><span class="lineno">   34</span>    <span class="comment">/* rounded is below 2^31, so the integer conversion is exact and safe.</span></div>
 <div class="line"><span class="lineno">   35</span><span class="comment">     * Compare integers: converting a large limit to float can round it up. */</span></div>
-<div class="line"><span class="lineno">   36</span>    <span class="keyword">const</span> int32_t candidate = (int32_t)rounded;</div>
+<div class="line"><span class="lineno">   36</span>    <span class="keyword">const</span> int32_t candidate = (int32_t)<a class="code hl_function" href="projection__bf16__train_8c.html#afcffd05a471aca5803c90dbe134ae5ca">rounded</a>;</div>
 <div class="line"><span class="lineno">   37</span>    <span class="keywordflow">if</span> ((<span class="keywordtype">size_t</span>)candidate &gt; max_duration_per_token)</div>
 <div class="line"><span class="lineno">   38</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__tts_8h.html#ac33d7dced18028940945c35c42dadf91a6a53055c5ccb0c65933840f461664959">CK_AUDIO_EXTENT_LIMIT</a>;</div>
 <div class="line"><span class="lineno">   39</span>    *frames = candidate;</div>
 <div class="line"><span class="lineno">   40</span>    <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="ckernel__tts_8h.html#ac33d7dced18028940945c35c42dadf91ace4d803def1b18836a5cbd7fbd659af1">CK_AUDIO_EXTENT_OK</a>;</div>
 <div class="line"><span class="lineno">   41</span>}</div>
 <div class="ttc" id="aaudio__duration__logits_8c_html_afd2264a11bfc666e3b483a174c7dfe44"><div class="ttname"><a href="audio__duration__logits_8c.html#afd2264a11bfc666e3b483a174c7dfe44">sigmoid_f32</a></div><div class="ttdeci">static float sigmoid_f32(float x)</div><div class="ttdef"><b>Definition</b> <a href="audio__duration__logits_8c_source.html#l00007">audio_duration_logits.c:7</a></div></div>
+<div class="ttc" id="aprojection__bf16__train_8c_html_afcffd05a471aca5803c90dbe134ae5ca"><div class="ttname"><a href="projection__bf16__train_8c.html#afcffd05a471aca5803c90dbe134ae5ca">rounded</a></div><div class="ttdeci">static float rounded(float x)</div><div class="ttdef"><b>Definition</b> <a href="projection__bf16__train_8c_source.html#l00022">projection_bf16_train.c:22</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="ckernel__tts_8h_source.html#l00042">CK_AUDIO_EXTENT_INVALID</a>, <a class="el" href="ckernel__tts_8h_source.html#l00043">CK_AUDIO_EXTENT_LIMIT</a>, <a class="el" href="ckernel__tts_8h_source.html#l00041">CK_AUDIO_EXTENT_OK</a>, and <a class="el" href="audio__duration__logits_8c_source.html#l00007">sigmoid_f32()</a>.</p>
+<p class="reference">References <a class="el" href="ckernel__tts_8h_source.html#l00042">CK_AUDIO_EXTENT_INVALID</a>, <a class="el" href="ckernel__tts_8h_source.html#l00043">CK_AUDIO_EXTENT_LIMIT</a>, <a class="el" href="ckernel__tts_8h_source.html#l00041">CK_AUDIO_EXTENT_OK</a>, <a class="el" href="projection__bf16__train_8c_source.html#l00022">rounded()</a>, and <a class="el" href="audio__duration__logits_8c_source.html#l00007">sigmoid_f32()</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="alignment__attention__dtw__f32_8c_source.html#l00032">alignment_attention_dtw_f32()</a>, and <a class="el" href="audio__duration__logits_8c_source.html#l00043">audio_duration_logits_to_frames_f32()</a>.</p>
 

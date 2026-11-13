@@ -1036,18 +1036,54 @@
 
 <p>Model topology lives in the circuit builders here. Kernels implement arithmetic; maps describe ABI, scratch and numerical contracts. Generic operation catalogue entries do not inspect the model name.</p>
 
+<section id="bf16-projection-training">
+<h2>Bounded BF16 projection training with FP32 masters</h2>
+<p><strong>One mixed-storage projection graph is certified; complete BF16 Clef training remains unsupported.</strong>
+The authoring helper <code>version/v8/training/bf16_projection.py</code> replaces an explicit biasless projection
+with a map-declared provider. Ordinary backward synthesis creates the VJP and accumulation edges; the existing
+generated trainer performs all forward, backward and AdamW arithmetic. There is no model-name compiler branch.</p>
+<p>The precision policy is explicit: FP32 inputs and master weights are rounded at each forward projection boundary to
+BF16 using round-to-nearest, ties-to-even. Those saved compute operands occupy typed <code>uint16_t</code> buffers.
+The provider computes ascending-index FP32 products and sums without FMA contraction and publishes FP32 output.
+Backward consumes FP32 output gradients and the saved BF16 operands, producing FP32 input and master-weight
+gradients. Operand rounding uses a declared identity derivative; this is not the derivative of a discontinuous
+quantizer, nor a claim of equivalence to default PyTorch autocast. The independent reference uses explicit BF16
+rounding and FP32 matmul/autograd with the same chosen VJP. It does not call the CKE kernels.</p>
+<p>Master weights, gradient accumulation and AdamW moments remain FP32. Frozen projections still propagate
+activation gradients, but have no parameter-gradient publication or optimizer state. Compute operands refresh
+on every forward call after updates or checkpoint restore; derived caches are not checkpoint payloads.
+The runtime admits BF16 only for nonpersistent, nondifferentiable auxiliary tensors with a typed forward producer
+and typed map consumers. BF16 model weights, BF16 gradient buffers and a global BF16 training configuration still
+fail explicitly. Layout byte extents and pointer types are checked; canaries reserve whole 32-bit words around
+packed caches, with direct kernel tests checking the exact 16-bit tail.</p>
+<table class="table"><thead><tr><th>Generated experiment</th><th>Evidence</th></tr></thead><tbody>
+<tr><td>4-channel projection and frozen bridge</td><td>40 native updates: loss 1.42442214 to 0.03998315.</td></tr>
+<tr><td>5-to-7 projection, frozen 7-channel bridge</td><td>40 native updates: loss 1.37150788 to 0.00395414; odd BF16 cache extents.</td></tr>
+<tr><td>Independent trajectory comparisons</td><td>Worst absolute gradient error 5.41e-8, master-weight error 9.54e-7, moment error 2.43e-8 (PyTorch 2.12.1 CPU, seed 837).</td></tr>
+<tr><td>State</td><td>Byte-unchanged frozen weights, exact same-process and fresh-process checkpoint continuation, trained-weight forward reload.</td></tr>
+<tr><td>Primitive contracts</td><td>Rectangular/tail shapes, O0/O3 equality, FP32 dX/dW oracle, nonfinite and finite-overflow rejection, null/alignment/overlap/capacity rejection, unchanged published outputs and recovery.</td></tr>
+</tbody></table>
+<pre><code>make build/libckernel_engine.so
+python -m unittest tests.test_projection_bf16_train_kernel tests.test_v8_bf16_projection_training -v
+python scripts/nightly_runner.py --tests training_projection_bf16 training_selective_parameters --ci --require-executed</code></pre>
+<p>Missing PyTorch or the built native engine reports SKIP, not parity PASS. This scalar implementation establishes
+semantics, not acceleration or an end-to-end memory reduction. It retains FP32 external activations in addition to
+BF16 saved compute operands. Full-head mixed precision, BF16 normalization/attention policies, public training-job
+admission, LoRA and quantized-base training remain separate gates. Next: compose this explicit projection policy
+into the small complete head while keeping its other operations FP32, then repeat released-head certification.</p>
+</section>
+
 <section id="bf16-training-admission">
-<h2>BF16 training prerequisites: storage admission now fails closed</h2>
-<p><strong>Complete BF16 head training remains unsupported.</strong> Released-head FP32 training
-passes, but the shared training runtime still hydrates, snapshots and optimizes floating tensors as
-FP32. The planner recognizing a two-byte BF16 dtype does not establish a typed runtime ABI.</p>
+<h2>Initial BF16 audit and remaining full-head prerequisites</h2>
+<p><strong>Complete BF16 head training remains unsupported.</strong> The initial audit found that the trainer represented all floating tensors as FP32. The bounded projection implementation above adds typed BF16 saved operands while retaining FP32 master hydration, snapshots and updates. The planner recognizing a two-byte BF16 dtype does not establish a typed runtime ABI.</p>
 <p>A controlled pre-fix reproduction supplied an FP32 layout and marked a trainable weight BF16.
 Codegen emitted a <code>float*</code> buffer, reported no skipped operations, and silently omitted the
 weight from <code>parameter_gradient_order</code> and optimizer updates. Storage admission now rejects
 unsupported tensor and reference dtypes before C emission. It also rejects inconsistent declarations,
 integer weights/gradients, and configurations claiming BF16 with FP32 tensors. The FP32 head author
 requires explicit FP32 arrays instead of interpreting packed uint16 weights as numeric FP32 values.</p>
-<table class="table"><thead><tr><th>Boundary</th><th>Existing evidence</th><th>Missing BF16 composition contract</th></tr></thead><tbody>
+<p>The following table records the initial audit; the projection milestone above resolves its bounded typed-cache case, not every full-head precision boundary.</p>
+<table class="table"><thead><tr><th>Boundary</th><th>Existing evidence at audit</th><th>BF16 composition gap identified</th></tr></thead><tbody>
 <tr><td>Generated training ABI</td><td>FP32 buffers and INT32 metadata; FP32 updates and snapshots.</td><td>Typed BF16 buffers, byte extents, initialization, saved tensors and checkpoint/export representation. See <code>version/v7/scripts/codegen_train_runtime_v7.py</code>.</td></tr>
 <tr><td>Gradient synthesis</td><td>Existing backward lowering constructs FP32 gradient and temporary tensors.</td><td>Explicit gradient precision and conversion edges; no inferred casts from component names.</td></tr>
 <tr><td>Span mean, exact-erf GELU, grouped pooling</td><td>Checked BF16-storage VJPs in <code>src/kernels/head_backward_bf16.c</code>, three maps and independent leaf tests.</td><td>The maps lack generated-training contracts. These variants consume and publish BF16 gradients; they cannot silently stand in for FP32-gradient variants.</td></tr>
@@ -1055,7 +1091,7 @@ requires explicit FP32 arrays instead of interpreting packed uint16 weights as n
 <tr><td>Noncausal attention and decision branches</td><td>FP32 generated-head derivatives; BF16 inference attention providers.</td><td>Compatible BF16 training forward/backward, indexed/scalar branches and branch-gradient accumulation with explicit rounding points.</td></tr>
 <tr><td>Optimizer</td><td><code>adamw_update_bf16</code> exists with BF16 weights/gradients and FP32 moments.</td><td>It is not the proposed FP32-master-weight recipe. Declare master/compute weight ownership and refresh boundaries before connecting updates.</td></tr>
 </tbody></table>
-<p><strong>Next implementation sequence:</strong> first prove typed storage and explicit conversion
+<p><strong>Original implementation sequence (first step now demonstrated above):</strong> first prove typed storage and explicit conversion
 edges on one generic projection. The initial mixed-precision target uses BF16 projection operands,
 FP32 normalization/softmax/loss/scoring, FP32 master parameters, FP32 parameter-gradient accumulation
 and FP32 AdamW moments. Each provider retains its declared accumulation order; BF16 storage alone
@@ -1064,7 +1100,7 @@ operations against PyTorch; do not assume equivalence to arbitrary autocast sett
 normalization, noncausal attention, pooling and scoring through the same graph. Certify the small complete
 head before repeating released-size tests. Existing BF16-gradient providers remain separately named
 variants rather than being silently repurposed.</p>
-<p>This step fixes unsafe dtype admission and defines the missing boundaries; it does not claim a
+<p>The initial admission-only change fixed unsafe dtype handling and defined the missing boundaries; it does not claim a
 BF16 speedup, memory reduction, generated BF16 update or complete BF16 head PASS.</p>
 <pre><code>python3 -m unittest tests.test_v8_training_storage_contract -v
 python3 scripts/nightly_runner.py --tests training_selective_parameters \

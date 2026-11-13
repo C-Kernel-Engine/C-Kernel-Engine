@@ -599,8 +599,8 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno">  168</span>            __m512i lsb = _mm512_srli_epi32(as_int, 16);</div>
 <div class="line"><span class="lineno">  169</span>            lsb = _mm512_and_si512(lsb, _mm512_set1_epi32(1));</div>
 <div class="line"><span class="lineno">  170</span>            __m512i rounding = _mm512_add_epi32(_mm512_set1_epi32(0x7FFF), lsb);</div>
-<div class="line"><span class="lineno">  171</span>            __m512i rounded = _mm512_add_epi32(as_int, rounding);</div>
-<div class="line"><span class="lineno">  172</span>            __m512i shifted = _mm512_srli_epi32(rounded, 16);</div>
+<div class="line"><span class="lineno">  171</span>            __m512i <a class="code hl_function" href="projection__bf16__train_8c.html#afcffd05a471aca5803c90dbe134ae5ca">rounded</a> = _mm512_add_epi32(as_int, rounding);</div>
+<div class="line"><span class="lineno">  172</span>            __m512i shifted = _mm512_srli_epi32(<a class="code hl_function" href="projection__bf16__train_8c.html#afcffd05a471aca5803c90dbe134ae5ca">rounded</a>, 16);</div>
 <div class="line"><span class="lineno">  173</span>            __m256i bf16 = _mm512_cvtepi32_epi16(shifted);</div>
 <div class="line"><span class="lineno">  174</span>            _mm256_storeu_si256((__m256i *)(dst + j), bf16);</div>
 <div class="line"><span class="lineno">  175</span>        }</div>
@@ -620,8 +620,9 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="ttc" id="abf16__utils_8h_html_a174b16a92b3a5972230d7519fc0c5aa3"><div class="ttname"><a href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a></div><div class="ttdeci">static uint16_t float_to_bf16(float f)</div><div class="ttdef"><b>Definition</b> <a href="bf16__utils_8h_source.html#l00090">bf16_utils.h:90</a></div></div>
 <div class="ttc" id="amlp__kernels__bf16_8c_html_a27c361a6bca1a4eb302dcecfc2d4b53c"><div class="ttname"><a href="mlp__kernels__bf16_8c.html#a27c361a6bca1a4eb302dcecfc2d4b53c">gelu_scalar</a></div><div class="ttdeci">static float gelu_scalar(float x)</div><div class="ttdef"><b>Definition</b> <a href="mlp__kernels__bf16_8c_source.html#l00045">mlp_kernels_bf16.c:45</a></div></div>
 <div class="ttc" id="amlp__kernels__bf16_8c_html_a8647bb8c6a9a965a92e1c98330f237af"><div class="ttname"><a href="mlp__kernels__bf16_8c.html#a8647bb8c6a9a965a92e1c98330f237af">gemm_bf16_fp32out</a></div><div class="ttdeci">void gemm_bf16_fp32out(const uint16_t *A, const uint16_t *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__bf16_8c_source.html#l00460">gemm_kernels_bf16.c:460</a></div></div>
+<div class="ttc" id="aprojection__bf16__train_8c_html_afcffd05a471aca5803c90dbe134ae5ca"><div class="ttname"><a href="projection__bf16__train_8c.html#afcffd05a471aca5803c90dbe134ae5ca">rounded</a></div><div class="ttdeci">static float rounded(float x)</div><div class="ttdef"><b>Definition</b> <a href="projection__bf16__train_8c_source.html#l00022">projection_bf16_train.c:22</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>, <a class="el" href="mlp__kernels__bf16_8c_source.html#l00045">gelu_scalar()</a>, and <a class="el" href="gemm__kernels__bf16_8c_source.html#l00460">gemm_bf16_fp32out()</a>.</p>
+<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>, <a class="el" href="mlp__kernels__bf16_8c_source.html#l00045">gelu_scalar()</a>, <a class="el" href="gemm__kernels__bf16_8c_source.html#l00460">gemm_bf16_fp32out()</a>, and <a class="el" href="projection__bf16__train_8c_source.html#l00022">rounded()</a>.</p>
 
 </div>
 </div>

@@ -1,5 +1,13 @@
 var NAVTREEINDEX26 =
 {
+"utf8_8h.html#acdd7aadd749d392abf4f96fe2c7078fa":[2,0,0,1,5,15],
+"utf8_8h.html#ace6fecfad97993bf1c681b881d01d54a":[2,0,0,1,5,21],
+"utf8_8h.html#acfef0231a8fb6bec54209132abf5e1d8":[2,0,0,1,5,4],
+"utf8_8h.html#ade29e8d0ad88f162e8d7ef74f65fdfc3":[2,0,0,1,5,12],
+"utf8_8h.html#aeb6bddc912498b587d42f1c4aec05c51":[2,0,0,1,5,7],
+"utf8_8h.html#af5dce8a668bfa95ea87f252ed0731e5f":[2,0,0,1,5,2],
+"utf8_8h.html#af9a7083888b25eb10b5233e287ac674a":[2,0,0,1,5,10],
+"utf8_8h_source.html":[2,0,0,1,5],
 "v2__legacy_2ck__tokenizer__v2_8c.html":[2,0,1,4,0],
 "v2__legacy_2ck__tokenizer__v2_8c.html#a4de5533c0e1c9f89bfb77bee05cf97fd":[2,0,1,4,0,0],
 "v2__legacy_2ck__tokenizer__v2_8c.html#a6f11f138126f83f02adef65dc6ceef4b":[2,0,1,4,0,1],
@@ -241,13 +249,5 @@ var NAVTREEINDEX26 =
 "v6_85_2test__generated_2int8__q4k__test_8c.html#af8f0fc56f0f14b7d4568f3b94997d062":[2,0,1,7,0,3,40],
 "v6_85_2test__generated_2int8__q4k__test_8c.html#afa7ed236a766adfaeeffa865ab2cfdc1":[2,0,1,7,0,3,54],
 "v6_85_2test__generated_2int8__q4k__test_8c.html#afd072f83e4f14e9c324bb41500746beb":[2,0,1,7,0,3,48],
-"v6_85_2test__generated_2int8__q4k__test_8c.html#afd4a0ad91d058028c6438774b207fd4a":[2,0,1,7,0,3,53],
-"v6_85_2test__generated_2int8__q4k__test_8c_source.html":[2,0,1,7,0,3],
-"v6_85_2test__generated_2qwen2__int8_8c.html":[2,0,1,7,0,4],
-"v6_85_2test__generated_2qwen2__int8_8c.html#a0015fda5f11a03c15f3e6a550764b9bb":[2,0,1,7,0,4,36],
-"v6_85_2test__generated_2qwen2__int8_8c.html#a034cdc8377df0f98e07d145a070719a9":[2,0,1,7,0,4,50],
-"v6_85_2test__generated_2qwen2__int8_8c.html#a039257c70cad72866b0746bbb4f1c350":[2,0,1,7,0,4,40],
-"v6_85_2test__generated_2qwen2__int8_8c.html#a04b2f4fbbf4b58951807d9abc141ffd8":[2,0,1,7,0,4,62],
-"v6_85_2test__generated_2qwen2__int8_8c.html#a0510fee3ff5d11afcae9436c01636ebc":[2,0,1,7,0,4,51],
-"v6_85_2test__generated_2qwen2__int8_8c.html#a0cfd0d104b622b5158f9add5c66330c8":[2,0,1,7,0,4,35]
+"v6_85_2test__generated_2int8__q4k__test_8c.html#afd4a0ad91d058028c6438774b207fd4a":[2,0,1,7,0,3,53]
 };

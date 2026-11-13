@@ -115,6 +115,7 @@ var dir_40856f0cdd4bcafd28810d9265a200f7 =
     [ "mlp_kernels_bf16.c", "mlp__kernels__bf16_8c.html", "mlp__kernels__bf16_8c" ],
     [ "optimizer_kernels.c", "optimizer__kernels_8c.html", "optimizer__kernels_8c" ],
     [ "optimizer_kernels_bf16.c", "optimizer__kernels__bf16_8c.html", "optimizer__kernels__bf16_8c" ],
+    [ "projection_bf16_train.c", "projection__bf16__train_8c.html", "projection__bf16__train_8c" ],
     [ "qk_norm_kernels.c", "qk__norm__kernels_8c.html", "qk__norm__kernels_8c" ],
     [ "quantize_row_q8_k_avx.c", "quantize__row__q8__k__avx_8c.html", "quantize__row__q8__k__avx_8c" ],
     [ "quantize_row_q8_k_avx2.c", "quantize__row__q8__k__avx2_8c.html", "quantize__row__q8__k__avx2_8c" ],
