@@ -5988,6 +5988,84 @@
       },
       "position_transform": null,
       "description": "Primary output and output gradient are FP32; named saved_input and saved_weight ports are BF16. RNE BF16 saved operands; FP32 outputs and gradients. Identity derivative of operand rounding; VJP evaluated at rounded operands. Not default torch.autocast. Independent PyTorch FP32 matmul on explicit BF16-rounded operands; custom autograd identity rounding VJP."
+    },
+    "projection_bf16_train_bias_forward_rne_ordered_fp32_v1": {
+      "operator_family": "gemm",
+      "status": "validated",
+      "storage": {
+        "input": "fp32",
+        "weight": "fp32",
+        "output": "fp32"
+      },
+      "compute": {
+        "input": "fp32",
+        "weight": "fp32",
+        "accumulator": "fp32",
+        "contraction": "disabled",
+        "evaluation_order": "ascending_contracted_index_separate_multiply_add"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": [
+          "input_load",
+          "weighted_product",
+          "reduction_update",
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "sum",
+        "order": "ascending_index",
+        "partial_accumulator": "fp32",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "serial",
+        "split_strategy": "serial",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Primary output and output gradient are FP32; named saved_input and saved_weight ports are BF16. RNE BF16 saved operands; FP32 outputs and gradients. Identity derivative of operand rounding; VJP evaluated at rounded operands. Not default torch.autocast. Independent PyTorch FP32 matmul on explicit BF16-rounded operands; custom autograd identity rounding VJP. FP32 bias added after the ordered dot; bias VJP sums rows in ascending FP32 order."
+    },
+    "projection_bf16_train_bias_backward_rne_ordered_fp32_v1": {
+      "operator_family": "gemm",
+      "status": "validated",
+      "storage": {
+        "input": "fp32",
+        "weight": "bf16",
+        "output": "fp32"
+      },
+      "compute": {
+        "input": "fp32",
+        "weight": "fp32",
+        "accumulator": "fp32",
+        "contraction": "disabled",
+        "evaluation_order": "ascending_contracted_index_separate_multiply_add"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": [
+          "input_load",
+          "weighted_product",
+          "reduction_update",
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "sum",
+        "order": "ascending_index",
+        "partial_accumulator": "fp32",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "serial",
+        "split_strategy": "serial",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Primary output and output gradient are FP32; named saved_input and saved_weight ports are BF16. RNE BF16 saved operands; FP32 outputs and gradients. Identity derivative of operand rounding; VJP evaluated at rounded operands. Not default torch.autocast. Independent PyTorch FP32 matmul on explicit BF16-rounded operands; custom autograd identity rounding VJP. FP32 bias added after the ordered dot; bias VJP sums rows in ascending FP32 order."
     }
   }
 }

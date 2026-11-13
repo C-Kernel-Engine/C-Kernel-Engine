@@ -8,10 +8,87 @@
 
 <p>Model topology lives in the circuit builders here. Kernels implement arithmetic; maps describe ABI, scratch and numerical contracts. Generic operation catalogue entries do not inspect the model name.</p>
 
+<section id="same-state-pytorch-oracle">
+<h2>Same-state update diagnosis: 39 of 40 comparisons pass</h2>
+<p><code>--same-state</code> copies CKE's pre-step master weights, both AdamW moments and optimizer
+step into PyTorch before each diagnostic comparison. Packed Q/K/V ownership and scalar parameters are
+restored explicitly and checked by byte-exact round trips through the effective-weight mapping.
+No oracle value is copied into CKE. The independent trajectory remains a separate required experiment.</p>
+<p>For the same small complete mixed head, only zero-based update 18 fails unchanged numerical gates.
+Maximum gradient, master-weight and moment errors are 6.748e-4, 2.578e-5 and 6.748e-5. This is still
+<strong>numerical FAIL</strong>, not complete mixed-precision certification. The earlier independent
+update-8 failure disappears when master weights and optimizer state are synchronized.</p>
+<p>The remaining first significant divergence is <code>hidden_norm → memory_projection</code>.
+With identical inputs and normalization parameters, native and PyTorch LayerNorm differ by at most
+2.384e-7. One value is 1.0976563692092896 versus 1.09765625; these round to BF16 values 1.1015625
+versus 1.09375. Replaying the projection on identical operands gives zero output error, dW error
+1.863e-9 and isolated dX error 4.657e-10. The packet retains the LayerNorm operands and the rounding
+witness. This exposes amplification at a precision boundary; it does not justify changing global tolerances.</p>
+<p>Input gradients may contain contributions from multiple branches. The diagnostic now replays the
+selected provider's dX into its own buffers rather than comparing it with the accumulated input gradient.
+A regression deliberately omits the accumulated dX to enforce this distinction.</p>
+<p>CKE's forty native losses, final master-weight hash and final optimizer-state hash are identical in
+same-state and independent runs. Checkpoint/restart remains exact. The report labels same-state comparison
+explicitly and marks independent trajectory parity NOT_TESTED in that report; the separate independent
+run remains FAIL. Production kernels, maps and compiler behavior are unchanged by this diagnostic.</p>
+<pre><code>python tests/run_clef_training_oracle.py --mixed --same-state \
+  --report /tmp/clef-oracle/same-state.json
+# Keep the independent run alongside it; both currently exit 1.
+python tests/run_clef_training_oracle.py --mixed \
+  --report /tmp/clef-oracle/independent.json</code></pre>
+<p>Evidence: <code>docs/notes/clef_same_state_oracle_20261113.json</code>. Next: evaluate the declared
+LayerNorm-to-BF16 precision boundary and a justified mixed-precision acceptance policy, preserving the
+independent FP32 and mixed trajectory checks. Do not force backend rounding history merely to obtain PASS.</p>
+</section>
+
+<section id="complete-head-pytorch-oracle">
+<h2>Complete-head PyTorch comparison: FP32 passes; mixed trajectory fails</h2>
+<p>The complete small topology now runs forty independent native/PyTorch AdamW updates with
+RNE BF16 projection operands and FP32 masters, bias, gradients, optimizer state and remaining operations.
+Biased projections use explicit generic forward/backward maps. Backward synthesis still owns the derivative
+graph; there is no Clef-specific compiler dispatch or Python update of CKE weights.</p>
+<p><strong>This is diagnostic mixed-precision training, not mixed-precision certification.</strong>
+The pinned reference owns the head topology; a test-only PyTorch autograd adapter declares the projection
+precision and identity-rounding VJP. This is not default autocast. Inputs are identical synthetic frozen
+backbone features, with two questions and unequal option counts. It is not complete backbone training.</p>
+<table class="table"><thead><tr><th>Comparison</th><th>Measured result</th></tr></thead><tbody>
+<tr><td>FP32 complete small head, 40 updates</td><td>PASS; loss 0.28329045 to 0.06633431; maximum gradient error 1.375e-6.</td></tr>
+<tr><td>Released FP32 head, 4 updates</td><td>PASS; pinned weights, synthetic frozen features; loss 0.59229440 to 0.13316446.</td></tr>
+<tr><td>Mixed small-head trajectory, 40 updates</td><td>FAIL under unchanged bounds; native loss 0.28323126 to 0.06657010. Maximum gradient, weight and moment errors: 0.0328365, 0.00121975 and 0.00366078.</td></tr>
+<tr><td>Mixed same/fresh-process resume</td><td>PASS, exact continuation. Separate generated mixed inference export: NOT_TESTED.</td></tr>
+</tbody></table>
+<p>At zero-based update 8, the first significant projection divergence is
+<code>fields0_cross_out</code>. Weight [7,2] is 0.0720214918255806 in CKE and
+0.07202146202325821 in PyTorch. Those nearby FP32 values round to different BF16 values:
+0.072265625 and 0.07177734375. Replaying the CKE operands in PyTorch yields zero output,
+weight-gradient and bias-gradient differences at this boundary; input-gradient error is 1.164e-10.
+This identifies a rounding-boundary amplification of prior master-weight drift, not a demonstrated local
+projection derivative defect. It does not establish that all later discrepancies are acceptable.</p>
+<p>The oracle runner compares raw option logits, loss, every parameter gradient, weights and optimizer
+moments throughout the trajectory. It retains per-parameter RMS/magnitude metrics, failed gates,
+artifact hashes and a first-divergence replay packet. Numerical FAIL exits 1; missing assets exit 2.
+Execution, loss reduction and exact resume cannot override numerical FAIL. Existing bounds are unchanged.</p>
+<pre><code>make build/libckernel_engine.so
+export CKE_CLEF_FLASH_REFERENCE_SOURCE=/path/to/pinned/joint_schema_model.py
+python tests/run_clef_training_oracle.py --report /tmp/clef-oracle/fp32.json
+CKE_CLEF_FLASH_HEAD_PATH=/path/to/pinned/joint_head.safetensors \
+  python tests/run_clef_training_oracle.py --released --report /tmp/clef-oracle/released.json
+# Expected exit 1: complete diagnostic comparison, known numerical FAIL.
+python tests/run_clef_training_oracle.py --mixed --report /tmp/clef-oracle/mixed.json
+python -m unittest tests.test_v8_clef_mixed_training -v</code></pre>
+<p>Recorded measurements and artifact identities: <code>docs/notes/clef_full_training_oracle_20261113.json</code>
+(Intel Core i7-14700T, CPU PyTorch 2.12.1; no Spark/GPU or performance comparison).</p>
+<p>Standard nightly adds biased-provider rejection/autograd, full-topology backward-generation and
+report-verdict regressions to the existing projection suite. That suite does not certify the failing mixed
+trajectory. Next: distinguish local same-state update accuracy from independent BF16 trajectories before
+proposing any mixed-precision acceptance policy. Released mixed training, mixed inference export, LoRA,
+quantized training, hardware speed and generalization remain unproven.</p>
+</section>
+
 <section id="bf16-projection-training">
 <h2>Bounded BF16 projection training with FP32 masters</h2>
 <p><strong>One mixed-storage projection graph is certified; complete BF16 Clef training remains unsupported.</strong>
-The authoring helper <code>version/v8/training/bf16_projection.py</code> replaces an explicit biasless projection
+The authoring helper <code>version/v8/training/bf16_projection.py</code> replaces an explicitly selected projection
 with a map-declared provider. Ordinary backward synthesis creates the VJP and accumulation edges; the existing
 generated trainer performs all forward, backward and AdamW arithmetic. There is no model-name compiler branch.</p>
 <p>The precision policy is explicit: FP32 inputs and master weights are rounded at each forward projection boundary to
@@ -41,8 +118,8 @@ python scripts/nightly_runner.py --tests training_projection_bf16 training_selec
 <p>Missing PyTorch or the built native engine reports SKIP, not parity PASS. This scalar implementation establishes
 semantics, not acceleration or an end-to-end memory reduction. It retains FP32 external activations in addition to
 BF16 saved compute operands. Full-head mixed precision, BF16 normalization/attention policies, public training-job
-admission, LoRA and quantized-base training remain separate gates. Next: compose this explicit projection policy
-into the small complete head while keeping its other operations FP32, then repeat released-head certification.</p>
+admission, LoRA and quantized-base training remain separate gates. The complete small-head diagnostic above
+now composes this policy but fails independent trajectory parity; released mixed-head certification remains pending.</p>
 </section>
 
 <section id="bf16-training-admission">

@@ -1,0 +1,132 @@
+{
+  "comparison_mode": "same_state_one_step",
+  "dataset_sha256": "28dcc6af91e658a70de09e1eb343821c03f38ea1ef9410c79cbe7c1d904d0b53",
+  "dtype": "mixed_projection_bf16_fp32_master",
+  "engine_sha256": "5ef4982a37942c9772de32022076be928043b39ff1b0e90a69b8112bfe03ecde",
+  "failed_steps": [
+    18
+  ],
+  "final_optimizer_state_sha256": "22e97a5d5e09b82595f847c205bcef12fdd6e0d7bdcffdb49c1a3eef4bb63c1c",
+  "final_weights_sha256": "bc1e2e49a05ab0672fef0d19b9a8d074340f8449fabfa79ed56ecd7ab707a1c3",
+  "first_divergence": {
+    "packet": {
+      "path": "/tmp/clef-oracle-20261113/same-state/first_projection_divergence.npz",
+      "sha256": "9d747f9da1916d6fe02f0ca7cddfcfa73a88743885764ee2e7f1a58f029b608c"
+    },
+    "projections": [
+      {
+        "d_input_evidence": "isolated provider replay, not accumulated generated gradient",
+        "first_rounded_input_difference": {
+          "actual": 1.0976563692092896,
+          "index": [
+            0,
+            2
+          ],
+          "reference": 1.09765625,
+          "rounded_actual": 1.1015625,
+          "rounded_reference": 1.09375
+        },
+        "input_error": 2.384185791015625e-07,
+        "op": "memory_projection",
+        "output_error": 0.002288818359375,
+        "rounded_input_difference": 1,
+        "rounded_weight_difference": 0,
+        "same_input_d_input_error": 4.656612873077393e-10,
+        "same_input_d_weight_error": 1.862645149230957e-09,
+        "same_input_output_error": 0.0,
+        "upstream_layernorm": {
+          "native_to_fp64": 2.384185791015625e-07,
+          "op": "hidden_norm",
+          "same_input_torch_to_captured_reference": 0.0,
+          "torch_to_fp64": 1.1920928955078125e-07
+        },
+        "weight": "memory_projection.weight",
+        "weight_error": 0.0
+      }
+    ],
+    "step": 18
+  },
+  "fresh_process_resume": "PASS",
+  "frozen_feature_provenance": "synthetic; not generated backbone",
+  "full_report_sha256": "18470db6dcb37154c6b7b6c565fa28e080f5231597e4b20a7bf796e49320cc1c",
+  "generated_c_sha256": "a4fdda86d2460d9334d9ade501d7827528fef7e2d6c58926316f30e226eb705b",
+  "generated_inference_export": "NOT_TESTED",
+  "geometry": "small_complete_head",
+  "head_weights_sha256": null,
+  "independent_report_sha256": "349bf7a74c720b105c3a61cd374388d4801d2240237f1d0725bda221e0ec76b0",
+  "independent_trajectory_comparison": {
+    "comparison_mode": "independent_trajectory",
+    "final_optimizer_state_sha256": "22e97a5d5e09b82595f847c205bcef12fdd6e0d7bdcffdb49c1a3eef4bb63c1c",
+    "final_weights_sha256": "bc1e2e49a05ab0672fef0d19b9a8d074340f8449fabfa79ed56ecd7ab707a1c3",
+    "max_abs_errors": {
+      "gradient": 0.03283648565411568,
+      "moment": 0.0036607775837183,
+      "weight": 0.0012197494506835938
+    },
+    "numerical_parity": "FAIL"
+  },
+  "independent_trajectory_parity": "NOT_TESTED",
+  "initial_weights_sha256": "047185feee0b1656350155fb4fe09097e8e0e5c2fd349e5f940789508ef22f3e",
+  "loss_first": 0.283231258392334,
+  "loss_last": 0.06657010316848755,
+  "max_abs_errors": {
+    "gradient": 0.0006747972220182419,
+    "moment": 6.74794428050518e-05,
+    "weight": 2.5779008865356445e-05
+  },
+  "native_trajectory_unchanged_by_diagnostic": true,
+  "numerical_failures": [
+    {
+      "comparison": "loss",
+      "limit": 3e-05,
+      "max_abs": 8.654594421386719e-05,
+      "step": 18
+    },
+    {
+      "atol": 3e-05,
+      "comparison": "option_logits",
+      "max_abs": 0.00037539005279541016,
+      "rtol": 0.0003,
+      "step": 18
+    },
+    {
+      "comparison": "parameter_gradient: residual_scorer.3.weight",
+      "limit": 3e-05,
+      "max_abs": 0.0006747972220182419,
+      "step": 18
+    },
+    {
+      "atol": 3e-06,
+      "comparison": "optimizer_moments",
+      "max_abs": 6.74794428050518e-05,
+      "rtol": 0.0003,
+      "step": 18
+    }
+  ],
+  "numerical_parity": "FAIL",
+  "policy": {
+    "beta1": 0.9,
+    "beta2": 0.999,
+    "epsilon": 0.0001,
+    "gradients": "fp32",
+    "learning_rate": 0.001,
+    "masters": "fp32",
+    "operand_rounding": "rne_bf16",
+    "optimizer": "AdamW",
+    "other_operations": "fp32",
+    "projection_accumulation": "ordered_fp32",
+    "rounding_vjp": "identity",
+    "weight_decay": 0.01
+  },
+  "reference_source_sha256": "0e304cf7c6500e8bb59bef7e2afd2c6373f82596dfb3b57d1aa93c175e2dc3a3",
+  "released_head_training": "NOT_TESTED",
+  "retained_artifacts": "/tmp/clef-oracle-20261113/same-state",
+  "runtime_contract_sha256": "735047e6b25b74885ceba4ef0d0b4f5a0b2dfe3a6c82c31e787da501b39c190b",
+  "same_process_resume": "PASS",
+  "same_state_verified_steps": 40,
+  "schema_version": 1,
+  "seed": 611,
+  "step_count": 40,
+  "torch_version": "2.12.1+cpu",
+  "trainable_parameters": 5596
+}
