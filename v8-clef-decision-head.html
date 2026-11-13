@@ -1036,6 +1036,44 @@
 
 <p>Model topology lives in the circuit builders here. Kernels implement arithmetic; maps describe ABI, scratch and numerical contracts. Generic operation catalogue entries do not inspect the model name.</p>
 
+<section id="bf16-training-admission">
+<h2>BF16 training prerequisites: storage admission now fails closed</h2>
+<p><strong>Complete BF16 head training remains unsupported.</strong> Released-head FP32 training
+passes, but the shared training runtime still hydrates, snapshots and optimizes floating tensors as
+FP32. The planner recognizing a two-byte BF16 dtype does not establish a typed runtime ABI.</p>
+<p>A controlled pre-fix reproduction supplied an FP32 layout and marked a trainable weight BF16.
+Codegen emitted a <code>float*</code> buffer, reported no skipped operations, and silently omitted the
+weight from <code>parameter_gradient_order</code> and optimizer updates. Storage admission now rejects
+unsupported tensor and reference dtypes before C emission. It also rejects inconsistent declarations,
+integer weights/gradients, and configurations claiming BF16 with FP32 tensors. The FP32 head author
+requires explicit FP32 arrays instead of interpreting packed uint16 weights as numeric FP32 values.</p>
+<table class="table"><thead><tr><th>Boundary</th><th>Existing evidence</th><th>Missing BF16 composition contract</th></tr></thead><tbody>
+<tr><td>Generated training ABI</td><td>FP32 buffers and INT32 metadata; FP32 updates and snapshots.</td><td>Typed BF16 buffers, byte extents, initialization, saved tensors and checkpoint/export representation. See <code>version/v7/scripts/codegen_train_runtime_v7.py</code>.</td></tr>
+<tr><td>Gradient synthesis</td><td>Existing backward lowering constructs FP32 gradient and temporary tensors.</td><td>Explicit gradient precision and conversion edges; no inferred casts from component names.</td></tr>
+<tr><td>Span mean, exact-erf GELU, grouped pooling</td><td>Checked BF16-storage VJPs in <code>src/kernels/head_backward_bf16.c</code>, three maps and independent leaf tests.</td><td>The maps lack generated-training contracts. These variants consume and publish BF16 gradients; they cannot silently stand in for FP32-gradient variants.</td></tr>
+<tr><td>Normalization and projection</td><td>BF16 LayerNorm and mixed MLP backward implementations exist in <code>layernorm_kernels_bf16.c</code> and <code>mlp_kernels_bf16.c</code>.</td><td>Map/ABI/scratch and cache contracts for the actual head shapes. The fused MLP uses a tanh GELU approximation; Clef's exact-erf GELU cannot be replaced by it.</td></tr>
+<tr><td>Noncausal attention and decision branches</td><td>FP32 generated-head derivatives; BF16 inference attention providers.</td><td>Compatible BF16 training forward/backward, indexed/scalar branches and branch-gradient accumulation with explicit rounding points.</td></tr>
+<tr><td>Optimizer</td><td><code>adamw_update_bf16</code> exists with BF16 weights/gradients and FP32 moments.</td><td>It is not the proposed FP32-master-weight recipe. Declare master/compute weight ownership and refresh boundaries before connecting updates.</td></tr>
+</tbody></table>
+<p><strong>Next implementation sequence:</strong> first prove typed storage and explicit conversion
+edges on one generic projection. The initial mixed-precision target uses BF16 projection operands,
+FP32 normalization/softmax/loss/scoring, FP32 master parameters, FP32 parameter-gradient accumulation
+and FP32 AdamW moments. Each provider retains its declared accumulation order; BF16 storage alone
+does not imply a particular compute instruction. Specify activation-gradient rounding separately and compare the exact declared
+operations against PyTorch; do not assume equivalence to arbitrary autocast settings. Then connect
+normalization, noncausal attention, pooling and scoring through the same graph. Certify the small complete
+head before repeating released-size tests. Existing BF16-gradient providers remain separately named
+variants rather than being silently repurposed.</p>
+<p>This step fixes unsafe dtype admission and defines the missing boundaries; it does not claim a
+BF16 speedup, memory reduction, generated BF16 update or complete BF16 head PASS.</p>
+<pre><code>python3 -m unittest tests.test_v8_training_storage_contract -v
+python3 scripts/nightly_runner.py --tests training_selective_parameters \
+  training_complete_clef_head decision_head_backward_bf16 --ci --require-executed</code></pre>
+<p>The full-head oracle lane requires the pinned source described below. Standalone BF16 derivatives
+retain their numerical gates. Unsupported BF16 training must remain a clear error until typed execution
+and composed training evidence replace this restriction.</p>
+</section>
+
 <section id="released-head-training">
 <h2>Released head weights: bounded FP32 training parity</h2>
 <p>The same canonical head topology now runs training at the released dimensions: 4,096-channel
