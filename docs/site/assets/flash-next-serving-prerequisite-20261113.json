@@ -1,0 +1,50 @@
+{
+  "schema": "cke.serving.prerequisite_audit.v1",
+  "date": "2026-11-13",
+  "source_base": "ce3201830635698916dc5d9d8bbfae76ef3c78e8",
+  "circuit": "qwen4_exp",
+  "profile": "serving_profiles/qwen_tools_v1.json",
+  "protocol": "qwen_xml",
+  "template": {
+    "source": "Local pinned GGUF tokenizer.chat_template metadata, read using GGUFReader without native model execution",
+    "gguf_name": "qwen3.8-flash-next-Q4_K_M.gguf",
+    "gguf_bytes": 119150722112,
+    "gguf_sha256": null,
+    "whole_weight_identity_status": "NOT_TESTED in this audit",
+    "sha256": "c3cf9e34abf4f9e36c2d72165aa9c132d3e2a725b6c2586aaa3a8af9d7a81041",
+    "fixture": "server/tests/fixtures/qwen38_native_chat_template.jinja",
+    "identical_to_fixture": true
+  },
+  "host_preflight": {
+    "host": "Ryzen",
+    "available_gib_approx": 64,
+    "memory_total_gib_approx": 150,
+    "dense_services_preserved": true,
+    "new_flash_model_load": "NOT_ATTEMPTED: insufficient headroom for competing full-model run"
+  },
+  "protocol_evidence": {
+    "runner": "python -m pytest server/tests/test_serving_bundle.py -k flash_next",
+    "native_output": "scripted, not model inference",
+    "stream_modes": [
+      false,
+      true
+    ],
+    "checks": [
+      "circuit profile declaration",
+      "normal resolved bundle entry",
+      "unaltered publisher template",
+      "tool call name and arguments",
+      "single completed terminal event",
+      "wrong call ID rejected before generation",
+      "correlated tool result followed by final answer",
+      "missing publisher template rejected"
+    ]
+  },
+  "acceptance": {
+    "native_tool_generation": "NOT_TESTED",
+    "qwen_code_task": "NOT_TESTED",
+    "long_context": "NOT_TESTED",
+    "prefix_reuse": "NOT_TESTED",
+    "batching": "NOT_TESTED"
+  }
+}

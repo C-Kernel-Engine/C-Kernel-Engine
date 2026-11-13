@@ -1000,3 +1000,79 @@ def test_runtime_renderer_tokens_stays_none_when_unresolvable(tmp_path):
     def boom(ids):
         raise RuntimeError("no tokenizer")
     assert runtime_renderer_tokens(tmp_path, decode_ids=boom) is None
+
+
+@pytest.mark.parametrize("stream", [False, True])
+def test_flash_next_declared_publisher_tools_through_bundle_entry(setup, monkeypatch, stream):
+    """Real resolver/renderer/HTTP parser, scripted native output: not model certification."""
+    import server.live as live
+    import server.serving_bundle as bundle
+    from server.tests.test_native_qwen_jinja_contract import TOOL, FIXTURE, FIXTURE_SHA256
+    from server.tests.test_muse_http_protocol import _events
+
+    run, circuit_path, source = setup
+    declaration = json.loads((ROOT / "version/v8/circuits/qwen4_exp.json").read_text())["serving"]
+    assert declaration == {
+        "schema": "cke.circuit_serving.v1",
+        "profile_ref": "serving_profiles/qwen_tools_v1.json",
+        "default_variant": "publisher",
+    }
+    circuit = json.loads(circuit_path.read_text())
+    circuit["serving"] = declaration
+    circuit_path.write_text(json.dumps(circuit))
+    (run / "chat_template.jinja").unlink()
+    with pytest.raises(ValueError, match="publisher default template is missing"):
+        resolve(setup, allow_serving_update=True)
+    publisher = FIXTURE.read_bytes()
+    assert hashlib.sha256(publisher).hexdigest() == FIXTURE_SHA256
+    (run / "chat_template.jinja").write_bytes(publisher)
+    resolved = resolve(setup, allow_serving_update=True)
+    assert resolved["output_protocol"] == "qwen_xml"
+    assert resolved["assets"]["chat"]["sha256"] == FIXTURE_SHA256
+    assert (run / "chat_template.jinja").read_bytes() == publisher
+
+    call_text = '<tool_call>\n<function=read_file>\n<parameter=file_path>\n/tmp/flash-read.txt\n</parameter>\n</function>\n</tool_call>'
+    session = RecordingSession([call_text, "FLASH_OK_837"])
+    session.lib = _session_library(run / "libck_session_v8.so")
+    monkeypatch.setattr(live, "open_live_session", lambda *_a, **_k: (session, 8192, {}))
+    # Placeholder native libraries are not an artifact or numerical acceptance.
+    monkeypatch.setattr(bundle, "verify_loaded_libraries", lambda *_a: None)
+    client = TestClient(live.create_live_app_from_run_dir(run, model="generic-test-name"))
+
+    def completed(response):
+        assert response.status_code == 200, response.text
+        if not stream:
+            return response.json()
+        events = _events(response)
+        terminal = [e for e in events if e["type"] == "response.completed"]
+        assert len(terminal) == 1
+        assert not any(e["type"] in ("error", "response.failed") for e in events)
+        return terminal[0]["response"]
+
+    first = completed(client.post("/v1/responses", json={
+        "model": "generic-test-name", "input": "Read /tmp/flash-read.txt",
+        "tools": [TOOL], "stream": stream, "max_output_tokens": 128,
+    }))
+    calls = [item for item in first["output"] if item["type"] == "function_call"]
+    assert len(calls) == 1
+    call = calls[0]
+    assert call["name"] == "read_file" and call["call_id"]
+    assert json.loads(call["arguments"]) == {"file_path": "/tmp/flash-read.txt"}
+    assert "<tools>" in session.prompts[0] and "read_file" in session.prompts[0]
+    invalid = client.post("/v1/responses", json={
+        "model": "generic-test-name", "previous_response_id": first["id"],
+        "input": [{"type": "function_call_output", "call_id": "wrong-call-id", "output": "INVALID"}],
+        "tools": [TOOL], "stream": False,
+    })
+    assert invalid.status_code == 400
+    assert len(session.prompts) == 1
+    final = completed(client.post("/v1/responses", json={
+        "model": "generic-test-name", "previous_response_id": first["id"],
+        "input": [{"type": "function_call_output", "call_id": call["call_id"], "output": "FLASH_OK_837"}],
+        "tools": [TOOL], "stream": stream, "max_output_tokens": 128,
+    }))
+    assert final["status"] == "completed"
+    assert final["output_text"] == "FLASH_OK_837"
+    prompt = session.prompts[1]
+    assert prompt.count("FLASH_OK_837") == 1 and "INVALID" not in prompt
+    assert prompt.index("Read /tmp/flash-read.txt") < prompt.index("<function=read_file>") < prompt.index("<tool_response>") < prompt.index("FLASH_OK_837")
