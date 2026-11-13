@@ -134,7 +134,7 @@
   },
   "modes": {
     "inference": false,
-    "training": false,
+    "training": true,
     "backward": true
   },
   "numerical_capabilities": [
@@ -341,9 +341,60 @@
   },
   "tests": {
     "unit": [
-      "tests/test_v8_decision_scoring_backward.py"
+      "tests/test_v8_decision_scoring_backward.py",
+      "tests/test_v8_scoring_training.py"
     ],
     "oracle": "Independent ordered scalar, pinned PyTorch 2.12.1 autograd and generated parallel scoring branches with native gradient joins; explicit clamp boundary policy."
   },
-  "notes": "FP32 contiguous operands. PyTorch 2.12.1 cosine_similarity: NoGrad cloned-norm clamp retains norm derivative below epsilon; zero vector norm derivative zero. Distinct from normalize-dot backward and finite-difference derivative below clamp. Norm squared sums and row derivatives use ascending FP64 reductions, with FP32 norm/normalized/product boundaries matching forward. Each row contribution is stored FP32, then repeated-owner gradients sum ascending rows in FP64 and round once. Both outputs publish atomically; unreferenced owners are zero. No BF16, optimizer or full-head training claim."
+  "notes": "FP32 contiguous operands. PyTorch 2.12.1 cosine_similarity: NoGrad cloned-norm clamp retains norm derivative below epsilon; zero vector norm derivative zero. Distinct from normalize-dot backward and finite-difference derivative below clamp. Norm squared sums and row derivatives use ascending FP64 reductions, with FP32 norm/normalized/product boundaries matching forward. Each row contribution is stored FP32, then repeated-owner gradients sum ascending rows in FP64 and round once. Both outputs publish atomically; unreferenced owners are zero. No BF16, optimizer or full-head training claim.",
+  "training_contract": {
+    "version": 1,
+    "layout": "contiguous",
+    "batch_policy": "fixed",
+    "return_status": "zero_success",
+    "buffer_spans": [
+      {
+        "pointer": "left",
+        "rows": "groups",
+        "width": "channels",
+        "elements": "left_elements"
+      },
+      {
+        "pointer": "right",
+        "rows": "rows",
+        "width": "channels",
+        "elements": "right_elements"
+      },
+      {
+        "pointer": "indices",
+        "rows": "rows",
+        "width": 1,
+        "elements": "indices_elements"
+      },
+      {
+        "pointer": "d_output",
+        "rows": "rows",
+        "width": 1,
+        "elements": "d_output_elements"
+      },
+      {
+        "pointer": "scratch",
+        "rows": 1,
+        "width": "scratch_elements",
+        "elements": "scratch_elements"
+      },
+      {
+        "pointer": "d_left",
+        "rows": "groups",
+        "width": "channels",
+        "elements": "d_left_elements"
+      },
+      {
+        "pointer": "d_right",
+        "rows": "rows",
+        "width": "channels",
+        "elements": "d_right_elements"
+      }
+    ]
+  }
 }

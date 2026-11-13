@@ -113,3 +113,57 @@ int ck_indexed_normalized_dot_backward_f32(ARGS) {return cosine_backward(PASS,0)
 int ck_indexed_cosine_rows_backward_f32(ARGS) {return cosine_backward(PASS,1);}
 #undef ARGS
 #undef PASS
+
+static int scalar_vjp_validate(const float *input, size_t input_elements,
+    const float *dy, size_t dy_elements, float *dx, size_t dx_elements) {
+    if (!input_elements || !dy_elements || !dx_elements) return -2;
+    if (!ck_checked_region(input,input_elements) || !ck_checked_region(dy,dy_elements) ||
+        !ck_checked_region(dx,dx_elements) ||
+        ck_checked_overlap(dx,dx_elements,input,input_elements) ||
+        ck_checked_overlap(dx,dx_elements,dy,dy_elements)) return -1;
+    return isfinite(input[0]) && isfinite(dy[0]) ? 0 : -3;
+}
+int ck_scalar_exp_clamped_backward_f32(const float *input, size_t input_elements,
+    const float *d_output, size_t d_output_elements,
+    float *d_input, size_t d_input_elements, float maximum) {
+    int rc=scalar_vjp_validate(input,input_elements,d_output,d_output_elements,d_input,d_input_elements);
+    if (rc) return rc;
+    if (!isfinite(maximum)) return -2;
+    float y=expf(fminf(input[0],maximum)), result;
+    if (!isfinite(y)) return -4;
+    /* clamp(max=...) has derivative one AT the boundary, zero above it. */
+    if (!store(&result,input[0]<=maximum ? (double)d_output[0]*y : 0.0)) return -4;
+    d_input[0]=result; return 0;
+}
+int ck_scalar_sigmoid_backward_f32(const float *input, size_t input_elements,
+    const float *d_output, size_t d_output_elements,
+    float *d_input, size_t d_input_elements) {
+    int rc=scalar_vjp_validate(input,input_elements,d_output,d_output_elements,d_input,d_input_elements);
+    if (rc) return rc;
+    float x=input[0], e=expf(-fabsf(x));
+    float y=x>=0 ? 1.0f/(1.0f+e) : e/(1.0f+e), result;
+    volatile double slope=(double)y*(1.0-(double)y);
+    if (!store(&result,(double)d_output[0]*slope)) return -4;
+    d_input[0]=result; return 0;
+}
+int ck_scale_vector_backward_f32(const float *input, size_t input_elements,
+    const float *gain, size_t gain_elements, const float *d_output, size_t d_output_elements,
+    float *d_input, size_t d_input_elements, float *d_gain, size_t d_gain_elements,
+    float *scratch, size_t scratch_elements, size_t rows) {
+    if (!rows || rows==SIZE_MAX || input_elements<rows || gain_elements<1 ||
+        d_output_elements<rows || d_input_elements<rows || d_gain_elements<1 ||
+        scratch_elements<rows+1) return -2;
+    const void *ptrs[]={input,gain,d_output,d_input,d_gain,scratch};
+    size_t sizes[]={input_elements,gain_elements,d_output_elements,d_input_elements,d_gain_elements,scratch_elements};
+    for (size_t i=0;i<6;++i) if (!ck_checked_region(ptrs[i],sizes[i])) return -1;
+    for (size_t i=3;i<6;++i) for (size_t j=0;j<i;++j)
+        if (ck_checked_overlap(ptrs[i],sizes[i],ptrs[j],sizes[j])) return -1;
+    if (!ck_checked_finite(input,rows) || !ck_checked_finite(gain,1) || !ck_checked_finite(d_output,rows)) return -3;
+    double sum=0;
+    for (size_t r=0;r<rows;++r) {
+        if (!store(scratch+r,(double)d_output[r]*gain[0])) return -4;
+        volatile double product=(double)d_output[r]*input[r]; sum+=product;
+    }
+    if (!store(scratch+rows,sum)) return -4;
+    memcpy(d_input,scratch,rows*sizeof(float)); d_gain[0]=scratch[rows]; return 0;
+}

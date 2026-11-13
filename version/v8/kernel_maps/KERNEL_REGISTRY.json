@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 504,
+      "total": 507,
       "by_op": {
         "add_backward": 1,
         "add_rows_checked": 1,
@@ -199,8 +199,11 @@
         "rwkv7_vgate_produce": 1,
         "rwkv7_vgate_vmix": 1,
         "rwkv7_wkv_decode": 1,
+        "scalar_exp_clamped_backward_checked": 1,
         "scalar_exp_clamped_checked": 1,
+        "scalar_sigmoid_backward_checked": 1,
         "scalar_sigmoid_checked": 1,
+        "scale_vector_backward_checked": 1,
         "scale_vector_checked": 1,
         "select_next_id_checked": 1,
         "shared_relu2_expert_mlp": 1,
@@ -462,7 +465,7 @@
       },
       "modes": {
         "inference": true,
-        "training": false,
+        "training": true,
         "backward": true
       },
       "call_abi": {
@@ -517,7 +520,8 @@
       "tests": {
         "unit": [
           "tests/test_v8_qwen3_tts_first_block.py",
-          "tests/test_v8_decision_scoring_backward.py"
+          "tests/test_v8_decision_scoring_backward.py",
+          "tests/test_v8_scoring_training.py"
         ]
       },
       "notes": "Checked exact FP32 residual add with no heap allocation.",
@@ -546,6 +550,32 @@
             "rows": 1,
             "width": "elements",
             "element_bytes": 4
+          }
+        ]
+      },
+      "training_contract": {
+        "version": 1,
+        "layout": "contiguous",
+        "batch_policy": "fixed",
+        "return_status": "zero_success",
+        "buffer_spans": [
+          {
+            "pointer": "left",
+            "rows": "elements",
+            "width": 1,
+            "elements": "left_elements"
+          },
+          {
+            "pointer": "right",
+            "rows": "elements",
+            "width": 1,
+            "elements": "right_elements"
+          },
+          {
+            "pointer": "output",
+            "rows": "elements",
+            "width": 1,
+            "elements": "output_elements"
           }
         ]
       },
@@ -57169,7 +57199,7 @@
       },
       "modes": {
         "inference": false,
-        "training": false,
+        "training": true,
         "backward": true
       },
       "numerical_capabilities": [
@@ -57376,11 +57406,62 @@
       },
       "tests": {
         "unit": [
-          "tests/test_v8_decision_scoring_backward.py"
+          "tests/test_v8_decision_scoring_backward.py",
+          "tests/test_v8_scoring_training.py"
         ],
         "oracle": "Independent ordered scalar, pinned PyTorch 2.12.1 autograd and generated parallel scoring branches with native gradient joins; explicit clamp boundary policy."
       },
       "notes": "FP32 contiguous operands. PyTorch 2.12.1 cosine_similarity: NoGrad cloned-norm clamp retains norm derivative below epsilon; zero vector norm derivative zero. Distinct from normalize-dot backward and finite-difference derivative below clamp. Norm squared sums and row derivatives use ascending FP64 reductions, with FP32 norm/normalized/product boundaries matching forward. Each row contribution is stored FP32, then repeated-owner gradients sum ascending rows in FP64 and round once. Both outputs publish atomically; unreferenced owners are zero. No BF16, optimizer or full-head training claim.",
+      "training_contract": {
+        "version": 1,
+        "layout": "contiguous",
+        "batch_policy": "fixed",
+        "return_status": "zero_success",
+        "buffer_spans": [
+          {
+            "pointer": "left",
+            "rows": "groups",
+            "width": "channels",
+            "elements": "left_elements"
+          },
+          {
+            "pointer": "right",
+            "rows": "rows",
+            "width": "channels",
+            "elements": "right_elements"
+          },
+          {
+            "pointer": "indices",
+            "rows": "rows",
+            "width": 1,
+            "elements": "indices_elements"
+          },
+          {
+            "pointer": "d_output",
+            "rows": "rows",
+            "width": 1,
+            "elements": "d_output_elements"
+          },
+          {
+            "pointer": "scratch",
+            "rows": 1,
+            "width": "scratch_elements",
+            "elements": "scratch_elements"
+          },
+          {
+            "pointer": "d_left",
+            "rows": "groups",
+            "width": "channels",
+            "elements": "d_left_elements"
+          },
+          {
+            "pointer": "d_right",
+            "rows": "rows",
+            "width": "channels",
+            "elements": "d_right_elements"
+          }
+        ]
+      },
       "name": "indexed_cosine_rows_backward_checked_f32",
       "_source_file": "indexed_cosine_rows_backward_checked_f32.json"
     },
@@ -57493,7 +57574,7 @@
       },
       "modes": {
         "inference": true,
-        "training": false,
+        "training": true,
         "backward": false
       },
       "numerical_capabilities": [
@@ -57661,11 +57742,50 @@
       "tests": {
         "unit": [
           "tests/test_v8_decision_tensor_ops.py",
-          "tests/test_v8_clef_flash_complete_head.py"
+          "tests/test_v8_clef_flash_complete_head.py",
+          "tests/test_v8_scoring_training.py"
         ],
         "oracle": "Independent PyTorch operations and pinned complete head; bounds and rejection/recovery tests."
       },
-      "notes": "FP64 ascending squared-norm sums, sqrt rounded FP32, clamp each norm by explicit positive epsilon, FP32 normalization and pair products, ascending FP64 sum rounded FP32. Inference only; no backward provider claimed.",
+      "notes": "FP64 ascending squared-norm sums, sqrt rounded FP32, clamp each norm by explicit positive epsilon, FP32 normalization and pair products, ascending FP64 sum rounded FP32. Fixed-capacity training binding. Choose normalized-dot or cosine-similarity VJP explicitly: their below-epsilon clamp derivatives differ.",
+      "training_contract": {
+        "version": 1,
+        "layout": "contiguous",
+        "batch_policy": "fixed",
+        "return_status": "zero_success",
+        "buffer_spans": [
+          {
+            "pointer": "left",
+            "rows": "groups",
+            "width": "channels",
+            "elements": "left_elements"
+          },
+          {
+            "pointer": "right",
+            "rows": "rows",
+            "width": "channels",
+            "elements": "right_elements"
+          },
+          {
+            "pointer": "indices",
+            "rows": "rows",
+            "width": 1,
+            "elements": "indices_elements"
+          },
+          {
+            "pointer": "output",
+            "rows": "rows",
+            "width": 1,
+            "elements": "output_elements"
+          },
+          {
+            "pointer": "scratch",
+            "rows": 1,
+            "width": "scratch_elements",
+            "elements": "scratch_elements"
+          }
+        ]
+      },
       "name": "indexed_cosine_rows_checked_f32",
       "_source_file": "indexed_cosine_rows_checked_f32.json"
     },
@@ -57805,7 +57925,7 @@
       },
       "modes": {
         "inference": false,
-        "training": false,
+        "training": true,
         "backward": true
       },
       "numerical_capabilities": [
@@ -58012,11 +58132,62 @@
       },
       "tests": {
         "unit": [
-          "tests/test_v8_decision_scoring_backward.py"
+          "tests/test_v8_decision_scoring_backward.py",
+          "tests/test_v8_scoring_training.py"
         ],
         "oracle": "Independent ordered scalar, pinned PyTorch 2.12.1 autograd and generated parallel scoring branches with native gradient joins; explicit clamp boundary policy."
       },
       "notes": "FP32 contiguous operands. Differentiable norm clamp: zero norm derivative below epsilon, one at equality; zero vector norm derivative zero. Norm squared sums and row derivatives use ascending FP64 reductions, with FP32 norm/normalized/product boundaries matching forward. Each row contribution is stored FP32, then repeated-owner gradients sum ascending rows in FP64 and round once. Both outputs publish atomically; unreferenced owners are zero. No BF16, optimizer or full-head training claim.",
+      "training_contract": {
+        "version": 1,
+        "layout": "contiguous",
+        "batch_policy": "fixed",
+        "return_status": "zero_success",
+        "buffer_spans": [
+          {
+            "pointer": "left",
+            "rows": "groups",
+            "width": "channels",
+            "elements": "left_elements"
+          },
+          {
+            "pointer": "right",
+            "rows": "rows",
+            "width": "channels",
+            "elements": "right_elements"
+          },
+          {
+            "pointer": "indices",
+            "rows": "rows",
+            "width": 1,
+            "elements": "indices_elements"
+          },
+          {
+            "pointer": "d_output",
+            "rows": "rows",
+            "width": 1,
+            "elements": "d_output_elements"
+          },
+          {
+            "pointer": "scratch",
+            "rows": 1,
+            "width": "scratch_elements",
+            "elements": "scratch_elements"
+          },
+          {
+            "pointer": "d_left",
+            "rows": "groups",
+            "width": "channels",
+            "elements": "d_left_elements"
+          },
+          {
+            "pointer": "d_right",
+            "rows": "rows",
+            "width": "channels",
+            "elements": "d_right_elements"
+          }
+        ]
+      },
       "name": "indexed_normalized_dot_backward_checked_f32",
       "_source_file": "indexed_normalized_dot_backward_checked_f32.json"
     },
@@ -95744,6 +95915,186 @@
       "_source_file": "rwkv7_wkv_decode_f32.json"
     },
     {
+      "id": "scalar_exp_clamped_backward_checked_f32",
+      "op": "scalar_exp_clamped_backward_checked",
+      "operation_interface": "tensor.scalar_exp_clamped_backward_checked.fp32.v1",
+      "variant": "checked_ordered_fp64",
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            1
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "d_output",
+          "dtype": "fp32",
+          "shape": [
+            1
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "d_input",
+          "dtype": "fp32",
+          "shape": [
+            1
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [],
+      "impl": {
+        "function": "ck_scalar_exp_clamped_backward_f32",
+        "c_declaration": "int ck_scalar_exp_clamped_backward_f32(const float *input, size_t input_elements, const float *d_output, size_t d_output_elements, float *d_input, size_t d_input_elements, float maximum);",
+        "sources": [
+          "src/kernels/decision_scoring_backward.c"
+        ]
+      },
+      "modes": {
+        "inference": false,
+        "training": true,
+        "backward": true
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "scalar_exp_clamped_backward_ordered_fp64_f32_v1",
+          "status": "validated",
+          "phases": [
+            "backward"
+          ],
+          "function": "ck_scalar_exp_clamped_backward_f32",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp64",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "serial"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const float *",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "input_elements",
+            "source": "runtime:input_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "d_output",
+            "source": "activation:d_output",
+            "cast": "const float *",
+            "ports": [
+              "input:d_output"
+            ]
+          },
+          {
+            "name": "d_output_elements",
+            "source": "runtime:d_output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "d_input",
+            "source": "output:d_input",
+            "cast": "float *",
+            "ports": [
+              "output:d_input"
+            ]
+          },
+          {
+            "name": "d_input_elements",
+            "source": "runtime:d_input_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "maximum",
+            "source": "param:maximum"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_scoring_training.py"
+        ],
+        "oracle": "Independent PyTorch autograd, finite differences and ordered FP64 scalar reference; generated gradient/update trajectory."
+      },
+      "notes": "expf(min(x,maximum)); derivative active at equality, zero above. Reject nonfinite forward value even if derivative inactive.",
+      "training_contract": {
+        "version": 1,
+        "layout": "contiguous",
+        "batch_policy": "fixed",
+        "return_status": "zero_success",
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "rows": 1,
+            "width": 1,
+            "elements": "input_elements"
+          },
+          {
+            "pointer": "d_output",
+            "rows": 1,
+            "width": 1,
+            "elements": "d_output_elements"
+          },
+          {
+            "pointer": "d_input",
+            "rows": 1,
+            "width": 1,
+            "elements": "d_input_elements"
+          }
+        ]
+      },
+      "name": "scalar_exp_clamped_backward_checked_f32",
+      "_source_file": "scalar_exp_clamped_backward_checked_f32.json"
+    },
+    {
       "id": "scalar_exp_clamped_checked_f32",
       "op": "scalar_exp_clamped_checked",
       "operation_interface": "tensor.scalar_exp_clamped_checked.fp32.v1",
@@ -95804,7 +96155,7 @@
       },
       "modes": {
         "inference": true,
-        "training": false,
+        "training": true,
         "backward": false
       },
       "numerical_capabilities": [
@@ -95895,13 +96246,210 @@
       "tests": {
         "unit": [
           "tests/test_v8_decision_tensor_ops.py",
-          "tests/test_v8_clef_flash_complete_head.py"
+          "tests/test_v8_clef_flash_complete_head.py",
+          "tests/test_v8_scoring_training.py"
         ],
         "oracle": "Independent PyTorch operations and pinned complete head; bounds and rejection/recovery tests."
       },
-      "notes": "Finite scalar expf(fminf(input,maximum)); explicit finite maximum and finite output required. Inference only; no backward provider claimed.",
+      "notes": "Finite scalar expf(fminf(input,maximum)); explicit finite maximum and finite output required. Checked fixed-capacity FP32 training binding; matching derivative map is separately registered.",
+      "training_contract": {
+        "version": 1,
+        "layout": "contiguous",
+        "batch_policy": "fixed",
+        "return_status": "zero_success",
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "rows": 1,
+            "width": 1,
+            "elements": "input_elements"
+          },
+          {
+            "pointer": "output",
+            "rows": 1,
+            "width": 1,
+            "elements": "output_elements"
+          }
+        ]
+      },
       "name": "scalar_exp_clamped_checked_f32",
       "_source_file": "scalar_exp_clamped_checked_f32.json"
+    },
+    {
+      "id": "scalar_sigmoid_backward_checked_f32",
+      "op": "scalar_sigmoid_backward_checked",
+      "operation_interface": "tensor.scalar_sigmoid_backward_checked.fp32.v1",
+      "variant": "checked_ordered_fp64",
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            1
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "d_output",
+          "dtype": "fp32",
+          "shape": [
+            1
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "d_input",
+          "dtype": "fp32",
+          "shape": [
+            1
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [],
+      "impl": {
+        "function": "ck_scalar_sigmoid_backward_f32",
+        "c_declaration": "int ck_scalar_sigmoid_backward_f32(const float *input, size_t input_elements, const float *d_output, size_t d_output_elements, float *d_input, size_t d_input_elements);",
+        "sources": [
+          "src/kernels/decision_scoring_backward.c"
+        ]
+      },
+      "modes": {
+        "inference": false,
+        "training": true,
+        "backward": true
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "scalar_sigmoid_backward_ordered_fp64_f32_v1",
+          "status": "validated",
+          "phases": [
+            "backward"
+          ],
+          "function": "ck_scalar_sigmoid_backward_f32",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp64",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "serial"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const float *",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "input_elements",
+            "source": "runtime:input_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "d_output",
+            "source": "activation:d_output",
+            "cast": "const float *",
+            "ports": [
+              "input:d_output"
+            ]
+          },
+          {
+            "name": "d_output_elements",
+            "source": "runtime:d_output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "d_input",
+            "source": "output:d_input",
+            "cast": "float *",
+            "ports": [
+              "output:d_input"
+            ]
+          },
+          {
+            "name": "d_input_elements",
+            "source": "runtime:d_input_elements",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_scoring_training.py"
+        ],
+        "oracle": "Independent PyTorch autograd, finite differences and ordered FP64 scalar reference; generated gradient/update trajectory."
+      },
+      "notes": "Stable sigmoid forward recomputation; derivative of rounded FP32 sigmoid using FP64 products.",
+      "training_contract": {
+        "version": 1,
+        "layout": "contiguous",
+        "batch_policy": "fixed",
+        "return_status": "zero_success",
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "rows": 1,
+            "width": 1,
+            "elements": "input_elements"
+          },
+          {
+            "pointer": "d_output",
+            "rows": 1,
+            "width": 1,
+            "elements": "d_output_elements"
+          },
+          {
+            "pointer": "d_input",
+            "rows": 1,
+            "width": 1,
+            "elements": "d_input_elements"
+          }
+        ]
+      },
+      "name": "scalar_sigmoid_backward_checked_f32",
+      "_source_file": "scalar_sigmoid_backward_checked_f32.json"
     },
     {
       "id": "scalar_sigmoid_checked_f32",
@@ -95964,7 +96512,7 @@
       },
       "modes": {
         "inference": true,
-        "training": false,
+        "training": true,
         "backward": false
       },
       "numerical_capabilities": [
@@ -96051,13 +96599,314 @@
       "tests": {
         "unit": [
           "tests/test_v8_decision_tensor_ops.py",
-          "tests/test_v8_clef_flash_complete_head.py"
+          "tests/test_v8_clef_flash_complete_head.py",
+          "tests/test_v8_scoring_training.py"
         ],
         "oracle": "Independent PyTorch operations and pinned complete head; bounds and rejection/recovery tests."
       },
-      "notes": "Stable FP32 sigmoid using expf and sign-dependent formula. Inference only; no backward provider claimed.",
+      "notes": "Stable FP32 sigmoid using expf and sign-dependent formula. Checked fixed-capacity FP32 training binding; matching derivative map is separately registered.",
+      "training_contract": {
+        "version": 1,
+        "layout": "contiguous",
+        "batch_policy": "fixed",
+        "return_status": "zero_success",
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "rows": 1,
+            "width": 1,
+            "elements": "input_elements"
+          },
+          {
+            "pointer": "output",
+            "rows": 1,
+            "width": 1,
+            "elements": "output_elements"
+          }
+        ]
+      },
       "name": "scalar_sigmoid_checked_f32",
       "_source_file": "scalar_sigmoid_checked_f32.json"
+    },
+    {
+      "id": "scale_vector_backward_checked_f32",
+      "op": "scale_vector_backward_checked",
+      "operation_interface": "tensor.scale_vector_backward_checked.fp32.v1",
+      "variant": "checked_ordered_fp64",
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            "R"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "gain",
+          "dtype": "fp32",
+          "shape": [
+            1
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "d_output",
+          "dtype": "fp32",
+          "shape": [
+            "R"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "d_input",
+          "dtype": "fp32",
+          "shape": [
+            "R"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "d_gain",
+          "dtype": "fp32",
+          "shape": [
+            1
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "scratch",
+          "dtype": "fp32",
+          "shape": [
+            "X"
+          ],
+          "size_bytes": "4 * X",
+          "size_resolution": "required",
+          "lifetime": "kernel_call",
+          "alignment": 64,
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read_write",
+          "storage_class": "scratch",
+          "consumption": "required",
+          "desc": "groups*channels + 2*rows*channels floats; staged gradients and per-option left contributions."
+        }
+      ],
+      "dims": [
+        "R",
+        "X"
+      ],
+      "impl": {
+        "function": "ck_scale_vector_backward_f32",
+        "c_declaration": "int ck_scale_vector_backward_f32(const float *input, size_t input_elements, const float *gain, size_t gain_elements, const float *d_output, size_t d_output_elements, float *d_input, size_t d_input_elements, float *d_gain, size_t d_gain_elements, float *scratch, size_t scratch_elements, size_t rows);",
+        "sources": [
+          "src/kernels/decision_scoring_backward.c"
+        ]
+      },
+      "modes": {
+        "inference": false,
+        "training": true,
+        "backward": true
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "scale_vector_backward_ordered_fp64_f32_v1",
+          "status": "validated",
+          "phases": [
+            "backward"
+          ],
+          "function": "ck_scale_vector_backward_f32",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp64",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "serial"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const float *",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "input_elements",
+            "source": "runtime:input_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "gain",
+            "source": "activation:gain",
+            "cast": "const float *",
+            "ports": [
+              "input:gain"
+            ]
+          },
+          {
+            "name": "gain_elements",
+            "source": "runtime:gain_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "d_output",
+            "source": "activation:d_output",
+            "cast": "const float *",
+            "ports": [
+              "input:d_output"
+            ]
+          },
+          {
+            "name": "d_output_elements",
+            "source": "runtime:d_output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "d_input",
+            "source": "output:d_input",
+            "cast": "float *",
+            "ports": [
+              "output:d_input"
+            ]
+          },
+          {
+            "name": "d_input_elements",
+            "source": "runtime:d_input_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "d_gain",
+            "source": "output:d_gain",
+            "cast": "float *",
+            "ports": [
+              "output:d_gain"
+            ]
+          },
+          {
+            "name": "d_gain_elements",
+            "source": "runtime:d_gain_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "scratch",
+            "source": "scratch:scratch",
+            "cast": "float *"
+          },
+          {
+            "name": "scratch_elements",
+            "source": "runtime:scratch_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_scoring_training.py"
+        ],
+        "oracle": "Independent PyTorch autograd, finite differences and ordered FP64 scalar reference; generated gradient/update trajectory."
+      },
+      "notes": "d_input = d_output * gain; d_gain is ascending FP64 dot reduction, FP32 stores. Stage both outputs in rows+1 scratch floats before publishing.",
+      "training_contract": {
+        "version": 1,
+        "layout": "contiguous",
+        "batch_policy": "fixed",
+        "return_status": "zero_success",
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "rows": "rows",
+            "width": 1,
+            "elements": "input_elements"
+          },
+          {
+            "pointer": "gain",
+            "rows": 1,
+            "width": 1,
+            "elements": "gain_elements"
+          },
+          {
+            "pointer": "d_output",
+            "rows": "rows",
+            "width": 1,
+            "elements": "d_output_elements"
+          },
+          {
+            "pointer": "d_input",
+            "rows": "rows",
+            "width": 1,
+            "elements": "d_input_elements"
+          },
+          {
+            "pointer": "d_gain",
+            "rows": 1,
+            "width": 1,
+            "elements": "d_gain_elements"
+          },
+          {
+            "pointer": "scratch",
+            "rows": 1,
+            "width": "scratch_elements",
+            "elements": "scratch_elements"
+          }
+        ]
+      },
+      "name": "scale_vector_backward_checked_f32",
+      "_source_file": "scale_vector_backward_checked_f32.json"
     },
     {
       "id": "scale_vector_checked_f32",
@@ -96152,7 +97001,7 @@
       },
       "modes": {
         "inference": true,
-        "training": false,
+        "training": true,
         "backward": false
       },
       "numerical_capabilities": [
@@ -96284,11 +97133,44 @@
       "tests": {
         "unit": [
           "tests/test_v8_decision_tensor_ops.py",
-          "tests/test_v8_clef_flash_complete_head.py"
+          "tests/test_v8_clef_flash_complete_head.py",
+          "tests/test_v8_scoring_training.py"
         ],
         "oracle": "Independent PyTorch operations and pinned complete head; bounds and rejection/recovery tests."
       },
-      "notes": "Separate FP32 multiplication of each element and one finite scalar gain. Inference only; no backward provider claimed.",
+      "notes": "Separate FP32 multiplication of each element and one finite scalar gain. Checked fixed-capacity FP32 training binding; matching derivative map is separately registered.",
+      "training_contract": {
+        "version": 1,
+        "layout": "contiguous",
+        "batch_policy": "fixed",
+        "return_status": "zero_success",
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "rows": "rows",
+            "width": 1,
+            "elements": "input_elements"
+          },
+          {
+            "pointer": "gain",
+            "rows": 1,
+            "width": 1,
+            "elements": "gain_elements"
+          },
+          {
+            "pointer": "output",
+            "rows": "rows",
+            "width": 1,
+            "elements": "output_elements"
+          },
+          {
+            "pointer": "scratch",
+            "rows": 1,
+            "width": "scratch_elements",
+            "elements": "scratch_elements"
+          }
+        ]
+      },
       "name": "scale_vector_checked_f32",
       "_source_file": "scale_vector_checked_f32.json"
     },

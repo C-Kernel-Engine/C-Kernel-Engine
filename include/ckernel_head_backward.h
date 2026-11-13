@@ -87,4 +87,17 @@ int ck_grouped_weighted_rows_backward_bf16(
     uint16_t *d_fields, size_t d_fields_elements, size_t d_fields_stride,
     float *scratch, size_t scratch_elements,
     size_t groups, size_t option_rows, size_t channels);
+
+/* Learned scalar/gain VJPs. Exp-clamp differentiates at equality; sigmoid
+ * differentiates its rounded forward value. Scale gain reduces ascending FP64.
+ * Rejection preserves all outputs; scale requires rows+1 scratch floats. */
+int ck_scalar_exp_clamped_backward_f32(const float *input, size_t input_elements,
+    const float *d_output, size_t d_output_elements, float *d_input, size_t d_input_elements, float maximum);
+int ck_scalar_sigmoid_backward_f32(const float *input, size_t input_elements,
+    const float *d_output, size_t d_output_elements, float *d_input, size_t d_input_elements);
+int ck_scale_vector_backward_f32(const float *input, size_t input_elements,
+    const float *gain, size_t gain_elements, const float *d_output, size_t d_output_elements,
+    float *d_input, size_t d_input_elements, float *d_gain, size_t d_gain_elements,
+    float *scratch, size_t scratch_elements, size_t rows);
+
 #endif
