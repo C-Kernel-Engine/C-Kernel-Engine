@@ -1029,12 +1029,12 @@
     </header>
     <main>
 <h1>v8 training kernel capability ledger</h1>
-<p>Generated from <code>version/v8/kernel_maps/*.json</code> by <code>version/v8/scripts/build_training_capability_ledger_v8.py</code>. Source digest: <code>16f6ef62b3418d6ddc09a5a3a22ae0349bf988162702bf9c053c0bccd312b067</code>; provider maps: 512.</p>
+<p>Generated from <code>version/v8/kernel_maps/*.json</code> by <code>version/v8/scripts/build_training_capability_ledger_v8.py</code>. Source digest: <code>29aaf5ded45c9db7b90492ffb5a63e33f87e91c32f12d4fa0d3e289fe3c4c1d7</code>; provider maps: 514.</p>
 <p>This is a <strong>map inventory, not a training PASS</strong>. A backward declaration means a backward provider is registered; it does not prove matching geometry, selection by a generated circuit, or executed PyTorch parity. BF16-tagged includes storage or arithmetic tags. Quantized forward maps do not imply quantized-base gradients or QLoRA support. Direct executed evidence: <code>NOT_MEASURED_BY_MAP_INVENTORY</code>.</p>
 <p><strong>Authoring, lowering, and execution are separate.</strong> The public <code>cke.nn</code> module list below comes from its Python source. A class existing there does not establish that v8 can lower it, select a backward provider, or certify a generated training run. Exact kernel-map operation names are not automatically equivalent to Python modules.</p>
 <table class="table"><thead><tr><th>Dtype family</th><th>Provider maps</th><th>Forward or unspecified</th><th>Declared training forward</th><th>Declared backward</th><th>Backward-named without mode</th><th>Maps with registered tests</th></tr></thead><tbody>
 <tr><td>fp32-tagged</td><td>334</td><td>292</td><td>28</td><td>42</td><td>5</td><td>293</td></tr>
-<tr><td>bf16-tagged</td><td>90</td><td>87</td><td>0</td><td>3</td><td>0</td><td>70</td></tr>
+<tr><td>bf16-tagged</td><td>92</td><td>88</td><td>1</td><td>4</td><td>0</td><td>72</td></tr>
 <tr><td>quantized</td><td>65</td><td>65</td><td>0</td><td>0</td><td>0</td><td>45</td></tr>
 <tr><td>unspecified</td><td>23</td><td>23</td><td>1</td><td>0</td><td>0</td><td>17</td></tr>
 </tbody></table>
@@ -1084,6 +1084,8 @@
 <tr><td>bf16-tagged</td><td>ple_gate_conv_inject</td><td>2</td><td>—</td><td>—</td></tr>
 <tr><td>bf16-tagged</td><td>ple_ngram_embed</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>bf16-tagged</td><td>position_embeddings</td><td>2</td><td>—</td><td>—</td></tr>
+<tr><td>bf16-tagged</td><td>projection_bf16_train_backward</td><td>1</td><td>projection_bf16_train_backward</td><td>—</td></tr>
+<tr><td>bf16-tagged</td><td>projection_bf16_train_forward</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>bf16-tagged</td><td>qk_norm</td><td>2</td><td>—</td><td>—</td></tr>
 <tr><td>bf16-tagged</td><td>qk_norm_no_weight_scaled</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>bf16-tagged</td><td>qsa_attention</td><td>1</td><td>—</td><td>—</td></tr>
@@ -1331,7 +1333,7 @@
 <tr><td>unspecified</td><td>speculative_commit_or_reject</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>unspecified</td><td>tokenizer</td><td>1</td><td>—</td><td>—</td></tr>
 </tbody></table>
-<details><summary>All 512 provider maps</summary>
+<details><summary>All 514 provider maps</summary>
 <table class="table"><thead><tr><th>Map</th><th>Provider ID</th><th>Operation</th><th>Dtype family</th><th>Backward mode</th><th>Registered test</th></tr></thead><tbody>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/adamw_update_f32.json">version/v8/kernel_maps/adamw_update_f32.json</a></td><td>adamw_update_f32</td><td>optimizer</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/add_rows_backward_train_f32.json">version/v8/kernel_maps/add_rows_backward_train_f32.json</a></td><td>add_rows_backward_train_f32</td><td>add_rows_backward_train_f32</td><td>fp32-tagged</td><td>declared</td><td>registered</td></tr>
@@ -1717,6 +1719,8 @@
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/position_embeddings_add_tiled_2d_align_corners.json">version/v8/kernel_maps/position_embeddings_add_tiled_2d_align_corners.json</a></td><td>position_embeddings_add_tiled_2d_align_corners</td><td>position_embeddings</td><td>fp32-tagged</td><td>not declared</td><td>not registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/position_embeddings_add_tiled_2d_align_corners_bf16.json">version/v8/kernel_maps/position_embeddings_add_tiled_2d_align_corners_bf16.json</a></td><td>position_embeddings_add_tiled_2d_align_corners_bf16</td><td>position_embeddings</td><td>bf16-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/position_embeddings_add_tiled_2d_align_corners_fp32_interp_bf16.json">version/v8/kernel_maps/position_embeddings_add_tiled_2d_align_corners_fp32_interp_bf16.json</a></td><td>position_embeddings_add_tiled_2d_align_corners_fp32_interp_bf16</td><td>position_embeddings</td><td>bf16-tagged</td><td>not declared</td><td>registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/projection_bf16_train_backward.json">version/v8/kernel_maps/projection_bf16_train_backward.json</a></td><td>projection_bf16_train_backward</td><td>projection_bf16_train_backward</td><td>bf16-tagged</td><td>declared</td><td>registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/projection_bf16_train_forward.json">version/v8/kernel_maps/projection_bf16_train_forward.json</a></td><td>projection_bf16_train_forward</td><td>projection_bf16_train_forward</td><td>bf16-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/q_norm_forward.json">version/v8/kernel_maps/q_norm_forward.json</a></td><td>q_norm_forward</td><td>q_norm</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/qk_norm_backward_f32.json">version/v8/kernel_maps/qk_norm_backward_f32.json</a></td><td>qk_norm_backward_f32</td><td>qk_norm_backward</td><td>fp32-tagged</td><td>declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/qk_norm_forward.json">version/v8/kernel_maps/qk_norm_forward.json</a></td><td>qk_norm_forward</td><td>qk_norm</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>

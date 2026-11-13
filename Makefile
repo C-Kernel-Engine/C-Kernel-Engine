@@ -474,6 +474,7 @@ SRCS    := src/backend_native.c \
 	           src/kernels/gelu_rows_tanh_checked.c \
 	           src/kernels/gelu_rows_erf_checked.c \
 	           src/kernels/head_backward.c \
+	           src/kernels/projection_bf16_train.c \
 	           src/kernels/grouped_cross_entropy.c \
 	           src/kernels/token_span_mean_checked.c \
 	           src/kernels/grouped_weighted_rows.c \
@@ -4394,6 +4395,7 @@ test-v8-template-circuit-audit:
 
 .PHONY: test-numerical-contracts
 test-numerical-contracts: $(LIB)
+	@$(PYTHON) -m unittest tests.test_projection_bf16_train_kernel
 	@echo "Running v8 numerical contract validation..."
 	@$(PYTHON) unittest/test_nvfp4_q8_0.py
 	@$(PYTHON) unittest/test_moe_swiglu_q4k_mixed_parallel.py

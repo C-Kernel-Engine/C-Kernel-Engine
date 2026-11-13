@@ -33,7 +33,9 @@ def run(request_path):
     try:
         lib.ck_set_strict_parity(1)
         workflow._checkpoint_load(Path(request["checkpoint"]), lib, request["metadata"])
-        ids = np.zeros(request["tokens"], dtype="i4")
+        ids = np.asarray(request.get("token_ids", [0] * request["tokens"]), dtype="i4")
+        if len(ids) != request["tokens"]:
+            raise ValueError("token count mismatch")
         metadata = np.asarray(request["integer_inputs"], dtype="i4")
         lib.ck_train_step_with_i32_ex.argtypes = [
             ip,

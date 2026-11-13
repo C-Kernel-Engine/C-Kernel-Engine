@@ -1011,6 +1011,11 @@ TEST_SUITES = {
         ROOT / "tests" / "test_v8_selective_training.py",
         unittest_targets=("tests.test_v8_selective_training", "tests.test_v8_training_storage_contract"),
     ),
+    "training_projection_bf16": TestSuite(
+        "BF16 Projection, FP32 Master Gradients and Native AdamW", "training",
+        ROOT / "tests" / "test_v8_bf16_projection_training.py",
+        unittest_targets=("tests.test_projection_bf16_train_kernel", "tests.test_v8_bf16_projection_training"),
+    ),
     "decision_head_backward_bf16": TestSuite(
         "BF16 Decision-Head VJPs and Generated Backward Chain", "kernels",
         ROOT / "tests" / "test_v8_head_backward_bf16.py",
