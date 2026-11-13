@@ -465,6 +465,9 @@ SRCS    := src/backend_native.c \
 	           src/kernels/decision_scoring_backward.c \
 	           src/kernels/attention_cross_token_major_checked.c \
 	           src/kernels/gelu_rows_tanh_checked.c \
+	           src/kernels/gelu_rows_erf_checked.c \
+	           src/kernels/head_backward.c \
+	           src/kernels/grouped_weighted_rows.c \
 	           src/kernels/layernorm_kernels_bf16.c \
 	           src/kernels/gelu_kernels.c \
 	           src/kernels/geglu_kernels.c \
@@ -4565,6 +4568,10 @@ test-source-integrity:
 
 # Standard DSL/nightly coverage: fail if the synthetic checkpoint dependencies
 # are absent rather than turning RWKV lowering into a skipped PASS.
+.PHONY: test-rwkv-world-tokenizer
+test-rwkv-world-tokenizer: $(LIB_TOKENIZER)
+	@$(PYTHON) $(PYTHONFLAGS) unittest/test_rwkv_world_trie_tokenizer.py
+
 .PHONY: test-v8-rwkv7-lowering
 test-v8-rwkv7-lowering:
 	@$(PYTHON) -c "import torch, safetensors"

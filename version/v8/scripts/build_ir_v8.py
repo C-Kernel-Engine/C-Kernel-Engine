@@ -4008,8 +4008,12 @@ CK_EXPORT int32_t ck_model_lookup_token(const char *text) {
  * After encoding, call ck_model_prefill() with the returned count.
  */
 CK_EXPORT int ck_model_encode_text(const char *text, int text_len) {
-    if (!g_model || !g_model->tokenizer || !text) return 0;
-    if (text_len < 0) text_len = (int)strlen(text);
+    if (!g_model || !g_model->tokenizer || !text) return -1;
+    if (text_len < 0) {
+        size_t inferred = strlen(text);
+        if (inferred > INT32_MAX) return -1;
+        text_len = (int)inferred;
+    }
     if (text_len == 0) return 0;
 
     /* Encode directly into the token_ids buffer that prefill uses */
@@ -4031,14 +4035,14 @@ CK_EXPORT int ck_model_count_text_tokens(const char *text, int text_len) {
     if (!g_model || !g_model->tokenizer || !text) return -1;
     if (text_len < 0) {
         size_t inferred = strlen(text);
-        if (inferred > (INT32_MAX - 2) / 7) return -1;
+        if (inferred > INT32_MAX - 1) return -1;
         text_len = (int)inferred;
     }
     if (text_len == 0) return 0;
     /* Each source byte becomes at most one token, so text_len plus the
      * terminator bounds the complete output. */
-    if (text_len > (INT32_MAX - 2) / 7) return -1;
-    size_t capacity = (size_t)text_len * 7 + 2;
+    if (text_len > INT32_MAX - 1) return -1;
+    size_t capacity = (size_t)text_len + 1;
     if (capacity > SIZE_MAX / sizeof(int32_t)) return -1;
     int32_t *tokens = (int32_t *)malloc(capacity * sizeof(int32_t));
     if (!tokens) return -1;
@@ -4074,13 +4078,7 @@ CK_EXPORT const int32_t* ck_model_get_token_buffer(void) {
  */
 CK_EXPORT int32_t ck_model_lookup_token(const char *text) {
     if (!g_model || !g_model->tokenizer || !text) return -1;
-    int32_t id = ck_tokenizer_lookup(g_model->tokenizer, text);
-    if (id < 0) return -1;
-    const char *token_str = ck_tokenizer_id_to_token(g_model->tokenizer, id);
-    if (token_str && strcmp(token_str, text) == 0) {
-        return id;
-    }
-    return -1;
+    return ck_tokenizer_lookup(g_model->tokenizer, text);
 }
 """ + chat_contract_api
         }

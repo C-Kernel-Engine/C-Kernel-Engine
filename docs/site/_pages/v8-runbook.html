@@ -455,7 +455,11 @@ make v8-training-python-authoring-smoke
         existing <code>CKTrie</code> and encoded with greedy longest-match (no BOS, no
         pretokenizer, id&nbsp;0 is <code>&lt;|endoftext|&gt;</code>). The importer fails closed
         unless the vocabulary satisfies the singleton-byte and prefix-rank invariants the trie
-        backend relies on. Weight import, recurrent-state and residual-buffer placement,
+        backend relies on. Encoding returns failure rather than a successful partial
+        prompt on capacity exhaustion or an unmapped byte. The standard nightly
+        <code>test-rwkv-world-tokenizer</code> gate covers exact capacity, recovery,
+        all byte values and end-of-text boundaries using a synthetic vocabulary;
+        it does not certify a publisher model trajectory. Weight import, recurrent-state and residual-buffer placement,
         layer-zero value sharing, token-serial prefill, and generated multi-token parity remain
         bring-up gates. Use the ordinary native host once those contracts are complete, rather
         than introducing a separate model-specific CLI or hardcoded prompt formatter.

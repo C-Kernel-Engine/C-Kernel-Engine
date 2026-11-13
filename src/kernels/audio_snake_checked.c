@@ -2,6 +2,15 @@
 #include "checked_float_buffer.h"
 
 #include <math.h>
+#include <float.h>
+
+/* For finite arguments, |sinf| <= 1. Leave ample rounding headroom so
+ * the separately rounded square, scale and addition cannot overflow. Extreme
+ * valid inputs still use the original exact preflight below. No values are
+ * written until every element has passed one of these checks. */
+static int bounded_periodic_output(float x, float inverse) {
+    return fabs((double)x) + fabs((double)inverse) <= (double)FLT_MAX / 4.0;
+}
 
 static int snake_value(float x, float alpha, float *value) {
     const float argument = alpha * x;
@@ -44,10 +53,14 @@ int audio_snake_strided_f32_checked(
     for (size_t channel = 0; channel < channels; ++channel) {
         const float a = alpha[channel];
         if (!isfinite(a) || a == 0.0f) return -3;
+        const float inverse = 1.0f / a;
+        if (!isfinite(inverse)) return -3;
         for (size_t frame = 0; frame < frames; ++frame) {
             const float x = input[channel * input_stride + frame];
             float result;
-            if (!isfinite(x) || !snake_value(x, a, &result)) return -3;
+            if (!isfinite(x) || !isfinite(a * x)) return -3;
+            if (!bounded_periodic_output(x, inverse) &&
+                !snake_value(x, a, &result)) return -3;
         }
     }
     for (size_t channel = 0; channel < channels; ++channel)
@@ -112,8 +125,10 @@ int audio_snake_beta_strided_f32_checked(
         for (size_t frame = 0; frame < frames; ++frame) {
             const float x = input[channel * input_stride + frame];
             float result;
-            if (!isfinite(x) || !snake_beta_value(
-                    x, frequency, inverse_magnitude, &result)) return -3;
+            if (!isfinite(x) || !isfinite(x * frequency)) return -3;
+            if (!bounded_periodic_output(x, inverse_magnitude) &&
+                !snake_beta_value(x, frequency, inverse_magnitude, &result))
+                return -3;
         }
     }
     for (size_t channel = 0; channel < channels; ++channel) {

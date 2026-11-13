@@ -21,6 +21,8 @@ import ctypes
 import importlib.util
 import json
 import os
+import subprocess
+import tempfile
 import sys
 from pathlib import Path
 
@@ -207,6 +209,52 @@ def _prompt_cases() -> list[bytes]:
     return cases
 
 
+def _check_generated_api(handle, reference) -> None:
+    """Exercise emitted model APIs, not only standalone tokenizer entry points."""
+    from build_ir_v8 import _generate_tokenizer_c_code
+
+    api = _generate_tokenizer_c_code("rwkv_world_trie", len(reference.raw_by_id), 0)
+    source = """
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include "tokenizer/tokenizer.h"
+#define CK_EXPORT
+#define MAX_SEQ_LEN 8
+#define A_TOKEN_IDS 0
+static int32_t token_buffer[MAX_SEQ_LEN];
+static struct { CKTokenizer *tokenizer; unsigned char *bump; } model;
+static __typeof__(model) *g_model = &model;
+void install_tokenizer(CKTokenizer *tokenizer) {
+    model.tokenizer = tokenizer;
+    model.bump = (unsigned char *)token_buffer;
+}
+""" + api["api_functions"]
+    with tempfile.TemporaryDirectory(prefix="rwkv-tokenizer-api-") as directory:
+        path = Path(directory) / "api.c"
+        library = Path(directory) / "api.so"
+        path.write_text(source)
+        subprocess.run(["cc", "-shared", "-fPIC", "-std=gnu11", "-Werror",
+                        "-I", str(ROOT / "include"), str(path), str(LIB_PATH),
+                        "-Wl,-rpath," + str(LIB_PATH.parent), "-o", str(library)], check=True)
+        model = ctypes.CDLL(str(library))
+        model.install_tokenizer.argtypes = [ctypes.c_void_p]
+        model.install_tokenizer(handle)
+        for name in ("ck_model_encode_text", "ck_model_count_text_tokens"):
+            getattr(model, name).argtypes = [ctypes.c_char_p, ctypes.c_int]
+            getattr(model, name).restype = ctypes.c_int
+        model.ck_model_lookup_token.argtypes = [ctypes.c_char_p]
+        model.ck_model_lookup_token.restype = ctypes.c_int32
+        short = bytes(range(8))
+        long = bytes(range(256))
+        assert model.ck_model_count_text_tokens(long, len(long)) == len(reference.encode(long))
+        assert model.ck_model_encode_text(long, len(long)) == -1
+        assert model.ck_model_encode_text(short, len(short)) == len(reference.encode(short))
+        for raw in (b" ", b"\n", b"\xff"):
+            assert model.ck_model_lookup_token(raw) == reference._terminal[raw]
+        assert model.ck_model_lookup_token(b"not-a-vocabulary-piece-123456789") == -1
+
+
 def main() -> int:
     tokenizer_json = _find_tokenizer_json()
     if tokenizer_json is None:
@@ -270,9 +318,43 @@ def main() -> int:
                 print(f"DECODE MISMATCH len={len(data)} data={data[:40]!r}")
                 print(f"  got {decoded[:60]!r}")
 
+        # Capacity failure invalidates the entire prefix, and must not poison
+        # a later encode on the same tokenizer.
+        data = bytes(range(256)) * 3
+        expected = reference.encode(data)
+        exact = (ctypes.c_int32 * len(expected))()
+        assert lib.ck_tokenizer_encode(handle, data, len(data), exact, len(expected)) == len(expected)
+        assert list(exact) == expected
+        assert lib.ck_tokenizer_encode(handle, data, len(data), exact, len(expected) - 1) == -1
+        assert encode(data) == expected
+        assert lib.ck_tokenizer_lookup(handle, b"not-a-vocabulary-piece-123456789") == -1
+        # Unlike stored ByteLevel vocabulary strings, lookup accepts raw bytes.
+        for raw in (b" ", b"\n", b"\xff"):
+            assert lib.ck_tokenizer_lookup(handle, raw) == reference._terminal[raw]
+
         if lib.ck_tokenizer_lookup(handle, b"<|endoftext|>") != 0:
             failures += 1
             print("LOOKUP MISMATCH: <|endoftext|> did not resolve to id 0")
+
+        sparse = lib.ck_tokenizer_create(CK_TOKENIZER_RWKV_WORLD_TRIE)
+        assert sparse
+        try:
+            lib.ck_tokenizer_set_use_trie(sparse, True)
+            offsets = (ctypes.c_int32 * 2)(0, 2)
+            assert lib.ck_tokenizer_load_binary(sparse, 1, offsets, b"a\0", 0, None) == 0
+            target = (ctypes.c_int32 * 8)()
+            assert lib.ck_tokenizer_encode(sparse, b"ab", 2, target, 8) == -1
+            assert lib.ck_tokenizer_encode(sparse, b"a", 1, target, 8) == 1
+        finally:
+            lib.ck_tokenizer_free(sparse)
+
+        lib.ck_tokenizer_add_token.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int32, ctypes.c_float]
+        lib.ck_tokenizer_add_token.restype = ctypes.c_int
+        assert lib.ck_tokenizer_add_token(handle, b"x<|endoftext|>y", vocab_size, 0.0) == 0
+        assert encode(b"x<|endoftext|>y") == reference.encode(b"x<|endoftext|>y")
+        assert lib.ck_tokenizer_encode(handle, b"x", 1, exact, 0) == -1
+
+        _check_generated_api(handle, reference)
 
         # The publisher's class is the strongest oracle when it is available.
         reference_path = tokenizer_json.with_name("tokenization_rwkv7.py")

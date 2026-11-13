@@ -967,6 +967,11 @@ TEST_SUITES = {
         ROOT / "tests" / "test_v8_attention_training.py",
         unittest_targets=("tests.test_v8_attention_training", "tests.test_v8_attention_cross_backward"),
     ),
+    "training_gelu_composition": TestSuite(
+        "FP32 Exact-Erf GELU Automatic Backward and Native AdamW",
+        "training", ROOT / "tests" / "test_v8_gelu_training.py",
+        unittest_targets=("tests.test_v8_gelu_training",),
+    ),
     "training_layernorm_composition": TestSuite(
         "FP32 LayerNorm Cached-Statistics Training and Native AdamW", "training",
         ROOT / "tests" / "test_v8_layernorm_training.py",
@@ -2049,6 +2054,12 @@ TEST_SUITES = {
 
 # Make targets to run (non-Python tests)
 MAKE_TARGETS = {
+    "rwkv_world_tokenizer": {
+        "name": "RWKV World Native Trie and Capacity",
+        "category": "inference",
+        "target": "test-rwkv-world-tokenizer",
+        "timeout_sec": 180,
+    },
     "v8_native_session_ffi": {
         "name": "v8 Native Session/CLI FFI",
         "category": "inference",

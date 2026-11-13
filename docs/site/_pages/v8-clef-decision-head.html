@@ -287,6 +287,37 @@ into the training IR, integration of the certified noncausal attention VJP, inde
 head parameter/optimizer/export comparisons. BF16 head trajectories and LoRA/QLoRA follow that baseline.</p>
 </section>
 
+<section id="gelu-automatic-training">
+<h2>Exact-erf GELU in automatic backward lowering</h2>
+<p>The existing FP32 checked GELU forward and derivative now expose contiguous, fixed-batch training
+contracts. A v8 derivative rule declares the saved pre-activation, incoming gradient and scratch extent;
+the shared backward lowerer inserts the VJP and explicit gradient accumulation. There is no handwritten
+Clef backward scheduler and no new arithmetic kernel. The shared training library now links the existing
+GELU and head-VJP implementations.</p>
+<p>Derivative rules may explicitly name their read ports, preserving existing provider ABIs. Legacy
+positional names remain supported. Duplicate, missing or invalid names are rejected. Strict non-partial
+lowering now rejects unresolved backward inputs instead of producing an incomplete training graph.
+Declared contiguous row strides are checked against tensor widths before C emission.</p>
+<p>The model-neutral regression trains fixed features → projection → exact-erf GELU → frozen projection
+→ option scores with the existing native cross-entropy and AdamW. It compares every trainable gradient,
+weight and moment with independent PyTorch, checks an upstream finite difference, frozen-weight identity,
+40 updates, same-process checkpoint restoration and trained-logit reload. A late injected VJP failure must discard
+partial accumulation and preserve weights/moments; recovery must match a fresh run. This is a small
+FP32 composition, not released Clef training, BF16 training or a new job recipe.</p>
+<p>Measured on P3 with PyTorch 2.12.1 CPU: loss 1.40563822 → 0.18035129 over 40 native updates;
+maximum absolute differences were 9.32e-8 for gradients, 7.16e-7 for weights and 4.48e-8 for moments.
+The unchanged fixture ceilings are absolute 3e-5 for gradients/weights/logits and 3e-6 for moments,
+with relative 3e-4. PyTorch absence explicitly skips the independent comparison.</p>
+<pre><code>make -j4 build/libckernel_engine.so
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python3 -m unittest tests.test_v8_gelu_training -v
+python3 scripts/nightly_runner.py --tests training_gelu_composition --ci --require-executed</code></pre>
+<p><strong>Complete Clef training remains unsupported.</strong> The complete inference circuit still
+needs automatic bindings for pooling, indexed/scalar scoring, grouped loss and their branch joins.
+Training authoring must then connect that graph to the existing workflow. Only after complete gradients,
+updates and export/reload pass should the local job registry advertise a Clef head recipe.
+Backbone-feature capture and frozen-backbone execution remain separate evidence levels.</p>
+</section>
+
 <section id="selective-training">
 <h2>Selective FP32 training prerequisite</h2>
 <p>The shared v7/v8 backward lowerer now honors boolean parameter <code>requires_grad</code>

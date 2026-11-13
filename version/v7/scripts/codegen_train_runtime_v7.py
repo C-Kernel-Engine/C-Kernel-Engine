@@ -1209,6 +1209,8 @@ def _declared_training_call(op, kernel, args, pools, tensors, tensor_numel, vari
     for span in spans:
         tid = pointers[span["pointer"]]
         rows, width = extent(span["rows"]), extent(span["width"])
+        if "stride" in span and extent(span["stride"]) != width:
+            raise ValueError("training map stride must match contiguous row width: " + tid)
         if rows * width > min(tensor_numel[tid], 2147483647):
             raise ValueError("training map buffer capacity exceeded: " + tid)
         if "elements" in span:

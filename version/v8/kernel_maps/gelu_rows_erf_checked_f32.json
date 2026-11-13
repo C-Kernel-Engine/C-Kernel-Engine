@@ -89,7 +89,7 @@
   },
   "modes": {
     "inference": true,
-    "training": false,
+    "training": true,
     "backward": false
   },
   "call_constant_contract": {
@@ -220,9 +220,38 @@
   ],
   "tests": {
     "unit": [
-      "tests/test_v8_qwen3_tts_codec_convnext_complete.py"
+      "tests/test_v8_qwen3_tts_codec_convnext_complete.py",
+      "tests/test_v8_gelu_training.py"
     ],
     "oracle": "Pinned PyTorch GELU approximate=none and independent checked row cases"
   },
-  "notes": "Checked rows reuse existing FP64-erf GELU arithmetic with FP32 storage. Caller-owned staging, finite inputs/results, unchanged output on rejection; distinct from tanh GELU."
+  "notes": "Checked rows reuse existing FP64-erf GELU arithmetic with FP32 storage. Caller-owned staging, finite inputs/results, unchanged output on rejection; distinct from tanh GELU.",
+  "training_contract": {
+    "version": 1,
+    "layout": "contiguous",
+    "batch_policy": "fixed",
+    "return_status": "zero_success",
+    "buffer_spans": [
+      {
+        "pointer": "input",
+        "rows": "rows",
+        "width": "channels",
+        "elements": "input_elements",
+        "stride": "input_stride"
+      },
+      {
+        "pointer": "output",
+        "rows": "rows",
+        "width": "channels",
+        "elements": "output_elements",
+        "stride": "output_stride"
+      },
+      {
+        "pointer": "scratch",
+        "rows": "rows",
+        "width": "channels",
+        "elements": "scratch_elements"
+      }
+    ]
+  }
 }

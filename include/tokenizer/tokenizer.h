@@ -372,6 +372,8 @@ int ck_tokenizer_add_merge(CKTokenizer *tok,
  * @param max_ids    Maximum IDs to write
  * @return           Number of tokens written
  */
+/* RWKV World: returns -1 on insufficient capacity, allocation failure or an
+ * unmapped input byte. On failure, callers must discard the entire output. */
 int ck_tokenizer_encode(const CKTokenizer *tok,
                         const char *text,
                         int text_len,

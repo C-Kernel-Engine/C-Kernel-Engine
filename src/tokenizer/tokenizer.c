@@ -420,7 +420,7 @@ int32_t ck_tokenizer_lookup(const CKTokenizer *tok, const char *token) {
         if (!encoded) return tok->unk_id;
         TokenInfo *info = (TokenInfo *)ck_tokenizer_hash_table_lookup(tok->vocab, encoded);
         free(encoded);
-        return info ? info->id : tok->unk_id;
+        return info ? info->id : -1;
     }
     TokenInfo *info = (TokenInfo *)ck_tokenizer_hash_table_lookup(tok->vocab, token);
     return info ? info->id : tok->unk_id;
@@ -529,31 +529,43 @@ static int preprocess_bpe_spaces(const char *text, int text_len, char *out, int 
 static int rwkv_world_trie_encode(const CKTokenizer *tok, const char *text,
                                   int text_len, int32_t *ids, int max_ids) {
     if (!tok || !tok->vocab_trie || !text || !ids || max_ids <= 0 || text_len < 0) {
-        return 0;
+        return -1;
     }
     if (text_len == 0) return 0;
 
     size_t encoded_len = 0;
     char *encoded = rwkv_bytelevel_encode(text, (size_t)text_len, &encoded_len);
-    if (!encoded) return 0;
+    if (!encoded) return -1;
 
     int out_idx = 0;
     size_t pos = 0;
+    /* The publisher matches EOS before ordinary tokenization, even when a
+     * longer ordinary vocabulary entry overlaps it. EOS is ASCII ByteLevel. */
+    const char *eos = ck_tokenizer_id_to_token(tok, tok->eos_id);
+    size_t eos_len = eos ? strlen(eos) : 0;
+    const char *next_eos = eos_len ? strstr(encoded, eos) : NULL;
     while (pos < encoded_len && out_idx < max_ids) {
-        size_t match_len = 0;
-        int32_t id = ck_trie_find_longest(tok->vocab_trie, encoded, encoded_len, pos, &match_len);
-        if (match_len == 0) {
-            /* Singleton-byte invariant: skip one codepoint, not one byte. */
-            int char_len = ck_utf8_char_length((unsigned char)encoded[pos]);
-            pos += char_len > 0 ? (size_t)char_len : 1;
+        if (next_eos == encoded + pos) {
+            ids[out_idx++] = tok->eos_id;
+            pos += eos_len;
+            next_eos = strstr(encoded + pos, eos);
             continue;
+        }
+        size_t match_len = 0;
+        size_t ordinary_end = next_eos ? (size_t)(next_eos - encoded) : encoded_len;
+        int32_t id = ck_trie_find_longest(tok->vocab_trie, encoded, ordinary_end, pos, &match_len);
+        if (match_len == 0 || id < 0) {
+            /* An incomplete vocabulary must not silently drop input bytes. */
+            free(encoded);
+            return -1;
         }
         ids[out_idx++] = id >= 0 ? id : tok->unk_id;
         pos += match_len;
     }
 
     free(encoded);
-    return out_idx;
+    /* Failure invalidates the entire output buffer, including any prefix. */
+    return pos == encoded_len ? out_idx : -1;
 }
 
 /* Decode RWKV World token IDs back to raw UTF-8 text. */
@@ -591,13 +603,16 @@ static int rwkv_world_trie_decode(const CKTokenizer *tok, const int32_t *ids,
 
 /* Encode text to token IDs using greedy longest-match or Viterbi for SPM */
 int ck_tokenizer_encode(const CKTokenizer *tok, const char *text, int text_len, int32_t *ids, int max_ids) {
-    if (!tok || !text || !ids || max_ids <= 0) return 0;
-    if (text_len < 0) text_len = (int)strlen(text);
-
-    /* RWKV World uses its own byte-level trie path. */
-    if (tok->config.type == CK_TOKENIZER_RWKV_WORLD_TRIE) {
+    if (tok && tok->config.type == CK_TOKENIZER_RWKV_WORLD_TRIE) {
+        if (text && text_len < 0) {
+            size_t inferred = strlen(text);
+            if (inferred > INT32_MAX) return -1;
+            text_len = (int)inferred;
+        }
         return rwkv_world_trie_encode(tok, text, text_len, ids, max_ids);
     }
+    if (!tok || !text || !ids || max_ids <= 0) return 0;
+    if (text_len < 0) text_len = (int)strlen(text);
 
     /* SentencePiece implementation lives in tokenizer_spm.c */
     if (tok->config.type == CK_TOKENIZER_SPM) {
