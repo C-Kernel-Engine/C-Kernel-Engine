@@ -1188,6 +1188,16 @@ def test_vocabulary_prompt_matches_reference_order_and_limits():
     assert call() == [104, 12, 21, 35, 100, 101, 102, 103]
     assert call('') == [100, 101, 102, 103]
     assert call('   ') == [100, 101, 102, 103]
+    assert call(cfg={'context_length': 136}) == [104, 12, 21, 35, 100, 101, 102, 103]
+    with pytest.raises(ValueError, match='capacity'):
+        call(cfg={'context_length': 135})
+    assert runner.vocabulary_decoder_prefix(
+        generation, {'context_length': 135}, tokenizer, 'en', 'transcribe',
+        'Jupyter Notebook, Kokoro', 128, timestamps=True) == [104, 12, 21, 35, 100, 101, 102]
+    with pytest.raises(ValueError, match='capacity'):
+        runner.vocabulary_decoder_prefix(
+            generation, {'context_length': 134}, tokenizer, 'en', 'transcribe',
+            'Jupyter Notebook, Kokoro', 128, timestamps=True)
     for hint in ('x\x00', 'x'*1025):
         with pytest.raises(ValueError): call(hint)
     tokenizer.ids = [12]*65

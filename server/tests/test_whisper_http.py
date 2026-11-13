@@ -426,3 +426,63 @@ def test_vocabulary_context_is_request_local_and_never_rewrites_text():
     with TestClient(create_app(lambda: Backend(1))) as client:
         assert client.post('/audio/transcriptions', params={'vocabulary_hint':'Kokoro'},
                            content=_wav(1), headers={'content-type':'audio/wav'}).status_code == 501
+
+
+def test_capabilities_are_service_specific_and_instance_scoped():
+    from server.whisper_http import create_app
+    ids = []
+    for _ in range(2):
+        with TestClient(create_app(lambda: None, max_seconds=12,
+                                  max_upload_bytes=12345,
+                                  vocabulary_validator=lambda hint: None,
+                                  worker_timeout_seconds=77)) as client:
+            first = client.get('/health').json()
+            second = client.get('/health').json()
+            assert first['service_instance_id'] == second['service_instance_id']
+            assert client.get('/telemetry').json()['boot_id'] == first['service_instance_id']
+            ids.append(first['service_instance_id'])
+            cap = first['capabilities']
+            assert cap['audio']['max_seconds'] == 12
+            assert cap['audio']['max_upload_bytes'] == 12345
+            assert cap['vocabulary_hint']['max_tokens'] == 64
+            assert cap['vocabulary_hint']['supported']
+            assert cap['worker_timeout_seconds'] == 77
+            for field in ('segment_timestamps', 'attention_traces', 'word_alignment',
+                          'long_audio', 'editing_review', 'artifact_retrieval', 'request_deadlines'):
+                assert cap[field] is False
+            assert first['running_native'] is False
+    assert ids[0] != ids[1]
+
+
+def test_unavailable_options_reject_before_upload_or_backend_creation():
+    from server.whisper_http import create_app
+    def forbidden():
+        raise AssertionError('unsupported option must not create backend')
+    with TestClient(create_app(forbidden)) as client:
+        assert client.get('/health').json()['capabilities']['vocabulary_hint']['supported'] is False
+        for key in ('timestamps', 'word_alignment', 'attention_trace_dir',
+                    'beam_size', 'language', 'vocabular_hint'):
+            response = client.post('/audio/transcriptions', params={key: 'true'},
+                                   content=b'not even a WAV')
+            assert response.status_code == 400
+            assert response.json()['detail']['code'] == 'unsupported_option'
+        assert client.get('/health').json()['worker_generation'] == 0
+
+
+def test_cli_disables_access_logs_containing_private_query_hints(tmp_path, monkeypatch):
+    import sys
+    import json
+    import uvicorn
+    from tokenizers import Tokenizer, models
+    from server import whisper_http
+    (tmp_path / 'config.json').write_text(json.dumps({
+        'audio_sample_rate': 16000, 'audio_sample_extent': 480000, 'context_length': 448}))
+    (tmp_path / 'generation_config.json').write_text('{}')
+    Tokenizer(models.WordLevel({'[UNK]': 0}, unk_token='[UNK]')).save(str(tmp_path / 'tokenizer.json'))
+    observed = {}
+    monkeypatch.setattr(sys, 'argv', ['whisper', '--encoder-run-dir', str(tmp_path),
+                                    '--decoder-run-dir', str(tmp_path)])
+    monkeypatch.setattr(uvicorn, 'run', lambda app, **kw: observed.update(kw))
+    whisper_http.main()
+    assert observed['access_log'] is False
+    assert observed['host'] == '127.0.0.1'
