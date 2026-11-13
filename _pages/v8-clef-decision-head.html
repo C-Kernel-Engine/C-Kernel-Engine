@@ -329,6 +329,47 @@ remain. BF16 training, LoRA/QLoRA and application submission remain separate acc
 The existing job service continues to reject unsupported recipes.</p>
 </section>
 
+<section id="combined-scoring-training">
+<h2>Automatic training through learned gains and combined scoring branches</h2>
+<p>The FP32 scoring composition now joins normalized-dot prior scores, cosine joint scores and a
+residual MLP, with two learned exponential scales and a sigmoid gate, before grouped decision loss.
+Its derivatives are selected by v8 rules and map contracts; the existing shared lowerer emits branch
+accumulation, parameter gradients and native AdamW. This milestone adds no generic compiler logic or
+model-specific backward scheduler.</p>
+<p>Three reusable checked VJPs cover scalar exp-clamp, scalar sigmoid and vector scaling. Exp-clamp
+has derivative one at the clamp boundary and zero above it. Sigmoid differentiates the rounded stable
+forward value. Vector scaling computes input gradients and an ascending FP64 gain reduction, staging
+both outputs before publication. Caller-owned scratch, capacities, finite values, alias rejection and
+failure atomicity are explicit. Existing cosine/normalized-dot VJPs and checked addition gain training
+bindings. Their distinct below-epsilon norm derivatives remain explicitly selected; the forward result
+alone cannot identify which derivative is appropriate.</p>
+<p>The nonzero model-neutral fixture uses two questions with one and three options, repeated owner
+indices and overlapping spans. All three learned scalars have significant initial gradients and independent
+finite-difference checks. Every trainable parameter gradient, weight and moment is compared with PyTorch
+through 40 native AdamW updates. The frozen feature table and redundant common score bias remain
+byte-identical. Checkpoint restore reproduces the remaining trajectory exactly, and trained-weight
+reload reproduces scores. An injected sigmoid-VJP failure after partial accumulation preserves weights
+and moments, discards incomplete gradients and recovers to the exact fresh-run update.</p>
+<p>Measured on P3 with PyTorch 2.12.1 CPU, seed 837: loss 0.77345836 → 0.00013260. Maximum absolute
+errors were 2.38e-7 for gradients, 7.16e-7 for weights and 1.09e-7 for moments. Existing regression
+ceilings remain unchanged. Primitive tests cover independent ordered FP64 arithmetic, O0/O3, PyTorch,
+finite differences, saturation/clamp boundaries, finite overflow, one-element-short capacities, guards,
+partial overlap and rejection/reuse. The explicit FP64 gain test sums [1e8, 1, -1e8] to one.</p>
+<p>The unchanged complete-head forward test also passes with hash-verified released head weights and
+pinned source at six and eight synthetic feature tokens: maximum raw-logit errors are 1.19e-7 and
+1.79e-7. This protects forward inference; it does not certify released-head backward execution.</p>
+<pre><code>make -j4 build/libckernel_engine.so
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python3 -m unittest tests.test_v8_scoring_training -v
+python3 scripts/nightly_runner.py --tests training_scoring_composition --ci --require-executed</code></pre>
+<p><strong>Complete released-head training remains NOT_TESTED.</strong> This is a reduced scoring graph,
+not the four field layers and evidence stack trained together. Next assemble those existing training
+components into complete head authoring, audit remaining broadcast/selection and trainable-embedding
+bindings, and certify every head gradient, update and export with released weights. No new application
+recipe is exposed. BF16 composed training, backbone execution, LoRA and QLoRA remain separate gates.
+The current trainer requires fixed capacities and positive scalar constants; the standalone exp-clamp
+kernel's finite-maximum domain is wider. Missing PyTorch or a native engine is reported as SKIP.</p>
+</section>
+
 <section id="grouped-loss-training">
 <h2>Declared grouped decision loss and indexed scoring training</h2>
 <p>A training graph can now declare its scalar loss and score tensor explicitly instead of requiring
@@ -361,7 +402,7 @@ O0/O3 comparison, padding and malformed-buffer rejection. Missing PyTorch or eng
 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python3 -m unittest tests.test_v8_grouped_loss_training -v
 python3 scripts/nightly_runner.py --tests training_grouped_loss_composition --ci --require-executed</code></pre>
 <p><strong>This is component training, not complete Clef head training.</strong> Remaining work includes
-scalar/gain and normalized-dot/cosine derivative integration, complete head training authoring,
+complete head training authoring (the combined scoring update above now covers scalar/gain and cosine derivatives),
 released-head gradient/update/export comparisons and the application recipe. BF16 composed training,
 backbone integration, LoRA and QLoRA remain separate gates. The job service still rejects unsupported
 Clef recipes. These low-level declarations do not yet make arbitrary inference circuits trainable through
@@ -393,7 +434,7 @@ with relative 3e-4. PyTorch absence explicitly skips the independent comparison.
 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python3 -m unittest tests.test_v8_gelu_training -v
 python3 scripts/nightly_runner.py --tests training_gelu_composition --ci --require-executed</code></pre>
 <p><strong>Complete Clef training remains unsupported.</strong> The complete inference circuit still
-needs remaining indexed/scalar derivative bindings, grouped loss and complete graph authoring.
+now has indexed/scalar and grouped-loss component evidence; complete graph authoring remains.
 Training authoring must then connect that graph to the existing workflow. Only after complete gradients,
 updates and export/reload pass should the local job registry advertise a Clef head recipe.
 Backbone-feature capture and frozen-backbone execution remain separate evidence levels.</p>
@@ -592,7 +633,7 @@ checkpoint/resume and inference-export workflow. Do not add a second model execu
 <tr><td>Token-span pooling and last-token selection</td><td>Checked span VJP accumulates overlapping spans with generated-chain evidence.</td><td>Automatic span VJP and branch accumulation pass in the typed-input training composition; integrate final-row selection and the complete head.</td></tr>
 <tr><td>Embedding/gather and residual branches</td><td><code>embedding_backward_f32.json</code>, native BF16 embedding scatter, <code>residual_add_backward_f32.json</code>, gradient-accumulation providers.</td><td>Wire type-embedding gradients, indexed-owner scatter and broadcast reductions. Frozen output embeddings need no updates, while required hidden-feature gradient paths remain explicit.</td></tr>
 <tr><td>Grouped softmax-weighted pooling</td><td>Checked options/query VJP covers both score and value paths, unequal and singleton groups.</td><td>Automatic VJP and shared-input branch accumulation pass in generated training; connect complete-head authoring and loss.</td></tr>
-<tr><td>Cosine, pair features, scalar transforms</td><td>Indexed pair features and distinct normalized-dot/cosine FP32 VJPs now have generated branch-join evidence.</td><td>Wire automatic head backward with explicit clamp policy; add scalar/gain and remaining indexed derivatives, then certify complete scoring parameter gradients.</td></tr>
+<tr><td>Cosine, pair features, scalar transforms</td><td>Indexed pair features and distinct normalized-dot/cosine FP32 VJPs now have generated branch-join evidence.</td><td>Automatic FP32 combined scoring now covers pair/cosine branches and learned scalar/gain gradients with 40 native updates. Complete released-head authoring and training remain uncertified.</td></tr>
 <tr><td>Loss and optimizer</td><td><code>softmax_cross_entropy_loss.json</code> and <code>adamw_update_f32.json</code>; existing trajectory/resume/export machinery.</td><td>Declare one label per question and loss reduction over unequal option counts, then verify every trainable parameter, frozen hashes, optimizer moments and restart equivalence.</td></tr>
 </tbody></table>
 <p><code>version/v8/scripts/run_training_workflow_v8.py:_apply_semantic_model</code> currently admits

@@ -8,6 +8,9 @@ var ckernel__head__backward_8h =
     [ "ck_indexed_cosine_rows_backward_f32", "ckernel__head__backward_8h.html#aab7b59b69b3b07d80a37da04cd18e7df", null ],
     [ "ck_indexed_normalized_dot_backward_f32", "ckernel__head__backward_8h.html#a2bfc926e0f3092b44c0992d81fd9bb39", null ],
     [ "ck_indexed_pair_features_backward_f32", "ckernel__head__backward_8h.html#a11622dd7bad4e79b09c933b074e4cca1", null ],
+    [ "ck_scalar_exp_clamped_backward_f32", "ckernel__head__backward_8h.html#ac5a786a92d3282c182af8e7778385a96", null ],
+    [ "ck_scalar_sigmoid_backward_f32", "ckernel__head__backward_8h.html#a4e025a9f0eccc90ad17ee87b0b31e69b", null ],
+    [ "ck_scale_vector_backward_f32", "ckernel__head__backward_8h.html#a38a1d265ee1f4c57319254b09a3fdd22", null ],
     [ "ck_token_span_mean_backward_bf16", "ckernel__head__backward_8h.html#aef32ae5311387616b47fc6a7fcda6200", null ],
     [ "ck_token_span_mean_backward_f32", "ckernel__head__backward_8h.html#ac1eb7292fe2a8641b5ccfea67f400c40", null ]
 ];

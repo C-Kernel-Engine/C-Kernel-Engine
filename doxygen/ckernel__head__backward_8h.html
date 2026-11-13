@@ -153,6 +153,12 @@ Functions</h2></td></tr>
 <tr class="separator:a2bfc926e0f3092b44c0992d81fd9bb39"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a11622dd7bad4e79b09c933b074e4cca1" id="r_a11622dd7bad4e79b09c933b074e4cca1"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__head__backward_8h.html#a11622dd7bad4e79b09c933b074e4cca1">ck_indexed_pair_features_backward_f32</a> (const float *<a class="el" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a>, size_t left_elements, const float *<a class="el" href="true__bpe_8h.html#afb60251d57a9ee3324fbc011e4be71e9">right</a>, size_t right_elements, const int32_t *indices, size_t indices_elements, const float *d_output, size_t d_output_elements, float *d_left, size_t d_left_elements, float *d_right, size_t d_right_elements, float *scratch, size_t scratch_elements, size_t groups, size_t rows, size_t channels)</td></tr>
 <tr class="separator:a11622dd7bad4e79b09c933b074e4cca1"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac5a786a92d3282c182af8e7778385a96" id="r_ac5a786a92d3282c182af8e7778385a96"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__head__backward_8h.html#ac5a786a92d3282c182af8e7778385a96">ck_scalar_exp_clamped_backward_f32</a> (const float *input, size_t input_elements, const float *d_output, size_t d_output_elements, float *d_input, size_t d_input_elements, float maximum)</td></tr>
+<tr class="separator:ac5a786a92d3282c182af8e7778385a96"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4e025a9f0eccc90ad17ee87b0b31e69b" id="r_a4e025a9f0eccc90ad17ee87b0b31e69b"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__head__backward_8h.html#a4e025a9f0eccc90ad17ee87b0b31e69b">ck_scalar_sigmoid_backward_f32</a> (const float *input, size_t input_elements, const float *d_output, size_t d_output_elements, float *d_input, size_t d_input_elements)</td></tr>
+<tr class="separator:a4e025a9f0eccc90ad17ee87b0b31e69b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a38a1d265ee1f4c57319254b09a3fdd22" id="r_a38a1d265ee1f4c57319254b09a3fdd22"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__head__backward_8h.html#a38a1d265ee1f4c57319254b09a3fdd22">ck_scale_vector_backward_f32</a> (const float *input, size_t input_elements, const float *gain, size_t gain_elements, const float *d_output, size_t d_output_elements, float *d_input, size_t d_input_elements, float *d_gain, size_t d_gain_elements, float *scratch, size_t scratch_elements, size_t rows)</td></tr>
+<tr class="separator:a38a1d265ee1f4c57319254b09a3fdd22"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aef32ae5311387616b47fc6a7fcda6200" id="r_aef32ae5311387616b47fc6a7fcda6200"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__head__backward_8h.html#aef32ae5311387616b47fc6a7fcda6200">ck_token_span_mean_backward_bf16</a> (const uint16_t *d_output, size_t d_output_elements, size_t d_output_stride, const int32_t *spans, size_t span_elements, size_t span_count, uint16_t *d_input, size_t d_input_elements, size_t d_input_stride, float *scratch, size_t scratch_elements, size_t token_capacity, size_t valid_tokens, size_t channels)</td></tr>
 <tr class="separator:aef32ae5311387616b47fc6a7fcda6200"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ac1eb7292fe2a8641b5ccfea67f400c40" id="r_ac1eb7292fe2a8641b5ccfea67f400c40"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__head__backward_8h.html#ac1eb7292fe2a8641b5ccfea67f400c40">ck_token_span_mean_backward_f32</a> (const float *d_output, size_t d_output_elements, size_t d_output_stride, const int32_t *spans, size_t span_elements, size_t span_count, float *d_input, size_t d_input_elements, size_t d_input_stride, float *scratch, size_t scratch_elements, size_t token_capacity, size_t valid_tokens, size_t channels)</td></tr>
@@ -1428,6 +1434,261 @@ Functions</h2></td></tr>
 <div class="ttc" id="atrue__bpe_8h_html_afb60251d57a9ee3324fbc011e4be71e9"><div class="ttname"><a href="true__bpe_8h.html#afb60251d57a9ee3324fbc011e4be71e9">right</a></div><div class="ttdeci">const char const char * right</div><div class="ttdef"><b>Definition</b> <a href="true__bpe_8h_source.html#l00141">true_bpe.h:141</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="true__bpe_8h_source.html#l00140">left</a>, <a class="el" href="decision__scoring__backward_8c_source.html#l00036">publish()</a>, <a class="el" href="true__bpe_8h_source.html#l00141">right</a>, <a class="el" href="decision__scoring__backward_8c_source.html#l00012">store()</a>, and <a class="el" href="decision__scoring__backward_8c_source.html#l00016">validate()</a>.</p>
+
+</div>
+</div>
+<a id="ac5a786a92d3282c182af8e7778385a96" name="ac5a786a92d3282c182af8e7778385a96"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ac5a786a92d3282c182af8e7778385a96">&#9670;&#160;</a></span>ck_scalar_exp_clamped_backward_f32()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int ck_scalar_exp_clamped_backward_f32 </td>
+          <td>(</td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>input</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>input_elements</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>d_output</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>d_output_elements</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>d_input</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>d_input_elements</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float&#160;</td>
+          <td class="paramname"><em>maximum</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="decision__scoring__backward_8c_source.html#l00126">126</a> of file <a class="el" href="decision__scoring__backward_8c_source.html">decision_scoring_backward.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  128</span>                                                            {</div>
+<div class="line"><span class="lineno">  129</span>    <span class="keywordtype">int</span> rc=<a class="code hl_function" href="decision__scoring__backward_8c.html#ac13c666d0c4ac54d0841e05e4c1f54f6">scalar_vjp_validate</a>(input,input_elements,d_output,d_output_elements,d_input,d_input_elements);</div>
+<div class="line"><span class="lineno">  130</span>    <span class="keywordflow">if</span> (rc) <span class="keywordflow">return</span> rc;</div>
+<div class="line"><span class="lineno">  131</span>    <span class="keywordflow">if</span> (!isfinite(maximum)) <span class="keywordflow">return</span> -2;</div>
+<div class="line"><span class="lineno">  132</span>    <span class="keywordtype">float</span> y=expf(fminf(input[0],maximum)), result;</div>
+<div class="line"><span class="lineno">  133</span>    <span class="keywordflow">if</span> (!isfinite(y)) <span class="keywordflow">return</span> -4;</div>
+<div class="line"><span class="lineno">  134</span>    <span class="comment">/* clamp(max=...) has derivative one AT the boundary, zero above it. */</span></div>
+<div class="line"><span class="lineno">  135</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="decision__scoring__backward_8c.html#a2af99e790bfb92fb7633afd43b02ce39">store</a>(&amp;result,input[0]&lt;=maximum ? (<span class="keywordtype">double</span>)d_output[0]*y : 0.0)) return -4;</div>
+<div class="line"><span class="lineno">  136</span>    d_input[0]=result; <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  137</span>}</div>
+<div class="ttc" id="adecision__scoring__backward_8c_html_ac13c666d0c4ac54d0841e05e4c1f54f6"><div class="ttname"><a href="decision__scoring__backward_8c.html#ac13c666d0c4ac54d0841e05e4c1f54f6">scalar_vjp_validate</a></div><div class="ttdeci">static int scalar_vjp_validate(const float *input, size_t input_elements, const float *dy, size_t dy_elements, float *dx, size_t dx_elements)</div><div class="ttdef"><b>Definition</b> <a href="decision__scoring__backward_8c_source.html#l00117">decision_scoring_backward.c:117</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="decision__scoring__backward_8c_source.html#l00117">scalar_vjp_validate()</a>, and <a class="el" href="decision__scoring__backward_8c_source.html#l00012">store()</a>.</p>
+
+</div>
+</div>
+<a id="a4e025a9f0eccc90ad17ee87b0b31e69b" name="a4e025a9f0eccc90ad17ee87b0b31e69b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a4e025a9f0eccc90ad17ee87b0b31e69b">&#9670;&#160;</a></span>ck_scalar_sigmoid_backward_f32()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int ck_scalar_sigmoid_backward_f32 </td>
+          <td>(</td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>input</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>input_elements</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>d_output</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>d_output_elements</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>d_input</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>d_input_elements</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="decision__scoring__backward_8c_source.html#l00138">138</a> of file <a class="el" href="decision__scoring__backward_8c_source.html">decision_scoring_backward.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  140</span>                                             {</div>
+<div class="line"><span class="lineno">  141</span>    <span class="keywordtype">int</span> rc=<a class="code hl_function" href="decision__scoring__backward_8c.html#ac13c666d0c4ac54d0841e05e4c1f54f6">scalar_vjp_validate</a>(input,input_elements,d_output,d_output_elements,d_input,d_input_elements);</div>
+<div class="line"><span class="lineno">  142</span>    <span class="keywordflow">if</span> (rc) <span class="keywordflow">return</span> rc;</div>
+<div class="line"><span class="lineno">  143</span>    <span class="keywordtype">float</span> x=input[0], e=expf(-fabsf(x));</div>
+<div class="line"><span class="lineno">  144</span>    <span class="keywordtype">float</span> y=x&gt;=0 ? 1.0f/(1.0f+e) : e/(1.0f+e), result;</div>
+<div class="line"><span class="lineno">  145</span>    <span class="keyword">volatile</span> <span class="keywordtype">double</span> slope=(double)y*(1.0-(<span class="keywordtype">double</span>)y);</div>
+<div class="line"><span class="lineno">  146</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="decision__scoring__backward_8c.html#a2af99e790bfb92fb7633afd43b02ce39">store</a>(&amp;result,(<span class="keywordtype">double</span>)d_output[0]*slope)) <span class="keywordflow">return</span> -4;</div>
+<div class="line"><span class="lineno">  147</span>    d_input[0]=result; <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  148</span>}</div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="decision__scoring__backward_8c_source.html#l00117">scalar_vjp_validate()</a>, and <a class="el" href="decision__scoring__backward_8c_source.html#l00012">store()</a>.</p>
+
+</div>
+</div>
+<a id="a38a1d265ee1f4c57319254b09a3fdd22" name="a38a1d265ee1f4c57319254b09a3fdd22"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a38a1d265ee1f4c57319254b09a3fdd22">&#9670;&#160;</a></span>ck_scale_vector_backward_f32()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int ck_scale_vector_backward_f32 </td>
+          <td>(</td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>input</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>input_elements</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>gain</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>gain_elements</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>d_output</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>d_output_elements</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>d_input</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>d_input_elements</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>d_gain</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>d_gain_elements</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>scratch</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>scratch_elements</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>rows</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="decision__scoring__backward_8c_source.html#l00149">149</a> of file <a class="el" href="decision__scoring__backward_8c_source.html">decision_scoring_backward.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  152</span>                                                          {</div>
+<div class="line"><span class="lineno">  153</span>    <span class="keywordflow">if</span> (!rows || rows==SIZE_MAX || input_elements&lt;rows || gain_elements&lt;1 ||</div>
+<div class="line"><span class="lineno">  154</span>        d_output_elements&lt;rows || d_input_elements&lt;rows || d_gain_elements&lt;1 ||</div>
+<div class="line"><span class="lineno">  155</span>        scratch_elements&lt;rows+1) <span class="keywordflow">return</span> -2;</div>
+<div class="line"><span class="lineno">  156</span>    <span class="keyword">const</span> <span class="keywordtype">void</span> *ptrs[]={input,gain,d_output,d_input,d_gain,scratch};</div>
+<div class="line"><span class="lineno">  157</span>    <span class="keywordtype">size_t</span> sizes[]={input_elements,gain_elements,d_output_elements,d_input_elements,d_gain_elements,scratch_elements};</div>
+<div class="line"><span class="lineno">  158</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i=0;i&lt;6;++i) <span class="keywordflow">if</span> (!<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(ptrs[i],sizes[i])) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  159</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i=3;i&lt;6;++i) <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> j=0;j&lt;i;++j)</div>
+<div class="line"><span class="lineno">  160</span>        <span class="keywordflow">if</span> (<a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(ptrs[i],sizes[i],ptrs[j],sizes[j])) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  161</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a>(input,rows) || !<a class="code hl_function" href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a>(gain,1) || !<a class="code hl_function" href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a>(d_output,rows)) <span class="keywordflow">return</span> -3;</div>
+<div class="line"><span class="lineno">  162</span>    <span class="keywordtype">double</span> sum=0;</div>
+<div class="line"><span class="lineno">  163</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> r=0;r&lt;rows;++r) {</div>
+<div class="line"><span class="lineno">  164</span>        <span class="keywordflow">if</span> (!<a class="code hl_function" href="decision__scoring__backward_8c.html#a2af99e790bfb92fb7633afd43b02ce39">store</a>(scratch+r,(<span class="keywordtype">double</span>)d_output[r]*gain[0])) <span class="keywordflow">return</span> -4;</div>
+<div class="line"><span class="lineno">  165</span>        <span class="keyword">volatile</span> <span class="keywordtype">double</span> <a class="code hl_function" href="decision__scoring__backward_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a>=(double)d_output[r]*input[r]; sum+=<a class="code hl_function" href="decision__scoring__backward_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a>;</div>
+<div class="line"><span class="lineno">  166</span>    }</div>
+<div class="line"><span class="lineno">  167</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="decision__scoring__backward_8c.html#a2af99e790bfb92fb7633afd43b02ce39">store</a>(scratch+rows,sum)) <span class="keywordflow">return</span> -4;</div>
+<div class="line"><span class="lineno">  168</span>    memcpy(d_input,scratch,rows*<span class="keyword">sizeof</span>(<span class="keywordtype">float</span>)); d_gain[0]=scratch[rows]; <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  169</span>}</div>
+<div class="ttc" id="adecision__scoring__backward_8c_html_a6cbb018b1e755f86de9d2dd05d164a53"><div class="ttname"><a href="decision__scoring__backward_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a></div><div class="ttdeci">static int product(size_t a, size_t b, size_t *out)</div><div class="ttdef"><b>Definition</b> <a href="decision__scoring__backward_8c_source.html#l00008">decision_scoring_backward.c:8</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="checked__float__buffer_8h_source.html#l00019">ck_checked_finite()</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00015">ck_checked_overlap()</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00011">ck_checked_region()</a>, <a class="el" href="decision__scoring__backward_8c_source.html#l00008">product()</a>, and <a class="el" href="decision__scoring__backward_8c_source.html#l00012">store()</a>.</p>
 
 </div>
 </div>
