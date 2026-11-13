@@ -13,7 +13,8 @@ SOURCE = r"""
 void gemm_nt_f32_llama_production_output_range(const float*, const float*, const float*, float*, int, int, int, int, int);
 int main(void) {
     const int shapes[][3] = {{1,1,1},{3,9,32},{4,9,32},{5,9,32},
-        {8,17,64},{9,17,65},{17,33,128},{9,1280,1280}};
+        {8,17,64},{9,17,65},{17,33,128},{31,33,128},{32,33,128},
+        {33,33,128},{65,33,128},{9,1280,1280},{65,1280,1280}};
     for (unsigned s=0; s<sizeof(shapes)/sizeof(shapes[0]); ++s) {
         int M=shapes[s][0], N=shapes[s][1], K=shapes[s][2], total=M*N;
         float *a=malloc(M*K*sizeof(float)), *b=malloc(N*K*sizeof(float));
