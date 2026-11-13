@@ -704,6 +704,14 @@ TEST_SUITES = {
     "rope": TestSuite("RoPE", "kernels", UNITTEST_DIR / "test_rope.py"),
     "embedding": TestSuite("Embedding", "kernels", UNITTEST_DIR / "test_embedding.py"),
     "attention": TestSuite("Attention", "kernels", UNITTEST_DIR / "test_attention.py"),
+    "bf16_exact_output_lanes": TestSuite(
+        "v8 BF16 exact output-lane SIMD", "kernels",
+        ROOT / "tests" / "test_v8_bf16_exact_output_lanes.py", timeout_sec=180,
+    ),
+    "attention_matmul_tail": TestSuite(
+        "AVX-512 Attention Matmul Tail", "kernels",
+        ROOT / "tests" / "test_v8_attention_matmul_tail.py", timeout_sec=180,
+    ),
     "attention_sliding": TestSuite("Attention Sliding Window", "kernels", UNITTEST_DIR / "test_attention_sliding_contract.py"),
     "attention_gemma3_arithmetic": TestSuite(
         "Gemma3 Attention Arithmetic Fixture", "kernels",

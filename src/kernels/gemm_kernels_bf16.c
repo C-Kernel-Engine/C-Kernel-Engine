@@ -724,6 +724,55 @@ void gemv_bf16_bf16_storage(float *y,
     gemv_bf16_bf16_storage_parallel_dispatch(y, W, x, M, K);
 }
 
+#if defined(__AVX512F__) && defined(__GNUC__) && !defined(__clang__)
+/* Independent output lanes preserve the scalar K order, including bias first.
+ * Bounded stack packing (2 KiB weights + 512 B inputs) is reused by four rows.
+ * Do not contract multiply/add: this provider promises the original reduction.
+ */
+__attribute__((optimize("O3", "fp-contract=off")))
+static void gemm_nt_bf16_exact_avx512(const float *A, const uint16_t *B,
+                                    const float *bias, float *C,
+                                    int N, int K, int begin, int end)
+{
+    for (int i = begin; i < end; i += 4) {
+        const int rows = end - i < 4 ? end - i : 4;
+        for (int j = 0; j < N; j += 16) {
+            const int width = N - j < 16 ? N - j : 16;
+            const __mmask16 mask = (__mmask16)((1u << width) - 1u);
+            __m512 sums[4];
+            const __m512 initial = bias ? _mm512_maskz_loadu_ps(mask, bias + j)
+                                       : _mm512_setzero_ps();
+            for (int r = 0; r < rows; ++r) sums[r] = initial;
+            for (int k0 = 0; k0 < K; k0 += 32) {
+                const int count = K - k0 < 32 ? K - k0 : 32;
+                float packed[32][16] = {{0}};
+                float rounded[4][32];
+                for (int lane = 0; lane < width; ++lane) {
+                    const uint16_t *w = B + (size_t)(j + lane) * K + k0;
+                    for (int k = 0; k < count; ++k)
+                        packed[k][lane] = bf16_to_float(w[k]);
+                }
+                for (int r = 0; r < rows; ++r) {
+                    const float *a = A + (size_t)(i + r) * K + k0;
+                    for (int k = 0; k < count; ++k)
+                        rounded[r][k] = bf16_to_float(float_to_bf16(a[k]));
+                }
+                for (int k = 0; k < count; ++k) {
+                    const __m512 w = _mm512_loadu_ps(packed[k]);
+                    for (int r = 0; r < rows; ++r) {
+                        const __m512 product = _mm512_mul_ps(
+                            _mm512_set1_ps(rounded[r][k]), w);
+                        sums[r] = _mm512_add_ps(sums[r], product);
+                    }
+                }
+            }
+            for (int r = 0; r < rows; ++r)
+                _mm512_mask_storeu_ps(C + (size_t)(i + r) * N + j, mask, sums[r]);
+        }
+    }
+}
+#endif
+
 void gemm_nt_bf16_row_range(const float *A,
                             const void *B,
                             const float *bias,
@@ -736,6 +785,11 @@ void gemm_nt_bf16_row_range(const float *A,
         row_begin < 0 || row_begin >= row_end || row_end > M) {
         return;
     }
+
+#if defined(__AVX512F__) && defined(__GNUC__) && !defined(__clang__)
+    gemm_nt_bf16_exact_avx512(A, w, bias, C, N, K, row_begin, row_end);
+    return;
+#endif
 
     for (int i = row_begin; i < row_end; ++i) {
         const float *a_row = A + (size_t)i * (size_t)K;
