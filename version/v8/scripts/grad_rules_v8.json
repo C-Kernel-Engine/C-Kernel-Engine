@@ -1384,6 +1384,53 @@
           ]
         }
       ]
+    },
+    "projection_bf16_train_bias_backward": {
+      "status": "ready",
+      "requires_saved": [
+        "saved_input",
+        "saved_weight"
+      ],
+      "extra_saved": [],
+      "backward_ops": [
+        {
+          "role": "core",
+          "kernel_id": "projection_bf16_train_bias_backward",
+          "map_call": true,
+          "reads": [
+            "grad:output",
+            "saved:saved_input",
+            "saved:saved_weight"
+          ],
+          "input_names": [
+            "d_output",
+            "saved_input",
+            "saved_weight"
+          ],
+          "writes": [
+            {
+              "name": "d_input",
+              "kind": "grad_activation",
+              "target_input": "input"
+            },
+            {
+              "name": "d_weight",
+              "kind": "tmp_grad_weight",
+              "target_weight": "weight"
+            },
+            {
+              "name": "scratch",
+              "kind": "aux",
+              "numel_from_forward_param": "backward_scratch_elements"
+            },
+            {
+              "name": "d_bias",
+              "kind": "tmp_grad_weight",
+              "target_weight": "bias"
+            }
+          ]
+        }
+      ]
     }
   },
   "template_op_to_rule": {

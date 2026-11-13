@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 514,
+      "total": 516,
       "by_op": {
         "add_backward": 1,
         "add_rows_backward_train_f32": 1,
@@ -162,6 +162,8 @@
         "position_embeddings": 7,
         "position_ids": 1,
         "projection_bf16_train_backward": 1,
+        "projection_bf16_train_bias_backward": 1,
+        "projection_bf16_train_bias_forward": 1,
         "projection_bf16_train_forward": 1,
         "projector_prep": 1,
         "q_norm": 1,
@@ -80812,6 +80814,691 @@
       },
       "name": "projection_bf16_train_backward",
       "_source_file": "projection_bf16_train_backward.json"
+    },
+    {
+      "id": "projection_bf16_train_bias_backward",
+      "op": "projection_bf16_train_bias_backward",
+      "operation_interface": "projection_bf16_train_bias_backward.v1",
+      "variant": "scalar_ordered_fp32_bf16_rne_operands",
+      "quant": {
+        "weight": "bf16",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "d_output",
+          "dtype": "fp32",
+          "shape": [
+            "rows",
+            "outputs"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "saved_input",
+          "dtype": "bf16",
+          "shape": [
+            "rows",
+            "inputs"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "saved_weight",
+          "dtype": "bf16",
+          "shape": [
+            "outputs",
+            "inputs"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "d_input",
+          "dtype": "fp32",
+          "shape": [
+            "rows",
+            "inputs"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "d_weight",
+          "dtype": "fp32",
+          "shape": [
+            "outputs",
+            "inputs"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "d_bias",
+          "dtype": "fp32",
+          "shape": [
+            "outputs"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "scratch",
+          "dtype": "fp32",
+          "shape": [
+            1,
+            "scratch_elements"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "dims": [
+        "d_output_elements",
+        "saved_input_elements",
+        "saved_weight_elements",
+        "d_input_elements",
+        "d_weight_elements",
+        "scratch_elements",
+        "rows",
+        "inputs",
+        "outputs",
+        "d_bias_elements"
+      ],
+      "impl": {
+        "function": "ck_projection_bf16_train_bias_backward",
+        "c_declaration": "int ck_projection_bf16_train_bias_backward(const float *d_output, size_t d_output_elements, const uint16_t *saved_input, size_t saved_input_elements, const uint16_t *saved_weight, size_t saved_weight_elements, float *d_input, size_t d_input_elements, float *d_weight, size_t d_weight_elements, float *d_bias, size_t d_bias_elements, float *scratch, size_t scratch_elements, size_t rows, size_t inputs, size_t outputs);",
+        "sources": [
+          "src/kernels/projection_bf16_train.c"
+        ]
+      },
+      "modes": {
+        "inference": false,
+        "training": true,
+        "backward": true
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "d_output",
+            "source": "activation:d_output",
+            "ports": [
+              "input:d_output"
+            ],
+            "cast": "const float *"
+          },
+          {
+            "name": "d_output_elements",
+            "source": "runtime:d_output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "saved_input",
+            "source": "activation:saved_input",
+            "ports": [
+              "input:saved_input"
+            ],
+            "cast": "const uint16_t *"
+          },
+          {
+            "name": "saved_input_elements",
+            "source": "runtime:saved_input_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "saved_weight",
+            "source": "activation:saved_weight",
+            "ports": [
+              "input:saved_weight"
+            ],
+            "cast": "const uint16_t *"
+          },
+          {
+            "name": "saved_weight_elements",
+            "source": "runtime:saved_weight_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "d_input",
+            "source": "output:d_input",
+            "ports": [
+              "output:d_input"
+            ],
+            "cast": "float *"
+          },
+          {
+            "name": "d_input_elements",
+            "source": "runtime:d_input_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "d_weight",
+            "source": "output:d_weight",
+            "ports": [
+              "output:d_weight"
+            ],
+            "cast": "float *"
+          },
+          {
+            "name": "d_weight_elements",
+            "source": "runtime:d_weight_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "d_bias",
+            "source": "output:d_bias",
+            "ports": [
+              "output:d_bias"
+            ],
+            "cast": "float *"
+          },
+          {
+            "name": "d_bias_elements",
+            "source": "runtime:d_bias_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "scratch",
+            "source": "scratch:scratch",
+            "cast": "float *"
+          },
+          {
+            "name": "scratch_elements",
+            "source": "runtime:backward_scratch_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "inputs",
+            "source": "runtime:inputs",
+            "value_type": "size_t"
+          },
+          {
+            "name": "outputs",
+            "source": "runtime:outputs",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "training_contract": {
+        "version": 1,
+        "layout": "contiguous",
+        "batch_policy": "fixed",
+        "return_status": "zero_success",
+        "buffer_spans": [
+          {
+            "pointer": "d_output",
+            "elements": "d_output_elements",
+            "rows": "rows",
+            "width": "outputs",
+            "flatten": true
+          },
+          {
+            "pointer": "saved_input",
+            "elements": "saved_input_elements",
+            "rows": "rows",
+            "width": "inputs",
+            "flatten": true
+          },
+          {
+            "pointer": "saved_weight",
+            "elements": "saved_weight_elements",
+            "rows": "outputs",
+            "width": "inputs",
+            "flatten": true
+          },
+          {
+            "pointer": "d_input",
+            "elements": "d_input_elements",
+            "rows": "rows",
+            "width": "inputs",
+            "flatten": true
+          },
+          {
+            "pointer": "d_weight",
+            "elements": "d_weight_elements",
+            "rows": "outputs",
+            "width": "inputs",
+            "flatten": true
+          },
+          {
+            "pointer": "scratch",
+            "elements": "scratch_elements",
+            "rows": 1,
+            "width": "scratch_elements",
+            "flatten": true
+          },
+          {
+            "pointer": "d_bias",
+            "elements": "d_bias_elements",
+            "rows": 1,
+            "width": "outputs",
+            "flatten": true
+          }
+        ]
+      },
+      "constraints": {
+        "notes": "Contiguous positive bounded extents; aligned nonaliasing writable buffers; finite inputs/results. Rejection preserves published outputs and caches; scratch may change. FP32 master weights and optimizer state remain external."
+      },
+      "notes": "Bounded mixed-storage projection training; no full BF16 model-training claim. FP32 bias added after the ordered dot; bias VJP sums rows in ascending FP32 order.",
+      "numerical_capabilities": [
+        {
+          "contract_id": "projection_bf16_train_bias_backward_rne_ordered_fp32_v1",
+          "status": "validated",
+          "phases": [
+            "backward"
+          ],
+          "function": "ck_projection_bf16_train_bias_backward",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp32",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "serial"
+          }
+        }
+      ],
+      "tests": {
+        "unit": [
+          "tests/test_projection_bf16_train_kernel.py",
+          "tests/test_v8_bf16_projection_training.py",
+          "tests/test_v8_clef_mixed_training.py"
+        ],
+        "oracle": "Independent PyTorch FP32 matmul on explicit BF16-rounded operands; custom autograd identity rounding VJP."
+      },
+      "name": "projection_bf16_train_bias_backward",
+      "_source_file": "projection_bf16_train_bias_backward.json"
+    },
+    {
+      "id": "projection_bf16_train_bias_forward",
+      "op": "projection_bf16_train_bias_forward",
+      "operation_interface": "projection_bf16_train_bias_forward.v1",
+      "variant": "scalar_ordered_fp32_bf16_rne_operands",
+      "quant": {
+        "weight": "fp32",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            "rows",
+            "inputs"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "weight",
+          "dtype": "fp32",
+          "shape": [
+            "outputs",
+            "inputs"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "bias",
+          "dtype": "fp32",
+          "shape": [
+            "outputs"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "rows",
+            "outputs"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "saved_input",
+          "dtype": "bf16",
+          "shape": [
+            "rows",
+            "inputs"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "saved_weight",
+          "dtype": "bf16",
+          "shape": [
+            "outputs",
+            "inputs"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "scratch",
+          "dtype": "fp32",
+          "shape": [
+            1,
+            "scratch_elements"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "dims": [
+        "input_elements",
+        "weight_elements",
+        "output_elements",
+        "saved_input_elements",
+        "saved_weight_elements",
+        "scratch_elements",
+        "rows",
+        "inputs",
+        "outputs",
+        "bias_elements"
+      ],
+      "impl": {
+        "function": "ck_projection_bf16_train_bias_forward",
+        "c_declaration": "int ck_projection_bf16_train_bias_forward(const float *input, size_t input_elements, const float *weight, size_t weight_elements, const float *bias, size_t bias_elements, float *output, size_t output_elements, uint16_t *saved_input, size_t saved_input_elements, uint16_t *saved_weight, size_t saved_weight_elements, float *scratch, size_t scratch_elements, size_t rows, size_t inputs, size_t outputs);",
+        "sources": [
+          "src/kernels/projection_bf16_train.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": true,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "ports": [
+              "input:input"
+            ],
+            "cast": "const float *"
+          },
+          {
+            "name": "input_elements",
+            "source": "runtime:input_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "weight",
+            "source": "weight:weight",
+            "ports": [
+              "weight:weight"
+            ],
+            "cast": "const float *"
+          },
+          {
+            "name": "weight_elements",
+            "source": "runtime:weight_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "bias",
+            "source": "weight:bias",
+            "ports": [
+              "weight:bias"
+            ],
+            "cast": "const float *"
+          },
+          {
+            "name": "bias_elements",
+            "source": "runtime:bias_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "ports": [
+              "output:output"
+            ],
+            "cast": "float *"
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "saved_input",
+            "source": "output:saved_input",
+            "ports": [
+              "output:saved_input"
+            ],
+            "cast": "uint16_t *"
+          },
+          {
+            "name": "saved_input_elements",
+            "source": "runtime:saved_input_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "saved_weight",
+            "source": "output:saved_weight",
+            "ports": [
+              "output:saved_weight"
+            ],
+            "cast": "uint16_t *"
+          },
+          {
+            "name": "saved_weight_elements",
+            "source": "runtime:saved_weight_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "scratch",
+            "source": "scratch:scratch",
+            "cast": "float *"
+          },
+          {
+            "name": "scratch_elements",
+            "source": "runtime:scratch_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "inputs",
+            "source": "runtime:inputs",
+            "value_type": "size_t"
+          },
+          {
+            "name": "outputs",
+            "source": "runtime:outputs",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "training_contract": {
+        "version": 1,
+        "layout": "contiguous",
+        "batch_policy": "fixed",
+        "return_status": "zero_success",
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "elements": "input_elements",
+            "rows": "rows",
+            "width": "inputs",
+            "flatten": true
+          },
+          {
+            "pointer": "weight",
+            "elements": "weight_elements",
+            "rows": "outputs",
+            "width": "inputs",
+            "flatten": true
+          },
+          {
+            "pointer": "output",
+            "elements": "output_elements",
+            "rows": "rows",
+            "width": "outputs",
+            "flatten": true
+          },
+          {
+            "pointer": "saved_input",
+            "elements": "saved_input_elements",
+            "rows": "rows",
+            "width": "inputs",
+            "flatten": true
+          },
+          {
+            "pointer": "saved_weight",
+            "elements": "saved_weight_elements",
+            "rows": "outputs",
+            "width": "inputs",
+            "flatten": true
+          },
+          {
+            "pointer": "scratch",
+            "elements": "scratch_elements",
+            "rows": 1,
+            "width": "scratch_elements",
+            "flatten": true
+          },
+          {
+            "pointer": "bias",
+            "elements": "bias_elements",
+            "rows": 1,
+            "width": "outputs",
+            "flatten": true
+          }
+        ]
+      },
+      "constraints": {
+        "notes": "Contiguous positive bounded extents; aligned nonaliasing writable buffers; finite inputs/results. Rejection preserves published outputs and caches; scratch may change. FP32 master weights and optimizer state remain external."
+      },
+      "notes": "Bounded mixed-storage projection training; no full BF16 model-training claim. FP32 bias added after the ordered dot; bias VJP sums rows in ascending FP32 order.",
+      "numerical_capabilities": [
+        {
+          "contract_id": "projection_bf16_train_bias_forward_rne_ordered_fp32_v1",
+          "status": "validated",
+          "phases": [
+            "prefill"
+          ],
+          "function": "ck_projection_bf16_train_bias_forward",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp32",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "serial"
+          }
+        }
+      ],
+      "tests": {
+        "unit": [
+          "tests/test_projection_bf16_train_kernel.py",
+          "tests/test_v8_bf16_projection_training.py",
+          "tests/test_v8_clef_mixed_training.py"
+        ],
+        "oracle": "Independent PyTorch FP32 matmul on explicit BF16-rounded operands; custom autograd identity rounding VJP."
+      },
+      "name": "projection_bf16_train_bias_forward",
+      "_source_file": "projection_bf16_train_bias_forward.json"
     },
     {
       "id": "projection_bf16_train_forward",

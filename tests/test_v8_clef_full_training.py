@@ -14,7 +14,7 @@ class FullHeadTraining(unittest.TestCase):
     def test_released_head_training(self):
         self.certify(released=True)
 
-    def certify(self, *, released):
+    def certify(self, *, released, mixed=False, diagnostic=False, artifacts=None):
         import sys, os, json, ctypes, tempfile, subprocess, importlib.util, hashlib
         from pathlib import Path
         from types import SimpleNamespace as NS
@@ -23,6 +23,35 @@ class FullHeadTraining(unittest.TestCase):
             import numpy as np, torch
         except ImportError as exc:
             self.skipTest("independent PyTorch comparison unavailable: " + str(exc))
+        failures = []
+        step_reports = []
+        first_divergence = None
+
+        def bound(actual, limit, label):
+            if diagnostic and not actual < limit:
+                failures.append(
+                    dict(
+                        step=step, comparison=label, max_abs=float(actual), limit=limit
+                    )
+                )
+            else:
+                self.assertLess(actual, limit, msg=f"step {step}: {label}")
+
+        def close(actual, expected, label, **tolerances):
+            try:
+                np.testing.assert_allclose(actual, expected, **tolerances)
+            except AssertionError:
+                if not diagnostic:
+                    raise
+                failures.append(
+                    dict(
+                        step=step,
+                        comparison=label,
+                        max_abs=float(np.max(np.abs(actual - expected))),
+                        **tolerances,
+                    )
+                )
+
         torch.set_num_threads(1)
         torch.manual_seed(611)
         root = Path(__file__).resolve().parents[1]
@@ -88,6 +117,17 @@ class FullHeadTraining(unittest.TestCase):
         ir, weights, graph = build_training_ir(
             raw, hidden, questions=2, options=3, heads=heads, feedforward=feedforward
         )
+        if mixed:
+            from version.v8.training.bf16_projection import use_bf16_projection
+            from tests.clef_mixed_oracle import install
+
+            for op in list(ir["ops"]):
+                if op["kernel_id"] in (
+                    "linear_rows_checked_f32",
+                    "linear_rows_checked_no_bias_f32",
+                ):
+                    ir = use_bf16_projection(ir, op["op_id"])
+            projection_captures = install(self, torch, head)
         reg = training_registry()
         o = b.synthesize_ir2_backward(
             ir,
@@ -162,6 +202,19 @@ class FullHeadTraining(unittest.TestCase):
                 ],
                 check=True,
             )
+            if artifacts is not None:
+                import shutil
+
+                artifact_dir = Path(artifacts)
+                artifact_dir.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(p / "train.c", artifact_dir / "train.c")
+                shutil.copy2(p / "train.so", artifact_dir / "train.so")
+                (artifact_dir / "layout.json").write_text(
+                    json.dumps(layout, indent=2) + "\n"
+                )
+                (artifact_dir / "backward_ir.json").write_text(
+                    json.dumps(o, indent=2) + "\n"
+                )
             lib = ctypes.CDLL(str(p / "train.so"))
             wf._configure(lib)
             self.addCleanup(lib.ck_train_free)
@@ -234,6 +287,8 @@ class FullHeadTraining(unittest.TestCase):
                 self.assertEqual(lib.ck_train_get_opt_step(), 0)
             for step in range(steps):
                 opt.zero_grad()
+                if mixed:
+                    projection_captures.clear()
                 out = head(
                     torch.tensor(hidden)[None],
                     torch.tensor(md["input_ids"])[None],
@@ -249,6 +304,19 @@ class FullHeadTraining(unittest.TestCase):
                     / 2
                 )
                 loss.backward()
+                if mixed:
+                    pre_flat = snapshot("weight", summary["weight_snapshot_floats"])
+                    pre_weights = {}
+                    off = 0
+                    for name, count in zip(
+                        summary["init_weight_order"], summary["init_weight_numel"]
+                    ):
+                        pre_weights[name] = (
+                            pre_flat[off : off + count]
+                            .reshape(weights[name].shape)
+                            .copy()
+                        )
+                        off += count
                 nl = ctypes.c_float()
                 rc = lib.ck_train_step_with_i32_ex(
                     ids.ctypes.data_as(ip),
@@ -260,8 +328,17 @@ class FullHeadTraining(unittest.TestCase):
                     0.001,
                 )
                 assert rc > 0
-                self.assertLess(
-                    abs(nl.value - loss.item()), 3e-5, msg=f"step {step} loss"
+                bound(abs(nl.value - loss.item()), 3e-5, "loss")
+                native_logits = wf.CERT._activation_snapshot(lib, summary)[
+                    "act.option_logits"
+                ].ravel()
+                reference_logits = torch.cat(out).detach().numpy()
+                close(
+                    native_logits,
+                    reference_logits,
+                    "option_logits",
+                    atol=3e-5,
+                    rtol=3e-4,
                 )
                 losses.append(nl.value)
                 grads = {k: v.grad.numpy().copy() for k, v in head.named_parameters()}
@@ -274,12 +351,23 @@ class FullHeadTraining(unittest.TestCase):
                 )
                 offset = 0
                 errs = []
+                gradient_details = []
                 for n in summary["parameter_gradient_order"]:
                     size = eg[n].size
                     a = actual[offset : offset + size]
                     e = eg[n].ravel()
                     errs.append(
                         (float(np.max(np.abs(a - e))), n, float(np.max(np.abs(e))))
+                    )
+                    delta = a.astype("float64") - e.astype("float64")
+                    gradient_details.append(
+                        dict(
+                            parameter=n,
+                            max_abs=float(np.max(np.abs(delta))),
+                            rmse=float(np.sqrt(np.mean(delta * delta))),
+                            reference_l2=float(np.linalg.norm(e.astype("float64"))),
+                            actual_l2=float(np.linalg.norm(a.astype("float64"))),
+                        )
                     )
                     offset += size
                 errors["gradient"] = max(errors["gradient"], max(x[0] for x in errs))
@@ -289,7 +377,51 @@ class FullHeadTraining(unittest.TestCase):
                         f"released step={step} loss={nl.value:.9g} worst_gradient={worst}",
                         flush=True,
                     )
-                self.assertLess(worst[0], 3e-5, msg=f"step {step}: {worst}")
+                if mixed and worst[0] >= 3e-5 and first_divergence is None:
+                    from tests.clef_mixed_oracle import diagnose
+
+                    gradient_values = {}
+                    off = 0
+                    for name in summary["parameter_gradient_order"]:
+                        gradient_values[name] = actual[off : off + eg[name].size].copy()
+                        off += eg[name].size
+                    first, packet = diagnose(
+                        ir,
+                        projection_captures,
+                        wf.CERT._activation_snapshot(lib, summary),
+                        pre_weights,
+                        gradient_values,
+                        layout,
+                        snapshot("accum", lib.ck_train_get_accum_snapshot_numel()),
+                    )
+                    first_divergence = dict(step=step, projections=first)
+                    if artifacts is not None and packet is not None:
+                        packet_path = (
+                            Path(artifacts) / "first_projection_divergence.npz"
+                        )
+                        packet_path.parent.mkdir(parents=True, exist_ok=True)
+                        np.savez(packet_path, **packet)
+                        first_divergence["packet"] = dict(
+                            path=str(packet_path.resolve()),
+                            sha256=hashlib.sha256(packet_path.read_bytes()).hexdigest(),
+                        )
+                    print("FIRST_FORWARD_DIVERGENCE", first[:1], flush=True)
+                bound(worst[0], 3e-5, "parameter_gradient: " + worst[1])
+                step_reports.append(
+                    dict(
+                        step=step,
+                        native_loss=nl.value,
+                        reference_loss=loss.item(),
+                        worst_gradient=dict(
+                            max_abs=worst[0],
+                            parameter=worst[1],
+                            reference_magnitude=worst[2],
+                        ),
+                        gradients=gradient_details,
+                        native_logits=native_logits.tolist(),
+                        reference_logits=reference_logits.tolist(),
+                    )
+                )
                 opt.step()
                 new = {
                     k: v.detach().numpy().copy() for k, v in head.state_dict().items()
@@ -322,9 +454,10 @@ class FullHeadTraining(unittest.TestCase):
                         )
                     ),
                 )
-                np.testing.assert_allclose(
+                close(
                     native_moments,
                     np.concatenate(expected_moments),
+                    "optimizer_moments",
                     atol=3e-6,
                     rtol=3e-4,
                 )
@@ -333,7 +466,7 @@ class FullHeadTraining(unittest.TestCase):
                     [ew[n].ravel() for n in summary["init_weight_order"]]
                 )
                 errors["weight"] = max(errors["weight"], float(np.max(np.abs(a - e))))
-                np.testing.assert_allclose(a, e, atol=3e-5, rtol=3e-4)
+                close(a, e, "master_weights", atol=3e-5, rtol=3e-4)
                 offset = 0
                 for name, count in zip(
                     summary["init_weight_order"], summary["init_weight_numel"]
@@ -351,7 +484,9 @@ class FullHeadTraining(unittest.TestCase):
                             hidden.tobytes() + metadata.tobytes()
                         ).hexdigest(),
                         training_config=dict(
-                            dtype="fp32",
+                            dtype=(
+                                "mixed_projection_bf16_fp32_master" if mixed else "fp32"
+                            ),
                             optimizer="AdamW",
                             lr=0.001,
                             eps=1e-4,
@@ -362,7 +497,11 @@ class FullHeadTraining(unittest.TestCase):
                         ),
                         training_config_sha256=wf._json_sha256(
                             dict(
-                                dtype="fp32",
+                                dtype=(
+                                    "mixed_projection_bf16_fp32_master"
+                                    if mixed
+                                    else "fp32"
+                                ),
                                 optimizer="AdamW",
                                 lr=0.001,
                                 eps=1e-4,
@@ -437,9 +576,10 @@ class FullHeadTraining(unittest.TestCase):
                 [record],
                 torch.tensor(raw["output_embedding.weight"]),
             )[0]
-            np.testing.assert_allclose(
+            close(
                 activations["act.option_logits"].ravel(),
                 torch.cat(expected).detach().numpy(),
+                "reloaded_logits",
                 atol=3e-5,
                 rtol=3e-4,
             )
@@ -500,84 +640,120 @@ class FullHeadTraining(unittest.TestCase):
                 resumed["optimizer_state_sha256"],
                 hashlib.sha256(moments.astype("<f4", copy=False).tobytes()).hexdigest(),
             )
-            # A separately generated inference entry consumes the exported trained weights.
-            from tests.test_v8_clef_flash_head_ingress import compile_case
+            if not mixed:
+                # A separately generated inference entry consumes the exported trained weights.
+                from tests.test_v8_clef_flash_head_ingress import compile_case
 
-            inference_weights = {}
-            offset = 0
-            for name, count in zip(
-                summary["init_weight_order"], summary["init_weight_numel"]
-            ):
-                inference_weights[name] = (
-                    final[offset : offset + count].reshape(weights[name].shape).copy()
-                )
-                offset += count
-            inference_weights.pop("__features.hidden")
-            with tempfile.TemporaryDirectory() as inf:
-                arena, execute, view, _, _ = compile_case(
-                    Path(inf), graph, inference_weights
-                )
-                view("hidden")[:] = hidden
-                for name in (
-                    "input_ids",
-                    "question_spans",
-                    "option_spans",
-                    "global_span",
-                    "option_counts",
-                    "question_type_ids",
+                inference_weights = {}
+                offset = 0
+                for name, count in zip(
+                    summary["init_weight_order"], summary["init_weight_numel"]
                 ):
-                    view(name)[:] = np.array(md[name], dtype="i4").reshape(
-                        view(name).shape
+                    inference_weights[name] = (
+                        final[offset : offset + count]
+                        .reshape(weights[name].shape)
+                        .copy()
                     )
-                self.assertEqual(execute(arena, len(arena)), 0)
-                np.testing.assert_allclose(
-                    view("option_logits").ravel(),
-                    torch.cat(expected).detach().numpy(),
-                    atol=3e-5,
-                    rtol=3e-4,
-                )
-            print(
-                f"{steps} full-head gradient/update/moment comparisons, checkpoint resume and generated inference export PASS"
+                    offset += count
+                inference_weights.pop("__features.hidden")
+                with tempfile.TemporaryDirectory() as inf:
+                    arena, execute, view, _, _ = compile_case(
+                        Path(inf), graph, inference_weights
+                    )
+                    view("hidden")[:] = hidden
+                    for name in (
+                        "input_ids",
+                        "question_spans",
+                        "option_spans",
+                        "global_span",
+                        "option_counts",
+                        "question_type_ids",
+                    ):
+                        view(name)[:] = np.array(md[name], dtype="i4").reshape(
+                            view(name).shape
+                        )
+                    self.assertEqual(execute(arena, len(arena)), 0)
+                    np.testing.assert_allclose(
+                        view("option_logits").ravel(),
+                        torch.cat(expected).detach().numpy(),
+                        atol=3e-5,
+                        rtol=3e-4,
+                    )
+            report = dict(
+                schema_version=1,
+                seed=611,
+                policy=dict(
+                    operand_rounding="rne_bf16" if mixed else "none",
+                    projection_accumulation="ordered_fp32" if mixed else "fp64",
+                    masters="fp32",
+                    gradients="fp32",
+                    optimizer="AdamW",
+                    learning_rate=0.001,
+                    epsilon=1e-4,
+                    weight_decay=0.01,
+                    beta1=0.9,
+                    beta2=0.999,
+                    other_operations="fp32",
+                    rounding_vjp="identity" if mixed else "not_applicable",
+                ),
+                retained_artifacts=(
+                    str(Path(artifacts).resolve()) if artifacts is not None else None
+                ),
+                dtype="mixed_projection_bf16_fp32_master" if mixed else "fp32",
+                geometry=(
+                    "released_complete_head" if released else "small_complete_head"
+                ),
+                numerical_parity="FAIL" if failures else "PASS",
+                trajectory_comparisons=step_reports,
+                numerical_failures=failures,
+                first_divergence=first_divergence,
+                max_abs_errors=errors,
+                loss_first=losses[0],
+                loss_last=losses[-1],
+                torch_version=torch.__version__,
+                reference_source_sha256=hashlib.sha256(
+                    Path(source).read_bytes()
+                ).hexdigest(),
+                generated_c_sha256=hashlib.sha256(src.encode()).hexdigest(),
+                engine_sha256=hashlib.sha256(engine.read_bytes()).hexdigest(),
+                runtime_contract_sha256=summary["runtime_contract_sha256"],
+                initial_weights_sha256=hashlib.sha256(packed.tobytes()).hexdigest(),
+                dataset_sha256=hashlib.sha256(
+                    hidden.tobytes() + metadata.tobytes()
+                ).hexdigest(),
+                released_head_training=(
+                    ("FAIL" if failures else "PASS") if released else "NOT_TESTED"
+                ),
+                frozen_feature_provenance="synthetic; not generated backbone",
+                head_weights_sha256=(
+                    hashlib.sha256(Path(head_path).read_bytes()).hexdigest()
+                    if released
+                    else None
+                ),
+                same_process_resume="PASS",
+                fresh_process_resume="PASS",
+                generated_inference_export="NOT_TESTED" if mixed else "PASS",
+                trainable_parameters=sum(
+                    summary["init_weight_numel"][summary["init_weight_order"].index(n)]
+                    for n in summary["parameter_gradient_order"]
+                ),
             )
             print(
                 json.dumps(
-                    dict(
-                        seed=611,
-                        dtype="fp32",
-                        geometry=(
-                            "released_complete_head"
-                            if released
-                            else "small_complete_head"
-                        ),
-                        max_abs_errors=errors,
-                        loss_first=losses[0],
-                        loss_last=losses[-1],
-                        torch_version=torch.__version__,
-                        reference_source_sha256=hashlib.sha256(
-                            Path(source).read_bytes()
-                        ).hexdigest(),
-                        generated_c_sha256=hashlib.sha256(src.encode()).hexdigest(),
-                        engine_sha256=hashlib.sha256(engine.read_bytes()).hexdigest(),
-                        runtime_contract_sha256=summary["runtime_contract_sha256"],
-                        released_head_training="PASS" if released else "NOT_TESTED",
-                        frozen_feature_provenance="synthetic; not generated backbone",
-                        head_weights_sha256=(
-                            hashlib.sha256(Path(head_path).read_bytes()).hexdigest()
-                            if released
-                            else None
-                        ),
-                        bf16_full_head_training="NOT_TESTED",
-                        fresh_process_resume="PASS",
-                        trainable_parameters=sum(
-                            summary["init_weight_numel"][
-                                summary["init_weight_order"].index(n)
-                            ]
-                            for n in summary["parameter_gradient_order"]
-                        ),
-                    ),
+                    {
+                        k: v
+                        for k, v in report.items()
+                        if k
+                        not in (
+                            "trajectory_comparisons",
+                            "numerical_failures",
+                            "first_divergence",
+                        )
+                    },
                     sort_keys=True,
                 )
             )
+            return report
 
 
 class FullHeadTrainingContracts(unittest.TestCase):
@@ -601,7 +777,7 @@ class FullHeadTrainingContracts(unittest.TestCase):
                     worker.run(path / "request.json")
                 loader.assert_not_called()
 
-    def graph(self):
+    def graph(self, mixed=False):
         try:
             import numpy as np
             import torch
@@ -628,6 +804,15 @@ class FullHeadTrainingContracts(unittest.TestCase):
             heads=2,
             feedforward=16,
         )
+        if mixed:
+            from version.v8.training.bf16_projection import use_bf16_projection
+
+            for op in list(ir["ops"]):
+                if op["kernel_id"] in (
+                    "linear_rows_checked_f32",
+                    "linear_rows_checked_no_bias_f32",
+                ):
+                    ir = use_bf16_projection(ir, op["op_id"])
         registry = training_registry()
         ir2 = backward.synthesize_ir2_backward(
             ir,

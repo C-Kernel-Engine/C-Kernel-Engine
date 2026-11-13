@@ -25,8 +25,9 @@ static float add_product(float sum, float a, float b) {
     volatile float next=sum+p;
     return next;
 }
-int ck_projection_bf16_train_forward(
+static int projection_forward(
     const float *input, size_t input_elements, const float *weight, size_t weight_elements,
+    const float *bias, size_t bias_elements,
     float *output, size_t output_elements, uint16_t *saved_input, size_t saved_input_elements,
     uint16_t *saved_weight, size_t saved_weight_elements, float *scratch, size_t scratch_elements,
     size_t rows, size_t inputs, size_t outputs) {
@@ -38,11 +39,20 @@ int ck_projection_bf16_train_forward(
     const size_t n[]={input_elements,weight_elements,output_elements,saved_input_elements,saved_weight_elements,scratch_elements};
     const size_t widths[]={4,4,4,2,2,4};
     if (!regions(p,n,widths,6,2)) return -1;
+    if (bias) {
+        if (bias_elements < outputs) return -2;
+        const void *bp[]={input,weight,bias,output,saved_input,saved_weight,scratch};
+        const size_t bn[]={input_elements,weight_elements,bias_elements,output_elements,saved_input_elements,saved_weight_elements,scratch_elements};
+        const size_t bw[]={4,4,4,4,2,2,4};
+        if (!regions(bp,bn,bw,7,3)) return -1;
+        for(size_t i=0;i<outputs;i++) if(!isfinite(bias[i])) return -1;
+    }
     for(size_t i=0;i<x;i++) if(!isfinite(input[i]) || !isfinite(rounded(input[i]))) return -1;
     for(size_t i=0;i<w;i++) if(!isfinite(weight[i]) || !isfinite(rounded(weight[i]))) return -1;
     for(size_t r=0;r<rows;r++) for(size_t o=0;o<outputs;o++) {
         float sum=0;
         for(size_t k=0;k<inputs;k++) sum=add_product(sum,rounded(input[r*inputs+k]),rounded(weight[o*inputs+k]));
+        if(bias) { volatile float biased=sum+bias[o]; sum=biased; }
         if(!isfinite(sum)) return -1;
         scratch[r*outputs+o]=sum;
     }
@@ -50,11 +60,12 @@ int ck_projection_bf16_train_forward(
     for(size_t i=0;i<w;i++) saved_weight[i]=float_to_bf16(weight[i]);
     memcpy(output,scratch,y*sizeof(float)); return 0;
 }
-int ck_projection_bf16_train_backward(
+static int projection_backward(
     const float *d_output, size_t d_output_elements,
     const uint16_t *saved_input, size_t saved_input_elements,
     const uint16_t *saved_weight, size_t saved_weight_elements,
     float *d_input, size_t d_input_elements, float *d_weight, size_t d_weight_elements,
+    float *d_bias, size_t d_bias_elements,
     float *scratch, size_t scratch_elements, size_t rows, size_t inputs, size_t outputs) {
     size_t x,w,y;
     if(!product(rows,inputs,&x) || !product(outputs,inputs,&w) || !product(rows,outputs,&y) ||
@@ -64,6 +75,13 @@ int ck_projection_bf16_train_backward(
     const size_t n[]={d_output_elements,saved_input_elements,saved_weight_elements,d_input_elements,d_weight_elements,scratch_elements};
     const size_t widths[]={4,2,2,4,4,4};
     if(!regions(p,n,widths,6,3)) return -1;
+    if (d_bias) {
+        if (d_bias_elements<outputs || x+w>SIZE_MAX-outputs || scratch_elements<x+w+outputs) return -2;
+        const void *bp[]={d_output,saved_input,saved_weight,d_input,d_weight,d_bias,scratch};
+        const size_t bn[]={d_output_elements,saved_input_elements,saved_weight_elements,d_input_elements,d_weight_elements,d_bias_elements,scratch_elements};
+        const size_t bw[]={4,2,2,4,4,4,4};
+        if(!regions(bp,bn,bw,7,3)) return -1;
+    }
     for(size_t i=0;i<y;i++) if(!isfinite(d_output[i])) return -1;
     for(size_t i=0;i<x;i++) if(!isfinite(bf16_to_float(saved_input[i]))) return -1;
     for(size_t i=0;i<w;i++) if(!isfinite(bf16_to_float(saved_weight[i]))) return -1;
@@ -79,5 +97,48 @@ int ck_projection_bf16_train_backward(
         if(!isfinite(sum)) return -1;
         scratch[x+o*inputs+k]=sum;
     }
+    if(d_bias) for(size_t o=0;o<outputs;o++) {
+        float sum=0;
+        for(size_t r=0;r<rows;r++) { volatile float next=sum+d_output[r*outputs+o]; sum=next; }
+        if(!isfinite(sum)) return -1;
+        scratch[x+w+o]=sum;
+    }
+    if(d_bias) memcpy(d_bias,scratch+x+w,outputs*sizeof(float));
     memcpy(d_input,scratch,x*sizeof(float)); memcpy(d_weight,scratch+x,w*sizeof(float)); return 0;
+}
+
+int ck_projection_bf16_train_forward(
+    const float *input, size_t input_elements, const float *weight, size_t weight_elements,
+    float *output, size_t output_elements, uint16_t *saved_input, size_t saved_input_elements,
+    uint16_t *saved_weight, size_t saved_weight_elements, float *scratch, size_t scratch_elements,
+    size_t rows, size_t inputs, size_t outputs) {
+    return projection_forward(input,input_elements,weight,weight_elements,NULL,0,output,output_elements,saved_input,saved_input_elements,saved_weight,saved_weight_elements,scratch,scratch_elements,rows,inputs,outputs);
+}
+
+int ck_projection_bf16_train_backward(
+    const float *d_output, size_t d_output_elements,
+    const uint16_t *saved_input, size_t saved_input_elements,
+    const uint16_t *saved_weight, size_t saved_weight_elements,
+    float *d_input, size_t d_input_elements, float *d_weight, size_t d_weight_elements,
+    float *scratch, size_t scratch_elements, size_t rows, size_t inputs, size_t outputs) {
+    return projection_backward(d_output,d_output_elements,saved_input,saved_input_elements,saved_weight,saved_weight_elements,d_input,d_input_elements,d_weight,d_weight_elements,NULL,0,scratch,scratch_elements,rows,inputs,outputs);
+}
+
+int ck_projection_bf16_train_bias_forward(
+    const float *input, size_t input_elements, const float *weight, size_t weight_elements, const float *bias, size_t bias_elements,
+    float *output, size_t output_elements, uint16_t *saved_input, size_t saved_input_elements,
+    uint16_t *saved_weight, size_t saved_weight_elements, float *scratch, size_t scratch_elements,
+    size_t rows, size_t inputs, size_t outputs) {
+    if(!bias) return -1;
+    return projection_forward(input,input_elements,weight,weight_elements,bias,bias_elements,output,output_elements,saved_input,saved_input_elements,saved_weight,saved_weight_elements,scratch,scratch_elements,rows,inputs,outputs);
+}
+
+int ck_projection_bf16_train_bias_backward(
+    const float *d_output, size_t d_output_elements,
+    const uint16_t *saved_input, size_t saved_input_elements,
+    const uint16_t *saved_weight, size_t saved_weight_elements,
+    float *d_input, size_t d_input_elements, float *d_weight, size_t d_weight_elements, float *d_bias, size_t d_bias_elements,
+    float *scratch, size_t scratch_elements, size_t rows, size_t inputs, size_t outputs) {
+    if(!d_bias) return -1;
+    return projection_backward(d_output,d_output_elements,saved_input,saved_input_elements,saved_weight,saved_weight_elements,d_input,d_input_elements,d_weight,d_weight_elements,d_bias,d_bias_elements,scratch,scratch_elements,rows,inputs,outputs);
 }
