@@ -469,6 +469,8 @@ SRCS    := src/backend_native.c \
 	           src/kernels/decision_tensor_ops.c \
 	           src/kernels/transformer_rows_checked.c \
 	           src/kernels/attention_cross_token_major_checked.c \
+	           src/kernels/attention_last_query_prob_trace_f32.c \
+	           src/kernels/alignment_attention_dtw_f32.c \
 	           src/kernels/gelu_rows_tanh_checked.c \
 	           src/kernels/gelu_rows_erf_checked.c \
 	           src/kernels/head_backward.c \

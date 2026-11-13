@@ -3432,6 +3432,10 @@ def _generate_tokenizer_c_code(tokenizer_type: str, vocab_size: int, num_merges:
             # still advertise automatic BOS for raw prompt use; the circuit
             # explicitly selects the publisher prompt contract here.
             add_bos = False
+        elif bos_policy == "decoder_start_token":
+            # Encoder-decoder runners construct the complete decoder prefix.
+            # Encoding vocabulary context must not inject another BOS.
+            add_bos = False
         elif bos_policy != "model_defined":
             raise ValueError(f"unsupported BPE bos_policy: {bos_policy}")
 

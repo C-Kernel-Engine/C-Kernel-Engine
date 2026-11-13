@@ -967,6 +967,7 @@ def test_unified_audio_checkpoint_builds_distinct_generic_roles(
         force_convert: bool,
         force_compile: bool,
         linear_weight_dtype: str = "preserve",
+        alignment_trace: bool = False,
     ) -> None:
         calls.append(
             (
@@ -1294,3 +1295,105 @@ def test_subprocess_vocabulary_hint_preserves_leading_dash(tmp_path, hint):
     )
     assert encoder['hint'] == ''
     assert decoder['hint'] == hint
+
+
+def test_whisper_alignment_trace_is_part_of_build_identity(tmp_path: Path) -> None:
+    unified = _unified_module()
+    (tmp_path / 'config.json').write_text('{}')
+    plain = unified._whisper_build_inputs(tmp_path, 'decoder')
+    traced = unified._whisper_build_inputs(tmp_path, 'decoder', alignment_trace=True)
+    assert plain['alignment_trace'] is False
+    assert traced['alignment_trace'] is True
+    assert plain != traced
+
+
+def test_explicit_phase_manifests_are_used_without_snapshot_replacement(tmp_path: Path, monkeypatch) -> None:
+    unified = _unified_module()
+    decode = tmp_path / 'decode.json'
+    prefill = tmp_path / 'prefill.json'
+    decode.write_text('{"phase":"decode"}')
+    prefill.write_text('{"phase":"prefill"}')
+    calls = []
+    monkeypatch.setattr(unified, 'step_regenerate_kernel_registry', lambda **kw: None)
+    monkeypatch.setattr(unified, '_refresh_manifest_circuit_snapshot',
+                        lambda path: pytest.fail('authored observation edges must not be replaced'))
+    def run(cmd, **kw):
+        calls.append(cmd)
+        for flag in ('--output', '--layout-output', '--lowered-output', '--call-output',
+                     '--manifest-map-output', '--init-output'):
+            if flag in cmd:
+                Path(cmd[cmd.index(flag)+1]).write_text('{}')
+        (tmp_path / 'init_call.json').write_text('{}')
+    monkeypatch.setattr(unified, 'run_cmd', run)
+    unified.step_build_ir(decode, tmp_path, force=True,
+                         prefill_manifest_path=prefill, refresh_circuit=False)
+    assert [cmd[cmd.index('--manifest')+1] for cmd in calls] == [str(prefill), str(decode)]
+    assert json.loads(decode.read_text()) == {'phase': 'decode'}
+
+
+def test_unified_audio_forwards_trace_and_leading_dash_hint(tmp_path: Path, monkeypatch) -> None:
+    import argparse
+    unified = _unified_module()
+    import run_whisper_v8
+    seen = []
+    monkeypatch.setattr(run_whisper_v8, 'main', lambda argv: seen.extend(argv) or 0)
+    args = argparse.Namespace(model=None, encoder_run_dir=tmp_path/'encoder',
+        decoder_run_dir=tmp_path/'decoder', wav=tmp_path/'clip.wav', language='en',
+        task='transcribe', max_tokens=16, timestamps=True, output=None, temp_dir=None,
+        attention_trace_dir=tmp_path/'trace', vocabulary_hint='--no-cache')
+    assert unified.run_audio_pipeline(args) == 0
+    assert '--vocabulary-hint=--no-cache' in seen
+    assert seen[seen.index('--attention-trace-dir')+1] == str(tmp_path/'trace')
+
+
+def test_built_engine_exports_trace_and_alignment_providers() -> None:
+    library = ROOT / 'build/libckernel_engine.so'
+    if not library.is_file():
+        pytest.skip('build the engine to exercise its linked trace/alignment providers')
+    subprocess.run([sys.executable, '-c',
+        'import ctypes,sys; lib=ctypes.CDLL(sys.argv[1]); '
+        'getattr(lib,"attention_last_query_prob_trace_f32"); '
+        'getattr(lib,"alignment_attention_dtw_f32")', str(library)],
+        check=True, timeout=30, capture_output=True, text=True)
+
+
+def test_optional_pinned_whisper_transformers_trajectory(tmp_path: Path) -> None:
+    """Asset-backed token trajectory, not a full-logit or human accuracy gate."""
+    names = ('CK_WHISPER_PARITY_CHECKPOINT', 'CK_WHISPER_PARITY_ENCODER',
+             'CK_WHISPER_PARITY_DECODER', 'CK_WHISPER_PARITY_WAV')
+    missing = [name for name in names if not os.environ.get(name)]
+    if missing:
+        pytest.skip('asset-backed Whisper parity requires: ' + ', '.join(missing))
+    output = tmp_path / 'parity.json'
+    subprocess.run([sys.executable, str(PYTORCH_PARITY_SCRIPT),
+        '--checkpoint', os.environ[names[0]], '--encoder-run-dir', os.environ[names[1]],
+        '--decoder-run-dir', os.environ[names[2]], '--wav', os.environ[names[3]],
+        '--threads', os.environ.get('CK_WHISPER_PARITY_THREADS', '4'),
+        '--output', str(output)], check=True,
+        timeout=float(os.environ.get('CK_WHISPER_PARITY_TIMEOUT_SECONDS', '1800')),
+        capture_output=True, text=True)
+    report = json.loads(output.read_text())
+    assert report['status'] == 'pass'
+    assert report['transcript_match'] is True
+    assert report['first_difference'] is None
+
+
+def test_attention_reference_rejects_stale_or_misaligned_capture(tmp_path: Path) -> None:
+    parity = _pytorch_parity_module()
+    path = tmp_path / 'trace.npz'
+    def write(ids=(7, 8), heads=((1, 0),), values=None):
+        np.savez(path, schema=np.asarray('cke.whisper_selected_attention.v2'),
+                 token_ids=ids, alignment_heads=heads,
+                 selected_attention=np.full((1, 2, 3), 1/3, dtype=np.float32) if values is None else values)
+        return {'path': str(path), 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
+    captured = write()
+    assert parity.load_attention_trace(captured, [7, 8], [[1, 0]]).shape == (1, 2, 3)
+    stale = dict(captured, sha256='0'*64)
+    with pytest.raises(ValueError, match='identity'):
+        parity.load_attention_trace(stale, [7, 8], [[1, 0]])
+    with pytest.raises(ValueError, match='token correspondence'):
+        parity.load_attention_trace(write(ids=(8, 7)), [7, 8], [[1, 0]])
+    with pytest.raises(ValueError, match='alignment heads'):
+        parity.load_attention_trace(write(heads=((0, 1),)), [7, 8], [[1, 0]])
+    with pytest.raises(ValueError, match='nonfinite'):
+        parity.load_attention_trace(write(values=np.full((1, 2, 3), np.nan)), [7, 8], [[1, 0]])

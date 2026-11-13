@@ -3480,7 +3480,10 @@ def _special_tokens_from_tokenizer_config(
             if tok in token_to_id:
                 out[f"{name}_id"] = _ids(token_to_id[tok], f"{name}_id")[0]
         numeric = cfg.get(f"{name}_id")
-        if numeric is None and (name != "eos_token" or f"{name}_id" not in out):
+        # Tokenizer padding is defined by its named vocabulary token. Model
+        # defaults can differ from the tokenizer/generation configuration.
+        # Explicit numeric tokenizer IDs still must agree with that token.
+        if numeric is None and (name not in {"eos_token", "pad_token"} or f"{name}_id" not in out):
             numeric = model_cfg.get(f"{name}_id")
         if numeric is not None:
             numeric_ids = _ids(numeric, f"{name}_id")

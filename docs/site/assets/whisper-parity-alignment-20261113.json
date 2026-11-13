@@ -1,0 +1,361 @@
+{
+  "schema": "cke.whisper.parity-and-alignment.v1",
+  "date": "2026-11-13",
+  "source_base": "701cb825d3a8c52ac1a27e6a8d1e554d675292fb",
+  "candidate_source_sha256": {
+    "Makefile": "5208d197ac01350cf37d639ee697fa654dc922a219333269b87824c9936da3ca",
+    "version/v8/scripts/build_ir_v8.py": "4baf3ca3bf77ce65b2afe8115208c66a304b56dc78a1a081cf0c4903f41e0ad5",
+    "version/v8/scripts/ck_run_v8.py": "1431de54e5593553d51943452d68301fbfcad83f513bd4422080fc7e654f7d6f",
+    "version/v8/scripts/convert_safetensors_to_bump_v8.py": "ca8ae9d1ce56305eb66f6cb2b540fd1a73396b5688ce2c94334fbd8232e63e0e",
+    "version/v8/scripts/compare_whisper_e2e_pytorch_v8.py": "bae5cd8a254eec267091e916826ece46bac953d9b3e3e8ddb7dead94eefe8348"
+  },
+  "large_checkpoint": {
+    "repository": "openai/whisper-large-v3",
+    "revision": "06f233fe06e710322aca913c1bc4249a0d71fce1",
+    "variant": "full large-v3, original model.safetensors, FP32 generated computation"
+  },
+  "cases": [
+    {
+      "case": "silence-parity",
+      "verdict_scope": "generated token trajectory, not full logits or accuracy",
+      "status": "pass",
+      "matched_tokens": 1,
+      "token_count": 1,
+      "transcript_match": true,
+      "wav_sha256": "643f8a8dc8bd9c19225afffad2becfec5426180b3749cb208abdf1a6c8354efc",
+      "report_sha256": "d3aae52483748595c0a8378b535e350921d42d5f8749dfcfe1bacb356387d00f",
+      "checkpoint_weights": {
+        "model.safetensors": {
+          "size": 290403936,
+          "sha256": "07cadb9f25677c8d50df603e66a98fbd842cce45047139baeb16e6219a1e807b"
+        }
+      },
+      "runtime_hashes": {
+        "encoder_runtime_sha256": "386d2b47cf122a89f2fc10c5a88c96c973a8377c9b26edd3d5a3baa3cc14aec0",
+        "decoder_runtime_sha256": "a203fe6a3d02eca0b0b83e504c4d6669ba5ec2c15ed1aee3665f89e786f1f8d9",
+        "encoder_engine_sha256": "f0cc7d2a8a7c926a5b574c08439506a335a7e379dffe2c84bbb05c5666259a97",
+        "decoder_engine_sha256": "f0cc7d2a8a7c926a5b574c08439506a335a7e379dffe2c84bbb05c5666259a97"
+      },
+      "cke_parent_wall_seconds": 1.985792481340468,
+      "cke_reported_phase_seconds": 1.646502060815692,
+      "hf_generation_seconds": 0.30718870367854834,
+      "hf_load_seconds": 0.14400684740394354,
+      "transformers": "5.13.0",
+      "torch": "2.12.1+cpu",
+      "reference_dtype": "Base source FP32; initial probe before explicit dtype metadata",
+      "attention_reference": null,
+      "artifact_provenance": {
+        "encoder": {
+          "config_sha256": "2243626ad904defa549e16f96c6e9ba55b7a373abae80cc9535d7a811cebc96d",
+          "weights_sha256": "e0da3059387b083090e7a895a6e6ff5b83b7d83dd1db2bb4979246556ffd9eb4",
+          "manifest_sha256": "f9d31ecceb748b60d5e2e5602427e57e47bb789510e7cb9f7e5db048123ed962",
+          "layers": 6,
+          "embed_dim": 512,
+          "heads": 8,
+          "context_length": 1500
+        },
+        "decoder": {
+          "config_sha256": "59c5a19a70cb0b45b07097c1e8ebc1aebdb50e7cff67d723bee84a45b95314e9",
+          "weights_sha256": "b9cee6bd15e65ff9b9015ee5490b3aeef297e35c5b39b4aebde817061b7cff35",
+          "manifest_sha256": "e9691e9378cd68d6383043d47ff34f65bf4d03a59714565157bbb121f1197a76",
+          "generation_config_sha256": "444b3f636d2fff89dd9ecf549e2a085b61f7ff0fa0246d4628bac6a3b8cc9ba4",
+          "tokenizer_sha256": "27fc476bfe7f17299480be2273fc0608e4d5a99aba2ab5dec5374b4482d1a566",
+          "layers": 6,
+          "embed_dim": 512,
+          "heads": 8,
+          "context_length": 448,
+          "encoder_memory_length": 1500,
+          "vocab_size": 51865
+        }
+      },
+      "generated_source_sha256": {
+        "encoder": "492e1c96e494537c9b8966a713ea514fccca0b7aa5069106f4a3cce27c2e8190",
+        "decoder": "ea8b9b250edf5b4f4fccda501daa45390019e31c05da4679356527a3643254bf"
+      }
+    },
+    {
+      "case": "base-speech-parity",
+      "verdict_scope": "generated token trajectory, not full logits or accuracy",
+      "status": "pass",
+      "matched_tokens": 63,
+      "token_count": 63,
+      "transcript_match": true,
+      "wav_sha256": "e3f2406b90557d3f75c40e2c33c6239585179165f4763466e3be7dd539d2d847",
+      "report_sha256": "370435ccbd6c938b1b79b1e0903f0541a1179496b6ab0dd51f25e8b1a80a0d03",
+      "checkpoint_weights": {
+        "model.safetensors": {
+          "size": 290403936,
+          "sha256": "07cadb9f25677c8d50df603e66a98fbd842cce45047139baeb16e6219a1e807b"
+        }
+      },
+      "runtime_hashes": {
+        "encoder_runtime_sha256": "386d2b47cf122a89f2fc10c5a88c96c973a8377c9b26edd3d5a3baa3cc14aec0",
+        "decoder_runtime_sha256": "a61b785eaf1f6682b4eadca2fbc10527c65a27bf7ca27e76657de1b369eb87cb",
+        "encoder_engine_sha256": "f0cc7d2a8a7c926a5b574c08439506a335a7e379dffe2c84bbb05c5666259a97",
+        "decoder_engine_sha256": "0a5cb56be846dd4c0ccf34bd4dc177edda333cbf7a6bc08805a3de77fc017b78"
+      },
+      "cke_parent_wall_seconds": 4.7059058314189315,
+      "cke_reported_phase_seconds": 3.9602752113714814,
+      "hf_generation_seconds": 1.277484579011798,
+      "hf_load_seconds": 0.20103495940566063,
+      "transformers": "5.13.0",
+      "torch": "2.12.1+cpu",
+      "reference_dtype": "torch.float32",
+      "attention_reference": null,
+      "artifact_provenance": {
+        "encoder": {
+          "config_sha256": "2243626ad904defa549e16f96c6e9ba55b7a373abae80cc9535d7a811cebc96d",
+          "weights_sha256": "e0da3059387b083090e7a895a6e6ff5b83b7d83dd1db2bb4979246556ffd9eb4",
+          "manifest_sha256": "f9d31ecceb748b60d5e2e5602427e57e47bb789510e7cb9f7e5db048123ed962",
+          "layers": 6,
+          "embed_dim": 512,
+          "heads": 8,
+          "context_length": 1500
+        },
+        "decoder": {
+          "config_sha256": "a122254e731c14b84fa4ce0e6e21719474d5bd56fc4608ef3fa7bb7e2c98111f",
+          "weights_sha256": "f35c46c988713edea4343106f5c52146cc2936a8132c77d716ed4aa2d7156304",
+          "manifest_sha256": "a858915d981ecf094da5a3bee82e63d287b84a7f1f89a1d9a4e75f4490d89a02",
+          "generation_config_sha256": "444b3f636d2fff89dd9ecf549e2a085b61f7ff0fa0246d4628bac6a3b8cc9ba4",
+          "tokenizer_sha256": "27fc476bfe7f17299480be2273fc0608e4d5a99aba2ab5dec5374b4482d1a566",
+          "layers": 6,
+          "embed_dim": 512,
+          "heads": 8,
+          "context_length": 448,
+          "encoder_memory_length": 1500,
+          "vocab_size": 51865
+        }
+      },
+      "generated_source_sha256": {
+        "encoder": "492e1c96e494537c9b8966a713ea514fccca0b7aa5069106f4a3cce27c2e8190",
+        "decoder": "54a76c5110a35b2e6efa468dd0feb75eebe41978bd5ca4069486cb64b7d7a51d"
+      }
+    },
+    {
+      "case": "base-hint-trace-final",
+      "verdict_scope": "generated token trajectory, not full logits or accuracy",
+      "status": "pass",
+      "matched_tokens": 72,
+      "token_count": 72,
+      "transcript_match": true,
+      "wav_sha256": "e3f2406b90557d3f75c40e2c33c6239585179165f4763466e3be7dd539d2d847",
+      "report_sha256": "87173266ceeac4412cc6a94f820cb52225673af584f9a90463b239c2d26fbd43",
+      "checkpoint_weights": {
+        "model.safetensors": {
+          "size": 290403936,
+          "sha256": "07cadb9f25677c8d50df603e66a98fbd842cce45047139baeb16e6219a1e807b"
+        }
+      },
+      "runtime_hashes": {
+        "encoder_runtime_sha256": "386d2b47cf122a89f2fc10c5a88c96c973a8377c9b26edd3d5a3baa3cc14aec0",
+        "decoder_runtime_sha256": "a61b785eaf1f6682b4eadca2fbc10527c65a27bf7ca27e76657de1b369eb87cb",
+        "encoder_engine_sha256": "f0cc7d2a8a7c926a5b574c08439506a335a7e379dffe2c84bbb05c5666259a97",
+        "decoder_engine_sha256": "0a5cb56be846dd4c0ccf34bd4dc177edda333cbf7a6bc08805a3de77fc017b78"
+      },
+      "cke_parent_wall_seconds": 2.84460018761456,
+      "cke_reported_phase_seconds": 2.381483679637313,
+      "hf_generation_seconds": 1.125659459270537,
+      "hf_load_seconds": 0.20826538372784853,
+      "transformers": "5.13.0",
+      "torch": "2.12.1+cpu",
+      "reference_dtype": "torch.float32",
+      "attention_reference": {
+        "status": "measured_not_certified",
+        "shape": [
+          8,
+          72,
+          1500
+        ],
+        "max_abs": 3.427267074584961e-06,
+        "rmse": 3.4781820574438186e-08,
+        "trace_sha256": "7e63923997b70e0f07be9c3b4a5603c43cf2c8c7d02c6afcbdedbc0ef46a0bc7",
+        "mode": "teacher-forced eager FP32; same decoder IDs, independent frontend and encoder",
+        "limitations": "Not identical-input local replay or human boundary accuracy; no fitted tolerance."
+      },
+      "artifact_provenance": {
+        "encoder": {
+          "config_sha256": "2243626ad904defa549e16f96c6e9ba55b7a373abae80cc9535d7a811cebc96d",
+          "weights_sha256": "e0da3059387b083090e7a895a6e6ff5b83b7d83dd1db2bb4979246556ffd9eb4",
+          "manifest_sha256": "f9d31ecceb748b60d5e2e5602427e57e47bb789510e7cb9f7e5db048123ed962",
+          "layers": 6,
+          "embed_dim": 512,
+          "heads": 8,
+          "context_length": 1500
+        },
+        "decoder": {
+          "config_sha256": "a122254e731c14b84fa4ce0e6e21719474d5bd56fc4608ef3fa7bb7e2c98111f",
+          "weights_sha256": "f35c46c988713edea4343106f5c52146cc2936a8132c77d716ed4aa2d7156304",
+          "manifest_sha256": "a858915d981ecf094da5a3bee82e63d287b84a7f1f89a1d9a4e75f4490d89a02",
+          "generation_config_sha256": "444b3f636d2fff89dd9ecf549e2a085b61f7ff0fa0246d4628bac6a3b8cc9ba4",
+          "tokenizer_sha256": "27fc476bfe7f17299480be2273fc0608e4d5a99aba2ab5dec5374b4482d1a566",
+          "layers": 6,
+          "embed_dim": 512,
+          "heads": 8,
+          "context_length": 448,
+          "encoder_memory_length": 1500,
+          "vocab_size": 51865
+        }
+      },
+      "generated_source_sha256": {
+        "encoder": "492e1c96e494537c9b8966a713ea514fccca0b7aa5069106f4a3cce27c2e8190",
+        "decoder": "54a76c5110a35b2e6efa468dd0feb75eebe41978bd5ca4069486cb64b7d7a51d"
+      }
+    },
+    {
+      "case": "large-silence-parity",
+      "verdict_scope": "generated token trajectory, not full logits or accuracy",
+      "status": "pass",
+      "matched_tokens": 1,
+      "token_count": 1,
+      "transcript_match": true,
+      "wav_sha256": "643f8a8dc8bd9c19225afffad2becfec5426180b3749cb208abdf1a6c8354efc",
+      "report_sha256": "4bbeedb784107be98b2095658cddc002e40116ee92eeae996bb3814bbb56c4ce",
+      "checkpoint_weights": {
+        "model.safetensors": {
+          "size": 3087130976,
+          "sha256": "a8e94b85976e5864ba3e9525c7e6c83b2a1eca42d4b797a0c7c24d778e40fd95"
+        }
+      },
+      "runtime_hashes": {
+        "encoder_runtime_sha256": "7252ff445cc5dd8aac4a10f246185871f7b2bbe1b51a8a4b2113b71094b43eb5",
+        "decoder_runtime_sha256": "b68446b3e9e8eccf9f05ba206c24c94f243faad40d375d40f083fff7a17eaef9",
+        "encoder_engine_sha256": "0a5cb56be846dd4c0ccf34bd4dc177edda333cbf7a6bc08805a3de77fc017b78",
+        "decoder_engine_sha256": "0a5cb56be846dd4c0ccf34bd4dc177edda333cbf7a6bc08805a3de77fc017b78"
+      },
+      "cke_parent_wall_seconds": 43.330091217532754,
+      "cke_reported_phase_seconds": 37.65264726988971,
+      "hf_generation_seconds": 9.201693207025528,
+      "hf_load_seconds": 0.5312453154474497,
+      "transformers": "5.13.0",
+      "torch": "2.12.1+cpu",
+      "reference_dtype": "torch.float32",
+      "attention_reference": null,
+      "artifact_provenance": {
+        "encoder": {
+          "config_sha256": "9681fd96f896269e7ddba89b60a4b0e2c286a7c4cedbb9fd844b4a5adfab407c",
+          "weights_sha256": "9900df149e15afb203153312b56aaea34ced2d914b1df1966fba4b1d25247583",
+          "manifest_sha256": "54ee89aaca4f811e30758d4614ef2d47fb5f61134f719cf8da308bb0ce3a502d",
+          "layers": 32,
+          "embed_dim": 1280,
+          "heads": 20,
+          "context_length": 1500
+        },
+        "decoder": {
+          "config_sha256": "42450df1f51c6f4bc68f691f648edccbe7697d4b997578367712853262d37e06",
+          "weights_sha256": "7cf930b9296bc64b9ff059e2377a7e874b636d64cbea777301a5c74d23cfff44",
+          "manifest_sha256": "97011109779704bc48b09bfece36f5e8c8ebe3b149738818fa5381b766f4219b",
+          "generation_config_sha256": "fbdfa70135de9b1d31553393f14e80aaeb1936ea36576b2ba864055943c09d23",
+          "tokenizer_sha256": "6d8cbd7cd0d8d5815e478dac67b85a26bbe77c1f5e0c6d76d1ce2abc0e5f21ca",
+          "layers": 32,
+          "embed_dim": 1280,
+          "heads": 20,
+          "context_length": 448,
+          "encoder_memory_length": 1500,
+          "vocab_size": 51866
+        }
+      },
+      "generated_source_sha256": {
+        "encoder": "563b2904e09fe6b373f9519d3236cf7c2adcd3114be9710b8806765c59d0743d",
+        "decoder": "f9480e27b61466cf6898dd2ab19a2686380dd5459cc02599e280943da6f80189"
+      }
+    },
+    {
+      "case": "large-speech-parity",
+      "verdict_scope": "generated token trajectory, not full logits or accuracy",
+      "status": "pass",
+      "matched_tokens": 62,
+      "token_count": 62,
+      "transcript_match": true,
+      "wav_sha256": "e3f2406b90557d3f75c40e2c33c6239585179165f4763466e3be7dd539d2d847",
+      "report_sha256": "3d1eaeb28f8127b06e0d83b458d1b406b59948e52ae008e3845a4fb31e12a2e8",
+      "checkpoint_weights": {
+        "model.safetensors": {
+          "size": 3087130976,
+          "sha256": "a8e94b85976e5864ba3e9525c7e6c83b2a1eca42d4b797a0c7c24d778e40fd95"
+        }
+      },
+      "runtime_hashes": {
+        "encoder_runtime_sha256": "7252ff445cc5dd8aac4a10f246185871f7b2bbe1b51a8a4b2113b71094b43eb5",
+        "decoder_runtime_sha256": "b68446b3e9e8eccf9f05ba206c24c94f243faad40d375d40f083fff7a17eaef9",
+        "encoder_engine_sha256": "0a5cb56be846dd4c0ccf34bd4dc177edda333cbf7a6bc08805a3de77fc017b78",
+        "decoder_engine_sha256": "0a5cb56be846dd4c0ccf34bd4dc177edda333cbf7a6bc08805a3de77fc017b78"
+      },
+      "cke_parent_wall_seconds": 42.607331722043455,
+      "cke_reported_phase_seconds": 41.01452286168933,
+      "hf_generation_seconds": 16.410977547988296,
+      "hf_load_seconds": 0.5561697846278548,
+      "transformers": "5.13.0",
+      "torch": "2.12.1+cpu",
+      "reference_dtype": "torch.float32",
+      "attention_reference": null,
+      "artifact_provenance": {
+        "encoder": {
+          "config_sha256": "9681fd96f896269e7ddba89b60a4b0e2c286a7c4cedbb9fd844b4a5adfab407c",
+          "weights_sha256": "9900df149e15afb203153312b56aaea34ced2d914b1df1966fba4b1d25247583",
+          "manifest_sha256": "54ee89aaca4f811e30758d4614ef2d47fb5f61134f719cf8da308bb0ce3a502d",
+          "layers": 32,
+          "embed_dim": 1280,
+          "heads": 20,
+          "context_length": 1500
+        },
+        "decoder": {
+          "config_sha256": "42450df1f51c6f4bc68f691f648edccbe7697d4b997578367712853262d37e06",
+          "weights_sha256": "7cf930b9296bc64b9ff059e2377a7e874b636d64cbea777301a5c74d23cfff44",
+          "manifest_sha256": "97011109779704bc48b09bfece36f5e8c8ebe3b149738818fa5381b766f4219b",
+          "generation_config_sha256": "fbdfa70135de9b1d31553393f14e80aaeb1936ea36576b2ba864055943c09d23",
+          "tokenizer_sha256": "6d8cbd7cd0d8d5815e478dac67b85a26bbe77c1f5e0c6d76d1ce2abc0e5f21ca",
+          "layers": 32,
+          "embed_dim": 1280,
+          "heads": 20,
+          "context_length": 448,
+          "encoder_memory_length": 1500,
+          "vocab_size": 51866
+        }
+      },
+      "generated_source_sha256": {
+        "encoder": "563b2904e09fe6b373f9519d3236cf7c2adcd3114be9710b8806765c59d0743d",
+        "decoder": "f9480e27b61466cf6898dd2ab19a2686380dd5459cc02599e280943da6f80189"
+      }
+    }
+  ],
+  "alignment": {
+    "status": "REVIEW_REQUIRED",
+    "edit_ready": false,
+    "counts": {
+      "committed": 44,
+      "review": 1
+    },
+    "traced_vs_untraced_generated_tokens": "72/72 exact",
+    "human_boundary_accuracy": "NOT_TESTED"
+  },
+  "quality": {
+    "digital_silence": "FAIL: Base and Large-v3 both return one text token on zero audio in CKE and Transformers",
+    "interpretation": "Matched model behavior, not evidence of a CKE numerical defect. No transcript filtering introduced.",
+    "base_explicit_reference_no_speech_policy": "0.6 threshold and -1.0 logprob threshold with explicit zero temperature did not suppress the short-form output. No claim about all long-form silence behavior.",
+    "human_WER": "NOT_TESTED"
+  },
+  "performance_limitations": "Individual P3 four-thread requests, some overlapping compilation/reference work; observational timings, not controlled speed comparisons. Large-v3 remains slower than real time on this clip.",
+  "deployment": "Existing 8110 Base service unchanged; no Large HTTP endpoint or HTTP word-alignment capability enabled.",
+  "known_test_failure": "Nemotron dense Mamba synthetic converter/dataflow case fails in both baseline and candidate: uninitialized main_stream_q8. Kept separate from Whisper fixes.",
+  "privacy": "Private audio, transcripts and prompt content omitted; raw attempts retained privately.",
+  "validation": {
+    "focused_with_real_base_asset": {
+      "passed": 128,
+      "skipped": 2,
+      "subtests_passed": 23
+    },
+    "converter_and_runner_suite_excluding_reproduced_baseline_failure": {
+      "passed": 182,
+      "skipped": 3,
+      "deselected": 1,
+      "subtests_passed": 3
+    },
+    "unfiltered_broad_suite": {
+      "passed": 208,
+      "failed": 1,
+      "skipped": 2,
+      "subtests_passed": 23
+    },
+    "baseline_nemotron_reproduction": "same test fails on unmodified parent 701cb825d"
+  }
+}

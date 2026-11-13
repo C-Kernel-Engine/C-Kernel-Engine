@@ -1031,6 +1031,78 @@
 
 <h1>Whisper Tiny and Base End-to-End</h1>
 
+<section id="base-large-parity-20261113">
+<h2>Base alignment and Large-v3: bounded execution evidence</h2>
+<p>The follow-up candidate makes the existing trace circuit reachable through the unified audio command.
+It fixes decoder-start BOS handling and links the existing trace and alignment providers into the normal engine.
+Large-v3 also exposed a tokenizer-padding precedence issue: a named tokenizer padding token must not be replaced
+by a conflicting model default. Explicit contradictions within tokenizer metadata still fail.</p>
+<p>The <a href="assets/whisper-parity-alignment-20261113.json">13 November evidence report</a>
+records loaded runtime/checkpoint hashes, separate quality verdicts and all limitations.
+The full <a href="https://huggingface.co/openai/whisper-large-v3">Large-v3 checkpoint</a> is pinned at
+<code>06f233fe06e710322aca913c1bc4249a0d71fce1</code>; this is not the Turbo variant.
+The generated encoder uses its declared 128 Mel bins and 32 layers. Its decoder ran through ordinary CKE generation.</p>
+<table><thead><tr><th>Case</th><th>CKE versus Transformers</th><th>Scope</th></tr></thead><tbody>
+<tr><td>Base, natural 20-second speech</td><td>63/63 tokens and transcript match</td><td>One greedy trajectory</td></tr>
+<tr><td>Base, vocabulary plus timestamps</td><td>72/72 tokens and transcript match</td><td>One greedy trajectory; traced and untraced CKE tokens also match</td></tr>
+<tr><td>Large-v3, natural 20-second speech</td><td>62/62 tokens and transcript match</td><td>One greedy trajectory, explicit FP32 eager reference</td></tr>
+<tr><td>Base and Large-v3, one-second digital silence</td><td>Each matches its reference's single unwanted text token</td><td>Numerical trajectory PASS; empty-transcript quality FAIL</td></tr>
+</tbody></table>
+<p>Silence is not fixed by changing CKE arithmetic: Transformers also returns the unwanted text.
+An explicit reference no-speech threshold of 0.6 with log-probability threshold −1.0 and zero temperature
+still retained the Base short-form output. No silent dictionary replacement, transcript filtering or
+unmeasured noise threshold is introduced. Quiet speech and long-form silence need separate evaluation.</p>
+<p>On identical decoder IDs, the eight selected attention heads across 72 rows and 1,500 frames differ from
+Transformers by maximum absolute error 3.43×10<sup>−6</sup> and RMSE 3.48×10<sup>−8</sup>.
+This includes independent frontend/encoder differences; it is not identical-operand local proof or a fitted tolerance.
+The existing assembler retained 44 word timings and marked one word for missing timing.
+It remains <code>edit_ready=false</code>. No human boundary accuracy or automatic cutting is certified.</p>
+<p>Large-v3's 20-second request took about 42.6 seconds parent wall time, including about 31.2 seconds
+in the encoder worker and 9.9 seconds in the decoder worker. The reference generation measurement was
+16.4 seconds, excluding model load. These individual observations occurred during development activity;
+repeat idle-host measurements before claiming a speed ratio. Keep Base for the deployed accessibility service.</p>
+<h3>Build and run a separate trace candidate</h3>
+<pre>CK_NUM_THREADS=4 version/v8/scripts/cks-v8-run audio /path/to/pinned/whisper-base \
+  --run /path/to/separate-trace-bundle --wav speech.wav \
+  --vocabulary-hint='C-Kernel-Engine, Clef' --timestamps \
+  --attention-trace-dir /private/traces --output /private/run.json
+
+python3 version/v8/scripts/align_whisper_trace_v8.py \
+  --report /private/run.json --trace /private/traces/window-0000.npz \
+  --encoder-run-dir /path/to/separate-trace-bundle/encoder \
+  --decoder-run-dir /path/to/separate-trace-bundle/decoder \
+  --alignment-library /path/to/separate-trace-bundle/decoder/libckernel_engine.so \
+  --output /private/alignment.json
+
+python3 version/v8/scripts/assemble_whisper_word_timings_v8.py \
+  --run-report /private/run.json --audio speech.wav \
+  --alignment /private/alignment.json --output /private/words.json</pre>
+<p>Use a fresh trace directory for each attempt. A partial alignment or review-required assembly intentionally
+returns a nonzero exit code; inspect its retained report rather than inventing missing timings.
+The trace build choice is part of bundle identity. Prefill and decode observations use separate phase manifests;
+ordinary circuit refresh remains enabled for normal builds.</p>
+<h3>Repeat the reference gate</h3>
+<pre>python3 version/v8/scripts/compare_whisper_e2e_pytorch_v8.py \
+  --checkpoint /path/to/pinned/whisper-base \
+  --encoder-run-dir /path/to/separate-trace-bundle/encoder \
+  --decoder-run-dir /path/to/separate-trace-bundle/decoder \
+  --wav speech.wav --threads 4 --timestamps \
+  --vocabulary-hint='C-Kernel-Engine, Clef' \
+  --attention-trace-dir /private/reference-traces --output /private/parity.json</pre>
+<p>The reference runs offline and is never a production fallback. It records explicit FP32 eager execution,
+checks captured token/head/hash correspondence and reports attention errors separately from token-trajectory status.
+Attention comparison currently supports one window. Run Large-v3 with its own pinned checkpoint and bundle;
+do not reuse Base artifacts or treat these short passes as long-form certification.</p>
+<p>The existing runner test lane also accepts <code>CK_WHISPER_PARITY_CHECKPOINT</code>,
+<code>CK_WHISPER_PARITY_ENCODER</code>, <code>CK_WHISPER_PARITY_DECODER</code> and
+<code>CK_WHISPER_PARITY_WAV</code> for an optional artifact-backed trajectory. Missing assets explicitly skip.
+<code>CK_WHISPER_PARITY_THREADS</code> defaults to 4 and the configurable
+<code>CK_WHISPER_PARITY_TIMEOUT_SECONDS</code> defaults to 1,800. A timeout fails the test; it is not a numerical verdict.</p>
+<p>The running P3 Base service remains unchanged. HTTP alignment, long-audio admission, full-logit/state certification,
+Large serving, held-out recognition quality and edit-safe boundaries remain open. This is usable CLI evidence,
+not full Transformers feature parity. Retain the previous bundle and service configuration for rollback.</p>
+</section>
+
 <section id="consumer-audit-20261113">
 <h2>Resident service audit: 13 November 2026</h2>
 <p>This is the first consumer-integration stage, not a long-recording or editing certificate.

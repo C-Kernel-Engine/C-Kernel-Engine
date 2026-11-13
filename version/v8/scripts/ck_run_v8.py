@@ -1300,11 +1300,14 @@ def step_build_ir(
     prefill_chunk_len: int | None = None,
     logits_layout: str | None = None,
     prefill_policy: str = "auto",
+    prefill_manifest_path: Path | None = None,
+    refresh_circuit: bool = True,
 ) -> dict[str, Path]:
     log_step(3, "Building v8 IR")
     output_dir.mkdir(parents=True, exist_ok=True)
     step_regenerate_kernel_registry(force=force)
-    force = _refresh_manifest_circuit_snapshot(manifest_path) or force
+    if refresh_circuit:
+        force = _refresh_manifest_circuit_snapshot(manifest_path) or force
 
     outputs = {
         "init_ir": output_dir / "init.json",
@@ -1325,6 +1328,7 @@ def step_build_ir(
     ir_inputs = {
         "schema": "ck-v8-ir-bundle-v1",
         "manifest": _file_identity(manifest_path),
+        "prefill_manifest": _file_identity(prefill_manifest_path) if prefill_manifest_path else None,
         "context_len": int(context_len) if context_len is not None else None,
         "prefill_chunk_len": int(prefill_chunk_len) if prefill_chunk_len is not None else None,
         "logits_layout": logits_layout,
@@ -1359,7 +1363,7 @@ def step_build_ir(
             sys.executable,
             str(SCRIPTS_DIR / "build_ir_v8.py"),
             "--manifest",
-            str(manifest_path),
+            str(prefill_manifest_path if mode == "prefill" and prefill_manifest_path else manifest_path),
             "--mode",
             mode,
             "--output",
@@ -2258,16 +2262,19 @@ def _whisper_build_inputs(
     role: str,
     *,
     linear_weight_dtype: str = "preserve",
+    alignment_trace: bool = False,
 ) -> dict[str, Any]:
     return {
         "schema": "ck-v8-whisper-runtime-inputs-v1",
         "role": role,
         "linear_weight_dtype": linear_weight_dtype,
+        "alignment_trace": bool(alignment_trace),
         "checkpoint": _whisper_checkpoint_identity(checkpoint_dir),
         "sources": _tree_identity(
             [
                 SCRIPTS_DIR / "convert_safetensors_to_bump_v8.py",
                 SCRIPTS_DIR / "build_ir_v8.py",
+                SCRIPTS_DIR / "build_whisper_alignment_trace_manifest_v8.py",
                 SCRIPTS_DIR / "plan_terminal_rows_v8.py",
                 SCRIPTS_DIR / "codegen_v8.py",
                 SCRIPTS_DIR / "codegen_core_v8.py",
@@ -2305,7 +2312,10 @@ def _build_whisper_role(
     force_convert: bool,
     force_compile: bool,
     linear_weight_dtype: str = "preserve",
+    alignment_trace: bool = False,
 ) -> None:
+    if alignment_trace and role != "decoder":
+        raise ValueError("alignment traces belong to the decoder")
     if role not in {"encoder", "decoder"}:
         raise ValueError(f"unsupported Whisper role: {role}")
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -2314,6 +2324,7 @@ def _build_whisper_role(
         checkpoint_dir,
         role,
         linear_weight_dtype=linear_weight_dtype,
+        alignment_trace=alignment_trace,
     )
     stamp = run_dir / ".ck-whisper-runtime.json"
     if (
@@ -2394,7 +2405,18 @@ def _build_whisper_role(
             cwd=PROJECT_ROOT,
         )
     else:
-        ir_paths = step_build_ir(manifest, run_dir, force=True)
+        if alignment_trace:
+            from build_whisper_alignment_trace_manifest_v8 import trace_manifest
+            source = json.loads(manifest.read_text())
+            generation = json.loads((run_dir / "generation_config.json").read_text())
+            prefill_manifest = run_dir / "weights_manifest_trace_prefill.json"
+            prefill_manifest.write_text(json.dumps(trace_manifest(source, generation, phase="prefill"), indent=2) + "\n")
+            manifest.write_text(json.dumps(trace_manifest(source, generation), indent=2) + "\n")
+            ir_paths = step_build_ir(manifest, run_dir, force=True,
+                                     prefill_manifest_path=prefill_manifest,
+                                     refresh_circuit=False)
+        else:
+            ir_paths = step_build_ir(manifest, run_dir, force=True)
         model_c = step_codegen(run_dir, ir_paths, force=True)
 
     step_compile(model_c, run_dir, force=force_compile)
@@ -2418,6 +2440,7 @@ def step_build_whisper_runtimes(
     force_convert: bool,
     force_compile: bool,
     encoder_linear_weight_dtype: str = "preserve",
+    alignment_trace: bool = False,
 ) -> tuple[Path, Path]:
     input_type, info = detect_input_type(model_input)
     if input_type == "hf_id":
@@ -2458,6 +2481,7 @@ def step_build_whisper_runtimes(
         checkpoint_dir,
         decoder,
         "decoder",
+        alignment_trace=alignment_trace,
         force_convert=force_convert,
         force_compile=force_compile,
     )
@@ -2573,6 +2597,8 @@ def run_audio_pipeline(args: argparse.Namespace) -> int:
             force_download=bool(getattr(args, "force_download", False)),
         )
         if checkpoint_kind == "parakeet_tdt":
+            if getattr(args, "attention_trace_dir", None) or getattr(args, "vocabulary_hint", ""):
+                raise RuntimeError("Whisper vocabulary/alignment options are not supported by Parakeet")
             if str(args.task) != "transcribe":
                 raise RuntimeError("Parakeet TDT currently supports transcription only")
             if str(args.language) != "en":
@@ -2615,6 +2641,7 @@ def run_audio_pipeline(args: argparse.Namespace) -> int:
             force_download=False,
             force_convert=bool(getattr(args, "force_convert", False)),
             force_compile=bool(getattr(args, "force_compile", False)),
+            alignment_trace=getattr(args, "attention_trace_dir", None) is not None,
             encoder_linear_weight_dtype=str(
                 getattr(args, "encoder_linear_weight_dtype", "preserve")
             ),
@@ -2650,6 +2677,10 @@ def run_audio_pipeline(args: argparse.Namespace) -> int:
     ]
     if args.timestamps:
         argv.append("--timestamps")
+    if getattr(args, "attention_trace_dir", None) is not None:
+        argv.extend(["--attention-trace-dir", str(args.attention_trace_dir)])
+    if getattr(args, "vocabulary_hint", ""):
+        argv.append(f"--vocabulary-hint={args.vocabulary_hint}")
     if args.output is not None:
         argv.extend(["--output", str(args.output)])
     if args.temp_dir is not None:
@@ -2791,6 +2822,9 @@ Examples:
         action="store_true",
         help="Generate monotonic paired Whisper timestamp tokens",
     )
+    audio_parser.add_argument("--attention-trace-dir", type=Path,
+                              help="Build a trace-enabled Whisper decoder and save private alignment traces")
+    audio_parser.add_argument("--vocabulary-hint", default="")
     audio_parser.add_argument("--output", type=Path)
     audio_parser.add_argument(
         "--window-seconds", type=float, default=180.0,
