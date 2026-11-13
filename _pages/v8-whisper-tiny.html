@@ -3,6 +3,31 @@
 
 <h1>Whisper: Tiny, Base and Large-v3</h1>
 
+<section id="large-v3-attention-locality">
+<h2>Attention locality candidate: preserve arithmetic, reorder independent work</h2>
+<p>The next candidate processes a head's query rows before advancing to the next head. This keeps the head's
+keys and values nearer in cache while preserving each output's QK contraction, softmax maximum and FP64
+normalization sum, probability–V reduction and stored layout. Workers retain their existing query-indexed
+scratch ownership. No new allocation, workspace or model-specific branch is introduced.</p>
+<p>Three alternating resident pairs at four threads measured encoder medians of 13.43 → 12.68 seconds and
+inference medians of 21.71 → 21.05 seconds, approximately 3% less inference time. Request medians were
+21.84 → 21.26 seconds; decode was 6.46 versus 6.54 seconds. This is a modest shared-host development gain,
+not evidence that CKE has caught Transformers. Model initialization is excluded; warm-ups and every attempt
+are retained separately.</p>
+<p>At eight threads on physical P cores, three measured pairs reduced median inference from 16.76 to 15.94 seconds
+and request latency from 16.90 to 16.08 seconds. The earlier warm-ups were materially faster than the measured
+runs and remain visible in the report; this is not a claim that the isolated deployed service has these
+absolute timings. All eight runs at each thread count returned identical tokens and encoder hashes.</p>
+<p>Complete encoder output, two full-vocabulary logit trajectories, captured logical decoder state and
+reset/repeat remain bit-exact against the merged projection baseline. Native tests compare packed/unpacked
+attention and serial/threaded execution, retaining the existing independent PyTorch tolerances. New cases
+check exact-sized scratch guards, repeated calls, worker counts 1/2/4/8 and query/key/dimension tails.
+The existing default-nightly Audio Transformer Primitives suite runs these checks.</p>
+<p><a href="assets/whisper-attention-locality-20261113.json">Retained timing and numerical evidence</a>.
+The running Base and Large services were not replaced by this candidate. No new recognition-quality,
+ARM performance, or independent full-logit Transformers certification is claimed.</p>
+</section>
+
 <section id="large-v3-cache-panel-candidate">
 <h2>Measured follow-up: bounded projection cache reuse</h2>
 <p>On P3, perf attributed 54.5% of sampled P-core cycles to FP32 projections and about 24.7% to attention.
