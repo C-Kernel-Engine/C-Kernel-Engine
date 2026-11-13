@@ -1163,11 +1163,16 @@ def _declared_training_call(op, kernel, args, pools, tensors, tensor_numel, vari
     for (ctype, name), binding in zip(args, params):
         source = binding.get("source", "")
         category, _, key = source.partition(":")
+        if source == "null":
+            if ctype.replace(" ", "") != "constfloat*":
+                raise ValueError("training null binding must be a read-only float pointer")
+            expressions.append("NULL")
+            continue
         if "*" in ctype:
             compact_type = ctype.replace(" ", "")
-            expected_dtype = {"float*": "fp32", "constfloat*": "fp32", "constint32_t*": "i32"}.get(compact_type)
+            expected_dtype = {"float*": "fp32", "constfloat*": "fp32", "constint32_t*": "i32", "int32_t*": "i32"}.get(compact_type)
             if expected_dtype is None:
-                raise ValueError("training map supports FP32 and read-only INT32 pointers")
+                raise ValueError("training map supports FP32 and nondifferentiable INT32 pointers")
             tid = pools.get(category, {}).get(key)
             if expected_dtype == "i32" and tensors.get(tid, {}).get("requires_grad") is not False:
                 raise ValueError("integer training metadata must explicitly disable gradients")
@@ -1179,10 +1184,11 @@ def _declared_training_call(op, kernel, args, pools, tensors, tensor_numel, vari
             expressions.append(variables[tid])
         else:
             value = (constants.get(key) if category == "runtime" else
-                     op.get("params", {}).get(key) if category == "param" else None)
+                     op.get("params", {}).get(key) if category == "param" else
+                     int(key) if category == "const" and key.isdigit() else None)
             if ctype in ("int", "size_t"):
                 bound = 2147483647 if ctype == "int" else (2**64 - 1) // 4
-                if type(value) is not int or not 0 < value <= bound:
+                if type(value) is not int or not (0 if category == "const" else 1) <= value <= bound:
                     raise ValueError("invalid bounded integer for " + name)
                 expressions.append(str(value))
             elif ctype == "float":
@@ -1227,10 +1233,16 @@ def _declared_training_call(op, kernel, args, pools, tensors, tensor_numel, vari
             if not rows * width <= capacity <= tensor_numel[tid]:
                 raise ValueError("training map advertised capacity invalid: " + tid)
         shape = tensors[tid].get("shape")
-        if shape not in ([rows, width], [rows * width]):
+        flatten = span.get("flatten", False)
+        if type(flatten) is not bool:
+            raise ValueError("training map flatten must be boolean")
+        flat_shape = (isinstance(shape, list) and bool(shape)
+                      and all(type(x) is int and x > 0 for x in shape)
+                      and math.prod(shape) == rows * width)
+        if shape not in ([rows, width], [rows * width]) and not (flatten and flat_shape):
             raise ValueError("training map requires contiguous declared shape: " + tid)
     writable = [pointers[n] for (t, n) in args if "*" in t and "const" not in t]
-    readable = {pointers[name] for ctype, name in args if "const" in ctype and "*" in ctype}
+    readable = {pointers[name] for ctype, name in args if "const" in ctype and "*" in ctype and name in pointers}
     if len(writable) != len(set(writable)) or set(writable) & readable:
         raise ValueError("training map writable buffers must not alias")
     return expressions
@@ -1310,12 +1322,22 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
         integer_offset += n
     # Integer operands used by declared map calls must be explicitly bound. They
     # must never silently read an uninitialized static buffer or token-ID alias.
+    initialized_i32 = set(integer_input_order)
     for op in all_ops:
         if op.get("map_call"):
             for ref in op.get("dataflow", {}).get("inputs", {}).values():
                 tid = ref.get("tensor")
-                if tid in tvars_i32 and tid not in integer_input_order:
+                if tid in tvars_i32 and tid not in initialized_i32:
                     raise ValueError("unbound integer training map input: " + tid)
+            for ref in op.get("dataflow", {}).get("outputs", {}).values():
+                tid = ref.get("tensor")
+                if tid in tvars_i32:
+                    meta = tensors[tid]
+                    if (tid in initialized_i32 or meta.get("requires_grad") is not False
+                            or meta.get("kind") != "activation" or meta.get("persistent", False)):
+                        raise ValueError("invalid generated integer training output: " + tid)
+                    initialized_i32.add(tid)
+
 
     # Collect declarations required by kernels in this IR.
     used_decl: Dict[str, Tuple[str, List[Tuple[str, str]], str]] = {}

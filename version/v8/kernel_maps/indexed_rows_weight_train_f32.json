@@ -1,0 +1,192 @@
+{
+  "id": "indexed_rows_weight_train_f32",
+  "op": "indexed_rows_weight_train_f32",
+  "operation_interface": "indexed_rows_weight_train_f32.v1",
+  "variant": "checked_training",
+  "quant": {
+    "weight": "fp32",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "ids",
+      "shape": [
+        "R"
+      ],
+      "dtype": "i32",
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [
+    {
+      "name": "table",
+      "shape": [
+        "V",
+        "C"
+      ],
+      "dtype": "fp32",
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "weight",
+      "consumption": "required"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "output",
+      "shape": [
+        "R",
+        "C"
+      ],
+      "dtype": "fp32",
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "scratch": [],
+  "dims": [],
+  "modes": {
+    "inference": false,
+    "training": true,
+    "backward": true
+  },
+  "impl": {
+    "function": "ck_indexed_rows_f32",
+    "c_declaration": "int ck_indexed_rows_f32(const float * table, size_t table_elements, const int32_t * ids, size_t id_elements, float * output, size_t output_elements, size_t rows, size_t capacity, size_t channels);",
+    "sources": [
+      "src/kernels/indexed_rows_train.c"
+    ]
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "table",
+        "source": "weight:table",
+        "cast": "const float *",
+        "ports": [
+          "weight:table"
+        ]
+      },
+      {
+        "name": "table_elements",
+        "source": "runtime:table_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "ids",
+        "source": "activation:ids",
+        "cast": "const int32_t *",
+        "ports": [
+          "input:ids"
+        ]
+      },
+      {
+        "name": "id_elements",
+        "source": "runtime:id_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "output",
+        "source": "output:output",
+        "cast": "float *",
+        "ports": [
+          "output:output"
+        ]
+      },
+      {
+        "name": "output_elements",
+        "source": "runtime:output_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "rows",
+        "source": "runtime:rows",
+        "value_type": "size_t"
+      },
+      {
+        "name": "capacity",
+        "source": "runtime:capacity",
+        "value_type": "size_t"
+      },
+      {
+        "name": "channels",
+        "source": "runtime:channels",
+        "value_type": "size_t"
+      }
+    ]
+  },
+  "training_contract": {
+    "version": 1,
+    "layout": "contiguous",
+    "batch_policy": "fixed",
+    "return_status": "zero_success",
+    "buffer_spans": [
+      {
+        "pointer": "table",
+        "rows": "capacity",
+        "width": "channels",
+        "elements": "table_elements"
+      },
+      {
+        "pointer": "ids",
+        "rows": "rows",
+        "width": 1,
+        "elements": "id_elements"
+      },
+      {
+        "pointer": "output",
+        "rows": "rows",
+        "width": "channels",
+        "elements": "output_elements"
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "tests/test_v8_indexed_rows_training.py",
+      "tests/test_v8_clef_full_training.py"
+    ],
+    "oracle": "Pinned PyTorch head autograd and independent gather/scatter arithmetic, capacity and recovery checks."
+  },
+  "numerical_capabilities": [
+    {
+      "contract_id": "indexed_rows_gather_exact_f32_v1",
+      "status": "validated",
+      "phases": [
+        "prefill"
+      ],
+      "function": "ck_indexed_rows_f32",
+      "explicit_selector": true,
+      "implementation": {
+        "isa_dispatch": "scalar",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": [
+            "serial"
+          ],
+          "dispatch": [
+            "inline"
+          ],
+          "reduction_order_effect": "none"
+        }
+      },
+      "arithmetic": {
+        "partial_accumulator": "none",
+        "merge_order": "none",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false,
+        "split_strategy": "serial"
+      }
+    }
+  ]
+}

@@ -3,6 +3,79 @@
   "schema_version": 1,
   "engine_contract_version": "8",
   "contracts": {
+    "indexed_rows_gather_exact_f32_v1": {
+      "operator_family": "indexed_rows_gather",
+      "status": "validated",
+      "storage": {
+        "input": "fp32",
+        "weight": "none",
+        "output": "fp32"
+      },
+      "compute": {
+        "input": "fp32",
+        "weight": "none",
+        "accumulator": "fp32",
+        "contraction": "disabled",
+        "evaluation_order": "checked_indexed_row_copy"
+      },
+      "rounding": {
+        "mode": "none",
+        "points": [
+          "input_load",
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "none",
+        "order": "none",
+        "partial_accumulator": "none",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "serial",
+        "split_strategy": "serial",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Validate every index and selected finite row before copying exact FP32 bits to disjoint output. No reduction."
+    },
+    "indexed_rows_scatter_ordered_fp64_f32_v1": {
+      "operator_family": "indexed_rows_scatter",
+      "status": "validated",
+      "storage": {
+        "input": "fp32",
+        "weight": "none",
+        "output": "fp32"
+      },
+      "compute": {
+        "input": "fp32",
+        "weight": "none",
+        "accumulator": "fp64",
+        "contraction": "disabled",
+        "evaluation_order": "ascending_source_rows_per_destination"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": [
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "sum",
+        "order": "ascending_index",
+        "partial_accumulator": "fp64",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "serial",
+        "split_strategy": "serial",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Repeated indices accumulate in ascending source-row order with FP64 accumulation and one FP32 store. Entire destination staged; rejection leaves destination unchanged."
+    },
     "scalar_exp_clamped_backward_ordered_fp64_f32_v1": {
       "operator_family": "scalar_exp_clamped_checked",
       "status": "validated",

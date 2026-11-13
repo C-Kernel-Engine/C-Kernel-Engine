@@ -86,7 +86,7 @@
   },
   "modes": {
     "inference": true,
-    "training": false,
+    "training": true,
     "backward": false
   },
   "call_constant_contract": {
@@ -240,9 +240,39 @@
   },
   "tests": {
     "unit": [
-      "tests/test_v8_qwen3_tts_first_block.py"
+      "tests/test_v8_qwen3_tts_first_block.py",
+      "tests/test_v8_clef_full_training.py"
     ],
     "oracle": "Pinned Qwen3-TTS 0.6B CustomVoice FP32 first-layer projections"
   },
-  "notes": "Same checked FP64 reduction as linear_rows_checked_f32, with an explicit zero-bias ABI. No full-model dequantization."
+  "notes": "Same checked FP64 reduction as linear_rows_checked_f32, with an explicit zero-bias ABI. No full-model dequantization.",
+  "training_contract": {
+    "version": 1,
+    "layout": "contiguous",
+    "batch_policy": "fixed",
+    "return_status": "zero_success",
+    "buffer_spans": [
+      {
+        "pointer": "input",
+        "elements": "input_elements",
+        "stride": "input_stride",
+        "rows": "rows",
+        "width": "input_channels"
+      },
+      {
+        "pointer": "weight",
+        "elements": "weight_elements",
+        "stride": "weight_stride",
+        "rows": "output_channels",
+        "width": "input_channels"
+      },
+      {
+        "pointer": "output",
+        "elements": "output_elements",
+        "stride": "output_stride",
+        "rows": "rows",
+        "width": "output_channels"
+      }
+    ]
+  }
 }

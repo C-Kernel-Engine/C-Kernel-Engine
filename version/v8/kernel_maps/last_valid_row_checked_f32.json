@@ -28,7 +28,11 @@
     "c_declaration": "int ck_last_valid_row_checked_f32(const float *input, size_t input_elements, size_t input_stride, size_t token_capacity, size_t valid_tokens, size_t channels, const int32_t *span, size_t span_elements, float *output, size_t output_elements);",
     "sources": ["src/kernels/last_valid_row_checked.c"]
   },
-  "modes": {"inference": true, "training": false, "backward": false},
+  "modes": {
+    "inference": true,
+    "training": true,
+    "backward": false
+  },
   "numerical_capabilities": [{
     "contract_id": "last_valid_row_checked_exact_f32",
     "status": "validated", "phases": ["prefill"],
@@ -63,7 +67,45 @@
         "width": "channels", "element_bytes": 4}
     ]
   },
-  "tests": {"unit": ["tests/test_v8_clef_flash_head_ingress.py"],
-    "oracle": "Exact final valid row, including rejection of wrong but in-bounds spans and unchanged output"},
-  "notes": "Generic final-valid-row copy with checked half-open span assertion. Rejected calls leave output untouched."
+  "tests": {
+    "unit": [
+      "tests/test_v8_clef_flash_head_ingress.py",
+      "tests/test_v8_clef_full_training.py"
+    ],
+    "oracle": "Exact final valid row, including rejection of wrong but in-bounds spans and unchanged output"
+  },
+  "notes": "Generic final-valid-row copy with checked half-open span assertion. Rejected calls leave output untouched.",
+  "training_contract": {
+    "version": 1,
+    "layout": "contiguous",
+    "batch_policy": "fixed",
+    "return_status": "zero_success",
+    "buffer_spans": [
+      {
+        "pointer": "input",
+        "elements": "input_elements",
+        "stride": "input_stride",
+        "rows": "token_capacity",
+        "width": "channels"
+      },
+      {
+        "pointer": "span",
+        "elements": "span_elements",
+        "rows": 1,
+        "width": 2
+      },
+      {
+        "pointer": "output",
+        "elements": "output_elements",
+        "rows": 1,
+        "width": "channels"
+      }
+    ],
+    "scalar_equalities": [
+      [
+        "valid_tokens",
+        "token_capacity"
+      ]
+    ]
+  }
 }

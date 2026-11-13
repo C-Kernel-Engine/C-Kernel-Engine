@@ -28,7 +28,11 @@
     "c_declaration": "int ck_expand_group_row_indices_checked_i32(const int32_t *group_counts, size_t group_count_elements, size_t groups, size_t rows, int32_t *row_indices, size_t row_index_elements, int32_t *owner_indices, size_t owner_index_elements);",
     "sources": ["src/kernels/expand_group_row_indices_checked.c"]
   },
-  "modes": {"inference": true, "training": false, "backward": false},
+  "modes": {
+    "inference": true,
+    "training": true,
+    "backward": false
+  },
   "numerical_capabilities": [{
     "contract_id": "expand_group_row_indices_checked_exact_i32",
     "status": "validated", "phases": ["prefill"],
@@ -62,7 +66,38 @@
         "width": "rows", "element_bytes": 4}
     ]
   },
-  "tests": {"unit": ["tests/test_v8_clef_flash_head_ingress.py"],
-    "oracle": "Independent Python group expansion, rejection, unchanged output, and generated option-query composition"},
-  "notes": "Model-neutral ordered group expansion. Positive counts must sum to output rows. Both outputs are caller-owned and unchanged on rejection."
+  "tests": {
+    "unit": [
+      "tests/test_v8_clef_flash_head_ingress.py",
+      "tests/test_v8_clef_full_training.py"
+    ],
+    "oracle": "Independent Python group expansion, rejection, unchanged output, and generated option-query composition"
+  },
+  "notes": "Model-neutral ordered group expansion. Positive counts must sum to output rows. Both outputs are caller-owned and unchanged on rejection.",
+  "training_contract": {
+    "version": 1,
+    "layout": "contiguous",
+    "batch_policy": "fixed",
+    "return_status": "zero_success",
+    "buffer_spans": [
+      {
+        "pointer": "group_counts",
+        "elements": "group_count_elements",
+        "rows": 1,
+        "width": "groups"
+      },
+      {
+        "pointer": "row_indices",
+        "elements": "row_index_elements",
+        "rows": 1,
+        "width": "rows"
+      },
+      {
+        "pointer": "owner_indices",
+        "elements": "owner_index_elements",
+        "rows": 1,
+        "width": "rows"
+      }
+    ]
+  }
 }

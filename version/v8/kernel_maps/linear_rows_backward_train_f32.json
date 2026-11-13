@@ -1,0 +1,220 @@
+{
+  "id": "linear_rows_backward_train_f32",
+  "op": "linear_rows_backward_train_f32",
+  "operation_interface": "linear_rows_backward_train_f32.v1",
+  "variant": "existing_native_vjp_explicit_rows",
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "d_output",
+      "shape": [
+        "R",
+        "O"
+      ],
+      "dtype": "fp32",
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "input",
+      "shape": [
+        "R",
+        "I"
+      ],
+      "dtype": "fp32",
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "weight",
+      "shape": [
+        "O",
+        "I"
+      ],
+      "dtype": "fp32",
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "d_input",
+      "shape": [
+        "R",
+        "I"
+      ],
+      "dtype": "fp32",
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "d_weight",
+      "shape": [
+        "O",
+        "I"
+      ],
+      "dtype": "fp32",
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "d_bias",
+      "shape": [
+        "O"
+      ],
+      "dtype": "fp32",
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "scratch": [],
+  "dims": [],
+  "modes": {
+    "inference": false,
+    "training": true,
+    "backward": true
+  },
+  "impl": {
+    "function": "fc2_backward_kernel",
+    "c_declaration": "void fc2_backward_kernel(const float * d_output, const float * fc2_input, const float * W_fc2, float * d_input, float * d_W_fc2, float * d_b_fc2, int T, int aligned_in, int aligned_out, int num_threads);",
+    "sources": [
+      "src/kernels/mlp_kernels.c"
+    ]
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "d_output",
+        "source": "activation:d_output",
+        "cast": "const float *",
+        "ports": [
+          "input:d_output"
+        ]
+      },
+      {
+        "name": "fc2_input",
+        "source": "activation:input",
+        "cast": "const float *",
+        "ports": [
+          "input:input"
+        ]
+      },
+      {
+        "name": "W_fc2",
+        "source": "activation:weight",
+        "cast": "const float *",
+        "ports": [
+          "input:weight"
+        ]
+      },
+      {
+        "name": "d_input",
+        "source": "output:d_input",
+        "cast": "float *",
+        "ports": [
+          "output:d_input"
+        ]
+      },
+      {
+        "name": "d_W_fc2",
+        "source": "output:d_weight",
+        "cast": "float *",
+        "ports": [
+          "output:d_weight"
+        ]
+      },
+      {
+        "name": "d_b_fc2",
+        "source": "output:d_bias",
+        "cast": "float *",
+        "ports": [
+          "output:d_bias"
+        ]
+      },
+      {
+        "name": "T",
+        "source": "runtime:T"
+      },
+      {
+        "name": "aligned_in",
+        "source": "runtime:aligned_in"
+      },
+      {
+        "name": "aligned_out",
+        "source": "runtime:aligned_out"
+      },
+      {
+        "name": "num_threads",
+        "source": "runtime:num_threads"
+      }
+    ]
+  },
+  "training_contract": {
+    "version": 1,
+    "layout": "contiguous",
+    "batch_policy": "fixed",
+    "buffer_spans": [
+      {
+        "pointer": "d_output",
+        "rows": "T",
+        "width": "aligned_out"
+      },
+      {
+        "pointer": "fc2_input",
+        "rows": "T",
+        "width": "aligned_in"
+      },
+      {
+        "pointer": "W_fc2",
+        "rows": "aligned_out",
+        "width": "aligned_in"
+      },
+      {
+        "pointer": "d_input",
+        "rows": "T",
+        "width": "aligned_in"
+      },
+      {
+        "pointer": "d_W_fc2",
+        "rows": "aligned_out",
+        "width": "aligned_in"
+      },
+      {
+        "pointer": "d_b_fc2",
+        "rows": 1,
+        "width": "aligned_out"
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "tests/test_v8_clef_full_training.py"
+    ],
+    "oracle": "Pinned PyTorch head autograd and independent gather/scatter arithmetic, capacity and recovery checks."
+  },
+  "notes": "Reuses the existing native training VJP with compiler-validated contiguous spans and explicit per-operation extents. The function is not a checked public pointer API. Complete-head certification enables the existing strict-parity runtime; non-strict backend numerical behavior is not newly certified here."
+}

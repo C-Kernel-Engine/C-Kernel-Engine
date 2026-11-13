@@ -5,9 +5,10 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 507,
+      "total": 512,
       "by_op": {
         "add_backward": 1,
+        "add_rows_backward_train_f32": 1,
         "add_rows_checked": 1,
         "add_stream": 2,
         "alignment_attention_dtw": 1,
@@ -120,6 +121,9 @@
         "indexed_normalized_dot_backward_checked": 1,
         "indexed_pair_features_backward_checked": 1,
         "indexed_pair_features_checked": 1,
+        "indexed_rows_backward_train_f32": 1,
+        "indexed_rows_train_f32": 1,
+        "indexed_rows_weight_train_f32": 1,
         "indexed_sum_rows_checked": 1,
         "kv_cache_seed_checked": 1,
         "kv_cache_store": 4,
@@ -132,6 +136,7 @@
         "layout_convert": 2,
         "layout_transform": 1,
         "leaky_relu_strided_checked": 1,
+        "linear_rows_backward_train_f32": 1,
         "linear_rows_checked": 1,
         "linear_rows_checked_no_bias": 1,
         "logits_store_indexed": 1,
@@ -393,6 +398,150 @@
       "_source_file": "adamw_update_f32.json"
     },
     {
+      "id": "add_rows_backward_train_f32",
+      "op": "add_rows_backward_train_f32",
+      "operation_interface": "add_rows_backward_train_f32.v1",
+      "variant": "existing_native_vjp_explicit_rows",
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "d_output",
+          "shape": [
+            "N"
+          ],
+          "dtype": "fp32",
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "d_a",
+          "shape": [
+            "N"
+          ],
+          "dtype": "fp32",
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "d_b",
+          "shape": [
+            "N"
+          ],
+          "dtype": "fp32",
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [],
+      "modes": {
+        "inference": false,
+        "training": true,
+        "backward": true
+      },
+      "impl": {
+        "function": "ck_residual_add_backward",
+        "c_declaration": "void ck_residual_add_backward(const float *d_output, float *d_a, float *d_b, int tokens, int elements);",
+        "sources": [
+          "src/ckernel_orchestration.c"
+        ],
+        "variants": [
+          {
+            "name": "default",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "d_output",
+            "source": "activation:d_output",
+            "cast": "const float *",
+            "ports": [
+              "input:d_output"
+            ]
+          },
+          {
+            "name": "d_a",
+            "source": "output:d_a",
+            "cast": "float *",
+            "ports": [
+              "output:d_a"
+            ]
+          },
+          {
+            "name": "d_b",
+            "source": "output:d_b",
+            "cast": "float *",
+            "ports": [
+              "output:d_b"
+            ]
+          },
+          {
+            "name": "tokens",
+            "source": "const:1"
+          },
+          {
+            "name": "elements",
+            "source": "runtime:elements"
+          }
+        ]
+      },
+      "training_contract": {
+        "version": 1,
+        "layout": "contiguous",
+        "batch_policy": "fixed",
+        "buffer_spans": [
+          {
+            "pointer": "d_output",
+            "rows": "elements",
+            "width": 1,
+            "flatten": true
+          },
+          {
+            "pointer": "d_a",
+            "rows": "elements",
+            "width": 1,
+            "flatten": true
+          },
+          {
+            "pointer": "d_b",
+            "rows": "elements",
+            "width": 1,
+            "flatten": true
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_clef_full_training.py"
+        ],
+        "oracle": "Pinned PyTorch head autograd and independent gather/scatter arithmetic, capacity and recovery checks."
+      },
+      "notes": "Reuses the existing native training VJP with compiler-validated contiguous spans and explicit per-operation extents. The function is not a checked public pointer API. Complete-head certification enables the existing strict-parity runtime; non-strict backend numerical behavior is not newly certified here.",
+      "name": "add_rows_backward_train_f32",
+      "_source_file": "add_rows_backward_train_f32.json"
+    },
+    {
       "id": "add_rows_checked_f32",
       "op": "add_rows_checked",
       "operation_interface": "add.rows.checked.fp32.v1",
@@ -563,19 +712,22 @@
             "pointer": "left",
             "rows": "elements",
             "width": 1,
-            "elements": "left_elements"
+            "elements": "left_elements",
+            "flatten": true
           },
           {
             "pointer": "right",
             "rows": "elements",
             "width": 1,
-            "elements": "right_elements"
+            "elements": "right_elements",
+            "flatten": true
           },
           {
             "pointer": "output",
             "rows": "elements",
             "width": 1,
-            "elements": "output_elements"
+            "elements": "output_elements",
+            "flatten": true
           }
         ]
       },
@@ -38170,7 +38322,7 @@
       },
       "modes": {
         "inference": true,
-        "training": false,
+        "training": true,
         "backward": false
       },
       "numerical_capabilities": [
@@ -38289,11 +38441,38 @@
       },
       "tests": {
         "unit": [
-          "tests/test_v8_clef_flash_head_ingress.py"
+          "tests/test_v8_clef_flash_head_ingress.py",
+          "tests/test_v8_clef_full_training.py"
         ],
         "oracle": "Independent Python group expansion, rejection, unchanged output, and generated option-query composition"
       },
       "notes": "Model-neutral ordered group expansion. Positive counts must sum to output rows. Both outputs are caller-owned and unchanged on rejection.",
+      "training_contract": {
+        "version": 1,
+        "layout": "contiguous",
+        "batch_policy": "fixed",
+        "return_status": "zero_success",
+        "buffer_spans": [
+          {
+            "pointer": "group_counts",
+            "elements": "group_count_elements",
+            "rows": 1,
+            "width": "groups"
+          },
+          {
+            "pointer": "row_indices",
+            "elements": "row_index_elements",
+            "rows": 1,
+            "width": "rows"
+          },
+          {
+            "pointer": "owner_indices",
+            "elements": "owner_index_elements",
+            "rows": 1,
+            "width": "rows"
+          }
+        ]
+      },
       "name": "expand_group_row_indices_checked_i32",
       "_source_file": "expand_group_row_indices_checked_i32.json"
     },
@@ -58918,6 +59097,619 @@
       "_source_file": "indexed_pair_features_checked_f32.json"
     },
     {
+      "id": "indexed_rows_backward_train_f32",
+      "op": "indexed_rows_backward_train_f32",
+      "operation_interface": "indexed_rows_backward_train_f32.v1",
+      "variant": "checked_training",
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "d_output",
+          "shape": [
+            "R",
+            "C"
+          ],
+          "dtype": "fp32",
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "ids",
+          "shape": [
+            "R"
+          ],
+          "dtype": "i32",
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "d_table",
+          "shape": [
+            "V",
+            "C"
+          ],
+          "dtype": "fp32",
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "scratch",
+          "shape": [
+            "X"
+          ],
+          "dtype": "fp32",
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read_write",
+          "storage_class": "scratch",
+          "consumption": "required",
+          "lifetime": "kernel_call",
+          "alignment": 64,
+          "size_bytes": "4 * X",
+          "size_resolution": "required"
+        }
+      ],
+      "dims": [],
+      "modes": {
+        "inference": false,
+        "training": true,
+        "backward": true
+      },
+      "impl": {
+        "function": "ck_indexed_rows_backward_f32",
+        "c_declaration": "int ck_indexed_rows_backward_f32(const float * d_output, size_t d_output_elements, const int32_t * ids, size_t id_elements, float * d_table, size_t d_table_elements, float * scratch, size_t scratch_elements, size_t rows, size_t capacity, size_t channels);",
+        "sources": [
+          "src/kernels/indexed_rows_train.c"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "d_output",
+            "source": "activation:d_output",
+            "cast": "const float *",
+            "ports": [
+              "input:d_output"
+            ]
+          },
+          {
+            "name": "d_output_elements",
+            "source": "runtime:d_output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "ids",
+            "source": "activation:ids",
+            "cast": "const int32_t *",
+            "ports": [
+              "input:ids"
+            ]
+          },
+          {
+            "name": "id_elements",
+            "source": "runtime:id_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "d_table",
+            "source": "output:d_table",
+            "cast": "float *",
+            "ports": [
+              "output:d_table"
+            ]
+          },
+          {
+            "name": "d_table_elements",
+            "source": "runtime:d_table_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "scratch",
+            "source": "scratch:scratch",
+            "cast": "float *"
+          },
+          {
+            "name": "scratch_elements",
+            "source": "runtime:scratch_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "capacity",
+            "source": "runtime:capacity",
+            "value_type": "size_t"
+          },
+          {
+            "name": "channels",
+            "source": "runtime:channels",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "training_contract": {
+        "version": 1,
+        "layout": "contiguous",
+        "batch_policy": "fixed",
+        "return_status": "zero_success",
+        "buffer_spans": [
+          {
+            "pointer": "d_output",
+            "rows": "rows",
+            "width": "channels",
+            "elements": "d_output_elements"
+          },
+          {
+            "pointer": "ids",
+            "rows": "rows",
+            "width": 1,
+            "elements": "id_elements"
+          },
+          {
+            "pointer": "d_table",
+            "rows": "capacity",
+            "width": "channels",
+            "elements": "d_table_elements"
+          },
+          {
+            "pointer": "scratch",
+            "rows": 1,
+            "width": "scratch_elements",
+            "elements": "scratch_elements"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_indexed_rows_training.py",
+          "tests/test_v8_clef_full_training.py"
+        ],
+        "oracle": "Pinned PyTorch head autograd and independent gather/scatter arithmetic, capacity and recovery checks."
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "indexed_rows_scatter_ordered_fp64_f32_v1",
+          "status": "validated",
+          "phases": [
+            "backward"
+          ],
+          "function": "ck_indexed_rows_backward_f32",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp64",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "serial"
+          }
+        }
+      ],
+      "name": "indexed_rows_backward_train_f32",
+      "_source_file": "indexed_rows_backward_train_f32.json"
+    },
+    {
+      "id": "indexed_rows_train_f32",
+      "op": "indexed_rows_train_f32",
+      "operation_interface": "indexed_rows_train_f32.v1",
+      "variant": "checked_training",
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "table",
+          "shape": [
+            "V",
+            "C"
+          ],
+          "dtype": "fp32",
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "ids",
+          "shape": [
+            "R"
+          ],
+          "dtype": "i32",
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "output",
+          "shape": [
+            "R",
+            "C"
+          ],
+          "dtype": "fp32",
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [],
+      "modes": {
+        "inference": false,
+        "training": true,
+        "backward": true
+      },
+      "impl": {
+        "function": "ck_indexed_rows_f32",
+        "c_declaration": "int ck_indexed_rows_f32(const float * table, size_t table_elements, const int32_t * ids, size_t id_elements, float * output, size_t output_elements, size_t rows, size_t capacity, size_t channels);",
+        "sources": [
+          "src/kernels/indexed_rows_train.c"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "table",
+            "source": "activation:table",
+            "cast": "const float *",
+            "ports": [
+              "input:table"
+            ]
+          },
+          {
+            "name": "table_elements",
+            "source": "runtime:table_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "ids",
+            "source": "activation:ids",
+            "cast": "const int32_t *",
+            "ports": [
+              "input:ids"
+            ]
+          },
+          {
+            "name": "id_elements",
+            "source": "runtime:id_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float *",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "capacity",
+            "source": "runtime:capacity",
+            "value_type": "size_t"
+          },
+          {
+            "name": "channels",
+            "source": "runtime:channels",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "training_contract": {
+        "version": 1,
+        "layout": "contiguous",
+        "batch_policy": "fixed",
+        "return_status": "zero_success",
+        "buffer_spans": [
+          {
+            "pointer": "table",
+            "rows": "capacity",
+            "width": "channels",
+            "elements": "table_elements"
+          },
+          {
+            "pointer": "ids",
+            "rows": "rows",
+            "width": 1,
+            "elements": "id_elements"
+          },
+          {
+            "pointer": "output",
+            "rows": "rows",
+            "width": "channels",
+            "elements": "output_elements"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_indexed_rows_training.py",
+          "tests/test_v8_clef_full_training.py"
+        ],
+        "oracle": "Pinned PyTorch head autograd and independent gather/scatter arithmetic, capacity and recovery checks."
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "indexed_rows_gather_exact_f32_v1",
+          "status": "validated",
+          "phases": [
+            "prefill"
+          ],
+          "function": "ck_indexed_rows_f32",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "none",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "serial"
+          }
+        }
+      ],
+      "name": "indexed_rows_train_f32",
+      "_source_file": "indexed_rows_train_f32.json"
+    },
+    {
+      "id": "indexed_rows_weight_train_f32",
+      "op": "indexed_rows_weight_train_f32",
+      "operation_interface": "indexed_rows_weight_train_f32.v1",
+      "variant": "checked_training",
+      "quant": {
+        "weight": "fp32",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "ids",
+          "shape": [
+            "R"
+          ],
+          "dtype": "i32",
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "table",
+          "shape": [
+            "V",
+            "C"
+          ],
+          "dtype": "fp32",
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "shape": [
+            "R",
+            "C"
+          ],
+          "dtype": "fp32",
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [],
+      "modes": {
+        "inference": false,
+        "training": true,
+        "backward": true
+      },
+      "impl": {
+        "function": "ck_indexed_rows_f32",
+        "c_declaration": "int ck_indexed_rows_f32(const float * table, size_t table_elements, const int32_t * ids, size_t id_elements, float * output, size_t output_elements, size_t rows, size_t capacity, size_t channels);",
+        "sources": [
+          "src/kernels/indexed_rows_train.c"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "table",
+            "source": "weight:table",
+            "cast": "const float *",
+            "ports": [
+              "weight:table"
+            ]
+          },
+          {
+            "name": "table_elements",
+            "source": "runtime:table_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "ids",
+            "source": "activation:ids",
+            "cast": "const int32_t *",
+            "ports": [
+              "input:ids"
+            ]
+          },
+          {
+            "name": "id_elements",
+            "source": "runtime:id_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float *",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "capacity",
+            "source": "runtime:capacity",
+            "value_type": "size_t"
+          },
+          {
+            "name": "channels",
+            "source": "runtime:channels",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "training_contract": {
+        "version": 1,
+        "layout": "contiguous",
+        "batch_policy": "fixed",
+        "return_status": "zero_success",
+        "buffer_spans": [
+          {
+            "pointer": "table",
+            "rows": "capacity",
+            "width": "channels",
+            "elements": "table_elements"
+          },
+          {
+            "pointer": "ids",
+            "rows": "rows",
+            "width": 1,
+            "elements": "id_elements"
+          },
+          {
+            "pointer": "output",
+            "rows": "rows",
+            "width": "channels",
+            "elements": "output_elements"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_indexed_rows_training.py",
+          "tests/test_v8_clef_full_training.py"
+        ],
+        "oracle": "Pinned PyTorch head autograd and independent gather/scatter arithmetic, capacity and recovery checks."
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "indexed_rows_gather_exact_f32_v1",
+          "status": "validated",
+          "phases": [
+            "prefill"
+          ],
+          "function": "ck_indexed_rows_f32",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "none",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "serial"
+          }
+        }
+      ],
+      "name": "indexed_rows_weight_train_f32",
+      "_source_file": "indexed_rows_weight_train_f32.json"
+    },
+    {
       "id": "indexed_sum_rows_checked_f32",
       "op": "indexed_sum_rows_checked",
       "operation_interface": "tensor.indexed_sum.rows.checked.fp32.v1",
@@ -60642,7 +61434,7 @@
       },
       "modes": {
         "inference": true,
-        "training": false,
+        "training": true,
         "backward": false
       },
       "numerical_capabilities": [
@@ -60773,11 +61565,45 @@
       },
       "tests": {
         "unit": [
-          "tests/test_v8_clef_flash_head_ingress.py"
+          "tests/test_v8_clef_flash_head_ingress.py",
+          "tests/test_v8_clef_full_training.py"
         ],
         "oracle": "Exact final valid row, including rejection of wrong but in-bounds spans and unchanged output"
       },
       "notes": "Generic final-valid-row copy with checked half-open span assertion. Rejected calls leave output untouched.",
+      "training_contract": {
+        "version": 1,
+        "layout": "contiguous",
+        "batch_policy": "fixed",
+        "return_status": "zero_success",
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "elements": "input_elements",
+            "stride": "input_stride",
+            "rows": "token_capacity",
+            "width": "channels"
+          },
+          {
+            "pointer": "span",
+            "elements": "span_elements",
+            "rows": 1,
+            "width": 2
+          },
+          {
+            "pointer": "output",
+            "elements": "output_elements",
+            "rows": 1,
+            "width": "channels"
+          }
+        ],
+        "scalar_equalities": [
+          [
+            "valid_tokens",
+            "token_capacity"
+          ]
+        ]
+      },
       "name": "last_valid_row_checked_f32",
       "_source_file": "last_valid_row_checked_f32.json"
     },
@@ -63217,6 +64043,228 @@
       "_source_file": "leaky_relu_strided_f32_checked.json"
     },
     {
+      "id": "linear_rows_backward_train_f32",
+      "op": "linear_rows_backward_train_f32",
+      "operation_interface": "linear_rows_backward_train_f32.v1",
+      "variant": "existing_native_vjp_explicit_rows",
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "d_output",
+          "shape": [
+            "R",
+            "O"
+          ],
+          "dtype": "fp32",
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "input",
+          "shape": [
+            "R",
+            "I"
+          ],
+          "dtype": "fp32",
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "weight",
+          "shape": [
+            "O",
+            "I"
+          ],
+          "dtype": "fp32",
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "d_input",
+          "shape": [
+            "R",
+            "I"
+          ],
+          "dtype": "fp32",
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "d_weight",
+          "shape": [
+            "O",
+            "I"
+          ],
+          "dtype": "fp32",
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "d_bias",
+          "shape": [
+            "O"
+          ],
+          "dtype": "fp32",
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [],
+      "modes": {
+        "inference": false,
+        "training": true,
+        "backward": true
+      },
+      "impl": {
+        "function": "fc2_backward_kernel",
+        "c_declaration": "void fc2_backward_kernel(const float * d_output, const float * fc2_input, const float * W_fc2, float * d_input, float * d_W_fc2, float * d_b_fc2, int T, int aligned_in, int aligned_out, int num_threads);",
+        "sources": [
+          "src/kernels/mlp_kernels.c"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "d_output",
+            "source": "activation:d_output",
+            "cast": "const float *",
+            "ports": [
+              "input:d_output"
+            ]
+          },
+          {
+            "name": "fc2_input",
+            "source": "activation:input",
+            "cast": "const float *",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "W_fc2",
+            "source": "activation:weight",
+            "cast": "const float *",
+            "ports": [
+              "input:weight"
+            ]
+          },
+          {
+            "name": "d_input",
+            "source": "output:d_input",
+            "cast": "float *",
+            "ports": [
+              "output:d_input"
+            ]
+          },
+          {
+            "name": "d_W_fc2",
+            "source": "output:d_weight",
+            "cast": "float *",
+            "ports": [
+              "output:d_weight"
+            ]
+          },
+          {
+            "name": "d_b_fc2",
+            "source": "output:d_bias",
+            "cast": "float *",
+            "ports": [
+              "output:d_bias"
+            ]
+          },
+          {
+            "name": "T",
+            "source": "runtime:T"
+          },
+          {
+            "name": "aligned_in",
+            "source": "runtime:aligned_in"
+          },
+          {
+            "name": "aligned_out",
+            "source": "runtime:aligned_out"
+          },
+          {
+            "name": "num_threads",
+            "source": "runtime:num_threads"
+          }
+        ]
+      },
+      "training_contract": {
+        "version": 1,
+        "layout": "contiguous",
+        "batch_policy": "fixed",
+        "buffer_spans": [
+          {
+            "pointer": "d_output",
+            "rows": "T",
+            "width": "aligned_out"
+          },
+          {
+            "pointer": "fc2_input",
+            "rows": "T",
+            "width": "aligned_in"
+          },
+          {
+            "pointer": "W_fc2",
+            "rows": "aligned_out",
+            "width": "aligned_in"
+          },
+          {
+            "pointer": "d_input",
+            "rows": "T",
+            "width": "aligned_in"
+          },
+          {
+            "pointer": "d_W_fc2",
+            "rows": "aligned_out",
+            "width": "aligned_in"
+          },
+          {
+            "pointer": "d_b_fc2",
+            "rows": 1,
+            "width": "aligned_out"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_clef_full_training.py"
+        ],
+        "oracle": "Pinned PyTorch head autograd and independent gather/scatter arithmetic, capacity and recovery checks."
+      },
+      "notes": "Reuses the existing native training VJP with compiler-validated contiguous spans and explicit per-operation extents. The function is not a checked public pointer API. Complete-head certification enables the existing strict-parity runtime; non-strict backend numerical behavior is not newly certified here.",
+      "name": "linear_rows_backward_train_f32",
+      "_source_file": "linear_rows_backward_train_f32.json"
+    },
+    {
       "id": "linear_rows_checked_f32",
       "op": "linear_rows_checked",
       "operation_interface": "linear.row_major.checked.fp32.v1",
@@ -63316,7 +64364,7 @@
       },
       "modes": {
         "inference": true,
-        "training": false,
+        "training": true,
         "backward": false
       },
       "call_constant_contract": {
@@ -63497,11 +64545,47 @@
           "tests/test_v8_kokoro_source_residual_first_pair.py",
           "tests/test_v8_kokoro_source_residual_block0.py",
           "tests/test_v8_kokoro_runtime_albert_layer.py",
-          "tests/test_v8_kokoro_runtime_encoder.py"
+          "tests/test_v8_kokoro_runtime_encoder.py",
+          "tests/test_v8_clef_full_training.py"
         ],
         "oracle": "Independent PyTorch torch.nn.functional.linear at small, pinned Kokoro projection and Q/K/V shapes, and direct full-model decoder style and source hooks; checked strided rows, bounded per-call capacities, and connected generated graphs"
       },
       "notes": "Reusable checked linear operator for inference only; Kokoro ALBERT projection is one consumer. FP64 accumulation is deliberately distinct from PyTorch's FP32 reduction and uses an explicit numerical tolerance. Pinned first Kokoro ALBERT FFN projection at [36,2048] to [36,768] differs from PyTorch 2.8 FP32 by 3.814697265625e-5 on oracle-fed inputs while matching independently executed FP64 arithmetic exactly. Its new composition fixture declares its own 5e-5 absolute projection/residual bound and keeps normalized outputs at 1e-5; existing projection/QKV bounds remain unchanged. Direct pinned full-model SDPA hooks show that the first Q/K/V projections already differ in the connected graph before attention reduction; pinned PyTorch 2.8 same-input replay attributes up to 2.38e-6, 2.86e-6 and 1.55e-6, respectively, to this provider's local reduction contract. These observations do not identify a universally preferable reduction order. If a tighter PyTorch-dispatch match is required, add a separately named reduction provider/contract rather than modifying this FP64 provider.",
+      "training_contract": {
+        "version": 1,
+        "layout": "contiguous",
+        "batch_policy": "fixed",
+        "return_status": "zero_success",
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "elements": "input_elements",
+            "stride": "input_stride",
+            "rows": "rows",
+            "width": "input_channels"
+          },
+          {
+            "pointer": "weight",
+            "elements": "weight_elements",
+            "stride": "weight_stride",
+            "rows": "output_channels",
+            "width": "input_channels"
+          },
+          {
+            "pointer": "bias",
+            "elements": "bias_elements",
+            "rows": "output_channels",
+            "width": 1
+          },
+          {
+            "pointer": "output",
+            "elements": "output_elements",
+            "stride": "output_stride",
+            "rows": "rows",
+            "width": "output_channels"
+          }
+        ]
+      },
       "name": "linear_rows_checked_f32",
       "_source_file": "linear_rows_checked_f32.json"
     },
@@ -63593,7 +64677,7 @@
       },
       "modes": {
         "inference": true,
-        "training": false,
+        "training": true,
         "backward": false
       },
       "call_constant_contract": {
@@ -63747,11 +64831,41 @@
       },
       "tests": {
         "unit": [
-          "tests/test_v8_qwen3_tts_first_block.py"
+          "tests/test_v8_qwen3_tts_first_block.py",
+          "tests/test_v8_clef_full_training.py"
         ],
         "oracle": "Pinned Qwen3-TTS 0.6B CustomVoice FP32 first-layer projections"
       },
       "notes": "Same checked FP64 reduction as linear_rows_checked_f32, with an explicit zero-bias ABI. No full-model dequantization.",
+      "training_contract": {
+        "version": 1,
+        "layout": "contiguous",
+        "batch_policy": "fixed",
+        "return_status": "zero_success",
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "elements": "input_elements",
+            "stride": "input_stride",
+            "rows": "rows",
+            "width": "input_channels"
+          },
+          {
+            "pointer": "weight",
+            "elements": "weight_elements",
+            "stride": "weight_stride",
+            "rows": "output_channels",
+            "width": "input_channels"
+          },
+          {
+            "pointer": "output",
+            "elements": "output_elements",
+            "stride": "output_stride",
+            "rows": "rows",
+            "width": "output_channels"
+          }
+        ]
+      },
       "name": "linear_rows_checked_no_bias_f32",
       "_source_file": "linear_rows_checked_no_bias_f32.json"
     },

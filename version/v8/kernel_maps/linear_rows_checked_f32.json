@@ -23,7 +23,11 @@
     "c_declaration": "int linear_rows_checked_f32(const float *input, size_t input_elements, size_t input_stride, const float *weight, size_t weight_elements, size_t weight_stride, const float *bias, size_t bias_elements, float *output, size_t output_elements, size_t output_stride, size_t rows, size_t input_channels, size_t output_channels);",
     "sources": ["src/kernels/linear_rows_checked.c"]
   },
-  "modes": {"inference": true, "training": false, "backward": false},
+  "modes": {
+    "inference": true,
+    "training": true,
+    "backward": false
+  },
   "call_constant_contract": {
     "shape_symbols": {"M": "linear_rows", "K": "linear_input_channels", "N": "linear_output_channels"},
     "buffer_spans": [
@@ -56,6 +60,63 @@
     {"name": "input_channels", "source": "runtime:linear_input_channels", "value_type": "size_t"},
     {"name": "output_channels", "source": "runtime:linear_output_channels", "value_type": "size_t"}
   ]},
-  "tests": {"unit": ["tests/test_v8_linear_rows_oracle.py", "tests/test_v8_kokoro_generated_projection.py", "tests/test_v8_kokoro_runtime_header.py", "tests/test_v8_checked_op_constants.py", "tests/test_v8_kokoro_generated_qkv.py", "tests/test_v8_kokoro_generated_albert_layer.py", "tests/test_v8_kokoro_generated_encoder.py", "tests/test_v8_kokoro_generated_decoder_encode.py", "tests/test_v8_kokoro_runtime_decoder_encode.py", "tests/test_v8_kokoro_generated_decoder_complete.py", "tests/test_v8_audio_source_projection_generated.py", "tests/test_v8_kokoro_generated_f0_source.py", "tests/test_v8_kokoro_source_residual_prefix.py", "tests/test_v8_kokoro_source_residual_first_pair.py", "tests/test_v8_kokoro_source_residual_block0.py", "tests/test_v8_kokoro_runtime_albert_layer.py", "tests/test_v8_kokoro_runtime_encoder.py"], "oracle": "Independent PyTorch torch.nn.functional.linear at small, pinned Kokoro projection and Q/K/V shapes, and direct full-model decoder style and source hooks; checked strided rows, bounded per-call capacities, and connected generated graphs"},
-  "notes": "Reusable checked linear operator for inference only; Kokoro ALBERT projection is one consumer. FP64 accumulation is deliberately distinct from PyTorch's FP32 reduction and uses an explicit numerical tolerance. Pinned first Kokoro ALBERT FFN projection at [36,2048] to [36,768] differs from PyTorch 2.8 FP32 by 3.814697265625e-5 on oracle-fed inputs while matching independently executed FP64 arithmetic exactly. Its new composition fixture declares its own 5e-5 absolute projection/residual bound and keeps normalized outputs at 1e-5; existing projection/QKV bounds remain unchanged. Direct pinned full-model SDPA hooks show that the first Q/K/V projections already differ in the connected graph before attention reduction; pinned PyTorch 2.8 same-input replay attributes up to 2.38e-6, 2.86e-6 and 1.55e-6, respectively, to this provider's local reduction contract. These observations do not identify a universally preferable reduction order. If a tighter PyTorch-dispatch match is required, add a separately named reduction provider/contract rather than modifying this FP64 provider."
+  "tests": {
+    "unit": [
+      "tests/test_v8_linear_rows_oracle.py",
+      "tests/test_v8_kokoro_generated_projection.py",
+      "tests/test_v8_kokoro_runtime_header.py",
+      "tests/test_v8_checked_op_constants.py",
+      "tests/test_v8_kokoro_generated_qkv.py",
+      "tests/test_v8_kokoro_generated_albert_layer.py",
+      "tests/test_v8_kokoro_generated_encoder.py",
+      "tests/test_v8_kokoro_generated_decoder_encode.py",
+      "tests/test_v8_kokoro_runtime_decoder_encode.py",
+      "tests/test_v8_kokoro_generated_decoder_complete.py",
+      "tests/test_v8_audio_source_projection_generated.py",
+      "tests/test_v8_kokoro_generated_f0_source.py",
+      "tests/test_v8_kokoro_source_residual_prefix.py",
+      "tests/test_v8_kokoro_source_residual_first_pair.py",
+      "tests/test_v8_kokoro_source_residual_block0.py",
+      "tests/test_v8_kokoro_runtime_albert_layer.py",
+      "tests/test_v8_kokoro_runtime_encoder.py",
+      "tests/test_v8_clef_full_training.py"
+    ],
+    "oracle": "Independent PyTorch torch.nn.functional.linear at small, pinned Kokoro projection and Q/K/V shapes, and direct full-model decoder style and source hooks; checked strided rows, bounded per-call capacities, and connected generated graphs"
+  },
+  "notes": "Reusable checked linear operator for inference only; Kokoro ALBERT projection is one consumer. FP64 accumulation is deliberately distinct from PyTorch's FP32 reduction and uses an explicit numerical tolerance. Pinned first Kokoro ALBERT FFN projection at [36,2048] to [36,768] differs from PyTorch 2.8 FP32 by 3.814697265625e-5 on oracle-fed inputs while matching independently executed FP64 arithmetic exactly. Its new composition fixture declares its own 5e-5 absolute projection/residual bound and keeps normalized outputs at 1e-5; existing projection/QKV bounds remain unchanged. Direct pinned full-model SDPA hooks show that the first Q/K/V projections already differ in the connected graph before attention reduction; pinned PyTorch 2.8 same-input replay attributes up to 2.38e-6, 2.86e-6 and 1.55e-6, respectively, to this provider's local reduction contract. These observations do not identify a universally preferable reduction order. If a tighter PyTorch-dispatch match is required, add a separately named reduction provider/contract rather than modifying this FP64 provider.",
+  "training_contract": {
+    "version": 1,
+    "layout": "contiguous",
+    "batch_policy": "fixed",
+    "return_status": "zero_success",
+    "buffer_spans": [
+      {
+        "pointer": "input",
+        "elements": "input_elements",
+        "stride": "input_stride",
+        "rows": "rows",
+        "width": "input_channels"
+      },
+      {
+        "pointer": "weight",
+        "elements": "weight_elements",
+        "stride": "weight_stride",
+        "rows": "output_channels",
+        "width": "input_channels"
+      },
+      {
+        "pointer": "bias",
+        "elements": "bias_elements",
+        "rows": "output_channels",
+        "width": 1
+      },
+      {
+        "pointer": "output",
+        "elements": "output_elements",
+        "stride": "output_stride",
+        "rows": "rows",
+        "width": "output_channels"
+      }
+    ]
+  }
 }
