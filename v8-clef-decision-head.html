@@ -1036,6 +1036,41 @@
 
 <p>Model topology lives in the circuit builders here. Kernels implement arithmetic; maps describe ABI, scratch and numerical contracts. Generic operation catalogue entries do not inspect the model name.</p>
 
+<section id="complete-small-head-training">
+<h2>Complete head topology: FP32 training on frozen supplied features</h2>
+<p>The bounded experiment now derives the training graph from the canonical complete-head circuit:
+two evidence-routing layers, four field layers, and every scoring branch. The existing shared v7/v8
+backward synthesizer, memory planner, generated C and native AdamW execute 144 forward operations and
+494 backward operations. Python authors the graph and runs the independent oracle; it does not update
+CKE parameters. No Clef-name branch is added to generic lowering.</p>
+<p>On the small geometry (six tokens, eight channels, two questions with two/one options), all 162
+effective trainable parameter arrays are compared with the hash-pinned reference class using PyTorch
+autograd. Forty updates reduce loss from <code>0.28329045</code> to <code>0.06633431</code>.
+Maximum absolute differences over the trajectory were 1.38e-6 for gradients, 1.67e-6 for weights,
+and 3.15e-7 for optimizer moments (PyTorch 2.12.1 CPU, seed 611).
+The test checks gradients, weights, optimizer moments, byte-identical frozen feature/embedding weights,
+rejection without updates, exact checkpoint resume, and trained-weight reload through a separately
+generated inference entry. Overlapping spans and shared question indices exercise gradient accumulation.</p>
+<p>The declared recipe uses FP32 AdamW, learning rate 0.001, weight decay 0.01, beta values 0.9/0.999,
+and epsilon <code>1e-4</code> in both implementations. This explicit epsilon limits amplification of
+roundoff-sized gradients on shift-invariant biases; it does not change the forward or gradient tolerance.
+The existing component recipes retain their own epsilon and remain separate regressions.</p>
+<p>Reusable additions are checked indexed gather/scatter, explicit per-operation row counts for linear
+and add derivatives, generated integer metadata initialization checks, and opt-in contiguous flattening.
+The checked projection source is compiled with the generated library, using its existing scalar/AVX
+provider contract rather than changing global engine compiler flags.</p>
+<pre><code>make build/libckernel_engine.so
+CKE_CLEF_FLASH_REFERENCE_SOURCE=/path/to/pinned/joint_schema_model.py \
+  python3 -m unittest tests.test_v8_clef_full_training \
+    tests.test_v8_indexed_rows_training -v</code></pre>
+<p>Standard nightly registers <code>training_complete_clef_head</code>. Missing reference source or
+PyTorch is explicitly SKIP; structural and native gather/scatter checks do not stand in for oracle execution.</p>
+<p><strong>Remaining gates:</strong> released-size/released-weight training, real generated-backbone
+features, a public dataset/job recipe, fresh-process training resume, and complete-head BF16/LoRA/QLoRA
+training remain NOT_TESTED here. This fixed-feature low-level composition is not an unrestricted
+<code>cke.v8.compile</code> training API or an application-ready trainer.</p>
+</section>
+
 <section id="reference-backbone-capture">
 <h2>Real-feature capture preparation — backbone run still NOT_TESTED</h2>
 <p>The next gate is a released-backbone feature capture followed by the packaged generated head.

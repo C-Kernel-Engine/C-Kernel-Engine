@@ -96,6 +96,7 @@ var dir_40856f0cdd4bcafd28810d9265a200f7 =
     [ "head_backward_bf16.c", "head__backward__bf16_8c.html", "head__backward__bf16_8c" ],
     [ "hybrid_attention_kernels.c", "hybrid__attention__kernels_8c.html", "hybrid__attention__kernels_8c" ],
     [ "hyper_connection_kernels.c", "hyper__connection__kernels_8c.html", "hyper__connection__kernels_8c" ],
+    [ "indexed_rows_train.c", "indexed__rows__train_8c.html", "indexed__rows__train_8c" ],
     [ "indexed_sum_rows_checked.c", "indexed__sum__rows__checked_8c.html", "indexed__sum__rows__checked_8c" ],
     [ "kokoro_shape_bounds.c", "kokoro__shape__bounds_8c.html", "kokoro__shape__bounds_8c" ],
     [ "kv_cache_kernels.c", "kv__cache__kernels_8c.html", "kv__cache__kernels_8c" ],
