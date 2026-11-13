@@ -3,6 +3,28 @@
 
 <h1>Whisper: Tiny, Base and Large-v3</h1>
 
+<section id="large-v3-cache-panel-candidate">
+<h2>Measured follow-up: bounded projection cache reuse</h2>
+<p>On P3, perf attributed 54.5% of sampled P-core cycles to FP32 projections and about 24.7% to attention.
+VTune software Hotspots independently attributed 50.9% of CPU time to projections and 26.8% to attention.
+These are attribution measurements, not predicted wall-time savings. The hardware-counter collection produced
+an implausible CPI and is excluded from roofline and memory-bound conclusions.</p>
+<p>The candidate groups four-row projection microtiles into a bounded 32-row panel, reusing each weight pair
+without changing any output's reduction order. It adds no allocation, changes no model schedule, and leaves
+partial output ownership and the non-AVX2 paths intact.</p>
+<p>Three alternating pairs on the same hinted 20-second recording, four threads pinned to physical P cores
+0, 2, 4 and 6, measured median encoder time 17.97 → 15.48 seconds, native worker time 27.29 → 24.35 seconds,
+and total CLI time 32.73 → 29.95 seconds. Decode medians were 6.54 and 6.44 seconds. Other agents were compiling;
+these are shared-host development measurements, not an idle-host guarantee. Every pair retained identical
+encoder hashes and all 74 generated tokens.</p>
+<p>Separate full-model replay retained bit-exact 1500 × 1280 encoder output, two 63 × 51866 full-logit
+trajectories, captured logical state and reset/repeat behavior. The external llama.cpp oracle passed 22 shapes
+at 1, 4 and 8 threads. Asset-free nightly now covers 31/32/33/65-row panel boundaries. No new comparison with
+Transformers or whisper.cpp was performed, and the deployed services were not replaced by this candidate.</p>
+<p><a href="assets/whisper-large-profile-20261113.json">All paired timings and reproduction commands</a> ·
+<a href="assets/whisper-large-profile-20261113.svg">Interactive perf flame graph</a></p>
+</section>
+
 <section id="large-v3-serving-candidate">
 <h2>Large-v3 serving candidate: FP32 row reuse</h2>
 <p>The AVX2 production FP32 projection now reuses a pair of weight vectors across four input rows.

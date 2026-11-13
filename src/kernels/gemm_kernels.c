@@ -1192,15 +1192,21 @@ void gemm_nt_f32_llama_production_output_range(
         const int col = index - row * N;
         if (grouped_reduction && col == 0 && N >= 2 &&
             (output_end - index) / N >= 4) {
+            /* Keep a bounded activation panel hot while reusing each weight
+             * pair across its four-row microtiles. Per-output K order is unchanged. */
+            int rows = (output_end - index) / N;
+            if (rows > 32) rows = 32;
+            rows -= rows % 4;
             int n = 0;
             for (; n + 1 < N; n += 2)
-                ck_gemm_nt_f32_llama_production_m4n2_avx2(A, B, bias, C, N, K, row, n);
+                for (int r = 0; r < rows; r += 4)
+                    ck_gemm_nt_f32_llama_production_m4n2_avx2(A, B, bias, C, N, K, row + r, n);
             if (n < N) {
-                for (int r = 0; r < 4; ++r)
+                for (int r = 0; r < rows; ++r)
                     ck_gemm_nt_f32_llama_production_output(
                         A, B, bias, C, M, N, K, (row + r) * N + n);
             }
-            index += 4 * N;
+            index += rows * N;
             continue;
         }
         if (grouped_reduction && M > 1 && col + 4 <= N && index + 4 <= output_end) {
