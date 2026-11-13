@@ -127,3 +127,34 @@ a training command. Keep the current decision HTTP worker loopback-only.
 The service exports checkpoint metadata and serving artifacts, but remote
 checkpoint-state transfer/resume is not yet an application contract. Applications
 must surface `recovery_required`, `NOT_TESTED` and unsupported operations explicitly.
+
+## Validation retained for this change
+
+On the local Intel i7-14700T host with PyTorch `2.12.1+cpu` and one requested
+OpenMP thread:
+
+- Focused recipe and existing service/client suites: 31 passed, 2 explicit skips
+  (opt-in real SVG and Clef jobs).
+- Real registered Clef job rerun separately from the clean committed tree: passed,
+  including independent observation and chunked artifact hash verification.
+- `training_clef_registered_recipe` through the standard nightly runner: passed.
+- Existing independent FP32 complete-head 40-update trajectory: passed. Loss
+  0.28329045 → 0.06633431; max absolute gradient error `1.374632e-6`, weight error
+  `1.668930e-6`, optimizer-moment error `3.147870e-7`. Checkpoint/resume and
+  generated inference export passed. These features and head geometry are
+  synthetic; this run does not certify released-geometry training or task quality.
+
+Reproduce the new boundary with:
+
+```sh
+OMP_NUM_THREADS=1 CKE_CLEF_FLASH_REFERENCE_SOURCE=/path/to/pinned/joint_schema_model.py \
+  python -m unittest tests.test_v8_clef_training_recipe \
+  server.tests.test_training_contract server.tests.test_training_jobs -v
+OMP_NUM_THREADS=1 CKE_RUN_CLEF_JOB=1 python -m unittest \
+  tests.test_v8_clef_training_recipe.NativeRecipe.test_registered_job_and_independent_artifact_client -v
+python scripts/nightly_runner.py --tests training_clef_registered_recipe --require-executed
+```
+
+The oracle source must match the SHA-256 in
+`tests/fixtures/decision/clef_flash/identity.json`; no source means explicit skip.
+The production resume test blocks imports of `torch` and `transformers`.
