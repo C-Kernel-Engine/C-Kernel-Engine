@@ -467,6 +467,7 @@ SRCS    := src/backend_native.c \
 	           src/kernels/gelu_rows_tanh_checked.c \
 	           src/kernels/gelu_rows_erf_checked.c \
 	           src/kernels/head_backward.c \
+	           src/kernels/token_span_mean_checked.c \
 	           src/kernels/grouped_weighted_rows.c \
 	           src/kernels/layernorm_kernels_bf16.c \
 	           src/kernels/gelu_kernels.c \

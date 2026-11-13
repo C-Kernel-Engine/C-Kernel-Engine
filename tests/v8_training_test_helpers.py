@@ -14,7 +14,7 @@ import codegen_train_runtime_v7 as codegen
 import generate_train_layout_v7 as planner
 
 
-def certify_training(self, ir, registry, values, trainable, forward):
+def certify_training(self, ir, registry, values, trainable, forward, *, integer_inputs=None):
     try:
         import numpy as np
         import torch
@@ -50,6 +50,18 @@ def certify_training(self, ir, registry, values, trainable, forward):
         self.assertEqual(lib.ck_train_init(ptr(packed), sizes.ctypes.data_as(ip), len(sizes)), len(sizes))
         params = {n: torch.tensor(v, requires_grad=n in trainable) for n, v in values.items()}
         opt = torch.optim.AdamW([params[n] for n in sorted(trainable)], lr=.03, weight_decay=.01, foreach=False)
+        metadata_inputs = np.ascontiguousarray(integer_inputs, dtype='int32') if integer_inputs is not None else None
+        if metadata_inputs is None:
+            native_step = lib.ck_train_step_ex
+            native_batch = lib.ck_train_set_batch_ex
+        else:
+            self.assertEqual(metadata_inputs.size, summary['integer_input_count'])
+            lib.ck_train_step_with_i32_ex.argtypes = [ip, ip, ctypes.c_int, ip, ctypes.c_size_t, fp, ctypes.c_float]
+            lib.ck_train_set_batch_with_i32_ex.argtypes = [ip, ip, ctypes.c_int, ip, ctypes.c_size_t]
+            def native_step(ids, targets, count, loss, lr):
+                return lib.ck_train_step_with_i32_ex(ids, targets, count, metadata_inputs.ctypes.data_as(ip), metadata_inputs.size, loss, lr)
+            def native_batch(ids, targets, count):
+                return lib.ck_train_set_batch_with_i32_ex(ids, targets, count, metadata_inputs.ctypes.data_as(ip), metadata_inputs.size)
         ids = np.arange(4, dtype='int32')
         labels = torch.arange(4)
         losses = []
@@ -58,7 +70,7 @@ def certify_training(self, ir, registry, values, trainable, forward):
                       beta1=.9, beta2=.999, eps=1e-8, grad_accum=1)
         metadata = dict(runtime_contract_sha256=summary['runtime_contract_sha256'],
                         training_config=config, training_config_sha256=workflow._json_sha256(config),
-                        dataset_sha256=workflow._sha256_bytes(ids.tobytes() + values['features'].tobytes()),
+                        dataset_sha256=workflow._sha256_bytes(ids.tobytes() + values['features'].tobytes() + (metadata_inputs.tobytes() if metadata_inputs is not None else b'')),
                         next_microstep=20, total_microsteps=40, grad_accum=1)
 
         def snapshot(kind, count):
@@ -76,7 +88,7 @@ def certify_training(self, ir, registry, values, trainable, forward):
                 loss.backward()
                 self.assertGreater(float(params['up'].grad.abs().max()), 1e-5)
                 native_loss = ctypes.c_float()
-                self.assertGreater(lib.ck_train_step_ex(ids.ctypes.data_as(ip), ids.ctypes.data_as(ip),
+                self.assertGreater(native_step(ids.ctypes.data_as(ip), ids.ctypes.data_as(ip),
                                                        4, ctypes.byref(native_loss), .03), 0)
                 self.assertAlmostEqual(native_loss.value, loss.item(), delta=3e-5, msg=str(step))
                 actual = snapshot('weight', summary['weight_snapshot_floats'])
@@ -124,7 +136,7 @@ def certify_training(self, ir, registry, values, trainable, forward):
             workflow._checkpoint_load(checkpoint, lib, metadata)
             for step in range(20, 40):
                 native_loss = ctypes.c_float()
-                self.assertGreater(lib.ck_train_step_ex(ids.ctypes.data_as(ip), ids.ctypes.data_as(ip),
+                self.assertGreater(native_step(ids.ctypes.data_as(ip), ids.ctypes.data_as(ip),
                                                        4, ctypes.byref(native_loss), .03), 0)
                 self.assertEqual(native_loss.value, losses[step])
             np.testing.assert_array_equal(snapshot('weight', len(final_weights)), final_weights)
@@ -132,7 +144,7 @@ def certify_training(self, ir, registry, values, trainable, forward):
             # Reload the trained weights for forward-only execution.
             lib.ck_train_free()
             self.assertEqual(lib.ck_train_init(ptr(final_weights), sizes.ctypes.data_as(ip), len(sizes)), len(sizes))
-            lib.ck_train_set_batch_ex(ids.ctypes.data_as(ip), ids.ctypes.data_as(ip), 4)
+            self.assertGreater(native_batch(ids.ctypes.data_as(ip), ids.ctypes.data_as(ip), 4), 0)
             self.assertGreater(lib.ck_train_forward_step(), 0)
             activations = workflow.CERT._activation_snapshot(lib, summary)
             expected_logits = forward(params)

@@ -1138,7 +1138,7 @@ def _bridge_head_group_macro(head_group: Any) -> str:
 def _declared_training_call(op, kernel, args, pools, tensors, tensor_numel, variables, *, fixed_batch=False):
     """Resolve a bounded map ABI without legacy pointer/scalar guessing.
 
-    Opt-in for fixed-capacity training graphs. Only FP32 buffers and literal
+    Opt-in for fixed-capacity training graphs. FP32 buffers, read-only INT32 metadata and literal
     scalar bindings are supported here. Checked providers must explicitly declare
     zero-success status; the generated step stops before optimizer execution.
     """
@@ -1164,10 +1164,14 @@ def _declared_training_call(op, kernel, args, pools, tensors, tensor_numel, vari
         source = binding.get("source", "")
         category, _, key = source.partition(":")
         if "*" in ctype:
-            if ctype.replace(" ", "") not in ("float*", "constfloat*"):
-                raise ValueError("training map call supports FP32 pointers only")
+            compact_type = ctype.replace(" ", "")
+            expected_dtype = {"float*": "fp32", "constfloat*": "fp32", "constint32_t*": "i32"}.get(compact_type)
+            if expected_dtype is None:
+                raise ValueError("training map supports FP32 and read-only INT32 pointers")
             tid = pools.get(category, {}).get(key)
-            if not tid or tid not in variables or tensors.get(tid, {}).get("dtype") != "fp32":
+            if expected_dtype == "i32" and tensors.get(tid, {}).get("requires_grad") is not False:
+                raise ValueError("integer training metadata must explicitly disable gradients")
+            if not tid or tid not in variables or tensors.get(tid, {}).get("dtype") != expected_dtype:
                 raise ValueError("missing or incompatible training map buffer: " + source)
             if ("const" not in ctype) != (category in ("output", "scratch")):
                 raise ValueError("training map buffer access mismatch: " + source)
@@ -1195,6 +1199,11 @@ def _declared_training_call(op, kernel, args, pools, tensors, tensor_numel, vari
         value = scalars.get(name)
         if value is None or not limits["min"] <= value <= limits["max"]:
             raise ValueError("training map scalar outside provider bounds: " + name)
+    for pair in contract.get("scalar_equalities", []):
+        if (not isinstance(pair, list) or len(pair) != 2
+                or any(not isinstance(k, str) or k not in scalars for k in pair)
+                or scalars[pair[0]] != scalars[pair[1]]):
+            raise ValueError("training map scalar equality violated")
     spans = contract.get("buffer_spans", [])
     if {span.get("pointer") for span in spans} != set(pointers) or len(spans) != len(pointers):
         raise ValueError("training map must bound every pointer exactly once")
@@ -1278,6 +1287,35 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
             tvars_i32[tid] = ident
         else:
             tvars_f32[tid] = ident
+
+    integer_input_order = cfg.get("training_integer_inputs", [])
+    if (not isinstance(integer_input_order, list)
+            or any(not isinstance(tid, str) for tid in integer_input_order)
+            or len(set(integer_input_order)) != len(integer_input_order)):
+        raise ValueError("training_integer_inputs must be a unique ordered tensor list")
+    if integer_input_order and cfg.get("train_batch_policy") != "fixed":
+        raise ValueError("integer training inputs require a fixed batch")
+    integer_inputs = []
+    integer_offset = 0
+    for tid in integer_input_order:
+        meta = tensors.get(tid, {})
+        if (tid not in tvars_i32 or meta.get("kind") != "input"
+                or meta.get("requires_grad") is not False or meta.get("persistent", False)
+                or tid in ("input.token_ids", "input.targets")):
+            raise ValueError("invalid nondifferentiable integer training input: " + tid)
+        n = tensor_numel[tid]
+        if type(n) is not int or n <= 0 or integer_offset + n > 2147483647:
+            raise ValueError("integer training input capacity exceeded")
+        integer_inputs.append(dict(tensor=tid, offset=integer_offset, count=n, dtype="i32"))
+        integer_offset += n
+    # Integer operands used by declared map calls must be explicitly bound. They
+    # must never silently read an uninitialized static buffer or token-ID alias.
+    for op in all_ops:
+        if op.get("map_call"):
+            for ref in op.get("dataflow", {}).get("inputs", {}).values():
+                tid = ref.get("tensor")
+                if tid in tvars_i32 and tid not in integer_input_order:
+                    raise ValueError("unbound integer training map input: " + tid)
 
     # Collect declarations required by kernels in this IR.
     used_decl: Dict[str, Tuple[str, List[Tuple[str, str]], str]] = {}
@@ -2154,6 +2192,8 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     token_input_i32_vars: List[str] = []
     target_input_i32_vars: List[str] = []
     for tid, var in sorted(tvars_i32.items(), key=lambda x: x[1]):
+        if tid in integer_input_order:
+            continue
         lt = str(tid).lower()
         if "token" in lt and "target" not in lt:
             token_input_i32_vars.append(var)
@@ -4221,7 +4261,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                 call_args = _declared_training_call(
                     op, kernel_map[kid], args,
                     {"activation": io_inputs, "output": io_outputs, "weight": io_weights, "scratch": io_outputs},
-                    tensors, tensor_numel, tvars_f32, fixed_batch=cfg.get("train_batch_policy") == "fixed")
+                    tensors, tensor_numel, {**tvars_f32, **tvars_i32}, fixed_batch=cfg.get("train_batch_policy") == "fixed")
                 bounds_checks = [(tvars_f32[tid], tensor_numel[tid])
                                  for tid in list(io_inputs.values()) + list(io_outputs.values()) + list(io_weights.values())
                                  if tid in tvars_f32]
@@ -4647,13 +4687,20 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("    return valid_tokens;")
     ap("}")
     ap("")
-    ap("int ck_train_set_batch_ex(const int32_t *token_ids, const int32_t *targets, int valid_tokens) {")
+    ap("static int ck_train_set_batch_inputs_impl(const int32_t *token_ids, const int32_t *targets, int valid_tokens, const int32_t *integer_inputs, size_t integer_count) {")
+    ap("    if (integer_count != (size_t)%d) return -2;" % integer_offset)
+    if integer_inputs:
+        ap("    if (!integer_inputs || (uintptr_t)integer_inputs %% sizeof(int32_t) != 0 || (uintptr_t)integer_inputs > UINTPTR_MAX - (size_t)%d * sizeof(int32_t)) return -2;" % integer_offset)
+
     if cfg.get("train_batch_policy") == "fixed":
         vocab = int(cfg.get("vocab_size", 0))
         if vocab <= 0:
             raise ValueError("fixed training batch requires positive vocabulary capacity")
         ap("    if (!token_ids || !targets || valid_tokens != CK_NUM_TOKENS) return -2;")
         ap("    for (int i = 0; i < CK_NUM_TOKENS; ++i) if (token_ids[i] < 0 || token_ids[i] >= %d || targets[i] < 0 || targets[i] >= %d) return -2;" % (vocab, vocab))
+    for item in integer_inputs:
+        ap("    memcpy(%s, integer_inputs + %d, (size_t)%d * sizeof(int32_t));" %
+           (tvars_i32[item["tensor"]], item["offset"], item["count"]))
     ap("    const int active = ck_clamp_active_tokens(valid_tokens);")
     ap("    if (token_ids != NULL) {")
     if token_input_i32_vars:
@@ -4677,16 +4724,22 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("    return active;")
     ap("}")
     ap("")
+    ap("int ck_train_set_batch_with_i32_ex(const int32_t *token_ids, const int32_t *targets, int valid_tokens, const int32_t *integer_inputs, size_t integer_count) {")
+    ap("    return ck_train_set_batch_inputs_impl(token_ids, targets, valid_tokens, integer_inputs, integer_count);")
+    ap("}")
+    ap("int ck_train_set_batch_ex(const int32_t *token_ids, const int32_t *targets, int valid_tokens) {")
+    ap("    return ck_train_set_batch_inputs_impl(token_ids, targets, valid_tokens, NULL, 0);")
+    ap("}")
     ap("int ck_train_set_batch(const int32_t *token_ids, const int32_t *targets) {")
     ap("    return ck_train_set_batch_ex(token_ids, targets, CK_NUM_TOKENS);")
     ap("}")
     ap("")
 
-    ap("int ck_train_step_ex(const int32_t *token_ids, const int32_t *targets, int valid_tokens, float *loss_out, float lr) {")
+    ap("int ck_train_step_with_i32_ex(const int32_t *token_ids, const int32_t *targets, int valid_tokens, const int32_t *integer_inputs, size_t integer_count, float *loss_out, float lr) {")
     ap("    double t_step0 = ck_now_ms();")
     ap("    g_last_opt_applied = 0;")
     ap("    g_last_opt_calls = 0;")
-    ap("    int batch_status = ck_train_set_batch_ex(token_ids, targets, valid_tokens);")
+    ap("    int batch_status = ck_train_set_batch_inputs_impl(token_ids, targets, valid_tokens, integer_inputs, integer_count);")
     ap("    if (batch_status < 0) return batch_status;")
     ap("    /*")
     ap("     * Grad-accum window contract (must match PyTorch):")
@@ -4766,12 +4819,17 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("    return fwd + bwd + opt;")
     ap("}")
     ap("")
+    ap("int ck_train_step_ex(const int32_t *token_ids, const int32_t *targets, int valid_tokens, float *loss_out, float lr) {")
+    ap("    return ck_train_step_with_i32_ex(token_ids, targets, valid_tokens, NULL, 0, loss_out, lr);")
+    ap("}")
     ap("int ck_train_step(const int32_t *token_ids, const int32_t *targets, float *loss_out, float lr) {")
     ap("    return ck_train_step_ex(token_ids, targets, CK_NUM_TOKENS, loss_out, lr);")
     ap("}")
     ap("")
 
     summary = {
+        "integer_inputs": integer_inputs,
+        "integer_input_count": integer_offset,
         "forward_ops": len(forward_ops),
         "backward_ops": len(backward_ops),
         "bridge_lowering": bridge_lowering,

@@ -53334,7 +53334,7 @@
       },
       "modes": {
         "inference": true,
-        "training": false,
+        "training": true,
         "backward": false
       },
       "numerical_capabilities": [
@@ -53519,11 +53519,53 @@
       "tests": {
         "unit": [
           "tests/test_v8_grouped_weighted_rows.py",
-          "tests/test_v8_clef_flash_option_summary.py"
+          "tests/test_v8_clef_flash_option_summary.py",
+          "tests/test_v8_pooling_training.py"
         ],
         "oracle": "Explicit sequential FP64/FP32-stage oracle; optional independent PyTorch grouped softmax and weighted sums. Generated connected head comparison."
       },
       "notes": "Generic grouped query-conditioned weighted pooling. Inference only; no backward provider claimed. Groups retain input order, with one query and one output per group. Ascending channels: separate FP64 multiply/add; scale by FP64 1/sqrt(C), round logits to FP32. Stable exp in FP64 rounded to FP32; ascending FP64 sum of rounded exponentials; probabilities rounded to FP32. Ascending options: separate FP64 weighted multiply/add, FP32 output. No fast-math.",
+      "training_contract": {
+        "version": 1,
+        "layout": "contiguous",
+        "batch_policy": "fixed",
+        "return_status": "zero_success",
+        "buffer_spans": [
+          {
+            "pointer": "options",
+            "rows": "option_rows",
+            "width": "channels",
+            "elements": "option_elements",
+            "stride": "option_stride"
+          },
+          {
+            "pointer": "fields",
+            "rows": "groups",
+            "width": "channels",
+            "elements": "field_elements",
+            "stride": "field_stride"
+          },
+          {
+            "pointer": "group_counts",
+            "rows": "groups",
+            "width": 1,
+            "elements": "count_elements"
+          },
+          {
+            "pointer": "output",
+            "rows": "groups",
+            "width": "channels",
+            "elements": "output_elements",
+            "stride": "output_stride"
+          },
+          {
+            "pointer": "scratch",
+            "rows": 1,
+            "width": "scratch_elements",
+            "elements": "scratch_elements"
+          }
+        ]
+      },
       "name": "grouped_softmax_weighted_rows_checked_f32",
       "_source_file": "grouped_softmax_weighted_rows_checked_f32.json"
     },
@@ -54315,11 +54357,67 @@
       ],
       "tests": {
         "unit": [
-          "tests/test_v8_head_backward.py"
+          "tests/test_v8_head_backward.py",
+          "tests/test_v8_pooling_training.py"
         ],
         "oracle": "Explicit ordered FP64/FP32-stage oracle, PyTorch autograd (explicit SKIP when unavailable), and finite differences."
       },
       "notes": "Generated VJP building block; not automatic head-backward synthesis or full trainer certification. Recompute forward FP32 probabilities using ordered FP64 reductions. dProbability dot and weighted mean use FP64, dProbability and scaled dLogit stored FP32. Direct/value and score paths use separate FP32 products then FP32 sum; field gradients sum FP64 ascending options. Both output gradients publish atomically.",
+      "training_contract": {
+        "version": 1,
+        "layout": "contiguous",
+        "batch_policy": "fixed",
+        "return_status": "zero_success",
+        "buffer_spans": [
+          {
+            "pointer": "options",
+            "rows": "option_rows",
+            "width": "channels",
+            "elements": "option_elements",
+            "stride": "option_stride"
+          },
+          {
+            "pointer": "fields",
+            "rows": "groups",
+            "width": "channels",
+            "elements": "field_elements",
+            "stride": "field_stride"
+          },
+          {
+            "pointer": "group_counts",
+            "rows": "groups",
+            "width": 1,
+            "elements": "count_elements"
+          },
+          {
+            "pointer": "d_output",
+            "rows": "groups",
+            "width": "channels",
+            "elements": "d_output_elements",
+            "stride": "d_output_stride"
+          },
+          {
+            "pointer": "d_options",
+            "rows": "option_rows",
+            "width": "channels",
+            "elements": "d_options_elements",
+            "stride": "d_options_stride"
+          },
+          {
+            "pointer": "d_fields",
+            "rows": "groups",
+            "width": "channels",
+            "elements": "d_fields_elements",
+            "stride": "d_fields_stride"
+          },
+          {
+            "pointer": "scratch",
+            "rows": 1,
+            "width": "scratch_elements",
+            "elements": "scratch_elements"
+          }
+        ]
+      },
       "name": "grouped_weighted_rows_backward_checked_f32",
       "_source_file": "grouped_weighted_rows_backward_checked_f32.json"
     },
@@ -99373,11 +99471,52 @@
       ],
       "tests": {
         "unit": [
-          "tests/test_v8_head_backward.py"
+          "tests/test_v8_head_backward.py",
+          "tests/test_v8_pooling_training.py"
         ],
         "oracle": "Explicit ordered FP64/FP32-stage oracle, PyTorch autograd (explicit SKIP when unavailable), and finite differences."
       },
       "notes": "Generated VJP building block; not automatic head-backward synthesis or full trainer certification. Ascending spans: sum d_output/span_length in FP64 per valid token/channel, one FP32 store. Overlaps accumulate; untouched inactive token rows and padding.",
+      "training_contract": {
+        "version": 1,
+        "layout": "contiguous",
+        "batch_policy": "fixed",
+        "return_status": "zero_success",
+        "buffer_spans": [
+          {
+            "pointer": "d_output",
+            "rows": "span_count",
+            "width": "channels",
+            "elements": "d_output_elements",
+            "stride": "d_output_stride"
+          },
+          {
+            "pointer": "spans",
+            "rows": "span_count",
+            "width": 2,
+            "elements": "span_elements"
+          },
+          {
+            "pointer": "d_input",
+            "rows": "token_capacity",
+            "width": "channels",
+            "elements": "d_input_elements",
+            "stride": "d_input_stride"
+          },
+          {
+            "pointer": "scratch",
+            "rows": 1,
+            "width": "scratch_elements",
+            "elements": "scratch_elements"
+          }
+        ],
+        "scalar_equalities": [
+          [
+            "valid_tokens",
+            "token_capacity"
+          ]
+        ]
+      },
       "name": "token_span_mean_backward_checked_f32",
       "_source_file": "token_span_mean_backward_checked_f32.json"
     },
@@ -99458,7 +99597,7 @@
       },
       "modes": {
         "inference": true,
-        "training": false,
+        "training": true,
         "backward": false
       },
       "numerical_capabilities": [
@@ -99602,11 +99741,46 @@
       },
       "tests": {
         "unit": [
-          "tests/test_v8_token_span_mean_checked.py"
+          "tests/test_v8_token_span_mean_checked.py",
+          "tests/test_v8_pooling_training.py"
         ],
         "oracle": "Independent NumPy and optional PyTorch span means; unchanged output on rejection"
       },
       "notes": "Reusable half-open token-span mean for typed decision heads. Checked valid tokens and capacities; caller owns input, spans, and output.",
+      "training_contract": {
+        "version": 1,
+        "layout": "contiguous",
+        "batch_policy": "fixed",
+        "return_status": "zero_success",
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "rows": "token_capacity",
+            "width": "channels",
+            "elements": "input_elements",
+            "stride": "input_stride"
+          },
+          {
+            "pointer": "spans",
+            "rows": "span_count",
+            "width": 2,
+            "elements": "span_elements"
+          },
+          {
+            "pointer": "output",
+            "rows": "span_count",
+            "width": "channels",
+            "elements": "output_elements",
+            "stride": "output_stride"
+          }
+        ],
+        "scalar_equalities": [
+          [
+            "valid_tokens",
+            "token_capacity"
+          ]
+        ]
+      },
       "name": "token_span_mean_checked_f32",
       "_source_file": "token_span_mean_checked_f32.json"
     },
