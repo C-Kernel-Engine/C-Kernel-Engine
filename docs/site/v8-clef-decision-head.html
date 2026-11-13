@@ -1357,6 +1357,45 @@ remain. BF16 training, LoRA/QLoRA and application submission remain separate acc
 The existing job service continues to reject unsupported recipes.</p>
 </section>
 
+<section id="grouped-loss-training">
+<h2>Declared grouped decision loss and indexed scoring training</h2>
+<p>A training graph can now declare its scalar loss and score tensor explicitly instead of requiring
+an operation named <code>logits</code>. The selected map declares the gradient input, gradient output,
+scalar value and reduction identity. The existing shared backward lowerer seeds that tensor and applies
+the normal derivative rules and branch accumulation. The existing generated native runtime performs
+forward, backward and AdamW; no model-name dispatch or separate decision training loop is added.</p>
+<p>The new checked FP32 grouped cross-entropy provider accepts positive option counts summing exactly
+to the score count and one relative label per question. Loss is the mean over questions, including
+zero-loss singleton questions. It uses ascending FP64 max-shift exponential reductions and FP32 output
+stores. Loss and gradients publish only after validation. Scratch, typed INT32 labels/counts, fixed
+capacities and numerical identity are declared; BF16, ignore-index, weighting and double backward are
+not supported. Existing decoder graphs retain their implicit cross-entropy seed.</p>
+<p>The small nonzero regression composes frozen features → trainable projection → overlapping spans
+and indexed pair features → biased projection → erf GELU → scores → grouped loss. It tests repeated
+owner indices, unequal option counts, all trainable gradients, an upstream finite difference, 40 native
+AdamW updates, frozen bytes, optimizer moments, checkpoint restoration and trained-logit reload.
+Invalid question counts or labels after a partial accumulation window must discard that window without
+updating weights or moments; subsequent updates must match a clean runtime.</p>
+<p>The final scalar score bias is explicitly frozen: adding the same offset to every option cannot
+change cross-entropy. During bring-up, near-zero FP32 PyTorch reduction residuals caused AdamW to move
+that redundant bias differently (about 0.02246 on the first update). This fixture does not certify a
+trainable shared score bias. The hidden projection bias remains trainable. No tolerance was widened.</p>
+<p>On P3 with PyTorch 2.12.1 CPU, the bounded fixture loss fell from 0.55899101 to approximately 3e-8.
+Maximum absolute errors across 40 updates were 1.94e-7 for gradients, 6.56e-7 for weights and 5.96e-8
+for moments. The existing absolute ceilings remain 3e-5 for gradients/weights/logits and 3e-6 for
+moments, with relative 3e-4. Kernel tests also use an explicit FP64 scalar oracle, finite differences,
+O0/O3 comparison, padding and malformed-buffer rejection. Missing PyTorch or engine assets are skips.</p>
+<pre><code>make -j4 build/libckernel_engine.so
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python3 -m unittest tests.test_v8_grouped_loss_training -v
+python3 scripts/nightly_runner.py --tests training_grouped_loss_composition --ci --require-executed</code></pre>
+<p><strong>This is component training, not complete Clef head training.</strong> Remaining work includes
+scalar/gain and normalized-dot/cosine derivative integration, complete head training authoring,
+released-head gradient/update/export comparisons and the application recipe. BF16 composed training,
+backbone integration, LoRA and QLoRA remain separate gates. The job service still rejects unsupported
+Clef recipes. These low-level declarations do not yet make arbitrary inference circuits trainable through
+<code>cke.v8.compile</code>.</p>
+</section>
+
 <section id="gelu-automatic-training">
 <h2>Exact-erf GELU in automatic backward lowering</h2>
 <p>The existing FP32 checked GELU forward and derivative now expose contiguous, fixed-batch training
