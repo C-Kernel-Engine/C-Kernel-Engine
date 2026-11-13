@@ -54,3 +54,14 @@ class BenchmarkTests(unittest.TestCase):
             report = b.run(cfg, out)
             self.assertEqual(report['status'], 'FAIL')
             self.assertEqual(json.loads(out.read_text())['status'], 'FAIL')
+
+    def test_pause_replaces_stale_pass_before_configuration_or_requests(self):
+        with tempfile.TemporaryDirectory() as td:
+            out, pause = Path(td) / 'latest.json', Path(td) / 'PAUSE'
+            out.write_text('{"status":"PASS"}')
+            pause.touch()
+            report = b.run(Path(td) / 'absent-config.json', out, pause_path=pause)
+            self.assertEqual(report['status'], 'INCOMPLETE')
+            self.assertIn('paused before startup', report['reason'])
+            self.assertEqual(report['attempts'], [])
+            self.assertEqual(json.loads(out.read_text())['status'], 'INCOMPLETE')

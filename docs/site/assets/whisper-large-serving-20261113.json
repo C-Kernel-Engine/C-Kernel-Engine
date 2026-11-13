@@ -194,16 +194,19 @@
     "asset_free_and_http": "23 passed, 6 subtests",
     "consumer_contracts": "129 passed, 3 asset/configuration skips, 106 subtests",
     "affected_qwen_kokoro": "48 passed, 21 subtests",
-    "llama_cpp_gemm": "18 shapes at each of 1, 4, 8 threads; exact where compared"
+    "llama_cpp_gemm": "18 shapes at each of 1, 4, 8 threads; exact where compared",
+    "server_suite": "960 passed, 5 skipped, 24 subtests after building native session and CLI prerequisites",
+    "configured_asset_lifecycle_and_benchmark": "11 passed, 4 subtests"
   },
   "limitations": [
     "Only one natural 20-second source and its six-second crop in this HTTP acceptance.",
     "Transcript/state equality is not a labelled recognition-quality or word-boundary certificate.",
     "The prior silence case produced unwanted text in both CKE and Transformers; not fixed here.",
-    "HTTP remains English greedy, <=30 seconds, 128 output tokens; no long-form/alignment API.",
+    "HTTP remains English greedy, <=30 seconds; initial evidence used 128 output tokens and the persisted candidate uses 256. No long-form/alignment API.",
     "No AVX-512 or ARM performance change or speed claim.",
     "Full-model equality compares the prior CKE bundle, not full-logit parity with Transformers.",
-    "No laptop microphone/headset acceptance in this run."
+    "No laptop microphone/headset acceptance in this run.",
+    "Vocabulary hints changed capitalization and wording in the technical clip. Matching the reference does not prove hints improve accuracy."
   ],
   "paired_cli": {
     "threads": 4,
@@ -305,5 +308,207 @@
       "libggml-cpu.so.0": "95bed1422758c129bc84f6529c3eeceac0a5dfd75b2bb437123bb8055b1e2aba",
       "libggml-base.so.0": "3305cb88bab82524a60919f82bfac5b0aad9b64a206e9c4f702bb2efc86d3e38"
     }
+  },
+  "http_256_budget": {
+    "status": "PASS",
+    "cases": [
+      {
+        "case": "A",
+        "http_status": 200
+      },
+      {
+        "case": "B",
+        "http_status": 200
+      },
+      {
+        "case": "A-repeat",
+        "http_status": 200
+      },
+      {
+        "case": "malformed",
+        "http_status": 400
+      },
+      {
+        "case": "oversized",
+        "http_status": 413
+      },
+      {
+        "case": "queue-full",
+        "http_status": 429
+      },
+      {
+        "case": "cancel-queued",
+        "http_status": 200
+      },
+      {
+        "case": "queued-result",
+        "http_status": 409
+      },
+      {
+        "case": "cancel-active",
+        "http_status": 200
+      },
+      {
+        "case": "active-result",
+        "http_status": 409
+      },
+      {
+        "case": "survivor",
+        "http_status": 200
+      },
+      {
+        "case": "recovered-A",
+        "http_status": 200
+      }
+    ],
+    "source_commit": "e6b3730702b777f912c04dc4da883f1132c70612",
+    "output_budget": 256,
+    "one_token_exhaustion": {
+      "stop": "max_tokens",
+      "complete": false,
+      "generated_tokens": 1
+    },
+    "service": "cke-whisper-large.service",
+    "loopback_port": 8112,
+    "persisted_user_unit": true
+  },
+  "reference_trajectories": {
+    "jfk": {
+      "status": "pass",
+      "scope": "generated_token_trajectory",
+      "audio_sha256": "59dfb9a4acb36fe2a2affc14bacbee2920ff435cb13cc314a08c13f66ba7860e",
+      "matched_generated_tokens": 25,
+      "max_tokens": 256,
+      "reference": "Transformers FP32 eager, pinned full Large-v3"
+    },
+    "hint": {
+      "status": "pass",
+      "scope": "generated_token_trajectory",
+      "audio_sha256": "e3f2406b90557d3f75c40e2c33c6239585179165f4763466e3be7dd539d2d847",
+      "matched_generated_tokens": 74,
+      "max_tokens": 256,
+      "reference": "Transformers FP32 eager, pinned full Large-v3"
+    },
+    "hint_and_timestamps": {
+      "status": "pass",
+      "matched_tokens": 80,
+      "subject_token_count": 80,
+      "oracle_token_count": 80,
+      "audio_sha256": "e3f2406b90557d3f75c40e2c33c6239585179165f4763466e3be7dd539d2d847",
+      "attention_reference": {
+        "status": "measured_not_certified",
+        "shape": [
+          10,
+          80,
+          1500
+        ],
+        "max_abs": 2.397596836090088e-05,
+        "rmse": 1.0704295785443717e-07,
+        "trace_sha256": "c635721591616b7fba43f86da58b2692f78551016bd73892cbaec073887230be",
+        "mode": "teacher-forced eager FP32; same decoder IDs, independent frontend and encoder",
+        "limitations": "Not identical-input local replay or human boundary accuracy; no fitted tolerance."
+      },
+      "word_assembly": {
+        "status": "ASSEMBLED_UNCALIBRATED",
+        "edit_ready": false,
+        "counts": {
+          "committed": 46,
+          "review": 0
+        }
+      },
+      "decoder_runtime_sha256": "0269a3fbd2908e0d2fc9ba7b98f21b03a5ea6a6ca17b10074a4d143e4902e272"
+    }
+  },
+  "five_minute_cli": {
+    "status": "ok",
+    "audio_sha256": "cca3c7deb9cf5673780258483bbd919c27d8ac0e0a721e9d744fdddbbd1a23ab",
+    "window_count": 10,
+    "output_tokens_per_window": [
+      106,
+      99,
+      99,
+      87,
+      108,
+      100,
+      121,
+      68,
+      2,
+      50
+    ],
+    "stop_per_window": [
+      "eos",
+      "eos",
+      "eos",
+      "eos",
+      "eos",
+      "eos",
+      "eos",
+      "eos",
+      "eos",
+      "eos"
+    ],
+    "timing": {
+      "parent_wall_seconds": 220.6629965286702,
+      "reported_phase_seconds": 216.88272927235812,
+      "outside_phase_seconds": 3.7802672563120723,
+      "encoder_worker_wall_seconds": 129.20833046454936,
+      "decoder_worker_wall_seconds": 86.93401921726763
+    },
+    "worker_lifecycle": {
+      "mode": "persistent",
+      "encoder_processes": 1,
+      "decoder_processes": 1,
+      "encoder_model_initializations": 1,
+      "decoder_model_initializations": 1,
+      "encoder_model_init_seconds": 0.5324651515111327,
+      "decoder_model_init_seconds": 1.9280281756073236,
+      "shutdown": {
+        "status": "ok",
+        "responses": {
+          "decoder": {
+            "status": "closed",
+            "role": "decoder"
+          },
+          "encoder": {
+            "status": "closed",
+            "role": "encoder"
+          }
+        },
+        "failures": []
+      }
+    },
+    "scope": "stability and termination; no labelled recognition or long-form oracle certification; overlapped other development checks"
+  },
+  "http_unexpected_failure": {
+    "status": "PASS",
+    "cases": [
+      {
+        "case": "initial-A",
+        "http_status": 200
+      },
+      {
+        "case": "killed-worker-result",
+        "http_status": 503
+      },
+      {
+        "case": "after-worker-failure",
+        "http_status": 200
+      },
+      {
+        "case": "after-disconnect",
+        "http_status": 200
+      }
+    ]
+  },
+  "real_worker_regression": {
+    "status": "PASS",
+    "config_sha256": "68dd40ddb314ce2d9a3a1d0b9e05f5a036645cad25e6b72db57edb71c683cf33",
+    "successful_requests": 4,
+    "scope": "isolated TestClient HTTP application with real generated encoder/decoder workers, distinct fixtures, request/boot IDs, cancellation and recovery"
+  },
+  "kernel_source_sha256": "fda0d313cdcb651e885bd20b6fefe7070ffb2c4f3d9342c04fec0a3f714391ab",
+  "generated_source_sha256": {
+    "encoder": "563b2904e09fe6b373f9519d3236cf7c2adcd3114be9710b8806765c59d0743d",
+    "decoder": "f9480e27b61466cf6898dd2ab19a2686380dd5459cc02599e280943da6f80189"
   }
 }

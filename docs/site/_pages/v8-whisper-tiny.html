@@ -1,7 +1,7 @@
-<!-- TITLE: Whisper Tiny and Base End-to-End -->
+<!-- TITLE: Whisper CPU Serving and Large-v3 -->
 <!-- NAV: quickstart -->
 
-<h1>Whisper Tiny and Base End-to-End</h1>
+<h1>Whisper: Tiny, Base and Large-v3</h1>
 
 <section id="large-v3-serving-candidate">
 <h2>Large-v3 serving candidate: FP32 row reuse</h2>
@@ -14,6 +14,18 @@ or change to the AVX-512 and ARM implementations.</p>
 kernel checks, complete-model equality, HTTP lifecycle acceptance and timing observations.
 The nonzero regression runs without model assets in standard nightly, including portable and available
 AVX2/FMA and AVX2/non-FMA builds. The external llama.cpp oracle additionally checks the real threaded wrapper.</p>
+<p>Three alternating baseline/candidate pairs on P3, at four threads, reduced median end-to-end time
+from 35.95 to 23.78 seconds (1.51×) for the same 20-second recording. All paired encoder hashes and tokens match.
+At eight threads the resident HTTP service measured a 16.81-second warm median. A separate five-minute CLI run
+completed ten windows in 220.7 seconds, using one encoder and one decoder initialization; every window reached EOS.
+That longer run overlapped other development checks and is a stability observation, not a controlled benchmark
+or transcript-accuracy certificate.</p>
+<p>Fresh Large-v3 reference runs matched 25 JFK tokens, 74 hinted technical-speech tokens, and 80 tokens with hints
+plus timestamps. Ten selected attention heads differed from eager FP32 Transformers by maximum absolute error
+2.40×10<sup>−5</sup> and RMSE 1.07×10<sup>−7</sup>; these are measured differences, not fitted acceptance tolerances.
+The existing CLI assembly produced 46 word timings and still reports <code>ASSEMBLED_UNCALIBRATED</code>,
+<code>edit_ready=false</code>. Word-boundary accuracy requires human-labelled recordings.
+Hints changed some wording and capitalization; reference agreement does not prove recognition improvement.</p>
 <h3>Bounded operating envelope</h3>
 <p>The isolated P3 candidate uses the full Large-v3 checkpoint, generated FP32 execution, eight native threads,
 one active recording and two waiting requests. It accepts mono 16 kHz PCM16 WAV, at most 30 seconds and 1 MiB,
@@ -40,12 +52,25 @@ python3 server/examples/whisper_http_client.py \
 hashes in replies. Use SSH forwarding for another machine; the service binds only to loopback.
 A client timeout does not prove native computation stopped. Cancel by request ID and wait for recovery.
 No automatic retry or silent transcript replacement is provided.</p>
+<h3>Repeatable real-worker lifecycle checks</h3>
+<p>The existing server test lane also contains an opt-in real-worker case. Its configuration extends the private
+speech benchmark configuration with <code>encoder_run_dir</code>, <code>decoder_run_dir</code> and
+<code>max_output_tokens</code>, and requires at least two recordings with different pinned expected transcripts.
+It starts its own isolated in-process HTTP application and native workers; it does not replace a deployed service.
+It checks A→B→A, loaded identities, malformed input, queued and active cancellation, and recovery.</p>
+<pre>CK_WHISPER_SERVICE_ACCEPTANCE_CONFIG=/private/acceptance-config.json \
+CK_WHISPER_SERVICE_ACCEPTANCE_OUTPUT=/private/lifecycle-latest.json \
+python3 -m pytest -q server/tests/test_whisper_artifact_lifecycle.py</pre>
+<p>Without configured assets it reports SKIP. Current attempts publish INCOMPLETE before running and preserve
+failures instead of leaving an earlier successful report as the latest attempt. Outputs contain private transcripts;
+store them in an access-restricted directory. Use this case alongside the lightweight default tests in a reserved
+local nightly window.</p>
 <h3>Repeatable local performance checks</h3>
 <p>Use <code>scripts/whisper_service_benchmark.py --config /private/benchmark.json --output /private/latest.json</code>
 with the exact audio hash, expected transcript, loaded artifact identities, CPU and native worker environment.
 The existing local harness nightly accepts this same configuration through <code>--speech-perf-config</code>.
 Use a reserved idle-host window. A missing endpoint produces an incomplete result rather than retaining an old pass.
-Keep private audio, hints and transcripts outside the public evidence report. A timing budget is an operational
+The standalone benchmark also accepts <code>--pause-file /private/PAUSE</code>: an existing file publishes an INCOMPLETE current attempt before submitting requests; it does not cancel an active run. Keep private audio, hints and transcripts outside the public evidence report. A timing budget is an operational
 limit, not a cross-CPU performance comparison. Retain both a known-good bundle and a separate candidate;
 rollback by stopping the candidate and reconnecting the client to the verified Base service.</p>
 </section>

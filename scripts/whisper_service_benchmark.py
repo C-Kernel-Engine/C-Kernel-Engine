@@ -73,12 +73,14 @@ def request(url, data=None):
         return json.load(response)
 
 
-def run(config_path, output):
+def run(config_path, output, *, pause_path=None):
     started = datetime.now(timezone.utc).isoformat()
     report = {'schema': 'cke.whisper_service_benchmark.v1', 'status': 'INCOMPLETE',
               'started_at': started, 'attempts': [], 'host_load': os.getloadavg()}
     write(output, report)  # Never leave a prior PASS as the current attempt.
     try:
+        if pause_path is not None and Path(pause_path).exists():
+            raise RuntimeError('paused before startup; no speech requests submitted')
         config = json.loads(Path(config_path).read_text())
         report['config_sha256'] = hashlib.sha256(Path(config_path).read_bytes()).hexdigest()
         report['source_commit'] = subprocess.check_output(
@@ -154,8 +156,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--pause-file', type=Path,
+                        help='prevent new benchmark requests while this file exists; does not stop an active run')
     args = parser.parse_args()
-    result = run(args.config, args.output)
+    result = run(args.config, args.output, pause_path=args.pause_file)
     print(json.dumps({'status': result['status'], 'reason': result.get('reason'), 'cases': result.get('cases')}))
     return 0 if result['status'] == 'PASS' else 1
 
