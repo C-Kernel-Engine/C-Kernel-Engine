@@ -1,7 +1,7 @@
-"""Complete topology, small geometry, frozen features: pinned independent autograd.
+"""Complete topology, small and released geometry: pinned independent autograd.
 
 The source asset is hash-verified. Missing source/PyTorch is explicitly SKIP.
-This is not a released-size head or generated-backbone training certificate.
+Released weights require a separate asset-backed lane; backbone features remain synthetic.
 """
 
 import unittest
@@ -9,6 +9,12 @@ import unittest
 
 class FullHeadTraining(unittest.TestCase):
     def test_pinned_complete_head_training(self):
+        self.certify(released=False)
+
+    def test_released_head_training(self):
+        self.certify(released=True)
+
+    def certify(self, *, released):
         import sys, os, json, ctypes, tempfile, subprocess, importlib.util, hashlib
         from pathlib import Path
         from types import SimpleNamespace as NS
@@ -43,23 +49,44 @@ class FullHeadTraining(unittest.TestCase):
         m = importlib.util.module_from_spec(spec)
         sys.modules[spec.name] = m
         spec.loader.exec_module(m)
+        channels, width, heads, feedforward = (
+            (4096, 1024, 16, 4096) if released else (8, 8, 2, 16)
+        )
+        steps, split = (4, 2) if released else (40, 20)
+        head_path = os.environ.get("CKE_CLEF_FLASH_HEAD_PATH")
+        if released and not head_path:
+            self.skipTest("pinned released head weights unavailable")
         head = m.JointSchemaHead(
-            hidden_size=8,
-            width=8,
+            hidden_size=channels,
+            width=width,
             routing_layers=2,
             layers=4,
-            heads=2,
-            feedforward=16,
+            heads=heads,
+            feedforward=feedforward,
             dropout=0,
         )
+        if released:
+            try:
+                from safetensors.torch import load_file
+            except ImportError as exc:
+                self.skipTest("pinned weight reader unavailable: " + str(exc))
+
+            identity = json.loads(
+                (root / "tests/fixtures/decision/clef_flash/identity.json").read_text()
+            )
+            self.assertEqual(
+                hashlib.sha256(Path(head_path).read_bytes()).hexdigest(),
+                identity["joint_head_weights_sha256"],
+            )
+            head.load_state_dict(load_file(head_path), strict=True)
         head.eval()
         raw = {k: v.detach().numpy().copy() for k, v in head.state_dict().items()}
         raw["output_embedding.weight"] = (
-            np.random.default_rng(9).normal(0, 0.2, (16, 8)).astype("f")
+            np.random.default_rng(9).normal(0, 0.2, (16, channels)).astype("f")
         )
-        hidden = np.random.default_rng(42).normal(0, 0.2, (6, 8)).astype("f")
+        hidden = np.random.default_rng(42).normal(0, 0.2, (6, channels)).astype("f")
         ir, weights, graph = build_training_ir(
-            raw, hidden, questions=2, options=3, heads=2, feedforward=16
+            raw, hidden, questions=2, options=3, heads=heads, feedforward=feedforward
         )
         reg = training_registry()
         o = b.synthesize_ir2_backward(
@@ -205,7 +232,7 @@ class FullHeadTraining(unittest.TestCase):
                 )
                 np.testing.assert_array_equal(snapshot("weight", len(before)), before)
                 self.assertEqual(lib.ck_train_get_opt_step(), 0)
-            for step in range(40):
+            for step in range(steps):
                 opt.zero_grad()
                 out = head(
                     torch.tensor(hidden)[None],
@@ -233,7 +260,9 @@ class FullHeadTraining(unittest.TestCase):
                     0.001,
                 )
                 assert rc > 0
-                assert abs(nl.value - loss.item()) < 3e-5
+                self.assertLess(
+                    abs(nl.value - loss.item()), 3e-5, msg=f"step {step} loss"
+                )
                 losses.append(nl.value)
                 grads = {k: v.grad.numpy().copy() for k, v in head.named_parameters()}
                 grads["output_embedding.weight"] = np.zeros_like(
@@ -254,7 +283,13 @@ class FullHeadTraining(unittest.TestCase):
                     )
                     offset += size
                 errors["gradient"] = max(errors["gradient"], max(x[0] for x in errs))
-                assert max(x[0] for x in errs) < 3e-5
+                worst = max(errs)
+                if released:
+                    print(
+                        f"released step={step} loss={nl.value:.9g} worst_gradient={worst}",
+                        flush=True,
+                    )
+                self.assertLess(worst[0], 3e-5, msg=f"step {step}: {worst}")
                 opt.step()
                 new = {
                     k: v.detach().numpy().copy() for k, v in head.state_dict().items()
@@ -309,7 +344,7 @@ class FullHeadTraining(unittest.TestCase):
                             weights[name].tobytes(),
                         )
                     offset += count
-                if step == 19:
+                if step == split - 1:
                     checkpoint_meta = dict(
                         runtime_contract_sha256=summary["runtime_contract_sha256"],
                         dataset_sha256=hashlib.sha256(
@@ -337,13 +372,13 @@ class FullHeadTraining(unittest.TestCase):
                                 grad_accum=1,
                             )
                         ),
-                        next_microstep=20,
-                        total_microsteps=40,
+                        next_microstep=split,
+                        total_microsteps=steps,
                         grad_accum=1,
                     )
                     checkpoint = wf._checkpoint_write(p, "step20", lib, checkpoint_meta)
             print("loss trajectory", losses[0], losses[-1])
-            assert losses[-1] < losses[0] * 0.7
+            assert losses[-1] < losses[0] * (1.0 if released else 0.7)
             final = snapshot("weight", summary["weight_snapshot_floats"])
             moments = snapshot(
                 "optimizer_state", summary["optimizer_state_snapshot_floats"]
@@ -353,7 +388,7 @@ class FullHeadTraining(unittest.TestCase):
                 ptr(packed), sizes.ctypes.data_as(ip), len(sizes)
             ) == len(sizes)
             wf._checkpoint_load(checkpoint, lib, checkpoint_meta)
-            for i in range(20, 40):
+            for i in range(split, steps):
                 nl = ctypes.c_float()
                 assert (
                     lib.ck_train_step_with_i32_ex(
@@ -410,6 +445,61 @@ class FullHeadTraining(unittest.TestCase):
             )
             assert lib.ck_train_get_opt_step() == 0
             lib.ck_train_free()
+            # A new process must restore the checkpoint without inherited native state.
+            resume_request = dict(
+                library=str(p / "train.so"),
+                library_sha256=hashlib.sha256(
+                    (p / "train.so").read_bytes()
+                ).hexdigest(),
+                sizes=sizes.tolist(),
+                tokens=6,
+                integer_inputs=metadata.tolist(),
+                checkpoint=str(checkpoint),
+                metadata=checkpoint_meta,
+                remaining_steps=steps - split,
+                learning_rate=0.001,
+                result=str(p / "resumed.json"),
+            )
+            (p / "resume_request.json").write_text(json.dumps(resume_request))
+            if not released:
+                rejected_request = dict(
+                    resume_request,
+                    metadata=dict(checkpoint_meta, dataset_sha256="wrong-dataset"),
+                )
+                (p / "rejected_resume.json").write_text(json.dumps(rejected_request))
+                rejected = subprocess.run(
+                    [
+                        sys.executable,
+                        str(root / "tests/clef_training_resume_worker.py"),
+                        str(p / "rejected_resume.json"),
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                )
+                self.assertNotEqual(rejected.returncode, 0)
+                self.assertIn("dataset_sha256 mismatch", rejected.stderr)
+                self.assertFalse((p / "resumed.json").exists())
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(root / "tests/clef_training_resume_worker.py"),
+                    str(p / "resume_request.json"),
+                ],
+                check=True,
+                timeout=300,
+            )
+            resumed = json.loads((p / "resumed.json").read_text())
+            self.assertEqual(resumed["losses"], losses[split:])
+            self.assertEqual(resumed["optimizer_step"], steps)
+            self.assertEqual(
+                resumed["weight_sha256"],
+                hashlib.sha256(final.astype("<f4", copy=False).tobytes()).hexdigest(),
+            )
+            self.assertEqual(
+                resumed["optimizer_state_sha256"],
+                hashlib.sha256(moments.astype("<f4", copy=False).tobytes()).hexdigest(),
+            )
             # A separately generated inference entry consumes the exported trained weights.
             from tests.test_v8_clef_flash_head_ingress import compile_case
 
@@ -447,14 +537,18 @@ class FullHeadTraining(unittest.TestCase):
                     rtol=3e-4,
                 )
             print(
-                "40 full-head gradient/update/moment comparisons, checkpoint resume and generated inference export PASS"
+                f"{steps} full-head gradient/update/moment comparisons, checkpoint resume and generated inference export PASS"
             )
             print(
                 json.dumps(
                     dict(
                         seed=611,
                         dtype="fp32",
-                        geometry="small_complete_head",
+                        geometry=(
+                            "released_complete_head"
+                            if released
+                            else "small_complete_head"
+                        ),
                         max_abs_errors=errors,
                         loss_first=losses[0],
                         loss_last=losses[-1],
@@ -465,8 +559,21 @@ class FullHeadTraining(unittest.TestCase):
                         generated_c_sha256=hashlib.sha256(src.encode()).hexdigest(),
                         engine_sha256=hashlib.sha256(engine.read_bytes()).hexdigest(),
                         runtime_contract_sha256=summary["runtime_contract_sha256"],
-                        released_head_training="NOT_TESTED",
+                        released_head_training="PASS" if released else "NOT_TESTED",
+                        frozen_feature_provenance="synthetic; not generated backbone",
+                        head_weights_sha256=(
+                            hashlib.sha256(Path(head_path).read_bytes()).hexdigest()
+                            if released
+                            else None
+                        ),
                         bf16_full_head_training="NOT_TESTED",
+                        fresh_process_resume="PASS",
+                        trainable_parameters=sum(
+                            summary["init_weight_numel"][
+                                summary["init_weight_order"].index(n)
+                            ]
+                            for n in summary["parameter_gradient_order"]
+                        ),
                     ),
                     sort_keys=True,
                 )
@@ -474,6 +581,26 @@ class FullHeadTraining(unittest.TestCase):
 
 
 class FullHeadTrainingContracts(unittest.TestCase):
+    def test_resume_rejects_wrong_library_before_loading(self):
+        import json
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+        from tests import clef_training_resume_worker as worker
+
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder)
+            (path / "wrong.so").write_bytes(b"not the expected library")
+            (path / "request.json").write_text(
+                json.dumps(
+                    dict(library=str(path / "wrong.so"), library_sha256="0" * 64)
+                )
+            )
+            with patch.object(worker.ctypes, "CDLL") as loader:
+                with self.assertRaisesRegex(ValueError, "library identity mismatch"):
+                    worker.run(path / "request.json")
+                loader.assert_not_called()
+
     def graph(self):
         try:
             import numpy as np

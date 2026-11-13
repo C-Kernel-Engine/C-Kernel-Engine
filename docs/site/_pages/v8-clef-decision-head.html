@@ -8,6 +8,38 @@
 
 <p>Model topology lives in the circuit builders here. Kernels implement arithmetic; maps describe ABI, scratch and numerical contracts. Generic operation catalogue entries do not inspect the model name.</p>
 
+<section id="released-head-training">
+<h2>Released head weights: bounded FP32 training parity</h2>
+<p>The same canonical head topology now runs training at the released dimensions: 4,096-channel
+features, width 1,024, 16 attention heads, feedforward width 4,096, two evidence layers and four field
+layers. The head safetensors and independent reference source are checked against the pinned hashes
+before use. No kernel, derivative, compiler special case or numerical tolerance was changed.</p>
+<p>Four native AdamW updates compare every effective parameter gradient, updated weight and optimizer
+moment against pinned PyTorch. On the fixed synthetic-feature request, loss falls from
+<code>0.59229439</code> to <code>0.13316447</code>. Maximum absolute differences are
+<code>1.68e-7</code> for gradients, <code>9.54e-7</code> for weights and <code>2.36e-8</code>
+for moments. This measures arithmetic and state correctness, not downstream decision quality or generalization.</p>
+<p>The fixture deliberately keeps backbone features and a small output-embedding table synthetic and
+frozen. It is released-head training with supplied features, not training with a generated backbone or
+reproducing the publisher's training data. FP32 AdamW uses the existing declared recipe: learning rate
+0.001, epsilon 1e-4, weight decay 0.01, beta values 0.9 and 0.999.</p>
+<p>A fresh subprocess loads the generated library, restores the checked checkpoint and executes the
+remaining native updates. Its loss sequence, final weight hash, optimizer-state hash and step count must
+exactly match uninterrupted execution. The existing same-process recovery, frozen-weight checks,
+rejection tests and separately generated inference export remain in place.</p>
+<pre><code>make build/libckernel_engine.so
+CKE_CLEF_FLASH_REFERENCE_SOURCE=/path/to/pinned/joint_schema_model.py \
+CKE_CLEF_FLASH_HEAD_PATH=/path/to/pinned/joint_head.safetensors \
+  python3 scripts/nightly_runner.py --tests training_complete_clef_head \
+    training_released_clef_head --ci --require-executed</code></pre>
+<p>The released-weight test has its own asset-backed nightly lane and a 600-second limit. Missing assets
+produce SKIP; configured files with incorrect hashes fail. The small 40-update trajectory remains a
+separate fast regression. This asset-backed certificate uses substantial memory and is not a latency benchmark.</p>
+<p><strong>Still unproven:</strong> generated-backbone feature training, a public dataset/job recipe,
+complete-head BF16, LoRA/QLoRA and real decision-task accuracy. The next precision milestone must certify
+storage, accumulation, gradients, optimizer updates and export separately.</p>
+</section>
+
 <section id="complete-small-head-training">
 <h2>Complete head topology: FP32 training on frozen supplied features</h2>
 <p>The bounded experiment now derives the training graph from the canonical complete-head circuit:
@@ -37,8 +69,8 @@ CKE_CLEF_FLASH_REFERENCE_SOURCE=/path/to/pinned/joint_schema_model.py \
     tests.test_v8_indexed_rows_training -v</code></pre>
 <p>Standard nightly registers <code>training_complete_clef_head</code>. Missing reference source or
 PyTorch is explicitly SKIP; structural and native gather/scatter checks do not stand in for oracle execution.</p>
-<p><strong>Remaining gates:</strong> released-size/released-weight training, real generated-backbone
-features, a public dataset/job recipe, fresh-process training resume, and complete-head BF16/LoRA/QLoRA
+<p><strong>Remaining gates:</strong> real generated-backbone
+features, a public dataset/job recipe, and complete-head BF16/LoRA/QLoRA
 training remain NOT_TESTED here. This fixed-feature low-level composition is not an unrestricted
 <code>cke.v8.compile</code> training API or an application-ready trainer.</p>
 </section>
