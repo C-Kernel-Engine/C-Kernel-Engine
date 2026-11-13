@@ -28,7 +28,7 @@
     "c_declaration": "int ck_token_span_mean_checked_f32(const float *input, size_t input_elements, size_t input_stride, size_t token_capacity, size_t valid_tokens, size_t channels, const int32_t *spans, size_t span_elements, size_t span_count, float *output, size_t output_elements, size_t output_stride);",
     "sources": ["src/kernels/token_span_mean_checked.c"]
   },
-  "modes": {"inference": true, "training": false, "backward": false},
+  "modes": {"inference": true, "training": true, "backward": false},
   "numerical_capabilities": [{
     "contract_id": "token_span_mean_fp64_accumulation_f32_output",
     "status": "validated", "phases": ["prefill"],
@@ -65,7 +65,41 @@
         "physical_row_stride": true, "rows": "span_count", "width": "channels", "element_bytes": 4}
     ]
   },
-  "tests": {"unit": ["tests/test_v8_token_span_mean_checked.py"],
+  "tests": {"unit": ["tests/test_v8_token_span_mean_checked.py", "tests/test_v8_pooling_training.py"],
     "oracle": "Independent NumPy and optional PyTorch span means; unchanged output on rejection"},
-  "notes": "Reusable half-open token-span mean for typed decision heads. Checked valid tokens and capacities; caller owns input, spans, and output."
+  "notes": "Reusable half-open token-span mean for typed decision heads. Checked valid tokens and capacities; caller owns input, spans, and output.",
+  "training_contract": {
+    "version": 1,
+    "layout": "contiguous",
+    "batch_policy": "fixed",
+    "return_status": "zero_success",
+    "buffer_spans": [
+      {
+        "pointer": "input",
+        "rows": "token_capacity",
+        "width": "channels",
+        "elements": "input_elements",
+        "stride": "input_stride"
+      },
+      {
+        "pointer": "spans",
+        "rows": "span_count",
+        "width": 2,
+        "elements": "span_elements"
+      },
+      {
+        "pointer": "output",
+        "rows": "span_count",
+        "width": "channels",
+        "elements": "output_elements",
+        "stride": "output_stride"
+      }
+    ],
+    "scalar_equalities": [
+      [
+        "valid_tokens",
+        "token_capacity"
+      ]
+    ]
+  }
 }

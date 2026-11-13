@@ -266,9 +266,50 @@
   ],
   "tests": {
     "unit": [
-      "tests/test_v8_head_backward.py"
+      "tests/test_v8_head_backward.py",
+      "tests/test_v8_pooling_training.py"
     ],
     "oracle": "Explicit ordered FP64/FP32-stage oracle, PyTorch autograd (explicit SKIP when unavailable), and finite differences."
   },
-  "notes": "Generated VJP building block; not automatic head-backward synthesis or full trainer certification. Ascending spans: sum d_output/span_length in FP64 per valid token/channel, one FP32 store. Overlaps accumulate; untouched inactive token rows and padding."
+  "notes": "Generated VJP building block; not automatic head-backward synthesis or full trainer certification. Ascending spans: sum d_output/span_length in FP64 per valid token/channel, one FP32 store. Overlaps accumulate; untouched inactive token rows and padding.",
+  "training_contract": {
+    "version": 1,
+    "layout": "contiguous",
+    "batch_policy": "fixed",
+    "return_status": "zero_success",
+    "buffer_spans": [
+      {
+        "pointer": "d_output",
+        "rows": "span_count",
+        "width": "channels",
+        "elements": "d_output_elements",
+        "stride": "d_output_stride"
+      },
+      {
+        "pointer": "spans",
+        "rows": "span_count",
+        "width": 2,
+        "elements": "span_elements"
+      },
+      {
+        "pointer": "d_input",
+        "rows": "token_capacity",
+        "width": "channels",
+        "elements": "d_input_elements",
+        "stride": "d_input_stride"
+      },
+      {
+        "pointer": "scratch",
+        "rows": 1,
+        "width": "scratch_elements",
+        "elements": "scratch_elements"
+      }
+    ],
+    "scalar_equalities": [
+      [
+        "valid_tokens",
+        "token_capacity"
+      ]
+    ]
+  }
 }

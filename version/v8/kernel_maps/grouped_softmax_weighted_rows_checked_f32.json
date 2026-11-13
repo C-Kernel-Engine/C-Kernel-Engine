@@ -108,7 +108,7 @@
   },
   "modes": {
     "inference": true,
-    "training": false,
+    "training": true,
     "backward": false
   },
   "numerical_capabilities": [
@@ -293,9 +293,51 @@
   "tests": {
     "unit": [
       "tests/test_v8_grouped_weighted_rows.py",
-      "tests/test_v8_clef_flash_option_summary.py"
+      "tests/test_v8_clef_flash_option_summary.py",
+      "tests/test_v8_pooling_training.py"
     ],
     "oracle": "Explicit sequential FP64/FP32-stage oracle; optional independent PyTorch grouped softmax and weighted sums. Generated connected head comparison."
   },
-  "notes": "Generic grouped query-conditioned weighted pooling. Inference only; no backward provider claimed. Groups retain input order, with one query and one output per group. Ascending channels: separate FP64 multiply/add; scale by FP64 1/sqrt(C), round logits to FP32. Stable exp in FP64 rounded to FP32; ascending FP64 sum of rounded exponentials; probabilities rounded to FP32. Ascending options: separate FP64 weighted multiply/add, FP32 output. No fast-math."
+  "notes": "Generic grouped query-conditioned weighted pooling. Inference only; no backward provider claimed. Groups retain input order, with one query and one output per group. Ascending channels: separate FP64 multiply/add; scale by FP64 1/sqrt(C), round logits to FP32. Stable exp in FP64 rounded to FP32; ascending FP64 sum of rounded exponentials; probabilities rounded to FP32. Ascending options: separate FP64 weighted multiply/add, FP32 output. No fast-math.",
+  "training_contract": {
+    "version": 1,
+    "layout": "contiguous",
+    "batch_policy": "fixed",
+    "return_status": "zero_success",
+    "buffer_spans": [
+      {
+        "pointer": "options",
+        "rows": "option_rows",
+        "width": "channels",
+        "elements": "option_elements",
+        "stride": "option_stride"
+      },
+      {
+        "pointer": "fields",
+        "rows": "groups",
+        "width": "channels",
+        "elements": "field_elements",
+        "stride": "field_stride"
+      },
+      {
+        "pointer": "group_counts",
+        "rows": "groups",
+        "width": 1,
+        "elements": "count_elements"
+      },
+      {
+        "pointer": "output",
+        "rows": "groups",
+        "width": "channels",
+        "elements": "output_elements",
+        "stride": "output_stride"
+      },
+      {
+        "pointer": "scratch",
+        "rows": 1,
+        "width": "scratch_elements",
+        "elements": "scratch_elements"
+      }
+    ]
+  }
 }
