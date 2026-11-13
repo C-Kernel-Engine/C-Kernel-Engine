@@ -20,7 +20,8 @@ var tokenizer_8h =
     [ "CKTokenizerType", "tokenizer_8h.html#a2fed9709848fc75201063ec8f8f99baa", [
       [ "CK_TOKENIZER_BPE", "tokenizer_8h.html#a2fed9709848fc75201063ec8f8f99baaaacc79f950f4619c0f760920d41453dc0", null ],
       [ "CK_TOKENIZER_WORDPIECE", "tokenizer_8h.html#a2fed9709848fc75201063ec8f8f99baaae3780f9d7b735346810efb8302a88621", null ],
-      [ "CK_TOKENIZER_SPM", "tokenizer_8h.html#a2fed9709848fc75201063ec8f8f99baaab8c2f7f0dd7dd9db1d814c09a07ce308", null ]
+      [ "CK_TOKENIZER_SPM", "tokenizer_8h.html#a2fed9709848fc75201063ec8f8f99baaab8c2f7f0dd7dd9db1d814c09a07ce308", null ],
+      [ "CK_TOKENIZER_RWKV_WORLD_TRIE", "tokenizer_8h.html#a2fed9709848fc75201063ec8f8f99baaa5bf4112e62cc43cd823fb0df4cc8c1f0", null ]
     ] ],
     [ "__attribute__", "tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278", null ],
     [ "ck_tokenizer_add_merge", "tokenizer_8h.html#acd0ec47154bf6f8b901e60a7d3cb8d58", null ],

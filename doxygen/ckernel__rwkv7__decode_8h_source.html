@@ -159,8 +159,8 @@ $(document).ready(function(){initNavTree('ckernel__rwkv7__decode_8h_source.html'
 <div class="line"><a id="l00024" name="l00024"></a><span class="lineno">   24</span><span class="comment"> * output projection stays with the caller&#39;s GEMV.</span></div>
 <div class="line"><a id="l00025" name="l00025"></a><span class="lineno">   25</span><span class="comment"> * v-mixing towards v_first and the LoRA chains are separate units below;</span></div>
 <div class="line"><a id="l00026" name="l00026"></a><span class="lineno">   26</span><span class="comment"> * the WKV takes final w_log/k/v/kk/a/g (kk L2-normalised, k scaled by</span></div>
-<div class="line"><a id="l00027" name="l00027"></a><span class="lineno">   27</span><span class="comment"> * 1+(k_a-1)*a per the RWKV-7-rc4a diagram&#39;s Lerp(k_a,1) box; this</span></div>
-<div class="line"><a id="l00028" name="l00028"></a><span class="lineno">   28</span><span class="comment"> * intentionally differs from modeling_rwkv7.py:501&#39;s 1+(a-1)*k_a).</span></div>
+<div class="line"><a id="l00027" name="l00027"></a><span class="lineno">   27</span><span class="comment"> * 1+(a-1)*k_a per modeling_rwkv7.py&#39;s Lerp(k_a,1) box; this matches the</span></div>
+<div class="line"><a id="l00028" name="l00028"></a><span class="lineno">   28</span><span class="comment"> * publisher reference used by the shipped checkpoints.</span></div>
 <div class="line"><a id="l00029" name="l00029"></a><span class="lineno">   29</span><span class="comment"> *</span></div>
 <div class="line"><a id="l00030" name="l00030"></a><span class="lineno">   30</span><span class="comment"> * Layouts (all FP32, row-major, flat C = H*N):</span></div>
 <div class="line"><a id="l00031" name="l00031"></a><span class="lineno">   31</span><span class="comment"> *  - vectors: [C]; rk: [H,N] (row per head)</span></div>
@@ -226,7 +226,7 @@ $(document).ready(function(){initNavTree('ckernel__rwkv7__decode_8h_source.html'
 <div class="line"><a id="l00091" name="l00091"></a><span class="lineno">   91</span>                         <span class="keywordtype">int</span> num_heads,</div>
 <div class="line"><a id="l00092" name="l00092"></a><span class="lineno">   92</span>                         <span class="keywordtype">int</span> head_dim);</div>
 <div class="line"><a id="l00093" name="l00093"></a><span class="lineno">   93</span> </div>
-<div class="line"><a id="l00094" name="l00094"></a><span class="lineno">   94</span><span class="comment">/* k_out = k_in * (1 + (k_a-1) * a), elementwise over [C] (diagram Lerp(k_a,1)</span></div>
+<div class="line"><a id="l00094" name="l00094"></a><span class="lineno">   94</span><span class="comment">/* k_out = k_in * (1 + (a-1) * k_a), elementwise over [C] (diagram Lerp(k_a,1)</span></div>
 <div class="line"><a id="l00095" name="l00095"></a><span class="lineno">   95</span><span class="comment"> * box with mix weight a. */</span></div>
 <div class="line"><a id="l00096" name="l00096"></a><span class="lineno">   96</span><span class="keywordtype">int</span> <a class="code hl_function" href="ckernel__rwkv7__decode_8h.html#a8a325bc13c423c3bc047d60f89392cc1">ck_rwkv7_scale_k</a>(<span class="keyword">const</span> <span class="keywordtype">float</span> *k_in,</div>
 <div class="line"><a id="l00097" name="l00097"></a><span class="lineno">   97</span>                         <span class="keyword">const</span> <span class="keywordtype">float</span> *a,</div>

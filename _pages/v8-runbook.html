@@ -450,11 +450,19 @@ make v8-training-python-authoring-smoke
         <strong>RWKV-7 inference groundwork is not executable-model certification.</strong>
         The candidate <code>rwkv7.json</code> circuit and FP32 maps describe operation
         interfaces; primitive oracle tests do not prove a generated full-model trajectory.
-        Native <code>rwkv_world_trie</code> tokenization is unsupported and fails before
-        tokenizer C emission. Weight import, recurrent-state and residual-buffer placement,
-        layer-zero value sharing, token-serial prefill, and generated multi-token parity
-        remain bring-up gates. Use the ordinary native host once those contracts are complete,
-        rather than introducing a separate model-specific CLI or hardcoded prompt formatter.
+        The converter and generated runtime now support the native
+        <code>rwkv_world_trie</code> tokenizer: ByteLevel vocabulary pieces are loaded into the
+        existing <code>CKTrie</code> and encoded with greedy longest-match (no BOS, no
+        pretokenizer, id&nbsp;0 is <code>&lt;|endoftext|&gt;</code>). The importer fails closed
+        unless the vocabulary satisfies the singleton-byte and prefix-rank invariants the trie
+        backend relies on. Encoding returns failure rather than a successful partial
+        prompt on capacity exhaustion or an unmapped byte. The standard nightly
+        <code>test-rwkv-world-tokenizer</code> gate covers exact capacity, recovery,
+        all byte values and end-of-text boundaries using a synthetic vocabulary;
+        it does not certify a publisher model trajectory. Weight import, recurrent-state and residual-buffer placement,
+        layer-zero value sharing, token-serial prefill, and generated multi-token parity remain
+        bring-up gates. Use the ordinary native host once those contracts are complete, rather
+        than introducing a separate model-specific CLI or hardcoded prompt formatter.
     </p>
 </div>
 
@@ -865,6 +873,32 @@ make test-v8-arm-model-smoke CK_ARM_MODEL_DIR=/path/to/generated-v8-model</pre><
   --temperature 0.0</pre>
     </div>
     <p class="mini-note">The Flash example is for a high-memory host, not the 64 GB P3. 8192 is capacity, not an 8K-input certification. See the evidence table above for numerical and long-context limits.</p>
+
+    <h4>Flash Next tool-serving prerequisite (13 November 2026)</h4>
+    <p>The <code>qwen4_exp</code> circuit now references the existing
+    <code>qwen_tools_v1</code> publisher profile. Metadata inspection of the retained
+    Q4_K_M GGUF found a <code>tokenizer.chat_template</code> byte-identical to the
+    existing Qwen XML fixture (SHA-256
+    <code>c3cf9e34abf4f9e36c2d72165aa9c132d3e2a725b6c2586aaa3a8af9d7a81041</code>).
+    Publisher Jinja is unchanged; the server adds no model-name branch.</p>
+    <p>Asset-free tests run the normal resolved-bundle loader, renderer and HTTP
+    parser with scripted native responses. Streaming and non-streaming tool calls,
+    matching result continuation, wrong-call-ID rejection and missing-template
+    rejection are covered. These are protocol tests, not proof that the real model
+    emits correct tools or completes Qwen Code tasks. The profile remains text-only.</p>
+    <p>Build a separate pinned bundle and resolve its serving assets through the
+    ordinary build/serve workflow; do not hand-edit old manifests to advertise
+    support. Keep prefix reuse and recurrent batching disabled until this artifact's
+    continuation and complete-state gates pass. First test a native short tool call,
+    result continuation, cancellation and follow-up recovery; then run the installed
+    Qwen Code read/edit/test acceptance with measured rendered prompt length.</p>
+    <p>The retained GGUF is 119,150,722,112 bytes. At inspection Ryzen had only about
+    64 GiB available while dense Qwen services remained resident, so no competing
+    full-model load was attempted. Reserve an adequate memory window, preflight the
+    generated state/workspace and choose context from actual harness input plus
+    output allowance. The historical 8K capacity does not establish that a normal
+    harness prompt fits. See the
+    <a href="assets/flash-next-serving-prerequisite-20261113.json">bounded audit</a>.</p>
 
     <h3 style="margin-top: 0;">Gemma 3 270M</h3>
     <div class="cmd-block">

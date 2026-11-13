@@ -26,5 +26,12 @@ var tokenizer_8c =
     [ "find_longest_match", "tokenizer_8c.html#a4a8056a40f88ea8ea10abf0fb7036897", null ],
     [ "find_longest_match_hash", "tokenizer_8c.html#aeec3f3e9fcc1faea770cb1e0e1b65b12", null ],
     [ "find_longest_match_trie", "tokenizer_8c.html#ac300919bef1f23da17327134992f7490", null ],
-    [ "preprocess_bpe_spaces", "tokenizer_8c.html#ae3e35fa650168d9f2b0260828c0e7938", null ]
+    [ "preprocess_bpe_spaces", "tokenizer_8c.html#ae3e35fa650168d9f2b0260828c0e7938", null ],
+    [ "rwkv_byte_is_identity", "tokenizer_8c.html#ae964b1b725c258f88b76d4aa7a3de430", null ],
+    [ "rwkv_byte_to_utf8", "tokenizer_8c.html#aeb9bd4b615df8f1d58098a5755ed4c53", null ],
+    [ "rwkv_bytelevel_encode", "tokenizer_8c.html#a6d46cd6bf2c1d015e4f029b9fbe71362", null ],
+    [ "rwkv_non_identity_rank", "tokenizer_8c.html#a7fdb1ba96f3c7f89cc513a699b9d736d", null ],
+    [ "rwkv_utf8_to_byte", "tokenizer_8c.html#a0f8c4d9d753b1ccbf430f6a718604496", null ],
+    [ "rwkv_world_trie_decode", "tokenizer_8c.html#af00d16a2f9b14f1d34f8ad67ff421cc1", null ],
+    [ "rwkv_world_trie_encode", "tokenizer_8c.html#ac8309862235fdd329d34b520c2d11906", null ]
 ];
