@@ -16,6 +16,14 @@ import uvicorn
 from server.whisper_http import _WhisperBackend, _wav_frames, create_app
 
 
+def _decoder_config(directory):
+    (directory / "config.json").write_text(json.dumps({"context_length": 448}))
+    (directory / "generation_config.json").write_text(json.dumps({
+        "decoder_start_token_id": 1, "lang_to_id": {"<|en|>": 2},
+        "task_to_id": {"transcribe": 3}, "no_timestamps_token_id": 4,
+    }))
+
+
 def _wav(value: int, *, frames: int = 160) -> bytes:
     output = io.BytesIO()
     with wave.open(output, "wb") as writer:
@@ -114,6 +122,7 @@ def test_runner_reuses_the_same_encoder_and_decoder_workers(monkeypatch, tmp_pat
     encoder_dir, decoder_dir = tmp_path / "encoder", tmp_path / "decoder"
     encoder_dir.mkdir()
     decoder_dir.mkdir()
+    _decoder_config(decoder_dir)
     (encoder_dir / "config.json").write_text(
         json.dumps({"audio_sample_rate": 16000, "audio_sample_extent": 480000}))
     workers = []
@@ -131,7 +140,10 @@ def test_runner_reuses_the_same_encoder_and_decoder_workers(monkeypatch, tmp_pat
                 np.save(arguments["encoder_output"], np.zeros((2, 2), dtype=np.float32))
                 result = {"audio": {"source_sample_rate": 16000}}
             else:
-                result = {"transcript_text": f"run-{self.calls}", "stop": "eos"}
+                assert arguments["max_tokens"] == 256
+                result = {"transcript_text": f"run-{self.calls}",
+                          "stop": "eos" if self.calls == 1 else "max_tokens",
+                          "generated_count": 1 if self.calls == 1 else 256}
             arguments["worker_report"].write_text(json.dumps(result))
 
         def close(self):
@@ -140,10 +152,13 @@ def test_runner_reuses_the_same_encoder_and_decoder_workers(monkeypatch, tmp_pat
     monkeypatch.setattr(whisper, "_PersistentWorker", Worker)
     monkeypatch.setattr(_WhisperBackend, "_loaded_identity",
                         lambda _self: {"schema": "cke.whisper.loaded.v1"})
-    backend = _WhisperBackend(encoder_dir, decoder_dir, 10, tmp_path)
+    backend = _WhisperBackend(encoder_dir, decoder_dir, 10, tmp_path, 256)
     try:
-        assert backend.run(_wav(1))["text"] == "run-1"
-        assert backend.run(_wav(2))["text"] == "run-2"
+        first = backend.run(_wav(1))
+        second = backend.run(_wav(2))
+        assert first["text"] == "run-1" and first["complete"] is True
+        assert second["text"] == "run-2" and second["complete"] is False
+        assert second["generated_tokens"] == 256
         try:
             backend.run(_wav(3, frames=480001))
         except ValueError:
@@ -164,6 +179,7 @@ def test_identity_failure_closes_both_workers_even_if_one_close_fails(
     encoder_dir, decoder_dir = tmp_path / "encoder", tmp_path / "decoder"
     encoder_dir.mkdir()
     decoder_dir.mkdir()
+    _decoder_config(decoder_dir)
     (encoder_dir / "config.json").write_text(
         json.dumps({"audio_sample_rate": 16000, "audio_sample_extent": 16000}))
     workers = []
@@ -477,7 +493,9 @@ def test_cli_disables_access_logs_containing_private_query_hints(tmp_path, monke
     from server import whisper_http
     (tmp_path / 'config.json').write_text(json.dumps({
         'audio_sample_rate': 16000, 'audio_sample_extent': 480000, 'context_length': 448}))
-    (tmp_path / 'generation_config.json').write_text('{}')
+    (tmp_path / 'generation_config.json').write_text(json.dumps({
+        'decoder_start_token_id': 1, 'lang_to_id': {'<|en|>': 2},
+        'task_to_id': {'transcribe': 3}, 'no_timestamps_token_id': 4}))
     Tokenizer(models.WordLevel({'[UNK]': 0}, unk_token='[UNK]')).save(str(tmp_path / 'tokenizer.json'))
     observed = {}
     monkeypatch.setattr(sys, 'argv', ['whisper', '--encoder-run-dir', str(tmp_path),
@@ -486,3 +504,36 @@ def test_cli_disables_access_logs_containing_private_query_hints(tmp_path, monke
     whisper_http.main()
     assert observed['access_log'] is False
     assert observed['host'] == '127.0.0.1'
+
+
+def test_output_budget_rejected_before_workers_start(tmp_path, monkeypatch):
+    import pytest
+    from version.v8.scripts import run_whisper_v8 as whisper
+    from server.whisper_http import _validate_output_budget
+    _decoder_config(tmp_path)
+    _validate_output_budget(tmp_path, 444)
+    def forbidden(*args, **kwargs):
+        raise AssertionError('invalid budget must not start workers')
+    monkeypatch.setattr(whisper, '_PersistentWorker', forbidden)
+    for budget in (0, -1, 445, True, 1.5):
+        with pytest.raises(ValueError, match='context capacity'):
+            _WhisperBackend(tmp_path, tmp_path, 10, tmp_path, budget)
+
+
+def test_output_budget_discovery_and_hint_reservation(tmp_path):
+    import pytest
+    from version.v8.scripts.run_whisper_v8 import vocabulary_decoder_prefix
+    _decoder_config(tmp_path)
+    generation = json.loads((tmp_path / 'generation_config.json').read_text())
+    generation['eos_token_id'] = 100
+    class Tokenizer:
+        def encode(self, *args, **kwargs):
+            return type('Encoding', (), {'ids': [5, 6]})()
+        def token_to_id(self, token):
+            return 99
+    config = {'context_length': 448}
+    vocabulary_decoder_prefix(generation, config, Tokenizer(), 'en', 'transcribe', 'hint', 441)
+    with pytest.raises(ValueError, match='capacity'):
+        vocabulary_decoder_prefix(generation, config, Tokenizer(), 'en', 'transcribe', 'hint', 442)
+    with TestClient(create_app(lambda: _FakeBackend(1), max_output_tokens=256)) as client:
+        assert client.get('/health').json()['capabilities']['decoding']['max_output_tokens'] == 256

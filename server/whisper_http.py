@@ -33,6 +33,16 @@ class TranscriptionCancelled(Exception):
     pass
 
 
+def _validate_output_budget(decoder_dir: Path, max_output_tokens: int) -> None:
+    from version.v8.scripts.run_whisper_v8 import forced_decoder_prefix
+    config = json.loads((decoder_dir / "config.json").read_text())
+    generation = json.loads((decoder_dir / "generation_config.json").read_text())
+    prefix = forced_decoder_prefix(generation, "en", "transcribe", timestamps=False)
+    if (type(max_output_tokens) is not int or
+            not 1 <= max_output_tokens <= int(config["context_length"]) - len(prefix)):
+        raise ValueError("output budget plus decoder prefix exceeds context capacity")
+
+
 @dataclass
 class _Job:
     request_id: str
@@ -65,13 +75,16 @@ class _WhisperBackend:
     """One process-owned encoder/decoder pair; only the queue thread calls run."""
 
     def __init__(self, encoder_dir: Path, decoder_dir: Path,
-                 timeout_seconds: float, temp_root: Path | None) -> None:
+                 timeout_seconds: float, temp_root: Path | None,
+                 max_output_tokens: int = 128) -> None:
         from version.v8.scripts import run_whisper_v8 as whisper
 
         self._whisper = whisper
         self.encoder_dir = encoder_dir.resolve()
         self.decoder_dir = decoder_dir.resolve()
         self.temp_root = temp_root
+        _validate_output_budget(self.decoder_dir, max_output_tokens)
+        self.max_output_tokens = max_output_tokens
         config = json.loads((self.encoder_dir / "config.json").read_text())
         self.max_frames = int(config["audio_sample_extent"])
         if int(config["audio_sample_rate"]) != 16000 or self.max_frames <= 0:
@@ -127,7 +140,7 @@ class _WhisperBackend:
             path = temp / "recording.wav"
             path.write_bytes(wav)
             args = argparse.Namespace(language="en", task="transcribe",
-                                      max_tokens=128, timestamps=False,
+                                      max_tokens=self.max_output_tokens, timestamps=False,
                                       attention_trace_dir=None, vocabulary_hint=vocabulary_hint)
             encoder, decoder = whisper._run_segment(
                 args, common=[], encoder_dir=self.encoder_dir,
@@ -137,6 +150,8 @@ class _WhisperBackend:
             return {
                 "text": str(decoder["transcript_text"]),
                 "stop": str(decoder["stop"]),
+                "complete": decoder["stop"] == "eos",
+                "generated_tokens": int(decoder["generated_count"]),
                 "vocabulary_hint_applied": decoder.get("vocabulary_hint_applied", False),
                 "vocabulary_hint_token_count": decoder.get("vocabulary_hint_token_count", 0),
                 "inference_seconds": (float(encoder["worker_wall_seconds"])
@@ -304,9 +319,12 @@ def create_app(factory: Callable[[], Any], *, max_upload_bytes: int = 1024 * 102
                max_seconds: float = 30.0, max_waiters: int = 2,
                preload: bool = False, max_uploads: int = 2,
                vocabulary_validator: Callable[[str], Any] | None = None,
-               worker_timeout_seconds: float | None = None) -> FastAPI:
+               worker_timeout_seconds: float | None = None,
+               max_output_tokens: int = 128) -> FastAPI:
     if max_upload_bytes < 44 or max_seconds <= 0 or max_uploads < 1:
         raise ValueError("invalid audio resource limits")
+    if type(max_output_tokens) is not int or max_output_tokens < 1:
+        raise ValueError("max_output_tokens must be a positive integer")
     owner = _Owner(factory, max_waiters=max_waiters, preload=preload)
 
     @asynccontextmanager
@@ -330,7 +348,7 @@ def create_app(factory: Callable[[], Any], *, max_upload_bytes: int = 1024 * 102
         "audio": {"format": "wav_pcm16", "sample_rate_hz": 16000, "channels": 1,
                   "max_upload_bytes": max_upload_bytes, "max_seconds": max_seconds},
         "decoding": {"language": "en", "task": "transcribe", "strategy": "greedy",
-                     "max_output_tokens": 128},
+                     "max_output_tokens": max_output_tokens},
         "vocabulary_hint": {"supported": vocabulary_validator is not None,
                             "max_utf8_bytes": MAX_VOCABULARY_HINT_BYTES,
                             "max_tokens": MAX_VOCABULARY_HINT_TOKENS,
@@ -449,6 +467,8 @@ def main() -> None:
     parser.add_argument("--max-seconds", type=float, default=30.0)
     parser.add_argument("--max-waiters", type=int, default=2)
     parser.add_argument("--worker-timeout-seconds", type=float, default=600.0)
+    parser.add_argument("--max-output-tokens", type=int, default=128,
+                        help="per-recording greedy output limit, including decoder context reservation")
     args = parser.parse_args()
     if args.worker_timeout_seconds <= 0:
         parser.error("worker timeout must be positive")
@@ -461,17 +481,22 @@ def main() -> None:
     tokenizer = Tokenizer.from_file(str(args.decoder_run_dir / "tokenizer.json"))
     generation = json.loads((args.decoder_run_dir / "generation_config.json").read_text())
     decoder_config = json.loads((args.decoder_run_dir / "config.json").read_text())
+    try:
+        _validate_output_budget(args.decoder_run_dir, args.max_output_tokens)
+    except ValueError as error:
+        parser.error(str(error))
     def vocabulary_validator(hint):
         return vocabulary_decoder_prefix(generation, decoder_config, tokenizer,
-                                         "en", "transcribe", hint, 128)
+                                         "en", "transcribe", hint, args.max_output_tokens)
     factory = lambda: _WhisperBackend(args.encoder_run_dir, args.decoder_run_dir,
-                                      args.worker_timeout_seconds, None)
+                                      args.worker_timeout_seconds, None, args.max_output_tokens)
     import uvicorn
     uvicorn.run(create_app(factory, max_upload_bytes=args.max_upload_bytes,
                            max_seconds=args.max_seconds,
                            max_waiters=args.max_waiters, preload=True,
                            vocabulary_validator=vocabulary_validator,
-                           worker_timeout_seconds=args.worker_timeout_seconds),
+                           worker_timeout_seconds=args.worker_timeout_seconds,
+                           max_output_tokens=args.max_output_tokens),
                 # Vocabulary travels in a query parameter for compatibility.
                 # Uvicorn access logs would otherwise retain that private text.
                 host="127.0.0.1", port=args.port, access_log=False)

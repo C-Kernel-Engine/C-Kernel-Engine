@@ -1095,6 +1095,38 @@ static inline void ck_gemm_nt_f32_llama_production_outputs4_avx2(
             bias ? sum[output] + bias[col + output] : sum[output];
     }
 }
+
+/* Four rows share each pair of weight vectors. Each output keeps the same
+ * ascending eight-lane contraction and horizontal reduction as outputs4. */
+static inline void ck_gemm_nt_f32_llama_production_m4n2_avx2(
+        const float *A, const float *B, const float *bias, float *C,
+        int N, int K, int row, int col)
+{
+    __m256 acc[4][2];
+    for (int r = 0; r < 4; ++r)
+        for (int n = 0; n < 2; ++n) acc[r][n] = _mm256_setzero_ps();
+    for (int k = 0; k < K; k += 8) {
+        const __m256 b0 = _mm256_loadu_ps(B + (size_t)col * K + k);
+        const __m256 b1 = _mm256_loadu_ps(B + (size_t)(col + 1) * K + k);
+        for (int r = 0; r < 4; ++r) {
+            const __m256 a = _mm256_loadu_ps(A + (size_t)(row + r) * K + k);
+#if defined(__FMA__)
+            acc[r][0] = _mm256_fmadd_ps(a, b0, acc[r][0]);
+            acc[r][1] = _mm256_fmadd_ps(a, b1, acc[r][1]);
+#else
+            acc[r][0] = _mm256_add_ps(acc[r][0], _mm256_mul_ps(a, b0));
+            acc[r][1] = _mm256_add_ps(acc[r][1], _mm256_mul_ps(a, b1));
+#endif
+        }
+    }
+    for (int r = 0; r < 4; ++r) {
+        for (int n = 0; n < 2; ++n) {
+            float sum = ck_hsum256_llamafile(acc[r][n]);
+            C[(size_t)(row + r) * N + col + n] = bias ? sum + bias[col + n] : sum;
+        }
+    }
+}
+
 #endif
 
 #if defined(__AVX512F__)
@@ -1158,6 +1190,19 @@ void gemm_nt_f32_llama_production_output_range(
 #if defined(__AVX__) && !defined(__AVX512F__)
         const int row = index / N;
         const int col = index - row * N;
+        if (grouped_reduction && col == 0 && N >= 2 &&
+            (output_end - index) / N >= 4) {
+            int n = 0;
+            for (; n + 1 < N; n += 2)
+                ck_gemm_nt_f32_llama_production_m4n2_avx2(A, B, bias, C, N, K, row, n);
+            if (n < N) {
+                for (int r = 0; r < 4; ++r)
+                    ck_gemm_nt_f32_llama_production_output(
+                        A, B, bias, C, M, N, K, (row + r) * N + n);
+            }
+            index += 4 * N;
+            continue;
+        }
         if (grouped_reduction && M > 1 && col + 4 <= N && index + 4 <= output_end) {
             ck_gemm_nt_f32_llama_production_outputs4_avx2(
                 A, B, bias, C, N, K, row, col);

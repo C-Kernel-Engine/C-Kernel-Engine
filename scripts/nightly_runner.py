@@ -688,6 +688,9 @@ TEST_SUITES = {
     # Core kernel tests (FP32)
     "gemm": TestSuite("GEMM", "kernels", UNITTEST_DIR / "test_gemm.py"),
     "gemm_variants": TestSuite("GEMM Variants", "kernels", UNITTEST_DIR / "test_gemm_variants.py"),
+    "f32_gemm_row_reuse": TestSuite(
+        "FP32 Production Row Reuse and Output Ownership", "kernels",
+        ROOT / "tests" / "test_v8_f32_gemm_row_reuse.py"),
     "gemm_microkernel": TestSuite("GEMM Microkernel", "kernels", UNITTEST_DIR / "test_gemm_microkernel.py"),
     "add_bf16": TestSuite("BF16 Add Stored-Value Oracle", "kernels", UNITTEST_DIR / "test_add.py"),
     "gemm_fused": TestSuite("GEMM Fused", "kernels", UNITTEST_DIR / "test_gemm_fused.py"),
