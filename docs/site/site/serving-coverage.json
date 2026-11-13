@@ -1,12 +1,12 @@
 {
   "chat_scope_counts": {
     "component": 105,
-    "linked_chat_declaration": 8,
-    "text_decoder_candidate": 11,
+    "linked_chat_declaration": 9,
+    "text_decoder_candidate": 10,
     "unassessed": 4
   },
   "circuit_count": 128,
-  "circuit_linked_count": 8,
+  "circuit_linked_count": 9,
   "rows": [
     {
       "artifact": {
@@ -4795,11 +4795,11 @@
         "revision": null,
         "tokenizer_sha256": null
       },
-      "chat_scope": "text_decoder_candidate",
-      "chat_scope_reason": "text decoder and token/logit contracts; serving unlinked",
+      "chat_scope": "linked_chat_declaration",
+      "chat_scope_reason": "circuit references a resolved serving profile",
       "circuit": "qwen4_exp",
       "circuit_path": "version/v8/circuits/qwen4_exp.json",
-      "circuit_sha256": "3f1e991dacff31a3f63637c4d2e11c0763aa7d2ccfe7d12c2a5bd1c37cbaf0cb",
+      "circuit_sha256": "ac17bec113b87f3626c9b0f5c16bc32418d4ea72f5f360a93d7f80541d1c1bce",
       "evidence": {
         "cancellation_recovery": "not_assessed",
         "exact_token_ids": "not_assessed",
@@ -4811,18 +4811,27 @@
         "tool_round_trip": "not_assessed"
       },
       "family": "qwen38_flash_next",
-      "input_modalities": null,
-      "output_protocol": null,
-      "profile_id": null,
-      "profile_ref": null,
-      "profile_sha256": null,
-      "publisher_template": null,
+      "input_modalities": [
+        "text"
+      ],
+      "output_protocol": "qwen_xml",
+      "profile_id": "qwen-tools-v1",
+      "profile_ref": "serving_profiles/qwen_tools_v1.json",
+      "profile_sha256": "89543095e856e028fbc2c4659a8d8674d4c53ddda56780ed23af9e84fabe9e44",
+      "publisher_template": {
+        "source": "publisher",
+        "variant": "default"
+      },
       "reasoning_protocol": null,
-      "renderer": null,
-      "serving_declaration": "missing",
+      "renderer": "jinja-chat-v1",
+      "serving_declaration": "circuit_linked",
       "stop_policy": null,
-      "tool_template": null,
-      "variant": null
+      "tool_template": {
+        "fallback_variant": "default",
+        "source": "publisher",
+        "variant": "tool_use"
+      },
+      "variant": "publisher"
     },
     {
       "artifact": {
