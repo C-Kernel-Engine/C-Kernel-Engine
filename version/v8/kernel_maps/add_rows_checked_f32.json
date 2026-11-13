@@ -71,7 +71,7 @@
   },
   "modes": {
     "inference": true,
-    "training": false,
+    "training": true,
     "backward": true
   },
   "call_abi": {
@@ -126,7 +126,8 @@
   "tests": {
     "unit": [
       "tests/test_v8_qwen3_tts_first_block.py",
-      "tests/test_v8_decision_scoring_backward.py"
+      "tests/test_v8_decision_scoring_backward.py",
+      "tests/test_v8_scoring_training.py"
     ]
   },
   "notes": "Checked exact FP32 residual add with no heap allocation.",
@@ -155,6 +156,32 @@
         "rows": 1,
         "width": "elements",
         "element_bytes": 4
+      }
+    ]
+  },
+  "training_contract": {
+    "version": 1,
+    "layout": "contiguous",
+    "batch_policy": "fixed",
+    "return_status": "zero_success",
+    "buffer_spans": [
+      {
+        "pointer": "left",
+        "rows": "elements",
+        "width": 1,
+        "elements": "left_elements"
+      },
+      {
+        "pointer": "right",
+        "rows": "elements",
+        "width": 1,
+        "elements": "right_elements"
+      },
+      {
+        "pointer": "output",
+        "rows": "elements",
+        "width": 1,
+        "elements": "output_elements"
       }
     ]
   }

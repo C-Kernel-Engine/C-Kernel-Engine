@@ -59,7 +59,7 @@
   },
   "modes": {
     "inference": true,
-    "training": false,
+    "training": true,
     "backward": false
   },
   "numerical_capabilities": [
@@ -146,9 +146,30 @@
   "tests": {
     "unit": [
       "tests/test_v8_decision_tensor_ops.py",
-      "tests/test_v8_clef_flash_complete_head.py"
+      "tests/test_v8_clef_flash_complete_head.py",
+      "tests/test_v8_scoring_training.py"
     ],
     "oracle": "Independent PyTorch operations and pinned complete head; bounds and rejection/recovery tests."
   },
-  "notes": "Stable FP32 sigmoid using expf and sign-dependent formula. Inference only; no backward provider claimed."
+  "notes": "Stable FP32 sigmoid using expf and sign-dependent formula. Checked fixed-capacity FP32 training binding; matching derivative map is separately registered.",
+  "training_contract": {
+    "version": 1,
+    "layout": "contiguous",
+    "batch_policy": "fixed",
+    "return_status": "zero_success",
+    "buffer_spans": [
+      {
+        "pointer": "input",
+        "rows": 1,
+        "width": 1,
+        "elements": "input_elements"
+      },
+      {
+        "pointer": "output",
+        "rows": 1,
+        "width": 1,
+        "elements": "output_elements"
+      }
+    ]
+  }
 }

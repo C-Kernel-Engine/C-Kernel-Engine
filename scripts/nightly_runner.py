@@ -967,6 +967,11 @@ TEST_SUITES = {
         ROOT / "tests" / "test_v8_attention_training.py",
         unittest_targets=("tests.test_v8_attention_training", "tests.test_v8_attention_cross_backward"),
     ),
+    "training_scoring_composition": TestSuite(
+        "FP32 Learned Gates, Cosine Branches and Residual Scoring Training",
+        "training", ROOT / "tests" / "test_v8_scoring_training.py",
+        unittest_targets=("tests.test_v8_scoring_training",),
+    ),
     "training_grouped_loss_composition": TestSuite(
         "FP32 Grouped Decision Loss, Indexed Scorer and Native AdamW",
         "training", ROOT / "tests" / "test_v8_grouped_loss_training.py",
