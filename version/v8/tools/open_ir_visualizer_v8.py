@@ -5089,6 +5089,11 @@ def load_model_data(
             data["files"]["vision_artifacts"] = vision_artifacts
             loaded.append("vision_artifacts(derived)")
 
+    from version.v8.tools.visualizer_components import build_component_inventory
+    # Keep this view confined to the selected root, independent of legacy aliases.
+    data["files"]["component_inventory"] = build_component_inventory(
+        run_dir if run_dir is not None else model_root, V8_ROOT / "circuits")
+
     print(f"  Loaded {len(loaded)} files")
     return data
 
