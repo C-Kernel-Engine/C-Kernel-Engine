@@ -1036,6 +1036,56 @@
 
 <p>Model topology lives in the circuit builders here. Kernels implement arithmetic; maps describe ABI, scratch and numerical contracts. Generic operation catalogue entries do not inspect the model name.</p>
 
+<section id="lora-fp32-authoring">
+<h2>FP32 LoRA: bounded graph authoring and native training</h2>
+<p><code>version/v8/training/lora.py</code> now attaches one explicitly named adapter
+at the existing authored training-IR boundary. This is not automatic adapter admission
+for arbitrary pretrained models or a new training service endpoint. The selected
+projection must already belong to a differentiable, bounded, contiguous FP32 training
+graph. Tied targets, bias, padded strides, BF16 and quantized bases are rejected.</p>
+<pre>from version.v8.training.lora import attach_lora, initialize_lora
+adapted_ir, spec = attach_lora(
+    training_ir, target="bridge", rank=2, alpha=3, name="demo")
+initial_adapter_weights = initialize_lora(spec, seed=41)
+# Merge these new weights with the original weight values, then use the
+# existing backward synthesis, layout planner, code generator and AdamW.</pre>
+<p>For row-major inputs, the declared graph computes
+<code>X Wᵀ + (alpha/rank) (X Aᵀ) Bᵀ</code>. The base weight is frozen;
+other parameter declarations are preserved. A uses seeded PCG64 normal initialization,
+B starts at zero, and the scale is an immutable training parameter. This leaves the
+initial projection unchanged. Parameter count is <code>rank × (inputs + outputs)</code>.
+The descriptor is retained in authored IR; generated runtime identity and existing
+checkpoint contracts remain in force. Dedicated portable adapter packages and
+application-job admission remain follow-up work.</p>
+<p>No new kernel, map, or generic compiler branch is introduced. Checked projection,
+vector scale and add maps supply forward and backward contracts; the shared trainer
+accumulates both activation-gradient branches and updates only trainable weights.
+Frozen parameters receive no optimizer state. This is correctness bring-up, not a
+claim that all frozen-weight arithmetic is optimally pruned.</p>
+<table><thead><tr><th>Independent PyTorch FP32 comparison</th><th>Native loss, 40 AdamW updates</th></tr></thead><tbody>
+<tr><td>Only A/B trainable; all original weights frozen</td><td>0.73031437 → 0.14123474</td></tr>
+<tr><td>Square target, trainable upstream/downstream projections</td><td>1.42433834 → 0.00277238</td></tr>
+<tr><td>Rectangular target (6 inputs, 3 outputs)</td><td>1.40610135 → 0.00002841</td></tr>
+</tbody></table>
+<p>Across these cases, maximum absolute gradient error was 4.48e-7 or less;
+weight error was 1.20e-6 or less. Existing numerical tolerances were unchanged.
+Tests compare every trainable gradient, weight and optimizer moment on every update,
+verify frozen weights bit-for-bit, check a central finite difference, resume at step 20
+in both the same and a fresh process, and reload final weights for generated inference.
+With identity feature inputs, the upstream projection gradient is the transpose of
+the adapter input gradient, testing both derivative branches. A starts with zero
+gradient and acquires a nonzero gradient after B's first update.</p>
+<pre>make -j4 build/libckernel_engine.so
+python -m unittest tests.test_v8_lora_training -v
+python scripts/nightly_runner.py --tests training_lora_fp32 --require-executed</pre>
+<p>Use a Python environment with NumPy and PyTorch for the independent oracle.
+Missing dependencies or the native engine produce explicit SKIP; the required lane
+rejects SKIP. <a href="assets/lora-fp32-20261114.json">Retained local evidence</a>.
+Full-model LoRA, BF16 adapters, QLoRA, Muon and application training-job admission are
+<strong>NOT_TESTED / unsupported by this milestone</strong>. Existing Clef FP32 and
+mixed-BF16 verdicts are not changed by these small adapter tests.</p>
+</section>
+
 <section id="validation-loss-correction">
 <h2>Validation loss correction: forward plus declared loss, without an update</h2>
 <p>A real notebook consumer at <code>aa68f5812</code> exposed stale held-out metrics.
