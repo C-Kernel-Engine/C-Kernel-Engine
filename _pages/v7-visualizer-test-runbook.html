@@ -786,3 +786,28 @@ document.querySelectorAll('.copy-btn').forEach(btn => {
     });
 });
 </script>
+
+<section id="v8-component-coverage">
+<h2>v8 Components &amp; Coverage</h2>
+<p>The v8 IR viewer includes a read-only component inventory for text, vision,
+ASR and TTS artifacts. Open a bundle containing its component directories with:</p>
+<pre><code>python3 version/v8/tools/open_ir_visualizer_v8.py /path/to/bundle --html-only --output /tmp/ir-report.html</code></pre>
+<p>Select the bundle directory using the launcher's artifact-path options and
+use <code>--html-only</code> when producing a report without launching a browser.
+The Components &amp; Coverage tab groups local JSON artifacts by directory,
+shows their hashes, phases, recorded providers, buffer references and declared
+lifetimes, and provides a searchable circuit declaration catalog and a plain-text
+summary for accessibility.</p>
+<p>Directory membership does not establish execution order. A declaration is not
+proof of a loaded or certified model, and a producer's PASS is not independently
+verified by the viewer. Missing serving timelines or component connections remain
+explicit gaps. Unknown schemas retain their identity without invented semantics.</p>
+<p>The component reader does not load libraries or execute models. It scans two
+directory levels, at most 256 JSON files and 64 MiB total, with a 16 MiB per-file
+limit. Child symlinks are skipped. Truncation and malformed artifacts are reported.
+The circuit catalog has a separate 128 MiB budget. Existing launcher options that
+explicitly generate profiling or probe artifacts retain their existing behavior.</p>
+<p>Run <code>make v8-visualizer-vision-artifacts</code> to check artifact embedding,
+the component reader and the shipped JavaScript renderer. The existing nightly
+visualizer lane runs these checks. Performance-tab behavior is unchanged.</p>
+</section>
