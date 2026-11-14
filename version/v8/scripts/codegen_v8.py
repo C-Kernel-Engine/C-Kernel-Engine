@@ -2063,85 +2063,9 @@ def _inject_decode_runtime_multimodal_fallback(
         input_embed_dim = embed_dim
     deepstack_elems = max(1, num_deepstack_layers * embed_dim)
 
-    def _inject_multimodal_deepstack_residuals(src: str) -> str:
-        if not (has_multimodal_bridge and num_deepstack_layers > 0):
-            return src
-
-        comment_pat = re.compile(
-            r"^    /\* Op (?P<op>\d+): ck_residual_add_token_major \(residual_add\) layer=(?P<layer>\d+) section=body \*/$"
-        )
-        counts: Dict[int, int] = {}
-        lines = src.splitlines(keepends=True)
-        out: list[str] = []
-        i = 0
-        while i < len(lines):
-            line = lines[i]
-            match = comment_pat.match(line.rstrip("\n"))
-            if match is None:
-                out.append(line)
-                i += 1
-                continue
-
-            op = int(match.group("op"))
-            layer = int(match.group("layer"))
-            counts[layer] = counts.get(layer, 0) + 1
-
-            out.append(line)
-            i += 1
-            while i < len(lines):
-                out.append(lines[i])
-                if lines[i] == f"    if (stop_seq == {op}) return;\n":
-                    i += 1
-                    break
-                i += 1
-
-            if counts[layer] == 2 and layer < num_deepstack_layers:
-                offset = layer * embed_dim
-                out.append(
-                    f"""    if (g_bridge_deepstack_active) {{
-        ck_residual_add_token_major(
-            (float*)(model->bump + A_EMBEDDED_INPUT),
-            g_bridge_deepstack_slices + {offset},
-            (float*)(model->bump + A_EMBEDDED_INPUT),
-            1,
-            {embed_dim}
-        );
-    }}
-"""
-                )
-
-        return "".join(out)
-
     decode_sig = "static void ck_decode(CKModel *model, int32_t token) {"
-    if "static int g_bridge_prefix_tokens;\n" not in code:
-        code = code.replace(decode_sig, "static int g_bridge_prefix_tokens;\n\n" + decode_sig, 1)
-    decode_fn = _extract_c_function(code, decode_sig)
-    if decode_fn is None:
-        raise RuntimeError("unable to locate ck_decode for decode-runtime multimodal fallback")
-    _, decode_end, decode_src = decode_fn
-    decode_src = _inject_multimodal_deepstack_residuals(decode_src)
-    embedded_decode = decode_src.replace(
-        "static void ck_decode(CKModel *model, int32_t token) {",
-        "static void ck_decode_embedded(CKModel *model) {",
-        1,
-    )
-    if has_multimodal_bridge and num_deepstack_layers > 0:
-        embedded_decode = (
-            f"static int g_bridge_deepstack_active;\n"
-            f"static float g_bridge_deepstack_slices[{deepstack_elems}];\n\n"
-            + embedded_decode
-        )
-    embedded_decode, removed = re.subn(
-        r"\n    /\* Store token at offset [^\n]*\n"
-        r"    \*\(int32_t\*\)\([^\n]*\) = token;\n\n"
-        r"    /\* Op 0: [\s\S]*?if \(stop_seq == 0\) return;\n",
-        "\n",
-        embedded_decode,
-        count=1,
-    )
-    if removed != 1:
-        raise RuntimeError("unable to derive ck_decode_embedded from ck_decode")
-    code = code[:decode_end] + "\n\n" + embedded_decode + code[decode_end:]
+    if "static void ck_decode_embedded(CKModel *model)" not in code:
+        raise RuntimeError("missing declared embedded-input entry")
 
     if has_multimodal_bridge:
         text_mrope_function = _resolved_text_mrope_function(ir_obj)
@@ -2882,6 +2806,17 @@ def main(argv: list[str] | None = None) -> int:
                     | _AUDIO_TDT_OPS
                 )
             ]
+        requires_embedded_entry = (
+            (prefill_obj is not None and args.prefill_layout is None)
+            or (supplied_prefill_obj is not None and not uses_generated_batched_prefill
+                and "multimodal_bridge_contract" in (ir_obj.get("config") or {})))
+        entry_config = dict(ir_obj.get("config") or {})
+        entry_config.update(layout_obj.get("config") or {})
+        if requires_embedded_entry and str(entry_config.get("logits_layout", "")).lower() == "last":
+            from embedded_entry_contract_v8 import plan_embedded_decode_entry
+            core_ir_obj = dict(core_ir_obj)
+            core_ir_obj["embedded_decode_entry"] = plan_embedded_decode_entry(
+                core_ir_obj.get("operations", []), entry_config)
         ir_path.write_text(json.dumps(core_ir_obj, indent=2), encoding="utf-8")
         layout_path.write_text(json.dumps(layout_obj, indent=2), encoding="utf-8")
         prefill_code = ""
@@ -3018,6 +2953,13 @@ def main(argv: list[str] | None = None) -> int:
         code += ("\n\nCK_EXPORT const char *ck_model_generated_source_sha256(void) {\n"
                  f'    return "{source_digest}";\n' + "}\n")
     args.output.write_text(code, encoding="utf-8")
+    if core_ir_obj.get("embedded_decode_entry") is not None:
+        import hashlib
+        args.output.with_suffix(".entries.json").write_text(json.dumps(dict(
+            schema="cke.generated-entry-contracts.v1",
+            generated_c_sha256=hashlib.sha256(code.encode("utf-8")).hexdigest(),
+            embedded_decode_entry=core_ir_obj["embedded_decode_entry"],
+        ), indent=2) + "\n", encoding="utf-8")
     if args.granular_report is not None:
         args.granular_report.parent.mkdir(parents=True, exist_ok=True)
         args.granular_report.write_text(

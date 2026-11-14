@@ -965,6 +965,12 @@ TEST_SUITES = {
         ROOT / "tests" / "test_v8_clef_feature_capture.py",
         unittest_targets=("tests.test_v8_clef_feature_capture",),
     ),
+    "generated_embedded_entry": TestSuite(
+        "Generated Embedded Entry and Declared Visual Layer Output", "inference",
+        ROOT / "tests" / "test_v8_codegen_bridge.py",
+        unittest_targets=("tests.test_v8_codegen_bridge.EmbeddedEntryContractTests",
+                          "tests.test_v8_codegen_bridge.V8CodegenBridgeTests.test_qwen3vl_decoder_codegen_without_prefill_layout_keeps_prefill_bridge_api"),
+    ),
     "generated_composition_training": TestSuite(
         "Generated Composition Claims and Shared Circuit Training Lowering", "training",
         ROOT / "tests" / "test_v8_generated_composition_contract.py",

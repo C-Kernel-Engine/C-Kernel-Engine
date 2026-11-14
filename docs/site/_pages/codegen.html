@@ -468,6 +468,16 @@ rmsnorm_forward_llama_production(
     hand-maintained until the docs build regenerates them; treat them as a dated snapshot, not a live counter.
 </p>
 
+
+<section id="embedded-entry-contracts">
+<h2>Declared embedded-input entries and visual connections</h2>
+<p>Decode-layout multimodal execution now plans a separate embedded-input entry from call IR. The plan declares the input buffer and extent, bypassed embedding operation, retained operation sequence and visual residual calls. Core code generation emits that entry directly; it does not copy and edit an already emitted decode function. A <code>.entries.json</code> sidecar retains the entry plan and generated-source hash.</p>
+<p>Visual residual placement uses the final operation of each declared contiguous body layer. It does not count attention, MLP or residual operations. Decode and prefill use the same boundary check. Invalid/noncontiguous layers, missing stream outputs and altered entry plans fail. Decode additions reuse the graph's resolved residual provider and call ABI.</p>
+<p>The old decode text matcher recognized the serial residual function spelling. Map-selected dispatch calls could therefore omit the visual connection. A native non-transformer regression uses three additions followed by scaling and verifies injection after the declared layer output, with active and inactive visual input. This corrects connection behavior; it is not a fresh full-weight vision parity certification.</p>
+<p>Other legacy host API and M-RoPE wrapper source assembly remains and is not claimed eliminated by this change. The work does not alter kernel arithmetic or the IR visualizer.</p>
+<pre>python -m pytest -q tests/test_v8_codegen_bridge.py tests/test_v8_prefill_codegen.py tests/test_v8_dsl_policy.py</pre>
+</section>
+
 <section id="checked-native-bundles">
 <h2>Checked native bundles and speech sessions</h2>
 <p>The Qwen3-TTS pinned session uses
