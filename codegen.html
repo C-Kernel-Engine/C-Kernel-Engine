@@ -1496,6 +1496,16 @@ rmsnorm_forward_llama_production(
     hand-maintained until the docs build regenerates them; treat them as a dated snapshot, not a live counter.
 </p>
 
+
+<section id="embedded-entry-contracts">
+<h2>Declared embedded-input entries and visual connections</h2>
+<p>Decode-layout multimodal execution now plans a separate embedded-input entry from call IR. The plan declares the input buffer and extent, bypassed embedding operation, retained operation sequence and visual residual calls. Core code generation emits that entry directly; it does not copy and edit an already emitted decode function. A <code>.entries.json</code> sidecar retains the entry plan and generated-source hash.</p>
+<p>Visual residual placement uses the final operation of each declared contiguous body layer. It does not count attention, MLP or residual operations. Decode and prefill use the same boundary check. Invalid/noncontiguous layers, missing stream outputs and altered entry plans fail. Decode additions reuse the graph's resolved residual provider and call ABI.</p>
+<p>The old decode text matcher recognized the serial residual function spelling. Map-selected dispatch calls could therefore omit the visual connection. A native non-transformer regression uses three additions followed by scaling and verifies injection after the declared layer output, with active and inactive visual input. This corrects connection behavior; it is not a fresh full-weight vision parity certification.</p>
+<p>Other legacy host API and M-RoPE wrapper source assembly remains and is not claimed eliminated by this change. The work does not alter kernel arithmetic or the IR visualizer.</p>
+<pre>python -m pytest -q tests/test_v8_codegen_bridge.py tests/test_v8_prefill_codegen.py tests/test_v8_dsl_policy.py</pre>
+</section>
+
 <section id="checked-native-bundles">
 <h2>Checked native bundles and speech sessions</h2>
 <p>The Qwen3-TTS pinned session uses
@@ -1508,13 +1518,23 @@ sources under <code>src/runtime</code>. The shared builder rejects support paths
 outside that directory and exports every declared native segment plus requested
 runtime functions. Qwen retains its GNU11, OpenMP and fast-contraction policy;
 other consumers retain their strict defaults. Generated C passes a separate
-ISO C11 syntax check with warnings as errors. Legacy provider warnings remain
-visible in <code>compiler-diagnostics.txt</code> rather than being suppressed
-with <code>-w</code>; they are not claimed fixed.</p>
-<p><code>build-identity.json</code> records the compiler command/version, selected
-provider and source hashes, IR/layout hashes, generated/library hashes, exports
-and build policy. Session metrics include its hash. Embedded runtime build
-identity remains explicitly <code>NOT_VERIFIED</code>.</p>
+ISO C11 syntax check with warnings as errors. Provider warning exceptions are
+reviewed exact source/message/category records with bounded occurrence counts in
+<code>checked_provider_warnings.json</code>. New or increased warnings fail the
+build; admitted warnings remain in <code>compiler-diagnostics.txt</code>.
+The five initial exceptions are existing unused attention diagnostic helpers,
+not a blanket exemption for that source file.</p>
+<p><code>build-identity.json</code> binds the compiler executable/version,
+selected providers and sources, headers, IR/layout, generated code, exports and
+build policy. A separate generated identity translation unit exposes the digest.
+The builder verifies the loaded library before reporting <code>VERIFIED</code>;
+the session loader verifies the pinned metadata hash, library hash and actual
+loaded getter. Relocation does not require the original build directory.</p>
+<p>New native decision packages also verify this loaded identity. Legacy packages
+without an embedded identity retain <code>NOT_VERIFIED</code>; byte checks alone
+are not upgraded to embedded verification. This is artifact consistency, not a
+signature or full system-dependency certification. A failed rebuild preserves
+the previous library until compilation and warning admission succeed.</p>
 <pre><code>OMP_NUM_THREADS=1 CK_NUM_THREADS=4 python -m unittest \
   tests.test_v8_checked_bundle_policy \
   tests.test_v8_checked_multi_entry \
