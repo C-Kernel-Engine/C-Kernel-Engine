@@ -1,6 +1,8 @@
 """Check output-lane SIMD against an independent sequential FP32 reduction."""
 import ctypes
+import os
 from pathlib import Path
+import shlex
 import shutil
 import subprocess
 import tempfile
@@ -24,6 +26,7 @@ class BF16ExactOutputLanesTests(unittest.TestCase):
         source = '#include "' + str(ROOT / 'src/kernels/gemm_kernels_bf16.c') + '"\n' + r'''
 #include <sys/mman.h>
 #include <unistd.h>
+#include <fenv.h>
 __attribute__((visibility("default")))
 void replay(const float *a, const void *b, const float *bias, float *c,
             int m, int n, int k, int begin, int end) {
@@ -52,11 +55,25 @@ int guarded(void) {
     for (int i=0; i<4; ++i) munmap(maps[i], 2*page);
     return bad;
 }
+__attribute__((visibility("default")))
+int tail_exceptions(void) {
+    float a[17*33], c[17*17];
+    uint16_t b[17*33];
+    for (int i=0;i<17*33;++i) { a[i]=4.f; b[i]=0x3f00; }
+    feclearexcept(FE_ALL_EXCEPT);
+    gemm_nt_bf16_row_range(a,b,NULL,c,17,17,33,0,17);
+    int flags=fetestexcept(FE_INVALID|FE_OVERFLOW);
+    for (int i=0;i<17*17;++i) if (c[i]!=66.f) return -1;
+    return flags;
+}
 '''
-        subprocess.run(['gcc', '-x', 'c', '-', '-shared', '-fPIC', '-O3', '-march=native',
+        cls.source = source
+        cls.command = ['gcc', '-x', 'c', '-', '-shared', '-fPIC', '-O3', '-march=native',
+                        *shlex.split(os.environ.get('CK_BF16_TEST_CFLAGS', '')),
                         '-ffp-contract=fast', '-fno-fast-math', '-ffunction-sections',
                         '-fdata-sections', '-fvisibility=hidden', '-Wl,--gc-sections',
-                        '-I' + str(ROOT / 'include'), '-lm', '-o', str(output)],
+                        '-I' + str(ROOT / 'include'), '-lm', '-o', str(output)]
+        subprocess.run(cls.command,
                        input=source, text=True, capture_output=True, check=True, timeout=120)
         cls.lib = ctypes.CDLL(str(output))
         cls.fn = cls.lib.replay
@@ -112,6 +129,26 @@ int guarded(void) {
 
     def test_guard_pages_for_input_and_output_tails(self):
         self.assertEqual(self.lib.guarded(), 0)
+
+    def test_unused_pack_lanes_do_not_raise_fp_exceptions(self):
+        # Also run with -ftrivial-auto-var-init=pattern: poisoned unused lanes
+        # overflow despite masked final output stores unless initialized.
+        self.assertEqual(self.lib.tail_exceptions(), 0)
+
+    def test_uninitialized_poisoned_tail_negative_control(self):
+        path = ROOT / 'src/kernels/gemm_kernels_bf16.c'
+        text = path.read_text()
+        old = 'if (width < 16) memset(packed, 0, sizeof(packed));'
+        self.assertIn(old, text)
+        mutant = text.replace(old, '/* Deliberately omit tail initialization. */', 1)
+        source = self.source.replace('#include "' + str(path) + '"', mutant, 1)
+        output = Path(self.tmp.name) / 'uninitialized.so'
+        command = [self.command[0], '-ftrivial-auto-var-init=pattern', *self.command[1:-1], str(output)]
+        subprocess.run(command, input=source, text=True, capture_output=True,
+                       check=True, timeout=120)
+        lib = ctypes.CDLL(str(output))
+        self.assertGreater(lib.tail_exceptions(), 0,
+                           'uninitialized poisoned tail must raise a floating-point exception')
 
 
 if __name__ == '__main__':
