@@ -3134,26 +3134,26 @@ static void __CK_DECODE_FUNCTION__(CKModel *model, int32_t token) {
     embed_scale_emitted = False
     op_counts: Dict[tuple[int, str], int] = {}
     for seq_idx, op in enumerate(ops):
-        if entry_contract is not None and seq_idx in entry_contract["skip_indices"]:
-            continue
+        bypass_lookup = entry_contract is not None and seq_idx in entry_contract["skip_indices"]
         key = (int(op.get("layer", -1)), str(op.get("op", "")))
         op_instance_idx = op_counts.get(key, 0)
         op_counts[key] = op_instance_idx + 1
-        lines.append(
-            emit_op(
-                op,
-                seq_idx,
-                debug=debug,
-                profile=profile,
-                dump=dump,
-                dump_mode=vision_dump_mode,
-                op_instance_idx=op_instance_idx,
-                force_outproj_fp32_layers=force_outproj_fp32_layers,
-                force_attn_proj_fp32_layers=force_attn_proj_fp32_layers,
-                force_mlp_gate_up_fp32_layers=force_mlp_gate_up_fp32_layers,
-                force_mlp_gate_up_q8_contract_layers=force_mlp_gate_up_q8_contract_layers,
+        if not bypass_lookup:
+            lines.append(
+                emit_op(
+                    op,
+                    seq_idx,
+                    debug=debug,
+                    profile=profile,
+                    dump=dump,
+                    dump_mode=vision_dump_mode,
+                    op_instance_idx=op_instance_idx,
+                    force_outproj_fp32_layers=force_outproj_fp32_layers,
+                    force_attn_proj_fp32_layers=force_attn_proj_fp32_layers,
+                    force_mlp_gate_up_fp32_layers=force_mlp_gate_up_fp32_layers,
+                    force_mlp_gate_up_q8_contract_layers=force_mlp_gate_up_q8_contract_layers,
+                )
             )
-        )
         if entry_contract is not None:
             connection = entry_contract["after_operations"].get(str(seq_idx))
             if connection is not None:
@@ -4563,7 +4563,8 @@ static void _ck_profile_dump(void) {
         parts.append(emit_decode_function(
             ops, token_offset, token_base, config=config, debug=debug,
             profile=profile, dump=dump, function_name=embedded_entry["name"],
-            store_token=False, entry_contract=embedded_entry))
+            store_token=False, entry_contract=embedded_entry,
+            scale_embeddings_sqrt_dim=scale_embeddings_sqrt_dim))
     if prefill_continuation_ops is not None:
         if len(prefill_continuation_ops) != len(ops):
             raise RuntimeError(
