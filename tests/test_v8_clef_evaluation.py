@@ -82,6 +82,39 @@ class NativeEvaluation(unittest.TestCase):
         )
         return loss, scores
 
+    def test_step_compares_frozen_tensor_without_parameter_export(self):
+        from unittest.mock import patch
+
+        rt = self.runtime("native-frozen-comparison")
+        arrays = self.records[0]["arrays"]
+        expected = rt.frozen_embedding.copy()
+        compare = rt.lib.ck_train_compare_weight
+        ptr = expected.ctypes.data_as(C.POINTER(C.c_float))
+        self.assertEqual(compare(rt.frozen_embedding_index, ptr, expected.size), 1)
+        for index, data, count in (
+            (-1, ptr, expected.size),
+            (len(rt.sizes), ptr, expected.size),
+            (rt.frozen_embedding_index, None, expected.size),
+            (rt.frozen_embedding_index, ptr, expected.size - 1),
+            (rt.frozen_embedding_index, ptr, 2**63),
+        ):
+            self.assertEqual(compare(index, data, count), -1)
+        with patch.object(
+            rt, "snapshot", side_effect=AssertionError("per-step full export")
+        ):
+            rt.step(arrays, 1e-3)
+        self.assertEqual(rt.last_step_metrics["host_weight_snapshot_bytes"], 0)
+        self.assertEqual(
+            rt.last_step_metrics["frozen_comparison_bytes"], expected.nbytes
+        )
+        self.assertGreater(rt.last_step_metrics["native_step_seconds"], 0)
+        expected.flat[0] += 1
+        self.assertEqual(compare(rt.frozen_embedding_index, ptr, expected.size), 0)
+        # Corrupt the saved expected frozen bytes: the step's retained guard must fail.
+        rt.frozen_embedding.flat[0] += 1
+        with self.assertRaisesRegex(ValueError, "frozen embedding changed"):
+            rt.step(arrays, 1e-3)
+
     def test_features_are_inputs_and_batch_does_not_copy_parameters(self):
         from unittest.mock import patch
         from version.v8.decision.train_clef_head import workflow

@@ -6,6 +6,7 @@ inside the same lowered graph. No model names or application categories occur he
 """
 
 from copy import deepcopy
+from math import prod
 
 
 def audit_generated_composition(ir, boundaries, output, codegen_report):
@@ -38,16 +39,27 @@ def audit_generated_composition(ir, boundaries, output, codegen_report):
     if not boundaries:
         errors.append("no declared component boundaries")
     ancestors = set()
+    output_operations = set()
     pending = [output]
     while pending:
         tensor = pending.pop()
         if tensor in ancestors:
             continue
         ancestors.add(tensor)
+        if tensor in producers:
+            output_operations.add(producers[tensor])
         pending.extend(dependencies.get(tensor, ()))
     if output not in producers:
         errors.append("output is not generated")
     for edge in boundaries:
+        if not isinstance(edge, dict) or any(
+            not isinstance(edge.get(k), str) or not edge[k].strip()
+            for k in ("tensor", "producer", "consumer")
+        ):
+            errors.append(
+                "boundary requires explicit tensor, producer and consumer identities"
+            )
+            continue
         tensor, producer, consumer = (
             edge.get(k) for k in ("tensor", "producer", "consumer")
         )
@@ -73,6 +85,29 @@ def audit_generated_composition(ir, boundaries, output, codegen_report):
             errors.append("boundary is not an ordered internal activation edge")
         if tensor not in ancestors:
             errors.append("boundary is disconnected from final output")
+        if consumer not in output_operations:
+            errors.append(
+                "declared boundary consumer is disconnected from final output"
+            )
+        shape = metadata.get("shape")
+        dtype = metadata.get("dtype")
+        numel = metadata.get("numel")
+        if (
+            not isinstance(shape, list)
+            or any(type(d) is not int or d <= 0 for d in shape)
+            or not isinstance(dtype, str)
+            or not dtype.strip()
+            or type(numel) is not int
+            or numel <= 0
+            or (
+                isinstance(shape, list)
+                and all(type(d) is int for d in shape)
+                and prod(shape) != numel
+            )
+        ):
+            errors.append(
+                "boundary requires complete consistent shape/dtype/extent metadata"
+            )
         for ref in writes + reads:
             if any(ref.get(k) != metadata.get(k) for k in ("shape", "dtype", "numel")):
                 errors.append("boundary shape/dtype/extent differs")

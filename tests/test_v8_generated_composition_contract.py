@@ -57,6 +57,58 @@ class CompositionGateTests(unittest.TestCase):
                     "FAIL",
                 )
 
+    def test_dead_declared_consumer_cannot_borrow_live_sibling_path(self):
+        ir = fixture()
+        for n, op in enumerate(ir["ops"]):
+            op["op"] = f"node{n}"
+        dead = deepcopy(ir["ops"][3])
+        dead["op"] = "dead_consumer"
+        for ref in dead["dataflow"]["outputs"].values():
+            old = ref["tensor"]
+            ref["tensor"] = "unused." + old
+            ir["tensors"][ref["tensor"]] = deepcopy(ir["tensors"][old])
+        ir["ops"].append(dead)
+        for consumer, verdict in (("node3", "PASS"), ("dead_consumer", "FAIL")):
+            result = audit_generated_composition(
+                ir,
+                [dict(tensor="act.bridge", producer="node2", consumer=consumer)],
+                "act.score",
+                {"skipped_ops": []},
+            )
+            self.assertEqual(result["structural"], verdict)
+        self.assertIn(
+            "declared boundary consumer is disconnected from final output",
+            result["errors"],
+        )
+
+    def test_incomplete_boundary_metadata_fails_even_when_refs_agree(self):
+        ir = fixture()
+        for n, op in enumerate(ir["ops"]):
+            op["op"] = f"node{n}"
+        edges = [dict(tensor="act.bridge", producer="node2", consumer="node3")]
+        for key in ("shape", "dtype", "numel"):
+            graph = deepcopy(ir)
+            graph["tensors"]["act.bridge"].pop(key)
+            for op in graph["ops"]:
+                for field in ("inputs", "outputs"):
+                    for ref in op["dataflow"].get(field, {}).values():
+                        if ref.get("tensor") == "act.bridge":
+                            ref.pop(key, None)
+            with self.subTest(key=key):
+                self.assertEqual(
+                    audit_generated_composition(
+                        graph, edges, "act.score", {"skipped_ops": []}
+                    )["structural"],
+                    "FAIL",
+                )
+        for boundary in (None, {}, dict(tensor="act.bridge", producer="node2")):
+            self.assertEqual(
+                audit_generated_composition(
+                    ir, [boundary], "act.score", {"skipped_ops": []}
+                )["structural"],
+                "FAIL",
+            )
+
     def test_real_commands_reject_e2e_before_assets_or_execution(self):
         with tempfile.TemporaryDirectory() as tmp:
             output = Path(tmp) / "output"
