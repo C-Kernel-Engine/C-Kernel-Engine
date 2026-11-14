@@ -48,6 +48,13 @@ The three exact local fixes do not resolve the complete backbone trajectory.
 The first token's final features are exact; the second token still diverges.
 Continue identical-input state/operation diagnosis before expanding LoRA.
 No tolerance was increased and no reference intermediate entered production.</p>
+<p>A further state capture identifies a precision-policy difference: the released
+Transformers incremental cache stores BF16, while CKE's selected recurrent contract
+retains FP32 state. Diagnostic BF16 rounding of CKE's first-step state reproduces all
+524,288 reference values exactly. A separate reference experiment retaining FP32 cache
+state still has connected logit error 0.00187111 and remains FAIL. This isolates one
+cause, not all remaining divergence. Production state precision is unchanged; the
+modified-reference experiment is explicitly labelled diagnostic, not released parity.</p>
 <p><a href="assets/clef-native-e2e-20261114.json">Machine-readable evidence</a>
 retains raw logits, RMSE, reference signal magnitudes, identities, dependency hashes,
 training results and local replay results. Private activation packets remain on the
@@ -55,6 +62,7 @@ asset host; the public artifact contains the synthetic request and summary metri
 <h3>Reproduction and boundaries</h3>
 <p>Use the pinned release <code>fb4417d31c1d0f9e7e77f1141b40aaede7491e00</code>,
 its SHA-verified release lock, and standalone native oneDNN/SLEEF/MKL dependencies.
+This profile is validated on AVX-512-capable Ryzen; it is not an AVX2-only portability claim.
 Set <code>CK_ONEDNN_LIBRARY</code>, <code>CK_SLEEF_LIBRARY</code> and
 <code>CK_MKL_LIBRARY</code> to those installed libraries. Record their hashes and thread
 settings. The build command requires a fresh output directory; it never reuses unbound

@@ -420,7 +420,15 @@
     },
     "dsl_policy": "PASS",
     "registered_nightly_frontend": "PASS",
-    "training_ledger_freshness": "PASS"
+    "training_ledger_freshness": "PASS",
+    "staged_v7_fast": "PASS overall; Nanbeige coherence diagnostic FAIL is nonblocking under the existing matrix policy",
+    "staged_v8_fast": "PASS overall; Nanbeige coherence diagnostic FAIL is nonblocking under the existing matrix policy",
+    "precommit_resources": {
+      "threads": 4,
+      "minimum_available_ram_gib": 16,
+      "minimum_free_swap_gib": 0,
+      "reason": "31 GiB available RAM; swap was full; all regression gates retained"
+    }
   },
   "limitations": [
     "Connected numerical parity FAIL remains explicit under unchanged strict logit bound.",
@@ -430,5 +438,62 @@
     "Headset/TTS/LoRA are outside this change.",
     "Times include verification, builds and shared-host contention; not latency benchmarks."
   ],
-  "private_replay_directory": "/data/cke/private/clef-native-e2e-20261114"
+  "private_replay_directory": "/data/cke/private/clef-native-e2e-20261114",
+  "state_storage_diagnosis": {
+    "native_state_dtype": "fp32",
+    "reference_cache_dtype": "bf16",
+    "raw_max_abs": 0.007483482360839844,
+    "after_diagnostic_bf16_roundtrip_max_abs": 0.0,
+    "after_diagnostic_bf16_roundtrip_differing": 0,
+    "elements": 524288
+  },
+  "fp32_cache_reference_diagnostic": {
+    "schema": "cke.clef.native-oracle.v1",
+    "native_report_sha256": "1c87d3ac80a9c9af8fc0c0a813554b9718870754e075e5b4aaef45fcbed6e354",
+    "capture_sha256": "d54a89203944bcf3cdb64f45d7e6122eb8eeecb414650a8b213d68b7cc084cb1",
+    "reference_source_sha256": "0e304cf7c6500e8bb59bef7e2afd2c6373f82596dfb3b57d1aa93c175e2dc3a3",
+    "torch_version": "2.13.0+cpu",
+    "oracle_script_sha256": "94a72d9658c2c562ecafb6f80568ddd04e8b248c5f0efa5a756e7e61d3fb2cdc",
+    "backbone_reference_transformers": "5.10.2",
+    "backbone_reference_schedule": "incremental",
+    "backbone_reference_attention": "sdpa",
+    "native_logits": [
+      -4.680750846862793,
+      0.1342177391052246
+    ],
+    "same_input_logits": [
+      -4.680751800537109,
+      0.13421738147735596
+    ],
+    "connected_reference_logits": [
+      -4.678879737854004,
+      0.13497495651245117
+    ],
+    "same_input_head": {
+      "max_abs": 9.5367431640625e-07,
+      "rmse": 7.202056630608185e-07,
+      "reference_rms": 3.3111517425000345,
+      "atol": 2e-06,
+      "status": "PASS"
+    },
+    "connected_logits": {
+      "max_abs": 0.0018711090087890625,
+      "rmse": 0.0014273099040815393,
+      "reference_rms": 3.3098439419545365,
+      "atol": 2e-06,
+      "status": "FAIL"
+    },
+    "backbone_exact_storage": {
+      "max_abs": 1.5,
+      "rmse": 0.023975634923971544,
+      "reference_rms": 1.7144595174097836,
+      "atol": 0,
+      "status": "FAIL"
+    },
+    "note": "Connected 2e-6 check retains the strict logit baseline; no broader model tolerance is inferred. Zero-tolerance feature comparison is exact-storage evidence.",
+    "diagnostic_overrides": [
+      "LinearAttentionLayer recurrent cache allocated FP32 instead of released BF16. Diagnostic only; not unmodified released execution."
+    ]
+  },
+  "state_diagnosis_scope": "The released incremental cache stores BF16 whereas CKE declares FP32 state. Rounding the captured native first-step state to BF16 reproduces all 524288 reference values. A separately labelled FP32-cache reference diagnostic still fails connected parity; this isolates one cause, not all remaining divergence. No production state rounding or oracle substitution was added."
 }
