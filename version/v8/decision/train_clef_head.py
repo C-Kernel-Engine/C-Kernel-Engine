@@ -8,9 +8,7 @@ import argparse
 import ctypes as C
 import hashlib
 import json
-import os
 from pathlib import Path
-import subprocess
 import zipfile
 import sys
 import time
@@ -92,9 +90,10 @@ class Runtime:
             feedforward=g["feedforward"],
         )
         self.ir = ir
-        engine = ROOT / "build/libckernel_engine.so"
-        require(engine.is_file(), "native engine unavailable")
+        engine = self.folder / "libckernel_engine.so"
         if not resume:
+            build_engine = ROOT / "build/libckernel_engine.so"
+            require(build_engine.is_file(), "native engine unavailable")
             reg = training_registry()
             lowered = backward.synthesize_ir2_backward(
                 ir,
@@ -121,24 +120,23 @@ class Runtime:
             )
             require(not summary["skipped_ops"], "incomplete backward generation")
             (self.folder / "train.c").write_text(source)
-            subprocess.run(
-                [
-                    os.environ.get("CC", "cc"),
-                    f"-DCK_NUM_TOKENS={g['tokens']}",
-                    "-DCK_ADAMW_EPS=1e-4f",
-                    "-O2",
-                    "-shared",
-                    "-fPIC",
-                    "-I" + str(ROOT / "include"),
-                    str(self.folder / "train.c"),
-                    str(ROOT / "src/kernels/linear_rows_checked.c"),
-                    str(engine),
-                    "-Wl,-rpath," + str(engine.parent),
-                    "-lm",
-                    "-o",
-                    str(self.folder / "train.so"),
-                ],
-                check=True,
+            compiler = workflow._load_module(
+                "cke_shared_train_runtime_builder",
+                ROOT / "version/v7/scripts/ck_run_v7.py",
+            )
+            compiler._compile_train_runtime_with_identity(
+                self.folder / "train.c",
+                self.folder / "train.so",
+                lib_ck=build_engine,
+                cflags=(),
+                defines={"CK_NUM_TOKENS": g["tokens"], "CK_ADAMW_EPS": "1e-4f"},
+                extra_sources=compiler._resolve_training_provider_sources(
+                    summary, reg, build_engine
+                ),
+                relocatable=True,
+                optimization="-O2",
+                compiler="cc",
+                identity_out=self.folder / "build-identity.json",
             )
             write(self.folder / "layout.json", layout)
             write(self.folder / "backward_ir.json", lowered)
@@ -149,8 +147,13 @@ class Runtime:
                     library_sha256=sha(self.folder / "train.so"),
                     engine_sha256=sha(engine),
                     source_sha256=sha(self.folder / "train.c"),
+                    build_identity_sha256=sha(self.folder / "build-identity.json"),
                 ),
             )
+        require(
+            engine.is_file(),
+            "runtime lacks bundled engine; regenerate the training runtime",
+        )
         runtime = json.loads((self.folder / "runtime.json").read_text())
         self.summary = runtime["summary"]
         require(
@@ -161,10 +164,19 @@ class Runtime:
         require(
             sha(self.folder / "train.so") == runtime["library_sha256"]
             and sha(engine) == runtime["engine_sha256"]
-            and sha(self.folder / "train.c") == runtime["source_sha256"],
+            and sha(self.folder / "train.c") == runtime["source_sha256"]
+            and sha(self.folder / "build-identity.json")
+            == runtime["build_identity_sha256"],
             "runtime identity mismatch",
         )
         self.lib = C.CDLL(str((self.folder / "train.so").resolve()))
+        build_identity = json.loads((self.folder / "build-identity.json").read_text())
+        require(
+            workflow.CERT._build_identity_check(
+                self.lib, build_identity["build_identity_sha256"]
+            )["passed"],
+            "loaded training build identity mismatch",
+        )
         workflow._configure(self.lib)
         self.lib.ck_train_init.argtypes = [FP, IP, C.c_int]
         self.lib.ck_train_step_with_i32_ex.argtypes = [
@@ -566,7 +578,7 @@ def run(
             ),
             runtime=dict(
                 library_sha256=sha(folder / "train.so"),
-                engine_sha256=sha(ROOT / "build/libckernel_engine.so"),
+                engine_sha256=sha(folder / "libckernel_engine.so"),
                 contract_sha256=rt.summary["runtime_contract_sha256"],
             ),
             final_optimizer_state_sha256=hashlib.sha256(moments.tobytes()).hexdigest(),

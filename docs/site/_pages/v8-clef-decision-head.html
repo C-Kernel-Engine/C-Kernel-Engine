@@ -5,6 +5,50 @@
 <div class="container">
 
 <h1>Clef-Flash decision-head bring-up</h1>
+<section id="portable-head-runtime">
+<h2>Relocatable native head training</h2>
+<p>The head recipe uses the existing shared training build helper and packages
+<code>libckernel_engine.so</code> beside <code>train.so</code>, with a
+<code>$ORIGIN</code> loader path. Build identity records the compiler, generated
+source, extra provider sources and engine hash. Additional neural sources are
+resolved from generated provider declarations and kernel maps when their symbols
+are absent from the engine; the head no longer names a special source file.
+Missing source contracts fail before compilation. Resume validates the packaged
+engine rather than consulting the checkout's build directory; older runtimes
+without that dependency must be regenerated.</p>
+<p>A C-only regression host runs generated forward, backward and AdamW after the
+bundle is moved outside its build directory. The model-neutral graph completes
+40 updates with frozen weights unchanged. A complete small Clef head reproduces
+three native updates and evaluation exactly after relocation. Removing the
+packaged engine causes startup failure. No Python interpreter or repository
+headers are required during those deployed runs.</p>
+<p><strong>Released-head relocation evidence:</strong> On Ryzen, the full
+121,762,820-element trainable head completed one AdamW update through a relocated
+C-only host. Loss changed from 0.0080747874 to 0.0078037283; all updated weights
+matched the native recipe exactly. Current gradients and updated head tensors
+also match the retained independent PyTorch-certified baseline exactly. This
+was a baseline replay, not a fresh oracle run. The single process took 18.22
+seconds including initialization and evaluations; it is not a performance
+benchmark. <a href="assets/clef-head-portability-20261114.json">Artifact identities
+and separate verdicts</a> retain the connected-model numerical FAIL.</p>
+<p>The private full-size reproduction is retained on Ryzen at
+<code>/data/cke/private/clef-portable-head-20261114/reproduce.py</code>;
+run it with the pinned oracle environment and a new output directory argument.
+It consumes the retained native feature capture and released head, so its scope
+is explicitly head-only. The small asset-free regression remains in ordinary
+nightly; it does not impersonate this full-size run.</p>
+<p>This is runtime portability on the tested Linux ABI, not arbitrary-machine
+binary portability or released 9B connected-model certification. The test host
+loads prepared parameters and feature requests; text preprocessing and a
+declared generated backbone-to-head connection remain separate work. The
+ordinary recipe's Python layer still manages datasets and reports.</p>
+<p>The DSL policy now covers the shared circuit-training adapter, composition
+gate, checked emitter and bundle compiler, plus shared backward synthesis,
+training memory planning, code generation and runtime building. Clef and Kokoro
+are explicitly included in forbidden model-dispatch literals. This checks those
+policy rules; it is not proof that all compiler behavior originates in IR.</p>
+</section>
+
 
 <p>Model topology lives in the circuit builders here. Kernels implement arithmetic; maps describe ABI, scratch and numerical contracts. Generic operation catalogue entries do not inspect the model name.</p>
 

@@ -4837,6 +4837,32 @@ def _normalize_compile_define(value: Any) -> str:
     return str(value)
 
 
+def _resolve_training_provider_sources(summary: dict, registry: dict, lib_ck: Path) -> list[Path]:
+    """Resolve declared providers not supplied by the packaged engine from maps."""
+    symbols = subprocess.check_output(
+        ["nm", "-D", "--defined-only", str(lib_ck)], text=True
+    )
+    available = {line.split()[-1].split("@", 1)[0]
+                 for line in symbols.splitlines() if line.split()}
+    providers = {item["id"]: item for item in registry["kernels"]}
+    declarations = summary.get("declared_kernel_providers")
+    if not isinstance(declarations, dict):
+        raise ValueError("training codegen did not declare provider dependencies")
+    sources = set()
+    for kid, function in declarations.items():
+        if function in available:
+            continue
+        paths = providers.get(kid, {}).get("impl", {}).get("sources", [])
+        if not paths:
+            raise ValueError(f"missing source contract for training provider {kid}: {function}")
+        for name in paths:
+            path = (PROJECT_ROOT / name).resolve()
+            if not path.is_relative_to(PROJECT_ROOT.resolve()) or path.suffix != ".c" or not path.is_file():
+                raise ValueError(f"invalid source contract for training provider {kid}: {name}")
+            sources.add(path)
+    return sorted(sources)
+
+
 def _train_runtime_build_identity_payload(
     c_src: Path,
     lib_ck: Path,
@@ -4844,6 +4870,9 @@ def _train_runtime_build_identity_payload(
     cc: str,
     cflags: Sequence[str],
     defines: dict[str, Any],
+    relocatable: bool = False,
+    extra_sources: Sequence[Path] = (),
+    optimization: str = "-O3",
 ) -> dict[str, Any]:
     resolved_cc = shutil.which(cc)
     cc_version = subprocess.run(
@@ -4864,12 +4893,13 @@ def _train_runtime_build_identity_payload(
             "resolved": str(Path(resolved_cc).resolve()) if resolved_cc else None,
             "version": cc_version.stdout.splitlines()[0] if cc_version.returncode == 0 and cc_version.stdout else None,
         },
-        "compile_flags": ["-shared", "-fPIC", "-O3", *[str(flag) for flag in cflags]],
+        "compile_flags": ["-shared", "-fPIC", optimization, *[str(flag) for flag in cflags]],
         "defines": {str(key): _normalize_compile_define(value) for key, value in sorted(defines.items())},
         "include_dirs": [str(PROJECT_ROOT / "include"), str(PROJECT_ROOT)],
-        "library_dirs": [str(BUILD_DIR)],
+        "library_dirs": [str(lib_ck.parent)],
         "libraries": ["ckernel_engine", "m"],
-        "rpath": str(BUILD_DIR),
+        "rpath": "$ORIGIN" if relocatable else str(lib_ck.parent),
+        "extra_source_sha256": {str(path): _hash_sha256_file(path) for path in extra_sources},
     }
     return {
         "schema": "cke.v7.train_runtime_build_identity.v1",
@@ -4886,23 +4916,47 @@ def _compile_train_runtime_with_identity(
     cflags: Sequence[str],
     defines: dict[str, Any],
     identity_out: Optional[Path] = None,
+    relocatable: bool = False,
+    extra_sources: Sequence[Path] = (),
+    optimization: str = "-O3",
+    compiler: Optional[str] = None,
 ) -> dict[str, Any]:
-    cc = os.environ.get("CC") or "gcc"
+    if type(relocatable) is not bool or optimization not in ("-O2", "-O3"):
+        raise ValueError("invalid training runtime build policy")
+    extra_sources = tuple(Path(path).resolve() for path in extra_sources)
+    if any(path.suffix != ".c" or not path.is_file() for path in extra_sources):
+        raise ValueError("training runtime extra sources must be existing C files")
+    output = Path(output).resolve()
+    lib_ck = Path(lib_ck).resolve()
+    if relocatable:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        bundled_engine = output.parent / "libckernel_engine.so"
+        if bundled_engine != lib_ck:
+            temporary = bundled_engine.with_name(bundled_engine.name + f".{os.getpid()}.tmp")
+            try:
+                shutil.copyfile(lib_ck, temporary)
+                os.replace(temporary, bundled_engine)
+            finally:
+                temporary.unlink(missing_ok=True)
+        lib_ck = bundled_engine
+    cc = os.environ.get("CC") or compiler or "gcc"
     identity = _train_runtime_build_identity_payload(
         c_src,
         lib_ck,
         cc=cc,
         cflags=cflags,
-        defines=defines,
+        defines=defines, relocatable=relocatable,
+        extra_sources=extra_sources, optimization=optimization,
     )
     digest = str(identity["build_identity_sha256"])
     cmd = [
         cc,
         "-shared",
         "-fPIC",
-        "-O3",
+        optimization,
         *[str(flag) for flag in cflags],
         str(c_src),
+        *[str(path) for path in extra_sources],
         "-o",
         str(output),
         "-I",
@@ -4910,10 +4964,11 @@ def _compile_train_runtime_with_identity(
         "-I",
         str(PROJECT_ROOT),
         "-L",
-        str(BUILD_DIR),
+        str(lib_ck.parent),
         "-lckernel_engine",
         "-lm",
-        f"-Wl,-rpath,{BUILD_DIR}",
+        *(["-Wl,--no-undefined"] if relocatable else []),
+        "-Wl,-rpath,$ORIGIN" if relocatable else f"-Wl,-rpath,{lib_ck.parent}",
     ]
     for key, value in sorted(defines.items()):
         cmd.append(f"-D{key}={_normalize_compile_define(value)}")

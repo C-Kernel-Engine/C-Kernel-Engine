@@ -5039,6 +5039,9 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
         "batched_grad_accumulate_calls": int(batched_grad_accumulate_calls),
         "batched_grad_accumulate_tensors": int(batched_grad_accumulate_tensors),
         "callable_kernels": len(used_decl),
+        "declared_kernel_providers": {
+            kid: declaration[0] for kid, declaration in sorted(used_decl.items())
+        },
         "optimizer_pairs": len(opt_pairs),
         "runtime_contract_sha256": runtime_contract_sha256,
         "parameter_gradient_order": [wname for (wname, _gvar, _wvar, _mvar, _vvar, _numel) in sorted(opt_pairs, key=lambda x: x[0])],

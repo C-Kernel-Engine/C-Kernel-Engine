@@ -9,14 +9,25 @@
     "llama",
     "nanbeige",
     "qwen",
-    "whisper"
+    "whisper",
+    "clef",
+    "kokoro"
   ],
-  "forbidden_dispatch_keys": ["model", "model_type", "arch", "family"],
+  "forbidden_dispatch_keys": [
+    "model",
+    "model_type",
+    "arch",
+    "family"
+  ],
   "model_literal_site_limits": {
     "version/v8/scripts/build_ir_v8.py": 24,
     "version/v8/scripts/codegen_core_v8.py": 13,
     "version/v8/scripts/codegen_prefill_v8.py": 10,
-    "version/v8/scripts/codegen_v8.py": 0
+    "version/v8/scripts/codegen_v8.py": 0,
+    "version/v8/scripts/lower_circuit_training_v8.py": 0,
+    "version/v8/scripts/compile_checked_bundle_v8.py": 0,
+    "version/v8/scripts/generated_composition_contract_v8.py": 0,
+    "version/v8/scripts/codegen_checked_calls_v8.py": 0
   },
   "compiler_files": {
     "version/v8/scripts/build_ir_v8.py": {
@@ -27,9 +38,29 @@
         "generate_init_ops"
       ]
     },
-    "version/v8/scripts/codegen_core_v8.py": {"exclude_functions": []},
-    "version/v8/scripts/codegen_prefill_v8.py": {"exclude_functions": []},
-    "version/v8/scripts/codegen_v8.py": {"exclude_functions": ["_granular_cutpoint_report"]}
+    "version/v8/scripts/codegen_core_v8.py": {
+      "exclude_functions": []
+    },
+    "version/v8/scripts/codegen_prefill_v8.py": {
+      "exclude_functions": []
+    },
+    "version/v8/scripts/codegen_v8.py": {
+      "exclude_functions": [
+        "_granular_cutpoint_report"
+      ]
+    },
+    "version/v8/scripts/lower_circuit_training_v8.py": {
+      "exclude_functions": []
+    },
+    "version/v8/scripts/compile_checked_bundle_v8.py": {
+      "exclude_functions": []
+    },
+    "version/v8/scripts/generated_composition_contract_v8.py": {
+      "exclude_functions": []
+    },
+    "version/v8/scripts/codegen_checked_calls_v8.py": {
+      "exclude_functions": []
+    }
   },
   "compiler_functions": {
     "version/v8/scripts/build_ir_v8.py": [
@@ -48,6 +79,20 @@
     ],
     "version/v8/scripts/resolve_numerical_execution_contracts_v8.py": [
       "resolve_contract"
+    ],
+    "version/v7/scripts/ck_run_v7.py": [
+      "_resolve_training_provider_sources",
+      "_compile_train_runtime_with_identity",
+      "_train_runtime_build_identity_payload"
+    ],
+    "version/v7/scripts/codegen_train_runtime_v7.py": [
+      "generate_c"
+    ],
+    "version/v7/scripts/lower_ir2_backward_v7.py": [
+      "synthesize_ir2_backward"
+    ],
+    "version/v7/scripts/generate_train_layout_v7.py": [
+      "build_layout"
     ]
   }
 }
