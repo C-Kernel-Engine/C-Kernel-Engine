@@ -1101,6 +1101,42 @@ trajectories, disconnect stress, then a real harness task. Independent encoder a
 separate open gate. Stop this isolated service to roll back; it does not replace text or speech services.</p>
 </section>
 
+<section id="image-answer-acceptance">
+<h2>Repeatable image answers and follow-up acceptance</h2>
+<p>Cancellation now retains ownership while subprocess creation finishes, then reaps the child before
+releasing admission. The delayed-creation regression fails against the previous controller and passes
+with this change; test cleanup also reaps its deliberate negative-control child. A failed transport
+before stream iteration also releases admission, and nested generators close before a new request
+can start. The CLI allows five seconds for graceful server shutdown before cancelling active requests;
+this does not impose a normal inference deadline.</p>
+<p>The acceptance lane uses committed two-color PNG/JPEG fixtures, swapped left/right colors,
+repeated requests and caller-supplied follow-up history. The assessor requires the requested JSON
+answer and normal stop; a truncated answer, swapped colors, duplicate JSON keys, extra contradictory
+text, reused request ID or service restart cannot pass. Every attempt gets its own report directory;
+it starts INCOMPLETE and preserves responses collected before a failure. A timeout is INCOMPLETE,
+not a model-quality verdict. This command is suitable for an opt-in local nightly; no timer is installed
+and no old result is substituted for a current attempt.</p>
+<p>For a stronger connection check, launch the isolated test service with <code>--verify-reference</code>.
+This operator-only flag repeats direct generated prefill using the identical rendered IDs and encoded
+prefix before native-session execution. Initial full-vocabulary logits must match exactly. It doubles
+prefill work and is intended for diagnosis, not performance measurement. The independent encoder
+oracle, later decode logits and full mutable-state comparisons remain separate gates.</p>
+<pre><code>python -m server.vision_http --profile /path/to/2k-profile.json --port 8121 \
+  --threads 4 --verify-reference
+python scripts/certify_vision_http.py --base-url http://127.0.0.1:8121 \
+  --model cke-qwen3-vl-2k --fixtures tests/fixtures/vision_http_acceptance \
+  --expected-bundle THE_PINNED_BUNDLE_SHA256 --require-reference \
+  --output-root /private/vision-acceptance --timeout 600</code></pre>
+<p>The expected bundle must come from the operator's retained profile and preflight evidence; do not
+silently adopt whichever identity happens to answer. The client verifies boot identity and loaded
+libraries across the run. Output contains the public fixture answers, hashes, token counts and timings.
+Use a dedicated endpoint so other clients do not interrupt single-request admission.</p>
+<p>The retained 2K bundle has 32 visual rows and preprocesses the 224-by-112 fixtures to its compiled
+256-by-128 geometry. Allocated 2K capacity is not certification of 2K rendered prompts. These simple
+color tasks do not establish OCR, arbitrary visual reasoning, tools, real harness integration, resident
+latency or sustained unattended operation. See the <a href="assets/vision-http-acceptance-20261114.json">actual acceptance verdicts and prompt counts</a>.</p>
+</section>
+
 <section id="native-visual-session">
 <h2>Native visual session: first connected decoder boundary</h2>
 <p>The next experimental step adds <code>ck_session_v8_generate_visual</code> and
