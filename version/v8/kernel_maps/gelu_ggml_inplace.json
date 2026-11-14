@@ -38,7 +38,7 @@
   "impl": {
     "function": "gelu_ggml_inplace",
     "c_declaration": "void gelu_ggml_inplace(float *data, size_t n);",
-    "sources": ["src/kernels/gelu_kernels.c"]
+    "sources": ["src/kernels/gelu_kernels.c", "src/ck_threadpool.c"]
   },
   "modes": {"inference": true, "training": false, "backward": false},
   "numerical_capabilities": [
@@ -51,9 +51,9 @@
       "implementation": {
         "isa_dispatch": "scalar",
         "threading": {
-          "runtime": "serial",
-          "work_partition": ["serial"],
-          "dispatch": ["inline"],
+          "runtime": "ck_threadpool",
+          "work_partition": ["output_tiles"],
+          "dispatch": ["ck_threadpool_dispatch_n"],
           "reduction_order_effect": "none"
         }
       },
@@ -62,12 +62,12 @@
         "merge_order": "none",
         "deterministic": true,
         "thread_count_changes_arithmetic_order": false,
-        "split_strategy": "serial"
+        "split_strategy": "independent_outputs"
       }
     }
   ],
   "tests": {
-    "unit": ["unittest/test_gelu.py::GGML Qwen3-VL boundary"]
+    "unit": ["unittest/test_gelu.py::GGML Qwen3-VL boundary", "tests/test_v8_gelu_ggml_parallel.py"]
   },
   "call_abi": {
     "version": 1,
@@ -84,5 +84,5 @@
       }
     ]
   },
-  "notes": "GGML-compatible FP16-table GELU used for llama.cpp activation parity."
+  "notes": "GGML-compatible FP16-table GELU. Large buffers use disjoint threadpool ranges without changing per-element arithmetic; small and nested calls stay serial."
 }

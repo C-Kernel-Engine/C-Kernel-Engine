@@ -644,6 +644,11 @@ int ck_threadpool_capacity(const ck_threadpool_t *pool)
     return pool ? pool->n_threads : 1;
 }
 
+int ck_threadpool_in_dispatch(const ck_threadpool_t *pool)
+{
+    return pool && g_dispatch_context.pool == pool;
+}
+
 int ck_threadpool_thread_id(const ck_threadpool_t *pool)
 {
     if (!pool) return -1;
