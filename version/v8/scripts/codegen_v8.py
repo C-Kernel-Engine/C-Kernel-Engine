@@ -2025,6 +2025,19 @@ def _resolved_text_mrope_function(ir_obj: Dict[str, Any]) -> str:
     return function
 
 
+def _emit_visual_prefix_contract(config: Dict[str, Any]) -> str:
+    """Width queried by the checked host session, including deep-stack slices."""
+    bridge = config.get("multimodal_bridge_contract")
+    if not isinstance(bridge, dict) or not str(bridge.get("prefix_policy", "")).strip():
+        return ""
+    embed_dim = int(config.get("embed_dim", 0) or 0)
+    layers = int(config.get("num_deepstack_layers", 0) or 0)
+    width = int(config.get("input_embed_dim", 0) or 0) or embed_dim * (1 + layers)
+    if embed_dim <= 0 or layers < 0 or width < embed_dim * (1 + layers) or width > 2147483647:
+        raise ValueError("invalid visual prefix row width")
+    return f"\nCK_EXPORT int ck_model_get_visual_prefix_width(void) {{ return {width}; }}\n"
+
+
 def _inject_decode_runtime_multimodal_fallback(
     code: str,
     layout_obj: Dict[str, Any],
@@ -2995,6 +3008,8 @@ def main(argv: list[str] | None = None) -> int:
         if generation_policy_api:
             code += "\n\n" + generation_policy_api
 
+    if "CK_EXPORT int ck_model_forward_segments_grid_ex(" in code:
+        code += _emit_visual_prefix_contract(sequence_config)
     if "CK_EXPORT int ck_model_decode_batch2(" in code:
         # The compiled batch entry attests the exact generated source prefix.
         # The appended identity function is excluded to avoid a self-hash.

@@ -4527,14 +4527,19 @@ class V8NativeBridgeHostTests(unittest.TestCase):
                 bridge_runner_v8._compile_generated_model(c_path, so_path)
                 run_cmd.assert_called_once()
                 self.assertIn("-Wl,-rpath,$ORIGIN", run_cmd.call_args.args[0])
+                self.assertIn("-lckernel_tokenizer", run_cmd.call_args.args[0])
 
             with mock.patch.object(bridge_runner_v8, "_run") as run_cmd:
                 bridge_runner_v8._compile_generated_model(c_path, so_path)
                 run_cmd.assert_not_called()
 
             initial = json.loads(stamp_path.read_text(encoding="utf-8"))
-            self.assertEqual(initial["version"], 3)
+            self.assertEqual(initial["version"], 4)
             self.assertEqual(initial["runtime_dependency"]["runpath"], "$ORIGIN")
+            self.assertEqual(initial["tokenizer_dependency"]["sha256"],
+                hashlib.sha256((BUILD_DIR / "libckernel_tokenizer.so").read_bytes()).hexdigest())
+            self.assertEqual((tmp / "libckernel_tokenizer.so").read_bytes(),
+                             (BUILD_DIR / "libckernel_tokenizer.so").read_bytes())
             self.assertEqual(
                 initial["runtime_dependency"]["sha256"],
                 hashlib.sha256((BUILD_DIR / "libckernel_engine.so").read_bytes()).hexdigest(),

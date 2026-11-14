@@ -203,6 +203,40 @@ int ck_session_v8_generate_ids(
     void *user_data,
     CKSessionGenerateResultV8 *result);
 
+/* One already-preprocessed visual block between exact rendered token segments.
+ * Buffers remain caller-owned and immutable until generate_visual returns.
+ * prefix_float_count must equal prefix_tokens * prefix_width (including any
+ * circuit-declared deep-stack slices). Grid dimensions describe merged visual
+ * rows. text_position is explicit; no position policy is guessed here.
+ * This is fresh-request execution, not append or a checkpoint-compatible path.
+ * Upload decoding and encoder execution are separate from this session entry. */
+typedef struct CKSessionVisualInputV8 {
+    uint32_t struct_size;
+    uint32_t abi_version;
+    const int32_t *tokens_before;
+    int32_t tokens_before_count;
+    const float *prefix;
+    uint64_t prefix_float_count;
+    int32_t prefix_tokens;
+    int32_t prefix_width;
+    int32_t grid_x;
+    int32_t grid_y;
+    int32_t text_position;
+    const int32_t *tokens_after;
+    int32_t tokens_after_count;
+} CKSessionVisualInputV8;
+
+/* Requires a newly generated visual-width contract and segmented-grid entry.
+ * RAW_PROMPT and a positive output budget are required. CONTINUE_STATE and
+ * timestamps are rejected. Invalid inputs leave native state untouched;
+ * failed/cancelled native execution resets state. HTTP capability stays off
+ * until the encoder, upload and session path is independently certified. */
+int ck_session_v8_generate_visual(CKSessionV8 *session,
+    const CKSessionGenerateRequestV8 *request,
+    const CKSessionVisualInputV8 *visual,
+    ck_session_token_callback_v8 callback, void *user_data,
+    CKSessionGenerateResultV8 *result);
+
 /* Process exact token IDs to a completed, checkpointable prefill boundary.
  * The host owns the IDs and serializes this call with generate/save/restore.
  * A fresh call resets state; CONTINUE requires a successful prior prefill or

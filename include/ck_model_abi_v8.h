@@ -72,6 +72,11 @@ typedef int (*ck_model_get_runtime_descriptor_v8_fn)(
     CKModelRuntimeDescriptorV8 *descriptor,
     size_t descriptor_size);
 
+/* Optional checked visual-session prerequisite, in addition to mixed prefill.
+ * Returns the exact FP32 visual row width including deep-stack slices. Older
+ * models lacking this export remain usable through their existing APIs. */
+typedef int (*ck_model_get_visual_prefix_width_v8_fn)(void);
+
 /* Optional when CK_MODEL_CAP_SEQUENCE_STATE_SWITCH is set. All calls, including
  * decode and reset, remain serialized. Nonzero handles are generation-tagged
  * IDs; retired handles and handles from an earlier model load are rejected.
