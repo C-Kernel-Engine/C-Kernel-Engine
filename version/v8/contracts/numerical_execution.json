@@ -3,6 +3,45 @@
   "schema_version": 1,
   "engine_contract_version": "8",
   "contracts": {
+    "sinusoidal_explicit_frequencies_fp32": {
+      "operator_family": "position_embeddings",
+      "status": "observed",
+      "storage": {
+        "input": "fp32",
+        "weight": "fp32",
+        "output": "fp32"
+      },
+      "compute": {
+        "input": "fp32",
+        "weight": "fp32",
+        "accumulator": "fp32",
+        "contraction": "disabled",
+        "evaluation_order": "position_times_scale_then_frequency_then_sinf_cosf"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": [
+          "input_load",
+          "pointwise_product",
+          "sine",
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "none",
+        "order": "none",
+        "partial_accumulator": "none",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "serial",
+        "split_strategy": "independent_outputs",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Explicit frequency and position operands; phase=(position*scale)*frequency with two FP32 stores, followed by scalar libm sine/cosine and FP32 output. No implicit frequency construction."
+    },
     "rope_pairwise_explicit_tables_fp32": {
       "operator_family": "text_mrope",
       "status": "observed",

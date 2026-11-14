@@ -76,7 +76,9 @@ def weight_shapes(graph):
     shapes={}
     for op in graph['block_types']['block']['body']['ops']:
         for key,name in op.get('weight_refs',{}).items():
-            shapes[name]=[op['params']['C']] if key=='gamma' else ([op['params']['N']] if key=='bias' else [op['params']['N'],op['params']['K']])
+            if key in ('gamma','frequencies'):shapes[name]=[op['params']['C']]
+            elif key=='positions':shapes[name]=[op['params']['R']]
+            else:shapes[name]=[op['params']['N']] if key=='bias' else [op['params']['N'],op['params']['K']]
     return shapes
 
 def main():
