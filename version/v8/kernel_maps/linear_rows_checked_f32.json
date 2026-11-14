@@ -85,6 +85,21 @@
   },
   "notes": "Reusable checked linear operator for inference only; Kokoro ALBERT projection is one consumer. FP64 accumulation is deliberately distinct from PyTorch's FP32 reduction and uses an explicit numerical tolerance. Pinned first Kokoro ALBERT FFN projection at [36,2048] to [36,768] differs from PyTorch 2.8 FP32 by 3.814697265625e-5 on oracle-fed inputs while matching independently executed FP64 arithmetic exactly. Its new composition fixture declares its own 5e-5 absolute projection/residual bound and keeps normalized outputs at 1e-5; existing projection/QKV bounds remain unchanged. Direct pinned full-model SDPA hooks show that the first Q/K/V projections already differ in the connected graph before attention reduction; pinned PyTorch 2.8 same-input replay attributes up to 2.38e-6, 2.86e-6 and 1.55e-6, respectively, to this provider's local reduction contract. These observations do not identify a universally preferable reduction order. If a tighter PyTorch-dispatch match is required, add a separately named reduction provider/contract rather than modifying this FP64 provider.",
   "training_contract": {
+    "differentiation": {
+      "schema": "cke.training.direct-vjp.v1",
+      "operation_interface": "linear.row_major.checked.fp32.v1",
+      "gradient_rule": "linear_rows_train_backward",
+      "saved_operands": {
+        "input": "input:input",
+        "weight": "weight:weight"
+      },
+      "constant_bindings": {
+        "T": "linear_rows",
+        "aligned_in": "linear_input_channels",
+        "aligned_out": "linear_output_channels",
+        "num_threads": 1
+      }
+    },
     "version": 1,
     "layout": "contiguous",
     "batch_policy": "fixed",
