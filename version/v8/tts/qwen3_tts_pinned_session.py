@@ -314,7 +314,9 @@ class PinnedQwenSession:
         self.library_path = library
         self.library_sha256 = hashlib.sha256(library.read_bytes()).hexdigest()
         self.build_identity_sha256 = hashlib.sha256((library.parent / "build-identity.json").read_bytes()).hexdigest()
-        self._native = ctypes.CDLL(str(library))
+        from version.v8.scripts.checked_bundle_evidence_v8 import load_verified_checked_bundle
+        self._native = load_verified_checked_bundle(
+            library, library.parent / "build-identity.json", self.build_identity_sha256)
         if provider == "avx2_fma":
             available = self._native.audio_conv1d_checked_avx2_fma_available
             available.argtypes, available.restype = [], ctypes.c_int
