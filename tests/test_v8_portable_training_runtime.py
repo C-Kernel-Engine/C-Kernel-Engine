@@ -30,13 +30,13 @@ int ck_train_export_weight_snapshot(float *, int);
 void ck_train_free(void);
 void ck_set_strict_parity(int);
 int main(void) {
-    float weights[48], features[16], loss = -1, before = -1;
-    int32_t sizes[3] = {16,16,16}, ids[4] = {0,1,2,3};
+    float weights[CK_WEIGHT_ELEMENTS], features[16], loss = -1, before = -1;
+    int32_t sizes[CK_WEIGHT_COUNT] = {CK_WEIGHT_SIZES}, ids[4] = {0,1,2,3};
     FILE *input = fopen("request.bin", "rb");
-    if (!input || fread(weights, sizeof(float), 48, input) != 48 ||
+    if (!input || fread(weights, sizeof(float), CK_WEIGHT_ELEMENTS, input) != CK_WEIGHT_ELEMENTS ||
         fread(features, sizeof(float), 16, input) != 16) return 1;
     fclose(input);
-    if (ck_train_init(weights, sizes, 3) != 3) return 2;
+    if (ck_train_init(weights, sizes, CK_WEIGHT_COUNT) != CK_WEIGHT_COUNT) return 2;
     ck_set_strict_parity(1);
     if (ck_train_set_float_inputs_ex(features, 16) != 16 ||
         ck_train_set_batch_ex(ids, ids, 4) <= 0 ||
@@ -45,12 +45,12 @@ int main(void) {
         if (ck_train_step_ex(ids, ids, 4, &loss, 0.03f) <= 0) return 4;
     if (ck_train_eval_step(&loss) <= 0 || !isfinite(loss) ||
         loss >= before || ck_train_get_opt_step() != 40) return 5;
-    if (ck_train_get_weight_snapshot_numel() != 48 ||
-        ck_train_export_weight_snapshot(weights, 48) != 48) return 6;
+    if (ck_train_get_weight_snapshot_numel() != CK_WEIGHT_ELEMENTS ||
+        ck_train_export_weight_snapshot(weights, CK_WEIGHT_ELEMENTS) != CK_WEIGHT_ELEMENTS) return 6;
     FILE *out = fopen("result.bin", "wb");
     if (!out || fwrite(&before, sizeof(float), 1, out) != 1 ||
         fwrite(&loss, sizeof(float), 1, out) != 1 ||
-        fwrite(weights, sizeof(float), 48, out) != 48) return 7;
+        fwrite(weights, sizeof(float), CK_WEIGHT_ELEMENTS, out) != CK_WEIGHT_ELEMENTS) return 7;
     fclose(out);
     ck_train_free();
     return 0;
@@ -102,23 +102,72 @@ class PortableTrainingRuntime(unittest.TestCase):
                     )
 
     def test_relocated_c_host_trains_without_checkout_or_python(self):
+        self.relocated_c_host()
+
+    def test_relocated_lora_trains_without_checkout_or_python(self):
+        self.relocated_c_host(adapters=True)
+
+    def relocated_c_host(self, adapters=False):
         engine = ROOT / "build/libckernel_engine.so"
         if not engine.is_file():
             self.skipTest("native engine unavailable")
-        ir = backend.lower(graph())
+        authored = graph()
+        registry = backend.REGISTRY
+        if adapters:
+            from version.v8.training.lora import attach_lora_adapters
+            from version.v8.training.lora_weights import (
+                prepare_lora_weights,
+                resolve_lora_parameters,
+            )
+            from tests.test_v8_lora_training import lower, training_registry
+
+            authored, _ = attach_lora_adapters(
+                authored,
+                adapters=[
+                    dict(target="up", rank=2, alpha=2, name="first"),
+                    dict(target="bridge", rank=1, alpha=2, name="second"),
+                ],
+            )
+            registry = training_registry()
+            ir = lower(authored)
+        else:
+            ir = backend.lower(authored)
         layout = backend.planner.build_layout(
             ir, {"config": ir["config"]}, 64, strict=True
         )
         source, summary = backend.codegen.generate_c(
-            ir, backend.REGISTRY, manifest={"config": ir["config"]}, layout=layout
+            ir, registry, manifest={"config": ir["config"]}, layout=layout
         )
-        self.assertEqual(summary["init_weight_numel"], [16, 16, 16])
+        if not adapters:
+            self.assertEqual(summary["init_weight_numel"], [16, 16, 16])
         compiler = workflow._load_module(
             "cke_portable_training_test", ROOT / "version/v7/scripts/ck_run_v7.py"
         )
         rng = np.random.default_rng(731)
         initial = rng.normal(0, 0.4, 48).astype("f4")
         features = rng.normal(0, 0.4, 16).astype("f4")
+        if adapters:
+            schema = resolve_lora_parameters(authored)
+            values = {
+                name: (np.eye(4) + rng.normal(0, 0.1, meta["shape"])).astype("f4")
+                for name, meta in schema.items()
+                if not name.startswith("lora.")
+            }
+            values, _ = prepare_lora_weights(
+                authored, values, seeds={"first": 41, "second": 42}
+            )
+            initial = np.concatenate(
+                [values[n].ravel() for n in summary["init_weight_order"]]
+            )
+            features = np.eye(4, dtype="f4").ravel()
+        host_source = (
+            f"#define CK_WEIGHT_ELEMENTS {len(initial)}\n"
+            f"#define CK_WEIGHT_COUNT {len(summary['init_weight_order'])}\n"
+            "#define CK_WEIGHT_SIZES "
+            + ",".join(map(str, summary["init_weight_numel"]))
+            + "\n"
+            + HOST
+        )
         with tempfile.TemporaryDirectory() as tmp:
             build = Path(tmp) / "build"
             bundle = Path(tmp) / "bundle"
@@ -134,6 +183,9 @@ class PortableTrainingRuntime(unittest.TestCase):
                 cflags=(),
                 defines={"CK_NUM_TOKENS": 4},
                 relocatable=True,
+                extra_sources=compiler._resolve_training_provider_sources(
+                    summary, registry, engine
+                ),
             )
             self.assertFalse((bundle / "libckernel_engine.so").is_symlink())
             self.assertEqual(identity["inputs"]["rpath"], "$ORIGIN")
@@ -141,7 +193,7 @@ class PortableTrainingRuntime(unittest.TestCase):
                 identity["inputs"]["kernel_library_sha256"],
                 workflow._sha256(bundle / "libckernel_engine.so"),
             )
-            (build / "host.c").write_text(HOST)
+            (build / "host.c").write_text(host_source)
             subprocess.run(
                 [
                     "cc",
@@ -204,11 +256,17 @@ class PortableTrainingRuntime(unittest.TestCase):
             self.assertEqual((relocated / "result.bin").read_bytes(), baseline)
             result = np.frombuffer(baseline, dtype="f4")
             self.assertLess(result[1], result[0])
-            frozen = summary["init_weight_order"].index("bridge")
-            np.testing.assert_array_equal(
-                result[2 + frozen * 16 : 2 + (frozen + 1) * 16],
-                initial[frozen * 16 : (frozen + 1) * 16],
-            )
+            for name in (
+                ["bridge", "up", "lora.first.scale", "lora.second.scale"]
+                if adapters
+                else ["bridge"]
+            ):
+                index = summary["init_weight_order"].index(name)
+                begin = sum(summary["init_weight_numel"][:index])
+                end = begin + summary["init_weight_numel"][index]
+                np.testing.assert_array_equal(
+                    result[2 + begin : 2 + end], initial[begin:end]
+                )
             # Removing the bundled dependency must fail rather than find a checkout copy.
             (relocated / "libckernel_engine.so").unlink()
             failed = subprocess.run(

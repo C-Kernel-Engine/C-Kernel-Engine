@@ -1034,6 +1034,29 @@
 
 <h1>Clef-Flash decision-head bring-up</h1>
 
+<section id="lora-parameter-preparation">
+<h2>Bounded FP32 adapters and weight preparation</h2>
+<p><code>attach_lora_adapters</code> accepts explicit target, rank, alpha and name declarations for multiple unique biasless FP32 projections before backward synthesis. It reuses ordinary projection, scale and add operations and the existing generated training backend. A declared parameter budget is checked against resolved ranks; the authoring utility does not guess targets or reduce ranks silently. Tied/shared targets, unsupported dtypes and inconsistent geometry fail.</p>
+<p><code>resolve_lora_parameters</code> returns names, shapes, layout, dtype and trainability without parameter values. <code>prepare_lora_weights</code> validates every base parameter, initializes wholly absent adapters with explicit seeds, and returns schema/specification/weight hashes plus initialization method, implementation and NumPy version. Existing adapters are preserved; partial adapters, stale scale values and unused initialization seeds fail. Resume requires all parameters and performs no initialization. Optimizer moments and counters still resume through the existing checkpoint interface.</p>
+<pre>from version.v8.training.lora import attach_lora_adapters
+from version.v8.training.lora_weights import prepare_lora_weights
+
+adapted, specs = attach_lora_adapters(authored_training_ir, adapters=[
+    dict(target="projection.weight", name="task", rank=8, alpha=16),
+])
+weights, evidence = prepare_lora_weights(
+    adapted, base_weights, seeds={"task": 41})
+# Compile the adapted graph through the existing training lowering/backend.
+# Pass these checked weights to its native loader; Python does not update them.
+resumed, resume_evidence = prepare_lora_weights(
+    adapted, checkpoint_weights, mode="resume")</pre>
+<p>This is supported training-IR authoring, not arbitrary PyTorch module conversion or an all-model notebook API. The default initialization remains PCG64 normal A with standard deviation 1/sqrt(input width), zero B and frozen FP32 scale. Initialization is artifact preparation outside native computation. Generated C executes forward, gradients and AdamW updates.</p>
+<p>The asset-free LoRA suite compares four nonzero native training compositions with independent PyTorch across 40 updates, including two adapters, rectangular projections, frozen-base gradient flow, evaluation, checkpoint resume and inference export. It also rejects malformed schemas and partial initialization. A shared-builder portability test runs two adapters for 40 updates from a C-only host, moves the bundle, removes the build directory, and reproduces identical results. Frozen base matrices and scales remain unchanged; removing the bundled engine fails. This does not certify BF16 adapters, quantized-base backward, QLoRA or complete connected Clef training.</p>
+<pre>CK_NUM_THREADS=4 OMP_NUM_THREADS=1 python -m pytest -q tests/test_v8_lora_training.py
+python scripts/nightly_runner.py --tests training_lora_fp32 --json /tmp/lora.json</pre>
+</section>
+
+
 <section id="training-audit-followup">
 <h2>Composition and training audit follow-up</h2>
 <p>The composition gate now requires the declared consumer operation to contribute to the
