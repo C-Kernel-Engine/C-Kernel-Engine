@@ -7656,10 +7656,10 @@ python3 trace_divergence.py --model "$MODEL_DIR" --token 25 --threads 1 --contex
             }
             return `<p>${graph.nodes.length} of ${text(graph.total_operations)} operations captured.
                 ${graph.truncated ? '<strong>Capture truncated; missing references may be outside the capture.</strong>' : ''}
-                Edges use explicit from_op references only. Array order and shared buffer names do not establish dependencies.</p>
+                Edges use explicit from_op references or unique declared tensor producers. Array order and shared buffer names do not establish dependencies.</p>
                 <div style="overflow-x:auto"><table><thead><tr><th>Operation ID / layer</th><th>Operation / provider</th><th>Incoming dependencies</th><th>Declared outputs / buffers</th></tr></thead><tbody>
                 ${graph.nodes.map(n => `<tr><td>${text(n.id)} / ${text(n.layer)}</td><td>${text(n.operation)}<br><code>${text(n.provider)}</code></td>
-                    <td>${(n.inputs || []).map(r => `<div><code>${text(r.input)}</code> &larr; ${r.from_op == null ? text(r.from) : `op ${text(r.from_op)}.${text(r.from_output)}`}<br>
+                    <td>${(n.inputs || []).map(r => `<div><code>${text(r.input)}</code> &larr; ${r.from_op != null ? `op ${text(r.from_op)}.${text(r.from_output)}` : r.tensor != null ? `tensor ${text(r.tensor)}${r.producer_index != null ? ` (producer op ${text(r.producer_id)}, artifact index ${text(r.producer_index)}, output ${text(r.producer_output)})` : ''}` : text(r.from)}<br>
                     <small>${text(r.status)}; dtype ${text(r.dtype)}; slot ${text(r.slot)}</small></div>`).join('<hr>') || 'No input references recorded'}</td>
                     <td>${text((n.outputs || []).join(', ') || null)}<br><small>Buffer references: ${text((n.buffer_refs || []).join(', ') || null)}</small>${n.bindings_truncated ? '<p>Binding list truncated.</p>' : ''}</td></tr>`).join('')}</tbody></table></div>`;
         }

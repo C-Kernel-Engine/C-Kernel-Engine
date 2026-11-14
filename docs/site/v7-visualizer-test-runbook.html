@@ -1816,8 +1816,12 @@ visualizer lane runs these checks. Performance-tab behavior is unchanged.</p>
 operation selector. The dependency table shows operation IDs, layers, providers,
 incoming tensor references, outputs and recorded buffer bindings. This supports
 recurrent and audio operations without assuming attention layers or model names.</p>
-<p>Only explicit <code>from_op</code> and <code>from_output</code> references
-establish resolved dependencies. External or symbolic inputs, missing outputs,
+<p>Explicit <code>from_op</code>/<code>from_output</code> references and training
+<code>tensor</code> IDs establish dependencies. Tensor IDs resolve only through a
+unique declared output producer, regardless of operation order. Declared input,
+weight, parameter and constant tensors without producers remain external; missing
+activation producers remain unresolved. Duplicate tensor producers are ambiguous,
+including producers outside the bounded capture. External or symbolic inputs, missing outputs,
 duplicate IDs and references outside the capture are labeled separately.
 Neither operation order nor shared buffer names creates an inferred edge.</p>
 <p>The report retains at most 256 operations per artifact and 2,048 operations
