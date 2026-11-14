@@ -29,6 +29,8 @@ def attach_lora(ir, *, target, rank, alpha, name):
         or alpha <= 0
     ):
         raise ValueError("rank and alpha must be positive finite values")
+    if any(spec.get("target") == target for spec in ir.get("adapter_specs", [])):
+        raise ValueError("target already has an adapter")
     result = deepcopy(ir)
     ops = result["ops"]
     tid = "weight." + target
@@ -79,7 +81,9 @@ def attach_lora(ir, *, target, rank, alpha, name):
     if wi != inputs or y["shape"] != [rows, outputs] or rank > min(inputs, outputs):
         raise ValueError("inconsistent geometry or rank outside projection bounds")
     if base.get("requires_grad") is not True or y.get("requires_grad") is not True:
-        raise ValueError("target must belong to an explicitly differentiable training graph")
+        raise ValueError(
+            "target must belong to an explicitly differentiable training graph"
+        )
     # No implicit padded-stride reinterpretation of an existing checked provider.
     constants = base.get("params", {}).get("call_constants", {})
     for key, expected in (
@@ -281,12 +285,8 @@ def attach_lora(ir, *, target, rank, alpha, name):
     return result, spec
 
 
-def initialize_lora(spec, *, seed):
-    """Deterministic author-time initialization, never a training weight update."""
-    import numpy as np
-
-    if type(seed) is not int or not 0 <= seed < 2**32:
-        raise ValueError("seed must be a uint32 integer")
+def _validate_spec(spec):
+    """Validate metadata without generating or reading parameter values."""
     if spec.get("schema") != "cke.lora.fp32.v1":
         raise ValueError("unsupported adapter specification")
     for field in ("rows", "inputs", "outputs", "rank"):
@@ -296,6 +296,8 @@ def initialize_lora(spec, *, seed):
         "parameter_count"
     ) != spec["rank"] * (spec["inputs"] + spec["outputs"]):
         raise ValueError("inconsistent adapter geometry")
+    if type(spec.get("target")) is not str or not spec["target"]:
+        raise ValueError("explicit base parameter required")
     name = spec.get("name")
     if type(name) is not str or not re.fullmatch("[A-Za-z][A-Za-z0-9_]{0,47}", name):
         raise ValueError("invalid adapter identity")
@@ -320,7 +322,21 @@ def initialize_lora(spec, *, seed):
         or alpha / spec["rank"] != scale
     ):
         raise ValueError("invalid adapter scale")
-    names = spec["parameters"]
+    if (
+        spec.get("initialization")
+        != "PCG64 normal A std=1/sqrt(inputs); zero B; FP32 scale"
+    ):
+        raise ValueError("unsupported initialization policy")
+    return spec["parameters"]
+
+
+def initialize_lora(spec, *, seed):
+    """Deterministic author-time initialization, never a training weight update."""
+    import numpy as np
+
+    names = _validate_spec(spec)
+    if type(seed) is not int or not 0 <= seed < 2**32:
+        raise ValueError("seed must be a uint32 integer")
     rng = np.random.Generator(np.random.PCG64(seed))
     return {
         names["a"]: rng.normal(
@@ -329,3 +345,46 @@ def initialize_lora(spec, *, seed):
         names["b"]: np.zeros((spec["outputs"], spec["rank"]), dtype="float32"),
         names["scale"]: np.array([spec["scale"]], dtype="float32"),
     }
+
+
+def attach_lora_adapters(ir, *, adapters, max_parameters=None):
+    """Declare multiple bounded projections before backward synthesis.
+
+    Each declaration has exactly target/rank/alpha/name. No target discovery,
+    rank guessing, parameter initialization or compilation occurs here.
+    """
+    if not isinstance(adapters, (list, tuple)) or not adapters:
+        raise ValueError("nonempty explicit adapter declarations required")
+    if max_parameters is not None and (
+        type(max_parameters) is not int or max_parameters <= 0
+    ):
+        raise ValueError("parameter budget must be a positive integer")
+    targets = set()
+    names = set()
+    for declaration in adapters:
+        if not isinstance(declaration, dict) or set(declaration) != {
+            "target",
+            "rank",
+            "alpha",
+            "name",
+        }:
+            raise ValueError("adapter requires target, rank, alpha and name")
+        target, name = declaration["target"], declaration["name"]
+        if (
+            type(target) is not str
+            or type(name) is not str
+            or target in targets
+            or name in names
+        ):
+            raise ValueError("adapter targets and names must be unique")
+        targets.add(target)
+        names.add(name)
+    result = ir
+    specs = []
+    for declaration in adapters:
+        result, spec = attach_lora(result, **declaration)
+        specs.append(spec)
+    total = sum(spec["parameter_count"] for spec in result["adapter_specs"])
+    if max_parameters is not None and total > max_parameters:
+        raise ValueError("resolved adapter parameters exceed budget")
+    return result, specs

@@ -1040,7 +1040,8 @@ TEST_SUITES = {
     "training_lora_fp32": TestSuite(
         "FP32 LoRA Authoring, Frozen Base and Native AdamW Oracle", "training",
         ROOT / "tests" / "test_v8_lora_training.py",
-        unittest_targets=("tests.test_v8_lora_training",),
+        unittest_targets=("tests.test_v8_lora_training",
+                          "tests.test_v8_portable_training_runtime.PortableTrainingRuntime.test_relocated_lora_trains_without_checkout_or_python"),
     ),
     "training_projection_bf16": TestSuite(
         "BF16 Projection, FP32 Master Gradients and Native AdamW", "training",
