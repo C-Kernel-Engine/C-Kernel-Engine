@@ -151,7 +151,12 @@ class Runtime:
             IP,
             C.c_size_t,
         ]
-        self.lib.ck_train_get_loss.argtypes = [FP]
+        require(
+            hasattr(self.lib, "ck_train_eval_step"),
+            "runtime lacks current-loss evaluation; regenerate the training runtime",
+        )
+        self.lib.ck_train_eval_step.argtypes = [FP]
+        self.lib.ck_train_eval_step.restype = C.c_int
         self.sizes = np.asarray(self.summary["init_weight_numel"], dtype="i4")
         initial = np.concatenate(
             [self.weights[n].ravel() for n in self.summary["init_weight_order"]]
@@ -225,10 +230,9 @@ class Runtime:
             > 0,
             "native batch rejected",
         )
-        require(self.lib.ck_train_forward_step() > 0, "native forward rejected")
         loss = C.c_float()
         require(
-            self.lib.ck_train_get_loss(C.byref(loss)) >= 0, "native loss unavailable"
+            self.lib.ck_train_eval_step(C.byref(loss)) > 0, "native evaluation rejected"
         )
         scores = (
             workflow.CERT._activation_snapshot(self.lib, self.summary)[

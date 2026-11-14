@@ -245,6 +245,28 @@ class NativeRecipe(PackageContracts):
                 <= {a["type"] for a in result["job"]["artifacts"]}
             )
             self.assertFalse(result["cancel_supported"])
+            # Published held-out metrics must come from validation logits, not
+            # the cached loss from the final training update.
+            from tests.test_v8_clef_evaluation import grouped_ce
+            from version.v8.decision.training_package import load_package
+
+            report = json.loads((jobs.store / job_id / "report.json").read_text())
+            _, _, records = load_package(self.path, self.digest)
+            scores = {r["id"]: r["logits"] for r in report["records"]}
+            losses = [
+                grouped_ce(
+                    scores[r["id"]], r["arrays"]["option_counts"], r["arrays"]["labels"]
+                )
+                for r in records
+                if r["split"] == "validation"
+            ]
+            expected = sum(losses) / len(losses)
+            metric = next(
+                m
+                for m in result["job"]["metrics"]
+                if m["name"] == "validation_cross_entropy"
+            )
+            self.assertAlmostEqual(metric["value"], expected, delta=2e-7)
         finally:
             jobs.close()
 

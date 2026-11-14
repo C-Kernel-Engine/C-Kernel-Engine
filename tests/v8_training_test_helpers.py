@@ -14,7 +14,7 @@ import codegen_train_runtime_v7 as codegen
 import generate_train_layout_v7 as planner
 
 
-def certify_training(self, ir, registry, values, trainable, forward, *, integer_inputs=None, loss_function=None, finite_difference=True, precision_label="FP32", fresh_process=False, checked_runtime=False):
+def certify_training(self, ir, registry, values, trainable, forward, *, integer_inputs=None, loss_function=None, finite_difference=True, precision_label="FP32", fresh_process=False, checked_runtime=False, check_evaluation=False):
     try:
         import numpy as np
         import torch
@@ -108,6 +108,20 @@ def certify_training(self, ir, registry, values, trainable, forward, *, integer_
                 opt.zero_grad()
                 logits = forward(params)
                 loss = criterion(logits)
+                if check_evaluation and step in (0, 20, 39):
+                    # Same declared entry must work for ordinary decoder CE and
+                    # grouped decision loss without executing optimizer updates.
+                    lib.ck_train_eval_step.argtypes = [fp]
+                    before_weights = snapshot('weight', summary['weight_snapshot_floats'])
+                    before_moments = workflow._array_export(lib, 'optimizer_state')
+                    before_step = lib.ck_train_get_opt_step()
+                    self.assertGreater(native_batch(ids.ctypes.data_as(ip), ids.ctypes.data_as(ip), 4), 0)
+                    evaluated = ctypes.c_float()
+                    self.assertGreater(lib.ck_train_eval_step(ctypes.byref(evaluated)), 0)
+                    self.assertAlmostEqual(evaluated.value, loss.item(), delta=3e-5)
+                    np.testing.assert_array_equal(snapshot('weight', summary['weight_snapshot_floats']), before_weights)
+                    np.testing.assert_array_equal(workflow._array_export(lib, 'optimizer_state'), before_moments)
+                    self.assertEqual(lib.ck_train_get_opt_step(), before_step)
                 loss.backward()
                 # Grouped objectives can converge to a zero gradient; preserve
                 # the existing decoder assertion for its original trajectory.
