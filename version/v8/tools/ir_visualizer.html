@@ -3451,6 +3451,13 @@ python3 trace_divergence.py --model "$MODEL_DIR" --token 25 --threads 1 --contex
                 <label for="componentsSummary">Inventory summary</label>
                 <textarea id="componentsSummary" readonly rows="8" style="width:100%;"></textarea>
             </details>
+            <section class="parity-section">
+                <h3>Component operation dependencies</h3>
+                <p>Inspect recorded operations within one artifact. This does not connect separate encoder, decoder or codec components automatically.</p>
+                <label for="componentOperationSelect">Generated component artifact</label>
+                <select id="componentOperationSelect" onchange="renderComponentOperations()"><option value="-1">Select a generated IR artifact</option></select>
+                <div id="componentOperationRoot"></div>
+            </section>
             <div id="componentsRoot">No component inventory loaded.</div>
         </div>
 
@@ -7642,12 +7649,46 @@ python3 trace_divergence.py --model "$MODEL_DIR" --token 25 --threads 1 --contex
                 <p>Serving and harness lifecycle: no common request-timeline artifact is loaded by this view. No queue, tool call or streaming event is inferred from model IR.</p>`;
         }
 
+        function buildComponentOperationHTML(graph) {
+            const text = value => escapeHtml(componentText(value));
+            if (!graph || !Array.isArray(graph.nodes) || !graph.nodes.length) {
+                return '<p>No captured operations. Select an IR artifact with operation data. A circuit declaration alone does not supply a generated graph.</p>';
+            }
+            return `<p>${graph.nodes.length} of ${text(graph.total_operations)} operations captured.
+                ${graph.truncated ? '<strong>Capture truncated; missing references may be outside the capture.</strong>' : ''}
+                Edges use explicit from_op references only. Array order and shared buffer names do not establish dependencies.</p>
+                <div style="overflow-x:auto"><table><thead><tr><th>Operation ID / layer</th><th>Operation / provider</th><th>Incoming dependencies</th><th>Declared outputs / buffers</th></tr></thead><tbody>
+                ${graph.nodes.map(n => `<tr><td>${text(n.id)} / ${text(n.layer)}</td><td>${text(n.operation)}<br><code>${text(n.provider)}</code></td>
+                    <td>${(n.inputs || []).map(r => `<div><code>${text(r.input)}</code> &larr; ${r.from_op == null ? text(r.from) : `op ${text(r.from_op)}.${text(r.from_output)}`}<br>
+                    <small>${text(r.status)}; dtype ${text(r.dtype)}; slot ${text(r.slot)}</small></div>`).join('<hr>') || 'No input references recorded'}</td>
+                    <td>${text((n.outputs || []).join(', ') || null)}<br><small>Buffer references: ${text((n.buffer_refs || []).join(', ') || null)}</small>${n.bindings_truncated ? '<p>Binding list truncated.</p>' : ''}</td></tr>`).join('')}</tbody></table></div>`;
+        }
+
+        function renderComponentOperations() {
+            const select = document.getElementById('componentOperationSelect');
+            const root = document.getElementById('componentOperationRoot');
+            if (!root || !select) return;
+            const payload = getEmbeddedFiles().component_inventory || {};
+            const artifacts = (payload.components || []).flatMap(c => c.artifacts || []);
+            const artifact = artifacts[Number(select.value)];
+            root.innerHTML = buildComponentOperationHTML(artifact && artifact.operation_graph);
+        }
+
         function renderComponents() {
             const root = document.getElementById('componentsRoot');
             if (!root) return;
             const payload = getEmbeddedFiles().component_inventory;
             const search = document.getElementById('componentsSearch');
             root.innerHTML = buildComponentInventoryHTML(payload, search ? search.value : '');
+            const artifacts = (payload && payload.components || []).flatMap(c => c.artifacts || []);
+            const select = document.getElementById('componentOperationSelect');
+            if (select) {
+                const previous = select.value;
+                select.innerHTML = '<option value="-1">Select a generated IR artifact</option>' + artifacts.map((a, i) =>
+                    a.operation_graph && a.operation_graph.total_operations ? `<option value="${i}">${escapeHtml(a.path)}</option>` : '').join('');
+                if (Array.from(select.options).some(o => o.value === previous)) select.value = previous;
+            }
+            renderComponentOperations();
             const summary = document.getElementById('componentsSummary');
             if (summary) summary.value = componentSummary(payload);
         }

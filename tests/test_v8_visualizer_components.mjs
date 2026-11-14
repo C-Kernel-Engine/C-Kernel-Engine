@@ -30,3 +30,13 @@ test('escaping and filtering apply to artifact and declaration text',()=>{
     assert.ok(!context.buildComponentInventoryHTML(payload,'unmatched').includes('real_kernel'));
     assert.match(context.buildComponentInventoryHTML({...payload,issues:['missing call.json']}),/Inventory gaps/);
 });
+
+test('operation dependencies preserve unresolved and truncated evidence',()=>{
+    const html=context.buildComponentOperationHTML({total_operations:4,truncated:true,nodes:[
+        {id:'1',operation:'recurrent_update',provider:'<unsafe>',layer:0,outputs:['state'],inputs:[
+            {input:'history',from_op:'0',from_output:'state',status:'unresolved_or_outside_capture'}]}]});
+    assert.match(html,/1 of 4/);assert.match(html,/Capture truncated/);
+    assert.match(html,/unresolved_or_outside_capture/);assert.match(html,/&lt;unsafe&gt;/);
+    assert.ok(!html.includes('<unsafe>'));
+    assert.match(context.buildComponentOperationHTML(null),/No captured operations/);
+});
