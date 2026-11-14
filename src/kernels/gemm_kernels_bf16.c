@@ -726,7 +726,9 @@ void gemv_bf16_bf16_storage(float *y,
 
 #if defined(__AVX512F__) && defined(__GNUC__) && !defined(__clang__)
 /* Independent output lanes preserve the scalar K order, including bias first.
- * Bounded stack packing (2 KiB weights + 512 B inputs) is reused by four rows.
+ * Bounded stack packing (2 KiB weights + 2 KiB inputs) is reused by sixteen
+ * rows; independent accumulators need up to another 1 KiB before allocation
+ * to registers. No persistent workspace or dynamic allocation is required.
  * Do not contract multiply/add: this provider promises the original reduction.
  */
 __attribute__((optimize("O3", "fp-contract=off")))
@@ -734,19 +736,19 @@ static void gemm_nt_bf16_exact_avx512(const float *A, const uint16_t *B,
                                     const float *bias, float *C,
                                     int N, int K, int begin, int end)
 {
-    for (int i = begin; i < end; i += 4) {
-        const int rows = end - i < 4 ? end - i : 4;
+    for (int i = begin; i < end; i += 16) {
+        const int rows = end - i < 16 ? end - i : 16;
         for (int j = 0; j < N; j += 16) {
             const int width = N - j < 16 ? N - j : 16;
             const __mmask16 mask = (__mmask16)((1u << width) - 1u);
-            __m512 sums[4];
+            __m512 sums[16];
             const __m512 initial = bias ? _mm512_maskz_loadu_ps(mask, bias + j)
                                        : _mm512_setzero_ps();
             for (int r = 0; r < rows; ++r) sums[r] = initial;
             for (int k0 = 0; k0 < K; k0 += 32) {
                 const int count = K - k0 < 32 ? K - k0 : 32;
                 float packed[32][16] = {{0}};
-                float rounded[4][32];
+                float rounded[16][32];
                 for (int lane = 0; lane < width; ++lane) {
                     const uint16_t *w = B + (size_t)(j + lane) * K + k0;
                     for (int k = 0; k < count; ++k)
