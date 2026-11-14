@@ -33,6 +33,23 @@ class V8DSLPolicyTests(unittest.TestCase):
         allowed_sites = sum(policy["model_literal_site_limits"].values())
         self.assertLessEqual(report["model_literal_sites"], allowed_sites)
 
+    def test_shared_training_and_bundle_paths_reject_model_dispatch(self) -> None:
+        policy = json.loads(audit.DEFAULT_POLICY.read_text(encoding="utf-8"))
+        for name in ("clef", "kokoro"):
+            self.assertIn(name, policy["forbidden_model_literals"])
+            source = "def lower(config):\n    if config.get('model') == '" + name + "':\n        return 'special'\n"
+            self.assertTrue(audit.scan_source(
+                source, ["lower"], policy["forbidden_model_literals"], path="synthetic.py"))
+        for name in ("lower_circuit_training_v8.py", "compile_checked_bundle_v8.py",
+                     "generated_composition_contract_v8.py", "codegen_checked_calls_v8.py"):
+            key = "version/v8/scripts/" + name
+            self.assertIn(key, policy["compiler_files"])
+            self.assertEqual(policy["model_literal_site_limits"][key], 0)
+        for name, function in (("codegen_train_runtime_v7.py", "generate_c"),
+                               ("lower_ir2_backward_v7.py", "synthesize_ir2_backward"),
+                               ("generate_train_layout_v7.py", "build_layout")):
+            self.assertIn(function, policy["compiler_functions"]["version/v7/scripts/" + name])
+
     def test_model_literal_inventory_accepts_debt_reduction(self) -> None:
         policy = json.loads(audit.DEFAULT_POLICY.read_text(encoding="utf-8"))
         relative_path = "version/v8/scripts/codegen_prefill_v8.py"
