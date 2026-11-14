@@ -1141,7 +1141,59 @@ def _bridge_head_group_macro(head_group: Any) -> str:
     return "CK_ROPE_NUM_HEADS"
 
 
-def _declared_training_call(op, kernel, args, pools, tensors, tensor_numel, variables, *, fixed_batch=False):
+def _training_native_contexts(config):
+    contexts = config.get("training_native_contexts", [])
+    if not isinstance(contexts, list) or len(contexts) > 16:
+        raise ValueError("bounded native context list required")
+    if contexts and config.get("train_batch_policy") != "fixed":
+        raise ValueError("native contexts require a fixed training batch")
+    bindings = {}
+    for index, context in enumerate(contexts):
+        if not isinstance(context, dict) or set(context) != {"pointer", "bytes"}:
+            raise ValueError("invalid borrowed native context contract")
+        for field, ctype, expression in (
+            ("pointer", "constvoid*", f"g_native_contexts[{index}]"),
+            ("bytes", "size_t", f"g_native_context_sizes[{index}]"),
+        ):
+            name = context[field]
+            if (not isinstance(name, str) or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name)
+                    or name in bindings):
+                raise ValueError("native context names must be unique identifiers")
+            bindings[name] = (ctype, expression)
+    return contexts, bindings
+
+
+def _training_native_context_source(count):
+    """Borrowed runtime bindings, never parameters or checkpoint state."""
+    return f'''
+static const void *g_native_contexts[{count}];
+static size_t g_native_context_sizes[{count}];
+static int g_native_contexts_ready = 0;
+static int g_native_forward_ready = 0;
+static int g_native_backward_ready = 0;
+void ck_train_clear_native_contexts(void) {{
+    memset(g_native_contexts, 0, sizeof(g_native_contexts));
+    memset(g_native_context_sizes, 0, sizeof(g_native_context_sizes));
+    g_native_contexts_ready = g_native_forward_ready = g_native_backward_ready = 0;
+}}
+int ck_train_set_native_context_ex(int index, const void *context, size_t bytes) {{
+    g_native_contexts_ready = g_native_forward_ready = g_native_backward_ready = 0;
+    if (index < 0 || index >= {count}) return -1;
+    g_native_contexts[index] = NULL;
+    g_native_context_sizes[index] = 0;
+    uintptr_t lo = (uintptr_t)context, base = (uintptr_t)g_memory;
+    if (!g_memory || !context || !bytes || bytes > 1048576 || bytes > UINTPTR_MAX - lo ||
+        (lo < base + g_memory_floats * sizeof(float) && base < lo + bytes)) return -1;
+    g_native_contexts[index] = context;
+    g_native_context_sizes[index] = bytes;
+    for (int i = 0; i < {count}; ++i) if (!g_native_contexts[i]) return 0;
+    g_native_contexts_ready = 1;
+    return {count};
+}}
+'''.strip().splitlines()
+
+
+def _declared_training_call(op, kernel, args, pools, tensors, tensor_numel, variables, *, fixed_batch=False, native_contexts=None):
     """Resolve a bounded map ABI without legacy pointer/scalar guessing.
 
     Opt-in for fixed-capacity training graphs. FP32 buffers, typed BF16 saved
@@ -1169,6 +1221,13 @@ def _declared_training_call(op, kernel, args, pools, tensors, tensor_numel, vari
     for (ctype, name), binding in zip(args, params):
         source = binding.get("source", "")
         category, _, key = source.partition(":")
+        if category == "entry":
+            binding_type = (native_contexts or {}).get(key)
+            if (binding.get("cast") or binding_type is None
+                    or ctype.replace(" ", "") != binding_type[0]):
+                raise ValueError("undeclared or incompatible borrowed training context")
+            expressions.append(binding_type[1])
+            continue
         if source == "null":
             if ctype.replace(" ", "") != "constfloat*":
                 raise ValueError("training null binding must be a read-only float pointer")
@@ -1341,6 +1400,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
         json.dumps(identity, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
     cfg = dict(ir2.get("config") or {})
+    native_context_specs, native_context_bindings = _training_native_contexts(cfg)
     if cfg.get("train_batch_policy") not in (None, "fixed"):
         raise ValueError("unsupported training batch policy")
     bridge_lowering = str(ir2.get("bridge_lowering", "legacy") or "legacy").strip().lower()
@@ -1360,6 +1420,17 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     forward_ops = sorted(list(ir2.get("forward") or []), key=lambda o: int(o.get("op_id", 0)))
     backward_ops = sorted(list(ir2.get("backward") or []), key=lambda o: int(o.get("op_id", 0)))
     all_ops = forward_ops + backward_ops
+    used_native_contexts = set()
+    for operation in all_ops:
+        provider = kernel_map.get(operation.get("kernel_id"), {})
+        for binding in provider.get("call_abi", {}).get("params", []):
+            source = binding.get("source", "")
+            if operation.get("map_call") and source.startswith("entry:"):
+                if str(operation.get("phase", "")).startswith("backward"):
+                    raise ValueError("borrowed native context is forward-only")
+                used_native_contexts.add(source.partition(":")[2])
+    if used_native_contexts != set(native_context_bindings):
+        raise ValueError("native context declarations must match consumed entry arguments")
     op_by_id = {int(op["op_id"]): op for op in all_ops if isinstance(op, dict) and "op_id" in op}
     exec_plan_info = _load_train_exec_plan(exec_plan)
     exec_plan_by_op = exec_plan_info["by_op_id"]
@@ -1893,6 +1964,9 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                 ap("static float *%s;" % vvar)
                 seen_v.add(vvar)
     ap("static int g_opt_step = 0;")
+    if native_context_specs:
+        for line in _training_native_context_source(len(native_context_specs)):
+            ap(line)
     ap("static int g_accum_step = 0;")
     ap("static int64_t g_accum_tokens = 0;")
     ap("static int g_active_tokens = CK_NUM_TOKENS;")
@@ -1982,6 +2056,8 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("")
 
     ap("void ck_train_free(void) {")
+    if native_context_specs:
+        ap("    ck_train_clear_native_contexts();")
     if float_inputs:
         ap("    g_float_inputs_ready = 0;")
         ap("    g_float_forward_ready = 0;")
@@ -2187,6 +2263,8 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("}")
     ap("")
     ap("int ck_train_import_weight_snapshot(const float *src, int src_numel) {")
+    if native_context_specs:
+        ap("    g_native_forward_ready = g_native_backward_ready = 0;")
     ap("    if (g_memory == NULL || src == NULL) return -1;")
     ap("    if (src_numel < (int)CK_WEIGHT_SNAPSHOT_FLOATS) return -2;")
     ap("    size_t cursor = 0;")
@@ -2345,6 +2423,8 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
         if isinstance(tid, str) and tid.startswith("grad."):
             grad_vars_f32.append(var)
     ap("void ck_train_reset_buffers(void) {")
+    if native_context_specs:
+        ap("    ck_train_clear_native_contexts();")
     if float_inputs:
         ap("    g_float_inputs_ready = 0;")
         ap("    g_float_forward_ready = 0;")
@@ -2431,6 +2511,8 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("}")
     ap("")
     ap("void ck_zero_grad(void) {")
+    if native_context_specs:
+        ap("    g_native_backward_ready = 0;")
     ap("    ck_zero_grad_weights();")
     ap("    ck_zero_grad_activations();")
     ap("    ck_zero_tmp_grads();")
@@ -3695,6 +3777,13 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
             ap("    int first = -1;")
         else:
             ap("int %s(void) {" % fn_name)
+        if native_context_specs and phase in ("forward", "backward", "backward_trace", "evaluation_loss"):
+            if phase == "forward":
+                ap("    g_native_forward_ready = g_native_backward_ready = 0;")
+                ap("    if (!g_native_contexts_ready) return -6;")
+            else:
+                ap("    g_native_backward_ready = 0;")
+                ap("    if (!g_native_contexts_ready || !g_native_forward_ready) return -6;")
         if float_inputs and phase in ("forward", "backward", "backward_trace", "evaluation_loss"):
             ap("    if (!g_float_inputs_ready) return -5;")
             if phase == "forward":
@@ -4410,7 +4499,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                 call_args = _declared_training_call(
                     op, kernel_map[kid], args,
                     {"activation": io_inputs, "output": io_outputs, "weight": io_weights, "scratch": io_outputs},
-                    tensors, tensor_numel, {**tvars_f32, **tvars_i32, **tvars_bf16}, fixed_batch=cfg.get("train_batch_policy") == "fixed")
+                    tensors, tensor_numel, {**tvars_f32, **tvars_i32, **tvars_bf16}, fixed_batch=cfg.get("train_batch_policy") == "fixed", native_contexts=native_context_bindings)
                 bounds_checks = [(tvars_f32[tid], tensor_numel[tid])
                                  for tid in list(io_inputs.values()) + list(io_outputs.values()) + list(io_weights.values())
                                  if tid in tvars_f32]
@@ -4700,12 +4789,19 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
 
         if float_inputs and phase == "forward":
             ap("    g_float_forward_ready = 1;")
+        if native_context_specs:
+            if phase == "forward":
+                ap("    g_native_forward_ready = 1;")
+            elif phase in ("backward", "backward_trace"):
+                ap("    g_native_backward_ready = 1;")
         ap("    return call_count;")
         ap("}")
         ap("")
 
     if float_inputs:
         ap("int ck_train_set_float_inputs_ex(const float *inputs, size_t count) {")
+        if native_context_specs:
+            ap("    g_native_forward_ready = g_native_backward_ready = 0;")
         ap("    g_float_inputs_ready = 0;")
         ap("    g_float_forward_ready = 0;")
         ap("    if (!g_memory || !inputs || count != (size_t)%d) return -1;" % float_offset)
@@ -4748,6 +4844,9 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     emit_ops("ck_train_backward_step_trace", backward_ops, "backward_trace", trace_canary=True)
 
     ap("int ck_train_optimizer_step(float lr) {")
+    if native_context_specs:
+        ap("    if (!g_native_contexts_ready || !g_native_backward_ready) return -6;")
+        ap("    g_native_forward_ready = g_native_backward_ready = 0;")
     if "adamw_update_f32" not in used_decl:
         ap("    (void)lr;")
         ap("    /* adamw_update_f32 is unavailable; optimizer kernel call path is disabled. */")
@@ -4884,6 +4983,8 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("}")
     ap("")
     ap("static int ck_train_set_batch_inputs_impl(const int32_t *token_ids, const int32_t *targets, int valid_tokens, const int32_t *integer_inputs, size_t integer_count) {")
+    if native_context_specs:
+        ap("    g_native_forward_ready = g_native_backward_ready = 0;")
     ap("    if (integer_count != (size_t)%d) return -2;" % integer_offset)
     if integer_inputs:
         ap("    if (!integer_inputs || (uintptr_t)integer_inputs %% sizeof(int32_t) != 0 || (uintptr_t)integer_inputs > UINTPTR_MAX - (size_t)%d * sizeof(int32_t)) return -2;" % integer_offset)
@@ -5027,6 +5128,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
         "evaluation_loss_ops": len(evaluation_loss_ops),
         "evaluation_entry": "ck_train_eval_step",
         "float_inputs": float_inputs,
+        "native_contexts": native_context_specs,
         "float_input_count": float_offset,
         "integer_inputs": integer_inputs,
         "integer_input_count": integer_offset,

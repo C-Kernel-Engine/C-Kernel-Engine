@@ -21,6 +21,10 @@ def lower_circuit_training(
     `inputs` describes runtime inputs; `bindings` maps circuit external names to
     those inputs or frozen weights. Neither supplies model arithmetic.
     """
+    from version.v8.scripts.native_entry_binding_v8 import resolve_entry_argument
+
+    provider_maps = {m["id"]: m for m in training_registry()["kernels"]}
+    native_contexts = []
     activation_dtypes = activation_dtypes or {}
     frozen = set(frozen)
     if frozen - set(weights):
@@ -160,6 +164,85 @@ def lower_circuit_training(
             if kernel == "expand_group_row_indices_checked_i32":
                 o = emit(name, kernel, inputs, out, c)
                 o["dataflow"]["outputs"] = {k: act(v) for k, v in outnames.items()}
+                continue
+            provider = provider_maps.get(kernel, {})
+            contract = provider.get("training_contract", {})
+            if contract.get("frozen_forward") is not None:
+                if (
+                    contract["frozen_forward"]
+                    != {
+                        "inputs": "nondifferentiable",
+                        "outputs": "stop_gradient",
+                        "parameters": "external_frozen",
+                    }
+                    or p.pop("stop_gradient", None) is not True
+                    or provider.get("modes", {}).get("training") is not True
+                    or ws
+                    or any(x.get("requires_grad") is not False for x in inputs.values())
+                    or set(outnames)
+                    != {port["name"] for port in provider.get("outputs", [])}
+                    or len(outnames) != 1
+                    or out.get("dtype") != "fp32"
+                ):
+                    raise ValueError(
+                        "frozen component requires explicit nondifferentiable boundary"
+                    )
+                entry = graph.get("native_entry", {})
+                abi = {
+                    a["name"]: a for a in provider.get("call_abi", {}).get("params", [])
+                }
+                declared_contexts = contract.get("borrowed_contexts")
+                if not isinstance(declared_contexts, list) or not declared_contexts:
+                    raise ValueError(
+                        "frozen component requires borrowed context declarations"
+                    )
+                for context in declared_contexts:
+                    if not isinstance(context, dict) or set(context) != {
+                        "pointer",
+                        "bytes",
+                    }:
+                        raise ValueError("invalid frozen component context pair")
+                    names = {}
+                    for field, expected in (
+                        ("pointer", "constvoid*"),
+                        ("bytes", "size_t"),
+                    ):
+                        argument = abi.get(context[field])
+                        if argument is None:
+                            raise ValueError("missing native context argument")
+                        bound_name = resolve_entry_argument(entry, provider, argument)
+                        parameter = next(
+                            p for p in entry["params"] if p["name"] == bound_name
+                        )
+                        if parameter["c_type"].replace(" ", "") != expected:
+                            raise ValueError("invalid borrowed native context type")
+                        names[field] = bound_name
+                    if names not in native_contexts:
+                        native_contexts.append(names)
+                tensors[out["tensor"]]["requires_grad"] = False
+                out["requires_grad"] = False
+                operation = emit(name, kernel, inputs, out, c, params=p)
+                symbols = provider.get("call_constant_contract", {}).get(
+                    "shape_symbols", {}
+                )
+                for scratch in provider.get("scratch", []):
+                    shape = [
+                        c.get(symbols.get(dim, "")) if isinstance(dim, str) else dim
+                        for dim in scratch.get("shape", [])
+                    ]
+                    port = scratch.get("name")
+                    if (
+                        scratch.get("dtype") != "fp32"
+                        or not shape
+                        or any(type(d) is not int or d <= 0 for d in shape)
+                        or math.prod(shape) > 2147483647
+                        or not isinstance(port, str)
+                        or port in operation["dataflow"]["outputs"]
+                    ):
+                        raise ValueError("invalid frozen component scratch contract")
+                    operation["dataflow"]["outputs"][port] = ref(
+                        "aux." + name + "." + port, shape, grad=False
+                    )
                 continue
             if kernel.startswith("linear_rows_checked"):
                 rows = c["linear_rows"]
@@ -449,6 +532,7 @@ def lower_circuit_training(
             config,
             training_integer_inputs=integer_inputs,
             training_float_inputs=sorted(float_inputs),
+            training_native_contexts=native_contexts,
         ),
         ops=ops,
         tensors=tensors,
