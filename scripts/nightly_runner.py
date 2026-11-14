@@ -963,6 +963,11 @@ TEST_SUITES = {
         ROOT / "tests" / "test_v8_clef_feature_capture.py",
         unittest_targets=("tests.test_v8_clef_feature_capture",),
     ),
+    "decision_native_frontend": TestSuite(
+        "Clef Text Spans and Native Backbone Feature Boundary", "inference",
+        ROOT / "tests" / "test_v8_clef_native_frontend.py",
+        unittest_targets=("tests.test_v8_clef_native_frontend",),
+    ),
     "decision_native_head": TestSuite(
         "Registered Generated Decision Head and Independent Consumer", "inference",
         ROOT / "server" / "tests" / "test_decision_native.py",

@@ -66,7 +66,21 @@ def write(path, value):
 
 
 class Runtime:
-    def __init__(self, folder, doc, raw, first, *, resume=False):
+    def __init__(
+        self,
+        folder,
+        doc,
+        raw,
+        first,
+        *,
+        resume=False,
+        workspace_limit_bytes=2 * 1024**3,
+    ):
+        require(
+            type(workspace_limit_bytes) is int
+            and 0 < workspace_limit_bytes <= 4 * 1024**3,
+            "workspace limit must be an explicit bounded value up to 4 GiB",
+        )
         self.folder = Path(folder)
         g = doc["geometry"]
         ir, self.weights, self.graph = build_training_ir(
@@ -99,8 +113,8 @@ class Runtime:
                 lowered, {"config": lowered["config"]}, 64, strict=True
             )
             require(
-                layout["total_bytes"] <= 2 * 1024**3,
-                "native workspace exceeds recipe bound",
+                layout["total_bytes"] <= workspace_limit_bytes,
+                f"native workspace {layout['total_bytes']} exceeds declared budget {workspace_limit_bytes}",
             )
             source, summary = codegen.generate_c(
                 lowered, reg, manifest={"config": lowered["config"]}, layout=layout
@@ -139,6 +153,11 @@ class Runtime:
             )
         runtime = json.loads((self.folder / "runtime.json").read_text())
         self.summary = runtime["summary"]
+        require(
+            type(self.summary.get("memory_total_floats")) is int
+            and 0 < self.summary["memory_total_floats"] * 4 <= workspace_limit_bytes,
+            "stored training runtime exceeds declared workspace budget",
+        )
         require(
             sha(self.folder / "train.so") == runtime["library_sha256"]
             and sha(engine) == runtime["engine_sha256"]
