@@ -97,6 +97,30 @@ python3 version/v8/tts/replay_ming3_waveform.py \
 <p>Output directories must not already exist, preserving previous attempts.
 The reference command requires its separate publisher dependencies. Native replay
 uses retained operands and does not run a hidden Transformers fallback.</p>
+<h2>First complete DiT block, explicit FP32 composition</h2>
+<p>The generated first-block graph now connects RMSNorm, biased Q/K/V projections,
+consecutive-pair rotary embedding, full unmasked attention, output projection,
+residual addition, second RMSNorm and the GELU MLP. It reuses checked providers and
+adds a checked explicit-table pairwise rotation. Semantic checkpoints identify
+all fourteen operation boundaries for X-Ray.</p>
+<p>Nonzero small graphs at two, three and seven tokens pass an independent
+reference. Corrupting a Q weight or a rotary coefficient fails the intended
+intermediate comparison. Invalid rotary input leaves the final output untouched;
+restoring valid input permits another successful call.</p>
+<p>Both real first-block conditioning branches were replayed with the pinned
+weights and inputs recast to FP32. Compared with the publisher block also recast
+to FP32, maximum errors were 3.34e-5 and 5.34e-5, with RMSE 1.99e-6 and 4.83e-6.
+The report labels these measured differences, not certification. This graph does
+not implement publisher BF16 storage boundaries, the full eight-block DiT,
+timestep conditioning or the complete sampler. It accepts supplied rotary tables.</p>
+<pre>python3 -m unittest tests.test_v8_ming3_dit_block tests.test_v8_rope_pairwise_rows -v
+python3 version/v8/tts/replay_ming3_dit_block.py \
+  --capture /tmp/ming-reference/dit_first_block.pt \
+  --output /tmp/ming-native-dit-block</pre>
+<p>The reference capture command above now retains the first block, its weights,
+its original BF16 output and a separately labelled FP32 replay. Tests retain
+nonzero mathematical fixtures; real checkpoint data stays in private local
+artifacts. Missing artifacts are not a model-level pass.</p>
 <h2>Kernel and circuit work still required</h2>
 <table><thead><tr><th>Component</th><th>Reuse candidates</th><th>Remaining gate</th></tr></thead><tbody>
 <tr><td>Qwen2.5 backbone</td><td>Linear projections, RMSNorm, RoPE, attention, KV</td><td>Weight mapping, prompt embedding assembly and artifact-specific BF16 parity</td></tr>

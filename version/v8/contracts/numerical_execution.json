@@ -3,6 +3,45 @@
   "schema_version": 1,
   "engine_contract_version": "8",
   "contracts": {
+    "rope_pairwise_explicit_tables_fp32": {
+      "operator_family": "text_mrope",
+      "status": "observed",
+      "storage": {
+        "input": "fp32",
+        "weight": "none",
+        "output": "fp32"
+      },
+      "compute": {
+        "input": "fp32",
+        "weight": "none",
+        "accumulator": "fp32",
+        "contraction": "disabled",
+        "evaluation_order": "two_rounded_products_then_add_or_subtract_for_each_consecutive_pair"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": [
+          "input_load",
+          "weighted_product",
+          "pointwise_sum",
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "sum",
+        "order": "left_to_right",
+        "partial_accumulator": "fp32",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "serial",
+        "split_strategy": "independent_outputs",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Checked nonaliasing token-major pairwise rotation with explicit position tables. Each product and sum rounds in FP32 with FMA disabled; no cache generation or position policy."
+    },
     "audio_istft_complex_window_bf16_fold": {
       "operator_family": "audio_istft_mag_phase",
       "status": "observed",

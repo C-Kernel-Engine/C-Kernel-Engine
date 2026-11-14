@@ -60,9 +60,25 @@ def main():
             def capture(module,inputs,output):
                 if name in seen:return
                 seen.add(name)
-                torch.save({'inputs':tuple(x.detach().cpu() for x in inputs),
-                    'output':output.detach().cpu()},args.output/(name+'.pt'))
+                def cpu(value):
+                    if isinstance(value,torch.Tensor):return value.detach().cpu()
+                    if isinstance(value,(tuple,list)):return tuple(cpu(x) for x in value)
+                    return value
+                payload={'inputs':cpu(inputs),'output':cpu(output)}
+                if name=='dit_first_block':
+                    import copy
+                    payload['weights']={key:cpu(value) for key,value in module.state_dict().items()}
+                    fp32=copy.deepcopy(module).float().eval()
+                    for child in fp32.modules():child._forward_hooks.clear()
+                    def floating(value):
+                        if isinstance(value,torch.Tensor):return value.float()
+                        if isinstance(value,(tuple,list)):return tuple(floating(x) for x in value)
+                        return value
+                    with torch.inference_mode():payload['fp32_replay_output']=cpu(fp32(*floating(inputs)))
+                    payload['reference_scope']='same captured inputs and weights recast to FP32; separate from BF16 trajectory'
+                torch.save(payload,args.output/(name+'.pt'))
             return capture
+        model.model.flowloss.cfm.model.blocks[0].register_forward_hook(hook('dit_first_block'))
         model.model.audio.decoder.fc1.register_forward_hook(hook('vae_fc1'))
         model.model.audio.decoder.head.out.register_forward_hook(hook('vae_head_projection'))
         steps=[]

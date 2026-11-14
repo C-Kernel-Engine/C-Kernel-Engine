@@ -766,6 +766,16 @@ TEST_SUITES = {
         "TTS Kokoro Extent and Duration Expansion", "kernels",
         ROOT / "tests" / "test_v8_kokoro_shape_bounds.py",
     ),
+    "tts_ming3_generated_dit_block_fp32": TestSuite(
+        "Ming3 Nonzero Generated DiT Block FP32 Composition", "inference",
+        ROOT / "tests" / "test_v8_ming3_dit_block.py",
+        timeout_sec=120,
+    ),
+    "rope_pairwise_rows_checked": TestSuite(
+        "Explicit-Table Checked Pairwise Rotation", "inference",
+        ROOT / "tests" / "test_v8_rope_pairwise_rows.py",
+        timeout_sec=120,
+    ),
     "audio_istft_complex_window_checked": TestSuite(
         "Audio Explicit-Window Cropped ISTFT and BF16 Fold Order", "inference",
         ROOT / "tests" / "test_v8_audio_istft_complex_window.py",
