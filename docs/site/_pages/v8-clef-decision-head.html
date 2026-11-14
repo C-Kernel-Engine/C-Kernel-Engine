@@ -25,6 +25,8 @@ base = next(op for op in adapted["ops"] if any(
 mixed = use_bf16_projection(adapted, base["op_id"])
 # Prepare checked weights, then use the existing backward lowering/runtime.
 </code></pre>
+<p>The resolved BF16 projection providers are <code>ck_projection_bf16_train_forward</code> and <code>ck_projection_bf16_train_backward</code> in <code>src/kernels/projection_bf16_train.c</code>. They use portable C conversion and ordered FP32 arithmetic, with no BF16 hardware-ISA dispatch; these tests do not claim AVX-512 BF16 or AMX acceleration. Generated provider identities are asserted alongside native execution.</p>
+<p>A fourth composition trains rank-two and rank-one adapters across two BF16-compute frozen projections. It requires the shared composition audit alongside independent gradients, unchanged FP32 base/scale bytes and exact fresh-process resume.</p>
 <p>Three small generated compositions cover adapter-only training, an upstream
 trainable projection, and rectangular dimensions. Each compares loss, gradients,
 weights and optimizer moments for 40 AdamW updates, including checkpoint reload,

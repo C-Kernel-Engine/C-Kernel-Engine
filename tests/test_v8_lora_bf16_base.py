@@ -43,6 +43,21 @@ class BF16BaseLoRA(unittest.TestCase):
         self.assertTrue(
             all(not t["persistent"] and not t["requires_grad"] for t in saved)
         )
+        from tests import test_v8_selective_training as backend
+
+        layout = backend.planner.build_layout(
+            trained, {"config": trained["config"]}, 64, strict=True
+        )
+        _, summary = backend.codegen.generate_c(
+            trained,
+            lora_tests.training_registry(),
+            manifest={"config": trained["config"]},
+            layout=layout,
+        )
+        providers = summary["declared_kernel_providers"]
+        for phase in ("forward", "backward"):
+            identity = "projection_bf16_train_" + phase
+            self.assertEqual(providers[identity], "ck_" + identity)
         self.assertEqual(spec["dtype"], "fp32")
         self.assertNotEqual(base["kernel_id"], "projection_bf16_train_forward")
 
@@ -56,3 +71,6 @@ class BF16BaseLoRA(unittest.TestCase):
 
     def test_bf16_rectangular_frozen_base(self):
         lora_tests.LoRANativeTests.certify(self, True, bf16_base=True)
+
+    def test_two_bf16_bases_with_distinct_adapter_ranks(self):
+        lora_tests.LoRANativeTests.certify_multiple_adapters(self, bf16_base=True)

@@ -231,6 +231,9 @@ class LoRAContractTests(unittest.TestCase):
 
 class LoRANativeTests(unittest.TestCase):
     def test_multiple_adapters_native_training(self):
+        self.certify_multiple_adapters()
+
+    def certify_multiple_adapters(self, bf16_base=False):
         import numpy as np
         from tests.v8_training_test_helpers import certify_training
 
@@ -245,6 +248,39 @@ class LoRANativeTests(unittest.TestCase):
             ],
         )
         assert_composition(self, ir)
+        base_projection = lambda x, w: x @ w.T
+        if bf16_base:
+            from version.v8.training.bf16_projection import use_bf16_projection
+
+            try:
+                import torch
+            except ImportError as exc:
+                self.skipTest("independent PyTorch unavailable: " + str(exc))
+
+            class FrozenProjection(torch.autograd.Function):
+                @staticmethod
+                def forward(ctx, x, w):
+                    xr, wr = x.to(torch.bfloat16).float(), w.to(torch.bfloat16).float()
+                    ctx.save_for_backward(wr)
+                    return xr @ wr.T
+
+                @staticmethod
+                def backward(ctx, dy):
+                    (w,) = ctx.saved_tensors
+                    return dy @ w, None
+
+            base_projection = FrozenProjection.apply
+            for target in ("up", "bridge"):
+                base = next(
+                    op
+                    for op in ir["ops"]
+                    if any(
+                        ref["tensor"] == "weight." + target
+                        for ref in op.get("weights", {}).values()
+                    )
+                )
+                ir = use_bf16_projection(ir, base["op_id"])
+            assert_composition(self, ir)
         rng = np.random.default_rng(837)
         values = {
             name: rng.normal(0, 0.2, meta["shape"]).astype("float32")
@@ -263,7 +299,7 @@ class LoRANativeTests(unittest.TestCase):
             def projection(x, base, adapter):
                 key = "lora." + adapter
                 return (
-                    x @ p[base].T
+                    base_projection(x, p[base])
                     + (x @ p[key + ".a"].T @ p[key + ".b"].T) * p[key + ".scale"]
                 )
 
@@ -285,6 +321,12 @@ class LoRANativeTests(unittest.TestCase):
             trainable,
             forward,
             probe_parameter="lora.first.b",
+            finite_difference=not bf16_base,
+            precision_label=(
+                "BF16 frozen bases / distinct-rank FP32 adapters"
+                if bf16_base
+                else "FP32"
+            ),
             fresh_process=True,
             check_evaluation=True,
             checked_runtime=True,
