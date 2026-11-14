@@ -1,0 +1,63 @@
+<!-- TITLE: Ming3 TTS Bring-up -->
+<!-- NAV: kernels -->
+<h1>Ming3 TTS: first generated flow arithmetic</h1>
+<p><strong>Status: bounded FP32 arithmetic milestone. No Ming checkpoint execution,
+DiT, audio VAE, complete synthesis, sampled generation or serving capability is certified.</strong></p>
+<p>The model is <a href="https://huggingface.co/inclusionAI/Ming-3.0-tts-0.5B">inclusionAI/Ming-3.0-tts-0.5B</a>.
+The publisher combines a Qwen2.5 backbone with a DiT flow head, an aggregator,
+an audio VAE and a speaker encoder. Existing CKE TTS work supplies reusable
+arithmetic and serving infrastructure, but does not certify this composition.</p>
+<h2>Pinned sources</h2>
+<ul><li>Publisher source: <code>a39b80660bdc5a4394d5e1d41af6dbfd9c443a54</code>,
+<a href="https://github.com/inclusionAI/Ming-3.0-tts/blob/a39b80660bdc5a4394d5e1d41af6dbfd9c443a54/fm/CFM.py">fm/CFM.py</a>.</li>
+<li>Checkpoint metadata: <code>7247f4c94a5b2e987404ed28a5cfec41b1a4ca61</code>.
+Weights have not been loaded or compared in this milestone.</li></ul>
+<h2>What executes</h2>
+<pre>difference = prediction - null_prediction
+velocity   = prediction + cfg * difference
+euler      = latent + dt * velocity
+output     = euler + noise_amplitude * supplied_noise</pre>
+<p>The circuit decomposes this into eight checked scale/sum operations through
+normal circuit resolution, kernel maps, memory planning, lowering and generated C.
+Providers are <code>scale_vector_checked_f32</code> and
+<code>audio_scaled_sum_strided_f32_checked</code>. No new kernel, model-name
+compiler branch or handwritten neural executor is needed for this step.</p>
+<p>All tensors and coefficients are supplied in the arena. The caller must set
+<code>neg_one=-1</code>; it is a supplied scalar, not a native constant validator.
+The supplied noise amplitude represents the publisher's noise coefficient at this
+step. Time schedules, CFG policy, random-number generation and BF16 storage
+rounding are not implemented by this entry. Intermediate buffers may change on
+failure; the final output remains untouched when an upstream operation rejects.</p>
+<h2>Evidence and reproduction</h2>
+<p>The retained fixture executes the pinned publisher CFM sampler with a small
+synthetic affine predictor in FP32, five EPSS/sway updates and supplied noise.
+It does not replace a real DiT parity test. The fixture records source SHA-256,
+source/checkpoint revisions, PyTorch version, seed, operands and expected outputs.
+Each native output matches the retained FP32 trajectory exactly.</p>
+<pre>python3 version/v8/tts/build_ming3_flow_step_circuit.py --check
+python3 -m unittest tests.test_v8_ming3_flow_step -v
+python3 version/v8/tts/capture_ming3_flow_reference.py \
+  --publisher-cfm /path/to/pinned/fm/CFM.py \
+  --output /tmp/ming-flow-reference.json</pre>
+<p>The optional capture command verifies the pinned source hash before importing
+it. Normal PR/nightly tests use the retained fixture and require no download or
+large model. Coverage includes 1/63/64/65/256 elements, zero/nonzero noise,
+independent arenas, capacity rejection, nonfinite input rejection, recovery and a
+wrong-guidance negative control. Existing Kokoro/Qwen consumers keep their maps.</p>
+<h2>Kernel and circuit work still required</h2>
+<table><thead><tr><th>Component</th><th>Reuse candidates</th><th>Remaining gate</th></tr></thead><tbody>
+<tr><td>Qwen2.5 backbone</td><td>Linear projections, RMSNorm, RoPE, attention, KV</td><td>Weight mapping, prompt embedding assembly and artifact-specific BF16 parity</td></tr>
+<tr><td>DiT and aggregator</td><td>Checked linear, GELU/SiLU, normalization, full attention</td><td>Timestep embeddings, conditioning/modulation, positional conventions and complete-block parity</td></tr>
+<tr><td>Flow sampler</td><td>Checked scale and sum</td><td>Native bounded iteration, EPSS/sway schedule, CFG, exact dtype boundaries and RNG contract</td></tr>
+<tr><td>Audio VAE</td><td>Transformer arithmetic and waveform plumbing</td><td>Specific encoder/decoder graphs, sliding masks, latent/patch layout and streaming state</td></tr>
+<tr><td>Voice conditioning</td><td>Existing audio preprocessing where contracts match</td><td>CAM++ speaker encoder and reference-audio conditioning</td></tr>
+<tr><td>Serving</td><td>Speech request lifecycle, queues, cancellation, WAV delivery</td><td>Connect only after native synthesis and repeat/reset pass</td></tr>
+</tbody></table>
+<p>These are reuse candidates, not claims that all required numerical contracts
+already match. Add generic kernels/maps only for demonstrated gaps. Next deliver
+reference latents to native waveform and a real first DiT block independently;
+then connect native generation. Do not claim CPU speed from backbone parameter
+count or promote this diagnostic circuit as a serving model.</p>
+<p>The <a href="v7-visualizer-test-runbook.html#v8-component-coverage">IR visualizer</a>
+can inspect the generated layout, calls and semantic checkpoints. A circuit in its
+catalog remains a declaration, not production certification.</p>

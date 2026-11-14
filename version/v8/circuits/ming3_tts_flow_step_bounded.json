@@ -1,0 +1,527 @@
+{
+  "version": 3,
+  "name": "ming3_tts_flow_step_bounded",
+  "family": "bounded_graph",
+  "checked_native_entry": true,
+  "contract": {
+    "runtime_invariants": {
+      "inference_only": true,
+      "production_kernel_heap_allocation": false,
+      "complete_synthesis": false,
+      "complete_dit": false,
+      "complete_sampler": false,
+      "publisher_bf16_parity": false,
+      "reference_scope": "FP32 supplied predictions, noise and coefficients; one flow step",
+      "neg_one_required_value": -1,
+      "native_rng": false,
+      "elements": 256
+    },
+    "provenance": {
+      "source_revision": "a39b80660bdc5a4394d5e1d41af6dbfd9c443a54",
+      "checkpoint_revision": "7247f4c94a5b2e987404ed28a5cfec41b1a4ca61",
+      "source_file": "fm/CFM.py"
+    }
+  },
+  "activation_buffers": {
+    "latent": {
+      "shape": [
+        256
+      ]
+    },
+    "prediction": {
+      "shape": [
+        256
+      ]
+    },
+    "null_prediction": {
+      "shape": [
+        256
+      ]
+    },
+    "noise": {
+      "shape": [
+        256
+      ]
+    },
+    "negative_null": {
+      "shape": [
+        256
+      ]
+    },
+    "difference": {
+      "shape": [
+        256
+      ]
+    },
+    "guidance": {
+      "shape": [
+        256
+      ]
+    },
+    "velocity": {
+      "shape": [
+        256
+      ]
+    },
+    "delta": {
+      "shape": [
+        256
+      ]
+    },
+    "euler": {
+      "shape": [
+        256
+      ]
+    },
+    "stochastic": {
+      "shape": [
+        256
+      ]
+    },
+    "output": {
+      "shape": [
+        256
+      ]
+    },
+    "neg_one": {
+      "shape": [
+        1
+      ]
+    },
+    "cfg": {
+      "shape": [
+        1
+      ]
+    },
+    "dt": {
+      "shape": [
+        1
+      ]
+    },
+    "noise_amplitude": {
+      "shape": [
+        1
+      ]
+    }
+  },
+  "activation_bindings": {
+    "latent": "latent",
+    "prediction": "prediction",
+    "null_prediction": "null_prediction",
+    "noise": "noise",
+    "negative_null": "negative_null",
+    "difference": "difference",
+    "guidance": "guidance",
+    "velocity": "velocity",
+    "delta": "delta",
+    "euler": "euler",
+    "stochastic": "stochastic",
+    "output": "output",
+    "neg_one": "neg_one",
+    "cfg": "cfg",
+    "dt": "dt",
+    "noise_amplitude": "noise_amplitude"
+  },
+  "native_entry": {
+    "function": "ck_ming3_flow_step_bounded",
+    "params": [
+      {
+        "c_type": "uint8_t *",
+        "name": "arena"
+      },
+      {
+        "c_type": "size_t",
+        "name": "arena_bytes"
+      }
+    ],
+    "arena": {
+      "pointer": "arena",
+      "bytes": "arena_bytes"
+    }
+  },
+  "sequence": [
+    "flow_step"
+  ],
+  "block_types": {
+    "flow_step": {
+      "sequence": [
+        "header",
+        "body",
+        "footer"
+      ],
+      "header": [],
+      "body": {
+        "type": "dense",
+        "ops": [
+          {
+            "id": "negate_null",
+            "op": "scale_vector_checked",
+            "kernel": "scale_vector_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "external:null_prediction",
+                "gain": "external:neg_one"
+              },
+              "outputs": {
+                "output": "negative_null"
+              }
+            },
+            "params": {
+              "R": 256,
+              "X": 256,
+              "call_constants": {
+                "input_elements": 256,
+                "gain_elements": 1,
+                "output_elements": 256,
+                "scratch_elements": 256,
+                "rows": 256
+              }
+            }
+          },
+          {
+            "id": "prediction_difference",
+            "op": "audio_scaled_sum_strided_checked",
+            "kernel": "audio_scaled_sum_strided_f32_checked",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "left": "external:prediction",
+                "right": "negative_null"
+              },
+              "outputs": {
+                "output": "difference"
+              }
+            },
+            "params": {
+              "R": 1,
+              "C": 256,
+              "scale": 1.0,
+              "call_constants": {
+                "sum_left_elements": 256,
+                "sum_left_stride": 256,
+                "sum_right_elements": 256,
+                "sum_right_stride": 256,
+                "sum_output_elements": 256,
+                "sum_output_stride": 256,
+                "sum_rows": 1,
+                "sum_columns": 256
+              }
+            }
+          },
+          {
+            "id": "apply_guidance",
+            "op": "scale_vector_checked",
+            "kernel": "scale_vector_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "difference",
+                "gain": "external:cfg"
+              },
+              "outputs": {
+                "output": "guidance"
+              }
+            },
+            "params": {
+              "R": 256,
+              "X": 256,
+              "call_constants": {
+                "input_elements": 256,
+                "gain_elements": 1,
+                "output_elements": 256,
+                "scratch_elements": 256,
+                "rows": 256
+              }
+            }
+          },
+          {
+            "id": "guided_velocity",
+            "op": "audio_scaled_sum_strided_checked",
+            "kernel": "audio_scaled_sum_strided_f32_checked",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "left": "external:prediction",
+                "right": "guidance"
+              },
+              "outputs": {
+                "output": "velocity"
+              }
+            },
+            "params": {
+              "R": 1,
+              "C": 256,
+              "scale": 1.0,
+              "call_constants": {
+                "sum_left_elements": 256,
+                "sum_left_stride": 256,
+                "sum_right_elements": 256,
+                "sum_right_stride": 256,
+                "sum_output_elements": 256,
+                "sum_output_stride": 256,
+                "sum_rows": 1,
+                "sum_columns": 256
+              }
+            }
+          },
+          {
+            "id": "euler_delta",
+            "op": "scale_vector_checked",
+            "kernel": "scale_vector_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "velocity",
+                "gain": "external:dt"
+              },
+              "outputs": {
+                "output": "delta"
+              }
+            },
+            "params": {
+              "R": 256,
+              "X": 256,
+              "call_constants": {
+                "input_elements": 256,
+                "gain_elements": 1,
+                "output_elements": 256,
+                "scratch_elements": 256,
+                "rows": 256
+              }
+            }
+          },
+          {
+            "id": "euler_update",
+            "op": "audio_scaled_sum_strided_checked",
+            "kernel": "audio_scaled_sum_strided_f32_checked",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "left": "external:latent",
+                "right": "delta"
+              },
+              "outputs": {
+                "output": "euler"
+              }
+            },
+            "params": {
+              "R": 1,
+              "C": 256,
+              "scale": 1.0,
+              "call_constants": {
+                "sum_left_elements": 256,
+                "sum_left_stride": 256,
+                "sum_right_elements": 256,
+                "sum_right_stride": 256,
+                "sum_output_elements": 256,
+                "sum_output_stride": 256,
+                "sum_rows": 1,
+                "sum_columns": 256
+              }
+            }
+          },
+          {
+            "id": "noise_delta",
+            "op": "scale_vector_checked",
+            "kernel": "scale_vector_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "external:noise",
+                "gain": "external:noise_amplitude"
+              },
+              "outputs": {
+                "output": "stochastic"
+              }
+            },
+            "params": {
+              "R": 256,
+              "X": 256,
+              "call_constants": {
+                "input_elements": 256,
+                "gain_elements": 1,
+                "output_elements": 256,
+                "scratch_elements": 256,
+                "rows": 256
+              }
+            }
+          },
+          {
+            "id": "stochastic_update",
+            "op": "audio_scaled_sum_strided_checked",
+            "kernel": "audio_scaled_sum_strided_f32_checked",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "left": "euler",
+                "right": "stochastic"
+              },
+              "outputs": {
+                "output": "output"
+              }
+            },
+            "params": {
+              "R": 1,
+              "C": 256,
+              "scale": 1.0,
+              "call_constants": {
+                "sum_left_elements": 256,
+                "sum_left_stride": 256,
+                "sum_right_elements": 256,
+                "sum_right_stride": 256,
+                "sum_output_elements": 256,
+                "sum_output_stride": 256,
+                "sum_rows": 1,
+                "sum_columns": 256
+              }
+            }
+          }
+        ]
+      },
+      "footer": []
+    }
+  },
+  "semantic_checkpoints": {
+    "schema": "cke.semantic_checkpoint_contract",
+    "schema_version": 1,
+    "exports": {
+      "negate_null": {
+        "section": "body",
+        "template_op_id": "negate_null",
+        "op": "scale_vector_checked",
+        "checkpoints": [
+          {
+            "id": "ming3.flow.negate_null",
+            "producer": "negate_null",
+            "tensor": "negative_null",
+            "logical_layout": "contiguous",
+            "axis_names": [
+              "element"
+            ],
+            "storage_dtype": "fp32"
+          }
+        ]
+      },
+      "prediction_difference": {
+        "section": "body",
+        "template_op_id": "prediction_difference",
+        "op": "audio_scaled_sum_strided_checked",
+        "checkpoints": [
+          {
+            "id": "ming3.flow.prediction_difference",
+            "producer": "prediction_difference",
+            "tensor": "difference",
+            "logical_layout": "contiguous",
+            "axis_names": [
+              "element"
+            ],
+            "storage_dtype": "fp32"
+          }
+        ]
+      },
+      "apply_guidance": {
+        "section": "body",
+        "template_op_id": "apply_guidance",
+        "op": "scale_vector_checked",
+        "checkpoints": [
+          {
+            "id": "ming3.flow.apply_guidance",
+            "producer": "apply_guidance",
+            "tensor": "guidance",
+            "logical_layout": "contiguous",
+            "axis_names": [
+              "element"
+            ],
+            "storage_dtype": "fp32"
+          }
+        ]
+      },
+      "guided_velocity": {
+        "section": "body",
+        "template_op_id": "guided_velocity",
+        "op": "audio_scaled_sum_strided_checked",
+        "checkpoints": [
+          {
+            "id": "ming3.flow.guided_velocity",
+            "producer": "guided_velocity",
+            "tensor": "velocity",
+            "logical_layout": "contiguous",
+            "axis_names": [
+              "element"
+            ],
+            "storage_dtype": "fp32"
+          }
+        ]
+      },
+      "euler_delta": {
+        "section": "body",
+        "template_op_id": "euler_delta",
+        "op": "scale_vector_checked",
+        "checkpoints": [
+          {
+            "id": "ming3.flow.euler_delta",
+            "producer": "euler_delta",
+            "tensor": "delta",
+            "logical_layout": "contiguous",
+            "axis_names": [
+              "element"
+            ],
+            "storage_dtype": "fp32"
+          }
+        ]
+      },
+      "euler_update": {
+        "section": "body",
+        "template_op_id": "euler_update",
+        "op": "audio_scaled_sum_strided_checked",
+        "checkpoints": [
+          {
+            "id": "ming3.flow.euler_update",
+            "producer": "euler_update",
+            "tensor": "euler",
+            "logical_layout": "contiguous",
+            "axis_names": [
+              "element"
+            ],
+            "storage_dtype": "fp32"
+          }
+        ]
+      },
+      "noise_delta": {
+        "section": "body",
+        "template_op_id": "noise_delta",
+        "op": "scale_vector_checked",
+        "checkpoints": [
+          {
+            "id": "ming3.flow.noise_delta",
+            "producer": "noise_delta",
+            "tensor": "stochastic",
+            "logical_layout": "contiguous",
+            "axis_names": [
+              "element"
+            ],
+            "storage_dtype": "fp32"
+          }
+        ]
+      },
+      "stochastic_update": {
+        "section": "body",
+        "template_op_id": "stochastic_update",
+        "op": "audio_scaled_sum_strided_checked",
+        "checkpoints": [
+          {
+            "id": "ming3.flow.stochastic_update",
+            "producer": "stochastic_update",
+            "tensor": "output",
+            "logical_layout": "contiguous",
+            "axis_names": [
+              "element"
+            ],
+            "storage_dtype": "fp32"
+          }
+        ]
+      }
+    }
+  }
+}
