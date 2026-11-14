@@ -62098,10 +62098,11 @@
         "notes": "Exact LayerNorm variant with scalar FP64 mean accumulation and ggml's ordered eight-lane AVX reduction for centered variance. The reduction identity is preserved on wider x86 ISAs."
       },
       "impl": {
-        "function": "layernorm_naive_serial_matched_precision",
-        "c_declaration": "void layernorm_naive_serial_matched_precision(const float *input, const float *gamma, const float *beta, float *output, float *mean_cache, float *rstd_cache, int tokens, int d_model, float eps);",
+        "function": "layernorm_fp32_exact_parallel_dispatch",
+        "c_declaration": "void layernorm_fp32_exact_parallel_dispatch(const float *input, const float *gamma, const float *beta, float *output, float *mean_cache, float *rstd_cache, int tokens, int d_model, float eps);",
         "sources": [
-          "src/kernels/layernorm_kernels.c"
+          "src/kernels/layernorm_kernels.c",
+          "version/v8/src/ck_parallel_prefill_v8.c"
         ]
       },
       "modes": {
@@ -62116,17 +62117,17 @@
           "phases": [
             "prefill"
           ],
-          "function": "layernorm_naive_serial_matched_precision",
+          "function": "layernorm_fp32_exact_parallel_dispatch",
           "explicit_selector": true,
           "implementation": {
             "isa_dispatch": "compile_time",
             "threading": {
-              "runtime": "serial",
+              "runtime": "ck_threadpool",
               "work_partition": [
                 "independent_rows"
               ],
               "dispatch": [
-                "inline"
+                "ck_threadpool_parallel_for_n"
               ],
               "reduction_order_effect": "contract_defined"
             }
@@ -62197,10 +62198,11 @@
       },
       "tests": {
         "unit": [
-          "unittest/test_layernorm.py"
+          "unittest/test_layernorm.py",
+          "tests/test_v8_encoder_row_parallel.py"
         ]
       },
-      "notes": "GGML-compatible contracted LayerNorm used for parity-sensitive FP32 graphs. AVX-512 hosts retain the declared ordered AVX reduction instead of selecting a wider reduction implicitly.",
+      "notes": "GGML-compatible contracted LayerNorm used for parity-sensitive FP32 graphs. AVX-512 hosts retain the declared ordered AVX reduction instead of selecting a wider reduction implicitly. Large disjoint tensors use independent row/head dispatch; small, nested, overlapping and unsupported head geometry calls preserve serial execution. Per-output arithmetic is unchanged.",
       "name": "layernorm_fp32_exact",
       "_source_file": "layernorm_fp32_exact.json"
     },
@@ -76074,13 +76076,14 @@
         }
       ],
       "impl": {
-        "function": "mrope_qk_vision",
-        "c_declaration": "void mrope_qk_vision(float *q, float *k, const int32_t *positions, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int n_dims, int section_0, int section_1, int section_2, int section_3, int n_ctx_orig, float freq_base, float freq_scale, float ext_factor, float attn_factor, float beta_fast, float beta_slow);",
+        "function": "mrope_qk_vision_parallel_dispatch",
+        "c_declaration": "void mrope_qk_vision_parallel_dispatch(float *q, float *k, const int32_t *positions, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int n_dims, int section_0, int section_1, int section_2, int section_3, int n_ctx_orig, float freq_base, float freq_scale, float ext_factor, float attn_factor, float beta_fast, float beta_slow);",
         "sources": [
-          "src/kernels/rope_kernels.c"
+          "src/kernels/rope_kernels.c",
+          "version/v8/src/ck_parallel_prefill_v8.c"
         ]
       },
-      "notes": "Vision multi-section RoPE for Q/K using four position streams and head-major activations.",
+      "notes": "Vision multi-section RoPE for Q/K using four position streams and head-major activations. Large disjoint tensors use independent row/head dispatch; small, nested, overlapping and unsupported head geometry calls preserve serial execution. Per-output arithmetic is unchanged.",
       "numerical_capabilities": [
         {
           "contract_id": "vision_mrope_fp32_input_fp32_compute_fp32_output",
@@ -76089,17 +76092,17 @@
             "prefill",
             "decode"
           ],
-          "function": "mrope_qk_vision",
+          "function": "mrope_qk_vision_parallel_dispatch",
           "explicit_selector": true,
           "implementation": {
             "isa_dispatch": "scalar",
             "threading": {
-              "runtime": "serial",
+              "runtime": "ck_threadpool",
               "work_partition": [
-                "serial"
+                "independent_rows"
               ],
               "dispatch": [
-                "inline"
+                "ck_threadpool_parallel_for_n"
               ],
               "reduction_order_effect": "none"
             }
@@ -76109,7 +76112,7 @@
             "merge_order": "none",
             "deterministic": true,
             "thread_count_changes_arithmetic_order": false,
-            "split_strategy": "serial"
+            "split_strategy": "independent_outputs"
           }
         }
       ],
@@ -76199,6 +76202,11 @@
             "name": "beta_slow",
             "source": "dim:beta_slow"
           }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_encoder_row_parallel.py"
         ]
       },
       "name": "mrope_qk_vision",
@@ -76611,13 +76619,14 @@
         }
       ],
       "impl": {
-        "function": "mrope_qk_vision_bf16_storage",
-        "c_declaration": "void mrope_qk_vision_bf16_storage(float *q, float *k, const int32_t *positions, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int n_dims, int section_0, int section_1, int section_2, int section_3, int n_ctx_orig, float freq_base, float freq_scale, float ext_factor, float attn_factor, float beta_fast, float beta_slow);",
+        "function": "mrope_qk_vision_bf16_storage_parallel_dispatch",
+        "c_declaration": "void mrope_qk_vision_bf16_storage_parallel_dispatch(float *q, float *k, const int32_t *positions, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int n_dims, int section_0, int section_1, int section_2, int section_3, int n_ctx_orig, float freq_base, float freq_scale, float ext_factor, float attn_factor, float beta_fast, float beta_slow);",
         "sources": [
-          "src/kernels/rope_kernels.c"
+          "src/kernels/rope_kernels.c",
+          "version/v8/src/ck_parallel_prefill_v8.c"
         ]
       },
-      "notes": "Vision M-RoPE FP32 compute with explicit BF16 RNE output storage boundary.",
+      "notes": "Vision M-RoPE FP32 compute with explicit BF16 RNE output storage boundary. Large disjoint tensors use independent row/head dispatch; small, nested, overlapping and unsupported head geometry calls preserve serial execution. Per-output arithmetic is unchanged.",
       "numerical_capabilities": [
         {
           "contract_id": "vision_mrope_fp32_input_fp32_compute_bf16_output",
@@ -76626,17 +76635,17 @@
             "prefill",
             "decode"
           ],
-          "function": "mrope_qk_vision_bf16_storage",
+          "function": "mrope_qk_vision_bf16_storage_parallel_dispatch",
           "explicit_selector": true,
           "implementation": {
             "isa_dispatch": "scalar",
             "threading": {
-              "runtime": "serial",
+              "runtime": "ck_threadpool",
               "work_partition": [
-                "serial"
+                "independent_rows"
               ],
               "dispatch": [
-                "inline"
+                "ck_threadpool_parallel_for_n"
               ],
               "reduction_order_effect": "none"
             }
@@ -76646,7 +76655,7 @@
             "merge_order": "none",
             "deterministic": true,
             "thread_count_changes_arithmetic_order": false,
-            "split_strategy": "serial"
+            "split_strategy": "independent_outputs"
           }
         }
       ],
@@ -76736,6 +76745,11 @@
             "name": "beta_slow",
             "source": "dim:beta_slow"
           }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_encoder_row_parallel.py"
         ]
       },
       "name": "mrope_qk_vision_bf16_storage",
@@ -76881,13 +76895,14 @@
         }
       ],
       "impl": {
-        "function": "mrope_qk_vision_fp16_storage",
-        "c_declaration": "void mrope_qk_vision_fp16_storage(float *q, float *k, const int32_t *positions, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int n_dims, int section_0, int section_1, int section_2, int section_3, int n_ctx_orig, float freq_base, float freq_scale, float ext_factor, float attn_factor, float beta_fast, float beta_slow);",
+        "function": "mrope_qk_vision_fp16_storage_parallel_dispatch",
+        "c_declaration": "void mrope_qk_vision_fp16_storage_parallel_dispatch(float *q, float *k, const int32_t *positions, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int n_dims, int section_0, int section_1, int section_2, int section_3, int n_ctx_orig, float freq_base, float freq_scale, float ext_factor, float attn_factor, float beta_fast, float beta_slow);",
         "sources": [
-          "src/kernels/rope_kernels.c"
+          "src/kernels/rope_kernels.c",
+          "version/v8/src/ck_parallel_prefill_v8.c"
         ]
       },
-      "notes": "Vision M-RoPE FP32 compute with explicit FP16 RNE output storage boundary.",
+      "notes": "Vision M-RoPE FP32 compute with explicit FP16 RNE output storage boundary. Large disjoint tensors use independent row/head dispatch; small, nested, overlapping and unsupported head geometry calls preserve serial execution. Per-output arithmetic is unchanged.",
       "numerical_capabilities": [
         {
           "contract_id": "vision_mrope_fp32_input_fp32_compute_fp16_output",
@@ -76896,17 +76911,17 @@
             "prefill",
             "decode"
           ],
-          "function": "mrope_qk_vision_fp16_storage",
+          "function": "mrope_qk_vision_fp16_storage_parallel_dispatch",
           "explicit_selector": true,
           "implementation": {
             "isa_dispatch": "scalar",
             "threading": {
-              "runtime": "serial",
+              "runtime": "ck_threadpool",
               "work_partition": [
-                "serial"
+                "independent_rows"
               ],
               "dispatch": [
-                "inline"
+                "ck_threadpool_parallel_for_n"
               ],
               "reduction_order_effect": "none"
             }
@@ -76916,7 +76931,7 @@
             "merge_order": "none",
             "deterministic": true,
             "thread_count_changes_arithmetic_order": false,
-            "split_strategy": "serial"
+            "split_strategy": "independent_outputs"
           }
         }
       ],
@@ -77006,6 +77021,11 @@
             "name": "beta_slow",
             "source": "dim:beta_slow"
           }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_encoder_row_parallel.py"
         ]
       },
       "name": "mrope_qk_vision_fp16_storage",

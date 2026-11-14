@@ -43,6 +43,7 @@
 #include "ck_threadpool.h"
 #include "ckernel_quant.h"
 #include "ck_speed_profiles.h"
+#include "ckernel_engine.h"
 
 #include <stdio.h>
 #include <stdint.h>
@@ -1011,6 +1012,120 @@ static void work_residual_add_rows(int begin, int end, void *userdata)
         args->a + offset, args->b + offset, args->output + offset,
         end - begin, args->aligned_embed_dim);
 }
+
+static int ck_ranges_overlap(const void *a, size_t na, const void *b, size_t nb)
+{
+    if (!a || !b || !na || !nb) return 0;
+    const uintptr_t x = (uintptr_t)a, y = (uintptr_t)b;
+    return x <= y ? y - x < na : x - y < nb;
+}
+
+typedef struct {
+    const float *input, *gamma, *beta;
+    float *output, *mean, *rstd;
+    int dim;
+    float eps;
+} ck_layernorm_rows_args;
+
+static void ck_layernorm_rows(int begin, int end, void *opaque)
+{
+    ck_layernorm_rows_args *a = opaque;
+    const size_t offset = (size_t)begin * a->dim;
+    layernorm_naive_serial_matched_precision(
+        a->input + offset, a->gamma, a->beta, a->output + offset,
+        a->mean ? a->mean + begin : NULL, a->rstd ? a->rstd + begin : NULL,
+        end - begin, a->dim, a->eps);
+}
+
+void layernorm_fp32_exact_parallel_dispatch(
+    const float *input, const float *gamma, const float *beta, float *output,
+    float *mean, float *rstd, int tokens, int dim, float eps)
+{
+    int safe = input && output && tokens >= 256 && dim > 0 &&
+        (size_t)tokens <= SIZE_MAX / sizeof(float) / (size_t)dim;
+    if (safe) {
+        const size_t bytes = (size_t)tokens * dim * sizeof(float);
+        const size_t row = (size_t)dim * sizeof(float);
+        const size_t cache = (size_t)tokens * sizeof(float);
+        safe = (input == output || !ck_ranges_overlap(input, bytes, output, bytes)) &&
+            !ck_ranges_overlap(output, bytes, gamma, row) &&
+            !ck_ranges_overlap(output, bytes, beta, row) &&
+            !ck_ranges_overlap(mean, cache, rstd, cache);
+        float *caches[2] = {mean, rstd};
+        for (int i = 0; i < 2 && safe; ++i) {
+            safe = !ck_ranges_overlap(caches[i], cache, input, bytes) &&
+                !ck_ranges_overlap(caches[i], cache, output, bytes) &&
+                !ck_ranges_overlap(caches[i], cache, gamma, row) &&
+                !ck_ranges_overlap(caches[i], cache, beta, row);
+        }
+    }
+    ck_threadpool_t *pool = safe ? ck_threadpool_global() : NULL;
+    if (!pool || ck_threadpool_n_threads(pool) <= 1 || ck_threadpool_in_dispatch(pool)) {
+        layernorm_naive_serial_matched_precision(input, gamma, beta, output,
+                                                mean, rstd, tokens, dim, eps);
+        return;
+    }
+    ck_layernorm_rows_args args = {input, gamma, beta, output, mean, rstd, dim, eps};
+    ck_threadpool_parallel_for_n(pool, ck_independent_row_active_threads(pool, tokens, 16),
+                                0, tokens, 16, ck_layernorm_rows, &args);
+}
+
+typedef void (*ck_vision_rope_fn)(float *, float *, const int32_t *,
+    int, int, int, int, int, int, int, int, int, int, int,
+    float, float, float, float, float, float);
+typedef struct {
+    ck_vision_rope_fn fn;
+    float *q, *k;
+    const int32_t *positions;
+    int tokens, dim, aligned, dims, sections[4], context;
+    float base, scale, ext, attn, fast, slow;
+} ck_vision_rope_args;
+
+static void ck_vision_rope_heads(int begin, int end, void *opaque)
+{
+    ck_vision_rope_args *a = opaque;
+    const size_t offset = (size_t)begin * a->tokens * a->aligned;
+    a->fn(a->q + offset, a->k + offset, a->positions, end - begin, end - begin,
+          a->tokens, a->dim, a->aligned, a->dims,
+          a->sections[0], a->sections[1], a->sections[2], a->sections[3],
+          a->context, a->base, a->scale, a->ext, a->attn, a->fast, a->slow);
+}
+
+/* Keep the strict oracle bridge serial: its setup is not a worker contract.
+ * Storage wrappers are called on whole head slices, preserving every cast. */
+#define CK_VISION_ROPE_DISPATCH(NAME) \
+void NAME##_parallel_dispatch(float *q, float *k, const int32_t *positions, \
+    int heads, int kvheads, int tokens, int dim, int aligned, int dims, \
+    int s0, int s1, int s2, int s3, int context, \
+    float base, float scale, float ext, float attn, float fast, float slow) \
+{ \
+    int safe = q && k && positions && heads > 1 && heads == kvheads && \
+        tokens >= 256 && dim > 0 && aligned >= dim && \
+        (size_t)tokens <= SIZE_MAX / (4 * sizeof(int32_t)) && \
+        (size_t)tokens <= SIZE_MAX / sizeof(float) / (size_t)aligned / (size_t)heads; \
+    if (safe) { \
+        const size_t bytes = (size_t)heads * tokens * aligned * sizeof(float); \
+        const size_t posbytes = (size_t)tokens * 4 * sizeof(int32_t); \
+        safe = !ck_ranges_overlap(q, bytes, k, bytes) && \
+            !ck_ranges_overlap(q, bytes, positions, posbytes) && \
+            !ck_ranges_overlap(k, bytes, positions, posbytes) && \
+            !ck_strict_parity_enabled(); \
+    } \
+    ck_threadpool_t *pool = safe ? ck_threadpool_global() : NULL; \
+    if (!pool || ck_threadpool_n_threads(pool) <= 1 || ck_threadpool_in_dispatch(pool)) { \
+        NAME(q,k,positions,heads,kvheads,tokens,dim,aligned,dims,s0,s1,s2,s3,context, \
+             base,scale,ext,attn,fast,slow); \
+        return; \
+    } \
+    ck_vision_rope_args args = {NAME,q,k,positions,tokens,dim,aligned,dims, \
+                               {s0,s1,s2,s3},context,base,scale,ext,attn,fast,slow}; \
+    ck_threadpool_parallel_for_n(pool, ck_independent_row_active_threads(pool, heads, 1), \
+                                0, heads, 1, ck_vision_rope_heads, &args); \
+}
+CK_VISION_ROPE_DISPATCH(mrope_qk_vision)
+CK_VISION_ROPE_DISPATCH(mrope_qk_vision_fp16_storage)
+CK_VISION_ROPE_DISPATCH(mrope_qk_vision_bf16_storage)
+#undef CK_VISION_ROPE_DISPATCH
 
 static void work_memcpy_jobs(int begin, int end, void *userdata)
 {
