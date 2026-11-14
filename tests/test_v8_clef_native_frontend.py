@@ -396,11 +396,15 @@ class NativeFeatureLifecycle(unittest.TestCase):
             self.skipTest("C compiler unavailable")
         source = r"""
         #include <stdint.h>
+        #include "ck_decoder_features.h"
+        size_t test_context_bytes(void) {return sizeof(CKDecoderFeatures);}
         #include <string.h>
         static float features[4];
-        static int position, state;
-        int ck_model_init_with_manifest(const char *a,const char *b) {return 0;}
-        void ck_model_free(void) {}
+        static int position, state, fail_init, frees;
+        void test_fail_init(int enabled) {fail_init=enabled;}
+        int test_frees(void) {return frees;}
+        int ck_model_init_with_manifest(const char *a,const char *b) {return fail_init;}
+        void ck_model_free(void) {frees++;}
         void ck_model_kv_cache_reset(void) {position=state=0;}
         int ck_model_get_context_window(void) {return 5;}
         int ck_model_get_vocab_size(void) {return 16;}
@@ -429,6 +433,11 @@ class NativeFeatureLifecycle(unittest.TestCase):
                     "-o",
                     str(root / "libmodel.so"),
                     str(root / "model.c"),
+                    "-I" + str(Path(__file__).resolve().parents[1] / "include"),
+                    str(
+                        Path(__file__).resolve().parents[1]
+                        / "src/runtime/decoder_features_sequence.c"
+                    ),
                 ],
                 check=True,
             )
@@ -439,6 +448,58 @@ class NativeFeatureLifecycle(unittest.TestCase):
                     DecoderFeatures(root)
                 baseline = model.encode([1, 2])
                 np.testing.assert_array_equal(baseline, [[1, 2, 3, 4], [3, 4, 5, 6]])
+                # Borrowed native pointers execute the complete token loop in C.
+                import ctypes as C
+
+                function = model.lib.decoder_features_sequence_checked_f32
+                function.argtypes = [
+                    C.c_void_p,
+                    C.c_size_t,
+                    C.POINTER(C.c_int32),
+                    C.c_size_t,
+                    C.c_size_t,
+                    C.c_size_t,
+                    C.POINTER(C.c_float),
+                    C.c_size_t,
+                    C.POINTER(C.c_float),
+                    C.c_size_t,
+                ]
+                function.restype = C.c_int
+                model.lib.test_context_bytes.restype = C.c_size_t
+                ids = np.array([1, 2], dtype="i4")
+                output = np.full((2, 4), -1, dtype="f4")
+                scratch = np.empty_like(output)
+                with model.borrow_native_descriptor() as descriptor:
+                    self.assertEqual(
+                        C.sizeof(descriptor), model.lib.test_context_bytes()
+                    )
+                    with self.assertRaises(RuntimeError):
+                        model.close()
+                    with self.assertRaises(RuntimeError):
+                        model.encode([1])
+                    with self.assertRaises(RuntimeError):
+                        with model.borrow_native_descriptor():
+                            pass
+                    with patch.object(
+                        model,
+                        "_encode",
+                        side_effect=AssertionError("Python token loop"),
+                    ):
+                        status = function(
+                            C.byref(descriptor),
+                            C.sizeof(descriptor),
+                            ids.ctypes.data_as(C.POINTER(C.c_int32)),
+                            ids.size,
+                            2,
+                            4,
+                            output.ctypes.data_as(C.POINTER(C.c_float)),
+                            output.size,
+                            scratch.ctypes.data_as(C.POINTER(C.c_float)),
+                            scratch.size,
+                        )
+                    self.assertEqual(status, 0)
+                np.testing.assert_array_equal(output, baseline)
+                self.assertEqual(model.lib.ck_model_get_active_tokens(), 0)
                 model.encode([3, 4, 5, 6, 7])
                 np.testing.assert_array_equal(model.encode([1, 2]), baseline)
                 for bad in ([], [True], [-1], [16], [1] * 6):
@@ -452,6 +513,17 @@ class NativeFeatureLifecycle(unittest.TestCase):
                 model.close()
             with self.assertRaises(RuntimeError):
                 model.encode([1])
+            with self.assertRaises(RuntimeError):
+                with model.borrow_native_descriptor():
+                    pass
+            frees = model.lib.test_frees()
+            model.lib.test_fail_init(1)
+            with self.assertRaisesRegex(RuntimeError, "initialization failed"):
+                DecoderFeatures(root)
+            self.assertEqual(model.lib.test_frees(), frees + 1)
+            model.lib.test_fail_init(0)
+            recovered = DecoderFeatures(root)
+            recovered.close()
             # A later writer of the same exported buffer must fail at loading.
             call = self.fixture()
             call["operations"].append(

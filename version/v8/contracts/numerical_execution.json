@@ -3,6 +3,43 @@
   "schema_version": 1,
   "engine_contract_version": "8",
   "contracts": {
+    "checked_native_decoder_feature_copy_fp32": {
+      "operator_family": "decoder_features_sequence",
+      "status": "validated",
+      "storage": {
+        "input": "int32",
+        "weight": "none",
+        "output": "fp32"
+      },
+      "compute": {
+        "input": "int32",
+        "weight": "none",
+        "accumulator": "fp32",
+        "contraction": "disabled",
+        "evaluation_order": "validate_request_reset_decode_collect_finite_rows_reset_publish_exact_fp32"
+      },
+      "rounding": {
+        "mode": "none",
+        "points": [
+          "input_load",
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "none",
+        "order": "none",
+        "partial_accumulator": "none",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "serial",
+        "split_strategy": "serial",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Checked native decoder sequence and exact FP32 feature transport. The caller binds an initialized deterministic decoder artifact and its independent numerical contract; delegated model arithmetic is not certified by this copy contract. Invalid requests precede execution; failures and cancellation publish no features."
+    },
     "indexed_rows_gather_exact_f32_v1": {
       "operator_family": "indexed_rows_gather",
       "status": "validated",
