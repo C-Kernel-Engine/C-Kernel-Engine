@@ -745,9 +745,12 @@ static void gemm_nt_bf16_exact_avx512(const float *A, const uint16_t *B,
             const __m512 initial = bias ? _mm512_maskz_loadu_ps(mask, bias + j)
                                        : _mm512_setzero_ps();
             for (int r = 0; r < rows; ++r) sums[r] = initial;
+            /* Every active packed lane is overwritten before use. Keep unused
+             * tail lanes zero without clearing full tiles or each K block. */
+            float packed[32][16];
+            if (width < 16) memset(packed, 0, sizeof(packed));
             for (int k0 = 0; k0 < K; k0 += 32) {
                 const int count = K - k0 < 32 ? K - k0 : 32;
-                float packed[32][16] = {{0}};
                 float rounded[16][32];
                 for (int lane = 0; lane < width; ++lane) {
                     const uint16_t *w = B + (size_t)(j + lane) * K + k0;
