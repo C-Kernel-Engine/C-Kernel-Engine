@@ -110,6 +110,7 @@ class NativeDecisionTest(unittest.TestCase):
         self.assertEqual(status,500);self.assertIsNone(r['result'])
 
     def test_weights_unchanged_and_library_sealed(self):
+        self.assertEqual(self.head.loaded_build_identity_status, "VERIFIED")
         import ctypes
         import os
         def digest():
@@ -144,6 +145,21 @@ class NativeDecisionTest(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError,'INVALID_PACKAGE'):NativeHead(path,hashlib.sha256(data).hexdigest())
                     load.assert_not_called()
         with self.assertRaises(ValueError):NativeHead(self.manifest,'0'*64)
+    def test_reject_self_consistent_metadata_for_wrong_loaded_build(self):
+        from version.v8.scripts.checked_bundle_evidence_v8 import digest_json
+        manifest = json.loads(self.manifest.read_text())
+        build = json.loads((self.folder / manifest['files']['build_identity']['file']).read_text())
+        build['identity_inputs']['negative_control'] = 'different build'
+        build['build_identity_sha256'] = digest_json(build['identity_inputs'])
+        build_bytes = wire.encode(build)
+        (self.folder / 'altered-build.json').write_bytes(build_bytes)
+        manifest['files']['build_identity'] = dict(file='altered-build.json', sha256=hashlib.sha256(build_bytes).hexdigest())
+        manifest_bytes = wire.encode(manifest)
+        target = self.folder / 'altered-package.json'
+        target.write_bytes(manifest_bytes)
+        with self.assertRaisesRegex(ValueError, 'INVALID_PACKAGE'):
+            NativeHead(target, hashlib.sha256(manifest_bytes).hexdigest())
+
     def test_malformed_http_never_executes(self):
         import http.client
         bodies=[b'{"private":"not-a-request"}', b'{"schema":1,"schema":2}', b'x'*16385]

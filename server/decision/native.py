@@ -122,6 +122,14 @@ class NativeHead:
         with os.fdopen(os.dup(self.fd),'wb') as f:f.write(blobs['library'])
         fcntl.fcntl(self.fd,fcntl.F_ADD_SEALS,fcntl.F_SEAL_WRITE|fcntl.F_SEAL_GROW|fcntl.F_SEAL_SHRINK|fcntl.F_SEAL_SEAL)
         self.library=ctypes.CDLL(f'/proc/self/fd/{self.fd}')
+        self.loaded_build_identity_status = 'NOT_VERIFIED'
+        if 'build_identity_sha256' in build:
+            from version.v8.scripts.checked_bundle_evidence_v8 import digest_json, verify_loaded_identity
+            check(digest_json(build.get('identity_inputs')) == build['build_identity_sha256'])
+            verify_loaded_identity(self.library, build['build_identity_sha256'])
+            self.loaded_build_identity_status = 'VERIFIED'
+        else:
+            check(build.get('embedded_runtime_build_identity') != 'VERIFIED')
         self.execute=getattr(self.library,m['function']);self.execute.argtypes=[ctypes.POINTER(ctypes.c_uint8),ctypes.c_size_t];self.execute.restype=ctypes.c_int
         self.storage=ctypes.create_string_buffer(n+63);self.address=(ctypes.addressof(self.storage)+63)&~63
         self.arena=ctypes.cast(self.address,ctypes.POINTER(ctypes.c_uint8))
