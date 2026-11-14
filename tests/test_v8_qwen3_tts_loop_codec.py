@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ctypes
 import json
+import hashlib
 from pathlib import Path
 import tempfile
 import unittest
@@ -19,6 +20,10 @@ from tests.test_v8_qwen3_tts_prompt_first_block import compile_entry, view
 from tests.test_v8_qwen3_tts_second_generated_frame import prepare_inputs
 from tests.test_v8_qwen3_tts_talker_prefill import weight_shapes
 from tests.test_v8_qwen3_tts_two_phase_speech import SOURCES, segment_function
+from version.v8.tts.qwen3_tts_pinned_session import _compile as compile_session
+from version.v8.tts.build_qwen3_tts_runtime_loop_codec_circuit import (
+    build_circuit as runtime_loop,
+)
 from version.v8.tts.build_qwen3_tts_loop_codec_circuit import (
     AVX2_CODEC_CONV, OUTPUT, SCALAR_CODEC_CONV, build_circuit,
 )
@@ -56,14 +61,22 @@ class FrameCodecPrefix(ctypes.Structure):
     _fields_ = [("base", FrameCodec), ("samples_per_code_frame", ctypes.c_size_t)]
 
 
+CancelCallback = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_void_p)
+
+
+class FrameCodecPrefixControl(ctypes.Structure):
+    _fields_ = [("base", FrameCodecPrefix), ("should_cancel", CancelCallback),
+                ("cancel_context", ctypes.c_void_p)]
+
+
 class Qwen3TTSLoopCodecTest(unittest.TestCase):
     def test_generated_loop_short_eos_through_capacity_codec(self):
         arrays = synthetic_arrays(np.random.default_rng(20261030))
         arrays["codec.acoustic.2.effective_embedding"] = (
             arrays["codec.acoustic.0.effective_embedding"].copy())
-        graph = build_circuit(frames=3, max_generated_frames=3,
-                              talker_layers=1, continuation_steps=2,
-                              codec_kwargs=GEOMETRY)
+        graph = runtime_loop(context_capacity=7, frames=3, max_generated_frames=3,
+                             talker_layers=1, continuation_steps=2,
+                             codec_kwargs=GEOMETRY)
         # The synthetic selector forces EOS after two frames; no reference
         # codes or waveform values enter the generated connected run.
         selector = graph["block_types"]["second_talker_predictor_bridge"]["body"]["ops"][1]
@@ -72,12 +85,20 @@ class Qwen3TTSLoopCodecTest(unittest.TestCase):
                                       max_generated_frames=3)
         shapes = weight_shapes(base_graph)
         shapes.update({name: value.shape for name, value in arrays.items()})
-        sources = tuple(dict.fromkeys((*SOURCES, *CODEC_SOURCES,
-                                       "src/runtime/checked_frame_loop.c",
-                                       "src/runtime/checked_frame_codec.c")))
         with tempfile.TemporaryDirectory() as temp:
-            _, acts, weights, layout, _, library = compile_entry(
-                Path(temp), graph, shapes, extra_sources=sources)
+            acts, weights, layout, calls, library = compile_session(
+                Path(temp), graph, shapes)
+            identity = json.loads((Path(temp) / "build-identity.json").read_text())
+            self.assertTrue(identity["build_policy"]["openmp"])
+            self.assertEqual(identity["build_policy"]["fp_contract"], "fast")
+            self.assertNotIn("-w", identity["compile_command"])
+            self.assertEqual(identity["library_sha256"],
+                             hashlib.sha256(library.read_bytes()).hexdigest())
+            self.assertEqual(set(identity["selected_provider_sha256"]),
+                             {op["call_abi"]["kernel_id"] for op in calls["operations"]})
+            self.assertEqual(set(identity["runtime_support_sources"]), {
+                "src/runtime/checked_frame_loop.c", "src/runtime/checked_frame_codec.c"})
+            self.assertTrue((Path(temp) / "compiler-diagnostics.txt").is_file())
             size = layout["memory"]["arena"]["total_size"]
             raw = (ctypes.c_uint8 * (size + 63))()
             arena = (ctypes.c_uint8 * size).from_buffer(
@@ -86,6 +107,7 @@ class Qwen3TTSLoopCodecTest(unittest.TestCase):
                 item = weights[name]
                 arena[item["abs_offset"]:item["abs_offset"] + value.nbytes] = value.tobytes()
             prepare_inputs(arena, acts)
+            view(arena, acts, "request_context_tokens", np.int32, (1,))[0] = 7
             first = ["talker_first_code_id", "pred_predictor_codebook0_selected_id",
                      "pred_step1_selected_id", "pred_step2_selected_id"]
             later = ["second_talker_first_code_id",
@@ -118,10 +140,11 @@ class Qwen3TTSLoopCodecTest(unittest.TestCase):
                 acts["waveform_valid_samples"]["abs_offset"], 192,
                 samples.ctypes.data_as(ctypes.POINTER(ctypes.c_float)), 193,
                 ctypes.pointer(valid)), 64)
-            run = ctypes.CDLL(str(library)).ck_run_checked_frame_codec_prefix
-            run.argtypes = [ctypes.POINTER(FrameCodecPrefix)]
+            control = FrameCodecPrefixControl(request, CancelCallback(lambda _: 0), None)
+            run = ctypes.CDLL(str(library)).ck_run_checked_frame_codec_prefix_control
+            run.argtypes = [ctypes.POINTER(FrameCodecPrefixControl)]
             run.restype = ctypes.c_int
-            self.assertEqual(run(ctypes.byref(request)), 0)
+            self.assertEqual(run(ctypes.byref(control)), 0)
             self.assertEqual((frames.value, valid.value), (2, 128))
             np.testing.assert_array_equal(samples[128:], -901)
             np.testing.assert_array_equal(

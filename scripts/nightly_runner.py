@@ -828,6 +828,8 @@ TEST_SUITES = {
     "tts_checked_multi_entry": TestSuite(
         "Checked Shared-Arena Multi-Entry Composition", "inference",
         ROOT / "tests" / "test_v8_checked_multi_entry.py",
+        unittest_targets=("tests.test_v8_checked_multi_entry",
+                          "tests.test_v8_checked_bundle_policy"),
     ),
     "tts_qwen3_customvoice_two_phase_speech": TestSuite(
         "Qwen3-TTS Checked Prefill and Rolling Frame Entries", "inference",

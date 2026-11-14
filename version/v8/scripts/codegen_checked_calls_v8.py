@@ -216,7 +216,8 @@ def emit_checked_calls(call_ir: dict, root: Path) -> str:
     all_produced = set()
     for segment_function, first, end in segments:
         lines.append(f"int {segment_function}({', '.join(declarations)}) {{")
-        if lengths:
+        if lengths and any(op.get("produces_runtime_lengths") or op.get("consumes_runtime_lengths")
+                           for op in ops[first:end]):
             lines.append("    CKRuntimeExtents runtime_extents = {0};")
         lines.append("    int status = 0;")
         lines.extend(arena_check)

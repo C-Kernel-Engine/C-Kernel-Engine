@@ -10,15 +10,12 @@ reference evidence. Unsupported or budget-exhausting requests publish no PCM.
 from __future__ import annotations
 
 import argparse
-import contextlib
 import ctypes
 import hashlib
-import io
 import json
 import numbers
 from pathlib import Path
 import resource
-import subprocess
 import sys
 import tempfile
 import threading
@@ -30,8 +27,8 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "version/v8/scripts"))
-import build_ir_v8
 
+from version.v8.scripts.compile_checked_bundle_v8 import compile_native_graph
 from version.v8.tts.build_qwen3_tts_loop_codec_circuit import build_circuit
 from version.v8.tts.build_qwen3_tts_runtime_loop_codec_circuit import (
     build_circuit as build_runtime_circuit,
@@ -51,39 +48,9 @@ CONTEXT_TOKENS = 7
 PROMPT_ROWS = 18
 RUNTIME_CONTEXT_CAPACITY = 16
 
-EXTRA_SOURCES = (
-    "src/kernels/select_next_id_checked.c",
-    "src/kernels/repetition_penalty_checked.c",
-    "src/kernels/copy_i32_span_checked.c",
-    "src/kernels/equal_i32_scalar_checked.c",
-    "src/kernels/audio_zero_pad_checked.c",
-    "src/kernels/audio_conv1d_checked.c",
-    "src/kernels/audio_conv_transpose_dense_checked.c",
-    "src/kernels/audio_conv1d_depthwise_checked.c",
-    "src/kernels/layernorm_rows_checked.c",
-    "src/kernels/layernorm_kernels.c",
-    "src/kernels/gelu_rows_erf_checked.c",
-    "src/kernels/gelu_kernels.c",
-    "src/kernels/audio_snake_checked.c",
-    "src/kernels/audio_scaled_sum_strided.c",
-    "src/runtime/checked_frame_loop.c",
-    "src/runtime/checked_frame_codec.c",
-)
-BASE_SOURCES = (
-    "src/kernels/audio_text_embedding.c",
-    "src/kernels/strided_unary_checked.c",
-    "src/kernels/indexed_sum_rows_checked.c",
-    "src/kernels/transformer_rows_checked.c",
-    "src/kernels/linear_rows_checked.c",
-    "src/kernels/rope_kernels.c",
-    "src/kernels/attention_kernels.c",
-    "src/kernels/softmax_kernels.c",
-    "src/kernels/attention_flash_true.c",
-    "src/ck_threadpool.c",
-    "src/ckernel_strict.c",
-    "src/kernels/attention_decode_append_checked.c",
-    "src/kernels/runtime_extent.c",
-)
+# Native execution shells are not neural providers. Arithmetic source closure
+# is obtained from the resolved kernel maps by the shared bundle compiler.
+RUNTIME_SOURCES = ("src/runtime/checked_frame_loop.c", "src/runtime/checked_frame_codec.c")
 
 
 class FrameLoop(ctypes.Structure):
@@ -211,34 +178,12 @@ def _compile(folder: Path, graph: dict, shapes: dict):
                 "frame_prompt_rows", "frame_prompt_rows_value",
                 "prompt_rows_verified")},
     }, "entries": entries, "quant_summary": {}, "template": graph}
-    registry = build_ir_v8.load_kernel_registry()
-    with contextlib.redirect_stdout(io.StringIO()):
-        ir1 = build_ir_v8.build_ir1_direct(source, circuit, mode="prefill")
-        lower1 = build_ir_v8.generate_ir_lower_1(ir1, registry, source, "prefill")
-        layout = build_ir_v8.generate_memory_layout(
-            lower1, source, registry, mode="prefill", context_len=request_rows)
-        lower2 = build_ir_v8.generate_ir_lower_2(
-            lower1, layout, source, registry, mode="prefill")
-        call_ir = build_ir_v8.generate_ir_lower_3(lower2, mode="prefill")
-    if call_ir["errors"]:
-        raise ValueError(f"Qwen3-TTS lowering failed: {call_ir['errors']}")
-    layout_path, call_path = folder / "layout.json", folder / "call.json"
-    layout_path.write_text(json.dumps(layout), encoding="utf-8")
-    call_path.write_text(json.dumps(call_ir), encoding="utf-8")
-    generated, library = folder / "generated.c", folder / "generated.so"
-    subprocess.run([
-        sys.executable, str(ROOT / "version/v8/scripts/codegen_v8.py"),
-        "--ir", str(call_path), "--layout", str(layout_path),
-        "--output", str(generated),
-    ], check=True, capture_output=True, text=True)
-    subprocess.run([
-        "cc", "-std=gnu11", "-O2", "-w", "-shared", "-fPIC",
-        "-ffunction-sections", "-fdata-sections", "-Wl,--gc-sections",
-        "-Wl,--no-undefined", "-fopenmp", str(generated),
-        *(str(ROOT / path) for path in dict.fromkeys((*BASE_SOURCES, *EXTRA_SOURCES))),
-        "-I", str(ROOT / "include"), "-lm", "-ldl", "-lpthread",
-        "-o", str(library),
-    ], check=True, capture_output=True, text=True)
+    layout, call_ir, library, _, _ = compile_native_graph(
+        folder, source, graph,
+        extra_exports=("ck_run_checked_frame_codec_prefix_control",
+                       "audio_conv1d_checked_avx2_fma_available"),
+        runtime_sources=RUNTIME_SOURCES, openmp=True, fp_contract="fast",
+        provider_warnings="report", c_standard="gnu11")
     acts = {entry["name"]: entry for entry in
             layout["memory"]["activations"]["buffers"]}
     weights = {entry["name"]: entry for entry in
@@ -368,6 +313,7 @@ class PinnedQwenSession:
                 self.arena[item["abs_offset"]:item["abs_offset"] + value.nbytes] = value.tobytes()
         self.library_path = library
         self.library_sha256 = hashlib.sha256(library.read_bytes()).hexdigest()
+        self.build_identity_sha256 = hashlib.sha256((library.parent / "build-identity.json").read_bytes()).hexdigest()
         self._native = ctypes.CDLL(str(library))
         if provider == "avx2_fma":
             available = self._native.audio_conv1d_checked_avx2_fma_available
@@ -471,6 +417,7 @@ class PinnedQwenSession:
             "code_sha256": hashlib.sha256(codes[:frames.value * CODEBOOKS].tobytes()).hexdigest(),
             "waveform_f32_sha256": hashlib.sha256(samples[:valid.value].tobytes()).hexdigest(),
             "library_sha256": self.library_sha256,
+            "build_identity_sha256": self.build_identity_sha256,
             "load_count": self.load_count,
             "run_seconds": round(seconds, 3),
         }
