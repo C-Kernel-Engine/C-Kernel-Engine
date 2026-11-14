@@ -1,0 +1,177 @@
+{
+  "id": "audio_upsample_linear_frames_f32_checked",
+  "op": "audio_upsample_linear_checked",
+  "operation_interface": "audio.upsample.linear.half_pixel.frame_major.fp32.v1",
+  "variant": "scalar_half_pixel_fp32_no_fma",
+  "selection": {
+    "status": "candidate",
+    "priority": 100,
+    "equivalence_group": "audio_linear_half_pixel_fp32",
+    "phases": [
+      "prefill"
+    ]
+  },
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "input",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "C"
+      ],
+      "layout": "frame_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "output",
+      "dtype": "fp32",
+      "shape": [
+        "T*factor",
+        "C"
+      ],
+      "layout": "frame_major_contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "scratch": [],
+  "dims": [
+    "input_elements",
+    "output_elements",
+    "frames",
+    "channels",
+    "factor"
+  ],
+  "impl": {
+    "function": "audio_upsample_linear_frames_f32_checked",
+    "c_declaration": "int audio_upsample_linear_frames_f32_checked(const float *input, size_t input_elements, float *output, size_t output_elements, size_t frames, size_t channels, size_t factor);",
+    "sources": [
+      "src/kernels/audio_upsample_linear_checked.c"
+    ]
+  },
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
+  "numerical_capabilities": [
+    {
+      "contract_id": "audio_linear_half_pixel_fp32",
+      "status": "observed",
+      "phases": [
+        "prefill"
+      ],
+      "function": "audio_upsample_linear_frames_f32_checked",
+      "explicit_selector": true,
+      "implementation": {
+        "isa_dispatch": "scalar",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": [
+            "serial"
+          ],
+          "dispatch": [
+            "inline"
+          ],
+          "reduction_order_effect": "none"
+        }
+      },
+      "arithmetic": {
+        "partial_accumulator": "fp32",
+        "merge_order": "none",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false,
+        "split_strategy": "independent_outputs"
+      }
+    }
+  ],
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "input",
+        "source": "activation:input",
+        "cast": "const float*",
+        "ports": [
+          "input:input"
+        ]
+      },
+      {
+        "name": "input_elements",
+        "source": "runtime:linear_input_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "output",
+        "source": "output:output",
+        "cast": "float*",
+        "ports": [
+          "output:output"
+        ]
+      },
+      {
+        "name": "output_elements",
+        "source": "runtime:linear_output_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "frames",
+        "source": "runtime:linear_frames",
+        "value_type": "size_t"
+      },
+      {
+        "name": "channels",
+        "source": "runtime:linear_channels",
+        "value_type": "size_t"
+      },
+      {
+        "name": "factor",
+        "source": "runtime:linear_factor",
+        "value_type": "size_t"
+      }
+    ]
+  },
+  "call_constant_contract": {
+    "shape_symbols": {
+      "T": "linear_frames",
+      "C": "linear_channels",
+      "factor": "linear_factor"
+    },
+    "buffer_spans": [
+      {
+        "pointer": "input",
+        "elements": "linear_input_elements",
+        "rows": 1,
+        "width": "linear_input_elements",
+        "element_bytes": 4
+      },
+      {
+        "pointer": "output",
+        "elements": "linear_output_elements",
+        "rows": 1,
+        "width": "linear_output_elements",
+        "element_bytes": 4
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "tests/test_v8_audio_linear_upsample.py"
+    ],
+    "oracle": "Independent half-pixel reference and PyTorch interpolate align_corners=False"
+  },
+  "notes": "Offline integer-factor linear interpolation with clamped endpoints; frame-major contiguous FP32. Two-term FP32 arithmetic, FMA disabled. Frames <= 16777216 and factor <= 65536. All failure paths preserve output. No streaming state and no BF16 storage claim."
+}
