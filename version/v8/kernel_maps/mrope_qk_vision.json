@@ -138,13 +138,14 @@
     }
   ],
   "impl": {
-    "function": "mrope_qk_vision",
-    "c_declaration": "void mrope_qk_vision(float *q, float *k, const int32_t *positions, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int n_dims, int section_0, int section_1, int section_2, int section_3, int n_ctx_orig, float freq_base, float freq_scale, float ext_factor, float attn_factor, float beta_fast, float beta_slow);",
+    "function": "mrope_qk_vision_parallel_dispatch",
+    "c_declaration": "void mrope_qk_vision_parallel_dispatch(float *q, float *k, const int32_t *positions, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int n_dims, int section_0, int section_1, int section_2, int section_3, int n_ctx_orig, float freq_base, float freq_scale, float ext_factor, float attn_factor, float beta_fast, float beta_slow);",
     "sources": [
-      "src/kernels/rope_kernels.c"
+      "src/kernels/rope_kernels.c",
+      "version/v8/src/ck_parallel_prefill_v8.c"
     ]
   },
-  "notes": "Vision multi-section RoPE for Q/K using four position streams and head-major activations.",
+  "notes": "Vision multi-section RoPE for Q/K using four position streams and head-major activations. Large disjoint tensors use independent row/head dispatch; small, nested, overlapping and unsupported head geometry calls preserve serial execution. Per-output arithmetic is unchanged.",
   "numerical_capabilities": [
     {
       "contract_id": "vision_mrope_fp32_input_fp32_compute_fp32_output",
@@ -153,17 +154,17 @@
         "prefill",
         "decode"
       ],
-      "function": "mrope_qk_vision",
+      "function": "mrope_qk_vision_parallel_dispatch",
       "explicit_selector": true,
       "implementation": {
         "isa_dispatch": "scalar",
         "threading": {
-          "runtime": "serial",
+          "runtime": "ck_threadpool",
           "work_partition": [
-            "serial"
+            "independent_rows"
           ],
           "dispatch": [
-            "inline"
+            "ck_threadpool_parallel_for_n"
           ],
           "reduction_order_effect": "none"
         }
@@ -173,11 +174,10 @@
         "merge_order": "none",
         "deterministic": true,
         "thread_count_changes_arithmetic_order": false,
-        "split_strategy": "serial"
+        "split_strategy": "independent_outputs"
       }
     }
-  ]
-,
+  ],
   "call_abi": {
     "version": 1,
     "params": [
@@ -264,6 +264,11 @@
         "name": "beta_slow",
         "source": "dim:beta_slow"
       }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "tests/test_v8_encoder_row_parallel.py"
     ]
   }
 }
