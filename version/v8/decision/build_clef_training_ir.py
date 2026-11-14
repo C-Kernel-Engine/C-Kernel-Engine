@@ -87,7 +87,6 @@ def build_training_ir(
     }
     inputs.update(
         labels=dict(shape=[questions], dtype="i32"),
-        broadcast_zeros=dict(shape=[questions], dtype="i32"),
     )
     inputs["hidden"] = dict(shape=list(hidden.shape), dtype="fp32")
     bindings = {n: "input." + n for n in inputs}

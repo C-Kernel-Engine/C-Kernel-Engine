@@ -1400,9 +1400,25 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
             raise ValueError("integer training input capacity exceeded")
         integer_inputs.append(dict(tensor=tid, offset=integer_offset, count=n, dtype="i32"))
         integer_offset += n
+    integer_constants = cfg.get("training_integer_constants", {})
+    if not isinstance(integer_constants, dict):
+        raise ValueError("training_integer_constants must be an explicit tensor/value mapping")
+    for tid, values in integer_constants.items():
+        meta = tensors.get(tid, {})
+        if (tid not in tvars_i32 or meta.get("kind") != "aux"
+                or meta.get("requires_grad") is not False or meta.get("persistent") is not True
+                or tid in integer_input_order or not isinstance(values, list)
+                or len(values) != tensor_numel[tid] or not values
+                or any(type(v) is not int or not -2147483648 <= v <= 2147483647 for v in values)):
+            raise ValueError("invalid compiler-owned integer training constant: " + str(tid))
+    for operation in all_ops:
+        for ref in operation.get("dataflow", {}).get("outputs", {}).values():
+            if ref.get("tensor") in integer_constants:
+                raise ValueError("training operation attempts to write an immutable integer constant")
+
     # Integer operands used by declared map calls must be explicitly bound. They
     # must never silently read an uninitialized static buffer or token-ID alias.
-    initialized_i32 = set(integer_input_order)
+    initialized_i32 = set(integer_input_order) | set(integer_constants)
     for op in all_ops:
         if op.get("map_call"):
             for ref in op.get("dataflow", {}).get("inputs", {}).values():
@@ -1878,7 +1894,11 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     for tid, var in sorted(tvars_bf16.items(), key=lambda x: x[1]):
         ap("static uint16_t *%s; /* %s: BF16 saved operands */" % (var, tid))
     for tid, var in sorted(tvars_i32.items(), key=lambda x: x[1]):
-        ap("static int32_t %s[%d]; /* %s */" % (var, int(tensor_numel[tid]), tid))
+        if tid in integer_constants:
+            values = ", ".join(str(v) for v in integer_constants[tid])
+            ap("static const int32_t %s[%d] = {%s}; /* %s */" % (var, int(tensor_numel[tid]), values, tid))
+        else:
+            ap("static int32_t %s[%d]; /* %s */" % (var, int(tensor_numel[tid]), tid))
     ap("")
 
     if opt_pairs:
@@ -2062,6 +2082,22 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("    }")
     ap("    return (int)cursor;")
     ap("}")
+    ap("")
+    if init_weight_specs:
+        ap("int ck_train_compare_weight(int index, const float *expected, size_t elements) {")
+        ap("    if (g_memory == NULL || expected == NULL || index < 0 || index >= CK_INIT_WEIGHT_COUNT) return -1;")
+        ap("    if (elements == 0 || elements != (size_t)g_init_weight_numel[index] ||")
+        ap("        elements > SIZE_MAX / sizeof(float) || (uintptr_t)expected % _Alignof(float)) return -1;")
+        ap("    size_t bytes = elements * sizeof(float);")
+        ap("    uintptr_t address = (uintptr_t)expected;")
+        ap("    uintptr_t begin = (uintptr_t)g_memory;")
+        ap("    if (bytes > UINTPTR_MAX - address || CK_TRAIN_TOTAL_FLOATS > (UINTPTR_MAX - begin) / sizeof(float)) return -1;")
+        ap("    uintptr_t end = begin + CK_TRAIN_TOTAL_FLOATS * sizeof(float);")
+        ap("    if (address < end && begin < address + bytes) return -1;")
+        ap("    return memcmp(g_memory + g_init_weight_offsets[index], expected, bytes) == 0 ? 1 : 0;")
+        ap("}")
+    else:
+        ap("int ck_train_compare_weight(int index, const float *expected, size_t elements) { (void)index; (void)expected; (void)elements; return -1; }")
     ap("")
     ap("int ck_train_get_weight_snapshot_numel(void) {")
     ap("    return (int)CK_WEIGHT_SNAPSHOT_FLOATS;")
@@ -2332,7 +2368,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     token_input_i32_vars: List[str] = []
     target_input_i32_vars: List[str] = []
     for tid, var in sorted(tvars_i32.items(), key=lambda x: x[1]):
-        if tid in integer_input_order:
+        if tid in integer_input_order or tid in integer_constants:
             continue
         lt = str(tid).lower()
         if "token" in lt and "target" not in lt:
@@ -2351,7 +2387,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("    if (g_memory != NULL && g_memory_floats > 0) {")
     ap("        memset(g_memory, 0, g_memory_floats * sizeof(float));")
     ap("    }")
-    for var in sorted(set(tvars_i32.values())):
+    for var in sorted({var for tid, var in tvars_i32.items() if tid not in integer_constants}):
         ap("    memset(%s, 0, sizeof(%s));" % (var, var))
     if opt_pairs:
         ap("    g_opt_step = 0;")
@@ -5029,6 +5065,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
         "float_inputs": float_inputs,
         "float_input_count": float_offset,
         "integer_inputs": integer_inputs,
+        "integer_constants": integer_constants,
         "integer_input_count": integer_offset,
         "forward_ops": len(forward_ops),
         "backward_ops": len(backward_ops),

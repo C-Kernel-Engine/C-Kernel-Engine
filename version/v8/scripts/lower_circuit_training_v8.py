@@ -39,6 +39,7 @@ def lower_circuit_training(
     ops = []
     integer_inputs = []
     float_inputs = []
+    integer_constants = {}
 
     def ref(tid, shape, kind="activation", dtype="fp32", grad=True):
         if tid in tensors:
@@ -249,17 +250,23 @@ def lower_circuit_training(
                 continue
             if kernel == "broadcast_add_rows_checked_f32":
                 rows, cols = out["shape"]
-                if act("broadcast_zeros")["shape"] != [rows]:
-                    raise ValueError("broadcast index capacity differs")
+                constant_id = "const." + name + ".broadcast_rows"
+                if constant_id in tensors:
+                    raise ValueError("duplicate compiler-owned broadcast constant")
+                indices = ref(constant_id, [rows], kind="aux", dtype="i32", grad=False)
+                tensors[constant_id]["persistent"] = True
+                indices["persistent"] = True
+                integer_constants[constant_id] = [0] * rows
                 g = ref("act." + name + ".broadcast", [rows, cols])
                 gather(
                     name + ".broadcast",
                     inputs["right"],
-                    act("broadcast_zeros"),
+                    indices,
                     g,
                     rows,
                     1,
                     cols,
+                    as_weight=inputs["right"].get("kind") == "weight",
                 )
                 emit(
                     name,
@@ -448,6 +455,7 @@ def lower_circuit_training(
         config=dict(
             config,
             training_integer_inputs=integer_inputs,
+            training_integer_constants=integer_constants,
             training_float_inputs=sorted(float_inputs),
         ),
         ops=ops,
