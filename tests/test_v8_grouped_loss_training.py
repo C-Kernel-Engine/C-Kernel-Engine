@@ -146,6 +146,12 @@ class DeclaredLossContracts(unittest.TestCase):
         self.assertEqual(seed['dataflow']['inputs']['logits']['tensor'],'act.score')
         self.assertEqual(ir['tensors'][seed['dataflow']['outputs']['d_logits']['tensor']]['numel'],4)
         self.assertFalse(any(o['op']=='logits' for o in g['ops']))
+        self.assertEqual(report['evaluation_loss_ops'],1)
+        evaluation=source.split('int ck_train_eval_step(float *loss_out) {',1)[1].split('\n}',1)[0]
+        self.assertIn('ck_train_forward_step()',evaluation)
+        self.assertIn('ck_train_eval_loss_step()',evaluation)
+        self.assertNotIn('ck_train_backward_step()',evaluation)
+        self.assertNotIn('ck_train_optimizer_step(',evaluation)
     def test_invalid_declared_loss_fails_closed(self):
         for mutation in ('unknown','missing','root','workspace','dtype','count','modes','no_seed','collision'):
             g=fixture();r=deepcopy(REGISTRY)
@@ -164,6 +170,8 @@ class DeclaredLossContracts(unittest.TestCase):
         layout=base.planner.build_layout(ir,manifest,64,strict=True)
         source,report=base.codegen.generate_c(ir,base.REGISTRY,manifest=manifest,layout=layout)
         self.assertEqual(report['skipped_ops'],[]);self.assertIn('ck_train_ce_dispatch(',source)
+        self.assertEqual(report['evaluation_loss_ops'],1)
+        self.assertIn('int ck_train_eval_step(float *loss_out)',source)
 
 class GroupedLossRecovery(unittest.TestCase):
     def test_invalid_group_labels_discard_partial_window_and_recover(self):
@@ -243,6 +251,6 @@ class ScoringLossNative(unittest.TestCase):
         def criterion(z):
             z=z.flatten();return (torch.nn.functional.cross_entropy(z[:1][None],torch.tensor([0]))+torch.nn.functional.cross_entropy(z[1:][None],torch.tensor([2])))/2
         metadata=np.array([0,2,0,4,0,1,1,1,1,3,0,2],'i4')
-        certify_training(self,lower(fixture()),REGISTRY,values,set(values)-{'features','score_bias'},forward,integer_inputs=metadata,loss_function=criterion)
+        certify_training(self,lower(fixture()),REGISTRY,values,set(values)-{'features','score_bias'},forward,integer_inputs=metadata,loss_function=criterion,check_evaluation=True)
 
 if __name__=='__main__':unittest.main(verbosity=2)

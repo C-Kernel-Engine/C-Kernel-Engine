@@ -147,7 +147,7 @@ class SelectiveTrainingNativeTests(unittest.TestCase):
                   'up': rng.normal(0, .2, (4, 4)).astype('f'),
                   'score': rng.normal(0, .2, (4, 4)).astype('f')}
         certify_training(self, lower(fixture()), REGISTRY, values, {'up', 'score'},
-                         lambda p: p['features'] @ p['up'].T @ p['bridge'].T @ p['score'].T)
+                         lambda p: p['features'] @ p['up'].T @ p['bridge'].T @ p['score'].T, check_evaluation=True)
 
 
 if __name__ == '__main__':

@@ -1,0 +1,59 @@
+{
+  "schema": "cke.clef.validation-loss-fix.v1",
+  "original_notebook_commit": "aa68f5812416698d5d121285cf69db1a36382e0f",
+  "reproduction_base": "1cf4a812c",
+  "package_sha256": "52e6c7c5c2930a39f3202a33082079939a6bffd9c04550962a9e4d41c255f7f3",
+  "epochs": 20,
+  "updates": 40,
+  "learning_rate": 0.001,
+  "independent_oracle": "FP64 stable log-sum-exp over each question, mean across questions",
+  "validation_record": "record-2",
+  "before_fix": {
+    "validation_loss_after": 0.11846388876438141,
+    "validation_loss_before": 0.0
+  },
+  "after_fix": {
+    "validation_loss_after": 0.17800277471542358,
+    "validation_loss_before": 0.22789864242076874
+  },
+  "independent": {
+    "before": 0.22789864582459604,
+    "after": 0.1780027813808104
+  },
+  "training_losses_bit_exact": true,
+  "trained_weights_bit_exact": true,
+  "record_logits_bit_exact": true,
+  "optimizer_state_sha256": "2607eeb987d86c2c42a889dbc1fc67806d730b17d2c07edffe22553ca0bf29d2",
+  "original_notebook_files_unchanged": true,
+  "production_torch_and_transformers_imports_blocked": true,
+  "artifacts": {
+    "before.json": {
+      "path": "/data/cke-experiments/clef-eval-loss-20261114/before.json",
+      "sha256": "532906b98303619c6e088962e006fed44fbf32b8bc9a352361e879d6045e0412"
+    },
+    "after.json": {
+      "path": "/data/cke-experiments/clef-eval-loss-20261114/after.json",
+      "sha256": "0f1373265fd64445ad5bf431cc4678aa290445de378830c3600fd6adfc04a9c6"
+    }
+  },
+  "scope": "Synthetic supplied-feature FP32 head; no backbone/task-quality claim",
+  "pytorch_grouped_ce": {
+    "version": "2.12.1+cpu",
+    "dtype": "float64",
+    "before": 0.22789864582459604,
+    "after": 0.17800278138081038
+  },
+  "pytorch_full_head_40_updates": {
+    "numerical_parity": "PASS",
+    "max_abs_errors": {
+      "gradient": 1.3746321201324463e-06,
+      "moment": 3.1478703022003174e-07,
+      "weight": 1.6689300537109375e-06
+    },
+    "fresh_process_resume": "PASS",
+    "generated_inference_export": "PASS",
+    "loss_first": 0.28329044580459595,
+    "loss_last": 0.0663343146443367,
+    "reference_source_sha256": "0e304cf7c6500e8bb59bef7e2afd2c6373f82596dfb3b57d1aa93c175e2dc3a3"
+  }
+}

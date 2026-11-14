@@ -8,6 +8,47 @@
 
 <p>Model topology lives in the circuit builders here. Kernels implement arithmetic; maps describe ABI, scratch and numerical contracts. Generic operation catalogue entries do not inspect the model name.</p>
 
+<section id="validation-loss-correction">
+<h2>Validation loss correction: forward plus declared loss, without an update</h2>
+<p>A real notebook consumer at <code>aa68f5812</code> exposed stale held-out metrics.
+<code>Runtime.evaluate()</code> ran forward and read <code>ck_train_get_loss()</code>,
+but that accessor returns cached loss. The grouped loss seed executes at the start
+of backward, so forward alone returned zero after initialization and the last
+training loss after updates. Native training, exported weights and scoring were
+correct; the reported validation metrics were not.</p>
+<p>The generic generated <code>ck_train_eval_step(float *loss_out)</code> now executes
+forward plus the single declared loss-seed operation. It does not run parameter
+backward or an optimizer step. The existing loss provider refreshes its output-gradient
+seed and scratch as well as the scalar loss; forward activations and supplied feature
+inputs also change. Trainable weights, parameter gradients, AdamW moments and update/
+accumulation counters remain unchanged. A failed evaluation does not publish a scalar.
+Ordinary decoder cross-entropy and grouped question loss use the same contract;
+there is no Clef-specific compiler branch or Python loss calculation in production.</p>
+<table class="table"><thead><tr><th>40-update notebook reproduction</th><th>Old report</th><th>Corrected native report</th><th>Independent grouped CE</th></tr></thead><tbody>
+<tr><td>Validation before training</td><td>0.0</td><td>0.2278986424</td><td>0.2278986458</td></tr>
+<tr><td>Validation after training</td><td>0.1184638888</td><td>0.1780027747</td><td>0.1780027814</td></tr>
+</tbody></table>
+<p>The reproduction uses the original pinned synthetic package, 20 epochs, learning
+rate 0.001 and 40 native updates, with PyTorch/Transformers imports blocked in the
+production process. All 40 training losses, trained weights, optimizer-state hash
+and record logits are unchanged. The original notebook evidence is preserved.
+<a href="assets/clef-validation-loss-20261114.json">Retained numerical evidence and artifact identities</a>
+separates the old and corrected reports.</p>
+<p>Regressions cover initial evaluation, different records and labels, unequal option
+counts, validation between updates, rejected evaluation and recovery, independent
+FP64 stable log-sum-exp, multiple held-out records, checkpoint reload, final report
+metrics and published job metrics. They separately preserve inference export/reload
+checks. Validation-before means the state at the start of this invocation; when
+resuming, it is evaluated at the loaded checkpoint, not at the original initialization.</p>
+<p>The generated runtime contract now includes evaluation semantics. Regenerate old
+training libraries; a cached runtime without the new entry rejects rather than silently
+using stale loss. Existing reports must be regenerated, not relabeled. Numerical bounds
+are unchanged, and this fix does not turn the mixed-BF16 trajectory into a pass or
+establish task quality.</p>
+<pre><code>python -m unittest tests.test_v8_clef_evaluation tests.test_v8_grouped_loss_training tests.test_v8_selective_training -v
+python scripts/nightly_runner.py --tests training_clef_registered_recipe --require-executed</code></pre>
+</section>
+
 <section id="training-bridge-v2">
 <h2>Training bridge v2: opaque revisions and pinned worker identity</h2>
 <p><code>cke.training.jobs.v2</code> adds a bounded local contract for external application

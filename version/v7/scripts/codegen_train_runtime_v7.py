@@ -1325,7 +1325,7 @@ def _validate_training_storage(ir2, tensors, manifest=None):
         raise ValueError("BF16 auxiliary has no forward producer")
 
 def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional[Dict[str, Any]] = None, layout: Optional[Dict[str, Any]] = None, exec_plan: Optional[Dict[str, Any]] = None) -> Tuple[str, Dict[str, Any]]:
-    identity = {"ir2": ir2, "manifest": manifest or {}, "layout": layout or {}, "exec_plan": exec_plan or {}}
+    identity = {"evaluation_contract": "forward_and_single_declared_loss_seed_v1", "ir2": ir2, "manifest": manifest or {}, "layout": layout or {}, "exec_plan": exec_plan or {}}
     declared_ids = set()
     for op in list(ir2.get("forward", [])) + list(ir2.get("backward", [])):
         if "map_call" in op and type(op["map_call"]) is not bool:
@@ -1965,6 +1965,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("}")
     ap("")
     ap("int ck_train_forward_step(void);")
+    ap("int ck_train_eval_step(float *loss_out);")
     ap("int ck_train_backward_step(void);")
     ap("int ck_train_backward_step_trace(int *failed_op_id, int *first_corrupt_idx);")
     ap("int ck_train_optimizer_step(float lr);")
@@ -4660,6 +4661,26 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
         ap("")
 
     emit_ops("ck_train_forward_step", forward_ops, "forward")
+    # Loss seeds are deliberately separate from forward-only feature execution.
+    # Evaluation executes the declared scalar loss/seed, never parameter VJPs or
+    # an optimizer update. The seed may refresh d_logits and its own scratch.
+    evaluation_loss_ops = [op for op in backward_ops if op.get("role") == "loss_seed"]
+    emit_ops("ck_train_eval_loss_step", evaluation_loss_ops if len(evaluation_loss_ops) == 1 else [], "evaluation_loss")
+    ap("int ck_train_eval_step(float *loss_out) {")
+    ap("    if (g_memory == NULL || loss_out == NULL) return -1;")
+    ap("    g_loss_scalar[0] = NAN;")
+    if len(evaluation_loss_ops) != 1:
+        ap("    return -3; /* Evaluation requires one declared scalar loss seed. */")
+    else:
+        ap("    int fwd = ck_train_forward_step();")
+        ap("    if (fwd < 0) return fwd;")
+        ap("    int loss = ck_train_eval_loss_step();")
+        ap("    if (loss <= 0) return loss < 0 ? loss : -3;")
+        ap("    if (!isfinite(g_loss_scalar[0])) return -4;")
+        ap("    *loss_out = g_loss_scalar[0];")
+        ap("    return fwd + loss;")
+    ap("}")
+    ap("")
     emit_ops("ck_train_backward_step", backward_ops, "backward")
     emit_ops("ck_train_backward_step_trace", backward_ops, "backward_trace", trace_canary=True)
 
@@ -4940,6 +4961,8 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("")
 
     summary = {
+        "evaluation_loss_ops": len(evaluation_loss_ops),
+        "evaluation_entry": "ck_train_eval_step",
         "integer_inputs": integer_inputs,
         "integer_input_count": integer_offset,
         "forward_ops": len(forward_ops),
