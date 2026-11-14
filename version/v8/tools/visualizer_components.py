@@ -126,7 +126,9 @@ def _operation_graph(data, budget):
                 continue
             refs.append({'input': _label(name), 'from_op': _label(ref.get('from_op')),
                          'from_output': _label(ref.get('from_output')), 'from': _label(ref.get('from')),
-                         'dtype': _label(ref.get('dtype')), 'slot': _label(ref.get('slot'))})
+                         'dtype': _label(ref.get('dtype')), 'slot': _label(ref.get('slot')),
+                         'tensor': ref.get('tensor') if isinstance(ref.get('tensor'), str) else None,
+                         'kind': _label(ref.get('kind'))})
         nodes.append({'index': index, 'id': _label(op.get('op_id')),
                       'operation': _label(op.get('op')), 'layer': _label(op.get('layer')),
                       'provider': _label(op.get('function') or op.get('kernel') or op.get('kernel_id')),
@@ -142,6 +144,15 @@ def _operation_graph(data, budget):
         identity = _label(op.get('op_id'))
         if identity is not None:
             id_counts[identity] = id_counts.get(identity, 0) + 1
+    producers = {}
+    for index, op in enumerate(operations):
+        flow = op.get('dataflow') if isinstance(op.get('dataflow'), dict) else op
+        outputs = flow.get('outputs') if isinstance(flow.get('outputs'), dict) else {}
+        for output, declaration in outputs.items():
+            tensor = declaration.get('tensor') if isinstance(declaration, dict) else None
+            if isinstance(tensor, str):
+                producers.setdefault(tensor, []).append((index, _label(op.get('op_id')), _label(output)))
+    tensors = data.get('tensors') if isinstance(data.get('tensors'), dict) else {}
     ids = {}
     for node in nodes:
         if node['id'] is not None:
@@ -150,7 +161,24 @@ def _operation_graph(data, budget):
         for ref in node['inputs']:
             source = ids.get(ref['from_op'], [])
             if ref['from_op'] is None:
-                ref['status'] = 'external_or_symbolic' if ref['from'] else 'not_recorded'
+                if ref['from']:
+                    ref['status'] = 'external_or_symbolic'
+                elif ref['tensor'] is not None:
+                    candidates = producers.get(ref['tensor'], [])
+                    declaration = tensors.get(ref['tensor'], {})
+                    kind = declaration.get('kind') if isinstance(declaration, dict) else None
+                    if len(candidates) > 1:
+                        ref['status'] = 'ambiguous'
+                    elif len(candidates) == 1:
+                        index, identity, output = candidates[0]
+                        ref.update(producer_index=index, producer_id=identity, producer_output=output)
+                        ref['status'] = 'resolved_tensor' if index < len(nodes) else 'producer_outside_capture'
+                    elif (kind or ref['kind']) in ('input', 'weight', 'parameter', 'constant'):
+                        ref['status'] = 'external_tensor'
+                    else:
+                        ref['status'] = 'unresolved_tensor'
+                else:
+                    ref['status'] = 'not_recorded'
             elif id_counts.get(ref['from_op'], 0) > 1:
                 ref['status'] = 'ambiguous'
             elif len(source) != 1:
@@ -159,8 +187,26 @@ def _operation_graph(data, budget):
                 ref['status'] = 'output_outside_capture' if source[0]['outputs_truncated'] else 'output_not_declared'
             else:
                 ref['status'] = 'resolved'
+                if ref['tensor'] is not None:
+                    candidates = producers.get(ref['tensor'], [])
+                    if len(candidates) > 1:
+                        ref['status'] = 'ambiguous'
+                    elif len(candidates) == 1:
+                        index, identity, output = candidates[0]
+                        ref.update(producer_index=index, producer_id=identity, producer_output=output)
+                        if index != source[0]['index'] or output != ref['from_output']:
+                            ref['status'] = 'conflicting_references'
+                    else:
+                        source_op = operations[source[0]['index']]
+                        source_flow = source_op.get('dataflow') if isinstance(source_op.get('dataflow'), dict) else source_op
+                        source_outputs = source_flow.get('outputs') if isinstance(source_flow.get('outputs'), dict) else {}
+                        declared = source_outputs.get(ref['from_output'], {})
+                        declared_tensor = declared.get('tensor') if isinstance(declared, dict) else None
+                        # Missing producer metadata is distinct from contradictory metadata.
+                        ref['status'] = ('conflicting_references' if isinstance(declared_tensor, str)
+                                         else 'tensor_identity_unverified')
     return {'nodes': nodes, 'total_operations': len(operations),
-            'truncated': len(nodes) < len(operations), 'edge_policy': 'explicit_from_op_only'}
+            'truncated': len(nodes) < len(operations), 'edge_policy': 'explicit_from_op_or_unique_tensor_producer'}
 
 
 def _description(path, data, digest):

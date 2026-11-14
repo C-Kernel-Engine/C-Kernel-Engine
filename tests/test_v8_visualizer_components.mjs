@@ -40,3 +40,18 @@ test('operation dependencies preserve unresolved and truncated evidence',()=>{
     assert.ok(!html.includes('<unsafe>'));
     assert.match(context.buildComponentOperationHTML(null),/No captured operations/);
 });
+
+test('training tensor identities and unique producers appear in dependency view',()=>{
+    const html=context.buildComponentOperationHTML({total_operations:1,nodes:[
+        {id:5,inputs:[{input:'x',tensor:'act.<x>',producer_id:2,producer_index:1,producer_output:'y',status:'resolved_tensor'}]}]});
+    assert.match(html,/tensor act.&lt;x&gt;/);assert.match(html,/producer op 2/);
+    assert.match(html,/resolved_tensor/);
+});
+
+test('conflicting dual references remain visible together',()=>{
+    const html=context.buildComponentOperationHTML({total_operations:1,nodes:[
+        {id:2,inputs:[{input:'x',from_op:0,from_output:'a',tensor:'other.tensor',
+          producer_id:1,producer_index:1,producer_output:'b',status:'conflicting_references'}]}]});
+    assert.match(html,/op 0.a/);assert.match(html,/other.tensor/);
+    assert.match(html,/tensor producer op 1.b/);assert.match(html,/conflicting_references/);
+});

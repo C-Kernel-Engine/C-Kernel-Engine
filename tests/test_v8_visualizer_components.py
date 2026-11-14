@@ -133,4 +133,60 @@ class OperationGraphTests(unittest.TestCase):
                     {'op_id': 1, 'op': 'read'}, {'op_id': 2, 'op': 'update'}]}, 10)
                 self.assertEqual([n['inputs'] for n in graph['nodes']], [[], []])
 
+class TrainingTensorEdges(unittest.TestCase):
+    def test_existing_training_fixture_projection_edges(self):
+        from tests.test_v8_selective_training import fixture
+        from version.v8.tools.visualizer_components import _operation_graph
+        graph = _operation_graph(fixture(), 256)
+        refs = [r for node in graph['nodes'] for r in node['inputs'] if r['tensor']]
+        self.assertTrue(refs)
+        self.assertTrue(any(r['status'] == 'resolved_tensor' for r in refs))
+        self.assertTrue(any(r['status'] == 'external_tensor' for r in refs))
+        self.assertNotIn('not_recorded', [r['status'] for r in refs])
+        self.assertFalse(any(r['status'] == 'unresolved_tensor' for r in refs))
+
+    def test_tensor_producers_ignore_order_and_preserve_ambiguity(self):
+        from version.v8.tools.visualizer_components import _operation_graph
+        consumer = {'op_id': 5, 'inputs': {'x': {'tensor': 'act.x'}}}
+        producer = {'op_id': 2, 'outputs': {'y': {'tensor': 'act.x'}}}
+        graph = _operation_graph({'ops': [consumer, producer]}, 10)
+        ref = graph['nodes'][0]['inputs'][0]
+        self.assertEqual((ref['status'], ref['producer_id']), ('resolved_tensor', '2'))
+        short = _operation_graph({'ops': [consumer, producer]}, 1)
+        self.assertEqual(short['nodes'][0]['inputs'][0]['status'], 'producer_outside_capture')
+        duplicate = _operation_graph({'ops': [consumer, producer, producer]}, 1)
+        self.assertEqual(duplicate['nodes'][0]['inputs'][0]['status'], 'ambiguous')
+
+    def test_simultaneous_tensor_and_operation_references(self):
+        from copy import deepcopy
+        from version.v8.tools.visualizer_components import _operation_graph
+        ops = [
+            {'op_id': 0, 'outputs': {'a': {'tensor': 'tensor.a'}, 'b': {'tensor': 'tensor.b'}}},
+            {'op_id': 1, 'outputs': {'a': {'tensor': 'tensor.other'}}},
+            {'op_id': 2, 'inputs': {'x': {'from_op': 0, 'from_output': 'a', 'tensor': 'tensor.a'}}}]
+        for tensor, expected in (('tensor.a', 'resolved'), ('tensor.b', 'conflicting_references'),
+                                 ('tensor.other', 'conflicting_references'), ('unknown', 'conflicting_references')):
+            with self.subTest(tensor=tensor):
+                candidate = deepcopy(ops)
+                candidate[2]['inputs']['x']['tensor'] = tensor
+                self.assertEqual(_operation_graph({'ops': candidate}, 10)['nodes'][2]['inputs'][0]['status'], expected)
+        incomplete = deepcopy(ops)
+        incomplete[0]['outputs']['a'] = {}
+        self.assertEqual(_operation_graph({'ops': incomplete}, 10)['nodes'][2]['inputs'][0]['status'], 'tensor_identity_unverified')
+        # A duplicate producer beyond the displayed rows must remain ambiguous.
+        duplicate = ops + [{'op_id': 3, 'outputs': {'a': {'tensor': 'tensor.a'}}}]
+        self.assertEqual(_operation_graph({'ops': duplicate}, 3)['nodes'][2]['inputs'][0]['status'], 'ambiguous')
+        # Tensor metadata cannot rescue an invalid explicit operation reference.
+        ops[2]['inputs']['x']['from_op'] = 99
+        self.assertEqual(_operation_graph({'ops': ops}, 10)['nodes'][2]['inputs'][0]['status'], 'unresolved_or_outside_capture')
+
+    def test_external_and_unknown_tensors_are_not_assumed_producers(self):
+        from version.v8.tools.visualizer_components import _operation_graph
+        data = {'tensors': {'input.x': {'kind': 'input'}}, 'ops': [{'inputs': {
+            'x': {'tensor': 'input.x'}, 'missing': {'tensor': 'act.missing'},
+            'explicit': {'tensor': 'act.missing', 'from': 'external:supplied'}}}]}
+        refs = _operation_graph(data, 10)['nodes'][0]['inputs']
+        self.assertEqual([r['status'] for r in refs],
+                         ['external_tensor', 'unresolved_tensor', 'external_or_symbolic'])
+
 if __name__=='__main__':unittest.main()

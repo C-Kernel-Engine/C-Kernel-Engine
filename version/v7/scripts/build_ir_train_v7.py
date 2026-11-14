@@ -1896,6 +1896,13 @@ def build_ir1_train(
             )
             current_main = logits_out["y"]
 
+    # This bounded training path starts each forward from zero recurrent history.
+    # Declare the initializer so strict input binding never relies on arena zeros.
+    zero_inputs = [tid for tid in ("input.recurrent_conv_state", "input.recurrent_ssm_state")
+                   if tid in tensors]
+    if zero_inputs:
+        config["training_zero_inputs"] = zero_inputs
+
     if strict and issues:
         raise RuntimeError("IR1 train build failed:\n- " + "\n- ".join(issues))
 

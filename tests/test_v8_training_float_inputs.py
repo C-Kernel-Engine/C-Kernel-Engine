@@ -76,6 +76,49 @@ class FloatInputContractTests(unittest.TestCase):
                     layout=layout,
                 )
 
+    def test_zero_input_contract_and_each_forward_reset(self):
+        ir = graph()
+        ir['config']['training_float_inputs'] = []
+        ir['config']['training_zero_inputs'] = ['input.features']
+        def generate(candidate):
+            lowered = backend.lower(candidate)
+            layout = backend.planner.build_layout(lowered, {'config': lowered['config']}, 64, strict=True)
+            return backend.codegen.generate_c(lowered, backend.REGISTRY,
+                manifest={'config': lowered['config']}, layout=layout)
+        source, summary = generate(ir)
+        self.assertEqual(summary['zero_input_order'], ['input.features'])
+        for defect in ('duplicate', 'overlap', 'unknown', 'weight', 'persistent', 'trainable'):
+            bad = deepcopy(ir)
+            if defect == 'duplicate': bad['config']['training_zero_inputs'] *= 2
+            if defect == 'overlap': bad['config']['training_float_inputs'] = ['input.features']
+            if defect == 'unknown': bad['config']['training_zero_inputs'] = ['missing']
+            if defect == 'weight': bad['config']['training_zero_inputs'] = ['weight.up']
+            if defect == 'persistent': bad['tensors']['input.features']['persistent'] = True
+            if defect == 'trainable': bad['tensors']['input.features']['requires_grad'] = True
+            with self.subTest(defect=defect), self.assertRaises(ValueError): generate(bad)
+        engine = ROOT / 'build/libckernel_engine.so'
+        if not engine.exists(): self.skipTest('native engine unavailable')
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            (folder/'train.c').write_text(source + '\nfloat *test_features(void) { return input_features; }\n')
+            subprocess.run(['cc', '-O2', '-shared', '-fPIC', '-DCK_NUM_TOKENS=4',
+                '-I'+str(ROOT/'include'), str(folder/'train.c'), str(engine),
+                '-Wl,-rpath,'+str(engine.parent), '-lm', '-o', str(folder/'train.so')], check=True)
+            lib = C.CDLL(str(folder/'train.so'))
+            fp = C.POINTER(C.c_float); ip = C.POINTER(C.c_int32)
+            lib.ck_train_init.argtypes = [fp, ip, C.c_int]
+            lib.test_features.restype = fp
+            weights = np.ones(sum(summary['init_weight_numel']), dtype='f4')
+            sizes = np.array(summary['init_weight_numel'], dtype='i4')
+            self.assertEqual(lib.ck_train_init(weights.ctypes.data_as(fp), sizes.ctypes.data_as(ip), len(sizes)), len(sizes))
+            try:
+                values = np.ctypeslib.as_array(lib.test_features(), shape=(16,))
+                for value in (17., -23.):
+                    values[:] = value
+                    self.assertGreater(lib.ck_train_forward_step(), 0)
+                    np.testing.assert_array_equal(values, np.zeros(16, dtype='f4'))
+            finally: lib.ck_train_free()
+
     def test_native_rejection_reuse_and_independent_gradient(self):
         try:
             import torch

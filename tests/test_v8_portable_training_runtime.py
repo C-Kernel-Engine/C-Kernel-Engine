@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import shutil
+import re
 import subprocess
 import tempfile
 import unittest
@@ -192,7 +193,10 @@ class PortableTrainingRuntime(unittest.TestCase):
             dependencies = subprocess.check_output(
                 ["ldd", "./train.so"], cwd=relocated, env=env, text=True
             )
-            self.assertIn(str(relocated / "libckernel_engine.so"), dependencies)
+            matches = re.findall(r"^\s*libckernel_engine\.so\s+=>\s+(.+?)\s+\(0x[0-9a-fA-F]+\)", dependencies, re.MULTILINE)
+            self.assertEqual(len(matches), 1, dependencies)
+            self.assertEqual(Path(matches[0]).resolve(strict=True),
+                             (relocated / "libckernel_engine.so").resolve(strict=True))
             subprocess.run(
                 ["./host"],
                 cwd=relocated,
