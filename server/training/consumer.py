@@ -44,11 +44,11 @@ def validate(reply,request,capabilities=None):
             for name,p in packages.items():
                 check(type(p) is dict and set(p)=={'id','sha256','model','geometry','splits','feature_provenance'})
                 check(p['id']==name and hexid(p['sha256'],64) and p['feature_provenance']=='supplied')
-                check(type(p['splits']) is dict and set(p['splits'])=={'train','validation'} and all(type(n) is int and 1<=n<=31 for n in p['splits'].values()))
+                check(type(p['splits']) is dict and set(p['splits'])=={'train','validation'} and all(type(n) is int and 1<=n<=4095 for n in p['splits'].values()))
                 check(type(p['model']) is dict and type(p['geometry']) is dict)
             r=caps['recipes']['clef_head_fp32_v1']
             check(type(r) is dict and set(r)=={'limits','status','dtype','optimizer','method','geometry','executor_sha256'})
-            check(r['limits']==dict(epochs=[1,40],grad_accum=1) and r['status']=='validation_only' and r['dtype']=='fp32' and r['optimizer']=='adamw' and r['method']=='head_only' and r['geometry']=='one declared geometry per package' and hexid(r['executor_sha256'],64))
+            check(r['limits']==dict(epochs=[1,1000],grad_accum=1,records=4096,tokens=512,steps=100000,dataset_bytes=536870912,lengths="exact_geometry; padding and mixed lengths unsupported") and r['status']=='validation_only' and r['dtype']=='fp32' and r['optimizer']=='adamw' and r['method']=='head_only' and r['geometry']=='one declared geometry per package' and hexid(r['executor_sha256'],64))
         for name,recipe in caps['recipes'].items():
             if name=='clef_head_fp32_v1':continue
             check(type(recipe) is dict and set(recipe)=={'status','workflow','shape','dtype','optimizer','method','tokenizer','dataset'})
@@ -75,7 +75,8 @@ def validate(reply,request,capabilities=None):
             check(type(cfg['package_id']) is str and cfg['package_id'] in capabilities.get('clef_packages',{}))
             check(cfg['package_sha256']==capabilities['clef_packages'][cfg['package_id']]['sha256'])
             check(cfg['dtype']=='fp32' and cfg['optimizer']=='adamw' and cfg['method']=='head_only')
-            check(type(cfg['epochs']) is int and 1<=cfg['epochs']<=40)
+            check(type(cfg['epochs']) is int and 1<=cfg['epochs']<=1000)
+            check(cfg['epochs']*capabilities['clef_packages'][cfg['package_id']]['splits']['train']<=100000)
             check(type(cfg['learning_rate']) in (int,float) and math.isfinite(cfg['learning_rate']) and 0<cfg['learning_rate']<=.01)
             check(capabilities['resources']=='unknown')
         else:

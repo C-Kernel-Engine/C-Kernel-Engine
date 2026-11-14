@@ -22,6 +22,8 @@ import uuid
 
 from .contract import Backend,ROOT,SHAPE,digest,encode,decode,file_hash,ident,MAX_BYTES
 
+from version.v8.decision.training_limits import MAX_STEPS
+
 class JobError(ValueError):pass
 
 def require(ok,code):
@@ -35,8 +37,10 @@ def atomic_json(path,data):
 class Jobs:
     execution_kind="native_generated_workflow"
     """Single admitted job, no backlog. Store is private to one local daemon."""
-    def __init__(self,store,*,principals,python=sys.executable,root=ROOT,min_free_bytes=2*1024**3,clef_packages=None):
+    def __init__(self,store,*,principals,python=sys.executable,root=ROOT,min_free_bytes=2*1024**3,clef_packages=None,wall_seconds=600):
         require(principals and all(ident(p) for p in principals),'INVALID_PRINCIPALS')
+        require(type(wall_seconds) is int and 60<=wall_seconds<=86400,'INVALID_WALL_BUDGET')
+        self.wall_seconds=wall_seconds
         self.principals=frozenset(principals);self.root=Path(root);self.backend=Backend(self.root,clef_packages=clef_packages)
         self.python=str(Path(python).absolute());self.min_free_bytes=min_free_bytes
         self.store=Path(store).resolve();self.store.mkdir(parents=True,exist_ok=True,mode=0o700)
@@ -70,7 +74,7 @@ class Jobs:
         self._auth(principal)
         return dict(schema='cke.training.jobs.v1',worker_boot_id=self.backend.boot,validation=self.backend.capabilities(),
                     execution='opt_in_registered_native' if self.backend.clef_packages else 'opt_in_local_svg',executable_recipes=['svg_tiny_v8']+(['clef_head_fp32_v1'] if self.backend.clef_packages else []),operations=['discover','prepare','submit','observe','artifact'],cancel='unsupported',
-                    limits=dict(active_jobs=1,queued_backlog=0,registered_jobs=32,plan_receipts=128,log_bytes=1048576,artifact_chunk_bytes=8192,wall_seconds=600),
+                    limits=dict(active_jobs=1,queued_backlog=0,registered_jobs=32,plan_receipts=128,log_bytes=1048576,artifact_chunk_bytes=8192,wall_seconds=self.wall_seconds),
                     authorization='trusted_local_caller; no network authentication',resources='disk_checked; one local slot; no global reservation')
     def prepare(self,principal,config,experiment_id,draft_revision=None,*,client_revision=None):
         self._auth(principal);require(ident(experiment_id),'INVALID_EXPERIMENT')
@@ -134,7 +138,7 @@ class Jobs:
             if j['status']=='running' and progress.is_file() and not progress.is_symlink() and progress.stat().st_size<=16384:
                 try:
                     row=json.loads(progress.read_text())
-                    valid=(type(row) is dict and row.get('stage') in ('training','complete') and type(row.get('completed_steps')) is int and type(row.get('total_steps')) is int and 0<=row['completed_steps']<=row['total_steps']<=1280 and (row['stage']!='complete' or row['completed_steps']==row['total_steps']))
+                    valid=(type(row) is dict and row.get('stage') in ('training','complete') and type(row.get('completed_steps')) is int and type(row.get('total_steps')) is int and 0<=row['completed_steps']<=row['total_steps']<=MAX_STEPS and (row['stage']!='complete' or row['completed_steps']==row['total_steps']))
                     if valid:
                         value={k:row[k] for k in ('stage','completed_steps','total_steps')}
                         prior=j['progress']
@@ -168,7 +172,7 @@ class Jobs:
             timed_out.set()
             try:os.killpg(proc.pid,signal.SIGKILL)
             except ProcessLookupError:pass
-        timer=threading.Timer(600,expire);timer.daemon=True;timer.start()
+        timer=threading.Timer(self.wall_seconds,expire);timer.daemon=True;timer.start()
         try:
             with open(folder/'workflow.log','wb') as log:
                 remaining=1048576

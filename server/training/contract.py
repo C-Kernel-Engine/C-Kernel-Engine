@@ -88,9 +88,10 @@ class Backend:
                   limits=dict(message_bytes=MAX_BYTES,epochs=[1,10],grad_accum=[1,8],queued_jobs=0))
         if self.clef_packages:
             from .clef import packages, RECIPE
+            from version.v8.decision.training_limits import limits as head_limits
             body['clef_packages']=packages(self.clef_packages)
             body['methods']['clef_head']='validation_only'
-            body['recipes'][RECIPE]=dict(limits=dict(epochs=[1,40],grad_accum=1),status='validation_only',dtype='fp32',optimizer='adamw',method='head_only',geometry='one declared geometry per package',executor_sha256=file_hash(self.root/'version/v8/decision/train_clef_head.py'))
+            body['recipes'][RECIPE]=dict(limits=head_limits(),status='validation_only',dtype='fp32',optimizer='adamw',method='head_only',geometry='one declared geometry per package',executor_sha256=file_hash(self.root/'version/v8/decision/train_clef_head.py'))
         body['sha256']=digest(body);return body
     def exchange(self,q):
         if len(encode(q))>MAX_BYTES:raise ValueError('MESSAGE_TOO_LARGE')
