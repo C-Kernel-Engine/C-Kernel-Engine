@@ -26,7 +26,7 @@ class TrainingContractTest(unittest.TestCase):
                 self.assertEqual(r['plan']['execution'],'disabled');self.assertIn('ADMISSION_NOT_IMPLEMENTED',[w['code'] for w in r['warnings']])
                 self.assertEqual(r['plan_sha256'],self.backend.exchange(q)['plan_sha256'])
     def test_field_errors_for_unsupported_and_invalid_configs(self):
-        mutations=[('recipe','v7_svg_runbook'),('dtype','bf16'),('method','lora'),('method','qlora'),('epochs',True),('grad_accum',0),('tokenizer','bpe'),('optimizer','muon')]
+        mutations=[('recipe','v7_svg_runbook'),('recipe','clef_head_v8'),('dtype','bf16'),('method','lora'),('method','qlora'),('epochs',True),('grad_accum',0),('tokenizer','bpe'),('optimizer','muon')]
         for field,value in mutations:
             with self.subTest(field=field,value=value):
                 q=self.request();q['config'][field]=value;r=validate(self.backend.exchange(q),q)

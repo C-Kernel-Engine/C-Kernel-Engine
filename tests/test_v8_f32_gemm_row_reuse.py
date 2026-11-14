@@ -13,8 +13,11 @@ SOURCE = r"""
 void gemm_nt_f32_llama_production_output_range(const float*, const float*, const float*, float*, int, int, int, int, int);
 int main(void) {
     const int shapes[][3] = {{1,1,1},{3,9,32},{4,9,32},{5,9,32},
-        {8,17,64},{9,17,65},{17,33,128},{31,33,128},{32,33,128},
-        {33,33,128},{65,33,128},{9,1280,1280},{65,1280,1280}};
+        {8,17,64},{9,17,65},{11,5,32},{12,4,32},{13,7,32},
+        {17,33,128},{29,33,128},{30,33,128},{31,33,128},{32,33,128},
+        {33,33,128},{47,33,128},{48,33,128},{49,33,128},
+        {65,33,128},{95,33,128},{96,33,128},{97,33,128},
+        {9,1280,1280},{65,1280,1280}};
     for (unsigned s=0; s<sizeof(shapes)/sizeof(shapes[0]); ++s) {
         int M=shapes[s][0], N=shapes[s][1], K=shapes[s][2], total=M*N;
         float *a=malloc(M*K*sizeof(float)), *b=malloc(N*K*sizeof(float));
@@ -48,17 +51,39 @@ int main(void) {
 
 
 class F32RowReuseTests(unittest.TestCase):
-    def run_build(self, flags):
+    def run_build(self, flags, *, corrupt_m3n4=False):
         with tempfile.TemporaryDirectory(prefix="cke-f32-row-reuse-") as name:
             path = Path(name)
             (path / "probe.c").write_text(SOURCE)
+            kernel = ROOT / "src/kernels/gemm_kernels.c"
+            if corrupt_m3n4:
+                source = kernel.read_text()
+                original = "__m256 acc00 = _mm256_setzero_ps();"
+                self.assertEqual(source.count(original), 1)
+                kernel = path / "corrupted_gemm.c"
+                kernel.write_text(source.replace(
+                    original, "__m256 acc00 = _mm256_set1_ps(1.0f);", 1))
             subprocess.run([
                 "cc", "-O3", "-ffp-contract=off", *flags, "-ffunction-sections",
                 "-fdata-sections", "-I", str(ROOT / "include"),
-                str(ROOT / "src/kernels/gemm_kernels.c"), str(path / "probe.c"),
+                str(kernel), str(path / "probe.c"),
                 "-Wl,--gc-sections", "-lm", "-o", str(path / "probe"),
             ], check=True, capture_output=True, timeout=120)
-            subprocess.run([str(path / "probe")], check=True, capture_output=True, timeout=60)
+            result = subprocess.run([str(path / "probe")], check=False,
+                                    capture_output=True, text=True, timeout=60)
+            if corrupt_m3n4:
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertIn("shape=", result.stderr)
+                self.assertIn("index=", result.stderr)
+            else:
+                self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_avx2_m3n4_corruption_fails_numerical_gate(self):
+        cpuinfo = Path("/proc/cpuinfo")
+        flags = cpuinfo.read_text() if cpuinfo.exists() else ""
+        if not all(flag in flags for flag in ("avx2", "fma")):
+            self.skipTest("AVX2/FMA execution unavailable")
+        self.run_build(["-mavx2", "-mfma"], corrupt_m3n4=True)
 
     def test_portable(self):
         self.run_build([])

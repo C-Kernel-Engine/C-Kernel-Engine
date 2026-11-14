@@ -1,0 +1,1133 @@
+{
+  "schema": "cke.whisper.projection_tile_evidence.v1",
+  "date": "2026-11-13",
+  "base_commit": "f6f5e6b1e",
+  "candidate_source_sha256": "bb1d38a383ab3137487877fb7fc30bcf06da8ee4e91e68c0920d221ee605f174",
+  "hardware": "P3 Intel Core i7-14700T, physical P-core affinity, AVX2/FMA",
+  "model": "openai/whisper-large-v3, revision 06f233fe06e710322aca913c1bc4249a0d71fce1, generated FP32",
+  "audio_sha256": "e3f2406b90557d3f75c40e2c33c6239585179165f4763466e3be7dd539d2d847",
+  "settings": {
+    "audio_seconds": 20,
+    "output_token_budget": 256,
+    "vocabulary_hint": "Linux, SSD, C-Kernel-Engine, Antsand, Jupyter Notebook, D-Bus, HPC",
+    "omp_num_threads": 1,
+    "openblas_num_threads": 1,
+    "pairs": 3,
+    "warmups_per_variant": 1
+  },
+  "limitations": [
+    "Shared development host, not exclusive controlled hardware. All attempts retained; warmups excluded from medians.",
+    "Full logical-state comparison at four threads; eight-thread resident runs compare encoder hashes and generated tokens.",
+    "No deployment, recognition-quality, ARM/AVX512 speed or full-logit HF equivalence claim.",
+    "Small-shape timing and decoder medians include modest slowdowns.",
+    "Prior colocated Torch short-operation ratios were sensitive to wait policy; a fixed 3\u20134x decoder-kernel deficit is not established."
+  ],
+  "tests": {
+    "asset_free": "3 tests and 2 subtests passed, including compiled wrong-accumulator negative control",
+    "llama_cpp_oracle": "28 shapes passed at each of 1/4/8 threads",
+    "audio": "make test-audio passed; optional unconfigured HF asset lane skipped"
+  },
+  "resident_4": {
+    "status": "PASS",
+    "threads": 4,
+    "cpus": [
+      0,
+      2,
+      4,
+      6
+    ],
+    "runs": [
+      {
+        "kind": "baseline",
+        "warmup": true,
+        "load": [
+          1.564453125,
+          1.38916015625,
+          0.9365234375
+        ],
+        "request_seconds": 21.00415908638388,
+        "encoder_seconds": 12.476282961666584,
+        "prefill_seconds": 1.8106943937018514,
+        "decode_seconds": 6.489566955715418,
+        "token_count": 74,
+        "token_ids_sha256": "95e7fe2c189de6ffc84183f2ae24da89737e14d98878b32c47a333a1e77d9d23",
+        "encoder_sha256": "b4773ab3268771fb22f9096c4171342bc406e49fe0373b8867913deac37547ab",
+        "complete": true,
+        "inference_seconds": 20.776544311083853
+      },
+      {
+        "kind": "candidate",
+        "warmup": true,
+        "load": [
+          2.12109375,
+          1.52685546875,
+          0.9921875
+        ],
+        "request_seconds": 19.980861043557525,
+        "encoder_seconds": 11.624436560086906,
+        "prefill_seconds": 1.6424406180158257,
+        "decode_seconds": 6.516540850512683,
+        "token_count": 74,
+        "token_ids_sha256": "95e7fe2c189de6ffc84183f2ae24da89737e14d98878b32c47a333a1e77d9d23",
+        "encoder_sha256": "b4773ab3268771fb22f9096c4171342bc406e49fe0373b8867913deac37547ab",
+        "complete": true,
+        "inference_seconds": 19.783418028615415
+      },
+      {
+        "kind": "baseline",
+        "warmup": false,
+        "load": [
+          2.6552734375,
+          1.68798828125,
+          1.05712890625
+        ],
+        "request_seconds": 21.09796036221087,
+        "encoder_seconds": 12.587551268748939,
+        "prefill_seconds": 1.8144111325964332,
+        "decode_seconds": 6.463881246745586,
+        "token_count": 74,
+        "token_ids_sha256": "95e7fe2c189de6ffc84183f2ae24da89737e14d98878b32c47a333a1e77d9d23",
+        "encoder_sha256": "b4773ab3268771fb22f9096c4171342bc406e49fe0373b8867913deac37547ab",
+        "complete": true,
+        "inference_seconds": 20.86584364809096
+      },
+      {
+        "kind": "candidate",
+        "warmup": false,
+        "load": [
+          3.111328125,
+          1.85546875,
+          1.12646484375
+        ],
+        "request_seconds": 19.925621868111193,
+        "encoder_seconds": 11.579991923645139,
+        "prefill_seconds": 1.6387104410678148,
+        "decode_seconds": 6.571324726566672,
+        "token_count": 74,
+        "token_ids_sha256": "95e7fe2c189de6ffc84183f2ae24da89737e14d98878b32c47a333a1e77d9d23",
+        "encoder_sha256": "b4773ab3268771fb22f9096c4171342bc406e49fe0373b8867913deac37547ab",
+        "complete": true,
+        "inference_seconds": 19.790027091279626
+      },
+      {
+        "kind": "candidate",
+        "warmup": false,
+        "load": [
+          3.36474609375,
+          1.9951171875,
+          1.18896484375
+        ],
+        "request_seconds": 19.958643725141883,
+        "encoder_seconds": 11.603397695347667,
+        "prefill_seconds": 1.6358198411762714,
+        "decode_seconds": 6.584911831654608,
+        "token_count": 74,
+        "token_ids_sha256": "95e7fe2c189de6ffc84183f2ae24da89737e14d98878b32c47a333a1e77d9d23",
+        "encoder_sha256": "b4773ab3268771fb22f9096c4171342bc406e49fe0373b8867913deac37547ab",
+        "complete": true,
+        "inference_seconds": 19.824129368178546
+      },
+      {
+        "kind": "baseline",
+        "warmup": false,
+        "load": [
+          3.5458984375,
+          2.1259765625,
+          1.24951171875
+        ],
+        "request_seconds": 20.94936245493591,
+        "encoder_seconds": 12.524339051917195,
+        "prefill_seconds": 1.8214002437889576,
+        "decode_seconds": 6.470408286899328,
+        "token_count": 74,
+        "token_ids_sha256": "95e7fe2c189de6ffc84183f2ae24da89737e14d98878b32c47a333a1e77d9d23",
+        "encoder_sha256": "b4773ab3268771fb22f9096c4171342bc406e49fe0373b8867913deac37547ab",
+        "complete": true,
+        "inference_seconds": 20.81614758260548
+      },
+      {
+        "kind": "baseline",
+        "warmup": false,
+        "load": [
+          3.4345703125,
+          2.19775390625,
+          1.29248046875
+        ],
+        "request_seconds": 20.94094822369516,
+        "encoder_seconds": 12.537277699448168,
+        "prefill_seconds": 1.8225784469395876,
+        "decode_seconds": 6.447139862924814,
+        "token_count": 74,
+        "token_ids_sha256": "95e7fe2c189de6ffc84183f2ae24da89737e14d98878b32c47a333a1e77d9d23",
+        "encoder_sha256": "b4773ab3268771fb22f9096c4171342bc406e49fe0373b8867913deac37547ab",
+        "complete": true,
+        "inference_seconds": 20.80699600931257
+      },
+      {
+        "kind": "candidate",
+        "warmup": false,
+        "load": [
+          3.2724609375,
+          2.26220703125,
+          1.33837890625
+        ],
+        "request_seconds": 19.793835567310452,
+        "encoder_seconds": 11.461048644967377,
+        "prefill_seconds": 1.6396369691938162,
+        "decode_seconds": 6.559745983220637,
+        "token_count": 74,
+        "token_ids_sha256": "95e7fe2c189de6ffc84183f2ae24da89737e14d98878b32c47a333a1e77d9d23",
+        "encoder_sha256": "b4773ab3268771fb22f9096c4171342bc406e49fe0373b8867913deac37547ab",
+        "complete": true,
+        "inference_seconds": 19.66043159738183
+      }
+    ],
+    "identities": {
+      "baseline": {
+        "schema": "cke.whisper.loaded.v1",
+        "encoder": {
+          "libraries": {
+            "libmodel.so": "7252ff445cc5dd8aac4a10f246185871f7b2bbe1b51a8a4b2113b71094b43eb5",
+            "libckernel_engine.so": "4f227ec9bfe6e9aed11a9c1c1a30002e4c7ecda76b6a65976902719ba30b166a"
+          },
+          "manifest_sha256": "54ee89aaca4f811e30758d4614ef2d47fb5f61134f719cf8da308bb0ce3a502d",
+          "weights_sha256": "9900df149e15afb203153312b56aaea34ced2d914b1df1966fba4b1d25247583",
+          "model_init_seconds": 0.5404381649568677
+        },
+        "decoder": {
+          "libraries": {
+            "libmodel.so": "b68446b3e9e8eccf9f05ba206c24c94f243faad40d375d40f083fff7a17eaef9",
+            "libckernel_engine.so": "4f227ec9bfe6e9aed11a9c1c1a30002e4c7ecda76b6a65976902719ba30b166a"
+          },
+          "manifest_sha256": "97011109779704bc48b09bfece36f5e8c8ebe3b149738818fa5381b766f4219b",
+          "weights_sha256": "7cf930b9296bc64b9ff059e2377a7e874b636d64cbea777301a5c74d23cfff44",
+          "model_init_seconds": 0.8424909897148609
+        }
+      },
+      "candidate": {
+        "schema": "cke.whisper.loaded.v1",
+        "encoder": {
+          "libraries": {
+            "libmodel.so": "7252ff445cc5dd8aac4a10f246185871f7b2bbe1b51a8a4b2113b71094b43eb5",
+            "libckernel_engine.so": "bb013a850c55bd6cf18832e1fdcc94e498cd01fbdd8d5e04404c7d1542e7db93"
+          },
+          "manifest_sha256": "54ee89aaca4f811e30758d4614ef2d47fb5f61134f719cf8da308bb0ce3a502d",
+          "weights_sha256": "9900df149e15afb203153312b56aaea34ced2d914b1df1966fba4b1d25247583",
+          "model_init_seconds": 0.5422534607350826
+        },
+        "decoder": {
+          "libraries": {
+            "libmodel.so": "b68446b3e9e8eccf9f05ba206c24c94f243faad40d375d40f083fff7a17eaef9",
+            "libckernel_engine.so": "bb013a850c55bd6cf18832e1fdcc94e498cd01fbdd8d5e04404c7d1542e7db93"
+          },
+          "manifest_sha256": "97011109779704bc48b09bfece36f5e8c8ebe3b149738818fa5381b766f4219b",
+          "weights_sha256": "7cf930b9296bc64b9ff059e2377a7e874b636d64cbea777301a5c74d23cfff44",
+          "model_init_seconds": 5.599656038917601
+        }
+      }
+    },
+    "baseline_startup_seconds": 5.423407680355012,
+    "candidate_startup_seconds": 10.177022244781256,
+    "exact": true,
+    "medians": {
+      "baseline": {
+        "request_seconds": 20.94936245493591,
+        "inference_seconds": 20.81614758260548,
+        "encoder_seconds": 12.537277699448168,
+        "prefill_seconds": 1.8214002437889576,
+        "decode_seconds": 6.463881246745586
+      },
+      "candidate": {
+        "request_seconds": 19.925621868111193,
+        "inference_seconds": 19.790027091279626,
+        "encoder_seconds": 11.579991923645139,
+        "prefill_seconds": 1.6387104410678148,
+        "decode_seconds": 6.571324726566672
+      }
+    }
+  },
+  "resident_8": {
+    "status": "PASS",
+    "threads": 8,
+    "cpus": [
+      0,
+      2,
+      4,
+      6,
+      8,
+      10,
+      12,
+      14
+    ],
+    "runs": [
+      {
+        "kind": "baseline",
+        "warmup": true,
+        "load": [
+          2.20947265625,
+          2.16552734375,
+          1.3818359375
+        ],
+        "request_seconds": 18.264610400423408,
+        "encoder_seconds": 9.77575043682009,
+        "prefill_seconds": 1.7584479982033372,
+        "decode_seconds": 6.587350836955011,
+        "token_count": 74,
+        "token_ids_sha256": "95e7fe2c189de6ffc84183f2ae24da89737e14d98878b32c47a333a1e77d9d23",
+        "encoder_sha256": "b4773ab3268771fb22f9096c4171342bc406e49fe0373b8867913deac37547ab",
+        "complete": true,
+        "inference_seconds": 18.121549271978438
+      },
+      {
+        "kind": "candidate",
+        "warmup": true,
+        "load": [
+          3.71826171875,
+          2.51220703125,
+          1.51318359375
+        ],
+        "request_seconds": 17.371119590476155,
+        "encoder_seconds": 9.17138110846281,
+        "prefill_seconds": 1.6401133183389902,
+        "decode_seconds": 6.412305592559278,
+        "token_count": 74,
+        "token_ids_sha256": "95e7fe2c189de6ffc84183f2ae24da89737e14d98878b32c47a333a1e77d9d23",
+        "encoder_sha256": "b4773ab3268771fb22f9096c4171342bc406e49fe0373b8867913deac37547ab",
+        "complete": true,
+        "inference_seconds": 17.22380001936108
+      },
+      {
+        "kind": "baseline",
+        "warmup": false,
+        "load": [
+          4.28857421875,
+          2.72216796875,
+          1.60400390625
+        ],
+        "request_seconds": 13.322061752900481,
+        "encoder_seconds": 6.5645705964416265,
+        "prefill_seconds": 1.3060484426096082,
+        "decode_seconds": 5.1877648970112205,
+        "token_count": 74,
+        "token_ids_sha256": "95e7fe2c189de6ffc84183f2ae24da89737e14d98878b32c47a333a1e77d9d23",
+        "encoder_sha256": "b4773ab3268771fb22f9096c4171342bc406e49fe0373b8867913deac37547ab",
+        "complete": true,
+        "inference_seconds": 13.058383936062455
+      },
+      {
+        "kind": "candidate",
+        "warmup": false,
+        "load": [
+          4.859375,
+          2.896484375,
+          1.6728515625
+        ],
+        "request_seconds": 13.513818565756083,
+        "encoder_seconds": 6.6596974758431315,
+        "prefill_seconds": 1.5256900731474161,
+        "decode_seconds": 5.174924720078707,
+        "token_count": 74,
+        "token_ids_sha256": "95e7fe2c189de6ffc84183f2ae24da89737e14d98878b32c47a333a1e77d9d23",
+        "encoder_sha256": "b4773ab3268771fb22f9096c4171342bc406e49fe0373b8867913deac37547ab",
+        "complete": true,
+        "inference_seconds": 13.360312269069254
+      },
+      {
+        "kind": "candidate",
+        "warmup": false,
+        "load": [
+          5.11328125,
+          3.048828125,
+          1.7431640625
+        ],
+        "request_seconds": 15.327410272322595,
+        "encoder_seconds": 8.4796232143417,
+        "prefill_seconds": 1.5192975085228682,
+        "decode_seconds": 5.184713687747717,
+        "token_count": 74,
+        "token_ids_sha256": "95e7fe2c189de6ffc84183f2ae24da89737e14d98878b32c47a333a1e77d9d23",
+        "encoder_sha256": "b4773ab3268771fb22f9096c4171342bc406e49fe0373b8867913deac37547ab",
+        "complete": true,
+        "inference_seconds": 15.183634410612285
+      },
+      {
+        "kind": "baseline",
+        "warmup": false,
+        "load": [
+          5.75341796875,
+          3.2919921875,
+          1.84423828125
+        ],
+        "request_seconds": 16.081965258345008,
+        "encoder_seconds": 9.138235187157989,
+        "prefill_seconds": 1.6338258609175682,
+        "decode_seconds": 5.167458216659725,
+        "token_count": 74,
+        "token_ids_sha256": "95e7fe2c189de6ffc84183f2ae24da89737e14d98878b32c47a333a1e77d9d23",
+        "encoder_sha256": "b4773ab3268771fb22f9096c4171342bc406e49fe0373b8867913deac37547ab",
+        "complete": true,
+        "inference_seconds": 15.939519264735281
+      },
+      {
+        "kind": "baseline",
+        "warmup": false,
+        "load": [
+          6.25146484375,
+          3.5234375,
+          1.943359375
+        ],
+        "request_seconds": 16.091947401873767,
+        "encoder_seconds": 9.183245343156159,
+        "prefill_seconds": 1.633186487480998,
+        "decode_seconds": 5.1368741216138005,
+        "token_count": 74,
+        "token_ids_sha256": "95e7fe2c189de6ffc84183f2ae24da89737e14d98878b32c47a333a1e77d9d23",
+        "encoder_sha256": "b4773ab3268771fb22f9096c4171342bc406e49fe0373b8867913deac37547ab",
+        "complete": true,
+        "inference_seconds": 15.953305952250957
+      },
+      {
+        "kind": "candidate",
+        "warmup": false,
+        "load": [
+          6.712890625,
+          3.759765625,
+          2.04638671875
+        ],
+        "request_seconds": 15.342809289693832,
+        "encoder_seconds": 8.476108139380813,
+        "prefill_seconds": 1.5156093118712306,
+        "decode_seconds": 5.210204800590873,
+        "token_count": 74,
+        "token_ids_sha256": "95e7fe2c189de6ffc84183f2ae24da89737e14d98878b32c47a333a1e77d9d23",
+        "encoder_sha256": "b4773ab3268771fb22f9096c4171342bc406e49fe0373b8867913deac37547ab",
+        "complete": true,
+        "inference_seconds": 15.201922251842916
+      }
+    ],
+    "identities": {
+      "baseline": {
+        "schema": "cke.whisper.loaded.v1",
+        "encoder": {
+          "libraries": {
+            "libmodel.so": "7252ff445cc5dd8aac4a10f246185871f7b2bbe1b51a8a4b2113b71094b43eb5",
+            "libckernel_engine.so": "4f227ec9bfe6e9aed11a9c1c1a30002e4c7ecda76b6a65976902719ba30b166a"
+          },
+          "manifest_sha256": "54ee89aaca4f811e30758d4614ef2d47fb5f61134f719cf8da308bb0ce3a502d",
+          "weights_sha256": "9900df149e15afb203153312b56aaea34ced2d914b1df1966fba4b1d25247583",
+          "model_init_seconds": 0.5328836711123586
+        },
+        "decoder": {
+          "libraries": {
+            "libmodel.so": "b68446b3e9e8eccf9f05ba206c24c94f243faad40d375d40f083fff7a17eaef9",
+            "libckernel_engine.so": "4f227ec9bfe6e9aed11a9c1c1a30002e4c7ecda76b6a65976902719ba30b166a"
+          },
+          "manifest_sha256": "97011109779704bc48b09bfece36f5e8c8ebe3b149738818fa5381b766f4219b",
+          "weights_sha256": "7cf930b9296bc64b9ff059e2377a7e874b636d64cbea777301a5c74d23cfff44",
+          "model_init_seconds": 0.842081462033093
+        }
+      },
+      "candidate": {
+        "schema": "cke.whisper.loaded.v1",
+        "encoder": {
+          "libraries": {
+            "libmodel.so": "7252ff445cc5dd8aac4a10f246185871f7b2bbe1b51a8a4b2113b71094b43eb5",
+            "libckernel_engine.so": "bb013a850c55bd6cf18832e1fdcc94e498cd01fbdd8d5e04404c7d1542e7db93"
+          },
+          "manifest_sha256": "54ee89aaca4f811e30758d4614ef2d47fb5f61134f719cf8da308bb0ce3a502d",
+          "weights_sha256": "9900df149e15afb203153312b56aaea34ced2d914b1df1966fba4b1d25247583",
+          "model_init_seconds": 0.5319014228880405
+        },
+        "decoder": {
+          "libraries": {
+            "libmodel.so": "b68446b3e9e8eccf9f05ba206c24c94f243faad40d375d40f083fff7a17eaef9",
+            "libckernel_engine.so": "bb013a850c55bd6cf18832e1fdcc94e498cd01fbdd8d5e04404c7d1542e7db93"
+          },
+          "manifest_sha256": "97011109779704bc48b09bfece36f5e8c8ebe3b149738818fa5381b766f4219b",
+          "weights_sha256": "7cf930b9296bc64b9ff059e2377a7e874b636d64cbea777301a5c74d23cfff44",
+          "model_init_seconds": 5.465150414034724
+        }
+      }
+    },
+    "baseline_startup_seconds": 5.391277463175356,
+    "candidate_startup_seconds": 9.996538493782282,
+    "exact": true,
+    "medians": {
+      "baseline": {
+        "request_seconds": 16.081965258345008,
+        "inference_seconds": 15.939519264735281,
+        "encoder_seconds": 9.138235187157989,
+        "prefill_seconds": 1.633186487480998,
+        "decode_seconds": 5.167458216659725
+      },
+      "candidate": {
+        "request_seconds": 15.327410272322595,
+        "inference_seconds": 15.183634410612285,
+        "encoder_seconds": 8.476108139380813,
+        "prefill_seconds": 1.5192975085228682,
+        "decode_seconds": 5.184713687747717
+      }
+    }
+  },
+  "full_state": {
+    "state_exact": true,
+    "reset_exact": true,
+    "candidate_loaded_libraries": {
+      "decoder/libckernel_engine.so": "bb013a850c55bd6cf18832e1fdcc94e498cd01fbdd8d5e04404c7d1542e7db93",
+      "decoder/libckernel_tokenizer.so": "382cd60701399df9f7d7059df763abbcfd5c6dc5e260feb8cc4c530cdada91ba",
+      "decoder/libmodel.so": "b68446b3e9e8eccf9f05ba206c24c94f243faad40d375d40f083fff7a17eaef9",
+      "encoder/libckernel_engine.so": "bb013a850c55bd6cf18832e1fdcc94e498cd01fbdd8d5e04404c7d1542e7db93",
+      "encoder/libmodel.so": "7252ff445cc5dd8aac4a10f246185871f7b2bbe1b51a8a4b2113b71094b43eb5"
+    },
+    "encoder.npy": {
+      "shape": [
+        1500,
+        1280
+      ],
+      "bit_exact": true,
+      "max_abs": 0.0
+    },
+    "logits-0.npy": {
+      "shape": [
+        63,
+        51866
+      ],
+      "bit_exact": true,
+      "max_abs": 0.0
+    },
+    "logits-1.npy": {
+      "shape": [
+        63,
+        51866
+      ],
+      "bit_exact": true,
+      "max_abs": 0.0
+    }
+  },
+  "prototype_tiles": [
+    {
+      "capture": "model_decoder_layers_0_fc1_m1.npz",
+      "shape": [
+        1,
+        5120,
+        1280
+      ],
+      "exact": true,
+      "times": {
+        "baseline": [
+          0.000215187668800354,
+          0.00018524378538131714,
+          0.0001858789473772049,
+          0.000199122354388237,
+          0.00018158834427595139,
+          0.00018573645502328873,
+          0.00018192920833826065,
+          0.00018641352653503418
+        ],
+        "m3n4": [
+          0.00019570067524909973,
+          0.0001817271113395691,
+          0.00018930435180664062,
+          0.0001805424690246582,
+          0.00018703006207942963,
+          0.0001819925382733345,
+          0.00018238462507724762,
+          0.00017896853387355804
+        ],
+        "m4n3": [
+          0.00018156599253416061,
+          0.00018131546676158905,
+          0.00018297228962183,
+          0.0001829788088798523,
+          0.0001824311912059784,
+          0.0001796940341591835,
+          0.00018279533833265305,
+          0.00017794501036405563
+        ],
+        "m6n2": [
+          0.00019099190831184387,
+          0.00018419139087200165,
+          0.00018073618412017822,
+          0.00018462073057889938,
+          0.00018132198601961136,
+          0.0001787003129720688,
+          0.00018557440489530563,
+          0.00018407031893730164
+        ]
+      },
+      "medians": {
+        "baseline": 0.0001858077012002468,
+        "m3n4": 0.00018218858167529106,
+        "m4n3": 0.0001819985918700695,
+        "m6n2": 0.00018413085490465164
+      }
+    },
+    {
+      "capture": "model_decoder_layers_0_fc1_m35.npz",
+      "shape": [
+        35,
+        5120,
+        1280
+      ],
+      "exact": true,
+      "times": {
+        "baseline": [
+          0.002124769613146782,
+          0.0020375344902276993,
+          0.002049335278570652,
+          0.0019410811364650726,
+          0.0019986024126410484,
+          0.0019099144265055656,
+          0.002006685361266136,
+          0.002101645804941654
+        ],
+        "m3n4": [
+          0.002651708200573921,
+          0.0025867046788334846,
+          0.0026810569688677788,
+          0.002704288810491562,
+          0.0025285957381129265,
+          0.0025317640975117683,
+          0.002521664835512638,
+          0.0026045916602015495
+        ],
+        "m4n3": [
+          0.0017884308472275734,
+          0.0018381206318736076,
+          0.0018115881830453873,
+          0.0017997855320572853,
+          0.0017687324434518814,
+          0.001802271232008934,
+          0.0017915284261107445,
+          0.0017935559153556824
+        ],
+        "m6n2": [
+          0.0025448137894272804,
+          0.00253171194344759,
+          0.0025147711858153343,
+          0.0025028688833117485,
+          0.002520861104130745,
+          0.0024480298161506653,
+          0.0024678874760866165,
+          0.002539265900850296
+        ]
+      },
+      "medians": {
+        "baseline": 0.0020221099257469177,
+        "m3n4": 0.002595648169517517,
+        "m4n3": 0.0017966707237064838,
+        "m6n2": 0.0025178161449730396
+      }
+    },
+    {
+      "capture": "model_encoder_layers_0_fc1_m1500.npz",
+      "shape": [
+        1500,
+        5120,
+        1280
+      ],
+      "exact": true,
+      "times": {
+        "baseline": [
+          0.07923362776637077,
+          0.07816040888428688,
+          0.07881370559334755,
+          0.0780641520395875,
+          0.07817621901631355,
+          0.07868953049182892,
+          0.07868588343262672,
+          0.07852650806307793
+        ],
+        "m3n4": [
+          0.05592882260680199,
+          0.05495773907750845,
+          0.0563083766028285,
+          0.056168535724282265,
+          0.05624275468289852,
+          0.055995477363467216,
+          0.05593554116785526,
+          0.05628467071801424
+        ],
+        "m4n3": [
+          0.06173337530344725,
+          0.0620270986109972,
+          0.06185902655124664,
+          0.06174037419259548,
+          0.06120441481471062,
+          0.061606209725141525,
+          0.06167288310825825,
+          0.061044429428875446
+        ],
+        "m6n2": [
+          0.07169447932392359,
+          0.07614114880561829,
+          0.07744100503623486,
+          0.07643851730972528,
+          0.07637455500662327,
+          0.07665625214576721,
+          0.0762169286608696,
+          0.07522090617567301
+        ]
+      },
+      "medians": {
+        "baseline": 0.07860619574785233,
+        "m3n4": 0.05608200654387474,
+        "m4n3": 0.06170312920585275,
+        "m6n2": 0.07629574183374643
+      }
+    },
+    {
+      "capture": "model_encoder_layers_0_fc2_m1500.npz",
+      "shape": [
+        1500,
+        1280,
+        5120
+      ],
+      "exact": true,
+      "times": {
+        "baseline": [
+          0.09326654858887196,
+          0.09312484972178936,
+          0.09317143075168133,
+          0.0930949030444026,
+          0.09303401689976454,
+          0.093128333799541,
+          0.09412233624607325,
+          0.09222862217575312
+        ],
+        "m3n4": [
+          0.07944695185869932,
+          0.07879816461354494,
+          0.07936134748160839,
+          0.07933464832603931,
+          0.07957582082599401,
+          0.07846654579043388,
+          0.0790392030030489,
+          0.07935493998229504
+        ],
+        "m4n3": [
+          0.08103452529758215,
+          0.08077015820890665,
+          0.08094384428113699,
+          0.08046262338757515,
+          0.08018700871616602,
+          0.08090820349752903,
+          0.08068613056093454,
+          0.0807863250374794
+        ],
+        "m6n2": [
+          0.09101308509707451,
+          0.09073357284069061,
+          0.09105309192091227,
+          0.0912522692233324,
+          0.0840271720662713,
+          0.09095290116965771,
+          0.09112285915762186,
+          0.09101901389658451
+        ]
+      },
+      "medians": {
+        "baseline": 0.09312659176066518,
+        "m3n4": 0.07934479415416718,
+        "m4n3": 0.08077824162319303,
+        "m6n2": 0.09101604949682951
+      }
+    },
+    {
+      "capture": "model_encoder_layers_0_self_attn_q_proj_m1500.npz",
+      "shape": [
+        1500,
+        1280,
+        1280
+      ],
+      "exact": true,
+      "times": {
+        "baseline": [
+          0.015914270654320717,
+          0.015845274552702904,
+          0.0159405916929245,
+          0.015911958180367947,
+          0.01596502773463726,
+          0.015883659943938255,
+          0.015874442644417286,
+          0.01587954629212618
+        ],
+        "m3n4": [
+          0.01322934404015541,
+          0.013172720558941364,
+          0.013235675171017647,
+          0.013071865774691105,
+          0.013192649930715561,
+          0.013135425746440887,
+          0.013134961947798729,
+          0.013114407658576965
+        ],
+        "m4n3": [
+          0.013542596250772476,
+          0.013449431397020817,
+          0.013501095585525036,
+          0.013479429297149181,
+          0.013539130799472332,
+          0.013521433807909489,
+          0.013580677099525928,
+          0.013459556736052036
+        ],
+        "m6n2": [
+          0.014528506435453892,
+          0.014549336396157742,
+          0.01449187844991684,
+          0.014563189819455147,
+          0.014545327052474022,
+          0.014593209140002728,
+          0.014609905891120434,
+          0.014513306319713593
+        ]
+      },
+      "medians": {
+        "baseline": 0.0158978090621531,
+        "m3n4": 0.013154073152691126,
+        "m4n3": 0.013511264696717262,
+        "m6n2": 0.014547331724315882
+      }
+    }
+  ],
+  "guarded_tiles": [
+    {
+      "capture": "model_decoder_layers_0_fc1_m1.npz",
+      "shape": [
+        1,
+        5120,
+        1280
+      ],
+      "exact": true,
+      "times": {
+        "baseline": [
+          0.00033645518124103546,
+          0.0001855902373790741,
+          0.00018548313528299332,
+          0.00017867237329483032,
+          0.0001812167465686798,
+          0.00017007067799568176
+        ],
+        "candidate": [
+          0.00028725992888212204,
+          0.00020859390497207642,
+          0.00017848331481218338,
+          0.00018958374857902527,
+          0.00017333030700683594,
+          0.00016966555267572403
+        ]
+      },
+      "medians": {
+        "baseline": 0.00018334994092583656,
+        "candidate": 0.00018403353169560432
+      }
+    },
+    {
+      "capture": "model_decoder_layers_0_fc1_m35.npz",
+      "shape": [
+        35,
+        5120,
+        1280
+      ],
+      "exact": true,
+      "times": {
+        "baseline": [
+          0.002723933197557926,
+          0.0025315312668681145,
+          0.0025979802012443542,
+          0.002710760571062565,
+          0.0025704707950353622,
+          0.002559276297688484
+        ],
+        "candidate": [
+          0.002742201089859009,
+          0.0026886677369475365,
+          0.002515438012778759,
+          0.0026902304962277412,
+          0.0025126757100224495,
+          0.0026129521429538727
+        ]
+      },
+      "medians": {
+        "baseline": 0.0025842254981398582,
+        "candidate": 0.0026508099399507046
+      }
+    },
+    {
+      "capture": "model_encoder_layers_0_fc1_m1500.npz",
+      "shape": [
+        1500,
+        5120,
+        1280
+      ],
+      "exact": true,
+      "times": {
+        "baseline": [
+          0.06656920351088047,
+          0.06651837099343538,
+          0.0664384039118886,
+          0.06646831892430782,
+          0.06655418500304222,
+          0.06496293190866709
+        ],
+        "candidate": [
+          0.05392057728022337,
+          0.05335560627281666,
+          0.05297774076461792,
+          0.053937449119985104,
+          0.05398469232022762,
+          0.0540079353377223
+        ]
+      },
+      "medians": {
+        "baseline": 0.0664933449588716,
+        "candidate": 0.05392901320010424
+      }
+    },
+    {
+      "capture": "model_encoder_layers_0_fc2_m1500.npz",
+      "shape": [
+        1500,
+        1280,
+        5120
+      ],
+      "exact": true,
+      "times": {
+        "baseline": [
+          0.0847659157589078,
+          0.08446016907691956,
+          0.08499654941260815,
+          0.084754204377532,
+          0.08474520687013865,
+          0.0677258288487792
+        ],
+        "candidate": [
+          0.06166928634047508,
+          0.06155225820839405,
+          0.06123914197087288,
+          0.06054575927555561,
+          0.06163155008107424,
+          0.0586407296359539
+        ]
+      },
+      "medians": {
+        "baseline": 0.08474970562383533,
+        "candidate": 0.061395700089633465
+      }
+    },
+    {
+      "capture": "model_encoder_layers_0_self_attn_q_proj_m1500.npz",
+      "shape": [
+        1500,
+        1280,
+        1280
+      ],
+      "exact": true,
+      "times": {
+        "baseline": [
+          0.019424397498369217,
+          0.019386150874197483,
+          0.019418741576373577,
+          0.019309005700051785,
+          0.0193709721788764,
+          0.019319352693855762
+        ],
+        "candidate": [
+          0.013683403842151165,
+          0.013659749180078506,
+          0.013607491739094257,
+          0.013677823357284069,
+          0.013565098866820335,
+          0.01360010914504528
+        ]
+      },
+      "medians": {
+        "baseline": 0.01937856152653694,
+        "candidate": 0.013633620459586382
+      }
+    }
+  ],
+  "small_shapes": [
+    {
+      "shape": [
+        64,
+        64,
+        64
+      ],
+      "exact": true,
+      "times": {
+        "baseline": [
+          7.714765767256418e-06,
+          6.9768478473027544e-06,
+          7.087675233681996e-06,
+          7.947906851768494e-06,
+          6.384216248989105e-06,
+          6.269974013169606e-06
+        ],
+        "candidate": [
+          9.268832703431448e-06,
+          7.315228382746379e-06,
+          8.787959814071655e-06,
+          7.033037642637889e-06,
+          6.6033874948819476e-06,
+          6.52950257062912e-06
+        ]
+      },
+      "medians": {
+        "baseline": 7.032261540492375e-06,
+        "candidate": 7.174133012692134e-06
+      }
+    },
+    {
+      "shape": [
+        64,
+        64,
+        128
+      ],
+      "exact": true,
+      "times": {
+        "baseline": [
+          8.34837555885315e-06,
+          8.42784841855367e-06,
+          8.341235419114431e-06,
+          8.565373718738556e-06,
+          8.230097591876984e-06,
+          8.229166269302368e-06
+        ],
+        "candidate": [
+          1.1112230519453684e-05,
+          7.82497227191925e-06,
+          7.967154184977213e-06,
+          7.721595466136932e-06,
+          7.63715555270513e-06,
+          9.172596037387848e-06
+        ]
+      },
+      "medians": {
+        "baseline": 8.344805488983791e-06,
+        "candidate": 7.896063228448231e-06
+      }
+    },
+    {
+      "shape": [
+        256,
+        512,
+        512
+      ],
+      "exact": true,
+      "times": {
+        "baseline": [
+          0.0006018926699956258,
+          0.0005908232803146044,
+          0.0005793515592813492,
+          0.0005704670523603758,
+          0.0005696828787525495,
+          0.0005700159817934036
+        ],
+        "candidate": [
+          0.0005091006557146708,
+          0.0004521561786532402,
+          0.0004522105058034261,
+          0.00043990959723790485,
+          0.00043983105570077896,
+          0.0004389239475131035
+        ]
+      },
+      "medians": {
+        "baseline": 0.0005749093058208625,
+        "candidate": 0.0004460328879455725
+      }
+    },
+    {
+      "shape": [
+        1500,
+        512,
+        512
+      ],
+      "exact": true,
+      "times": {
+        "baseline": [
+          0.003407002737124761,
+          0.0033754026517271996,
+          0.0033300494154294333,
+          0.0033783077572782836,
+          0.0033179313565293946,
+          0.003363789680103461
+        ],
+        "candidate": [
+          0.0025864429771900177,
+          0.0025921491906046867,
+          0.0025937209526697793,
+          0.0025958443681399026,
+          0.0025359212110439935,
+          0.00255783274769783
+        ]
+      },
+      "medians": {
+        "baseline": 0.00336959616591533,
+        "candidate": 0.0025892960838973522
+      }
+    },
+    {
+      "shape": [
+        1500,
+        2048,
+        512
+      ],
+      "exact": true,
+      "times": {
+        "baseline": [
+          0.012200407994290194,
+          0.012218843835095564,
+          0.012216318398714066,
+          0.012200139462947845,
+          0.012209310506780943,
+          0.01217953891803821
+        ],
+        "candidate": [
+          0.009013148335119089,
+          0.00889143751313289,
+          0.008983223078151545,
+          0.008874552634855112,
+          0.00891584592560927,
+          0.008889734124143919
+        ]
+      },
+      "medians": {
+        "baseline": 0.012204859250535568,
+        "candidate": 0.00890364171937108
+      }
+    },
+    {
+      "shape": [
+        1500,
+        512,
+        2048
+      ],
+      "exact": true,
+      "times": {
+        "baseline": [
+          0.013197347211341063,
+          0.013527834167083105,
+          0.013517748874922594,
+          0.013565033984680971,
+          0.013452887845536074,
+          0.01351807980487744
+        ],
+        "candidate": [
+          0.011229574059446653,
+          0.011101405136287212,
+          0.011096122674643993,
+          0.011139058197538057,
+          0.011073976444701353,
+          0.011091420116523901
+        ]
+      },
+      "medians": {
+        "baseline": 0.013517914339900017,
+        "candidate": 0.011098763905465603
+      }
+    }
+  ]
+}

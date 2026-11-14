@@ -171,6 +171,49 @@ python scripts/nightly_runner.py --tests training_clef_registered_recipe --requi
 The production resume test blocks imports of <code>torch</code> and <code>transformers</code>.</p>
 </section>
 
+<section id="fp32-memory-boundary-experiment">
+<h2>FP32 memory-projection boundary: useful diagnosis, still not certified</h2>
+<p>The bounded <code>--mixed --fp32-memory-projection</code> experiment retains the existing FP32
+memory projection in the authored training graph. Other selected projections retain BF16 operands.
+The independent PyTorch reference uses its original FP32 linear operation for that same projection.
+The report lists actual selected providers and the exception. There is no production kernel, map,
+compiler or application admission change.</p>
+<p>All five experiments were rerun on the same build of main <code>f6f5e6b1e</code>, seed 611,
+CPU PyTorch 2.12.1. The complete small head still uses synthetic frozen features and a bounded task;
+these are not generalization or performance measurements.</p>
+<table class="table"><thead><tr><th>40-update comparison</th><th>Worst gradient error</th><th>Verdict</th></tr></thead><tbody>
+<tr><td>FP32 baseline</td><td>1.375e-6</td><td>PASS</td></tr>
+<tr><td>All selected projections mixed, same state</td><td>6.748e-4</td><td>FAIL at update 18</td></tr>
+<tr><td>FP32 memory exception, same state</td><td>4.170e-5</td><td>FAIL at update 37</td></tr>
+<tr><td>All selected projections mixed, independent trajectory</td><td>0.0328365</td><td>FAIL from update 8</td></tr>
+<tr><td>FP32 memory exception, independent trajectory</td><td>0.00409246</td><td>FAIL, first at update 21</td></tr>
+</tbody></table>
+<p>The exception removes the earlier memory-projection rounding failure, but a new same-state
+rounding boundary appears at <code>evidence1_feedforward_norm_op → evidence1_feedforward1</code>.
+Its first affected input is -1.4179686307907104 versus -1.41796875, rounding to -1.4140625 versus
+-1.421875. Identical-input projection replay gives zero output error and dW error 5.821e-11.
+The independent trajectory additionally encounters a QKV master-weight rounding boundary.
+This is evidence against treating one FP32 exception as a general solution.</p>
+<p>Thresholds are unchanged. Both mixed policies retain numerical FAIL. Native state hashes match
+across same-state/independent diagnostic modes for each policy; resume remains exact. Released-weight
+mixed precision, mixed inference export and performance remain NOT_TESTED. Full reports and packets
+are referenced in <code>docs/notes/clef_fp32_memory_boundary_20261113.json</code>.</p>
+<pre><code>python tests/run_clef_training_oracle.py --mixed --fp32-memory-projection --same-state \
+  --report /tmp/clef-boundary/same-state.json
+python tests/run_clef_training_oracle.py --mixed --fp32-memory-projection \
+  --report /tmp/clef-boundary/independent.json</code></pre>
+<h3>Application-agent readiness</h3>
+<p>The numerical experiment above is separate from the
+<a href="#registered-fp32-training">registered FP32 head-training recipe</a>.
+With an administrator-registered supplied-feature package, the local job service
+now admits <code>clef_head_fp32_v1</code>, executes generated forward/backward and AdamW,
+and exports a native inference package. Clients must discover the running worker's
+capabilities before submitting; <code>clef_head_v8</code> is not a supported alias.</p>
+<p>This is head-only integration, not raw-text/backbone execution. BF16 certification,
+LoRA, QLoRA, remote authentication and job cancellation remain unavailable.
+The mixed-policy numerical failures above remain unchanged.</p>
+</section>
+
 <section id="same-state-pytorch-oracle">
 <h2>Same-state update diagnosis: 39 of 40 comparisons pass</h2>
 <p><code>--same-state</code> copies CKE's pre-step master weights, both AdamW moments and optimizer

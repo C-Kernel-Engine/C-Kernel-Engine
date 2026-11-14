@@ -32,8 +32,15 @@ def main():
         action="store_true",
         help="Diagnostic only: copy native weights and AdamW state into PyTorch before each step",
     )
+    parser.add_argument(
+        "--fp32-memory-projection",
+        action="store_true",
+        help="Experimental mixed policy: retain the memory projection in FP32",
+    )
     parser.add_argument("--report", required=True, type=Path)
     args = parser.parse_args()
+    if args.fp32_memory_projection and not args.mixed:
+        parser.error("--fp32-memory-projection requires --mixed")
     args.report.parent.mkdir(parents=True, exist_ok=True)
     case = unittest.TestCase()
     try:
@@ -42,6 +49,7 @@ def main():
             released=args.released,
             mixed=args.mixed,
             same_state=args.same_state,
+            fp32_memory_projection=args.fp32_memory_projection,
             diagnostic=True,
             artifacts=args.report.with_suffix(""),
         )

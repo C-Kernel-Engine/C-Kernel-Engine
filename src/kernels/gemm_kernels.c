@@ -1096,6 +1096,86 @@ static inline void ck_gemm_nt_f32_llama_production_outputs4_avx2(
     }
 }
 
+#if defined(__FMA__)
+/* Three rows by four columns keep twelve independent accumulators live.
+ * Each output retains the existing ascending eight-lane contraction and hsum.
+ * Only the order of independent outputs changes; no packing or allocation. */
+static inline void ck_gemm_nt_f32_llama_production_m3n4_avx2(
+        const float *A, const float *B, const float *bias, float *C,
+        int N, int K, int row, int col)
+{
+    __m256 acc00 = _mm256_setzero_ps();
+    __m256 acc01 = _mm256_setzero_ps();
+    __m256 acc02 = _mm256_setzero_ps();
+    __m256 acc03 = _mm256_setzero_ps();
+    __m256 acc10 = _mm256_setzero_ps();
+    __m256 acc11 = _mm256_setzero_ps();
+    __m256 acc12 = _mm256_setzero_ps();
+    __m256 acc13 = _mm256_setzero_ps();
+    __m256 acc20 = _mm256_setzero_ps();
+    __m256 acc21 = _mm256_setzero_ps();
+    __m256 acc22 = _mm256_setzero_ps();
+    __m256 acc23 = _mm256_setzero_ps();
+    for (int k = 0; k < K; k += 8) {
+        const __m256 a0 = _mm256_loadu_ps(A + (size_t)(row + 0) * K + k);
+        const __m256 a1 = _mm256_loadu_ps(A + (size_t)(row + 1) * K + k);
+        const __m256 a2 = _mm256_loadu_ps(A + (size_t)(row + 2) * K + k);
+        {
+            const __m256 b = _mm256_loadu_ps(B + (size_t)(col + 0) * K + k);
+            acc00 = _mm256_fmadd_ps(a0, b, acc00);
+            acc10 = _mm256_fmadd_ps(a1, b, acc10);
+            acc20 = _mm256_fmadd_ps(a2, b, acc20);
+        }
+        {
+            const __m256 b = _mm256_loadu_ps(B + (size_t)(col + 1) * K + k);
+            acc01 = _mm256_fmadd_ps(a0, b, acc01);
+            acc11 = _mm256_fmadd_ps(a1, b, acc11);
+            acc21 = _mm256_fmadd_ps(a2, b, acc21);
+        }
+        {
+            const __m256 b = _mm256_loadu_ps(B + (size_t)(col + 2) * K + k);
+            acc02 = _mm256_fmadd_ps(a0, b, acc02);
+            acc12 = _mm256_fmadd_ps(a1, b, acc12);
+            acc22 = _mm256_fmadd_ps(a2, b, acc22);
+        }
+        {
+            const __m256 b = _mm256_loadu_ps(B + (size_t)(col + 3) * K + k);
+            acc03 = _mm256_fmadd_ps(a0, b, acc03);
+            acc13 = _mm256_fmadd_ps(a1, b, acc13);
+            acc23 = _mm256_fmadd_ps(a2, b, acc23);
+        }
+    }
+    {
+        const float sum[4] = {
+            ck_hsum256_llamafile(acc00), ck_hsum256_llamafile(acc01),
+            ck_hsum256_llamafile(acc02), ck_hsum256_llamafile(acc03)
+        };
+        for (int n = 0; n < 4; ++n)
+            C[(size_t)(row + 0) * N + col + n] =
+                bias ? sum[n] + bias[col + n] : sum[n];
+    }
+    {
+        const float sum[4] = {
+            ck_hsum256_llamafile(acc10), ck_hsum256_llamafile(acc11),
+            ck_hsum256_llamafile(acc12), ck_hsum256_llamafile(acc13)
+        };
+        for (int n = 0; n < 4; ++n)
+            C[(size_t)(row + 1) * N + col + n] =
+                bias ? sum[n] + bias[col + n] : sum[n];
+    }
+    {
+        const float sum[4] = {
+            ck_hsum256_llamafile(acc20), ck_hsum256_llamafile(acc21),
+            ck_hsum256_llamafile(acc22), ck_hsum256_llamafile(acc23)
+        };
+        for (int n = 0; n < 4; ++n)
+            C[(size_t)(row + 2) * N + col + n] =
+                bias ? sum[n] + bias[col + n] : sum[n];
+    }
+}
+
+#endif
+
 /* Four rows share each pair of weight vectors. Each output keeps the same
  * ascending eight-lane contraction and horizontal reduction as outputs4. */
 static inline void ck_gemm_nt_f32_llama_production_m4n2_avx2(
@@ -1190,6 +1270,26 @@ void gemm_nt_f32_llama_production_output_range(
 #if defined(__AVX__) && !defined(__AVX512F__)
         const int row = index / N;
         const int col = index - row * N;
+#if defined(__FMA__)
+        /* Require four complete microtiles; shorter ranges retain M4N2 reuse. */
+        if (grouped_reduction && col == 0 && N >= 4 &&
+            (output_end - index) / N >= 12) {
+            int rows = (output_end - index) / N;
+            if (rows > 32) rows = 32;
+            rows -= rows % 3;
+            int n = 0;
+            for (; n + 4 <= N; n += 4)
+                for (int r = 0; r < rows; r += 3)
+                    ck_gemm_nt_f32_llama_production_m3n4_avx2(
+                        A, B, bias, C, N, K, row + r, n);
+            for (; n < N; ++n)
+                for (int r = 0; r < rows; ++r)
+                    ck_gemm_nt_f32_llama_production_output(
+                        A, B, bias, C, M, N, K, (row + r) * N + n);
+            index += rows * N;
+            continue;
+        }
+#endif
         if (grouped_reduction && col == 0 && N >= 2 &&
             (output_end - index) / N >= 4) {
             /* Keep a bounded activation panel hot while reusing each weight
