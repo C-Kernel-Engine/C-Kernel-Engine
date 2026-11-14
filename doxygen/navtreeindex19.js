@@ -1,5 +1,7 @@
 var NAVTREEINDEX19 =
 {
+"rmsnorm__kernels__bf16_8c_source.html":[2,0,1,1,131],
+"rmsnorm__kernels__int4_8c.html":[2,0,1,1,132],
 "rmsnorm__kernels__int4_8c.html#a59a34ee64765705aafa4472344e32e5e":[2,0,1,1,132,1],
 "rmsnorm__kernels__int4_8c.html#a6a38fc674c4b95afb267cc4d4b5cde57":[2,0,1,1,132,4],
 "rmsnorm__kernels__int4_8c.html#a8636e5ec5a86b1093378e6b9e47232f6":[2,0,1,1,132,2],
@@ -247,7 +249,5 @@ var NAVTREEINDEX19 =
 "structAffinityInfo.html#ad7c543698d7fa66a65b006a8e16e5368":[1,0,0,1],
 "structAffinityInfo.html#aed549054fb9376cc874f3d8d710d1e89":[1,0,0,5],
 "structCKAudioWavInfo.html":[1,0,21],
-"structCKAudioWavInfo.html#a028e31e0ebfd2ddaa941c841b5a4df90":[1,0,21,5],
-"structCKAudioWavInfo.html#a056e487f230f8cd625dec984e79711dd":[1,0,21,6],
-"structCKAudioWavInfo.html#a5977de925aa541e28ce598ac6005dc19":[1,0,21,1]
+"structCKAudioWavInfo.html#a028e31e0ebfd2ddaa941c841b5a4df90":[1,0,21,5]
 };

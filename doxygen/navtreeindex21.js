@@ -1,5 +1,7 @@
 var NAVTREEINDEX21 =
 {
+"structCKLayerForwardParams.html#a63e37652b3bb5e0d394ea70af0895595":[1,0,42,12],
+"structCKLayerForwardParams.html#a64b3c9bf08573696fe23f773e0af3f4a":[1,0,42,36],
 "structCKLayerForwardParams.html#a6d0ecfad1a74e3fe0583785851741e71":[1,0,42,30],
 "structCKLayerForwardParams.html#a6ef0a14fb20cf0840ecc43d05ece08a5":[1,0,42,25],
 "structCKLayerForwardParams.html#a72a52720f195370d45e7cc00a6985651":[1,0,42,39],
@@ -247,7 +249,5 @@ var NAVTREEINDEX21 =
 "structCKMergeRule.html":[1,0,52],
 "structCKMergeRule.html#a2f4fb999c8ad7581926948836ad96949":[1,0,52,0],
 "structCKMergeRule.html#ad429814a773c9faa0526991078347e4f":[1,0,52,3],
-"structCKMergeRule.html#adacd50b760f95bfe3bd04d8618fb4c19":[1,0,52,1],
-"structCKMergeRule.html#af89e288682de3079e22683c57b629d4c":[1,0,52,2],
-"structCKMetric.html":[1,0,53]
+"structCKMergeRule.html#adacd50b760f95bfe3bd04d8618fb4c19":[1,0,52,1]
 };

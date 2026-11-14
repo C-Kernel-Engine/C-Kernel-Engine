@@ -1056,11 +1056,45 @@
 
 <div class="alert alert-warning"><strong>No full vision artifact is certified for the HTTP harness yet.</strong> Generated image paths run, but independent numerical, task-quality, and live-serving gates have not all passed on one pinned artifact. Unsupported bundles should continue rejecting image requests.</div>
 
+<section id="native-visual-session">
+<h2>Native visual session: first connected decoder boundary</h2>
+<p>The next experimental step adds <code>ck_session_v8_generate_visual</code> and
+<code>SessionV8.generate_visual</code>. One already-encoded visual block sits between exact rendered token
+segments. The existing generation lock, decoder loop, token callbacks, cancellation flag and failure reset
+remain the execution owner. This is not yet an HTTP image route or resident encoder service.</p>
+<p>The generated decoder exports its exact visual-row width, including any deep-stack slices. Older bundles
+without that contract reject this entry. Native admission checks token IDs, finite visual values, buffer
+extent, grid geometry, explicit text position, sampling parameters and both requested and loaded context
+capacities before reset. Failed or cancelled execution resets the affected state. Visual requests do not
+publish text checkpoints or enable prefix reuse. The Python binding owns a prefix copy during execution;
+its storage must be included in the future HTTP memory budget.</p>
+<p>A fresh Qwen3-VL-8B-Instruct Q4_K_M decoder and BF16 vision projector processed a generated 56-by-56
+image into four visual rows of 16,384 floats, with 20 total prompt rows. Three native session repetitions
+matched direct generated execution for all four full-vocabulary logit rows, active positions and declared
+KV arenas. KV comparison includes arena padding; internal bridge scratch is not captured. This establishes
+same-artifact session equivalence, not an independent encoder oracle, OCR accuracy, long-context or harness
+certification. Four-token generation stopped at its requested budget.</p>
+<p>The first real load exposed a deployment gap: standalone bridge libraries relied on a globally preloaded
+tokenizer. The bundle compiler now links and packages that dependency, hashes it in the build fingerprint,
+and invalidates old compile stamps. A fresh-process relocation test covers this defect.</p>
+<p><a href="assets/vision-native-session-20261114.json">Retained native evidence and limitations</a>.
+The opt-in replay command consumes an existing bridge report and its exact prefix/logit captures:</p>
+<pre><code>python version/v8/scripts/certify_visual_session_v8.py   --bridge-report /path/to/bridge_report.json   --prefix-f32 /path/to/prefix.f32   --reference-logits-f32 /path/to/logits.f32   --output /path/to/current-session-report.json</code></pre>
+<p>The probe writes INCOMPLETE before starting and FAIL on missing inputs or an execution error. It verifies
+actually loaded library hashes. Synthetic compiled tests separately exercise A/B/A, failed prefill, invalid
+admission without mutation, cancellation, close ownership and successful follow-up. They are not model
+arithmetic certification. Both tests and the artifact replay remain distinct from the pending HTTP tests.</p>
+<p>Next: bind one encoder/preprocessing artifact to this session entry, enforce upload/concurrency and
+visual-token budgets, then certify the HTTP result, streaming and cancellation. Only afterward advertise
+experimental image capability and connect a real harness. Current live image admission stays closed;
+existing text and speech services are unchanged.</p>
+</section>
+
 <section id="serving-integration">
 <h2>Experimental serving integration: upload contract first</h2>
 <p>As of 2026-11-13, the ordinary HTTP session still rejects live images. The generated standalone bridge
-already executes image preprocessing, encoder, visual prefix and decoder, but the text session ABI does not
-expose that connected path. The first serving change adds <code>server.vision_input.prepare_vision_input</code>:
+already executes image preprocessing, encoder, visual prefix and decoder, but the complete upload/encoder/session path is not
+yet exposed through HTTP. The first serving change adds <code>server.vision_input.prepare_vision_input</code>:
 a model-independent, ordered input contract. This is a callable validation helper, not a new HTTP endpoint
 or a claim of harness acceptance.</p>
 <p>The harness owns local file access. It must read an explicitly selected file and upload its bytes as a

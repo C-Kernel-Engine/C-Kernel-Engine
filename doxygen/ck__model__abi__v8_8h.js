@@ -13,6 +13,7 @@ var ck__model__abi__v8_8h =
     [ "ck_model_get_abi_version_v8_fn", "ck__model__abi__v8_8h.html#a5385b6e9bc0a739d8b8edd12cf376521", null ],
     [ "ck_model_get_capabilities_v8_fn", "ck__model__abi__v8_8h.html#a36dc8190afb9f8678f05368dcad38cee", null ],
     [ "ck_model_get_runtime_descriptor_v8_fn", "ck__model__abi__v8_8h.html#a0b7c6d803b4d3ae2a169e5fd8e1e448c", null ],
+    [ "ck_model_get_visual_prefix_width_v8_fn", "ck__model__abi__v8_8h.html#a7062d995876d52d672e73ebb733b139d", null ],
     [ "ck_model_prefill_append_row_group_v8_fn", "ck__model__abi__v8_8h.html#ac81260f7275f8c9bc007111a341b3f62", null ],
     [ "ck_model_sequence_checkpoint_bind_instance_v8_fn", "ck__model__abi__v8_8h.html#a64c02cc076e545f18b49bd831dba3fbf", null ],
     [ "ck_model_sequence_checkpoint_requirements_v8_fn", "ck__model__abi__v8_8h.html#a635ea32a9b2ab5dee0f8f88adc81825c", null ],
