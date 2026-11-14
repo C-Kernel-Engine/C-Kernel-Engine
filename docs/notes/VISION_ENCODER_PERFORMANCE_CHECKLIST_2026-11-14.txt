@@ -1,0 +1,62 @@
+VISION ENCODER PERFORMANCE REGRESSION CHECKLIST
+
+Scope: shared providers and exact generated consumers, not family-wide parity.
+Preserving a retained output does not establish agreement with an independent
+oracle. Numerical fidelity, image-task quality and latency remain separate gates.
+
+COMPLETED / MERGED
+[x] BF16 projection output-row reuse (#1110): preserve ascending-K arithmetic.
+[x] Attention tail reuse and strict softmax optimization (#1127).
+[x] Large table GELU independent-output dispatch (#1128).
+    Guard: tests/test_v8_gelu_ggml_parallel.py, standard nightly.
+    Check actual dispatch, exact output bits, tails, single-worker and nesting.
+
+CURRENT CHANGE
+[x] Implement explicit RoPE and matched LayerNorm parallel dispatch wrappers.
+    Arithmetic remains in existing kernels; provider maps select wrappers.
+[x] Preserve small-work, nesting and overlapping-buffer serial fallbacks.
+[x] Execute synthetic output-preservation tests and assert dispatch occurs.
+[x] Register tests/test_v8_encoder_row_parallel.py in standard nightly.
+[x] Local contract and generated-inventory gates passed.
+[x] Execute focused nightly entries (zero skips), portable and native-ISA tests.
+[ ] Complete rebuilt affected-consumer gates and final-head required nightly.
+[ ] Rebuild generated Qwen3-VL and Qwen3.6 consumers using selected wrappers.
+[ ] Validate Gemma's LayerNorm consumer; it does not use Qwen vision M-RoPE.
+[ ] Repeat capture-disabled whole-encoder timing on physical cores only.
+    Diagnostic interposer gains are not production-wrapper acceptance evidence.
+
+NEXT MEASUREMENTS
+[ ] Attribute GEMM-specific cache traffic, separately from encoder-wide traffic.
+[ ] Measure packing/conversion reuse, SIMD instruction mix and vector tails.
+[ ] Measure core occupancy per operation, dispatch overhead and serial intervals.
+[ ] Compare core-group locality on Ryzen's separate L3 domains.
+[ ] Test blocking or prefetch changes only after identifying a costly access.
+    Cache misses are not inherently defects; optimize elapsed time, not a ratio.
+    IBS latency-weighted shares are not CPU-cycle or wall-time shares.
+    Missing memory-source attribution must remain unknown, not cache HIT.
+
+PER-CHANGE ACCEPTANCE
+[ ] Retain baseline and candidate source, library, provider and input identities.
+[ ] Independent kernel reference plus exact old-provider comparisons where promised.
+[ ] Nonzero inputs, tails, geometry boundaries, aliasing and nested execution.
+[ ] Execute generated selection; reject unexpected serial/provider fallback.
+[ ] Compare outputs on every available affected consumer.
+[ ] Run interleaved warmed repetitions with loading/capture excluded from timing.
+[ ] Keep thread count, physical-core affinity, geometry and host load matched.
+[ ] Record elapsed time, CPU time, peak memory, packing and allocation costs.
+[ ] Regenerate inventories; run freshness and final-head required nightly.
+
+COVERAGE BOUNDARY
+Qwen3-VL and Qwen3.6: retained performance consumers exist; current wrapper
+rebuild and acceptance are pending. Gemma vision selects layernorm_fp32_exact,
+so it is an affected consumer, not an automatically measured speedup.
+Qwen3.5/Qwen3.8/Next and other families: require exact vision-capable artifacts,
+provider selections and their own results. Text support does not prove vision.
+Keep all private corpus identities, content and size out of public reports.
+
+CURRENT VALIDATION COMMANDS
+.venv/bin/python -m pytest -q tests/test_v8_encoder_row_parallel.py
+CK_ENCODER_TEST_CFLAGS=-march=native .venv/bin/python -m pytest -q tests/test_v8_encoder_row_parallel.py
+make v8-kernel-map-contracts
+.venv/bin/python scripts/nightly_runner.py --tests encoder_row_parallel gelu_ggml_parallel --require-executed
+Native tests were also executed on Ryzen pinned to physical CPUs 0-3.
