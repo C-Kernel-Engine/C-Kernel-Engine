@@ -796,7 +796,7 @@ class NumericalExecutionContractTests(unittest.TestCase):
         )
         self.assertEqual(plan["kernel"]["id"], "layernorm_fp32_exact")
         self.assertEqual(
-            plan["kernel"]["function"], "layernorm_naive_serial_matched_precision"
+            plan["kernel"]["function"], "layernorm_fp32_exact_parallel_dispatch"
         )
         semantics = plan["contract"]["semantics"]
         self.assertEqual(semantics["compute"]["contraction"], "enabled")
@@ -805,9 +805,9 @@ class NumericalExecutionContractTests(unittest.TestCase):
 
     def test_mrope_storage_contract_matrix_resolves_exact_functions(self):
         expected = {
-            "vision_mrope_fp32_input_fp32_compute_fp32_output": ("mrope_qk_vision", "mrope_qk_vision"),
-            "vision_mrope_fp32_input_fp32_compute_bf16_output": ("mrope_qk_vision_bf16_storage", "mrope_qk_vision_bf16_storage"),
-            "vision_mrope_fp32_input_fp32_compute_fp16_output": ("mrope_qk_vision_fp16_storage", "mrope_qk_vision_fp16_storage"),
+            "vision_mrope_fp32_input_fp32_compute_fp32_output": ("mrope_qk_vision", "mrope_qk_vision_parallel_dispatch"),
+            "vision_mrope_fp32_input_fp32_compute_bf16_output": ("mrope_qk_vision_bf16_storage", "mrope_qk_vision_bf16_storage_parallel_dispatch"),
+            "vision_mrope_fp32_input_fp32_compute_fp16_output": ("mrope_qk_vision_fp16_storage", "mrope_qk_vision_fp16_storage_parallel_dispatch"),
         }
         for contract_id, (kernel_id, function) in expected.items():
             with self.subTest(contract_id=contract_id):
@@ -835,7 +835,7 @@ class NumericalExecutionContractTests(unittest.TestCase):
             "vision_mrope_fp32_input_fp32_compute_bf16_output",
         )
         self.assertEqual(plan["kernel"]["id"], "mrope_qk_vision_bf16_storage")
-        self.assertEqual(plan["kernel"]["function"], "mrope_qk_vision_bf16_storage")
+        self.assertEqual(plan["kernel"]["function"], "mrope_qk_vision_bf16_storage_parallel_dispatch")
 
     def test_qwen3vl_decoder_norm_contracts_resolve_exact_providers(self):
         circuit_doc = resolver.load_json(

@@ -41,6 +41,13 @@ CKMathBackend ckernel_backend_native(void);
 // Enable stricter numeric parity (single-thread + double-accumulation GEMM).
 void ck_set_strict_parity(int enabled);
 int ck_strict_parity_enabled(void);
+
+void layernorm_fp32_exact_parallel_dispatch(const float *input, const float *gamma,
+    const float *beta, float *output, float *mean_cache, float *rstd_cache,
+    int tokens, int d_model, float eps);
+void mrope_qk_vision_parallel_dispatch(float *q, float *k, const int32_t *positions, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int n_dims, int section_0, int section_1, int section_2, int section_3, int n_ctx_orig, float freq_base, float freq_scale, float ext_factor, float attn_factor, float beta_fast, float beta_slow);
+void mrope_qk_vision_fp16_storage_parallel_dispatch(float *q, float *k, const int32_t *positions, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int n_dims, int section_0, int section_1, int section_2, int section_3, int n_ctx_orig, float freq_base, float freq_scale, float ext_factor, float attn_factor, float beta_fast, float beta_slow);
+void mrope_qk_vision_bf16_storage_parallel_dispatch(float *q, float *k, const int32_t *positions, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int n_dims, int section_0, int section_1, int section_2, int section_3, int n_ctx_orig, float freq_base, float freq_scale, float ext_factor, float attn_factor, float beta_fast, float beta_slow);
 void ck_strict_store_next_gemm_a(const float *data, size_t elems);
 const float *ck_strict_consume_next_gemm_a(size_t elems);
 int ck_strict_mtmd_clip_encode_planar_f32(const float *planar,

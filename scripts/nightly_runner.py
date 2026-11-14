@@ -720,6 +720,10 @@ TEST_SUITES = {
         "GGML GELU independent-output parallelism", "kernels",
         ROOT / "tests" / "test_v8_gelu_ggml_parallel.py", timeout_sec=180,
     ),
+    "encoder_row_parallel": TestSuite(
+        "Encoder RoPE and LayerNorm independent-row dispatch", "kernels",
+        ROOT / "tests" / "test_v8_encoder_row_parallel.py", timeout_sec=180,
+    ),
     "attention_sliding": TestSuite("Attention Sliding Window", "kernels", UNITTEST_DIR / "test_attention_sliding_contract.py"),
     "attention_gemma3_arithmetic": TestSuite(
         "Gemma3 Attention Arithmetic Fixture", "kernels",
