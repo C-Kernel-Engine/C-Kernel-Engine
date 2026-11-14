@@ -50,7 +50,7 @@ int guarded_tail(void) {
     const size_t page = (size_t)sysconf(_SC_PAGESIZE);
     void *mapping[3] = {NULL, NULL, NULL};
     float *values[3];
-    const size_t count[3] = {5*7, 7*72, 5*72};
+    const size_t count[3] = {9*7, 7*72, 9*72};
     for (int i=0; i<3; ++i) {
         mapping[i] = mmap(NULL, 2*page, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
         if (mapping[i] == MAP_FAILED) return 2;
@@ -58,10 +58,10 @@ int guarded_tail(void) {
         values[i] = (float *)((char *)mapping[i]+page-count[i]*sizeof(float));
         for(size_t j=0; j<count[i]; ++j) values[i][j] = (float)((int)(j%17)-8)*0.125f;
     }
-    float expected[5*72];
+    float expected[9*72];
     memcpy(expected, values[2], sizeof(expected));
-    reference(expected, values[0], values[1], 5, 7, 72);
-    replay(values[2], values[0], values[1], 5, 7, 72);
+    reference(expected, values[0], values[1], 9, 7, 72);
+    replay(values[2], values[0], values[1], 9, 7, 72);
     int result = memcmp(expected, values[2], sizeof(expected)) != 0;
     for (int i=0; i<3; ++i) munmap(mapping[i], 2*page);
     return result;
@@ -87,8 +87,8 @@ int guarded_tail(void) {
 
     def test_shapes_guards_and_identical_input_reference(self):
         rng = np.random.default_rng(20261113)
-        for m in (1, 3, 4, 5, 7):
-            for k in (1, 3, 17, 73):
+        for m in (1, 3, 4, 5, 7, 8, 9, 15, 16, 17):
+            for k in (0, 1, 3, 17, 64, 73):
                 for n in (1, 7, 8, 15, 16, 17, 63, 64, 65, 71, 72, 73, 79, 80):
                     with self.subTest(m=m, k=k, n=n):
                         a = rng.uniform(-2, 2, (m, k)).astype("f4")
@@ -108,15 +108,28 @@ int guarded_tail(void) {
                         self.assertEqual(b.tobytes(), b_before)
 
     def test_tail_is_nonfused_even_with_compiler_contraction_enabled(self):
-        a = np.full((5, 1), np.float32(1 + 2**-23))
+        a = np.full((9, 1), np.float32(1 + 2**-23))
         b = np.full((1, 72), np.float32(1 - 2**-23))
-        c = np.full((5, 72), -1, dtype="f4")
+        c = np.full((9, 72), -1, dtype="f4")
         self.run_op("replay", a, b, c)
         self.assertTrue(np.all(c[:, 64:] == 0))
         self.assertTrue(np.all(c[:, :64] != 0), "fixture must detect fused arithmetic")
 
     def test_tail_does_not_access_guard_pages(self):
         self.assertEqual(self.lib.guarded_tail(), 0)
+
+    def test_query_tiles_preserve_accumulation_order(self):
+        rng = np.random.default_rng(20261114)
+        for m in (64, 65, 336, 337):
+            for k, n in ((72, 64), (64, 72)):
+                with self.subTest(m=m, k=k, n=n):
+                    a = rng.uniform(-1, 1, (m, k)).astype("f4")
+                    b = rng.uniform(-1, 1, (k, n)).astype("f4")
+                    expected = rng.uniform(-1, 1, (m, n)).astype("f4")
+                    actual = expected.copy()
+                    self.run_op("reference", a, b, expected)
+                    self.run_op("replay", a, b, actual)
+                    np.testing.assert_array_equal(actual.view("u4"), expected.view("u4"))
 
 
 if __name__ == "__main__":

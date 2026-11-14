@@ -712,6 +712,10 @@ TEST_SUITES = {
         "AVX-512 Attention Matmul Tail", "kernels",
         ROOT / "tests" / "test_v8_attention_matmul_tail.py", timeout_sec=180,
     ),
+    "attention_softmax_exact": TestSuite(
+        "AVX-512 Attention Softmax Exact Reduction", "kernels",
+        ROOT / "tests" / "test_v8_attention_softmax_exact.py", timeout_sec=180,
+    ),
     "attention_sliding": TestSuite("Attention Sliding Window", "kernels", UNITTEST_DIR / "test_attention_sliding_contract.py"),
     "attention_gemma3_arithmetic": TestSuite(
         "Gemma3 Attention Arithmetic Fixture", "kernels",
