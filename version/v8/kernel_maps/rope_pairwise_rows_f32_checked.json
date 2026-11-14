@@ -1,0 +1,236 @@
+{
+  "id": "rope_pairwise_rows_f32_checked",
+  "op": "rope_pairwise_rows_checked",
+  "operation_interface": "rope.pairwise.explicit_tables.checked.fp32.v1",
+  "variant": "scalar_pairwise_fp32_no_fma",
+  "selection": {
+    "status": "candidate",
+    "priority": 100,
+    "equivalence_group": "rope_pairwise_explicit_tables_fp32",
+    "phases": [
+      "prefill"
+    ]
+  },
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "input",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "H*D"
+      ],
+      "layout": "token_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "cosine",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "D/2"
+      ],
+      "layout": "token_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "sine",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "D/2"
+      ],
+      "layout": "token_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "output",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "H*D"
+      ],
+      "layout": "token_major_contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "scratch": [],
+  "dims": [
+    "T",
+    "H",
+    "D"
+  ],
+  "impl": {
+    "function": "rope_pairwise_rows_f32_checked",
+    "c_declaration": "int rope_pairwise_rows_f32_checked(const float *input, size_t input_elements, const float *cosine, const float *sine, size_t table_elements, float *output, size_t output_elements, size_t tokens, size_t heads, size_t head_dim);",
+    "sources": [
+      "src/kernels/rope_pairwise_rows_checked.c"
+    ]
+  },
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
+  "numerical_capabilities": [
+    {
+      "contract_id": "rope_pairwise_explicit_tables_fp32",
+      "status": "observed",
+      "phases": [
+        "prefill"
+      ],
+      "function": "rope_pairwise_rows_f32_checked",
+      "explicit_selector": true,
+      "implementation": {
+        "isa_dispatch": "scalar",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": [
+            "serial"
+          ],
+          "dispatch": [
+            "inline"
+          ],
+          "reduction_order_effect": "none"
+        }
+      },
+      "arithmetic": {
+        "partial_accumulator": "fp32",
+        "merge_order": "none",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false,
+        "split_strategy": "independent_outputs"
+      }
+    }
+  ],
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "input",
+        "source": "activation:input",
+        "cast": "const float*",
+        "ports": [
+          "input:input"
+        ]
+      },
+      {
+        "name": "input_elements",
+        "source": "runtime:rotation_input_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "cosine",
+        "source": "activation:cosine",
+        "cast": "const float*",
+        "ports": [
+          "input:cosine"
+        ]
+      },
+      {
+        "name": "sine",
+        "source": "activation:sine",
+        "cast": "const float*",
+        "ports": [
+          "input:sine"
+        ]
+      },
+      {
+        "name": "table_elements",
+        "source": "runtime:rotation_table_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "output",
+        "source": "output:output",
+        "cast": "float*",
+        "ports": [
+          "output:output"
+        ]
+      },
+      {
+        "name": "output_elements",
+        "source": "runtime:rotation_output_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "tokens",
+        "source": "runtime:rotation_tokens",
+        "value_type": "size_t"
+      },
+      {
+        "name": "heads",
+        "source": "runtime:rotation_heads",
+        "value_type": "size_t"
+      },
+      {
+        "name": "head_dim",
+        "source": "runtime:rotation_head_dim",
+        "value_type": "size_t"
+      }
+    ]
+  },
+  "call_constant_contract": {
+    "shape_symbols": {
+      "T": "rotation_tokens",
+      "H": "rotation_heads",
+      "D": "rotation_head_dim"
+    },
+    "buffer_spans": [
+      {
+        "pointer": "input",
+        "elements": "rotation_input_elements",
+        "rows": 1,
+        "width": "rotation_input_elements",
+        "element_bytes": 4
+      },
+      {
+        "pointer": "cosine",
+        "elements": "rotation_table_elements",
+        "rows": 1,
+        "width": "rotation_table_elements",
+        "element_bytes": 4
+      },
+      {
+        "pointer": "sine",
+        "elements": "rotation_table_elements",
+        "rows": 1,
+        "width": "rotation_table_elements",
+        "element_bytes": 4
+      },
+      {
+        "pointer": "output",
+        "elements": "rotation_output_elements",
+        "rows": 1,
+        "width": "rotation_output_elements",
+        "element_bytes": 4
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "tests/test_v8_ming3_dit_block.py", "tests/test_v8_rope_pairwise_rows.py"
+    ],
+    "oracle": "Independent consecutive-pair rotation; supplied cosine/sine tables, no frequency-generation claim"
+  },
+  "notes": "Checked nonaliasing token-major pairwise rotation with explicit position tables. Each product and sum rounds in FP32 with FMA disabled; no cache generation or position policy."
+}

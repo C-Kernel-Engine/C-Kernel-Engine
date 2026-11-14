@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 518,
+      "total": 521,
       "by_op": {
         "add_backward": 1,
         "add_rows_backward_train_f32": 1,
@@ -195,6 +195,7 @@
         "rope": 19,
         "rope_backward": 2,
         "rope_init": 3,
+        "rope_pairwise_rows_checked": 1,
         "rope_qk_bounded": 1,
         "rowwise_bias_add": 1,
         "runtime_copy_valid": 1,
@@ -221,6 +222,8 @@
         "shared_swiglu_expert_mlp": 6,
         "silu_mul_rows_checked": 1,
         "silu_strided_checked": 1,
+        "sinusoidal_constant_tables_checked": 1,
+        "sinusoidal_features_checked": 1,
         "softmax": 1,
         "spatial_merge": 3,
         "speculative_commit_or_reject": 1,
@@ -94854,6 +94857,245 @@
       "_source_file": "rope_forward_qk_split_llama.json"
     },
     {
+      "id": "rope_pairwise_rows_f32_checked",
+      "op": "rope_pairwise_rows_checked",
+      "operation_interface": "rope.pairwise.explicit_tables.checked.fp32.v1",
+      "variant": "scalar_pairwise_fp32_no_fma",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "equivalence_group": "rope_pairwise_explicit_tables_fp32",
+        "phases": [
+          "prefill"
+        ]
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "H*D"
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "cosine",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "D/2"
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "sine",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "D/2"
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "H*D"
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "T",
+        "H",
+        "D"
+      ],
+      "impl": {
+        "function": "rope_pairwise_rows_f32_checked",
+        "c_declaration": "int rope_pairwise_rows_f32_checked(const float *input, size_t input_elements, const float *cosine, const float *sine, size_t table_elements, float *output, size_t output_elements, size_t tokens, size_t heads, size_t head_dim);",
+        "sources": [
+          "src/kernels/rope_pairwise_rows_checked.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "rope_pairwise_explicit_tables_fp32",
+          "status": "observed",
+          "phases": [
+            "prefill"
+          ],
+          "function": "rope_pairwise_rows_f32_checked",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp32",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "independent_outputs"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const float*",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "input_elements",
+            "source": "runtime:rotation_input_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "cosine",
+            "source": "activation:cosine",
+            "cast": "const float*",
+            "ports": [
+              "input:cosine"
+            ]
+          },
+          {
+            "name": "sine",
+            "source": "activation:sine",
+            "cast": "const float*",
+            "ports": [
+              "input:sine"
+            ]
+          },
+          {
+            "name": "table_elements",
+            "source": "runtime:rotation_table_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:rotation_output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "tokens",
+            "source": "runtime:rotation_tokens",
+            "value_type": "size_t"
+          },
+          {
+            "name": "heads",
+            "source": "runtime:rotation_heads",
+            "value_type": "size_t"
+          },
+          {
+            "name": "head_dim",
+            "source": "runtime:rotation_head_dim",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "T": "rotation_tokens",
+          "H": "rotation_heads",
+          "D": "rotation_head_dim"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "elements": "rotation_input_elements",
+            "rows": 1,
+            "width": "rotation_input_elements",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "cosine",
+            "elements": "rotation_table_elements",
+            "rows": 1,
+            "width": "rotation_table_elements",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "sine",
+            "elements": "rotation_table_elements",
+            "rows": 1,
+            "width": "rotation_table_elements",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "output",
+            "elements": "rotation_output_elements",
+            "rows": 1,
+            "width": "rotation_output_elements",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_ming3_dit_block.py",
+          "tests/test_v8_rope_pairwise_rows.py"
+        ],
+        "oracle": "Independent consecutive-pair rotation; supplied cosine/sine tables, no frequency-generation claim"
+      },
+      "notes": "Checked nonaliasing token-major pairwise rotation with explicit position tables. Each product and sum rounds in FP32 with FMA disabled; no cache generation or position policy.",
+      "name": "rope_pairwise_rows_f32_checked",
+      "_source_file": "rope_pairwise_rows_f32_checked.json"
+    },
+    {
       "id": "rope_precompute_cache",
       "op": "rope_init",
       "operation_interface": "rope_init.cache.half_split.fp32.v1",
@@ -100682,6 +100924,464 @@
       },
       "name": "silu_strided_f32_checked",
       "_source_file": "silu_strided_f32_checked.json"
+    },
+    {
+      "id": "sinusoidal_constant_tables_f32_checked",
+      "op": "sinusoidal_constant_tables_checked",
+      "operation_interface": "position.sinusoidal.constant_tables.checked.fp32.v1",
+      "variant": "scalar_libm_two_product_phase",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "equivalence_group": "sinusoidal_explicit_frequencies_fp32",
+        "phases": [
+          "prefill"
+        ]
+      },
+      "quant": {
+        "weight": "fp32",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [],
+      "weights": [
+        {
+          "name": "positions",
+          "dtype": "fp32",
+          "shape": [
+            "R"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "frequencies",
+          "dtype": "fp32",
+          "shape": [
+            "C"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "sine",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "C"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "cosine",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "C"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "R",
+        "C"
+      ],
+      "impl": {
+        "function": "sinusoidal_tables_f32_checked",
+        "c_declaration": "int sinusoidal_tables_f32_checked(const float *positions, size_t position_elements, const float *frequencies, size_t frequency_elements, float scale, float *sine, size_t sine_elements, float *cosine, size_t cosine_elements, size_t rows, size_t columns);",
+        "sources": [
+          "src/kernels/sinusoidal_rows_checked.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "sinusoidal_explicit_frequencies_fp32",
+          "status": "observed",
+          "phases": [
+            "prefill"
+          ],
+          "function": "sinusoidal_tables_f32_checked",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "none",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "independent_outputs"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "positions",
+            "source": "weight:positions",
+            "cast": "const float*",
+            "ports": [
+              "weight:positions"
+            ]
+          },
+          {
+            "name": "position_elements",
+            "source": "runtime:sinusoid_position_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "frequencies",
+            "source": "weight:frequencies",
+            "cast": "const float*",
+            "ports": [
+              "weight:frequencies"
+            ]
+          },
+          {
+            "name": "frequency_elements",
+            "source": "runtime:sinusoid_frequency_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "scale",
+            "source": "param:scale"
+          },
+          {
+            "name": "sine",
+            "source": "output:sine",
+            "cast": "float*",
+            "ports": [
+              "output:sine"
+            ]
+          },
+          {
+            "name": "sine_elements",
+            "source": "runtime:sinusoid_sine_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "cosine",
+            "source": "output:cosine",
+            "cast": "float*",
+            "ports": [
+              "output:cosine"
+            ]
+          },
+          {
+            "name": "cosine_elements",
+            "source": "runtime:sinusoid_cosine_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:sinusoid_rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "columns",
+            "source": "runtime:sinusoid_columns",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "R": "sinusoid_rows",
+          "C": "sinusoid_columns"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "positions",
+            "elements": "sinusoid_position_elements",
+            "rows": 1,
+            "width": "sinusoid_position_elements",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "frequencies",
+            "elements": "sinusoid_frequency_elements",
+            "rows": 1,
+            "width": "sinusoid_frequency_elements",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "sine",
+            "elements": "sinusoid_sine_elements",
+            "rows": 1,
+            "width": "sinusoid_sine_elements",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "cosine",
+            "elements": "sinusoid_cosine_elements",
+            "rows": 1,
+            "width": "sinusoid_cosine_elements",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_sinusoidal_rows.py",
+          "tests/test_v8_ming3_dit.py"
+        ],
+        "oracle": "FP32 phase products, independent double sin/cos; supplied inverse-frequency artifact values"
+      },
+      "notes": "Two ordered FP32 phase products, sinf/cosf, FP32 outputs. Frequencies are explicit weight artifacts. Positions are explicit constant weight artifacts; outputs are separate tables.",
+      "params": [
+        {
+          "name": "scale",
+          "dtype": "float32"
+        }
+      ],
+      "name": "sinusoidal_constant_tables_f32_checked",
+      "_source_file": "sinusoidal_constant_tables_f32_checked.json"
+    },
+    {
+      "id": "sinusoidal_features_f32_checked",
+      "op": "sinusoidal_features_checked",
+      "operation_interface": "position.sinusoidal.features.checked.fp32.v1",
+      "variant": "scalar_libm_two_product_phase",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "equivalence_group": "sinusoidal_explicit_frequencies_fp32",
+        "phases": [
+          "prefill"
+        ]
+      },
+      "quant": {
+        "weight": "fp32",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "positions",
+          "dtype": "fp32",
+          "shape": [
+            "R"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "frequencies",
+          "dtype": "fp32",
+          "shape": [
+            "C"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "2*C"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "R",
+        "C"
+      ],
+      "impl": {
+        "function": "sinusoidal_features_f32_checked",
+        "c_declaration": "int sinusoidal_features_f32_checked(const float *positions, size_t position_elements, const float *frequencies, size_t frequency_elements, float scale, float *output, size_t output_elements, size_t rows, size_t columns);",
+        "sources": [
+          "src/kernels/sinusoidal_rows_checked.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "sinusoidal_explicit_frequencies_fp32",
+          "status": "observed",
+          "phases": [
+            "prefill"
+          ],
+          "function": "sinusoidal_features_f32_checked",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "none",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "independent_outputs"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "positions",
+            "source": "activation:positions",
+            "cast": "const float*",
+            "ports": [
+              "input:positions"
+            ]
+          },
+          {
+            "name": "position_elements",
+            "source": "runtime:sinusoid_position_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "frequencies",
+            "source": "weight:frequencies",
+            "cast": "const float*",
+            "ports": [
+              "weight:frequencies"
+            ]
+          },
+          {
+            "name": "frequency_elements",
+            "source": "runtime:sinusoid_frequency_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "scale",
+            "source": "param:scale"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:sinusoid_output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:sinusoid_rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "columns",
+            "source": "runtime:sinusoid_columns",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "R": "sinusoid_rows",
+          "C": "sinusoid_columns"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "positions",
+            "elements": "sinusoid_position_elements",
+            "rows": 1,
+            "width": "sinusoid_position_elements",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "frequencies",
+            "elements": "sinusoid_frequency_elements",
+            "rows": 1,
+            "width": "sinusoid_frequency_elements",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "output",
+            "elements": "sinusoid_output_elements",
+            "rows": 1,
+            "width": "sinusoid_output_elements",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_sinusoidal_rows.py",
+          "tests/test_v8_ming3_dit.py"
+        ],
+        "oracle": "FP32 phase products, independent double sin/cos; supplied inverse-frequency artifact values"
+      },
+      "notes": "Two ordered FP32 phase products, sinf/cosf, FP32 outputs. Frequencies are explicit weight artifacts. Output concatenates sine then cosine per row.",
+      "params": [
+        {
+          "name": "scale",
+          "dtype": "float32"
+        }
+      ],
+      "name": "sinusoidal_features_f32_checked",
+      "_source_file": "sinusoidal_features_f32_checked.json"
     },
     {
       "id": "softmax_cross_entropy_loss",

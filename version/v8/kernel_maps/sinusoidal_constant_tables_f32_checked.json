@@ -1,0 +1,243 @@
+{
+  "id": "sinusoidal_constant_tables_f32_checked",
+  "op": "sinusoidal_constant_tables_checked",
+  "operation_interface": "position.sinusoidal.constant_tables.checked.fp32.v1",
+  "variant": "scalar_libm_two_product_phase",
+  "selection": {
+    "status": "candidate",
+    "priority": 100,
+    "equivalence_group": "sinusoidal_explicit_frequencies_fp32",
+    "phases": [
+      "prefill"
+    ]
+  },
+  "quant": {
+    "weight": "fp32",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [],
+  "weights": [
+    {
+      "name": "positions",
+      "dtype": "fp32",
+      "shape": [
+        "R"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "weight",
+      "consumption": "required"
+    },
+    {
+      "name": "frequencies",
+      "dtype": "fp32",
+      "shape": [
+        "C"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "weight",
+      "consumption": "required"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "sine",
+      "dtype": "fp32",
+      "shape": [
+        "R",
+        "C"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "cosine",
+      "dtype": "fp32",
+      "shape": [
+        "R",
+        "C"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "scratch": [],
+  "dims": [
+    "R",
+    "C"
+  ],
+  "impl": {
+    "function": "sinusoidal_tables_f32_checked",
+    "c_declaration": "int sinusoidal_tables_f32_checked(const float *positions, size_t position_elements, const float *frequencies, size_t frequency_elements, float scale, float *sine, size_t sine_elements, float *cosine, size_t cosine_elements, size_t rows, size_t columns);",
+    "sources": [
+      "src/kernels/sinusoidal_rows_checked.c"
+    ]
+  },
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
+  "numerical_capabilities": [
+    {
+      "contract_id": "sinusoidal_explicit_frequencies_fp32",
+      "status": "observed",
+      "phases": [
+        "prefill"
+      ],
+      "function": "sinusoidal_tables_f32_checked",
+      "explicit_selector": true,
+      "implementation": {
+        "isa_dispatch": "scalar",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": [
+            "serial"
+          ],
+          "dispatch": [
+            "inline"
+          ],
+          "reduction_order_effect": "none"
+        }
+      },
+      "arithmetic": {
+        "partial_accumulator": "none",
+        "merge_order": "none",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false,
+        "split_strategy": "independent_outputs"
+      }
+    }
+  ],
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "positions",
+        "source": "weight:positions",
+        "cast": "const float*",
+        "ports": [
+          "weight:positions"
+        ]
+      },
+      {
+        "name": "position_elements",
+        "source": "runtime:sinusoid_position_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "frequencies",
+        "source": "weight:frequencies",
+        "cast": "const float*",
+        "ports": [
+          "weight:frequencies"
+        ]
+      },
+      {
+        "name": "frequency_elements",
+        "source": "runtime:sinusoid_frequency_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "scale",
+        "source": "param:scale"
+      },
+      {
+        "name": "sine",
+        "source": "output:sine",
+        "cast": "float*",
+        "ports": [
+          "output:sine"
+        ]
+      },
+      {
+        "name": "sine_elements",
+        "source": "runtime:sinusoid_sine_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "cosine",
+        "source": "output:cosine",
+        "cast": "float*",
+        "ports": [
+          "output:cosine"
+        ]
+      },
+      {
+        "name": "cosine_elements",
+        "source": "runtime:sinusoid_cosine_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "rows",
+        "source": "runtime:sinusoid_rows",
+        "value_type": "size_t"
+      },
+      {
+        "name": "columns",
+        "source": "runtime:sinusoid_columns",
+        "value_type": "size_t"
+      }
+    ]
+  },
+  "call_constant_contract": {
+    "shape_symbols": {
+      "R": "sinusoid_rows",
+      "C": "sinusoid_columns"
+    },
+    "buffer_spans": [
+      {
+        "pointer": "positions",
+        "elements": "sinusoid_position_elements",
+        "rows": 1,
+        "width": "sinusoid_position_elements",
+        "element_bytes": 4
+      },
+      {
+        "pointer": "frequencies",
+        "elements": "sinusoid_frequency_elements",
+        "rows": 1,
+        "width": "sinusoid_frequency_elements",
+        "element_bytes": 4
+      },
+      {
+        "pointer": "sine",
+        "elements": "sinusoid_sine_elements",
+        "rows": 1,
+        "width": "sinusoid_sine_elements",
+        "element_bytes": 4
+      },
+      {
+        "pointer": "cosine",
+        "elements": "sinusoid_cosine_elements",
+        "rows": 1,
+        "width": "sinusoid_cosine_elements",
+        "element_bytes": 4
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "tests/test_v8_sinusoidal_rows.py",
+      "tests/test_v8_ming3_dit.py"
+    ],
+    "oracle": "FP32 phase products, independent double sin/cos; supplied inverse-frequency artifact values"
+  },
+  "notes": "Two ordered FP32 phase products, sinf/cosf, FP32 outputs. Frequencies are explicit weight artifacts. Positions are explicit constant weight artifacts; outputs are separate tables.",
+  "params": [
+    {
+      "name": "scale",
+      "dtype": "float32"
+    }
+  ]
+}
