@@ -823,7 +823,10 @@ recurrent and audio operations without assuming attention layers or model names.
 unique declared output producer, regardless of operation order. Declared input,
 weight, parameter and constant tensors without producers remain external; missing
 activation producers remain unresolved. Duplicate tensor producers are ambiguous,
-including producers outside the bounded capture. External or symbolic inputs, missing outputs,
+including producers outside the bounded capture. When both operation and tensor
+references are present, they must identify the same output. Conflicts are reported
+as <code>conflicting_references</code>; missing output tensor metadata remains
+<code>tensor_identity_unverified</code>. Both references stay visible for inspection. External or symbolic inputs, missing outputs,
 duplicate IDs and references outside the capture are labeled separately.
 Neither operation order nor shared buffer names creates an inferred edge.</p>
 <p>The report retains at most 256 operations per artifact and 2,048 operations

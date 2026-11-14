@@ -187,6 +187,24 @@ def _operation_graph(data, budget):
                 ref['status'] = 'output_outside_capture' if source[0]['outputs_truncated'] else 'output_not_declared'
             else:
                 ref['status'] = 'resolved'
+                if ref['tensor'] is not None:
+                    candidates = producers.get(ref['tensor'], [])
+                    if len(candidates) > 1:
+                        ref['status'] = 'ambiguous'
+                    elif len(candidates) == 1:
+                        index, identity, output = candidates[0]
+                        ref.update(producer_index=index, producer_id=identity, producer_output=output)
+                        if index != source[0]['index'] or output != ref['from_output']:
+                            ref['status'] = 'conflicting_references'
+                    else:
+                        source_op = operations[source[0]['index']]
+                        source_flow = source_op.get('dataflow') if isinstance(source_op.get('dataflow'), dict) else source_op
+                        source_outputs = source_flow.get('outputs') if isinstance(source_flow.get('outputs'), dict) else {}
+                        declared = source_outputs.get(ref['from_output'], {})
+                        declared_tensor = declared.get('tensor') if isinstance(declared, dict) else None
+                        # Missing producer metadata is distinct from contradictory metadata.
+                        ref['status'] = ('conflicting_references' if isinstance(declared_tensor, str)
+                                         else 'tensor_identity_unverified')
     return {'nodes': nodes, 'total_operations': len(operations),
             'truncated': len(nodes) < len(operations), 'edge_policy': 'explicit_from_op_or_unique_tensor_producer'}
 
