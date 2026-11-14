@@ -2993,6 +2993,7 @@ def emit_decode_function(
     function_name: str = "ck_decode",
     store_token: bool = True,
     advance_position: bool = True,
+    entry_contract: Optional[Dict] = None,
 ) -> str:
     """Emit the decode function with all ops unrolled."""
     config = config or {}
@@ -3044,6 +3045,12 @@ static void __CK_DECODE_FUNCTION__(CKModel *model, int32_t token) {
     #endif
 """
     prologue = prologue.replace("__CK_DECODE_FUNCTION__", function_name)
+    if entry_contract is not None:
+        from embedded_entry_contract_v8 import validate_embedded_decode_entry
+        validate_embedded_decode_entry(entry_contract, ops, config)
+        if function_name != entry_contract["name"] or store_token:
+            raise ValueError("embedded entry signature disagrees with its contract")
+        prologue = prologue.replace("CKModel *model, int32_t token", "CKModel *model")
     prologue = prologue.replace(
         "int debug_outproj_fp32 = debug_outproj_env ? (atoi(debug_outproj_env) != 0) : 0;",
         f"int debug_outproj_fp32 = debug_outproj_env ? (atoi(debug_outproj_env) != 0) : {debug_outproj_default};",
@@ -3116,7 +3123,7 @@ static void __CK_DECODE_FUNCTION__(CKModel *model, int32_t token) {
     if store_token:
         lines.append(f"    /* Store token at offset {token_offset} (from layout) */")
         lines.append(f"    *(int32_t*)({token_base} + {token_offset}) = token;")
-    else:
+    elif entry_contract is None:
         lines.append("    (void)token;")
     lines.append("")
 
@@ -3127,6 +3134,8 @@ static void __CK_DECODE_FUNCTION__(CKModel *model, int32_t token) {
     embed_scale_emitted = False
     op_counts: Dict[tuple[int, str], int] = {}
     for seq_idx, op in enumerate(ops):
+        if entry_contract is not None and seq_idx in entry_contract["skip_indices"]:
+            continue
         key = (int(op.get("layer", -1)), str(op.get("op", "")))
         op_instance_idx = op_counts.get(key, 0)
         op_counts[key] = op_instance_idx + 1
@@ -3145,6 +3154,12 @@ static void __CK_DECODE_FUNCTION__(CKModel *model, int32_t token) {
                 force_mlp_gate_up_q8_contract_layers=force_mlp_gate_up_q8_contract_layers,
             )
         )
+        if entry_contract is not None:
+            connection = entry_contract["after_operations"].get(str(seq_idx))
+            if connection is not None:
+                lines.append("    if (g_bridge_deepstack_active) {")
+                lines.append(emit_op(connection, debug=debug, profile=profile, dump=dump))
+                lines.append("    }")
         if (scale_embeddings_sqrt_dim
                 and not embed_scale_emitted
                 and op.get("op") == "dense_embedding_lookup"
@@ -4537,6 +4552,18 @@ static void _ck_profile_dump(void) {
             scale_embeddings_sqrt_dim=scale_embeddings_sqrt_dim,
         )
     )
+    embedded_entry = ir.get("embedded_decode_entry")
+    if embedded_entry is not None:
+        from embedded_entry_contract_v8 import validate_embedded_decode_entry
+        validate_embedded_decode_entry(embedded_entry, ops, config)
+        parts.append("static int g_bridge_prefix_tokens;\n")
+        if embedded_entry["after_operations"]:
+            parts.append("static int g_bridge_deepstack_active;\n"
+                         f"static float g_bridge_deepstack_slices[{embedded_entry['deepstack_elements']}];\n")
+        parts.append(emit_decode_function(
+            ops, token_offset, token_base, config=config, debug=debug,
+            profile=profile, dump=dump, function_name=embedded_entry["name"],
+            store_token=False, entry_contract=embedded_entry))
     if prefill_continuation_ops is not None:
         if len(prefill_continuation_ops) != len(ops):
             raise RuntimeError(

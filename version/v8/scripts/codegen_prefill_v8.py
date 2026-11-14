@@ -3055,7 +3055,8 @@ static void ck_prefill_from_embedded_range(CKModel *model, int num_tokens, int p
         lines.append("")
 
     _annotate_kv_transpose_roles(ops)
-    residual_add_count_total = 0
+    from embedded_entry_contract_v8 import layer_output_boundaries
+    bridge_layer_outputs = {index: layer for layer, index in layer_output_boundaries(ops).items()} if has_decoder_multimodal_bridge else {}
     residual_add_counts_by_layer: Dict[int, int] = {}
     residual_save_counts_by_layer: Dict[int, int] = {}
     rmsnorm_counts_by_layer: Dict[int, int] = {}
@@ -3279,12 +3280,9 @@ static void ck_prefill_from_embedded_range(CKModel *model, int num_tokens, int p
                     )
         lines.append(op_code)
         lines.append(f"    if (stop_seq == {seq_idx}) return;")
-        if has_decoder_multimodal_bridge and op_type == "residual_add":
-            residual_add_count_total += 1
-            if residual_add_count_total % 2 == 0:
-                deepstack_layer = residual_add_count_total // 2 - 1
-                if 0 <= deepstack_layer < num_deepstack_layers:
-                    lines.append(f"    ck_multimodal_prefill_deepstack_add(model, {deepstack_layer}, num_tokens);")
+        deepstack_layer = bridge_layer_outputs.get(seq_idx)
+        if deepstack_layer is not None and deepstack_layer < num_deepstack_layers:
+            lines.append(f"    ck_multimodal_prefill_deepstack_add(model, {deepstack_layer}, num_tokens);")
         lines.append("")
 
     if terminal_rows:

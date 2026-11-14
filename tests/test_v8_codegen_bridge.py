@@ -946,6 +946,12 @@ class V8CodegenBridgeTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, msg=result.stderr)
 
             text = c_path.read_text(encoding="utf-8")
+            import hashlib
+            entries = json.loads(c_path.with_suffix(".entries.json").read_text())
+            self.assertEqual(entries["generated_c_sha256"], hashlib.sha256(text.encode()).hexdigest())
+            self.assertEqual(entries["embedded_decode_entry"]["input_contract"]["shape"], [1, 256])
+            self.assertTrue(entries["embedded_decode_entry"]["after_operations"])
+
             self.assertIn("static void ck_prefill_from_embedded", text)
             self.assertIn("CK_EXPORT int ck_model_forward_segments_grid_ex", text)
             self.assertIn("CK_EXPORT int ck_model_forward_mixed_grid_ex", text)
@@ -1283,6 +1289,108 @@ class V8CodegenBridgeTests(unittest.TestCase):
 
             text = c_path.read_text(encoding="utf-8")
             self.assertIn('ck_dump_tensor((float*)(model->bump + A_ATTN_SCRATCH), 0, "kqv_out", NUM_HEADS * HEAD_DIM);', text)
+
+
+class EmbeddedEntryContractTests(unittest.TestCase):
+    def fixture(self):
+        from embedded_entry_contract_v8 import plan_embedded_decode_entry
+        x = "(float*)model->bump"
+        def arg(name, expr, source, buffer=None):
+            result = dict(name=name, expr=expr, source=source)
+            if buffer:
+                result["buffer_ref"] = buffer
+            return result
+        embedding = dict(idx=0, op="dense_embedding_lookup", section="header", layer=-1,
+                         args=[arg("output", x, "output:output", "embedded_input")])
+        add = dict(op="residual_add", function="ck_residual_add_token_major_parallel_dispatch",
+                   section="body", layer=0,
+                   call_abi=dict(owner="kernel_map", kernel_id="ck_residual_add_token_major"),
+                   args=[arg("a", x, "activation:a", "embedded_input"),
+                         arg("b", "ones", "activation:b", "ones"),
+                         arg("out", x, "output:out", "embedded_input"),
+                         arg("tokens", "1", "dim:seq_len"),
+                         arg("aligned_embed_dim", "4", "dim:embed_dim")])
+        ops = [embedding] + [dict(add, idx=i) for i in range(1,4)]
+        ops.append(dict(idx=4, op="fixture_scale", function="double_row", section="body", layer=0,
+                        args=[arg("out", x, "output:out", "embedded_input")]))
+        config = dict(embed_dim=4, num_deepstack_layers=1,
+                      multimodal_bridge_contract=dict(prefix_policy="test"))
+        return ops, config, plan_embedded_decode_entry(ops, config)
+
+    def test_boundaries_are_not_residual_counts(self):
+        import copy
+        from embedded_entry_contract_v8 import layer_output_boundaries, validate_embedded_decode_entry
+        ops, config, plan = self.fixture()
+        self.assertEqual(layer_output_boundaries(ops), {0: 4})
+        self.assertEqual(set(plan["after_operations"]), {"4"})
+        bad = copy.deepcopy(plan)
+        bad["after_operations"]["2"] = bad["after_operations"].pop("4")
+        with self.assertRaises(ValueError):
+            validate_embedded_decode_entry(bad, ops, config)
+        with self.assertRaises(ValueError):
+            layer_output_boundaries([dict(section="body", layer=0),
+                                     dict(section="body", layer=1),
+                                     dict(section="body", layer=0)])
+        bad_provider = copy.deepcopy(ops)
+        for operation in bad_provider:
+            if operation.get("op") == "residual_add":
+                operation["function"] = "undeclared_residual"
+        from embedded_entry_contract_v8 import plan_embedded_decode_entry
+        with self.assertRaises(ValueError):
+            plan_embedded_decode_entry(bad_provider, config)
+        bad = copy.deepcopy(ops)
+        bad[-1]["args"][0]["buffer_ref"] = "unused"
+        with self.assertRaises(ValueError):
+            from embedded_entry_contract_v8 import plan_embedded_decode_entry
+            plan_embedded_decode_entry(bad, config)
+
+    def test_generated_nontransformer_entry_executes_connection(self):
+        from codegen_core_v8 import emit_decode_function
+        ops, config, plan = self.fixture()
+        emitted = emit_decode_function(ops, 0, "MEM", config=config,
+                                       function_name="ck_decode_embedded", store_token=False,
+                                       entry_contract=plan)
+        self.assertNotIn("embedding_lookup", emitted)
+        self.assertNotIn("int32_t token", emitted)
+        # Exercise the real residual provider. Three sums followed by scaling
+        # distinguish the declared layer boundary from the former second-sum rule.
+        prefix = r"""
+#include <stdint.h>
+#include <stdlib.h>
+#include <stddef.h>
+typedef struct { uint8_t *bump, *activations; int pos, rope_pos, bridge_has_explicit_positions; } CKModel;
+static float ones[4] = {1,1,1,1};
+static int g_bridge_deepstack_active = 1;
+static float g_bridge_deepstack_slices[4] = {10,10,10,10};
+void ck_residual_add_token_major_parallel_dispatch(const float*,const float*,float*,int,int);
+static void double_row(float *out) { for(int i=0;i<4;i++) out[i] *= 2; }
+static void ck_debug_export_hidden(CKModel *m,int l,const char *n,const float *x,size_t c) {}
+static void ck_debug_import_checkpoint(CKModel *m,int l,const char *n,float *x,size_t c) {}
+"""
+        suffix = r"""
+int main(void) {
+    float data[4] = {1,2,3,4}; CKModel model = {(uint8_t*)data, (uint8_t*)data, 0,0,0};
+    ck_decode_embedded(&model);
+    for(int i=0;i<4;i++) if(data[i] != (i+1+3)*2+10) return 1;
+    if(model.pos != 1 || model.rope_pos != 1) return 2;
+    g_bridge_deepstack_active = 0;
+    ck_decode_embedded(&model);
+    for(int i=0;i<4;i++) if(data[i] != (((i+1+3)*2+10)+3)*2) return 3;
+    return 0;
+}
+"""
+        with tempfile.TemporaryDirectory(prefix="embedded-entry-native-") as tmp:
+            path = Path(tmp)
+            (path / "host.c").write_text(prefix + emitted + suffix)
+            engine = ROOT / "build/libckernel_engine.so"
+            if not engine.exists():
+                self.skipTest("native engine asset required")
+            built = subprocess.run(["cc", "-std=c11", str(path / "host.c"), str(engine),
+                                    "-Wl,-rpath," + str(engine.parent), "-o", str(path / "host")],
+                                   text=True, capture_output=True)
+            self.assertEqual(built.returncode, 0, built.stderr)
+            run = subprocess.run([str(path / "host")], text=True, capture_output=True)
+            self.assertEqual(run.returncode, 0, run.stderr)
 
 
 if __name__ == "__main__":
