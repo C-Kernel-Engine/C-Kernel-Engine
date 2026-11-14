@@ -120,6 +120,21 @@ class _GenerateResult(ctypes.Structure):
     ]
 
 
+class _VisualInput(ctypes.Structure):
+    _fields_ = [
+        ("struct_size", ctypes.c_uint32), ("abi_version", ctypes.c_uint32),
+        ("tokens_before", ctypes.POINTER(ctypes.c_int32)),
+        ("tokens_before_count", ctypes.c_int32),
+        ("prefix", ctypes.POINTER(ctypes.c_float)),
+        ("prefix_float_count", ctypes.c_uint64),
+        ("prefix_tokens", ctypes.c_int32), ("prefix_width", ctypes.c_int32),
+        ("grid_x", ctypes.c_int32), ("grid_y", ctypes.c_int32),
+        ("text_position", ctypes.c_int32),
+        ("tokens_after", ctypes.POINTER(ctypes.c_int32)),
+        ("tokens_after_count", ctypes.c_int32),
+    ]
+
+
 class _Progress(ctypes.Structure):
     _fields_ = [
         ("struct_size", ctypes.c_uint32),
@@ -263,6 +278,11 @@ def _configure_abi(lib: Any, name: str) -> None:
             ctypes.c_void_p,
             ctypes.POINTER(_GenerateResult),
         ]
+    elif name == "ck_session_v8_generate_visual":
+        fn.restype = ctypes.c_int
+        fn.argtypes = [ctypes.c_void_p, ctypes.c_void_p,
+                       ctypes.POINTER(_VisualInput), ctypes.c_void_p,
+                       ctypes.c_void_p, ctypes.POINTER(_GenerateResult)]
     elif name == "ck_session_v8_generate_ids":
         fn.restype = ctypes.c_int
         fn.argtypes = [ctypes.c_void_p, ctypes.c_void_p,
@@ -844,6 +864,53 @@ class SessionV8:
             self._batch2 = batch
             return self._batch2
 
+    def generate_visual(self, tokens_before: Sequence[int], prefix,
+                        tokens_after: Sequence[int], *, prefix_tokens: int,
+                        prefix_width: int, grid_x: int, grid_y: int,
+                        text_position: int, max_tokens: int,
+                        on_token: Callable[[int, str], int],
+                        stop_on_text: Sequence[str] = ()) -> dict[str, Any]:
+        """Generate from one encoder block; no image decoding or HTTP admission.
+
+        The exact rendered IDs, grid and position policy come from the pinned
+        artifact adapter. No text checkpoint/cache reuse is permitted. Holding
+        the session lock retains all caller-owned buffers and protects close.
+        This first entry uses deterministic greedy generation.
+        """
+        from array import array
+        counts = (prefix_tokens, prefix_width, grid_x, grid_y, text_position, max_tokens)
+        if any(type(n) is not int or not 0 <= n <= 0x7fffffff for n in counts):
+            raise ValueError("invalid visual dimensions or budget")
+        if min(prefix_tokens, prefix_width, grid_x, grid_y, max_tokens) <= 0:
+            raise ValueError("visual dimensions and budget must be positive")
+        if grid_x * grid_y != prefix_tokens:
+            raise ValueError("visual grid does not match token count")
+        if not isinstance(prefix, array) or prefix.typecode != 'f' or prefix.itemsize != 4:
+            raise TypeError("prefix must be an array of native float32 values")
+        if len(prefix) != prefix_tokens * prefix_width:
+            raise ValueError("visual prefix extent mismatch")
+        for ids in (tokens_before, tokens_after):
+            if len(ids) > 0x7fffffff or any(type(i) is not int or not 0 <= i <= 0x7fffffff for i in ids):
+                raise ValueError("invalid visual prompt token IDs")
+        before = (ctypes.c_int32 * len(tokens_before))(*tokens_before)
+        after = (ctypes.c_int32 * len(tokens_after))(*tokens_after)
+        # Copy so another Python thread cannot alter the encoder array in flight.
+        owned_prefix = (ctypes.c_float * len(prefix)).from_buffer_copy(prefix)
+        visual = _VisualInput(ctypes.sizeof(_VisualInput), self.CK_ABI_VERSION,
+            before, len(before), owned_prefix, len(prefix), prefix_tokens,
+            prefix_width, grid_x, grid_y, text_position, after, len(after))
+        with self._lock:
+            if self.session is None:
+                raise SessionError(-6, "session is closed")
+            try:
+                _configure_abi(self.lib, "ck_session_v8_generate_visual")
+            except AttributeError as exc:
+                raise SessionError(-5, "native visual session ABI is unavailable") from exc
+            return self.generate(None, "", max_tokens=max_tokens, temperature=0.0,
+                top_p=1.0, on_token=on_token, stop_on_text=stop_on_text,
+                flags=CK_SESSION_REQUEST_RAW_PROMPT | CK_SESSION_REQUEST_REJECT_PROMPT_TRUNCATION,
+                _visual_input=visual)
+
     def generate(
         self,
         system: str | None,
@@ -857,6 +924,7 @@ class SessionV8:
         stop_on_text: Sequence[str] = (),
         stop_at_eos: bool = False,
         prompt_ids: Sequence[int] | None = None,
+        _visual_input: _VisualInput | None = None,
     ) -> dict[str, Any]:
         request = _GenerateRequest(
             struct_size=ctypes.sizeof(_GenerateRequest),
@@ -922,7 +990,13 @@ class SessionV8:
                 return 1
             return 0
 
-        if prompt_ids is None:
+        if _visual_input is not None:
+            if prompt_ids is not None:
+                raise ValueError("visual and ordinary prompt IDs are mutually exclusive")
+            status = self.lib.ck_session_v8_generate_visual(
+                self.session, ctypes.byref(request), ctypes.byref(_visual_input),
+                callback, None, ctypes.byref(result))
+        elif prompt_ids is None:
             status = self.lib.ck_session_v8_generate(
                 self.session, ctypes.byref(request), callback, None,
                 ctypes.byref(result))

@@ -184,6 +184,7 @@ typedef struct {
     forward_mixed_ex_t forward_mixed_ex;
     forward_mixed_grid_ex_t forward_mixed_grid_ex;
     forward_segments_grid_ex_t forward_segments_grid_ex;
+    get_int_t get_visual_prefix_width;
     get_logits_t get_logits;
     get_int_t get_logits_stride;
     get_int_t get_context;
@@ -1884,6 +1885,7 @@ static bool load_model_api(const char *lib_path, ModelAPI *api) {
     resolve_symbol(api->handle, "ck_model_forward_mixed_ex", (void **)&api->forward_mixed_ex, false);
     resolve_symbol(api->handle, "ck_model_forward_mixed_grid_ex", (void **)&api->forward_mixed_grid_ex, false);
     resolve_symbol(api->handle, "ck_model_forward_segments_grid_ex", (void **)&api->forward_segments_grid_ex, false);
+    resolve_symbol(api->handle, "ck_model_get_visual_prefix_width", (void **)&api->get_visual_prefix_width, false);
     resolve_symbol(api->handle, "ck_model_get_logits", (void **)&api->get_logits, false);
     resolve_symbol(api->handle, "ck_model_get_logits_stride", (void **)&api->get_logits_stride, false);
     resolve_symbol(api->handle, "ck_model_kv_cache_enable", (void **)&api->kv_enable, false);
@@ -6042,10 +6044,109 @@ int ck_session_v8_format_chat(
     return session->api.format_chat(system_text, user_text, output, capacity);
 }
 
+static int session_validate_visual(CKSessionV8 *session,
+        const CKSessionGenerateRequestV8 *request,
+        const CKSessionVisualInputV8 *v) {
+    ModelAPI *api = &session->api;
+    if (!api->has_descriptor ||
+        !(api->descriptor.capabilities & CK_MODEL_CAP_MIXED_EMBEDDING_PREFILL) ||
+        !(api->descriptor.capabilities & CK_MODEL_CAP_AUTOREGRESSIVE_DECODE) ||
+        !api->forward_segments_grid_ex || !api->get_visual_prefix_width ||
+        api->get_visual_prefix_width() <= 0 || !api->get_logits ||
+        !api->get_logits_stride || !api->get_active_tokens || !api->kv_reset)
+        return session_error(session, CK_SESSION_V8_ERROR_CAPABILITY,
+                             "loaded model lacks checked visual generation contract");
+    int capacity = session->context_length;
+    if (api->descriptor.context_length > 0 && api->descriptor.context_length < capacity)
+        capacity = api->descriptor.context_length;
+    if (api->get_context) {
+        int loaded_capacity = api->get_context();
+        if (loaded_capacity <= 0) return CK_SESSION_V8_ERROR_CAPABILITY;
+        if (loaded_capacity < capacity) capacity = loaded_capacity;
+    }
+    const int64_t total = (int64_t)v->tokens_before_count + v->prefix_tokens +
+                          v->tokens_after_count;
+    const uint32_t allowed = CK_SESSION_REQUEST_RAW_PROMPT |
+        CK_SESSION_REQUEST_IGNORE_EOS | CK_SESSION_REQUEST_REJECT_PROMPT_TRUNCATION;
+    if (v->struct_size != sizeof(*v) || v->abi_version != CK_SESSION_ABI_V8_VERSION ||
+        !(request->flags & CK_SESSION_REQUEST_RAW_PROMPT) || (request->flags & ~allowed) ||
+        (request->system_text && request->system_text[0]) || request->user_text[0] ||
+        !isfinite(request->temperature) || request->temperature < 0.0f ||
+        !isfinite(request->top_p) || request->top_p <= 0.0f || request->top_p > 1.0f ||
+        request->max_tokens <= 0 || v->tokens_before_count < 0 ||
+        v->tokens_after_count < 0 || v->prefix_tokens <= 0 ||
+        v->prefix_width != api->get_visual_prefix_width() || !v->prefix ||
+        (v->tokens_before_count && !v->tokens_before) ||
+        (v->tokens_after_count && !v->tokens_after) ||
+        v->prefix_float_count != (uint64_t)v->prefix_tokens * (uint64_t)v->prefix_width ||
+        v->prefix_float_count > SIZE_MAX / sizeof(float) ||
+        v->grid_x <= 0 || v->grid_y <= 0 ||
+        (int64_t)v->grid_x * v->grid_y != v->prefix_tokens ||
+        total <= 0 || total > capacity ||
+        request->max_tokens > capacity - total ||
+        (int64_t)v->text_position < (int64_t)v->tokens_before_count +
+            (v->grid_x > v->grid_y ? v->grid_x : v->grid_y) ||
+        (int64_t)v->text_position + v->tokens_after_count + request->max_tokens > capacity)
+        return session_error(session, CK_SESSION_V8_ERROR_INVALID_ARGUMENT,
+                             "invalid visual segments, geometry or capacity");
+    int vocab = api->get_vocab_size ? api->get_vocab_size() : 0;
+    if (vocab <= 0) return CK_SESSION_V8_ERROR_CAPABILITY;
+    for (int part = 0; part < 2; ++part) {
+        const int32_t *ids = part ? v->tokens_after : v->tokens_before;
+        const int count = part ? v->tokens_after_count : v->tokens_before_count;
+        for (int i = 0; i < count; ++i)
+            if (ids[i] < 0 || ids[i] >= vocab)
+                return session_error(session, CK_SESSION_V8_ERROR_INVALID_ARGUMENT,
+                                     "invalid visual prompt token ID");
+    }
+    for (uint64_t i = 0; i < v->prefix_float_count; ++i)
+        if (!isfinite(v->prefix[i]))
+            return session_error(session, CK_SESSION_V8_ERROR_INVALID_ARGUMENT,
+                                 "nonfinite visual prefix");
+    return CK_SESSION_V8_OK;
+}
+
+static int session_run_visual(CKSessionV8 *session, CLIOptions *opt,
+                              const CKSessionVisualInputV8 *v) {
+    ModelAPI *api = &session->api;
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    g_prefill_time_ms = g_decode_time_ms = 0.0;
+    g_decode_count = 0;
+    opt->state_mutated = true;
+    session->checkpoint_ready = 0;
+    api->kv_reset();
+    int status = api->forward_segments_grid_ex(v->tokens_before,
+        v->tokens_before_count, v->prefix, v->prefix_tokens, v->prefix_width,
+        v->grid_x, v->grid_y, v->text_position, v->tokens_after,
+        v->tokens_after_count, NULL);
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    g_prefill_time_ms = (end.tv_sec - start.tv_sec) * 1000.0 +
+                       (end.tv_nsec - start.tv_nsec) / 1000000.0;
+    g_prompt_tokens = v->tokens_before_count + v->prefix_tokens + v->tokens_after_count;
+    g_user_tokens = v->tokens_before_count + v->tokens_after_count;
+    if (cli_cancel_requested(opt)) {
+        opt->session_result->prompt_tokens = g_prompt_tokens;
+        opt->session_result->prefill_time_ms = g_prefill_time_ms;
+        opt->session_result->stop_reason = CK_SESSION_STOP_CANCELLED;
+        return 0;
+    }
+    if (status != 0 || api->get_active_tokens() != g_prompt_tokens) return -1;
+    float *logits = api->get_logits();
+    const int vocab = api->get_vocab_size();
+    const int stride = api->get_logits_stride();
+    if (!logits || vocab <= 0 || stride < 0 || (stride > 0 && stride < vocab)) return -1;
+    if (stride > 0) logits += (size_t)(g_prompt_tokens - 1) * (size_t)stride;
+    for (int i = 0; i < vocab; ++i) if (!isfinite(logits[i])) return -1;
+    session_progress_set_phase(session, CK_SESSION_PROGRESS_DECODE);
+    return run_generation_loop(api, opt);
+}
+
 static int ck_session_v8_generate_impl(
     CKSessionV8 *session,
     const CKSessionGenerateRequestV8 *request,
     const int32_t *prompt_ids, int32_t prompt_id_count,
+    const CKSessionVisualInputV8 *visual,
     ck_session_token_callback_v8 callback,
     void *user_data,
     CKSessionGenerateResultV8 *result) {
@@ -6067,6 +6168,13 @@ static int ck_session_v8_generate_impl(
         pthread_mutex_unlock(&session->generation_lock);
         return session_error(session, CK_SESSION_V8_ERROR_BUSY,
                              "bounded batch mode owns the generated model");
+    }
+    if (visual) {
+        int checked = session_validate_visual(session, request, visual);
+        if (checked != CK_SESSION_V8_OK) {
+            pthread_mutex_unlock(&session->generation_lock);
+            return checked;
+        }
     }
     int32_t *owned_ids = NULL;
     if (prompt_ids) {
@@ -6142,7 +6250,7 @@ static int ck_session_v8_generate_impl(
     opt.progress_session = session;
     opt.session_result = result;
 
-    int status = owned_ids
+    int status = visual ? session_run_visual(session, &opt, visual) : owned_ids
         ? run_token_ids(&session->api, &opt, owned_ids, prompt_id_count,
                         prompt_id_count)
         : run_prompt(&session->api, &opt, request->user_text);
@@ -6166,7 +6274,7 @@ static int ck_session_v8_generate_impl(
         session->api.kv_reset();
     }
     if (opt.state_mutated) {
-        session->checkpoint_ready = status == 0 &&
+        session->checkpoint_ready = !visual && status == 0 &&
             result->stop_reason != CK_SESSION_STOP_CANCELLED;
     }
     session_progress_set_phase(session, CK_SESSION_PROGRESS_COMPLETE);
@@ -6180,7 +6288,7 @@ int ck_session_v8_generate(CKSessionV8 *session,
                            const CKSessionGenerateRequestV8 *request,
                            ck_session_token_callback_v8 callback, void *user_data,
                            CKSessionGenerateResultV8 *result) {
-    return ck_session_v8_generate_impl(session, request, NULL, 0,
+    return ck_session_v8_generate_impl(session, request, NULL, 0, NULL,
                                        callback, user_data, result);
 }
 
@@ -6193,8 +6301,20 @@ int ck_session_v8_generate_ids(CKSessionV8 *session,
     if (!prompt_ids || prompt_id_count <= 0)
         return CK_SESSION_V8_ERROR_INVALID_ARGUMENT;
     return ck_session_v8_generate_impl(session, request, prompt_ids,
-                                       prompt_id_count, callback, user_data,
+                                       prompt_id_count, NULL, callback, user_data,
                                        result);
+}
+
+int ck_session_v8_generate_visual(CKSessionV8 *session,
+        const CKSessionGenerateRequestV8 *request,
+        const CKSessionVisualInputV8 *visual,
+        ck_session_token_callback_v8 callback, void *user_data,
+        CKSessionGenerateResultV8 *result) {
+    if (!visual || visual->struct_size != sizeof(*visual) ||
+        visual->abi_version != CK_SESSION_ABI_V8_VERSION)
+        return CK_SESSION_V8_ERROR_INVALID_ARGUMENT;
+    return ck_session_v8_generate_impl(session, request, NULL, 0, visual,
+                                       callback, user_data, result);
 }
 
 int ck_session_v8_prefill_ids(CKSessionV8 *session,

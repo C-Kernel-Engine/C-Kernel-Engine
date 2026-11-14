@@ -2374,12 +2374,25 @@ def _compile_generated_model(c_path: Path, so_path: Path, *, profile: bool = Fal
     if not engine_path.is_file():
         raise FileNotFoundError(f"CK engine library is missing: {engine_path}")
     engine_hash = hashlib.sha256(engine_path.read_bytes()).hexdigest()
+    tokenizer_path = (BUILD_DIR / "libckernel_tokenizer.so").resolve()
+    if not tokenizer_path.is_file():
+        raise FileNotFoundError(f"CK tokenizer library is missing: {tokenizer_path}")
+    tokenizer_hash = hashlib.sha256(tokenizer_path.read_bytes()).hexdigest()
+
+    def sync_tokenizer() -> None:
+        destination = so_path.resolve().parent / tokenizer_path.name
+        if destination != tokenizer_path and (not destination.is_file() or
+                hashlib.sha256(destination.read_bytes()).hexdigest() != tokenizer_hash):
+            temporary = destination.with_suffix(destination.suffix + ".tmp")
+            shutil.copy2(tokenizer_path, temporary)
+            os.replace(temporary, destination)
+
     source_hash = hashlib.sha256(c_path.read_bytes()).hexdigest()
     source_size = int(c_path.stat().st_size)
     compiler_argv = _engine_compiler_argv()
     compiler = _engine_compiler_descriptor()
     build_fingerprint = {
-        "version": 3,
+        "version": 4,
         "source_path": str(c_path.resolve()),
         "source_sha256": source_hash,
         "source_size": source_size,
@@ -2390,12 +2403,14 @@ def _compile_generated_model(c_path: Path, so_path: Path, *, profile: bool = Fal
             "sha256": engine_hash,
             "runpath": "$ORIGIN",
         },
+        "tokenizer_dependency": {"name": tokenizer_path.name, "sha256": tokenizer_hash},
         "compiled_support_source_set": _compiled_runtime_support_fingerprint(),
     }
     if so_path.exists():
         cached = _json_read(stamp_path)
         if cached == build_fingerprint:
             _sync_runtime_engine(engine_path, so_path)
+            sync_tokenizer()
             return so_path
     cmd = [
         *compiler_argv,
@@ -2412,6 +2427,7 @@ def _compile_generated_model(c_path: Path, so_path: Path, *, profile: bool = Fal
         "version/v8/src/ck_parallel_prefill_v8.c",
         "-Lbuild",
         "-lckernel_engine",
+        "-lckernel_tokenizer",
         "-Wl,-rpath,$ORIGIN",
         "-o",
         str(so_path),
@@ -2420,6 +2436,7 @@ def _compile_generated_model(c_path: Path, so_path: Path, *, profile: bool = Fal
     ]
     _run(cmd)
     _sync_runtime_engine(engine_path, so_path)
+    sync_tokenizer()
     _json_write(stamp_path, build_fingerprint)
     return so_path
 
