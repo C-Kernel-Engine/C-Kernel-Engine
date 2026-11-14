@@ -14,7 +14,7 @@ import codegen_train_runtime_v7 as codegen
 import generate_train_layout_v7 as planner
 
 
-def certify_training(self, ir, registry, values, trainable, forward, *, integer_inputs=None, loss_function=None, finite_difference=True, precision_label="FP32", fresh_process=False, checked_runtime=False, check_evaluation=False):
+def certify_training(self, ir, registry, values, trainable, forward, *, integer_inputs=None, loss_function=None, finite_difference=True, precision_label="FP32", fresh_process=False, checked_runtime=False, check_evaluation=False, extra_sources=(), probe_parameter="up", gradient_check=None):
     try:
         import numpy as np
         import torch
@@ -35,7 +35,7 @@ def certify_training(self, ir, registry, values, trainable, forward, *, integer_
         (path / 'train.c').write_text(source)
         subprocess.run([os.environ.get('CC', 'cc'), '-DCK_NUM_TOKENS=4', '-O2', '-shared', '-fPIC', '-I' + str(ROOT / 'include'),
                         *(['-DCK_RUNTIME_CANARY_CHECKS=1','-DCK_RUNTIME_BOUNDS_ASSERT=1','-Werror=incompatible-pointer-types'] if checked_runtime else []),
-                        str(path / 'train.c'), str(engine), '-Wl,-rpath,' + str(engine.parent),
+                        str(path / 'train.c'), *[str(ROOT / source) for source in extra_sources], str(engine), '-Wl,-rpath,' + str(engine.parent),
                         '-lm', '-o', str(path / 'train.so')], check=True)
         lib = ctypes.CDLL(str(path / 'train.so'))
         fp = ctypes.POINTER(ctypes.c_float)
@@ -95,7 +95,7 @@ def certify_training(self, ir, registry, values, trainable, forward, *, integer_
                 # Reject a bad master operand before any optimizer update, then
                 # reuse this loaded runtime after explicit reinitialization.
                 bad = packed.copy()
-                offset = sum(summary['init_weight_numel'][:ordered.index('up')])
+                offset = sum(summary['init_weight_numel'][:ordered.index(probe_parameter)])
                 bad[offset] = np.nan
                 lib.ck_train_import_weight_snapshot.argtypes = [fp, ctypes.c_int]
                 self.assertEqual(lib.ck_train_import_weight_snapshot(ptr(bad), len(bad)), len(bad))
@@ -123,10 +123,12 @@ def certify_training(self, ir, registry, values, trainable, forward, *, integer_
                     np.testing.assert_array_equal(workflow._array_export(lib, 'optimizer_state'), before_moments)
                     self.assertEqual(lib.ck_train_get_opt_step(), before_step)
                 loss.backward()
+                if gradient_check is not None:
+                    gradient_check(step, params)
                 # Grouped objectives can converge to a zero gradient; preserve
                 # the existing decoder assertion for its original trajectory.
                 if loss_function is None or step == 0:
-                    self.assertGreater(float(params['up'].grad.abs().max()), 1e-5)
+                    self.assertGreater(float(params[probe_parameter].grad.abs().max()), 1e-5)
                 native_loss = ctypes.c_float()
                 self.assertGreater(native_step(ids.ctypes.data_as(ip), ids.ctypes.data_as(ip),
                                                        4, ctypes.byref(native_loss), .03), 0)
@@ -145,12 +147,12 @@ def certify_training(self, ir, registry, values, trainable, forward, *, integer_
                     # detaching the frozen middle would lose this derivative.
                     double = {n: p.detach().double().clone() for n, p in params.items()}
                     def evaluate(delta):
-                        w = double['up'].clone()
+                        w = double[probe_parameter].clone()
                         w[0, 0] += delta
-                        z = forward(dict(double, up=w))
+                        z = forward(dict(double, **{probe_parameter:w}))
                         return criterion(z).item()
                     finite_difference = (evaluate(1e-5) - evaluate(-1e-5)) / 2e-5
-                    self.assertAlmostEqual(float(grads[sum(values[n].size for n in sorted(trainable)[:sorted(trainable).index('up')])]), finite_difference, delta=1e-6)
+                    self.assertAlmostEqual(float(grads[sum(values[n].size for n in sorted(trainable)[:sorted(trainable).index(probe_parameter)])]), finite_difference, delta=1e-6)
                 opt.step()
                 moments = snapshot('optimizer_state', summary['optimizer_state_snapshot_floats'])
                 expected_moments = np.concatenate([
