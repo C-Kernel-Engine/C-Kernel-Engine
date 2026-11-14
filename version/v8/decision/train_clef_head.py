@@ -13,6 +13,9 @@ from pathlib import Path
 import subprocess
 import zipfile
 import sys
+import time
+import resource
+import shutil
 
 import numpy as np
 
@@ -34,6 +37,16 @@ from version.v8.decision.training_package import (
     raw_from_effective,
     INPUTS,
     require,
+)
+
+from version.v8.decision.training_limits import (
+    MAX_EPOCHS,
+    MAX_STEPS,
+    MAX_SERVING_ARTIFACTS,
+)
+from version.v8.decision.training_metrics import (
+    classification_metrics,
+    grouped_probabilities,
 )
 
 FP = C.POINTER(C.c_float)
@@ -251,26 +264,33 @@ class Runtime:
 def run(
     package, package_sha256, folder, *, epochs=2, lr=0.001, resume=None, stop_after=None
 ):
-    require(type(epochs) is int and 1 <= epochs <= 40, "epochs outside bounds")
+    require(type(epochs) is int and 1 <= epochs <= MAX_EPOCHS, "epochs outside bounds")
     require(
         type(lr) in (int, float) and np.isfinite(lr) and 0 < lr <= 0.01,
         "invalid learning rate",
     )
     require(
-        stop_after is None or (type(stop_after) is int and 1 <= stop_after <= 1280),
+        stop_after is None
+        or (type(stop_after) is int and 1 <= stop_after <= MAX_STEPS),
         "invalid checkpoint step",
     )
     doc, raw, records = load_package(package, package_sha256)
+    train = [r for r in records if r["split"] == "train"]
+    validation = [r for r in records if r["split"] == "validation"]
+    total_steps = len(train) * epochs
+    require(total_steps <= MAX_STEPS, "step budget exceeded")
+    require(
+        stop_after is None or stop_after <= total_steps,
+        "checkpoint step exceeds schedule",
+    )
+    started = time.perf_counter()
     folder = Path(folder).resolve()
     if resume is None:
         folder.mkdir(parents=True, exist_ok=False)
     else:
         require(folder.is_dir(), "missing resume runtime")
     rt = Runtime(folder, doc, raw, records[0]["arrays"], resume=resume is not None)
-    train = [r for r in records if r["split"] == "train"]
-    validation = [r for r in records if r["split"] == "validation"]
-    schedule = train * epochs
-    require(len(schedule) <= 1280, "step budget exceeded")
+
     cfg = dict(
         dtype="fp32",
         optimizer="AdamW",
@@ -282,40 +302,77 @@ def run(
         grad_accum=1,
         epochs=epochs,
         recipe="clef_head_fp32_v1",
+        evaluation_checkpoint_interval=1000,
     )
     meta = dict(
         runtime_contract_sha256=rt.summary["runtime_contract_sha256"],
         dataset_sha256=package_sha256,
         training_config=cfg,
         training_config_sha256=workflow._json_sha256(cfg),
-        total_microsteps=len(schedule),
+        total_microsteps=total_steps,
         grad_accum=1,
         next_microstep=0,
     )
     losses = []
     start = 0
+    periodic = []
+    validation_history = []
     try:
         if resume:
             restored = workflow._checkpoint_load(Path(resume), rt.lib, meta)
             start = restored["next_microstep"]
-            require(start < len(schedule), "checkpoint already completed")
+            require(start < total_steps, "checkpoint already completed")
             require(
                 stop_after is None or stop_after > start,
                 "checkpoint step must follow resumed state",
             )
         before = [rt.evaluate(r["arrays"])[0] for r in validation]
-        for step, record in enumerate(schedule[start:], start):
+        validation_history.append(dict(step=start, loss=float(np.mean(before))))
+        for step in range(start, total_steps):
+            record = train[step % len(train)]
             losses.append(rt.step(record["arrays"], float(lr)))
             write(
                 folder / "progress.json",
                 dict(
                     stage="training",
                     completed_steps=step + 1,
-                    total_steps=len(schedule),
+                    total_steps=total_steps,
                     record_id=record["id"],
                     loss=losses[-1],
                 ),
             )
+            if (
+                (step + 1) % 1000 == 0
+                and step + 1 < total_steps
+                and step + 1 != stop_after
+            ):
+                evaluated = {r["id"]: rt.evaluate(r["arrays"]) for r in validation}
+                validation_history.append(
+                    dict(
+                        step=step + 1,
+                        loss=float(np.mean([v[0] for v in evaluated.values()])),
+                        classification=classification_metrics(validation, evaluated),
+                    )
+                )
+                saved = workflow._checkpoint_write(
+                    folder,
+                    f"checkpoint-{step+1}",
+                    rt.lib,
+                    dict(meta, next_microstep=step + 1),
+                )
+                periodic.append(saved)
+                # Prune only checkpoints created by this invocation, after the
+                # new complete checkpoint and latest pointer are published.
+                if len(periodic) > 2:
+                    shutil.rmtree(periodic.pop(0))
+                write(
+                    folder / "validation-history.json",
+                    dict(
+                        package_sha256=package_sha256,
+                        start_step=start,
+                        evaluations=validation_history,
+                    ),
+                )
             if stop_after is not None and step + 1 == stop_after:
                 break
         completed = start + len(losses)
@@ -325,7 +382,7 @@ def run(
             rt.lib,
             dict(meta, next_microstep=completed),
         )
-        if completed < len(schedule):
+        if completed < total_steps:
             return dict(
                 status="CHECKPOINTED",
                 passed=False,
@@ -348,8 +405,16 @@ def run(
         updated = raw_from_effective(raw, effective)
         np.savez(folder / "trained_head.npz", **updated)
         expected = {r["id"]: rt.evaluate(r["arrays"]) for r in records}
+        # Serving registrations are bounded examples, not the training dataset.
+        # All records still receive native validation logits in the job report.
+        export_order = validation[:1] + [
+            r for r in records if r["id"] != validation[0]["id"]
+        ]
+        export_records = export_order[
+            : MAX_SERVING_ARTIFACTS // doc["geometry"]["questions"]
+        ]
         artifacts = []
-        for r in records:
+        for r in export_records:
             for q, candidates in enumerate(r["candidate_ids"]):
                 artifacts.append(
                     dict(
@@ -390,7 +455,7 @@ def run(
 
         native = NativeHead(folder / "inference/package.json", package_identity)
         try:
-            for r in records:
+            for r in export_records:
                 offset = 0
                 for q, candidates in enumerate(r["candidate_ids"]):
                     status, reply = native.evaluate(native.request(f"{r['id']}-q{q}"))
@@ -431,6 +496,14 @@ def run(
             },
             metrics=dict(
                 training_losses=losses,
+                classification=classification_metrics(records, expected),
+                validation_history_segment=validation_history,
+                start_step=start,
+                elapsed_seconds=time.perf_counter() - started,
+                peak_process_rss_bytes=resource.getrusage(
+                    resource.RUSAGE_SELF
+                ).ru_maxrss
+                * 1024,
                 validation_loss_before=float(np.mean(before)),
                 validation_loss_after=float(
                     np.mean([expected[r["id"]][0] for r in validation])
@@ -443,9 +516,14 @@ def run(
                     question_ids=r["question_ids"],
                     candidate_ids=r["candidate_ids"],
                     logits=expected[r["id"]][1].tolist(),
+                    labels=r["arrays"]["labels"].tolist(),
+                    probabilities=grouped_probabilities(
+                        expected[r["id"]][1], r["arrays"]["option_counts"]
+                    ),
                 )
                 for r in records
             ],
+            inference_export_record_ids=[r["id"] for r in export_records],
             artifacts=dict(
                 checkpoint=str(checkpoint),
                 trained_head=str(folder / "trained_head.npz"),
@@ -462,9 +540,7 @@ def run(
         write(folder / "result.json", report)
         write(
             folder / "progress.json",
-            dict(
-                stage="complete", completed_steps=completed, total_steps=len(schedule)
-            ),
+            dict(stage="complete", completed_steps=completed, total_steps=total_steps),
         )
         return report
     finally:

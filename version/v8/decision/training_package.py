@@ -9,7 +9,9 @@ from pathlib import Path
 
 import numpy as np
 
-MAX_BYTES = 512 * 1024**2
+from .training_limits import MAX_DATA_BYTES, MAX_MANIFEST_BYTES, MAX_RECORDS, MAX_TOKENS
+
+MAX_BYTES = MAX_DATA_BYTES
 IDENT = re.compile(r"[A-Za-z0-9_.-]{1,64}\Z")
 HASH = re.compile(r"[0-9a-f]{64}\Z")
 INPUTS = (
@@ -149,7 +151,7 @@ def archive(folder, descriptor):
 def load_package(path, expected_sha256):
     path = Path(path).resolve()
     require(
-        path.stat().st_size <= 1024**2 and sha(path) == expected_sha256,
+        path.stat().st_size <= MAX_MANIFEST_BYTES and sha(path) == expected_sha256,
         "package identity mismatch",
     )
     doc = json.loads(path.read_text())
@@ -191,7 +193,7 @@ def load_package(path, expected_sha256):
     )
     g = doc["geometry"]
     limits = dict(
-        tokens=64,
+        tokens=MAX_TOKENS,
         channels=4096,
         width=1024,
         heads=16,
@@ -218,12 +220,13 @@ def load_package(path, expected_sha256):
             "invalid weight: " + name,
         )
     require(
-        type(doc["records"]) is list and 2 <= len(doc["records"]) <= 32,
+        type(doc["records"]) is list and 2 <= len(doc["records"]) <= MAX_RECORDS,
         "record count outside bounds",
     )
     records = []
     seen = set()
     splits = set()
+    asset_splits = {}
     total = 0
     t, c, q, o = (g[k] for k in ("tokens", "channels", "questions", "options"))
     shapes = dict(
@@ -252,6 +255,12 @@ def load_package(path, expected_sha256):
         require(record["split"] in ("train", "validation"), "invalid split")
         splits.add(record["split"])
         arrays = archive(path.parent, record["asset"])
+        asset_hash = record["asset"]["sha256"]
+        require(
+            asset_splits.get(asset_hash, record["split"]) == record["split"],
+            "identical record asset crosses train/validation splits",
+        )
+        asset_splits[asset_hash] = record["split"]
         require(set(arrays) == set(shapes), "record inventory mismatch")
         total += sum(a.nbytes for a in arrays.values())
         require(total <= MAX_BYTES, "dataset too large")

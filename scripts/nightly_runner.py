@@ -987,7 +987,7 @@ TEST_SUITES = {
         "Registered FP32 Clef Dataset, Training, Resume and Native Export",
         "training", ROOT / "tests" / "test_v8_clef_training_recipe.py",
         timeout_sec=600,
-        unittest_targets=("tests.test_v8_clef_training_recipe", "tests.test_v8_clef_evaluation"),
+        unittest_targets=("tests.test_v8_clef_training_recipe", "tests.test_v8_clef_evaluation", "tests.test_v8_clef_dataset_scale"),
     ),
     "training_released_clef_head": TestSuite(
         "FP32 Released Clef Head Gradients, Updates and Export (Asset-backed)",

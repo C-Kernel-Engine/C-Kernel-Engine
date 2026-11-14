@@ -3,6 +3,8 @@
 from pathlib import Path
 import math
 
+from version.v8.decision.training_limits import MAX_EPOCHS, MAX_STEPS
+
 RECIPE = "clef_head_fp32_v1"
 
 
@@ -67,8 +69,10 @@ def validate(config, available):
     elif config.get("package_sha256") != package["sha256"]:
         error("package_sha256", "IDENTITY_MISMATCH")
     n = config.get("epochs")
-    if type(n) is not int or not 1 <= n <= 40:
+    if type(n) is not int or not 1 <= n <= MAX_EPOCHS:
         error("epochs", "OUT_OF_RANGE")
+    elif package is not None and n * package["splits"]["train"] > MAX_STEPS:
+        error("epochs", "STEP_BUDGET_EXCEEDED")
     lr = config.get("learning_rate")
     if type(lr) not in (float, int) or not math.isfinite(lr) or not 0 < lr <= 0.01:
         error("learning_rate", "OUT_OF_RANGE")
