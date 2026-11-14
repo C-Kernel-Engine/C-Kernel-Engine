@@ -1,0 +1,499 @@
+{
+  "schema": "cke.clef.native-e2e-evidence.v1",
+  "date": "2026-11-14",
+  "base_commit": "7325ab9fe",
+  "host": "cke-amd-zen5-01",
+  "hardware": "AMD Ryzen 9 9950X3D",
+  "threads": 8,
+  "request": {
+    "id": "sentiment",
+    "state": "The service was excellent.",
+    "questions": {
+      "sentiment": {
+        "type": "choice",
+        "instructions": "Classify sentiment.",
+        "criteria": {
+          "positive": "Positive",
+          "negative": "Negative"
+        }
+      }
+    }
+  },
+  "model": "Cloudflare/clef-flash",
+  "revision": "fb4417d31c1d0f9e7e77f1141b40aaede7491e00",
+  "tokens": 128,
+  "production_framework_imports": "torch and transformers imports blocked during native inference and training",
+  "backbone_dtype": "BF16 weights; provider-declared FP32 state and BF16 storage boundaries",
+  "head_training_dtype": "FP32",
+  "backbone_training": "FROZEN",
+  "native_execution": {
+    "schema": "cke.clef.native-diagnostic.v1",
+    "execution": "PASS",
+    "numerical_parity": "NOT_TESTED",
+    "application_quality": "NOT_TESTED",
+    "backbone_executor": "cke_generated",
+    "head_executor": "cke_generated",
+    "frontend": "pinned_schema_python_and_tokenizers",
+    "model": "Cloudflare/clef-flash",
+    "revision": "fb4417d31c1d0f9e7e77f1141b40aaede7491e00",
+    "release_lock_sha256": "3e909060f2a07e7224482bcf8e36ac75e69bbc822f9fb35337bdfe5f1f53f20b",
+    "request_sha256": "bc327750eeb532bae37ab4bcbf1344da73cf2076d884d62ca6e357958e5fd506",
+    "tokens": 128,
+    "input_ids": [
+      248045,
+      8678,
+      198,
+      4274,
+      279,
+      4434,
+      1528,
+      321,
+      10485,
+      13,
+      95462,
+      1396,
+      2002,
+      50407,
+      13,
+      8618,
+      4087,
+      1902,
+      381,
+      6681,
+      799,
+      314,
+      421,
+      2002,
+      579,
+      5252,
+      2519,
+      13,
+      248046,
+      198,
+      248045,
+      846,
+      198,
+      23852,
+      25,
+      198,
+      760,
+      2393,
+      557,
+      8800,
+      13,
+      271,
+      3423,
+      34651,
+      426,
+      32349,
+      25,
+      198,
+      198,
+      27806,
+      220,
+      16,
+      198,
+      887,
+      25,
+      25144,
+      198,
+      9222,
+      25,
+      5576,
+      198,
+      669,
+      55530,
+      25,
+      220,
+      1890,
+      1386,
+      25144,
+      13,
+      198,
+      51535,
+      1425,
+      49555,
+      25,
+      198,
+      32929,
+      220,
+      16,
+      25,
+      220,
+      4754,
+      4532,
+      3147,
+      37212,
+      2129,
+      1979,
+      816,
+      3147,
+      40823,
+      8934,
+      198,
+      32929,
+      220,
+      17,
+      25,
+      220,
+      4754,
+      4532,
+      3147,
+      34317,
+      2129,
+      1979,
+      816,
+      3147,
+      29492,
+      8934,
+      198,
+      4537,
+      38945,
+      198,
+      198,
+      248046,
+      198,
+      248045,
+      74455,
+      198,
+      248068,
+      271,
+      248069,
+      271,
+      25310,
+      3118,
+      7295,
+      34651,
+      41402,
+      23451,
+      50,
+      25
+    ],
+    "feature_sha256": "e68776a4c75c32335b8b57776688e700add5bbc3050c7f82571c0bf3f4eca7bd",
+    "embedding_sha256": "361ac064cf98ea04750bdcdbce33b3341b6f2b4ff2de30cc43a20a9d5b2296dd",
+    "backbone_bundle_sha256": "a19e9a407da43086b1597aac2f7c8d7afc14eb864c0a84b4d9ccaf6cf5f0f054",
+    "head_package_sha256": "b6ab558b77db7fa78b78868989b58c52deab840d00da6428073bb5e521ea8cce",
+    "native_math_libraries": {
+      "CK_SLEEF_LIBRARY": {
+        "path": "/data/cke/tools/sleef-runtime/root/usr/lib/x86_64-linux-gnu/libsleef.so.3.7.0",
+        "sha256": "ff8f3513360e8e344ba60f5020b4350f94e043525f83072a1c4fa374f2d84d66"
+      },
+      "CK_MKL_LIBRARY": {
+        "path": "/data/cke/tools/mkl-2024.2.0-probe/wheel/mkl-2024.2.0.data/data/lib/libmkl_rt.so.2",
+        "sha256": "0f3c805b85c36f3aaf6792930b054d80a945af032f0a97c4926d7ad94a7d61d9"
+      }
+    },
+    "results": [
+      {
+        "question_id": "sentiment",
+        "candidate_ids": [
+          "negative",
+          "positive"
+        ],
+        "logits": [
+          -4.680750846862793,
+          0.1342177391052246
+        ]
+      }
+    ],
+    "elapsed_seconds": 223.3686696900986,
+    "verify_and_backbone_seconds": 217.91963743115775,
+    "limitations": [
+      "request-shaped offline head build",
+      "no native backbone training",
+      "not a persistent serving endpoint"
+    ]
+  },
+  "training": {
+    "schema": "cke.clef.native-training-diagnostic.v1",
+    "execution": "PASS",
+    "native_report_sha256": "1c87d3ac80a9c9af8fc0c0a813554b9718870754e075e5b4aaef45fcbed6e354",
+    "backbone_training": "FROZEN",
+    "before_loss": 0.008074787445366383,
+    "after_loss": 0.007803728338330984,
+    "step_losses": [
+      0.008074787445366383
+    ],
+    "steps": 1,
+    "learning_rate": 1e-05,
+    "trainable_elements": 121762820,
+    "workspace_bytes": 2509897536,
+    "workspace_budget_bytes": 4294967296,
+    "inference_package_sha256": "226f0458df874d1974360cfb9277393fc57d362bb4fbfe2d7470eeb676a42619",
+    "trained_head_sha256": "0bf05bf7135695ca56ef928870f3ec8e7298362a745f0e5f807f73fdd5b03489",
+    "gradient_sha256": "b257084ba390b2bf65dfaf2c95b40f28e76c2894923f20e946278244e481abca",
+    "reload_max_abs": 0.0,
+    "numerical_gradient_parity": "NOT_TESTED",
+    "connected_backbone_parity": "NOT_TESTED",
+    "held_out_accuracy": "NOT_TESTED",
+    "seconds": 30.664285435108468
+  },
+  "updated_parameter_tensor_count": 162,
+  "training_oracle": {
+    "schema": "cke.clef.native-training-oracle.v1",
+    "native_report_sha256": "1c87d3ac80a9c9af8fc0c0a813554b9718870754e075e5b4aaef45fcbed6e354",
+    "training_report_sha256": "fc470f98e981165fdbd09d7eb99f7b388cb768eac0d5dc46b366256a0c28907b",
+    "torch_version": "2.13.0+cpu",
+    "reference_source_sha256": "0e304cf7c6500e8bb59bef7e2afd2c6373f82596dfb3b57d1aa93c175e2dc3a3",
+    "oracle_script_sha256": "0a8d0d6b782a60db2f97e3b4d229c17639ecbe2b54408490970c782ffc01be59",
+    "steps": 1,
+    "reference_losses": [
+      0.008074735291302204
+    ],
+    "gradient_max": {
+      "parameter": "residual_scorer.3.weight",
+      "max_abs": 1.2246891856193542e-07
+    },
+    "updated_weight_max": {
+      "parameter": "type_embedding.weight",
+      "max_abs": 2.384185791015625e-07
+    },
+    "gradient_atol": 3e-05,
+    "update_atol": 3e-06,
+    "gradient_status": "PASS",
+    "update_status": "PASS",
+    "parameter_tensors": 162,
+    "parameter_elements": 121762820
+  },
+  "connected_prefill_oracle": {
+    "schema": "cke.clef.native-oracle.v1",
+    "native_report_sha256": "1c87d3ac80a9c9af8fc0c0a813554b9718870754e075e5b4aaef45fcbed6e354",
+    "capture_sha256": "fea696d403eac42980b07bed5ff967073dc37a5951d3bd86e5fa92876d553f33",
+    "reference_source_sha256": "0e304cf7c6500e8bb59bef7e2afd2c6373f82596dfb3b57d1aa93c175e2dc3a3",
+    "torch_version": "2.13.0+cpu",
+    "oracle_script_sha256": "94a72d9658c2c562ecafb6f80568ddd04e8b248c5f0efa5a756e7e61d3fb2cdc",
+    "backbone_reference_transformers": "5.10.2",
+    "backbone_reference_schedule": "prefill",
+    "backbone_reference_attention": "sdpa",
+    "native_logits": [
+      -4.680750846862793,
+      0.1342177391052246
+    ],
+    "same_input_logits": [
+      -4.680751800537109,
+      0.13421738147735596
+    ],
+    "connected_reference_logits": [
+      -4.677098274230957,
+      0.12618112564086914
+    ],
+    "same_input_head": {
+      "max_abs": 9.5367431640625e-07,
+      "rmse": 7.202056630608185e-07,
+      "reference_rms": 3.3111517425000345,
+      "atol": 2e-06,
+      "status": "PASS"
+    },
+    "connected_logits": {
+      "max_abs": 0.008036613464355469,
+      "rmse": 0.00624213276077562,
+      "reference_rms": 3.308411245846123,
+      "atol": 2e-06,
+      "status": "FAIL"
+    },
+    "backbone_exact_storage": {
+      "max_abs": 1.4375,
+      "rmse": 0.024273943936513664,
+      "reference_rms": 1.7142072946518132,
+      "atol": 0,
+      "status": "FAIL"
+    },
+    "note": "Connected 2e-6 check retains the strict logit baseline; no broader model tolerance is inferred. Zero-tolerance feature comparison is exact-storage evidence."
+  },
+  "connected_incremental_oracle": {
+    "schema": "cke.clef.native-oracle.v1",
+    "native_report_sha256": "1c87d3ac80a9c9af8fc0c0a813554b9718870754e075e5b4aaef45fcbed6e354",
+    "capture_sha256": "6d85ca7281ef1add094e08f2aa2a70a15148be173fd7d2ba58a0bfa982e736de",
+    "reference_source_sha256": "0e304cf7c6500e8bb59bef7e2afd2c6373f82596dfb3b57d1aa93c175e2dc3a3",
+    "torch_version": "2.13.0+cpu",
+    "oracle_script_sha256": "94a72d9658c2c562ecafb6f80568ddd04e8b248c5f0efa5a756e7e61d3fb2cdc",
+    "backbone_reference_transformers": "5.10.2",
+    "backbone_reference_schedule": "incremental",
+    "backbone_reference_attention": "sdpa",
+    "native_logits": [
+      -4.680750846862793,
+      0.1342177391052246
+    ],
+    "same_input_logits": [
+      -4.680751800537109,
+      0.13421738147735596
+    ],
+    "connected_reference_logits": [
+      -4.6752448081970215,
+      0.12504327297210693
+    ],
+    "same_input_head": {
+      "max_abs": 9.5367431640625e-07,
+      "rmse": 7.202056630608185e-07,
+      "reference_rms": 3.3111517425000345,
+      "atol": 2e-06,
+      "status": "PASS"
+    },
+    "connected_logits": {
+      "max_abs": 0.009174466133117676,
+      "rmse": 0.007565953033712733,
+      "reference_rms": 3.307079514971539,
+      "atol": 2e-06,
+      "status": "FAIL"
+    },
+    "backbone_exact_storage": {
+      "max_abs": 1.1875,
+      "rmse": 0.025337947930965454,
+      "reference_rms": 1.7145243837177928,
+      "atol": 0,
+      "status": "FAIL"
+    },
+    "note": "Connected 2e-6 check retains the strict logit baseline; no broader model tolerance is inferred. Zero-tolerance feature comparison is exact-storage evidence."
+  },
+  "local_contract_replays": {
+    "attention_gate": {
+      "first_divergence": "layer3.attn_gate_sigmoid_mul",
+      "old_provider": "attn_gate_sigmoid_mul_forward",
+      "required_provider": "attn_gate_sigmoid_mul_pytorch_bf16_storage",
+      "old": {
+        "max_abs": 0.004815340042114258,
+        "differing": 4096
+      },
+      "existing_bf16_provider": {
+        "max_abs": 0.0,
+        "differing": 0
+      }
+    },
+    "rotary": {
+      "old_q": {
+        "max_abs": 0.017657756805419922,
+        "differing": 1007
+      },
+      "old_k": {
+        "max_abs": 0.0050275325775146484,
+        "differing": 252
+      },
+      "existing_bf16_q": {
+        "max_abs": 0.0,
+        "differing": 0
+      },
+      "existing_bf16_k": {
+        "max_abs": 0.0,
+        "differing": 0
+      }
+    },
+    "recurrent_dt_gate": {
+      "old": {
+        "max_abs": 3.550667315721512e-09,
+        "differing": 21
+      },
+      "existing_pytorch_provider": {
+        "max_abs": 0.0,
+        "differing": 0
+      }
+    }
+  },
+  "optimizer": {
+    "name": "AdamW",
+    "learning_rate": 1e-05,
+    "beta1": 0.9,
+    "beta2": 0.999,
+    "epsilon": 0.0001,
+    "weight_decay": 0.01
+  },
+  "native_onednn": {
+    "version": "3.12",
+    "sha256": "9476142d9b469adaa0d0fa07fb2a3c2bd0930c1063bc2779f942a86b40b94b8b"
+  },
+  "report_sha256": {
+    "native-contract-fixed/result.json": "1c87d3ac80a9c9af8fc0c0a813554b9718870754e075e5b4aaef45fcbed6e354",
+    "training-contract-final/result.json": "fc470f98e981165fdbd09d7eb99f7b388cb768eac0d5dc46b366256a0c28907b",
+    "training-contract-final/oracle-comparison.json": "9c9d72701628c07e3e0e8294c122739f2b6d2f882af72fe18b1dbee9a5e6db20",
+    "comparison-contract-fixed-sdpa.json": "37f2b8137b4667151c49339aa135e5a71c651a51b020d3466a25814a8b790268",
+    "comparison-contract-fixed-incremental-sdpa.json": "e05bb4eb710349937cbe1a801a573c09f13e6369e5f72909b66445769e5bc97f"
+  },
+  "tests": {
+    "numerical_contracts": {
+      "run": 92,
+      "skipped": 1,
+      "failed": 0
+    },
+    "ryzen_frontend_evaluation_dataset": {
+      "run": 25,
+      "skipped": 1,
+      "failed": 0
+    },
+    "dsl_policy": "PASS",
+    "registered_nightly_frontend": "PASS",
+    "training_ledger_freshness": "PASS",
+    "staged_v7_fast": "PASS overall; Nanbeige coherence diagnostic FAIL is nonblocking under the existing matrix policy",
+    "staged_v8_fast": "PASS overall; Nanbeige coherence diagnostic FAIL is nonblocking under the existing matrix policy",
+    "precommit_resources": {
+      "threads": 4,
+      "minimum_available_ram_gib": 16,
+      "minimum_free_swap_gib": 0,
+      "reason": "31 GiB available RAM; swap was full; all regression gates retained"
+    }
+  },
+  "limitations": [
+    "Connected numerical parity FAIL remains explicit under unchanged strict logit bound.",
+    "One 128-token decision request; no held-out quality claim.",
+    "Offline request-shaped head builds, no persistent application endpoint.",
+    "One native AdamW update at released geometry; longer/resume tests here are synthetic existing regressions.",
+    "Headset/TTS/LoRA are outside this change.",
+    "Times include verification, builds and shared-host contention; not latency benchmarks."
+  ],
+  "private_replay_directory": "/data/cke/private/clef-native-e2e-20261114",
+  "state_storage_diagnosis": {
+    "native_state_dtype": "fp32",
+    "reference_cache_dtype": "bf16",
+    "raw_max_abs": 0.007483482360839844,
+    "after_diagnostic_bf16_roundtrip_max_abs": 0.0,
+    "after_diagnostic_bf16_roundtrip_differing": 0,
+    "elements": 524288
+  },
+  "fp32_cache_reference_diagnostic": {
+    "schema": "cke.clef.native-oracle.v1",
+    "native_report_sha256": "1c87d3ac80a9c9af8fc0c0a813554b9718870754e075e5b4aaef45fcbed6e354",
+    "capture_sha256": "d54a89203944bcf3cdb64f45d7e6122eb8eeecb414650a8b213d68b7cc084cb1",
+    "reference_source_sha256": "0e304cf7c6500e8bb59bef7e2afd2c6373f82596dfb3b57d1aa93c175e2dc3a3",
+    "torch_version": "2.13.0+cpu",
+    "oracle_script_sha256": "94a72d9658c2c562ecafb6f80568ddd04e8b248c5f0efa5a756e7e61d3fb2cdc",
+    "backbone_reference_transformers": "5.10.2",
+    "backbone_reference_schedule": "incremental",
+    "backbone_reference_attention": "sdpa",
+    "native_logits": [
+      -4.680750846862793,
+      0.1342177391052246
+    ],
+    "same_input_logits": [
+      -4.680751800537109,
+      0.13421738147735596
+    ],
+    "connected_reference_logits": [
+      -4.678879737854004,
+      0.13497495651245117
+    ],
+    "same_input_head": {
+      "max_abs": 9.5367431640625e-07,
+      "rmse": 7.202056630608185e-07,
+      "reference_rms": 3.3111517425000345,
+      "atol": 2e-06,
+      "status": "PASS"
+    },
+    "connected_logits": {
+      "max_abs": 0.0018711090087890625,
+      "rmse": 0.0014273099040815393,
+      "reference_rms": 3.3098439419545365,
+      "atol": 2e-06,
+      "status": "FAIL"
+    },
+    "backbone_exact_storage": {
+      "max_abs": 1.5,
+      "rmse": 0.023975634923971544,
+      "reference_rms": 1.7144595174097836,
+      "atol": 0,
+      "status": "FAIL"
+    },
+    "note": "Connected 2e-6 check retains the strict logit baseline; no broader model tolerance is inferred. Zero-tolerance feature comparison is exact-storage evidence.",
+    "diagnostic_overrides": [
+      "LinearAttentionLayer recurrent cache allocated FP32 instead of released BF16. Diagnostic only; not unmodified released execution."
+    ]
+  },
+  "state_diagnosis_scope": "The released incremental cache stores BF16 whereas CKE declares FP32 state. Rounding the captured native first-step state to BF16 reproduces all 524288 reference values. A separately labelled FP32-cache reference diagnostic still fails connected parity; this isolates one cause, not all remaining divergence. No production state rounding or oracle substitution was added."
+}
