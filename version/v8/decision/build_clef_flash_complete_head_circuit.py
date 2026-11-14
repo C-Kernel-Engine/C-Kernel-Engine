@@ -125,15 +125,17 @@ def build_circuit(*, tokens=6, questions=2, options=3, channels=4096,
         ops.append(add(previous,name+'_cross_residual',name+'_ff2',questions,width))
         block(name,ops)
 
-    def pair(name, left, right, cols, features=False):
+    def pair(name, left, right, cols, features=False, vjp="cosine_similarity"):
         kind='indexed_pair_features_checked' if features else 'indexed_cosine_rows_checked'
         n=options*4*cols if features else options
         params={'G':questions,'R':options,'C':cols,'X':n,'call_constants':{
             'left_elements':questions*cols,'right_elements':options*cols,'indices_elements':options,
             'output_elements':n,'scratch_elements':n,'groups':questions,'rows':options,'channels':cols}}
-        if not features: params['epsilon']=1e-12 if name=='prior_cosine' else 1e-8
-        return op(name,kind,kind+'_f32',{'left':left,'right':right,'indices':'option_question_indices'},
+        if not features: params['epsilon']=1e-12 if vjp=='normalized_dot' else 1e-8
+        result = op(name,kind,kind+'_f32',{'left':left,'right':right,'indices':'option_question_indices'},
                   name,[options,4*cols] if features else [options],params)
+        if not features: result['training'] = {'vjp': vjp}
+        return result
 
     def scalar(name, weight, sigmoid=False):
         kind='scalar_sigmoid_checked' if sigmoid else 'scalar_exp_clamped_checked'
@@ -149,7 +151,7 @@ def build_circuit(*, tokens=6, questions=2, options=3, channels=4096,
     scoring=[norm('final_fields',previous,questions,width,'field_norm'),
         norm('final_options','evidence1_output',options,width,'option_norm'),
         broadcast('prior_anchor','question_vectors','global_vector',questions,channels),
-        pair('prior_cosine','prior_anchor','lexical_option_vectors',channels),
+        pair('prior_cosine','prior_anchor','lexical_option_vectors',channels,vjp='normalized_dot'),
         pair('joint_cosine','final_fields','final_options',width),
         pair('scorer_features','final_fields','final_options',width,True),
         linear('scorer_hidden','scorer_features',options,4*width,width,'residual_scorer.0'),

@@ -1044,6 +1044,20 @@ and passes those CKE-produced features and pinned output-embedding rows into the
 generated head. No PyTorch or Transformers import is needed for production inference
 or head training. Python owns schema encoding, tokenization, artifact preparation,
 requests and reporting; generated C owns neural forward/backward and AdamW.</p>
+<p><strong>Generated composition: NOT_IMPLEMENTED. End-to-end certification: NOT_TESTED.</strong>
+The host currently extracts backbone features, prepares embedding rows and builds a separate
+head package. Two native components connected by Python do not satisfy the generated
+backbone-to-head composition gate. This is component integration evidence, not a complete
+compiled inference/training graph. The CLI option <code>--require-generated-e2e</code>
+fails before execution on this diagnostic path.</p>
+<p>The shared bounded circuit-training adapter now owns operation-to-training translation;
+Clef authoring supplies its graph, inputs, frozen parameters and grouped loss. Cosine
+VJP semantics are explicit circuit metadata, never inferred from operation names. The
+adapter still has a bounded provider inventory; it does not imply arbitrary inference
+circuits support training. A non-Clef graph exercises generated forward, backward,
+frozen-weight gradient propagation, evaluation and 40 native AdamW updates against PyTorch.
+Standard nightly checks reject missing composition evidence and host-fed internal edges.
+Structural checks remain distinct from execution, gradient and numerical certification.</p>
 <p>The backbone is frozen. The 121,762,820-element released head is trained using
 <code>train_clef_head.Runtime</code>, exported and reloaded through generated inference.
 This does not train the backbone, introduce LoRA, or establish held-out task accuracy.

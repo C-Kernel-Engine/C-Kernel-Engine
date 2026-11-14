@@ -25,6 +25,12 @@ from version.v8.decision.package_clef_head import build_package
 from server.decision.native import NativeHead
 
 
+from version.v8.scripts.generated_composition_contract_v8 import (
+    component_only_status,
+    require_generated_e2e,
+)
+
+
 def label_indices(results, labels):
     if not isinstance(labels, dict) or set(labels) != {
         r["question_id"] for r in results
@@ -189,6 +195,7 @@ def train(
         np.testing.assert_allclose(reloaded, scores, atol=2e-6, rtol=0)
         result = dict(
             schema="cke.clef.native-training-diagnostic.v1",
+            generated_composition=component_only_status("training"),
             execution="PASS",
             native_report_sha256=report_sha,
             backbone_training="FROZEN",
@@ -224,7 +231,16 @@ if __name__ == "__main__":
     p.add_argument("--steps", type=int, default=1)
     p.add_argument("--lr", type=float, default=1e-5)
     p.add_argument("--workspace-mib", type=int, choices=[2048, 4096], default=4096)
+    p.add_argument(
+        "--require-generated-e2e",
+        action="store_true",
+        help="Fail before execution unless the full generated composition is certified",
+    )
     a = p.parse_args()
+    if a.require_generated_e2e:
+        require_generated_e2e(
+            dict(generated_composition=component_only_status("training"))
+        )
     print(
         json.dumps(
             train(
