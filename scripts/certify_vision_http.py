@@ -13,6 +13,7 @@ import hashlib
 import json
 from pathlib import Path
 import socket
+import re
 import time
 import urllib.error
 import urllib.request
@@ -67,11 +68,23 @@ def request(base, route, body=None, timeout=300):
     return json.loads(raw,object_pairs_hook=unique_object)
 
 
+REQUIRED_LIBRARIES=('session_library','ck_model_forward_segments_grid_ex',
+                    'ck_set_num_threads','ck_true_bpe_decode')
+
+def library_identity(value):
+    if not isinstance(value,dict) or not all(key in value for key in REQUIRED_LIBRARIES):
+        raise ValueError('missing loaded library identities')
+    if not all(isinstance(key,str) and isinstance(digest,str) and re.fullmatch(r'[0-9a-f]{64}',digest)
+               for key,digest in value.items()):
+        raise ValueError('invalid loaded library digest')
+    return value
+
+
 def identity(base):
     data=request(base,'/v1/capabilities',timeout=10)
     for key in ('server_instance_id','bundle_identity'):
         if not isinstance(data.get(key),str) or not data[key]: raise ValueError('missing '+key)
-    if not data.get('loaded_libraries'):raise ValueError('missing loaded library identities')
+    library_identity(data.get('loaded_libraries'))
     return data
 
 
@@ -103,9 +116,15 @@ def run(base, model, fixtures, output, expected_bundle, timeout=300, require_ref
                 case['seconds']=time.monotonic()-started;case['response']=response
                 write(target,report)
                 answer=assess(response,expected)
+                if response.get('model')!=model:raise ValueError('response model mismatch')
                 if response['id'] in ids:raise ValueError('reused request ID')
                 ids.add(response['id'])
                 evidence=response.get('cke_evidence',{})
+                libraries=library_identity(evidence.get('loaded_libraries'))
+                if any(libraries[k]!=initial['loaded_libraries'][k] for k in REQUIRED_LIBRARIES):
+                    raise ValueError('response loaded library mismatch')
+                if not isinstance(evidence.get('initial_logits_sha256'),str) or not re.fullmatch(r'[0-9a-f]{64}',evidence['initial_logits_sha256']):
+                    raise ValueError('missing initial logits capture')
                 if require_reference and evidence.get('direct_reference_match') is not True:
                     raise ValueError('missing direct generated reference equality')
                 if evidence.get('bundle_identity')!=expected_bundle or evidence.get('image_sha256')!=case['image_sha256']:
@@ -116,6 +135,10 @@ def run(base, model, fixtures, output, expected_bundle, timeout=300, require_ref
                 case['status']='PASS';write(target,report)
                 messages.extend([{'role':'assistant','content':answer},
                     {'role':'user','content':'Check the same image again. Return the same two JSON keys with the correct left and right colors.'}])
+        for first,repeated in ((0,6),(1,7)):
+            left=report['cases'][first]['response'];right=report['cases'][repeated]['response']
+            if left['cke_evidence']['initial_logits_sha256']!=right['cke_evidence']['initial_logits_sha256']:
+                raise ValueError('repeated request initial logits differ')
         report['status']='PASS'
         report['same_artifact_initial_logits']='PASS' if require_reference else 'NOT_TESTED'
     except (TimeoutError,socket.timeout) as error:

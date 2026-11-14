@@ -4,11 +4,11 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
-from scripts.certify_vision_http import assess,run
+from scripts.certify_vision_http import assess,run,identity,REQUIRED_LIBRARIES
 
 
 def good():
-    return {'id':'one','object':'chat.completion','choices':[{'finish_reason':'stop',
+    return {'model':'test','id':'one','object':'chat.completion','choices':[{'finish_reason':'stop',
         'message':{'role':'assistant','content':'{"left":"red","right":"blue"}'}}],
         'usage':{'prompt_tokens':20,'completion_tokens':10,'total_tokens':30}}
 
@@ -40,11 +40,11 @@ class VisionAcceptanceTests(unittest.TestCase):
             self.assertEqual(json.loads((output/'report.json').read_text())['error'],'missing boot identity')
 
     def test_restart_and_reused_request_id_fail(self):
-        initial={'server_instance_id':'boot-one','bundle_identity':'expected','loaded_libraries':{'engine':'hash'}}
+        initial={'server_instance_id':'boot-one','bundle_identity':'expected','loaded_libraries':{key:'a'*64 for key in REQUIRED_LIBRARIES}}
         for restarted in (True,False):
             with self.subTest(restarted=restarted),tempfile.TemporaryDirectory() as root:
                 directory=Path(root);(directory/'red-blue.png').write_bytes(b'fixture')
-                response=good();response['cke_evidence']={'bundle_identity':'expected',
+                response=good();response['cke_evidence']={'loaded_libraries':{key:'a'*64 for key in REQUIRED_LIBRARIES},'initial_logits_sha256':'b'*64,'bundle_identity':'expected',
                     'image_sha256':hashlib.sha256(b'fixture').hexdigest()}
                 identities=[initial,dict(initial,server_instance_id='new-boot')] if restarted else [initial]*3
                 with patch('scripts.certify_vision_http.identity',side_effect=identities),patch('scripts.certify_vision_http.request',return_value=response):
@@ -56,13 +56,19 @@ class VisionAcceptanceTests(unittest.TestCase):
     def test_required_reference_cannot_be_omitted(self):
         with tempfile.TemporaryDirectory() as root:
             directory=Path(root);(directory/'red-blue.png').write_bytes(b'fixture')
-            initial={'server_instance_id':'boot','bundle_identity':'expected','loaded_libraries':{'engine':'hash'}}
-            response=good();response['cke_evidence']={'bundle_identity':'expected',
+            initial={'server_instance_id':'boot','bundle_identity':'expected','loaded_libraries':{key:'a'*64 for key in REQUIRED_LIBRARIES}}
+            response=good();response['cke_evidence']={'loaded_libraries':{key:'a'*64 for key in REQUIRED_LIBRARIES},'initial_logits_sha256':'b'*64,'bundle_identity':'expected',
                 'image_sha256':hashlib.sha256(b'fixture').hexdigest()}
             with patch('scripts.certify_vision_http.identity',return_value=initial),patch('scripts.certify_vision_http.request',return_value=response):
                 report=run('unused','test',directory,directory/'run','expected',require_reference=True)
             self.assertEqual(report['status'],'FAIL')
             self.assertIn('missing direct',report['error'])
+
+    def test_malformed_library_identity_cannot_pass(self):
+        for libraries in ('hashes',{}, {'engine':'hash'}, {key:'not-a-digest' for key in REQUIRED_LIBRARIES}):
+            with self.subTest(libraries=libraries),patch('scripts.certify_vision_http.request',return_value={
+                    'server_instance_id':'boot','bundle_identity':'expected','loaded_libraries':libraries}),self.assertRaises(ValueError):
+                identity('unused')
 
     def test_timeout_not_pass(self):
         with tempfile.TemporaryDirectory() as root:
