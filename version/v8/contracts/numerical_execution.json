@@ -3,6 +3,45 @@
   "schema_version": 1,
   "engine_contract_version": "8",
   "contracts": {
+    "audio_linear_half_pixel_fp32": {
+      "operator_family": "audio_upsample_linear",
+      "status": "observed",
+      "storage": {
+        "input": "fp32",
+        "weight": "none",
+        "output": "fp32"
+      },
+      "compute": {
+        "input": "fp32",
+        "weight": "none",
+        "accumulator": "fp32",
+        "contraction": "disabled",
+        "evaluation_order": "fp64_half_pixel_coordinate_then_fp32_weight_then_left_product_plus_right_product"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": [
+          "input_load",
+          "weighted_product",
+          "pointwise_sum",
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "sum",
+        "order": "left_to_right",
+        "partial_accumulator": "fp32",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "serial",
+        "split_strategy": "independent_outputs",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Offline clamped half-pixel integer-factor interpolation. FP64 coordinates, FP32 weights and two rounded products followed by FP32 add. Not a BF16 or streaming contract."
+    },
     "indexed_rows_gather_exact_f32_v1": {
       "operator_family": "indexed_rows_gather",
       "status": "validated",

@@ -766,6 +766,11 @@ TEST_SUITES = {
         "TTS Kokoro Extent and Duration Expansion", "kernels",
         ROOT / "tests" / "test_v8_kokoro_shape_bounds.py",
     ),
+    "audio_linear_upsample_checked": TestSuite(
+        "Audio Linear Half-Pixel Upsampling and Generated Binding", "inference",
+        ROOT / "tests" / "test_v8_audio_linear_upsample.py",
+        timeout_sec=120,
+    ),
     "tts_ming3_generated_flow_step": TestSuite(
         "Ming3 FP32 Supplied-Prediction Generated Flow Step", "inference",
         ROOT / "tests" / "test_v8_ming3_flow_step.py",
