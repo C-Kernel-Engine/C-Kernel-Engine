@@ -4,7 +4,11 @@ import copy
 import unittest
 
 from tests.test_v8_selective_training import fixture, BINDINGS, load, backward
-from version.v8.training.lora import attach_lora, initialize_lora
+from version.v8.training.lora import attach_lora, attach_lora_adapters, initialize_lora
+from version.v8.training.lora_weights import (
+    prepare_lora_weights,
+    resolve_lora_parameters,
+)
 from version.v8.decision.build_clef_training_ir import training_registry
 
 
@@ -93,6 +97,97 @@ class LoRAContractTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 initialize_lora(spec, seed=seed)
 
+    def test_multiple_adapter_declarations(self):
+        declarations = [
+            dict(target="up", rank=2, alpha=2, name="first"),
+            dict(target="bridge", rank=1, alpha=2, name="second"),
+        ]
+        original = fixture()
+        saved = copy.deepcopy(original)
+        ir, specs = attach_lora_adapters(
+            original, adapters=declarations, max_parameters=24
+        )
+        self.assertEqual(original, saved)
+        self.assertEqual(sum(s["parameter_count"] for s in specs), 24)
+        lower(ir)
+        with self.assertRaises(ValueError):
+            attach_lora(ir, target="bridge", rank=1, alpha=1, name="duplicate_base")
+        for bad, budget in (
+            (declarations, 23),
+            (declarations + [declarations[0]], 99),
+            ([dict(declarations[0], rank=0)], 99),
+            ([], 99),
+        ):
+            with self.subTest(adapters=bad, budget=budget), self.assertRaises(
+                ValueError
+            ):
+                attach_lora_adapters(original, adapters=bad, max_parameters=budget)
+        self.assertEqual(original, saved)
+
+    def test_preparation_and_resume_contract(self):
+        import numpy as np
+
+        ir, _ = build()
+        schema = resolve_lora_parameters(ir)
+        base = {
+            name: np.ones(meta["shape"], dtype="float32")
+            for name, meta in schema.items()
+            if not name.startswith("lora.")
+        }
+        prepared, report = prepare_lora_weights(ir, base, seeds={"demo": 41})
+        repeated, same_report = prepare_lora_weights(ir, base, seeds={"demo": 41})
+        self.assertEqual(report, same_report)
+        self.assertNotIn("lora.demo.a", base)
+        self.assertEqual(
+            report["parameters"]["lora.demo.a"]["initialization"]["seed"], 41
+        )
+        # Resumed adapters need not have the initial zero B. Never reinitialize.
+        prepared["lora.demo.b"][:] = 0.125
+        resumed, resumed_report = prepare_lora_weights(ir, prepared, mode="resume")
+        self.assertIs(resumed["lora.demo.b"], prepared["lora.demo.b"])
+        self.assertEqual(
+            resumed_report["parameter_schema_sha256"], report["parameter_schema_sha256"]
+        )
+        self.assertNotEqual(resumed_report["weights_sha256"], report["weights_sha256"])
+        self.assertTrue(
+            all(
+                row["origin"] == "supplied"
+                for row in resumed_report["parameters"].values()
+            )
+        )
+        for weights, kwargs in (
+            (prepared, dict(seeds={"demo": 41})),
+            (prepared, dict(mode="resume", seeds={"demo": 41})),
+            (base, dict(mode="resume")),
+            (base, dict(seeds={"unknown": 41})),
+            (
+                {**base, "lora.demo.a": prepared["lora.demo.a"]},
+                dict(seeds={"demo": 41}),
+            ),
+            ({k: v for k, v in prepared.items() if k != "bridge"}, {}),
+            ({**prepared, "extra": np.zeros(1, dtype="float32")}, {}),
+        ):
+            with self.subTest(kwargs=kwargs), self.assertRaises(ValueError):
+                prepare_lora_weights(ir, weights, **kwargs)
+        for bad in (
+            np.zeros((4, 4), dtype="float64"),
+            np.full((4, 4), np.nan, dtype="float32"),
+            np.zeros((4, 4), dtype="float32").T,
+            np.zeros((16,), dtype="float32"),
+        ):
+            with self.subTest(dtype=bad.dtype, shape=bad.shape), self.assertRaises(
+                ValueError
+            ):
+                prepare_lora_weights(ir, {**prepared, "bridge": bad}, mode="resume")
+        broken = copy.deepcopy(ir)
+        broken["tensors"]["weight.bridge"]["requires_grad"] = True
+        with self.assertRaises(ValueError):
+            resolve_lora_parameters(broken)
+        with self.assertRaises(ValueError):
+            prepare_lora_weights(
+                ir, {**prepared, "lora.demo.scale": np.array([2.0], dtype="float32")}
+            )
+
     def test_duplicate_operation_ids_and_scale_range(self):
         original = fixture()
         original["ops"][2]["op_id"] = 0
@@ -106,6 +201,66 @@ class LoRAContractTests(unittest.TestCase):
 
 
 class LoRANativeTests(unittest.TestCase):
+    def test_multiple_adapters_native_training(self):
+        import numpy as np
+        from tests.v8_training_test_helpers import certify_training
+
+        ir, _ = attach_lora_adapters(
+            fixture(),
+            adapters=[
+                dict(target="up", rank=2, alpha=2, name="first"),
+                dict(target="bridge", rank=1, alpha=2, name="second"),
+            ],
+        )
+        rng = np.random.default_rng(837)
+        values = {
+            name: rng.normal(0, 0.2, meta["shape"]).astype("float32")
+            for name, meta in resolve_lora_parameters(ir).items()
+            if not name.startswith("lora.")
+        }
+        values["features"] = np.eye(4, dtype="float32")
+        for name in ("up", "bridge"):
+            values[name] += np.eye(4, dtype="float32")
+        values, report = prepare_lora_weights(
+            ir, values, seeds={"first": 41, "second": 42}
+        )
+        self.assertEqual(report["parameters"]["up"]["trainable"], False)
+
+        def forward(p):
+            def projection(x, base, adapter):
+                key = "lora." + adapter
+                return (
+                    x @ p[base].T
+                    + (x @ p[key + ".a"].T @ p[key + ".b"].T) * p[key + ".scale"]
+                )
+
+            return (
+                projection(projection(p["features"], "up", "first"), "bridge", "second")
+                @ p["score"].T
+            )
+
+        trainable = {
+            name
+            for name, meta in resolve_lora_parameters(ir).items()
+            if meta["trainable"]
+        }
+        certify_training(
+            self,
+            lower(ir),
+            training_registry(),
+            values,
+            trainable,
+            forward,
+            probe_parameter="lora.first.b",
+            fresh_process=True,
+            check_evaluation=True,
+            checked_runtime=True,
+            extra_sources=(
+                "src/kernels/linear_rows_checked.c",
+                "src/kernels/transformer_rows_checked.c",
+            ),
+        )
+
     def test_native_adamw_resume_and_export(self):
         self.certify(False)
 
@@ -174,7 +329,10 @@ class LoRANativeTests(unittest.TestCase):
                 values[name] = rng.normal(
                     0, 0.2, original["tensors"]["weight." + name]["shape"]
                 ).astype("f")
-        values.update(initialize_lora(spec, seed=41))
+        values, preparation = prepare_lora_weights(ir, values, seeds={"demo": 41})
+        self.assertEqual(
+            preparation["parameters"]["lora.demo.a"]["origin"], "initialized"
+        )
 
         def forward(p):
             x = p["features"] @ p["up"].T
