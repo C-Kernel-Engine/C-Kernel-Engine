@@ -105,6 +105,47 @@ def fixture():
     return graph, weights, args
 
 
+def broadcast_fixture():
+    graph, weights, args = fixture()
+    weights["offsets"] = np.array([[0.2, -0.1, 0.3, -0.2]], dtype="f4")
+    args["bindings"]["row_shift"] = "weight.offsets"
+    graph["activation_buffers"].update(
+        shifted=dict(shape=[4, 4]), nonlinear=dict(shape=[4, 4])
+    )
+    operations = graph["block_types"]["component"]["body"]["ops"]
+    operations[2]["graph_slots"]["inputs"]["input"] = "nonlinear"
+    operations[2:2] = [
+        dict(
+            id="unrelated_row_adjustment",
+            kernel="broadcast_add_rows_checked_f32",
+            graph_slots=dict(
+                inputs=dict(left="up", right="row_shift"),
+                outputs=dict(output="shifted"),
+            ),
+            params=dict(call_constants={}),
+        ),
+        dict(
+            id="nonlinear_shift",
+            kernel="gelu_rows_erf_checked_f32",
+            graph_slots=dict(
+                inputs=dict(input="shifted"), outputs=dict(output="nonlinear")
+            ),
+            params=dict(
+                call_constants=dict(
+                    gelu_input_elements=16,
+                    gelu_input_stride=4,
+                    gelu_output_elements=16,
+                    gelu_output_stride=4,
+                    gelu_scratch_elements=16,
+                    gelu_rows=4,
+                    gelu_channels=4,
+                )
+            ),
+        ),
+    ]
+    return graph, weights, args
+
+
 class CircuitTrainingTests(unittest.TestCase):
     def test_native_non_model_specific_composition(self):
         try:
@@ -166,6 +207,77 @@ class CircuitTrainingTests(unittest.TestCase):
             extra_sources=("src/kernels/linear_rows_checked.c",),
             check_evaluation=True,
         )
+
+    def test_broadcast_uses_compiler_constants_with_independent_gradient_oracle(self):
+        try:
+            import torch
+        except ImportError as exc:
+            self.skipTest("independent PyTorch unavailable: " + str(exc))
+        graph, weights, args = broadcast_fixture()
+        ir = lower_circuit_training(graph, weights, **args)
+        constants = ir["config"]["training_integer_constants"]
+        self.assertEqual(list(constants.values()), [[0, 0, 0, 0]])
+        self.assertNotIn("input.broadcast_zeros", ir["tensors"])
+        registry = training_registry()
+        rules = json.loads((ROOT / "version/v8/scripts/grad_rules_v8.json").read_text())
+        lowered = backend.backward.synthesize_ir2_backward(
+            ir,
+            registry,
+            backend.BINDINGS,
+            rules,
+            strict=True,
+            allow_partial=False,
+            checkpoint_policy="none",
+        )
+        forward = (
+            lambda p: torch.nn.functional.gelu(p["features"] @ p["up"].T + p["offsets"])
+            @ p["bridge"].T
+            @ p["score"].T
+        )
+        ints = np.concatenate(
+            (
+                np.full(2, 2, dtype="i4"),
+                np.arange(4, dtype="i4"),
+                np.arange(2, dtype="i4"),
+            )
+        )
+        certify_training(
+            self,
+            lowered,
+            registry,
+            weights,
+            {"up", "score", "offsets"},
+            forward,
+            integer_inputs=ints,
+            loss_function=lambda z: torch.nn.functional.cross_entropy(
+                z.reshape(2, 2), torch.arange(2)
+            ),
+            extra_sources=("src/kernels/linear_rows_checked.c",),
+            check_evaluation=True,
+        )
+        layout = backend.planner.build_layout(
+            lowered, {"config": lowered["config"]}, 64, strict=True
+        )
+        for defect in ("length", "value", "trainable", "write"):
+            changed = deepcopy(lowered)
+            name = next(iter(constants))
+            if defect == "length":
+                changed["config"]["training_integer_constants"][name] = [0]
+            if defect == "value":
+                changed["config"]["training_integer_constants"][name][0] = 2**32
+            if defect == "trainable":
+                changed["tensors"][name]["requires_grad"] = True
+            if defect == "write":
+                next(iter(changed["forward"][0]["dataflow"]["outputs"].values()))[
+                    "tensor"
+                ] = name
+            with self.subTest(defect=defect), self.assertRaises(ValueError):
+                backend.codegen.generate_c(
+                    changed,
+                    registry,
+                    manifest={"config": changed["config"]},
+                    layout=layout,
+                )
 
     def test_unsupported_operation_fails_before_codegen(self):
         graph, weights, args = fixture()
