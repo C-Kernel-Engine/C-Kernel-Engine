@@ -76,6 +76,155 @@ class FloatInputContractTests(unittest.TestCase):
                     layout=layout,
                 )
 
+    def test_zero_input_contract_and_each_forward_reset(self):
+        ir = graph()
+        ir["config"]["training_float_inputs"] = []
+        ir["config"]["training_zero_inputs"] = ["input.features"]
+
+        def generate(candidate):
+            lowered = backend.lower(candidate)
+            layout = backend.planner.build_layout(
+                lowered, {"config": lowered["config"]}, 64, strict=True
+            )
+            return backend.codegen.generate_c(
+                lowered,
+                backend.REGISTRY,
+                manifest={"config": lowered["config"]},
+                layout=layout,
+            )
+
+        source, summary = generate(ir)
+        self.assertEqual(summary["zero_input_order"], ["input.features"])
+        for defect in (
+            "duplicate",
+            "overlap",
+            "unknown",
+            "weight",
+            "persistent",
+            "trainable",
+        ):
+            bad = deepcopy(ir)
+            if defect == "duplicate":
+                bad["config"]["training_zero_inputs"] *= 2
+            if defect == "overlap":
+                bad["config"]["training_float_inputs"] = ["input.features"]
+            if defect == "unknown":
+                bad["config"]["training_zero_inputs"] = ["missing"]
+            if defect == "weight":
+                bad["config"]["training_zero_inputs"] = ["weight.up"]
+            if defect == "persistent":
+                bad["tensors"]["input.features"]["persistent"] = True
+            if defect == "trainable":
+                bad["tensors"]["input.features"]["requires_grad"] = True
+            with self.subTest(defect=defect), self.assertRaises(ValueError):
+                generate(bad)
+        engine = ROOT / "build/libckernel_engine.so"
+        if not engine.exists():
+            self.skipTest("native engine unavailable")
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            (folder / "train.c").write_text(
+                source + "\nfloat *test_features(void) { return input_features; }\n"
+            )
+            subprocess.run(
+                [
+                    "cc",
+                    "-O2",
+                    "-shared",
+                    "-fPIC",
+                    "-DCK_NUM_TOKENS=4",
+                    "-I" + str(ROOT / "include"),
+                    str(folder / "train.c"),
+                    str(engine),
+                    "-Wl,-rpath," + str(engine.parent),
+                    "-lm",
+                    "-o",
+                    str(folder / "train.so"),
+                ],
+                check=True,
+            )
+            lib = C.CDLL(str(folder / "train.so"))
+            fp = C.POINTER(C.c_float)
+            ip = C.POINTER(C.c_int32)
+            lib.ck_train_init.argtypes = [fp, ip, C.c_int]
+            lib.test_features.restype = fp
+            weights = np.ones(sum(summary["init_weight_numel"]), dtype="f4")
+            sizes = np.array(summary["init_weight_numel"], dtype="i4")
+            self.assertEqual(
+                lib.ck_train_init(
+                    weights.ctypes.data_as(fp), sizes.ctypes.data_as(ip), len(sizes)
+                ),
+                len(sizes),
+            )
+            try:
+                values = np.ctypeslib.as_array(lib.test_features(), shape=(16,))
+                for value in (17.0, -23.0):
+                    values[:] = value
+                    self.assertGreater(lib.ck_train_forward_step(), 0)
+                    np.testing.assert_array_equal(values, np.zeros(16, dtype="f4"))
+            finally:
+                lib.ck_train_free()
+
+    def test_qwen35_actual_training_ir_declares_fresh_state(self):
+        import build_ir_train_v7
+        import init_tiny_train_model_v7
+
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            template = backend.load("version/v7/templates/qwen35.json")
+            init_tiny_train_model_v7.build_tiny_model(
+                folder,
+                seed=42,
+                init="xavier_uniform",
+                template_name="qwen35",
+                template_doc=template,
+                n_layers=2,
+                vocab_size=128,
+                embed_dim=32,
+                hidden_dim=64,
+                num_heads=4,
+                num_kv_heads=2,
+                context_len=1,
+                rope_theta=10000.0,
+                kernel_policy="fp32",
+                adamw_beta1=0.9,
+                adamw_beta2=0.999,
+                adamw_eps=1e-8,
+                adamw_weight_decay=0.01,
+            )
+            manifest = json.loads((folder / "weights_manifest.json").read_text())
+            manifest["config"]["train_tokens"] = 1
+            registry = backend.load("version/v7/kernel_maps/KERNEL_REGISTRY.json")
+            bindings = backend.load("version/v7/kernel_maps/kernel_bindings.json")
+            rules = backend.load("version/v7/scripts/grad_rules_v7.json")
+            ir = build_ir_train_v7.build_ir1_train(
+                manifest, registry, bindings, rules, max_layers=2, strict=False
+            )
+            expected = {"input.recurrent_conv_state", "input.recurrent_ssm_state"}
+            self.assertEqual(set(ir["config"]["training_zero_inputs"]), expected)
+            # Existing family acceptance is deliberately partial backward;
+            # this test protects actual forward-state binding, not full BPTT.
+            lowered = backend.backward.synthesize_ir2_backward(
+                ir,
+                registry,
+                bindings,
+                rules,
+                strict=False,
+                allow_partial=True,
+                checkpoint_policy="none",
+            )
+            layout = backend.planner.build_layout(lowered, manifest, 64, strict=True)
+            _, summary = backend.codegen.generate_c(
+                lowered, registry, manifest=manifest, layout=layout
+            )
+            self.assertEqual(set(summary["zero_input_order"]), expected)
+            broken = deepcopy(lowered)
+            broken["config"]["training_zero_inputs"] = []
+            with self.assertRaisesRegex(ValueError, "unbound FP32 training input"):
+                backend.codegen.generate_c(
+                    broken, registry, manifest=manifest, layout=layout
+                )
+
     def test_native_rejection_reuse_and_independent_gradient(self):
         try:
             import torch

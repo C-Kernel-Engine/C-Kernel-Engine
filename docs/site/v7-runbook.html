@@ -1014,6 +1014,8 @@
                         <a href="kernel-tuning-methodology.html">Kernel Tuning Methodology<small>CPU-node performance runbook</small></a>
                         <a href="v7-profiling.html">v7 Profiling Runbook<small>Train kernels: VTune, Advisor, perf</small></a>
                         <a href="v7-runbook.html">v7 Inference + Training Runbook<small>Copy/paste train + infer workflow</small></a>
+                        <a href="sizing.html">Model Sizing Lab<small>KV, state, concurrency, six-GPU placement</small></a>
+                        <a href="serving.html">Serving &amp; Batching<small>Single-flight, batch2, continuous-batching roadmap</small></a>
                         <a href="v7-svg-dataset-runbook.html">v7 SVG Dataset Runbook<small>Pretrain + midtrain data generation</small></a>
                         <a href="testing.html">Testing<small>Numerical parity verification</small></a>
                         <a href="divergence-harness.html">Stitched Divergence Harness<small>llama.cpp/PyTorch tensor attribution</small></a>
@@ -5479,6 +5481,20 @@ python3 scripts/ck_chat.py --help</pre>
 
 })();
 </script>
+
+<section id="training-zero-inputs">
+<h2>Explicit zero-state training inputs</h2>
+<p>The shared generated trainer distinguishes externally supplied FP32 tensors
+(<code>training_float_inputs</code>) from declared zero-state tensors
+(<code>training_zero_inputs</code>). Zero-state tensors must be nonpersistent,
+nontrainable FP32 inputs with positive sizes. They cannot overlap supplied inputs,
+weights or forward-produced tensors. Undeclared FP32 inputs remain errors.</p>
+<p>The bounded recurrent training builder declares its initial convolution and
+SSM histories as zero-state inputs. Generated C clears them before each forward
+pass, rather than relying on fresh arena allocation. This preserves zero-history
+training semantics; it does not establish training across retained recurrent
+history or full sequence-mode recurrent parity.</p>
+</section>
     </main>
 
     <!-- SVG Viewer Overlay (shared across all pages) -->
@@ -5663,6 +5679,7 @@ python3 scripts/ck_chat.py --help</pre>
             }
         });
     })();
+
     // Site search keyboard shortcuts: "/" or Ctrl+K / Cmd+K focuses the header search box.
     (function() {
         var searchInput = document.getElementById('site-search-input');
@@ -5727,7 +5744,7 @@ python3 scripts/ck_chat.py --help</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-08-30</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-11-14</p>
             </div>
         </div>
     </footer>
