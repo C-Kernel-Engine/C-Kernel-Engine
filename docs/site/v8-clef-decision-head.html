@@ -1033,6 +1033,40 @@
 <div class="container">
 
 <h1>Clef-Flash decision-head bring-up</h1>
+
+<section id="frozen-native-training-prefix">
+<h2>Declared frozen native prefix in training</h2>
+<p>A checked feature-producing component can feed the existing generated head
+trainer when its circuit explicitly declares <code>stop_gradient=True</code>.
+Kernel maps declare a frozen forward boundary and borrowed context arguments;
+shared lowering owns feature and scratch storage. Generated C executes the
+component, head forward, backward and AdamW. Python need not transfer hidden
+features or schedule component tokens.</p>
+<p>The caller binds an exclusively owned, live native descriptor through
+<code>ck_train_set_native_context_ex</code> and retains it until execution ends.
+Contexts are not parameters or checkpoint contents and must be rebound after
+initialization or reset. Changed inputs, weight imports, failed execution and
+evaluation invalidate permission to apply stale gradients. Failed native
+execution cannot advance the optimizer.</p>
+<p>Small non-Clef tests compare five FP32 updates and parameter gradients against
+PyTorch, including a declared FP32 LoRA adapter after the frozen component. They
+test invalid IDs, nonfinite output, cancellation and recovery, and run a
+relocated C-only training host after deleting its build directory. This certifies
+the bounded interface. A separate released-model run executes the frozen 9B
+backbone and one generated head update with no Python hidden-feature handoff.
+Fresh pinned PyTorch head comparisons on the identical native features pass:
+maximum gradient error <code>1.02e-7</code>, weight error <code>2.38e-7</code> and
+optimizer-state error <code>1.01e-8</code>, preserving the existing tolerances.
+A separate C-only host outside the checkout reproduces the complete updated
+weight array and loss exactly, without a Python process or captured hidden inputs.
+Loaded native library identities are retained; this is not arbitrary-machine portability.
+See <a href="assets/clef-frozen-native-training-20261114.json">bound evidence</a>.
+This fixed-request experiment is not yet exposed by the application training
+recipe. No backbone derivative, BF16 adapter or quantized-base training is advertised.
+Connected backbone/head numerical acceptance remains a separate open gate.</p>
+<pre><code>python3 -m unittest tests.test_v8_frozen_component_training -v</code></pre>
+</section>
+
 <section id="portable-head-runtime">
 <h2>Relocatable native head training</h2>
 <p>The head recipe uses the existing shared training build helper and packages
