@@ -11,7 +11,10 @@
     {
       "name": "input",
       "dtype": "fp32",
-      "shape": ["T", "E"],
+      "shape": [
+        "T",
+        "E"
+      ],
       "desc": "Input activations [tokens, embed_dim]"
     }
   ],
@@ -19,13 +22,17 @@
     {
       "name": "gamma",
       "dtype": "fp32",
-      "shape": ["E"],
+      "shape": [
+        "E"
+      ],
       "desc": "LayerNorm scale weight"
     },
     {
       "name": "beta",
       "dtype": "fp32",
-      "shape": ["E"],
+      "shape": [
+        "E"
+      ],
       "desc": "LayerNorm bias weight"
     }
   ],
@@ -34,12 +41,18 @@
     {
       "name": "output",
       "dtype": "fp32",
-      "shape": ["T", "E"],
+      "shape": [
+        "T",
+        "E"
+      ],
       "desc": "Normalized output"
     }
   ],
   "scratch": [],
-  "dims": ["T", "E"],
+  "dims": [
+    "T",
+    "E"
+  ],
   "params": [
     {
       "name": "eps",
@@ -51,24 +64,37 @@
     "notes": "Exact LayerNorm variant with scalar FP64 mean accumulation and ggml's ordered eight-lane AVX reduction for centered variance. The reduction identity is preserved on wider x86 ISAs."
   },
   "impl": {
-    "function": "layernorm_naive_serial_matched_precision",
-    "c_declaration": "void layernorm_naive_serial_matched_precision(const float *input, const float *gamma, const float *beta, float *output, float *mean_cache, float *rstd_cache, int tokens, int d_model, float eps);",
-    "sources": ["src/kernels/layernorm_kernels.c"]
+    "function": "layernorm_fp32_exact_parallel_dispatch",
+    "c_declaration": "void layernorm_fp32_exact_parallel_dispatch(const float *input, const float *gamma, const float *beta, float *output, float *mean_cache, float *rstd_cache, int tokens, int d_model, float eps);",
+    "sources": [
+      "src/kernels/layernorm_kernels.c",
+      "version/v8/src/ck_parallel_prefill_v8.c"
+    ]
   },
-  "modes": {"inference": true, "training": false, "backward": false},
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
   "numerical_capabilities": [
     {
       "contract_id": "layernorm_fp32_ggml_chunked_contracted",
       "status": "validated",
-      "phases": ["prefill"],
-      "function": "layernorm_naive_serial_matched_precision",
+      "phases": [
+        "prefill"
+      ],
+      "function": "layernorm_fp32_exact_parallel_dispatch",
       "explicit_selector": true,
       "implementation": {
         "isa_dispatch": "compile_time",
         "threading": {
-          "runtime": "serial",
-          "work_partition": ["independent_rows"],
-          "dispatch": ["inline"],
+          "runtime": "ck_threadpool",
+          "work_partition": [
+            "independent_rows"
+          ],
+          "dispatch": [
+            "ck_threadpool_parallel_for_n"
+          ],
           "reduction_order_effect": "contract_defined"
         }
       },
@@ -84,19 +110,63 @@
   "call_abi": {
     "version": 1,
     "params": [
-      {"name": "input", "source": "activation:input", "cast": "const float*"},
-      {"name": "gamma", "source": "weight_f:gamma", "alt": ["ln1_gamma", "ln2_gamma", "final_ln_weight", "branch_norm_gamma"]},
-      {"name": "beta", "source": "weight_f:beta", "alt": ["ln1_beta", "ln2_beta", "final_ln_bias", "branch_norm_beta"]},
-      {"name": "output", "source": "output:output", "cast": "float*"},
-      {"name": "mean_cache", "source": "null"},
-      {"name": "rstd_cache", "source": "null"},
-      {"name": "tokens", "source": "dim:seq_len"},
-      {"name": "d_model", "source": "dim:embed_dim"},
-      {"name": "eps", "source": "dim:rms_eps"}
+      {
+        "name": "input",
+        "source": "activation:input",
+        "cast": "const float*"
+      },
+      {
+        "name": "gamma",
+        "source": "weight_f:gamma",
+        "alt": [
+          "ln1_gamma",
+          "ln2_gamma",
+          "final_ln_weight",
+          "branch_norm_gamma"
+        ]
+      },
+      {
+        "name": "beta",
+        "source": "weight_f:beta",
+        "alt": [
+          "ln1_beta",
+          "ln2_beta",
+          "final_ln_bias",
+          "branch_norm_beta"
+        ]
+      },
+      {
+        "name": "output",
+        "source": "output:output",
+        "cast": "float*"
+      },
+      {
+        "name": "mean_cache",
+        "source": "null"
+      },
+      {
+        "name": "rstd_cache",
+        "source": "null"
+      },
+      {
+        "name": "tokens",
+        "source": "dim:seq_len"
+      },
+      {
+        "name": "d_model",
+        "source": "dim:embed_dim"
+      },
+      {
+        "name": "eps",
+        "source": "dim:rms_eps"
+      }
     ]
   },
   "tests": {
-    "unit": ["unittest/test_layernorm.py"]
+    "unit": [
+      "unittest/test_layernorm.py",
+      "tests/test_v8_encoder_row_parallel.py"
+    ]
   },
-  "notes": "GGML-compatible contracted LayerNorm used for parity-sensitive FP32 graphs. AVX-512 hosts retain the declared ordered AVX reduction instead of selecting a wider reduction implicitly."
+  "notes": "GGML-compatible contracted LayerNorm used for parity-sensitive FP32 graphs. AVX-512 hosts retain the declared ordered AVX reduction instead of selecting a wider reduction implicitly. Large disjoint tensors use independent row/head dispatch; small, nested, overlapping and unsupported head geometry calls preserve serial execution. Per-output arithmetic is unchanged."
 }
