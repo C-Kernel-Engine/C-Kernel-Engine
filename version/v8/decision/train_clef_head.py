@@ -225,6 +225,16 @@ class Runtime:
             self.slices[name] = slice(offset, offset + int(count))
             offset += int(count)
         self.frozen_embedding = initial[self.slices["output_embedding.weight"]].copy()
+        require(
+            hasattr(self.lib, "ck_train_compare_weight"),
+            "runtime lacks native frozen-weight comparison; regenerate runtime",
+        )
+        self.lib.ck_train_compare_weight.argtypes = [C.c_int, FP, C.c_size_t]
+        self.lib.ck_train_compare_weight.restype = C.c_int
+        self.frozen_embedding_index = self.summary["init_weight_order"].index(
+            "output_embedding.weight"
+        )
+        self.last_step_metrics = None
 
     def close(self):
         self.lib.ck_train_free()
@@ -247,20 +257,19 @@ class Runtime:
             == hidden.size,
             "native feature input rejected",
         )
-        supplied = dict(
-            arrays, broadcast_zeros=np.zeros(len(arrays["option_counts"]), dtype="i4")
-        )
         metadata = np.concatenate(
             [
-                supplied[n.removeprefix("input.")].ravel()
+                arrays[n.removeprefix("input.")].ravel()
                 for n in self.ir["config"]["training_integer_inputs"]
             ]
         ).astype("i4")
         return metadata
 
     def step(self, arrays, lr):
+        self.last_step_metrics = None
         metadata = self.batch(arrays)
         loss = C.c_float()
+        step_started = time.perf_counter()
         require(
             self.lib.ck_train_step_with_i32_ex(
                 ip(self.ids),
@@ -275,9 +284,22 @@ class Runtime:
             "native training step rejected",
         )
         require(np.isfinite(loss.value), "nonfinite native loss")
-        np.testing.assert_array_equal(
-            self.snapshot()[self.slices["output_embedding.weight"]],
-            self.frozen_embedding,
+        native_finished = time.perf_counter()
+        require(
+            self.lib.ck_train_compare_weight(
+                self.frozen_embedding_index,
+                fp(self.frozen_embedding),
+                self.frozen_embedding.size,
+            )
+            == 1,
+            "frozen embedding changed during native update",
+        )
+        self.last_step_metrics = dict(
+            native_step_seconds=native_finished - step_started,
+            frozen_check_seconds=time.perf_counter() - native_finished,
+            frozen_comparison_bytes=int(self.frozen_embedding.nbytes),
+            host_weight_snapshot_bytes=0,
+            avoided_weight_snapshot_bytes=sum(int(n) for n in self.sizes) * 4,
         )
         return loss.value
 
