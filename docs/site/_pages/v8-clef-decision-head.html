@@ -8,6 +8,169 @@
 
 <p>Model topology lives in the circuit builders here. Kernels implement arithmetic; maps describe ABI, scratch and numerical contracts. Generic operation catalogue entries do not inspect the model name.</p>
 
+<section id="registered-fp32-training">
+<h2>Registered FP32 Clef head training</h2>
+<p>This opt-in recipe trains the complete supported Clef head on <strong>supplied backbone
+features</strong>. It does not execute or train a backbone, tokenize text, add adapters,
+or execute application actions. A successful job means generated training,
+frozen embedding checks, checkpoint reload and generated inference export passed.
+It does not certify the submitted dataset's quality, calibrated confidence or
+numerical parity against an oracle. Those report fields remain <code>NOT_TESTED</code>.</p>
+<h3>Ownership and precision</h3>
+<p>The existing v8 circuit authoring, backward rules and shared training code generator
+produce native forward, backward and AdamW execution. Python validates records,
+loads input features, invokes complete generated steps and packages artifacts.
+It never computes model gradients or updates parameters. No new compiler branch,
+model scheduler or training stack is introduced.</p>
+<p>The admitted recipe is <code>clef_head_fp32_v1</code>: FP32, AdamW, per-question cross entropy,
+1–40 epochs, learning rate <code>(0, 0.01]</code>, epsilon <code>1e-4</code>, betas <code>(0.9, 0.999)</code>, weight
+decay <code>0.01</code>, no dropout, gradient accumulation 1. All head parameters train;
+output embedding rows and supplied backbone features are frozen. Mixed BF16,
+LoRA and QLoRA are unavailable through this recipe. In particular, the existing
+mixed-BF16 trajectory failure has not become a pass.</p>
+<h3>Dataset/package contract</h3>
+<p><code>cke.clef.training-package.v1</code> has exactly five fields:</p>
+<ul>
+<li><code>schema</code>: the version above.</li>
+<li><code>model</code>: <code>id</code>, <code>revision</code>, <code>backbone_id</code>, <code>backbone_revision</code>,
+<code>tokenizer_revision</code>, and <code>feature_provenance: &quot;supplied&quot;</code>. Revisions are pinned
+hexadecimal identities. Supplied provenance records a declaration, not proof
+that CKE executed that backbone.</li>
+<li><code>geometry</code>: <code>tokens</code>, <code>channels</code>, <code>width</code>, <code>heads</code>, <code>feedforward</code>, <code>vocabulary</code>,
+<code>questions</code>, <code>options</code>. All records share this declared geometry.</li>
+<li><code>weights</code>: local basename <code>file</code> and <code>sha256</code> of the FP32 NPZ raw head weights,
+including <code>output_embedding.weight</code> and packed QKV weights.</li>
+<li><code>records</code>: 2–32 records with <code>id</code> (at most 60 characters), <code>split</code> (<code>train</code> or
+<code>validation</code>), <code>asset</code> (<code>file</code>, <code>sha256</code>), <code>question_ids</code> and grouped
+<code>candidate_ids</code>. Both splits must be present. IDs preserve question/option order.</li>
+</ul>
+<p>Each record NPZ contains <code>hidden</code> (FP32) and int32 <code>input_ids</code>, <code>question_spans</code>,
+<code>option_spans</code>, <code>global_span</code>, <code>option_counts</code>, <code>question_type_ids</code>, <code>labels</code>.
+Spans are half-open. Global span must select the last valid token. Labels index
+that question's allowed options; option counts partition flattened option rows.
+Arrays, finite values, IDs, counts, shapes, archive expansion and all asset hashes
+are checked before code generation. Archives must not contain Python objects.
+See <code>version/v8/decision/training_package.py</code> for exact bounds and inventories.
+The tests create synthetic, nonzero examples with overlapping spans and two
+questions with unequal option counts. Do not use private customer data for the
+first client demonstration.</p>
+<h3>Run locally</h3>
+<p>Build <code>build/libckernel_engine.so</code> first. Use a trusted package and retain its hash:</p>
+<pre><code class="language-sh">python version/v8/decision/train_clef_head.py \
+  --package /absolute/path/package.json --package-sha256 SHA256 \
+  --run-dir /private/new-run --json-out /private/result.json --epochs 2
+</code></pre>
+<p>The output contains native runtime/source identities, held-out loss before/after,
+per-record raw logits and identities, an identity-bound optimizer checkpoint,
+<code>trained_head.npz</code>, and <code>serving.zip</code>. The latter contains the ordinary generated
+head package and registered supplied feature artifacts. The recipe loads it with
+<code>NativeHead</code> and compares its logits with the trained runtime for every record.</p>
+<p>For a deliberate CLI checkpoint, add <code>--stop-after 2</code>; continue with the same
+package, configuration and run directory using <code>--resume /private/new-run/checkpoint-2</code>.
+This restores weights, AdamW state and step count. The saved runtime and engine
+identities must match. Completed checkpoints cannot be resumed as new training.
+This is local CLI resume, not a job-service resume or cancellation promise.</p>
+<h3>Independent client and job service</h3>
+<p>The existing <code>cke.training.v1</code> discovery/validation API remains non-executing.
+An administrator can opt into the head recipe by registering a package mapping:</p>
+<pre><code class="language-json">{&quot;demo&quot;:{&quot;path&quot;:&quot;/absolute/path/package.json&quot;,&quot;sha256&quot;:&quot;SHA256&quot;}}
+</code></pre>
+<p>Launch trusted local stdio, from a clean committed source tree:</p>
+<pre><code class="language-sh">python -m server.training.jobs --store /private/jobs --principal demo \
+  --clef-registry /private/registry.json
+</code></pre>
+<p>Use discovery before constructing a request. A head configuration is:</p>
+<pre><code class="language-json">{&quot;recipe&quot;:&quot;clef_head_fp32_v1&quot;,&quot;package_id&quot;:&quot;demo&quot;,&quot;package_sha256&quot;:&quot;SHA256&quot;,
+ &quot;dtype&quot;:&quot;fp32&quot;,&quot;optimizer&quot;:&quot;adamw&quot;,&quot;method&quot;:&quot;head_only&quot;,
+ &quot;epochs&quot;:2,&quot;learning_rate&quot;:0.001}
+</code></pre>
+<p><code>prepare</code> binds configuration, worker boot, capability/source/interpreter/package
+identities and expiration. <code>submit</code> returns a durable acknowledgement with an
+idempotency key. Only one job executes, with no backlog; discovery and preparation
+do not execute training. <code>observe</code> reports durable monotonic progress and metrics.
+Head metrics use <code>step_kind: update</code> and <code>unit: nats/question</code>; they must not be
+interpreted as decoder token losses. Artifact retrieval uses opaque IDs, bounded
+chunks and hashes. The independent clients in <code>server/training/consumer.py</code> and
+<code>job_consumer.py</code> do not import the worker implementation.</p>
+<h3>Readiness and gaps</h3>
+<table>
+<thead>
+<tr>
+<th>Boundary</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Supplied-feature FP32 generated head training and inference export</td>
+<td>Implemented; synthetic native regression</td>
+</tr>
+<tr>
+<td>Independent small-head PyTorch comparison</td>
+<td>Optional pinned-source test; explicit skip when unavailable</td>
+</tr>
+<tr>
+<td>Frozen output embeddings and fresh-process CLI resume</td>
+<td>Native regression</td>
+</tr>
+<tr>
+<td>Held-out loss</td>
+<td>Reported; no automatic quality acceptance</td>
+</tr>
+<tr>
+<td>Backbone execution, text-to-decision</td>
+<td>Not provided by this recipe</td>
+</tr>
+<tr>
+<td>Job cancellation / automatic restart / remote resume</td>
+<td>Unsupported; interrupted jobs become <code>recovery_required</code></td>
+</tr>
+<tr>
+<td>Remote authenticated transport</td>
+<td>Unsupported; trusted local stdio only</td>
+</tr>
+<tr>
+<td>BF16 trajectory certification, LoRA, QLoRA</td>
+<td>Not admitted</td>
+</tr>
+</tbody>
+</table>
+<p>Do not expose this interface as an authenticated remote service. A caller-provided
+principal is meaningful only inside a trusted local supervisor. A tunnel is a
+development bridge, not authorization. Evaluation continues to use the separate
+<code>cke.decision.evaluate.v1</code> contract; neither evaluation nor control discovery is
+a training command. Keep the current decision HTTP worker loopback-only.</p>
+<p>The service exports checkpoint metadata and serving artifacts, but remote
+checkpoint-state transfer/resume is not yet an application contract. Applications
+must surface <code>recovery_required</code>, <code>NOT_TESTED</code> and unsupported operations explicitly.</p>
+<h3>Validation retained for this change</h3>
+<p>On the local Intel i7-14700T host with PyTorch <code>2.12.1+cpu</code> and one requested
+OpenMP thread:</p>
+<ul>
+<li>Focused recipe and existing service/client suites: 31 passed, 2 explicit skips
+(opt-in real SVG and Clef jobs).</li>
+<li>Real registered Clef job rerun separately from the clean committed tree: passed,
+including independent observation and chunked artifact hash verification.</li>
+<li><code>training_clef_registered_recipe</code> through the standard nightly runner: passed.</li>
+<li>Existing independent FP32 complete-head 40-update trajectory: passed. Loss
+0.28329045 → 0.06633431; max absolute gradient error <code>1.374632e-6</code>, weight error
+<code>1.668930e-6</code>, optimizer-moment error <code>3.147870e-7</code>. Checkpoint/resume and
+generated inference export passed. These features and head geometry are
+synthetic; this run does not certify released-geometry training or task quality.</li>
+</ul>
+<p>Reproduce the new boundary with:</p>
+<pre><code class="language-sh">OMP_NUM_THREADS=1 CKE_CLEF_FLASH_REFERENCE_SOURCE=/path/to/pinned/joint_schema_model.py \
+  python -m unittest tests.test_v8_clef_training_recipe \
+  server.tests.test_training_contract server.tests.test_training_jobs -v
+OMP_NUM_THREADS=1 CKE_RUN_CLEF_JOB=1 python -m unittest \
+  tests.test_v8_clef_training_recipe.NativeRecipe.test_registered_job_and_independent_artifact_client -v
+python scripts/nightly_runner.py --tests training_clef_registered_recipe --require-executed
+</code></pre>
+<p>The oracle source must match the SHA-256 in
+<code>tests/fixtures/decision/clef_flash/identity.json</code>; no source means explicit skip.
+The production resume test blocks imports of <code>torch</code> and <code>transformers</code>.</p>
+</section>
+
 <section id="same-state-pytorch-oracle">
 <h2>Same-state update diagnosis: 39 of 40 comparisons pass</h2>
 <p><code>--same-state</code> copies CKE's pre-step master weights, both AdamW moments and optimizer
