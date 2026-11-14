@@ -8,6 +8,107 @@
 
 <p>Model topology lives in the circuit builders here. Kernels implement arithmetic; maps describe ABI, scratch and numerical contracts. Generic operation catalogue entries do not inspect the model name.</p>
 
+<section id="native-backbone-head-training">
+<h2>Native text → backbone → decision → head training</h2>
+<p>The offline diagnostic now runs the released Clef-Flash Qwen3.5-9B backbone
+through ordinary generated decode execution, reads its declared final feature row,
+and passes those CKE-produced features and pinned output-embedding rows into the
+generated head. No PyTorch or Transformers import is needed for production inference
+or head training. Python owns schema encoding, tokenization, artifact preparation,
+requests and reporting; generated C owns neural forward/backward and AdamW.</p>
+<p>The backbone is frozen. The 121,762,820-element released head is trained using
+<code>train_clef_head.Runtime</code>, exported and reloaded through generated inference.
+This does not train the backbone, introduce LoRA, or establish held-out task accuracy.
+The head is compiled for each offline request geometry; a persistent arbitrary-text
+application endpoint remains a separate integration gate.</p>
+<p>The Qwen3.5 circuit now selects existing BF16-storage providers for recurrent softplus, attention gating
+and text rotary arithmetic when BF16 recurrent projection weights are declared.
+Identical-input replay isolated these contract mismatches: FP32 gating differed by 0.00481534,
+and position-one rotary Q differed by 0.01765776. The existing BF16 providers matched
+the corresponding PyTorch values exactly. FP32 and quantized selections remain unchanged.
+The recurrent softplus replay also becomes exact (previous maximum difference 3.55e-9). These are circuit contract fixes, not new model-specific compiler branches.</p>
+<p>The diagnostic profile explicitly selects the existing oneDNN 3.12 projection
+contract. Its reference is Transformers 5.10.2, the release's recorded version, with
+SDPA attention. An experimental Transformers checkout and eager attention are retained
+as diagnostic comparisons, not silently treated as the same oracle.</p>
+<h3>Released-weight evidence, 2026-11-14</h3>
+<p>On Ryzen 9950X3D, one 128-token sentiment request ran through the actual released
+backbone and head with PyTorch/Transformers imports blocked. One native AdamW update
+reduced this record's loss from 0.008074787 to 0.007803728; exported/reloaded logits
+were exact. This is a training-mechanics test, not a held-out accuracy result.</p>
+<table><thead><tr><th>Independent check</th><th>Maximum absolute error</th><th>Verdict</th></tr></thead><tbody>
+<tr><td>Head on identical native features</td><td>9.53674e-7 (bound 2e-6)</td><td>PASS</td></tr>
+<tr><td>All 121,762,820 head parameter gradients</td><td>1.22469e-7 (bound 3e-5)</td><td>PASS</td></tr>
+<tr><td>AdamW-updated weights</td><td>2.38419e-7 (bound 3e-6)</td><td>PASS</td></tr>
+<tr><td>Connected logits versus SDPA full prefill</td><td>0.00803661 (bound 2e-6)</td><td>FAIL</td></tr>
+<tr><td>Connected logits versus SDPA incremental execution</td><td>0.00917447 (bound 2e-6)</td><td>FAIL</td></tr>
+</tbody></table>
+<p><strong>The native path executes end to end, but is not numerically certified.</strong>
+The three exact local fixes do not resolve the complete backbone trajectory.
+The first token's final features are exact; the second token still diverges.
+Continue identical-input state/operation diagnosis before expanding LoRA.
+No tolerance was increased and no reference intermediate entered production.</p>
+<p>A further state capture identifies a precision-policy difference: the released
+Transformers incremental cache stores BF16, while CKE's selected recurrent contract
+retains FP32 state. Diagnostic BF16 rounding of CKE's first-step state reproduces all
+524,288 reference values exactly. A separate reference experiment retaining FP32 cache
+state still has connected logit error 0.00187111 and remains FAIL. This isolates one
+cause, not all remaining divergence. Production state precision is unchanged; the
+modified-reference experiment is explicitly labelled diagnostic, not released parity.</p>
+<p><a href="assets/clef-native-e2e-20261114.json">Machine-readable evidence</a>
+retains raw logits, RMSE, reference signal magnitudes, identities, dependency hashes,
+training results and local replay results. Private activation packets remain on the
+asset host; the public artifact contains the synthetic request and summary metrics.</p>
+<h3>Reproduction and boundaries</h3>
+<p>Use the pinned release <code>fb4417d31c1d0f9e7e77f1141b40aaede7491e00</code>,
+its SHA-verified release lock, and standalone native oneDNN/SLEEF/MKL dependencies.
+This profile is validated on AVX-512-capable Ryzen; it is not an AVX2-only portability claim.
+Set <code>CK_ONEDNN_LIBRARY</code>, <code>CK_SLEEF_LIBRARY</code> and
+<code>CK_MKL_LIBRARY</code> to those installed libraries. Record their hashes and thread
+settings. The build command requires a fresh output directory; it never reuses unbound
+converted weights. A local trusted administrator must supply the expected lock and
+bundle hashes.</p>
+<pre><code>python3 version/v8/decision/build_native_clef_backbone.py \
+  --release "$RELEASE" --lock "$LOCK" --lock-sha256 "$LOCK_SHA" --output "$BUNDLE"
+python3 version/v8/decision/run_native_clef.py \
+  --release "$RELEASE" --lock "$LOCK" --lock-sha256 "$LOCK_SHA" \
+  --bundle "$BUNDLE" --bundle-descriptor "$BUNDLE/bundle.json" \
+  --bundle-sha256 "$BUNDLE_SHA" --request request.json --output native-run
+python3 version/v8/decision/train_native_clef.py \
+  --release "$RELEASE" --native-run native-run --report-sha256 "$REPORT_SHA" \
+  --labels labels.json --output training-run --steps 1 --workspace-mib 4096
+python3 tests/run_clef_native_oracle.py \
+  --release "$RELEASE" --native-run native-run --native-sha256 "$REPORT_SHA" \
+  --capture "$CAPTURE" --capture-sha256 "$CAPTURE_SHA" --output comparison.json
+python3 tests/run_clef_native_training_oracle.py \
+  --release "$RELEASE" --native-run native-run --native-sha256 "$REPORT_SHA" \
+  --training training-run --training-sha256 "$TRAINING_SHA" \
+  --labels labels.json --output gradient-comparison.json</code></pre>
+<p>The independent capture tool accepts <code>--attention sdpa --schedule incremental</code>
+to match the native token-by-token schedule. Its defaults remain eager/prefill for
+existing users. Full-prefill and incremental comparisons are retained separately;
+changing the oracle schedule is not permission to erase a failing comparison. Neither reference features nor reference logits enter
+the native runner. Reports separate execution, same-input head parity, connected
+logit parity, exact backbone-storage agreement, gradients, optimizer updates and reload.
+Unavailable reference evidence is NOT_TESTED, not PASS.</p>
+<p>The released geometry needs approximately 2.51 GB of native training workspace.
+The offline CLI explicitly permits a 4 GiB budget; existing application recipes retain
+their 2 GiB default. This is an arena bound, not total process memory: weights, compiler,
+Python arrays and exported snapshots require additional RAM. Evaluation performs no
+optimizer update. Offline tools do not claim HTTP deadlines, cancellation, concurrent
+backbone ownership, streaming training datasets or automatic application admission.</p>
+<p>Cheap standard-nightly coverage checks schema spans, rejection without truncation,
+BF16 versus FP32/quantized contract selection, artifact tampering, decoder ownership,
+short/long/short state reset, output lifetime, partial failure and recovery, and a
+nonzero generated head against an independent reference. Full 9B/released-head runs
+require the pinned assets and are reported separately. Set
+<code>CKE_CLEF_NATIVE_ACCEPTANCE</code> to a trusted JSON file with the runner arguments
+<code>release, lock, lock_sha, bundle, bundle_descriptor, bundle_sha, request</code>
+and a <code>labels</code> mapping (question ID to candidate ID) to enable the released
+asset execution/training/reload test. Without that configuration it reports SKIP.
+That test is execution evidence; run the independent comparison commands separately.</p>
+</section>
+
 <section id="lora-fp32-authoring">
 <h2>FP32 LoRA: bounded graph authoring and native training</h2>
 <p><code>version/v8/training/lora.py</code> now attaches one explicitly named adapter

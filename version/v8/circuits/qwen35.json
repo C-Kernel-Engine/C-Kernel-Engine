@@ -862,10 +862,45 @@
         "axis_names": ["token", "channel"]
       }
     },
+    "decoder.attention_gate.bf16_pytorch": {
+      "op": "attn_gate_sigmoid_mul",
+      "operation_interface": "attn_gate_sigmoid_mul.fp32.v1",
+      "template_ops": [
+        "attn_gate_sigmoid_mul"
+      ],
+      "phases": {
+        "prefill": {
+          "contract_id": "attention_gate_pytorch_sleef_bf16_storage",
+          "validation": "validated",
+          "evidence": "Identical-input Clef Qwen3.5 layer-3 replay is exact with the existing BF16 sigmoid and product storage provider; FP32 gating changes all 4096 outputs. Connected model parity is checked separately."
+        },
+        "decode": {
+          "contract_id": "attention_gate_pytorch_sleef_bf16_storage",
+          "validation": "validated",
+          "evidence": "Identical-input Clef Qwen3.5 layer-3 replay is exact with the existing BF16 sigmoid and product storage provider; FP32 gating changes all 4096 outputs. Connected model parity is checked separately."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.attention_gate.output",
+        "producer": "attn_gate_sigmoid_mul",
+        "logical_layout": "token_major",
+        "axis_names": [
+          "token",
+          "head",
+          "channel"
+        ]
+      },
+      "selector": {
+        "config_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      }
+    },
     "decoder.attention_gate": {
       "op": "attn_gate_sigmoid_mul",
       "operation_interface": "attn_gate_sigmoid_mul.fp32.v1",
       "template_ops": ["attn_gate_sigmoid_mul"],
+      "selector": {"config_not_equals": {"recurrent_qkv_weight_dtype": "bf16"}},
       "phases": {
         "prefill": {
           "contract_id": "attention_gate_llama_sigmoid_fp32_output",
@@ -945,7 +980,71 @@
         "axis_names": ["token", "channel"]
       }
     },
+    "decoder.recurrent_dt_gate.bf16_pytorch": {
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.recurrent_dt_gate.output",
+        "producer": "recurrent_dt_gate",
+        "logical_layout": "token_major",
+        "axis_names": ["token", "head"]
+      },
+      "op": "recurrent_dt_gate",
+      "operation_interface": "recurrent_dt_gate.fp32.v1",
+      "template_ops": [
+        "recurrent_dt_gate"
+      ],
+      "selector": {
+        "config_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "recurrent_dt_gate_pytorch_sleef_fp32_output",
+          "validation": "validated",
+          "evidence": "Identical-input second-token replay matches all 32 gates with the existing PyTorch SLEEF provider. The default llama softplus differs before recurrent state propagation."
+        },
+        "decode": {
+          "contract_id": "recurrent_dt_gate_pytorch_sleef_fp32_output",
+          "validation": "validated",
+          "evidence": "Identical-input second-token replay matches all 32 gates with the existing PyTorch SLEEF provider. The default llama softplus differs before recurrent state propagation."
+        }
+      }
+    },
+    "decoder.mrope.bf16_pytorch": {
+      "op": "rope",
+      "template_ops": [
+        "rope_qk"
+      ],
+      "phases": {
+        "prefill": {
+          "contract_id": "text_imrope_bf16_input_pytorch_bf16_compute_bf16_output",
+          "validation": "validated",
+          "evidence": "Identical-input position-1 Qwen3.5 replay matches all Q/K values with BF16 cosine, sine, product and sum storage boundaries. Connected parity is checked separately."
+        },
+        "decode": {
+          "contract_id": "text_imrope_bf16_input_pytorch_bf16_compute_bf16_output",
+          "validation": "validated",
+          "evidence": "Identical-input position-1 Qwen3.5 replay matches all Q/K values with BF16 cosine, sine, product and sum storage boundaries. Connected parity is checked separately."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.mrope.output",
+        "producer": "rope_qk",
+        "logical_layout": "head_major",
+        "axis_names": [
+          "head",
+          "token",
+          "channel"
+        ]
+      },
+      "selector": {
+        "config_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      }
+    },
     "decoder.mrope": {
+      "selector": {"config_not_equals": {"recurrent_qkv_weight_dtype": "bf16"}},
       "op": "rope",
       "template_ops": ["rope_qk"],
       "phases": {

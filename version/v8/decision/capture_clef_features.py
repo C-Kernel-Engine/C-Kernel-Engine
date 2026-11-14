@@ -95,7 +95,9 @@ def verify_lock(folder,lock_path,expected_sha):
     return lock
 
 
-def capture(folder,lock_path,lock_sha,request_path,output,*,max_tokens=512,threads=4):
+def capture(folder,lock_path,lock_sha,request_path,output,*,max_tokens=512,threads=4,attention="eager",schedule="prefill"):
+    if attention not in ("eager", "sdpa"):raise ValueError("unsupported reference attention backend")
+    if schedule not in ("prefill", "incremental"):raise ValueError("unsupported reference schedule")
     import torch
     import transformers
     import tokenizers
@@ -110,13 +112,23 @@ def capture(folder,lock_path,lock_sha,request_path,output,*,max_tokens=512,threa
     record=wire.decode(Path(request_path).read_bytes());encoded=strict_encode(reference,tokenizer,record,max_tokens)
     if type(threads) is not int or not 1<=threads<=64:raise ValueError('invalid thread count')
     torch.set_num_threads(threads)
-    backbone=Qwen3_5ForConditionalGeneration.from_pretrained(folder,dtype=torch.bfloat16,local_files_only=True,use_safetensors=True,attn_implementation='eager').eval()
+    backbone=Qwen3_5ForConditionalGeneration.from_pretrained(folder,dtype=torch.bfloat16,local_files_only=True,use_safetensors=True,attn_implementation=attention).eval()
     text_model=backbone.model
     if hasattr(text_model,'language_model'):text_model=text_model.language_model
     ids=torch.tensor(encoded.input_ids,dtype=torch.int64)[None]
     unique=torch.unique(ids,sorted=True)
     with torch.inference_mode():
-        hidden=text_model(input_ids=ids,attention_mask=torch.ones_like(ids),use_cache=False,return_dict=True).last_hidden_state[0].float().cpu().numpy()
+        if schedule == "prefill":
+            hidden=text_model(input_ids=ids,attention_mask=torch.ones_like(ids),use_cache=False,return_dict=True).last_hidden_state[0].float().cpu().numpy()
+        else:
+            cache=None;features=[]
+            for position in range(ids.shape[1]):
+                step=text_model(input_ids=ids[:,position:position+1],attention_mask=torch.ones_like(ids[:,:position+1]),past_key_values=cache,use_cache=True,return_dict=True)
+                cache=step.past_key_values
+                features.append(step.last_hidden_state[0].float().cpu().numpy().copy())
+            hidden=np.concatenate(features,axis=0)
+            del cache,step
+
         rows=backbone.get_output_embeddings().weight[unique].float().cpu().numpy()
     inputs=compact_inputs(encoded,hidden,rows,unique.cpu().numpy())
     # Free the large backbone before building the FP32 head reference. Head
@@ -142,7 +154,7 @@ def capture(folder,lock_path,lock_sha,request_path,output,*,max_tokens=512,threa
     questions=[dict(id=q.question_id,type=q.question_type,span=list(q.question_span),option_spans=[list(s) for s in q.option_spans],candidate_ids=list(q.option_ids)) for q in encoded.questions]
     metadata=dict(schema='cke.clef.feature-capture.v1',model=identity['model'],revision=identity['revision'],release_lock_sha256=lock_sha,
                   request_sha256=file_sha(request_path),reference_source_sha256=identity['joint_schema_model_sha256'],head_sha256=identity['joint_head_weights_sha256'],
-                  backbone_executor='pytorch_reference',backbone_dtype='bf16',head_dtype='fp32',attention='eager',torch_version=torch.__version__,transformers_version=transformers.__version__,tokenizers_version=tokenizers.__version__,threads=threads,
+                  backbone_executor='pytorch_reference',backbone_dtype='bf16',head_dtype='fp32',attention=attention,backbone_schedule=schedule,torch_version=torch.__version__,transformers_version=transformers.__version__,tokenizers_version=tokenizers.__version__,threads=threads,
                   tokens=len(encoded.input_ids),questions=questions,files={p.name:file_sha(p) for p in sorted(output.iterdir())},
                   evidence='captured reference backbone; CKE backbone NOT_TESTED; same-input FP32 head oracle')
     (output/'capture.json').write_text(json.dumps(metadata,indent=2)+'\n')
@@ -152,8 +164,8 @@ def capture(folder,lock_path,lock_sha,request_path,output,*,max_tokens=512,threa
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--release',type=Path,required=True);p.add_argument('--release-lock',type=Path,required=True);p.add_argument('--release-lock-sha256',required=True)
-    p.add_argument('--request',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--max-tokens',type=int,default=512);p.add_argument('--threads',type=int,default=4)
-    a=p.parse_args();m=capture(a.release,a.release_lock,a.release_lock_sha256,a.request,a.output,max_tokens=a.max_tokens,threads=a.threads)
+    p.add_argument('--request',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--max-tokens',type=int,default=512);p.add_argument('--threads',type=int,default=4);p.add_argument('--attention',choices=['eager','sdpa'],default='eager');p.add_argument('--schedule',choices=['prefill','incremental'],default='prefill')
+    a=p.parse_args();m=capture(a.release,a.release_lock,a.release_lock_sha256,a.request,a.output,max_tokens=a.max_tokens,threads=a.threads,attention=a.attention,schedule=a.schedule)
     print(json.dumps(dict(status='CAPTURED',tokens=m['tokens'],backbone_executor=m['backbone_executor'],capture_sha256=file_sha(a.output/'capture.json'))))
 
 if __name__=='__main__':main()
