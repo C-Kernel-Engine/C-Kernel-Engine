@@ -61,11 +61,7 @@ class NativeEvaluation(unittest.TestCase):
 
         weights = rt.snapshot()
         return dict(
-            weights={
-                k: weights[v].tobytes()
-                for k, v in rt.slices.items()
-                if k != "__features.hidden"
-            },
+            weights={k: weights[v].tobytes() for k, v in rt.slices.items()},
             moments=workflow._array_export(rt.lib, "optimizer_state").tobytes(),
             gradients=workflow._array_export(rt.lib, "parameter_gradient").tobytes(),
             step=rt.lib.ck_train_get_opt_step(),
@@ -85,6 +81,26 @@ class NativeEvaluation(unittest.TestCase):
             delta=2e-7,
         )
         return loss, scores
+
+    def test_features_are_inputs_and_batch_does_not_copy_parameters(self):
+        from unittest.mock import patch
+        from version.v8.decision.train_clef_head import workflow
+
+        rt = self.runtime("typed-inputs")
+        self.assertNotIn("__features.hidden", rt.slices)
+        self.assertEqual(rt.ir["tensors"]["input.hidden"]["kind"], "input")
+        self.assertEqual(rt.summary["float_input_count"], 48)
+        before = self.state(rt)
+        with patch.object(
+            rt, "snapshot", side_effect=AssertionError("batch exported parameters")
+        ), patch.object(
+            workflow,
+            "_array_import",
+            side_effect=AssertionError("batch imported parameters"),
+        ):
+            rt.batch(self.records[0]["arrays"])
+            rt.batch(self.records[1]["arrays"])
+        self.assertEqual(before, self.state(rt))
 
     def test_initial_labels_unequal_groups_and_interleaved_training(self):
         rt = self.runtime("evaluation")

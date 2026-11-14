@@ -155,14 +155,13 @@ def train(
         changed = [
             n for n, s in rt.slices.items() if not np.array_equal(initial[s], final[s])
         ]
-        for name in ("__features.hidden", "output_embedding.weight"):
+        for name in ("output_embedding.weight",):
             np.testing.assert_array_equal(
                 initial[rt.slices[name]], final[rt.slices[name]]
             )
         effective = {
             n: final[s].reshape(rt.weights[n].shape).copy()
             for n, s in rt.slices.items()
-            if n != "__features.hidden"
         }
         updated = raw_from_effective(raw, effective)
         np.savez(output / "trained_head.npz", **updated)

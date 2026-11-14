@@ -251,6 +251,10 @@ class FullHeadTraining(unittest.TestCase):
                 lib.ck_train_init(ptr(packed), sizes.ctypes.data_as(ip), len(sizes)),
                 len(sizes),
             )
+            lib.ck_train_set_float_inputs_ex.argtypes = [fp, ctypes.c_size_t]
+            self.assertEqual(
+                lib.ck_train_set_float_inputs_ex(ptr(hidden), hidden.size), hidden.size
+            )
             lib.ck_set_strict_parity(1)
             ids = np.zeros(6, dtype="i4")
 
@@ -490,7 +494,6 @@ class FullHeadTraining(unittest.TestCase):
                 }
                 new["output_embedding.weight"] = raw["output_embedding.weight"]
                 ew = effective_weights(graph, new)
-                ew["__features.hidden"] = hidden
                 native_moments = snapshot(
                     "optimizer_state", summary["optimizer_state_snapshot_floats"]
                 )
@@ -533,7 +536,7 @@ class FullHeadTraining(unittest.TestCase):
                 for name, count in zip(
                     summary["init_weight_order"], summary["init_weight_numel"]
                 ):
-                    if name in ("__features.hidden", "output_embedding.weight"):
+                    if name == "output_embedding.weight":
                         self.assertEqual(
                             a[offset : offset + count].tobytes(),
                             weights[name].tobytes(),
@@ -589,6 +592,9 @@ class FullHeadTraining(unittest.TestCase):
                 ptr(packed), sizes.ctypes.data_as(ip), len(sizes)
             ) == len(sizes)
             wf._checkpoint_load(checkpoint, lib, checkpoint_meta)
+            self.assertEqual(
+                lib.ck_train_set_float_inputs_ex(ptr(hidden), hidden.size), hidden.size
+            )
             for i in range(split, steps):
                 nl = ctypes.c_float()
                 assert (
@@ -612,6 +618,9 @@ class FullHeadTraining(unittest.TestCase):
             assert lib.ck_train_init(
                 ptr(final), sizes.ctypes.data_as(ip), len(sizes)
             ) == len(sizes)
+            self.assertEqual(
+                lib.ck_train_set_float_inputs_ex(ptr(hidden), hidden.size), hidden.size
+            )
             lib.ck_train_set_batch_with_i32_ex.argtypes = [
                 ip,
                 ip,
@@ -656,6 +665,7 @@ class FullHeadTraining(unittest.TestCase):
                 sizes=sizes.tolist(),
                 tokens=6,
                 integer_inputs=metadata.tolist(),
+                float_inputs=hidden.ravel().tolist(),
                 checkpoint=str(checkpoint),
                 metadata=checkpoint_meta,
                 remaining_steps=steps - split,
@@ -717,7 +727,6 @@ class FullHeadTraining(unittest.TestCase):
                         .copy()
                     )
                     offset += count
-                inference_weights.pop("__features.hidden")
                 with tempfile.TemporaryDirectory() as inf:
                     arena, execute, view, _, _ = compile_case(
                         Path(inf), graph, inference_weights

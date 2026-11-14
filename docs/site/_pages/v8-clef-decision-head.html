@@ -30,6 +30,19 @@ circuits support training. A non-Clef graph exercises generated forward, backwar
 frozen-weight gradient propagation, evaluation and 40 native AdamW updates against PyTorch.
 Standard nightly checks reject missing composition evidence and host-fed internal edges.
 Structural checks remain distinct from execution, gradient and numerical certification.</p>
+<p>Feature batches now use the shared generated FP32 input ABI:
+<code>ck_train_set_float_inputs_ex</code>. Hidden features occupy input storage,
+not a frozen <code>__features.hidden</code> parameter. Batch binding copies only
+feature data and does not export/import the parameter array. Counts, alignment,
+overlap and finite values are checked before publication; rejection invalidates
+input readiness and leaves parameters and optimizer state unchanged. Backward
+cannot reuse a forward pass after the feature binding changes. These inputs are
+nondifferentiable external features; this is not a substitute for a connected
+backbone activation edge when backbone training is requested.</p>
+<p>Checkpoints retain parameters and optimizer state, not feature batches. Inputs
+must be supplied again after initialization/reload. Existing generated runtimes
+without this ABI must be regenerated; their old runtime identities are not silently
+accepted as compatible. This remains a fixed-capacity input contract.</p>
 <p>The backbone is frozen. The 121,762,820-element released head is trained using
 <code>train_clef_head.Runtime</code>, exported and reloaded through generated inference.
 This does not train the backbone, introduce LoRA, or establish held-out task accuracy.

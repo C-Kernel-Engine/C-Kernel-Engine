@@ -49,8 +49,7 @@ def build_training_ir(
         feedforward=feedforward,
     )
     weights = effective_weights(graph, raw)
-    weights["__features.hidden"] = hidden.copy()
-    frozen = set(frozen) | {"output_embedding.weight", "__features.hidden"}
+    frozen = set(frozen) | {"output_embedding.weight"}
     if frozen - set(weights):
         raise ValueError("unknown frozen parameter")
     loss = dict(
@@ -90,8 +89,8 @@ def build_training_ir(
         labels=dict(shape=[questions], dtype="i32"),
         broadcast_zeros=dict(shape=[questions], dtype="i32"),
     )
+    inputs["hidden"] = dict(shape=list(hidden.shape), dtype="fp32")
     bindings = {n: "input." + n for n in inputs}
-    bindings["hidden"] = "weight.__features.hidden"
     ir = lower_circuit_training(
         graph,
         weights,

@@ -966,7 +966,7 @@ TEST_SUITES = {
     "generated_composition_training": TestSuite(
         "Generated Composition Claims and Shared Circuit Training Lowering", "training",
         ROOT / "tests" / "test_v8_generated_composition_contract.py",
-        unittest_targets=("tests.test_v8_generated_composition_contract", "tests.test_v8_circuit_training_lowering"),
+        unittest_targets=("tests.test_v8_generated_composition_contract", "tests.test_v8_circuit_training_lowering", "tests.test_v8_training_float_inputs"),
     ),
     "decision_native_frontend": TestSuite(
         "Clef Text Spans and Native Backbone Feature Boundary", "inference",

@@ -29,10 +29,8 @@ def lower_circuit_training(
         if str(value.dtype) != "float32":
             raise ValueError("circuit adapter requires FP32 weights: " + name)
     for name, spec in inputs.items():
-        if spec.get("dtype") != "i32":
-            raise ValueError(
-                "runtime input binding currently supports i32 only: " + name
-            )
+        if spec.get("dtype") not in ("i32", "fp32"):
+            raise ValueError("runtime input binding supports i32 or fp32 only: " + name)
         if not spec.get("shape") or any(
             type(d) is not int or d <= 0 for d in spec["shape"]
         ):
@@ -40,6 +38,7 @@ def lower_circuit_training(
     tensors = {}
     ops = []
     integer_inputs = []
+    float_inputs = []
 
     def ref(tid, shape, kind="activation", dtype="fp32", grad=True):
         if tid in tensors:
@@ -65,6 +64,8 @@ def lower_circuit_training(
         ref("input." + name, spec["shape"], "input", spec["dtype"], False)
         if spec["dtype"] == "i32":
             integer_inputs.append("input." + name)
+        else:
+            float_inputs.append("input." + name)
     integer_inputs.sort()
 
     def act(n):
@@ -444,7 +445,11 @@ def lower_circuit_training(
         format="ir1-train-v7",
         version=1,
         num_layers=0,
-        config=dict(config, training_integer_inputs=integer_inputs),
+        config=dict(
+            config,
+            training_integer_inputs=integer_inputs,
+            training_float_inputs=sorted(float_inputs),
+        ),
         ops=ops,
         tensors=tensors,
         loss=deepcopy(loss),

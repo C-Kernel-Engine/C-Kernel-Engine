@@ -187,6 +187,12 @@ class Runtime:
             hasattr(self.lib, "ck_train_eval_step"),
             "runtime lacks current-loss evaluation; regenerate the training runtime",
         )
+        require(
+            hasattr(self.lib, "ck_train_set_float_inputs_ex"),
+            "runtime lacks typed feature inputs; regenerate the training runtime",
+        )
+        self.lib.ck_train_set_float_inputs_ex.argtypes = [FP, C.c_size_t]
+        self.lib.ck_train_set_float_inputs_ex.restype = C.c_int
         self.lib.ck_train_eval_step.argtypes = [FP]
         self.lib.ck_train_eval_step.restype = C.c_int
         self.sizes = np.asarray(self.summary["init_weight_numel"], dtype="i4")
@@ -215,10 +221,20 @@ class Runtime:
         return workflow._weight_export(self.lib)
 
     def batch(self, arrays):
-        weights = self.snapshot()
-        weights[self.slices["__features.hidden"]] = arrays["hidden"].ravel()
-        require(np.isfinite(weights).all(), "nonfinite parameter snapshot")
-        workflow._array_import(self.lib, "weight", weights)
+        # Invalid host metadata must invalidate a previous feature binding too.
+        self.lib.ck_train_set_float_inputs_ex(None, 0)
+        hidden = arrays["hidden"]
+        require(
+            hidden.dtype == np.float32
+            and list(hidden.shape) == self.ir["tensors"]["input.hidden"]["shape"],
+            "invalid FP32 feature shape/dtype",
+        )
+        hidden = np.ascontiguousarray(hidden)
+        require(
+            self.lib.ck_train_set_float_inputs_ex(fp(hidden), hidden.size)
+            == hidden.size,
+            "native feature input rejected",
+        )
         supplied = dict(
             arrays, broadcast_zeros=np.zeros(len(arrays["option_counts"]), dtype="i4")
         )
@@ -419,7 +435,6 @@ def run(
         effective = {
             n: final[sl].reshape(rt.weights[n].shape).copy()
             for n, sl in rt.slices.items()
-            if n != "__features.hidden"
         }
         updated = raw_from_effective(raw, effective)
         np.savez(folder / "trained_head.npz", **updated)

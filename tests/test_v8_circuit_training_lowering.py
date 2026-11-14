@@ -199,13 +199,12 @@ class CircuitTrainingTests(unittest.TestCase):
             if t["kind"] == "input"
         }
         bindings = {n: "input." + n for n in inputs}
-        bindings["hidden"] = "weight.__features.hidden"
         result = lower_circuit_training(
             graph,
             weights,
             inputs=inputs,
             bindings=bindings,
-            frozen={"output_embedding.weight", "__features.hidden"},
+            frozen={"output_embedding.weight"},
             config=ir["config"],
             activation_dtypes={
                 n: "i32" for n in ("option_row_indices", "option_question_indices")
@@ -225,7 +224,7 @@ class CircuitTrainingTests(unittest.TestCase):
                 weights,
                 inputs=inputs,
                 bindings=bindings,
-                frozen={"output_embedding.weight", "__features.hidden"},
+                frozen={"output_embedding.weight"},
                 config=ir["config"],
                 loss=ir["loss"],
             )
