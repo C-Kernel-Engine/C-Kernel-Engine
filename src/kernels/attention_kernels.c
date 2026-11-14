@@ -1277,7 +1277,13 @@ ck_attention_mul_add_rounded_f32(float lhs, float rhs, float addend)
 }
 #endif
 
-static CK_NOINLINE CK_OPTNONE double ck_ggml_vec_soft_max_row(int n,
+/* Keep the intrinsic reduction tree and sequential double sum, without O0 spills. */
+#if defined(__GNUC__) && !defined(__clang__) && defined(__AVX512F__) && defined(__AVX512DQ__)
+__attribute__((optimize("O3", "no-fast-math", "fp-contract=off")))
+#else
+CK_OPTNONE
+#endif
+static CK_NOINLINE double ck_ggml_vec_soft_max_row(int n,
                                                               float *y,
                                                               const float *x,
                                                               float max)
@@ -3020,6 +3026,29 @@ static CK_NOINLINE void ck_attention_matmul_f32_tail(float *c,
 {
     /* Preserve the scalar tail's non-fused K-order, vectorizing only outputs. */
     const __mmask16 mask = (__mmask16)((1u << tail) - 1u);
+    if (rows == 4) {
+        /* Reuse each masked B load across independent row accumulators. */
+        __m512 acc0 = _mm512_maskz_loadu_ps(mask, c);
+        __m512 acc1 = _mm512_maskz_loadu_ps(mask, c + (size_t)n);
+        __m512 acc2 = _mm512_maskz_loadu_ps(mask, c + (size_t)2 * n);
+        __m512 acc3 = _mm512_maskz_loadu_ps(mask, c + (size_t)3 * n);
+        for (int kk = 0; kk < k; ++kk) {
+            const __m512 bv = _mm512_maskz_loadu_ps(mask, b + (size_t)kk * n);
+            const __m512 p0 = _mm512_maskz_mul_ps(mask, _mm512_set1_ps(a[kk]), bv);
+            const __m512 p1 = _mm512_maskz_mul_ps(mask, _mm512_set1_ps(a[(size_t)k + kk]), bv);
+            const __m512 p2 = _mm512_maskz_mul_ps(mask, _mm512_set1_ps(a[(size_t)2 * k + kk]), bv);
+            const __m512 p3 = _mm512_maskz_mul_ps(mask, _mm512_set1_ps(a[(size_t)3 * k + kk]), bv);
+            acc0 = _mm512_mask_add_ps(acc0, mask, acc0, p0);
+            acc1 = _mm512_mask_add_ps(acc1, mask, acc1, p1);
+            acc2 = _mm512_mask_add_ps(acc2, mask, acc2, p2);
+            acc3 = _mm512_mask_add_ps(acc3, mask, acc3, p3);
+        }
+        _mm512_mask_storeu_ps(c, mask, acc0);
+        _mm512_mask_storeu_ps(c + (size_t)n, mask, acc1);
+        _mm512_mask_storeu_ps(c + (size_t)2 * n, mask, acc2);
+        _mm512_mask_storeu_ps(c + (size_t)3 * n, mask, acc3);
+        return;
+    }
     for (int i = 0; i < rows; ++i) {
         __m512 acc = _mm512_maskz_loadu_ps(mask, c + (size_t)i * n);
         for (int kk = 0; kk < k; ++kk) {
