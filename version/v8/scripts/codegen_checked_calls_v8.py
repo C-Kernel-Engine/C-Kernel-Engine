@@ -246,6 +246,16 @@ def emit_checked_calls(call_ir: dict, root: Path) -> str:
                 expr = arg.get("expr")
                 if not isinstance(expr, str) or not expr.strip():
                     raise CheckedCallCodegenError(f"call {index} has unresolved argument")
+                if arg.get("source", "").startswith("entry:"):
+                    from native_entry_binding_v8 import resolve_entry_argument
+                    canonical = next(p for p in kernel["call_abi"]["params"]
+                                     if p["name"] == arg["name"])
+                    try:
+                        bound = resolve_entry_argument(entry, kernel, canonical)
+                    except ValueError as error:
+                        raise CheckedCallCodegenError(str(error)) from error
+                    if expr != bound:
+                        raise CheckedCallCodegenError("entry argument expression changed after lowering")
                 arg_exprs.append(expr)
             lines.append(f"    status = {op['function']}({', '.join(arg_exprs)});")
             lines.append("    if (status != 0) return status;")
