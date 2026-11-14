@@ -34,7 +34,7 @@ int guarded(void) {
     const size_t page = (size_t)sysconf(_SC_PAGESIZE);
     void *maps[4];
     void *ptrs[4];
-    const size_t sizes[4] = {5*33*4, 17*33*2, 17*4, 5*17*4};
+    const size_t sizes[4] = {17*33*4, 17*33*2, 17*4, 17*17*4};
     for (int i = 0; i < 4; ++i) {
         maps[i] = mmap(NULL, 2*page, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
         if (maps[i] == MAP_FAILED) return 1;
@@ -43,12 +43,12 @@ int guarded(void) {
     }
     float *a = ptrs[0], *bias = ptrs[2], *c = ptrs[3];
     uint16_t *b = ptrs[1];
-    for (int i=0; i<5*33; ++i) a[i] = 0.25f;
+    for (int i=0; i<17*33; ++i) a[i] = 0.25f;
     for (int i=0; i<17*33; ++i) b[i] = 0x3f00;
     for (int i=0; i<17; ++i) bias[i] = 0.5f;
-    gemm_nt_bf16_row_range(a, b, bias, c, 5, 17, 33, 0, 5);
+    gemm_nt_bf16_row_range(a, b, bias, c, 17, 17, 33, 0, 17);
     int bad = 0;
-    for (int i=0; i<5*17; ++i) if (c[i] != 4.625f) bad = 3;
+    for (int i=0; i<17*17; ++i) if (c[i] != 4.625f) bad = 3;
     for (int i=0; i<4; ++i) munmap(maps[i], 2*page);
     return bad;
 }
@@ -95,7 +95,7 @@ int guarded(void) {
         self.assertEqual(before, (a.tobytes(), b.tobytes(), bias.tobytes()))
 
     def test_shapes_and_bias(self):
-        for m in (1, 3, 4, 5, 9):
+        for m in (1, 3, 4, 5, 9, 15, 16, 17, 31, 32, 33):
             for n in (1, 7, 15, 16, 17, 31, 32, 65):
                 for k in (1, 7, 31, 32, 33, 129):
                     with self.subTest(m=m, n=n, k=k):
@@ -106,6 +106,9 @@ int guarded(void) {
         for begin, end in ((1, 8), (3, 5), (0, 0), (-1, 5), (0, 10)):
             with self.subTest(begin=begin, end=end):
                 self.check_case(9, 19, 65, begin=begin, end=end)
+        for begin, end in ((1, 32), (7, 24), (16, 33)):
+            with self.subTest(begin=begin, end=end):
+                self.check_case(33, 19, 65, begin=begin, end=end)
 
     def test_guard_pages_for_input_and_output_tails(self):
         self.assertEqual(self.lib.guarded(), 0)
