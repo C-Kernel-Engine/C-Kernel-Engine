@@ -1,0 +1,62 @@
+{
+  "schema": "cke.native_training_portability.v1",
+  "scope": "head_only_captured_native_features",
+  "execution": "PASS",
+  "relocation": "PASS",
+  "exact_update_replay": "PASS",
+  "trainable_elements": 121762820,
+  "steps": 1,
+  "losses": [
+    0.008074787445366383,
+    0.007803728338330984
+  ],
+  "standalone_seconds": 13.694289732025936,
+  "weight_sha256": "66b271cccd19c11a6ac177cfe8fcf9a66dd081557c5f0bc937bbf2bf0dd75c1e",
+  "train_library_sha256": "d7614b5d7b5924d4756cac74dc26efdd43dc45270cfa52b7161ef42b381d6ffd",
+  "engine_sha256": "afed9d14e0c9159a0ff2250077693ea2c165b8fb4611bf86a9201aab9a9f011a",
+  "request_sha256": "9d67ec56fdcea67653668f8797ef13e70549485adb9624accf2e9a16237017ec",
+  "source_sha256": "4692d1df5a5a8ddd2f7a784f292f50fefb9bb5c34872967d9a8c1d6b6237e958",
+  "native_report_sha256": "1c87d3ac80a9c9af8fc0c0a813554b9718870754e075e5b4aaef45fcbed6e354",
+  "independent_gradient_parity": "RETAINED_BASELINE_EXACT_REPLAY; fresh oracle NOT_TESTED",
+  "connected_backbone_parity": "NOT_TESTED",
+  "generated_backbone_head_composition": "NOT_IMPLEMENTED",
+  "frozen_weight_verification": {
+    "native_step_seconds": 11.815411349991336,
+    "frozen_check_seconds": 0.0001823620405048132,
+    "frozen_comparison_bytes": 1245184,
+    "host_weight_snapshot_bytes": 0,
+    "avoided_weight_snapshot_bytes": 488296464
+  },
+  "same_reference_baseline": {
+    "status": "PASS",
+    "gradient_elements": 121762820,
+    "exported_tensors": 123,
+    "gradients": "exact",
+    "updated_weights": "exact",
+    "baseline_oracle_sha256": "9c9d72701628c07e3e0e8294c122739f2b6d2f882af72fe18b1dbee9a5e6db20"
+  },
+  "reproduction_script_sha256": "3c70dd25397454767000f31f7d10b2ea3f9591e96caf08f726f6882ccd4eebfb",
+  "retained_connected_model_gate": {
+    "comparison": {
+      "max_abs": 0.009174466133117676,
+      "rmse": 0.007565953033712733,
+      "reference_rms": 3.307079514971539,
+      "atol": 2e-06,
+      "status": "FAIL"
+    },
+    "report_sha256": "e05bb4eb710349937cbe1a801a573c09f13e6369e5f72909b66445769e5bc97f",
+    "rerun": false
+  },
+  "model_head_sha256": "19cdcec8c81dc9212be320fff47462ab342fbc1278be4368fb3da71241cf5ba0",
+  "host": {
+    "machine": "x86_64",
+    "processor": "AMD Ryzen 9 9950X3D",
+    "threads": 4,
+    "openmp_threads": 1
+  },
+  "timing_scope": "One released-head native update and frozen comparison; excludes loading and batch binding. Not an end-to-end throughput benchmark.",
+  "source_base": "2468a10e83e98f549dd78dc63460e75cfd06d58f",
+  "tested_patch_sha256": "7b19d91e115302be12636fdc53fca0ecb61dbccbf799844a5d6c9aa8a893dc9f",
+  "tested_patch_scope": "Map binding runtime changes; later output-port rejection hardening does not change the accepted released graph.",
+  "evidence_scope": "One released-head update against retained oracle gradients/weights, plus relocated C-only replay. Not a fresh independent backbone oracle run."
+}

@@ -147,6 +147,25 @@ def broadcast_fixture():
 
 
 class CircuitTrainingTests(unittest.TestCase):
+    def test_provider_prefix_does_not_establish_training_support(self):
+        graph, weights, args = fixture()
+        for block in graph["block_types"].values():
+            for op in block.get("body", {}).get("ops", []):
+                if op["kernel"] == "linear_rows_checked_no_bias_f32":
+                    op["kernel"] = "linear_rows_checked_unregistered_variant"
+        with self.assertRaisesRegex(ValueError, "provider"):
+            lower_circuit_training(graph, weights, **args)
+
+    def test_direct_binding_rejects_undeclared_output_port(self):
+        graph, weights, args = fixture()
+        for block in graph["block_types"].values():
+            for op in block.get("body", {}).get("ops", []):
+                if op["kernel"] == "linear_rows_checked_no_bias_f32":
+                    outputs = op["graph_slots"]["outputs"]
+                    outputs["unexpected"] = outputs.pop("output")
+        with self.assertRaisesRegex(ValueError, "output ports"):
+            lower_circuit_training(graph, weights, **args)
+
     def test_native_non_model_specific_composition(self):
         try:
             import torch

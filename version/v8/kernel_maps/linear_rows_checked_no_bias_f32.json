@@ -247,6 +247,21 @@
   },
   "notes": "Same checked FP64 reduction as linear_rows_checked_f32, with an explicit zero-bias ABI. No full-model dequantization.",
   "training_contract": {
+    "differentiation": {
+      "schema": "cke.training.direct-vjp.v1",
+      "operation_interface": "linear.row_major.checked.zero_bias.fp32.v1",
+      "gradient_rule": "linear_rows_train_backward_nobias",
+      "saved_operands": {
+        "input": "input:input",
+        "weight": "weight:weight"
+      },
+      "constant_bindings": {
+        "T": "linear_rows",
+        "aligned_in": "linear_input_channels",
+        "aligned_out": "linear_output_channels",
+        "num_threads": 1
+      }
+    },
     "version": 1,
     "layout": "contiguous",
     "batch_policy": "fixed",
