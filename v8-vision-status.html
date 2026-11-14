@@ -1056,6 +1056,40 @@
 
 <div class="alert alert-warning"><strong>No full vision artifact is certified for the HTTP harness yet.</strong> Generated image paths run, but independent numerical, task-quality, and live-serving gates have not all passed on one pinned artifact. Unsupported bundles should continue rejecting image requests.</div>
 
+<section id="serving-integration">
+<h2>Experimental serving integration: upload contract first</h2>
+<p>As of 2026-11-13, the ordinary HTTP session still rejects live images. The generated standalone bridge
+already executes image preprocessing, encoder, visual prefix and decoder, but the text session ABI does not
+expose that connected path. The first serving change adds <code>server.vision_input.prepare_vision_input</code>:
+a model-independent, ordered input contract. This is a callable validation helper, not a new HTTP endpoint
+or a claim of harness acceptance.</p>
+<p>The harness owns local file access. It must read an explicitly selected file and upload its bytes as a
+PNG/JPEG base64 data URL. A filename on the laptop is not a filename on P3. The helper accepts Responses
+<code>input_text/input_image</code> and Chat Completions <code>text/image_url</code> parts and preserves their
+order and original image bytes. It does not flatten images into text, resize them, fetch URLs, read server
+paths, or modify publisher templates. Model-specific preprocessing remains in the generated pipeline.</p>
+<p>Initial defaults allow one image, 8 MiB total compressed image data, 16 million decoded pixels,
+64 KiB of UTF-8 text and 32 ordered parts. These are input-safety bounds, not a bundle's token capacity or
+supported visual geometry. Future HTTP integration must additionally bound raw body size and concurrent
+uploads before JSON parsing. Animated images, PDF, audio/video parts, remote URLs, file IDs and explicit
+image detail modes are rejected until their own contracts exist.</p>
+<ol>
+<li>Pin and rebuild one Qwen3-VL encoder/decoder pair with loaded library, tokenizer and preprocessing identities.</li>
+<li>Expose generated mixed-image/text execution through a checked native session adapter. Bind visual rows,
+positions, masks and any deep-stack inputs to their owner. Reject unsupported order/geometry before mutation.</li>
+<li>Use the upload contract at HTTP admission only for a bundle declaring the connected capability. Validate
+visual plus text plus output capacity; serialize native ownership and keep prefix caches disabled until certified.</li>
+<li>Compare identical image bytes and rendered tokens through standalone and HTTP execution, including full
+logits and applicable state. Exercise reset, cancellation, streaming and a successful follow-up.</li>
+<li>Connect a real harness, then add image-plus-tool continuation and explicitly tested multi-image ordering.</li>
+</ol>
+<p>The server suite covers malformed images, MIME mismatches, truncation, aggregate limits, part order,
+Unicode, request independence and rejection before expensive decoding. It also retains the live-media
+rejection tests. These are admission tests, not encoder parity tests. Qwen Code, Nemotron harnesses and other
+clients gain image support only for an explicitly supported vision artifact; text-family support alone is
+insufficient. PDF rasterization and its page/pixel limits belong to a separate follow-up.</p>
+</section>
+
 <div class="vision-status-table-wrap" role="region" aria-label="Vision artifact status" tabindex="0">
 <table class="vision-status-table">
 <thead><tr><th scope="col">CKE artifact</th><th scope="col">Encoder vs llama.cpp</th><th scope="col">Decoder vs llama.cpp</th><th scope="col">PyTorch</th><th scope="col">Image tasks</th><th scope="col">HTTP / harness</th><th scope="col">First unresolved boundary</th></tr></thead>
@@ -1354,7 +1388,7 @@
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-11-13</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-11-14</p>
             </div>
         </div>
     </footer>
