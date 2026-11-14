@@ -38,6 +38,12 @@ BUNDLE_FILES = (
 )
 
 
+from version.v8.scripts.generated_composition_contract_v8 import (
+    component_only_status,
+    require_generated_e2e,
+)
+
+
 def native_dependencies():
     """Fail before loading 9B weights if required native math symbols are absent."""
     result = {}
@@ -260,6 +266,7 @@ def run(
         native.close()
     report = dict(
         schema="cke.clef.native-diagnostic.v1",
+        generated_composition=component_only_status("inference"),
         execution="PASS",
         numerical_parity="NOT_TESTED",
         application_quality="NOT_TESTED",
@@ -296,7 +303,16 @@ def main():
         p.add_argument("--" + name, type=Path, required=True)
     for name in ("lock-sha256", "bundle-sha256"):
         p.add_argument("--" + name, required=True)
+    p.add_argument(
+        "--require-generated-e2e",
+        action="store_true",
+        help="Fail before execution unless the full generated composition is certified",
+    )
     a = p.parse_args()
+    if a.require_generated_e2e:
+        require_generated_e2e(
+            dict(generated_composition=component_only_status("inference"))
+        )
     r = run(
         a.release,
         a.lock,

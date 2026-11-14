@@ -1419,6 +1419,33 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                     initialized_i32.add(tid)
 
 
+    float_input_order = cfg.get("training_float_inputs", [])
+    if (not isinstance(float_input_order, list)
+            or any(not isinstance(tid, str) for tid in float_input_order)
+            or len(set(float_input_order)) != len(float_input_order)):
+        raise ValueError("training_float_inputs must be a unique ordered tensor list")
+    if float_input_order and cfg.get("train_batch_policy") != "fixed":
+        raise ValueError("float training inputs require a fixed batch")
+    float_inputs = []
+    float_offset = 0
+    produced = {ref.get("tensor") for op in forward_ops
+                for ref in op.get("dataflow", {}).get("outputs", {}).values()}
+    for tid in float_input_order:
+        meta = tensors.get(tid, {})
+        if (tid not in tvars_f32 or meta.get("dtype") != "fp32"
+                or meta.get("kind") != "input" or meta.get("requires_grad") is not False
+                or meta.get("persistent", False) or tid in produced):
+            raise ValueError("invalid external FP32 training input: " + tid)
+        n = tensor_numel[tid]
+        if type(n) is not int or n <= 0 or float_offset + n > 2147483647:
+            raise ValueError("float training input capacity exceeded")
+        float_inputs.append(dict(tensor=tid, offset=float_offset, count=n, shape=list(meta["shape"]), dtype="fp32"))
+        float_offset += n
+    # A declared FP32 input must not silently read zeroed/stale workspace.
+    for tid, meta in tensors.items():
+        if meta.get("kind") == "input" and meta.get("dtype", "fp32") == "fp32" and tid not in float_input_order:
+            raise ValueError("unbound FP32 training input: " + tid)
+
     # Collect declarations required by kernels in this IR.
     used_decl: Dict[str, Tuple[str, List[Tuple[str, str]], str]] = {}
     skipped_ops: List[str] = []
@@ -1836,6 +1863,9 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
 
     ap("static float *g_memory = NULL;")
     ap("static size_t g_memory_floats = 0;")
+    if float_inputs:
+        ap("static int g_float_inputs_ready = 0;")
+        ap("static int g_float_forward_ready = 0;")
     ap("static float g_dummy_f32[1];")
     ap("static int32_t g_dummy_i32[(CK_NUM_TOKENS > 0 ? CK_NUM_TOKENS : 1)];")
     ap("static float g_loss_scalar[1];")
@@ -1952,6 +1982,9 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("")
 
     ap("void ck_train_free(void) {")
+    if float_inputs:
+        ap("    g_float_inputs_ready = 0;")
+        ap("    g_float_forward_ready = 0;")
     ap("    if (g_memory != NULL) {")
     ap("        free(g_memory);")
     ap("        g_memory = NULL;")
@@ -2312,6 +2345,9 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
         if isinstance(tid, str) and tid.startswith("grad."):
             grad_vars_f32.append(var)
     ap("void ck_train_reset_buffers(void) {")
+    if float_inputs:
+        ap("    g_float_inputs_ready = 0;")
+        ap("    g_float_forward_ready = 0;")
     ap("    if (g_memory != NULL && g_memory_floats > 0) {")
     ap("        memset(g_memory, 0, g_memory_floats * sizeof(float));")
     ap("    }")
@@ -3659,6 +3695,12 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
             ap("    int first = -1;")
         else:
             ap("int %s(void) {" % fn_name)
+        if float_inputs and phase in ("forward", "backward", "backward_trace", "evaluation_loss"):
+            ap("    if (!g_float_inputs_ready) return -5;")
+            if phase == "forward":
+                ap("    g_float_forward_ready = 0;")
+            else:
+                ap("    if (!g_float_forward_ready) return -5;")
         ap("    /* %s ops: %d */" % (phase, len(ops)))
         ap("    int call_count = 0;")
         idx = 0
@@ -4656,7 +4698,28 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                 ap("    }")
             idx += 1
 
+        if float_inputs and phase == "forward":
+            ap("    g_float_forward_ready = 1;")
         ap("    return call_count;")
+        ap("}")
+        ap("")
+
+    if float_inputs:
+        ap("int ck_train_set_float_inputs_ex(const float *inputs, size_t count) {")
+        ap("    g_float_inputs_ready = 0;")
+        ap("    g_float_forward_ready = 0;")
+        ap("    if (!g_memory || !inputs || count != (size_t)%d) return -1;" % float_offset)
+        ap("    uintptr_t begin = (uintptr_t)inputs;")
+        ap("    if (begin %% _Alignof(float) != 0 || begin > UINTPTR_MAX - (size_t)%d * sizeof(float)) return -2;" % float_offset)
+        ap("    uintptr_t end = begin + (size_t)%d * sizeof(float);" % float_offset)
+        ap("    uintptr_t arena = (uintptr_t)g_memory;")
+        ap("    if (begin < arena + g_memory_floats * sizeof(float) && arena < end) return -2;")
+        ap("    for (size_t i = 0; i < count; ++i) if (!isfinite(inputs[i])) return -3;")
+        for item in float_inputs:
+            ap("    memcpy(%s, inputs + %d, (size_t)%d * sizeof(float));" %
+               (tvars_f32[item["tensor"]], item["offset"], item["count"]))
+        ap("    g_float_inputs_ready = 1;")
+        ap("    return %d;" % float_offset)
         ap("}")
         ap("")
 
@@ -4963,6 +5026,8 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     summary = {
         "evaluation_loss_ops": len(evaluation_loss_ops),
         "evaluation_entry": "ck_train_eval_step",
+        "float_inputs": float_inputs,
+        "float_input_count": float_offset,
         "integer_inputs": integer_inputs,
         "integer_input_count": integer_offset,
         "forward_ops": len(forward_ops),
@@ -4974,6 +5039,9 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
         "batched_grad_accumulate_calls": int(batched_grad_accumulate_calls),
         "batched_grad_accumulate_tensors": int(batched_grad_accumulate_tensors),
         "callable_kernels": len(used_decl),
+        "declared_kernel_providers": {
+            kid: declaration[0] for kid, declaration in sorted(used_decl.items())
+        },
         "optimizer_pairs": len(opt_pairs),
         "runtime_contract_sha256": runtime_contract_sha256,
         "parameter_gradient_order": [wname for (wname, _gvar, _wvar, _mvar, _vvar, _numel) in sorted(opt_pairs, key=lambda x: x[0])],

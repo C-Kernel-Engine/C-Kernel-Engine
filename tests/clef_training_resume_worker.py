@@ -46,6 +46,16 @@ def run(request_path):
             fp,
             ctypes.c_float,
         ]
+        if "float_inputs" in request:
+            features = np.asarray(request["float_inputs"], dtype="f4")
+            lib.ck_train_set_float_inputs_ex.argtypes = [fp, ctypes.c_size_t]
+            if (
+                lib.ck_train_set_float_inputs_ex(
+                    features.ctypes.data_as(fp), features.size
+                )
+                != features.size
+            ):
+                raise RuntimeError("native resumed features rejected")
         losses = []
         for _ in range(request["remaining_steps"]):
             loss = ctypes.c_float()
