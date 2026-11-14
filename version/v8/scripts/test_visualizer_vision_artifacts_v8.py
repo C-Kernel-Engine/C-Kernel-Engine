@@ -5,6 +5,7 @@ import argparse
 import json
 import re
 import sys
+import subprocess
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
@@ -214,6 +215,21 @@ def run(json_out: Path) -> int:
             checks.append({"name": "html_embedding", "status": "pass", "detail": str(html_path)})
         except AssertionError as exc:
             checks.append({"name": "html_embedding", "status": "fail", "detail": str(exc)})
+            status = "fail"
+
+    # Keep component-reader and shipped JS rendering checks in the existing lane.
+    for name, command in (
+        ("component_reader", [sys.executable, "-m", "unittest", "discover", "-s", "tests", "-p", "test_v8_visualizer_components.py"]),
+        ("component_renderer", ["node", "--test", "tests/test_v8_visualizer_components.mjs"]),
+    ):
+        try:
+            result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=30)
+            passed = result.returncode == 0
+            detail = (result.stdout + result.stderr)[-4000:]
+        except (OSError, subprocess.TimeoutExpired) as error:
+            passed, detail = False, str(error)
+        checks.append({"name": name, "status": "pass" if passed else "fail", "detail": detail})
+        if not passed:
             status = "fail"
 
     summary = {

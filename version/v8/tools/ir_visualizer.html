@@ -206,6 +206,17 @@
             transition: var(--transition);
         }
 
+        button.tab {
+            appearance: none;
+            font-family: inherit;
+            background: transparent;
+            border: 0;
+            border-bottom: 3px solid transparent;
+            text-align: left;
+        }
+
+        button.tab:focus-visible { outline: 2px solid var(--orange); outline-offset: -3px; }
+
         .tab:hover {
             color: var(--text-primary);
             background: var(--grey);
@@ -2381,6 +2392,7 @@
         <div class="tab" data-tab="xray" data-mode="inference,training" onclick="showTab('xray')">X-Ray</div>
         <div class="tab" data-tab="explain" data-mode="inference,training" onclick="showTab('explain')">Explain</div>
         <div class="tab" data-tab="dataflow" data-mode="inference" onclick="showTab('dataflow')">Dataflow Graph</div>
+        <button type="button" class="tab" data-tab="components" data-mode="inference,training" onclick="showTab('components')">Components &amp; Coverage</button>
         <div class="tab" data-tab="multimodal" data-mode="inference" onclick="showTab('multimodal')">Multimodal Bridge</div>
         <div class="tab" data-tab="tests" data-mode="inference" onclick="showTab('tests')">Tests</div>
         <div class="tab" data-tab="stats" data-mode="inference" onclick="showTab('stats')">Statistics</div>
@@ -3428,6 +3440,18 @@ python3 trace_divergence.py --model "$MODEL_DIR" --token 25 --threads 1 --contex
                 <thead><tr><th>Kernel</th><th>Count</th><th>Layers</th></tr></thead>
                 <tbody></tbody>
             </table>
+        </div>
+
+        <div id="components" class="panel">
+            <h2>Components &amp; Artifact Coverage</h2>
+            <p>Read-only view of text, vision, audio and speech artifact components. No inference, compilation or profiler is launched by this tab.</p>
+            <label for="componentsSearch">Filter component, family, scope or provider</label>
+            <input id="componentsSearch" type="search" oninput="renderComponents()" placeholder="e.g. encoder, parakeet, instella, codec" style="width:100%;max-width:42rem;margin:0.5rem 0 1rem;padding:0.6rem;">
+            <details><summary>Plain-text summary for copying or speech</summary>
+                <label for="componentsSummary">Inventory summary</label>
+                <textarea id="componentsSummary" readonly rows="8" style="width:100%;"></textarea>
+            </details>
+            <div id="componentsRoot">No component inventory loaded.</div>
         </div>
 
         <div id="multimodal" class="panel">
@@ -5434,7 +5458,7 @@ python3 trace_divergence.py --model "$MODEL_DIR" --token 25 --threads 1 --contex
 
         function markAllTabsDirty() {
             _dirtyTabs = {
-                memory: true, kernels: true, stats: true, multimodal: true, training: true,
+                memory: true, kernels: true, stats: true, multimodal: true, components: true, training: true,
                 quantization: true, dataflow: true, interpretability: true,
                 profile: true, tests: true, parity: true, 'data-pipeline': true,
                 xray: true, explain: true,
@@ -5465,6 +5489,9 @@ python3 trace_divergence.py --model "$MODEL_DIR" --token 25 --threads 1 --contex
                     break;
                 case 'stats':
                     renderStats();
+                    break;
+                case 'components':
+                    renderComponents();
                     break;
                 case 'multimodal':
                     renderMultimodal();
@@ -7554,6 +7581,75 @@ python3 trace_divergence.py --model "$MODEL_DIR" --token 25 --threads 1 --contex
                 if (Number.isFinite(value) && value > 0) return value;
             }
             return null;
+        }
+
+        function componentText(value) {
+            return value === null || value === undefined ? 'Not recorded' : String(value);
+        }
+
+        function componentSummary(payload) {
+            if (!payload || payload.schema !== 'cke.visualizer.components.v1') {
+                return 'No component inventory loaded. Generate an HTML-only report from the selected artifact directory.';
+            }
+            const components = Array.isArray(payload.components) ? payload.components : [];
+            const catalog = Array.isArray(payload.catalog) ? payload.catalog : [];
+            const issues = Array.isArray(payload.issues) ? payload.issues : [];
+            return [
+                `Artifact components: ${components.length}. Circuit declarations: ${catalog.length}.`,
+                'Read-only inventory. Directory membership is not execution order. Execution is not independently verified.',
+                ...components.map(c => `${c.id}: ${(c.artifacts || []).length} JSON artifacts.`),
+                ...issues.map(issue => `Inventory gap: ${issue}`),
+            ].join('\n');
+        }
+
+        function buildComponentInventoryHTML(payload, query = '') {
+            if (!payload || payload.schema !== 'cke.visualizer.components.v1') {
+                return '<p>No component inventory loaded. Generate an HTML-only report from the selected artifact directory. No inference or profiling is required.</p>';
+            }
+            const text = value => escapeHtml(componentText(value));
+            const matches = value => JSON.stringify(value).toLowerCase().includes(query.toLowerCase());
+            const components = (payload.components || []).filter(matches);
+            const catalog = (payload.catalog || []).filter(matches);
+            const issues = payload.issues || [];
+            const artifactRows = artifacts => artifacts.map(a => `
+                <tr><td><code>${text(a.path)}</code><details><summary>Identity and declared bindings</summary>
+                    <p>SHA-256: <code>${text(a.sha256)}</code></p>
+                    <p>Providers recorded in IR, not proof of runtime selection:</p><pre>${text((a.providers || []).join('\n') || null)}</pre>
+                    ${a.providers_truncated ? '<p>Provider list truncated.</p>' : ''}
+                    <p>Buffer references, not verified ownership:</p><pre>${text((a.buffer_bindings || []).join('\n') || null)}</pre>
+                    ${a.bindings_truncated ? '<p>Buffer list truncated.</p>' : ''}
+                    <p>Declared buffer lifetimes:</p><pre>${text((a.declared_lifetimes || []).length ? JSON.stringify(a.declared_lifetimes, null, 2) : null)}</pre>
+                    <p>Runtime invariants recorded in this artifact:</p><pre>${text(Object.keys(a.runtime_invariants || {}).length ? JSON.stringify(a.runtime_invariants, null, 2) : null)}</pre>
+                    ${(a.not_certified || []).length ? `<p>Producer exclusions:</p><pre>${text(a.not_certified.join('\n'))}</pre>` : ''}
+                </details></td><td>${text(a.schema)}</td><td>${text(a.phase)}</td><td>${text(a.model)}</td>
+                <td>${text(a.scope)}</td><td>${text(a.operation_count)}</td>
+                <td>${a.has_layout ? 'Layout metadata present' : 'No layout metadata'}</td>
+                <td>${a.reported_status == null ? 'No execution verdict' : `Reported ${text(a.reported_status)} — not independently verified`}</td></tr>`).join('');
+            return `
+                <p><strong>${components.length} component directories shown.</strong> JSON artifacts are grouped by directory, not connected into an inferred execution graph.
+                Existing graph and X-Ray tabs retain their own evidence. Circuit declarations below are not loaded-model certification.</p>
+                ${issues.length ? `<details open><summary>Inventory gaps (${issues.length})</summary><ul>${issues.map(i => `<li>${text(i)}</li>`).join('')}</ul></details>` : '<p>No scan errors reported within the bounded search. This is not a completeness certificate.</p>'}
+                ${components.map(c => `<section class="parity-section"><h3>${text(c.id)}</h3>
+                    <div style="overflow-x:auto"><table><thead><tr><th>Artifact</th><th>Schema</th><th>Phase</th><th>Declared model</th><th>Declared scope</th><th>Ops</th><th>Layout</th><th>Producer verdict</th></tr></thead>
+                    <tbody>${artifactRows(c.artifacts || [])}</tbody></table></div></section>`).join('') || '<p>No matching component artifacts found.</p>'}
+                <details class="parity-section"><summary>Circuit declaration catalog (${catalog.length} shown; not execution evidence)</summary>
+                <div style="overflow-x:auto"><table><thead><tr><th>Circuit</th><th>Declared family</th><th>Contract sections</th><th>Serving profile declaration</th><th>Source and scope</th></tr></thead><tbody>
+                ${catalog.map(c => `<tr><td>${text(c.name)}</td><td>${text(c.family)}</td><td>${text((c.contract_sections || []).join(', '))}</td>
+                    <td>${text(c.serving_profile)}</td><td><details><summary>${text(c.path)}</summary><p>SHA-256: <code>${text(c.sha256)}</code></p>
+                    <p>Declared status: ${text(c.declared_status)}</p><p>Checked entry declaration: ${text(c.checked_native_entry)}</p>
+                    <pre>${text(Object.keys(c.runtime_invariants || {}).length ? JSON.stringify(c.runtime_invariants, null, 2) : null)}</pre></details></td></tr>`).join('')}
+                </tbody></table></div></details>
+                <p>Serving and harness lifecycle: no common request-timeline artifact is loaded by this view. No queue, tool call or streaming event is inferred from model IR.</p>`;
+        }
+
+        function renderComponents() {
+            const root = document.getElementById('componentsRoot');
+            if (!root) return;
+            const payload = getEmbeddedFiles().component_inventory;
+            const search = document.getElementById('componentsSearch');
+            root.innerHTML = buildComponentInventoryHTML(payload, search ? search.value : '');
+            const summary = document.getElementById('componentsSummary');
+            if (summary) summary.value = componentSummary(payload);
         }
 
         function renderMultimodal() {
