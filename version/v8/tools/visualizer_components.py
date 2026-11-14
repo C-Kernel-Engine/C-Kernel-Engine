@@ -111,6 +111,58 @@ def _invariants(value):
             for k, v in list(value.items())[:64] if isinstance(v, (str, int, float, bool))}
 
 
+def _operation_graph(data, budget):
+    """Export only explicit IR references; never infer edges from list order or slots."""
+    operations = _ops(data)
+    limit = min(256, budget)
+    nodes = []
+    for index, op in enumerate(operations[:limit]):
+        flow = op.get('dataflow') if isinstance(op.get('dataflow'), dict) else op
+        inputs = flow.get('inputs') if isinstance(flow.get('inputs'), dict) else {}
+        outputs = flow.get('outputs') if isinstance(flow.get('outputs'), dict) else {}
+        refs = []
+        for name, ref in list(inputs.items())[:64]:
+            if not isinstance(ref, dict):
+                continue
+            refs.append({'input': _label(name), 'from_op': _label(ref.get('from_op')),
+                         'from_output': _label(ref.get('from_output')), 'from': _label(ref.get('from')),
+                         'dtype': _label(ref.get('dtype')), 'slot': _label(ref.get('slot'))})
+        nodes.append({'index': index, 'id': _label(op.get('op_id')),
+                      'operation': _label(op.get('op')), 'layer': _label(op.get('layer')),
+                      'provider': _label(op.get('function') or op.get('kernel') or op.get('kernel_id')),
+                      'inputs': refs, 'outputs': [_label(key) for key in list(outputs)[:64]],
+                      'outputs_truncated': len(outputs) > 64,
+                      'bindings_truncated': len(inputs) > 64 or len(outputs) > 64 or
+                          (isinstance(op.get('args'), list) and len(op['args']) > 64),
+                      'buffer_refs': [_label(arg.get('buffer_ref')) for arg in
+                          (op.get('args') if isinstance(op.get('args'), list) else [])[:64]
+                          if isinstance(arg, dict) and arg.get('buffer_ref') is not None]})
+    id_counts = {}
+    for op in operations:
+        identity = _label(op.get('op_id'))
+        if identity is not None:
+            id_counts[identity] = id_counts.get(identity, 0) + 1
+    ids = {}
+    for node in nodes:
+        if node['id'] is not None:
+            ids.setdefault(node['id'], []).append(node)
+    for node in nodes:
+        for ref in node['inputs']:
+            source = ids.get(ref['from_op'], [])
+            if ref['from_op'] is None:
+                ref['status'] = 'external_or_symbolic' if ref['from'] else 'not_recorded'
+            elif id_counts.get(ref['from_op'], 0) > 1:
+                ref['status'] = 'ambiguous'
+            elif len(source) != 1:
+                ref['status'] = 'unresolved_or_outside_capture'
+            elif ref['from_output'] not in source[0]['outputs']:
+                ref['status'] = 'output_outside_capture' if source[0]['outputs_truncated'] else 'output_not_declared'
+            else:
+                ref['status'] = 'resolved'
+    return {'nodes': nodes, 'total_operations': len(operations),
+            'truncated': len(nodes) < len(operations), 'edge_policy': 'explicit_from_op_only'}
+
+
 def _description(path, data, digest):
     config = data.get('config') if isinstance(data.get('config'), dict) else {}
     operations = _ops(data)
@@ -146,6 +198,7 @@ def build_component_inventory(root: Path, circuits: Path | None = None):
     issues = []
     artifacts = []
     budget = MAX_TOTAL_BYTES
+    graph_budget = 2048
     for path in _paths(root, issues):
         relative = str(path.relative_to(root))
         try:
@@ -156,7 +209,10 @@ def build_component_inventory(root: Path, circuits: Path | None = None):
                 continue
             # Plain configs/manifests remain useful, but arbitrary transcripts and
             # tensor values are never embedded in this inventory.
-            artifacts.append(_description(relative, value, digest))
+            artifact = _description(relative, value, digest)
+            artifact['operation_graph'] = _operation_graph(value, graph_budget)
+            graph_budget -= len(artifact['operation_graph']['nodes'])
+            artifacts.append(artifact)
         except (OSError, ValueError) as error:
             issues.append(f'{relative}: {type(error).__name__}: artifact unavailable or oversized')
         if budget <= 0:

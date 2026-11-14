@@ -1809,6 +1809,23 @@ explicitly generate profiling or probe artifacts retain their existing behavior.
 the component reader and the shipped JavaScript renderer. The existing nightly
 visualizer lane runs these checks. Performance-tab behavior is unchanged.</p>
 </section>
+
+<section id="v8-component-operations">
+<h2>Inspect operations inside a component</h2>
+<p>In Components &amp; Coverage, select a generated IR artifact in the component
+operation selector. The dependency table shows operation IDs, layers, providers,
+incoming tensor references, outputs and recorded buffer bindings. This supports
+recurrent and audio operations without assuming attention layers or model names.</p>
+<p>Only explicit <code>from_op</code> and <code>from_output</code> references
+establish resolved dependencies. External or symbolic inputs, missing outputs,
+duplicate IDs and references outside the capture are labeled separately.
+Neither operation order nor shared buffer names creates an inferred edge.</p>
+<p>The report retains at most 256 operations per artifact and 2,048 operations
+across the selected root, with up to 64 input/output bindings per operation.
+Truncation is visible. Rebuild older HTML reports to include these captures.
+This is a dependency inspection view, not proof of state ownership, a scheduler
+trace or a numerical certificate. No model execution or profiling is required.</p>
+</section>
     </main>
 
     <!-- SVG Viewer Overlay (shared across all pages) -->

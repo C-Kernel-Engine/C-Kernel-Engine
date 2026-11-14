@@ -89,4 +89,48 @@ class ComponentInventoryTests(unittest.TestCase):
             self.assertEqual(artifact['model'],'arbitrary-new-family')
             self.assertEqual(artifact['declared_lifetimes'][0]['lifetime'],'sequence')
 
+class OperationGraphTests(unittest.TestCase):
+    def test_explicit_edges_and_missing_output(self):
+        from version.v8.tools.visualizer_components import _operation_graph
+        ops = [{'op_id': 0, 'op': 'state_read', 'dataflow': {'outputs': {'state': {}}}},
+               {'op_id': 1, 'op': 'recurrent_update', 'dataflow': {'inputs': {
+                   'history': {'from_op': 0, 'from_output': 'state'},
+                   'bad': {'from_op': 0, 'from_output': 'missing'},
+                   'external': {'from': 'external:audio'},
+                   'unbound': {'slot': 'state'}}}}]
+        graph = _operation_graph({'ops': ops}, 10)
+        self.assertEqual([r['status'] for r in graph['nodes'][1]['inputs']],
+                         ['resolved', 'output_not_declared', 'external_or_symbolic', 'not_recorded'])
+        self.assertFalse(graph['truncated'])
+
+    def test_duplicate_ids_and_truncation_do_not_invent_edges(self):
+        from version.v8.tools.visualizer_components import _operation_graph
+        ops = [{'op_id': 0}, {'op_id': 0}, {'op_id': 2, 'inputs': {'x': {'from_op': 0}}}]
+        graph = _operation_graph({'operations': ops}, 10)
+        self.assertEqual(graph['nodes'][2]['inputs'][0]['status'], 'ambiguous')
+        outside = [ops[0], ops[2], ops[1]]
+        self.assertEqual(_operation_graph({'ops': outside}, 2)['nodes'][1]['inputs'][0]['status'], 'ambiguous')
+        self.assertTrue(_operation_graph({'operations': ops}, 1)['truncated'])
+        self.assertEqual(_operation_graph({'operations': ops}, 0)['nodes'], [])
+
+    def test_global_capture_budget_and_buffer_bindings(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            ops = [{'op_id': i, 'args': [{'buffer_ref': 'recurrent_history'}]} for i in range(300)]
+            for i in range(10):
+                put(root, f'{i}.json', {'operations': ops})
+            result = build_component_inventory(root)
+            graphs = [a['operation_graph'] for c in result['components'] for a in c['artifacts']]
+            self.assertEqual(sum(len(g['nodes']) for g in graphs), 2048)
+            self.assertTrue(all(g['truncated'] for g in graphs))
+            self.assertEqual(graphs[0]['nodes'][0]['buffer_refs'], ['recurrent_history'])
+
+    def test_no_family_or_order_based_dependencies(self):
+        from version.v8.tools.visualizer_components import _operation_graph
+        for name in ('rwkv7', 'parakeet', 'whisper', 'kokoro', 'instella', 'cohere2'):
+            with self.subTest(name=name):
+                graph = _operation_graph({'config': {'model': name}, 'ops': [
+                    {'op_id': 1, 'op': 'read'}, {'op_id': 2, 'op': 'update'}]}, 10)
+                self.assertEqual([n['inputs'] for n in graph['nodes']], [[], []])
+
 if __name__=='__main__':unittest.main()
