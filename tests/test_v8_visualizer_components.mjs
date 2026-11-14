@@ -40,3 +40,10 @@ test('operation dependencies preserve unresolved and truncated evidence',()=>{
     assert.ok(!html.includes('<unsafe>'));
     assert.match(context.buildComponentOperationHTML(null),/No captured operations/);
 });
+
+test('training tensor identities and unique producers appear in dependency view',()=>{
+    const html=context.buildComponentOperationHTML({total_operations:1,nodes:[
+        {id:5,inputs:[{input:'x',tensor:'act.<x>',producer_id:2,producer_index:1,producer_output:'y',status:'resolved_tensor'}]}]});
+    assert.match(html,/tensor act.&lt;x&gt;/);assert.match(html,/producer op 2/);
+    assert.match(html,/resolved_tensor/);
+});
