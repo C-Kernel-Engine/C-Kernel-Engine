@@ -4454,3 +4454,17 @@ python3 scripts/ck_chat.py --help</pre>
 
 })();
 </script>
+
+<section id="training-zero-inputs">
+<h2>Explicit zero-state training inputs</h2>
+<p>The shared generated trainer distinguishes externally supplied FP32 tensors
+(<code>training_float_inputs</code>) from declared zero-state tensors
+(<code>training_zero_inputs</code>). Zero-state tensors must be nonpersistent,
+nontrainable FP32 inputs with positive sizes. They cannot overlap supplied inputs,
+weights or forward-produced tensors. Undeclared FP32 inputs remain errors.</p>
+<p>The bounded recurrent training builder declares its initial convolution and
+SSM histories as zero-state inputs. Generated C clears them before each forward
+pass, rather than relying on fresh arena allocation. This preserves zero-history
+training semantics; it does not establish training across retained recurrent
+history or full sequence-mode recurrent parity.</p>
+</section>
