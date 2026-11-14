@@ -154,6 +154,21 @@ def compile_native_graph(root, source, circuit, extra_exports=(), mode="prefill"
     identity['embedded_runtime_build_identity'] = 'VERIFIED'
     (root / 'build-identity.json').write_text(json.dumps(identity, indent=2))
     fn = getattr(loaded, function)
-    fn.argtypes = [ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t]
+    scalar_types = {"float": ctypes.c_float, "int32_t": ctypes.c_int32,
+                    "size_t": ctypes.c_size_t, "uint8_t": ctypes.c_uint8,
+                    "int": ctypes.c_int}
+    def parameter_type(parameter):
+        declared = parameter["c_type"].replace("const ", "").strip()
+        pointers = declared.count("*")
+        base = declared.replace("*", "").strip()
+        if base == "void" and pointers == 1:
+            return ctypes.c_void_p
+        if base not in scalar_types:
+            raise ValueError(f"unsupported native entry parameter type: {declared}")
+        result = scalar_types[base]
+        for _ in range(pointers):
+            result = ctypes.POINTER(result)
+        return result
+    fn.argtypes = [parameter_type(p) for p in source["template"]["native_entry"]["params"]]
     fn.restype = ctypes.c_int
     return layout, call_ir, library, loaded, fn

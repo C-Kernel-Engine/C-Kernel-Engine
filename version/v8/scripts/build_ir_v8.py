@@ -2272,6 +2272,10 @@ OP_DATAFLOW = {
         "inputs": {"input": "external:input", "spans": "external:spans"},
         "outputs": {"output": {"slot": "pooled_rows", "dtype": "fp32"}},
     },
+    "decoder_features_sequence": {
+        "inputs": {"ids": "external:ids"},
+        "outputs": {"output": {"slot": "decoder_features", "dtype": "fp32"}},
+    },
     "last_valid_row_checked": {
         "inputs": {"input": "external:input", "span": "external:span"},
         "outputs": {"output": {"slot": "final_valid_row", "dtype": "fp32"}},
@@ -5349,6 +5353,7 @@ TEMPLATE_TO_KERNEL_OP = {
     "runtime_extent_sum": "runtime_extent_sum",
     "runtime_extent_scale": "runtime_extent_scale",
     "runtime_extent_affine": "runtime_extent_affine",
+    "decoder_features_sequence": "decoder_features_sequence",
     "audio_duration_expand": "audio_duration_expand",
     "runtime_copy_valid": "runtime_copy_valid",
     "audio_istft_mag_phase": "audio_istft_mag_phase",
@@ -10182,6 +10187,7 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
         "runtime_extent_sum": None,
         "runtime_extent_scale": None,
         "runtime_extent_affine": None,
+        "decoder_features_sequence": None,
         "audio_upsample_nearest_checked": None,
         "audio_conv_transpose1d_depthwise_checked": ["weight", "bias"],
         "audio_conv_transpose1d_dense_checked": ["weight", "bias"],
@@ -13647,6 +13653,7 @@ TEMPLATE_OP_WEIGHTS = {
     "runtime_extent_sum": [],
     "runtime_extent_scale": [],
     "runtime_extent_affine": [],
+    "decoder_features_sequence": [],
     "audio_upsample_nearest_checked": [],
     "audio_conv_transpose1d_depthwise_checked": ["weight", "bias"],
     "audio_conv_transpose1d_dense_checked": ["weight", "bias"],
@@ -17273,6 +17280,7 @@ def load_kernel_bindings() -> Dict[str, Dict]:
 
 
 _CALL_ABI_SOURCE_KINDS = {
+    "entry",
     "activation",
     "config",
     "const",
@@ -18266,6 +18274,17 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
                     expr = "0"
                 if cast:
                     expr = f"({cast})({expr})"
+
+            elif src.startswith("entry:"):
+                from native_entry_binding_v8 import resolve_entry_argument
+                try:
+                    expr = resolve_entry_argument(
+                        config.get("native_entry"), physical_maps[kernel_id],
+                        next(p for p in physical_maps[kernel_id]["call_abi"]["params"]
+                             if p["name"] == name))
+                except ValueError as error:
+                    op_errors.append(f"{func}.{name}: {error}")
+                    expr = "0"
 
             elif src.startswith("const:"):
                 expr = src.split(":", 1)[1]

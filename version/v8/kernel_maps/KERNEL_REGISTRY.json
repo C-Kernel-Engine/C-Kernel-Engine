@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 516,
+      "total": 517,
       "by_op": {
         "add_backward": 1,
         "add_rows_backward_train_f32": 1,
@@ -80,6 +80,7 @@
         "concat_i32_checked": 1,
         "copy_i32_span_checked": 1,
         "copy_last_logits": 1,
+        "decoder_features_sequence": 1,
         "embedding": 7,
         "embedding_backward": 1,
         "embedding_lookup_checked": 1,
@@ -34498,6 +34499,214 @@
       "notes": "Overlap-safe copy of the final prefill token logits to the runtime output position.",
       "name": "copy_last_logits",
       "_source_file": "copy_last_logits.json"
+    },
+    {
+      "id": "decoder_features_sequence_checked_f32",
+      "op": "decoder_features_sequence",
+      "variant": "checked_reset_decode_collect_reset",
+      "quant": {
+        "weight": "none",
+        "activation": "int32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "ids",
+          "dtype": "i32",
+          "shape": [
+            "T"
+          ],
+          "alignment": 4,
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "C"
+          ],
+          "alignment": 4,
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "workspace",
+          "dtype": "fp32",
+          "shape": [
+            "Q"
+          ],
+          "alignment": 4
+        }
+      ],
+      "dims": [
+        "T",
+        "C",
+        "Q"
+      ],
+      "impl": {
+        "function": "decoder_features_sequence_checked_f32",
+        "c_declaration": "int decoder_features_sequence_checked_f32(const void *context, size_t context_bytes, const int32_t *ids, size_t id_elements, size_t tokens, size_t channels, float *output, size_t output_elements, float *scratch, size_t scratch_elements);",
+        "sources": [
+          "src/runtime/decoder_features_sequence.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "checked_native_decoder_feature_copy_fp32",
+          "status": "validated",
+          "phases": [
+            "prefill"
+          ],
+          "function": "decoder_features_sequence_checked_f32",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "none",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "serial"
+          }
+        }
+      ],
+      "constraints": {
+        "notes": "Caller exclusively owns an initialized generated decoder ABI v1. Its artifact and arithmetic contract are separate from this exact-copy contract. All declared regions are disjoint. Reset failure invalidates the component until reinitialization. Optional cancellation is checked between token calls and before publication. No gradients through this frozen component are claimed."
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "context",
+            "source": "entry:decoder_context"
+          },
+          {
+            "name": "context_bytes",
+            "source": "entry:decoder_context_bytes"
+          },
+          {
+            "name": "ids",
+            "source": "activation:ids",
+            "cast": "const int32_t*",
+            "ports": [
+              "input:ids"
+            ]
+          },
+          {
+            "name": "id_elements",
+            "source": "runtime:id_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "tokens",
+            "source": "runtime:feature_tokens",
+            "value_type": "size_t"
+          },
+          {
+            "name": "channels",
+            "source": "runtime:feature_channels",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:feature_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "scratch",
+            "source": "scratch:workspace",
+            "cast": "float*"
+          },
+          {
+            "name": "scratch_elements",
+            "source": "runtime:feature_elements",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_decoder_feature_sequence.py"
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "T": "feature_tokens",
+          "C": "feature_channels",
+          "Q": "feature_elements"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "ids",
+            "elements": "id_elements",
+            "rows": "feature_tokens",
+            "width": 1,
+            "element_bytes": 4
+          },
+          {
+            "pointer": "output",
+            "elements": "feature_elements",
+            "rows": "feature_tokens",
+            "width": "feature_channels",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "scratch",
+            "elements": "feature_elements",
+            "rows": "feature_tokens",
+            "width": "feature_channels",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "operation_interface": "native.decoder.feature_sequence.checked.fp32.v1",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "equivalence_group": "native.decoder.feature_sequence.checked.fp32.v1",
+        "phases": [
+          "prefill"
+        ]
+      },
+      "name": "decoder_features_sequence_checked_f32",
+      "_source_file": "decoder_features_sequence_checked_f32.json"
     },
     {
       "id": "deepseek_mla_attention_bf16_phases",
