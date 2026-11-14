@@ -75,6 +75,27 @@ class MapTrainingBindingTests(unittest.TestCase):
             with self.subTest(defect=defect), self.assertRaises(ValueError):
                 resolve_training_binding(self.provider, self.rules, **args)
 
+    def test_ready_rule_must_match_interface_and_gradient_destinations(self):
+        name = "linear_rows_train_backward_nobias"
+        for defect in ("interface", "missing", "wrong_port", "duplicate", "ownership"):
+            rules = deepcopy(self.rules)
+            rule = rules[name]
+            if defect == "interface":
+                rule["operation_interfaces"] = ["unrelated.operation.v1"]
+            else:
+                writes = rule["backward_ops"][0]["writes"]
+                if defect == "missing":
+                    writes.pop(0)
+                elif defect == "wrong_port":
+                    writes[0]["target_input"] = "unrelated_input"
+                elif defect == "duplicate":
+                    writes.append(deepcopy(writes[0]))
+                else:
+                    writes[0]["kind"] = "tmp_grad_weight"
+            # All cases retain ready status and the exact saved operand names.
+            with self.subTest(defect=defect), self.assertRaises(ValueError):
+                resolve_training_binding(self.provider, rules, **self.args)
+
     def test_bias_and_addition_ports_are_explicit(self):
         biased = json.loads(
             (ROOT / "version/v8/kernel_maps/linear_rows_checked_f32.json").read_text()

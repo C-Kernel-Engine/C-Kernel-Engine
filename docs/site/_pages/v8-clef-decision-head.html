@@ -39,7 +39,7 @@ operand ports and dimension aliases from that declaration. A provider name or
 prefix no longer establishes training support for these operations.</p>
 <p>The bounded <code>cke.training.direct-vjp.v1</code> contract reuses the same
 forward provider and existing operand tensors. It validates FP32 ports, saved
-operands and positive bounded dimensions before backward generation. It does not
+operands and positive bounded dimensions before backward generation. Ready rules must explicitly admit the operation interface and provide exactly the declared input/weight gradient destinations with compatible ownership. Missing, unrelated, duplicate or misowned destinations are rejected even when saved operands match. It does not
 introduce a new derivative executor or an expression language. Cached-forward
 rewrites and other operation groups still use explicit translation rules; this
 is not arbitrary-circuit differentiation or BF16 adapter certification.</p>

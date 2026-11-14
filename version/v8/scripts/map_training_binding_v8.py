@@ -51,6 +51,31 @@ def resolve_training_binding(kernel_map, rules, *, inputs, weights, output, cons
     rule = rules.get(rule_name)
     if not isinstance(rule, dict) or rule.get("status") != "ready":
         raise ValueError("map names an unavailable gradient rule")
+    interfaces = rule.get("operation_interfaces")
+    if (
+        not isinstance(interfaces, list)
+        or binding["operation_interface"] not in interfaces
+    ):
+        raise ValueError("gradient rule does not support the operation interface")
+    destinations = []
+    for operation in rule.get("backward_ops", []):
+        for write in operation.get("writes", []):
+            keys = [key for key in ("target_input", "target_weight") if key in write]
+            if len(keys) > 1:
+                raise ValueError("ambiguous gradient destination")
+            if keys:
+                key = keys[0]
+                expected_kind = (
+                    "grad_activation" if key == "target_input" else "tmp_grad_weight"
+                )
+                if write.get("kind") != expected_kind:
+                    raise ValueError("gradient destination has incompatible ownership")
+                destinations.append((key, write[key]))
+    expected = {("target_input", name) for name in inputs} | {
+        ("target_weight", name) for name in weights
+    }
+    if len(destinations) != len(set(destinations)) or set(destinations) != expected:
+        raise ValueError("gradient destinations disagree with operation ports")
     saved = {}
     if not isinstance(binding["saved_operands"], dict):
         raise ValueError("invalid saved operand bindings")
