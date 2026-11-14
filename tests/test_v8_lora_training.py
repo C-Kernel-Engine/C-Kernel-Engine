@@ -303,7 +303,7 @@ class LoRANativeTests(unittest.TestCase):
     def test_adapter_only_training(self):
         self.certify(False, adapter_only=True)
 
-    def certify(self, rectangular, adapter_only=False):
+    def certify(self, rectangular, adapter_only=False, bf16_base=False):
         import numpy as np
         from tests.v8_training_test_helpers import certify_training
 
@@ -347,6 +347,37 @@ class LoRANativeTests(unittest.TestCase):
             freeze_other(ir)
             for name in ("up", "score"):
                 ir["tensors"]["weight." + name]["requires_grad"] = False
+        if bf16_base:
+            from version.v8.training.bf16_projection import use_bf16_projection
+
+            try:
+                import torch
+            except ImportError as exc:
+                self.skipTest("independent PyTorch oracle unavailable: " + str(exc))
+
+            # The declared contract saves RNE BF16 operands, but keeps dY/dX and
+            # accumulation in FP32. This is not PyTorch's default autocast VJP.
+            class FrozenBaseProjection(torch.autograd.Function):
+                @staticmethod
+                def forward(ctx, x, w):
+                    xr, wr = x.to(torch.bfloat16).float(), w.to(torch.bfloat16).float()
+                    ctx.save_for_backward(wr)
+                    return xr @ wr.T
+
+                @staticmethod
+                def backward(ctx, dy):
+                    (w,) = ctx.saved_tensors
+                    return dy @ w, None
+
+            base_op = next(
+                op
+                for op in ir["ops"]
+                if any(
+                    ref.get("tensor") == "weight.bridge"
+                    for ref in op.get("weights", {}).values()
+                )
+            )
+            ir = use_bf16_projection(ir, base_op["op_id"])
         rng = np.random.default_rng(837)
         values = {
             "features": np.eye(4, dtype="f"),
@@ -369,8 +400,13 @@ class LoRANativeTests(unittest.TestCase):
 
         def forward(p):
             x = p["features"] @ p["up"].T
+            base = (
+                FrozenBaseProjection.apply(x, p["bridge"])
+                if bf16_base
+                else x @ p["bridge"].T
+            )
             y = (
-                x @ p["bridge"].T
+                base
                 + (x @ p["lora.demo.a"].T @ p["lora.demo.b"].T) * p["lora.demo.scale"]
             )
             return y @ p["score"].T
@@ -394,6 +430,12 @@ class LoRANativeTests(unittest.TestCase):
             ),
             forward,
             gradient_check=check_gradients,
+            finite_difference=not bf16_base,
+            precision_label=(
+                "BF16 frozen-base operands / FP32 adapters and gradients"
+                if bf16_base
+                else "FP32"
+            ),
             probe_parameter="lora.demo.b" if adapter_only else "up",
             fresh_process=True,
             check_evaluation=True,
