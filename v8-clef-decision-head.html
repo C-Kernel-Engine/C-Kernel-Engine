@@ -1215,6 +1215,62 @@ CKE_RUN_CLEF_JOB=1 python -m unittest \
   tests.test_v8_clef_training_recipe.NativeRecipe.test_opaque_revision_native_job_and_export -v</code></pre>
 </section>
 
+<section id="bounded-dataset-expansion">
+<h2>Application training: larger supplied-feature packages</h2>
+<p>The FP32 head recipe now admits up to 4,096 records and 512 token positions,
+with 1–1,000 epochs and a combined ceiling of 100,000 updates. The loader retains
+its 512 MiB decoded-dataset bound and the compiler retains its 2 GiB native-workspace
+bound. These are admission ceilings, not evidence that every maximum-size geometry
+fits memory or has acceptable speed. Package manifests are bounded to 8 MiB.</p>
+<p>Application clients must rediscover capabilities: <code>clef_head_fp32_v1.limits</code>
+now explicitly reports records, tokens, update budget, dataset bytes and the exact-length
+restriction. The independent simulated consumer and job-progress checks use the expanded
+contract. An administrator can construct <code>Jobs(..., wall_seconds=3600)</code>
+for a longer local run; the default remains 600 seconds and the accepted range is
+60–86,400 seconds. This is local policy, not a client-requested timeout override.
+Cancellation and remote authentication remain unsupported.</p>
+<p>The trainer indexes the schedule instead of materializing one record reference for
+every update. Every 1,000 updates before the final/interrupted step it evaluates validation
+records and publishes an identity-bound checkpoint. Only the last two periodic checkpoints
+created by that invocation are retained; a resumed invocation preserves earlier files.
+The final checkpoint and explicit stop-after behavior remain available. Resumption requires
+the same dataset and configuration. Older checkpoint configurations without the new
+checkpoint/evaluation policy are not silently accepted.</p>
+<p>The final report includes per-split, per-question accuracy, macro-F1, support and confusion
+matrices, plus record logits, labels and stable per-question softmax scores. Candidate
+identities, not their array positions, define classes. Question IDs must denote the same
+task across records. Macro-F1 includes declared classes with zero support (zero-division
+score zero); softmax scores are not calibrated confidence. Sparse confusion entries
+are always supplied; dense matrices are omitted once their combined 65,536-cell budget
+is exhausted. This avoids quadratic reporting memory for many candidate identities. Reports include elapsed time
+and process high-water RSS on Linux. Timing includes preparation/export and is not a
+kernel-throughput measurement.</p>
+<p>Serving fixtures no longer grow with the training dataset: export registers at most
+64 question examples, prioritizing the first validation record then dataset order, and explicitly reports
+<code>inference_export_record_ids</code>. Native training-runtime evaluation still reports
+all records. Independent generated-inference export checks apply to the selected subset;
+the exported head contains the trained weights, not a claim of corpus-wide export parity.</p>
+<p>Executed stress test: 34 synthetic records, 96 token positions, 41 epochs / 1,353 updates,
+periodic validation at update 1,000, and 32 exported two-question records. This tests limits
+and lifecycle behavior, not sentiment accuracy or Qwen execution. The existing distinct-record
+pinned PyTorch head-update comparison also passes without tolerance changes.</p>
+<pre>make -j4 build/libckernel_engine.so
+python -m unittest tests.test_v8_clef_dataset_scale -v
+python scripts/nightly_runner.py --tests training_clef_registered_recipe --require-executed
+python version/v8/decision/train_clef_head.py \
+  --package /absolute/path/package.json --package-sha256 EXPECTED_SHA256 \
+  --run-dir /absolute/path/new-run --json-out /absolute/path/result.json \
+  --epochs 50 --lr 0.001</pre>
+<p><strong>Still required before claiming general real-text training:</strong> each package
+has one exact token/question/option geometry. No implicit padding or attention masking is
+provided. Mixed-length capture, bucketed shared-optimizer training, a checked multi-record
+capture-to-package converter, automatic best-validation-checkpoint selection, and a separate
+final test-set workflow remain follow-ups. The application should preserve train/validation/test
+separation and must not select models using the final test set. Native backbone execution,
+full-model LoRA and QLoRA are not enabled by this expansion. No real dataset benchmark or
+application-quality claim has been made.</p>
+</section>
+
 <section id="registered-fp32-training">
 <h2>Registered FP32 Clef head training</h2>
 <p>This opt-in recipe trains the complete supported Clef head on <strong>supplied backbone
@@ -1230,7 +1286,7 @@ loads input features, invokes complete generated steps and packages artifacts.
 It never computes model gradients or updates parameters. No new compiler branch,
 model scheduler or training stack is introduced.</p>
 <p>The admitted recipe is <code>clef_head_fp32_v1</code>: FP32, AdamW, per-question cross entropy,
-1–40 epochs, learning rate <code>(0, 0.01]</code>, epsilon <code>1e-4</code>, betas <code>(0.9, 0.999)</code>, weight
+1–1,000 epochs (at most 100,000 updates), learning rate <code>(0, 0.01]</code>, epsilon <code>1e-4</code>, betas <code>(0.9, 0.999)</code>, weight
 decay <code>0.01</code>, no dropout, gradient accumulation 1. All head parameters train;
 output embedding rows and supplied backbone features are frozen. Mixed BF16,
 LoRA and QLoRA are unavailable through this recipe. In particular, the existing
@@ -1247,7 +1303,7 @@ that CKE executed that backbone.</li>
 <code>questions</code>, <code>options</code>. All records share this declared geometry.</li>
 <li><code>weights</code>: local basename <code>file</code> and <code>sha256</code> of the FP32 NPZ raw head weights,
 including <code>output_embedding.weight</code> and packed QKV weights.</li>
-<li><code>records</code>: 2–32 records with <code>id</code> (at most 60 characters), <code>split</code> (<code>train</code> or
+<li><code>records</code>: 2–4,096 records with <code>id</code> (at most 60 characters), <code>split</code> (<code>train</code> or
 <code>validation</code>), <code>asset</code> (<code>file</code>, <code>sha256</code>), <code>question_ids</code> and grouped
 <code>candidate_ids</code>. Both splits must be present. IDs preserve question/option order.</li>
 </ul>
