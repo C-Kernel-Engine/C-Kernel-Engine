@@ -26,6 +26,7 @@ var annotated_dup =
     [ "CKBufferSpec", "structCKBufferSpec.html", "structCKBufferSpec" ],
     [ "CKBumpHeaderV5", "structCKBumpHeaderV5.html", "structCKBumpHeaderV5" ],
     [ "CKBumpMetaFooterV5", "structCKBumpMetaFooterV5.html", "structCKBumpMetaFooterV5" ],
+    [ "CKDecoderFeatures", "structCKDecoderFeatures.html", "structCKDecoderFeatures" ],
     [ "CKDimToken", "structCKDimToken.html", "structCKDimToken" ],
     [ "CKFooterGradOffsets", "structCKFooterGradOffsets.html", "structCKFooterGradOffsets" ],
     [ "CKFooterOffsets", "structCKFooterOffsets.html", "structCKFooterOffsets" ],

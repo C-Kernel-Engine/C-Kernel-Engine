@@ -3,6 +3,7 @@ var dir_d44c64559bbebec7f509842c48db8b23 =
     [ "data_structures", "dir_ebed218ca042e0cae3861bf18b14f766.html", "dir_ebed218ca042e0cae3861bf18b14f766" ],
     [ "tokenizer", "dir_018f648cfdb036060b96c3c119d2a3f6.html", "dir_018f648cfdb036060b96c3c119d2a3f6" ],
     [ "bf16_utils.h", "bf16__utils_8h.html", "bf16__utils_8h" ],
+    [ "ck_decoder_features.h", "ck__decoder__features_8h.html", "ck__decoder__features_8h" ],
     [ "ck_features.h", "ck__features_8h.html", "ck__features_8h" ],
     [ "ck_metrics.h", "ck__metrics_8h.html", "ck__metrics_8h" ],
     [ "ck_model_abi_v8.h", "ck__model__abi__v8_8h.html", "ck__model__abi__v8_8h" ],

@@ -1,5 +1,12 @@
 var NAVTREEINDEX16 =
 {
+"gemma4__per__layer__embed_8c.html#a21bf1789acc5556879531b42b0bd40cd":[2,0,1,1,87,14],
+"gemma4__per__layer__embed_8c.html#a2aa87174026cb74a26c93cba1b96ba10":[2,0,1,1,87,4],
+"gemma4__per__layer__embed_8c.html#a30422424fed31c45296604972fcf124e":[2,0,1,1,87,6],
+"gemma4__per__layer__embed_8c.html#a3bd934b2994fd4fd15d2819330100b04":[2,0,1,1,87,9],
+"gemma4__per__layer__embed_8c.html#a44ec1cbc9e8de0e2cad3dc725c59fdd9":[2,0,1,1,87,5],
+"gemma4__per__layer__embed_8c.html#a4eead89f0a06792f12d01d53959144c6":[2,0,1,1,87,16],
+"gemma4__per__layer__embed_8c.html#a562d10af21415229ce39871223295450":[2,0,1,1,87,13],
 "gemma4__per__layer__embed_8c.html#a86d5ed3bc2576b6c5b7c824aa1d6ef8e":[2,0,1,1,87,2],
 "gemma4__per__layer__embed_8c.html#a8df789062851b1738820b4eeecd5fded":[2,0,1,1,87,7],
 "gemma4__per__layer__embed_8c.html#a93be87f3d867edd2bfecc967ef7d677f":[2,0,1,1,87,1],
@@ -60,8 +67,8 @@ var NAVTREEINDEX16 =
 "globals_b.html":[2,1,0,2],
 "globals_c.html":[2,1,0,3],
 "globals_d.html":[2,1,0,4],
-"globals_defs.html":[2,1,6],
 "globals_defs.html":[2,1,6,0],
+"globals_defs.html":[2,1,6],
 "globals_defs_a.html":[2,1,6,1],
 "globals_defs_b.html":[2,1,6,2],
 "globals_defs_c.html":[2,1,6,3],
@@ -242,12 +249,5 @@ var NAVTREEINDEX16 =
 "hybrid__attention__kernels_8c_source.html":[2,0,1,1,95],
 "hyper__connection__kernels_8c.html":[2,0,1,1,96],
 "hyper__connection__kernels_8c.html#a001a6d60734a214538c2f8ba85d8bde5":[2,0,1,1,96,8],
-"hyper__connection__kernels_8c.html#a01609ec0952da9be3347459e153d2859":[2,0,1,1,96,2],
-"hyper__connection__kernels_8c.html#a030c98b26ad610ccea6dabf993b60cdf":[2,0,1,1,96,6],
-"hyper__connection__kernels_8c.html#a03ebf0213367790001c5592f91e0b7ec":[2,0,1,1,96,7],
-"hyper__connection__kernels_8c.html#a2d95bed31e64f88f1012b0c9de74cb55":[2,0,1,1,96,13],
-"hyper__connection__kernels_8c.html#a33720e96daf3e65a3b0265565accb526":[2,0,1,1,96,14],
-"hyper__connection__kernels_8c.html#a4da2cd449f38b3ec7918f903dc8d8f33":[2,0,1,1,96,9],
-"hyper__connection__kernels_8c.html#a6972ea09e82d3da8da8f45154a790ceb":[2,0,1,1,96,5],
-"hyper__connection__kernels_8c.html#aa1831a4dc6f249f45ea4a2591971b697":[2,0,1,1,96,1]
+"hyper__connection__kernels_8c.html#a01609ec0952da9be3347459e153d2859":[2,0,1,1,96,2]
 };

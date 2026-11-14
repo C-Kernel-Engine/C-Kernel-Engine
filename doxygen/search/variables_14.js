@@ -20,7 +20,7 @@ var searchData=
   ['v_5fmlp_5fup_5fb_17',['v_mlp_up_b',['../structCKLayerOptimizerOffsets.html#a7bafeba33b123654fbd253bbdded7bd6',1,'CKLayerOptimizerOffsets']]],
   ['v_5fmlp_5fup_5fw_18',['v_mlp_up_w',['../structCKLayerOptimizerOffsets.html#abeb389a924018bda89771dc56a70c2c0',1,'CKLayerOptimizerOffsets']]],
   ['v_5fwk_19',['v_wk',['../structCKLayerGradOffsets.html#a0f042df968961329893d5a375b2ceb3d',1,'CKLayerGradOffsets::v_wk'],['../structCKLayerOptimizerOffsets.html#a335d764b0992ead6630474f6b1c0f171',1,'CKLayerOptimizerOffsets::v_wk']]],
-  ['v_5fwo_20',['v_wo',['../structCKLayerGradOffsets.html#acba8a7fbb8f97544b52044869c46789c',1,'CKLayerGradOffsets::v_wo'],['../structCKLayerOptimizerOffsets.html#a66f90d80c3b0b3274f57b16b824c4050',1,'CKLayerOptimizerOffsets::v_wo']]],
+  ['v_5fwo_20',['v_wo',['../structCKLayerOptimizerOffsets.html#a66f90d80c3b0b3274f57b16b824c4050',1,'CKLayerOptimizerOffsets::v_wo'],['../structCKLayerGradOffsets.html#acba8a7fbb8f97544b52044869c46789c',1,'CKLayerGradOffsets::v_wo']]],
   ['v_5fwq_21',['v_wq',['../structCKLayerGradOffsets.html#a961c5f51bc787cfd934f468f70536674',1,'CKLayerGradOffsets::v_wq'],['../structCKLayerOptimizerOffsets.html#a142f3597b192e27b22152d7e5e1cca73',1,'CKLayerOptimizerOffsets::v_wq']]],
   ['v_5fwv_22',['v_wv',['../structCKLayerGradOffsets.html#af0e2b103e7a3b9f799947d8447e091c0',1,'CKLayerGradOffsets::v_wv'],['../structCKLayerOptimizerOffsets.html#af930f5e076e326272b26fb52cc4162d4',1,'CKLayerOptimizerOffsets::v_wv']]],
   ['valid_5fframes_23',['valid_frames',['../structck__checked__frame__loop.html#a62066d2333a1d53ea05a264e4af42ac4',1,'ck_checked_frame_loop']]],
@@ -36,5 +36,6 @@ var searchData=
   ['vocab_5foffsets_33',['vocab_offsets',['../structQWEN2__0__5B__DECODEHeaderOffsets.html#a7c4211b4f3a7c74aec65281818a81693',1,'QWEN2_0_5B_DECODEHeaderOffsets']]],
   ['vocab_5fsize_34',['vocab_size',['../structCKModelRuntimeDescriptorV8.html#af6a006961191329f5cc41410bf97a13e',1,'CKModelRuntimeDescriptorV8::vocab_size'],['../structCKModelConfig.html#ad2b6c5944307859fe26f4d915d089027',1,'CKModelConfig::vocab_size'],['../structCKTokenizer.html#ada5e95a402ab1abb0295df8e1ecccc04',1,'CKTokenizer::vocab_size'],['../structCKBumpHeaderV5.html#a1d7ceb3da86e1cc40493cf185e486507',1,'CKBumpHeaderV5::vocab_size'],['../structCKSectionConfig.html#a2dc3bafd010bc86e6879784f37c2cf26',1,'CKSectionConfig::vocab_size'],['../structCKTokenizer.html#a2993f4ea714c7d2996caccf32eb9ddef',1,'CKTokenizer::vocab_size'],['../true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697',1,'vocab_size:&#160;true_bpe.h']]],
   ['vocab_5fstrings_35',['vocab_strings',['../structQWEN2__0__5B__DECODEHeaderOffsets.html#a60e3a70cccede22b6473dd0be408af24',1,'QWEN2_0_5B_DECODEHeaderOffsets']]],
-  ['vocab_5ftrie_36',['vocab_trie',['../structCKTokenizer.html#a6ac6c2255e6c5ccf7dfc45ecf2be9456',1,'CKTokenizer']]]
+  ['vocab_5ftrie_36',['vocab_trie',['../structCKTokenizer.html#a6ac6c2255e6c5ccf7dfc45ecf2be9456',1,'CKTokenizer']]],
+  ['vocabulary_5fsize_37',['vocabulary_size',['../structCKDecoderFeatures.html#ab304219bf87b0d271ffdd9ab9b26db8c',1,'CKDecoderFeatures']]]
 ];
