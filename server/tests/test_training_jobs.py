@@ -36,6 +36,24 @@ class TrainingJobsTest(unittest.TestCase):
         with self.assertRaisesRegex(JobError,'IDEMPOTENCY_CONFLICT'):self.jobs.submit('alice',changed['plan_sha256'],'key',start=False)
         self.jobs.run_job('alice',first['job']['job_id']);self.assertEqual(self.jobs.calls,1)
         self.assertEqual(self.jobs.submit('alice',p['plan_sha256'],'key')['job']['status'],'succeeded');self.assertEqual(self.jobs.calls,1)
+    def test_progress_is_persisted_monotonic_and_client_observable(self):
+        from server.training.job_consumer import observe
+        import time
+        p=self.prepare();j=self.jobs.submit('alice',p['plan_sha256'],'progress',start=False)['job']
+        with self.jobs.guard,self.jobs.db:
+            row=self.jobs._read('alice',j['job_id']);row.update(status='running',stage='workflow',updated_at=time.time());self.jobs._save(row)
+        first=self.jobs.observe('alice',j['job_id'])
+        path=self.jobs.store/j['job_id']/'run/progress.json'
+        path.parent.mkdir(parents=True)
+        atomic_json(path,dict(stage='training',completed_steps=1,total_steps=4))
+        second=self.jobs.observe('alice',j['job_id'])
+        self.assertGreater(second['job']['updated_at'],first['job']['updated_at'])
+        observe(second,worker_boot_id=self.jobs.backend.boot,owner='alice',job_id=j['job_id'],plan_sha256=p['plan_sha256'],experiment_id='experiment',draft_revision=3,last=first,allow_simulation=True)
+        self.assertEqual(self.jobs._read('alice',j['job_id'])['progress'],second['job']['progress'])
+        for bad in (dict(stage='training',completed_steps=0,total_steps=4),dict(stage='training',completed_steps=2,total_steps=5),[],dict(stage='complete',completed_steps=2,total_steps=4)):
+            atomic_json(path,bad)
+            self.assertEqual(self.jobs.observe('alice',j['job_id'])['job'],second['job'])
+
     def test_cross_identity_unknown_plan_and_busy(self):
         p=self.prepare()
         with self.assertRaisesRegex(JobError,'UNKNOWN_PLAN'):self.jobs.submit('bob',p['plan_sha256'],'key',start=False)

@@ -1,6 +1,7 @@
-"""Independent simulated Antsand validation client. No producer imports/jobs."""
+"""Independent simulated external validation client. No producer imports/jobs."""
 import hashlib
 import json
+import math
 import re
 import threading
 import time
@@ -26,17 +27,30 @@ def validate(reply,request,capabilities=None):
         check(reply['capabilities'] is None and reply['plan'] is None and reply['plan_sha256'] is None);return reply
     if request['operation']=='discover':
         caps=reply['capabilities'];check(type(caps) is dict)
-        check(set(caps)=={'schema','worker_boot_id','cke_commit','runtime','execution','resources','recipes','datasets','stages','methods','limits','sha256'})
+        has_head='clef_packages' in caps
+        check(set(caps)-({'clef_packages'} if has_head else set())=={'schema','worker_boot_id','cke_commit','runtime','execution','resources','recipes','datasets','stages','methods','limits','sha256'})
         check(caps['schema']=='cke.training.v1' and caps['worker_boot_id']==reply['worker_boot_id'] and caps['sha256']==reply['capabilities_sha256'])
         check(caps['sha256']==sha({k:v for k,v in caps.items() if k!='sha256'}))
         check(hexid(caps['cke_commit'],40) and caps['execution']=='disabled' and caps['resources'] in ('unknown','unavailable'))
         check(caps['stages']==dict(discover='supported',validate='supported',submit='unsupported',observe='unsupported',artifacts='unsupported',cancel='unsupported'))
         check(type(caps['runtime']) is dict and set(caps['runtime'])=={'version','loaded','workflow_sha256'} and caps['runtime']['version']=='v8.workflow.source')
         check(caps['runtime'].get('loaded') is False and hexid(caps['runtime'].get('workflow_sha256'),64))
-        check(type(caps['datasets']) is list and len(caps['datasets'])==2 and type(caps['recipes']) is dict and set(caps['recipes'])=={'svg_tiny_v8','english_tiny_v8'})
-        check(caps['methods']==dict(full_tiny_decoder='validation_only',clef_head='unsupported',lora='unsupported',qlora='unsupported'))
+        check(type(caps['datasets']) is list and len(caps['datasets'])==2 and type(caps['recipes']) is dict and set(caps['recipes'])==({'svg_tiny_v8','english_tiny_v8','clef_head_fp32_v1'} if has_head else {'svg_tiny_v8','english_tiny_v8'}))
+        check(caps['methods']==dict(full_tiny_decoder='validation_only',clef_head='validation_only' if has_head else 'unsupported',lora='unsupported',qlora='unsupported'))
         check(caps['limits']==dict(message_bytes=16384,epochs=[1,10],grad_accum=[1,8],queued_jobs=0))
-        for recipe in caps['recipes'].values():
+        if has_head:
+            packages=caps['clef_packages']
+            check(type(packages) is dict and 1<=len(packages)<=8)
+            for name,p in packages.items():
+                check(type(p) is dict and set(p)=={'id','sha256','model','geometry','splits','feature_provenance'})
+                check(p['id']==name and hexid(p['sha256'],64) and p['feature_provenance']=='supplied')
+                check(type(p['splits']) is dict and set(p['splits'])=={'train','validation'} and all(type(n) is int and 1<=n<=31 for n in p['splits'].values()))
+                check(type(p['model']) is dict and type(p['geometry']) is dict)
+            r=caps['recipes']['clef_head_fp32_v1']
+            check(type(r) is dict and set(r)=={'limits','status','dtype','optimizer','method','geometry','executor_sha256'})
+            check(r['limits']==dict(epochs=[1,40],grad_accum=1) and r['status']=='validation_only' and r['dtype']=='fp32' and r['optimizer']=='adamw' and r['method']=='head_only' and r['geometry']=='one declared geometry per package' and hexid(r['executor_sha256'],64))
+        for name,recipe in caps['recipes'].items():
+            if name=='clef_head_fp32_v1':continue
             check(type(recipe) is dict and set(recipe)=={'status','workflow','shape','dtype','optimizer','method','tokenizer','dataset'})
             check(recipe['status']=='validation_only' and recipe['workflow']=='v8_training_workflow' and recipe['dtype']=='fp32' and recipe['optimizer']=='adamw' and recipe['method']=='full_tiny_decoder' and recipe['tokenizer']=='utf8_byte_v1')
             check(recipe['shape']==dict(layers=4,d_model=32,hidden=64,heads=4,kv_heads=4,vocab_size=256,seq_len=32))
@@ -54,18 +68,29 @@ def validate(reply,request,capabilities=None):
         check(type(capabilities) is dict and capabilities.get('sha256')==request['capabilities_sha256'])
         check(capabilities['sha256']==sha({k:v for k,v in capabilities.items() if k!='sha256'}))
         check(reply['worker_boot_id']==request['worker_boot_id'] and reply['capabilities_sha256']==request['capabilities_sha256'])
-        cfg=request['config'];check(set(cfg)=={'recipe','dataset','tokenizer','shape','dtype','optimizer','method','epochs','grad_accum'})
-        check(type(cfg['recipe']) is str and cfg['recipe'] in capabilities['recipes'])
-        recipe=capabilities['recipes'][cfg['recipe']]
-        for key in ('tokenizer','shape','dtype','optimizer','method'):check(cfg[key]==recipe[key])
-        for key,limit in (('epochs',10),('grad_accum',8)):check(type(cfg[key]) is int and 1<=cfg[key]<=limit)
-        dataset=cfg['dataset'];check(type(dataset) is dict and set(dataset)=={'id','version','sha256','train_split','validation_split'})
-        registered=next((d for d in capabilities['datasets'] if d['id']==recipe['dataset']),None);check(registered is not None)
-        check(all(dataset[k]==registered[k] for k in ('id','version','sha256')) and registered['qc']['integrity']=='PASS')
-        check(dataset['train_split']=='train' and dataset['validation_split']=='validation' and capabilities['resources']=='unknown')
+        cfg=request['config']
+        head=cfg.get('recipe')=='clef_head_fp32_v1'
+        if head:
+            check(set(cfg)=={'recipe','package_id','package_sha256','dtype','optimizer','method','epochs','learning_rate'})
+            check(type(cfg['package_id']) is str and cfg['package_id'] in capabilities.get('clef_packages',{}))
+            check(cfg['package_sha256']==capabilities['clef_packages'][cfg['package_id']]['sha256'])
+            check(cfg['dtype']=='fp32' and cfg['optimizer']=='adamw' and cfg['method']=='head_only')
+            check(type(cfg['epochs']) is int and 1<=cfg['epochs']<=40)
+            check(type(cfg['learning_rate']) in (int,float) and math.isfinite(cfg['learning_rate']) and 0<cfg['learning_rate']<=.01)
+            check(capabilities['resources']=='unknown')
+        else:
+            check(set(cfg)=={'recipe','dataset','tokenizer','shape','dtype','optimizer','method','epochs','grad_accum'})
+            check(type(cfg['recipe']) is str and cfg['recipe'] in capabilities['recipes'])
+            recipe=capabilities['recipes'][cfg['recipe']]
+            for key in ('tokenizer','shape','dtype','optimizer','method'):check(cfg[key]==recipe[key])
+            for key,limit in (('epochs',10),('grad_accum',8)):check(type(cfg[key]) is int and 1<=cfg[key]<=limit)
+            dataset=cfg['dataset'];check(type(dataset) is dict and set(dataset)=={'id','version','sha256','train_split','validation_split'})
+            registered=next((d for d in capabilities['datasets'] if d['id']==recipe['dataset']),None);check(registered is not None)
+            check(all(dataset[k]==registered[k] for k in ('id','version','sha256')) and registered['qc']['integrity']=='PASS')
+            check(dataset['train_split']=='train' and dataset['validation_split']=='validation' and capabilities['resources']=='unknown')
         plan=reply['plan'];check(type(plan) is dict and set(plan)=={'schema','worker_boot_id','capabilities_sha256','cke_commit','workflow_sha256','config','submittable','execution'})
         check(plan['schema']=='cke.training.plan.v1' and plan['worker_boot_id']==request['worker_boot_id'] and plan['capabilities_sha256']==request['capabilities_sha256'])
-        check(plan['cke_commit']==capabilities['cke_commit'] and plan['workflow_sha256']==capabilities['runtime']['workflow_sha256'])
+        check(plan['cke_commit']==capabilities['cke_commit'] and plan['workflow_sha256']==(capabilities['recipes']['clef_head_fp32_v1']['executor_sha256'] if head else capabilities['runtime']['workflow_sha256']))
         check(plan['submittable'] is False and plan['execution']=='disabled' and plan['config']==request['config'])
         check(hexid(plan['cke_commit'],40) and hexid(plan['workflow_sha256'],64) and hexid(reply['plan_sha256'],64) and reply['plan_sha256']==sha(plan))
         check(reply['capabilities'] is None)
