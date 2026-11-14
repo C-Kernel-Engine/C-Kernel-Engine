@@ -8,12 +8,15 @@ def check(ok):
     if not ok:raise InvalidObservation('INVALID_OR_STALE_OBSERVATION')
 def hexid(x,n):return type(x) is str and re.fullmatch('[a-f0-9]{'+str(n)+'}',x) is not None
 
-def observe(value,*,worker_boot_id,owner,job_id,plan_sha256,experiment_id,draft_revision,last=None,allow_simulation=False):
+def observe(value,*,worker_boot_id,owner,job_id,plan_sha256,experiment_id,draft_revision=None,client_revision=None,last=None,allow_simulation=False):
     check(type(value) is dict and set(value)=={'job','worker_boot_id','observed_at','cancel_supported'})
     check(hexid(worker_boot_id,32) and value['worker_boot_id']==worker_boot_id and value['cancel_supported'] is False)
-    j=value['job'];check(type(j) is dict and set(j)=={'schema','job_id','owner','experiment_id','draft_revision','submitted_worker_boot_id','cke_commit','plan_sha256','status','stage','created_at','updated_at','error_code','artifacts','metrics','execution_kind','progress'})
-    check(j['schema']=='cke.training.job.v1' and hexid(job_id,32) and j['job_id']==job_id and hexid(plan_sha256,64) and j['plan_sha256']==plan_sha256)
-    check(type(owner) is str and bool(owner) and j['owner']==owner and j['experiment_id']==experiment_id and type(draft_revision) is int and j['draft_revision']==draft_revision)
+    j=value['job'];v2=client_revision is not None
+    check(type(j) is dict and set(j)-({'client_revision'} if v2 else set())=={'schema','job_id','owner','experiment_id','draft_revision','submitted_worker_boot_id','cke_commit','plan_sha256','status','stage','created_at','updated_at','error_code','artifacts','metrics','execution_kind','progress'})
+    check(j['schema']==('cke.training.job.v2' if v2 else 'cke.training.job.v1') and hexid(job_id,32) and j['job_id']==job_id and hexid(plan_sha256,64) and j['plan_sha256']==plan_sha256)
+    check(type(owner) is str and bool(owner) and j['owner']==owner and j['experiment_id']==experiment_id and j['draft_revision']==draft_revision)
+    if v2:check(draft_revision is None and hexid(client_revision,32) and j.get('client_revision')==client_revision)
+    else:check(type(draft_revision) is int and type(j['draft_revision']) is int)
     check(hexid(j['submitted_worker_boot_id'],32) and hexid(j['cke_commit'],40))
     for t in (value['observed_at'],j['created_at'],j['updated_at']):check(type(t) in (float,int) and math.isfinite(t) and t>0)
     check(j['created_at']<=j['updated_at']<=value['observed_at'])

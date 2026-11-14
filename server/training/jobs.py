@@ -10,6 +10,7 @@ import hashlib
 import json
 import math
 import os
+import re
 from pathlib import Path
 import signal
 import sqlite3
@@ -71,8 +72,10 @@ class Jobs:
                     execution='opt_in_registered_native' if self.backend.clef_packages else 'opt_in_local_svg',executable_recipes=['svg_tiny_v8']+(['clef_head_fp32_v1'] if self.backend.clef_packages else []),operations=['discover','prepare','submit','observe','artifact'],cancel='unsupported',
                     limits=dict(active_jobs=1,queued_backlog=0,registered_jobs=32,plan_receipts=128,log_bytes=1048576,artifact_chunk_bytes=8192,wall_seconds=600),
                     authorization='trusted_local_caller; no network authentication',resources='disk_checked; one local slot; no global reservation')
-    def prepare(self,principal,config,experiment_id,draft_revision):
-        self._auth(principal);require(ident(experiment_id) and type(draft_revision) is int and draft_revision>=0,'INVALID_EXPERIMENT')
+    def prepare(self,principal,config,experiment_id,draft_revision=None,*,client_revision=None):
+        self._auth(principal);require(ident(experiment_id),'INVALID_EXPERIMENT')
+        if client_revision is None:require(type(draft_revision) is int and draft_revision>=0,'INVALID_EXPERIMENT')
+        else:require(draft_revision is None and type(client_revision) is str and re.fullmatch('[a-f0-9]{32}',client_revision),'INVALID_CLIENT_REVISION')
         require(type(config) is dict,'INVALID_CONFIGURATION')
         clef=config.get('recipe')=='clef_head_fp32_v1' and bool(self.backend.clef_packages)
         require(config.get('recipe')=='svg_tiny_v8' or clef,'UNSUPPORTED_RECIPE')
@@ -86,19 +89,21 @@ class Jobs:
                   executor='v8_generated_training_workflow',python_sha256=file_hash(Path(self.python)),seed=42,
                   optimizer=dict(lr=config['learning_rate'] if clef else .0003,beta1=.9,beta2=.999,eps=1e-4 if clef else 1e-8,weight_decay=.01),
                   submittable=True,expires_at=int(time.time())+600)
+        if client_revision is not None:plan.update(schema='cke.training.execution-plan.v2',client_revision=client_revision)
         h=digest(plan)
         with self.guard,self.db:
             require(self.db.execute('SELECT count(*) FROM plans').fetchone()[0]<128,'PLAN_LIMIT')
             self.db.execute('INSERT OR IGNORE INTO plans VALUES(?,?,?)',(h,principal,encode(plan).decode()))
         return dict(plan=plan,plan_sha256=h,submitted=False)
-    def submit(self,principal,plan_sha256,idempotency_key,*,start=True):
+    def submit(self,principal,plan_sha256,idempotency_key,*,start=True,client_revision=None):
         self._auth(principal);require(ident(idempotency_key),'INVALID_IDEMPOTENCY_KEY')
         with self.guard,self.db:
             row=self.db.execute('SELECT plan_hash,body FROM jobs WHERE owner=? AND idem=?',(principal,idempotency_key)).fetchone()
             if row:
-                require(row[0]==plan_sha256,'IDEMPOTENCY_CONFLICT');return self._observation(json.loads(row[1]))
+                require(row[0]==plan_sha256,'IDEMPOTENCY_CONFLICT');prior=json.loads(row[1])
+                require(prior.get('client_revision')==client_revision,'CLIENT_REVISION_MISMATCH');return self._observation(prior)
             row=self.db.execute('SELECT body FROM plans WHERE hash=? AND owner=?',(plan_sha256,principal)).fetchone()
-            require(row is not None,'UNKNOWN_PLAN');plan=json.loads(row[0]);require(digest(plan)==plan_sha256,'PLAN_CHANGED');self._recheck(plan)
+            require(row is not None,'UNKNOWN_PLAN');plan=json.loads(row[0]);require(digest(plan)==plan_sha256,'PLAN_CHANGED');require(plan.get('client_revision')==client_revision,'CLIENT_REVISION_MISMATCH');self._recheck(plan)
             require(self.db.execute('SELECT count(*) FROM jobs').fetchone()[0]<32,'JOB_LIMIT')
             active=any(json.loads(r[0])['status'] in ('queued','running','recovery_required') for r in self.db.execute('SELECT body FROM jobs'))
             require(not active,'BUSY');self._resources()
@@ -107,6 +112,7 @@ class Jobs:
                    submitted_worker_boot_id=self.backend.boot,cke_commit=plan['validation_plan']['cke_commit'],plan_sha256=plan_sha256,
                    status='queued',stage='admission',created_at=now,updated_at=now,error_code=None,artifacts=[],metrics=[],
                    execution_kind=self.execution_kind,progress=None)
+            if client_revision is not None:j.update(schema='cke.training.job.v2',client_revision=client_revision)
             self.db.execute('INSERT INTO jobs VALUES(?,?,?,?,?)',(job_id,principal,idempotency_key,plan_sha256,encode(j).decode()))
         if start:
             t=threading.Thread(target=self.run_job,args=(principal,job_id));self.threads.append(t);t.start()
@@ -240,6 +246,9 @@ class Jobs:
             return dict(artifact_id=artifact_id,sha256=a['sha256'],bytes=a['bytes'],offset=offset,next_offset=offset+len(data),eof=offset+len(data)==a['bytes'],base64=base64.b64encode(data).decode())
 
 def exchange(jobs,principal,q):
+    if type(q) is dict and q.get('schema')=='cke.training.jobs.v2':
+        from .jobs_v2 import exchange as exchange_v2
+        return exchange_v2(jobs,principal,q)
     require(type(q) is dict and q.get('schema')=='cke.training.jobs.v1' and ident(q.get('request_id')),'INVALID_REQUEST')
     operation=q.get('operation')
     fields={'discover':set(),'prepare':{'config','experiment_id','draft_revision'},'submit':{'plan_sha256','idempotency_key'},'observe':{'job_id'},'artifact':{'job_id','artifact_id','offset'}}
@@ -269,9 +278,9 @@ def main():
             try:
                 q=decode(raw);reply=exchange(jobs,a.principal,q)
             except Exception as exc:
-                reply=dict(schema='cke.training.jobs.v1',request_id=q.get('request_id') if type(q) is dict and ident(q.get('request_id')) else None,ok=False,result=None,error=str(exc) if isinstance(exc,JobError) else 'INVALID_REQUEST')
+                reply=dict(schema='cke.training.jobs.v2' if type(q) is dict and q.get('schema')=='cke.training.jobs.v2' else 'cke.training.jobs.v1',request_id=q.get('request_id') if type(q) is dict and ident(q.get('request_id')) else None,ok=False,result=None,error=str(exc) if isinstance(exc,JobError) else 'INVALID_REQUEST')
             body=encode(reply)
-            if len(body)>MAX_BYTES:body=encode(dict(schema='cke.training.jobs.v1',ok=False,error='RESPONSE_TOO_LARGE'))
+            if len(body)>MAX_BYTES:body=encode(dict(schema=reply['schema'],ok=False,error='RESPONSE_TOO_LARGE'))
             print(body.decode(),flush=True)
             if len(raw)>MAX_BYTES:return
     finally:jobs.close()

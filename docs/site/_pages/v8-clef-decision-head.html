@@ -8,6 +8,94 @@
 
 <p>Model topology lives in the circuit builders here. Kernels implement arithmetic; maps describe ABI, scratch and numerical contracts. Generic operation catalogue entries do not inspect the model name.</p>
 
+<section id="training-bridge-v2">
+<h2>Training bridge v2: opaque revisions and pinned worker identity</h2>
+<p><code>cke.training.jobs.v2</code> adds a bounded local contract for external application
+backends. It preserves the application's 32-character lowercase hexadecimal
+<code>client_revision</code> verbatim in the reviewed plan and durable job. It does not
+cast or hash that revision into an integer. Existing v1 integer-revision clients
+continue to use their unchanged contract. V2 plans/jobs carry a null legacy
+<code>draft_revision</code> and explicitly versioned schemas.</p>
+<p>This milestone is <strong>trusted local integration only</strong>. It opens no socket,
+adds no remote authentication, and does not reuse read-only control discovery for
+training execution. The principal comes from the trusted supervisor, never JSON.
+A future authenticated transport must bind a verified backend credential to the
+appropriate tenant/owner; a caller-selected owner or a tunnel is not authorization.</p>
+<h3>Lifecycle and freshness</h3>
+<ol>
+<li>Discover approved recipes and registered package IDs/hashes, geometry and split
+counts. Retain the returned <code>worker_boot_id</code> and
+<code>capabilities_sha256</code>. The latter hashes the complete v2 capability body,
+excluding its own digest. Hashes detect changed content; they do not authenticate a peer.</li>
+<li>Every non-discovery request includes both identities and the exact client revision.
+Preparation validates the configuration and persists a reviewable plan without
+executing training. The plan hash binds owner, configuration, revision, backend
+capabilities and expiration.</li>
+<li>Submit the reviewed <code>plan_sha256</code> with a stable owner-scoped
+<code>idempotency_key</code>. An uncertain timeout must retry the same plan/key/revision;
+it must not invent a new key. An exact duplicate returns the existing receipt.</li>
+<li>Observe and retrieve artifacts only for the authenticated supervisor's owner and
+matching revision. A different application draft must not publish an older job as current.
+The independent client rejects mismatched request hashes, boot/capability identities,
+revisions and corrupted artifact streams.</li>
+<li>After worker restart, discover its new boot identity before observing or retrying.
+An existing idempotency receipt can be recovered, but ambiguous interrupted jobs stay
+<code>recovery_required</code>; they are never automatically relaunched.</li>
+</ol>
+<p>Revisions are opaque, not ordered counters. CKE binds them to the submitted plan;
+the application remains responsible for tracking which draft is current. Unknown or
+unavailable capabilities remain unavailable. Missing metrics are absent, never fabricated
+as zero; clients should display them as unavailable. Cancellation remains unsupported.</p>
+<h3>Local setup and wire examples</h3>
+<p>Use the existing administrator package registry and private job store described below.
+The principal argument is supervisor configuration, not a field accepted from clients.
+The following command performs discovery only and contains no credentials:</p>
+<pre><code>printf '%s\n' '{"schema":"cke.training.jobs.v2","request_id":"discover-1","operation":"discover"}' | \
+  python -m server.training.jobs --store /private/jobs --principal demo \
+  --clef-registry /private/registry.json</code></pre>
+<p>A successful reply uses these fields (placeholders below are explanatory, not a
+valid pinned response):</p>
+<pre><code>{"schema":"cke.training.jobs.v2","request_id":"discover-1",
+ "request_sha256":"SHA256_OF_EXACT_REQUEST","worker_boot_id":"BOOT_HEX_32",
+ "capabilities_sha256":"CAPABILITIES_HEX_64","ok":true,"error":null,
+ "result":{"schema":"cke.training.jobs.v2","worker_boot_id":"BOOT_HEX_32",
+   "capabilities_sha256":"CAPABILITIES_HEX_64",
+   "operations":["discover","prepare","submit","observe","artifact"],
+   "cancel":"unsupported",
+   "transport":"trusted_local_only; remote authentication NOT_IMPLEMENTED"}}</code></pre>
+<p>The actual discovery result additionally contains the complete registered validation
+capabilities, execution scope, limits and authorization description. Never hash or pin
+this abbreviated example. Prepare with the actual returned identities:</p>
+<pre><code>{"schema":"cke.training.jobs.v2","request_id":"prepare-1","operation":"prepare",
+ "worker_boot_id":"BOOT_HEX_32","capabilities_sha256":"CAPABILITIES_HEX_64",
+ "client_revision":"00ffffffffffffffffffffffffffffff","experiment_id":"decision-demo",
+ "config":{"recipe":"clef_head_fp32_v1","package_id":"demo",
+   "package_sha256":"REGISTERED_PACKAGE_SHA256","dtype":"fp32","optimizer":"adamw",
+   "method":"head_only","epochs":2,"learning_rate":0.001}}</code></pre>
+<p>Submit requires <code>plan_sha256</code> and <code>idempotency_key</code>; observe requires
+<code>job_id</code>; artifact requires <code>job_id</code>, <code>artifact_id</code> and
+<code>offset</code>. All include schema, request ID, operation, boot/capability identities
+and client revision. Unknown fields, client paths, principals and shell commands reject.
+Artifacts retain the existing 8192-byte chunk limit and manifest SHA-256 verification;
+an application must retain the expected manifest and verify the entire resumed transfer.</p>
+<h3>Evidence and remaining agreement</h3>
+<p>Asset-free independent consumer tests cover no-execution preparation, exact revision
+preservation, duplicate/lost-reply recovery, restart, stale identities, cross-owner denial,
+wrong revisions and corrupt/truncated artifact responses. These tests simulate execution;
+they do not certify native arithmetic or the actual laptop application. The separate
+opt-in native Clef job test exercises opaque revisions through training and export.</p>
+<p>Before exposing a remote service, agree and test authenticated ZeroMQ peer/tenant
+mapping, server identity pinning, bounded messages and deadlines, disconnect/reconnect
+behavior and transport error envelopes. V2 local error handling remains the existing
+stdio rejection envelope. Do not advertise a production network endpoint or cancellation
+until those contracts exist. No backward kernels, optimizer math or compiler lowering
+change in this bridge milestone.</p>
+<pre><code>python -m unittest server.tests.test_training_bridge server.tests.test_training_jobs -v
+python scripts/nightly_runner.py --tests training_job_lifecycle --require-executed
+CKE_RUN_CLEF_JOB=1 python -m unittest \
+  tests.test_v8_clef_training_recipe.NativeRecipe.test_opaque_revision_native_job_and_export -v</code></pre>
+</section>
+
 <section id="registered-fp32-training">
 <h2>Registered FP32 Clef head training</h2>
 <p>This opt-in recipe trains the complete supported Clef head on <strong>supplied backbone
