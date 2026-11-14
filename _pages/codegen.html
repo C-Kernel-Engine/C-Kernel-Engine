@@ -468,6 +468,42 @@ rmsnorm_forward_llama_production(
     hand-maintained until the docs build regenerates them; treat them as a dated snapshot, not a live counter.
 </p>
 
+<section id="checked-native-bundles">
+<h2>Checked native bundles and speech sessions</h2>
+<p>The Qwen3-TTS pinned session uses
+<code>version/v8/scripts/compile_checked_bundle_v8.py</code> for ordinary IR
+construction, lowering, memory planning, code generation and compilation.
+Its circuit authoring owns model topology and weight geometry. Neural source
+files come from the resolved provider maps rather than a separate session list.</p>
+<p>Generic frame-loop and frame-to-codec control are explicitly declared support
+sources under <code>src/runtime</code>. The shared builder rejects support paths
+outside that directory and exports every declared native segment plus requested
+runtime functions. Qwen retains its GNU11, OpenMP and fast-contraction policy;
+other consumers retain their strict defaults. Generated C passes a separate
+ISO C11 syntax check with warnings as errors. Legacy provider warnings remain
+visible in <code>compiler-diagnostics.txt</code> rather than being suppressed
+with <code>-w</code>; they are not claimed fixed.</p>
+<p><code>build-identity.json</code> records the compiler command/version, selected
+provider and source hashes, IR/layout hashes, generated/library hashes, exports
+and build policy. Session metrics include its hash. Embedded runtime build
+identity remains explicitly <code>NOT_VERIFIED</code>.</p>
+<pre><code>OMP_NUM_THREADS=1 CK_NUM_THREADS=4 python -m unittest \
+  tests.test_v8_checked_bundle_policy \
+  tests.test_v8_checked_multi_entry \
+  tests.test_v8_qwen3_tts_loop_codec \
+  tests.test_v8_qwen3_tts_pinned_session \
+  tests.test_v8_clef_flash_complete_head \
+  tests.test_v8_clef_flash_head_ingress</code></pre>
+<p>The synthetic production-built runtime loop forces EOS after two frames,
+checks 128 valid samples and untouched padding, and matches the valid waveform
+exactly against a separately compiled codec. This is generated-execution
+evidence, not natural stopping or intelligible speech. Full-model tests require
+<code>CKE_QWEN3_TTS_MODEL_DIR</code>; missing assets remain <code>SKIP</code>.
+This cleanup does not recertify full-model parity, listening or performance,
+resolve Kokoro's connected waveform mismatch, or remove frontend and
+development-time conversion dependencies.</p>
+</section>
+
 <h2 id="legacy-v7-appendix">Appendix: Legacy v7 Codegen (Training Lane)</h2>
 
 <div class="alert alert-warning">

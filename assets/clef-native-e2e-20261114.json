@@ -495,5 +495,11 @@
       "LinearAttentionLayer recurrent cache allocated FP32 instead of released BF16. Diagnostic only; not unmodified released execution."
     ]
   },
-  "state_diagnosis_scope": "The released incremental cache stores BF16 whereas CKE declares FP32 state. Rounding the captured native first-step state to BF16 reproduces all 524288 reference values. A separately labelled FP32-cache reference diagnostic still fails connected parity; this isolates one cause, not all remaining divergence. No production state rounding or oracle substitution was added."
+  "state_diagnosis_scope": "The released incremental cache stores BF16 whereas CKE declares FP32 state. Rounding the captured native first-step state to BF16 reproduces all 524288 reference values. A separately labelled FP32-cache reference diagnostic still fails connected parity; this isolates one cause, not all remaining divergence. No production state rounding or oracle substitution was added.",
+  "composition_scope_correction": {
+    "scope": "native_components_with_host_handoff",
+    "generated_composition": "NOT_IMPLEMENTED",
+    "end_to_end_certification": "NOT_TESTED",
+    "note": "Historical component measurements remain unchanged. This evidence does not certify one composed generated backbone/head inference or training entry."
+  }
 }
