@@ -1031,6 +1031,28 @@
 
 <h1>Whisper: Tiny, Base and Large-v3</h1>
 
+<section id="large-v3-projection-m3n4">
+<h2>Projection follow-up: three rows by four columns</h2>
+<p>A bounded AVX2/FMA tile reuses weights across three rows and activations across four columns, preserving
+ascending eight-lane reductions and bias order. It applies only to worker ranges with at least twelve complete
+rows; short ranges retain the previous path. No packing, allocation, provider identity or model schedule changes.
+ARM, AVX-512 and non-FMA paths are unchanged.</p>
+<p>On P3, three alternating resident pairs on the same 20-second hinted recording reduced four-thread median
+inference from 20.82 to 19.79 seconds (4.9%), and eight-thread inference from 15.94 to 15.18 seconds (4.7%).
+Four-thread encoder time fell from 12.54 to 11.58 seconds; decode was 6.46 versus 6.57 seconds. Eight-thread
+encoder time was 9.14 versus 8.48 seconds, decode 5.17 versus 5.18 seconds. These shared-host measurements
+include variability and small slowdowns; they do not establish parity with Transformers performance.</p>
+<p>Every resident attempt retained identical encoder hashes and 74 generated tokens. A separate four-thread
+comparison preserved the complete encoder, two full-vocabulary logit trajectories, logical decoder state and
+reset/repeat bit-for-bit. The independent llama.cpp projection oracle passed 28 shapes at each of 1/4/8 threads.
+The existing nightly row-reuse suite now covers the selection boundary and a compiled corrupted-accumulator
+negative control. The full audio suite passed locally; final-head CI remains a separate gate.</p>
+<p><a href="assets/whisper-projection-m3n4-20261113.json">All timing attempts, hashes, shapes and limitations</a>.
+Production services remain unchanged. Earlier colocated Torch microbenchmarks were sensitive to wait policy:
+a fixed three-to-four-times short decoder projection deficit is not established. Native-versus-native results
+here avoid loading Torch in the timing process. No recognition-quality or new hardware certification is claimed.</p>
+</section>
+
 <section id="large-v3-attention-locality">
 <h2>Attention locality candidate: preserve arithmetic, reorder independent work</h2>
 <p>The next candidate processes a head's query rows before advancing to the next head. This keeps the head's
