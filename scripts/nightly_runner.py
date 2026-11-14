@@ -766,6 +766,11 @@ TEST_SUITES = {
         "TTS Kokoro Extent and Duration Expansion", "kernels",
         ROOT / "tests" / "test_v8_kokoro_shape_bounds.py",
     ),
+    "audio_istft_complex_window_checked": TestSuite(
+        "Audio Explicit-Window Cropped ISTFT and BF16 Fold Order", "inference",
+        ROOT / "tests" / "test_v8_audio_istft_complex_window.py",
+        timeout_sec=120,
+    ),
     "audio_linear_upsample_checked": TestSuite(
         "Audio Linear Half-Pixel Upsampling and Generated Binding", "inference",
         ROOT / "tests" / "test_v8_audio_linear_upsample.py",

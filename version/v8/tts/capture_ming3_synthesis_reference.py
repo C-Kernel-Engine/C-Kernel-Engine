@@ -79,6 +79,18 @@ def main():
         soundfile.write(str(args.output/'publisher.wav'),wav.float().numpy().reshape(-1),model.sample_rate)
         report.update(samples=wav.numel(),sample_rate=model.sample_rate,steps=len(steps),
             normal_stop=bool(steps and steps[-1]),status='PASS' if steps and steps[-1] else 'INCOMPLETE')
+        # Preserve actual spectral conversion and the BF16 window, not a
+        # recomputed FP32 approximation. These remain oracle-fed native inputs.
+        import numpy as np
+        head=torch.load(args.output/'vae_head_projection.pt',weights_only=True)['output']
+        magnitude,phase=head.transpose(1,2).chunk(2,dim=1)
+        magnitude=magnitude.exp().clamp(max=100)
+        spectrum=magnitude*(phase.cos()+1j*phase.sin())
+        np.savez(args.output/'waveform_operands.npz',
+            real=spectrum.real[0].T.contiguous().numpy(),
+            imag=spectrum.imag[0].T.contiguous().numpy(),
+            window=model.model.audio.decoder.head.istft.window.float().cpu().numpy(),
+            expected=wav.float().cpu().numpy().reshape(-1))
         report['outputs']={path.name:digest(path) for path in args.output.iterdir() if path.name!='report.json'}
     except Exception as exc:
         report.update(status='FAIL',error_type=type(exc).__name__,error=str(exc));save();raise

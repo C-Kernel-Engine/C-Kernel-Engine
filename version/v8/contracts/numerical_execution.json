@@ -3,6 +3,46 @@
   "schema_version": 1,
   "engine_contract_version": "8",
   "contracts": {
+    "audio_istft_complex_window_bf16_fold": {
+      "operator_family": "audio_istft_mag_phase",
+      "status": "observed",
+      "storage": {
+        "input": "fp32",
+        "weight": "none",
+        "output": "fp32"
+      },
+      "compute": {
+        "input": "fp32",
+        "weight": "none",
+        "accumulator": "fp64",
+        "contraction": "disabled",
+        "evaluation_order": "fp64_inverse_dft_recurrence_and_overlap_numerator_bf16_squared_window_and_reverse_frame_fold_denominator"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": [
+          "input_load",
+          "fft_projection",
+          "square_product",
+          "reduction_update",
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "composite",
+        "order": "stage_ordered",
+        "partial_accumulator": "fp64",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "serial",
+        "split_strategy": "serial",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Correctness baseline, O(frames*n_fft^2), not a fast FFT provider. Cartesian inputs preserve upstream phase/magnitude rounding; FP64 inverse recurrence and overlap numerator; BF16 square and each denominator sum in descending contributing-frame order; FP32 output. Explicit crop. Offline only."
+    },
     "audio_linear_half_pixel_fp32": {
       "operator_family": "audio_upsample_linear",
       "status": "observed",

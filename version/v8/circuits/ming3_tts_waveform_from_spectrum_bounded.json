@@ -1,0 +1,119 @@
+{
+  "version": 3,
+  "name": "ming3_tts_waveform_from_spectrum_bounded",
+  "family": "bounded_graph",
+  "checked_native_entry": true,
+  "contract": {
+    "runtime_invariants": {
+      "inference_only": true,
+      "complete_synthesis": false,
+      "oracle_spectrum_input": true,
+      "streaming": false,
+      "production_kernel_heap_allocation": false,
+      "source_revision": "a39b80660bdc5a4394d5e1d41af6dbfd9c443a54",
+      "checkpoint_revision": "7247f4c94a5b2e987404ed28a5cfec41b1a4ca61",
+      "frames": 4,
+      "n_fft": 3528,
+      "hop": 882
+    }
+  },
+  "activation_buffers": {
+    "real": {
+      "shape": [
+        4,
+        1765
+      ]
+    },
+    "imag": {
+      "shape": [
+        4,
+        1765
+      ]
+    },
+    "window": {
+      "shape": [
+        3528
+      ]
+    },
+    "output": {
+      "shape": [
+        3528
+      ]
+    }
+  },
+  "activation_bindings": {
+    "real": "real",
+    "imag": "imag",
+    "window": "window",
+    "output": "output"
+  },
+  "native_entry": {
+    "function": "ck_ming3_waveform_from_spectrum_bounded",
+    "params": [
+      {
+        "c_type": "uint8_t *",
+        "name": "arena"
+      },
+      {
+        "c_type": "size_t",
+        "name": "arena_bytes"
+      }
+    ],
+    "arena": {
+      "pointer": "arena",
+      "bytes": "arena_bytes"
+    }
+  },
+  "sequence": [
+    "waveform"
+  ],
+  "block_types": {
+    "waveform": {
+      "sequence": [
+        "header",
+        "body",
+        "footer"
+      ],
+      "header": [],
+      "body": {
+        "type": "dense",
+        "ops": [
+          {
+            "id": "inverse_transform",
+            "op": "audio_istft_complex_window_checked",
+            "kernel": "audio_istft_complex_window_bf16_envelope_f32_checked",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "real": "external:real",
+                "imag": "external:imag",
+                "window": "external:window"
+              },
+              "outputs": {
+                "output": "output"
+              }
+            },
+            "params": {
+              "F": 4,
+              "N_fft": 3528,
+              "O": 3528,
+              "Q": 15876,
+              "call_constants": {
+                "istft_spectral_elements": 7060,
+                "istft_window_elements": 3528,
+                "istft_frames": 4,
+                "istft_n_fft": 3528,
+                "istft_hop": 882,
+                "istft_left_crop": 1323,
+                "istft_right_crop": 1323,
+                "istft_output_elements": 3528,
+                "istft_scratch_elements": 15876
+              }
+            }
+          }
+        ]
+      },
+      "footer": []
+    }
+  }
+}

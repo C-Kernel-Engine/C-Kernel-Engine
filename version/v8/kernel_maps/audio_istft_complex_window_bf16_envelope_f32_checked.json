@@ -1,0 +1,289 @@
+{
+  "id": "audio_istft_complex_window_bf16_envelope_f32_checked",
+  "op": "audio_istft_complex_window_checked",
+  "operation_interface": "audio.istft.cartesian.explicit_window.crop.bf16_fold.fp32.v1",
+  "variant": "fp64_idft_recurrence_bf16_reverse_fold",
+  "selection": {
+    "status": "candidate",
+    "priority": 100,
+    "equivalence_group": "audio_istft_complex_window_bf16_envelope",
+    "phases": [
+      "prefill"
+    ]
+  },
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "real",
+      "dtype": "fp32",
+      "shape": [
+        "F",
+        "N_fft/2+1"
+      ],
+      "layout": "frame_bin_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "imag",
+      "dtype": "fp32",
+      "shape": [
+        "F",
+        "N_fft/2+1"
+      ],
+      "layout": "frame_bin_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "window",
+      "dtype": "fp32",
+      "shape": [
+        "N_fft"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "output",
+      "dtype": "fp32",
+      "shape": [
+        "O"
+      ],
+      "layout": "sample_contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "scratch": [
+    {
+      "name": "overlap_window",
+      "dtype": "fp64",
+      "shape": [
+        "Q"
+      ],
+      "size_bytes": "8 * Q",
+      "size_resolution": "required",
+      "lifetime": "kernel_call",
+      "alignment": 64,
+      "layout": "contiguous",
+      "access": "read_write",
+      "storage_class": "scratch",
+      "consumption": "required"
+    }
+  ],
+  "dims": [
+    "spectral_elements",
+    "window_elements",
+    "frames",
+    "n_fft",
+    "hop",
+    "left_crop",
+    "right_crop",
+    "output_elements",
+    "scratch_elements",
+    "Q",
+    "O"
+  ],
+  "constraints": {
+    "notes": "Even FFT 2..8192; nonzero frames; hop 1..n_fft; crop must leave positive output. Window inputs must be finite, exactly BF16 representable. Explicit plan yields scratch in FP64 elements; disjoint buffers and positive normalization required."
+  },
+  "impl": {
+    "function": "audio_istft_complex_window_bf16_envelope_f32_checked",
+    "c_declaration": "int audio_istft_complex_window_bf16_envelope_f32_checked(const float *real, const float *imag, size_t spectral_elements, const float *window, size_t window_elements, size_t frames, size_t n_fft, size_t hop, size_t left_crop, size_t right_crop, float *output, size_t output_elements, double *scratch, size_t scratch_elements);",
+    "sources": [
+      "src/kernels/audio_istft_complex_window_checked.c"
+    ]
+  },
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
+  "numerical_capabilities": [
+    {
+      "contract_id": "audio_istft_complex_window_bf16_fold",
+      "status": "observed",
+      "phases": [
+        "prefill"
+      ],
+      "function": "audio_istft_complex_window_bf16_envelope_f32_checked",
+      "explicit_selector": true,
+      "implementation": {
+        "isa_dispatch": "scalar",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": [
+            "serial"
+          ],
+          "dispatch": [
+            "inline"
+          ],
+          "reduction_order_effect": "contract_defined"
+        }
+      },
+      "arithmetic": {
+        "partial_accumulator": "fp64",
+        "merge_order": "none",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false,
+        "split_strategy": "serial"
+      }
+    }
+  ],
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "real",
+        "source": "activation:real",
+        "cast": "const float*",
+        "ports": [
+          "input:real"
+        ]
+      },
+      {
+        "name": "imag",
+        "source": "activation:imag",
+        "cast": "const float*",
+        "ports": [
+          "input:imag"
+        ]
+      },
+      {
+        "name": "spectral_elements",
+        "source": "runtime:istft_spectral_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "window",
+        "source": "activation:window",
+        "cast": "const float*",
+        "ports": [
+          "input:window"
+        ]
+      },
+      {
+        "name": "window_elements",
+        "source": "runtime:istft_window_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "frames",
+        "source": "runtime:istft_frames",
+        "value_type": "size_t"
+      },
+      {
+        "name": "n_fft",
+        "source": "runtime:istft_n_fft",
+        "value_type": "size_t"
+      },
+      {
+        "name": "hop",
+        "source": "runtime:istft_hop",
+        "value_type": "size_t"
+      },
+      {
+        "name": "left_crop",
+        "source": "runtime:istft_left_crop",
+        "value_type": "size_t"
+      },
+      {
+        "name": "right_crop",
+        "source": "runtime:istft_right_crop",
+        "value_type": "size_t"
+      },
+      {
+        "name": "output",
+        "source": "output:output",
+        "cast": "float*",
+        "ports": [
+          "output:output"
+        ]
+      },
+      {
+        "name": "output_elements",
+        "source": "runtime:istft_output_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "scratch",
+        "source": "scratch:overlap_window",
+        "cast": "double*"
+      },
+      {
+        "name": "scratch_elements",
+        "source": "runtime:istft_scratch_elements",
+        "value_type": "size_t"
+      }
+    ]
+  },
+  "call_constant_contract": {
+    "shape_symbols": {
+      "F": "istft_frames",
+      "N_fft": "istft_n_fft",
+      "O": "istft_output_elements",
+      "Q": "istft_scratch_elements"
+    },
+    "buffer_spans": [
+      {
+        "pointer": "real",
+        "elements": "istft_spectral_elements",
+        "rows": 1,
+        "width": "istft_spectral_elements",
+        "element_bytes": 4
+      },
+      {
+        "pointer": "imag",
+        "elements": "istft_spectral_elements",
+        "rows": 1,
+        "width": "istft_spectral_elements",
+        "element_bytes": 4
+      },
+      {
+        "pointer": "window",
+        "elements": "istft_window_elements",
+        "rows": 1,
+        "width": "istft_window_elements",
+        "element_bytes": 4
+      },
+      {
+        "pointer": "output",
+        "elements": "istft_output_elements",
+        "rows": 1,
+        "width": "istft_output_elements",
+        "element_bytes": 4
+      },
+      {
+        "pointer": "scratch",
+        "elements": "istft_scratch_elements",
+        "rows": 1,
+        "width": "istft_scratch_elements",
+        "element_bytes": 8
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "tests/test_v8_audio_istft_complex_window.py"
+    ],
+    "oracle": "Independent NumPy FP64 inverse FFT; publisher CPU fold BF16 square/store and descending-frame accumulation"
+  },
+  "notes": "Correctness baseline, O(frames*n_fft^2), not a fast FFT provider. Cartesian inputs preserve upstream phase/magnitude rounding; FP64 inverse recurrence and overlap numerator; BF16 square and each denominator sum in descending contributing-frame order; FP32 output. Explicit crop. Offline only."
+}
