@@ -770,6 +770,16 @@ TEST_SUITES = {
         "TTS Kokoro Extent and Duration Expansion", "kernels",
         ROOT / "tests" / "test_v8_kokoro_shape_bounds.py",
     ),
+    "tts_ming3_generated_dit_fp32": TestSuite(
+        "Ming3 Full Generated DiT FP32 Composition", "inference",
+        ROOT / "tests" / "test_v8_ming3_dit.py",
+        timeout_sec=120,
+    ),
+    "sinusoidal_rows_checked": TestSuite(
+        "Checked Native Sinusoidal Features", "inference",
+        ROOT / "tests" / "test_v8_sinusoidal_rows.py",
+        timeout_sec=120,
+    ),
     "tts_ming3_generated_dit_block_fp32": TestSuite(
         "Ming3 Nonzero Generated DiT Block FP32 Composition", "inference",
         ROOT / "tests" / "test_v8_ming3_dit_block.py",

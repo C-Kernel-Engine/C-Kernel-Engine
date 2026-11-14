@@ -121,6 +121,24 @@ python3 version/v8/tts/replay_ming3_dit_block.py \
 its original BF16 output and a separately labelled FP32 replay. Tests retain
 nonzero mathematical fixtures; real checkpoint data stays in private local
 artifacts. Missing artifacts are not a model-level pass.</p>
+<h2>Complete FP32 DiT component</h2>
+<p>The generated graph now connects timestep features, conditioning, history and
+latent projections, all eight DiT blocks, and the final projection. Checked native
+sinusoidal providers construct timestep and rotary features using explicit
+frequencies. Mathematical timestep constants are compiled artifacts; rotary
+frequencies come from the checkpoint. Neither table is an oracle-fed activation.</p>
+<p>Nonzero one-, two- and eight-layer fixtures compare against an independent
+composition. Direct kernel checks cover capacities, aliasing, nonfinite inputs,
+phase overflow and recovery. These tests are registered in nightly.</p>
+<p>The retained real-weight two-branch replay measured maximum errors 1.67e-6
+and 3.58e-6, with RMSE 4.80e-7 and 8.50e-7 against the publisher DiT recast to
+FP32. Native execution took approximately 0.109 seconds per branch in one
+component measurement, using a 415 MB arena. This is measured FP32 component
+evidence, not publisher BF16 certification or end-to-end synthesis performance.</p>
+<pre>python3 -m unittest tests.test_v8_ming3_dit tests.test_v8_sinusoidal_rows -v</pre>
+<p>The native sampler/RNG loop, backbone, aggregator and audio-decoder transformer
+remain separate integration gates. The existing reference-spectrum WAV does not
+become native text-to-speech merely because this DiT component executes.</p>
 <h2>Kernel and circuit work still required</h2>
 <table><thead><tr><th>Component</th><th>Reuse candidates</th><th>Remaining gate</th></tr></thead><tbody>
 <tr><td>Qwen2.5 backbone</td><td>Linear projections, RMSNorm, RoPE, attention, KV</td><td>Weight mapping, prompt embedding assembly and artifact-specific BF16 parity</td></tr>
