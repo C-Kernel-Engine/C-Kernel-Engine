@@ -28,12 +28,57 @@
 
 <div class="alert alert-warning"><strong>No full vision artifact is certified for the HTTP harness yet.</strong> Generated image paths run, but independent numerical, task-quality, and live-serving gates have not all passed on one pinned artifact. Unsupported bundles should continue rejecting image requests.</div>
 
+<section id="experimental-vision-http">
+<h2>Experimental Qwen3-VL image HTTP adapter</h2>
+<p>The separate <code>server.vision_http</code> service connects uploaded PNG/JPEG bytes to the
+existing generated encoder and visual native-session entry. Ordinary text serving remains unchanged.
+It binds only to loopback. Its supported surface is <code>/v1/chat/completions</code>, streamed or
+non-streamed, with exactly one image across the caller-supplied conversation. Tools, PDFs, remote
+image fetching and additional images are explicitly unsupported. A PDF must first be rendered into
+page images by the client; this first endpoint handles one page per request.</p>
+<p>One request owns admission before upload starts; other requests receive 429. Uploads are bounded
+at 12 MiB and 30 seconds, image bytes at 8 MiB, decoded pixels at 16 million, text at 64 KiB and
+output at 1,024 tokens, further restricted by the generated context capacity. Each request uses a
+fresh subprocess with a 32 GiB address-space limit. This is not resident serving or batching.
+Cancellation kills and reaps that worker before releasing admission. A streaming response supplies
+<code>X-Request-ID</code>; cancel it with <code>DELETE /v1/requests/{id}</code>. Closing the client
+connection also cancels work. Healthy native execution has no automatic inference deadline.</p>
+<p>Pin operator-owned generated artifacts before launch. The decoder directory needs
+<code>libmodel.so</code>, its packaged engine/tokenizer, weights, layouts and imported publisher
+<code>chat_template.jinja</code>. The profile hashes these inputs, the GGUF tokenizer source and the
+native session library. Artifact changes require explicit re-pinning; rebuilding a bundle does not
+silently upgrade the running profile.</p>
+<pre><code>make ck-session-v8
+python -m server.vision_bundle --encoder /path/to/encoder --decoder /path/to/decoder \
+  --tokenizer-gguf /path/to/model.gguf --model cke-qwen3-vl-experimental \
+  --image-placeholder '&lt;|image_pad|&gt;' --output /path/to/profile.json
+OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 python -m server.vision_http \
+  --profile /path/to/profile.json --threads 4 --port 8120
+curl http://127.0.0.1:8120/v1/capabilities
+python scripts/vision_http_client.py --model cke-qwen3-vl-experimental \
+  --image ./example.png --prompt 'Describe the image.' --max-tokens 4 --stream</code></pre>
+<p>The client example uses only Python's standard library and can be copied to another machine.
+Connect through SSH forwarding for remote use. No unauthenticated remote listener is provided.
+Capabilities describe preflight validation, not full numerical certification. Startup loads and frees
+both native models; workers verify pinned artifacts again for every request.</p>
+<p>The November 14 P3 smoke test uses a generated 56-by-56 two-color fixture, four visual rows,
+20 prompt rows and only 256 tokens of compiled capacity. Both response modes produced the same
+four tokens and first full-vocabulary logit hash as retained standalone execution. This is a budget-
+truncated output, not an answer-quality or normal-EOS pass. Rejection, busy admission, cancellation
+and follow-up recovery were exercised separately. Cold request cost includes hashing and loading;
+these timings must not be presented as warm resident performance. See the
+<a href="assets/vision-http-20261114.json">retained scope and evidence</a>.</p>
+<p>Next gates: larger pinned context and image geometry, complete answers, repeated image/follow-up
+trajectories, disconnect stress, then a real harness task. Independent encoder accuracy remains a
+separate open gate. Stop this isolated service to roll back; it does not replace text or speech services.</p>
+</section>
+
 <section id="native-visual-session">
 <h2>Native visual session: first connected decoder boundary</h2>
 <p>The next experimental step adds <code>ck_session_v8_generate_visual</code> and
 <code>SessionV8.generate_visual</code>. One already-encoded visual block sits between exact rendered token
 segments. The existing generation lock, decoder loop, token callbacks, cancellation flag and failure reset
-remain the execution owner. This is not yet an HTTP image route or resident encoder service.</p>
+remain the execution owner. That native change alone did not add HTTP serving; the experimental adapter above now connects it. It is not a resident encoder service.</p>
 <p>The generated decoder exports its exact visual-row width, including any deep-stack slices. Older bundles
 without that contract reject this entry. Native admission checks token IDs, finite visual values, buffer
 extent, grid geometry, explicit text position, sampling parameters and both requested and loaded context
@@ -55,11 +100,8 @@ The opt-in replay command consumes an existing bridge report and its exact prefi
 <p>The probe writes INCOMPLETE before starting and FAIL on missing inputs or an execution error. It verifies
 actually loaded library hashes. Synthetic compiled tests separately exercise A/B/A, failed prefill, invalid
 admission without mutation, cancellation, close ownership and successful follow-up. They are not model
-arithmetic certification. Both tests and the artifact replay remain distinct from the pending HTTP tests.</p>
-<p>Next: bind one encoder/preprocessing artifact to this session entry, enforce upload/concurrency and
-visual-token budgets, then certify the HTTP result, streaming and cancellation. Only afterward advertise
-experimental image capability and connect a real harness. Current live image admission stays closed;
-existing text and speech services are unchanged.</p>
+arithmetic certification. These native tests remain separate from the HTTP smoke evidence above.</p>
+<p>The experimental HTTP adapter above connects this boundary for one pinned bundle. Larger-context task acceptance and image-plus-tool continuation remain open. Ordinary text and speech services are unchanged.</p>
 </section>
 
 <section id="serving-integration">
@@ -106,7 +148,7 @@ insufficient. PDF rasterization and its page/pixel limits belong to a separate f
   <td><span class="vision-status-label pending">Historical scoped PASS</span><small>Shared-prefix decoder campaigns passed under older artifacts and oracle settings. Current independent-prefix certification is open. <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/pull/506">#506</a></small></td>
   <td><span class="vision-status-label none">NOT TESTED</span><small>No complete independent PyTorch encoder-to-decoder verdict recorded here.</small></td>
   <td><span class="vision-status-label pending">NOT CERTIFIED</span><small>Current independent image-to-answer and broader quality gates remain open.</small></td>
-  <td><span class="vision-status-label none">NOT CONNECTED</span><small>Image upload and tool continuation are not promoted. <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/issues/894">#894</a></small></td>
+  <td><span class="vision-status-label pending">EXPERIMENTAL HTTP</span><small>Tiny pinned upload smoke passed; full harness and tool continuation are not promoted. <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/issues/894">#894</a></small></td>
   <td>Late visual-prefix row outlier; its first causal layer is unresolved. <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/issues/893">Track</a></td>
 </tr>
 <tr>
