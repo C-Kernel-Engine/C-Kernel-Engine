@@ -2,7 +2,7 @@
 import argparse
 import anyio
 import asyncio
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, aclosing
 import json
 from pathlib import Path
 import signal
@@ -73,9 +73,11 @@ class Worker:
         if self.cancelled: raise RuntimeError("request cancelled")
         data=json.dumps(payload,ensure_ascii=False).encode()
         if len(data)>256*1024: raise ValueError('worker input too large')
+        launch=None
         try:
-            self.process=await asyncio.create_subprocess_exec(*self.command,stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.DEVNULL,start_new_session=True,limit=128*1024)
+            launch=asyncio.create_task(asyncio.create_subprocess_exec(*self.command,stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.DEVNULL,start_new_session=True,limit=128*1024))
+            self.process=await asyncio.shield(launch)
             if self.cancelled: raise RuntimeError("request cancelled")
             self.process.stdin.write(data);await self.process.stdin.drain();self.process.stdin.close()
             terminal=None;event_bytes=0
@@ -95,10 +97,31 @@ class Worker:
             raise RuntimeError("vision worker protocol failed") from error
         finally:
             with anyio.CancelScope(shield=True):
+                if launch is not None and self.process is None:
+                    # Retain ownership even when cancellation races process creation.
+                    try: self.process=await launch
+                    except Exception: pass
                 await self.stop();self.process=None
 
 
-def create_app(profile, *, threads=4, memory=32<<30, command=None):
+class OwnedStreamingResponse(StreamingResponse):
+    """Keep admission owned even if transport fails before iteration starts."""
+    def __init__(self, content, cleanup, **kwargs):
+        super().__init__(content, **kwargs)
+        self.cleanup = cleanup
+
+    async def __call__(self, scope, receive, send):
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            with anyio.CancelScope(shield=True):
+                try:
+                    await self.body_iterator.aclose()
+                finally:
+                    await self.cleanup()
+
+
+def create_app(profile, *, threads=4, memory=32<<30, command=None, verify_reference=False):
     from server.vision_bundle import load
     pinned=load(profile)
     worker=Worker(profile,threads,memory,command)
@@ -110,6 +133,7 @@ def create_app(profile, *, threads=4, memory=32<<30, command=None):
                 if event['type']=='complete':
                     readiness.update(event)
                     readiness['server_instance_id']=uuid.uuid4().hex
+                    readiness['reference_replay']=verify_reference
                 elif event['type']=='error': raise RuntimeError('vision preflight failed')
         if not readiness: raise RuntimeError('missing preflight result')
         try:
@@ -153,14 +177,15 @@ def create_app(profile, *, threads=4, memory=32<<30, command=None):
             directory=tempfile.TemporaryDirectory(prefix='cke-vision-')
             path=Path(directory.name)/('image.png' if image.mime_type=='image/png' else 'image.jpg')
             path.write_bytes(image.data)
-            payload={'messages':messages,'image_path':str(path),'max_tokens':budget}
+            payload={'messages':messages,'image_path':str(path),'max_tokens':budget,'verify_reference':verify_reference}
             def completion(text,event):
                 return {'id':rid,'object':'chat.completion','model':pinned['model'],
                     'choices':[{'index':0,'message':{'role':'assistant','content':text},'finish_reason':event['finish_reason']}],
                     'usage':event['usage'],'cke_evidence':event.get('evidence')}
             async def stream():
+                events=worker.events(payload)
                 try:
-                    async for event in worker.events(payload):
+                    async for event in events:
                         if event['type']=='stage':yield ': native stage\n\n';continue
                         if event['type']=='delta':value={'id':rid,'object':'chat.completion.chunk','model':pinned['model'],'choices':[{'index':0,'delta':{'content':event['text']},'finish_reason':None}]}
                         elif event['type']=='complete':value={'id':rid,'object':'chat.completion.chunk','choices':[{'index':0,'delta':{},'finish_reason':event['finish_reason']}],'usage':event['usage'],'cke_evidence':event.get('evidence')}
@@ -169,16 +194,19 @@ def create_app(profile, *, threads=4, memory=32<<30, command=None):
                     yield 'data: [DONE]\n\n'
                 except Exception:
                     yield 'data: {"error":{"code":"worker_failed"}}\n\n'
-                finally:await release()
+                finally:
+                    with anyio.CancelScope(shield=True):
+                        await events.aclose()
             if body.get('stream',False):
                 transferred=True
-                return StreamingResponse(stream(),media_type='text/event-stream',headers={'X-Request-ID':rid})
+                return OwnedStreamingResponse(stream(),release,media_type='text/event-stream',headers={'X-Request-ID':rid})
             async def collect():
                 text=''
-                async for event in worker.events(payload):
-                    if event['type']=='delta':text+=event['text']
-                    elif event['type']=='error':return error(event['code'],event['message'],400 if event['code']=='context_length_exceeded' else 500)
-                    elif event['type']=='complete':return JSONResponse(completion(text,event),headers={'X-Request-ID':rid})
+                async with aclosing(worker.events(payload)) as events:
+                    async for event in events:
+                        if event['type']=='delta':text+=event['text']
+                        elif event['type']=='error':return error(event['code'],event['message'],400 if event['code']=='context_length_exceeded' else 500)
+                        elif event['type']=='complete':return JSONResponse(completion(text,event),headers={'X-Request-ID':rid})
             task=asyncio.create_task(collect())
             try:
                 while not task.done():
@@ -202,9 +230,10 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--profile',required=True);parser.add_argument('--port',type=int,default=8120)
     parser.add_argument('--threads',type=int,default=4)
+    parser.add_argument('--verify-reference',action='store_true',help='Replay direct generated prefill and require exact initial logits; adds work')
     args=parser.parse_args()
     if args.threads<1:parser.error('threads must be positive')
     import uvicorn
-    uvicorn.run(create_app(args.profile,threads=args.threads),host='127.0.0.1',port=args.port)
+    uvicorn.run(create_app(args.profile,threads=args.threads,verify_reference=args.verify_reference),host='127.0.0.1',port=args.port,timeout_graceful_shutdown=5)
 
 if __name__=='__main__':main()
