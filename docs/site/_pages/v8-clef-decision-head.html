@@ -6,6 +6,31 @@
 
 <h1>Clef-Flash decision-head bring-up</h1>
 
+<section id="map-owned-training-bindings">
+<h2>Map-owned projection and addition differentiation</h2>
+<p>FP32 checked row projections (with or without bias) and row addition declare
+<code>training_contract.differentiation</code> in their kernel maps. The shared
+circuit adapter resolves the operation interface, ready gradient rule, saved
+operand ports and dimension aliases from that declaration. A provider name or
+prefix no longer establishes training support for these operations.</p>
+<p>The bounded <code>cke.training.direct-vjp.v1</code> contract reuses the same
+forward provider and existing operand tensors. It validates FP32 ports, saved
+operands and positive bounded dimensions before backward generation. It does not
+introduce a new derivative executor or an expression language. Cached-forward
+rewrites and other operation groups still use explicit translation rules; this
+is not arbitrary-circuit differentiation or BF16 adapter certification.</p>
+<p>Generated nonzero projection compositions, complete supplied-feature head
+training and mixed-projection regressions retain independent PyTorch checks.
+Unavailable pinned assets remain SKIP. Connected backbone/head numerical
+acceptance remains separate and unresolved.</p>
+<p>A released-size Ryzen replay compares all 121,762,820 gradient elements and
+123 exported tensors exactly with the retained baseline. A relocated C-only host
+reproduces its update. This is one supplied-feature head update, not a fresh
+backbone oracle run; the prior connected score FAIL remains visible in the
+<a href="assets/clef-map-training-bindings-20261114.json">identity-bound evidence</a>.</p>
+<pre>python -m pytest -q tests/test_v8_map_training_binding.py tests/test_v8_circuit_training_lowering.py tests/test_v8_clef_evaluation.py tests/test_v8_clef_full_training.py tests/test_v8_clef_mixed_training.py</pre>
+</section>
+
 <section id="training-audit-followup">
 <h2>Composition and training audit follow-up</h2>
 <p>The composition gate now requires the declared consumer operation to contribute to the

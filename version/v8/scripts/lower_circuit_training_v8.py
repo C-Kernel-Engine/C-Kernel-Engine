@@ -2,7 +2,8 @@
 
 This is operation-level lowering, independent of model names and topology.
 Unsupported providers fail closed. Existing gradient rules own derivatives;
-this adapter still supplies provider-specific ABI/save bindings explicitly.
+direct FP32 projections/additions declare ABI/save bindings in their maps.
+Other operation groups retain explicit bounded translation rules.
 """
 
 from copy import deepcopy
@@ -21,6 +22,12 @@ def lower_circuit_training(
     `inputs` describes runtime inputs; `bindings` maps circuit external names to
     those inputs or frozen weights. Neither supplies model arithmetic.
     """
+    from version.v8.scripts.map_training_binding_v8 import resolve_training_binding
+
+    provider_maps = {m["id"]: m for m in training_registry()["kernels"]}
+    gradient_rules = json.loads(
+        (ROOT / "version/v8/scripts/grad_rules_v8.json").read_text()
+    )["rules"]
     activation_dtypes = activation_dtypes or {}
     frozen = set(frozen)
     if frozen - set(weights):
@@ -113,7 +120,7 @@ def lower_circuit_training(
             weights=ws or {},
             params=dict(params or {}, call_constants=constants),
             dataflow=dict(inputs=inputs, outputs=outputs),
-            save_for_backward=saved or inputs,
+            save_for_backward=saved if saved is not None else inputs,
         )
         if rule:
             o["grad_rule"] = rule
@@ -162,24 +169,24 @@ def lower_circuit_training(
                 o = emit(name, kernel, inputs, out, c)
                 o["dataflow"]["outputs"] = {k: act(v) for k, v in outnames.items()}
                 continue
-            if kernel.startswith("linear_rows_checked"):
-                rows = c["linear_rows"]
-                ic = c["linear_input_channels"]
-                oc = c["linear_output_channels"]
-                c.update(T=rows, aligned_in=ic, aligned_out=oc, num_threads=1)
+            if kernel not in provider_maps:
+                raise ValueError("unsupported circuit training provider: " + kernel)
+            binding = resolve_training_binding(
+                provider_maps[kernel],
+                gradient_rules,
+                inputs=inputs,
+                weights=ws,
+                output=out,
+                constants=c,
+            )
+            if binding is not None:
+                if set(outnames) != {
+                    port["name"] for port in provider_maps[kernel].get("outputs", [])
+                }:
+                    raise ValueError("training output ports disagree with provider")
+                rule, bound_constants, saved = binding
                 emit(
-                    name,
-                    kernel,
-                    inputs,
-                    out,
-                    c,
-                    (
-                        "linear_rows_train_backward"
-                        if "bias" in ws
-                        else "linear_rows_train_backward_nobias"
-                    ),
-                    ws=ws,
-                    saved=dict(input=inputs["input"], weight=ws["weight"]),
+                    name, kernel, inputs, out, bound_constants, rule, ws=ws, saved=saved
                 )
                 continue
             if kernel == "layernorm_rows_checked_param_epsilon_f32":
@@ -443,9 +450,6 @@ def lower_circuit_training(
                     "scale_vector_checked_backward",
                     scratch=rows + 1,
                 )
-                continue
-            if kernel == "add_rows_checked_f32":
-                emit(name, kernel, inputs, out, c, "add_rows_checked_backward")
                 continue
             raise ValueError("unsupported circuit training provider: " + kernel)
     return dict(

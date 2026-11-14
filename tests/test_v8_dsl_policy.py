@@ -41,7 +41,8 @@ class V8DSLPolicyTests(unittest.TestCase):
             self.assertTrue(audit.scan_source(
                 source, ["lower"], policy["forbidden_model_literals"], path="synthetic.py"))
         for name in ("lower_circuit_training_v8.py", "compile_checked_bundle_v8.py",
-                     "generated_composition_contract_v8.py", "codegen_checked_calls_v8.py"):
+                     "generated_composition_contract_v8.py", "codegen_checked_calls_v8.py",
+                     "map_training_binding_v8.py"):
             key = "version/v8/scripts/" + name
             self.assertIn(key, policy["compiler_files"])
             self.assertEqual(policy["model_literal_site_limits"][key], 0)
