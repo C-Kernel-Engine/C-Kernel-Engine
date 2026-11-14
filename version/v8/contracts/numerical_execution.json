@@ -4132,13 +4132,13 @@
         "merge_order": "none"
       },
       "threading": {
-        "work_partition": "serial",
-        "split_strategy": "serial",
+        "work_partition": "output_tiles",
+        "split_strategy": "independent_outputs",
         "deterministic": true,
         "thread_count_changes_arithmetic_order": false
       },
       "position_transform": null,
-      "description": "llama.cpp CPU GELU semantics: round FP32 input to FP16, index the GGML FP16 GELU table, then widen the FP16 result to FP32."
+      "description": "llama.cpp CPU GELU semantics: round FP32 input to FP16, index the GGML FP16 GELU table, then widen the FP16 result to FP32. Independent elements may execute in parallel; no reduction or per-element rounding changes."
     },
     "fp16_weight_fp16_input_llamafile_x86_native_fp32_output": {
       "operator_family": "gemm",

@@ -802,7 +802,7 @@ void gelu_ggml_native_inplace(float *data, size_t n)
     }
 }
 
-void gelu_ggml_inplace(float *data, size_t n)
+static void gelu_ggml_serial(float *data, size_t n)
 {
     pthread_once(&ck_gelu_ggml_runtime_once, ck_gelu_ggml_runtime_init);
     if (ck_gelu_runtime_ready) {
@@ -838,6 +838,42 @@ void gelu_ggml_inplace(float *data, size_t n)
         const ck_half y_fp16 = ck_gelu_ggml_table_f16[(uint16_t) x_fp16];
         data[i] = ggml_fp16_to_fp32(y_fp16);
     }
+}
+
+typedef struct {
+    float *data;
+    size_t n;
+} ck_gelu_ggml_work_t;
+
+static void ck_gelu_ggml_work(int ith, int nth, void *opaque)
+{
+    ck_gelu_ggml_work_t *work = (ck_gelu_ggml_work_t *)opaque;
+    const size_t width = work->n / (size_t)nth;
+    const size_t remainder = work->n % (size_t)nth;
+    const size_t begin = (size_t)ith * width +
+        ((size_t)ith < remainder ? (size_t)ith : remainder);
+    const size_t count = width + ((size_t)ith < remainder ? 1u : 0u);
+    gelu_ggml_serial(work->data + begin, count);
+}
+
+void gelu_ggml_inplace(float *data, size_t n)
+{
+    const size_t grain = 32768u;
+    if (!data || n == 0) return;
+    ck_threadpool_t *pool = ck_threadpool_global();
+    int active = pool ? ck_threadpool_n_threads(pool) : 1;
+    if (!pool || active <= 1 || n < 2u * grain || ck_threadpool_in_dispatch(pool)) {
+        gelu_ggml_serial(data, n);
+        return;
+    }
+    const size_t useful = n / grain + (n % grain != 0);
+    if ((size_t)active > useful) active = (int)useful;
+    /* Initialize shared immutable tables before workers consume them. */
+    pthread_once(&ck_gelu_ggml_runtime_once, ck_gelu_ggml_runtime_init);
+    if (!ck_gelu_runtime_ready)
+        pthread_once(&ck_gelu_ggml_table_once, ck_gelu_ggml_table_init);
+    ck_gelu_ggml_work_t work = {.data = data, .n = n};
+    ck_threadpool_dispatch_n(pool, active, ck_gelu_ggml_work, &work);
 }
 
 // Scalar-only exact GELU backward using standard library tanhf.

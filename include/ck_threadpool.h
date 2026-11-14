@@ -247,6 +247,9 @@ int ck_threadpool_capacity(const ck_threadpool_t *pool);
  */
 int ck_threadpool_thread_id(const ck_threadpool_t *pool);
 
+/** True inside a callback on this pool, including its calling-thread slot 0. */
+int ck_threadpool_in_dispatch(const ck_threadpool_t *pool);
+
 /** Enable profiling and reset cumulative dispatch timing counters. */
 void ck_threadpool_profile_reset(ck_threadpool_t *pool);
 
