@@ -976,7 +976,7 @@ $(document).ready(function(){initNavTree('gelu__kernels_8c_source.html',''); ini
 </div>
 <div class="line"><a id="l00804" name="l00804"></a><span class="lineno">  804</span> </div>
 <div class="foldopen" id="foldopen00805" data-start="{" data-end="}">
-<div class="line"><a id="l00805" name="l00805"></a><span class="lineno"><a class="line" href="ckernel__engine_8h.html#a2f0b0fab254b6af615754ac2eaf84ddb">  805</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="gelu__kernels_8c.html#a2f0b0fab254b6af615754ac2eaf84ddb">gelu_ggml_inplace</a>(<span class="keywordtype">float</span> *data, <span class="keywordtype">size_t</span> n)</div>
+<div class="line"><a id="l00805" name="l00805"></a><span class="lineno"><a class="line" href="gelu__kernels_8c.html#a3b67585bb4e0da8bb2795e403279e602">  805</a></span><span class="keyword">static</span> <span class="keywordtype">void</span> <a class="code hl_function" href="gelu__kernels_8c.html#a3b67585bb4e0da8bb2795e403279e602">gelu_ggml_serial</a>(<span class="keywordtype">float</span> *data, <span class="keywordtype">size_t</span> n)</div>
 <div class="line"><a id="l00806" name="l00806"></a><span class="lineno">  806</span>{</div>
 <div class="line"><a id="l00807" name="l00807"></a><span class="lineno">  807</span>    pthread_once(&amp;<a class="code hl_variable" href="gelu__kernels_8c.html#adca08cfc740df10ac2ef0f0c895f50b8">ck_gelu_ggml_runtime_once</a>, <a class="code hl_function" href="gelu__kernels_8c.html#a0bc5158b1cda49eb5176af325bb07bc2">ck_gelu_ggml_runtime_init</a>);</div>
 <div class="line"><a id="l00808" name="l00808"></a><span class="lineno">  808</span>    <span class="keywordflow">if</span> (<a class="code hl_variable" href="gelu__kernels_8c.html#a363cbee84a1de5954c8bcd09cc2c5683">ck_gelu_runtime_ready</a>) {</div>
@@ -1015,159 +1015,199 @@ $(document).ready(function(){initNavTree('gelu__kernels_8c_source.html',''); ini
 <div class="line"><a id="l00841" name="l00841"></a><span class="lineno">  841</span>}</div>
 </div>
 <div class="line"><a id="l00842" name="l00842"></a><span class="lineno">  842</span> </div>
-<div class="line"><a id="l00843" name="l00843"></a><span class="lineno">  843</span><span class="comment">// Scalar-only exact GELU backward using standard library tanhf.</span></div>
-<div class="line"><a id="l00844" name="l00844"></a><span class="lineno">  844</span><span class="comment">// This is slower than gelu_backward_exact but provides maximum accuracy.</span></div>
-<div class="line"><a id="l00845" name="l00845"></a><span class="lineno">  845</span><span class="comment">// Used by BF16 wrapper where conversion overhead dominates anyway.</span></div>
-<div class="foldopen" id="foldopen00846" data-start="{" data-end="}">
-<div class="line"><a id="l00846" name="l00846"></a><span class="lineno"><a class="line" href="ckernel__engine_8h.html#ac4d3711dee095194f24437af73ad1763">  846</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="gelu__kernels_8c.html#ac4d3711dee095194f24437af73ad1763">gelu_backward_scalar</a>(<span class="keyword">const</span> <span class="keywordtype">float</span> *input,</div>
-<div class="line"><a id="l00847" name="l00847"></a><span class="lineno">  847</span>                          <span class="keyword">const</span> <span class="keywordtype">float</span> *d_output,</div>
-<div class="line"><a id="l00848" name="l00848"></a><span class="lineno">  848</span>                          <span class="keywordtype">float</span> *d_input,</div>
-<div class="line"><a id="l00849" name="l00849"></a><span class="lineno">  849</span>                          <span class="keywordtype">size_t</span> n)</div>
-<div class="line"><a id="l00850" name="l00850"></a><span class="lineno">  850</span>{</div>
-<div class="line"><a id="l00851" name="l00851"></a><span class="lineno">  851</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> sqrt_2_over_pi = 0.7978845608f;</div>
-<div class="line"><a id="l00852" name="l00852"></a><span class="lineno">  852</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> coeff = 0.044715f;</div>
-<div class="line"><a id="l00853" name="l00853"></a><span class="lineno">  853</span> </div>
-<div class="line"><a id="l00854" name="l00854"></a><span class="lineno">  854</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; n; ++i) {</div>
-<div class="line"><a id="l00855" name="l00855"></a><span class="lineno">  855</span>        <span class="keywordtype">float</span> x = input[i];</div>
-<div class="line"><a id="l00856" name="l00856"></a><span class="lineno">  856</span>        <span class="keywordtype">float</span> x3 = x * x * x;</div>
-<div class="line"><a id="l00857" name="l00857"></a><span class="lineno">  857</span>        <span class="keywordtype">float</span> g = sqrt_2_over_pi * (x + coeff * x3);</div>
-<div class="line"><a id="l00858" name="l00858"></a><span class="lineno">  858</span>        <span class="keywordtype">float</span> tanh_g = tanhf(g);</div>
-<div class="line"><a id="l00859" name="l00859"></a><span class="lineno">  859</span>        <span class="keywordtype">float</span> x2 = x * x;</div>
-<div class="line"><a id="l00860" name="l00860"></a><span class="lineno">  860</span>        <span class="keywordtype">float</span> g_prime = sqrt_2_over_pi * (1.0f + 3.0f * coeff * x2);</div>
-<div class="line"><a id="l00861" name="l00861"></a><span class="lineno">  861</span>        <span class="keywordtype">float</span> sech2_g = 1.0f - tanh_g * tanh_g;</div>
-<div class="line"><a id="l00862" name="l00862"></a><span class="lineno">  862</span>        <span class="keywordtype">float</span> gelu_derivative = 0.5f * (1.0f + tanh_g) + 0.5f * x * sech2_g * g_prime;</div>
-<div class="line"><a id="l00863" name="l00863"></a><span class="lineno">  863</span>        d_input[i] = d_output[i] * gelu_derivative;</div>
-<div class="line"><a id="l00864" name="l00864"></a><span class="lineno">  864</span>    }</div>
-<div class="line"><a id="l00865" name="l00865"></a><span class="lineno">  865</span>}</div>
+<div class="line"><a id="l00843" name="l00843"></a><span class="lineno">  843</span><span class="keyword">typedef</span> <span class="keyword">struct </span>{</div>
+<div class="line"><a id="l00844" name="l00844"></a><span class="lineno">  844</span>    <span class="keywordtype">float</span> *data;</div>
+<div class="line"><a id="l00845" name="l00845"></a><span class="lineno">  845</span>    <span class="keywordtype">size_t</span> n;</div>
+<div class="line"><a id="l00846" name="l00846"></a><span class="lineno">  846</span>} ck_gelu_ggml_work_t;</div>
+<div class="line"><a id="l00847" name="l00847"></a><span class="lineno">  847</span> </div>
+<div class="foldopen" id="foldopen00848" data-start="{" data-end="}">
+<div class="line"><a id="l00848" name="l00848"></a><span class="lineno"><a class="line" href="gelu__kernels_8c.html#a2eb8015c611332e254c7e7167ed07c3f">  848</a></span><span class="keyword">static</span> <span class="keywordtype">void</span> <a class="code hl_function" href="gelu__kernels_8c.html#a2eb8015c611332e254c7e7167ed07c3f">ck_gelu_ggml_work</a>(<span class="keywordtype">int</span> ith, <span class="keywordtype">int</span> nth, <span class="keywordtype">void</span> *opaque)</div>
+<div class="line"><a id="l00849" name="l00849"></a><span class="lineno">  849</span>{</div>
+<div class="line"><a id="l00850" name="l00850"></a><span class="lineno">  850</span>    ck_gelu_ggml_work_t *work = (ck_gelu_ggml_work_t *)opaque;</div>
+<div class="line"><a id="l00851" name="l00851"></a><span class="lineno">  851</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> width = work-&gt;n / (size_t)nth;</div>
+<div class="line"><a id="l00852" name="l00852"></a><span class="lineno">  852</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> remainder = work-&gt;n % (size_t)nth;</div>
+<div class="line"><a id="l00853" name="l00853"></a><span class="lineno">  853</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> begin = (size_t)ith * width +</div>
+<div class="line"><a id="l00854" name="l00854"></a><span class="lineno">  854</span>        ((<span class="keywordtype">size_t</span>)ith &lt; remainder ? (size_t)ith : remainder);</div>
+<div class="line"><a id="l00855" name="l00855"></a><span class="lineno">  855</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> <a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a> = width + ((size_t)ith &lt; remainder ? 1u : 0u);</div>
+<div class="line"><a id="l00856" name="l00856"></a><span class="lineno">  856</span>    <a class="code hl_function" href="gelu__kernels_8c.html#a3b67585bb4e0da8bb2795e403279e602">gelu_ggml_serial</a>(work-&gt;data + begin, <a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a>);</div>
+<div class="line"><a id="l00857" name="l00857"></a><span class="lineno">  857</span>}</div>
 </div>
-<div class="line"><a id="l00866" name="l00866"></a><span class="lineno">  866</span> </div>
-<div class="line"><a id="l00867" name="l00867"></a><span class="lineno">  867</span><span class="comment">// Fast approximate GELU backward, adapted from C-Transformer&#39;s backward_gelu_fast.</span></div>
-<div class="line"><a id="l00868" name="l00868"></a><span class="lineno">  868</span><span class="comment">// Uses sigmoid approximation: GELU(x) ≈ x * sigmoid(1.702 * x)</span></div>
-<div class="line"><a id="l00869" name="l00869"></a><span class="lineno">  869</span><span class="comment">// Derivative: s * (1 + x * (1 - s) * 1.702) where s = sigmoid(1.702 * x)</span></div>
-<div class="foldopen" id="foldopen00870" data-start="{" data-end="}">
-<div class="line"><a id="l00870" name="l00870"></a><span class="lineno"><a class="line" href="ckernel__engine_8h.html#aeaf518a5239f4588f8c28b05b96d5478">  870</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="gelu__kernels_8c.html#aeaf518a5239f4588f8c28b05b96d5478">gelu_backward_fast</a>(<span class="keyword">const</span> <span class="keywordtype">float</span> *input,</div>
-<div class="line"><a id="l00871" name="l00871"></a><span class="lineno">  871</span>                        <span class="keyword">const</span> <span class="keywordtype">float</span> *d_output,</div>
-<div class="line"><a id="l00872" name="l00872"></a><span class="lineno">  872</span>                        <span class="keywordtype">float</span> *d_input,</div>
-<div class="line"><a id="l00873" name="l00873"></a><span class="lineno">  873</span>                        <span class="keywordtype">size_t</span> n)</div>
-<div class="line"><a id="l00874" name="l00874"></a><span class="lineno">  874</span>{</div>
-<div class="line"><a id="l00875" name="l00875"></a><span class="lineno">  875</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> beta = 1.702f;</div>
-<div class="line"><a id="l00876" name="l00876"></a><span class="lineno">  876</span> </div>
-<div class="line"><a id="l00877" name="l00877"></a><span class="lineno">  877</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
-<div class="line"><a id="l00878" name="l00878"></a><span class="lineno">  878</span>    <span class="keyword">const</span> __m512 beta_vec = _mm512_set1_ps(beta);</div>
-<div class="line"><a id="l00879" name="l00879"></a><span class="lineno">  879</span>    <span class="keyword">const</span> __m512 one_vec = _mm512_set1_ps(1.0f);</div>
-<div class="line"><a id="l00880" name="l00880"></a><span class="lineno">  880</span>    <span class="keyword">const</span> __m512 neg_beta_vec = _mm512_set1_ps(-beta);</div>
-<div class="line"><a id="l00881" name="l00881"></a><span class="lineno">  881</span> </div>
-<div class="line"><a id="l00882" name="l00882"></a><span class="lineno">  882</span>    <span class="keywordtype">size_t</span> i = 0;</div>
-<div class="line"><a id="l00883" name="l00883"></a><span class="lineno">  883</span>    <span class="keywordflow">for</span> (; i + 16 &lt;= n; i += 16) {</div>
-<div class="line"><a id="l00884" name="l00884"></a><span class="lineno">  884</span>        __m512 x = _mm512_loadu_ps(&amp;input[i]);</div>
-<div class="line"><a id="l00885" name="l00885"></a><span class="lineno">  885</span>        __m512 dy = _mm512_loadu_ps(&amp;d_output[i]);</div>
-<div class="line"><a id="l00886" name="l00886"></a><span class="lineno">  886</span> </div>
-<div class="line"><a id="l00887" name="l00887"></a><span class="lineno">  887</span>        <span class="comment">// s = sigmoid(beta * x) = 1 / (1 + exp(-beta * x))</span></div>
-<div class="line"><a id="l00888" name="l00888"></a><span class="lineno">  888</span>        __m512 neg_beta_x = _mm512_mul_ps(neg_beta_vec, x);</div>
-<div class="line"><a id="l00889" name="l00889"></a><span class="lineno">  889</span>        __m512 exp_neg = exp512_fast(neg_beta_x);</div>
-<div class="line"><a id="l00890" name="l00890"></a><span class="lineno">  890</span>        __m512 s = _mm512_div_ps(one_vec, _mm512_add_ps(one_vec, exp_neg));</div>
-<div class="line"><a id="l00891" name="l00891"></a><span class="lineno">  891</span> </div>
-<div class="line"><a id="l00892" name="l00892"></a><span class="lineno">  892</span>        <span class="comment">// gelu_derivative = s * (1 + x * (1 - s) * beta)</span></div>
-<div class="line"><a id="l00893" name="l00893"></a><span class="lineno">  893</span>        __m512 one_minus_s = _mm512_sub_ps(one_vec, s);</div>
-<div class="line"><a id="l00894" name="l00894"></a><span class="lineno">  894</span>        __m512 inner = _mm512_fmadd_ps(_mm512_mul_ps(x, one_minus_s), beta_vec, one_vec);</div>
-<div class="line"><a id="l00895" name="l00895"></a><span class="lineno">  895</span>        __m512 gelu_deriv = _mm512_mul_ps(s, inner);</div>
-<div class="line"><a id="l00896" name="l00896"></a><span class="lineno">  896</span> </div>
-<div class="line"><a id="l00897" name="l00897"></a><span class="lineno">  897</span>        __m512 result = _mm512_mul_ps(dy, gelu_deriv);</div>
-<div class="line"><a id="l00898" name="l00898"></a><span class="lineno">  898</span>        _mm512_storeu_ps(&amp;d_input[i], result);</div>
-<div class="line"><a id="l00899" name="l00899"></a><span class="lineno">  899</span>    }</div>
-<div class="line"><a id="l00900" name="l00900"></a><span class="lineno">  900</span>    <span class="comment">// Handle remaining elements</span></div>
-<div class="line"><a id="l00901" name="l00901"></a><span class="lineno">  901</span>    <span class="keywordflow">for</span> (; i &lt; n; ++i) {</div>
-<div class="line"><a id="l00902" name="l00902"></a><span class="lineno">  902</span>        <span class="keywordtype">float</span> x = input[i];</div>
-<div class="line"><a id="l00903" name="l00903"></a><span class="lineno">  903</span>        <span class="keywordtype">float</span> s = 1.0f / (1.0f + expf(-beta * x));</div>
-<div class="line"><a id="l00904" name="l00904"></a><span class="lineno">  904</span>        <span class="keywordtype">float</span> gelu_derivative = s * (1.0f + x * (1.0f - s) * beta);</div>
-<div class="line"><a id="l00905" name="l00905"></a><span class="lineno">  905</span>        d_input[i] = d_output[i] * gelu_derivative;</div>
-<div class="line"><a id="l00906" name="l00906"></a><span class="lineno">  906</span>    }</div>
-<div class="line"><a id="l00907" name="l00907"></a><span class="lineno">  907</span> </div>
-<div class="line"><a id="l00908" name="l00908"></a><span class="lineno">  908</span><span class="preprocessor">#elif defined(__AVX2__)</span></div>
-<div class="line"><a id="l00909" name="l00909"></a><span class="lineno">  909</span>    <span class="keyword">const</span> __m256 beta_vec = _mm256_set1_ps(beta);</div>
-<div class="line"><a id="l00910" name="l00910"></a><span class="lineno">  910</span>    <span class="keyword">const</span> __m256 one_vec = _mm256_set1_ps(1.0f);</div>
-<div class="line"><a id="l00911" name="l00911"></a><span class="lineno">  911</span>    <span class="keyword">const</span> __m256 neg_beta_vec = _mm256_set1_ps(-beta);</div>
+<div class="line"><a id="l00858" name="l00858"></a><span class="lineno">  858</span> </div>
+<div class="foldopen" id="foldopen00859" data-start="{" data-end="}">
+<div class="line"><a id="l00859" name="l00859"></a><span class="lineno"><a class="line" href="ckernel__engine_8h.html#a2f0b0fab254b6af615754ac2eaf84ddb">  859</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="gelu__kernels_8c.html#a2f0b0fab254b6af615754ac2eaf84ddb">gelu_ggml_inplace</a>(<span class="keywordtype">float</span> *data, <span class="keywordtype">size_t</span> n)</div>
+<div class="line"><a id="l00860" name="l00860"></a><span class="lineno">  860</span>{</div>
+<div class="line"><a id="l00861" name="l00861"></a><span class="lineno">  861</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> grain = 32768u;</div>
+<div class="line"><a id="l00862" name="l00862"></a><span class="lineno">  862</span>    <span class="keywordflow">if</span> (!data || n == 0) <span class="keywordflow">return</span>;</div>
+<div class="line"><a id="l00863" name="l00863"></a><span class="lineno">  863</span>    ck_threadpool_t *pool = <a class="code hl_function" href="ck__threadpool_8h.html#a4597badcb0a5a6c31549f2b6bc6a88a7">ck_threadpool_global</a>();</div>
+<div class="line"><a id="l00864" name="l00864"></a><span class="lineno">  864</span>    <span class="keywordtype">int</span> active = pool ? <a class="code hl_function" href="ck__threadpool_8h.html#aef9103ab0a271feb7fdc74c915a78d10">ck_threadpool_n_threads</a>(pool) : 1;</div>
+<div class="line"><a id="l00865" name="l00865"></a><span class="lineno">  865</span>    <span class="keywordflow">if</span> (!pool || active &lt;= 1 || n &lt; 2u * grain || <a class="code hl_function" href="ck__threadpool_8h.html#a92ab47612f4b24d3ce156ad737bdd955">ck_threadpool_in_dispatch</a>(pool)) {</div>
+<div class="line"><a id="l00866" name="l00866"></a><span class="lineno">  866</span>        <a class="code hl_function" href="gelu__kernels_8c.html#a3b67585bb4e0da8bb2795e403279e602">gelu_ggml_serial</a>(data, n);</div>
+<div class="line"><a id="l00867" name="l00867"></a><span class="lineno">  867</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><a id="l00868" name="l00868"></a><span class="lineno">  868</span>    }</div>
+<div class="line"><a id="l00869" name="l00869"></a><span class="lineno">  869</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> useful = n / grain + (n % grain != 0);</div>
+<div class="line"><a id="l00870" name="l00870"></a><span class="lineno">  870</span>    <span class="keywordflow">if</span> ((<span class="keywordtype">size_t</span>)active &gt; useful) active = (<span class="keywordtype">int</span>)useful;</div>
+<div class="line"><a id="l00871" name="l00871"></a><span class="lineno">  871</span>    <span class="comment">/* Initialize shared immutable tables before workers consume them. */</span></div>
+<div class="line"><a id="l00872" name="l00872"></a><span class="lineno">  872</span>    pthread_once(&amp;<a class="code hl_variable" href="gelu__kernels_8c.html#adca08cfc740df10ac2ef0f0c895f50b8">ck_gelu_ggml_runtime_once</a>, <a class="code hl_function" href="gelu__kernels_8c.html#a0bc5158b1cda49eb5176af325bb07bc2">ck_gelu_ggml_runtime_init</a>);</div>
+<div class="line"><a id="l00873" name="l00873"></a><span class="lineno">  873</span>    <span class="keywordflow">if</span> (!<a class="code hl_variable" href="gelu__kernels_8c.html#a363cbee84a1de5954c8bcd09cc2c5683">ck_gelu_runtime_ready</a>)</div>
+<div class="line"><a id="l00874" name="l00874"></a><span class="lineno">  874</span>        pthread_once(&amp;<a class="code hl_variable" href="gelu__kernels_8c.html#a5eafec0c7299984eb731b697944ebdaa">ck_gelu_ggml_table_once</a>, <a class="code hl_function" href="gelu__kernels_8c.html#ab2ab62212a2b2e21b12d60f9977b31b0">ck_gelu_ggml_table_init</a>);</div>
+<div class="line"><a id="l00875" name="l00875"></a><span class="lineno">  875</span>    ck_gelu_ggml_work_t work = {.data = data, .n = n};</div>
+<div class="line"><a id="l00876" name="l00876"></a><span class="lineno">  876</span>    <a class="code hl_function" href="ck__threadpool_8h.html#a4554995880b7a47e275f9b10511b5e43">ck_threadpool_dispatch_n</a>(pool, active, <a class="code hl_function" href="gelu__kernels_8c.html#a2eb8015c611332e254c7e7167ed07c3f">ck_gelu_ggml_work</a>, &amp;work);</div>
+<div class="line"><a id="l00877" name="l00877"></a><span class="lineno">  877</span>}</div>
+</div>
+<div class="line"><a id="l00878" name="l00878"></a><span class="lineno">  878</span> </div>
+<div class="line"><a id="l00879" name="l00879"></a><span class="lineno">  879</span><span class="comment">// Scalar-only exact GELU backward using standard library tanhf.</span></div>
+<div class="line"><a id="l00880" name="l00880"></a><span class="lineno">  880</span><span class="comment">// This is slower than gelu_backward_exact but provides maximum accuracy.</span></div>
+<div class="line"><a id="l00881" name="l00881"></a><span class="lineno">  881</span><span class="comment">// Used by BF16 wrapper where conversion overhead dominates anyway.</span></div>
+<div class="foldopen" id="foldopen00882" data-start="{" data-end="}">
+<div class="line"><a id="l00882" name="l00882"></a><span class="lineno"><a class="line" href="ckernel__engine_8h.html#ac4d3711dee095194f24437af73ad1763">  882</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="gelu__kernels_8c.html#ac4d3711dee095194f24437af73ad1763">gelu_backward_scalar</a>(<span class="keyword">const</span> <span class="keywordtype">float</span> *input,</div>
+<div class="line"><a id="l00883" name="l00883"></a><span class="lineno">  883</span>                          <span class="keyword">const</span> <span class="keywordtype">float</span> *d_output,</div>
+<div class="line"><a id="l00884" name="l00884"></a><span class="lineno">  884</span>                          <span class="keywordtype">float</span> *d_input,</div>
+<div class="line"><a id="l00885" name="l00885"></a><span class="lineno">  885</span>                          <span class="keywordtype">size_t</span> n)</div>
+<div class="line"><a id="l00886" name="l00886"></a><span class="lineno">  886</span>{</div>
+<div class="line"><a id="l00887" name="l00887"></a><span class="lineno">  887</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> sqrt_2_over_pi = 0.7978845608f;</div>
+<div class="line"><a id="l00888" name="l00888"></a><span class="lineno">  888</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> coeff = 0.044715f;</div>
+<div class="line"><a id="l00889" name="l00889"></a><span class="lineno">  889</span> </div>
+<div class="line"><a id="l00890" name="l00890"></a><span class="lineno">  890</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; n; ++i) {</div>
+<div class="line"><a id="l00891" name="l00891"></a><span class="lineno">  891</span>        <span class="keywordtype">float</span> x = input[i];</div>
+<div class="line"><a id="l00892" name="l00892"></a><span class="lineno">  892</span>        <span class="keywordtype">float</span> x3 = x * x * x;</div>
+<div class="line"><a id="l00893" name="l00893"></a><span class="lineno">  893</span>        <span class="keywordtype">float</span> g = sqrt_2_over_pi * (x + coeff * x3);</div>
+<div class="line"><a id="l00894" name="l00894"></a><span class="lineno">  894</span>        <span class="keywordtype">float</span> tanh_g = tanhf(g);</div>
+<div class="line"><a id="l00895" name="l00895"></a><span class="lineno">  895</span>        <span class="keywordtype">float</span> x2 = x * x;</div>
+<div class="line"><a id="l00896" name="l00896"></a><span class="lineno">  896</span>        <span class="keywordtype">float</span> g_prime = sqrt_2_over_pi * (1.0f + 3.0f * coeff * x2);</div>
+<div class="line"><a id="l00897" name="l00897"></a><span class="lineno">  897</span>        <span class="keywordtype">float</span> sech2_g = 1.0f - tanh_g * tanh_g;</div>
+<div class="line"><a id="l00898" name="l00898"></a><span class="lineno">  898</span>        <span class="keywordtype">float</span> gelu_derivative = 0.5f * (1.0f + tanh_g) + 0.5f * x * sech2_g * g_prime;</div>
+<div class="line"><a id="l00899" name="l00899"></a><span class="lineno">  899</span>        d_input[i] = d_output[i] * gelu_derivative;</div>
+<div class="line"><a id="l00900" name="l00900"></a><span class="lineno">  900</span>    }</div>
+<div class="line"><a id="l00901" name="l00901"></a><span class="lineno">  901</span>}</div>
+</div>
+<div class="line"><a id="l00902" name="l00902"></a><span class="lineno">  902</span> </div>
+<div class="line"><a id="l00903" name="l00903"></a><span class="lineno">  903</span><span class="comment">// Fast approximate GELU backward, adapted from C-Transformer&#39;s backward_gelu_fast.</span></div>
+<div class="line"><a id="l00904" name="l00904"></a><span class="lineno">  904</span><span class="comment">// Uses sigmoid approximation: GELU(x) ≈ x * sigmoid(1.702 * x)</span></div>
+<div class="line"><a id="l00905" name="l00905"></a><span class="lineno">  905</span><span class="comment">// Derivative: s * (1 + x * (1 - s) * 1.702) where s = sigmoid(1.702 * x)</span></div>
+<div class="foldopen" id="foldopen00906" data-start="{" data-end="}">
+<div class="line"><a id="l00906" name="l00906"></a><span class="lineno"><a class="line" href="ckernel__engine_8h.html#aeaf518a5239f4588f8c28b05b96d5478">  906</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="gelu__kernels_8c.html#aeaf518a5239f4588f8c28b05b96d5478">gelu_backward_fast</a>(<span class="keyword">const</span> <span class="keywordtype">float</span> *input,</div>
+<div class="line"><a id="l00907" name="l00907"></a><span class="lineno">  907</span>                        <span class="keyword">const</span> <span class="keywordtype">float</span> *d_output,</div>
+<div class="line"><a id="l00908" name="l00908"></a><span class="lineno">  908</span>                        <span class="keywordtype">float</span> *d_input,</div>
+<div class="line"><a id="l00909" name="l00909"></a><span class="lineno">  909</span>                        <span class="keywordtype">size_t</span> n)</div>
+<div class="line"><a id="l00910" name="l00910"></a><span class="lineno">  910</span>{</div>
+<div class="line"><a id="l00911" name="l00911"></a><span class="lineno">  911</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> beta = 1.702f;</div>
 <div class="line"><a id="l00912" name="l00912"></a><span class="lineno">  912</span> </div>
-<div class="line"><a id="l00913" name="l00913"></a><span class="lineno">  913</span>    <span class="keywordtype">size_t</span> i = 0;</div>
-<div class="line"><a id="l00914" name="l00914"></a><span class="lineno">  914</span>    <span class="keywordflow">for</span> (; i + 8 &lt;= n; i += 8) {</div>
-<div class="line"><a id="l00915" name="l00915"></a><span class="lineno">  915</span>        __m256 x = _mm256_loadu_ps(&amp;input[i]);</div>
-<div class="line"><a id="l00916" name="l00916"></a><span class="lineno">  916</span>        __m256 dy = _mm256_loadu_ps(&amp;d_output[i]);</div>
+<div class="line"><a id="l00913" name="l00913"></a><span class="lineno">  913</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
+<div class="line"><a id="l00914" name="l00914"></a><span class="lineno">  914</span>    <span class="keyword">const</span> __m512 beta_vec = _mm512_set1_ps(beta);</div>
+<div class="line"><a id="l00915" name="l00915"></a><span class="lineno">  915</span>    <span class="keyword">const</span> __m512 one_vec = _mm512_set1_ps(1.0f);</div>
+<div class="line"><a id="l00916" name="l00916"></a><span class="lineno">  916</span>    <span class="keyword">const</span> __m512 neg_beta_vec = _mm512_set1_ps(-beta);</div>
 <div class="line"><a id="l00917" name="l00917"></a><span class="lineno">  917</span> </div>
-<div class="line"><a id="l00918" name="l00918"></a><span class="lineno">  918</span>        <span class="comment">// s = sigmoid(beta * x) = 1 / (1 + exp(-beta * x))</span></div>
-<div class="line"><a id="l00919" name="l00919"></a><span class="lineno">  919</span>        __m256 neg_beta_x = _mm256_mul_ps(neg_beta_vec, x);</div>
-<div class="line"><a id="l00920" name="l00920"></a><span class="lineno">  920</span>        __m256 exp_neg = exp256_fast(neg_beta_x);</div>
-<div class="line"><a id="l00921" name="l00921"></a><span class="lineno">  921</span>        __m256 s = _mm256_div_ps(one_vec, _mm256_add_ps(one_vec, exp_neg));</div>
+<div class="line"><a id="l00918" name="l00918"></a><span class="lineno">  918</span>    <span class="keywordtype">size_t</span> i = 0;</div>
+<div class="line"><a id="l00919" name="l00919"></a><span class="lineno">  919</span>    <span class="keywordflow">for</span> (; i + 16 &lt;= n; i += 16) {</div>
+<div class="line"><a id="l00920" name="l00920"></a><span class="lineno">  920</span>        __m512 x = _mm512_loadu_ps(&amp;input[i]);</div>
+<div class="line"><a id="l00921" name="l00921"></a><span class="lineno">  921</span>        __m512 dy = _mm512_loadu_ps(&amp;d_output[i]);</div>
 <div class="line"><a id="l00922" name="l00922"></a><span class="lineno">  922</span> </div>
-<div class="line"><a id="l00923" name="l00923"></a><span class="lineno">  923</span>        <span class="comment">// gelu_derivative = s * (1 + x * (1 - s) * beta)</span></div>
-<div class="line"><a id="l00924" name="l00924"></a><span class="lineno">  924</span>        __m256 one_minus_s = _mm256_sub_ps(one_vec, s);</div>
-<div class="line"><a id="l00925" name="l00925"></a><span class="lineno">  925</span>        __m256 inner = _mm256_fmadd_ps(_mm256_mul_ps(x, one_minus_s), beta_vec, one_vec);</div>
-<div class="line"><a id="l00926" name="l00926"></a><span class="lineno">  926</span>        __m256 gelu_deriv = _mm256_mul_ps(s, inner);</div>
+<div class="line"><a id="l00923" name="l00923"></a><span class="lineno">  923</span>        <span class="comment">// s = sigmoid(beta * x) = 1 / (1 + exp(-beta * x))</span></div>
+<div class="line"><a id="l00924" name="l00924"></a><span class="lineno">  924</span>        __m512 neg_beta_x = _mm512_mul_ps(neg_beta_vec, x);</div>
+<div class="line"><a id="l00925" name="l00925"></a><span class="lineno">  925</span>        __m512 exp_neg = exp512_fast(neg_beta_x);</div>
+<div class="line"><a id="l00926" name="l00926"></a><span class="lineno">  926</span>        __m512 s = _mm512_div_ps(one_vec, _mm512_add_ps(one_vec, exp_neg));</div>
 <div class="line"><a id="l00927" name="l00927"></a><span class="lineno">  927</span> </div>
-<div class="line"><a id="l00928" name="l00928"></a><span class="lineno">  928</span>        __m256 result = _mm256_mul_ps(dy, gelu_deriv);</div>
-<div class="line"><a id="l00929" name="l00929"></a><span class="lineno">  929</span>        _mm256_storeu_ps(&amp;d_input[i], result);</div>
-<div class="line"><a id="l00930" name="l00930"></a><span class="lineno">  930</span>    }</div>
-<div class="line"><a id="l00931" name="l00931"></a><span class="lineno">  931</span>    <span class="comment">// Handle remaining elements</span></div>
-<div class="line"><a id="l00932" name="l00932"></a><span class="lineno">  932</span>    <span class="keywordflow">for</span> (; i &lt; n; ++i) {</div>
-<div class="line"><a id="l00933" name="l00933"></a><span class="lineno">  933</span>        <span class="keywordtype">float</span> x = input[i];</div>
-<div class="line"><a id="l00934" name="l00934"></a><span class="lineno">  934</span>        <span class="keywordtype">float</span> s = 1.0f / (1.0f + expf(-beta * x));</div>
-<div class="line"><a id="l00935" name="l00935"></a><span class="lineno">  935</span>        <span class="keywordtype">float</span> gelu_derivative = s * (1.0f + x * (1.0f - s) * beta);</div>
-<div class="line"><a id="l00936" name="l00936"></a><span class="lineno">  936</span>        d_input[i] = d_output[i] * gelu_derivative;</div>
-<div class="line"><a id="l00937" name="l00937"></a><span class="lineno">  937</span>    }</div>
-<div class="line"><a id="l00938" name="l00938"></a><span class="lineno">  938</span> </div>
-<div class="line"><a id="l00939" name="l00939"></a><span class="lineno">  939</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
-<div class="line"><a id="l00940" name="l00940"></a><span class="lineno">  940</span>    <span class="comment">// AVX1: Vectorize arithmetic, use scalar exp</span></div>
-<div class="line"><a id="l00941" name="l00941"></a><span class="lineno">  941</span>    <span class="keyword">const</span> __m256 beta_vec = _mm256_set1_ps(beta);</div>
-<div class="line"><a id="l00942" name="l00942"></a><span class="lineno">  942</span>    <span class="keyword">const</span> __m256 one_vec = _mm256_set1_ps(1.0f);</div>
-<div class="line"><a id="l00943" name="l00943"></a><span class="lineno">  943</span>    <span class="keyword">const</span> __m256 neg_beta_vec = _mm256_set1_ps(-beta);</div>
-<div class="line"><a id="l00944" name="l00944"></a><span class="lineno">  944</span> </div>
-<div class="line"><a id="l00945" name="l00945"></a><span class="lineno">  945</span>    <span class="keywordtype">size_t</span> i = 0;</div>
-<div class="line"><a id="l00946" name="l00946"></a><span class="lineno">  946</span>    <span class="keywordtype">float</span> neg_beta_x_arr[8] <a class="code hl_function" href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__</a>((aligned(32)));</div>
-<div class="line"><a id="l00947" name="l00947"></a><span class="lineno">  947</span>    <span class="keywordtype">float</span> exp_arr[8] <a class="code hl_function" href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__</a>((aligned(32)));</div>
+<div class="line"><a id="l00928" name="l00928"></a><span class="lineno">  928</span>        <span class="comment">// gelu_derivative = s * (1 + x * (1 - s) * beta)</span></div>
+<div class="line"><a id="l00929" name="l00929"></a><span class="lineno">  929</span>        __m512 one_minus_s = _mm512_sub_ps(one_vec, s);</div>
+<div class="line"><a id="l00930" name="l00930"></a><span class="lineno">  930</span>        __m512 inner = _mm512_fmadd_ps(_mm512_mul_ps(x, one_minus_s), beta_vec, one_vec);</div>
+<div class="line"><a id="l00931" name="l00931"></a><span class="lineno">  931</span>        __m512 gelu_deriv = _mm512_mul_ps(s, inner);</div>
+<div class="line"><a id="l00932" name="l00932"></a><span class="lineno">  932</span> </div>
+<div class="line"><a id="l00933" name="l00933"></a><span class="lineno">  933</span>        __m512 result = _mm512_mul_ps(dy, gelu_deriv);</div>
+<div class="line"><a id="l00934" name="l00934"></a><span class="lineno">  934</span>        _mm512_storeu_ps(&amp;d_input[i], result);</div>
+<div class="line"><a id="l00935" name="l00935"></a><span class="lineno">  935</span>    }</div>
+<div class="line"><a id="l00936" name="l00936"></a><span class="lineno">  936</span>    <span class="comment">// Handle remaining elements</span></div>
+<div class="line"><a id="l00937" name="l00937"></a><span class="lineno">  937</span>    <span class="keywordflow">for</span> (; i &lt; n; ++i) {</div>
+<div class="line"><a id="l00938" name="l00938"></a><span class="lineno">  938</span>        <span class="keywordtype">float</span> x = input[i];</div>
+<div class="line"><a id="l00939" name="l00939"></a><span class="lineno">  939</span>        <span class="keywordtype">float</span> s = 1.0f / (1.0f + expf(-beta * x));</div>
+<div class="line"><a id="l00940" name="l00940"></a><span class="lineno">  940</span>        <span class="keywordtype">float</span> gelu_derivative = s * (1.0f + x * (1.0f - s) * beta);</div>
+<div class="line"><a id="l00941" name="l00941"></a><span class="lineno">  941</span>        d_input[i] = d_output[i] * gelu_derivative;</div>
+<div class="line"><a id="l00942" name="l00942"></a><span class="lineno">  942</span>    }</div>
+<div class="line"><a id="l00943" name="l00943"></a><span class="lineno">  943</span> </div>
+<div class="line"><a id="l00944" name="l00944"></a><span class="lineno">  944</span><span class="preprocessor">#elif defined(__AVX2__)</span></div>
+<div class="line"><a id="l00945" name="l00945"></a><span class="lineno">  945</span>    <span class="keyword">const</span> __m256 beta_vec = _mm256_set1_ps(beta);</div>
+<div class="line"><a id="l00946" name="l00946"></a><span class="lineno">  946</span>    <span class="keyword">const</span> __m256 one_vec = _mm256_set1_ps(1.0f);</div>
+<div class="line"><a id="l00947" name="l00947"></a><span class="lineno">  947</span>    <span class="keyword">const</span> __m256 neg_beta_vec = _mm256_set1_ps(-beta);</div>
 <div class="line"><a id="l00948" name="l00948"></a><span class="lineno">  948</span> </div>
-<div class="line"><a id="l00949" name="l00949"></a><span class="lineno">  949</span>    <span class="keywordflow">for</span> (; i + 8 &lt;= n; i += 8) {</div>
-<div class="line"><a id="l00950" name="l00950"></a><span class="lineno">  950</span>        __m256 x = _mm256_loadu_ps(&amp;input[i]);</div>
-<div class="line"><a id="l00951" name="l00951"></a><span class="lineno">  951</span>        __m256 dy = _mm256_loadu_ps(&amp;d_output[i]);</div>
-<div class="line"><a id="l00952" name="l00952"></a><span class="lineno">  952</span> </div>
-<div class="line"><a id="l00953" name="l00953"></a><span class="lineno">  953</span>        <span class="comment">// s = sigmoid(beta * x) = 1 / (1 + exp(-beta * x))</span></div>
-<div class="line"><a id="l00954" name="l00954"></a><span class="lineno">  954</span>        __m256 neg_beta_x = _mm256_mul_ps(neg_beta_vec, x);</div>
-<div class="line"><a id="l00955" name="l00955"></a><span class="lineno">  955</span> </div>
-<div class="line"><a id="l00956" name="l00956"></a><span class="lineno">  956</span>        <span class="comment">// Compute exp scalarly</span></div>
-<div class="line"><a id="l00957" name="l00957"></a><span class="lineno">  957</span>        _mm256_store_ps(neg_beta_x_arr, neg_beta_x);</div>
-<div class="line"><a id="l00958" name="l00958"></a><span class="lineno">  958</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; 8; ++j) {</div>
-<div class="line"><a id="l00959" name="l00959"></a><span class="lineno">  959</span>            exp_arr[j] = expf(neg_beta_x_arr[j]);</div>
-<div class="line"><a id="l00960" name="l00960"></a><span class="lineno">  960</span>        }</div>
-<div class="line"><a id="l00961" name="l00961"></a><span class="lineno">  961</span>        __m256 exp_neg = _mm256_load_ps(exp_arr);</div>
-<div class="line"><a id="l00962" name="l00962"></a><span class="lineno">  962</span> </div>
-<div class="line"><a id="l00963" name="l00963"></a><span class="lineno">  963</span>        __m256 s = _mm256_div_ps(one_vec, _mm256_add_ps(one_vec, exp_neg));</div>
-<div class="line"><a id="l00964" name="l00964"></a><span class="lineno">  964</span> </div>
-<div class="line"><a id="l00965" name="l00965"></a><span class="lineno">  965</span>        <span class="comment">// gelu_derivative = s * (1 + x * (1 - s) * beta)</span></div>
-<div class="line"><a id="l00966" name="l00966"></a><span class="lineno">  966</span>        __m256 one_minus_s = _mm256_sub_ps(one_vec, s);</div>
-<div class="line"><a id="l00967" name="l00967"></a><span class="lineno">  967</span>        __m256 x_one_minus_s = _mm256_mul_ps(x, one_minus_s);</div>
-<div class="line"><a id="l00968" name="l00968"></a><span class="lineno">  968</span>        __m256 x_one_minus_s_beta = _mm256_mul_ps(x_one_minus_s, beta_vec);</div>
-<div class="line"><a id="l00969" name="l00969"></a><span class="lineno">  969</span>        __m256 inner = _mm256_add_ps(one_vec, x_one_minus_s_beta);</div>
-<div class="line"><a id="l00970" name="l00970"></a><span class="lineno">  970</span>        __m256 gelu_deriv = _mm256_mul_ps(s, inner);</div>
-<div class="line"><a id="l00971" name="l00971"></a><span class="lineno">  971</span> </div>
-<div class="line"><a id="l00972" name="l00972"></a><span class="lineno">  972</span>        __m256 result = _mm256_mul_ps(dy, gelu_deriv);</div>
-<div class="line"><a id="l00973" name="l00973"></a><span class="lineno">  973</span>        _mm256_storeu_ps(&amp;d_input[i], result);</div>
-<div class="line"><a id="l00974" name="l00974"></a><span class="lineno">  974</span>    }</div>
-<div class="line"><a id="l00975" name="l00975"></a><span class="lineno">  975</span>    <span class="comment">// Handle remaining elements</span></div>
-<div class="line"><a id="l00976" name="l00976"></a><span class="lineno">  976</span>    <span class="keywordflow">for</span> (; i &lt; n; ++i) {</div>
-<div class="line"><a id="l00977" name="l00977"></a><span class="lineno">  977</span>        <span class="keywordtype">float</span> x = input[i];</div>
-<div class="line"><a id="l00978" name="l00978"></a><span class="lineno">  978</span>        <span class="keywordtype">float</span> s = 1.0f / (1.0f + expf(-beta * x));</div>
-<div class="line"><a id="l00979" name="l00979"></a><span class="lineno">  979</span>        <span class="keywordtype">float</span> gelu_derivative = s * (1.0f + x * (1.0f - s) * beta);</div>
-<div class="line"><a id="l00980" name="l00980"></a><span class="lineno">  980</span>        d_input[i] = d_output[i] * gelu_derivative;</div>
-<div class="line"><a id="l00981" name="l00981"></a><span class="lineno">  981</span>    }</div>
-<div class="line"><a id="l00982" name="l00982"></a><span class="lineno">  982</span> </div>
-<div class="line"><a id="l00983" name="l00983"></a><span class="lineno">  983</span><span class="preprocessor">#else</span></div>
-<div class="line"><a id="l00984" name="l00984"></a><span class="lineno">  984</span>    <span class="comment">// Scalar fallback</span></div>
-<div class="line"><a id="l00985" name="l00985"></a><span class="lineno">  985</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; n; ++i) {</div>
-<div class="line"><a id="l00986" name="l00986"></a><span class="lineno">  986</span>        <span class="keywordtype">float</span> x = input[i];</div>
-<div class="line"><a id="l00987" name="l00987"></a><span class="lineno">  987</span>        <span class="keywordtype">float</span> s = 1.0f / (1.0f + expf(-beta * x));</div>
-<div class="line"><a id="l00988" name="l00988"></a><span class="lineno">  988</span>        <span class="keywordtype">float</span> gelu_derivative = s * (1.0f + x * (1.0f - s) * beta);</div>
-<div class="line"><a id="l00989" name="l00989"></a><span class="lineno">  989</span>        d_input[i] = d_output[i] * gelu_derivative;</div>
-<div class="line"><a id="l00990" name="l00990"></a><span class="lineno">  990</span>    }</div>
-<div class="line"><a id="l00991" name="l00991"></a><span class="lineno">  991</span><span class="preprocessor">#endif</span></div>
-<div class="line"><a id="l00992" name="l00992"></a><span class="lineno">  992</span>}</div>
+<div class="line"><a id="l00949" name="l00949"></a><span class="lineno">  949</span>    <span class="keywordtype">size_t</span> i = 0;</div>
+<div class="line"><a id="l00950" name="l00950"></a><span class="lineno">  950</span>    <span class="keywordflow">for</span> (; i + 8 &lt;= n; i += 8) {</div>
+<div class="line"><a id="l00951" name="l00951"></a><span class="lineno">  951</span>        __m256 x = _mm256_loadu_ps(&amp;input[i]);</div>
+<div class="line"><a id="l00952" name="l00952"></a><span class="lineno">  952</span>        __m256 dy = _mm256_loadu_ps(&amp;d_output[i]);</div>
+<div class="line"><a id="l00953" name="l00953"></a><span class="lineno">  953</span> </div>
+<div class="line"><a id="l00954" name="l00954"></a><span class="lineno">  954</span>        <span class="comment">// s = sigmoid(beta * x) = 1 / (1 + exp(-beta * x))</span></div>
+<div class="line"><a id="l00955" name="l00955"></a><span class="lineno">  955</span>        __m256 neg_beta_x = _mm256_mul_ps(neg_beta_vec, x);</div>
+<div class="line"><a id="l00956" name="l00956"></a><span class="lineno">  956</span>        __m256 exp_neg = exp256_fast(neg_beta_x);</div>
+<div class="line"><a id="l00957" name="l00957"></a><span class="lineno">  957</span>        __m256 s = _mm256_div_ps(one_vec, _mm256_add_ps(one_vec, exp_neg));</div>
+<div class="line"><a id="l00958" name="l00958"></a><span class="lineno">  958</span> </div>
+<div class="line"><a id="l00959" name="l00959"></a><span class="lineno">  959</span>        <span class="comment">// gelu_derivative = s * (1 + x * (1 - s) * beta)</span></div>
+<div class="line"><a id="l00960" name="l00960"></a><span class="lineno">  960</span>        __m256 one_minus_s = _mm256_sub_ps(one_vec, s);</div>
+<div class="line"><a id="l00961" name="l00961"></a><span class="lineno">  961</span>        __m256 inner = _mm256_fmadd_ps(_mm256_mul_ps(x, one_minus_s), beta_vec, one_vec);</div>
+<div class="line"><a id="l00962" name="l00962"></a><span class="lineno">  962</span>        __m256 gelu_deriv = _mm256_mul_ps(s, inner);</div>
+<div class="line"><a id="l00963" name="l00963"></a><span class="lineno">  963</span> </div>
+<div class="line"><a id="l00964" name="l00964"></a><span class="lineno">  964</span>        __m256 result = _mm256_mul_ps(dy, gelu_deriv);</div>
+<div class="line"><a id="l00965" name="l00965"></a><span class="lineno">  965</span>        _mm256_storeu_ps(&amp;d_input[i], result);</div>
+<div class="line"><a id="l00966" name="l00966"></a><span class="lineno">  966</span>    }</div>
+<div class="line"><a id="l00967" name="l00967"></a><span class="lineno">  967</span>    <span class="comment">// Handle remaining elements</span></div>
+<div class="line"><a id="l00968" name="l00968"></a><span class="lineno">  968</span>    <span class="keywordflow">for</span> (; i &lt; n; ++i) {</div>
+<div class="line"><a id="l00969" name="l00969"></a><span class="lineno">  969</span>        <span class="keywordtype">float</span> x = input[i];</div>
+<div class="line"><a id="l00970" name="l00970"></a><span class="lineno">  970</span>        <span class="keywordtype">float</span> s = 1.0f / (1.0f + expf(-beta * x));</div>
+<div class="line"><a id="l00971" name="l00971"></a><span class="lineno">  971</span>        <span class="keywordtype">float</span> gelu_derivative = s * (1.0f + x * (1.0f - s) * beta);</div>
+<div class="line"><a id="l00972" name="l00972"></a><span class="lineno">  972</span>        d_input[i] = d_output[i] * gelu_derivative;</div>
+<div class="line"><a id="l00973" name="l00973"></a><span class="lineno">  973</span>    }</div>
+<div class="line"><a id="l00974" name="l00974"></a><span class="lineno">  974</span> </div>
+<div class="line"><a id="l00975" name="l00975"></a><span class="lineno">  975</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
+<div class="line"><a id="l00976" name="l00976"></a><span class="lineno">  976</span>    <span class="comment">// AVX1: Vectorize arithmetic, use scalar exp</span></div>
+<div class="line"><a id="l00977" name="l00977"></a><span class="lineno">  977</span>    <span class="keyword">const</span> __m256 beta_vec = _mm256_set1_ps(beta);</div>
+<div class="line"><a id="l00978" name="l00978"></a><span class="lineno">  978</span>    <span class="keyword">const</span> __m256 one_vec = _mm256_set1_ps(1.0f);</div>
+<div class="line"><a id="l00979" name="l00979"></a><span class="lineno">  979</span>    <span class="keyword">const</span> __m256 neg_beta_vec = _mm256_set1_ps(-beta);</div>
+<div class="line"><a id="l00980" name="l00980"></a><span class="lineno">  980</span> </div>
+<div class="line"><a id="l00981" name="l00981"></a><span class="lineno">  981</span>    <span class="keywordtype">size_t</span> i = 0;</div>
+<div class="line"><a id="l00982" name="l00982"></a><span class="lineno">  982</span>    <span class="keywordtype">float</span> neg_beta_x_arr[8] <a class="code hl_function" href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__</a>((aligned(32)));</div>
+<div class="line"><a id="l00983" name="l00983"></a><span class="lineno">  983</span>    <span class="keywordtype">float</span> exp_arr[8] <a class="code hl_function" href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__</a>((aligned(32)));</div>
+<div class="line"><a id="l00984" name="l00984"></a><span class="lineno">  984</span> </div>
+<div class="line"><a id="l00985" name="l00985"></a><span class="lineno">  985</span>    <span class="keywordflow">for</span> (; i + 8 &lt;= n; i += 8) {</div>
+<div class="line"><a id="l00986" name="l00986"></a><span class="lineno">  986</span>        __m256 x = _mm256_loadu_ps(&amp;input[i]);</div>
+<div class="line"><a id="l00987" name="l00987"></a><span class="lineno">  987</span>        __m256 dy = _mm256_loadu_ps(&amp;d_output[i]);</div>
+<div class="line"><a id="l00988" name="l00988"></a><span class="lineno">  988</span> </div>
+<div class="line"><a id="l00989" name="l00989"></a><span class="lineno">  989</span>        <span class="comment">// s = sigmoid(beta * x) = 1 / (1 + exp(-beta * x))</span></div>
+<div class="line"><a id="l00990" name="l00990"></a><span class="lineno">  990</span>        __m256 neg_beta_x = _mm256_mul_ps(neg_beta_vec, x);</div>
+<div class="line"><a id="l00991" name="l00991"></a><span class="lineno">  991</span> </div>
+<div class="line"><a id="l00992" name="l00992"></a><span class="lineno">  992</span>        <span class="comment">// Compute exp scalarly</span></div>
+<div class="line"><a id="l00993" name="l00993"></a><span class="lineno">  993</span>        _mm256_store_ps(neg_beta_x_arr, neg_beta_x);</div>
+<div class="line"><a id="l00994" name="l00994"></a><span class="lineno">  994</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; 8; ++j) {</div>
+<div class="line"><a id="l00995" name="l00995"></a><span class="lineno">  995</span>            exp_arr[j] = expf(neg_beta_x_arr[j]);</div>
+<div class="line"><a id="l00996" name="l00996"></a><span class="lineno">  996</span>        }</div>
+<div class="line"><a id="l00997" name="l00997"></a><span class="lineno">  997</span>        __m256 exp_neg = _mm256_load_ps(exp_arr);</div>
+<div class="line"><a id="l00998" name="l00998"></a><span class="lineno">  998</span> </div>
+<div class="line"><a id="l00999" name="l00999"></a><span class="lineno">  999</span>        __m256 s = _mm256_div_ps(one_vec, _mm256_add_ps(one_vec, exp_neg));</div>
+<div class="line"><a id="l01000" name="l01000"></a><span class="lineno"> 1000</span> </div>
+<div class="line"><a id="l01001" name="l01001"></a><span class="lineno"> 1001</span>        <span class="comment">// gelu_derivative = s * (1 + x * (1 - s) * beta)</span></div>
+<div class="line"><a id="l01002" name="l01002"></a><span class="lineno"> 1002</span>        __m256 one_minus_s = _mm256_sub_ps(one_vec, s);</div>
+<div class="line"><a id="l01003" name="l01003"></a><span class="lineno"> 1003</span>        __m256 x_one_minus_s = _mm256_mul_ps(x, one_minus_s);</div>
+<div class="line"><a id="l01004" name="l01004"></a><span class="lineno"> 1004</span>        __m256 x_one_minus_s_beta = _mm256_mul_ps(x_one_minus_s, beta_vec);</div>
+<div class="line"><a id="l01005" name="l01005"></a><span class="lineno"> 1005</span>        __m256 inner = _mm256_add_ps(one_vec, x_one_minus_s_beta);</div>
+<div class="line"><a id="l01006" name="l01006"></a><span class="lineno"> 1006</span>        __m256 gelu_deriv = _mm256_mul_ps(s, inner);</div>
+<div class="line"><a id="l01007" name="l01007"></a><span class="lineno"> 1007</span> </div>
+<div class="line"><a id="l01008" name="l01008"></a><span class="lineno"> 1008</span>        __m256 result = _mm256_mul_ps(dy, gelu_deriv);</div>
+<div class="line"><a id="l01009" name="l01009"></a><span class="lineno"> 1009</span>        _mm256_storeu_ps(&amp;d_input[i], result);</div>
+<div class="line"><a id="l01010" name="l01010"></a><span class="lineno"> 1010</span>    }</div>
+<div class="line"><a id="l01011" name="l01011"></a><span class="lineno"> 1011</span>    <span class="comment">// Handle remaining elements</span></div>
+<div class="line"><a id="l01012" name="l01012"></a><span class="lineno"> 1012</span>    <span class="keywordflow">for</span> (; i &lt; n; ++i) {</div>
+<div class="line"><a id="l01013" name="l01013"></a><span class="lineno"> 1013</span>        <span class="keywordtype">float</span> x = input[i];</div>
+<div class="line"><a id="l01014" name="l01014"></a><span class="lineno"> 1014</span>        <span class="keywordtype">float</span> s = 1.0f / (1.0f + expf(-beta * x));</div>
+<div class="line"><a id="l01015" name="l01015"></a><span class="lineno"> 1015</span>        <span class="keywordtype">float</span> gelu_derivative = s * (1.0f + x * (1.0f - s) * beta);</div>
+<div class="line"><a id="l01016" name="l01016"></a><span class="lineno"> 1016</span>        d_input[i] = d_output[i] * gelu_derivative;</div>
+<div class="line"><a id="l01017" name="l01017"></a><span class="lineno"> 1017</span>    }</div>
+<div class="line"><a id="l01018" name="l01018"></a><span class="lineno"> 1018</span> </div>
+<div class="line"><a id="l01019" name="l01019"></a><span class="lineno"> 1019</span><span class="preprocessor">#else</span></div>
+<div class="line"><a id="l01020" name="l01020"></a><span class="lineno"> 1020</span>    <span class="comment">// Scalar fallback</span></div>
+<div class="line"><a id="l01021" name="l01021"></a><span class="lineno"> 1021</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; n; ++i) {</div>
+<div class="line"><a id="l01022" name="l01022"></a><span class="lineno"> 1022</span>        <span class="keywordtype">float</span> x = input[i];</div>
+<div class="line"><a id="l01023" name="l01023"></a><span class="lineno"> 1023</span>        <span class="keywordtype">float</span> s = 1.0f / (1.0f + expf(-beta * x));</div>
+<div class="line"><a id="l01024" name="l01024"></a><span class="lineno"> 1024</span>        <span class="keywordtype">float</span> gelu_derivative = s * (1.0f + x * (1.0f - s) * beta);</div>
+<div class="line"><a id="l01025" name="l01025"></a><span class="lineno"> 1025</span>        d_input[i] = d_output[i] * gelu_derivative;</div>
+<div class="line"><a id="l01026" name="l01026"></a><span class="lineno"> 1026</span>    }</div>
+<div class="line"><a id="l01027" name="l01027"></a><span class="lineno"> 1027</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l01028" name="l01028"></a><span class="lineno"> 1028</span>}</div>
 </div>
 <div class="ttc" id="aattention__kernels_8c_html_a58d13c5dcabbb85848fa97b446086247"><div class="ttname"><a href="attention__kernels_8c.html#a58d13c5dcabbb85848fa97b446086247">RTLD_DEFAULT</a></div><div class="ttdeci">#define RTLD_DEFAULT</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l00032">attention_kernels.c:32</a></div></div>
 <div class="ttc" id="abf16__utils_8h_html"><div class="ttname"><a href="bf16__utils_8h.html">bf16_utils.h</a></div></div>
@@ -1175,8 +1215,9 @@ $(document).ready(function(){initNavTree('gelu__kernels_8c_source.html',''); ini
 <div class="ttc" id="abf16__utils_8h_html_a314c3970fd5e2770d19b1bb49aefcf94"><div class="ttname"><a href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a></div><div class="ttdeci">static float bf16_to_float(uint16_t v)</div><div class="ttdef"><b>Definition</b> <a href="bf16__utils_8h_source.html#l00038">bf16_utils.h:38</a></div></div>
 <div class="ttc" id="ack__threadpool_8h_html"><div class="ttname"><a href="ck__threadpool_8h.html">ck_threadpool.h</a></div><div class="ttdoc">Persistent pthread thread pool for CK-Engine inference.</div></div>
 <div class="ttc" id="ack__threadpool_8h_html_a4554995880b7a47e275f9b10511b5e43"><div class="ttname"><a href="ck__threadpool_8h.html#a4554995880b7a47e275f9b10511b5e43">ck_threadpool_dispatch_n</a></div><div class="ttdeci">void ck_threadpool_dispatch_n(ck_threadpool_t *pool, int active_threads, ck_work_fn_t fn, void *args)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00451">ck_threadpool.c:451</a></div></div>
-<div class="ttc" id="ack__threadpool_8h_html_a4597badcb0a5a6c31549f2b6bc6a88a7"><div class="ttname"><a href="ck__threadpool_8h.html#a4597badcb0a5a6c31549f2b6bc6a88a7">ck_threadpool_global</a></div><div class="ttdeci">ck_threadpool_t * ck_threadpool_global(void)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00738">ck_threadpool.c:738</a></div></div>
-<div class="ttc" id="ack__threadpool_8h_html_ada9a2b22c2eb79fe8834b026a3c7d8b4"><div class="ttname"><a href="ck__threadpool_8h.html#ada9a2b22c2eb79fe8834b026a3c7d8b4">ck_threadpool_thread_id</a></div><div class="ttdeci">int ck_threadpool_thread_id(const ck_threadpool_t *pool)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00647">ck_threadpool.c:647</a></div></div>
+<div class="ttc" id="ack__threadpool_8h_html_a4597badcb0a5a6c31549f2b6bc6a88a7"><div class="ttname"><a href="ck__threadpool_8h.html#a4597badcb0a5a6c31549f2b6bc6a88a7">ck_threadpool_global</a></div><div class="ttdeci">ck_threadpool_t * ck_threadpool_global(void)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00743">ck_threadpool.c:743</a></div></div>
+<div class="ttc" id="ack__threadpool_8h_html_a92ab47612f4b24d3ce156ad737bdd955"><div class="ttname"><a href="ck__threadpool_8h.html#a92ab47612f4b24d3ce156ad737bdd955">ck_threadpool_in_dispatch</a></div><div class="ttdeci">int ck_threadpool_in_dispatch(const ck_threadpool_t *pool)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00647">ck_threadpool.c:647</a></div></div>
+<div class="ttc" id="ack__threadpool_8h_html_ada9a2b22c2eb79fe8834b026a3c7d8b4"><div class="ttname"><a href="ck__threadpool_8h.html#ada9a2b22c2eb79fe8834b026a3c7d8b4">ck_threadpool_thread_id</a></div><div class="ttdeci">int ck_threadpool_thread_id(const ck_threadpool_t *pool)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00652">ck_threadpool.c:652</a></div></div>
 <div class="ttc" id="ack__threadpool_8h_html_aef9103ab0a271feb7fdc74c915a78d10"><div class="ttname"><a href="ck__threadpool_8h.html#aef9103ab0a271feb7fdc74c915a78d10">ck_threadpool_n_threads</a></div><div class="ttdeci">int ck_threadpool_n_threads(const ck_threadpool_t *pool)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00637">ck_threadpool.c:637</a></div></div>
 <div class="ttc" id="ackernel__quant_8h_html"><div class="ttname"><a href="ckernel__quant_8h.html">ckernel_quant.h</a></div><div class="ttdoc">Quantization block structures for weight-only quantization.</div></div>
 <div class="ttc" id="ackernel__quant_8h_html_a428d91eb599be350065e91e178defd8d"><div class="ttname"><a href="ckernel__quant_8h.html#a428d91eb599be350065e91e178defd8d">ggml_fp32_to_fp16</a></div><div class="ttdeci">#define ggml_fp32_to_fp16</div><div class="ttdef"><b>Definition</b> <a href="ckernel__quant_8h_source.html#l00450">ckernel_quant.h:450</a></div></div>
@@ -1189,11 +1230,13 @@ $(document).ready(function(){initNavTree('gelu__kernels_8c_source.html',''); ini
 <div class="ttc" id="agelu__kernels_8c_html_a25b9eee043b230c304d7d44b0cfe54d4"><div class="ttname"><a href="gelu__kernels_8c.html#a25b9eee043b230c304d7d44b0cfe54d4">ck_gelu_ggml_fp16_to_fp32_fn</a></div><div class="ttdeci">float(* ck_gelu_ggml_fp16_to_fp32_fn)(ck_half)</div><div class="ttdef"><b>Definition</b> <a href="gelu__kernels_8c_source.html#l00051">gelu_kernels.c:51</a></div></div>
 <div class="ttc" id="agelu__kernels_8c_html_a28b32095708fdb6304b1b7d322942e42"><div class="ttname"><a href="gelu__kernels_8c.html#a28b32095708fdb6304b1b7d322942e42">ck_gelu_runtime_table_f16</a></div><div class="ttdeci">static const ck_half * ck_gelu_runtime_table_f16</div><div class="ttdef"><b>Definition</b> <a href="gelu__kernels_8c_source.html#l00055">gelu_kernels.c:55</a></div></div>
 <div class="ttc" id="agelu__kernels_8c_html_a2abcc2be3ca0cce23cd0e4b0ee3f7a58"><div class="ttname"><a href="gelu__kernels_8c.html#a2abcc2be3ca0cce23cd0e4b0ee3f7a58">ck_gelu_math_f32_fn</a></div><div class="ttdeci">float(* ck_gelu_math_f32_fn)(float)</div><div class="ttdef"><b>Definition</b> <a href="gelu__kernels_8c_source.html#l00052">gelu_kernels.c:52</a></div></div>
-<div class="ttc" id="agelu__kernels_8c_html_a2f0b0fab254b6af615754ac2eaf84ddb"><div class="ttname"><a href="gelu__kernels_8c.html#a2f0b0fab254b6af615754ac2eaf84ddb">gelu_ggml_inplace</a></div><div class="ttdeci">void gelu_ggml_inplace(float *data, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="gelu__kernels_8c_source.html#l00805">gelu_kernels.c:805</a></div></div>
+<div class="ttc" id="agelu__kernels_8c_html_a2eb8015c611332e254c7e7167ed07c3f"><div class="ttname"><a href="gelu__kernels_8c.html#a2eb8015c611332e254c7e7167ed07c3f">ck_gelu_ggml_work</a></div><div class="ttdeci">static void ck_gelu_ggml_work(int ith, int nth, void *opaque)</div><div class="ttdef"><b>Definition</b> <a href="gelu__kernels_8c_source.html#l00848">gelu_kernels.c:848</a></div></div>
+<div class="ttc" id="agelu__kernels_8c_html_a2f0b0fab254b6af615754ac2eaf84ddb"><div class="ttname"><a href="gelu__kernels_8c.html#a2f0b0fab254b6af615754ac2eaf84ddb">gelu_ggml_inplace</a></div><div class="ttdeci">void gelu_ggml_inplace(float *data, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="gelu__kernels_8c_source.html#l00859">gelu_kernels.c:859</a></div></div>
 <div class="ttc" id="agelu__kernels_8c_html_a3075b77764b4b408e3c1c9b89a2822ad"><div class="ttname"><a href="gelu__kernels_8c.html#a3075b77764b4b408e3c1c9b89a2822ad">gelu_backward_exact</a></div><div class="ttdeci">void gelu_backward_exact(const float *input, const float *d_output, float *d_input, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="gelu__kernels_8c_source.html#l00369">gelu_kernels.c:369</a></div></div>
 <div class="ttc" id="agelu__kernels_8c_html_a315f43ac44656b5d77360d9879c5f122"><div class="ttname"><a href="gelu__kernels_8c.html#a315f43ac44656b5d77360d9879c5f122">gelu_exact_inplace</a></div><div class="ttdeci">void gelu_exact_inplace(float *data, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="gelu__kernels_8c_source.html#l00558">gelu_kernels.c:558</a></div></div>
 <div class="ttc" id="agelu__kernels_8c_html_a363cbee84a1de5954c8bcd09cc2c5683"><div class="ttname"><a href="gelu__kernels_8c.html#a363cbee84a1de5954c8bcd09cc2c5683">ck_gelu_runtime_ready</a></div><div class="ttdeci">static int ck_gelu_runtime_ready</div><div class="ttdef"><b>Definition</b> <a href="gelu__kernels_8c_source.html#l00059">gelu_kernels.c:59</a></div></div>
 <div class="ttc" id="agelu__kernels_8c_html_a3781af580a3fe9c5c3df37db21a18ede"><div class="ttname"><a href="gelu__kernels_8c.html#a3781af580a3fe9c5c3df37db21a18ede">gelu_pytorch_erf_f32_inplace</a></div><div class="ttdeci">void gelu_pytorch_erf_f32_inplace(float *data, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="gelu__kernels_8c_source.html#l00632">gelu_kernels.c:632</a></div></div>
+<div class="ttc" id="agelu__kernels_8c_html_a3b67585bb4e0da8bb2795e403279e602"><div class="ttname"><a href="gelu__kernels_8c.html#a3b67585bb4e0da8bb2795e403279e602">gelu_ggml_serial</a></div><div class="ttdeci">static void gelu_ggml_serial(float *data, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="gelu__kernels_8c_source.html#l00805">gelu_kernels.c:805</a></div></div>
 <div class="ttc" id="agelu__kernels_8c_html_a47aef981ac51c59b32d08bc11446d1b5"><div class="ttname"><a href="gelu__kernels_8c.html#a47aef981ac51c59b32d08bc11446d1b5">ck_gelu_try_bind_runtime</a></div><div class="ttdeci">static void ck_gelu_try_bind_runtime(void *handle)</div><div class="ttdef"><b>Definition</b> <a href="gelu__kernels_8c_source.html#l00099">gelu_kernels.c:99</a></div></div>
 <div class="ttc" id="agelu__kernels_8c_html_a5bad3e98efcaf996272c57b45c43d60b"><div class="ttname"><a href="gelu__kernels_8c.html#a5bad3e98efcaf996272c57b45c43d60b">ck_gelu_erf_fp64_parallel_work</a></div><div class="ttdeci">static void ck_gelu_erf_fp64_parallel_work(int ith, int nth, void *opaque)</div><div class="ttdef"><b>Definition</b> <a href="gelu__kernels_8c_source.html#l00585">gelu_kernels.c:585</a></div></div>
 <div class="ttc" id="agelu__kernels_8c_html_a5eafec0c7299984eb731b697944ebdaa"><div class="ttname"><a href="gelu__kernels_8c.html#a5eafec0c7299984eb731b697944ebdaa">ck_gelu_ggml_table_once</a></div><div class="ttdeci">static pthread_once_t ck_gelu_ggml_table_once</div><div class="ttdef"><b>Definition</b> <a href="gelu__kernels_8c_source.html#l00046">gelu_kernels.c:46</a></div></div>
@@ -1210,17 +1253,18 @@ $(document).ready(function(){initNavTree('gelu__kernels_8c_source.html',''); ini
 <div class="ttc" id="agelu__kernels_8c_html_ab3debc2a69f7f85c072ab78453ec5565"><div class="ttname"><a href="gelu__kernels_8c.html#ab3debc2a69f7f85c072ab78453ec5565">ck_gelu_ggml_table_f16</a></div><div class="ttdeci">static ck_half ck_gelu_ggml_table_f16[1u&lt;&lt; 16]</div><div class="ttdef"><b>Definition</b> <a href="gelu__kernels_8c_source.html#l00045">gelu_kernels.c:45</a></div></div>
 <div class="ttc" id="agelu__kernels_8c_html_ab48a772c053be8dd3cc0f5e4ea1a1223"><div class="ttname"><a href="gelu__kernels_8c.html#ab48a772c053be8dd3cc0f5e4ea1a1223">gelu_ggml_native_inplace</a></div><div class="ttdeci">void gelu_ggml_native_inplace(float *data, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="gelu__kernels_8c_source.html#l00793">gelu_kernels.c:793</a></div></div>
 <div class="ttc" id="agelu__kernels_8c_html_abc5977fca1e95c2406a779657c4d2365"><div class="ttname"><a href="gelu__kernels_8c.html#abc5977fca1e95c2406a779657c4d2365">gelu_fast_inplace</a></div><div class="ttdeci">void gelu_fast_inplace(float *data, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="gelu__kernels_8c_source.html#l00244">gelu_kernels.c:244</a></div></div>
-<div class="ttc" id="agelu__kernels_8c_html_ac4d3711dee095194f24437af73ad1763"><div class="ttname"><a href="gelu__kernels_8c.html#ac4d3711dee095194f24437af73ad1763">gelu_backward_scalar</a></div><div class="ttdeci">void gelu_backward_scalar(const float *input, const float *d_output, float *d_input, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="gelu__kernels_8c_source.html#l00846">gelu_kernels.c:846</a></div></div>
+<div class="ttc" id="agelu__kernels_8c_html_ac4d3711dee095194f24437af73ad1763"><div class="ttname"><a href="gelu__kernels_8c.html#ac4d3711dee095194f24437af73ad1763">gelu_backward_scalar</a></div><div class="ttdeci">void gelu_backward_scalar(const float *input, const float *d_output, float *d_input, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="gelu__kernels_8c_source.html#l00882">gelu_kernels.c:882</a></div></div>
 <div class="ttc" id="agelu__kernels_8c_html_ad24747e8b3c5e00732bd153715877324"><div class="ttname"><a href="gelu__kernels_8c.html#ad24747e8b3c5e00732bd153715877324">ck_gelu_reference_erf</a></div><div class="ttdeci">static ck_gelu_math_f64_fn ck_gelu_reference_erf</div><div class="ttdef"><b>Definition</b> <a href="gelu__kernels_8c_source.html#l00061">gelu_kernels.c:61</a></div></div>
 <div class="ttc" id="agelu__kernels_8c_html_ad893f7c7aae6db18a790555697561cfb"><div class="ttname"><a href="gelu__kernels_8c.html#ad893f7c7aae6db18a790555697561cfb">gelu_erf_bf16_storage</a></div><div class="ttdeci">void gelu_erf_bf16_storage(float *data, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="gelu__kernels_8c_source.html#l00661">gelu_kernels.c:661</a></div></div>
 <div class="ttc" id="agelu__kernels_8c_html_adca08cfc740df10ac2ef0f0c895f50b8"><div class="ttname"><a href="gelu__kernels_8c.html#adca08cfc740df10ac2ef0f0c895f50b8">ck_gelu_ggml_runtime_once</a></div><div class="ttdeci">static pthread_once_t ck_gelu_ggml_runtime_once</div><div class="ttdef"><b>Definition</b> <a href="gelu__kernels_8c_source.html#l00047">gelu_kernels.c:47</a></div></div>
 <div class="ttc" id="agelu__kernels_8c_html_ae2bf41b9b9172a7a197fc197d1e17200"><div class="ttname"><a href="gelu__kernels_8c.html#ae2bf41b9b9172a7a197fc197d1e17200">ck_gelu_tanh_f32</a></div><div class="ttdeci">static float ck_gelu_tanh_f32(float x)</div><div class="ttdef"><b>Definition</b> <a href="gelu__kernels_8c_source.html#l00037">gelu_kernels.c:37</a></div></div>
 <div class="ttc" id="agelu__kernels_8c_html_ae93ad49f83d821958ebbe4d0d24c0aef"><div class="ttname"><a href="gelu__kernels_8c.html#ae93ad49f83d821958ebbe4d0d24c0aef">ck_gelu_reference_math_once</a></div><div class="ttdeci">static pthread_once_t ck_gelu_reference_math_once</div><div class="ttdef"><b>Definition</b> <a href="gelu__kernels_8c_source.html#l00062">gelu_kernels.c:62</a></div></div>
-<div class="ttc" id="agelu__kernels_8c_html_aeaf518a5239f4588f8c28b05b96d5478"><div class="ttname"><a href="gelu__kernels_8c.html#aeaf518a5239f4588f8c28b05b96d5478">gelu_backward_fast</a></div><div class="ttdeci">void gelu_backward_fast(const float *input, const float *d_output, float *d_input, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="gelu__kernels_8c_source.html#l00870">gelu_kernels.c:870</a></div></div>
+<div class="ttc" id="agelu__kernels_8c_html_aeaf518a5239f4588f8c28b05b96d5478"><div class="ttname"><a href="gelu__kernels_8c.html#aeaf518a5239f4588f8c28b05b96d5478">gelu_backward_fast</a></div><div class="ttdeci">void gelu_backward_fast(const float *input, const float *d_output, float *d_input, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="gelu__kernels_8c_source.html#l00906">gelu_kernels.c:906</a></div></div>
 <div class="ttc" id="agelu__kernels_8c_html_aef13e1955fcd7a7367d82a5da0bd8492"><div class="ttname"><a href="gelu__kernels_8c.html#aef13e1955fcd7a7367d82a5da0bd8492">gelu_erf_fp64_f32_parallel_dispatch</a></div><div class="ttdeci">void gelu_erf_fp64_f32_parallel_dispatch(float *data, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="gelu__kernels_8c_source.html#l00606">gelu_kernels.c:606</a></div></div>
 <div class="ttc" id="agelu__kernels_8c_html_af965b5310bebc06a3a3b7c76ad88a06e"><div class="ttname"><a href="gelu__kernels_8c.html#af965b5310bebc06a3a3b7c76ad88a06e">ck_gelu_tanh_ggml_reference_f32</a></div><div class="ttdeci">static float ck_gelu_tanh_ggml_reference_f32(float x)</div><div class="ttdef"><b>Definition</b> <a href="gelu__kernels_8c_source.html#l00087">gelu_kernels.c:87</a></div></div>
 <div class="ttc" id="agelu__kernels_8c_html_afa19bdb5dd6cbe60bc106159d62d7327"><div class="ttname"><a href="gelu__kernels_8c.html#afa19bdb5dd6cbe60bc106159d62d7327">gelu_pytorch_tanh_bf16_storage</a></div><div class="ttdeci">void gelu_pytorch_tanh_bf16_storage(float *data, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="gelu__kernels_8c_source.html#l00642">gelu_kernels.c:642</a></div></div>
 <div class="ttc" id="atokenizer_8h_html_a42cef42021e2391865cfbed2c2ee5278"><div class="ttname"><a href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__</a></div><div class="ttdeci">__attribute__((visibility(&quot;default&quot;))) CKTokenizer *ck_tokenizer_create(CKTokenizerType type)</div></div>
+<div class="ttc" id="atrue__bpe_8h_html_ac7f5fd4f55df36920bf0583c3516e72f"><div class="ttname"><a href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a></div><div class="ttdeci">const uint8_t size_t count</div><div class="ttdef"><b>Definition</b> <a href="true__bpe_8h_source.html#l00211">true_bpe.h:211</a></div></div>
 <div class="ttc" id="autf8_8c_html_a204a3f4fa39b9c007f9784d3e4af4667"><div class="ttname"><a href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a></div><div class="ttdeci">uint32_t end</div><div class="ttdef"><b>Definition</b> <a href="utf8_8c_source.html#l00215">utf8.c:215</a></div></div>
 </div><!-- fragment --></div><!-- contents -->
 </div><!-- doc-content -->

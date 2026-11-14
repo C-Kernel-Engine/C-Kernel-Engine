@@ -24,6 +24,7 @@ var ck__threadpool_8h =
     [ "ck_threadpool_dispatch_n", "ck__threadpool_8h.html#a4554995880b7a47e275f9b10511b5e43", null ],
     [ "ck_threadpool_global", "ck__threadpool_8h.html#a4597badcb0a5a6c31549f2b6bc6a88a7", null ],
     [ "ck_threadpool_global_destroy", "ck__threadpool_8h.html#a4cb5ec1ec3544e52288a3ed3c17671fe", null ],
+    [ "ck_threadpool_in_dispatch", "ck__threadpool_8h.html#a92ab47612f4b24d3ce156ad737bdd955", null ],
     [ "ck_threadpool_n_threads", "ck__threadpool_8h.html#aef9103ab0a271feb7fdc74c915a78d10", null ],
     [ "ck_threadpool_parallel_for_n", "ck__threadpool_8h.html#a201c68c915e80d824c95721b55c5ab83", null ],
     [ "ck_threadpool_pause", "ck__threadpool_8h.html#a001490b08bc5ba893488e49d4b10d3bf", null ],

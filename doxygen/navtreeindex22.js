@@ -1,5 +1,9 @@
 var NAVTREEINDEX22 =
 {
+"structCKMergeRule.html":[1,0,52],
+"structCKMergeRule.html#a2f4fb999c8ad7581926948836ad96949":[1,0,52,0],
+"structCKMergeRule.html#ad429814a773c9faa0526991078347e4f":[1,0,52,3],
+"structCKMergeRule.html#adacd50b760f95bfe3bd04d8618fb4c19":[1,0,52,1],
 "structCKMergeRule.html#af89e288682de3079e22683c57b629d4c":[1,0,52,2],
 "structCKMetric.html":[1,0,53],
 "structCKMetric.html#a040a7d8ed259051d66391388ba7f3d56":[1,0,53,3],
@@ -245,9 +249,5 @@ var NAVTREEINDEX22 =
 "structCKTokenizerConfig.html#a1c6c52e64b87d70be97a2e9547f950e5":[1,0,71,0],
 "structCKTokenizerConfig.html#a25de8175fe44fc209d958136ce3c669e":[1,0,71,9],
 "structCKTokenizerConfig.html#a61cf1a1974d46e1da99c1c86f43fad4b":[1,0,71,7],
-"structCKTokenizerConfig.html#a6318844b8b3efb4e6e5e352f1967c4a9":[1,0,71,2],
-"structCKTokenizerConfig.html#a6a4c7a490b1e83f6dfc73b351b3826ec":[1,0,71,10],
-"structCKTokenizerConfig.html#ad33c5d657dea175cb8c1ae9fdff33816":[1,0,71,3],
-"structCKTokenizerConfig.html#adeee37aac61b482ef54dc4262852a035":[1,0,71,8],
-"structCKTokenizerConfig.html#adf662a4222984144966097373043a51f":[1,0,71,1]
+"structCKTokenizerConfig.html#a6318844b8b3efb4e6e5e352f1967c4a9":[1,0,71,2]
 };

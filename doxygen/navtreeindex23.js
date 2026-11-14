@@ -1,5 +1,9 @@
 var NAVTREEINDEX23 =
 {
+"structCKTokenizerConfig.html#a6a4c7a490b1e83f6dfc73b351b3826ec":[1,0,71,10],
+"structCKTokenizerConfig.html#ad33c5d657dea175cb8c1ae9fdff33816":[1,0,71,3],
+"structCKTokenizerConfig.html#adeee37aac61b482ef54dc4262852a035":[1,0,71,8],
+"structCKTokenizerConfig.html#adf662a4222984144966097373043a51f":[1,0,71,1],
 "structCKTokenizerConfig.html#ae2fe2d16420d6118bc884b3f0ef17e4d":[1,0,71,6],
 "structCKTokenizerConfig.html#af82fde6580003dff44ed719380e61673":[1,0,71,4],
 "structCKTokenizerConfig.html#af8f0acf8af0468b0c852db59df1172bb":[1,0,71,5],
@@ -245,9 +249,5 @@ var NAVTREEINDEX23 =
 "structTransformerModel.html#a04378052961669504042e717e3219736":[1,0,99,8],
 "structTransformerModel.html#a08ba885dfade40a3910ffba35076a1a3":[1,0,99,4],
 "structTransformerModel.html#a15ebe2bd4db54209b7cc8e89bb1cb8fd":[1,0,99,1],
-"structTransformerModel.html#a1989f1f535ad94b85bb4242ec2148969":[1,0,99,2],
-"structTransformerModel.html#a4a924d843ebdc352caa809c1f72b1838":[1,0,99,3],
-"structTransformerModel.html#a5e14c6be5365203ff62022d605db1672":[1,0,99,12],
-"structTransformerModel.html#a79f34fccbab0e1d127d521b03df5b327":[1,0,99,11],
-"structTransformerModel.html#a920af187f3562257c0fb9c80c05b4582":[1,0,99,7]
+"structTransformerModel.html#a1989f1f535ad94b85bb4242ec2148969":[1,0,99,2]
 };
