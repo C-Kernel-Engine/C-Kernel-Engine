@@ -1441,9 +1441,22 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
             raise ValueError("float training input capacity exceeded")
         float_inputs.append(dict(tensor=tid, offset=float_offset, count=n, shape=list(meta["shape"]), dtype="fp32"))
         float_offset += n
+    zero_input_order = cfg.get("training_zero_inputs", [])
+    if (not isinstance(zero_input_order, list)
+            or any(not isinstance(tid, str) for tid in zero_input_order)
+            or len(set(zero_input_order)) != len(zero_input_order)):
+        raise ValueError("training_zero_inputs must be a unique ordered tensor list")
+    for tid in zero_input_order:
+        meta = tensors.get(tid, {})
+        if (tid not in tvars_f32 or meta.get("dtype") != "fp32"
+                or meta.get("kind") != "input" or meta.get("requires_grad") is not False
+                or meta.get("persistent", False) or tid in produced or tid in float_input_order
+                or type(tensor_numel.get(tid)) is not int or tensor_numel[tid] <= 0):
+            raise ValueError("invalid zero-initialized FP32 training input: " + tid)
+
     # A declared FP32 input must not silently read zeroed/stale workspace.
     for tid, meta in tensors.items():
-        if meta.get("kind") == "input" and meta.get("dtype", "fp32") == "fp32" and tid not in float_input_order:
+        if meta.get("kind") == "input" and meta.get("dtype", "fp32") == "fp32" and tid not in float_input_order and tid not in zero_input_order:
             raise ValueError("unbound FP32 training input: " + tid)
 
     # Collect declarations required by kernels in this IR.
@@ -3701,6 +3714,10 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                 ap("    g_float_forward_ready = 0;")
             else:
                 ap("    if (!g_float_forward_ready) return -5;")
+        if phase == "forward" and zero_input_order:
+            ap("    if (g_memory == NULL) return -1;")
+            for tid in zero_input_order:
+                ap("    memset(%s, 0, (size_t)%d * sizeof(float));" % (tvars_f32[tid], tensor_numel[tid]))
         ap("    /* %s ops: %d */" % (phase, len(ops)))
         ap("    int call_count = 0;")
         idx = 0
@@ -5028,6 +5045,8 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
         "evaluation_entry": "ck_train_eval_step",
         "float_inputs": float_inputs,
         "float_input_count": float_offset,
+        "zero_input_order": zero_input_order,
+        "zero_input_policy": "each_forward",
         "integer_inputs": integer_inputs,
         "integer_input_count": integer_offset,
         "forward_ops": len(forward_ops),
