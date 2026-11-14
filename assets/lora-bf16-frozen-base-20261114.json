@@ -1,0 +1,90 @@
+{
+  "schema": "cke.lora.bf16-frozen-base.v1",
+  "execution": "PASS",
+  "scope": "three small generated compositions; frozen base BF16 compute operands and FP32 adapters",
+  "oracle": "independent PyTorch RNE BF16 operands with declared FP32 input-gradient contract, not default autocast",
+  "initialization": "external checked preparation: PCG64 seed 41 for A, zero B, frozen scale",
+  "checkpoint_resume": "exact same-process and fresh-process continuation",
+  "inference_reload": "PASS",
+  "frozen_base_weights": "UNCHANGED",
+  "full_clef_adapter_training": "NOT_TESTED",
+  "bf16_adapter_storage": "NOT_IMPLEMENTED",
+  "quantized_base_training": "NOT_IMPLEMENTED",
+  "performance": "NOT_MEASURED",
+  "environment": {
+    "CK_NUM_THREADS": 4,
+    "OMP_NUM_THREADS": 1
+  },
+  "tests": [
+    {
+      "engine_sha256": "bb013a850c55bd6cf18832e1fdcc94e498cd01fbdd8d5e04404c7d1542e7db93",
+      "full_clef_training": "NOT_TESTED",
+      "generated_c_sha256": "67cadbf8b2a2c7d4111b24eb213b4cd04ba6f8bb82c93ea56524995e4ab3b524",
+      "max_abs_errors": {
+        "gradient": 2.0675361156463623e-07,
+        "moment": 7.805647328495979e-08,
+        "weight": 1.6689300537109375e-06
+      },
+      "native_training": "PASS",
+      "runtime_contract_sha256": "8236deeb8634232960d5b488742f9e5d617849023bd55db396d3041647f83910",
+      "seed": 837,
+      "torch_version": "2.12.1+cpu",
+      "case": "adapter_only",
+      "updates": 40,
+      "loss_before": 0.72948879,
+      "loss_last_step": 0.1410711,
+      "gradient_atol": 3e-05,
+      "weight_atol": 3e-05,
+      "relative_tolerance": 0.0003
+    },
+    {
+      "engine_sha256": "bb013a850c55bd6cf18832e1fdcc94e498cd01fbdd8d5e04404c7d1542e7db93",
+      "full_clef_training": "NOT_TESTED",
+      "generated_c_sha256": "44d46b421a7e90830627d8c0cbde2ebd80870c8ec340dd5fc677a9eb52f8f140",
+      "max_abs_errors": {
+        "gradient": 4.0978193283081055e-07,
+        "moment": 4.0978193283081055e-08,
+        "weight": 5.960464477539062e-07
+      },
+      "native_training": "PASS",
+      "runtime_contract_sha256": "ae6a644d2ada305772e19002bf01f2c858af79f2f24fa02d3bb8214236951063",
+      "seed": 837,
+      "torch_version": "2.12.1+cpu",
+      "case": "trainable_upstream",
+      "updates": 40,
+      "loss_before": 1.42442214,
+      "loss_last_step": 0.00277816,
+      "gradient_atol": 3e-05,
+      "weight_atol": 3e-05,
+      "relative_tolerance": 0.0003
+    },
+    {
+      "engine_sha256": "bb013a850c55bd6cf18832e1fdcc94e498cd01fbdd8d5e04404c7d1542e7db93",
+      "full_clef_training": "NOT_TESTED",
+      "generated_c_sha256": "b59f8e9b36ccccf2a753529ff7d0932b289dd7900ffef615a7846dc4d3561291",
+      "max_abs_errors": {
+        "gradient": 2.5331974029541016e-07,
+        "moment": 5.3085386753082275e-08,
+        "weight": 1.0728836059570312e-06
+      },
+      "native_training": "PASS",
+      "runtime_contract_sha256": "788ccbed4e7a50bbdefa1d75cda8f36cbf7bef3606a03be46b1d4abea678af6a",
+      "seed": 837,
+      "torch_version": "2.12.1+cpu",
+      "case": "rectangular",
+      "updates": 40,
+      "loss_before": 1.40619373,
+      "loss_last_step": 2.875e-05,
+      "gradient_atol": 3e-05,
+      "weight_atol": 3e-05,
+      "relative_tolerance": 0.0003
+    }
+  ],
+  "source_sha256": {
+    "tests/test_v8_lora_training.py": "16bce47a5b7281c04b2cea0c399f240a3a72aa4730ab36c4bdeed3019507cbc0",
+    "tests/test_v8_lora_bf16_base.py": "e70a84a1aec27e845b3d859c4225f5f336188eb86f08966725a94d0c675e7cf8",
+    "version/v8/training/lora.py": "bb17b1c4a8675c5a7899a26224db16d694efa2893608bc36500dacef0c0d096b",
+    "version/v8/training/lora_weights.py": "404269f6fdca2922ec950b37af43af74353849518d08f5801e55604e1e8a072d",
+    "version/v8/training/bf16_projection.py": "29e3c0e3f6aabb5a2ec3d021dac67c4813411cec5ff67bb5eb6f4d2b988c9aab"
+  }
+}
