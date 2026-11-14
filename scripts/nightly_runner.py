@@ -944,9 +944,9 @@ TEST_SUITES = {
         ROOT / "tests" / "test_v8_copy_i32_span_checked.py",
     ),
     "training_job_lifecycle": TestSuite(
-        "Explicit SVG Job Submission, Idempotency and Persistent Recovery", "training",
+        "Training Jobs: Integer/Opaque Revisions, Idempotency and Recovery", "training",
         ROOT / "server" / "tests" / "test_training_jobs.py",
-        unittest_targets=("server.tests.test_training_jobs",),
+        unittest_targets=("server.tests.test_training_jobs", "server.tests.test_training_bridge"),
     ),
     "training_backend_contract": TestSuite(
         "Training Capability Discovery and Side-Effect-Free Plan Validation", "training",

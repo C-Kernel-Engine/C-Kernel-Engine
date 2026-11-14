@@ -169,6 +169,12 @@ class PackageContracts(unittest.TestCase):
 
 class NativeRecipe(PackageContracts):
     def test_registered_job_and_independent_artifact_client(self):
+        self._registered_job()
+
+    def test_opaque_revision_native_job_and_export(self):
+        self._registered_job(client_revision="00" + "f" * 30)
+
+    def _registered_job(self, client_revision=None):
         if os.environ.get("CKE_RUN_CLEF_JOB") != "1":
             self.skipTest("real clean-tree job execution is opt-in")
         from server.training.jobs import Jobs
@@ -191,13 +197,29 @@ class NativeRecipe(PackageContracts):
             clef_packages={"toy": dict(path=str(self.path), sha256=self.digest)},
         )
         try:
-            p = jobs.prepare("tester", cfg, "synthetic-decision", 1)
-            first = jobs.submit("tester", p["plan_sha256"], "same-request", start=False)
+            p = jobs.prepare(
+                "tester",
+                cfg,
+                "synthetic-decision",
+                None if client_revision else 1,
+                client_revision=client_revision,
+            )
+            first = jobs.submit(
+                "tester",
+                p["plan_sha256"],
+                "same-request",
+                start=False,
+                client_revision=client_revision,
+            )
             job_id = first["job"]["job_id"]
             self.assertEqual(
-                jobs.submit("tester", p["plan_sha256"], "same-request", start=False)[
-                    "job"
-                ]["job_id"],
+                jobs.submit(
+                    "tester",
+                    p["plan_sha256"],
+                    "same-request",
+                    start=False,
+                    client_revision=client_revision,
+                )["job"]["job_id"],
                 job_id,
             )
             jobs.run_job("tester", job_id)
@@ -210,7 +232,8 @@ class NativeRecipe(PackageContracts):
                 job_id=job_id,
                 plan_sha256=p["plan_sha256"],
                 experiment_id="synthetic-decision",
-                draft_revision=1,
+                draft_revision=None if client_revision else 1,
+                client_revision=client_revision,
                 last=first,
             )
             verified = verify_artifacts(
