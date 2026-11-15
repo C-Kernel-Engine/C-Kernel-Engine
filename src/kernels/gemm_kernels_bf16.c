@@ -752,11 +752,10 @@ static void gemm_nt_bf16_exact_avx512(const float *A, const uint16_t *B,
             for (int k0 = 0; k0 < K; k0 += 32) {
                 const int count = K - k0 < 32 ? K - k0 : 32;
                 float rounded[16][32];
-                for (int lane = 0; lane < width; ++lane) {
-                    const uint16_t *w = B + (size_t)(j + lane) * K + k0;
-                    for (int k = 0; k < count; ++k)
-                        packed[k][lane] = bf16_to_float(w[k]);
-                }
+                for (int k = 0; k < count; ++k)
+                    for (int lane = 0; lane < width; ++lane)
+                        packed[k][lane] = bf16_to_float(
+                            B[(size_t)(j + lane) * K + k0 + k]);
                 for (int r = 0; r < rows; ++r) {
                     const float *a = A + (size_t)(i + r) * K + k0;
                     for (int k = 0; k < count; ++k)
