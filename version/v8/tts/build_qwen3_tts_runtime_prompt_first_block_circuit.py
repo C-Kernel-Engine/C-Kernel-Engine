@@ -24,46 +24,9 @@ else:
 OUTPUT = ROOT / "version/v8/circuits/qwen3_tts_runtime_prompt_first_block_bounded.json"
 
 
-def _bind(op: dict, **bindings: str) -> None:
-    op["consumes_runtime_lengths"] = sorted(set(bindings.values()))
-    op["runtime_scalar_bindings"] = bindings
-    constants = op["params"]["call_constants"]
-    for argument in bindings:
-        if argument not in constants:
-            raise ValueError(f"{op['id']} has no scalar ABI argument {argument}")
-        del constants[argument]
-
-
-def _extent(op_id: str, kind: str, source: str, target: str,
-            output: str, *, offset: int = 0, factor: int = 1,
-            capacity: int) -> dict:
-    if kind == "runtime_extent_sum":
-        return {
-            "id": op_id, "op": kind, "kernel": "runtime_extent_sum_i32",
-            "returns_status": True,
-            "produces_runtime_lengths": {target: "valid_extent"},
-            "graph_slots": {"inputs": {"values": "external:" + source},
-                            "outputs": {"valid_extent": output}},
-        }
-    if kind not in ("runtime_extent_affine", "runtime_extent_scale"):
-        raise ValueError("unsupported extent derivation")
-    argument = ("extent_affine_source" if kind == "runtime_extent_affine"
-                else "extent_scale_source")
-    constants = ({"extent_affine_factor": factor,
-                  "extent_affine_offset": offset,
-                  "extent_affine_capacity": capacity} if kind == "runtime_extent_affine"
-                 else {"extent_scale_factor": factor,
-                       "extent_scale_capacity": capacity})
-    return {
-        "id": op_id, "op": kind, "kernel": kind + "_i32",
-        "returns_status": True,
-        "consumes_runtime_lengths": [source],
-        "produces_runtime_lengths": {target: "valid_extent"},
-        "runtime_scalar_bindings": {argument: source},
-        "params": {"call_constants": constants},
-        "graph_slots": {"inputs": {}, "outputs": {"valid_extent": output}},
-    }
-
+from version.v8.scripts.checked_circuit_authoring_v8 import (
+    bind_runtime_scalars as _bind, runtime_extent as _extent,
+)
 
 def build_circuit(*, context_capacity: int = 7) -> dict:
     if isinstance(context_capacity, bool) or not isinstance(context_capacity, int) or not 1 <= context_capacity <= 117:

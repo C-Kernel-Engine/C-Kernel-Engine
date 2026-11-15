@@ -1,0 +1,111 @@
+{
+  "schema": "cke.latent_autoregressive.v1",
+  "shell": "checked_latent_loop.v1",
+  "policy": {
+    "hidden_selection": "last_valid_row",
+    "stop": "two_logits_stop1_gt_continue0",
+    "feedback": "append_one_embedding",
+    "history": "replace_one_patch",
+    "publication": "normal_stop_only",
+    "aggregator_class_id": 0,
+    "rng_stream": "base_plus_frame"
+  },
+  "components": {
+    "backbone": {
+      "artifact": "backbone",
+      "ports": {
+        "embeddings": "embeddings",
+        "hidden": "hidden",
+        "stop_logits": "stop_logits",
+        "request_rows": "request_rows",
+        "token_ids": "token_ids",
+        "decode_input": "decode_input",
+        "decode_hidden": "decode_hidden",
+        "decode_stop_logits": "decode_stop_logits",
+        "decode_position": "decode_position"
+      },
+      "entries": {
+        "embed": "embed",
+        "prefill": "prefill",
+        "decode": "decode"
+      }
+    },
+    "flow_model": {
+      "artifact": "dit",
+      "ports": {
+        "latent": "latent",
+        "condition": "condition",
+        "history": "history",
+        "time": "time",
+        "prediction": "prediction"
+      },
+      "entries": {
+        "run": "run"
+      }
+    },
+    "flow_update": {
+      "artifact": "update",
+      "ports": {
+        "latent": "latent",
+        "prediction": "prediction",
+        "null_prediction": "null_prediction",
+        "noise": "noise",
+        "neg_one": "neg_one",
+        "cfg": "cfg",
+        "dt": "dt",
+        "noise_amplitude": "noise_amplitude",
+        "output": "output"
+      },
+      "entries": {
+        "update": "update",
+        "noise": "noise"
+      }
+    },
+    "aggregator": {
+      "artifact": "aggregator",
+      "ports": {
+        "latent": "latent",
+        "class_id": "class_id",
+        "embedding": "embedding"
+      },
+      "entries": {
+        "run": "run"
+      }
+    },
+    "decoder": {
+      "artifact": "decoder",
+      "ports": {
+        "latent": "latent",
+        "request_frames": "request_frames",
+        "window": "window",
+        "waveform": "waveform"
+      },
+      "entries": {
+        "run": "run"
+      }
+    }
+  },
+  "sampling": {
+    "contract": "guided_cfg_euler_sde.v1",
+    "schedule_id": "ming3_epss10_sway_minus1_fp32.v1",
+    "times": [
+      0.0,
+      0.004815280437469482,
+      0.019214749336242676,
+      0.04305964708328247,
+      0.07612049579620361,
+      0.1685304045677185,
+      0.2928932309150696,
+      0.44442981481552124,
+      0.6173165440559387,
+      0.8049097657203674,
+      1.0
+    ],
+    "cfg": 2.0,
+    "sigma": 0.25,
+    "temperature": 0.0,
+    "rng": "splitmix64_box_muller.v1"
+  },
+  "minimum_frames": 5,
+  "prediction_selection": "last_leading_row"
+}

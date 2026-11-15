@@ -5,8 +5,8 @@ from pathlib import Path
 import numpy as np
 ROOT=Path(__file__).resolve().parents[3];sys.path.insert(0,str(ROOT))
 from version.v8.tts.build_ming3_audio_decoder_circuit import build_circuit
-from version.v8.tts.build_ming3_dit_block_circuit import weight_shapes
-from version.v8.tts.replay_ming3_dit_block import compile_block
+from version.v8.scripts.checked_circuit_authoring_v8 import declared_f32_weight_shapes as weight_shapes
+from version.v8.scripts.compile_checked_bundle_v8 import compile_declared_f32_graph as compile_block
 from version.v8.tts.capture_ming3_synthesis_reference import digest
 
 def main():

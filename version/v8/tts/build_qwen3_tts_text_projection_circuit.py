@@ -10,36 +10,18 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT))
 OUTPUT = ROOT / "version/v8/circuits/qwen3_tts_text_projection_bounded.json"
 VOCAB = 151936
 TEXT = 2048
 HIDDEN = 1024
 
 
-def linear(name: str, source: str, output: str, input_width: int,
-           output_width: int, rows: int, prefix: str) -> dict:
-    return {
-        "id": name, "op": "linear_rows_checked",
-        "kernel": "linear_rows_checked_f32", "returns_status": True,
-        "weight_refs": {"weight": f"{prefix}.weight", "bias": f"{prefix}.bias"},
-        "graph_slots": {"inputs": {"input": source},
-                        "outputs": {"output": output}},
-        "params": {"M": rows, "K": input_width, "N": output_width,
-                   "call_constants": {
-                       "linear_input_elements": rows * input_width,
-                       "linear_input_stride": input_width,
-                       "linear_weight_elements": input_width * output_width,
-                       "linear_weight_stride": input_width,
-                       "linear_bias_elements": output_width,
-                       "linear_output_elements": rows * output_width,
-                       "linear_output_stride": output_width,
-                       "linear_rows": rows,
-                       "linear_input_channels": input_width,
-                       "linear_output_channels": output_width}}}
-
+from version.v8.scripts.checked_circuit_authoring_v8 import linear
 
 def build_circuit(*, tokens: int = 7, vocab: int = VOCAB,
                   text_width: int = TEXT, hidden_width: int = HIDDEN) -> dict:
