@@ -385,7 +385,7 @@ class V8Qwen3VLTemplateTests(unittest.TestCase):
                     "mrope_qk_vision",
                 )
                 if artifact == "call":
-                    self.assertEqual(mrope["function"], "mrope_qk_vision")
+                    self.assertEqual(mrope["function"], "mrope_qk_vision_parallel_dispatch")
                 else:
                     self.assertEqual(mrope["kernel"], "mrope_qk_vision")
 
@@ -407,7 +407,8 @@ class V8Qwen3VLTemplateTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, msg=result.stderr)
             generated = generated_c.read_text(encoding="utf-8")
-            self.assertIn("mrope_qk_vision(", generated)
+            self.assertRegex(generated, r"(?m)^\s+mrope_qk_vision_parallel_dispatch\(")
+            self.assertNotRegex(generated, r"\bmrope_qk_vision\s*\(")
             self.assertNotIn("ck_multimodal_prefill_mrope_qk", generated)
             result = subprocess.run(
                 [
@@ -524,7 +525,7 @@ class V8Qwen3VLTemplateTests(unittest.TestCase):
                     "mrope_qk_vision_bf16_storage",
                 )
                 if artifact == "call":
-                    self.assertEqual(mrope["function"], "mrope_qk_vision_bf16_storage")
+                    self.assertEqual(mrope["function"], "mrope_qk_vision_bf16_storage_parallel_dispatch")
                 else:
                     self.assertEqual(mrope["kernel"], "mrope_qk_vision_bf16_storage")
                 if artifact == "lowered":
@@ -1546,9 +1547,16 @@ class V8Qwen3VLTemplateTests(unittest.TestCase):
                 "gemm_nt_fp32_exact_parallel_dispatch",
             )
             attn_norm = next(op for op in call_ops if op.get("op") == "layernorm")
-            self.assertEqual(attn_norm.get("function"), "layernorm_naive_serial_matched_precision")
+            self.assertEqual(attn_norm.get("function"), "layernorm_fp32_exact_parallel_dispatch")
             branch_norm = next(op for op in call_ops if op.get("op") == "branch_layernorm")
-            self.assertEqual(branch_norm.get("function"), "layernorm_naive_serial_matched_precision")
+            self.assertEqual(branch_norm.get("function"), "layernorm_fp32_exact_parallel_dispatch")
+            for norm in (op for op in call_ops if op.get("op") in {"layernorm", "branch_layernorm"}):
+                self.assertEqual(norm["function"], "layernorm_fp32_exact_parallel_dispatch")
+                self.assertEqual(norm["resolved_contract"]["kernel_id"], "layernorm_fp32_exact")
+                self.assertEqual(
+                    norm["resolved_contract"]["contract_id"],
+                    "layernorm_fp32_ggml_chunked_contracted",
+                )
             mlp_up = next(op for op in call_ops if op.get("op") == "mlp_up")
             self.assertEqual(mlp_up.get("function"), "gemm_nt_q8_0_q8_0_contract")
             mlp_up_n = next(arg for arg in mlp_up.get("args", []) if arg.get("name") == "N")
@@ -1595,7 +1603,8 @@ class V8Qwen3VLTemplateTests(unittest.TestCase):
             self.assertIn("vision_bridge_output", text)
             self.assertIn("ck_strict_mtmd_clip_encode_planar_f32", text)
             self.assertIn("gelu_ggml_inplace", text)
-            self.assertIn("layernorm_naive_serial_matched_precision", text)
+            self.assertRegex(text, r"(?m)^\s+layernorm_fp32_exact_parallel_dispatch\(")
+            self.assertNotRegex(text, r"\blayernorm_naive_serial_matched_precision\s*\(")
             self.assertIn("ck_debug_export_hidden(model, 0, \"qkv_packed\"", text)
             self.assertIn("ck_debug_export_hidden(model, 0, \"q_proj\"", text)
             self.assertIn("ck_debug_export_hidden(model, 0, \"k_proj\"", text)
