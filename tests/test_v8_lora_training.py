@@ -49,6 +49,22 @@ def lower(ir):
 
 
 class LoRAContractTests(unittest.TestCase):
+    def test_explicit_adapter_only_policy(self):
+        original = fixture()
+        saved = copy.deepcopy(original)
+        declarations = [dict(target="bridge", rank=2, alpha=3, name="demo")]
+        ir, _ = attach_lora_adapters(original, adapters=declarations, freeze_base=True)
+        self.assertEqual(original, saved)
+        self.assertEqual(ir["adapter_training_policy"]["trainable_parameters"],
+                         ["lora.demo.a", "lora.demo.b"])
+        lowered = lower(ir)
+        self.assertEqual({tid for tid in lowered["tensors"] if tid.startswith("grad.weight.")},
+                         {"grad.weight.lora.demo.a", "grad.weight.lora.demo.b"})
+        for invalid in (None, 0, 1, "true"):
+            with self.subTest(invalid=invalid), self.assertRaisesRegex(ValueError, "boolean"):
+                attach_lora_adapters(original, adapters=declarations, freeze_base=invalid)
+        self.assertEqual(original, saved)
+
     def test_immutable_graph_and_freeze(self):
         original = fixture()
         original["ops"][1]["op"] = "up_projection"

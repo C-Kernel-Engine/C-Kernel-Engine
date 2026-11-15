@@ -7,6 +7,33 @@
 <h1>Clef-Flash decision-head bring-up</h1>
 
 
+<section id="decoder-lora-certification">
+<h2>Complete small decoder with FP32 adapters</h2>
+<p><code>attach_lora_adapters(..., freeze_base=True)</code> explicitly freezes
+all base parameters while preserving activation gradients through the decoder.
+The default preserves existing selective-training behavior. Initialization remains
+external; generated native code performs forward, backward and AdamW updates.</p>
+<p>The regression uses the standard two-layer dense Qwen-style decoder template,
+including embeddings, normalization, RoPE, causal attention, residuals, SwiGLU and
+vocabulary loss. Rank-2 query and rank-3 value adapters in different layers total
+320 trainable parameters. Four- and seven-token cases use separate compiled
+geometries; this does not certify dynamic lengths in one library.</p>
+<p>Both cases compare named forward tensors, loss, every adapter gradient, weights
+and optimizer moments against independent PyTorch for 40 updates. Tests cover
+frozen-base bytes, zero-B initialization, finite differences, capacity/nonfinite
+rejection, checkpoint continuation and fresh-process forward-only reload.
+Missing dependencies remain explicit skips; numerical tolerances are unchanged.</p>
+<p>Training loss fell from 4.764195 to 1.113996 and from 3.932966 to 1.229868.
+Maximum observed gradient error was 7.67e-6, weight error 2.55e-6 and moment error
+4.49e-7. This is synthetic training correctness, not held-out application accuracy.
+Pretrained Qwen fine-tuning, base-import adapter manifests, complete BF16 decoder
+training, QLoRA and performance certification remain untested.</p>
+<pre>make -j4 build/libckernel_engine.so
+CK_NUM_THREADS=4 OMP_NUM_THREADS=1 python -m pytest -q tests/test_v8_decoder_lora_training.py tests/test_v8_lora_training.py tests/test_v8_lora_bf16_base.py tests/test_v8_selective_training.py</pre>
+<p>The existing <code>training_lora_fp32</code> nightly lane includes this test.
+PyTorch runs only as the independent development oracle.</p>
+</section>
+
 <section id="frozen-native-training-prefix">
 <h2>Declared frozen native prefix in training</h2>
 <p>A checked feature-producing component can feed the existing generated head

@@ -353,14 +353,18 @@ def initialize_lora(spec, *, seed):
     }
 
 
-def attach_lora_adapters(ir, *, adapters, max_parameters=None):
+def attach_lora_adapters(ir, *, adapters, max_parameters=None, freeze_base=False):
     """Declare multiple bounded projections before backward synthesis.
 
     Each declaration has exactly target/rank/alpha/name. No target discovery,
     rank guessing, parameter initialization or compilation occurs here.
+    freeze_base=True freezes every non-adapter parameter while preserving the
+    activation-gradient paths needed to reach earlier adapters.
     """
     if not isinstance(adapters, (list, tuple)) or not adapters:
         raise ValueError("nonempty explicit adapter declarations required")
+    if type(freeze_base) is not bool:
+        raise ValueError("freeze_base must be an explicit boolean")
     if max_parameters is not None and (
         type(max_parameters) is not int or max_parameters <= 0
     ):
@@ -393,4 +397,32 @@ def attach_lora_adapters(ir, *, adapters, max_parameters=None):
     total = sum(spec["parameter_count"] for spec in result["adapter_specs"])
     if max_parameters is not None and total > max_parameters:
         raise ValueError("resolved adapter parameters exceed budget")
+    if freeze_base:
+        trainable = {
+            "weight." + spec["parameters"][factor]
+            for spec in result["adapter_specs"]
+            for factor in ("a", "b")
+        }
+        parameters = {
+            tid for tid, meta in result["tensors"].items()
+            if meta.get("kind") == "weight"
+        }
+
+        def declare(value):
+            if isinstance(value, dict):
+                if value.get("tensor") in parameters:
+                    value["requires_grad"] = value["tensor"] in trainable
+                for item in value.values():
+                    declare(item)
+            elif isinstance(value, list):
+                for item in value:
+                    declare(item)
+
+        declare(result)
+        for tid in parameters:
+            result["tensors"][tid]["requires_grad"] = tid in trainable
+        result["adapter_training_policy"] = {
+            "mode": "adapter_only",
+            "trainable_parameters": sorted(tid.removeprefix("weight.") for tid in trainable),
+        }
     return result, specs

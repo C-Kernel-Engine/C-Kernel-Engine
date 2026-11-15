@@ -14,7 +14,7 @@ import codegen_train_runtime_v7 as codegen
 import generate_train_layout_v7 as planner
 
 
-def certify_training(self, ir, registry, values, trainable, forward, *, integer_inputs=None, loss_function=None, finite_difference=True, precision_label="FP32", fresh_process=False, checked_runtime=False, check_evaluation=False, extra_sources=(), probe_parameter="up", gradient_check=None):
+def certify_training(self, ir, registry, values, trainable, forward, *, integer_inputs=None, loss_function=None, finite_difference=True, precision_label="FP32", fresh_process=False, checked_runtime=False, check_evaluation=False, extra_sources=(), probe_parameter="up", gradient_check=None, token_ids=None, target_ids=None, output_tensor="act.score", loss_ratio=.2, gradient_floor=1e-5, initialization_evidence=None):
     try:
         import numpy as np
         import torch
@@ -26,6 +26,10 @@ def certify_training(self, ir, registry, values, trainable, forward, *, integer_
     if not engine.exists():
         self.skipTest('build/libckernel_engine.so is required for native training')
     torch.set_num_threads(1)
+    ids = np.ascontiguousarray(np.arange(4) if token_ids is None else token_ids, dtype='int32')
+    targets = np.ascontiguousarray(ids if target_ids is None else target_ids, dtype='int32')
+    self.assertEqual(ids.shape, targets.shape)
+    count = len(ids)
     manifest = {'config': ir['config']}
     layout = planner.build_layout(ir, manifest, 64, strict=True)
     source, summary = codegen.generate_c(ir, registry, manifest=manifest, layout=layout)
@@ -33,7 +37,7 @@ def certify_training(self, ir, registry, values, trainable, forward, *, integer_
     with tempfile.TemporaryDirectory(prefix='cke-selective-training-') as tmp:
         path = Path(tmp)
         (path / 'train.c').write_text(source)
-        subprocess.run([os.environ.get('CC', 'cc'), '-DCK_NUM_TOKENS=4', '-O2', '-shared', '-fPIC', '-I' + str(ROOT / 'include'),
+        subprocess.run([os.environ.get('CC', 'cc'), '-DCK_NUM_TOKENS=' + str(count), '-O2', '-shared', '-fPIC', '-I' + str(ROOT / 'include'),
                         *(['-DCK_RUNTIME_CANARY_CHECKS=1','-DCK_RUNTIME_BOUNDS_ASSERT=1','-Werror=incompatible-pointer-types'] if checked_runtime else []),
                         str(path / 'train.c'), *[str(ROOT / source) for source in extra_sources], str(engine), '-Wl,-rpath,' + str(engine.parent),
                         '-lm', '-o', str(path / 'train.so')], check=True)
@@ -63,8 +67,7 @@ def certify_training(self, ir, registry, values, trainable, forward, *, integer_
                 return lib.ck_train_step_with_i32_ex(ids, targets, count, metadata_inputs.ctypes.data_as(ip), metadata_inputs.size, loss, lr)
             def native_batch(ids, targets, count):
                 return lib.ck_train_set_batch_with_i32_ex(ids, targets, count, metadata_inputs.ctypes.data_as(ip), metadata_inputs.size)
-        ids = np.arange(4, dtype='int32')
-        labels = torch.arange(4)
+        labels = torch.from_numpy(targets.astype('int64'))
         criterion = loss_function or (lambda logits: torch.nn.functional.cross_entropy(logits, labels))
         losses = []
         errors = dict(gradient=0.0, weight=0.0, moment=0.0)
@@ -74,7 +77,7 @@ def certify_training(self, ir, registry, values, trainable, forward, *, integer_
             config["precision_policy"] = precision_label
         metadata = dict(runtime_contract_sha256=summary['runtime_contract_sha256'],
                         training_config=config, training_config_sha256=workflow._json_sha256(config),
-                        dataset_sha256=workflow._sha256_bytes(ids.tobytes() + values['features'].tobytes() + (metadata_inputs.tobytes() if metadata_inputs is not None else b'')),
+                        dataset_sha256=workflow._sha256_bytes(ids.tobytes() + targets.tobytes() + packed.tobytes() + (metadata_inputs.tobytes() if metadata_inputs is not None else b'')),
                         next_microstep=20, total_microsteps=40, grad_accum=1)
 
         def snapshot(kind, count):
@@ -88,8 +91,8 @@ def certify_training(self, ir, registry, values, trainable, forward, *, integer_
             if checked_runtime:
                 # Fixed-capacity rejection must not advance AdamW or alter weights.
                 rejected_loss = ctypes.c_float()
-                self.assertLess(native_step(ids.ctypes.data_as(ip), ids.ctypes.data_as(ip),
-                    3, ctypes.byref(rejected_loss), .03), 0)
+                self.assertLess(native_step(ids.ctypes.data_as(ip), targets.ctypes.data_as(ip),
+                    count - 1, ctypes.byref(rejected_loss), .03), 0)
                 self.assertEqual(lib.ck_train_get_opt_step(), 0)
                 np.testing.assert_array_equal(snapshot('weight', len(packed)), packed)
                 # Reject a bad master operand before any optimizer update, then
@@ -99,8 +102,8 @@ def certify_training(self, ir, registry, values, trainable, forward, *, integer_
                 bad[offset] = np.nan
                 lib.ck_train_import_weight_snapshot.argtypes = [fp, ctypes.c_int]
                 self.assertEqual(lib.ck_train_import_weight_snapshot(ptr(bad), len(bad)), len(bad))
-                self.assertLess(native_step(ids.ctypes.data_as(ip), ids.ctypes.data_as(ip),
-                    4, ctypes.byref(rejected_loss), .03), 0)
+                self.assertLess(native_step(ids.ctypes.data_as(ip), targets.ctypes.data_as(ip),
+                    count, ctypes.byref(rejected_loss), .03), 0)
                 self.assertEqual(lib.ck_train_get_opt_step(), 0)
                 self.assertEqual(snapshot('weight', len(bad)).tobytes(), bad.tobytes())
                 self.assertEqual(lib.ck_train_import_weight_snapshot(ptr(packed), len(packed)), len(packed))
@@ -115,9 +118,14 @@ def certify_training(self, ir, registry, values, trainable, forward, *, integer_
                     before_weights = snapshot('weight', summary['weight_snapshot_floats'])
                     before_moments = workflow._array_export(lib, 'optimizer_state')
                     before_step = lib.ck_train_get_opt_step()
-                    self.assertGreater(native_batch(ids.ctypes.data_as(ip), ids.ctypes.data_as(ip), 4), 0)
+                    self.assertGreater(native_batch(ids.ctypes.data_as(ip), targets.ctypes.data_as(ip), count), 0)
                     evaluated = ctypes.c_float()
                     self.assertGreater(lib.ck_train_eval_step(ctypes.byref(evaluated)), 0)
+                    if hasattr(forward, "slots"):
+                        activations = workflow.CERT._activation_snapshot(lib, summary)
+                        for name, expected_slot in getattr(forward, "slots", {}).items():
+                            self.assertIn(name, activations, "missing named oracle checkpoint")
+                            np.testing.assert_allclose(activations[name], expected_slot, atol=3e-5, rtol=3e-4, err_msg=name)
                     self.assertAlmostEqual(evaluated.value, loss.item(), delta=3e-5)
                     np.testing.assert_array_equal(snapshot('weight', summary['weight_snapshot_floats']), before_weights)
                     np.testing.assert_array_equal(workflow._array_export(lib, 'optimizer_state'), before_moments)
@@ -128,10 +136,10 @@ def certify_training(self, ir, registry, values, trainable, forward, *, integer_
                 # Grouped objectives can converge to a zero gradient; preserve
                 # the existing decoder assertion for its original trajectory.
                 if loss_function is None or step == 0:
-                    self.assertGreater(float(params[probe_parameter].grad.abs().max()), 1e-5)
+                    self.assertGreater(float(params[probe_parameter].grad.abs().max()), gradient_floor)
                 native_loss = ctypes.c_float()
-                self.assertGreater(native_step(ids.ctypes.data_as(ip), ids.ctypes.data_as(ip),
-                                                       4, ctypes.byref(native_loss), .03), 0)
+                self.assertGreater(native_step(ids.ctypes.data_as(ip), targets.ctypes.data_as(ip),
+                                                       count, ctypes.byref(native_loss), .03), 0)
                 self.assertAlmostEqual(native_loss.value, loss.item(), delta=3e-5, msg=str(step))
                 actual = snapshot('weight', summary['weight_snapshot_floats'])
                 for n in set(values) - set(trainable):
@@ -159,7 +167,7 @@ def certify_training(self, ir, registry, values, trainable, forward, *, integer_
                     opt.state[params[n]][kind].numpy().ravel()
                     for kind in ('exp_avg', 'exp_avg_sq') for n in sorted(trainable)])
                 errors['moment'] = max(errors['moment'], float(np.max(np.abs(moments - expected_moments))))
-                np.testing.assert_allclose(moments, expected_moments, atol=3e-6, rtol=3e-4)
+                np.testing.assert_allclose(moments, expected_moments, atol=3e-6, rtol=3e-4, err_msg=f'step={step}; errors={errors}')
                 actual = snapshot('weight', summary['weight_snapshot_floats'])
                 expected = np.concatenate([params[n].detach().numpy().ravel() for n in ordered])
                 errors['weight'] = max(errors['weight'], float(np.max(np.abs(actual - expected))))
@@ -167,7 +175,7 @@ def certify_training(self, ir, registry, values, trainable, forward, *, integer_
                 losses.append(native_loss.value)
                 if step == 19:
                     checkpoint = workflow._checkpoint_write(path, 'step20', lib, metadata)
-            self.assertLess(losses[-1], losses[0] * .2)
+            self.assertLess(losses[-1], losses[0] * loss_ratio)
             final_weights = snapshot('weight', summary['weight_snapshot_floats'])
             final_moments = snapshot('optimizer_state', summary['optimizer_state_snapshot_floats'])
             # Reset the native runtime before restoring; no Python weight updates.
@@ -178,8 +186,8 @@ def certify_training(self, ir, registry, values, trainable, forward, *, integer_
             workflow._checkpoint_load(checkpoint, lib, metadata)
             for step in range(20, 40):
                 native_loss = ctypes.c_float()
-                self.assertGreater(native_step(ids.ctypes.data_as(ip), ids.ctypes.data_as(ip),
-                                                       4, ctypes.byref(native_loss), .03), 0)
+                self.assertGreater(native_step(ids.ctypes.data_as(ip), targets.ctypes.data_as(ip),
+                                                       count, ctypes.byref(native_loss), .03), 0)
                 self.assertEqual(native_loss.value, losses[step])
             np.testing.assert_array_equal(snapshot('weight', len(final_weights)), final_weights)
             np.testing.assert_array_equal(snapshot('optimizer_state', len(final_moments)), final_moments)
@@ -187,7 +195,7 @@ def certify_training(self, ir, registry, values, trainable, forward, *, integer_
                 result_path = path / 'fresh-result.json'
                 request = dict(library=str(path/'train.so'),
                     library_sha256=hashlib.sha256((path/'train.so').read_bytes()).hexdigest(),
-                    sizes=sizes.tolist(), tokens=4, token_ids=ids.tolist(),
+                    sizes=sizes.tolist(), tokens=count, token_ids=ids.tolist(), target_ids=targets.tolist(),
                     integer_inputs=[] if metadata_inputs is None else metadata_inputs.tolist(),
                     checkpoint=str(checkpoint), metadata=metadata, remaining_steps=20,
                     learning_rate=.03, result=str(result_path))
@@ -201,15 +209,27 @@ def certify_training(self, ir, registry, values, trainable, forward, *, integer_
             # Reload the trained weights for forward-only execution.
             lib.ck_train_free()
             self.assertEqual(lib.ck_train_init(ptr(final_weights), sizes.ctypes.data_as(ip), len(sizes)), len(sizes))
-            self.assertGreater(native_batch(ids.ctypes.data_as(ip), ids.ctypes.data_as(ip), 4), 0)
+            self.assertGreater(native_batch(ids.ctypes.data_as(ip), targets.ctypes.data_as(ip), count), 0)
             self.assertGreater(lib.ck_train_forward_step(), 0)
             activations = workflow.CERT._activation_snapshot(lib, summary)
             expected_logits = forward(params)
-            np.testing.assert_allclose(activations['act.score'].reshape(tuple(expected_logits.shape)),
+            np.testing.assert_allclose(activations[output_tensor].reshape(tuple(expected_logits.shape)),
                                        expected_logits.detach().numpy(), atol=3e-5, rtol=3e-4)
             self.assertEqual(lib.ck_train_get_opt_step(), 0)
+            if fresh_process:
+                weights_path = path / 'inference-weights.bin'
+                weights_path.write_bytes(final_weights.astype('<f4').tobytes())
+                request.update(mode='inference', weights=str(weights_path),
+                    weights_sha256=hashlib.sha256(weights_path.read_bytes()).hexdigest(),
+                    summary=summary, output_tensor=output_tensor)
+                request_path.write_text(json.dumps(request))
+                subprocess.run([sys.executable, str(ROOT/'tests/clef_training_resume_worker.py'), str(request_path)], check=True)
+                inferred = json.loads(result_path.read_text())
+                self.assertEqual(inferred['optimizer_step'], 0)
+                self.assertEqual(inferred['weight_sha256'], request['weights_sha256'])
+                np.testing.assert_array_equal(inferred['logits'], activations[output_tensor].tolist())
             print('%s native AdamW: loss %.8f -> %.8f; 40 gradient/update comparisons' % (precision_label, losses[0], losses[-1]))
-            print(json.dumps(dict(seed=837, torch_version=torch.__version__, max_abs_errors=errors,
+            print(json.dumps(dict(initialization=initialization_evidence or {"seed":837}, torch_version=torch.__version__, max_abs_errors=errors,
                                   runtime_contract_sha256=summary['runtime_contract_sha256'],
                                   generated_c_sha256=hashlib.sha256(source.encode()).hexdigest(),
                                   engine_sha256=hashlib.sha256(engine.read_bytes()).hexdigest(),
