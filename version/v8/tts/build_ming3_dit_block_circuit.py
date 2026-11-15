@@ -8,7 +8,7 @@ from __future__ import annotations
 import argparse,json,sys
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[3];sys.path.insert(0,str(ROOT))
-from version.v8.tts.build_qwen3_tts_text_projection_circuit import linear
+from version.v8.scripts.checked_circuit_authoring_v8 import linear
 OUTPUT=ROOT/'version/v8/circuits/ming3_tts_dit_block_fp32_bounded.json'
 
 def build_circuit(tokens=3,width=1024,heads=16,mult=4):
@@ -72,15 +72,7 @@ def build_circuit(tokens=3,width=1024,heads=16,mult=4):
                     'logical_layout':'token_major_contiguous','axis_names':['token','channel'],
                     'storage_dtype':'fp32'}]} for op in ops}}}
 
-def weight_shapes(graph):
-    shapes={}
-    for op in (op for block in graph['block_types'].values() for op in block.get('body',{}).get('ops',[])):
-        for key,name in op.get('weight_refs',{}).items():
-            if key=='table':shapes[name]=[op['params']['V'],op['params']['C']]
-            elif key in ('gamma','frequencies'):shapes[name]=[op['params']['C']]
-            elif key=='positions':shapes[name]=[op['params']['R']]
-            else:shapes[name]=[op['params']['N']] if key=='bias' else [op['params']['N'],op['params']['K']]
-    return shapes
+from version.v8.scripts.checked_circuit_authoring_v8 import declared_f32_weight_shapes as weight_shapes
 
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--output',type=Path,default=OUTPUT);p.add_argument('--check',action='store_true');a=p.parse_args();content=json.dumps(build_circuit(),indent=2)+'\n'

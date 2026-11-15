@@ -4,8 +4,9 @@ from __future__ import annotations
 import argparse,copy,json,sys
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[3];sys.path.insert(0,str(ROOT))
+from version.v8.scripts.checked_circuit_authoring_v8 import execution_port
 from version.v8.tts.build_ming3_dit_block_circuit import build_circuit as block_circuit
-from version.v8.tts.build_qwen3_tts_text_projection_circuit import linear
+from version.v8.scripts.checked_circuit_authoring_v8 import linear
 OUTPUT=ROOT/'version/v8/circuits/ming3_tts_dit_fp32_bounded.json'
 
 def build_circuit(width=1024,heads=16,depth=8,latent=64,condition=896,time_width=256,mult=4):
@@ -81,6 +82,10 @@ def build_circuit(width=1024,heads=16,depth=8,latent=64,condition=896,time_width
         'checkpoints':[{'id':'ming3.dit_full.'+op['id']+'.'+port,'producer':op['id'],
             'tensor':tensor,'logical_layout':'row_major_contiguous','axis_names':['row','channel'],
             'storage_dtype':'fp32'} for port,tensor in op['graph_slots']['outputs'].items()]} for op in ops}
+    graph['execution_exports']={'schema':'cke.checked.execution_exports.v1',
+        'entries':{'run':graph['native_entry']['function']},
+        'ports':{name:execution_port(graph,name) for name in ('latent','time','condition','history')}}
+    graph['execution_exports']['ports']['prediction']=execution_port(graph,'output',leading_slice=(2,1))
     return graph
 
 def constant_weights(time_width=256):

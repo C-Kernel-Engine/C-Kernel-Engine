@@ -1029,7 +1029,7 @@
     </header>
     <main>
 <h1>Ming3 TTS: connected native components</h1>
-<p><strong>Status: generated flow arithmetic, complete FP32 DiT and connected offline FP32 audio decoding. Full native text-to-speech, publisher BF16 parity and serving remain unestablished.</strong></p>
+<p><strong>Status: experimental native FP32 text-to-WAV, checked cached continuation and a sentence-chunked 100-word trial. Publisher BF16/RNG parity, human listening approval, practical speed and HTTP serving remain open.</strong></p>
 <p>The model is <a href="https://huggingface.co/inclusionAI/Ming-3.0-tts-0.5B">inclusionAI/Ming-3.0-tts-0.5B</a>.
 The publisher combines a Qwen2.5 backbone with a DiT flow head, an aggregator,
 an audio VAE and a speaker encoder. Existing CKE TTS work supplies reusable
@@ -1163,9 +1163,9 @@ FP32. Native execution took approximately 0.109 seconds per branch in one
 component measurement, using a 415 MB arena. This is measured FP32 component
 evidence, not publisher BF16 certification or end-to-end synthesis performance.</p>
 <pre>python3 -m unittest tests.test_v8_ming3_dit tests.test_v8_sinusoidal_rows -v</pre>
-<p>The native sampler/RNG loop, backbone, aggregator and audio-decoder transformer
-remain separate integration gates. The existing reference-spectrum WAV does not
-become native text-to-speech merely because this DiT component executes.</p>
+<p>This DiT component result is separate from the connected native sampler, backbone,
+aggregator and audio-decoder evidence below. Reference-spectrum output alone does
+not establish native text-to-speech.</p>
 <h2>Connected offline audio decoder</h2>
 <p>The generated audio graph now accepts reference latents and an explicit window
 asset, then executes input projection, half-pixel interpolation, all 24 decoder
@@ -1187,9 +1187,7 @@ maximum difference was 0.0343, so small waveform error must not hide intermediat
 drift. This is measured evidence without a numerical certification verdict or
 listening approval; no production speed claim follows from this development run.</p>
 <p>The present graph compiles a fixed latent count, at most 512 latent frames,
-which become 2048 spectral frames at the pinned factor four. It is not yet a
-variable-length resident session, streaming decoder, or a 100-word acceptance
-result. Kernel workspace is planned; Python's offline compiler/weight conversion
+which become 2048 spectral frames at the pinned factor four. This fixed-length baseline is retained alongside the newer resident runtime-length decoder described below. Neither establishes streaming equivalence. Kernel workspace is planned; Python's offline compiler/weight conversion
 has additional memory costs. The quadratic inverse transform remains a correctness
 baseline. No listening approval is inferred from numerical tests.</p>
 <pre>python3 -m unittest tests.test_v8_ming3_audio_decoder tests.test_v8_audio_spectrum_cartesian -v
@@ -1201,12 +1199,12 @@ python3 version/v8/tts/replay_ming3_audio_decoder.py \
   --reference /tmp/ming-reference/decoder-fp32-17.npz \
   --output /tmp/ming-native-decoder</pre>
 <h2>Native generation loop and resident lengths</h2>
-<p>The next bounded implementation connects token embedding, the complete Qwen2.5
+<p>The connected implementation executes token embedding, the complete Qwen2.5
 backbone, stop head, native guided-flow sampler and latent aggregator. A C driver
 owns the iteration and feeds the aggregator's class-row output back into the next
 backbone position. Python prepares inputs and invokes native execution; it does not
 run the neural sampling loop. The initial backbone deliberately recomputes the
-whole valid prefix. This is not cached decode or a performance claim.</p>
+whole valid prefix. A separately selected cached policy now uses generated checked KV append after prefill; it does not silently replace the full-prefix baseline.</p>
 <p>The generated dynamic audio decoder uses checked request lengths within a fixed
 allocation. Small independent-reference tests cover short, long, then short
 requests, invalid capacities and recovery. The connected loop tests nonzero
@@ -1243,18 +1241,67 @@ rotary inverse frequencies. Against that variant, native hidden-state RMSE was
 frequencies directly in FP32 gave RMSE 1.48e-5 (maximum 5.57e-4); stop-logit
 maximum error was 8.21e-5. Both results remain recorded. This identifies a major
 contract difference, not permission to label the native path publisher-BF16 exact.</p>
+<h2>Declarative bindings and shared authoring</h2>
+<p>Model builders declare topology through ordinary circuit lowering. The backbone
+and audio decoder compose a shared transformer-stack authoring helper; backbone
+construction does not filter another model graph by operation names. Checked
+compilation, weight-shape validation and runtime-extent authoring live in shared
+modules, with representative Qwen TTS consumer tests.</p>
+<p>Each component exports named tensors and generated entries. The compiler validates
+shapes, contiguous slices, provider dtypes, entry call ranges and allocation bounds,
+then binds the manifest to the loaded library identity. The latent execution profile
+selects a versioned runtime shell and declares feedback, history, stop semantics,
+minimum frames, sampling schedule and RNG policy. Binding rejects the wrong
+prediction row, incompatible dimensions, wrong entry outputs and stale manifests
+before native execution. The decoder returns its valid sample count through the
+existing generated runtime-length ABI; the host does not reconstruct that count.</p>
+<p>The C loop is a bounded latent-autoregressive execution pattern, not an arbitrary
+graph executor. Version one supports one-patch history, one feedback embedding and
+binary stop logits. Unsupported policies reject. No Ming-name branch is added to
+generic lowering or code generation.</p>
+<h2>Retained native trials, 15 November 2026</h2>
+<p>The built-in UK_George voice spoke “Hello. This is Ming speech.” from a
+publisher-formatted 144-token prompt without oracle activations. Full-prefix
+execution took 552.3 seconds plus 14.0 seconds of waveform decoding. The cached
+candidate took 91.1 seconds plus 14.0 seconds for the same 32 latent frames and
+2.56 seconds of audio. These are development runs, not controlled speed benchmarks.
+Cached versus full-prefix latent maximum error was 0.0001903; waveform maximum
+error was 0.0001027. They are not bitwise equivalent. Real resident cancellation,
+oversized-input rejection and a repeated request recovered bit-exact latents and
+waveform for that cached candidate.</p>
+<p>A separate 100-word trial completed seven explicit sentence chunks in one loaded
+session, producing 2,127,384 samples (48.24 seconds). Generation took 1,583.7 seconds
+and waveform decoding 263.4 seconds, excluding load. This is far from interactive
+speed. Whisper, without vocabulary hints, recovered all sentences and the numbers
+3 and 42; one normalized word differed for “C-Kernel-Engine.” ASR agreement is not
+human listening approval, pronunciation certification or seamless-join evidence.</p>
+<p>The paragraph trial used an earlier cached build; its retained artifact hashes
+identify that build. It does not certify later binding refactors. A subsequent
+short trial exercised the validated declarative bindings separately: 91.6 seconds
+generation and 14.0 seconds decoding, with bit-exact latents and waveform against
+the earlier cached candidate. Native neural execution uses
+FP32 and the declared counter RNG, not the publisher BF16/PyTorch-RNG trajectory.</p>
+<pre>python3 -m unittest tests.test_v8_latent_execution_contract \
+  tests.test_v8_checked_circuit_authoring tests.test_v8_ming3_cached_backbone -v
+python3 version/v8/tts/run_ming3_native_v8.py \
+  --checkpoint /path/to/checkpoint --publisher-root /path/to/pinned/publisher \
+  --output /path/to/new-cached-run --text "Hello. This is Ming speech." \
+  --capacity 256 --max-frames 100 --threads 2 --cached-backbone
+python3 version/v8/tts/run_ming3_paragraph_v8.py \
+  --checkpoint /path/to/checkpoint --publisher-root /path/to/pinned/publisher \
+  --text-file /path/to/paragraph.txt --output /path/to/new-paragraph-run \
+  --capacity 512 --max-frames 200 --threads 2</pre>
 <h2>Kernel and circuit work still required</h2>
 <table><thead><tr><th>Component</th><th>Reuse candidates</th><th>Remaining gate</th></tr></thead><tbody>
-<tr><td>Qwen2.5 backbone</td><td>Linear projections, RMSNorm, RoPE, attention, KV</td><td>Weight mapping, prompt embedding assembly and artifact-specific BF16 parity</td></tr>
-<tr><td>DiT and aggregator</td><td>Checked linear, GELU/SiLU, normalization, full attention</td><td>FP32 DiT, native flow and aggregator connected; full synthesis and publisher BF16 trajectory certification remain</td></tr>
+<tr><td>Qwen2.5 backbone</td><td>Linear projections, RMSNorm, RoPE, attention, KV</td><td>Connected prompt/weight mapping and cached continuation tested; artifact-specific BF16 parity remains</td></tr>
+<tr><td>DiT and aggregator</td><td>Checked linear, GELU/SiLU, normalization, full attention</td><td>FP32 DiT, native flow and aggregator connected through synthesis; publisher BF16 trajectory certification remains</td></tr>
 <tr><td>Flow sampler</td><td>Checked scale and sum</td><td>Native bounded iteration, EPSS/sway and CFG implemented; separate publisher RNG and BF16 contracts remain</td></tr>
 <tr><td>Audio VAE</td><td>Transformer arithmetic and waveform plumbing</td><td>FP32 latents-to-waveform and runtime extents connected; real-weight certification and streaming remain</td></tr>
 <tr><td>Voice conditioning</td><td>Existing audio preprocessing where contracts match</td><td>CAM++ speaker encoder and reference-audio conditioning</td></tr>
 <tr><td>Serving</td><td>Speech request lifecycle, queues, cancellation, WAV delivery</td><td>Connect only after native synthesis and repeat/reset pass</td></tr>
 </tbody></table>
 <p>These are reuse candidates, not claims that all required numerical contracts
-already match. Add generic kernels/maps only for demonstrated gaps. Next connect the backbone, native sampler, aggregator and stop decision,
-then establish short native text-to-WAV and resident length/recovery semantics. Do not claim CPU speed from backbone parameter
+already match. Add generic kernels/maps only for demonstrated gaps. Next measure the connected bottlenecks, establish controlled numerical trajectory comparisons and finish listening and service lifecycle acceptance. Do not claim CPU speed from backbone parameter
 count or promote this diagnostic circuit as a serving model.</p>
 <p>The <a href="v7-visualizer-test-runbook.html#v8-component-coverage">IR visualizer</a>
 can inspect the generated layout, calls and semantic checkpoints. A circuit in its

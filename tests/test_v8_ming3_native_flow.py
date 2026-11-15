@@ -6,7 +6,8 @@ from version.v8.tts.build_ming3_dit_circuit import build_circuit,constant_weight
 from version.v8.tts.build_ming3_sampler_update_circuit import build_circuit as update_graph
 from version.v8.tts.build_ming3_dit_block_circuit import weight_shapes
 from version.v8.tts.replay_ming3_dit_block import compile_block
-from version.v8.tts.native_guided_flow import Model,Update,Request,ENTRY,NOISE,CANCEL,P,U,offsets,schedule
+from version.v8.tts.native_guided_flow import Model,Update,Request,ENTRY,NOISE,CANCEL,P,U,offsets
+from version.v8.tts.ming3_execution_profile import sampling_times as schedule
 from tests.test_v8_ming3_dit import reference as model_reference
 from tests.test_v8_audio_noise_counter_oracle import oracle as noise_reference
 
@@ -58,15 +59,32 @@ class FlowTests(unittest.TestCase):
             elif stream==0:np.testing.assert_array_equal(first,arrays[-1])
             else:self.assertGreater(abs(first-arrays[-1]).max(),.01)
             self.assertGreater(abs(arrays[-1]-self.expected(arrays,stream,cfg=0)).max(),1e-5)
+    def test_distinct_concurrent_native_arenas(self):
+        from concurrent.futures import ThreadPoolExecutor
+        def run(stream):
+            r,a=self.request(stream)
+            def clone(source):
+                raw=(C.c_uint8*(len(source)+63))()
+                aligned=(C.c_uint8*len(source)).from_buffer(raw,(-C.addressof(raw))&63)
+                C.memmove(C.addressof(aligned),C.addressof(source),len(source));return aligned
+            model=clone(self.model[1]);update=clone(self.update[1])
+            r.model.arena=C.cast(model,U);r.update.arena=C.cast(update,U)
+            status=self.driver(C.byref(r))
+            self.assertEqual(status,0)
+            np.testing.assert_allclose(a[-1],self.expected(a,stream),atol=2e-5,rtol=2e-5)
+            return a[-1].copy()
+        with ThreadPoolExecutor(max_workers=2) as pool:results=list(pool.map(run,[0,1,0,1]))
+        np.testing.assert_array_equal(results[0],results[2]);np.testing.assert_array_equal(results[1],results[3])
+
     def test_host_callback_exception_is_not_swallowed(self):
         from version.v8.tts.native_guided_flow import NativeGuidedFlow
         with tempfile.TemporaryDirectory() as d:
-            runner=NativeGuidedFlow(self.model,self.g,self.root/'model',Path(d))
+            runner=NativeGuidedFlow(self.model,self.g,self.root/'model',Path(d),times=schedule())
             _,arrays=self.request()
             def broken():raise ValueError('cancel callback failed')
             with self.assertRaisesRegex(ValueError,'cancel callback failed'):
-                runner.run(arrays[0],arrays[1],should_cancel=broken)
-            output=runner.run(arrays[0],arrays[1],temperature=.1)
+                runner.run(arrays[0],arrays[1],cfg=2.,sigma=.25,temperature=.1,should_cancel=broken)
+            output=runner.run(arrays[0],arrays[1],cfg=2.,sigma=.25,temperature=.1)
             np.testing.assert_allclose(output,self.expected(arrays),atol=2e-5,rtol=2e-5)
 
     def test_rejection_cancellation_failure_and_recovery(self):

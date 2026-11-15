@@ -800,6 +800,26 @@ TEST_SUITES = {
         ROOT / "tests" / "test_v8_ming3_native_flow.py", timeout_sec=180,
         unittest_targets=("tests.test_v8_ming3_native_flow",),
     ),
+    "checked_latent_execution_contract": TestSuite(
+        "Checked Latent Execution Bindings", "inference",
+        ROOT / "tests" / "test_v8_latent_execution_contract.py", timeout_sec=240,
+        unittest_targets=("tests.test_v8_latent_execution_contract",),
+    ),
+    "checked_circuit_authoring": TestSuite(
+        "Shared Checked Circuit Authoring", "inference",
+        ROOT / "tests" / "test_v8_checked_circuit_authoring.py", timeout_sec=240,
+        unittest_targets=("tests.test_v8_checked_circuit_authoring",),
+    ),
+    "tts_ming3_cached_backbone": TestSuite(
+        "Ming3 Cached Backbone State", "inference",
+        ROOT / "tests" / "test_v8_ming3_cached_backbone.py", timeout_sec=240,
+        unittest_targets=("tests.test_v8_ming3_cached_backbone",),
+    ),
+    "tts_ming3_text_segments": TestSuite(
+        "Ming3 Explicit Text Spans", "inference",
+        ROOT / "tests" / "test_v8_ming3_text_segments.py", timeout_sec=240,
+        unittest_targets=("tests.test_v8_ming3_text_segments",),
+    ),
     "tts_ming3_native_latent_loop": TestSuite(
         "Ming3 Connected Native Latent Loop", "inference",
         ROOT / "tests" / "test_v8_ming3_native_latent_loop.py", timeout_sec=180,

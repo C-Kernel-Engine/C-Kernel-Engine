@@ -38,23 +38,8 @@ def _kernel_map(root: Path, kernel_id: str) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def emit_checked_calls(call_ir: dict, root: Path) -> str:
-    """Return C for call-ready IR with explicit caller-owned entry buffers.
-
-    The input is the generic call-ready operation representation emitted by
-    IR Lower 3, plus a small `entry` declaration for the host ABI. No provider
-    selection or model-family behavior occurs here.
-    """
-    phase = call_ir.get("mode", "prefill")
-    if phase not in {"init", "prefill", "decode", "backward"}:
-        raise CheckedCallCodegenError(f"unsupported checked execution phase: {phase!r}")
-    entry = call_ir.get("entry")
-    ops = call_ir.get("operations")
-    contract = call_ir.get("runtime_extent_contract")
-    if not isinstance(entry, dict) or not isinstance(ops, list) or not ops:
-        raise CheckedCallCodegenError("entry and nonempty operations are required")
-    if not isinstance(contract, dict):
-        raise CheckedCallCodegenError("runtime_extent_contract is required")
+def resolve_entry_segments(entry: dict, ops: list) -> list:
+    """Resolve the exact generated call ranges for named entry points."""
     function_name = _ident(entry.get("function"), "entry function")
     segment_specs = entry.get("segments")
     if segment_specs is None:
@@ -83,6 +68,28 @@ def emit_checked_calls(call_ir: dict, root: Path) -> str:
             raise CheckedCallCodegenError("entry segments must cover every resolved call")
         if function_name in names and segments[0][0] != function_name:
             raise CheckedCallCodegenError("declared native entry collides with a later segment")
+    return segments
+
+
+def emit_checked_calls(call_ir: dict, root: Path) -> str:
+    """Return C for call-ready IR with explicit caller-owned entry buffers.
+
+    The input is the generic call-ready operation representation emitted by
+    IR Lower 3, plus a small `entry` declaration for the host ABI. No provider
+    selection or model-family behavior occurs here.
+    """
+    phase = call_ir.get("mode", "prefill")
+    if phase not in {"init", "prefill", "decode", "backward"}:
+        raise CheckedCallCodegenError(f"unsupported checked execution phase: {phase!r}")
+    entry = call_ir.get("entry")
+    ops = call_ir.get("operations")
+    contract = call_ir.get("runtime_extent_contract")
+    if not isinstance(entry, dict) or not isinstance(ops, list) or not ops:
+        raise CheckedCallCodegenError("entry and nonempty operations are required")
+    if not isinstance(contract, dict):
+        raise CheckedCallCodegenError("runtime_extent_contract is required")
+    function_name = _ident(entry.get("function"), "entry function")
+    segments = resolve_entry_segments(entry, ops)
     params = entry.get("params")
     if not isinstance(params, list) or not params:
         raise CheckedCallCodegenError("entry params are required")

@@ -1,6 +1,7 @@
 """Resident checked valid lengths for the connected FP32 Ming audio decoder."""
 from version.v8.tts.build_ming3_audio_decoder_circuit import build_circuit as fixed
-from version.v8.tts.build_qwen3_tts_runtime_prompt_first_block_circuit import _extent,_bind
+from version.v8.scripts.checked_circuit_authoring_v8 import execution_port
+from version.v8.scripts.checked_circuit_authoring_v8 import runtime_extent as _extent, bind_runtime_scalars as _bind
 
 def build_circuit(capacity=64,**kwargs):
     g=fixed(frames=capacity,**kwargs);c=g['contract']['runtime_invariants']
@@ -28,4 +29,19 @@ def build_circuit(capacity=64,**kwargs):
         elif kind=='audio_istft_complex_window_checked':b={'istft_frames':'spectral_frames'}
         else:raise ValueError('unbound decoder consumer '+kind)
         _bind(op,**b)
+    # Return the runtime's checked valid length, rather than host reconstruction.
+    crop=(c['n_fft']-c['hop'])//2;extra=c['n_fft']-c['hop']-2*crop
+    g['runtime_lengths']['valid_samples']={'producer':'check_valid_samples','result':'valid_extent',
+        'capacity':c['samples'],'allow_zero':False}
+    g['activation_buffers']['valid_samples']={'shape':[1]};g['activation_bindings']['valid_samples']='valid_samples'
+    g['block_types']['block']['header'].append(_extent('check_valid_samples','runtime_extent_affine',
+        'spectral_frames','valid_samples','valid_samples',factor=c['hop'],offset=extra,capacity=c['samples']))
+    g['native_entry']['params'].append({'c_type':'int32_t *','name':'valid_samples_out'})
+    g['native_entry']['runtime_length_outputs']={'valid_samples':'valid_samples_out'}
+    g['execution_exports']={'schema':'cke.checked.execution_exports.v1',
+        'entries':{'run':g['native_entry']['function']},
+        'ports':{name:execution_port(g,buffer) for name,buffer,dtype in (
+            ('latent','latent','fp32'),('request_frames','request_frames','i32'),('window','window','fp32'),('waveform','output','fp32'))},
+        'properties':{'sample_rate_hz':44100,'window':'periodic_hann_f32',
+            'valid_samples_output':'valid_samples_out','valid_samples_length':'valid_samples'}}
     return g

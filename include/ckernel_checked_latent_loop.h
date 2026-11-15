@@ -12,6 +12,9 @@ typedef struct {
     float *staging,*output;
     size_t staging_elements,output_elements;
     size_t *valid_frames;
+    ck_flow_entry decode; /* optional generated cached continuation */
+    size_t decode_input,decode_hidden,decode_stop_logits,decode_position;
+    uint32_t policy_version; /* checked_latent_loop.v1 */
 } ck_checked_latent_loop;
 /* Executes the generated embedding/backbone, native guided flow and generated
  * latent aggregator. Recomputes the prefix, does not claim KV caching. On EOS

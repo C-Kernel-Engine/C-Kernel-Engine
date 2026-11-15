@@ -1,7 +1,7 @@
 """Connected generated backbone/flow/aggregator; no oracle activations."""
-import ctypes as C
+import ctypes as C,unittest
 import numpy as np
-from tests.test_v8_ming3_native_flow import FlowTests
+from tests import test_v8_ming3_native_flow as flow_fixture
 from version.v8.tts.build_ming3_backbone_circuit import build_circuit as backbone
 from version.v8.tts.build_ming3_aggregator_circuit import build_circuit as aggregator
 from version.v8.tts.build_ming3_dit_block_circuit import weight_shapes
@@ -10,12 +10,17 @@ from version.v8.tts.replay_ming3_dit_block import compile_block
 from version.v8.tts.native_guided_flow import ENTRY,U,P,S,Request,CANCEL,offsets
 from version.v8.tts.native_latent_loop import LatentLoop
 
-class LatentLoopTests(FlowTests):
+class LatentLoopTests(unittest.TestCase):
+    request=flow_fixture.FlowTests.request
+    expected=flow_fixture.FlowTests.expected
+    @classmethod
+    def tearDownClass(cls):cls.tmp.cleanup()
+    backbone_builder=staticmethod(backbone)
     @classmethod
     def setUpClass(cls):
-        super().setUpClass()
+        flow_fixture.FlowTests.setUpClass.__func__(cls)
         # Flow conditioning width six matches this backbone and aggregator output.
-        cls.bg=backbone(capacity=12,width=6,heads=1,kv_heads=1,depth=1,inner=12,vocab=16)
+        cls.bg=cls.backbone_builder(capacity=12,width=6,heads=1,kv_heads=1,depth=1,inner=12,vocab=16)
         cls.ag=aggregator(width=8,heads=2,depth=1,latent=4,output_width=6,mult=2)
         rng=np.random.default_rng(9)
         for name,g in [('backbone',cls.bg),('aggregator',cls.ag)]:
@@ -47,6 +52,7 @@ class LatentLoopTests(FlowTests):
             *[b[k] for k in ('request_rows','embeddings','final_norm','stop_logits')],
             *[a[k] for k in ('latent','class_id','output')],6,4,12,3,5,5,C.pointer(flow),
             staging.ctypes.data_as(P),output.ctypes.data_as(P),staging.size,output.size,C.pointer(valid))
+        request.policy_version=1
         return request,(flow,arrays,staging,output,valid)
     def test_connected_repeat_budget_and_cancel(self):
         r,a=self.make_loop();self.assertEqual(self.loop(C.byref(r)),0)
@@ -78,7 +84,7 @@ class LatentLoopTests(FlowTests):
             a[0].should_cancel=CANCEL();self.assertEqual(self.loop(C.byref(r)),0)
             np.testing.assert_array_equal(a[-2],baseline)
     def test_invalid_rejected_and_native_failure_recovers(self):
-        for field,value in [('prompt_rows',13),('min_frames',6),('output_elements',19)]:
+        for field,value in [('policy_version',0),('policy_version',2),('prompt_rows',13),('min_frames',6),('output_elements',19)]:
             r,a=self.make_loop();setattr(r,field,value)
             self.assertEqual(self.loop(C.byref(r)),-1);self.assertTrue((a[-2]==-999).all())
         r,a=self.make_loop();bad=ENTRY(lambda arena,size:-33);r.aggregate=bad

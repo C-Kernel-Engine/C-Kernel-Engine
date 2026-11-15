@@ -41,7 +41,8 @@ def compile_native_graph(root, source, circuit, extra_exports=(), mode="prefill"
         support.add(str(path.relative_to(ROOT)))
     entry = source['template']['native_entry']
     exported = {entry['function'], *extra_exports,
-                *(segment['function'] for segment in entry.get('segments', []))}
+                *(segment['function'] for segment in entry.get('segments', [])),
+                *(spec['function'] for spec in source['template'].get('execution_exports',{}).get('provider_entries',{}).values())}
     if any(not isinstance(name, str) or not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', name) for name in exported):
         raise ValueError("invalid native export name")
     if IDENTITY_SYMBOL in exported:
@@ -70,6 +71,10 @@ def compile_native_graph(root, source, circuit, extra_exports=(), mode="prefill"
     exports.write_text('{ global: ' + '; '.join(sorted(exported)) +
                        '; local: *; };\n')
     providers = {provider["id"]: provider for provider in registry["kernels"]}
+    from version.v8.scripts.checked_execution_exports_v8 import resolve_exports, canonical_hash
+    execution_exports=resolve_exports(source['template'],layout,call_ir,providers,exported)
+    if execution_exports is not None:
+        (root/'execution-bindings.json').write_text(json.dumps(execution_exports,indent=2)+'\n')
     sources = set()
     selected = {}
     for op in call_ir['operations']:
@@ -100,6 +105,9 @@ def compile_native_graph(root, source, circuit, extra_exports=(), mode="prefill"
         layout_sha256=hashlib.sha256((root / 'layout.json').read_bytes()).hexdigest(),
         warning_policy_sha256=hashlib.sha256(WARNING_POLICY.read_bytes()).hexdigest(),
         exports=sorted(exported),
+        circuit_sha256=(digest_json(circuit) if isinstance(circuit, dict)
+                        else hashlib.sha256(Path(circuit).read_bytes()).hexdigest()),
+        execution_exports_sha256=canonical_hash(execution_exports) if execution_exports is not None else None,
     )
     build_digest = digest_json(identity_inputs)
     identity_source = root / 'build-identity.c'
@@ -172,3 +180,38 @@ def compile_native_graph(root, source, circuit, extra_exports=(), mode="prefill"
     fn.argtypes = [parameter_type(p) for p in source["template"]["native_entry"]["params"]]
     fn.restype = ctypes.c_int
     return layout, call_ir, library, loaded, fn
+
+
+def compile_declared_f32_graph(folder,graph,weights, *, source_config=None, **build_policy):
+    """Load declared FP32 arrays into an ordinary checked generated bundle.
+
+    Callers may supply the normal source configuration explicitly. The default
+    accepts the bounded authoring convention's geometry metadata; it never
+    dispatches on a model name. Unsupported weight-port shapes reject.
+    """
+    import numpy as np
+    from version.v8.scripts.checked_circuit_authoring_v8 import declared_f32_weight_shapes as weight_shapes
+    entries=[];offset=4096
+    for name,shape in weight_shapes(graph).items():
+        w=weights[name]
+        if list(w.shape)!=shape or w.dtype!=np.float32:raise ValueError(name)
+        offset=(offset+63)&~63
+        entries.append({'name':name,'shape':shape,'dtype':'F32','size':w.nbytes,'file_offset':offset})
+        offset+=w.nbytes
+    if source_config is None:
+        c=graph['contract']['runtime_invariants'];width=c['width'];tokens=c['tokens'];heads=c['heads']
+        source_config={'model':graph['name'],'arch':graph['name'],'num_layers':1,'embed_dim':width,
+            'num_heads':heads,'num_kv_heads':c.get('kv_heads',heads),'head_dim':width//heads,
+            'intermediate_size':c.get('inner',width*c['mult']),'context_length':tokens,
+            'max_seq_len':tokens,'vocab_size':c.get('vocab',1)}
+    source={'config':dict(source_config),'entries':entries,'quant_summary':{},'template':graph}
+    path=folder/'circuit.json';path.write_text(json.dumps(graph))
+    layout,calls,library,loaded,fn=compile_native_graph(folder,source,path,**build_policy)
+    size=layout['memory']['arena']['total_size'];raw=(ctypes.c_uint8*(size+63))()
+    arena=(ctypes.c_uint8*size).from_buffer(raw,(-ctypes.addressof(raw))&63)
+    for item in layout['memory']['weights']['entries']:
+        w=np.ascontiguousarray(weights[item['name']]);start=item['abs_offset']
+        ctypes.memmove(ctypes.addressof(arena)+start,w.ctypes.data,w.nbytes)
+    buffers={b['name']:b for b in layout['memory']['activations']['buffers']}
+    def view(name,dtype=np.float32):return np.ndarray(tuple(graph['activation_buffers'][name]['shape']),dtype,buffer=arena,offset=buffers[name]['abs_offset'])
+    return fn,arena,view,loaded

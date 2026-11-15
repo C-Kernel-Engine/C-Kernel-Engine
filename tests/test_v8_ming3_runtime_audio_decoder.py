@@ -1,5 +1,5 @@
 """Resident dynamic lengths share the fixed decoder's independent oracle."""
-import tempfile,unittest
+import tempfile,unittest,ctypes as C
 from pathlib import Path
 import numpy as np
 from version.v8.tts.build_ming3_runtime_audio_decoder_circuit import build_circuit
@@ -17,23 +17,24 @@ class RuntimeDecoderTests(unittest.TestCase):
         window=np.hanning(9)[:-1].astype('f4');inputs={n:rng.normal(size=(n,4)).astype('f4') for n in (1,2,5)}
         with tempfile.TemporaryDirectory() as d:
             fn,a,v,lib=compile_block(Path(d),g,w,openmp=True,c_standard='gnu11',provider_warnings='report')
-            v('window')[:]=window;first=None
+            v('window')[:]=window;first=None;count=C.c_int32(-1)
             for frames in (1,5,2,1):
                 x=inputs[frames];v('latent')[:]=np.nan;v('latent')[:frames]=x
                 v('request_frames',np.int32)[:]=frames
                 expected=reference(x,w,g,window)['output']
-                self.assertEqual(fn(a,len(a)),0)
+                self.assertEqual(fn(a,len(a),C.byref(count)),0)
+                self.assertEqual(count.value,len(expected))
                 np.testing.assert_allclose(v('output')[:len(expected)],expected,atol=1e-5,rtol=1e-5)
                 if frames==1:
                     if first is None:first=v('output')[:len(expected)].copy()
                     else:np.testing.assert_array_equal(v('output')[:len(expected)],first)
             before=v('output').copy()
-            for count in (0,-1,6,2147483647):
-                v('request_frames',np.int32)[:]=count
-                self.assertNotEqual(fn(a,len(a)),0)
+            for invalid in (0,-1,6,2147483647):
+                v('request_frames',np.int32)[:]=invalid
+                self.assertNotEqual(fn(a,len(a),C.byref(count)),0)
                 np.testing.assert_array_equal(v('output'),before)
             v('request_frames',np.int32)[:]=1
-            self.assertEqual(fn(a,len(a)),0)
+            self.assertEqual(fn(a,len(a),C.byref(count)),0)
 
 if __name__=="__main__":
     import unittest

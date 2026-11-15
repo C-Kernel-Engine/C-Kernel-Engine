@@ -7,29 +7,7 @@ ROOT=Path(__file__).resolve().parents[3];sys.path.insert(0,str(ROOT))
 from version.v8.tts.build_ming3_dit_block_circuit import build_circuit,weight_shapes
 from version.v8.scripts.compile_checked_bundle_v8 import compile_native_graph
 
-def compile_block(folder,graph,weights, **build_policy):
-    entries=[];offset=4096
-    for name,shape in weight_shapes(graph).items():
-        w=weights[name]
-        if list(w.shape)!=shape or w.dtype!=np.float32:raise ValueError(name)
-        offset=(offset+63)&~63
-        entries.append({'name':name,'shape':shape,'dtype':'F32','size':w.nbytes,'file_offset':offset})
-        offset+=w.nbytes
-    c=graph['contract']['runtime_invariants'];width=c['width'];tokens=c['tokens'];heads=c['heads']
-    source={'config':{'model':graph['name'],'arch':graph['name'],'num_layers':1,'embed_dim':width,
-        'num_heads':heads,'num_kv_heads':heads,'head_dim':width//heads,'intermediate_size':width*c['mult'],
-        'context_length':tokens,'max_seq_len':tokens,'vocab_size':1},'entries':entries,'quant_summary':{},'template':graph}
-    path=folder/'circuit.json';path.write_text(json.dumps(graph))
-    layout,calls,library,loaded,fn=compile_native_graph(folder,source,path,**build_policy)
-    size=layout['memory']['arena']['total_size'];raw=(ctypes.c_uint8*(size+63))()
-    arena=(ctypes.c_uint8*size).from_buffer(raw,(-ctypes.addressof(raw))&63)
-    for item in layout['memory']['weights']['entries']:
-        w=np.ascontiguousarray(weights[item['name']]);start=item['abs_offset']
-        ctypes.memmove(ctypes.addressof(arena)+start,w.ctypes.data,w.nbytes)
-    buffers={b['name']:b for b in layout['memory']['activations']['buffers']}
-    def view(name,dtype=np.float32):return np.ndarray(tuple(graph['activation_buffers'][name]['shape']),dtype,buffer=arena,offset=buffers[name]['abs_offset'])
-    return fn,arena,view,loaded
-
+from version.v8.scripts.compile_checked_bundle_v8 import compile_declared_f32_graph as compile_block
 
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--capture',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args()

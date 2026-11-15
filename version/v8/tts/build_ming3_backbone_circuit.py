@@ -1,27 +1,32 @@
 """Checked dynamic-prefix Ming backbone; explicit full-prefix recomputation baseline."""
 import copy
-from version.v8.tts.build_ming3_audio_decoder_circuit import build_circuit as decoder
-from version.v8.tts.build_qwen3_tts_text_projection_circuit import linear
-from version.v8.tts.build_qwen3_tts_runtime_prompt_first_block_circuit import _bind,_extent
+from version.v8.scripts.checked_circuit_authoring_v8 import execution_port
+from version.v8.scripts.checked_transformer_authoring_v8 import transformer_stack
+from version.v8.scripts.checked_circuit_authoring_v8 import linear
+from version.v8.scripts.checked_circuit_authoring_v8 import runtime_extent as _extent, bind_runtime_scalars as _bind
 
 def build_circuit(capacity=128,width=896,heads=14,kv_heads=2,depth=24,inner=4864,vocab=151936):
     if type(capacity) is not int or not 1<=capacity<=512 or type(vocab) is not int or not 1<=vocab<=200000:
         raise ValueError('unsupported backbone capacity/vocabulary')
-    g=decoder(frames=capacity,width=width,heads=heads,kv_heads=kv_heads,depth=depth,inner=inner,latent=64,factor=1,window=capacity,n_fft=4)
-    g['name']=f'ming3_backbone_fp32_bounded_d{depth}'
-    g['native_entry']['function']='ck_ming3_backbone_fp32'
-    g['native_entry']['segments']=[{'function':'ck_ming3_backbone_embed','last_op':'embeddings'},
-        {'function':'ck_ming3_backbone_prefix','last_op':'stop_logits'}]
-    g['contract']['runtime_invariants'].update(complete_audio_decoder=False,capacity=capacity,vocab=vocab,
-        execution_policy='full_prefix_recompute_no_kv_cache',scope='FP32 embeddings/backbone/stop logits with checked runtime prefix')
-    ops=[]
-    for op in g['block_types']['block']['body']['ops']:
-        if op['id'].startswith('layer') or op['id']=='final_norm':
-            if 'weight_refs' in op:op['weight_refs']={k:v.replace('decoder.','model.') for k,v in op['weight_refs'].items()}
-            for k,v in op['graph_slots']['inputs'].items():
-                if v=='upsampled':op['graph_slots']['inputs'][k]='external:embeddings'
-            ops.append(op)
+    ops,shapes=transformer_stack(tokens=capacity,width=width,heads=heads,kv_heads=kv_heads,depth=depth,
+        inner=inner,source='external:embeddings',weight_namespace='model',output='final_norm',window=capacity)
     ops.append(linear('stop_logits','final_norm','stop_logits',width,2,capacity,'stop_head'))
+    g={'version':3,'name':f'ming3_backbone_fp32_bounded_d{depth}','family':'bounded_graph',
+        'checked_native_entry':True,'contract':{'runtime_invariants':{
+            'inference_only':True,'complete_synthesis':False,'publisher_bf16_parity':False,
+            'arithmetic':'FP32 storage with map-declared reductions','tokens':capacity,'width':width,
+            'heads':heads,'kv_heads':kv_heads,'depth':depth,'inner':inner,'mult':1,'capacity':capacity,'vocab':vocab,
+            'execution_policy':'full_prefix_recompute_no_kv_cache',
+            'scope':'FP32 embeddings/backbone/stop logits with checked runtime prefix'}},
+        'native_entry':{'function':'ck_ming3_backbone_fp32',
+            'params':[{'c_type':'uint8_t *','name':'arena'},{'c_type':'size_t','name':'arena_bytes'}],
+            'arena':{'pointer':'arena','bytes':'arena_bytes'},
+            'segments':[{'function':'ck_ming3_backbone_embed','last_op':'embeddings'},
+                        {'function':'ck_ming3_backbone_prefix','last_op':'stop_logits'}]},
+        'block_types':{'block':{'sequence':['header','body','footer'],'header':[],
+                              'body':{'type':'dense','ops':ops},'footer':[]}},
+        'activation_buffers':{k:{'shape':v} for k,v in shapes.items()},
+        'semantic_checkpoints':{'schema':'cke.semantic_checkpoint_contract','schema_version':1,'exports':{}}}
     g['runtime_constants']={'value_elements':1,'phoneme_count':1,'max_duration':capacity,'expanded_capacity':capacity}
     limits={'embed_rows':capacity,'prefix_rows':capacity,'mlp_elements':capacity*inner}
     g['runtime_lengths']={k:{'producer':'check_'+k,'result':'valid_extent','capacity':v,'allow_zero':False} for k,v in limits.items()}
@@ -57,4 +62,9 @@ def build_circuit(capacity=128,width=896,heads=14,kv_heads=2,depth=24,inner=4864
     g['semantic_checkpoints']['exports']={op['id']:{'section':'body','template_op_id':op['id'],'op':op['op'],
         'checkpoints':[{'id':'ming3.backbone.'+op['id']+'.'+port,'producer':op['id'],'tensor':tensor.removeprefix('external:'),
           'logical_layout':'contiguous','axis_names':['row','channel'],'storage_dtype':'fp32'} for port,tensor in op['graph_slots']['outputs'].items()]} for op in [embed,*ops]}
+    g['execution_exports']={'schema':'cke.checked.execution_exports.v1',
+        'entries':{'embed':'ck_ming3_backbone_embed','prefill':'ck_ming3_backbone_prefix'},
+        'ports':{name:execution_port(g,buffer) for name,buffer,dtype in (
+            ('request_rows','request_rows','i32'),('token_ids','prompt_ids','i32'),
+            ('embeddings','embeddings','fp32'),('hidden','final_norm','fp32'),('stop_logits','stop_logits','fp32'))}}
     return g
