@@ -1035,6 +1035,21 @@
 <h1>Clef-Flash decision-head bring-up</h1>
 
 
+<section id="lora-registered-jobs">
+<h2>Registered local LoRA jobs</h2>
+<p>An administrator can register a pinned FP32 decoder package for the existing
+v2 prepare → review → submit → observe → artifact workflow. The job runs generated
+native training, evaluates separate held-out records, and checks exact loss/logit
+reproduction after adapter and checkpoint reload. Targets, ranks, package hashes
+and split counts are discoverable; clients cannot supply executable code or paths.</p>
+<p>This remains the bounded two-layer decoder configuration. The job tests use
+synthetic weights, not a released pretrained model. Job success is separate from
+numerical oracle certification and held-out quality. Remote authentication and
+job cancellation are not advertised. See
+<a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/docs/training/lora-registered-jobs.md">the registered LoRA job contract</a>
+for exact package/configuration examples and remaining gates.</p>
+</section>
+
 <section id="lora-notebook-session">
 <h2>Bounded notebook LoRA training interface</h2>
 <p>The public <code>cke.v8.prepare_lora</code> interface accepts an existing FP32

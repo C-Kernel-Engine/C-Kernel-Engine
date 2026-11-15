@@ -37,11 +37,11 @@ def atomic_json(path,data):
 class Jobs:
     execution_kind="native_generated_workflow"
     """Single admitted job, no backlog. Store is private to one local daemon."""
-    def __init__(self,store,*,principals,python=sys.executable,root=ROOT,min_free_bytes=2*1024**3,clef_packages=None,wall_seconds=600):
+    def __init__(self,store,*,principals,python=sys.executable,root=ROOT,min_free_bytes=2*1024**3,clef_packages=None,lora_packages=None,wall_seconds=600):
         require(principals and all(ident(p) for p in principals),'INVALID_PRINCIPALS')
         require(type(wall_seconds) is int and 60<=wall_seconds<=86400,'INVALID_WALL_BUDGET')
         self.wall_seconds=wall_seconds
-        self.principals=frozenset(principals);self.root=Path(root);self.backend=Backend(self.root,clef_packages=clef_packages)
+        self.principals=frozenset(principals);self.root=Path(root);self.backend=Backend(self.root,clef_packages=clef_packages,lora_packages=lora_packages)
         self.python=str(Path(python).absolute());self.min_free_bytes=min_free_bytes
         self.store=Path(store).resolve();self.store.mkdir(parents=True,exist_ok=True,mode=0o700)
         require(self.store.stat().st_uid==os.getuid() and self.store.stat().st_mode&0o077==0,'PRIVATE_STORE_REQUIRED')
@@ -73,7 +73,7 @@ class Jobs:
     def capabilities(self,principal):
         self._auth(principal)
         return dict(schema='cke.training.jobs.v1',worker_boot_id=self.backend.boot,validation=self.backend.capabilities(),
-                    execution='opt_in_registered_native' if self.backend.clef_packages else 'opt_in_local_svg',executable_recipes=['svg_tiny_v8']+(['clef_head_fp32_v1'] if self.backend.clef_packages else []),operations=['discover','prepare','submit','observe','artifact'],cancel='unsupported',
+                    execution='opt_in_registered_native' if self.backend.clef_packages or self.backend.lora_packages else 'opt_in_local_svg',executable_recipes=['svg_tiny_v8']+(['clef_head_fp32_v1'] if self.backend.clef_packages else [])+(['decoder_lora_fp32_v1'] if self.backend.lora_packages else []),operations=['discover','prepare','submit','observe','artifact'],cancel='unsupported',
                     limits=dict(active_jobs=1,queued_backlog=0,registered_jobs=32,plan_receipts=128,log_bytes=1048576,artifact_chunk_bytes=8192,wall_seconds=self.wall_seconds),
                     authorization='trusted_local_caller; no network authentication',resources='disk_checked; one local slot; no global reservation')
     def prepare(self,principal,config,experiment_id,draft_revision=None,*,client_revision=None):
@@ -82,16 +82,17 @@ class Jobs:
         else:require(draft_revision is None and type(client_revision) is str and re.fullmatch('[a-f0-9]{32}',client_revision),'INVALID_CLIENT_REVISION')
         require(type(config) is dict,'INVALID_CONFIGURATION')
         clef=config.get('recipe')=='clef_head_fp32_v1' and bool(self.backend.clef_packages)
-        require(config.get('recipe')=='svg_tiny_v8' or clef,'UNSUPPORTED_RECIPE')
-        if not clef:require(type(config.get('epochs')) is int and 2<=config['epochs']<=10,'EPOCHS_REQUIRE_TWO_OR_MORE')
+        lora=config.get('recipe')=='decoder_lora_fp32_v1' and bool(self.backend.lora_packages)
+        require(config.get('recipe')=='svg_tiny_v8' or clef or lora,'UNSUPPORTED_RECIPE')
+        if not clef and not lora:require(type(config.get('epochs')) is int and 2<=config['epochs']<=10,'EPOCHS_REQUIRE_TWO_OR_MORE')
         # Existing certification requires loss reduction between first/last epochs.
         self._resources();caps=self.backend.capabilities()
         q=dict(schema='cke.training.v1',request_id='prepare',operation='validate',worker_boot_id=self.backend.boot,capabilities_sha256=caps['sha256'],config=config)
         result=self.backend.exchange(q);require(result['ok'],'INVALID_CONFIGURATION')
         plan=dict(schema='cke.training.execution-plan.v1',owner=principal,experiment_id=experiment_id,draft_revision=draft_revision,
                   worker_boot_id=self.backend.boot,validation_plan=result['plan'],validation_plan_sha256=result['plan_sha256'],
-                  executor='v8_generated_training_workflow',python_sha256=file_hash(Path(self.python)),seed=42,
-                  optimizer=dict(lr=config['learning_rate'] if clef else .0003,beta1=.9,beta2=.999,eps=1e-4 if clef else 1e-8,weight_decay=.01),
+                  executor='v8_generated_training_workflow',python_sha256=file_hash(Path(self.python)),seed=None if lora else 42,
+                  optimizer=dict(lr=config['learning_rate'] if clef or lora else .0003,beta1=.9,beta2=.999,eps=1e-4 if clef else 1e-8,weight_decay=.01),
                   submittable=True,expires_at=int(time.time())+600)
         if client_revision is not None:plan.update(schema='cke.training.execution-plan.v2',client_revision=client_revision)
         h=digest(plan)
@@ -149,6 +150,10 @@ class Jobs:
             return self._observation(j)
     def _command(self,plan,folder):
         c=plan['validation_plan']['config']
+        if c['recipe']=='decoder_lora_fp32_v1':
+            package=self.backend.lora_packages[c['package_id']]
+            atomic_json(folder/'lora_config.json',c)
+            return [self.python,str(self.root/'version/v8/training/run_lora_job.py'),'--package',str(Path(package['path']).resolve()),'--package-sha256',c['package_sha256'],'--config',str(folder/'lora_config.json'),'--run-dir',str(folder/'run'),'--json-out',str(folder/'report.json')]
         if c['recipe']=='clef_head_fp32_v1':
             package=self.backend.clef_packages[c['package_id']]
             return [self.python,str(self.root/'version/v8/decision/train_clef_head.py'),'--package',str(Path(package['path']).resolve()),'--package-sha256',c['package_sha256'],'--run-dir',str(folder/'run'),'--json-out',str(folder/'report.json'),'--epochs',str(c['epochs']),'--lr',str(c['learning_rate'])]
@@ -204,6 +209,8 @@ class Jobs:
             report=json.loads((folder/'report.json').read_text())
             required={'learning','pytorch_trajectory','fresh_process_resume','checkpoint_compatibility','inference_export','runtime_provenance','training_ir_visualizer'}
             clef=plan['validation_plan']['config']['recipe']=='clef_head_fp32_v1'
+            lora=plan['validation_plan']['config']['recipe']=='decoder_lora_fp32_v1'
+            if lora:required={'native_execution','frozen_base','checkpoint_reload','adapter_reload'}
             if clef:required={'native_execution','frozen_embedding','checkpoint_reload','inference_export'}
             checks=report.get('checks',{})
             passed=(rc==0 and report.get('passed') is True and report.get('status')=='PASS' and required<=checks.keys() and all(type(v) is dict and v.get('passed') is True for v in checks.values()))
@@ -219,22 +226,30 @@ class Jobs:
             if clef and report.get('passed') is True:
                 require(report.get('schema')=='cke.clef.training-result.v1' and report.get('package_sha256')==plan['validation_plan']['config']['package_sha256'],'RESULT_IDENTITY_MISMATCH')
                 files.extend([('run/trained_head.npz','trained_head'),('run/serving.zip','inference_package')])
+            if lora and report.get('passed') is True:
+                from .lora import validate_result
+                from version.v8.training.lora_package import load_package
+                config=plan['validation_plan']['config']
+                entry=self.backend.lora_packages[config['package_id']]
+                package,_,_=load_package(entry['path'],config['package_sha256'])
+                require(validate_result(report,config,package),'RESULT_IDENTITY_OR_METRICS_MISMATCH')
+                files.extend([('run/adapters.zip','adapter_package'),('run/checkpoint.zip','training_checkpoint')])
             for name,kind in files:
                 path=folder/name
-                require(not path.is_symlink() and path.resolve().is_relative_to(folder.resolve()) and 0<path.stat().st_size<=(512 if clef else 16)*1024**2,'INVALID_ARTIFACT')
+                require(not path.is_symlink() and path.resolve().is_relative_to(folder.resolve()) and 0<path.stat().st_size<=(512 if clef or lora else 16)*1024**2,'INVALID_ARTIFACT')
                 artifacts.append(dict(artifact_id=uuid.uuid4().hex,type=kind,bytes=path.stat().st_size,sha256=file_hash(path),file=name))
             metrics=[];observed=time.time()
             for source,name in [('last_epoch_loss','training_cross_entropy'),('heldout_loss_after','validation_cross_entropy')]:
                 value=checks.get('learning',{}).get(source)
                 if type(value) in (float,int) and math.isfinite(value):
                     metrics.append(dict(name=name,step=plan['validation_plan']['config']['epochs'],step_kind='epoch',value=value,unit='nats/token',observed_at=observed))
-            if clef:
+            if clef or lora:
                 for source,name in [('validation_loss_before','validation_cross_entropy_before'),('validation_loss_after','validation_cross_entropy')]:
                     value=report.get('metrics',{}).get(source)
-                    if type(value) in (float,int) and math.isfinite(value):metrics.append(dict(name=name,step=report['completed_steps'],step_kind='update',value=value,unit='nats/question',observed_at=observed))
+                    if type(value) in (float,int) and math.isfinite(value):metrics.append(dict(name=name,step=report['completed_steps'],step_kind='update',value=value,unit='nats/token' if lora else 'nats/question',observed_at=observed))
             with self.guard,self.db:
                 j=self._read(principal,job_id)
-                if clef and passed:j['progress']=dict(stage='complete',completed_steps=report['completed_steps'],total_steps=report['completed_steps'])
+                if (clef or lora) and passed:j['progress']=dict(stage='complete',completed_steps=report['completed_steps'],total_steps=report['completed_steps'])
                 j.update(status='succeeded'  if passed else 'failed',stage='complete',updated_at=time.time(),error_code=None if passed else 'WORKFLOW_CERTIFICATION_FAILED',artifacts=artifacts,metrics=metrics);self._save(j)
         except Exception as exc:
             code=str(exc) if isinstance(exc,JobError) else 'EXECUTION_FAILED'
@@ -270,10 +285,11 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--enable-svg-training',action='store_true')
     p.add_argument('--clef-registry',type=Path,help='Administrator-owned JSON mapping IDs to pinned package paths/hashes')
+    p.add_argument('--lora-registry',type=Path,help='Administrator-owned pinned LoRA package registry')
     p.add_argument('--store',type=Path,required=True);p.add_argument('--principal',required=True);p.add_argument('--python',default=sys.executable)
     a=p.parse_args()
-    if not a.enable_svg_training and not a.clef_registry:p.error('explicit local training opt-in required')
-    jobs=Jobs(a.store,principals={a.principal},python=a.python,clef_packages=json.loads(a.clef_registry.read_text()) if a.clef_registry else None)
+    if not a.enable_svg_training and not a.clef_registry and not a.lora_registry:p.error('explicit local training opt-in required')
+    jobs=Jobs(a.store,principals={a.principal},python=a.python,clef_packages=json.loads(a.clef_registry.read_text()) if a.clef_registry else None,lora_packages=json.loads(a.lora_registry.read_text()) if a.lora_registry else None)
     try:
         while True:
             raw=sys.stdin.buffer.readline(MAX_BYTES+1)

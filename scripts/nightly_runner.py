@@ -1003,7 +1003,7 @@ TEST_SUITES = {
     "training_job_lifecycle": TestSuite(
         "Training Jobs: Integer/Opaque Revisions, Idempotency and Recovery", "training",
         ROOT / "server" / "tests" / "test_training_jobs.py",
-        unittest_targets=("server.tests.test_training_jobs", "server.tests.test_training_bridge"),
+        unittest_targets=("server.tests.test_training_jobs", "server.tests.test_training_bridge", "server.tests.test_lora_jobs"),
     ),
     "training_backend_contract": TestSuite(
         "Training Capability Discovery and Side-Effect-Free Plan Validation", "training",
