@@ -15,3 +15,13 @@ __all__ = [
     "TrainingConfig",
     "compile",
 ]
+
+
+def __getattr__(name):
+    if name in {'LoRAConfig', 'LoRAPlan', 'LoRASession', 'prepare_lora', 'lora_capabilities', 'lora_targets'}:
+        from . import lora
+        return getattr(lora, name)
+    raise AttributeError(name)
+
+
+__all__ += ['LoRAConfig', 'LoRAPlan', 'LoRASession', 'prepare_lora', 'lora_capabilities', 'lora_targets']
