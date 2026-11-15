@@ -1035,6 +1035,54 @@
 <h1>Clef-Flash decision-head bring-up</h1>
 
 
+<section id="lora-notebook-session">
+<h2>Bounded notebook LoRA training interface</h2>
+<p>The public <code>cke.v8.prepare_lora</code> interface accepts an existing FP32
+BUMP base artifact and explicit <code>LoRAConfig</code> targets. It resolves a
+checked plan, freezes all base parameters and prepares externally initialized
+adapter values before compilation. <code>plan.compile</code> uses the existing
+shared backward lowering, memory planner and native compiler. No Python gradient
+calculation, optimizer update or second neural execution schedule is introduced.</p>
+<pre>plan = cke.v8.prepare_lora(base_directory, tokens=4, adapters=[
+    cke.v8.LoRAConfig("layer.0.wq", rank=2, alpha=4, name="query", seed=42),
+    cke.v8.LoRAConfig("layer.1.wv", rank=3, alpha=6, name="value", seed=43),
+])
+with plan.compile(new_run_directory, dataset_id="my-dataset-sha256",
+                  max_steps=1000, learning_rate=0.003) as session:
+    metrics = session.train_step(token_ids, target_ids)
+    validation = session.evaluate(validation_ids, validation_targets)
+    session.save_checkpoint(checkpoint_directory)
+    session.export_adapters(adapter_directory)</pre>
+<p><code>cke.v8.lora_capabilities()</code> reports the supported scope.
+<code>cke.v8.lora_targets(base_directory, tokens=4)</code> discovers supported
+projection IDs, layer/role, shapes, legal rank ranges and parameter costs without
+initializing adapters, compiling or executing training. Initially:
+two-layer dense qwen3-template FP32 artifacts with explicit RMS/QK epsilon 1e-5,
+2–64 tokens fixed at compile time,
+explicit projection targets, adapter-only native AdamW, and bounded workspace and
+step count. It does not load arbitrary pretrained Qwen/GGUF models, implement
+BF16 whole-decoder training or QLoRA, or accept arbitrary PyTorch modules. Token
+IDs must match the base tokenizer; tokenization is not guessed.</p>
+<p><code>LoRASession.open</code> verifies artifact/build identities and creates
+isolated native state. Adapter reload requires the same base, shapes, targets and
+scales and a fresh optimizer. Checkpoint resume instead restores the complete
+optimizer trajectory and declared dataset/step-budget identity. All checkpoint
+payloads are validated before import. Calls on one session are serialized.</p>
+<p>Tests execute the notebook cells, two concurrent session objects, input rejection
+and recovery, corrupt checkpoint rejection, incompatible adapter rejection,
+40 native updates, and fresh-process reload without importing PyTorch or
+Transformers. Numerical certification remains in the complete-decoder oracle
+lane. Training loss is separate from held-out quality and performance.</p>
+<p>Examples: <code>version/v8/notebooks/03_generated_lora_session.ipynb</code> and
+<code>version/v8/examples/python_lora_session_v8.py</code>. Both require an explicit
+existing base artifact and tokenized records; neither substitutes a synthetic
+base or silently changes unsupported input. The notebook regression uses a
+labelled synthetic base solely as test evidence.</p>
+<pre>make -j4 build/libckernel_engine.so
+CK_NUM_THREADS=4 OMP_NUM_THREADS=1 python -m pytest -q tests/test_v8_lora_session.py
+CK_NUM_THREADS=4 OMP_NUM_THREADS=1 python scripts/nightly_runner.py --tests training_lora_fp32 --require-executed</pre>
+</section>
+
 <section id="decoder-lora-certification">
 <h2>Complete small decoder with FP32 adapters</h2>
 <p><code>attach_lora_adapters(..., freeze_base=True)</code> explicitly freezes
