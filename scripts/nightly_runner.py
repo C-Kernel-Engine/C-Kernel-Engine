@@ -790,6 +790,14 @@ TEST_SUITES = {
         ROOT / "tests" / "test_v8_rope_pairwise_rows.py",
         timeout_sec=120,
     ),
+    "tts_ming3_generated_audio_decoder": TestSuite(
+        "Ming3 Connected FP32 Latents to Waveform", "inference",
+        ROOT / "tests" / "test_v8_ming3_audio_decoder.py", timeout_sec=180,
+    ),
+    "audio_spectrum_cartesian_checked": TestSuite(
+        "Checked Clamped Cartesian Spectrum", "inference",
+        ROOT / "tests" / "test_v8_audio_spectrum_cartesian.py", timeout_sec=120,
+    ),
     "audio_istft_complex_window_checked": TestSuite(
         "Audio Explicit-Window Cropped ISTFT and BF16 Fold Order", "inference",
         ROOT / "tests" / "test_v8_audio_istft_complex_window.py",

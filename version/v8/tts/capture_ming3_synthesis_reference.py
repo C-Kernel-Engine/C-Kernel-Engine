@@ -25,6 +25,7 @@ def main():
     p.add_argument('--output',type=Path,required=True)
     p.add_argument('--threads',type=int,default=4)
     p.add_argument('--max-decode-steps',type=int,default=128)
+    p.add_argument('--decoder-fp32-replay',action='store_true',help='also capture separate recast-FP32 decoder references')
     args=p.parse_args()
     if not 1<=args.threads<=64 or not 4<=args.max_decode_steps<=512:
         p.error('threads must be 1..64; decode steps must be 4..512')
@@ -107,6 +108,30 @@ def main():
             imag=spectrum.imag[0].T.contiguous().numpy(),
             window=model.model.audio.decoder.head.istft.window.float().cpu().numpy(),
             expected=wav.float().cpu().numpy().reshape(-1))
+        if args.decoder_fp32_replay:
+            decoder=model.model.audio.decoder.float().eval()
+            latents=torch.load(args.output/'vae_fc1.pt',weights_only=True)['inputs'][0].float()
+            captures={}
+            def keep(name):
+                def retain(module,inputs,output):
+                    if hasattr(output,'last_hidden_state'):output=output.last_hidden_state
+                    captures[name]=output.detach().cpu().numpy()[0]
+                return retain
+            handles=[decoder.fc1.register_forward_hook(keep('projection')),
+                     decoder.decoder.register_forward_hook(keep('final_norm')),
+                     decoder.head.out.register_forward_hook(keep('spectral_projection'))]
+            lengths=sorted(set([min(2,latents.shape[1]),min(17,latents.shape[1]),latents.shape[1]]))
+            try:
+                for length in lengths:
+                    with torch.inference_mode():
+                        audio,_,_=decoder.low_level_reconstruct(latents[:,:length],stream_state=(None,None,None))
+                    np.savez(args.output/f'decoder-fp32-{length}.npz',latent=latents[0,:length].numpy(),
+                        window=decoder.head.istft.window.detach().cpu().numpy(),output=audio.cpu().numpy().reshape(-1),**captures)
+            finally:
+                for handle in handles:handle.remove()
+            report['decoder_fp32_replay']={'scope':'Recast FP32 decoder from publisher latents; NOT BF16 parity',
+                'lengths':lengths,'attention_implementation':decoder.decoder.config._attn_implementation,
+                'sliding_window':decoder.decoder.config.sliding_window}
         report['outputs']={path.name:digest(path) for path in args.output.iterdir() if path.name!='report.json'}
     except Exception as exc:
         report.update(status='FAIL',error_type=type(exc).__name__,error=str(exc));save();raise

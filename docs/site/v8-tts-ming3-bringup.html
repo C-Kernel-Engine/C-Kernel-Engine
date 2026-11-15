@@ -1028,9 +1028,8 @@
         </nav>
     </header>
     <main>
-<h1>Ming3 TTS: first generated flow arithmetic</h1>
-<p><strong>Status: bounded FP32 arithmetic milestone. No Ming checkpoint execution,
-DiT, audio VAE, complete synthesis, sampled generation or serving capability is certified.</strong></p>
+<h1>Ming3 TTS: connected native components</h1>
+<p><strong>Status: generated flow arithmetic, complete FP32 DiT and connected offline FP32 audio decoding. Full native text-to-speech, publisher BF16 parity and serving remain unestablished.</strong></p>
 <p>The model is <a href="https://huggingface.co/inclusionAI/Ming-3.0-tts-0.5B">inclusionAI/Ming-3.0-tts-0.5B</a>.
 The publisher combines a Qwen2.5 backbone with a DiT flow head, an aggregator,
 an audio VAE and a speaker encoder. Existing CKE TTS work supplies reusable
@@ -1040,7 +1039,7 @@ arithmetic and serving infrastructure, but does not certify this composition.</p
 <a href="https://github.com/inclusionAI/Ming-3.0-tts/blob/a39b80660bdc5a4394d5e1d41af6dbfd9c443a54/fm/CFM.py">fm/CFM.py</a>.</li>
 <li>Checkpoint metadata: <code>7247f4c94a5b2e987404ed28a5cfec41b1a4ca61</code>.
 The initial flow milestone did not load weights. A subsequent isolated publisher CPU reference loaded this checkpoint; that is not native CKE synthesis.</li></ul>
-<h2>What executes</h2>
+<h2>Flow update component</h2>
 <pre>difference = prediction - null_prediction
 velocity   = prediction + cfg * difference
 euler      = latent + dt * velocity
@@ -1167,19 +1166,52 @@ evidence, not publisher BF16 certification or end-to-end synthesis performance.<
 <p>The native sampler/RNG loop, backbone, aggregator and audio-decoder transformer
 remain separate integration gates. The existing reference-spectrum WAV does not
 become native text-to-speech merely because this DiT component executes.</p>
+<h2>Connected offline audio decoder</h2>
+<p>The generated audio graph now accepts reference latents and an explicit window
+asset, then executes input projection, half-pixel interpolation, all 24 decoder
+layers, final normalization, spectral projection, clamped Cartesian conversion
+and waveform reconstruction. It requires no reference-provided spectra. Each
+layer uses split-half RoPE, grouped-query attention with an explicit 64-frame
+causal window, and SwiGLU. Small nonzero one-, two- and 24-layer cases compare
+intermediate outputs and waveform with an independent mathematical reference.</p>
+<p>This is a separate FP32 arithmetic variant with FP64 inverse-transform and
+overlap-envelope accumulation. It does not silently adopt the earlier BF16-window
+fold contract. The real-weight replay reports errors without declaring a newly
+chosen tolerance to be certification. Publisher CPU attention fallback warnings
+remain recorded; the intended mask is tested explicitly.</p>
+<p>Retained full-weight FP32 replays at 2, 17 and 32 latent frames all returned
+success. At 32 frames, the generated decoder produced 112,896 samples in 14.0
+seconds with a 1.76 GB planned arena. Compared with the publisher decoder recast
+to FP32, waveform maximum error was 6.89e-4 and RMSE 2.92e-5. The spectral-head
+maximum difference was 0.0343, so small waveform error must not hide intermediate
+drift. This is measured evidence without a numerical certification verdict or
+listening approval; no production speed claim follows from this development run.</p>
+<p>The present graph compiles a fixed latent count, at most 512 latent frames,
+which become 2048 spectral frames at the pinned factor four. It is not yet a
+variable-length resident session, streaming decoder, or a 100-word acceptance
+result. Kernel workspace is planned; Python's offline compiler/weight conversion
+has additional memory costs. The quadratic inverse transform remains a correctness
+baseline. No listening approval is inferred from numerical tests.</p>
+<pre>python3 -m unittest tests.test_v8_ming3_audio_decoder tests.test_v8_audio_spectrum_cartesian -v
+python3 version/v8/tts/capture_ming3_synthesis_reference.py \
+  --publisher-root /path/to/pinned/publisher --checkpoint /path/to/pinned/checkpoint \
+  --output /tmp/ming-reference --decoder-fp32-replay
+python3 version/v8/tts/replay_ming3_audio_decoder.py \
+  --checkpoint /path/to/pinned/checkpoint/model.safetensors \
+  --reference /tmp/ming-reference/decoder-fp32-17.npz \
+  --output /tmp/ming-native-decoder</pre>
 <h2>Kernel and circuit work still required</h2>
 <table><thead><tr><th>Component</th><th>Reuse candidates</th><th>Remaining gate</th></tr></thead><tbody>
 <tr><td>Qwen2.5 backbone</td><td>Linear projections, RMSNorm, RoPE, attention, KV</td><td>Weight mapping, prompt embedding assembly and artifact-specific BF16 parity</td></tr>
-<tr><td>DiT and aggregator</td><td>Checked linear, GELU/SiLU, normalization, full attention</td><td>Timestep embeddings, concatenated conditioning/history rows, positional conventions and complete-block parity</td></tr>
+<tr><td>DiT and aggregator</td><td>Checked linear, GELU/SiLU, normalization, full attention</td><td>FP32 DiT connected; native sampling loop, aggregator and publisher BF16 trajectory remain</td></tr>
 <tr><td>Flow sampler</td><td>Checked scale and sum</td><td>Native bounded iteration, EPSS/sway schedule, CFG, exact dtype boundaries and RNG contract</td></tr>
-<tr><td>Audio VAE</td><td>Transformer arithmetic and waveform plumbing</td><td>Specific encoder/decoder graphs, sliding masks, latent/patch layout and streaming state</td></tr>
+<tr><td>Audio VAE</td><td>Transformer arithmetic and waveform plumbing</td><td>Offline FP32 latents-to-waveform connected; real-weight numerical certification, runtime extents and streaming remain</td></tr>
 <tr><td>Voice conditioning</td><td>Existing audio preprocessing where contracts match</td><td>CAM++ speaker encoder and reference-audio conditioning</td></tr>
 <tr><td>Serving</td><td>Speech request lifecycle, queues, cancellation, WAV delivery</td><td>Connect only after native synthesis and repeat/reset pass</td></tr>
 </tbody></table>
 <p>These are reuse candidates, not claims that all required numerical contracts
-already match. Add generic kernels/maps only for demonstrated gaps. Next deliver
-reference latents to native waveform and a real first DiT block independently;
-then connect native generation. Do not claim CPU speed from backbone parameter
+already match. Add generic kernels/maps only for demonstrated gaps. Next connect the backbone, native sampler, aggregator and stop decision,
+then establish short native text-to-WAV and resident length/recovery semantics. Do not claim CPU speed from backbone parameter
 count or promote this diagnostic circuit as a serving model.</p>
 <p>The <a href="v7-visualizer-test-runbook.html#v8-component-coverage">IR visualizer</a>
 can inspect the generated layout, calls and semantic checkpoints. A circuit in its
@@ -1433,7 +1465,7 @@ catalog remains a declaration, not production certification.</p>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-11-14</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-11-15</p>
             </div>
         </div>
     </footer>
