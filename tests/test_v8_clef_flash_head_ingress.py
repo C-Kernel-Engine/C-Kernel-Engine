@@ -38,7 +38,7 @@ def weights_for(channels, width, vocabulary, *, seed=271):
 
 
 def compile_case(folder, graph, weights, *, enclosing_epsilon=1e-5,
-                 extra_exports=()):
+                 extra_exports=(), activation_dtypes=None):
     folder.mkdir(parents=True, exist_ok=True)
     bundle = write_synthetic_weights(folder, weights)
     circuit_path = folder / "circuit.json"
@@ -56,6 +56,7 @@ def compile_case(folder, graph, weights, *, enclosing_epsilon=1e-5,
              "option_counts", "question_type_ids",
              "option_row_indices", "option_question_indices")}},
         "entries": bundle["entries"], "quant_summary": {}, "template": graph}
+    source["config"]["activation_buffer_dtypes"].update(activation_dtypes or {})
     layout, call_ir, _library, loaded, execute = compile_native_graph(
         folder, source, circuit_path, extra_exports=extra_exports)
     size = layout["memory"]["arena"]["total_size"]

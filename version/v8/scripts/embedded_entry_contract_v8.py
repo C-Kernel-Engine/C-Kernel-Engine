@@ -83,7 +83,10 @@ def plan_embedded_decode_entry(ops, config):
             )
         ):
             raise ValueError("residual call disagrees with its provider map")
-        for layer, index in layer_output_boundaries(ops).items():
+        boundaries = layer_output_boundaries(ops)
+        if not set(range(count)).issubset(boundaries):
+            raise ValueError("declared visual connections exceed available layer boundaries")
+        for layer, index in boundaries.items():
             if layer >= count:
                 continue
             writers = [
@@ -119,7 +122,8 @@ def plan_embedded_decode_entry(ops, config):
         name="ck_decode_embedded",
         input_buffer="embedded_input",
         input_contract=dict(
-            shape=[1, width], dtype="fp32", layout="token_major_contiguous"
+            shape=[1, width], dtype="fp32", layout="token_major_contiguous",
+            embedding_values="raw_before_model_scaling"
         ),
         skip_indices=[0],
         after_operations=after,

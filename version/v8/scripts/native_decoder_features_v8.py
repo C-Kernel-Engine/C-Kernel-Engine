@@ -6,10 +6,38 @@ loaded library is required because the current decoder ABI owns global state.
 """
 
 import ctypes as C
+from contextlib import contextmanager
 import json
 import threading
 from pathlib import Path
 import numpy as np
+
+_Decode = C.CFUNCTYPE(C.c_int, C.c_int32, C.POINTER(C.c_float))
+_Reset = C.CFUNCTYPE(None)
+_GetInt = C.CFUNCTYPE(C.c_int)
+_Cancel = C.CFUNCTYPE(C.c_int, C.c_void_p)
+
+
+class NativeDecoderFeatures(C.Structure):
+    """Borrowed ABI 1 descriptor matching ck_decoder_features.h.
+
+    Function pointers refer directly to the loaded generated library, never
+    Python callbacks. The owner must remain locked and loaded while C uses it.
+    """
+
+    _fields_ = [
+        ("abi_version", C.c_uint32),
+        ("channels", C.c_size_t),
+        ("features", C.POINTER(C.c_float)),
+        ("feature_elements", C.c_size_t),
+        ("decode", _Decode),
+        ("reset", _Reset),
+        ("active_tokens", _GetInt),
+        ("context_window", _GetInt),
+        ("vocabulary_size", _GetInt),
+        ("should_cancel", _Cancel),
+        ("cancel_context", C.c_void_p),
+    ]
 
 
 def final_feature_contract(call):
@@ -71,6 +99,7 @@ class DecoderFeatures:
     def __init__(self, folder):
         self.lock = threading.RLock()
         self.owner_key = None
+        self.native_borrowed = False
         self.folder = Path(folder)
         self.closed = True
         call = json.loads((self.folder / "lowered_decode_call.json").read_text())
@@ -111,7 +140,12 @@ class DecoderFeatures:
             )
             != 0
         ):
-            self.close()
+            # Init may have allocated only part of its native state. The owner
+            # is still marked closed, so release explicitly before unregistering.
+            try:
+                self.lib.ck_model_free()
+            finally:
+                self.close()
             raise RuntimeError("native backbone initialization failed")
         self.closed = False
         try:
@@ -142,8 +176,39 @@ class DecoderFeatures:
             self.close()
             raise
 
+    @contextmanager
+    def borrow_native_descriptor(self):
+        """Hold exclusive ownership for one generated component invocation.
+
+        The descriptor cannot be retained, serialized or used after this scope.
+        It exposes existing native entry points; it runs no token/layer loop.
+        """
+        with self.lock:
+            if self.closed or self.native_borrowed:
+                raise RuntimeError("decoder closed or already borrowed")
+            descriptor = NativeDecoderFeatures(
+                1,
+                self.channels,
+                C.cast(self.address, C.POINTER(C.c_float)),
+                self.channels,
+                C.cast(self.lib.ck_model_decode, _Decode),
+                C.cast(self.lib.ck_model_kv_cache_reset, _Reset),
+                C.cast(self.lib.ck_model_get_active_tokens, _GetInt),
+                C.cast(self.lib.ck_model_get_context_window, _GetInt),
+                C.cast(self.lib.ck_model_get_vocab_size, _GetInt),
+                _Cancel(),
+                None,
+            )
+            self.native_borrowed = True
+            try:
+                yield descriptor
+            finally:
+                self.native_borrowed = False
+
     def encode(self, ids):
         with self.lock:
+            if self.native_borrowed:
+                raise RuntimeError("decoder already borrowed")
             return self._encode(ids)
 
     def _encode(self, ids):
@@ -177,6 +242,8 @@ class DecoderFeatures:
 
     def close(self):
         with self.lock:
+            if self.native_borrowed:
+                raise RuntimeError("decoder already borrowed")
             if not self.closed:
                 self.lib.ck_model_free()
                 self.closed = True

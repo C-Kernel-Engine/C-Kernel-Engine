@@ -11,7 +11,7 @@ COMPLETED / MERGED
     Guard: tests/test_v8_gelu_ggml_parallel.py, standard nightly.
     Check actual dispatch, exact output bits, tails, single-worker and nesting.
 
-CURRENT CHANGE
+MERGED ROW SCHEDULING (#1130)
 [x] Implement explicit RoPE and matched LayerNorm parallel dispatch wrappers.
     Arithmetic remains in existing kernels; provider maps select wrappers.
 [x] Preserve small-work, nesting and overlapping-buffer serial fallbacks.
@@ -20,13 +20,13 @@ CURRENT CHANGE
 [x] Local contract and generated-inventory gates passed.
 [x] Execute focused nightly entries (zero skips), portable and native-ISA tests.
 [ ] Complete rebuilt affected-consumer gates and final-head required nightly.
-[ ] Rebuild generated Qwen3-VL and Qwen3.6 consumers using selected wrappers.
+[x] Rebuild generated Qwen3-VL and Qwen3.6 consumers using selected wrappers.
 [ ] Validate Gemma's LayerNorm consumer; it does not use Qwen vision M-RoPE.
-[ ] Repeat capture-disabled whole-encoder timing on physical cores only.
+[x] Repeat capture-disabled whole-encoder timing on physical cores only.
     Diagnostic interposer gains are not production-wrapper acceptance evidence.
 
 NEXT MEASUREMENTS
-[ ] Attribute GEMM-specific cache traffic, separately from encoder-wide traffic.
+[x] Attribute GEMM-specific cache traffic, separately from encoder-wide traffic.
 [ ] Measure packing/conversion reuse, SIMD instruction mix and vector tails.
 [ ] Measure core occupancy per operation, dispatch overhead and serial intervals.
 [ ] Compare core-group locality on Ryzen's separate L3 domains.
@@ -47,8 +47,9 @@ PER-CHANGE ACCEPTANCE
 [ ] Regenerate inventories; run freshness and final-head required nightly.
 
 COVERAGE BOUNDARY
-Qwen3-VL and Qwen3.6: retained performance consumers exist; current wrapper
-rebuild and acceptance are pending. Gemma vision selects layernorm_fp32_exact,
+Qwen3-VL and Qwen3.6: rebuilt consumers preserve retained prefix bytes and meet
+the <=1.5x encoder latency target on the bounded measured configurations.
+This is not broad geometry or corpus certification. Gemma selects layernorm_fp32_exact,
 so it is an affected consumer, not an automatically measured speedup.
 Qwen3.5/Qwen3.8/Next and other families: require exact vision-capable artifacts,
 provider selections and their own results. Text support does not prove vision.
@@ -60,3 +61,60 @@ CK_ENCODER_TEST_CFLAGS=-march=native .venv/bin/python -m pytest -q tests/test_v8
 make v8-kernel-map-contracts
 .venv/bin/python scripts/nightly_runner.py --tests encoder_row_parallel gelu_ggml_parallel --require-executed
 Native tests were also executed on Ryzen pinned to physical CPUs 0-3.
+
+PRODUCTION TIMING CHECKPOINT (3148d375b)
+Ryzen, physical CPUs 0-15, warmed encode calls, loading/preprocessing excluded,
+no tensor captures or interposer. Same processed pixels and frozen weights.
+Pinned llama.cpp: 19e28a27702117d8f2eb16b825b9a308111f67d9.
+Artifact lane     Baseline CKE   New CKE    llama.cpp   CKE/oracle
+Qwen3-VL         35.00 s        32.94 s    23.47 s     1.404x
+Qwen3.6          34.30 s        31.19 s    23.10 s     1.350x
+Candidate average busy physical CPUs: 13.98 and 14.28, respectively.
+Qwen3.6's baseline has fewer repetitions; its before/after estimate needs more
+repeats. Oracle/candidate repetitions support the bounded ratio, not a family-wide
+guarantee. Output preservation is relative to frozen CKE, not new oracle parity.
+
+GEMM-SCOPED DIAGNOSTIC
+Counters gated around generated BF16 GEMM dispatch calls in the measured encode;
+dispatch count checked against call-ready IR. Output retained byte identity.
+Instrumented GEMM time: 13.69 s. L2 hit ratio: 98.45%; L3 miss ratio: 8.13%.
+Counters scheduled 100%. L3 is system-wide uncore, not process-exclusive.
+Backend-stall events count dispatch opportunities, not stalled-cycle percent.
+This does not prove memory bandwidth or L3 misses dominate GEMM. Separate packing,
+conversion, arithmetic and load/store costs before changing blocking/prefetch.
+
+BF16 PACK INITIALIZATION EXPERIMENT
+[x] Remove full-tile zeroing; initialize unused tail lanes once per output tile.
+    Keep ascending-K multiply/add, bias placement and BF16 rounding unchanged.
+    No additional allocation, packing cache, provider or compiler policy.
+[x] Native and poisoned-stack tests: 5 tests and 536 subtests each passed.
+    Guard pages, row/channel/K tails and independent sequential FP32 arithmetic.
+    A mutation omitting tail initialization raises FP exceptions with poisoned
+    automatic storage, despite masked final stores. Keep this negative control.
+[x] Synthetic paired timings on physical CPU 0 and CPU 8: representative large
+    shapes improve by 1.071-1.078x, all output bytes equal to baseline.
+    Always-masked-load variants were slower and were rejected.
+[x] Finish interleaved generated Qwen3-VL and Qwen3.6 encoder acceptance.
+[ ] Final-head required nightly.
+Existing nightly suite bf16_exact_output_lanes runs the expanded regression.
+Gemma's FP16 projections are not covered by this BF16 performance claim.
+
+PACKING CONNECTED RESULTS
+Current main base: 64993770e. Same generated consumers as the production timing
+checkpoint above. Only engine changes; source/provider hashes retained privately.
+16 physical cores; baseline/candidate/candidate/baseline, each with a warmup.
+Capture-disabled encode-only seconds (medians):
+Artifact        Baseline       Candidate      Latency reduction
+Qwen3-VL        33.3407        31.6632        5.03%
+Qwen3.6         31.3057        30.8285        1.52%
+Qwen3-VL ranges: baseline 32.4579-34.2234, candidate 31.3814-31.9449.
+Qwen3.6 ranges: baseline 31.2265-31.3850, candidate 30.6855-30.9714.
+All warmed and measured prefixes equal retained CKE bytes. No new task-quality
+or independent-oracle parity claim. The small Qwen3.6 gain needs ongoing tracking.
+Do not combine these times with an older oracle run to claim a new speed ratio.
+Baseline engine SHA256:
+1655cffde79a397432b91cd4f756ff50a9964c1ddc334465572086bd0574fc15
+Candidate engine SHA256:
+2cc75ad82351e065660b8df390f3f12820d1bb0b8b7b5792743194041657fbbf
+Next: reprofile the remaining GEMM conversion/packing and serial intervals on
+the accepted artifact before changing blocking, prefetching or precision.

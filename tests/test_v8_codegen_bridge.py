@@ -201,7 +201,7 @@ def _make_qwen3vl_decoder_manifest() -> dict:
             "tie_word_embeddings": False,
             "mrope_sections": [1, 1, 0, 0],
             "mrope_n_dims": 2,
-            "num_deepstack_layers": 3,
+            "num_deepstack_layers": 1,  # This fixture contains one decoder layer.
             "rope_layout": "multi_section_1d",
         },
         "quant_summary": {
@@ -1343,6 +1343,73 @@ class EmbeddedEntryContractTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             from embedded_entry_contract_v8 import plan_embedded_decode_entry
             plan_embedded_decode_entry(bad, config)
+
+    def test_raw_embeddings_scale_once_like_token_and_legacy_entries(self):
+        from codegen_core_v8 import emit_decode_function
+        from embedded_entry_contract_v8 import plan_embedded_decode_entry
+        ops, config, plan = self.fixture()
+        self.assertEqual(plan["input_contract"]["embedding_values"], "raw_before_model_scaling")
+        with self.assertRaisesRegex(ValueError, "available layer boundaries"):
+            plan_embedded_decode_entry(ops, dict(config, num_deepstack_layers=2))
+        ops[0]["function"] = "copy_embedding"
+        engine = ROOT / "build/libckernel_engine.so"
+        if not engine.is_file():
+            self.skipTest("native engine asset required")
+        prefix = r"""
+#include <stdint.h>
+#include <stdlib.h>
+#include <stddef.h>
+#include <math.h>
+#define EMBED_DIM 4
+#define A_EMBEDDED_INPUT 0
+#define A_LOGITS 0
+typedef struct { uint8_t *bump, *activations; int pos, rope_pos, bridge_has_explicit_positions; } CKModel;
+static float ones[4] = {1,1,1,1};
+static int g_bridge_deepstack_active = 0;
+static float g_bridge_deepstack_slices[4] = {10,10,10,10};
+void ck_residual_add_token_major_parallel_dispatch(const float*,const float*,float*,int,int);
+static void copy_embedding(float *out) { for(int i=0;i<4;i++) out[i] = i+1; }
+static void double_row(float *out) { for(int i=0;i<4;i++) out[i] *= 2; }
+static void ck_debug_export_hidden(CKModel *m,int l,const char *n,const float *x,size_t c) {}
+static void ck_debug_import_checkpoint(CKModel *m,int l,const char *n,float *x,size_t c) {}
+"""
+        for scaling in (False, True):
+            with self.subTest(scaling=scaling), tempfile.TemporaryDirectory() as tmp:
+                normal = emit_decode_function(ops, 0, "MEM", config=config,
+                    store_token=False, scale_embeddings_sqrt_dim=scaling)
+                embedded = emit_decode_function(ops, 0, "MEM", config=config,
+                    function_name="ck_decode_embedded", store_token=False,
+                    entry_contract=plan, scale_embeddings_sqrt_dim=scaling)
+                self.assertEqual(embedded.count("const float emb_scale"), int(scaling))
+                # The former extractor removed the lookup, retaining subsequent
+                # scaling. Reproduce that bounded behavior only in this oracle.
+                lookup_start = normal.index("    copy_embedding(")
+                lookup_end = normal.index(");", lookup_start) + 2
+                legacy = (normal[:lookup_start] + normal[lookup_end:]).replace(
+                    "ck_decode(", "legacy_decode(", 1)
+                factor = 2 if scaling else 1
+                suffix = r"""
+int main(void) {
+    float token_data[4] = {0}, imported[4] = {1,2,3,4}, old[4] = {1,2,3,4};
+    CKModel a = {(uint8_t*)token_data,(uint8_t*)token_data,0,0,0};
+    CKModel b = {(uint8_t*)imported,(uint8_t*)imported,0,0,0};
+    CKModel c = {(uint8_t*)old,(uint8_t*)old,0,0,0};
+    ck_decode(&a, 0); ck_decode_embedded(&b); legacy_decode(&c, 0);
+    for(int i=0;i<4;i++) {
+        float expected = ((i+1)*FACTOR+3)*2;
+        if(token_data[i] != expected || imported[i] != expected || old[i] != expected) return 1;
+    }
+    return 0;
+}
+""".replace("FACTOR", str(factor))
+                path = Path(tmp)
+                (path / "host.c").write_text(prefix + normal + embedded + legacy + suffix)
+                built = subprocess.run(["cc", "-std=c11", str(path / "host.c"), str(engine),
+                    "-Wl,-rpath," + str(engine.parent), "-lm", "-o", str(path / "host")],
+                    text=True, capture_output=True)
+                self.assertEqual(built.returncode, 0, built.stderr)
+                run = subprocess.run([str(path / "host")], text=True, capture_output=True)
+                self.assertEqual(run.returncode, 0, run.stderr)
 
     def test_generated_nontransformer_entry_executes_connection(self):
         from codegen_core_v8 import emit_decode_function
