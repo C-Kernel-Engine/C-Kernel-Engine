@@ -74,9 +74,10 @@ def build_circuit(tokens=3,width=1024,heads=16,mult=4):
 
 def weight_shapes(graph):
     shapes={}
-    for op in graph['block_types']['block']['body']['ops']:
+    for op in (op for block in graph['block_types'].values() for op in block.get('body',{}).get('ops',[])):
         for key,name in op.get('weight_refs',{}).items():
-            if key in ('gamma','frequencies'):shapes[name]=[op['params']['C']]
+            if key=='table':shapes[name]=[op['params']['V'],op['params']['C']]
+            elif key in ('gamma','frequencies'):shapes[name]=[op['params']['C']]
             elif key=='positions':shapes[name]=[op['params']['R']]
             else:shapes[name]=[op['params']['N']] if key=='bias' else [op['params']['N'],op['params']['K']]
     return shapes

@@ -24,9 +24,10 @@ def compile_block(folder,graph,weights, **build_policy):
     size=layout['memory']['arena']['total_size'];raw=(ctypes.c_uint8*(size+63))()
     arena=(ctypes.c_uint8*size).from_buffer(raw,(-ctypes.addressof(raw))&63)
     for item in layout['memory']['weights']['entries']:
-        w=weights[item['name']];start=item['abs_offset'];arena[start:start+w.nbytes]=w.tobytes()
+        w=np.ascontiguousarray(weights[item['name']]);start=item['abs_offset']
+        ctypes.memmove(ctypes.addressof(arena)+start,w.ctypes.data,w.nbytes)
     buffers={b['name']:b for b in layout['memory']['activations']['buffers']}
-    def view(name):return np.ndarray(tuple(graph['activation_buffers'][name]['shape']),np.float32,buffer=arena,offset=buffers[name]['abs_offset'])
+    def view(name,dtype=np.float32):return np.ndarray(tuple(graph['activation_buffers'][name]['shape']),dtype,buffer=arena,offset=buffers[name]['abs_offset'])
     return fn,arena,view,loaded
 
 

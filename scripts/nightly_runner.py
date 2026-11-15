@@ -790,6 +790,31 @@ TEST_SUITES = {
         ROOT / "tests" / "test_v8_rope_pairwise_rows.py",
         timeout_sec=120,
     ),
+    "tts_ming3_aggregator": TestSuite(
+        "Ming3 Generated Latent Feedback", "inference",
+        ROOT / "tests" / "test_v8_ming3_aggregator.py", timeout_sec=180,
+        unittest_targets=("tests.test_v8_ming3_aggregator",),
+    ),
+    "tts_ming3_native_flow": TestSuite(
+        "Ming3 Native Guided Flow", "inference",
+        ROOT / "tests" / "test_v8_ming3_native_flow.py", timeout_sec=180,
+        unittest_targets=("tests.test_v8_ming3_native_flow",),
+    ),
+    "tts_ming3_native_latent_loop": TestSuite(
+        "Ming3 Connected Native Latent Loop", "inference",
+        ROOT / "tests" / "test_v8_ming3_native_latent_loop.py", timeout_sec=180,
+        unittest_targets=("tests.test_v8_ming3_native_latent_loop",),
+    ),
+    "tts_ming3_backbone": TestSuite(
+        "Ming3 Runtime Prefix Backbone", "inference",
+        ROOT / "tests" / "test_v8_ming3_backbone.py", timeout_sec=180,
+        unittest_targets=("tests.test_v8_ming3_backbone",),
+    ),
+    "tts_ming3_runtime_audio_decoder": TestSuite(
+        "Ming3 Resident Audio Decoder", "inference",
+        ROOT / "tests" / "test_v8_ming3_runtime_audio_decoder.py", timeout_sec=180,
+        unittest_targets=("tests.test_v8_ming3_runtime_audio_decoder",),
+    ),
     "tts_ming3_generated_audio_decoder": TestSuite(
         "Ming3 Connected FP32 Latents to Waveform", "inference",
         ROOT / "tests" / "test_v8_ming3_audio_decoder.py", timeout_sec=180,

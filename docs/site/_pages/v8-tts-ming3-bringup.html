@@ -172,12 +172,55 @@ python3 version/v8/tts/replay_ming3_audio_decoder.py \
   --checkpoint /path/to/pinned/checkpoint/model.safetensors \
   --reference /tmp/ming-reference/decoder-fp32-17.npz \
   --output /tmp/ming-native-decoder</pre>
+<h2>Native generation loop and resident lengths</h2>
+<p>The next bounded implementation connects token embedding, the complete Qwen2.5
+backbone, stop head, native guided-flow sampler and latent aggregator. A C driver
+owns the iteration and feeds the aggregator's class-row output back into the next
+backbone position. Python prepares inputs and invokes native execution; it does not
+run the neural sampling loop. The initial backbone deliberately recomputes the
+whole valid prefix. This is not cached decode or a performance claim.</p>
+<p>The generated dynamic audio decoder uses checked request lengths within a fixed
+allocation. Small independent-reference tests cover short, long, then short
+requests, invalid capacities and recovery. The connected loop tests nonzero
+backbone, DiT and aggregator arithmetic against independent composition, A/B/A,
+minimum stop length, cancellation, budget exhaustion and failure recovery. Failed
+or incomplete synthesis does not publish partial latents as a completed utterance.</p>
+<p>Real-weight native guided-flow replay uses the same initial noise and schedule
+as an independent FP32 publisher comparison. Two retained streams had maximum
+latent differences 1.43e-6 and 1.22e-6. The real aggregator replay's maximum
+embedding differences ranged from 9.54e-6 to 1.34e-5. These are measured FP32
+component results, not BF16 trajectory certification. Native counter Gaussian RNG
+is explicitly different from PyTorch RNG.</p>
+<p>The experimental runner accepts a clean pinned publisher checkout only for its
+pure prompt-building functions. It uses the checkpoint tokenizer directly, maps
+BF16-stored weights into FP32 native arenas, and has no publisher neural fallback.
+Cancellation is checked between native generation stages; an already executing
+audio-decoder entry finishes before its output can be discarded. It is not yet an
+HTTP service, low-latency streaming session or listening-approved voice.</p>
+<pre>python3 -m unittest tests.test_v8_ming3_aggregator tests.test_v8_ming3_native_flow \
+  tests.test_v8_ming3_native_latent_loop tests.test_v8_ming3_backbone \
+  tests.test_v8_ming3_runtime_audio_decoder -v
+python3 version/v8/tts/run_ming3_native_v8.py \
+  --checkpoint /path/to/checkpoint --publisher-root /path/to/pinned/publisher \
+  --output /path/to/new-run --text "Hello. This is Ming speech." \
+  --capacity 256 --max-frames 100 --threads 2</pre>
+<p>Run directories retain exact tokens, checkpoint/tokenizer and generated-library
+identities, native timings and explicit incomplete/failure status. Allocated
+capacity is not a successful long-text or 100-word trial. Full-model reference
+comparisons, intelligibility, replacement and practical latency remain gates.</p>
+<p>A retained 144-token backbone comparison exposed a reference precision
+boundary: the publisher loaded as BF16 and then recast to FP32 retains BF16-rounded
+rotary inverse frequencies. Against that variant, native hidden-state RMSE was
+0.0182 (maximum 0.722). A separately retained reference initializing those
+frequencies directly in FP32 gave RMSE 1.48e-5 (maximum 5.57e-4); stop-logit
+maximum error was 8.21e-5. Both results remain recorded. This identifies a major
+contract difference, not permission to label the native path publisher-BF16 exact.</p>
 <h2>Kernel and circuit work still required</h2>
 <table><thead><tr><th>Component</th><th>Reuse candidates</th><th>Remaining gate</th></tr></thead><tbody>
 <tr><td>Qwen2.5 backbone</td><td>Linear projections, RMSNorm, RoPE, attention, KV</td><td>Weight mapping, prompt embedding assembly and artifact-specific BF16 parity</td></tr>
-<tr><td>DiT and aggregator</td><td>Checked linear, GELU/SiLU, normalization, full attention</td><td>FP32 DiT connected; native sampling loop, aggregator and publisher BF16 trajectory remain</td></tr>
-<tr><td>Flow sampler</td><td>Checked scale and sum</td><td>Native bounded iteration, EPSS/sway schedule, CFG, exact dtype boundaries and RNG contract</td></tr>
-<tr><td>Audio VAE</td><td>Transformer arithmetic and waveform plumbing</td><td>Offline FP32 latents-to-waveform connected; real-weight numerical certification, runtime extents and streaming remain</td></tr>
+<tr><td>DiT and aggregator</td><td>Checked linear, GELU/SiLU, normalization, full attention</td><td>FP32 DiT, native flow and aggregator connected; full synthesis and publisher BF16 trajectory certification remain</td></tr>
+<tr><td>Flow sampler</td><td>Checked scale and sum</td><td>Native bounded iteration, EPSS/sway and CFG implemented; separate publisher RNG and BF16 contracts remain</td></tr>
+<tr><td>Audio VAE</td><td>Transformer arithmetic and waveform plumbing</td><td>FP32 latents-to-waveform and runtime extents connected; real-weight certification and streaming remain</td></tr>
 <tr><td>Voice conditioning</td><td>Existing audio preprocessing where contracts match</td><td>CAM++ speaker encoder and reference-audio conditioning</td></tr>
 <tr><td>Serving</td><td>Speech request lifecycle, queues, cancellation, WAV delivery</td><td>Connect only after native synthesis and repeat/reset pass</td></tr>
 </tbody></table>
