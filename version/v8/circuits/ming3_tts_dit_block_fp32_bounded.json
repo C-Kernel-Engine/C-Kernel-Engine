@@ -1,0 +1,886 @@
+{
+  "version": 3,
+  "name": "ming3_tts_dit_block_fp32_bounded",
+  "family": "bounded_graph",
+  "checked_native_entry": true,
+  "contract": {
+    "runtime_invariants": {
+      "inference_only": true,
+      "complete_synthesis": false,
+      "complete_dit": false,
+      "publisher_bf16_parity": false,
+      "supplied_rotary_tables": true,
+      "arithmetic": "FP32 storage with map-declared reductions",
+      "tokens": 3,
+      "width": 1024,
+      "heads": 16,
+      "mult": 4
+    }
+  },
+  "activation_buffers": {
+    "input": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "norm1": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "q": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "k": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "v": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "q_rot": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "k_rot": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "attention": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "attention_projection": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "residual1": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "norm2": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "down": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "output": {
+      "shape": [
+        3,
+        1024
+      ]
+    },
+    "cosine": {
+      "shape": [
+        3,
+        32
+      ]
+    },
+    "sine": {
+      "shape": [
+        3,
+        32
+      ]
+    },
+    "up": {
+      "shape": [
+        3,
+        4096
+      ]
+    },
+    "activated": {
+      "shape": [
+        3,
+        4096
+      ]
+    }
+  },
+  "activation_bindings": {
+    "input": "input",
+    "norm1": "norm1",
+    "q": "q",
+    "k": "k",
+    "v": "v",
+    "q_rot": "q_rot",
+    "k_rot": "k_rot",
+    "attention": "attention",
+    "attention_projection": "attention_projection",
+    "residual1": "residual1",
+    "norm2": "norm2",
+    "down": "down",
+    "output": "output",
+    "cosine": "cosine",
+    "sine": "sine",
+    "up": "up",
+    "activated": "activated"
+  },
+  "native_entry": {
+    "function": "ck_ming3_dit_block_fp32_bounded",
+    "params": [
+      {
+        "c_type": "uint8_t *",
+        "name": "arena"
+      },
+      {
+        "c_type": "size_t",
+        "name": "arena_bytes"
+      }
+    ],
+    "arena": {
+      "pointer": "arena",
+      "bytes": "arena_bytes"
+    }
+  },
+  "sequence": [
+    "block"
+  ],
+  "block_types": {
+    "block": {
+      "sequence": [
+        "header",
+        "body",
+        "footer"
+      ],
+      "header": [],
+      "body": {
+        "type": "dense",
+        "ops": [
+          {
+            "id": "norm1",
+            "op": "rmsnorm_rows_checked",
+            "kernel": "rmsnorm_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "external:input"
+              },
+              "outputs": {
+                "output": "norm1"
+              }
+            },
+            "params": {
+              "R": 3,
+              "C": 1024,
+              "eps": 1e-06,
+              "call_constants": {
+                "input_elements": 3072,
+                "input_stride": 1024,
+                "gamma_elements": 1024,
+                "output_elements": 3072,
+                "output_stride": 1024,
+                "rows": 3,
+                "width": 1024
+              }
+            },
+            "weight_refs": {
+              "gamma": "norm1.weight"
+            }
+          },
+          {
+            "id": "q",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "weight_refs": {
+              "weight": "attn.to_q.weight",
+              "bias": "attn.to_q.bias"
+            },
+            "graph_slots": {
+              "inputs": {
+                "input": "norm1"
+              },
+              "outputs": {
+                "output": "q"
+              }
+            },
+            "params": {
+              "M": 3,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 3072,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 3072,
+                "linear_output_stride": 1024,
+                "linear_rows": 3,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            }
+          },
+          {
+            "id": "k",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "weight_refs": {
+              "weight": "attn.to_k.weight",
+              "bias": "attn.to_k.bias"
+            },
+            "graph_slots": {
+              "inputs": {
+                "input": "norm1"
+              },
+              "outputs": {
+                "output": "k"
+              }
+            },
+            "params": {
+              "M": 3,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 3072,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 3072,
+                "linear_output_stride": 1024,
+                "linear_rows": 3,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            }
+          },
+          {
+            "id": "v",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "weight_refs": {
+              "weight": "attn.to_v.weight",
+              "bias": "attn.to_v.bias"
+            },
+            "graph_slots": {
+              "inputs": {
+                "input": "norm1"
+              },
+              "outputs": {
+                "output": "v"
+              }
+            },
+            "params": {
+              "M": 3,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 3072,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 3072,
+                "linear_output_stride": 1024,
+                "linear_rows": 3,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            }
+          },
+          {
+            "id": "q_rot",
+            "op": "rope_pairwise_rows_checked",
+            "kernel": "rope_pairwise_rows_f32_checked",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "q",
+                "cosine": "external:cosine",
+                "sine": "external:sine"
+              },
+              "outputs": {
+                "output": "q_rot"
+              }
+            },
+            "params": {
+              "T": 3,
+              "H": 16,
+              "D": 64,
+              "call_constants": {
+                "rotation_input_elements": 3072,
+                "rotation_output_elements": 3072,
+                "rotation_table_elements": 96,
+                "rotation_tokens": 3,
+                "rotation_heads": 16,
+                "rotation_head_dim": 64
+              }
+            }
+          },
+          {
+            "id": "k_rot",
+            "op": "rope_pairwise_rows_checked",
+            "kernel": "rope_pairwise_rows_f32_checked",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "k",
+                "cosine": "external:cosine",
+                "sine": "external:sine"
+              },
+              "outputs": {
+                "output": "k_rot"
+              }
+            },
+            "params": {
+              "T": 3,
+              "H": 16,
+              "D": 64,
+              "call_constants": {
+                "rotation_input_elements": 3072,
+                "rotation_output_elements": 3072,
+                "rotation_table_elements": 96,
+                "rotation_tokens": 3,
+                "rotation_heads": 16,
+                "rotation_head_dim": 64
+              }
+            }
+          },
+          {
+            "id": "attention",
+            "op": "attention_full_token_major_checked",
+            "kernel": "attention_full_token_major_f32_checked",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "query": "q_rot",
+                "key": "k_rot",
+                "value": "v"
+              },
+              "outputs": {
+                "output": "attention"
+              }
+            },
+            "params": {
+              "T": 3,
+              "H": 16,
+              "D": 64,
+              "call_constants": {
+                "attention_query_elements": 3072,
+                "attention_key_elements": 3072,
+                "attention_value_elements": 3072,
+                "attention_output_elements": 3072,
+                "attention_tokens": 3,
+                "attention_heads": 16,
+                "attention_head_dim": 64
+              }
+            }
+          },
+          {
+            "id": "attention_projection",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "weight_refs": {
+              "weight": "attn.to_out.0.weight",
+              "bias": "attn.to_out.0.bias"
+            },
+            "graph_slots": {
+              "inputs": {
+                "input": "attention"
+              },
+              "outputs": {
+                "output": "attention_projection"
+              }
+            },
+            "params": {
+              "M": 3,
+              "K": 1024,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 3072,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 1048576,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 3072,
+                "linear_output_stride": 1024,
+                "linear_rows": 3,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 1024
+              }
+            }
+          },
+          {
+            "id": "residual1",
+            "op": "audio_scaled_sum_strided_checked",
+            "kernel": "audio_scaled_sum_strided_f32_checked",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "left": "external:input",
+                "right": "attention_projection"
+              },
+              "outputs": {
+                "output": "residual1"
+              }
+            },
+            "params": {
+              "R": 3,
+              "C": 1024,
+              "scale": 1.0,
+              "call_constants": {
+                "sum_left_elements": 3072,
+                "sum_right_elements": 3072,
+                "sum_output_elements": 3072,
+                "sum_left_stride": 1024,
+                "sum_right_stride": 1024,
+                "sum_output_stride": 1024,
+                "sum_rows": 3,
+                "sum_columns": 1024
+              }
+            }
+          },
+          {
+            "id": "norm2",
+            "op": "rmsnorm_rows_checked",
+            "kernel": "rmsnorm_rows_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "residual1"
+              },
+              "outputs": {
+                "output": "norm2"
+              }
+            },
+            "params": {
+              "R": 3,
+              "C": 1024,
+              "eps": 1e-06,
+              "call_constants": {
+                "input_elements": 3072,
+                "input_stride": 1024,
+                "gamma_elements": 1024,
+                "output_elements": 3072,
+                "output_stride": 1024,
+                "rows": 3,
+                "width": 1024
+              }
+            },
+            "weight_refs": {
+              "gamma": "norm2.weight"
+            }
+          },
+          {
+            "id": "up",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "weight_refs": {
+              "weight": "mlp.ff.0.0.weight",
+              "bias": "mlp.ff.0.0.bias"
+            },
+            "graph_slots": {
+              "inputs": {
+                "input": "norm2"
+              },
+              "outputs": {
+                "output": "up"
+              }
+            },
+            "params": {
+              "M": 3,
+              "K": 1024,
+              "N": 4096,
+              "call_constants": {
+                "linear_input_elements": 3072,
+                "linear_input_stride": 1024,
+                "linear_weight_elements": 4194304,
+                "linear_weight_stride": 1024,
+                "linear_bias_elements": 4096,
+                "linear_output_elements": 12288,
+                "linear_output_stride": 4096,
+                "linear_rows": 3,
+                "linear_input_channels": 1024,
+                "linear_output_channels": 4096
+              }
+            }
+          },
+          {
+            "id": "activated",
+            "op": "gelu",
+            "kernel": "gelu_rows_tanh_checked_f32",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "input": "up"
+              },
+              "outputs": {
+                "output": "activated"
+              }
+            },
+            "params": {
+              "M": 3,
+              "C": 4096,
+              "N": 4096,
+              "Q": 12288,
+              "call_constants": {
+                "gelu_input_elements": 12288,
+                "gelu_input_stride": 4096,
+                "gelu_output_elements": 12288,
+                "gelu_output_stride": 4096,
+                "gelu_scratch_elements": 12288,
+                "gelu_rows": 3,
+                "gelu_channels": 4096
+              }
+            }
+          },
+          {
+            "id": "down",
+            "op": "linear_rows_checked",
+            "kernel": "linear_rows_checked_f32",
+            "returns_status": true,
+            "weight_refs": {
+              "weight": "mlp.ff.2.weight",
+              "bias": "mlp.ff.2.bias"
+            },
+            "graph_slots": {
+              "inputs": {
+                "input": "activated"
+              },
+              "outputs": {
+                "output": "down"
+              }
+            },
+            "params": {
+              "M": 3,
+              "K": 4096,
+              "N": 1024,
+              "call_constants": {
+                "linear_input_elements": 12288,
+                "linear_input_stride": 4096,
+                "linear_weight_elements": 4194304,
+                "linear_weight_stride": 4096,
+                "linear_bias_elements": 1024,
+                "linear_output_elements": 3072,
+                "linear_output_stride": 1024,
+                "linear_rows": 3,
+                "linear_input_channels": 4096,
+                "linear_output_channels": 1024
+              }
+            }
+          },
+          {
+            "id": "output",
+            "op": "audio_scaled_sum_strided_checked",
+            "kernel": "audio_scaled_sum_strided_f32_checked",
+            "returns_status": true,
+            "graph_slots": {
+              "inputs": {
+                "left": "residual1",
+                "right": "down"
+              },
+              "outputs": {
+                "output": "output"
+              }
+            },
+            "params": {
+              "R": 3,
+              "C": 1024,
+              "scale": 1.0,
+              "call_constants": {
+                "sum_left_elements": 3072,
+                "sum_right_elements": 3072,
+                "sum_output_elements": 3072,
+                "sum_left_stride": 1024,
+                "sum_right_stride": 1024,
+                "sum_output_stride": 1024,
+                "sum_rows": 3,
+                "sum_columns": 1024
+              }
+            }
+          }
+        ]
+      },
+      "footer": []
+    }
+  },
+  "semantic_checkpoints": {
+    "schema": "cke.semantic_checkpoint_contract",
+    "schema_version": 1,
+    "exports": {
+      "norm1": {
+        "section": "body",
+        "template_op_id": "norm1",
+        "op": "rmsnorm_rows_checked",
+        "checkpoints": [
+          {
+            "id": "ming3.dit.norm1",
+            "producer": "norm1",
+            "tensor": "norm1",
+            "logical_layout": "token_major_contiguous",
+            "axis_names": [
+              "token",
+              "channel"
+            ],
+            "storage_dtype": "fp32"
+          }
+        ]
+      },
+      "q": {
+        "section": "body",
+        "template_op_id": "q",
+        "op": "linear_rows_checked",
+        "checkpoints": [
+          {
+            "id": "ming3.dit.q",
+            "producer": "q",
+            "tensor": "q",
+            "logical_layout": "token_major_contiguous",
+            "axis_names": [
+              "token",
+              "channel"
+            ],
+            "storage_dtype": "fp32"
+          }
+        ]
+      },
+      "k": {
+        "section": "body",
+        "template_op_id": "k",
+        "op": "linear_rows_checked",
+        "checkpoints": [
+          {
+            "id": "ming3.dit.k",
+            "producer": "k",
+            "tensor": "k",
+            "logical_layout": "token_major_contiguous",
+            "axis_names": [
+              "token",
+              "channel"
+            ],
+            "storage_dtype": "fp32"
+          }
+        ]
+      },
+      "v": {
+        "section": "body",
+        "template_op_id": "v",
+        "op": "linear_rows_checked",
+        "checkpoints": [
+          {
+            "id": "ming3.dit.v",
+            "producer": "v",
+            "tensor": "v",
+            "logical_layout": "token_major_contiguous",
+            "axis_names": [
+              "token",
+              "channel"
+            ],
+            "storage_dtype": "fp32"
+          }
+        ]
+      },
+      "q_rot": {
+        "section": "body",
+        "template_op_id": "q_rot",
+        "op": "rope_pairwise_rows_checked",
+        "checkpoints": [
+          {
+            "id": "ming3.dit.q_rot",
+            "producer": "q_rot",
+            "tensor": "q_rot",
+            "logical_layout": "token_major_contiguous",
+            "axis_names": [
+              "token",
+              "channel"
+            ],
+            "storage_dtype": "fp32"
+          }
+        ]
+      },
+      "k_rot": {
+        "section": "body",
+        "template_op_id": "k_rot",
+        "op": "rope_pairwise_rows_checked",
+        "checkpoints": [
+          {
+            "id": "ming3.dit.k_rot",
+            "producer": "k_rot",
+            "tensor": "k_rot",
+            "logical_layout": "token_major_contiguous",
+            "axis_names": [
+              "token",
+              "channel"
+            ],
+            "storage_dtype": "fp32"
+          }
+        ]
+      },
+      "attention": {
+        "section": "body",
+        "template_op_id": "attention",
+        "op": "attention_full_token_major_checked",
+        "checkpoints": [
+          {
+            "id": "ming3.dit.attention",
+            "producer": "attention",
+            "tensor": "attention",
+            "logical_layout": "token_major_contiguous",
+            "axis_names": [
+              "token",
+              "channel"
+            ],
+            "storage_dtype": "fp32"
+          }
+        ]
+      },
+      "attention_projection": {
+        "section": "body",
+        "template_op_id": "attention_projection",
+        "op": "linear_rows_checked",
+        "checkpoints": [
+          {
+            "id": "ming3.dit.attention_projection",
+            "producer": "attention_projection",
+            "tensor": "attention_projection",
+            "logical_layout": "token_major_contiguous",
+            "axis_names": [
+              "token",
+              "channel"
+            ],
+            "storage_dtype": "fp32"
+          }
+        ]
+      },
+      "residual1": {
+        "section": "body",
+        "template_op_id": "residual1",
+        "op": "audio_scaled_sum_strided_checked",
+        "checkpoints": [
+          {
+            "id": "ming3.dit.residual1",
+            "producer": "residual1",
+            "tensor": "residual1",
+            "logical_layout": "token_major_contiguous",
+            "axis_names": [
+              "token",
+              "channel"
+            ],
+            "storage_dtype": "fp32"
+          }
+        ]
+      },
+      "norm2": {
+        "section": "body",
+        "template_op_id": "norm2",
+        "op": "rmsnorm_rows_checked",
+        "checkpoints": [
+          {
+            "id": "ming3.dit.norm2",
+            "producer": "norm2",
+            "tensor": "norm2",
+            "logical_layout": "token_major_contiguous",
+            "axis_names": [
+              "token",
+              "channel"
+            ],
+            "storage_dtype": "fp32"
+          }
+        ]
+      },
+      "up": {
+        "section": "body",
+        "template_op_id": "up",
+        "op": "linear_rows_checked",
+        "checkpoints": [
+          {
+            "id": "ming3.dit.up",
+            "producer": "up",
+            "tensor": "up",
+            "logical_layout": "token_major_contiguous",
+            "axis_names": [
+              "token",
+              "channel"
+            ],
+            "storage_dtype": "fp32"
+          }
+        ]
+      },
+      "activated": {
+        "section": "body",
+        "template_op_id": "activated",
+        "op": "gelu",
+        "checkpoints": [
+          {
+            "id": "ming3.dit.activated",
+            "producer": "activated",
+            "tensor": "activated",
+            "logical_layout": "token_major_contiguous",
+            "axis_names": [
+              "token",
+              "channel"
+            ],
+            "storage_dtype": "fp32"
+          }
+        ]
+      },
+      "down": {
+        "section": "body",
+        "template_op_id": "down",
+        "op": "linear_rows_checked",
+        "checkpoints": [
+          {
+            "id": "ming3.dit.down",
+            "producer": "down",
+            "tensor": "down",
+            "logical_layout": "token_major_contiguous",
+            "axis_names": [
+              "token",
+              "channel"
+            ],
+            "storage_dtype": "fp32"
+          }
+        ]
+      },
+      "output": {
+        "section": "body",
+        "template_op_id": "output",
+        "op": "audio_scaled_sum_strided_checked",
+        "checkpoints": [
+          {
+            "id": "ming3.dit.output",
+            "producer": "output",
+            "tensor": "output",
+            "logical_layout": "token_major_contiguous",
+            "axis_names": [
+              "token",
+              "channel"
+            ],
+            "storage_dtype": "fp32"
+          }
+        ]
+      }
+    }
+  }
+}

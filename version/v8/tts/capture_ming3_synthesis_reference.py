@@ -60,9 +60,25 @@ def main():
             def capture(module,inputs,output):
                 if name in seen:return
                 seen.add(name)
-                torch.save({'inputs':tuple(x.detach().cpu() for x in inputs),
-                    'output':output.detach().cpu()},args.output/(name+'.pt'))
+                def cpu(value):
+                    if isinstance(value,torch.Tensor):return value.detach().cpu()
+                    if isinstance(value,(tuple,list)):return tuple(cpu(x) for x in value)
+                    return value
+                payload={'inputs':cpu(inputs),'output':cpu(output)}
+                if name=='dit_first_block':
+                    import copy
+                    payload['weights']={key:cpu(value) for key,value in module.state_dict().items()}
+                    fp32=copy.deepcopy(module).float().eval()
+                    for child in fp32.modules():child._forward_hooks.clear()
+                    def floating(value):
+                        if isinstance(value,torch.Tensor):return value.float()
+                        if isinstance(value,(tuple,list)):return tuple(floating(x) for x in value)
+                        return value
+                    with torch.inference_mode():payload['fp32_replay_output']=cpu(fp32(*floating(inputs)))
+                    payload['reference_scope']='same captured inputs and weights recast to FP32; separate from BF16 trajectory'
+                torch.save(payload,args.output/(name+'.pt'))
             return capture
+        model.model.flowloss.cfm.model.blocks[0].register_forward_hook(hook('dit_first_block'))
         model.model.audio.decoder.fc1.register_forward_hook(hook('vae_fc1'))
         model.model.audio.decoder.head.out.register_forward_hook(hook('vae_head_projection'))
         steps=[]
@@ -79,6 +95,18 @@ def main():
         soundfile.write(str(args.output/'publisher.wav'),wav.float().numpy().reshape(-1),model.sample_rate)
         report.update(samples=wav.numel(),sample_rate=model.sample_rate,steps=len(steps),
             normal_stop=bool(steps and steps[-1]),status='PASS' if steps and steps[-1] else 'INCOMPLETE')
+        # Preserve actual spectral conversion and the BF16 window, not a
+        # recomputed FP32 approximation. These remain oracle-fed native inputs.
+        import numpy as np
+        head=torch.load(args.output/'vae_head_projection.pt',weights_only=True)['output']
+        magnitude,phase=head.transpose(1,2).chunk(2,dim=1)
+        magnitude=magnitude.exp().clamp(max=100)
+        spectrum=magnitude*(phase.cos()+1j*phase.sin())
+        np.savez(args.output/'waveform_operands.npz',
+            real=spectrum.real[0].T.contiguous().numpy(),
+            imag=spectrum.imag[0].T.contiguous().numpy(),
+            window=model.model.audio.decoder.head.istft.window.float().cpu().numpy(),
+            expected=wav.float().cpu().numpy().reshape(-1))
         report['outputs']={path.name:digest(path) for path in args.output.iterdir() if path.name!='report.json'}
     except Exception as exc:
         report.update(status='FAIL',error_type=type(exc).__name__,error=str(exc));save();raise

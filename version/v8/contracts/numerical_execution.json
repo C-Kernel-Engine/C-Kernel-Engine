@@ -40,6 +40,124 @@
       "position_transform": null,
       "description": "Checked native decoder sequence and exact FP32 feature transport. The caller binds an initialized deterministic decoder artifact and its independent numerical contract; delegated model arithmetic is not certified by this copy contract. Invalid requests precede execution; failures and cancellation publish no features."
     },
+    "sinusoidal_explicit_frequencies_fp32": {
+      "operator_family": "position_embeddings",
+      "status": "observed",
+      "storage": {
+        "input": "fp32",
+        "weight": "fp32",
+        "output": "fp32"
+      },
+      "compute": {
+        "input": "fp32",
+        "weight": "fp32",
+        "accumulator": "fp32",
+        "contraction": "disabled",
+        "evaluation_order": "position_times_scale_then_frequency_then_sinf_cosf"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": [
+          "input_load",
+          "pointwise_product",
+          "sine",
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "none",
+        "order": "none",
+        "partial_accumulator": "none",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "serial",
+        "split_strategy": "independent_outputs",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Explicit frequency and position operands; phase=(position*scale)*frequency with two FP32 stores, followed by scalar libm sine/cosine and FP32 output. No implicit frequency construction."
+    },
+    "rope_pairwise_explicit_tables_fp32": {
+      "operator_family": "text_mrope",
+      "status": "observed",
+      "storage": {
+        "input": "fp32",
+        "weight": "none",
+        "output": "fp32"
+      },
+      "compute": {
+        "input": "fp32",
+        "weight": "none",
+        "accumulator": "fp32",
+        "contraction": "disabled",
+        "evaluation_order": "two_rounded_products_then_add_or_subtract_for_each_consecutive_pair"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": [
+          "input_load",
+          "weighted_product",
+          "pointwise_sum",
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "sum",
+        "order": "left_to_right",
+        "partial_accumulator": "fp32",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "serial",
+        "split_strategy": "independent_outputs",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Checked nonaliasing token-major pairwise rotation with explicit position tables. Each product and sum rounds in FP32 with FMA disabled; no cache generation or position policy."
+    },
+    "audio_istft_complex_window_bf16_fold": {
+      "operator_family": "audio_istft_mag_phase",
+      "status": "observed",
+      "storage": {
+        "input": "fp32",
+        "weight": "none",
+        "output": "fp32"
+      },
+      "compute": {
+        "input": "fp32",
+        "weight": "none",
+        "accumulator": "fp64",
+        "contraction": "disabled",
+        "evaluation_order": "fp64_inverse_dft_recurrence_and_overlap_numerator_bf16_squared_window_and_reverse_frame_fold_denominator"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": [
+          "input_load",
+          "fft_projection",
+          "square_product",
+          "reduction_update",
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "composite",
+        "order": "stage_ordered",
+        "partial_accumulator": "fp64",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "serial",
+        "split_strategy": "serial",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Correctness baseline, O(frames*n_fft^2), not a fast FFT provider. Cartesian inputs preserve upstream phase/magnitude rounding; FP64 inverse recurrence and overlap numerator; BF16 square and each denominator sum in descending contributing-frame order; FP32 output. Explicit crop. Offline only."
+    },
     "audio_linear_half_pixel_fp32": {
       "operator_family": "audio_upsample_linear",
       "status": "observed",

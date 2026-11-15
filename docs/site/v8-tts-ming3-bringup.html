@@ -1093,6 +1093,80 @@ This is identical-input primitive evidence, not full-model parity. The generated
 regression checks normal map resolution, lowering, execution and rejection recovery;
 a nearest-neighbor negative control fails the intended value comparison.</p>
 <pre>python3 -m unittest tests.test_v8_audio_linear_upsample -v</pre>
+<h2>Generated waveform from supplied spectra</h2>
+<p>The next connected boundary is an explicit-window inverse real DFT, normalized
+by overlap-add and cropped by caller-declared extents. Ming uses FFT length 3528,
+hop 882 and 1323 samples cropped at each end; Kokoro's centered crop is different.
+The new provider consumes Cartesian spectra and the actual stored window, avoiding
+an unannounced recomputation of upstream BF16 magnitude or phase.</p>
+<p>Identical-input replay isolated a 0.002938 maximum difference to the window
+normalizer. The publisher squares its BF16 window and stores each fold addition
+in BF16. For each destination sample, CPU fold accumulates contributing frames in
+descending order. Reversing that order is numerically observable. The native
+contract now declares these conversion points and ordering explicitly.</p>
+<p>On the retained 128-frame reference, normal generated execution produced
+112,896 finite waveform samples. Maximum absolute error was 8.94e-8 and RMSE
+6.80e-9 against the publisher waveform. The native final stage took 1.92 seconds
+with a 4,201,216-byte arena in one development run. This measures only waveform
+reconstruction from oracle spectra, not text-to-speech speed or listening quality.</p>
+<p>This correctness provider uses an FP64 inverse-DFT recurrence and overlap
+numerator, then the declared BF16 envelope and FP32 output. It is quadratic in FFT
+length, not an optimized FFT implementation. NumPy FP64 supplies an independent
+reference; a wrong fold-order control must fail. Existing Kokoro ISTFT contracts
+and execution remain separate.</p>
+<pre>python3 -m unittest tests.test_v8_audio_istft_complex_window -v
+python3 version/v8/tts/build_ming3_waveform_circuit.py --check
+python3 version/v8/tts/capture_ming3_synthesis_reference.py \
+  --publisher-root /path/to/pinned/publisher \
+  --checkpoint /path/to/pinned/checkpoint --output /tmp/ming-reference
+python3 version/v8/tts/replay_ming3_waveform.py \
+  --operands /tmp/ming-reference/waveform_operands.npz \
+  --output /tmp/ming-native-waveform</pre>
+<p>Output directories must not already exist, preserving previous attempts.
+The reference command requires its separate publisher dependencies. Native replay
+uses retained operands and does not run a hidden Transformers fallback.</p>
+<h2>First complete DiT block, explicit FP32 composition</h2>
+<p>The generated first-block graph now connects RMSNorm, biased Q/K/V projections,
+consecutive-pair rotary embedding, full unmasked attention, output projection,
+residual addition, second RMSNorm and the GELU MLP. It reuses checked providers and
+adds a checked explicit-table pairwise rotation. Semantic checkpoints identify
+all fourteen operation boundaries for X-Ray.</p>
+<p>Nonzero small graphs at two, three and seven tokens pass an independent
+reference. Corrupting a Q weight or a rotary coefficient fails the intended
+intermediate comparison. Invalid rotary input leaves the final output untouched;
+restoring valid input permits another successful call.</p>
+<p>Both real first-block conditioning branches were replayed with the pinned
+weights and inputs recast to FP32. Compared with the publisher block also recast
+to FP32, maximum errors were 3.34e-5 and 5.34e-5, with RMSE 1.99e-6 and 4.83e-6.
+The report labels these measured differences, not certification. This graph does
+not implement publisher BF16 storage boundaries, the full eight-block DiT,
+timestep conditioning or the complete sampler. It accepts supplied rotary tables.</p>
+<pre>python3 -m unittest tests.test_v8_ming3_dit_block tests.test_v8_rope_pairwise_rows -v
+python3 version/v8/tts/replay_ming3_dit_block.py \
+  --capture /tmp/ming-reference/dit_first_block.pt \
+  --output /tmp/ming-native-dit-block</pre>
+<p>The reference capture command above now retains the first block, its weights,
+its original BF16 output and a separately labelled FP32 replay. Tests retain
+nonzero mathematical fixtures; real checkpoint data stays in private local
+artifacts. Missing artifacts are not a model-level pass.</p>
+<h2>Complete FP32 DiT component</h2>
+<p>The generated graph now connects timestep features, conditioning, history and
+latent projections, all eight DiT blocks, and the final projection. Checked native
+sinusoidal providers construct timestep and rotary features using explicit
+frequencies. Mathematical timestep constants are compiled artifacts; rotary
+frequencies come from the checkpoint. Neither table is an oracle-fed activation.</p>
+<p>Nonzero one-, two- and eight-layer fixtures compare against an independent
+composition. Direct kernel checks cover capacities, aliasing, nonfinite inputs,
+phase overflow and recovery. These tests are registered in nightly.</p>
+<p>The retained real-weight two-branch replay measured maximum errors 1.67e-6
+and 3.58e-6, with RMSE 4.80e-7 and 8.50e-7 against the publisher DiT recast to
+FP32. Native execution took approximately 0.109 seconds per branch in one
+component measurement, using a 415 MB arena. This is measured FP32 component
+evidence, not publisher BF16 certification or end-to-end synthesis performance.</p>
+<pre>python3 -m unittest tests.test_v8_ming3_dit tests.test_v8_sinusoidal_rows -v</pre>
+<p>The native sampler/RNG loop, backbone, aggregator and audio-decoder transformer
+remain separate integration gates. The existing reference-spectrum WAV does not
+become native text-to-speech merely because this DiT component executes.</p>
 <h2>Kernel and circuit work still required</h2>
 <table><thead><tr><th>Component</th><th>Reuse candidates</th><th>Remaining gate</th></tr></thead><tbody>
 <tr><td>Qwen2.5 backbone</td><td>Linear projections, RMSNorm, RoPE, attention, KV</td><td>Weight mapping, prompt embedding assembly and artifact-specific BF16 parity</td></tr>

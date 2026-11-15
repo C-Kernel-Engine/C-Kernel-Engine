@@ -770,6 +770,31 @@ TEST_SUITES = {
         "TTS Kokoro Extent and Duration Expansion", "kernels",
         ROOT / "tests" / "test_v8_kokoro_shape_bounds.py",
     ),
+    "tts_ming3_generated_dit_fp32": TestSuite(
+        "Ming3 Full Generated DiT FP32 Composition", "inference",
+        ROOT / "tests" / "test_v8_ming3_dit.py",
+        timeout_sec=120,
+    ),
+    "sinusoidal_rows_checked": TestSuite(
+        "Checked Native Sinusoidal Features", "inference",
+        ROOT / "tests" / "test_v8_sinusoidal_rows.py",
+        timeout_sec=120,
+    ),
+    "tts_ming3_generated_dit_block_fp32": TestSuite(
+        "Ming3 Nonzero Generated DiT Block FP32 Composition", "inference",
+        ROOT / "tests" / "test_v8_ming3_dit_block.py",
+        timeout_sec=120,
+    ),
+    "rope_pairwise_rows_checked": TestSuite(
+        "Explicit-Table Checked Pairwise Rotation", "inference",
+        ROOT / "tests" / "test_v8_rope_pairwise_rows.py",
+        timeout_sec=120,
+    ),
+    "audio_istft_complex_window_checked": TestSuite(
+        "Audio Explicit-Window Cropped ISTFT and BF16 Fold Order", "inference",
+        ROOT / "tests" / "test_v8_audio_istft_complex_window.py",
+        timeout_sec=120,
+    ),
     "audio_linear_upsample_checked": TestSuite(
         "Audio Linear Half-Pixel Upsampling and Generated Binding", "inference",
         ROOT / "tests" / "test_v8_audio_linear_upsample.py",
