@@ -10,8 +10,10 @@ import re
 
 
 def compose_decoder_features(
-    circuit, *, feature_input="hidden", token_input="backbone_ids"
+    circuit, *, feature_input="hidden", token_input="backbone_ids", stop_gradient=False
 ):
+    if type(stop_gradient) is not bool:
+        raise ValueError("stop_gradient must be an explicit boolean")
     if any(
         not isinstance(name, str) or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name)
         for name in (feature_input, token_input)
@@ -74,6 +76,7 @@ def compose_decoder_features(
             "outputs": {"output": feature_input},
         },
         "params": {
+            "stop_gradient": stop_gradient,
             "T": tokens,
             "C": channels,
             "Q": tokens * channels,

@@ -63,7 +63,7 @@
   },
   "modes": {
     "inference": true,
-    "training": false,
+    "training": true,
     "backward": false
   },
   "numerical_capabilities": [
@@ -201,6 +201,63 @@
     "equivalence_group": "native.decoder.feature_sequence.checked.fp32.v1",
     "phases": [
       "prefill"
+    ]
+  },
+  "training_contract": {
+    "version": 1,
+    "layout": "contiguous",
+    "batch_policy": "fixed",
+    "return_status": "zero_success",
+    "frozen_forward": {
+      "inputs": "nondifferentiable",
+      "outputs": "stop_gradient",
+      "parameters": "external_frozen"
+    },
+    "borrowed_contexts": [
+      {
+        "pointer": "context",
+        "bytes": "context_bytes"
+      }
+    ],
+    "buffer_spans": [
+      {
+        "pointer": "ids",
+        "rows": "tokens",
+        "width": 1,
+        "elements": "id_elements"
+      },
+      {
+        "pointer": "output",
+        "rows": "tokens",
+        "width": "channels",
+        "elements": "output_elements"
+      },
+      {
+        "pointer": "scratch",
+        "rows": "tokens",
+        "width": "channels",
+        "elements": "scratch_elements"
+      }
+    ],
+    "scalar_bounds": {
+      "tokens": {
+        "min": 1,
+        "max": 2147483647
+      },
+      "channels": {
+        "min": 1,
+        "max": 2147483647
+      }
+    },
+    "scalar_equalities": [
+      [
+        "id_elements",
+        "tokens"
+      ],
+      [
+        "output_elements",
+        "scratch_elements"
+      ]
     ]
   }
 }
