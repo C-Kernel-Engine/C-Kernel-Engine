@@ -127,6 +127,13 @@ int tail_exceptions(void) {
             with self.subTest(begin=begin, end=end):
                 self.check_case(33, 19, 65, begin=begin, end=end)
 
+    def test_packing_strides_across_multiple_tiles(self):
+        for n in (33, 63, 64, 67):
+            for k in (63, 64, 65, 127, 128):
+                with self.subTest(n=n, k=k):
+                    self.check_case(19, n, k, begin=1, end=18)
+                    self.check_case(19, n, k, False, begin=1, end=18)
+
     def test_guard_pages_for_input_and_output_tails(self):
         self.assertEqual(self.lib.guarded(), 0)
 

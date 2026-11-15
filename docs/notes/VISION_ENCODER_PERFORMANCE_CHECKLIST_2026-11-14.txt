@@ -118,3 +118,47 @@ Candidate engine SHA256:
 2cc75ad82351e065660b8df390f3f12820d1bb0b8b7b5792743194041657fbbf
 Next: reprofile the remaining GEMM conversion/packing and serial intervals on
 the accepted artifact before changing blocking, prefetching or precision.
+
+CONTIGUOUS WEIGHT PACKING (2026-11-15)
+Base: merged #1135, 1a558d817. Profiling the retained exact BF16 provider on
+physical CPU 0 put approximately 45% of its synthetic cycle samples in the
+weight-packing region. Disassembly shows extracts/shuffles and strided stores.
+Sampling identifies a candidate region, not an exact wall-time decomposition.
+[x] Test K-outer/channel-inner packing to write contiguous packed output lanes.
+    Packed values, stack size, BF16 conversion and ascending-K reduction stay
+    unchanged. No persistent packing, allocation, provider or compiler change.
+[x] Paired synthetic shapes on physical CPUs 0 and 8: 1.033-1.107x speedup,
+    bitwise-identical results. The smallest observed gain was the first shape
+    on CPU 0; do not present the maximum as a whole-encoder gain.
+[x] Extend independent arithmetic tests across multi-tile channel/K strides.
+    Poisoned-stack AVX512 run: 6 tests and 556 subtests passed.
+[x] Map/ABI/registry gate and row-dispatch/Qwen BF16 contract tests passed.
+[x] Complete paired generated encoder timing and prefix-byte acceptance.
+[ ] Final-head required nightly.
+Continue to treat Gemma FP16 and other artifact/provider combinations as
+separate measured consumers; this is not an all-family speed claim.
+
+CONTIGUOUS PACKING CONNECTED RESULTS
+Same generated consumers, frozen inputs and weights; change engine only.
+Physical CPUs 0-15; baseline/candidate/candidate/baseline, each with a warmup.
+Encoder-only seconds (median; initialization and captures excluded):
+Artifact        Baseline       Candidate      Latency reduction
+Qwen3-VL        31.4705        30.3200        3.66%
+Qwen3.6         30.3676        29.9890        1.25%
+Qwen3-VL ranges: baseline 30.8088-32.1321, candidate 30.1806-30.4595.
+Qwen3.6 ranges: baseline 30.1639-30.5713, candidate 29.5277-30.4503.
+Qwen3.6 ranges overlap: treat its small gain as provisional, not a guaranteed
+speedup across inputs. Every warmup and measured prefix preserved CKE bytes.
+This does not establish new oracle parity, image quality or a fresh oracle
+latency ratio. Gemma FP16 and other consumers remain separately unmeasured.
+Baseline engine SHA256:
+2cc75ad82351e065660b8df390f3f12820d1bb0b8b7b5792743194041657fbbf
+Candidate engine SHA256:
+c40cbfbfcc62a27fd73b6040709f3522a4e0ad740ca29ec85fee437ea8889457
+
+Synthetic process counters, physical CPU 0 (startup included, normalized by
+completed projections): cycles/call approximately 31.17M -> 28.20M, instructions
+approximately 96.07M -> 158.27M. More instructions can still execute faster;
+do not advertise instruction-count reduction or infer better L3 behavior.
+Intel AVX512 throughput remains unmeasured. Focused nightly executed with no
+skips; required full nightly remains a separate gate.
