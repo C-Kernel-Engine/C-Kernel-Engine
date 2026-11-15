@@ -7,7 +7,7 @@ var searchData=
   ['has_5famx_5ftile_4',['has_amx_tile',['../structCPUInfo.html#a5ee89af0328fd68d00101afcd4072405',1,'CPUInfo::has_amx_tile'],['../structCPUInfo.html#ad5a579994982f5cee575bb9674abd238',1,'CPUInfo::has_amx_tile']]],
   ['has_5favx_5',['has_avx',['../structCPUInfo.html#a6981442ec8c03e3486d68e5011cbe02c',1,'CPUInfo::has_avx'],['../structCPUInfo.html#ac02376e5e445112e00ec31ff39f0bd17',1,'CPUInfo::has_avx']]],
   ['has_5favx2_6',['has_avx2',['../structCPUInfo.html#a5392c3ca44cc97b171ee980e48408e03',1,'CPUInfo::has_avx2'],['../structCPUInfo.html#ade0ca8a679c8ba6761283507550f2b84',1,'CPUInfo::has_avx2']]],
-  ['has_5favx512_5fbf16_7',['has_avx512_bf16',['../structCPUInfo.html#a2f0697cf41068e3a7b9acfaa03b72dc1',1,'CPUInfo::has_avx512_bf16'],['../structCPUInfo.html#a7cb0183778ff279baa23ce4816b99089',1,'CPUInfo::has_avx512_bf16']]],
+  ['has_5favx512_5fbf16_7',['has_avx512_bf16',['../structCPUInfo.html#a7cb0183778ff279baa23ce4816b99089',1,'CPUInfo::has_avx512_bf16'],['../structCPUInfo.html#a2f0697cf41068e3a7b9acfaa03b72dc1',1,'CPUInfo::has_avx512_bf16']]],
   ['has_5favx512_5fvnni_8',['has_avx512_vnni',['../structCPUInfo.html#af5794c564eefe3fab7338e7fe1c5f61b',1,'CPUInfo']]],
   ['has_5favx512bw_9',['has_avx512bw',['../structCPUInfo.html#ae25e58f2b50c70a860e5dcafa0af8d37',1,'CPUInfo::has_avx512bw'],['../structCPUInfo.html#a17a91fbcd0b73af602d2504a754a1e62',1,'CPUInfo::has_avx512bw']]],
   ['has_5favx512dq_10',['has_avx512dq',['../structCPUInfo.html#a7fed58e4df275a215e37074b900e0f96',1,'CPUInfo']]],
@@ -24,12 +24,15 @@ var searchData=
   ['has_5fsse4_5f2_21',['has_sse4_2',['../structCPUInfo.html#ad3efc23f84451ced9b6085cb036ceb7d',1,'CPUInfo']]],
   ['has_5fvnni_22',['has_vnni',['../structCPUInfo.html#a2d0f8aabf38b410e7242db59a3ea63ae',1,'CPUInfo']]],
   ['head_23',['head',['../structCKMemPool.html#ac7919cceb17dccce7584f443a2f9eb4e',1,'CKMemPool']]],
-  ['head_5fdim_24',['head_dim',['../structCKBumpHeaderV5.html#ad0b6a32b8d1ed0f867e9c16c2d87d410',1,'CKBumpHeaderV5::head_dim'],['../structCKLayerForwardParamsQ4K.html#a8f8ca9f6b17918a424041cc9003229e9',1,'CKLayerForwardParamsQ4K::head_dim'],['../structCKLayerBackwardParams.html#ace4e73b166d2b71dba81099ff55f9c5f',1,'CKLayerBackwardParams::head_dim'],['../structCKLayerForwardParams.html#a5aac19a779c176623a55fd48bb9502cf',1,'CKLayerForwardParams::head_dim'],['../structCKSectionConfig.html#a70a85143350acb4f082fd2664728e7e9',1,'CKSectionConfig::head_dim'],['../structCKModelConfig.html#a97a73a9bfbe5b159083d6048c9cc4712',1,'CKModelConfig::head_dim']]],
+  ['head_5fdim_24',['head_dim',['../structCKLayerBackwardParams.html#ace4e73b166d2b71dba81099ff55f9c5f',1,'CKLayerBackwardParams::head_dim'],['../structCKLayerForwardParamsQ4K.html#a8f8ca9f6b17918a424041cc9003229e9',1,'CKLayerForwardParamsQ4K::head_dim'],['../structCKLayerForwardParams.html#a5aac19a779c176623a55fd48bb9502cf',1,'CKLayerForwardParams::head_dim'],['../structCKSectionConfig.html#a70a85143350acb4f082fd2664728e7e9',1,'CKSectionConfig::head_dim'],['../structCKBumpHeaderV5.html#ad0b6a32b8d1ed0f867e9c16c2d87d410',1,'CKBumpHeaderV5::head_dim'],['../structCKModelConfig.html#a97a73a9bfbe5b159083d6048c9cc4712',1,'CKModelConfig::head_dim']]],
   ['header_25',['header',['../structCKSection.html#adafbb43b1edb42a0adb1b97311b601a4',1,'CKSection']]],
   ['header_5fend_26',['header_end',['../structCKHeaderOffsets.html#acb634ce1abbf44e2ee2791e8a1d1817e',1,'CKHeaderOffsets']]],
   ['header_5foutput_27',['header_output',['../structCKHeaderOffsets.html#af6277b6a25c2312f49d22592e268dab0',1,'CKHeaderOffsets']]],
   ['header_5fstart_28',['header_start',['../structCKHeaderOffsets.html#a8bd89231afd3b0a519c8491e955504df',1,'CKHeaderOffsets']]],
-  ['hidden_5fsize_29',['hidden_size',['../structCKModelConfig.html#afd04ffe4db48600b90f32904c49d73af',1,'CKModelConfig']]],
-  ['hostname_30',['hostname',['../structSystemTopology.html#a8c3a908fdf3d9b0c50e3346a66f68a13',1,'SystemTopology']]],
-  ['hugepage_5fsize_31',['hugepage_size',['../structCKModel.html#a9122ea9b37528516af41eb29c237838f',1,'CKModel']]]
+  ['hidden_29',['hidden',['../structck__checked__latent__loop.html#a66d332d22fd56de51124a95d6f088963',1,'ck_checked_latent_loop']]],
+  ['hidden_5fsize_30',['hidden_size',['../structCKModelConfig.html#afd04ffe4db48600b90f32904c49d73af',1,'CKModelConfig']]],
+  ['history_31',['history',['../structck__flow__model.html#a91a8b49aa2537723334c6e89e953b237',1,'ck_flow_model::history'],['../structck__guided__flow__request.html#ac06ba5332f026fee97f860210bd54056',1,'ck_guided_flow_request::history']]],
+  ['history_5felements_32',['history_elements',['../structck__guided__flow__request.html#af904817dacb1c40bb64b7e5153a1f452',1,'ck_guided_flow_request']]],
+  ['hostname_33',['hostname',['../structSystemTopology.html#a8c3a908fdf3d9b0c50e3346a66f68a13',1,'SystemTopology']]],
+  ['hugepage_5fsize_34',['hugepage_size',['../structCKModel.html#a9122ea9b37528516af41eb29c237838f',1,'CKModel']]]
 ];

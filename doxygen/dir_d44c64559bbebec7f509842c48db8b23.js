@@ -30,6 +30,8 @@ var dir_d44c64559bbebec7f509842c48db8b23 =
     [ "ckernel_bump_v5.h", "ckernel__bump__v5_8h.html", "ckernel__bump__v5_8h" ],
     [ "ckernel_checked_frame_codec.h", "ckernel__checked__frame__codec_8h.html", "ckernel__checked__frame__codec_8h" ],
     [ "ckernel_checked_frame_loop.h", "ckernel__checked__frame__loop_8h.html", "ckernel__checked__frame__loop_8h" ],
+    [ "ckernel_checked_guided_flow.h", "ckernel__checked__guided__flow_8h.html", "ckernel__checked__guided__flow_8h" ],
+    [ "ckernel_checked_latent_loop.h", "ckernel__checked__latent__loop_8h.html", "ckernel__checked__latent__loop_8h" ],
     [ "ckernel_codegen.h", "ckernel__codegen_8h.html", "ckernel__codegen_8h" ],
     [ "ckernel_codegen_v2.h", "ckernel__codegen__v2_8h.html", "ckernel__codegen__v2_8h" ],
     [ "ckernel_concat_i32.h", "ckernel__concat__i32_8h.html", "ckernel__concat__i32_8h" ],

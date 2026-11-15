@@ -23,7 +23,7 @@ var searchData=
   ['v_5fwo_20',['v_wo',['../structCKLayerOptimizerOffsets.html#a66f90d80c3b0b3274f57b16b824c4050',1,'CKLayerOptimizerOffsets::v_wo'],['../structCKLayerGradOffsets.html#acba8a7fbb8f97544b52044869c46789c',1,'CKLayerGradOffsets::v_wo']]],
   ['v_5fwq_21',['v_wq',['../structCKLayerGradOffsets.html#a961c5f51bc787cfd934f468f70536674',1,'CKLayerGradOffsets::v_wq'],['../structCKLayerOptimizerOffsets.html#a142f3597b192e27b22152d7e5e1cca73',1,'CKLayerOptimizerOffsets::v_wq']]],
   ['v_5fwv_22',['v_wv',['../structCKLayerGradOffsets.html#af0e2b103e7a3b9f799947d8447e091c0',1,'CKLayerGradOffsets::v_wv'],['../structCKLayerOptimizerOffsets.html#af930f5e076e326272b26fb52cc4162d4',1,'CKLayerOptimizerOffsets::v_wv']]],
-  ['valid_5fframes_23',['valid_frames',['../structck__checked__frame__loop.html#a62066d2333a1d53ea05a264e4af42ac4',1,'ck_checked_frame_loop']]],
+  ['valid_5fframes_23',['valid_frames',['../structck__checked__frame__loop.html#a62066d2333a1d53ea05a264e4af42ac4',1,'ck_checked_frame_loop::valid_frames'],['../structck__checked__latent__loop.html#a316b16476031e7bce012aef5669b4a15',1,'ck_checked_latent_loop::valid_frames']]],
   ['valid_5fsamples_24',['valid_samples',['../structck__checked__frame__codec.html#ab2d98e2f4402d557c3e66cbaa2eb2b40',1,'ck_checked_frame_codec']]],
   ['value_25',['value',['../structCKMetric.html#ad0ca8343bf6c7d34f380835d0d7ec484',1,'CKMetric::value'],['../structCKTokenizerHashEntry.html#a5636de7cf6ff6ad7fb7d40e500cfa9ff',1,'CKTokenizerHashEntry::value']]],
   ['vendor_26',['vendor',['../structCPUInfo.html#a49e6a0b2a711e5acbb16ab29ed9da21f',1,'CPUInfo::vendor'],['../structPCIeDevice.html#ad0ee5cdc2f18d4a309e541766e95a5e6',1,'PCIeDevice::vendor']]],
