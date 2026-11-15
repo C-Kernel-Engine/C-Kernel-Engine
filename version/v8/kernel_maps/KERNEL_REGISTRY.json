@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 522,
+      "total": 524,
       "by_op": {
         "add_backward": 1,
         "add_rows_backward_train_f32": 1,
@@ -48,7 +48,7 @@
         "audio_glu": 1,
         "audio_hann_window": 1,
         "audio_harmonic_source_checked": 2,
-        "audio_istft_complex_window_checked": 1,
+        "audio_istft_complex_window_checked": 2,
         "audio_istft_mag_phase": 1,
         "audio_log_mel": 4,
         "audio_lstm": 2,
@@ -68,6 +68,7 @@
         "audio_snake_beta_strided_checked": 1,
         "audio_snake_strided_checked": 1,
         "audio_spectral_head_mag_phase": 1,
+        "audio_spectrum_cartesian_checked": 1,
         "audio_stft": 4,
         "audio_stft_mag_phase_checked": 1,
         "audio_stft_tables": 1,
@@ -26213,6 +26214,297 @@
       "_source_file": "audio_istft_complex_window_bf16_envelope_f32_checked.json"
     },
     {
+      "id": "audio_istft_complex_window_f32_checked",
+      "op": "audio_istft_complex_window_checked",
+      "operation_interface": "audio.istft.cartesian.explicit_window.crop.fp64_fold.fp32.v1",
+      "variant": "fp64_idft_recurrence_fp64_fold",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "equivalence_group": "audio_istft_complex_window_fp64_envelope",
+        "phases": [
+          "prefill"
+        ]
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "real",
+          "dtype": "fp32",
+          "shape": [
+            "F",
+            "N_fft/2+1"
+          ],
+          "layout": "frame_bin_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "imag",
+          "dtype": "fp32",
+          "shape": [
+            "F",
+            "N_fft/2+1"
+          ],
+          "layout": "frame_bin_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "window",
+          "dtype": "fp32",
+          "shape": [
+            "N_fft"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "O"
+          ],
+          "layout": "sample_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "overlap_window",
+          "dtype": "fp64",
+          "shape": [
+            "Q"
+          ],
+          "size_bytes": "8 * Q",
+          "size_resolution": "required",
+          "lifetime": "kernel_call",
+          "alignment": 64,
+          "layout": "contiguous",
+          "access": "read_write",
+          "storage_class": "scratch",
+          "consumption": "required"
+        }
+      ],
+      "dims": [
+        "spectral_elements",
+        "window_elements",
+        "frames",
+        "n_fft",
+        "hop",
+        "left_crop",
+        "right_crop",
+        "output_elements",
+        "scratch_elements",
+        "Q",
+        "O"
+      ],
+      "constraints": {
+        "notes": "Even FFT 2..8192; nonzero frames; hop 1..n_fft; crop must leave positive output. Window inputs must be finite FP32 values. Explicit plan yields scratch in FP64 elements; disjoint buffers and positive normalization required."
+      },
+      "impl": {
+        "function": "audio_istft_complex_window_f32_checked",
+        "c_declaration": "int audio_istft_complex_window_f32_checked(const float *real, const float *imag, size_t spectral_elements, const float *window, size_t window_elements, size_t frames, size_t n_fft, size_t hop, size_t left_crop, size_t right_crop, float *output, size_t output_elements, double *scratch, size_t scratch_elements);",
+        "sources": [
+          "src/kernels/audio_istft_complex_window_checked.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "audio_istft_complex_window_fp64_fold",
+          "status": "observed",
+          "phases": [
+            "prefill"
+          ],
+          "function": "audio_istft_complex_window_f32_checked",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "contract_defined"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp64",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "serial"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "real",
+            "source": "activation:real",
+            "cast": "const float*",
+            "ports": [
+              "input:real"
+            ]
+          },
+          {
+            "name": "imag",
+            "source": "activation:imag",
+            "cast": "const float*",
+            "ports": [
+              "input:imag"
+            ]
+          },
+          {
+            "name": "spectral_elements",
+            "source": "runtime:istft_spectral_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "window",
+            "source": "activation:window",
+            "cast": "const float*",
+            "ports": [
+              "input:window"
+            ]
+          },
+          {
+            "name": "window_elements",
+            "source": "runtime:istft_window_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "frames",
+            "source": "runtime:istft_frames",
+            "value_type": "size_t"
+          },
+          {
+            "name": "n_fft",
+            "source": "runtime:istft_n_fft",
+            "value_type": "size_t"
+          },
+          {
+            "name": "hop",
+            "source": "runtime:istft_hop",
+            "value_type": "size_t"
+          },
+          {
+            "name": "left_crop",
+            "source": "runtime:istft_left_crop",
+            "value_type": "size_t"
+          },
+          {
+            "name": "right_crop",
+            "source": "runtime:istft_right_crop",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:istft_output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "scratch",
+            "source": "scratch:overlap_window",
+            "cast": "double*"
+          },
+          {
+            "name": "scratch_elements",
+            "source": "runtime:istft_scratch_elements",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "F": "istft_frames",
+          "N_fft": "istft_n_fft",
+          "O": "istft_output_elements",
+          "Q": "istft_scratch_elements"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "real",
+            "elements": "istft_spectral_elements",
+            "rows": 1,
+            "width": "istft_spectral_elements",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "imag",
+            "elements": "istft_spectral_elements",
+            "rows": 1,
+            "width": "istft_spectral_elements",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "window",
+            "elements": "istft_window_elements",
+            "rows": 1,
+            "width": "istft_window_elements",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "output",
+            "elements": "istft_output_elements",
+            "rows": 1,
+            "width": "istft_output_elements",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "scratch",
+            "elements": "istft_scratch_elements",
+            "rows": 1,
+            "width": "istft_scratch_elements",
+            "element_bytes": 8
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_audio_istft_complex_window.py"
+        ],
+        "oracle": "Independent NumPy FP64 inverse FFT and FP64 overlap envelope; not publisher BF16 folding"
+      },
+      "notes": "Explicit FP64 inverse transform and FP64 envelope; FP32 output. Distinct from BF16 fold contract.",
+      "name": "audio_istft_complex_window_f32_checked",
+      "_source_file": "audio_istft_complex_window_f32_checked.json"
+    },
+    {
       "id": "audio_istft_mag_phase_f32",
       "op": "audio_istft_mag_phase",
       "operation_interface": "audio.istft.magnitude_phase.centered_hann.fp32.v1",
@@ -30089,6 +30381,212 @@
       "notes": "Inference only. PCM conversion and playback are separate from this model arithmetic.",
       "name": "audio_spectral_head_mag_phase_f32",
       "_source_file": "audio_spectral_head_mag_phase_f32.json"
+    },
+    {
+      "id": "audio_spectrum_cartesian_f32_checked",
+      "op": "audio_spectrum_cartesian_checked",
+      "operation_interface": "audio.spectrum.cartesian.fp32.v1",
+      "variant": "scalar_checked",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "equivalence_group": "audio_spectrum_cartesian_fp32",
+        "phases": [
+          "prefill"
+        ]
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            "F",
+            "2*B"
+          ],
+          "layout": "frame_channel_contiguous",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "real",
+          "dtype": "fp32",
+          "shape": [
+            "F",
+            "B"
+          ],
+          "layout": "frame_bin_contiguous",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "imag",
+          "dtype": "fp32",
+          "shape": [
+            "F",
+            "B"
+          ],
+          "layout": "frame_bin_contiguous",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "F",
+        "B"
+      ],
+      "constraints": {
+        "notes": "Finite inputs; positive finite magnitude limit; disjoint buffers; capacities checked before writes."
+      },
+      "impl": {
+        "function": "audio_spectrum_cartesian_f32_checked",
+        "c_declaration": "int audio_spectrum_cartesian_f32_checked(const float *input, size_t input_elements, float *real, size_t real_elements, float *imag, size_t imag_elements, size_t frames, size_t bins, float magnitude_limit);",
+        "sources": [
+          "src/kernels/audio_spectrum_cartesian_checked.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "audio_spectrum_cartesian_fp32",
+          "status": "observed",
+          "phases": [
+            "prefill"
+          ],
+          "function": "audio_spectrum_cartesian_f32_checked",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "none",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "independent_outputs"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const float*",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "input_elements",
+            "source": "runtime:spectrum_input_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "real",
+            "source": "output:real",
+            "cast": "float*",
+            "ports": [
+              "output:real"
+            ]
+          },
+          {
+            "name": "real_elements",
+            "source": "runtime:spectrum_real_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "imag",
+            "source": "output:imag",
+            "cast": "float*",
+            "ports": [
+              "output:imag"
+            ]
+          },
+          {
+            "name": "imag_elements",
+            "source": "runtime:spectrum_imag_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "frames",
+            "source": "runtime:spectrum_frames",
+            "value_type": "size_t"
+          },
+          {
+            "name": "bins",
+            "source": "runtime:spectrum_bins",
+            "value_type": "size_t"
+          },
+          {
+            "name": "magnitude_limit",
+            "source": "param:magnitude_limit"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "F": "spectrum_frames",
+          "B": "spectrum_bins"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "elements": "spectrum_input_elements",
+            "rows": 1,
+            "width": "spectrum_input_elements",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "real",
+            "elements": "spectrum_real_elements",
+            "rows": 1,
+            "width": "spectrum_real_elements",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "imag",
+            "elements": "spectrum_imag_elements",
+            "rows": 1,
+            "width": "spectrum_imag_elements",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_ming3_audio_decoder.py",
+          "tests/test_v8_audio_spectrum_cartesian.py"
+        ]
+      },
+      "name": "audio_spectrum_cartesian_f32_checked",
+      "_source_file": "audio_spectrum_cartesian_f32_checked.json"
     },
     {
       "id": "audio_stft_mag_phase_checked_f32",
