@@ -1645,6 +1645,7 @@ test-qwen3vl-methodical-parity: $(LIB) $(LIB_VISION)
 	@echo "qwen3vl_checkpoint_coverage max_diff=0 tol=0 [PASS]"
 	@$(PYTHON) $(PYTHONFLAGS) -m unittest tests.test_v8_qwen3vl_template -v
 	@echo "qwen3vl_circuit_codegen max_diff=0 tol=0 [PASS]"
+	@$(PYTHON) $(PYTHONFLAGS) -m unittest tests.test_v8_encoder_row_parallel -v
 	@LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_vision.py
 	@echo "qwen3vl_frontend_mrope max_diff=0 tol=0 [PASS]"
 	@LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_attention_full.py
