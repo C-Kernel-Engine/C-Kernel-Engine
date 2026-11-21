@@ -2615,6 +2615,13 @@ def _build_config(
             "has_vision_encoder": True,
             "dtype": "bf16",
         })
+        if arch == "cohere_compass_vision" and "resample" in preproc:
+            resample = preproc["resample"]
+            # Hugging Face serializes Pillow's integer resampling enum.
+            algorithms = {2: "bilinear", 3: "bicubic"}
+            if type(resample) is not int or resample not in algorithms:
+                raise SystemExit(f"unsupported Cohere Compass image resampling mode: {resample!r}")
+            cfg["image_resize_algorithm"] = algorithms[resample]
 
     if arch == "qwen4_exp":
         architecture = _qwen4_exp_architecture_metadata(hf)
