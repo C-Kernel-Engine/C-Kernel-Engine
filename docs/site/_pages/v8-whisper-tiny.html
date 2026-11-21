@@ -174,6 +174,20 @@ It remains <code>edit_ready=false</code>. No human boundary accuracy or automati
 in the encoder worker and 9.9 seconds in the decoder worker. The reference generation measurement was
 16.4 seconds, excluding model load. These individual observations occurred during development activity;
 repeat idle-host measurements before claiming a speed ratio. Keep Base for the deployed accessibility service.</p>
+<h3 id="speech-discovery">Discover speech workflows</h3>
+<p>Query <code>GET /audio/discovery</code> on a Whisper HTTP service.
+The <code>http_endpoints</code> list describes the service answering the request.
+The <code>offline_workflows</code> list describes tools in the CKE repository and
+their prerequisites. It does not probe installed model bundles or other servers.
+The capability response at <code>/health</code> links to this route.</p>
+<ul>
+  <li>Whisper emits candidate word timings in <code>words.json</code> using the trace workflow below.</li>
+  <li><a href="v8-parakeet-tdt.html#runbook">Parakeet TDT</a> emits recording-relative
+    word spans in <code>selected_words</code> through <code>run_parakeet_long_audio_v8.py</code>.</li>
+  <li><a href="v8-cohere-kernels.html">Cohere Transcribe</a> emits recording-relative
+    token spans in <code>selected_tokens</code> through <code>run_cohere_transcribe_long_audio_v8.py</code>.
+    Token spans require word grouping for word-by-word captions.</li>
+</ul>
 <h3 id="offline-word-alignment">Offline word alignment</h3>
 <p>The resident transcription endpoint reports its own feature flags under
 <code>/health</code>. If <code>word_alignment</code> is false, submit plain
