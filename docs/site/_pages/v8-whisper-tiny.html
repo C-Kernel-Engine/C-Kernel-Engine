@@ -174,7 +174,15 @@ It remains <code>edit_ready=false</code>. No human boundary accuracy or automati
 in the encoder worker and 9.9 seconds in the decoder worker. The reference generation measurement was
 16.4 seconds, excluding model load. These individual observations occurred during development activity;
 repeat idle-host measurements before claiming a speed ratio. Keep Base for the deployed accessibility service.</p>
-<h3>Build and run a separate trace candidate</h3>
+<h3 id="offline-word-alignment">Offline word alignment</h3>
+<p>The resident transcription endpoint reports its own feature flags under
+<code>/health</code>. If <code>word_alignment</code> is false, submit plain
+transcription to that endpoint and use the offline workflow below for timing.
+Services with this discovery update advertise the workflow in <code>capabilities.related_workflows</code>
+and in errors for timing options. Older servers may omit those discovery fields.
+The offline workflow needs a compatible trace-enabled decoder and alignment heads
+for its checkpoint. Review the resulting boundaries before using them for caption
+edits.</p>
 <pre>CK_NUM_THREADS=4 version/v8/scripts/cks-v8-run audio /path/to/pinned/whisper-base \
   --run /path/to/separate-trace-bundle --wav speech.wav \
   --vocabulary-hint='C-Kernel-Engine, Clef' --timestamps \

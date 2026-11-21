@@ -29,6 +29,26 @@ from fastapi.responses import JSONResponse
 from server.speech_usage import SpeechUsage, SpeechUsageMiddleware
 
 
+_OFFLINE_WORD_ALIGNMENT = {
+    "feature": "word_alignment",
+    "interface": "offline_cli",
+    "requires": ["trace_enabled_decoder_bundle", "compatible_alignment_heads"],
+    "output": "candidate_word_timings_with_review_status",
+    "documentation_url": (
+        "https://c-kernel-engine.github.io/C-Kernel-Engine/"
+        "v8-whisper-tiny.html#offline-word-alignment"
+    ),
+}
+_TIMING_OPTIONS = frozenset({
+    "timestamps", "segment_timestamps", "word_alignment", "attention_traces",
+    "attention_trace_dir", "attention_trace_output",
+})
+_TRANSCRIPTION_DESCRIPTION = (
+    "This HTTP endpoint returns plain transcription. CKE also includes a separate "
+    "offline word-alignment workflow for compatible trace-enabled decoder bundles."
+)
+
+
 class TranscriptionCancelled(Exception):
     pass
 
@@ -345,6 +365,8 @@ def create_app(factory: Callable[[], Any], *, max_upload_bytes: int = 1024 * 102
     )
     capabilities = {
         "schema": "cke.whisper.capabilities.v1",
+        "scope": "http_endpoint",
+        "related_workflows": [_OFFLINE_WORD_ALIGNMENT],
         "audio": {"format": "wav_pcm16", "sample_rate_hz": 16000, "channels": 1,
                   "max_upload_bytes": max_upload_bytes, "max_seconds": max_seconds},
         "decoding": {"language": "en", "task": "transcribe", "strategy": "greedy",
@@ -375,13 +397,22 @@ def create_app(factory: Callable[[], Any], *, max_upload_bytes: int = 1024 * 102
         return {"status": "ok", "service_instance_id": service_instance_id,
                 "capabilities": capabilities, **owner.status}
 
-    @app.post("/audio/transcriptions")
+    @app.post("/audio/transcriptions", description=(
+        f"{_TRANSCRIPTION_DESCRIPTION} [Offline alignment runbook]"
+        f"({_OFFLINE_WORD_ALIGNMENT['documentation_url']})."
+    ))
     async def transcribe(request: Request):
-        if any(key != "vocabulary_hint" for key in request.query_params):
-            raise HTTPException(400, {
+        unsupported = set(request.query_params) - {"vocabulary_hint"}
+        if unsupported:
+            detail: dict[str, Any] = {
                 "code": "unsupported_option",
-                "message": "This service accepts only vocabulary_hint; consult /health capabilities. Timestamps, alignment and long audio require a separately supported interface.",
-            })
+                "scope": capabilities["scope"],
+                "message": "This HTTP endpoint accepts only vocabulary_hint. See /health for its capabilities.",
+            }
+            if unsupported & _TIMING_OPTIONS:
+                detail["message"] = _TRANSCRIPTION_DESCRIPTION
+                detail["related_workflows"] = capabilities["related_workflows"]
+            raise HTTPException(400, detail)
         hint = request.query_params.get("vocabulary_hint", "")
         if len(request.query_params.getlist("vocabulary_hint")) > 1:
             raise HTTPException(400, "duplicate vocabulary hint")
