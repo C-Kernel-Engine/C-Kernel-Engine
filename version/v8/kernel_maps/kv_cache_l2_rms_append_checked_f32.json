@@ -1,0 +1,281 @@
+{
+  "id": "kv_cache_l2_rms_append_checked_f32",
+  "op": "kv_cache_l2_rms_append_checked",
+  "operation_interface": "kv.cache.append_l2_key_rms_value.checked.fp32.v1",
+  "variant": "fp64_norm_head_major_cache_fp32",
+  "selection": {
+    "status": "candidate",
+    "priority": 100,
+    "equivalence_group": "kv.cache.append_l2_key_rms_value.checked.fp32.v1",
+    "phases": [
+      "prefill",
+      "decode"
+    ]
+  },
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "k",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "KV",
+        "D"
+      ],
+      "layout": "token_major_contiguous",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "v",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "KV",
+        "D"
+      ],
+      "layout": "token_major_contiguous",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "cache_k",
+      "dtype": "fp32",
+      "shape": [
+        "KV",
+        "S",
+        "D"
+      ],
+      "layout": "head_major_capacity_stride",
+      "access": "read",
+      "storage_class": "state",
+      "consumption": "required"
+    },
+    {
+      "name": "cache_v",
+      "dtype": "fp32",
+      "shape": [
+        "KV",
+        "S",
+        "D"
+      ],
+      "layout": "head_major_capacity_stride",
+      "access": "read",
+      "storage_class": "state",
+      "consumption": "required"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "cache_k",
+      "dtype": "fp32",
+      "shape": [
+        "KV",
+        "S",
+        "D"
+      ],
+      "layout": "head_major_capacity_stride",
+      "access": "read_write",
+      "storage_class": "state",
+      "consumption": "required",
+      "alias_of": "input:cache_k"
+    },
+    {
+      "name": "cache_v",
+      "dtype": "fp32",
+      "shape": [
+        "KV",
+        "S",
+        "D"
+      ],
+      "layout": "head_major_capacity_stride",
+      "access": "read_write",
+      "storage_class": "state",
+      "consumption": "required",
+      "alias_of": "input:cache_v"
+    }
+  ],
+  "scratch": [],
+  "dims": [
+    "KV",
+    "T",
+    "S",
+    "D"
+  ],
+  "impl": {
+    "function": "ck_kv_cache_l2_rms_append_checked_f32",
+    "sources": [
+      "src/kernels/kv_cache_l2_rms_append_checked.c"
+    ],
+    "c_declaration": "int ck_kv_cache_l2_rms_append_checked_f32(const float *key, size_t key_elements, const float *value, size_t value_elements, float *k_cache, size_t k_cache_elements, float *v_cache, size_t v_cache_elements, size_t tokens, size_t heads, size_t dim, size_t capacity, size_t position, float key_clip, float epsilon);"
+  },
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "key",
+        "source": "activation:k",
+        "cast": "const float*",
+        "ports": [
+          "input:k"
+        ]
+      },
+      {
+        "name": "key_elements",
+        "source": "runtime:key_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "value",
+        "source": "activation:v",
+        "cast": "const float*",
+        "ports": [
+          "input:v"
+        ]
+      },
+      {
+        "name": "value_elements",
+        "source": "runtime:value_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "k_cache",
+        "source": "activation:cache_k",
+        "cast": "float*",
+        "ports": [
+          "input:cache_k",
+          "output:cache_k"
+        ]
+      },
+      {
+        "name": "k_cache_elements",
+        "source": "runtime:k_cache_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "v_cache",
+        "source": "activation:cache_v",
+        "cast": "float*",
+        "ports": [
+          "input:cache_v",
+          "output:cache_v"
+        ]
+      },
+      {
+        "name": "v_cache_elements",
+        "source": "runtime:v_cache_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "tokens",
+        "source": "runtime:tokens",
+        "value_type": "size_t"
+      },
+      {
+        "name": "heads",
+        "source": "runtime:heads",
+        "value_type": "size_t"
+      },
+      {
+        "name": "dim",
+        "source": "runtime:dim",
+        "value_type": "size_t"
+      },
+      {
+        "name": "capacity",
+        "source": "runtime:capacity",
+        "value_type": "size_t"
+      },
+      {
+        "name": "position",
+        "source": "runtime:position",
+        "value_type": "size_t"
+      },
+      {
+        "name": "key_clip",
+        "source": "param:key_clip"
+      },
+      {
+        "name": "epsilon",
+        "source": "param:epsilon"
+      }
+    ]
+  },
+  "call_constant_contract": {
+    "shape_symbols": {
+      "T": "tokens",
+      "KV": "heads",
+      "D": "dim",
+      "S": "capacity"
+    },
+    "buffer_spans": [
+      {
+        "pointer": "key",
+        "elements": "key_elements",
+        "rows": 1,
+        "width": "key_elements",
+        "element_bytes": 4,
+        "exact_elements_product": [
+          "tokens",
+          "heads",
+          "dim"
+        ]
+      },
+      {
+        "pointer": "value",
+        "elements": "value_elements",
+        "rows": 1,
+        "width": "value_elements",
+        "element_bytes": 4,
+        "exact_elements_product": [
+          "tokens",
+          "heads",
+          "dim"
+        ]
+      },
+      {
+        "pointer": "k_cache",
+        "elements": "k_cache_elements",
+        "rows": 1,
+        "width": "k_cache_elements",
+        "element_bytes": 4,
+        "exact_elements_product": [
+          "capacity",
+          "heads",
+          "dim"
+        ]
+      },
+      {
+        "pointer": "v_cache",
+        "elements": "v_cache_elements",
+        "rows": 1,
+        "width": "v_cache_elements",
+        "element_bytes": 4,
+        "exact_elements_product": [
+          "capacity",
+          "heads",
+          "dim"
+        ]
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "tests/test_v8_inkling2_mini_causal_kv.py"
+    ],
+    "oracle": "PyTorch eager FP32 norms and independent exact state continuity"
+  },
+  "notes": "Token-major K/V input. Per-head L2 clipping on K and unweighted RMS on V, using ordered FP64 norms. The output overwrites exactly the caller-selected span of the head-major cache after complete validation."
+}

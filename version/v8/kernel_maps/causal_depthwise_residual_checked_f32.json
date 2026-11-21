@@ -1,0 +1,250 @@
+{
+  "id": "causal_depthwise_residual_checked_f32",
+  "op": "causal_depthwise_residual_checked",
+  "operation_interface": "conv.causal_depthwise.residual_history.checked.fp32.v1",
+  "variant": "ordered_fp64_history_fp32",
+  "selection": {
+    "status": "candidate",
+    "priority": 100,
+    "equivalence_group": "conv.causal_depthwise.residual_history.checked.fp32.v1",
+    "phases": [
+      "prefill",
+      "decode"
+    ]
+  },
+  "quant": {
+    "weight": "fp32",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "input",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "C"
+      ],
+      "layout": "row_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "history",
+      "dtype": "fp32",
+      "shape": [
+        "H",
+        "C"
+      ],
+      "layout": "row_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "state",
+      "consumption": "required"
+    }
+  ],
+  "weights": [
+    {
+      "name": "weight",
+      "dtype": "fp32",
+      "shape": [
+        "C",
+        "K"
+      ],
+      "layout": "row_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "weight",
+      "consumption": "required"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "output",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "C"
+      ],
+      "layout": "row_major_contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "history",
+      "dtype": "fp32",
+      "shape": [
+        "H",
+        "C"
+      ],
+      "layout": "row_major_contiguous",
+      "placement": "local",
+      "access": "read_write",
+      "storage_class": "state",
+      "consumption": "required",
+      "alias_of": "input:history"
+    }
+  ],
+  "scratch": [],
+  "dims": [
+    "T",
+    "C",
+    "K",
+    "H"
+  ],
+  "impl": {
+    "function": "ck_causal_depthwise_residual_checked_f32",
+    "sources": [
+      "src/kernels/causal_depthwise_residual_checked.c"
+    ],
+    "c_declaration": "int ck_causal_depthwise_residual_checked_f32(const float *input, size_t input_elements, const float *weight, size_t weight_elements, float *history, size_t history_elements, float *output, size_t output_elements, size_t tokens, size_t channels, size_t taps, size_t history_rows);"
+  },
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "input",
+        "source": "activation:input",
+        "cast": "const float*",
+        "ports": [
+          "input:input"
+        ]
+      },
+      {
+        "name": "input_elements",
+        "source": "runtime:input_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "weight",
+        "source": "weight:weight",
+        "cast": "const float*",
+        "ports": [
+          "weight:weight"
+        ]
+      },
+      {
+        "name": "weight_elements",
+        "source": "runtime:weight_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "history",
+        "source": "activation:history",
+        "cast": "float*",
+        "ports": [
+          "input:history",
+          "output:history"
+        ]
+      },
+      {
+        "name": "history_elements",
+        "source": "runtime:history_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "output",
+        "source": "output:output",
+        "cast": "float*",
+        "ports": [
+          "output:output"
+        ]
+      },
+      {
+        "name": "output_elements",
+        "source": "runtime:output_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "tokens",
+        "source": "runtime:tokens",
+        "value_type": "size_t"
+      },
+      {
+        "name": "channels",
+        "source": "runtime:channels",
+        "value_type": "size_t"
+      },
+      {
+        "name": "taps",
+        "source": "runtime:taps",
+        "value_type": "size_t"
+      },
+      {
+        "name": "history_rows",
+        "source": "runtime:history_rows",
+        "value_type": "size_t"
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "tests/test_v8_inkling2_mini_causal_kv.py"
+    ],
+    "oracle": "Independent ordered convolution and FP32 Torch convolution"
+  },
+  "notes": "Caller-owned oldest-first pre-convolution history has K-1 rows. Ordered FP64 tap sum plus residual divided by sqrt(K+1), stored as FP32. Output and history remain unchanged after any rejection.",
+  "call_constant_contract": {
+    "shape_symbols": {
+      "T": "tokens",
+      "C": "channels",
+      "K": "taps",
+      "H": "history_rows"
+    },
+    "buffer_spans": [
+      {
+        "pointer": "input",
+        "elements": "input_elements",
+        "rows": "tokens",
+        "width": "channels",
+        "element_bytes": 4,
+        "exact_elements_product": [
+          "tokens",
+          "channels"
+        ]
+      },
+      {
+        "pointer": "weight",
+        "elements": "weight_elements",
+        "rows": "channels",
+        "width": "taps",
+        "element_bytes": 4,
+        "exact_elements_product": [
+          "channels",
+          "taps"
+        ]
+      },
+      {
+        "pointer": "history",
+        "elements": "history_elements",
+        "rows": "history_rows",
+        "width": "channels",
+        "element_bytes": 4,
+        "exact_elements_product": [
+          "history_rows",
+          "channels"
+        ]
+      },
+      {
+        "pointer": "output",
+        "elements": "output_elements",
+        "rows": "tokens",
+        "width": "channels",
+        "element_bytes": 4,
+        "exact_elements_product": [
+          "tokens",
+          "channels"
+        ]
+      }
+    ]
+  }
+}

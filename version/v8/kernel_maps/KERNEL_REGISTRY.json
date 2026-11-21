@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 524,
+      "total": 526,
       "by_op": {
         "add_backward": 1,
         "add_rows_backward_train_f32": 1,
@@ -78,6 +78,7 @@
         "audio_zero_pad1d_left_checked": 1,
         "bias_add": 1,
         "broadcast_add_rows_checked": 1,
+        "causal_depthwise_residual_checked": 1,
         "channel_scale_rows_checked": 1,
         "clip_strided_checked": 1,
         "concat_i32_checked": 1,
@@ -129,6 +130,7 @@
         "indexed_rows_train_f32": 1,
         "indexed_rows_weight_train_f32": 1,
         "indexed_sum_rows_checked": 1,
+        "kv_cache_l2_rms_append_checked": 1,
         "kv_cache_seed_checked": 1,
         "kv_cache_store": 4,
         "kv_cache_store_batch_bf16": 1,
@@ -33882,6 +33884,258 @@
       "_source_file": "broadcast_add_rows_checked_f32.json"
     },
     {
+      "id": "causal_depthwise_residual_checked_f32",
+      "op": "causal_depthwise_residual_checked",
+      "operation_interface": "conv.causal_depthwise.residual_history.checked.fp32.v1",
+      "variant": "ordered_fp64_history_fp32",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "equivalence_group": "conv.causal_depthwise.residual_history.checked.fp32.v1",
+        "phases": [
+          "prefill",
+          "decode"
+        ]
+      },
+      "quant": {
+        "weight": "fp32",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "C"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "history",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "C"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "state",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "weight",
+          "dtype": "fp32",
+          "shape": [
+            "C",
+            "K"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "C"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "history",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "C"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read_write",
+          "storage_class": "state",
+          "consumption": "required",
+          "alias_of": "input:history"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "T",
+        "C",
+        "K",
+        "H"
+      ],
+      "impl": {
+        "function": "ck_causal_depthwise_residual_checked_f32",
+        "sources": [
+          "src/kernels/causal_depthwise_residual_checked.c"
+        ],
+        "c_declaration": "int ck_causal_depthwise_residual_checked_f32(const float *input, size_t input_elements, const float *weight, size_t weight_elements, float *history, size_t history_elements, float *output, size_t output_elements, size_t tokens, size_t channels, size_t taps, size_t history_rows);"
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const float*",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "input_elements",
+            "source": "runtime:input_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "weight",
+            "source": "weight:weight",
+            "cast": "const float*",
+            "ports": [
+              "weight:weight"
+            ]
+          },
+          {
+            "name": "weight_elements",
+            "source": "runtime:weight_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "history",
+            "source": "activation:history",
+            "cast": "float*",
+            "ports": [
+              "input:history",
+              "output:history"
+            ]
+          },
+          {
+            "name": "history_elements",
+            "source": "runtime:history_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "tokens",
+            "source": "runtime:tokens",
+            "value_type": "size_t"
+          },
+          {
+            "name": "channels",
+            "source": "runtime:channels",
+            "value_type": "size_t"
+          },
+          {
+            "name": "taps",
+            "source": "runtime:taps",
+            "value_type": "size_t"
+          },
+          {
+            "name": "history_rows",
+            "source": "runtime:history_rows",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_mini_causal_kv.py"
+        ],
+        "oracle": "Independent ordered convolution and FP32 Torch convolution"
+      },
+      "notes": "Caller-owned oldest-first pre-convolution history has K-1 rows. Ordered FP64 tap sum plus residual divided by sqrt(K+1), stored as FP32. Output and history remain unchanged after any rejection.",
+      "call_constant_contract": {
+        "shape_symbols": {
+          "T": "tokens",
+          "C": "channels",
+          "K": "taps",
+          "H": "history_rows"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "elements": "input_elements",
+            "rows": "tokens",
+            "width": "channels",
+            "element_bytes": 4,
+            "exact_elements_product": [
+              "tokens",
+              "channels"
+            ]
+          },
+          {
+            "pointer": "weight",
+            "elements": "weight_elements",
+            "rows": "channels",
+            "width": "taps",
+            "element_bytes": 4,
+            "exact_elements_product": [
+              "channels",
+              "taps"
+            ]
+          },
+          {
+            "pointer": "history",
+            "elements": "history_elements",
+            "rows": "history_rows",
+            "width": "channels",
+            "element_bytes": 4,
+            "exact_elements_product": [
+              "history_rows",
+              "channels"
+            ]
+          },
+          {
+            "pointer": "output",
+            "elements": "output_elements",
+            "rows": "tokens",
+            "width": "channels",
+            "element_bytes": 4,
+            "exact_elements_product": [
+              "tokens",
+              "channels"
+            ]
+          }
+        ]
+      },
+      "name": "causal_depthwise_residual_checked_f32",
+      "_source_file": "causal_depthwise_residual_checked_f32.json"
+    },
+    {
       "id": "channel_scale_rows_checked_f32",
       "op": "channel_scale_rows_checked",
       "operation_interface": "channel_scale.checked_rows.fp32.v1",
@@ -61260,6 +61514,289 @@
       },
       "name": "indexed_sum_rows_checked_f32",
       "_source_file": "indexed_sum_rows_checked_f32.json"
+    },
+    {
+      "id": "kv_cache_l2_rms_append_checked_f32",
+      "op": "kv_cache_l2_rms_append_checked",
+      "operation_interface": "kv.cache.append_l2_key_rms_value.checked.fp32.v1",
+      "variant": "fp64_norm_head_major_cache_fp32",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "equivalence_group": "kv.cache.append_l2_key_rms_value.checked.fp32.v1",
+        "phases": [
+          "prefill",
+          "decode"
+        ]
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "k",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "KV",
+            "D"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "v",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "KV",
+            "D"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "cache_k",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "S",
+            "D"
+          ],
+          "layout": "head_major_capacity_stride",
+          "access": "read",
+          "storage_class": "state",
+          "consumption": "required"
+        },
+        {
+          "name": "cache_v",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "S",
+            "D"
+          ],
+          "layout": "head_major_capacity_stride",
+          "access": "read",
+          "storage_class": "state",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "cache_k",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "S",
+            "D"
+          ],
+          "layout": "head_major_capacity_stride",
+          "access": "read_write",
+          "storage_class": "state",
+          "consumption": "required",
+          "alias_of": "input:cache_k"
+        },
+        {
+          "name": "cache_v",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "S",
+            "D"
+          ],
+          "layout": "head_major_capacity_stride",
+          "access": "read_write",
+          "storage_class": "state",
+          "consumption": "required",
+          "alias_of": "input:cache_v"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "KV",
+        "T",
+        "S",
+        "D"
+      ],
+      "impl": {
+        "function": "ck_kv_cache_l2_rms_append_checked_f32",
+        "sources": [
+          "src/kernels/kv_cache_l2_rms_append_checked.c"
+        ],
+        "c_declaration": "int ck_kv_cache_l2_rms_append_checked_f32(const float *key, size_t key_elements, const float *value, size_t value_elements, float *k_cache, size_t k_cache_elements, float *v_cache, size_t v_cache_elements, size_t tokens, size_t heads, size_t dim, size_t capacity, size_t position, float key_clip, float epsilon);"
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "key",
+            "source": "activation:k",
+            "cast": "const float*",
+            "ports": [
+              "input:k"
+            ]
+          },
+          {
+            "name": "key_elements",
+            "source": "runtime:key_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "value",
+            "source": "activation:v",
+            "cast": "const float*",
+            "ports": [
+              "input:v"
+            ]
+          },
+          {
+            "name": "value_elements",
+            "source": "runtime:value_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "k_cache",
+            "source": "activation:cache_k",
+            "cast": "float*",
+            "ports": [
+              "input:cache_k",
+              "output:cache_k"
+            ]
+          },
+          {
+            "name": "k_cache_elements",
+            "source": "runtime:k_cache_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "v_cache",
+            "source": "activation:cache_v",
+            "cast": "float*",
+            "ports": [
+              "input:cache_v",
+              "output:cache_v"
+            ]
+          },
+          {
+            "name": "v_cache_elements",
+            "source": "runtime:v_cache_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "tokens",
+            "source": "runtime:tokens",
+            "value_type": "size_t"
+          },
+          {
+            "name": "heads",
+            "source": "runtime:heads",
+            "value_type": "size_t"
+          },
+          {
+            "name": "dim",
+            "source": "runtime:dim",
+            "value_type": "size_t"
+          },
+          {
+            "name": "capacity",
+            "source": "runtime:capacity",
+            "value_type": "size_t"
+          },
+          {
+            "name": "position",
+            "source": "runtime:position",
+            "value_type": "size_t"
+          },
+          {
+            "name": "key_clip",
+            "source": "param:key_clip"
+          },
+          {
+            "name": "epsilon",
+            "source": "param:epsilon"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "T": "tokens",
+          "KV": "heads",
+          "D": "dim",
+          "S": "capacity"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "key",
+            "elements": "key_elements",
+            "rows": 1,
+            "width": "key_elements",
+            "element_bytes": 4,
+            "exact_elements_product": [
+              "tokens",
+              "heads",
+              "dim"
+            ]
+          },
+          {
+            "pointer": "value",
+            "elements": "value_elements",
+            "rows": 1,
+            "width": "value_elements",
+            "element_bytes": 4,
+            "exact_elements_product": [
+              "tokens",
+              "heads",
+              "dim"
+            ]
+          },
+          {
+            "pointer": "k_cache",
+            "elements": "k_cache_elements",
+            "rows": 1,
+            "width": "k_cache_elements",
+            "element_bytes": 4,
+            "exact_elements_product": [
+              "capacity",
+              "heads",
+              "dim"
+            ]
+          },
+          {
+            "pointer": "v_cache",
+            "elements": "v_cache_elements",
+            "rows": 1,
+            "width": "v_cache_elements",
+            "element_bytes": 4,
+            "exact_elements_product": [
+              "capacity",
+              "heads",
+              "dim"
+            ]
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_mini_causal_kv.py"
+        ],
+        "oracle": "PyTorch eager FP32 norms and independent exact state continuity"
+      },
+      "notes": "Token-major K/V input. Per-head L2 clipping on K and unweighted RMS on V, using ordered FP64 norms. The output overwrites exactly the caller-selected span of the head-major cache after complete validation.",
+      "name": "kv_cache_l2_rms_append_checked_f32",
+      "_source_file": "kv_cache_l2_rms_append_checked_f32.json"
     },
     {
       "id": "kv_cache_seed_checked_f32",
