@@ -2971,6 +2971,23 @@ def _effective_ref_dtype_policy(
     return ref.dtype or dtype_policy
 
 
+def _combined_ref_shape(ref: TensorRef, shapes: list[list[int]]) -> list[int]:
+    """Describe contiguous source concatenation, or a declared equal-size reshape."""
+    if not shapes:
+        return list(ref.shape or ())
+    if ref.shape is not None:
+        declared = [int(x) for x in ref.shape]
+        if math.prod(declared) != sum(math.prod(shape) for shape in shapes):
+            raise ValueError(f"{ref.ck_name}: declared shape disagrees with source extent")
+        return declared
+    result = list(shapes[0])
+    for shape in shapes[1:]:
+        if not result or not shape or result[1:] != shape[1:]:
+            raise ValueError(f"{ref.ck_name}: incompatible concatenated source shapes")
+        result[0] += shape[0]
+    return result
+
+
 def _entry_size_from_header(
     ref: TensorRef,
     headers: dict[str, HeaderTensor],
@@ -3028,7 +3045,7 @@ def _entry_size_from_header(
         ref, dtype_policy, linear_weight_dtype
     )
     out_dtype: str | None = None if effective_policy == "preserve" else effective_policy
-    out_shape: list[int] = []
+    source_shapes: list[list[int]] = []
     for src in ref.source_names:
         if src not in headers:
             raise KeyError(src)
@@ -3040,11 +3057,11 @@ def _entry_size_from_header(
         else:
             dtype, elem = _header_dtype_to_ck(h.dtype)
         total += int(np.prod(shape, dtype=np.int64)) * elem
-        out_dtype = out_dtype or dtype
-        out_shape = shape if not out_shape else out_shape
-    if ref.shape is not None:
-        out_shape = [int(x) for x in ref.shape]
-    return out_dtype or "fp32", total, out_shape
+        if out_dtype is not None and out_dtype != dtype:
+            raise ValueError(f"{ref.ck_name}: concatenated sources have different dtypes")
+        out_dtype = dtype
+        source_shapes.append(list(shape))
+    return out_dtype or "fp32", total, _combined_ref_shape(ref, source_shapes)
 
 
 def _is_qwen35_shifted_norm_ref(ref: TensorRef) -> bool:
@@ -3208,7 +3225,7 @@ def _write_ref(
         ref, dtype_policy, linear_weight_dtype
     )
     out_dtype: str | None = None if effective_policy == "preserve" else effective_policy
-    out_shape: list[int] = []
+    source_shapes: list[list[int]] = []
     for src in ref.source_names:
         t = _load_tensor(model_dir, headers, src)
         transform = _ref_transform(arch, ref)
@@ -3228,11 +3245,11 @@ def _write_ref(
         data, dt, shape = _torch_to_bytes(t, effective_policy)
         w.write(data)
         total += len(data)
-        out_dtype = out_dtype or dt
-        out_shape = shape if not out_shape else out_shape
-    if ref.shape is not None:
-        out_shape = [int(x) for x in ref.shape]
-    return out_dtype or "fp32", total, out_shape
+        if out_dtype is not None and out_dtype != dt:
+            raise ValueError(f"{ref.ck_name}: concatenated sources have different dtypes")
+        out_dtype = dt
+        source_shapes.append(list(shape))
+    return out_dtype or "fp32", total, _combined_ref_shape(ref, source_shapes)
 
 
 _RWKV_WORLD_EOS = "<|endoftext|>"
