@@ -2126,7 +2126,9 @@ def test_glm4_safetensors_to_bump_uses_declarative_source_map(tmp_path: Path) ->
     assert audit["unmapped_source_tensors"] == []
     assert "layer.0.bq" in names and "layer.0.bo" in names
     assert entries["layer.0.w1"]["source_name"].endswith("gate_proj.weight+model.layers.0.mlp.up_proj.weight")
-    assert entries["layer.0.w1"]["shape"] == [16, 8]
+    assert entries["layer.0.w1"]["shape"] == [32, 8]
+    assert entries["layer.0.w1"]["dtype"] == "bf16"
+    assert entries["layer.0.w1"]["size"] == 32 * 8 * 2
     assert entries["layer.0.b1"]["shape"] == [32]
     assert "output.weight" in names
 
@@ -4123,3 +4125,36 @@ def test_named_tokenizer_padding_overrides_model_default(tmp_path: Path) -> None
         "pad_token": "<end>", "pad_token_id": 0}))
     with pytest.raises(ValueError, match="pad_token ID conflicts"):
         converter._special_tokens_from_tokenizer_config(tmp_path, "bpe", vocab_size=2)
+
+@pytest.mark.parametrize('policy,expected_dtype,width', [('fp32','fp32',4), ('bf16','bf16',2), ('preserve','fp32',4)])
+def test_concatenated_weight_shape_matches_serialized_extent(monkeypatch, policy, expected_dtype, width):
+    import io
+    torch = pytest.importorskip('torch')
+    converter = _load_converter()
+    tensors = {'gate': torch.arange(6, dtype=torch.float32).reshape(2,3),
+               'up': torch.arange(9, dtype=torch.float32).reshape(3,3) + 10}
+    headers = {name: converter.HeaderTensor(name, 'F32', list(value.shape), Path('unused'))
+               for name, value in tensors.items()}
+    ref = converter.TensorRef('projection', ('gate','up'))
+    monkeypatch.setattr(converter, '_load_tensor', lambda directory, headers, name: tensors[name])
+    expected = (expected_dtype, 15 * width, [5,3])
+    assert converter._entry_size_from_header(ref, headers, policy) == expected
+    stream = io.BytesIO()
+    assert converter._write_ref(converter.HashingWriter(stream), Path('.'), headers, ref, policy, 'qwen3') == expected
+    oracle = converter._torch_to_bytes(torch.cat(list(tensors.values()), dim=0), policy)[0]
+    assert stream.getvalue() == oracle
+
+
+def test_concatenation_rejects_inconsistent_shapes_and_types():
+    converter = _load_converter()
+    ref = converter.TensorRef('projection', ('a','b'))
+    headers = {'a': converter.HeaderTensor('a','F32',[2,3],Path('unused')),
+               'b': converter.HeaderTensor('b','F32',[2,4],Path('unused'))}
+    with pytest.raises(ValueError, match='incompatible concatenated'):
+        converter._entry_size_from_header(ref, headers, 'fp32')
+    headers['b'] = converter.HeaderTensor('b','BF16',[2,3],Path('unused'))
+    with pytest.raises(ValueError, match='different dtypes'):
+        converter._entry_size_from_header(ref, headers, 'preserve')
+    wrong = converter.TensorRef('projection', ('a','b'), shape=(2,3))
+    with pytest.raises(ValueError, match='source extent'):
+        converter._entry_size_from_header(wrong, headers, 'fp32')

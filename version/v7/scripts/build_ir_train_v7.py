@@ -185,6 +185,17 @@ def _manifest_weight_index(manifest: Dict[str, Any]) -> Dict[str, Dict[str, Any]
     for entry in manifest.get("entries", []):
         name = entry.get("name")
         if isinstance(name, str) and name:
+            # Dense manifest extents are a storage contract, not a hint. A stale
+            # shape must not silently truncate an imported parameter tensor.
+            shape = entry.get("shape")
+            size = entry.get("size")
+            dtype = str(entry.get("dtype", "")).lower()
+            element_bytes = {"fp32": 4, "f32": 4, "bf16": 2, "bfloat16": 2,
+                             "fp16": 2, "f16": 2, "int32": 4, "i32": 4}.get(dtype)
+            if isinstance(shape, list) and size is not None and element_bytes:
+                numel = _shape_numel(shape)
+                if numel is None or size != numel * element_bytes:
+                    raise ValueError(f"{name}: manifest shape and byte size disagree")
             out[name] = entry
     return out
 
