@@ -22,6 +22,8 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <float.h>
+#include <limits.h>
+#include "checked_float_buffer.h"
 #include <math.h>
 
 #include "bf16_utils.h"
@@ -811,4 +813,37 @@ void group_limited_topk_router_sigmoid_f32(const float *logits,
         logits, correction_bias, indices, weights, rows, n_experts, top_k,
         n_group, topk_group, norm_topk_prob, routed_scaling_factor, 1
     );
+}
+
+int sigmoid_topk_router_checked_f32(const float *logits, size_t logits_elements,
+                                    const float *bias, size_t bias_elements,
+                                    int32_t *indices, size_t indices_elements,
+                                    float *weights, size_t weights_elements,
+                                    size_t rows, size_t experts, size_t top_k,
+                                    float route_scale)
+{
+    size_t input_count, output_count;
+    if (rows > INT_MAX || experts > 1024 || top_k > experts ||
+        !ck_checked_span(rows, experts, experts, &input_count) ||
+        !ck_checked_span(rows, top_k, top_k, &output_count) ||
+        logits_elements < input_count || bias_elements < experts ||
+        indices_elements < output_count || weights_elements < output_count) return -2;
+
+    _Static_assert(sizeof(int32_t) == sizeof(float), "checked router spans use 4 byte elements");
+    if (!isfinite(route_scale) || route_scale <= 0.0f ||
+        (uintptr_t)indices % _Alignof(int32_t) != 0 ||
+        !ck_checked_region((const float *)(const void *)indices, output_count) ||
+        !ck_checked_region(weights, output_count) ||
+        !ck_checked_region(logits, input_count) || !ck_checked_region(bias, experts) ||
+        ck_checked_overlap(logits, input_count, weights, output_count) ||
+        ck_checked_overlap(bias, experts, weights, output_count) ||
+        ck_checked_overlap((const float *)(const void *)indices, output_count, logits, input_count) ||
+        ck_checked_overlap((const float *)(const void *)indices, output_count, bias, experts) ||
+        ck_checked_overlap((const float *)(const void *)indices, output_count, weights, output_count)) return -1;
+    if (!ck_checked_finite(logits, input_count) || !ck_checked_finite(bias, experts)) return -3;
+
+    group_limited_topk_router_sigmoid_f32(
+        logits, bias, indices, weights, (int)rows, (int)experts, (int)top_k, 1, 1, 1, route_scale
+    );
+    return 0;
 }

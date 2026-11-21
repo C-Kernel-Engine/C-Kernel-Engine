@@ -275,3 +275,32 @@ def selected_expert(tokens=3, width=2304, inner=1152, *, layer=6, expert=7,
     ops.append(_project("down", "activated", inner, width, tokens, "down", weight_prefix=prefix))
     return _graph("selected_expert", tokens, width, shapes, ops, layer=layer,
                   scope="one preselected expert, expanded checkpoint weights, FP32 operands and outputs")
+
+
+def expert_router(tokens=4, width=2304, experts=128, top_k=8, *, layer=6, route_scale=8.0):
+    """Checked no-group routing from synthetic or captured post-normalization rows."""
+    if type(experts) is not int or type(top_k) is not int or not 1 <= top_k <= experts <= 1024:
+        raise ValueError("invalid router dimensions")
+    prefix = f"model.llm.layers.{layer}.mlp.gate."
+    shapes = {"hidden": [tokens, width], "logits": [tokens, experts],
+              "correction_bias": [experts], "indices": [tokens, top_k],
+              "route_weights": [tokens, top_k]}
+    ops = [_project("logits", "external:hidden", width, experts, tokens, "weight", weight_prefix=prefix)]
+    ops.append({
+        "id": "indices", "op": "sigmoid_topk_router_checked",
+        "kernel": "sigmoid_topk_router_checked_f32", "returns_status": True,
+        "graph_slots": {"inputs": {"logits": "logits", "bias": "external:correction_bias"},
+                        "outputs": {"indices": "indices", "weights": "route_weights"}},
+        "params": {"R": tokens, "E": experts, "K": top_k, "route_scale": route_scale,
+                   "call_constants": {
+                       "logits_elements": tokens * experts, "bias_elements": experts,
+                       "indices_elements": tokens * top_k, "weights_elements": tokens * top_k,
+                       "rows": tokens, "experts": experts, "top_k": top_k,
+                   }},
+    })
+    graph = _graph("expert_router", tokens, width, shapes, ops, layer=layer,
+                   scope="ungrouped sigmoid router; FP32 projection and scores; no expert dispatch")
+    checkpoints = graph["semantic_checkpoints"]["exports"]["indices"]["checkpoints"]
+    checkpoints[0].update(id=f"inkling2.layer{layer}.expert_router.weights",
+                          tensor="route_weights", axis_names=["token", "route"])
+    return graph
