@@ -2118,6 +2118,10 @@ OP_DATAFLOW = {
         "inputs": {"gate": "external:gate", "up": "external:up"},
         "outputs": {"output": {"slot": "activated_features", "dtype": "fp32"}},
     },
+    "softcapped_swiglu_rows_checked": {
+        "inputs": {"gate": "external:gate", "up": "external:up"},
+        "outputs": {"output": {"slot": "activated_features", "dtype": "fp32"}},
+    },
     "rope_qk_bounded": {
         "inputs": {"q": "external:q", "k": "external:k"},
         "outputs": {"q": {"slot": "rotated_q", "dtype": "fp32"},
@@ -3124,6 +3128,11 @@ OP_DATAFLOW = {
             "indices": {"slot": "q_scratch", "dtype": "i32"},
             "weights": {"slot": "k_scratch", "dtype": "fp32"},
         },
+    },
+    "sigmoid_topk_router_checked": {
+        "inputs": {"logits": "external:logits", "bias": "external:bias"},
+        "outputs": {"indices": {"slot": "indices", "dtype": "i32"},
+                    "weights": {"slot": "weights", "dtype": "fp32"}},
     },
     "group_limited_topk_router": {
         "inputs": {"scores": "mlp_scratch"},
@@ -5349,6 +5358,7 @@ TEMPLATE_TO_KERNEL_OP = {
     "add_rows_checked": "add_rows_checked",
     "indexed_sum_rows_checked": "indexed_sum_rows_checked",
     "silu_mul_rows_checked": "silu_mul_rows_checked",
+    "softcapped_swiglu_rows_checked": "softcapped_swiglu_rows_checked",
     "rope_qk_bounded": "rope_qk_bounded",
     "attention_causal_bounded": "attention_causal_bounded",
     "causal_depthwise_residual_checked": "causal_depthwise_residual_checked",
@@ -5539,6 +5549,7 @@ TEMPLATE_TO_KERNEL_OP = {
     "rwkv7_trie_tokenizer": None,  # RWKV-7 trie tokenizer - init handled separately
     "moe_router": "matmul",
     "full_softmax_topk_router": "full_softmax_topk_router",
+    "sigmoid_topk_router_checked": "sigmoid_topk_router_checked",
     "group_limited_topk_router": "group_limited_topk_router",
     "moe_relu2_expert_mlp": "moe_relu2_expert_mlp",
     "shared_relu2_expert_mlp": "shared_relu2_expert_mlp",

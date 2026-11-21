@@ -30,6 +30,10 @@ int channel_scale_rows_checked_f32(const float *input, size_t input_elements,
                                    size_t scale_elements, float *output,
                                    size_t output_elements, size_t output_stride,
                                    size_t rows, size_t channels);
+int softcapped_swiglu_rows_checked_f32(const float *gate, size_t gate_elements,
+                                       const float *up, size_t up_elements,
+                                       float *output, size_t output_elements,
+                                       size_t elements, float gate_cap, float up_cap);
 int rope_qk_bounded_checked_f32(float *q, size_t q_elements,
                                 float *k, size_t k_elements,
                                 size_t heads, size_t kv_heads,

@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 527,
+      "total": 529,
       "by_op": {
         "add_backward": 1,
         "add_rows_backward_train_f32": 1,
@@ -225,10 +225,12 @@
         "select_next_id_checked": 1,
         "shared_relu2_expert_mlp": 1,
         "shared_swiglu_expert_mlp": 6,
+        "sigmoid_topk_router_checked": 1,
         "silu_mul_rows_checked": 1,
         "silu_strided_checked": 1,
         "sinusoidal_constant_tables_checked": 1,
         "sinusoidal_features_checked": 1,
+        "softcapped_swiglu_rows_checked": 1,
         "softmax": 1,
         "spatial_merge": 3,
         "speculative_commit_or_reject": 1,
@@ -102259,6 +102261,220 @@
       "_source_file": "select_next_id_checked_f32.json"
     },
     {
+      "id": "sigmoid_topk_router_checked_f32",
+      "op": "sigmoid_topk_router_checked",
+      "operation_interface": "moe.router.sigmoid_unbiased_weights.checked.fp32.v1",
+      "variant": "ungrouped_checked_f32",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "phases": [
+          "prefill"
+        ],
+        "equivalence_group": "moe.router.sigmoid_unbiased_weights.checked.fp32.v1"
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "logits",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "E"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "bias",
+          "dtype": "fp32",
+          "shape": [
+            "E"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "indices",
+          "dtype": "i32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "weights",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "R",
+        "E",
+        "K"
+      ],
+      "impl": {
+        "function": "sigmoid_topk_router_checked_f32",
+        "c_declaration": "int sigmoid_topk_router_checked_f32(const float *logits, size_t logits_elements, const float *bias, size_t bias_elements, int32_t *indices, size_t indices_elements, float *weights, size_t weights_elements, size_t rows, size_t experts, size_t top_k, float route_scale);",
+        "sources": [
+          "src/kernels/topk_kernels.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "logits",
+            "source": "activation:logits",
+            "cast": "const float*",
+            "ports": [
+              "input:logits"
+            ]
+          },
+          {
+            "name": "logits_elements",
+            "source": "runtime:logits_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "bias",
+            "source": "activation:bias",
+            "cast": "const float*",
+            "ports": [
+              "input:bias"
+            ]
+          },
+          {
+            "name": "bias_elements",
+            "source": "runtime:bias_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "indices",
+            "source": "output:indices",
+            "cast": "int32_t*",
+            "ports": [
+              "output:indices"
+            ]
+          },
+          {
+            "name": "indices_elements",
+            "source": "runtime:indices_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "weights",
+            "source": "output:weights",
+            "cast": "float*",
+            "ports": [
+              "output:weights"
+            ]
+          },
+          {
+            "name": "weights_elements",
+            "source": "runtime:weights_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "experts",
+            "source": "runtime:experts",
+            "value_type": "size_t"
+          },
+          {
+            "name": "top_k",
+            "source": "runtime:top_k",
+            "value_type": "size_t"
+          },
+          {
+            "name": "route_scale",
+            "source": "param:route_scale"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "R": "rows",
+          "E": "experts",
+          "K": "top_k"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "logits",
+            "elements": "logits_elements",
+            "rows": "rows",
+            "width": "experts",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "bias",
+            "elements": "bias_elements",
+            "rows": 1,
+            "width": "experts",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "indices",
+            "elements": "indices_elements",
+            "rows": "rows",
+            "width": "top_k",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "weights",
+            "elements": "weights_elements",
+            "rows": "rows",
+            "width": "top_k",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_router.py"
+        ]
+      },
+      "notes": "Ranks experts by sigmoid(logit) plus bias, then normalizes and scales unbiased scores. Ties use ascending expert IDs.",
+      "name": "sigmoid_topk_router_checked_f32",
+      "_source_file": "sigmoid_topk_router_checked_f32.json"
+    },
+    {
       "id": "silu_mul_rows_checked_f32",
       "op": "silu_mul_rows_checked",
       "operation_interface": "swiglu.separate_rows.checked.fp32.v1",
@@ -103064,6 +103280,175 @@
       ],
       "name": "sinusoidal_features_f32_checked",
       "_source_file": "sinusoidal_features_f32_checked.json"
+    },
+    {
+      "id": "softcapped_swiglu_rows_checked_f32",
+      "op": "softcapped_swiglu_rows_checked",
+      "operation_interface": "swiglu.separate_softcaps.checked.fp32.v1",
+      "variant": "checked_scalar_fp32",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "equivalence_group": "swiglu.separate_softcaps.checked.fp32.v1",
+        "phases": [
+          "prefill"
+        ]
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "gate",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "layout": "flat",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "up",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "layout": "flat",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "layout": "flat",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "N"
+      ],
+      "impl": {
+        "function": "softcapped_swiglu_rows_checked_f32",
+        "c_declaration": "int softcapped_swiglu_rows_checked_f32(const float *gate, size_t gate_elements, const float *up, size_t up_elements, float *output, size_t output_elements, size_t elements, float gate_cap, float up_cap);",
+        "sources": [
+          "src/kernels/transformer_rows_checked.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "gate",
+            "source": "activation:gate",
+            "cast": "const float*",
+            "ports": [
+              "input:gate"
+            ]
+          },
+          {
+            "name": "gate_elements",
+            "source": "runtime:gate_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "up",
+            "source": "activation:up",
+            "cast": "const float*",
+            "ports": [
+              "input:up"
+            ]
+          },
+          {
+            "name": "up_elements",
+            "source": "runtime:up_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "elements",
+            "source": "runtime:elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "gate_cap",
+            "source": "param:gate_cap"
+          },
+          {
+            "name": "up_cap",
+            "source": "param:up_cap"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_expert_weights.py"
+        ]
+      },
+      "notes": "Separate tanh softcaps for gate and up, with sigmoid evaluated on the original gate.",
+      "call_constant_contract": {
+        "shape_symbols": {
+          "N": "elements"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "gate",
+            "elements": "gate_elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "up",
+            "elements": "up_elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "output",
+            "elements": "output_elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "name": "softcapped_swiglu_rows_checked_f32",
+      "_source_file": "softcapped_swiglu_rows_checked_f32.json"
     },
     {
       "id": "softmax_cross_entropy_loss",
