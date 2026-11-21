@@ -177,3 +177,76 @@ def causal_kv_replay(prefill_tokens=8, width=2304, kv_width=1024, taps=4,
         # named after the operation. Compare their logical extents in replay.
         del exports[segment["last_op"]]
     return graph
+
+
+def relative_attention_replay(prefill_tokens=8, width=2304, kv_width=1024, taps=4,
+                              slots=(6, 24, 36), kv_heads=8, query_heads=24,
+                              band=1024, window=1024):
+    """Read the generated cache through causal GQA with relative logits and sinks."""
+    graph = causal_kv_replay(prefill_tokens=prefill_tokens, width=width, kv_width=kv_width,
+                             taps=taps, slots=slots, kv_heads=kv_heads)
+    if (any(type(value) is not int for value in (query_heads, band, window))
+            or not 1 <= query_heads <= 256 or query_heads % kv_heads
+            or not 1 <= band <= 16384 or not 0 <= window <= 16384):
+        raise ValueError("unsupported attention geometry")
+    dim, capacity = kv_width // kv_heads, prefill_tokens + 1
+    ops, shapes, new_ops = graph["block_types"]["block"]["body"]["ops"], graph["activation_buffers"], {}
+    for slot in slots:
+        for phase, tokens in (("prefill", prefill_tokens), ("append", 1)):
+            prefix = f"inkling2_{phase}_slot{slot}"
+            output = prefix + "_attention"
+            q, bias, sink = (prefix + "_" + port for port in ("query", "relative_band", "sink"))
+            shapes.update({
+                q: {"shape": [tokens, query_heads, dim]},
+                bias: {"shape": [tokens, query_heads, band]},
+                sink: {"shape": [tokens, query_heads]},
+                output: {"shape": [tokens, query_heads, dim]},
+            })
+            for name in (q, bias, sink, output):
+                graph["activation_bindings"][name] = name
+            new_ops[prefix + "_commit_kv"] = {
+                "id": output, "op": "gqa_relative_sink_checked", "kernel": "gqa_relative_sink_checked_f32",
+                "returns_status": True,
+                "graph_slots": {
+                    "inputs": {
+                        "query": "external:" + q, "key": f"external:cache_k_{slot}",
+                        "value": f"external:cache_v_{slot}", "relative": "external:" + bias,
+                        "sink": "external:" + sink,
+                    },
+                    "outputs": {"output": output},
+                },
+                "params": {
+                    "T": tokens, "H": query_heads, "KV": kv_heads, "D": dim, "S": capacity, "B": band,
+                    "call_constants": {
+                        "query_elements": tokens * query_heads * dim,
+                        "key_elements": capacity * kv_width, "value_elements": capacity * kv_width,
+                        "relative_elements": tokens * query_heads * band, "sink_elements": tokens * query_heads,
+                        "output_elements": tokens * query_heads * dim, "work_elements": dim,
+                        "tokens": tokens, "heads": query_heads, "kv_heads": kv_heads,
+                        "dim": dim, "capacity": capacity, "position": 0 if phase == "prefill" else prefill_tokens,
+                        "relative_extent": band, "window": window,
+                    },
+                },
+            }
+
+    for segment in graph["native_entry"]["segments"]:
+        segment["last_op"] = new_ops[segment["last_op"]]["id"]
+    graph["block_types"]["block"]["body"]["ops"] = [
+        child for op in ops for child in ([op, new_ops[op["id"]]] if op["id"] in new_ops else [op])
+    ]
+    for op in new_ops.values():
+        name = op["id"]
+        graph["semantic_checkpoints"]["exports"][name] = {
+            "section": "body", "template_op_id": name, "op": op["op"],
+            "checkpoints": [{
+                "id": f"inkling2.layer6.{name}", "producer": name, "tensor": name,
+                "logical_layout": "token_major_contiguous",
+                "axis_names": ["token", "head", "channel"], "storage_dtype": "fp32",
+            }],
+        }
+    graph["name"] = "inkling2_mini_layer6_relative_attention_fp32"
+    graph["native_entry"]["function"] = "ck_inkling2_mini_layer6_relative_attention_fp32"
+    graph["contract"]["runtime_invariants"]["scope"] = (
+        "generated K/V projection and static convolution through attention over stored cache; supplied Q, bias and sinks"
+    )
+    return graph
