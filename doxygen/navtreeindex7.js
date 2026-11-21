@@ -1,5 +1,9 @@
 var NAVTREEINDEX7 =
 {
+"ckernel__copy__i32__span_8h.html#a60ff4eed86da446c94d43223177181b8":[2,0,0,35,0],
+"ckernel__copy__i32__span_8h_source.html":[2,0,0,35],
+"ckernel__decision__tensor__ops_8h.html":[2,0,0,36],
+"ckernel__decision__tensor__ops_8h.html#a5d28199a889d048ce31328685d05ad60":[2,0,0,36,5],
 "ckernel__decision__tensor__ops_8h.html#a673293001b30ba095a5acc905f894e0d":[2,0,0,36,1],
 "ckernel__decision__tensor__ops_8h.html#acef7afdc810e552b8db9b72376d47f65":[2,0,0,36,0],
 "ckernel__decision__tensor__ops_8h.html#ad54110afe68eb87625181e28f5028121":[2,0,0,36,2],
@@ -245,9 +249,5 @@ var NAVTREEINDEX7 =
 "ckernel__engine_8h.html#a4e854ffc919637e40ea0d320ecb5ed0b":[2,0,0,39,366],
 "ckernel__engine_8h.html#a4eead89f0a06792f12d01d53959144c6":[2,0,0,39,329],
 "ckernel__engine_8h.html#a4eee9d55d4691437d5ea205a03e50593":[2,0,0,39,503],
-"ckernel__engine_8h.html#a4f024774420774821f805d0742694d02":[2,0,0,39,561],
-"ckernel__engine_8h.html#a4f11509e1e7b5d11992dd9328cff17f1":[2,0,0,39,362],
-"ckernel__engine_8h.html#a4fb9cf343ac07a0868c55f25bd201ca3":[2,0,0,39,350],
-"ckernel__engine_8h.html#a4fba55591d34562afbde38826f9c0d80":[2,0,0,39,428],
-"ckernel__engine_8h.html#a500cf70fc074fd75ae5b691103de1df3":[2,0,0,39,542]
+"ckernel__engine_8h.html#a4f024774420774821f805d0742694d02":[2,0,0,39,561]
 };
