@@ -189,15 +189,37 @@ def compile_declared_f32_graph(folder,graph,weights, *, source_config=None, **bu
     accepts the bounded authoring convention's geometry metadata; it never
     dispatches on a model name. Unsupported weight-port shapes reject.
     """
-    import numpy as np
     from version.v8.scripts.checked_circuit_authoring_v8 import declared_f32_weight_shapes as weight_shapes
-    entries=[];offset=4096
-    for name,shape in weight_shapes(graph).items():
-        w=weights[name]
-        if list(w.shape)!=shape or w.dtype!=np.float32:raise ValueError(name)
-        offset=(offset+63)&~63
-        entries.append({'name':name,'shape':shape,'dtype':'F32','size':w.nbytes,'file_offset':offset})
-        offset+=w.nbytes
+    declarations = {name: (shape, "F32") for name, shape in weight_shapes(graph).items()}
+    return compile_checked_weight_graph(
+        folder, graph, {name: weights[name] for name in declarations}, declarations,
+        source_config=source_config, **build_policy
+    )
+
+
+def compile_checked_weight_graph(folder, graph, weights, declarations, *, source_config=None, **build_policy):
+    """Compile a checked graph with explicit logical shapes and stored tensor types."""
+    import numpy as np
+
+    if weights.keys() != declarations.keys():
+        raise ValueError("weight declarations and payloads disagree")
+    entries = []
+    offset = 4096
+    for name, (shape, dtype) in declarations.items():
+        w = weights[name]
+        if dtype == "F32":
+            valid = list(w.shape) == shape and w.dtype == np.float32
+        elif dtype in {"Q8_0", "IQ4_NL"}:
+            elements = int(np.prod(shape, dtype=object))
+            valid = (shape[-1] % 32 == 0 and w.ndim == 1 and w.dtype == np.uint8
+                     and w.nbytes == elements // 32 * (34 if dtype == "Q8_0" else 18))
+        else:
+            raise ValueError(f"unknown weight storage: {name} ({dtype})")
+        if not valid:
+            raise ValueError(f"weight storage disagrees with declaration: {name}")
+        offset = (offset + 63) & ~63
+        entries.append({"name": name, "shape": shape, "dtype": dtype, "size": w.nbytes, "file_offset": offset})
+        offset += w.nbytes
     if source_config is None:
         c=graph['contract']['runtime_invariants'];width=c['width'];tokens=c['tokens'];heads=c['heads']
         source_config={'model':graph['name'],'arch':graph['name'],'num_layers':1,'embed_dim':width,

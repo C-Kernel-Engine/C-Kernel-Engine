@@ -304,3 +304,62 @@ def expert_router(tokens=4, width=2304, experts=128, top_k=8, *, layer=6, route_
     checkpoints[0].update(id=f"inkling2.layer{layer}.expert_router.weights",
                           tensor="route_weights", axis_names=["token", "route"])
     return graph
+
+
+def routed_expert_mixture(tokens, width, inner, experts, top_k, slots, *,
+                          layer=6, storage="f32", route_scale=8.0, gate_cap=4.0, up_cap=25.0):
+    """Connect generated routing, checked expert dispatch and weighted mixture."""
+    if (type(slots) is not int or not 1 <= slots <= experts
+            or storage not in {"f32", "q8_0", "iq4_nl"}
+            or storage != "f32" and (width % 32 or inner % 32)):
+        raise ValueError("unsupported routed expert bank")
+    graph = expert_router(tokens, width, experts, top_k, layer=layer, route_scale=route_scale)
+    graph["name"] = f"inkling2_mini_layer{layer}_routed_experts_{storage}"
+    graph["native_entry"]["function"] = "ck_" + graph["name"]
+    graph["contract"]["runtime_invariants"].update(
+        inner=inner, scope="checked routed MoE with caller-provided expert bank"
+    )
+    graph["activation_buffers"].update(
+        expert_slots={"shape": [experts]},
+        expert_output={"shape": [tokens * top_k, width]},
+        mixture={"shape": [tokens, width]},
+    )
+    graph["activation_bindings"].update({p: p for p in ("expert_slots", "expert_output", "mixture")})
+    work = 3 * inner + tokens * (top_k + 1) * width
+    elements = slots * inner * width
+    block_bytes = {"q8_0": 34, "iq4_nl": 18}
+    prefix = f"model.llm.layers.{layer}.mlp.experts.bank."
+    mixture = {
+        "id": "mixture", "op": "routed_softcapped_experts_checked",
+        "kernel": f"routed_softcapped_experts_checked_{storage}", "returns_status": True,
+        "graph_slots": {
+            "inputs": {"hidden": "external:hidden", "ids": "indices",
+                       "route_weights": "route_weights", "expert_slots": "external:expert_slots"},
+            "outputs": {"expert_output": "expert_output", "output": "mixture"},
+        },
+        "weight_refs": {port: prefix + port for port in ("gate", "up", "down")},
+        "params": {
+            "R": tokens, "H": width, "I": inner, "E": experts, "S": slots, "K": top_k,
+            "P": tokens * top_k, "W": work, "gate_cap": gate_cap, "up_cap": up_cap,
+            "call_constants": {
+                "rows": tokens, "hidden_dim": width, "inner": inner, "experts": experts,
+                "slots": slots, "top_k": top_k,
+                "matrix_bytes": 4 * elements if storage == "f32" else elements // 32 * block_bytes[storage],
+                "hidden_elements": tokens * width, "id_elements": tokens * top_k,
+                "route_elements": tokens * top_k, "expert_slot_elements": experts,
+                "expert_output_elements": tokens * top_k * width,
+                "output_capacity": tokens * width, "work_elements": work,
+            },
+        },
+    }
+    graph["block_types"]["block"]["body"]["ops"].append(mixture)
+    graph["semantic_checkpoints"]["exports"]["mixture"] = {
+        "section": "body", "template_op_id": "mixture", "op": mixture["op"],
+        "checkpoints": [
+            {"id": f"inkling2.layer{layer}.routed_experts.{name}", "producer": "mixture",
+             "tensor": name, "logical_layout": "token_major_contiguous",
+             "axis_names": [axis, "channel"], "storage_dtype": "fp32"}
+            for name, axis in (("expert_output", "route"), ("mixture", "token"))
+        ],
+    }
+    return graph

@@ -1350,6 +1350,11 @@ TEST_SUITES = {
         ROOT / "tests" / "test_v8_inkling2_mini_audit.py",
         unittest_targets=("tests.test_v8_inkling2_mini_audit",),
     ),
+    "inkling2_mini_routed_moe": TestSuite(
+        "Inkling 2 Mini Routed MoE and Packed GGUF Expert Weights", "inference",
+        ROOT / "tests" / "test_v8_inkling2_routed_moe.py",
+        unittest_targets=("tests.test_v8_inkling2_routed_moe",),
+    ),
     "inkling2_mini_router": TestSuite(
         "Inkling 2 Mini Generated Sigmoid Router", "inference",
         ROOT / "tests" / "test_v8_inkling2_router.py",

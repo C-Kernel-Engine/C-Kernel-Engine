@@ -1122,6 +1122,30 @@ git diff --exit-code -- version/v8/kernel_maps/KERNEL_REGISTRY.json   <span clas
   <pre class="mb-code"><code>python3 version/v8/scripts/replay_inkling2_router.py \
   --header /path/to/metadata/safetensors-header.json --output /path/to/new-router-replay</code></pre>
 
+  <h3 id="inkling2-mini-routed-moe">Inkling 2 Mini routed expert mixture</h3>
+  <p>One generated entry runs the router, uses its IDs and weights to
+  dispatch eight experts, and sums their outputs in ascending checkpoint
+  expert-ID order. The native entry accepts a caller-owned expert bank and
+  rejects missing or duplicate bank bindings before publishing results.
+  It reads Q8_0 and IQ4_NL blocks directly in the dot product with FP32
+  activations and ordered FP64 accumulation.</p>
+  <p>The <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/docs/notes/artifacts/inkling2_mini_routed_moe.json">pinned replay</a>
+  covers layers 6 and 20 using the publisher checkpoint and two ggml-org
+  GGUF files. The Q8_0 GGUF uses Q8_0 expert blocks in both tested layers.
+  The IQ4_NL GGUF uses IQ4_NL in layer 6 and Q8_0 in layer 20. Native
+  binding checks use the tensor dtype. The publisher cases expand NVFP4
+  or MXFP8 weights to FP32 before native execution. All six cases match
+  the reference route IDs, and the largest mixed-output difference from
+  PyTorch FP32 is below 8 &times; 10<sup>&minus;7</sup>.</p>
+  <pre class="mb-code"><code>python3 version/v8/scripts/replay_inkling2_routed_moe.py --gguf q8_0 --layer 6 \
+  --output /path/to/new-routed-replay
+python3 version/v8/scripts/replay_inkling2_routed_moe.py --gguf iq4_nl --layer 6 \
+  --output /path/to/new-iq4-replay</code></pre>
+  <p>These replays use one synthetic hidden row at a time and fetch only
+  the selected experts. Full GGUF import, attention-to-MoE composition,
+  cross-pass state, publisher activation quantization and text generation
+  remain separate integration gates.</p>
+
   <h2 id="lowering">9. Run lowering and inspect the generated C</h2>
   <p>The verified entry point is the wrapper <code>version/v8/scripts/cks-v8-run</code> (it selects a Python, checks requirements, and drives <code>ck_run_v8.py</code>). The full pipeline, exactly as run for this page <span class="tag tag-executed">executed</span>:</p>
   <pre class="mb-code"><code>version/v8/scripts/cks-v8-run run \
