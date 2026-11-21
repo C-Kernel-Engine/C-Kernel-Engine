@@ -183,6 +183,22 @@ and in errors for timing options. Older servers may omit those discovery fields.
 The offline workflow needs a compatible trace-enabled decoder and alignment heads
 for its checkpoint. Review the resulting boundaries before using them for caption
 edits.</p>
+<p>With an existing trace-enabled decoder, run one command to transcribe,
+align every window and assemble candidate word timings against the original
+audio. The alignment kernel comes from the decoder bundle's
+<code>libckernel_engine.so</code>. The selected heads are stored in that
+decoder's <code>generation_config.json</code>.</p>
+<pre>python3 version/v8/scripts/run_whisper_word_timings_v8.py \
+  --encoder-run-dir /path/to/encoder \
+  --decoder-run-dir /path/to/trace-enabled/decoder \
+  --wav speech.wav --output-dir /private/new-word-timing-run</pre>
+<p>Open <code>words.json</code> in the new directory. Exit 0 means the assembler
+produced candidates without flagged words, exit 2 means the report contains
+words for review, and exit 1 means processing failed. Both completed reports
+carry <code>edit_ready: false</code> because word boundaries still need
+validation for precise cuts. Keep the source recording and the run's private
+artifacts together for review.</p>
+<h4>Build a trace-enabled decoder and inspect the individual stages</h4>
 <pre>CK_NUM_THREADS=4 version/v8/scripts/cks-v8-run audio /path/to/pinned/whisper-base \
   --run /path/to/separate-trace-bundle --wav speech.wav \
   --vocabulary-hint='C-Kernel-Engine, Clef' --timestamps \
