@@ -62,6 +62,7 @@ class CohereCompassContractTests(unittest.TestCase):
                         "default_to_square": False,
                         "patch_size": 16,
                         "merge_size": 2,
+                        "resample": 3,
                         "size": {
                             "shortest_edge": 65_536,
                             "longest_edge": 16_777_216,
@@ -81,11 +82,20 @@ class CohereCompassContractTests(unittest.TestCase):
                 config = converter._build_config(
                     root, "cohere_compass_vision", None
                 )
+                path = root / "preprocessor_config.json"
+                preproc = json.loads(path.read_text(encoding="utf-8"))
+                for invalid in (None, True, "3", 3.0, 1, []):
+                    with self.subTest(resample=invalid):
+                        preproc["resample"] = invalid
+                        path.write_text(json.dumps(preproc), encoding="utf-8")
+                        with self.assertRaisesRegex(SystemExit, "unsupported Cohere Compass image resampling"):
+                            converter._build_config(root, "cohere_compass_vision", None)
 
         self.assertEqual(config["image_min_pixels"], 65_536)
         self.assertEqual(config["image_max_pixels"], 16_777_216)
         self.assertEqual(config["image_resize_factor"], 32)
         self.assertTrue(config["image_resize_preserve_aspect"])
+        self.assertEqual(config["image_resize_algorithm"], "bicubic")
 
     def test_native_geometry_matches_official_smart_resize(self) -> None:
         config = {
