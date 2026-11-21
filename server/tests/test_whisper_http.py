@@ -466,6 +466,13 @@ def test_capabilities_are_service_specific_and_instance_scoped():
             for field in ('segment_timestamps', 'attention_traces', 'word_alignment',
                           'long_audio', 'editing_review', 'artifact_retrieval', 'request_deadlines'):
                 assert cap[field] is False
+            assert cap['scope'] == 'http_endpoint'
+            workflow, = cap['related_workflows']
+            assert workflow['feature'] == 'word_alignment'
+            assert workflow['interface'] == 'offline_cli'
+            assert 'trace_enabled_decoder_bundle' in workflow['requires']
+            assert workflow['output'] == 'candidate_word_timings_with_review_status'
+            assert workflow['documentation_url'].endswith('#offline-word-alignment')
             assert first['running_native'] is False
     assert ids[0] != ids[1]
 
@@ -475,13 +482,22 @@ def test_unavailable_options_reject_before_upload_or_backend_creation():
     def forbidden():
         raise AssertionError('unsupported option must not create backend')
     with TestClient(create_app(forbidden)) as client:
-        assert client.get('/health').json()['capabilities']['vocabulary_hint']['supported'] is False
+        cap = client.get('/health').json()['capabilities']
+        assert cap['vocabulary_hint']['supported'] is False
+        description = client.get('/openapi.json').json()['paths']['/audio/transcriptions']['post']['description']
+        assert cap['related_workflows'][0]['documentation_url'] in description
         for key in ('timestamps', 'word_alignment', 'attention_trace_dir',
                     'beam_size', 'language', 'vocabular_hint'):
             response = client.post('/audio/transcriptions', params={key: 'true'},
                                    content=b'not even a WAV')
             assert response.status_code == 400
-            assert response.json()['detail']['code'] == 'unsupported_option'
+            detail = response.json()['detail']
+            assert detail['code'] == 'unsupported_option'
+            assert detail['scope'] == 'http_endpoint'
+            if key in {'timestamps', 'word_alignment', 'attention_trace_dir'}:
+                assert detail['related_workflows'] == cap['related_workflows']
+            else:
+                assert 'related_workflows' not in detail
         assert client.get('/health').json()['worker_generation'] == 0
 
 
