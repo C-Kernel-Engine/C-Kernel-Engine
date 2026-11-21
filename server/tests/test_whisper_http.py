@@ -477,6 +477,38 @@ def test_capabilities_are_service_specific_and_instance_scoped():
     assert ids[0] != ids[1]
 
 
+def test_speech_discovery_distinguishes_live_endpoint_and_offline_timing():
+    from server.whisper_http import create_app
+
+    def forbidden():
+        raise AssertionError("discovery must not load a model")
+
+    with TestClient(create_app(forbidden)) as client:
+        health = client.get("/health").json()
+        response = client.get(health["capabilities"]["speech_discovery_path"])
+        assert response.status_code == 200
+        discovery = response.json()
+        assert discovery["schema"] == "cke.speech.discovery.v1"
+        assert discovery["http_scope"] == "this_service"
+        endpoint, = discovery["http_endpoints"]
+        assert endpoint["model_family"] == "whisper"
+        assert endpoint["path"] == "/audio/transcriptions"
+        assert endpoint["ready"] == health["ready"]
+        assert endpoint["service_instance_id"] == health["service_instance_id"]
+        assert endpoint["word_alignment"] is False
+        assert endpoint["long_audio"] is False
+        assert discovery["offline_scope"] == "repository_workflows"
+        workflows = discovery["offline_workflows"]
+        assert all(workflow["interface"] == "offline_cli" for workflow in workflows)
+        assert {workflow["model_family"]: (workflow["timing_unit"], workflow["output_field"])
+                for workflow in workflows} == {
+            "whisper": ("word", "words"),
+            "parakeet_tdt": ("word", "selected_words"),
+            "cohere_transcribe": ("token", "selected_tokens"),
+        }
+        assert client.get("/health").json()["worker_generation"] == 0
+
+
 def test_unavailable_options_reject_before_upload_or_backend_creation():
     from server.whisper_http import create_app
     def forbidden():

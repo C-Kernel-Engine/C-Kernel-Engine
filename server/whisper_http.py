@@ -39,6 +39,42 @@ _OFFLINE_WORD_ALIGNMENT = {
         "v8-whisper-tiny.html#offline-word-alignment"
     ),
 }
+_SPEECH_DISCOVERY_PATH = "/audio/discovery"
+_OFFLINE_SPEECH_WORKFLOWS = (
+    {
+        **_OFFLINE_WORD_ALIGNMENT,
+        "model_family": "whisper",
+        "runner": "version/v8/scripts/run_whisper_word_timings_v8.py",
+        "output_field": "words",
+        "timing_unit": "word",
+        "time_origin": "recording_start",
+    },
+    {
+        "model_family": "parakeet_tdt",
+        "interface": "offline_cli",
+        "runner": "version/v8/scripts/run_parakeet_long_audio_v8.py",
+        "requires": ["converted_parakeet_model", "cke_engine_and_audio_libraries"],
+        "output_field": "selected_words",
+        "timing_unit": "word",
+        "time_origin": "recording_start",
+        "documentation_url": (
+            "https://c-kernel-engine.github.io/C-Kernel-Engine/v8-parakeet-tdt.html#runbook"
+        ),
+    },
+    {
+        "model_family": "cohere_transcribe",
+        "interface": "offline_cli",
+        "runner": "version/v8/scripts/run_cohere_transcribe_long_audio_v8.py",
+        "requires": ["converted_cohere_transcribe_model", "cke_engine_and_audio_libraries"],
+        "output_field": "selected_tokens",
+        "timing_unit": "token",
+        "time_origin": "recording_start",
+        "documentation_url": (
+            "https://c-kernel-engine.github.io/C-Kernel-Engine/v8-cohere-kernels.html"
+        ),
+    },
+)
+
 _TIMING_OPTIONS = frozenset({
     "timestamps", "segment_timestamps", "word_alignment", "attention_traces",
     "attention_trace_dir", "attention_trace_output",
@@ -366,6 +402,7 @@ def create_app(factory: Callable[[], Any], *, max_upload_bytes: int = 1024 * 102
     capabilities = {
         "schema": "cke.whisper.capabilities.v1",
         "scope": "http_endpoint",
+        "speech_discovery_path": _SPEECH_DISCOVERY_PATH,
         "related_workflows": [_OFFLINE_WORD_ALIGNMENT],
         "audio": {"format": "wav_pcm16", "sample_rate_hz": 16000, "channels": 1,
                   "max_upload_bytes": max_upload_bytes, "max_seconds": max_seconds},
@@ -396,6 +433,26 @@ def create_app(factory: Callable[[], Any], *, max_upload_bytes: int = 1024 * 102
     async def health():
         return {"status": "ok", "service_instance_id": service_instance_id,
                 "capabilities": capabilities, **owner.status}
+
+    @app.get(_SPEECH_DISCOVERY_PATH)
+    async def speech_discovery():
+        return {
+            "schema": "cke.speech.discovery.v1",
+            "http_scope": "this_service",
+            "http_endpoints": [{
+                "model_family": "whisper",
+                "method": "POST",
+                "path": "/audio/transcriptions",
+                "health_path": "/health",
+                "service_instance_id": service_instance_id,
+                "ready": owner.status["ready"],
+                "word_alignment": capabilities["word_alignment"],
+                "segment_timestamps": capabilities["segment_timestamps"],
+                "long_audio": capabilities["long_audio"],
+            }],
+            "offline_scope": "repository_workflows",
+            "offline_workflows": _OFFLINE_SPEECH_WORKFLOWS,
+        }
 
     @app.post("/audio/transcriptions", description=(
         f"{_TRANSCRIPTION_DESCRIPTION} [Offline alignment runbook]"
