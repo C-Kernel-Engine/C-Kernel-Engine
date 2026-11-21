@@ -1345,6 +1345,11 @@ TEST_SUITES = {
         "TTS Runtime Extent IR Contract", "kernels",
         ROOT / "tests" / "test_v8_runtime_extent_contract.py",
     ),
+    "inkling2_mini_import_audit": TestSuite(
+        "Inkling 2 Mini Import Metadata and State Schedule", "inference",
+        ROOT / "tests" / "test_v8_inkling2_mini_audit.py",
+        unittest_targets=("tests.test_v8_inkling2_mini_audit",),
+    ),
     "tts_checked_call_codegen": TestSuite(
         "TTS Generated Checked Call Graph", "kernels",
         ROOT / "tests" / "test_v8_checked_call_codegen.py",

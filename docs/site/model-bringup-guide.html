@@ -2038,6 +2038,29 @@ git diff --exit-code -- version/v8/kernel_maps/KERNEL_REGISTRY.json   <span clas
   </div>
   <div class="svg-expand-hint">click / tap the diagram to expand</div>
 
+  <h3 id="inkling2-mini-import">Inkling 2 Mini checkpoint audit</h3>
+  <p>The <a href="https://huggingface.co/thinkingmachines/Inkling-2-Mini/tree/ed40e7da625f594fc9c4990f5f66be24873c22d7">pinned publisher checkpoint</a>
+  contains 24 physical text layers. The 12-layer core runs three passes, yielding
+  48 text-layer evaluations. A later pass restarts from the prelude and consumes
+  messages from the prior pass. Each occurrence has independent KV and causal
+  convolution state. The schedule is cross-checked against the
+  <a href="https://github.com/huggingface/transformers/blob/046bdb8cc2cee29d233964bb77fe6fd37cfe4aa3/src/transformers/models/inkling2_loop/modeling_inkling2_loop.py">Transformers implementation</a>.</p>
+  <p>The audit checks the publisher tensor index against the shard header and validates
+  the expert matrices and scale-sidecar shapes. Layers 0&ndash;19 declare NVFP4
+  and its per-token four-over-six activation policy. Layers 20&ndash;23 declare MXFP8
+  and E8M0 activation scales. CKE's existing packed NVFP4 providers require an explicit
+  packing and arithmetic comparison before selection. This stage produces
+  a metadata report. The main-shard inventory includes vision tensors and
+  excludes the separate MTP shard.</p>
+  <pre class="mb-code"><code>python3 version/v8/scripts/audit_inkling2_mini_v8.py /path/to/new-metadata-dir --fetch \
+  --revision ed40e7da625f594fc9c4990f5f66be24873c22d7</code></pre>
+  <p>Fetch uses HTTP ranges for the safetensors header and downloads no tensor payload.
+  The retained <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/docs/notes/artifacts/inkling2_mini_import_audit.json">audit report</a>
+  records the metadata identities, observed storage and explicit state schedule.
+  The next execution gate is a text-only generated block replay with matching
+  projection inputs, attention and convolution state, followed by one cross-pass
+  message/control replay. Speculative decoding, images and serving follow text execution.</p>
+
   <h2 id="lowering">9. Run lowering and inspect the generated C</h2>
   <p>The verified entry point is the wrapper <code>version/v8/scripts/cks-v8-run</code> (it selects a Python, checks requirements, and drives <code>ck_run_v8.py</code>). The full pipeline, exactly as run for this page <span class="tag tag-executed">executed</span>:</p>
   <pre class="mb-code"><code>version/v8/scripts/cks-v8-run run \
