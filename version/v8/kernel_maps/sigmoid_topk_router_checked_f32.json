@@ -1,0 +1,212 @@
+{
+  "id": "sigmoid_topk_router_checked_f32",
+  "op": "sigmoid_topk_router_checked",
+  "operation_interface": "moe.router.sigmoid_unbiased_weights.checked.fp32.v1",
+  "variant": "ungrouped_checked_f32",
+  "selection": {
+    "status": "candidate",
+    "priority": 100,
+    "phases": [
+      "prefill"
+    ],
+    "equivalence_group": "moe.router.sigmoid_unbiased_weights.checked.fp32.v1"
+  },
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "logits",
+      "dtype": "fp32",
+      "shape": [
+        "R",
+        "E"
+      ],
+      "layout": "row_major",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "bias",
+      "dtype": "fp32",
+      "shape": [
+        "E"
+      ],
+      "layout": "row_major",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "indices",
+      "dtype": "i32",
+      "shape": [
+        "R",
+        "K"
+      ],
+      "layout": "row_major",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "weights",
+      "dtype": "fp32",
+      "shape": [
+        "R",
+        "K"
+      ],
+      "layout": "row_major",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "scratch": [],
+  "dims": [
+    "R",
+    "E",
+    "K"
+  ],
+  "impl": {
+    "function": "sigmoid_topk_router_checked_f32",
+    "c_declaration": "int sigmoid_topk_router_checked_f32(const float *logits, size_t logits_elements, const float *bias, size_t bias_elements, int32_t *indices, size_t indices_elements, float *weights, size_t weights_elements, size_t rows, size_t experts, size_t top_k, float route_scale);",
+    "sources": [
+      "src/kernels/topk_kernels.c"
+    ]
+  },
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "logits",
+        "source": "activation:logits",
+        "cast": "const float*",
+        "ports": [
+          "input:logits"
+        ]
+      },
+      {
+        "name": "logits_elements",
+        "source": "runtime:logits_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "bias",
+        "source": "activation:bias",
+        "cast": "const float*",
+        "ports": [
+          "input:bias"
+        ]
+      },
+      {
+        "name": "bias_elements",
+        "source": "runtime:bias_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "indices",
+        "source": "output:indices",
+        "cast": "int32_t*",
+        "ports": [
+          "output:indices"
+        ]
+      },
+      {
+        "name": "indices_elements",
+        "source": "runtime:indices_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "weights",
+        "source": "output:weights",
+        "cast": "float*",
+        "ports": [
+          "output:weights"
+        ]
+      },
+      {
+        "name": "weights_elements",
+        "source": "runtime:weights_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "rows",
+        "source": "runtime:rows",
+        "value_type": "size_t"
+      },
+      {
+        "name": "experts",
+        "source": "runtime:experts",
+        "value_type": "size_t"
+      },
+      {
+        "name": "top_k",
+        "source": "runtime:top_k",
+        "value_type": "size_t"
+      },
+      {
+        "name": "route_scale",
+        "source": "param:route_scale"
+      }
+    ]
+  },
+  "call_constant_contract": {
+    "shape_symbols": {
+      "R": "rows",
+      "E": "experts",
+      "K": "top_k"
+    },
+    "buffer_spans": [
+      {
+        "pointer": "logits",
+        "elements": "logits_elements",
+        "rows": "rows",
+        "width": "experts",
+        "element_bytes": 4
+      },
+      {
+        "pointer": "bias",
+        "elements": "bias_elements",
+        "rows": 1,
+        "width": "experts",
+        "element_bytes": 4
+      },
+      {
+        "pointer": "indices",
+        "elements": "indices_elements",
+        "rows": "rows",
+        "width": "top_k",
+        "element_bytes": 4
+      },
+      {
+        "pointer": "weights",
+        "elements": "weights_elements",
+        "rows": "rows",
+        "width": "top_k",
+        "element_bytes": 4
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "tests/test_v8_inkling2_router.py"
+    ]
+  },
+  "notes": "Ranks experts by sigmoid(logit) plus bias, then normalizes and scales unbiased scores. Ties use ascending expert IDs."
+}

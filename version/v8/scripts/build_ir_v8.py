@@ -3129,6 +3129,11 @@ OP_DATAFLOW = {
             "weights": {"slot": "k_scratch", "dtype": "fp32"},
         },
     },
+    "sigmoid_topk_router_checked": {
+        "inputs": {"logits": "external:logits", "bias": "external:bias"},
+        "outputs": {"indices": {"slot": "indices", "dtype": "i32"},
+                    "weights": {"slot": "weights", "dtype": "fp32"}},
+    },
     "group_limited_topk_router": {
         "inputs": {"scores": "mlp_scratch"},
         "outputs": {
@@ -5544,6 +5549,7 @@ TEMPLATE_TO_KERNEL_OP = {
     "rwkv7_trie_tokenizer": None,  # RWKV-7 trie tokenizer - init handled separately
     "moe_router": "matmul",
     "full_softmax_topk_router": "full_softmax_topk_router",
+    "sigmoid_topk_router_checked": "sigmoid_topk_router_checked",
     "group_limited_topk_router": "group_limited_topk_router",
     "moe_relu2_expert_mlp": "moe_relu2_expert_mlp",
     "shared_relu2_expert_mlp": "shared_relu2_expert_mlp",
