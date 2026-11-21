@@ -2063,6 +2063,23 @@ git diff --exit-code -- version/v8/kernel_maps/KERNEL_REGISTRY.json   <span clas
   projection inputs, attention and convolution state, followed by one cross-pass
   message/control replay. Speculative decoding, images and serving follow text execution.</p>
 
+  <h3 id="inkling2-mini-layer6">Inkling 2 Mini layer 6 projection replay</h3>
+  <p>The generated checked graphs replay layer 6 Q, K, V, relative-logit and sink
+  projections, plus the query controller's forget and gain projections and tanh.
+  The command reads seven BF16 tensors (26.1 MB) from pinned shard byte ranges,
+  expands them to FP32 and compares against PyTorch eager FP32. Both paths receive
+  the same deterministic synthetic operands. The largest absolute difference
+  across one- and eight-row executions was 1.19 &times; 10<sup>&minus;7</sup>.
+  The <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/docs/notes/artifacts/inkling2_mini_layer6_projection_replay.json">replay report</a>
+  records tensor hashes, generated build identities and per-checkpoint error.</p>
+  <pre class="mb-code"><code>python3 version/v8/scripts/replay_inkling2_mini_projections.py \
+  --header /path/to/metadata/safetensors-header.json --output /path/to/new-replay</code></pre>
+  <p>The generated path currently starts at normalized attention rows or a supplied
+  controller bottleneck. Certification of a full block needs the causal
+  convolution, attention score and sink algebra, quantized experts, controller
+  merge, and state continuity. Validate prefill and a continuation token before
+  comparing the second occurrence of layer 6 with independent state.</p>
+
   <h2 id="lowering">9. Run lowering and inspect the generated C</h2>
   <p>The verified entry point is the wrapper <code>version/v8/scripts/cks-v8-run</code> (it selects a Python, checks requirements, and drives <code>ck_run_v8.py</code>). The full pipeline, exactly as run for this page <span class="tag tag-executed">executed</span>:</p>
   <pre class="mb-code"><code>version/v8/scripts/cks-v8-run run \
