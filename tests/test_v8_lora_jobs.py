@@ -15,7 +15,7 @@ from server.training.job_consumer import verify_artifacts
 from version.v8.training.lora_package import load_package, sha
 from tests.test_v8_lora_session import base_artifact
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def package(folder):
