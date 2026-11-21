@@ -1291,6 +1291,23 @@ python3 version/v8/tts/run_ming3_paragraph_v8.py \
   --checkpoint /path/to/checkpoint --publisher-root /path/to/pinned/publisher \
   --text-file /path/to/paragraph.txt --output /path/to/new-paragraph-run \
   --capacity 512 --max-frames 200 --threads 2</pre>
+<h2>Checked projection threading on P3, 21 November 2026</h2>
+<p>A sampled run of the pinned 144-token short phrase on the Intel Core i7-14700T
+attributed 10,127 of 20,066 process-wide user CPU samples to DiT projection compute
+and weight validation. The inverse transform accounted for 285 samples.
+The checked AVX2 projection now divides large output-channel ranges across up to four
+OpenMP workers. Each output keeps its original FP64 accumulation order. All
+weight tiles finish validation before any output is written.</p>
+<p>In one before-and-after pair with two configured threads, latent generation fell
+from 91.4 to 47.5 seconds and waveform decoding from 14.0 to 8.6 seconds.
+Compute time fell from 105.4 to 56.1 seconds, excluding bundle preparation.
+Both runs produced 32 latent frames and 112,896 samples with bit-identical latents,
+waveform and WAV. This measures one short phrase with the cached execution profile
+and seed 731. Longer utterance latency and first audible output remain unmeasured
+for this provider.</p>
+<pre>python3 -m pytest -q tests/test_v8_linear_rows_oracle.py tests/test_v8_ming3_dit.py \
+  tests/test_v8_ming3_runtime_audio_decoder.py tests/test_v8_kokoro_generated_projection.py \
+  tests/test_v8_qwen3_tts_runtime_prompt_first_block.py</pre>
 <h2>Kernel and circuit work still required</h2>
 <table><thead><tr><th>Component</th><th>Reuse candidates</th><th>Remaining gate</th></tr></thead><tbody>
 <tr><td>Qwen2.5 backbone</td><td>Linear projections, RMSNorm, RoPE, attention, KV</td><td>Connected prompt/weight mapping and cached continuation tested; artifact-specific BF16 parity remains</td></tr>
