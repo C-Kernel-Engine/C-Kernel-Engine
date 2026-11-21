@@ -2150,6 +2150,12 @@ TEST_SUITES = {
         ROOT / "tests" / "test_v8_xray_conv_operands.py",
         timeout_sec=120,
     ),
+    "v8_f16_patch_projection_replay": TestSuite(
+        "X-Ray FP16 Patch Projection Replay",
+        "parity",
+        ROOT / "tests" / "test_v8_replay_f16_patch_projection.py",
+        timeout_sec=120,
+    ),
     "v8_hidden_export_extents": TestSuite(
         "Generated Hidden Export Extents",
         "parity",

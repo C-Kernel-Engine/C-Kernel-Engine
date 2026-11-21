@@ -403,6 +403,32 @@ class TestAttentionFull(unittest.TestCase):
         diff = max_diff(got, ref)
         self.assertLessEqual(diff, 1e-5)
 
+    def test_full_exact_strided_preserves_fp32_kv(self) -> None:
+        # Distinct FP32 keys can round to the same FP16 value. A large but
+        # finite query makes the resulting softmax error easy to detect.
+        shape = (1, 3, 64)
+        q = np.zeros(shape, dtype=np.float32)
+        k = np.zeros_like(q)
+        v = np.zeros_like(q)
+        q[0, :, 0] = (2048.0, 1024.0, -1024.0)
+        k[0, :, 0] = (1.0001, 1.00045, 0.995)
+        v[0, :, :2] = ((-2.0, 0.25), (3.0, -1.0), (0.5, 2.0))
+
+        def run(keys):
+            out = np.empty_like(q)
+            lib.attention_forward_full_head_major_gqa_exact_strided(
+                numpy_to_ptr(q), numpy_to_ptr(keys), numpy_to_ptr(v), numpy_to_ptr(out),
+                1, 1, 3, 64, 64, 3,
+            )
+            return out
+
+        scores = (q.astype(np.float64) @ k.astype(np.float64).swapaxes(-1, -2)) / 8
+        probs = np.exp(scores - scores.max(axis=-1, keepdims=True))
+        expected = (probs / probs.sum(axis=-1, keepdims=True)) @ v
+        np.testing.assert_allclose(run(k), expected, atol=3e-6, rtol=0)
+        rounded = run(k.astype(np.float16).astype(np.float32))
+        self.assertGreater(float(np.max(np.abs(rounded - expected))), 0.01)
+
     def test_full_ggml_strided_matches_pytorch_reference(self) -> None:
         lib.attention_forward_full_head_major_gqa_ggml_strided(
             numpy_to_ptr(self.q),
