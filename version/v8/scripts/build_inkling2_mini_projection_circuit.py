@@ -7,27 +7,27 @@ TRANSFORMERS_REVISION = "046bdb8cc2cee29d233964bb77fe6fd37cfe4aa3"
 LAYER = "model.llm.layers.6."
 
 
-def _project(name, source, width, channels, tokens, weight):
+def _project(name, source, width, channels, tokens, weight, *, weight_prefix=LAYER):
     op = linear(name, source, name, width, channels, tokens, "unused")
     op.update(op="linear_rows_checked_no_bias", kernel="linear_rows_checked_no_bias_f32",
-              weight_refs={"weight": LAYER + weight})
+              weight_refs={"weight": weight_prefix + weight})
     del op["params"]["call_constants"]["linear_bias_elements"]
     return op
 
 
-def _graph(kind, tokens, width, shapes, ops):
+def _graph(kind, tokens, width, shapes, ops, *, layer=6, scope=None):
     if type(tokens) is not int or not 1 <= tokens <= 16:
         raise ValueError("expected 1..16 fixed token rows")
     if any(type(n) is not int or not 1 <= n <= 8192 for shape in shapes.values() for n in shape):
         raise ValueError("unsupported projection geometry")
-    name = f"inkling2_mini_layer6_{kind}_fp32"
+    name = f"inkling2_mini_layer{layer}_{kind}_fp32"
     checks = {}
     for op in ops:
         operation = op["id"]
         checks[operation] = {
             "section": "body", "template_op_id": operation, "op": op["op"],
             "checkpoints": [{
-                "id": f"inkling2.layer6.{kind}.{operation}", "producer": operation,
+                "id": f"inkling2.layer{layer}.{kind}.{operation}", "producer": operation,
                 "tensor": operation, "logical_layout": "token_major_contiguous",
                 "axis_names": ["token", "channel"], "storage_dtype": "fp32",
             }],
@@ -37,7 +37,7 @@ def _graph(kind, tokens, width, shapes, ops):
         "contract": {
             "runtime_invariants": {
                 "inference_only": True, "tokens": tokens, "width": width, "heads": 1, "mult": 1,
-                "scope": "supplied projection operands, FP32 output, isolated layer-6 component",
+                "scope": scope or "supplied projection operands, FP32 output, isolated layer-6 component",
             },
             "provenance": {"checkpoint_revision": SOURCE_REVISION, "transformers_revision": TRANSFORMERS_REVISION},
         },
@@ -250,3 +250,28 @@ def relative_attention_replay(prefill_tokens=8, width=2304, kv_width=1024, taps=
         "generated K/V projection and static convolution through attention over stored cache; supplied Q, bias and sinks"
     )
     return graph
+
+
+def selected_expert(tokens=3, width=2304, inner=1152, *, layer=6, expert=7,
+                    gate_cap=4.0, up_cap=25.0):
+    """Generated FP32 path for one preselected expert with expanded weights."""
+    if type(layer) is not int or not 0 <= layer < 24 or type(expert) is not int or not 0 <= expert < 128:
+        raise ValueError("invalid checkpoint layer or expert")
+    sizes = {"hidden": width, "gate": inner, "up": inner, "activated": inner, "down": width}
+    shapes = {name: [tokens, columns] for name, columns in sizes.items()}
+    prefix = f"model.llm.layers.{layer}.mlp.experts.expanded.{expert}."
+    ops = [_project(name, "external:hidden", width, inner, tokens, name, weight_prefix=prefix)
+           for name in ("gate", "up")]
+    elements = tokens * inner
+    ops.append({
+        "id": "activated", "op": "softcapped_swiglu_rows_checked",
+        "kernel": "softcapped_swiglu_rows_checked_f32", "returns_status": True,
+        "graph_slots": {"inputs": {"gate": "gate", "up": "up"}, "outputs": {"output": "activated"}},
+        "params": {"N": elements, "gate_cap": gate_cap, "up_cap": up_cap, "call_constants": {
+            "gate_elements": elements, "up_elements": elements, "output_elements": elements,
+            "elements": elements,
+        }},
+    })
+    ops.append(_project("down", "activated", inner, width, tokens, "down", weight_prefix=prefix))
+    return _graph("selected_expert", tokens, width, shapes, ops, layer=layer,
+                  scope="one preselected expert, expanded checkpoint weights, FP32 operands and outputs")

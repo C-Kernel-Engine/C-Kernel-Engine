@@ -2118,6 +2118,10 @@ OP_DATAFLOW = {
         "inputs": {"gate": "external:gate", "up": "external:up"},
         "outputs": {"output": {"slot": "activated_features", "dtype": "fp32"}},
     },
+    "softcapped_swiglu_rows_checked": {
+        "inputs": {"gate": "external:gate", "up": "external:up"},
+        "outputs": {"output": {"slot": "activated_features", "dtype": "fp32"}},
+    },
     "rope_qk_bounded": {
         "inputs": {"q": "external:q", "k": "external:k"},
         "outputs": {"q": {"slot": "rotated_q", "dtype": "fp32"},
@@ -5349,6 +5353,7 @@ TEMPLATE_TO_KERNEL_OP = {
     "add_rows_checked": "add_rows_checked",
     "indexed_sum_rows_checked": "indexed_sum_rows_checked",
     "silu_mul_rows_checked": "silu_mul_rows_checked",
+    "softcapped_swiglu_rows_checked": "softcapped_swiglu_rows_checked",
     "rope_qk_bounded": "rope_qk_bounded",
     "attention_causal_bounded": "attention_causal_bounded",
     "causal_depthwise_residual_checked": "causal_depthwise_residual_checked",

@@ -147,6 +147,36 @@ int silu_mul_rows_checked_f32(const float *gate, size_t gate_elements,
     return 0;
 }
 
+static float softcapped_swiglu(float gate, float up, float gate_cap, float up_cap)
+{
+    const float exp_gate = expf(-fabsf(gate));
+    const float sigmoid = (gate < 0.0f ? exp_gate : 1.0f) / (1.0f + exp_gate);
+    const float capped_gate = gate_cap * tanhf(gate / gate_cap);
+    const float capped_up = up_cap * tanhf(up / up_cap);
+    return (capped_gate * sigmoid) * capped_up;
+}
+
+int softcapped_swiglu_rows_checked_f32(const float *gate, size_t gate_elements,
+                                       const float *up, size_t up_elements,
+                                       float *output, size_t output_elements,
+                                       size_t elements, float gate_cap, float up_cap)
+{
+    if (!elements || gate_elements < elements || up_elements < elements ||
+        output_elements < elements) return -2;
+    if (!isfinite(gate_cap) || gate_cap <= 0.0f || !isfinite(up_cap) || up_cap <= 0.0f ||
+        !ck_checked_region(gate, elements) || !ck_checked_region(up, elements) ||
+        !ck_checked_region(output, elements) ||
+        ck_checked_overlap(gate, elements, output, elements) ||
+        ck_checked_overlap(up, elements, output, elements)) return -1;
+    for (size_t i = 0; i < elements; ++i) {
+        if (!isfinite(gate[i]) || !isfinite(up[i]) ||
+            !isfinite(softcapped_swiglu(gate[i], up[i], gate_cap, up_cap))) return -3;
+    }
+    for (size_t i = 0; i < elements; ++i)
+        output[i] = softcapped_swiglu(gate[i], up[i], gate_cap, up_cap);
+    return 0;
+}
+
 int rope_qk_bounded_checked_f32(float *q, size_t q_elements,
                                 float *k, size_t k_elements,
                                 size_t heads, size_t kv_heads,

@@ -1350,6 +1350,11 @@ TEST_SUITES = {
         ROOT / "tests" / "test_v8_inkling2_mini_audit.py",
         unittest_targets=("tests.test_v8_inkling2_mini_audit",),
     ),
+    "inkling2_mini_expert_weights": TestSuite(
+        "Inkling 2 Mini Expert Import and Generated Softcapped SwiGLU", "inference",
+        ROOT / "tests" / "test_v8_inkling2_expert_weights.py",
+        unittest_targets=("tests.test_v8_inkling2_expert_weights",),
+    ),
     "inkling2_mini_relative_attention": TestSuite(
         "Inkling 2 Mini Generated Relative and Sink Attention", "inference",
         ROOT / "tests" / "test_v8_inkling2_mini_relative_attention.py",

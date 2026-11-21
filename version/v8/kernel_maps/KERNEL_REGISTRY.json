@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 527,
+      "total": 528,
       "by_op": {
         "add_backward": 1,
         "add_rows_backward_train_f32": 1,
@@ -229,6 +229,7 @@
         "silu_strided_checked": 1,
         "sinusoidal_constant_tables_checked": 1,
         "sinusoidal_features_checked": 1,
+        "softcapped_swiglu_rows_checked": 1,
         "softmax": 1,
         "spatial_merge": 3,
         "speculative_commit_or_reject": 1,
@@ -103064,6 +103065,175 @@
       ],
       "name": "sinusoidal_features_f32_checked",
       "_source_file": "sinusoidal_features_f32_checked.json"
+    },
+    {
+      "id": "softcapped_swiglu_rows_checked_f32",
+      "op": "softcapped_swiglu_rows_checked",
+      "operation_interface": "swiglu.separate_softcaps.checked.fp32.v1",
+      "variant": "checked_scalar_fp32",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "equivalence_group": "swiglu.separate_softcaps.checked.fp32.v1",
+        "phases": [
+          "prefill"
+        ]
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "gate",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "layout": "flat",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "up",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "layout": "flat",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "layout": "flat",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "N"
+      ],
+      "impl": {
+        "function": "softcapped_swiglu_rows_checked_f32",
+        "c_declaration": "int softcapped_swiglu_rows_checked_f32(const float *gate, size_t gate_elements, const float *up, size_t up_elements, float *output, size_t output_elements, size_t elements, float gate_cap, float up_cap);",
+        "sources": [
+          "src/kernels/transformer_rows_checked.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "gate",
+            "source": "activation:gate",
+            "cast": "const float*",
+            "ports": [
+              "input:gate"
+            ]
+          },
+          {
+            "name": "gate_elements",
+            "source": "runtime:gate_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "up",
+            "source": "activation:up",
+            "cast": "const float*",
+            "ports": [
+              "input:up"
+            ]
+          },
+          {
+            "name": "up_elements",
+            "source": "runtime:up_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "elements",
+            "source": "runtime:elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "gate_cap",
+            "source": "param:gate_cap"
+          },
+          {
+            "name": "up_cap",
+            "source": "param:up_cap"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_expert_weights.py"
+        ]
+      },
+      "notes": "Separate tanh softcaps for gate and up, with sigmoid evaluated on the original gate.",
+      "call_constant_contract": {
+        "shape_symbols": {
+          "N": "elements"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "gate",
+            "elements": "gate_elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "up",
+            "elements": "up_elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "output",
+            "elements": "output_elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "name": "softcapped_swiglu_rows_checked_f32",
+      "_source_file": "softcapped_swiglu_rows_checked_f32.json"
     },
     {
       "id": "softmax_cross_entropy_loss",
