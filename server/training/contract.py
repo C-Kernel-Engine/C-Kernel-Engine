@@ -73,9 +73,10 @@ def registered_dataset(root,recipe):
     return entry
 
 class Backend:
-    def __init__(self,root=ROOT,*,resources='unknown',clef_packages=None):
+    def __init__(self,root=ROOT,*,resources='unknown',clef_packages=None,lora_packages=None):
         if resources not in ('unknown','unavailable'):raise ValueError('no resource reservation provider')
         self.clef_packages=copy.deepcopy(clef_packages or {})
+        self.lora_packages=copy.deepcopy(lora_packages or {})
         self.root=Path(root);self.boot=uuid.uuid4().hex;self.resources=resources
     def capabilities(self):
         datasets={k:registered_dataset(self.root,k) for k in SPECS}
@@ -92,6 +93,11 @@ class Backend:
             body['clef_packages']=packages(self.clef_packages)
             body['methods']['clef_head']='validation_only'
             body['recipes'][RECIPE]=dict(limits=head_limits(),status='validation_only',dtype='fp32',optimizer='adamw',method='head_only',geometry='one declared geometry per package',executor_sha256=file_hash(self.root/'version/v8/decision/train_clef_head.py'))
+        if self.lora_packages:
+            from .lora import packages, RECIPE
+            body['lora_packages']=packages(self.lora_packages)
+            body['methods']['lora']='validation_only'
+            body['recipes'][RECIPE]=dict(status='validation_only',dtype='fp32',optimizer='adamw',method='lora',steps=[1,100000],max_adapter_parameters=1000000,executor_sha256=file_hash(self.root/'version/v8/training/run_lora_job.py'))
         body['sha256']=digest(body);return body
     def exchange(self,q):
         if len(encode(q))>MAX_BYTES:raise ValueError('MESSAGE_TOO_LARGE')
@@ -109,6 +115,14 @@ class Backend:
         if q['operation']=='discover':response.update(ok=True,capabilities=caps);return response
         if q['worker_boot_id']!=self.boot:error('/worker_boot_id','STALE_WORKER')
         if q['capabilities_sha256']!=caps['sha256']:error('/capabilities_sha256','STALE_CAPABILITIES')
+        if type(q['config']) is dict and q['config'].get('recipe')=='decoder_lora_fp32_v1' and self.lora_packages:
+            from .lora import validate, RECIPE
+            errors.extend(validate(q['config'],caps['lora_packages']))
+            if self.resources=='unavailable':error('/resources','UNAVAILABLE')
+            if not errors:
+                plan=dict(schema='cke.training.plan.v1',worker_boot_id=self.boot,capabilities_sha256=caps['sha256'],cke_commit=caps['cke_commit'],workflow_sha256=caps['recipes'][RECIPE]['executor_sha256'],config=copy.deepcopy(q['config']),submittable=False,execution='disabled')
+                response.update(ok=True,plan=plan,plan_sha256=digest(plan))
+            return response
         if type(q['config']) is dict and q['config'].get('recipe')=='clef_head_fp32_v1' and self.clef_packages:
             from .clef import validate
             errors.extend(validate(q['config'],caps['clef_packages']))

@@ -33,7 +33,7 @@ def observe(value,*,worker_boot_id,owner,job_id,plan_sha256,experiment_id,draft_
         check(type(metric) is dict and set(metric)=={'name','step','step_kind','value','unit','observed_at'})
         check(type(metric['step']) is int)
         decoder=(metric['name'] in ('training_cross_entropy','validation_cross_entropy') and metric['step']>=2 and metric['step_kind']=='epoch' and metric['unit']=='nats/token')
-        head=(metric['name'] in ('validation_cross_entropy_before','validation_cross_entropy') and 1<=metric['step']<=100000 and metric['step_kind']=='update' and metric['unit']=='nats/question')
+        head=(metric['name'] in ('validation_cross_entropy_before','validation_cross_entropy') and 1<=metric['step']<=100000 and metric['step_kind']=='update' and metric['unit'] in ('nats/question','nats/token'))
         check(decoder or head)
         check(type(metric['value']) in (int,float) and math.isfinite(metric['value']) and metric['value']>=0)
         check(type(metric['observed_at']) in (int,float) and j['created_at']<=metric['observed_at']<=value['observed_at'])
@@ -41,8 +41,8 @@ def observe(value,*,worker_boot_id,owner,job_id,plan_sha256,experiment_id,draft_
     ids=[]
     for a in j['artifacts']:
         check(type(a) is dict and set(a)=={'artifact_id','type','bytes','sha256'})
-        check(hexid(a['artifact_id'],32) and hexid(a['sha256'],64) and type(a['bytes']) is int and 0<a['bytes']<=(512 if a['type'] in ('trained_head','inference_package','training_report') else 16)*1024**2)
-        check(a['type'] in ('execution_plan','training_report','checkpoint_manifest','training_plan','training_pipeline','trained_head','inference_package'));ids.append(a['artifact_id'])
+        check(hexid(a['artifact_id'],32) and hexid(a['sha256'],64) and type(a['bytes']) is int and 0<a['bytes']<=(512 if a['type'] in ('trained_head','inference_package','training_report','adapter_package','training_checkpoint') else 16)*1024**2)
+        check(a['type'] in ('execution_plan','training_report','checkpoint_manifest','training_plan','training_pipeline','trained_head','inference_package','adapter_package','training_checkpoint'));ids.append(a['artifact_id'])
     check(len(ids)==len(set(ids)))
     if j['status']=='succeeded':check(j['error_code'] is None and {'training_report','execution_plan'}<={a['type'] for a in j['artifacts']})
     elif j['status'] in ('failed','recovery_required'):check(type(j['error_code']) is str and bool(j['error_code']))
