@@ -33,7 +33,7 @@ var searchData=
   ['pretokenizer_30',['pretokenizer',['../structCKBPEConfig.html#ab6d9b2ee3a8b5f532432a50c0613354c',1,'CKBPEConfig']]],
   ['primary_5finput_5fdim_31',['primary_input_dim',['../structCKModelRuntimeDescriptorV8.html#ab0bb22f4a933cd1eb8d4603b8391f950',1,'CKModelRuntimeDescriptorV8']]],
   ['primary_5finput_5ftokens_32',['primary_input_tokens',['../structCKModelRuntimeDescriptorV8.html#af0560f7439030c528a9b3364bef4b79e',1,'CKModelRuntimeDescriptorV8']]],
-  ['priority_33',['priority',['../true__bpe_8h.html#a328f69c6aefebd48ef10a1c553458d04',1,'priority:&#160;true_bpe.h'],['../structRecommendation.html#a2dea715a398d739605559094647c11eb',1,'Recommendation::priority'],['../structCKTrieNode.html#aace4764a43a80b9f2039dd91fb50c649',1,'CKTrieNode::priority'],['../structCKMergeRule.html#af89e288682de3079e22683c57b629d4c',1,'CKMergeRule::priority']]],
+  ['priority_33',['priority',['../structCKMergeRule.html#af89e288682de3079e22683c57b629d4c',1,'CKMergeRule::priority'],['../structCKTrieNode.html#aace4764a43a80b9f2039dd91fb50c649',1,'CKTrieNode::priority'],['../structRecommendation.html#a2dea715a398d739605559094647c11eb',1,'Recommendation::priority'],['../true__bpe_8h.html#a328f69c6aefebd48ef10a1c553458d04',1,'priority:&#160;true_bpe.h']]],
   ['producer_34',['producer',['../structCKInputRef.html#a952a97cab88682ffb36027b353492e6f',1,'CKInputRef']]],
   ['proj_5fout_35',['proj_out',['../structCKLayerOffsets.html#ad4bc2b7cea35add011aa22e48f10f99c',1,'CKLayerOffsets']]],
   ['proj_5foutput_36',['proj_output',['../structCKLayerOffsets.html#a4b9708d80f644d75e1fcbb65b08263fd',1,'CKLayerOffsets']]],

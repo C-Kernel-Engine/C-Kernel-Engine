@@ -8,7 +8,7 @@ var attention__kernels_8c =
     [ "CK_MUSE_PREFILL_QUERY_TILE", "attention__kernels_8c.html#aa0b96241d79b08360d6225be3661c82c", null ],
     [ "CK_NOINLINE", "attention__kernels_8c.html#a3d95b3463c77064e6a98cf98c6ba49b6", null ],
     [ "CK_OPTNONE", "attention__kernels_8c.html#a54568b8be869568ed6759114f1e19693", null ],
-    [ "FLASH_QUERY_IMPL", "attention__kernels_8c.html#a686599872afcb86c5fc7ad5e5e5b4773", null ],
+    [ "FLASH_QUERY_IMPL", "attention__kernels_8c.html#ae4e864b6825d8425b69127a7e8d24c9e", null ],
     [ "FLASH_QUERY_IMPL", "attention__kernels_8c.html#a686599872afcb86c5fc7ad5e5e5b4773", null ],
     [ "FLASH_QUERY_IMPL_DECODE", "attention__kernels_8c.html#aba8a26d95a9c96411b5fea006f2097e4", null ],
     [ "RTLD_DEFAULT", "attention__kernels_8c.html#a58d13c5dcabbb85848fa97b446086247", null ],

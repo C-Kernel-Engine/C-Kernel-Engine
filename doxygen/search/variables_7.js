@@ -2,7 +2,7 @@ var searchData=
 [
   ['has_5fai_5faccel_0',['has_ai_accel',['../structck__capability__t.html#a9f5f0f74c73143705dc702efbee3a8d3',1,'ck_capability_t']]],
   ['has_5famx_1',['has_amx',['../structCPUInfo.html#ac41947b54c3a9b315338aee3113b5714',1,'CPUInfo']]],
-  ['has_5famx_5fbf16_2',['has_amx_bf16',['../structCPUInfo.html#a7983ac279a57f5d5992248d720452dfe',1,'CPUInfo::has_amx_bf16'],['../structCPUInfo.html#a30cb3045feb76257726fe2c7b469a070',1,'CPUInfo::has_amx_bf16']]],
+  ['has_5famx_5fbf16_2',['has_amx_bf16',['../structCPUInfo.html#a30cb3045feb76257726fe2c7b469a070',1,'CPUInfo::has_amx_bf16'],['../structCPUInfo.html#a7983ac279a57f5d5992248d720452dfe',1,'CPUInfo::has_amx_bf16']]],
   ['has_5famx_5fint8_3',['has_amx_int8',['../structCPUInfo.html#a0e15d7b296d77c9c495be6633285ad54',1,'CPUInfo::has_amx_int8'],['../structCPUInfo.html#a660af436345a21868c7c6f0160cd7513',1,'CPUInfo::has_amx_int8']]],
   ['has_5famx_5ftile_4',['has_amx_tile',['../structCPUInfo.html#a5ee89af0328fd68d00101afcd4072405',1,'CPUInfo::has_amx_tile'],['../structCPUInfo.html#ad5a579994982f5cee575bb9674abd238',1,'CPUInfo::has_amx_tile']]],
   ['has_5favx_5',['has_avx',['../structCPUInfo.html#a6981442ec8c03e3486d68e5011cbe02c',1,'CPUInfo::has_avx'],['../structCPUInfo.html#ac02376e5e445112e00ec31ff39f0bd17',1,'CPUInfo::has_avx']]],
@@ -24,7 +24,7 @@ var searchData=
   ['has_5fsse4_5f2_21',['has_sse4_2',['../structCPUInfo.html#ad3efc23f84451ced9b6085cb036ceb7d',1,'CPUInfo']]],
   ['has_5fvnni_22',['has_vnni',['../structCPUInfo.html#a2d0f8aabf38b410e7242db59a3ea63ae',1,'CPUInfo']]],
   ['head_23',['head',['../structCKMemPool.html#ac7919cceb17dccce7584f443a2f9eb4e',1,'CKMemPool']]],
-  ['head_5fdim_24',['head_dim',['../structCKLayerBackwardParams.html#ace4e73b166d2b71dba81099ff55f9c5f',1,'CKLayerBackwardParams::head_dim'],['../structCKLayerForwardParamsQ4K.html#a8f8ca9f6b17918a424041cc9003229e9',1,'CKLayerForwardParamsQ4K::head_dim'],['../structCKLayerForwardParams.html#a5aac19a779c176623a55fd48bb9502cf',1,'CKLayerForwardParams::head_dim'],['../structCKSectionConfig.html#a70a85143350acb4f082fd2664728e7e9',1,'CKSectionConfig::head_dim'],['../structCKBumpHeaderV5.html#ad0b6a32b8d1ed0f867e9c16c2d87d410',1,'CKBumpHeaderV5::head_dim'],['../structCKModelConfig.html#a97a73a9bfbe5b159083d6048c9cc4712',1,'CKModelConfig::head_dim']]],
+  ['head_5fdim_24',['head_dim',['../structCKModelConfig.html#a97a73a9bfbe5b159083d6048c9cc4712',1,'CKModelConfig::head_dim'],['../structCKBumpHeaderV5.html#ad0b6a32b8d1ed0f867e9c16c2d87d410',1,'CKBumpHeaderV5::head_dim'],['../structCKSectionConfig.html#a70a85143350acb4f082fd2664728e7e9',1,'CKSectionConfig::head_dim'],['../structCKLayerForwardParams.html#a5aac19a779c176623a55fd48bb9502cf',1,'CKLayerForwardParams::head_dim'],['../structCKLayerBackwardParams.html#ace4e73b166d2b71dba81099ff55f9c5f',1,'CKLayerBackwardParams::head_dim'],['../structCKLayerForwardParamsQ4K.html#a8f8ca9f6b17918a424041cc9003229e9',1,'CKLayerForwardParamsQ4K::head_dim']]],
   ['header_25',['header',['../structCKSection.html#adafbb43b1edb42a0adb1b97311b601a4',1,'CKSection']]],
   ['header_5fend_26',['header_end',['../structCKHeaderOffsets.html#acb634ce1abbf44e2ee2791e8a1d1817e',1,'CKHeaderOffsets']]],
   ['header_5foutput_27',['header_output',['../structCKHeaderOffsets.html#af6277b6a25c2312f49d22592e268dab0',1,'CKHeaderOffsets']]],

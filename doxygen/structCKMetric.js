@@ -5,5 +5,5 @@ var structCKMetric =
     [ "name", "structCKMetric.html#a113674774faddfa6441f1da3a19ffe92", null ],
     [ "s", "structCKMetric.html#a040a7d8ed259051d66391388ba7f3d56", null ],
     [ "type", "structCKMetric.html#ac7fc629fa6869ee876ee3cdb097ebd38", null ],
-    [ "value", "structCKMetric.html#ad0ca8343bf6c7d34f380835d0d7ec484", null ]
+    [ "value", "structCKMetric.html#a809ec57a627f735438dcaf732c0c8836", null ]
 ];

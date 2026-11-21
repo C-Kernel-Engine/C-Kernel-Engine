@@ -1,6 +1,6 @@
 var searchData=
 [
-  ['temperature_0',['temperature',['../structck__guided__flow__request.html#a671b2df880406dc2bdac9e0cbadb2a44',1,'ck_guided_flow_request::temperature'],['../structCKSessionGenerateRequestV8.html#aae79740b1fecc0445423d59cf5549021',1,'CKSessionGenerateRequestV8::temperature']]],
+  ['temperature_0',['temperature',['../structCKSessionGenerateRequestV8.html#aae79740b1fecc0445423d59cf5549021',1,'CKSessionGenerateRequestV8::temperature'],['../structck__guided__flow__request.html#a671b2df880406dc2bdac9e0cbadb2a44',1,'ck_guided_flow_request::temperature']]],
   ['text_1',['text',['../tokenizer_8h.html#a462f1390f421769e5f487370f8f21ee9',1,'text:&#160;tokenizer.h'],['../true__bpe_8h.html#a66c43cd207a5a3d05689fa20dd19ef66',1,'text:&#160;true_bpe.h']]],
   ['text_5flen_2',['text_len',['../true__bpe_8h.html#a888f9023ee38c1b409b124b34c084f55',1,'true_bpe.h']]],
   ['text_5fposition_3',['text_position',['../structCKSessionVisualInputV8.html#ae7c5a40df6f427a07eea397f4a2564bf',1,'CKSessionVisualInputV8']]],
@@ -17,7 +17,7 @@ var searchData=
   ['token_5fembed_14',['token_embed',['../structCKSection.html#ada852daa4974ccedece03be2d141d1b2',1,'CKSection']]],
   ['token_5fid_15',['token_id',['../structCKTrieNode.html#aa55f70549c1823d3325218b0b71a42b8',1,'CKTrieNode']]],
   ['token_5flen_16',['token_len',['../structCKVocabEntry.html#a667d73bdaec1e4affe0a3f5f397aba85',1,'CKVocabEntry']]],
-  ['tokens_17',['tokens',['../structCKLayerBackwardParams.html#a267b127c20c2f099f1b39e1bb618a2d1',1,'CKLayerBackwardParams::tokens'],['../structCKLayerForwardParamsQ4K.html#a70dcc9d69d068743233b527d879154b1',1,'CKLayerForwardParamsQ4K::tokens'],['../structCKLayerForwardParams.html#a9b2e8d95ad724035dc4ef7d8f2aeb2b8',1,'CKLayerForwardParams::tokens']]],
+  ['tokens_17',['tokens',['../structCKLayerForwardParams.html#a9b2e8d95ad724035dc4ef7d8f2aeb2b8',1,'CKLayerForwardParams::tokens'],['../structCKLayerBackwardParams.html#a267b127c20c2f099f1b39e1bb618a2d1',1,'CKLayerBackwardParams::tokens'],['../structCKLayerForwardParamsQ4K.html#a70dcc9d69d068743233b527d879154b1',1,'CKLayerForwardParamsQ4K::tokens']]],
   ['tokens_5fafter_18',['tokens_after',['../structCKSessionVisualInputV8.html#afd645e197ea711e0717bae8e227419b7',1,'CKSessionVisualInputV8']]],
   ['tokens_5fafter_5fcount_19',['tokens_after_count',['../structCKSessionVisualInputV8.html#a8042c847ffa54c6a1259679215c48d27',1,'CKSessionVisualInputV8']]],
   ['tokens_5fbefore_20',['tokens_before',['../structCKSessionVisualInputV8.html#adf8293dbacc3bcdd32321fd75082c2fd',1,'CKSessionVisualInputV8']]],
@@ -34,7 +34,7 @@ var searchData=
   ['total_5fvocab_5fbytes_31',['total_vocab_bytes',['../structCKBumpHeaderV5.html#ad4442506feb0743741ccc07af81a049d',1,'CKBumpHeaderV5']]],
   ['training_5fenabled_32',['training_enabled',['../structCKModel.html#a84832de4929055025d6634e18ceae38a',1,'CKModel']]],
   ['treat_5fwhitespace_5fas_5fsuffix_33',['treat_whitespace_as_suffix',['../structCKTokenizerConfig.html#a61cf1a1974d46e1da99c1c86f43fad4b',1,'CKTokenizerConfig']]],
-  ['type_34',['type',['../structMemorySlot.html#a2356cb4cf76513cf5ef48c8c2732b5aa',1,'MemorySlot::type'],['../structCKTokenizerConfig.html#adeee37aac61b482ef54dc4262852a035',1,'CKTokenizerConfig::type'],['../structCacheInfo.html#a2d480cc7cf9fcab61720174ffad45770',1,'CacheInfo::type'],['../structCKMetric.html#ac7fc629fa6869ee876ee3cdb097ebd38',1,'CKMetric::type']]],
+  ['type_34',['type',['../structCKMetric.html#ac7fc629fa6869ee876ee3cdb097ebd38',1,'CKMetric::type'],['../structCacheInfo.html#a2d480cc7cf9fcab61720174ffad45770',1,'CacheInfo::type'],['../structMemorySlot.html#a2356cb4cf76513cf5ef48c8c2732b5aa',1,'MemorySlot::type'],['../structCKTokenizerConfig.html#adeee37aac61b482ef54dc4262852a035',1,'CKTokenizerConfig::type']]],
   ['types_35',['types',['../structCKTokenizer.html#abb547a25be3e435baaaa4eb1047b5d56',1,'CKTokenizer::types'],['../true__bpe_8h.html#a7ae0f0acd2aa21012fd52ea4ba2f67d4',1,'types:&#160;true_bpe.h']]],
   ['types_5fsize_36',['types_size',['../structCKTokenizer.html#a121603ec2a9e2cbd377932d783dde05d',1,'CKTokenizer']]]
 ];
