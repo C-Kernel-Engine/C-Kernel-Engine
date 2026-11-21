@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Explicit sentence-chunked Ming trial using one resident native session."""
-import argparse,json,os,sys,time,wave
+import argparse,json,os,sys,tempfile,time,wave
 from pathlib import Path
 import numpy as np
 ROOT=Path(__file__).resolve().parents[3];sys.path.insert(0,str(ROOT))
@@ -12,6 +12,42 @@ def write_wav(path,audio,sample_rate):
     with wave.open(str(path),'wb') as f:
         f.setnchannels(1);f.setsampwidth(2);f.setframerate(sample_rate)
         f.writeframes((np.clip(audio,-1,1)*32767).astype('<i2').tobytes())
+
+def join_chunk_wavs(output, chunks, sample_rate):
+    """Assemble the published PCM from validated chunks using bounded memory."""
+    final = output / "paragraph.wav"
+    samples = sum(chunk["measurements"]["samples"] for chunk in chunks)
+    if not 0 < samples <= (2**32 - 36 - 1) // 2:
+        raise ValueError("assembled speech exceeds the PCM16 WAV size limit")
+    fd, temp_path = tempfile.mkstemp(prefix=".paragraph-", suffix=".wav", dir=output)
+    pending = Path(temp_path)
+    try:
+        with os.fdopen(fd, "wb") as file, wave.open(file, "wb") as writer:
+            writer.setnchannels(1)
+            writer.setsampwidth(2)
+            writer.setframerate(sample_rate)
+            writer.setnframes(samples)
+            for chunk in chunks:
+                path = output / f"chunk-{chunk['index']}.wav"
+                if digest(path) != chunk["wav_sha256"]:
+                    raise ValueError(f"chunk integrity check failed: {path.name}")
+                with wave.open(str(path), "rb") as reader:
+                    remaining = chunk["measurements"]["samples"]
+                    if (reader.getnchannels(), reader.getsampwidth(),
+                        reader.getframerate(), reader.getnframes()) != (1, 2, sample_rate, remaining):
+                        raise ValueError(f"chunk WAV format or sample count differs: {path.name}")
+                    while remaining:
+                        count = min(remaining, 32_768)
+                        pcm = reader.readframes(count)
+                        if len(pcm) != count * 2:
+                            raise ValueError(f"truncated PCM: {path.name}")
+                        writer.writeframesraw(pcm)
+                        remaining -= count
+        pending.replace(final)
+    finally:
+        pending.unlink(missing_ok=True)
+    return samples
+
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
@@ -38,7 +74,7 @@ def main():
         start=time.monotonic();session=NativeMingSession(args.checkpoint,args.output/'native',capacity=args.capacity,max_frames=args.max_frames,cached_backbone=True)
         report.update(load_seconds=time.monotonic()-start,artifacts=session.identities,execution_descriptor_sha256=session.plan['descriptor_sha256']);save()
         if any(len(ids)+session.plan['minimum_frames']-1>session.plan['capacity'] for ids in tokens):raise ValueError('a sentence exceeds prompt capacity')
-        pieces=[];last_progress=[0.]
+        last_progress=[0.]
         for index,((a,b),ids) in enumerate(zip(spans,tokens)):
             report['active_chunk']=index;report['chunks'].append({'index':index,'source_start':a,'source_end':b,'token_ids':ids,'status':'RUNNING'});save()
             def progress():
@@ -49,9 +85,9 @@ def main():
             audio,measurements,latents=session.synthesize(ids,seed=731+index,should_cancel=progress)
             write_wav(args.output/f'chunk-{index}.wav',audio,session.plan['sample_rate']);np.save(args.output/f'latents-{index}.npy',latents)
             report['chunks'][-1].update(status='GENERATED_NOT_CERTIFIED',measurements=measurements,wav_sha256=digest(args.output/f'chunk-{index}.wav'))
-            pieces.append(audio);save()
-        joined=np.concatenate(pieces);write_wav(args.output/'paragraph.wav',joined,session.plan['sample_rate'])
-        report.update(status='GENERATED_NOT_CERTIFIED',active_chunk=None,samples=len(joined),audio_seconds=len(joined)/session.plan['sample_rate'],
+            save()
+        samples = join_chunk_wavs(args.output, report["chunks"], session.plan["sample_rate"])
+        report.update(status='GENERATED_NOT_CERTIFIED',active_chunk=None,samples=samples,audio_seconds=samples/session.plan['sample_rate'],
             join_policy='ordered direct sample concatenation; no invented overlap or omitted samples',wav_sha256=digest(args.output/'paragraph.wav'));save()
     except (CancelledSynthesis,KeyboardInterrupt) as exc:report.update(status='CANCELLED',error=str(exc));save();raise
     except IncompleteSynthesis as exc:report.update(status='INCOMPLETE',error=str(exc));save();raise

@@ -280,6 +280,28 @@ for this provider.</p>
 <pre>python3 -m pytest -q tests/test_v8_linear_rows_oracle.py tests/test_v8_ming3_dit.py \
   tests/test_v8_ming3_runtime_audio_decoder.py tests/test_v8_kokoro_generated_projection.py \
   tests/test_v8_qwen3_tts_runtime_prompt_first_block.py</pre>
+<h2>Long text and final WAV assembly</h2>
+<p>The paragraph runner writes each completed chunk to disk. It assembles the final
+WAV in bounded PCM blocks after all chunks have completed and checks each chunk's
+hash, format and valid sample count. The completed WAV appears via atomic rename.
+A failed chunk leaves its evidence available for inspection and the run report
+carries the failure or incomplete status.</p>
+<p>Kokoro's HTTP service checks the pinned text planner before creating a ready
+native worker. Deploy both the checked configuration and Python frontend
+dependencies from persistent storage. The native worker alone cannot verify the
+text frontend.</p>
+<p>A P3 trial used the full 116-word body of
+<a href="https://www.shivasnotes.com/blog/5818/Recovering-...">Recovering ...</a>.
+Ming generated all seven sentence spans and assembled 44.32 seconds of audio.
+Generation and decoding took 536.3 seconds, excluding 21.0 seconds of model
+preparation. The final PCM matched the exact ordered chunk concatenation.
+A separate Kokoro HTTP trial returned 25 chunks and 53.28 seconds of audio in
+126.8 seconds, with the first chunk received after 11.2 seconds. Its input
+removed three replacement glyphs from the page; the article's words were retained.
+These runs used different speech paths and are not a matched kernel benchmark.
+Whisper readback was non-exact for both paths. Human listening remains
+unmeasured. The tested Qwen TTS session rejected the 151-token article against
+its 16-token runtime prompt capacity.</p>
 <h2>Kernel and circuit work still required</h2>
 <table><thead><tr><th>Component</th><th>Reuse candidates</th><th>Remaining gate</th></tr></thead><tbody>
 <tr><td>Qwen2.5 backbone</td><td>Linear projections, RMSNorm, RoPE, attention, KV</td><td>Connected prompt/weight mapping and cached continuation tested; artifact-specific BF16 parity remains</td></tr>
