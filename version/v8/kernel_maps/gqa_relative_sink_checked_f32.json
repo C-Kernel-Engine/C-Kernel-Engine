@@ -1,0 +1,378 @@
+{
+  "id": "gqa_relative_sink_checked_f32",
+  "op": "gqa_relative_sink_checked",
+  "operation_interface": "attention.gqa.relative_band_sink.checked.fp32.v1",
+  "variant": "ordered_fp64_online_softmax",
+  "selection": {
+    "status": "candidate",
+    "priority": 100,
+    "equivalence_group": "attention.gqa.relative_band_sink.checked.fp32.v1",
+    "phases": [
+      "prefill",
+      "decode"
+    ]
+  },
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "weights": [],
+  "dims": [
+    "T",
+    "H",
+    "KV",
+    "D",
+    "S",
+    "B"
+  ],
+  "inputs": [
+    {
+      "name": "query",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "H",
+        "D"
+      ],
+      "layout": "token_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "key",
+      "dtype": "fp32",
+      "shape": [
+        "KV",
+        "S",
+        "D"
+      ],
+      "layout": "head_major_capacity_stride",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "value",
+      "dtype": "fp32",
+      "shape": [
+        "KV",
+        "S",
+        "D"
+      ],
+      "layout": "head_major_capacity_stride",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "relative",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "H",
+        "B"
+      ],
+      "layout": "token_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "sink",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "H"
+      ],
+      "layout": "token_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "output",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "H",
+        "D"
+      ],
+      "layout": "token_major_contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "scratch": [
+    {
+      "name": "accumulator",
+      "dtype": "fp64",
+      "shape": [
+        "D"
+      ],
+      "size_bytes": "8 * D",
+      "size_resolution": "required",
+      "lifetime": "kernel_call",
+      "alignment": 64,
+      "layout": "contiguous",
+      "access": "read_write",
+      "storage_class": "scratch",
+      "consumption": "required"
+    }
+  ],
+  "impl": {
+    "function": "ck_gqa_relative_sink_checked_f32",
+    "sources": [
+      "src/kernels/gqa_relative_sink_checked.c"
+    ],
+    "c_declaration": "int ck_gqa_relative_sink_checked_f32(const float *query, size_t query_elements, const float *key, size_t key_elements, const float *value, size_t value_elements, const float *relative, size_t relative_elements, const float *sink, size_t sink_elements, float *output, size_t output_elements, double *work, size_t work_elements, size_t tokens, size_t heads, size_t kv_heads, size_t dim, size_t capacity, size_t position, size_t relative_extent, size_t window);"
+  },
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "query",
+        "source": "activation:query",
+        "cast": "const float*",
+        "ports": [
+          "input:query"
+        ]
+      },
+      {
+        "name": "query_elements",
+        "source": "runtime:query_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "key",
+        "source": "activation:key",
+        "cast": "const float*",
+        "ports": [
+          "input:key"
+        ]
+      },
+      {
+        "name": "key_elements",
+        "source": "runtime:key_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "value",
+        "source": "activation:value",
+        "cast": "const float*",
+        "ports": [
+          "input:value"
+        ]
+      },
+      {
+        "name": "value_elements",
+        "source": "runtime:value_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "relative",
+        "source": "activation:relative",
+        "cast": "const float*",
+        "ports": [
+          "input:relative"
+        ]
+      },
+      {
+        "name": "relative_elements",
+        "source": "runtime:relative_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "sink",
+        "source": "activation:sink",
+        "cast": "const float*",
+        "ports": [
+          "input:sink"
+        ]
+      },
+      {
+        "name": "sink_elements",
+        "source": "runtime:sink_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "output",
+        "source": "output:output",
+        "cast": "float*",
+        "ports": [
+          "output:output"
+        ]
+      },
+      {
+        "name": "output_elements",
+        "source": "runtime:output_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "work",
+        "source": "scratch:accumulator",
+        "cast": "double*"
+      },
+      {
+        "name": "work_elements",
+        "source": "runtime:work_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "tokens",
+        "source": "runtime:tokens",
+        "value_type": "size_t"
+      },
+      {
+        "name": "heads",
+        "source": "runtime:heads",
+        "value_type": "size_t"
+      },
+      {
+        "name": "kv_heads",
+        "source": "runtime:kv_heads",
+        "value_type": "size_t"
+      },
+      {
+        "name": "dim",
+        "source": "runtime:dim",
+        "value_type": "size_t"
+      },
+      {
+        "name": "capacity",
+        "source": "runtime:capacity",
+        "value_type": "size_t"
+      },
+      {
+        "name": "position",
+        "source": "runtime:position",
+        "value_type": "size_t"
+      },
+      {
+        "name": "relative_extent",
+        "source": "runtime:relative_extent",
+        "value_type": "size_t"
+      },
+      {
+        "name": "window",
+        "source": "runtime:window",
+        "value_type": "size_t"
+      }
+    ]
+  },
+  "call_constant_contract": {
+    "shape_symbols": {
+      "T": "tokens",
+      "H": "heads",
+      "KV": "kv_heads",
+      "D": "dim",
+      "S": "capacity",
+      "B": "relative_extent"
+    },
+    "buffer_spans": [
+      {
+        "pointer": "query",
+        "elements": "query_elements",
+        "rows": 1,
+        "width": "query_elements",
+        "element_bytes": 4,
+        "exact_elements_product": [
+          "tokens",
+          "heads",
+          "dim"
+        ]
+      },
+      {
+        "pointer": "output",
+        "elements": "output_elements",
+        "rows": 1,
+        "width": "output_elements",
+        "element_bytes": 4,
+        "exact_elements_product": [
+          "tokens",
+          "heads",
+          "dim"
+        ]
+      },
+      {
+        "pointer": "key",
+        "elements": "key_elements",
+        "rows": 1,
+        "width": "key_elements",
+        "element_bytes": 4,
+        "exact_elements_product": [
+          "kv_heads",
+          "capacity",
+          "dim"
+        ]
+      },
+      {
+        "pointer": "value",
+        "elements": "value_elements",
+        "rows": 1,
+        "width": "value_elements",
+        "element_bytes": 4,
+        "exact_elements_product": [
+          "kv_heads",
+          "capacity",
+          "dim"
+        ]
+      },
+      {
+        "pointer": "relative",
+        "elements": "relative_elements",
+        "rows": 1,
+        "width": "relative_elements",
+        "element_bytes": 4,
+        "exact_elements_product": [
+          "tokens",
+          "heads",
+          "relative_extent"
+        ]
+      },
+      {
+        "pointer": "sink",
+        "elements": "sink_elements",
+        "rows": 1,
+        "width": "sink_elements",
+        "element_bytes": 4,
+        "exact_elements_product": [
+          "tokens",
+          "heads"
+        ]
+      },
+      {
+        "pointer": "work",
+        "elements": "work_elements",
+        "rows": 1,
+        "width": "work_elements",
+        "element_bytes": 8,
+        "exact_elements_product": [
+          "dim"
+        ]
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "tests/test_v8_inkling2_mini_relative_attention.py"
+    ],
+    "oracle": "Independent dense masked softmax including zero-value sink"
+  },
+  "notes": "Causal and optionally windowed grouped-query attention with a bounded relative bias band and per-query zero-value sink. Reads a non-evicting cache from absolute position zero. Uses ordered FP64 online softmax and caller-owned scratch."
+}

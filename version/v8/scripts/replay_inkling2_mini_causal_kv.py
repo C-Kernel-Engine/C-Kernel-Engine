@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 
 from version.v8.scripts.build_inkling2_mini_projection_circuit import (  # noqa: E402
-    SOURCE_REVISION, TRANSFORMERS_REVISION, LAYER, causal_kv_replay,
+    SOURCE_REVISION, TRANSFORMERS_REVISION, LAYER, causal_kv_replay, relative_attention_replay,
 )
 from version.v8.scripts.checked_circuit_authoring_v8 import declared_f32_weight_shapes  # noqa: E402
 from version.v8.scripts.compile_checked_bundle_v8 import compile_declared_f32_graph  # noqa: E402
@@ -33,6 +33,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--header", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--attention", action="store_true",
+                        help="connect scoped relative-bias and sink attention to the stored K/V")
     args = parser.parse_args()
     header = args.header.read_bytes()
     if digest(header) != HEADER_HASH:
@@ -50,17 +52,24 @@ def main():
         "slots": [6, 24, 36], "prefill_tokens": 8, "append_tokens": 1, "seed": 491,
         "weights": {}, "comparisons": {},
     }
+    builder = relative_attention_replay if args.attention else causal_kv_replay
+    if args.attention:
+        report["scope"] += "; connected attention with supplied Q and sink plus a band from the publisher's bias table"
     target = args.output / "report.json"
     rng = np.random.default_rng(report["seed"])
     try:
-        split_graph = causal_kv_replay()
+        split_graph = builder()
         weights = {}
         for name, shape in declared_f32_weight_shapes(split_graph).items():
             source_shape = [shape[0], 1, shape[1]] if name.endswith("_sconv.weight") else shape
             weight, report["weights"][name] = read_bf16(header, name, source_shape)
             weights[name] = weight.reshape(shape)
         bundles, identities = {}, {}
-        for key, graph in (("split", split_graph), ("full", causal_kv_replay(prefill_tokens=9))):
+        if args.attention:
+            name = LAYER + "attn.rel_logits_proj.proj"
+            bias_table, report["weights"][name] = read_bf16(header, name, [16, 1024])
+        query_inputs = {}
+        for key, graph in (("split", split_graph), ("full", builder(prefill_tokens=9))):
             path = args.output / key
             path.mkdir()
             bundles[key] = compile_declared_f32_graph(path, graph, weights)
@@ -97,6 +106,16 @@ def main():
                 else:
                     scale = torch.rsqrt(heads.square().mean(dim=-1, keepdim=True) + 1e-6)
                 oracle_cache[slot, kind] = (heads * scale).transpose(0, 1).numpy()
+            if args.attention:
+                query = rng.standard_normal((9, 24, 128), dtype=np.float32) * 0.2
+                relative_state = rng.standard_normal((9, 24, 16), dtype=np.float32) * 0.2
+                band = torch.from_numpy(relative_state) @ torch.from_numpy(bias_table)
+                sinks = rng.standard_normal((9, 24), dtype=np.float32)
+                query_inputs[slot] = (query, band, sinks)
+                for name, data in (("query", query), ("relative_band", band.numpy()), ("sink", sinks)):
+                    split_view(f"inkling2_prefill_slot{slot}_{name}")[:] = data[:8]
+                    split_view(f"inkling2_append_slot{slot}_{name}")[:] = data[8:]
+                    full_view(f"inkling2_prefill_slot{slot}_{name}")[:] = data
             run(bundles["full"], "prefill", slot)
             run(bundles["split"], "prefill", slot)
             for kind in ("k", "v"):
@@ -138,7 +157,32 @@ def main():
                     "oracle_cache_max_abs": float(abs(cache - oracle_cache[slot, kind]).max()),
                     "oracle_max_abs": float(abs(output - oracle[slot, kind]).max()),
                 }
-        report["status"] = "PASS_CAUSAL_KV_COMPONENT"
+        if args.attention:
+            report["attention"] = {}
+            positions = torch.arange(9)
+            distance = positions[:, None] - positions[None, :]
+            for slot in report["slots"]:
+                before = split_view(f"inkling2_prefill_slot{slot}_attention")
+                after = split_view(f"inkling2_append_slot{slot}_attention")
+                full = full_view(f"inkling2_prefill_slot{slot}_attention")
+                split_output = np.concatenate((before, after))
+                if split_output.tobytes() != full.tobytes():
+                    raise ValueError(f"split attention changed output in slot {slot}")
+                query, band, sinks = query_inputs[slot]
+                key = torch.from_numpy(oracle_cache[slot, "k"]).repeat_interleave(3, dim=0)
+                value = torch.from_numpy(oracle_cache[slot, "v"]).repeat_interleave(3, dim=0)
+                score = torch.einsum("thd,hsd->ths", torch.from_numpy(query), key) / np.sqrt(128)
+                bias = band.gather(-1, distance.clamp(min=0)[:, None, :].expand(-1, 24, -1))
+                score = (score + bias).masked_fill(distance[:, None, :] < 0, -torch.inf)
+                probs = torch.cat((score, torch.from_numpy(sinks).unsqueeze(-1)), dim=-1)
+                probs = torch.softmax(probs, dim=-1)[..., :-1]
+                expected = torch.einsum("ths,hsd->thd", probs, value).numpy()
+                np.testing.assert_allclose(split_output, expected, rtol=2e-5, atol=8e-6)
+                report["attention"][slot] = {
+                    "split_exact": True,
+                    "oracle_max_abs": float(abs(split_output - expected).max()),
+                }
+        report["status"] = "PASS_CACHED_ATTENTION_COMPONENT" if args.attention else "PASS_CAUSAL_KV_COMPONENT"
     except Exception as error:
         report.update(status="FAIL", error=str(error))
         raise
