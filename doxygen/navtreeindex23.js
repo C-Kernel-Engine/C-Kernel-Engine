@@ -1,5 +1,6 @@
 var NAVTREEINDEX23 =
 {
+"structCKSessionConfigV8.html#adddfa06e356784ee8dc61967f1766fbd":[1,0,70,0],
 "structCKSessionConfigV8.html#aff2a54ae49d9384bce0b3cddae97a252":[1,0,70,2],
 "structCKSessionGenerateRequestV8.html":[1,0,71],
 "structCKSessionGenerateRequestV8.html#a24a2da51c5349c60b20a08880423a688":[1,0,71,2],
@@ -248,6 +249,5 @@ var NAVTREEINDEX23 =
 "structPCIeDevice.html#a3acd9044981a0acf21e4bbad490782b0":[1,0,93,14],
 "structPCIeDevice.html#a3c9a5d7185811db52d5443d767c155e7":[1,0,93,2],
 "structPCIeDevice.html#a492fb416b29956d0442ec47c57c3f091":[1,0,93,6],
-"structPCIeDevice.html#a7179511c6502936e503a2ff80dcf464d":[1,0,93,4],
-"structPCIeDevice.html#a8119bb375e580a3302f3110f689fc213":[1,0,93,12]
+"structPCIeDevice.html#a7179511c6502936e503a2ff80dcf464d":[1,0,93,4]
 };

@@ -6645,7 +6645,7 @@ test_attention.py::TestAttentionForward::test_flash_decode</p>
 
 
 <details open>
-    <summary>Sigmoid Activation (28)</summary>
+    <summary>Sigmoid Activation (29)</summary>
     <div class="accordion-content">
 
 
@@ -6928,12 +6928,22 @@ test_attention.py::TestAttentionForward::test_flash_decode</p>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">sigmoid_topk_router_checked_f32</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int sigmoid_topk_router_checked_f32(const float * logits, size_t logits_elements, const float * bias, size_t bias_elements, int32_t * indices, size_t indices_elements, float * weights, size_t weights_elements, size_t rows, size_t experts, size_t top_k, float route_scale)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
     </div>
 </details>
 
 
 <details open>
-    <summary>SwiGLU Activation (78)</summary>
+    <summary>SwiGLU Activation (80)</summary>
     <div class="accordion-content">
 
 
@@ -7613,6 +7623,26 @@ test_attention.py::TestAttentionForward::test_flash_decode</p>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">size_t moe_swiglu_shared_q8_0_gated_workspace_bytes(int hidden_dim, int intermediate_dim)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">softcapped_swiglu</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">float softcapped_swiglu(float gate, float up, float gate_cap, float up_cap)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">softcapped_swiglu_rows_checked_f32</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int softcapped_swiglu_rows_checked_f32(const float * gate, size_t gate_elements, const float * up, size_t up_elements, float * output, size_t output_elements, size_t elements, float gate_cap, float up_cap)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 

@@ -1,5 +1,6 @@
 var NAVTREEINDEX21 =
 {
+"structCKKokoroShapeV8.html#af82a7ac64f96c0db649cc3b216b3c2f2":[1,0,45,1],
 "structCKLayerBackwardParams.html":[1,0,46],
 "structCKLayerBackwardParams.html#a023a1e75829f8f420e35838f7384c3a3":[1,0,46,19],
 "structCKLayerBackwardParams.html#a0a43398737b3990bce0677aedddd310c":[1,0,46,10],
@@ -248,6 +249,5 @@ var NAVTREEINDEX21 =
 "structCKLayerOffsets.html#a4bb907fd60ba2d980d91b4af199671ce":[1,0,51,18],
 "structCKLayerOffsets.html#a4f2f21241cc69041cc62d5ae1c9f8c14":[1,0,51,21],
 "structCKLayerOffsets.html#a52f48fdcdf2b539423f0313b5cab029e":[1,0,51,24],
-"structCKLayerOffsets.html#a599bdd7039ffc353f5302c9c6fa287b4":[1,0,51,33],
-"structCKLayerOffsets.html#a5a50122740389c57c4c993f2aa470e4c":[1,0,51,40]
+"structCKLayerOffsets.html#a599bdd7039ffc353f5302c9c6fa287b4":[1,0,51,33]
 };

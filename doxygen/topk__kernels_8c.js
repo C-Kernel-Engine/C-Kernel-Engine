@@ -9,6 +9,7 @@ var topk__kernels_8c =
     [ "moe_softmax_topk_router_pytorch_bf16_workspace", "topk__kernels_8c.html#aef6f6d076d35008ec1e385829b11d92f", null ],
     [ "moe_softmax_topk_router_workspace_bytes", "topk__kernels_8c.html#aa39a6196baec8d9bf9e3eeca3687c41c", null ],
     [ "nemotron_group_limited_topk_router_f32", "topk__kernels_8c.html#ab9b2fb1513e1e2f6ac7637be48021ff1", null ],
+    [ "sigmoid_topk_router_checked_f32", "topk__kernels_8c.html#a0c870763edbf064894ac684abc820ed1", null ],
     [ "speculative_commit_one_i32", "topk__kernels_8c.html#ae9070cfb82f7058378d853e59fddc89c", null ],
     [ "speculative_verify_greedy_f32", "topk__kernels_8c.html#add5a945b527fa38fbc30c72bf93cae1c", null ],
     [ "topk_batched_f32", "topk__kernels_8c.html#a3ced6292072f7fb17630a298120e04d2", null ],
