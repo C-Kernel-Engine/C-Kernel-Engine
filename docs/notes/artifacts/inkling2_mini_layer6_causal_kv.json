@@ -1,0 +1,123 @@
+{
+  "status": "PASS_CAUSAL_KV_COMPONENT",
+  "source_revision": "ed40e7da625f594fc9c4990f5f66be24873c22d7",
+  "transformers_revision": "046bdb8cc2cee29d233964bb77fe6fd37cfe4aa3",
+  "header_sha256": "4b1fa8297cb1a0f6484c707bef69e7f0f81d08325ccf2c5b25b86d528f64acf2",
+  "scope": "Layer 6 K/V projections and static residual convolution and normalized KV storage, isolated FP32 with supplied synthetic rows",
+  "oracle": "PyTorch 2.12.1+cpu eager FP32 linear, grouped conv1d and per-head norms",
+  "slots": [
+    6,
+    24,
+    36
+  ],
+  "prefill_tokens": 8,
+  "append_tokens": 1,
+  "seed": 491,
+  "weights": {
+    "model.llm.layers.6.attn.wk_dv.weight": {
+      "raw_bf16_sha256": "2d79a10075978f0327152a22e20238c4f814402bfb587fa94658ce38248ac4c1",
+      "bytes": 4718592,
+      "source_shape": [
+        1024,
+        2304
+      ],
+      "shard_byte_range_inclusive": [
+        2070281568,
+        2075000159
+      ]
+    },
+    "model.llm.layers.6.attn.k_sconv.weight": {
+      "raw_bf16_sha256": "cfdb1207102d3f5a41b88f292411fa2d8ecea936ecfe5f69e8e0c5219fc96438",
+      "bytes": 8192,
+      "source_shape": [
+        1024,
+        1,
+        4
+      ],
+      "shard_byte_range_inclusive": [
+        2070225504,
+        2070233695
+      ]
+    },
+    "model.llm.layers.6.attn.wv_dv.weight": {
+      "raw_bf16_sha256": "54827d4d957ea7b3e6177f72c92e071a9aa7d1e9434b1a556bf79961243bdaf2",
+      "bytes": 4718592,
+      "source_shape": [
+        1024,
+        2304
+      ],
+      "shard_byte_range_inclusive": [
+        2105081184,
+        2109799775
+      ]
+    },
+    "model.llm.layers.6.attn.v_sconv.weight": {
+      "raw_bf16_sha256": "f87495873866a7a66c9b89fade4e682b420061325264f1425fe5e277d3d4c7c1",
+      "bytes": 8192,
+      "source_shape": [
+        1024,
+        1,
+        4
+      ],
+      "shard_byte_range_inclusive": [
+        2070273376,
+        2070281567
+      ]
+    }
+  },
+  "comparisons": {
+    "36_k": {
+      "split_exact": true,
+      "history_exact": true,
+      "stored_kv_exact": true,
+      "oracle_cache_max_abs": 7.152557373046875e-07,
+      "oracle_max_abs": 7.152557373046875e-07
+    },
+    "36_v": {
+      "split_exact": true,
+      "history_exact": true,
+      "stored_kv_exact": true,
+      "oracle_cache_max_abs": 2.86102294921875e-06,
+      "oracle_max_abs": 6.556510925292969e-07
+    },
+    "6_k": {
+      "split_exact": true,
+      "history_exact": true,
+      "stored_kv_exact": true,
+      "oracle_cache_max_abs": 8.344650268554688e-07,
+      "oracle_max_abs": 8.344650268554688e-07
+    },
+    "6_v": {
+      "split_exact": true,
+      "history_exact": true,
+      "stored_kv_exact": true,
+      "oracle_cache_max_abs": 2.384185791015625e-06,
+      "oracle_max_abs": 4.76837158203125e-07
+    },
+    "24_k": {
+      "split_exact": true,
+      "history_exact": true,
+      "stored_kv_exact": true,
+      "oracle_cache_max_abs": 7.152557373046875e-07,
+      "oracle_max_abs": 7.152557373046875e-07
+    },
+    "24_v": {
+      "split_exact": true,
+      "history_exact": true,
+      "stored_kv_exact": true,
+      "oracle_cache_max_abs": 2.384185791015625e-06,
+      "oracle_max_abs": 3.725290298461914e-07
+    }
+  },
+  "builds": {
+    "split": {
+      "build_identity_sha256": "2c70d569c6b8bdf7a14bb5c6da9bc6dad30d30b2ca029ba8194acbf75f0a625a",
+      "generated_library_sha256": "3d07e8ac860375ab18803b924a2d13614777bac6902562b7ca0d9511b4dfac60"
+    },
+    "full": {
+      "build_identity_sha256": "5fda4a9d9abf89ad598c2b1d642ebc61b5e91f4d56f88a9c6b21b69a74aa83e4",
+      "generated_library_sha256": "424cd5711b556ec778603241f8ab6c7753baee7700573418d7735467805409b7"
+    }
+  },
+  "wrong_slot_max_abs": 3.2515640258789062
+}

@@ -97,3 +97,83 @@ def controller_gates(tokens=8, width=2304, rank=64):
             }},
         })
     return _graph("controller_gates", tokens, width, shapes, ops)
+
+
+def causal_kv_replay(prefill_tokens=8, width=2304, kv_width=1024, taps=4,
+                     slots=(6, 24, 36), kv_heads=8, key_clip=22.627416997969522):
+    """K/V projections with independent caller-owned convolution histories."""
+    if type(taps) is not int or not 2 <= taps <= 256:
+        raise ValueError("unsupported convolution tap count")
+    if not slots or len(set(slots)) != len(slots) or any(type(s) is not int or s < 0 for s in slots):
+        raise ValueError("each pass needs an independent state slot")
+
+    if type(kv_heads) is not int or kv_heads < 1 or kv_width % kv_heads:
+        raise ValueError("K/V widths must partition into whole heads")
+    dim = kv_width // kv_heads
+    capacity = prefill_tokens + 1
+    ops, shapes, segments, state_buffers = [], {}, [], []
+    for slot in slots:
+        for kind in ("k", "v"):
+            history = f"history_{kind}_{slot}"
+            shapes[history] = [taps - 1, kv_width]
+            cache = f"cache_{kind}_{slot}"
+            shapes[cache] = [kv_heads, capacity, dim]
+            state_buffers.extend((history, cache))
+        for phase, rows in (("prefill", prefill_tokens), ("append", 1)):
+            entry = f"inkling2_{phase}_slot{slot}"
+            for kind in ("k", "v"):
+                source, projection, output = (f"{entry}_{kind}_{suffix}" for suffix in
+                                             ("input", "projection", "output"))
+                history = f"history_{kind}_{slot}"
+                shapes[source] = [rows, width]
+                shapes[projection] = shapes[output] = [rows, kv_width]
+                ops.append(_project(projection, "external:" + source, width, kv_width, rows,
+                                    f"attn.w{kind}_dv.weight"))
+                ops.append({
+                    "id": output, "op": "causal_depthwise_residual_checked",
+                    "kernel": "causal_depthwise_residual_checked_f32", "returns_status": True,
+                    "graph_slots": {
+                        "inputs": {"input": projection, "history": "external:" + history},
+                        "outputs": {"output": output, "history": "external:" + history},
+                    },
+                    "weight_refs": {"weight": LAYER + f"attn.{kind}_sconv.weight"},
+                    "params": {
+                        "T": rows, "C": kv_width, "K": taps, "H": taps - 1, "N": kv_width,
+                        "call_constants": {
+                            "input_elements": rows * kv_width, "weight_elements": taps * kv_width,
+                            "history_elements": (taps - 1) * kv_width, "output_elements": rows * kv_width,
+                            "tokens": rows, "channels": kv_width, "taps": taps, "history_rows": taps - 1,
+                        },
+                    },
+                })
+            commit = f"{entry}_commit_kv"
+            cache_bindings = {f"cache_{kind}": f"external:cache_{kind}_{slot}" for kind in ("k", "v")}
+            ops.append({
+                "id": commit, "op": "kv_cache_l2_rms_append_checked", "kernel": "kv_cache_l2_rms_append_checked_f32",
+                "returns_status": True,
+                "graph_slots": {
+                    "inputs": {"k": f"{entry}_k_output", "v": f"{entry}_v_output", **cache_bindings},
+                    "outputs": cache_bindings,
+                },
+                "params": {"T": rows, "KV": kv_heads, "D": dim, "S": capacity,
+                           "key_clip": key_clip, "epsilon": 1e-6, "call_constants": {
+                    "key_elements": rows * kv_width, "value_elements": rows * kv_width,
+                    "k_cache_elements": capacity * kv_width, "v_cache_elements": capacity * kv_width,
+                    "tokens": rows, "heads": kv_heads, "dim": dim, "capacity": capacity,
+                    "position": 0 if phase == "prefill" else prefill_tokens,
+                }},
+            })
+            segments.append({"function": f"ck_{entry}", "last_op": commit})
+    graph = _graph("causal_kv", prefill_tokens, width, shapes, ops)
+    scope = graph["contract"]["runtime_invariants"]
+    scope["scope"] = "supplied K/V input rows through FP32 projection, static convolution, normalization and KV storage"
+    scope["state_slots"] = list(slots)
+    graph["native_entry"]["segments"] = segments
+    for buffer in state_buffers:
+        graph["activation_buffers"][buffer]["lifetime"] = "sequence"
+    exports = graph["semantic_checkpoints"]["exports"]
+    for segment in segments:
+        # Cache writes use the explicit state buffers, rather than a tensor
+        # named after the operation. Compare their logical extents in replay.
+        del exports[segment["last_op"]]
+    return graph

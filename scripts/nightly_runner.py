@@ -1350,6 +1350,11 @@ TEST_SUITES = {
         ROOT / "tests" / "test_v8_inkling2_mini_audit.py",
         unittest_targets=("tests.test_v8_inkling2_mini_audit",),
     ),
+    "inkling2_mini_causal_kv": TestSuite(
+        "Inkling 2 Mini Generated K/V Continuation and Slot Isolation", "inference",
+        ROOT / "tests" / "test_v8_inkling2_mini_causal_kv.py",
+        unittest_targets=("tests.test_v8_inkling2_mini_causal_kv",),
+    ),
     "inkling2_mini_generated_projections": TestSuite(
         "Inkling 2 Mini Generated Layer-6 Projection Replay", "inference",
         ROOT / "tests" / "test_v8_inkling2_mini_projections.py",

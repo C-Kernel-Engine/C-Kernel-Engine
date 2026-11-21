@@ -2127,6 +2127,17 @@ OP_DATAFLOW = {
         "inputs": {"q": "external:q", "k": "external:k", "v": "external:v"},
         "outputs": {"out": {"slot": "attention_output", "dtype": "fp32"}},
     },
+    "causal_depthwise_residual_checked": {
+        "inputs": {"input": "external:input", "history": "external:history"},
+        "outputs": {"output": {"slot": "convolved", "dtype": "fp32"},
+                    "history": {"slot": "history", "dtype": "fp32"}},
+    },
+    "kv_cache_l2_rms_append_checked": {
+        "inputs": {"k": "external:k", "v": "external:v",
+                   "cache_k": "external:cache_k", "cache_v": "external:cache_v"},
+        "outputs": {"cache_k": {"slot": "cache_k", "dtype": "fp32"},
+                    "cache_v": {"slot": "cache_v", "dtype": "fp32"}},
+    },
     "kv_cache_seed_checked": {
         "inputs": {"k": "external:k", "v": "external:v",
                    "cache_k": "external:cache_k", "cache_v": "external:cache_v"},
@@ -5335,6 +5346,8 @@ TEMPLATE_TO_KERNEL_OP = {
     "silu_mul_rows_checked": "silu_mul_rows_checked",
     "rope_qk_bounded": "rope_qk_bounded",
     "attention_causal_bounded": "attention_causal_bounded",
+    "causal_depthwise_residual_checked": "causal_depthwise_residual_checked",
+    "kv_cache_l2_rms_append_checked": "kv_cache_l2_rms_append_checked",
     "kv_cache_seed_checked": "kv_cache_seed_checked",
     "attention_decode_append_checked": "attention_decode_append_checked",
     "attention_sliding_bounded": "attention_sliding_bounded",
