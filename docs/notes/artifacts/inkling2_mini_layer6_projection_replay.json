@@ -1,0 +1,199 @@
+{
+  "status": "PASS_COMPONENT_REPLAY",
+  "checkpoint_revision": "ed40e7da625f594fc9c4990f5f66be24873c22d7",
+  "transformers_source_revision": "046bdb8cc2cee29d233964bb77fe6fd37cfe4aa3",
+  "header_sha256": "4b1fa8297cb1a0f6484c707bef69e7f0f81d08325ccf2c5b25b86d528f64acf2",
+  "shard": "model-00001-of-00001.safetensors",
+  "scope": "real BF16 weights expanded to FP32; synthetic BF16-representable inputs; FP32 projection and tanh oracle",
+  "seed": 414,
+  "physical_layer": 6,
+  "oracle": "PyTorch 2.12.1+cpu FP32 eager",
+  "weights": {
+    "model.llm.layers.6.attn.wq_du.weight": {
+      "raw_bf16_sha256": "6c84f646008730a3beb7fd113c353c04fca89795cb1c240b24b62b12374a33a8",
+      "bytes": 14155776,
+      "source_shape": [
+        3072,
+        2304
+      ],
+      "shard_byte_range_inclusive": [
+        2089155936,
+        2103311711
+      ]
+    },
+    "model.llm.layers.6.attn.wk_dv.weight": {
+      "raw_bf16_sha256": "2d79a10075978f0327152a22e20238c4f814402bfb587fa94658ce38248ac4c1",
+      "bytes": 4718592,
+      "source_shape": [
+        1024,
+        2304
+      ],
+      "shard_byte_range_inclusive": [
+        2070281568,
+        2075000159
+      ]
+    },
+    "model.llm.layers.6.attn.wv_dv.weight": {
+      "raw_bf16_sha256": "54827d4d957ea7b3e6177f72c92e071a9aa7d1e9434b1a556bf79961243bdaf2",
+      "bytes": 4718592,
+      "source_shape": [
+        1024,
+        2304
+      ],
+      "shard_byte_range_inclusive": [
+        2105081184,
+        2109799775
+      ]
+    },
+    "model.llm.layers.6.attn.wr_du.weight": {
+      "raw_bf16_sha256": "2d0eaeaa3b004ce378e65a1fe4ed491db946829e86d9b061ddc98fb95310b187",
+      "bytes": 1769472,
+      "source_shape": [
+        384,
+        2304
+      ],
+      "shard_byte_range_inclusive": [
+        2103311712,
+        2105081183
+      ]
+    },
+    "model.llm.layers.6.attn.attn_sink_proj.weight": {
+      "raw_bf16_sha256": "65baec998e1b7dcaf1f2ed677ebd8ef4bc0899e10c185ee892341ee401967f82",
+      "bytes": 110592,
+      "source_shape": [
+        24,
+        2304
+      ],
+      "shard_byte_range_inclusive": [
+        2055959136,
+        2056069727
+      ]
+    },
+    "model.llm.layers.6.controllers.attn.forget_weight": {
+      "raw_bf16_sha256": "d6d16bd56737baee80e42558ab84907f403233cb75889a367f64fad6e9aa3973",
+      "bytes": 294912,
+      "source_shape": [
+        2304,
+        64
+      ],
+      "shard_byte_range_inclusive": [
+        2110412640,
+        2110707551
+      ]
+    },
+    "model.llm.layers.6.controllers.attn.gain_weight": {
+      "raw_bf16_sha256": "038e51f856574b45c04663711406cbead18372f5e2511c8b8bf0911bd5a6815d",
+      "bytes": 294912,
+      "source_shape": [
+        2304,
+        64
+      ],
+      "shard_byte_range_inclusive": [
+        2110707552,
+        2111002463
+      ]
+    }
+  },
+  "results": {
+    "attention_projections-1": {
+      "tokens": 1,
+      "checkpoints": {
+        "q": {
+          "max_abs": 1.1920928955078125e-07,
+          "rmse": 2.5193602956718393e-08
+        },
+        "k": {
+          "max_abs": 1.1920928955078125e-07,
+          "rmse": 2.634879198427873e-08
+        },
+        "v": {
+          "max_abs": 1.1920928955078125e-07,
+          "rmse": 2.635705449307373e-08
+        },
+        "relative": {
+          "max_abs": 1.1920928955078125e-07,
+          "rmse": 2.5537603765627383e-08
+        },
+        "sink": {
+          "max_abs": 5.960464477539063e-08,
+          "rmse": 2.4691211323195612e-08
+        }
+      },
+      "loaded_build_identity_sha256": "88a3a17387b930efde041811cc44e13345c7dc0b41e53e64a901dea39e1e6a52",
+      "library_sha256": "1034b755759e0fe1feec3caa104965573a822cdab9924b4fea1d54e90bfb4dbe"
+    },
+    "attention_projections-8": {
+      "tokens": 8,
+      "checkpoints": {
+        "q": {
+          "max_abs": 1.1920928955078125e-07,
+          "rmse": 2.3247291208484193e-08
+        },
+        "k": {
+          "max_abs": 1.1920928955078125e-07,
+          "rmse": 2.3117772170232035e-08
+        },
+        "v": {
+          "max_abs": 1.1920928955078125e-07,
+          "rmse": 2.378364157525293e-08
+        },
+        "relative": {
+          "max_abs": 1.1920928955078125e-07,
+          "rmse": 2.4913762423816546e-08
+        },
+        "sink": {
+          "max_abs": 5.960464477539063e-08,
+          "rmse": 2.113652370581844e-08
+        }
+      },
+      "loaded_build_identity_sha256": "989bb154d0ae03d74bbc0b3089069d93042df7cc4cd30dd508f1c6babe70f343",
+      "library_sha256": "0115eb9889e83bf3bff2210b303b74c6c7743c863d463a8fcd601292b19a7647"
+    },
+    "controller_gates-1": {
+      "tokens": 1,
+      "checkpoints": {
+        "forget_logits": {
+          "max_abs": 5.960464477539063e-08,
+          "rmse": 5.940228132213199e-09
+        },
+        "forget": {
+          "max_abs": 5.960464477539063e-08,
+          "rmse": 5.7143773345622185e-09
+        },
+        "gain_logits": {
+          "max_abs": 5.960464477539063e-08,
+          "rmse": 9.170061754307587e-09
+        },
+        "gain": {
+          "max_abs": 5.960464477539063e-08,
+          "rmse": 8.378196389068008e-09
+        }
+      },
+      "loaded_build_identity_sha256": "846c66c54cf9378960f63ed67224acd08cb26923fac9b0fb7fbb1f924f56df1a",
+      "library_sha256": "456dccab473b020f91db08b8c7bad8ff690e679c288e8f8f92cdba73717f8629"
+    },
+    "controller_gates-8": {
+      "tokens": 8,
+      "checkpoints": {
+        "forget_logits": {
+          "max_abs": 1.1920928955078125e-07,
+          "rmse": 7.0554233945632655e-09
+        },
+        "forget": {
+          "max_abs": 5.960464477539063e-08,
+          "rmse": 6.678753293182418e-09
+        },
+        "gain_logits": {
+          "max_abs": 1.1920928955078125e-07,
+          "rmse": 1.3108834454885608e-08
+        },
+        "gain": {
+          "max_abs": 1.1920928955078125e-07,
+          "rmse": 1.164521868272005e-08
+        }
+      },
+      "loaded_build_identity_sha256": "29d57fb2ab0f4da3a2c627fbab50a4d6c040804b22d76a82adf742ee4ea481fb",
+      "library_sha256": "a8f7d236bcdfb9f2bbae958db0a577214ec0114e5b5bd8b1e9ed189d5f7126e3"
+    }
+  }
+}
