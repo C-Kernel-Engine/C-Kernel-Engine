@@ -11,6 +11,7 @@ import time
 import wave
 
 from fastapi.testclient import TestClient
+import pytest
 
 from server.kokoro_http import create_app
 
@@ -302,3 +303,31 @@ def test_repeated_stalled_readers_release_owner_and_followup_recovers() -> None:
         assert len(backends) == 4
     finally:
         owner.close()
+
+
+def test_missing_frontend_config_fails_before_native_worker_launch(tmp_path, monkeypatch):
+    from server.kokoro_http import _KokoroBackend
+
+    (tmp_path / "native-kokoro-dispatch").touch()
+
+    def unexpected_worker(*args, **kwargs):
+        raise AssertionError("frontend preflight must run before launching the native worker")
+
+    monkeypatch.setattr("server.kokoro_http.subprocess.Popen", unexpected_worker)
+    with pytest.raises(FileNotFoundError):
+        _KokoroBackend(tmp_path / "missing-config.json", tmp_path)
+
+
+def test_kokoro_readiness_tracks_missing_frontend_config(tmp_path):
+    from types import SimpleNamespace
+    from server.kokoro_http import _KokoroBackend
+
+    backend = _KokoroBackend.__new__(_KokoroBackend)
+    backend.worker = SimpleNamespace(poll=lambda: None)
+    backend.bundle = tmp_path
+    backend.config = tmp_path / "config.json"
+    backend.config.touch()
+    (tmp_path / "bundle_manifest.json").touch()
+    assert backend.ready
+    backend.config.unlink()
+    assert not backend.ready

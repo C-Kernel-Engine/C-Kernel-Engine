@@ -54,6 +54,9 @@ class _KokoroBackend:
         dispatcher = self.bundle / "native-kokoro-dispatch"
         if not dispatcher.is_file():
             raise RuntimeError("native Kokoro dispatcher unavailable")
+        # The worker only loads audio kernels. Check the pinned text frontend
+        # before publishing a ready backend for speech clients.
+        prepare("Ready.", self.config, self.bundle)
         self.worker = subprocess.Popen(
             [str(dispatcher), str(self.bundle), "--session"],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
@@ -81,6 +84,14 @@ class _KokoroBackend:
             self.abort()
             self.close()
             raise
+
+    @property
+    def ready(self) -> bool:
+        return (
+            self.worker.poll() is None
+            and self.config.is_file()
+            and (self.bundle / "bundle_manifest.json").is_file()
+        )
 
     def run(self, text: str, seed: int, technical_mode: str,
             emit: Callable[[dict[str, Any]], None], cancelled: threading.Event) -> None:
@@ -345,7 +356,7 @@ def create_app(factory: Callable[[], Any], *, max_waiters: int = 2) -> FastAPI:
     @app.get("/health")
     async def health():
         with owner.lock:
-            return {"ready": owner.backend is not None,
+            return {"ready": owner.backend is not None and getattr(owner.backend, "ready", True),
                     "active": owner.active.request_id if owner.active else None,
                     "queued": len(owner.waiting),
                     "worker_generation": owner.generation}
