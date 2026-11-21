@@ -25,6 +25,9 @@ static double dot_bias(const float *input, const float *weight,
 
 #if (defined(__x86_64__) || defined(__i386__)) && (defined(__GNUC__) || defined(__clang__))
 #include <immintrin.h>
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 /* Independent rows share weight loads; tail rows vectorize output channels.
  * Each lane preserves ordered FP64
  * multiplication and addition. No horizontal reduction or FMA is introduced. */
@@ -169,6 +172,57 @@ static int validate_weight_rows(const float *weight, size_t stride,
     return 0;
 }
 
+#ifdef _OPENMP
+enum { projection_tile_channels = 128 };
+
+static int projection_workers(size_t width, size_t channels)
+{
+    if (width < 256 || channels < 4 * projection_tile_channels || omp_in_parallel())
+        return 1;
+    const int available = omp_get_max_threads();
+    return available < 4 ? available : 4;
+}
+
+static int validate_weight_tiles(const float *weight, size_t stride,
+                                 const float *bias, size_t width, size_t channels,
+                                 double *max_l1, double *max_bias, int workers)
+{
+    double weight_bound = 0.0, bias_bound = 0.0;
+    int invalid = 0;
+    /* A tile starts on a four-channel boundary, so the SIMD validation
+     * processes the same independent rows and preserves each row's L1 sum. */
+    const size_t tiles = (channels - 1) / projection_tile_channels + 1;
+    #pragma omp parallel for num_threads(workers) schedule(static) reduction(max:weight_bound,bias_bound) reduction(|:invalid)
+    for (size_t tile = 0; tile < tiles; ++tile) {
+        const size_t first = tile * projection_tile_channels;
+        size_t count = channels - first;
+        if (count > projection_tile_channels) count = projection_tile_channels;
+        invalid |= validate_weight_rows(weight + first * stride, stride,
+            bias ? bias + first : NULL, width, count, &weight_bound, &bias_bound) != 0;
+    }
+    *max_l1 = weight_bound;
+    *max_bias = bias_bound;
+    return invalid;
+}
+
+static void compute_projection_tiles(const float *input, size_t input_stride,
+                                     const float *weight, size_t weight_stride,
+                                     const float *bias, float *output, size_t output_stride,
+                                     size_t rows, size_t width, size_t channels, int workers)
+{
+    const size_t tiles = (channels - 1) / projection_tile_channels + 1;
+    #pragma omp parallel for num_threads(workers) schedule(static)
+    for (size_t tile = 0; tile < tiles; ++tile) {
+        const size_t first = tile * projection_tile_channels;
+        size_t count = channels - first;
+        if (count > projection_tile_channels) count = projection_tile_channels;
+        compute_independent_lanes(input, input_stride, weight + first * weight_stride,
+            weight_stride, bias ? bias + first : NULL, output + first, output_stride,
+            rows, width, count);
+    }
+}
+#endif
+
 static int disjoint(const float *a, size_t na, const float *b, size_t nb)
 {
     if (!b || !nb) return 1;
@@ -209,7 +263,17 @@ int linear_rows_checked_f32(
         }
 #if (defined(__x86_64__) || defined(__i386__)) && (defined(__GNUC__) || defined(__clang__))
     __builtin_cpu_init();
+#ifdef _OPENMP
+    const int workers = projection_workers(input_channels, output_channels);
+#endif
     if (output_channels >= 4 && __builtin_cpu_supports("avx2")) {
+#ifdef _OPENMP
+        if (workers > 1) {
+            if (validate_weight_tiles(weight, weight_stride, bias, input_channels,
+                                      output_channels, &max_weight_l1, &max_bias, workers))
+                return -1;
+        } else
+#endif
         if (validate_weight_rows(weight, weight_stride, bias, input_channels,
                                  output_channels, &max_weight_l1, &max_bias))
             return -1;
@@ -239,9 +303,17 @@ int linear_rows_checked_f32(
             disjoint(output, output_elements, input, input_elements) &&
             disjoint(output, output_elements, weight, weight_elements) &&
             disjoint(output, output_elements, bias, bias_elements)) {
+#ifdef _OPENMP
+            if (workers > 1) {
+                compute_projection_tiles(input, input_stride, weight, weight_stride, bias,
+                                         output, output_stride, rows, input_channels,
+                                         output_channels, workers);
+                return 0;
+            }
+#endif
             compute_independent_lanes(input, input_stride, weight, weight_stride, bias,
-                              output, output_stride, rows, input_channels,
-                              output_channels);
+                                      output, output_stride, rows, input_channels,
+                                      output_channels);
             return 0;
         }
 #endif
