@@ -1,5 +1,6 @@
 var ckernel__transformer__rows__checked_8h =
 [
+    [ "CHECKED_ROUTED_EXPERT_MAX_ROWS", "ckernel__transformer__rows__checked_8h.html#aafca0bec103e454f1d2f7a9fbfc1ecf1", null ],
     [ "add_rows_checked_f32", "ckernel__transformer__rows__checked_8h.html#a96703045defdeab76e8db94f0051b461", null ],
     [ "attention_causal_bounded_checked_f32", "ckernel__transformer__rows__checked_8h.html#ace67baa0aba90a45fb7c13187307698f", null ],
     [ "attention_sliding_bounded_checked_f32", "ckernel__transformer__rows__checked_8h.html#ac6ccde6ed505aa8ddf108e7ab92ba7d6", null ],

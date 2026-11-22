@@ -2466,6 +2466,22 @@ python3 version/v8/scripts/xray_layer_output_sweep_v8.py \
   across generated variants while another workload runs on the P-cores.
   See the <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/docs/notes/artifacts/inkling2_mini_q8_parallel_decode.json">matched replay evidence</a>.</p>
 
+  <h3 id="inkling2-mini-prefill-chunk64">Inkling Q8_0 64-row prefill chunks</h3>
+  <p>The checked resident replay accepts up to 64 rows per prefill call.
+  Circuit authoring and the native routed provider use the limit declared
+  in <code>include/ckernel_transformer_rows_checked.h</code>.
+  Set <code>--chunk-tokens 64</code> with the explicit context capacity.
+  The planner accounts for each row's staging and the complete visible
+  sliding KV span. Smaller chunks remain available.</p>
+  <p>In three paired generated-C trials on P3 E-cores, processing 64 real
+  input tokens near position 32768 took 36.22 seconds in one call
+  versus 47.36 seconds in four 16-row calls. Both variants used seeded
+  state and circular sliding KV. The final prefill and three decode logits
+  matched bitwise, along with the logical cache and convolution state.
+  The 64-row plan used 1.20 GB more arena space than the 16-row plan at
+  the same context capacity.
+  See <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/docs/notes/artifacts/inkling2_mini_q8_prefill_chunk64.json">the individual trials</a>.</p>
+
   <h3 id="inkling2-mini-continuation-replay">Inkling Q8_0 continuation replay</h3>
   <p>The layer 2 Q input contains one changed Q8 scale on the eight-token
   trace. Replacing the incoming layer 1 residual with the captured oracle

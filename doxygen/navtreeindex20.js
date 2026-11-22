@@ -1,5 +1,6 @@
 var NAVTREEINDEX20 =
 {
+"rope__kernels_8c.html#ac681da59f31c68769892a932fa2e0ad2":[2,0,1,1,149,38],
 "rope__kernels_8c.html#ad16d38cd049be55296b1fef5ca5fee8c":[2,0,1,1,149,67],
 "rope__kernels_8c.html#ad51fc299bc98d31775398592102bd44d":[2,0,1,1,149,42],
 "rope__kernels_8c.html#ad6b670bd710a898edf4af57914eaca9d":[2,0,1,1,149,61],
@@ -248,6 +249,5 @@ var NAVTREEINDEX20 =
 "structCKFooterGradOffsets.html#ada3b948a5b678ac0f01d74bf7ab3a8c8":[1,0,32,3],
 "structCKFooterGradOffsets.html#ae2a60b057eaa172d1132474349ad5d40":[1,0,32,5],
 "structCKFooterGradOffsets.html#ae30e8699e5a492c5ecfd6bd6644e775b":[1,0,32,2],
-"structCKFooterGradOffsets.html#ae6e42eddc33324875a7458f7d804a694":[1,0,32,1],
-"structCKFooterGradOffsets.html#ae9169fef93e53c932b9f4728d8cb6e30":[1,0,32,10]
+"structCKFooterGradOffsets.html#ae6e42eddc33324875a7458f7d804a694":[1,0,32,1]
 };
