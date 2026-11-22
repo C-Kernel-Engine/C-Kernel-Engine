@@ -72,9 +72,12 @@ class RelativeAttentionTests(unittest.TestCase):
                             "-Wall", "-Wextra", "-Werror", "-shared", "-fPIC",
                             str(root / "src/kernels/gqa_relative_sink_checked.c"), "-lm", "-o", str(library)],
                            check=True)
-            fn = ctypes.CDLL(str(library)).ck_gqa_relative_sink_checked_f32
-            fn.argtypes = [ctypes.c_void_p, ctypes.c_size_t] * 7 + [ctypes.c_size_t] * 8
-            fn.restype = ctypes.c_int
+            handle = ctypes.CDLL(str(library))
+            fn = handle.ck_gqa_relative_sink_checked_f32
+            ring = handle.ck_gqa_relative_sink_ring_checked_f32
+            for provider in (fn, ring):
+                provider.argtypes = [ctypes.c_void_p, ctypes.c_size_t] * 7 + [ctypes.c_size_t] * 8
+                provider.restype = ctypes.c_int
             tokens, heads, kv_heads, position, width = 4, 4, 2, 23, 5
             capacity = position + tokens
             for dim, window in ((19, 0), (16, 13)):
@@ -109,6 +112,25 @@ class RelativeAttentionTests(unittest.TestCase):
                         peak = new_peak
                     expected[t, h] = [element / denom for element in acc]
                 np.testing.assert_array_equal(output.view("u4"), expected.view("u4"))
+                if window:
+                    ring_capacity = window + tokens - 1
+                    logical = np.arange(position - window + 1, position + tokens)
+                    for cache_capacity in (ring_capacity, ring_capacity - 1):
+                        keys = np.empty((kv_heads, cache_capacity, dim), dtype="f4")
+                        values = np.empty_like(keys)
+                        keys[:, logical % cache_capacity] = k[:, logical]
+                        values[:, logical % cache_capacity] = v[:, logical]
+                        output.fill(np.nan)
+                        ring_spans = [arg for array in (q, keys, values, bias, sink, output, work)
+                                      for arg in (array.ctypes.data, array.size)]
+                        rc = ring(*ring_spans, tokens, heads, kv_heads, dim, cache_capacity,
+                                  position, width, window)
+                        if cache_capacity == ring_capacity:
+                            self.assertEqual(rc, 0)
+                            np.testing.assert_array_equal(output.view("u4"), expected.view("u4"))
+                        else:
+                            self.assertEqual(rc, -2)
+                            self.assertTrue(np.isnan(output).all())
 
     def test_connected_prefix_and_decode_match_with_bias_window_and_sink(self):
         rng = np.random.default_rng(276)

@@ -11,7 +11,7 @@ from version.v8.scripts.checked_circuit_authoring_v8 import (
 )
 
 
-def hidden_text_loop(config, prefill_tokens=4, *, cache_capacity=None):
+def hidden_text_loop(config, prefill_tokens=4, *, cache_capacity=None, circular_sliding=False):
     """Execute all occurrences for supplied hidden rows, with isolated slot state."""
     schedule = text_schedule(config)
     width = config["hidden_size"]
@@ -21,35 +21,51 @@ def hidden_text_loop(config, prefill_tokens=4, *, cache_capacity=None):
     if end - start != 2 * block_size or len(schedule) > 48 or config["num_hidden_layers"] % block_size:
         raise ValueError("expected complete residual blocks, two per core pass, and at most 48 state slots")
     experts = config["n_routed_experts"]
-    programs = {}
+    if circular_sliding and cache_capacity is None:
+        raise ValueError("circular sliding KV requires an explicit context capacity")
+    programs, circular_slots = {}, {}
     for occurrence in schedule:
         layer, slot = occurrence["weight_layer"], occurrence["state_slot"]
         full = occurrence["attention"] == "full"
         sliding_heads = config["swa_num_attention_heads"]
         sliding_kv = config["swa_num_key_value_heads"]
         boundary = layer % block_size == 0
+        window = 0 if full else config["sliding_window_size"]
+        physical = cache_capacity
+        if circular_sliding and window:
+            bounded = max(prefill_tokens + 1, window + prefill_tokens - 1)
+            if cache_capacity > bounded:
+                physical = bounded
+                circular_slots[str(slot)] = physical
         programs[slot] = decoder_block(
             prefill_tokens, width, config["num_key_value_heads"] if full else sliding_kv,
             config["num_attention_heads"] if full else sliding_heads,
             config["head_dim"] if full else config["swa_head_dim"],
             config["d_rel"],
             config["rel_extent"] if full else config["sliding_window_size"],
-            0 if full else config["sliding_window_size"], config["intermediate_size"],
+            window, config["intermediate_size"],
             experts, config["num_experts_per_tok"], experts, config["sconv_kernel_size"],
             config["rms_norm_eps"], True,
             layer=layer, state_slot=slot, depth_states=(layer + block_size - 1) // block_size,
             previous_pass_states=int(occurrence["takes_prior_pass_message"]),
             block_boundary=boundary, control_rank=loop["gate_rank"], full_attention=full,
             log_floor=config["log_scaling_n_floor"], log_alpha=config["log_scaling_alpha"],
-            cache_capacity=cache_capacity,
+            cache_capacity=physical,
         )
+        if str(slot) in circular_slots:
+            for node in programs[slot]["block_types"]["block"]["body"]["ops"]:
+                if node["kernel"] == "kv_cache_l2_rms_append_checked_f32":
+                    node["kernel"] = "kv_cache_l2_rms_append_ring_checked_f32"
+                if node["kernel"] == "gqa_relative_sink_checked_f32":
+                    node["kernel"] = "gqa_relative_sink_ring_checked_f32"
 
     graph = _graph("text_loop", prefill_tokens, width, {}, [], layer=0,
                    scope="bounded hidden rows through the entire fixed loop and final normalization")
     graph["name"] = "inkling2_mini_text_loop"
     graph["native_entry"]["function"] = "ck_inkling2_mini_text_loop"
     graph["native_entry"]["segments"] = []
-    graph["contract"]["runtime_invariants"]["layer_schedule"] = schedule
+    graph["contract"]["runtime_invariants"].update(
+        layer_schedule=schedule, circular_sliding_slots=circular_slots)
     buffers = graph["activation_buffers"]
     bindings = graph["activation_bindings"]
     ops = graph["block_types"]["block"]["body"]["ops"]
@@ -152,9 +168,11 @@ def hidden_text_loop(config, prefill_tokens=4, *, cache_capacity=None):
     return graph
 
 
-def text_token_loop(config, prefill_tokens=4, *, cache_capacity=None, f64_norm_sum=False, last_prefill_logit=False, reference_moe=False, fp32_static_conv=False):
+def text_token_loop(config, prefill_tokens=4, *, cache_capacity=None, f64_norm_sum=False, last_prefill_logit=False,
+                    reference_moe=False, fp32_static_conv=False, circular_sliding=False):
     """Bind packed token lookup and capped full-vocabulary logits to the fixed loop."""
-    graph = hidden_text_loop(config, prefill_tokens, cache_capacity=cache_capacity)
+    graph = hidden_text_loop(config, prefill_tokens, cache_capacity=cache_capacity,
+                             circular_sliding=circular_sliding)
     width, vocab = config["hidden_size"], config["vocab_size"]
     logits_width = config.get("unpadded_vocab_size", vocab)
     cap, eps = config["final_logit_softcapping"], config["rms_norm_eps"]
@@ -258,16 +276,18 @@ def text_token_loop(config, prefill_tokens=4, *, cache_capacity=None, f64_norm_s
                        "chunk_tokens": prefill_tokens, "supports_explicit_position": False,
                        "prefill_logits": "last_row" if last_prefill_logit else "all_rows",
                        "expert_accumulation": "router_slot" if reference_moe else "expert_id",
-                       "static_conv_accumulator": "fp32" if fp32_static_conv else "fp64"},
+                       "static_conv_accumulator": "fp32" if fp32_static_conv else "fp64",
+                       "circular_sliding_slots": graph["contract"]["runtime_invariants"]["circular_sliding_slots"]},
     }
     return graph
 
 
-def resident_text_loop(config, chunk_tokens, context_capacity, *, f64_norm_sum=False, last_prefill_logit=False, reference_moe=False, fp32_static_conv=False):
+def resident_text_loop(config, chunk_tokens, context_capacity, *, f64_norm_sum=False, last_prefill_logit=False,
+                       reference_moe=False, fp32_static_conv=False, circular_sliding=False):
     """Generate repeated fixed-size prefill chunks and one-row decode over shared state."""
     graph = text_token_loop(config, chunk_tokens, cache_capacity=context_capacity, f64_norm_sum=f64_norm_sum,
                             last_prefill_logit=last_prefill_logit, reference_moe=reference_moe,
-                            fp32_static_conv=fp32_static_conv)
+                            fp32_static_conv=fp32_static_conv, circular_sliding=circular_sliding)
     graph["name"] = "inkling2_mini_resident_text_loop"
     graph["native_entry"]["function"] = "ck_inkling2_mini_resident_text_loop"
     graph["contract"]["runtime_invariants"].update(context_capacity=context_capacity, chunk_tokens=chunk_tokens)
