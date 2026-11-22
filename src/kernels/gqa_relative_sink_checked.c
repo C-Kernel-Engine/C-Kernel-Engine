@@ -39,18 +39,21 @@ static inline __attribute__((target("avx2"))) void scores_for_four_keys(
 static __attribute__((target("avx2"))) void attention_row_avx2(
     const float *query, const float *key, const float *value, const float *relative, float sink,
     float *output, double *accumulator, size_t dim, size_t begin, size_t position,
-    size_t relative_extent, double scale)
+    size_t relative_extent, double scale, size_t ring_capacity)
 {
     double max_logit = sink, denom = 1.0;
     for (size_t d = 0; d < dim; ++d) accumulator[d] = 0.0;
     for (size_t first = begin; first <= position;) {
-        const size_t available = position - first + 1;
+        const size_t physical = ring_capacity ? first % ring_capacity : first;
+        size_t available = position - first + 1;
+        if (ring_capacity && available > ring_capacity - physical)
+            available = ring_capacity - physical;
         double dots[4];
         if (available >= 4) {
-            scores_for_four_keys(query, key + first * dim, dim, dots);
+            scores_for_four_keys(query, key + physical * dim, dim, dots);
         } else {
             for (size_t lane = 0; lane < available; ++lane) {
-                const float *keys = key + (first + lane) * dim;
+                const float *keys = key + (physical + lane) * dim;
                 double dot = 0.0;
                 for (size_t d = 0; d < dim; ++d) dot += (double)query[d] * keys[d];
                 dots[lane] = dot;
@@ -65,7 +68,7 @@ static __attribute__((target("avx2"))) void attention_row_avx2(
             const double old_factor = max_logit == next_max ? 1.0 : exp(max_logit - next_max);
             const double new_factor = score == next_max ? 1.0 : exp(score - next_max);
             denom = denom * old_factor + new_factor;
-            const float *values = value + (first + lane) * dim;
+            const float *values = value + (physical + lane) * dim;
             const __m256d old_vector = _mm256_set1_pd(old_factor), new_vector = _mm256_set1_pd(new_factor);
             size_t d = 0;
             for (; d + 4 <= dim; d += 4) {
@@ -84,19 +87,20 @@ static __attribute__((target("avx2"))) void attention_row_avx2(
 }
 #endif
 
-/* Read caller-owned K/V at absolute positions [0, position + tokens).
- * Relative bias is indexed by backward distance inside its supplied extent.
- * An extra sink logit contributes to the denominator with a zero value. */
-int ck_gqa_relative_sink_checked_f32(
-    const float *query, size_t query_elements, const float *key, size_t key_elements,
-    const float *value, size_t value_elements, const float *relative, size_t relative_elements,
-    const float *sink, size_t sink_elements, float *output, size_t output_elements,
-    double *work, size_t work_elements, size_t tokens, size_t heads, size_t kv_heads,
-    size_t dim, size_t capacity, size_t position, size_t relative_extent, size_t window)
+#define GQA_RELATIVE_ARGS \
+    const float *query, size_t query_elements, const float *key, size_t key_elements, \
+    const float *value, size_t value_elements, const float *relative, size_t relative_elements, \
+    const float *sink, size_t sink_elements, float *output, size_t output_elements, \
+    double *work, size_t work_elements, size_t tokens, size_t heads, size_t kv_heads, \
+    size_t dim, size_t capacity, size_t position, size_t relative_extent, size_t window
+
+/* Read the causal span in absolute order, including across a ring wrap. */
+static int gqa_relative_sink_checked(GQA_RELATIVE_ARGS, int circular)
 {
     if (!heads || heads > 256 || !kv_heads || heads % kv_heads ||
         !dim || dim > 4096 || !capacity || capacity > SIZE_MAX / kv_heads ||
-        !tokens || position >= capacity || tokens > capacity - position ||
+        !tokens || tokens > capacity || position > SIZE_MAX - tokens ||
+        (!circular && position > capacity - tokens) || (circular && !window) ||
         !relative_extent || relative_extent > 16384 || window > 16384)
         return -2;
 
@@ -132,10 +136,20 @@ int ck_gqa_relative_sink_checked_f32(
     if (!ck_checked_finite(query, q_size) || !ck_checked_finite(relative, rel_size) ||
         !ck_checked_finite(sink, rows)) return -3;
     const size_t first = window && position >= window ? position - window + 1 : 0;
+    const size_t visible = position + tokens - first;
+    /* The writer commits the entire chunk first, so every query's visible key
+     * must fit at once. Otherwise the newest rows can evict an earlier query. */
+    if (circular && visible > capacity) return -2;
+    const size_t physical = circular ? first % capacity : first;
+    const size_t contiguous = visible < capacity - physical ? visible : capacity - physical;
     for (size_t h = 0; h < kv_heads; ++h) {
-        const size_t offset = (h * capacity + first) * dim;
-        const size_t used = (position + tokens - first) * dim;
-        if (!ck_checked_finite(key + offset, used) || !ck_checked_finite(value + offset, used))
+        const size_t offset = (h * capacity + physical) * dim;
+        const size_t prefix = contiguous * dim;
+        const size_t suffix = (visible - contiguous) * dim;
+        const size_t head_start = h * capacity * dim;
+        if (!ck_checked_finite(key + offset, prefix) || !ck_checked_finite(value + offset, prefix) ||
+            (suffix && (!ck_checked_finite(key + head_start, suffix) ||
+                        !ck_checked_finite(value + head_start, suffix))))
             return -3;
     }
 
@@ -145,7 +159,6 @@ int ck_gqa_relative_sink_checked_f32(
     const int use_avx2 = dim >= 16 && __builtin_cpu_supports("avx2");
 #endif
 #ifdef _OPENMP
-    const size_t visible = position + tokens - first;
     const int parallel = workspace > dim && visible >= 128;
 #pragma omp parallel for if(parallel)
 #endif
@@ -159,15 +172,16 @@ int ck_gqa_relative_sink_checked_f32(
 #ifdef CK_GQA_X86_AVX2
         if (use_avx2 && qpos - begin >= 7) {
             attention_row_avx2(q, key + cache * dim, value + cache * dim, rel, sink[row],
-                               output + row * dim, accumulator, dim, begin, qpos, relative_extent, scale);
+                               output + row * dim, accumulator, dim, begin, qpos, relative_extent, scale, circular ? capacity : 0);
             continue;
         }
 #endif
         double max_logit = sink[row], denom = 1.0;
         for (size_t d = 0; d < dim; ++d) accumulator[d] = 0.0;
         for (size_t k = begin; k <= qpos; ++k) {
-            const float *keys = key + (cache + k) * dim;
-            const float *values = value + (cache + k) * dim;
+            const size_t row_index = circular ? k % capacity : k;
+            const float *keys = key + (cache + row_index) * dim;
+            const float *values = value + (cache + row_index) * dim;
             double dot = 0.0;
             /* Each product of finite FP32 operands is exact in FP64. */
             for (size_t d = 0; d < dim; ++d) dot += (double)q[d] * (double)keys[d];
@@ -185,6 +199,22 @@ int ck_gqa_relative_sink_checked_f32(
             output[row * dim + d] = (float)(accumulator[d] / denom);
     }
     return 0;
+}
+
+#define GQA_RELATIVE_FORWARD(circular) \
+    gqa_relative_sink_checked(query, query_elements, key, key_elements, value, value_elements, \
+                              relative, relative_elements, sink, sink_elements, output, output_elements, \
+                              work, work_elements, tokens, heads, kv_heads, dim, capacity, position, \
+                              relative_extent, window, circular)
+
+int ck_gqa_relative_sink_checked_f32(GQA_RELATIVE_ARGS)
+{
+    return GQA_RELATIVE_FORWARD(0);
+}
+
+int ck_gqa_relative_sink_ring_checked_f32(GQA_RELATIVE_ARGS)
+{
+    return GQA_RELATIVE_FORWARD(1);
 }
 
 #if defined(__GNUC__) && !defined(__clang__)

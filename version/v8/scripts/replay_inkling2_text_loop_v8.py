@@ -162,6 +162,8 @@ def main():
                         help="use ordered FP32 arithmetic for static short convolutions")
     parser.add_argument("--reference-moe", action="store_true",
                         help="use reciprocal-scaled SiTU and router-slot accumulation")
+    parser.add_argument("--circular-sliding", action="store_true",
+                        help="bound the sliding KV cache while retaining full-attention history")
     parser.add_argument("--last-prefill-logit", action="store_true",
                         help="project only the final hidden row in each prefill chunk")
     parser.add_argument("--threads", type=int, default=1,
@@ -192,6 +194,8 @@ def main():
             or len(ids) + len(forced) > capacity
             or any(not 0 <= token < vocab for token in ids)):
         parser.error("invalid prompt IDs, chunk size or context capacity")
+    if args.circular_sliding and not resident:
+        parser.error("circular sliding KV requires --context-capacity")
     if any(not 0 <= token < vocab for token in forced):
         parser.error("invalid continuation ID")
     if (args.greedy_tokens < 0 or (args.greedy_tokens and (not resident or forced))
@@ -220,7 +224,8 @@ def main():
               "context_capacity": capacity, "chunk_tokens": chunk_tokens, "completed_prompt_tokens": 0,
               "threads": args.threads,
               "f64_norm_sum": args.f64_norm_sum, "last_prefill_logit": args.last_prefill_logit,
-              "reference_moe": args.reference_moe, "fp32_static_conv": args.fp32_static_conv}
+              "reference_moe": args.reference_moe, "fp32_static_conv": args.fp32_static_conv,
+              "circular_sliding": args.circular_sliding}
     if args.append_tokens_file is not None:
         report.update(append_ids=forced, completed_append_tokens=0)
     if oracle is not None:
@@ -249,7 +254,8 @@ def main():
             gguf.seek(0)
             tensors, base = read_gguf_header(gguf.read(16 * 1024 * 1024))
             options = {"f64_norm_sum": args.f64_norm_sum, "last_prefill_logit": args.last_prefill_logit,
-                       "reference_moe": args.reference_moe, "fp32_static_conv": args.fp32_static_conv}
+                       "reference_moe": args.reference_moe, "fp32_static_conv": args.fp32_static_conv,
+                       "circular_sliding": args.circular_sliding}
             if resident:
                 graph = resident_text_loop(config, chunk_tokens, capacity, **options)
             else:
