@@ -14,5 +14,7 @@ var searchData=
   ['gguf_5ftoken_5funknown_11',['GGUF_TOKEN_UNKNOWN',['../tokenizer__spm_8c.html#aebfc8e903d40787ae3bae076f38beb96',1,'tokenizer_spm.c']]],
   ['gguf_5ftoken_5funused_12',['GGUF_TOKEN_UNUSED',['../tokenizer__spm_8c.html#ab88434b0ebe5c3ab2643fe6074064c31',1,'tokenizer_spm.c']]],
   ['gguf_5ftoken_5fuser_5fdefined_13',['GGUF_TOKEN_USER_DEFINED',['../tokenizer__spm_8c.html#a80742b73116479d68d521463c2557047',1,'tokenizer_spm.c']]],
-  ['green_14',['GREEN',['../show__config_8c.html#acfbc006ea433ad708fdee3e82996e721',1,'show_config.c']]]
+  ['gqa_5frelative_5fargs_14',['GQA_RELATIVE_ARGS',['../gqa__relative__sink__checked_8c.html#a7a12f4c3362ccc27a7f5e68b86c25cec',1,'gqa_relative_sink_checked.c']]],
+  ['gqa_5frelative_5fforward_15',['GQA_RELATIVE_FORWARD',['../gqa__relative__sink__checked_8c.html#a21b1542e28fa8d6020d18dcae1037d5b',1,'gqa_relative_sink_checked.c']]],
+  ['green_16',['GREEN',['../show__config_8c.html#acfbc006ea433ad708fdee3e82996e721',1,'show_config.c']]]
 ];
