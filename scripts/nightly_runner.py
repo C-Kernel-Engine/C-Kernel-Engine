@@ -1350,6 +1350,11 @@ TEST_SUITES = {
         ROOT / "tests" / "test_v8_inkling2_mini_audit.py",
         unittest_targets=("tests.test_v8_inkling2_mini_audit",),
     ),
+    "inkling2_mini_routed_moe": TestSuite(
+        "Inkling 2 Mini Routed MoE and Packed GGUF Expert Weights", "inference",
+        ROOT / "tests" / "test_v8_inkling2_routed_moe.py",
+        unittest_targets=("tests.test_v8_inkling2_routed_moe",),
+    ),
     "inkling2_mini_router": TestSuite(
         "Inkling 2 Mini Generated Sigmoid Router", "inference",
         ROOT / "tests" / "test_v8_inkling2_router.py",
@@ -1359,6 +1364,11 @@ TEST_SUITES = {
         "Inkling 2 Mini Expert Import and Generated Softcapped SwiGLU", "inference",
         ROOT / "tests" / "test_v8_inkling2_expert_weights.py",
         unittest_targets=("tests.test_v8_inkling2_expert_weights",),
+    ),
+    "inkling2_mini_sliding_attention": TestSuite(
+        "Inkling 2 Mini Generated Sliding Attention Output", "inference",
+        ROOT / "tests" / "test_v8_inkling2_sliding_attention.py",
+        unittest_targets=("tests.test_v8_inkling2_sliding_attention",),
     ),
     "inkling2_mini_relative_attention": TestSuite(
         "Inkling 2 Mini Generated Relative and Sink Attention", "inference",
