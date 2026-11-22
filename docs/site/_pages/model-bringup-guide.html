@@ -1280,6 +1280,44 @@ python3 version/v8/scripts/compare_inkling2_llama_layer0_v8.py \
   ordered FP64 arithmetic and FP32 storage. The full model, text output and
   long-prompt serving still require connected execution and oracle evidence.</p>
 
+  <h3 id="inkling2-mini-text-loop">Inkling 2 Mini generated fixed text loop</h3>
+  <p>A checked graph connects packed token embeddings, all 48 scheduled
+  decoder occurrences, final depth mixing and normalization, the packed
+  vocabulary head, and logit softcapping. Each occurrence owns its KV and
+  four convolution histories. Later passes restart from the pre-loop
+  residual and depth bank, and compiled edges bind the previous pass's
+  messages. The 24 physical layers share their weights.</p>
+  <p>The synthetic fixture compares full logits and each occurrence's state
+  for multiple prefill chunks and an append against uninterrupted execution.
+  The native entries validate positions before committing state. Named token,
+  logit and position ports are bound to the loaded build identity.</p>
+  <p>The <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/docs/notes/artifacts/inkling2_mini_q8_text_loop.json">pinned Q8_0 replay</a>
+  emits all 200,058 logits. Against an FP32 KV llama.cpp replay, the selected
+  FP64 sum of FP32 RMS squares made the first layer's query output exact.
+  Final RMSE was 0.183 for eight input tokens and 0.171 after a
+  teacher-forced append. The first 128 rendered tokens of the SVG workload
+  completed native prefill in 106.1 seconds on P3 and gave final-logit
+  RMSE 0.348. All three comparisons had the same highest-scoring token.
+  These development timings describe individual executions.</p>
+  <p>The eight-token trace showed the first substantial layer-output drift
+  at physical layer 2. The raw Q projection matched bit-for-bit on the
+  oracle's weighted normalized input. In a separate 128-output-token chat
+  comparison, the two greedy trajectories agreed for five tokens and only
+  the oracle emitted a final answer within the budget.</p>
+  <pre class="mb-code"><code>python3 version/v8/scripts/replay_inkling2_text_loop_v8.py \
+  --config "$PUBLISHER_CONFIG" --gguf "$Q8_GGUF" \
+  --tokens-file "$TOKEN_IDS" --context-capacity 256 --chunk-tokens 16 \
+  --append-token "$CONTINUATION_ID" --output "$REPLAY"</code></pre>
+  <p>Supply whitespace-separated token IDs. The replay verifies the exact
+  GGUF checksum and builds a file-backed arena. The resident entry processes
+  full chunks and uses single-token appends for the tail. Optional greedy
+  continuation requires a context with room for the requested output and
+  explicit stop IDs when stopping on model tokens is desired.</p>
+  <p>SVG workloads have been rendered at 8,192 and 32,768 input tokens.
+  Builds reserving an additional 2,048 decode tokens compiled with 34.0 GB
+  and 47.8 GB arenas, respectively. The full workloads, native tokenizer
+  integration and HTTP lifecycle remain to be verified.</p>
+
   <h2 id="lowering">9. Run lowering and inspect the generated C</h2>
   <p>The verified entry point is the wrapper <code>version/v8/scripts/cks-v8-run</code> (it selects a Python, checks requirements, and drives <code>ck_run_v8.py</code>). The full pipeline, exactly as run for this page <span class="tag tag-executed">executed</span>:</p>
   <pre class="mb-code"><code>version/v8/scripts/cks-v8-run run \

@@ -67,7 +67,7 @@ def sliding_decoder_block(prefill_tokens=4, width=2304, kv_heads=8, query_heads=
 def decoder_block(prefill_tokens, width, kv_heads, query_heads, dim, relative_dim,
                   band, window, inner, experts, top_k, slots, taps, epsilon, q8_activations,
                   *, layer, state_slot, depth_states, previous_pass_states, block_boundary,
-                  control_rank, full_attention=False, log_floor=8192, log_alpha=0.1):
+                  control_rank, full_attention=False, log_floor=8192, log_alpha=0.1, cache_capacity=None):
     """Select the attention topology before lowering a single decoder occurrence."""
     if full_attention and (not layer or window or type(log_floor) is not int or log_floor < 1
                            or not math.isfinite(log_alpha) or log_alpha < 0):
@@ -86,7 +86,7 @@ def decoder_block(prefill_tokens, width, kv_heads, query_heads, dim, relative_di
     graph = sliding_attention_replay(
         prefill_tokens=prefill_tokens, width=width, kv_width=kv_heads * dim, taps=taps,
         slots=(state_slot,), kv_heads=kv_heads, query_heads=query_heads, relative_dim=relative_dim,
-        band=band, window=window,
+        band=band, window=window, cache_capacity=cache_capacity,
     )
     body = graph["block_types"]["block"]["body"]
     exports = graph["semantic_checkpoints"]["exports"]
@@ -329,12 +329,14 @@ def first_block_weights(graph):
     """Describe the logical tensors loaded into the bounded native block."""
     result = {}
     for op in graph["block_types"]["block"]["body"]["ops"]:
-        p = op["params"]
         for port, name in op.get("weight_refs", {}).items():
+            p = op["params"]
             mode = "F32"
             if op["op"] == "routed_softcapped_experts_checked":
                 shape = [p["S"], p["H"], p["I"]] if port == "down" else [p["S"], p["I"], p["H"]]
                 mode = "Q8_0"
+            elif op["op"] == "embedding_lookup_q8_0_checked":
+                shape, mode = [p["V"], p["C"]], "Q8_0"
             elif port in ("gamma", "query"):
                 shape = [p["C"]]
             else:
