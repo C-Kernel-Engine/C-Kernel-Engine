@@ -1,5 +1,8 @@
 var NAVTREEINDEX20 =
 {
+"routed__softcapped__experts__checked_8c.html":[2,0,1,1,149],
+"routed__softcapped__experts__checked_8c.html#a0596a7029552c6390c8ec30dbba5d296":[2,0,1,1,149,7],
+"routed__softcapped__experts__checked_8c.html#a0a86a84605dd1a7c7214a11d3d32ac58":[2,0,1,1,149,12],
 "routed__softcapped__experts__checked_8c.html#a0aca1c0006bd2c840f46d998e94754d9":[2,0,1,1,149,8],
 "routed__softcapped__experts__checked_8c.html#a0bd719ef28d932a7e818c7c599908d49":[2,0,1,1,149,1],
 "routed__softcapped__experts__checked_8c.html#a12058ac45a5ce809600c431dfa137986":[2,0,1,1,149,5],
@@ -246,8 +249,5 @@ var NAVTREEINDEX20 =
 "structCKIRNode.html#abf6244a44982d225b1f19abfa2906e8c":[1,0,37,2],
 "structCKIRNode.html#ac80c87853b9a0b35958d643481e95fc7":[1,0,37,3],
 "structCKIRV2Binding.html":[1,0,38],
-"structCKIRV2Binding.html#a0e50855a2852b3018c3b87ae5e53db19":[1,0,38,0],
-"structCKIRV2Binding.html#acbaa32705fa3caa147f63c8beecd6fe5":[1,0,38,1],
-"structCKIRV2Buffer.html":[1,0,39],
-"structCKIRV2Buffer.html#a22f159608ef2fbcdfdd84704ae3f5da4":[1,0,39,7]
+"structCKIRV2Binding.html#a0e50855a2852b3018c3b87ae5e53db19":[1,0,38,0]
 };

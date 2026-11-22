@@ -1,5 +1,8 @@
 var NAVTREEINDEX23 =
 {
+"structCKPlanStepV2.html":[1,0,66],
+"structCKPlanStepV2.html#a1762220af86b81c437f4290195e928b1":[1,0,66,2],
+"structCKPlanStepV2.html#a22d5d759ab81944a97689a1a80456664":[1,0,66,1],
 "structCKPlanStepV2.html#a99fd1a750634dd8160937d173e7acf31":[1,0,66,3],
 "structCKPlanStepV2.html#acaaa916701cbcf1e9a5d35ff79e7c5bf":[1,0,66,0],
 "structCKPoolBlock.html":[1,0,67],
@@ -246,8 +249,5 @@ var NAVTREEINDEX23 =
 "structCacheTopology.html#aad6fb272149cb50628325bed91adfa37":[1,0,11,0],
 "structGEMMParams.html":[1,0,85],
 "structGEMMParams.html#a2956e1497d1e97174d5d17e872707769":[1,0,85,1],
-"structGEMMParams.html#a450121a9c76be4c90fe5326b1808eb1a":[1,0,85,3],
-"structGEMMParams.html#a6b0b003d129e3c027928ac6ad089e110":[1,0,85,2],
-"structGEMMParams.html#aa84a148f54c8ec49fec73e7b2354761c":[1,0,85,0],
-"structGEMMParams.html#adc0714de30284b4b62ecfac446979251":[1,0,85,4]
+"structGEMMParams.html#a450121a9c76be4c90fe5326b1808eb1a":[1,0,85,3]
 };

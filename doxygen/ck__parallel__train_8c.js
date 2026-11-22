@@ -1,5 +1,7 @@
 var ck__parallel__train_8c =
 [
+    [ "ck_frozen_dx_work", "ck__parallel__train_8c.html#a236b44775310c5ae4f182bd431beecba", null ],
+    [ "ck_gemm_backward_input_accum64_f32", "ck__parallel__train_8c.html#a04f9664e93de5fbca0070e67a90008a1", null ],
     [ "ck_train_bias_reduce_compute_range", "ck__parallel__train_8c.html#a074f3ba4e2e5e250a1d3da3ec881a25c", null ],
     [ "ck_train_gemm_backward_serial", "ck__parallel__train_8c.html#a2c28131807e759d4933c69143c37c0ba", null ],
     [ "ck_train_gemm_backward_work", "ck__parallel__train_8c.html#ac3fecc2babce4b360bf97501453fd028", null ],
