@@ -162,11 +162,13 @@ var menudata={children:[
 {text:"v",url:"globals_type.html#index_v"}]},
 {text:"Enumerations",url:"globals_enum.html",children:[
 {text:"c",url:"globals_enum.html#index_c"},
+{text:"e",url:"globals_enum.html#index_e"},
 {text:"g",url:"globals_enum.html#index_g"},
 {text:"q",url:"globals_enum.html#index_q"},
 {text:"r",url:"globals_enum.html#index_r"}]},
 {text:"Enumerator",url:"globals_eval.html",children:[
 {text:"c",url:"globals_eval.html#index_c"},
+{text:"e",url:"globals_eval_e.html#index_e"},
 {text:"g",url:"globals_eval_g.html#index_g"},
 {text:"q",url:"globals_eval_q.html#index_q"},
 {text:"r",url:"globals_eval_r.html#index_r"}]},

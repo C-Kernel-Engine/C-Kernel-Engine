@@ -88,8 +88,13 @@ var searchData=
   ['expected_5fcode_5fframes_85',['expected_code_frames',['../structck__checked__frame__codec.html#af55cf19d75b7b8dec7496d6be62396e2',1,'ck_checked_frame_codec']]],
   ['expected_5fcodebooks_86',['expected_codebooks',['../structck__checked__frame__codec.html#a7b779d608bc0f128e3a6dccb1bb53fbe',1,'ck_checked_frame_codec']]],
   ['expected_5fsamples_87',['expected_samples',['../structck__checked__frame__codec.html#a4dbced71f17c455bfccc0f8bc84d87f4',1,'ck_checked_frame_codec']]],
-  ['explicit_5fmrope_5fapply_5fggml_5fexact_88',['explicit_mrope_apply_ggml_exact',['../rope__kernels_8c.html#a120d7d23796d5864335badbb717c594d',1,'rope_kernels.c']]],
-  ['explicit_5fmrope_5fapply_5fhead_89',['explicit_mrope_apply_head',['../rope__kernels_8c.html#a2a1b1783ea95630d700e8858205bbcbc',1,'rope_kernels.c']]],
-  ['extent_90',['extent',['../head__backward__bf16_8c.html#af2df54ac14f2de8b82e1ed69060c83ff',1,'head_backward_bf16.c']]],
-  ['extents_91',['extents',['../indexed__rows__train_8c.html#a671fb2bec1523668e4fff60461438023',1,'indexed_rows_train.c']]]
+  ['expert_5fdot_88',['expert_dot',['../routed__softcapped__experts__checked_8c.html#a32d8d74ca6c960c883d3d4605549a7a4',1,'routed_softcapped_experts_checked.c']]],
+  ['expert_5ff32_89',['EXPERT_F32',['../routed__softcapped__experts__checked_8c.html#a9215a77bd991b11391d98d0379a07c96ad13cb5eca70fb9919ec3139400301f6c',1,'routed_softcapped_experts_checked.c']]],
+  ['expert_5fiq4_5fnl_90',['EXPERT_IQ4_NL',['../routed__softcapped__experts__checked_8c.html#a9215a77bd991b11391d98d0379a07c96aa67db061b8ec54a4d8bf3d3530101ab0',1,'routed_softcapped_experts_checked.c']]],
+  ['expert_5fq8_5f0_91',['EXPERT_Q8_0',['../routed__softcapped__experts__checked_8c.html#a9215a77bd991b11391d98d0379a07c96a5eaa96d48c93163bc2846c2ea6d4b4c3',1,'routed_softcapped_experts_checked.c']]],
+  ['expert_5fstorage_92',['expert_storage',['../routed__softcapped__experts__checked_8c.html#a9215a77bd991b11391d98d0379a07c96',1,'routed_softcapped_experts_checked.c']]],
+  ['explicit_5fmrope_5fapply_5fggml_5fexact_93',['explicit_mrope_apply_ggml_exact',['../rope__kernels_8c.html#a120d7d23796d5864335badbb717c594d',1,'rope_kernels.c']]],
+  ['explicit_5fmrope_5fapply_5fhead_94',['explicit_mrope_apply_head',['../rope__kernels_8c.html#a2a1b1783ea95630d700e8858205bbcbc',1,'rope_kernels.c']]],
+  ['extent_95',['extent',['../head__backward__bf16_8c.html#af2df54ac14f2de8b82e1ed69060c83ff',1,'head_backward_bf16.c']]],
+  ['extents_96',['extents',['../indexed__rows__train_8c.html#a671fb2bec1523668e4fff60461438023',1,'indexed_rows_train.c']]]
 ];
