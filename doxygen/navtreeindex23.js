@@ -1,5 +1,15 @@
 var NAVTREEINDEX23 =
 {
+"structCKSection.html#ada852daa4974ccedece03be2d141d1b2":[1,0,68,30],
+"structCKSection.html#adafbb43b1edb42a0adb1b97311b601a4":[1,0,68,12],
+"structCKSection.html#add9ec57d8f21293d2bf65a94a128fc9f":[1,0,68,28],
+"structCKSection.html#ade03ada595b6909fbb58a548d29a2b65":[1,0,68,17],
+"structCKSection.html#ae6657035787375ea5e3ea2c5b28f7161":[1,0,68,24],
+"structCKSection.html#aeb788d634d43d321c22d52573318692f":[1,0,68,10],
+"structCKSection.html#aeea1efa805610505363a8dbe6d734282":[1,0,68,25],
+"structCKSection.html#aeefc8b6cfe54401ea7adf601307f85ca":[1,0,68,2],
+"structCKSectionConfig.html":[1,0,69],
+"structCKSectionConfig.html#a00a231463e2b815a98384b93f5173853":[1,0,69,2],
 "structCKSectionConfig.html#a2dc3bafd010bc86e6879784f37c2cf26":[1,0,69,15],
 "structCKSectionConfig.html#a3348e1ea8c54d4e25647daa3685da89a":[1,0,69,4],
 "structCKSectionConfig.html#a39652ec04ab2531ba520a9c0738eafa4":[1,0,69,13],
@@ -239,15 +249,5 @@ var NAVTREEINDEX23 =
 "structNUMANode.html#a0c71fe04154d6a80d08829e547f5145d":[1,0,91,0],
 "structNUMANode.html#a11cae96c43efc187a78bb509aa86355b":[1,0,91,3],
 "structNUMANode.html#aad2dccb35d57507ce243031012618337":[1,0,91,4],
-"structNUMANode.html#abe328366c0632dadc801508c6bbc44df":[1,0,91,1],
-"structNUMANode.html#ad207fd0ff088689dc91e40729dc9c60a":[1,0,91,2],
-"structNUMATopology.html":[1,0,92],
-"structNUMATopology.html#a2a61e03ff57dd6feb35b92d1e03c0cdd":[1,0,92,0],
-"structNUMATopology.html#a4f4876ca34eed1e6c7732e611a13a674":[1,0,92,1],
-"structNUMATopology.html#ab0befa19cd4b9b08a68d901f301e9de7":[1,0,92,2],
-"structNetworkInterface.html":[1,0,89],
-"structNetworkInterface.html#a156a7eee11ff7323838f53326e25d730":[1,0,89,10],
-"structNetworkInterface.html#a260f76fbda4cab4180579f1bf506bf76":[1,0,89,7],
-"structNetworkInterface.html#a3a7b2f85e17f8e861ea160f94ade4a46":[1,0,89,13],
-"structNetworkInterface.html#a4d1f0f6d6f8e5ba00f06945274ac913b":[1,0,89,4]
+"structNUMANode.html#abe328366c0632dadc801508c6bbc44df":[1,0,91,1]
 };

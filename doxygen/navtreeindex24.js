@@ -1,5 +1,15 @@
 var NAVTREEINDEX24 =
 {
+"structNUMANode.html#ad207fd0ff088689dc91e40729dc9c60a":[1,0,91,2],
+"structNUMATopology.html":[1,0,92],
+"structNUMATopology.html#a2a61e03ff57dd6feb35b92d1e03c0cdd":[1,0,92,0],
+"structNUMATopology.html#a4f4876ca34eed1e6c7732e611a13a674":[1,0,92,1],
+"structNUMATopology.html#ab0befa19cd4b9b08a68d901f301e9de7":[1,0,92,2],
+"structNetworkInterface.html":[1,0,89],
+"structNetworkInterface.html#a156a7eee11ff7323838f53326e25d730":[1,0,89,10],
+"structNetworkInterface.html#a260f76fbda4cab4180579f1bf506bf76":[1,0,89,7],
+"structNetworkInterface.html#a3a7b2f85e17f8e861ea160f94ade4a46":[1,0,89,13],
+"structNetworkInterface.html#a4d1f0f6d6f8e5ba00f06945274ac913b":[1,0,89,4],
 "structNetworkInterface.html#a5c06474416d85a879cf5ae151eaff925":[1,0,89,8],
 "structNetworkInterface.html#a63e2fdf290d8a23dc2f92cf28e87e870":[1,0,89,0],
 "structNetworkInterface.html#a6aeca68cb500898ceebc5a70b984ed10":[1,0,89,1],
@@ -239,15 +249,5 @@ var NAVTREEINDEX24 =
 "structck__checked__latent__loop.html#a5abc9d19d6552f15bb24a6ed4a7efc98":[1,0,20,4],
 "structck__checked__latent__loop.html#a628af8fe739b4cdba19918473092fcff":[1,0,20,9],
 "structck__checked__latent__loop.html#a62c5c83e56fa46eb76759bc57d9d2f66":[1,0,20,12],
-"structck__checked__latent__loop.html#a66d332d22fd56de51124a95d6f088963":[1,0,20,17],
-"structck__checked__latent__loop.html#a6d13d2bcc126b12f228692f8ad56a634":[1,0,20,28],
-"structck__checked__latent__loop.html#a70ed7b5cbad8fc41ef325b758de109bf":[1,0,20,20],
-"structck__checked__latent__loop.html#a73fab0994f1b33c9eaa76fe75a36c614":[1,0,20,18],
-"structck__checked__latent__loop.html#a75dcced70f33a87a409ce43b7d98f6b5":[1,0,20,26],
-"structck__checked__latent__loop.html#a7d9f16ab8ba705fb283c306e45bf477f":[1,0,20,23],
-"structck__checked__latent__loop.html#a836de9b2516bbefbe6281a78b8a4b2e8":[1,0,20,15],
-"structck__checked__latent__loop.html#a88b81acc12055e75cfb45ff1701b0807":[1,0,20,19],
-"structck__checked__latent__loop.html#a8b20490175d5d733cd3833e4504071c3":[1,0,20,22],
-"structck__checked__latent__loop.html#a9dbbc50d61625d891c57be0668fa9430":[1,0,20,3],
-"structck__checked__latent__loop.html#a9eb45963e318b7ef92972e8127bbc0f9":[1,0,20,11]
+"structck__checked__latent__loop.html#a66d332d22fd56de51124a95d6f088963":[1,0,20,17]
 };

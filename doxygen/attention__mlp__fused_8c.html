@@ -356,10 +356,10 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno">  256</span><span class="comment">     * STEP 3: RMSNorm</span></div>
 <div class="line"><span class="lineno">  257</span><span class="comment">     * ═══════════════════════════════════════════════════════════════════════ */</span></div>
 <div class="line"><span class="lineno">  258</span> </div>
-<div class="line"><span class="lineno">  259</span>    <span class="keywordtype">float</span> rms_scale = <a class="code hl_function" href="#aac3e5e26bcc266ae17babf0a4cb5872c">compute_rms_scale_internal</a>(hidden_after_attn, embed_dim, eps);</div>
+<div class="line"><span class="lineno">  259</span>    <span class="keywordtype">float</span> <a class="code hl_function" href="depth__residual__mix__checked_8c.html#a85e47ff5d5b66b07317ca15daf33c397">rms_scale</a> = <a class="code hl_function" href="#aac3e5e26bcc266ae17babf0a4cb5872c">compute_rms_scale_internal</a>(hidden_after_attn, embed_dim, eps);</div>
 <div class="line"><span class="lineno">  260</span> </div>
 <div class="line"><span class="lineno">  261</span><span class="preprocessor">#ifdef __AVX2__</span></div>
-<div class="line"><span class="lineno">  262</span>    __m256 vscale = _mm256_set1_ps(rms_scale);</div>
+<div class="line"><span class="lineno">  262</span>    __m256 vscale = _mm256_set1_ps(<a class="code hl_function" href="depth__residual__mix__checked_8c.html#a85e47ff5d5b66b07317ca15daf33c397">rms_scale</a>);</div>
 <div class="line"><span class="lineno">  263</span>    <span class="keywordtype">int</span> i = 0;</div>
 <div class="line"><span class="lineno">  264</span>    <span class="keywordflow">for</span> (; i + 7 &lt; embed_dim; i += 8) {</div>
 <div class="line"><span class="lineno">  265</span>        __m256 vh = _mm256_loadu_ps(hidden_after_attn + i);</div>
@@ -368,11 +368,11 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno">  268</span>        _mm256_storeu_ps(normed + i, vn);</div>
 <div class="line"><span class="lineno">  269</span>    }</div>
 <div class="line"><span class="lineno">  270</span>    <span class="keywordflow">for</span> (; i &lt; embed_dim; i++) {</div>
-<div class="line"><span class="lineno">  271</span>        normed[i] = hidden_after_attn[i] * rms_weight[i] * rms_scale;</div>
+<div class="line"><span class="lineno">  271</span>        normed[i] = hidden_after_attn[i] * rms_weight[i] * <a class="code hl_function" href="depth__residual__mix__checked_8c.html#a85e47ff5d5b66b07317ca15daf33c397">rms_scale</a>;</div>
 <div class="line"><span class="lineno">  272</span>    }</div>
 <div class="line"><span class="lineno">  273</span><span class="preprocessor">#else</span></div>
 <div class="line"><span class="lineno">  274</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; embed_dim; i++) {</div>
-<div class="line"><span class="lineno">  275</span>        normed[i] = hidden_after_attn[i] * rms_weight[i] * rms_scale;</div>
+<div class="line"><span class="lineno">  275</span>        normed[i] = hidden_after_attn[i] * rms_weight[i] * <a class="code hl_function" href="depth__residual__mix__checked_8c.html#a85e47ff5d5b66b07317ca15daf33c397">rms_scale</a>;</div>
 <div class="line"><span class="lineno">  276</span>    }</div>
 <div class="line"><span class="lineno">  277</span><span class="preprocessor">#endif</span></div>
 <div class="line"><span class="lineno">  278</span> </div>
@@ -438,9 +438,10 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="ttc" id="aattention__mlp__fused_8c_html_a7e1099a11aedb31545ad636aeb9d97ed"><div class="ttname"><a href="#a7e1099a11aedb31545ad636aeb9d97ed">silu_scalar</a></div><div class="ttdeci">static float silu_scalar(float x)</div><div class="ttdef"><b>Definition</b> <a href="attention__mlp__fused_8c_source.html#l00109">attention_mlp_fused.c:109</a></div></div>
 <div class="ttc" id="aattention__mlp__fused_8c_html_aac3e5e26bcc266ae17babf0a4cb5872c"><div class="ttname"><a href="#aac3e5e26bcc266ae17babf0a4cb5872c">compute_rms_scale_internal</a></div><div class="ttdeci">static float compute_rms_scale_internal(const float *x, int n, float eps)</div><div class="ttdef"><b>Definition</b> <a href="attention__mlp__fused_8c_source.html#l00076">attention_mlp_fused.c:76</a></div></div>
 <div class="ttc" id="aattention__mlp__fused_8c_html_abed6b72ead18c700ac28270c3ff03c83"><div class="ttname"><a href="#abed6b72ead18c700ac28270c3ff03c83">softmax_inplace</a></div><div class="ttdeci">static void softmax_inplace(float *x, int n)</div><div class="ttdef"><b>Definition</b> <a href="attention__mlp__fused_8c_source.html#l00128">attention_mlp_fused.c:128</a></div></div>
+<div class="ttc" id="adepth__residual__mix__checked_8c_html_a85e47ff5d5b66b07317ca15daf33c397"><div class="ttname"><a href="depth__residual__mix__checked_8c.html#a85e47ff5d5b66b07317ca15daf33c397">rms_scale</a></div><div class="ttdeci">static double rms_scale(const float *x, size_t width, double epsilon)</div><div class="ttdef"><b>Definition</b> <a href="depth__residual__mix__checked_8c_source.html#l00003">depth_residual_mix_checked.c:3</a></div></div>
 <div class="ttc" id="atokenizer_8h_html_a86dbad16ac00b8aa3c450398e4f8b741"><div class="ttname"><a href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a></div><div class="ttdeci">int32_t float * score</div><div class="ttdef"><b>Definition</b> <a href="tokenizer_8h_source.html#l00329">tokenizer.h:329</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__mlp__fused_8c_source.html#l00076">compute_rms_scale_internal()</a>, <a class="el" href="tokenizer_8h_source.html#l00329">score</a>, <a class="el" href="attention__mlp__fused_8c_source.html#l00109">silu_scalar()</a>, and <a class="el" href="attention__mlp__fused_8c_source.html#l00128">softmax_inplace()</a>.</p>
+<p class="reference">References <a class="el" href="attention__mlp__fused_8c_source.html#l00076">compute_rms_scale_internal()</a>, <a class="el" href="depth__residual__mix__checked_8c_source.html#l00003">rms_scale()</a>, <a class="el" href="tokenizer_8h_source.html#l00329">score</a>, <a class="el" href="attention__mlp__fused_8c_source.html#l00109">silu_scalar()</a>, and <a class="el" href="attention__mlp__fused_8c_source.html#l00128">softmax_inplace()</a>.</p>
 
 </div>
 </div>
@@ -608,10 +609,10 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno">  813</span><span class="comment">     * STEP 3: RMSNorm (same as before)</span></div>
 <div class="line"><span class="lineno">  814</span><span class="comment">     * ═══════════════════════════════════════════════════════════════════════ */</span></div>
 <div class="line"><span class="lineno">  815</span> </div>
-<div class="line"><span class="lineno">  816</span>    <span class="keywordtype">float</span> rms_scale = <a class="code hl_function" href="#aac3e5e26bcc266ae17babf0a4cb5872c">compute_rms_scale_internal</a>(hidden_after_attn, embed_dim, eps);</div>
+<div class="line"><span class="lineno">  816</span>    <span class="keywordtype">float</span> <a class="code hl_function" href="depth__residual__mix__checked_8c.html#a85e47ff5d5b66b07317ca15daf33c397">rms_scale</a> = <a class="code hl_function" href="#aac3e5e26bcc266ae17babf0a4cb5872c">compute_rms_scale_internal</a>(hidden_after_attn, embed_dim, eps);</div>
 <div class="line"><span class="lineno">  817</span> </div>
 <div class="line"><span class="lineno">  818</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; embed_dim; i++) {</div>
-<div class="line"><span class="lineno">  819</span>        normed[i] = hidden_after_attn[i] * rms_weight[i] * rms_scale;</div>
+<div class="line"><span class="lineno">  819</span>        normed[i] = hidden_after_attn[i] * rms_weight[i] * <a class="code hl_function" href="depth__residual__mix__checked_8c.html#a85e47ff5d5b66b07317ca15daf33c397">rms_scale</a>;</div>
 <div class="line"><span class="lineno">  820</span>    }</div>
 <div class="line"><span class="lineno">  821</span> </div>
 <div class="line"><span class="lineno">  822</span>    <span class="comment">/* ═══════════════════════════════════════════════════════════════════════</span></div>
@@ -663,7 +664,7 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno">  868</span>}</div>
 <div class="ttc" id="ackernel__engine_8h_html_a9beb124343d26ac4870d92b2f047d643"><div class="ttname"><a href="ckernel__engine_8h.html#a9beb124343d26ac4870d92b2f047d643">gemv_q4_k</a></div><div class="ttdeci">void gemv_q4_k(float *y, const void *W, const float *x, int M, int K)</div><div class="ttdoc">Auto-dispatch GEMV based on available SIMD.</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q4k_8c_source.html#l00301">gemm_kernels_q4k.c:301</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__mlp__fused_8c_source.html#l00076">compute_rms_scale_internal()</a>, <a class="el" href="gemm__kernels__q4k_8c_source.html#l00301">gemv_q4_k()</a>, <a class="el" href="tokenizer_8h_source.html#l00329">score</a>, <a class="el" href="attention__mlp__fused_8c_source.html#l00109">silu_scalar()</a>, and <a class="el" href="attention__mlp__fused_8c_source.html#l00128">softmax_inplace()</a>.</p>
+<p class="reference">References <a class="el" href="attention__mlp__fused_8c_source.html#l00076">compute_rms_scale_internal()</a>, <a class="el" href="gemm__kernels__q4k_8c_source.html#l00301">gemv_q4_k()</a>, <a class="el" href="depth__residual__mix__checked_8c_source.html#l00003">rms_scale()</a>, <a class="el" href="tokenizer_8h_source.html#l00329">score</a>, <a class="el" href="attention__mlp__fused_8c_source.html#l00109">silu_scalar()</a>, and <a class="el" href="attention__mlp__fused_8c_source.html#l00128">softmax_inplace()</a>.</p>
 
 </div>
 </div>
@@ -848,9 +849,9 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno"> 1127</span>    }</div>
 <div class="line"><span class="lineno"> 1128</span> </div>
 <div class="line"><span class="lineno"> 1129</span>    <span class="comment">/* Step 3: RMSNorm -&gt; DRAM write */</span></div>
-<div class="line"><span class="lineno"> 1130</span>    <span class="keywordtype">float</span> rms_scale = <a class="code hl_function" href="#aac3e5e26bcc266ae17babf0a4cb5872c">compute_rms_scale_internal</a>(hidden_after_attn_buf, embed_dim, eps);</div>
+<div class="line"><span class="lineno"> 1130</span>    <span class="keywordtype">float</span> <a class="code hl_function" href="depth__residual__mix__checked_8c.html#a85e47ff5d5b66b07317ca15daf33c397">rms_scale</a> = <a class="code hl_function" href="#aac3e5e26bcc266ae17babf0a4cb5872c">compute_rms_scale_internal</a>(hidden_after_attn_buf, embed_dim, eps);</div>
 <div class="line"><span class="lineno"> 1131</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; embed_dim; i++) {</div>
-<div class="line"><span class="lineno"> 1132</span>        normed_buf[i] = hidden_after_attn_buf[i] * rms_weight[i] * rms_scale;</div>
+<div class="line"><span class="lineno"> 1132</span>        normed_buf[i] = hidden_after_attn_buf[i] * rms_weight[i] * <a class="code hl_function" href="depth__residual__mix__checked_8c.html#a85e47ff5d5b66b07317ca15daf33c397">rms_scale</a>;</div>
 <div class="line"><span class="lineno"> 1133</span>    }</div>
 <div class="line"><span class="lineno"> 1134</span> </div>
 <div class="line"><span class="lineno"> 1135</span>    <span class="comment">/* Step 4: Gate projection -&gt; DRAM write */</span></div>
@@ -894,7 +895,7 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno"> 1173</span>    }</div>
 <div class="line"><span class="lineno"> 1174</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__mlp__fused_8c_source.html#l00076">compute_rms_scale_internal()</a>, <a class="el" href="tokenizer_8h_source.html#l00329">score</a>, <a class="el" href="attention__mlp__fused_8c_source.html#l00109">silu_scalar()</a>, and <a class="el" href="attention__mlp__fused_8c_source.html#l00128">softmax_inplace()</a>.</p>
+<p class="reference">References <a class="el" href="attention__mlp__fused_8c_source.html#l00076">compute_rms_scale_internal()</a>, <a class="el" href="depth__residual__mix__checked_8c_source.html#l00003">rms_scale()</a>, <a class="el" href="tokenizer_8h_source.html#l00329">score</a>, <a class="el" href="attention__mlp__fused_8c_source.html#l00109">silu_scalar()</a>, and <a class="el" href="attention__mlp__fused_8c_source.html#l00128">softmax_inplace()</a>.</p>
 
 </div>
 </div>
@@ -1184,10 +1185,10 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno">  998</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; embed_dim; i++) {</div>
 <div class="line"><span class="lineno">  999</span>        sum_sq += hidden_after_attn[i] * hidden_after_attn[i];</div>
 <div class="line"><span class="lineno"> 1000</span>    }</div>
-<div class="line"><span class="lineno"> 1001</span>    <span class="keywordtype">float</span> rms_scale = 1.0f / sqrtf(sum_sq / embed_dim + eps);</div>
+<div class="line"><span class="lineno"> 1001</span>    <span class="keywordtype">float</span> <a class="code hl_function" href="depth__residual__mix__checked_8c.html#a85e47ff5d5b66b07317ca15daf33c397">rms_scale</a> = 1.0f / sqrtf(sum_sq / embed_dim + eps);</div>
 <div class="line"><span class="lineno"> 1002</span> </div>
 <div class="line"><span class="lineno"> 1003</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; embed_dim; i++) {</div>
-<div class="line"><span class="lineno"> 1004</span>        normed_mlp[i] = hidden_after_attn[i] * rms_weight_mlp[i] * rms_scale;</div>
+<div class="line"><span class="lineno"> 1004</span>        normed_mlp[i] = hidden_after_attn[i] * rms_weight_mlp[i] * <a class="code hl_function" href="depth__residual__mix__checked_8c.html#a85e47ff5d5b66b07317ca15daf33c397">rms_scale</a>;</div>
 <div class="line"><span class="lineno"> 1005</span>    }</div>
 <div class="line"><span class="lineno"> 1006</span> </div>
 <div class="line"><span class="lineno"> 1007</span>    <span class="comment">/* ═══════════════════════════════════════════════════════════════════════</span></div>
@@ -1221,10 +1222,10 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno"> 1035</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; embed_dim; i++) {</div>
 <div class="line"><span class="lineno"> 1036</span>        sum_sq += hidden_out[i] * hidden_out[i];</div>
 <div class="line"><span class="lineno"> 1037</span>    }</div>
-<div class="line"><span class="lineno"> 1038</span>    rms_scale = 1.0f / sqrtf(sum_sq / embed_dim + eps);</div>
+<div class="line"><span class="lineno"> 1038</span>    <a class="code hl_function" href="depth__residual__mix__checked_8c.html#a85e47ff5d5b66b07317ca15daf33c397">rms_scale</a> = 1.0f / sqrtf(sum_sq / embed_dim + eps);</div>
 <div class="line"><span class="lineno"> 1039</span> </div>
 <div class="line"><span class="lineno"> 1040</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; embed_dim; i++) {</div>
-<div class="line"><span class="lineno"> 1041</span>        normed_attn[i] = hidden_out[i] * rms_weight_attn[i] * rms_scale;</div>
+<div class="line"><span class="lineno"> 1041</span>        normed_attn[i] = hidden_out[i] * rms_weight_attn[i] * <a class="code hl_function" href="depth__residual__mix__checked_8c.html#a85e47ff5d5b66b07317ca15daf33c397">rms_scale</a>;</div>
 <div class="line"><span class="lineno"> 1042</span>    }</div>
 <div class="line"><span class="lineno"> 1043</span> </div>
 <div class="line"><span class="lineno"> 1044</span>    <span class="comment">/* ═══════════════════════════════════════════════════════════════════════</span></div>
@@ -1241,7 +1242,7 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno"> 1055</span>    <span class="comment">/* hidden_out already contains the final hidden state - no memcpy needed! */</span></div>
 <div class="line"><span class="lineno"> 1056</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="gemm__kernels__q4k_8c_source.html#l00301">gemv_q4_k()</a>, and <a class="el" href="tokenizer_8h_source.html#l00329">score</a>.</p>
+<p class="reference">References <a class="el" href="gemm__kernels__q4k_8c_source.html#l00301">gemv_q4_k()</a>, <a class="el" href="depth__residual__mix__checked_8c_source.html#l00003">rms_scale()</a>, and <a class="el" href="tokenizer_8h_source.html#l00329">score</a>.</p>
 
 </div>
 </div>
@@ -1313,10 +1314,10 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno">  414</span><span class="comment">     * STEP 1: RMSNorm (SIMD)</span></div>
 <div class="line"><span class="lineno">  415</span><span class="comment">     * ═══════════════════════════════════════════════════════════════════════ */</span></div>
 <div class="line"><span class="lineno">  416</span> </div>
-<div class="line"><span class="lineno">  417</span>    <span class="keywordtype">float</span> rms_scale = <a class="code hl_function" href="#aac3e5e26bcc266ae17babf0a4cb5872c">compute_rms_scale_internal</a>(hidden_in, embed_dim, eps);</div>
+<div class="line"><span class="lineno">  417</span>    <span class="keywordtype">float</span> <a class="code hl_function" href="depth__residual__mix__checked_8c.html#a85e47ff5d5b66b07317ca15daf33c397">rms_scale</a> = <a class="code hl_function" href="#aac3e5e26bcc266ae17babf0a4cb5872c">compute_rms_scale_internal</a>(hidden_in, embed_dim, eps);</div>
 <div class="line"><span class="lineno">  418</span> </div>
 <div class="line"><span class="lineno">  419</span><span class="preprocessor">#ifdef __AVX2__</span></div>
-<div class="line"><span class="lineno">  420</span>    __m256 vscale = _mm256_set1_ps(rms_scale);</div>
+<div class="line"><span class="lineno">  420</span>    __m256 vscale = _mm256_set1_ps(<a class="code hl_function" href="depth__residual__mix__checked_8c.html#a85e47ff5d5b66b07317ca15daf33c397">rms_scale</a>);</div>
 <div class="line"><span class="lineno">  421</span>    <span class="keywordtype">int</span> i = 0;</div>
 <div class="line"><span class="lineno">  422</span>    <span class="keywordflow">for</span> (; i + 7 &lt; embed_dim; i += 8) {</div>
 <div class="line"><span class="lineno">  423</span>        __m256 vh = _mm256_loadu_ps(hidden_in + i);</div>
@@ -1325,11 +1326,11 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno">  426</span>        _mm256_storeu_ps(normed + i, vn);</div>
 <div class="line"><span class="lineno">  427</span>    }</div>
 <div class="line"><span class="lineno">  428</span>    <span class="keywordflow">for</span> (; i &lt; embed_dim; i++) {</div>
-<div class="line"><span class="lineno">  429</span>        normed[i] = hidden_in[i] * rms_weight[i] * rms_scale;</div>
+<div class="line"><span class="lineno">  429</span>        normed[i] = hidden_in[i] * rms_weight[i] * <a class="code hl_function" href="depth__residual__mix__checked_8c.html#a85e47ff5d5b66b07317ca15daf33c397">rms_scale</a>;</div>
 <div class="line"><span class="lineno">  430</span>    }</div>
 <div class="line"><span class="lineno">  431</span><span class="preprocessor">#else</span></div>
 <div class="line"><span class="lineno">  432</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; embed_dim; i++) {</div>
-<div class="line"><span class="lineno">  433</span>        normed[i] = hidden_in[i] * rms_weight[i] * rms_scale;</div>
+<div class="line"><span class="lineno">  433</span>        normed[i] = hidden_in[i] * rms_weight[i] * <a class="code hl_function" href="depth__residual__mix__checked_8c.html#a85e47ff5d5b66b07317ca15daf33c397">rms_scale</a>;</div>
 <div class="line"><span class="lineno">  434</span>    }</div>
 <div class="line"><span class="lineno">  435</span><span class="preprocessor">#endif</span></div>
 <div class="line"><span class="lineno">  436</span> </div>
@@ -1423,7 +1424,7 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno">  524</span><span class="preprocessor">#endif</span></div>
 <div class="line"><span class="lineno">  525</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__mlp__fused_8c_source.html#l00076">compute_rms_scale_internal()</a>, and <a class="el" href="attention__mlp__fused_8c_source.html#l00109">silu_scalar()</a>.</p>
+<p class="reference">References <a class="el" href="attention__mlp__fused_8c_source.html#l00076">compute_rms_scale_internal()</a>, <a class="el" href="depth__residual__mix__checked_8c_source.html#l00003">rms_scale()</a>, and <a class="el" href="attention__mlp__fused_8c_source.html#l00109">silu_scalar()</a>.</p>
 
 </div>
 </div>
@@ -1496,10 +1497,10 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno">  563</span><span class="comment">     * STEP 1: RMSNorm (SIMD)</span></div>
 <div class="line"><span class="lineno">  564</span><span class="comment">     * ═══════════════════════════════════════════════════════════════════════ */</span></div>
 <div class="line"><span class="lineno">  565</span> </div>
-<div class="line"><span class="lineno">  566</span>    <span class="keywordtype">float</span> rms_scale = <a class="code hl_function" href="#aac3e5e26bcc266ae17babf0a4cb5872c">compute_rms_scale_internal</a>(hidden_in, embed_dim, eps);</div>
+<div class="line"><span class="lineno">  566</span>    <span class="keywordtype">float</span> <a class="code hl_function" href="depth__residual__mix__checked_8c.html#a85e47ff5d5b66b07317ca15daf33c397">rms_scale</a> = <a class="code hl_function" href="#aac3e5e26bcc266ae17babf0a4cb5872c">compute_rms_scale_internal</a>(hidden_in, embed_dim, eps);</div>
 <div class="line"><span class="lineno">  567</span> </div>
 <div class="line"><span class="lineno">  568</span><span class="preprocessor">#ifdef __AVX2__</span></div>
-<div class="line"><span class="lineno">  569</span>    __m256 vscale = _mm256_set1_ps(rms_scale);</div>
+<div class="line"><span class="lineno">  569</span>    __m256 vscale = _mm256_set1_ps(<a class="code hl_function" href="depth__residual__mix__checked_8c.html#a85e47ff5d5b66b07317ca15daf33c397">rms_scale</a>);</div>
 <div class="line"><span class="lineno">  570</span>    <span class="keywordtype">int</span> i = 0;</div>
 <div class="line"><span class="lineno">  571</span>    <span class="keywordflow">for</span> (; i + 7 &lt; embed_dim; i += 8) {</div>
 <div class="line"><span class="lineno">  572</span>        __m256 vh = _mm256_loadu_ps(hidden_in + i);</div>
@@ -1508,11 +1509,11 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno">  575</span>        _mm256_storeu_ps(normed + i, vn);</div>
 <div class="line"><span class="lineno">  576</span>    }</div>
 <div class="line"><span class="lineno">  577</span>    <span class="keywordflow">for</span> (; i &lt; embed_dim; i++) {</div>
-<div class="line"><span class="lineno">  578</span>        normed[i] = hidden_in[i] * rms_weight[i] * rms_scale;</div>
+<div class="line"><span class="lineno">  578</span>        normed[i] = hidden_in[i] * rms_weight[i] * <a class="code hl_function" href="depth__residual__mix__checked_8c.html#a85e47ff5d5b66b07317ca15daf33c397">rms_scale</a>;</div>
 <div class="line"><span class="lineno">  579</span>    }</div>
 <div class="line"><span class="lineno">  580</span><span class="preprocessor">#else</span></div>
 <div class="line"><span class="lineno">  581</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; embed_dim; i++) {</div>
-<div class="line"><span class="lineno">  582</span>        normed[i] = hidden_in[i] * rms_weight[i] * rms_scale;</div>
+<div class="line"><span class="lineno">  582</span>        normed[i] = hidden_in[i] * rms_weight[i] * <a class="code hl_function" href="depth__residual__mix__checked_8c.html#a85e47ff5d5b66b07317ca15daf33c397">rms_scale</a>;</div>
 <div class="line"><span class="lineno">  583</span>    }</div>
 <div class="line"><span class="lineno">  584</span><span class="preprocessor">#endif</span></div>
 <div class="line"><span class="lineno">  585</span> </div>
@@ -1580,7 +1581,7 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno">  647</span><span class="preprocessor">#endif</span></div>
 <div class="line"><span class="lineno">  648</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__mlp__fused_8c_source.html#l00076">compute_rms_scale_internal()</a>, and <a class="el" href="attention__mlp__fused_8c_source.html#l00109">silu_scalar()</a>.</p>
+<p class="reference">References <a class="el" href="attention__mlp__fused_8c_source.html#l00076">compute_rms_scale_internal()</a>, <a class="el" href="depth__residual__mix__checked_8c_source.html#l00003">rms_scale()</a>, and <a class="el" href="attention__mlp__fused_8c_source.html#l00109">silu_scalar()</a>.</p>
 
 </div>
 </div>
@@ -1656,9 +1657,9 @@ CK-ENGINE KERNEL RULES:</h1>
 <p class="definition">Definition at line <a class="el" href="attention__mlp__fused_8c_source.html#l00657">657</a> of file <a class="el" href="attention__mlp__fused_8c_source.html">attention_mlp_fused.c</a>.</p>
 <div class="fragment"><div class="line"><span class="lineno">  670</span>  {</div>
 <div class="line"><span class="lineno">  671</span>    <span class="comment">/* Step 1: RMSNorm */</span></div>
-<div class="line"><span class="lineno">  672</span>    <span class="keywordtype">float</span> rms_scale = <a class="code hl_function" href="#aac3e5e26bcc266ae17babf0a4cb5872c">compute_rms_scale_internal</a>(hidden_in, embed_dim, eps);</div>
+<div class="line"><span class="lineno">  672</span>    <span class="keywordtype">float</span> <a class="code hl_function" href="depth__residual__mix__checked_8c.html#a85e47ff5d5b66b07317ca15daf33c397">rms_scale</a> = <a class="code hl_function" href="#aac3e5e26bcc266ae17babf0a4cb5872c">compute_rms_scale_internal</a>(hidden_in, embed_dim, eps);</div>
 <div class="line"><span class="lineno">  673</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; embed_dim; i++) {</div>
-<div class="line"><span class="lineno">  674</span>        normed_buf[i] = hidden_in[i] * rms_weight[i] * rms_scale;</div>
+<div class="line"><span class="lineno">  674</span>        normed_buf[i] = hidden_in[i] * rms_weight[i] * <a class="code hl_function" href="depth__residual__mix__checked_8c.html#a85e47ff5d5b66b07317ca15daf33c397">rms_scale</a>;</div>
 <div class="line"><span class="lineno">  675</span>    }</div>
 <div class="line"><span class="lineno">  676</span> </div>
 <div class="line"><span class="lineno">  677</span>    <span class="comment">/* Step 2: Gate projection */</span></div>
@@ -1697,7 +1698,7 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno">  710</span>    }</div>
 <div class="line"><span class="lineno">  711</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__mlp__fused_8c_source.html#l00076">compute_rms_scale_internal()</a>, and <a class="el" href="attention__mlp__fused_8c_source.html#l00109">silu_scalar()</a>.</p>
+<p class="reference">References <a class="el" href="attention__mlp__fused_8c_source.html#l00076">compute_rms_scale_internal()</a>, <a class="el" href="depth__residual__mix__checked_8c_source.html#l00003">rms_scale()</a>, and <a class="el" href="attention__mlp__fused_8c_source.html#l00109">silu_scalar()</a>.</p>
 
 </div>
 </div>

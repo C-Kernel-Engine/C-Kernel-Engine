@@ -1,5 +1,15 @@
 var NAVTREEINDEX21 =
 {
+"structCKInputRef.html#a952a97cab88682ffb36027b353492e6f":[1,0,35,1],
+"structCKInputRef.html#ae1ae7d92ed1362d599e30bf5aff958e3":[1,0,35,0],
+"structCKKernelId.html":[1,0,42],
+"structCKKernelId.html#aaa58279e743ef1ec7a4c9cce3dc67c79":[1,0,42,1],
+"structCKKernelId.html#ab2cebeabdb83297de77f4926e9994ac9":[1,0,42,0],
+"structCKKernelSpec.html":[1,0,43],
+"structCKKernelSpec.html#a19f87171754de66c10e0d6a0968489e2":[1,0,43,2],
+"structCKKernelSpec.html#a702e1368abaa202d24597a58f2f5c751":[1,0,43,5],
+"structCKKernelSpec.html#a851ca16066a7dfa2499bee69cfef2360":[1,0,43,1],
+"structCKKernelSpec.html#ab6e588e0f3701c3c63904c231325185d":[1,0,43,4],
 "structCKKernelSpec.html#aba0f53ce7d166eb16ab0a2cb0973040b":[1,0,43,0],
 "structCKKernelSpec.html#af3d9a06048ce2f5e9fa5c852d864d625":[1,0,43,3],
 "structCKKokoroShapeLimitsV8.html":[1,0,44],
@@ -239,15 +249,5 @@ var NAVTREEINDEX21 =
 "structCKLayerGradOffsets.html#ad3dcd4463deb7947578383f61a5800d9":[1,0,49,36],
 "structCKLayerGradOffsets.html#ada5e0bec439bedbacce85db5a7ecebde":[1,0,49,32],
 "structCKLayerGradOffsets.html#adb3cdd15a030bb3684a4f06ad3e71c60":[1,0,49,3],
-"structCKLayerGradOffsets.html#ade2c721a3da200abf42f0de5c620acf3":[1,0,49,7],
-"structCKLayerGradOffsets.html#ade63c68f660125900a8617279239e1b2":[1,0,49,50],
-"structCKLayerGradOffsets.html#ae3e95857036311e4cad538f1ce2497f9":[1,0,49,5],
-"structCKLayerGradOffsets.html#aea96deb7ae068b65e7f674dd283d5a4f":[1,0,49,14],
-"structCKLayerGradOffsets.html#af0e2b103e7a3b9f799947d8447e091c0":[1,0,49,55],
-"structCKLayerGradOffsets.html#af0ff713ac09310725fe0e8025f446280":[1,0,49,8],
-"structCKLayerGradOffsets.html#af3bc21f8303fd7a535361612ca1388f4":[1,0,49,51],
-"structCKLayerGradOffsets.html#af63821f25445571fda408336d3afb2bf":[1,0,49,46],
-"structCKLayerGradOffsets.html#af845115639ccdc758c87a394f5b60b5d":[1,0,49,6],
-"structCKLayerGradOffsets.html#afef9636288a7b686f3b8ec2569352838":[1,0,49,42],
-"structCKLayerLayout.html":[1,0,50]
+"structCKLayerGradOffsets.html#ade2c721a3da200abf42f0de5c620acf3":[1,0,49,7]
 };
