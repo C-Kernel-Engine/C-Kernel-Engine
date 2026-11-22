@@ -16,7 +16,7 @@ sys.path.insert(0, str(ROOT))
 from version.v8.scripts.build_inkling2_mini_projection_circuit import routed_expert_mixture
 from version.v8.scripts.compile_checked_bundle_v8 import compile_checked_weight_graph
 from version.v8.scripts.convert_gguf_to_bump_v8 import (
-    GGUFReader, TensorInfo, GGML_TYPE_F32, GGML_TYPE_Q8_0,
+    GGUFReader, TensorInfo, GGML_TYPE_F32, GGML_TYPE_Q8_0, GGML_TYPE_IQ4_NL,
     _gguf_read_value, _gguf_skip_value, align_up, ggml_row_bytes,
 )
 from version.v8.scripts.inkling2_expert_weights_v8 import decode_expert_rows
@@ -29,7 +29,6 @@ GGUF_FILES = {
     "q8_0": ("Inkling-2-Mini-Q8_0.gguf", 27_820_099_264),
     "iq4_nl": ("Inkling-2-Mini-IQ4_NL.gguf", 17_627_940_768),
 }
-GGML_TYPE_IQ4_NL = 20
 PACKED_FORMATS = {GGML_TYPE_Q8_0: "q8_0", GGML_TYPE_IQ4_NL: "iq4_nl"}
 IQ4_LEVELS = np.array(
     [-127, -104, -83, -65, -49, -35, -22, -10, 1, 13, 25, 38, 53, 69, 89, 113], dtype=np.float32,
@@ -89,12 +88,7 @@ def gguf_tensor(file, tensors, data_start, name, dims, kind, expert=None):
     info = tensors[name]
     if info.dims != dims or info.ggml_type != kind:
         raise ValueError(f"unexpected GGUF shape or dtype: {name}")
-    if kind == GGML_TYPE_IQ4_NL:
-        if dims[0] % 32:
-            raise ValueError("IQ4_NL input width must contain complete rows")
-        row_bytes = dims[0] // 32 * 18
-    else:
-        row_bytes = ggml_row_bytes(kind, dims[0])
+    row_bytes = ggml_row_bytes(kind, dims[0])
     count = row_bytes * (dims[1] if len(dims) > 1 else 1)
     offset = data_start + info.offset
     if expert is not None:

@@ -1345,6 +1345,11 @@ TEST_SUITES = {
         "TTS Runtime Extent IR Contract", "kernels",
         ROOT / "tests" / "test_v8_runtime_extent_contract.py",
     ),
+    "inkling2_mini_gguf_import_contract": TestSuite(
+        "Inkling 2 Mini GGUF Tensor and Loop Contract", "inference",
+        ROOT / "tests" / "test_v8_inkling2_gguf_import_contract.py",
+        unittest_targets=("tests.test_v8_inkling2_gguf_import_contract",),
+    ),
     "inkling2_mini_import_audit": TestSuite(
         "Inkling 2 Mini Import Metadata and State Schedule", "inference",
         ROOT / "tests" / "test_v8_inkling2_mini_audit.py",

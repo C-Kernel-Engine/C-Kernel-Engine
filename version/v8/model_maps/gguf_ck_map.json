@@ -2,6 +2,142 @@
   "version": 1,
   "description": "Declarative GGUF-to-CK model contract map. Keep model file tensor names here; keep kernel_maps focused on CK op-to-C-kernel bindings.",
   "architectures": {
+    "inkling2_loop": {
+      "template": "inkling2_loop",
+      "family": "inkling2_loop",
+      "conversion_status": "inspection_only",
+      "conversion_blocker": "full text conversion needs a generated Inkling loop circuit, complete weight bindings, and native continuation",
+      "metadata_map": {
+        "block_count": "inkling2_loop.block_count",
+        "context_length": "inkling2_loop.context_length",
+        "embedding_length": "inkling2_loop.embedding_length",
+        "feed_forward_length": "inkling2_loop.feed_forward_length",
+        "expert_feed_forward_length": "inkling2_loop.expert_feed_forward_length",
+        "attention_head_count": "inkling2_loop.attention.head_count",
+        "attention_head_count_kv": "inkling2_loop.attention.head_count_kv",
+        "attention_key_length": "inkling2_loop.attention.key_length",
+        "attention_value_length": "inkling2_loop.attention.value_length",
+        "attention_key_length_swa": "inkling2_loop.attention.key_length_swa",
+        "attention_value_length_swa": "inkling2_loop.attention.value_length_swa",
+        "attention_layer_norm_rms_epsilon": "inkling2_loop.attention.layer_norm_rms_epsilon",
+        "attention_sliding_window": "inkling2_loop.attention.sliding_window",
+        "attention_sliding_window_pattern": "inkling2_loop.attention.sliding_window_pattern",
+        "attention_relative_length": "inkling2_loop.attention.relative_length",
+        "attention_relative_extent": "inkling2_loop.attention.relative_extent",
+        "attention_qk_clip": "inkling2_loop.attention.qk_clip",
+        "attention_relative_clip": "inkling2_loop.attention.relative_clip",
+        "attention_log_scale_floor": "inkling2_loop.attention.log_scale_floor",
+        "attention_log_scale_alpha": "inkling2_loop.attention.log_scale_alpha",
+        "expert_count": "inkling2_loop.expert_count",
+        "expert_used_count": "inkling2_loop.expert_used_count",
+        "expert_weights_scale": "inkling2_loop.expert_weights_scale",
+        "gate_softcap": "inkling2_loop.activation.situ_beta",
+        "up_softcap": "inkling2_loop.activation.situ_linear_beta",
+        "vocab_size": "inkling2_loop.vocab_size",
+        "vocab_size_unpadded": "inkling2_loop.vocab_size_unpadded",
+        "conv_taps": "inkling2_loop.shortconv.l_cache",
+        "block_residual_size": "inkling2_loop.attn_res.block_size",
+        "logit_softcap": "inkling2_loop.final_logit_softcapping",
+        "rope_dimension_count": "inkling2_loop.rope.dimension_count",
+        "loop_start": "inkling2_loop.loop.start",
+        "loop_end": "inkling2_loop.loop.end",
+        "loop_count": "inkling2_loop.loop.count",
+        "loop_gate_rank": "inkling2_loop.loop.gate_rank",
+        "loop_varying": "inkling2_loop.loop.varying"
+      },
+      "tensor_inventory": {
+        "required_global": [
+          "token_embd.weight",
+          "token_embd_norm.weight",
+          "output.weight",
+          "output_norm.weight",
+          "output_res_query.weight"
+        ],
+        "layer_groups": [
+          {
+            "name": "physical_layers",
+            "count_metadata": "inkling2_loop.block_count",
+            "prefix": "blk.{L}.",
+            "required_suffixes": [
+              "attn_gate.weight",
+              "attn_k.weight",
+              "attn_k_conv.weight",
+              "attn_output.weight",
+              "attn_post_conv.weight",
+              "attn_q.weight",
+              "attn_q_clip.weight",
+              "attn_rel.weight",
+              "attn_rel_bias.weight",
+              "attn_rel_clip.weight",
+              "attn_sink_proj.weight",
+              "attn_v.weight",
+              "attn_v_conv.weight",
+              "exp_probs_b.bias",
+              "ffn_down_exps.weight",
+              "ffn_gate_inp.weight",
+              "ffn_gate_up_exps.weight",
+              "ffn_norm.weight",
+              "ffn_post_conv.weight",
+              "ffn_res_query.weight"
+            ]
+          },
+          {
+            "name": "attention_residual_queries",
+            "count_metadata": "inkling2_loop.block_count",
+            "prefix": "blk.{L}.",
+            "required_suffixes": [
+              "attn_res_query.weight"
+            ],
+            "start_index": 1
+          },
+          {
+            "name": "sliding_attention",
+            "count_metadata": "inkling2_loop.block_count",
+            "prefix": "blk.{L}.",
+            "required_suffixes": [
+              "attn_norm.weight"
+            ],
+            "layer_mask_metadata": "inkling2_loop.attention.sliding_window_pattern"
+          },
+          {
+            "name": "full_attention",
+            "count_metadata": "inkling2_loop.block_count",
+            "prefix": "blk.{L}.",
+            "required_suffixes": [
+              "attn_k_conv_proj.weight",
+              "attn_v_conv_proj.weight",
+              "attn_k_inp_norm.weight",
+              "attn_q_inp_norm.weight",
+              "attn_v_inp_norm.weight"
+            ],
+            "layer_mask_metadata": "inkling2_loop.attention.sliding_window_pattern",
+            "layer_mask_value": false
+          },
+          {
+            "name": "loop_core",
+            "count_metadata": "inkling2_loop.block_count",
+            "prefix": "blk.{L}.",
+            "required_suffixes": [
+              "loop_msg_query.weight",
+              "loop_q_ctrl_down.weight",
+              "loop_q_ctrl_forget.weight",
+              "loop_q_ctrl_gain.weight",
+              "loop_k_ctrl_down.weight",
+              "loop_k_ctrl_forget.weight",
+              "loop_k_ctrl_gain.weight",
+              "loop_v_ctrl_down.weight",
+              "loop_v_ctrl_forget.weight",
+              "loop_v_ctrl_gain.weight",
+              "loop_ffn_ctrl_down.weight",
+              "loop_ffn_ctrl_forget.weight",
+              "loop_ffn_ctrl_gain.weight"
+            ],
+            "start_metadata": "inkling2_loop.loop.start",
+            "end_metadata": "inkling2_loop.loop.end"
+          }
+        ]
+      }
+    },
     "cohere2": {
       "template": "cohere2",
       "family": "cohere2",
