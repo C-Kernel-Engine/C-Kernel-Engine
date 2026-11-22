@@ -207,8 +207,9 @@ def compile_checked_weight_graph(folder, graph, weights, declarations, *, source
     offset = 4096
     for name, (shape, dtype) in declarations.items():
         w = weights[name]
-        if dtype == "F32":
-            valid = list(w.shape) == shape and w.dtype == np.float32
+        if dtype in {"F32", "BF16"}:
+            storage_dtype = np.float32 if dtype == "F32" else np.uint16
+            valid = list(w.shape) == shape and w.dtype == storage_dtype
         elif dtype in {"Q8_0", "IQ4_NL"}:
             elements = int(np.prod(shape, dtype=object))
             valid = (shape[-1] % 32 == 0 and w.ndim == 1 and w.dtype == np.uint8

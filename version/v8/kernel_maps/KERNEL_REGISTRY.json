@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 550,
+      "total": 553,
       "by_op": {
         "add_backward": 1,
         "add_rows_backward_train_f32": 1,
@@ -21,6 +21,7 @@
         "attention_full_token_major_checked": 1,
         "attention_last_query_prob_trace": 1,
         "attention_projection": 1,
+        "attention_ranges_checked": 1,
         "attention_sliding": 15,
         "attention_sliding_bounded": 1,
         "attn_gate_sigmoid_mul": 2,
@@ -89,6 +90,7 @@
         "copy_last_row_checked": 1,
         "decoder_features_sequence": 1,
         "depth_residual_mix_checked": 1,
+        "diffusion_vp_ddpm_step_checked": 1,
         "embedding": 7,
         "embedding_backward": 1,
         "embedding_lookup_checked": 1,
@@ -150,6 +152,7 @@
         "layout_transform": 1,
         "leaky_relu_strided_checked": 1,
         "linear_rows_backward_train_f32": 1,
+        "linear_rows_bf16_checked": 1,
         "linear_rows_checked": 1,
         "linear_rows_checked_no_bias": 1,
         "linear_rows_q8_0_checked": 2,
@@ -15580,6 +15583,345 @@
       },
       "name": "attention_last_query_prob_trace_f32",
       "_source_file": "attention_last_query_prob_trace_f32.json"
+    },
+    {
+      "id": "attention_ranges_checked_f32",
+      "op": "attention_ranges_checked",
+      "operation_interface": "attention.two_ranges.token_major.gqa.fp32.checked.v1",
+      "variant": "scalar_fp64_dot_fp32_scores_fp64_softmax",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "equivalence_group": "attention.two_ranges.token_major.gqa.fp32.checked.v1",
+        "phases": [
+          "prefill"
+        ]
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "query",
+          "dtype": "fp32",
+          "shape": [
+            "Q",
+            "H*D"
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "key",
+          "dtype": "fp32",
+          "shape": [
+            "S",
+            "G*D"
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "value",
+          "dtype": "fp32",
+          "shape": [
+            "S",
+            "G*D"
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "ranges",
+          "dtype": "i32",
+          "shape": [
+            "Q",
+            4
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "Q",
+            "H*D"
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "scratch",
+          "dtype": "fp32",
+          "shape": [
+            "X"
+          ],
+          "size_bytes": "4 * X",
+          "size_resolution": "required",
+          "lifetime": "kernel_call",
+          "alignment": 64,
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read_write",
+          "storage_class": "scratch",
+          "consumption": "required"
+        }
+      ],
+      "dims": [
+        "Q",
+        "S",
+        "H",
+        "G",
+        "D",
+        "X"
+      ],
+      "constraints": {
+        "notes": "Batch one. Each query selects up to two ordered nonoverlapping half-open key ranges. Q heads must be a multiple of KV heads. Visible keys reduce in ascending order. Output unchanged on rejection."
+      },
+      "impl": {
+        "function": "ck_attention_ranges_checked_f32",
+        "c_declaration": "int ck_attention_ranges_checked_f32(const float *query, size_t query_elements, const float *key, size_t key_elements, const float *value, size_t value_elements, const int32_t *ranges, size_t range_elements, float *output, size_t output_elements, float *scratch, size_t scratch_elements, size_t query_tokens, size_t memory_tokens, size_t heads, size_t kv_heads, size_t head_dim, float scale);",
+        "sources": [
+          "src/kernels/attention_ranges_checked.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "attention_ranges_scalar_fp64_dot_fp32_scores_fp64_softmax",
+          "status": "validated",
+          "phases": [
+            "prefill"
+          ],
+          "function": "ck_attention_ranges_checked_f32",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp64",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "serial"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "query",
+            "source": "activation:query",
+            "cast": "const float*",
+            "ports": [
+              "input:query"
+            ]
+          },
+          {
+            "name": "query_elements",
+            "source": "runtime:query_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "key",
+            "source": "activation:key",
+            "cast": "const float*",
+            "ports": [
+              "input:key"
+            ]
+          },
+          {
+            "name": "key_elements",
+            "source": "runtime:key_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "value",
+            "source": "activation:value",
+            "cast": "const float*",
+            "ports": [
+              "input:value"
+            ]
+          },
+          {
+            "name": "value_elements",
+            "source": "runtime:value_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "ranges",
+            "source": "activation:ranges",
+            "cast": "const int32_t*",
+            "ports": [
+              "input:ranges"
+            ]
+          },
+          {
+            "name": "range_elements",
+            "source": "runtime:range_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "scratch",
+            "source": "scratch:scratch",
+            "cast": "float*"
+          },
+          {
+            "name": "scratch_elements",
+            "source": "runtime:scratch_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "query_tokens",
+            "source": "runtime:query_tokens",
+            "value_type": "size_t"
+          },
+          {
+            "name": "memory_tokens",
+            "source": "runtime:memory_tokens",
+            "value_type": "size_t"
+          },
+          {
+            "name": "heads",
+            "source": "runtime:heads",
+            "value_type": "size_t"
+          },
+          {
+            "name": "kv_heads",
+            "source": "runtime:kv_heads",
+            "value_type": "size_t"
+          },
+          {
+            "name": "head_dim",
+            "source": "runtime:head_dim",
+            "value_type": "size_t"
+          },
+          {
+            "name": "scale",
+            "source": "param:scale"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "Q": "query_tokens",
+          "S": "memory_tokens",
+          "H": "heads",
+          "D": "head_dim",
+          "X": "scratch_elements",
+          "G": "kv_heads"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "query",
+            "elements": "query_elements",
+            "rows": "query_elements",
+            "width": 1,
+            "element_bytes": 4,
+            "storage_dtype": "fp32"
+          },
+          {
+            "pointer": "key",
+            "elements": "key_elements",
+            "rows": "key_elements",
+            "width": 1,
+            "element_bytes": 4,
+            "storage_dtype": "fp32"
+          },
+          {
+            "pointer": "value",
+            "elements": "value_elements",
+            "rows": "value_elements",
+            "width": 1,
+            "element_bytes": 4,
+            "storage_dtype": "fp32"
+          },
+          {
+            "pointer": "output",
+            "elements": "output_elements",
+            "rows": "output_elements",
+            "width": 1,
+            "element_bytes": 4,
+            "storage_dtype": "fp32"
+          },
+          {
+            "pointer": "scratch",
+            "elements": "scratch_elements",
+            "rows": 1,
+            "width": "scratch_elements",
+            "element_bytes": 4,
+            "storage_dtype": "fp32"
+          },
+          {
+            "pointer": "ranges",
+            "elements": "range_elements",
+            "rows": "query_tokens",
+            "width": 4,
+            "element_bytes": 4,
+            "storage_dtype": "i32"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_attention_ranges_checked.py"
+        ],
+        "oracle": "Independent PyTorch SDPA with explicit boolean visibility and GQA."
+      },
+      "notes": "Reference provider for bounded checked graphs. The calling circuit owns visibility and state policy. Scratch is memory_tokens + query_tokens * heads * head_dim FP32 elements.",
+      "name": "attention_ranges_checked_f32",
+      "_source_file": "attention_ranges_checked_f32.json"
     },
     {
       "id": "attention_sliding_head_major_bounded_f32",
@@ -39115,6 +39457,184 @@
       },
       "name": "depth_residual_mix_checked_f32",
       "_source_file": "depth_residual_mix_checked_f32.json"
+    },
+    {
+      "id": "diffusion_vp_ddpm_step_checked_f64",
+      "op": "diffusion_vp_ddpm_step_checked",
+      "operation_interface": "diffusion.vp_ddpm.explicit_noise.fp64.checked.v1",
+      "variant": "serial_fp64",
+      "quant": {
+        "weight": "none",
+        "activation": "fp64",
+        "output": "fp64"
+      },
+      "inputs": [
+        {
+          "name": "latent",
+          "dtype": "fp64",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "estimate",
+          "dtype": "fp64",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "noise",
+          "dtype": "fp64",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp64",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "N"
+      ],
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "impl": {
+        "function": "ck_diffusion_vp_ddpm_step_f64",
+        "c_declaration": "int ck_diffusion_vp_ddpm_step_f64(const double *latent, const double *estimate, const double *noise, double *output, size_t count, double gamma_from, double gamma_to);",
+        "sources": [
+          "src/kernels/diffusion_vp_step.c"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "latent",
+            "source": "activation:latent",
+            "cast": "const double*",
+            "ports": [
+              "input:latent"
+            ]
+          },
+          {
+            "name": "estimate",
+            "source": "activation:estimate",
+            "cast": "const double*",
+            "ports": [
+              "input:estimate"
+            ]
+          },
+          {
+            "name": "noise",
+            "source": "activation:noise",
+            "cast": "const double*",
+            "ports": [
+              "input:noise"
+            ]
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "double*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "count",
+            "source": "runtime:count",
+            "value_type": "size_t"
+          },
+          {
+            "name": "gamma_from",
+            "source": "param:gamma_from"
+          },
+          {
+            "name": "gamma_to",
+            "source": "param:gamma_to"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "N": "count"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "latent",
+            "elements": "count",
+            "rows": 1,
+            "width": "count",
+            "element_bytes": 8,
+            "storage_dtype": "fp64"
+          },
+          {
+            "pointer": "estimate",
+            "elements": "count",
+            "rows": 1,
+            "width": "count",
+            "element_bytes": 8,
+            "storage_dtype": "fp64"
+          },
+          {
+            "pointer": "noise",
+            "elements": "count",
+            "rows": 1,
+            "width": "count",
+            "element_bytes": 8,
+            "storage_dtype": "fp64"
+          },
+          {
+            "pointer": "output",
+            "elements": "count",
+            "rows": 1,
+            "width": "count",
+            "element_bytes": 8,
+            "storage_dtype": "fp64"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_diffusion_vp_step.py"
+        ],
+        "oracle": "PyTorch FP64 DDPM transition on identical latent, estimate, gamma and noise."
+      },
+      "notes": "FP64 latent storage and explicit external noise. Monotonically nonincreasing gamma. Staged validation prevents output mutation on rejection.",
+      "name": "diffusion_vp_ddpm_step_checked_f64",
+      "_source_file": "diffusion_vp_ddpm_step_checked_f64.json"
     },
     {
       "id": "embedding_backward_f32",
@@ -67874,6 +68394,215 @@
       "notes": "Reuses the existing native training VJP with compiler-validated contiguous spans and explicit per-operation extents. The function is not a checked public pointer API. Complete-head certification enables the existing strict-parity runtime; non-strict backend numerical behavior is not newly certified here.",
       "name": "linear_rows_backward_train_f32",
       "_source_file": "linear_rows_backward_train_f32.json"
+    },
+    {
+      "id": "linear_rows_bf16_checked",
+      "op": "linear_rows_bf16_checked",
+      "operation_interface": "projection.row_major.bf16.rne.checked.v1",
+      "variant": "scalar_fp64_sum_fp32_then_bf16_rne",
+      "quant": {
+        "weight": "bf16",
+        "activation": "bf16",
+        "output": "bf16"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "bf16",
+          "shape": [
+            "M",
+            "K"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "weight",
+          "dtype": "bf16",
+          "shape": [
+            "N",
+            "K"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "bf16",
+          "shape": [
+            "M",
+            "N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "staged",
+          "dtype": "bf16",
+          "shape": [
+            "M*N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read_write",
+          "storage_class": "scratch",
+          "consumption": "required",
+          "size_bytes": "2 * M * N",
+          "size_resolution": "required",
+          "lifetime": "kernel_call",
+          "alignment": 64
+        }
+      ],
+      "dims": [
+        "M",
+        "K",
+        "N"
+      ],
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "impl": {
+        "function": "ck_linear_rows_bf16_checked",
+        "c_declaration": "int ck_linear_rows_bf16_checked(const uint16_t *input, size_t input_elements, const uint16_t *weight, size_t weight_elements, uint16_t *output, size_t output_elements, uint16_t *staged, size_t staged_elements, size_t rows, size_t input_width, size_t output_width);",
+        "sources": [
+          "src/kernels/linear_rows_bf16_checked.c"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const uint16_t*",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "input_elements",
+            "source": "runtime:input_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "weight",
+            "source": "weight:weight",
+            "cast": "const uint16_t*",
+            "ports": [
+              "weight:weight"
+            ]
+          },
+          {
+            "name": "weight_elements",
+            "source": "runtime:weight_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "uint16_t*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "staged",
+            "source": "scratch:staged",
+            "cast": "uint16_t*"
+          },
+          {
+            "name": "staged_elements",
+            "source": "runtime:staged_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "input_width",
+            "source": "runtime:input_width",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output_width",
+            "source": "runtime:output_width",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "M": "rows",
+          "K": "input_width",
+          "N": "output_width"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "elements": "input_elements",
+            "rows": "rows",
+            "width": "input_width",
+            "element_bytes": 2,
+            "storage_dtype": "bf16"
+          },
+          {
+            "pointer": "weight",
+            "elements": "weight_elements",
+            "rows": "output_width",
+            "width": "input_width",
+            "element_bytes": 2,
+            "storage_dtype": "bf16"
+          },
+          {
+            "pointer": "output",
+            "elements": "output_elements",
+            "rows": "rows",
+            "width": "output_width",
+            "element_bytes": 2,
+            "storage_dtype": "bf16"
+          },
+          {
+            "pointer": "staged",
+            "elements": "staged_elements",
+            "rows": "rows",
+            "width": "output_width",
+            "element_bytes": 2
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_linear_rows_bf16_checked.py"
+        ],
+        "oracle": "PyTorch BF16 projection with independently rounded output and FP64 diagnostic oracle."
+      },
+      "notes": "Biasless row-major reference projection. Ascending FP64 accumulation, FP32 intermediate store, BF16 RNE output. No heap allocation. Output untouched on rejection. Temporary BF16 values occupy a checked byte span in caller-owned scratch.",
+      "name": "linear_rows_bf16_checked",
+      "_source_file": "linear_rows_bf16_checked.json"
     },
     {
       "id": "linear_rows_checked_f32",
