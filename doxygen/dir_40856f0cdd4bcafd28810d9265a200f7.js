@@ -115,6 +115,7 @@ var dir_40856f0cdd4bcafd28810d9265a200f7 =
     [ "layernorm_kernels_bf16.c", "layernorm__kernels__bf16_8c.html", "layernorm__kernels__bf16_8c" ],
     [ "layernorm_rows_checked.c", "layernorm__rows__checked_8c.html", "layernorm__rows__checked_8c" ],
     [ "layout_kernels.c", "layout__kernels_8c.html", "layout__kernels_8c" ],
+    [ "linear_rows_bf16_checked.c", "linear__rows__bf16__checked_8c.html", "linear__rows__bf16__checked_8c" ],
     [ "linear_rows_checked.c", "linear__rows__checked_8c.html", "linear__rows__checked_8c" ],
     [ "linear_rows_q8_0_checked.c", "linear__rows__q8__0__checked_8c.html", "linear__rows__q8__0__checked_8c" ],
     [ "log_position_scale_rows_checked.c", "log__position__scale__rows__checked_8c.html", "log__position__scale__rows__checked_8c" ],

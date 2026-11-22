@@ -1,5 +1,10 @@
 var NAVTREEINDEX24 =
 {
+"structCPUInfo.html#ade0ca8a679c8ba6761283507550f2b84":[1,0,84,13],
+"structCPUInfo.html#ae25e58f2b50c70a860e5dcafa0af8d37":[1,0,84,17],
+"structCPUInfo.html#aec1d73dace532ccaa255243ad9222d44":[1,0,84,27],
+"structCPUInfo.html#aef5b41cc946c52f34e354c69a66bcde3":[1,0,84,39],
+"structCPUInfo.html#af5794c564eefe3fab7338e7fe1c5f61b":[1,0,84,16],
 "structCacheInfo.html":[1,0,10],
 "structCacheInfo.html#a2bbafb632144b03c4ac4d74fea63b438":[1,0,10,0],
 "structCacheInfo.html#a2d480cc7cf9fcab61720174ffad45770":[1,0,10,4],
@@ -244,10 +249,5 @@ var NAVTREEINDEX24 =
 "structck__capability__t.html#a691a1ed7473609bba2431299aab8bded":[1,0,14,4],
 "structck__capability__t.html#a9f5f0f74c73143705dc702efbee3a8d3":[1,0,14,1],
 "structck__capability__t.html#abe5ee8f28c062c14b0f243dfd0546068":[1,0,14,3],
-"structck__checked__frame__codec.html":[1,0,15],
-"structck__checked__frame__codec.html#a34b1a6a865cc4d36c75144c94f84235b":[1,0,15,7],
-"structck__checked__frame__codec.html#a4dbced71f17c455bfccc0f8bc84d87f4":[1,0,15,4],
-"structck__checked__frame__codec.html#a4e50ba44c69ab292085480dc55156073":[1,0,15,5],
-"structck__checked__frame__codec.html#a525397cbefeaaaba47f1c41e073a6baf":[1,0,15,9],
-"structck__checked__frame__codec.html#a5e4197c8d4353e695277e01cf11e693f":[1,0,15,10]
+"structck__checked__frame__codec.html":[1,0,15]
 };
