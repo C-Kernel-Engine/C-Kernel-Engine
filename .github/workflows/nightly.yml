@@ -239,6 +239,9 @@ jobs:
           # Build a controlled oracle. A native Sapphire Rapids build enables
           # AVX512-FP16 and silently changes ggml_vec_dot_f16 from the FP32
           # accumulation contract used by CKE to FP16 accumulation.
+          # Q8_K reference quantization also requires rounding the scale
+          # product before adding nearest_int's rounding constant. Disable
+          # implicit C contraction while keeping explicit GGML FMA intrinsics.
           ggml_isa=(-DGGML_NATIVE=OFF -DGGML_AVX=ON -DGGML_AVX2=ON -DGGML_F16C=ON -DGGML_FMA=ON)
           if grep -qw avx512f /proc/cpuinfo; then
             ggml_isa+=(-DGGML_AVX512=ON)
@@ -248,6 +251,7 @@ jobs:
             -DLLAMA_BUILD_TESTS=OFF \
             -DLLAMA_CURL=OFF \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_FLAGS=-ffp-contract=off \
             "${ggml_isa[@]}"
           cmake --build build -j$(nproc)
 

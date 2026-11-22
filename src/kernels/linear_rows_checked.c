@@ -31,12 +31,21 @@ static double dot_bias(const float *input, const float *weight,
 /* Independent rows share weight loads; tail rows vectorize output channels.
  * Each lane preserves ordered FP64
  * multiplication and addition. No horizontal reduction or FMA is introduced. */
-__attribute__((target("avx2,no-fma"), noinline))
+/* Disable contraction without removing FMA from the ISA target. GCC 15
+ * intrinsics can inherit the translation unit's FMA target. */
+#if defined(__GNUC__) && !defined(__clang__)
+__attribute__((optimize("fp-contract=off")))
+#endif
+__attribute__((target("avx2"), noinline))
 static void compute_independent_lanes(const float *input, size_t input_stride,
                               const float *weight, size_t weight_stride,
                               const float *bias, float *output, size_t output_stride,
                               size_t rows, size_t width, size_t channels)
 {
+#if defined(__clang__)
+#pragma clang fp contract(off)
+#pragma clang fp exceptions(strict)
+#endif
     size_t r = 0;
     for (; r + 4 <= rows; r += 4) {
         for (size_t o = 0; o < channels; ++o) {
@@ -108,7 +117,7 @@ static void compute_independent_lanes(const float *input, size_t input_stride,
 
 /* Validate four independent weight rows with the original per-row L1 order.
  * No output is published here; a late nonfinite value still rejects atomically. */
-__attribute__((target("avx2,no-fma"), noinline))
+__attribute__((target("avx2"), noinline))
 static int validate_weight_rows(const float *weight, size_t stride,
                                 const float *bias, size_t width, size_t channels,
                                 double *max_l1, double *max_bias)

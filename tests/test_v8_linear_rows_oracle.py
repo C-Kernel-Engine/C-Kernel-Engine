@@ -91,7 +91,7 @@ class LinearRowsOracleTest(unittest.TestCase):
         lib = Path(self.temp.name) / "linear-openmp.so"
         subprocess.run([
             "cc", "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror", "-pedantic",
-            "-fopenmp", "-shared", "-fPIC",
+            "-march=native", "-fopenmp", "-shared", "-fPIC",
             str(ROOT / "src/kernels/linear_rows_checked.c"),
             "-I", str(ROOT / "include"), "-lm", "-o", str(lib),
         ], check=True)
