@@ -476,6 +476,38 @@ class ModelContractInspectorTests(unittest.TestCase):
         self.assertIn("checkpoint_attention_override", report["missing_ops"])
         self.assertIn("checkpoint_decision_readout", report["missing_ops"])
 
+    def test_decision_moe_and_dense_checkpoints_have_distinct_requirements(self) -> None:
+        from version.v8.scripts.inspect_model_contract_v8 import inspect_config
+
+        config = {
+            "model_type": "gemma4",
+            "text_config": {"model_type": "gemma4_text", "num_hidden_layers": 2,
+                            "enable_moe_block": True, "num_experts": 128, "top_k_experts": 8},
+            "baseten_modeling_overrides": {"readout": "slot_lm"},
+        }
+        report = inspect_config(config)
+        self.assertIn("gemma4_moe_circuit", report["missing_ops"])
+        self.assertIn("gemma4_moe_router", report["required_ops"])
+        self.assertIn("gemma4_routed_geglu", report["required_ops"])
+        config["text_config"]["enable_moe_block"] = False
+        self.assertNotIn("gemma4_moe_circuit", inspect_config(config)["missing_ops"])
+
+    def test_audio_checkpoint_audit_preserves_declared_layer_kinds(self) -> None:
+        from version.v8.scripts.inspect_model_contract_v8 import inspect_config
+
+        config = {
+            "model_type": "fish_omni",
+            "text_config": {"model_type": "fish_omni_text", "num_hidden_layers": 4,
+                            "layer_types": ["linear_attention"] * 3 + ["full_attention"],
+                            "num_experts": 256},
+            "audio_decoder_config": {"model_type": "fish_qwen3_audio_decoder", "num_codebooks": 10},
+        }
+        report = inspect_config(config)
+        self.assertEqual(report["layer_kind_counts"], {"deltanet": 3, "full_attention": 1})
+        self.assertTrue({"gated_deltanet", "full_softmax_topk_router", "audio_codebook_mtp",
+                         "audio_codec_waveform"}.issubset(report["required_ops"]))
+        self.assertEqual(report["status"], "bringup_required")
+
     def test_qwen3_dense_config_is_supported_at_contract_level(self) -> None:
         cfg = {
             "architectures": ["Qwen3ForCausalLM"],

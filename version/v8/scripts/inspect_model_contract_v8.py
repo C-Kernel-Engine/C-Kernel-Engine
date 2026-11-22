@@ -160,6 +160,10 @@ def _layer_kinds(arch: str, config: dict[str, Any]) -> list[str]:
         return _qwen35_layers(config)
     if arch == "gemma4":
         return _gemma4_layers(config)
+    if arch == "fish_omni_text":
+        declared = text.get("layer_types")
+        if isinstance(declared, list) and declared:
+            return ["deltanet" if kind == "linear_attention" else str(kind) for kind in declared]
     if arch == "kimi_vl":
         return _kimi_vl_layers(config)
     if arch == "instella_moe":
@@ -222,6 +226,17 @@ def _required_ops(arch: str, config: dict[str, Any], layer_kinds: list[str]) -> 
         ops.add("swiglu_or_geglu")
     if arch == "gemma4":
         ops.update({"gemma4_per_layer_embed", "gemma4_final_logit_softcap"})
+        if _text_config(config).get("enable_moe_block") is True:
+            ops.update({"gemma4_moe_router", "gemma4_routed_geglu"})
+    if arch == "fish_omni_text":
+        if _text_config(config).get("num_experts", 0):
+            ops.update({"full_softmax_topk_router", "moe_swiglu_expert_mlp", "shared_swiglu_expert_mlp"})
+        if isinstance(config.get("audio_decoder_config"), dict):
+            ops.update({"audio_codebook_mtp", "audio_codec_waveform"})
+    if arch == "nemotron_labs_sigma":
+        ops.update({"diffusion_vp_ddpm_step_checked", "diffusion_read_only_prefix",
+                    "diffusion_time_conditioning", "diffusion_self_conditioning",
+                    "diffusion_token_readout"})
     if arch == "kimi_vl":
         ops.update({"moonvit_encoder", "moonvit_projector", "media_placeholder_merge", "tiktoken_tokenizer"})
     return sorted(ops)
@@ -242,6 +257,8 @@ def _missing_ops(arch: str, required_ops: list[str]) -> list[str]:
             missing.append(op)
     if arch == "cohere":
         missing.append("cohere_tensor_name_mapping_audit")
+    if arch == "gemma4" and "gemma4_moe_router" in required_ops:
+        missing.append("gemma4_moe_circuit")
     if arch == "kimi_vl":
         missing.append("moonvit_bridge_contract")
     if arch not in SUPPORTED_DENSE_ARCHES | SUPPORTED_HYBRID_ARCHES:
