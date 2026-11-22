@@ -488,5 +488,24 @@
       "max_abs": 0.259033203125
     }
   },
-  "remaining_gap": "On the eight-token trace the first substantial captured layer-output drift is at physical layer 2. The selected expert set matches there, and the Q and attention residual already differ. Identical-input replay is needed to attribute further amplification."
+  "remaining_gap": "Physical layer 2 has the first substantial captured layer-output drift. The expert set still matches and Q and the attention residual already differ. The raw Q projection matches exactly with the oracle input and the same GGUF matrix.",
+  "short_greedy_128_comparison": {
+    "native_tokens": 128,
+    "oracle_tokens": 128,
+    "common_greedy_prefix": 5,
+    "native_emitted_answer": false,
+    "oracle_emitted_answer": true,
+    "task_verdict": "FAIL"
+  },
+  "layer2_q_identical_input": {
+    "physical_layer": 2,
+    "operation": "raw Q Q8_0 projection on the oracle's weighted normalized input",
+    "elements": 24576,
+    "max_abs": 0.0,
+    "rmse": 0.0,
+    "bitwise_equal": true,
+    "projection_input_sha256": "00689b2f714ae977cd77a054b3b94a172e1801b02d78b171ea2872bb7913714d",
+    "projection_weight_sha256": "034384a7fc301d9a259f2a91bb7c2eb0a8c9a4ca9a589bb6c8ac4f4e3155ccaf",
+    "library_sha256": "63a25e776c021da7d18fb7e318ac33770e2892d83fdbc4b4cc82a438449b1d7b"
+  }
 }

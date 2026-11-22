@@ -2325,6 +2325,11 @@ python3 version/v8/scripts/compare_inkling2_llama_layer0_v8.py \
   completed native prefill in 106.1 seconds on P3 and gave final-logit
   RMSE 0.348. All three comparisons had the same highest-scoring token.
   These development timings describe individual executions.</p>
+  <p>The eight-token trace showed the first substantial layer-output drift
+  at physical layer 2. The raw Q projection matched bit-for-bit on the
+  oracle's weighted normalized input. In a separate 128-output-token chat
+  comparison, the two greedy trajectories agreed for five tokens and only
+  the oracle emitted a final answer within the budget.</p>
   <pre class="mb-code"><code>python3 version/v8/scripts/replay_inkling2_text_loop_v8.py \
   --config "$PUBLISHER_CONFIG" --gguf "$Q8_GGUF" \
   --tokens-file "$TOKEN_IDS" --context-capacity 256 --chunk-tokens 16 \
