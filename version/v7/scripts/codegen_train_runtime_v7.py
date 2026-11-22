@@ -21,6 +21,7 @@ import hashlib
 import json
 import math
 import re
+import struct
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -492,7 +493,16 @@ def _scalar_expr_from_binding_source(arg_type: str, source: Optional[str], cfg: 
 
     if is_float:
         if key == "rms_eps":
-            return "%.8ff" % _cfg_float(cfg, "rms_eps", default=1e-5)
+            raw = cfg.get("rms_eps", 1e-5)
+            if type(raw) not in (int, float) or not math.isfinite(raw) or raw <= 0:
+                raise ValueError("rms_eps must be positive finite FP32")
+            try:
+                value = struct.unpack("f", struct.pack("f", raw))[0]
+            except (OverflowError, struct.error):
+                raise ValueError("rms_eps must be positive finite FP32") from None
+            if not math.isfinite(value) or value <= 0:
+                raise ValueError("rms_eps must be positive finite FP32")
+            return "%.9ef" % value
         if key == "rope_theta":
             return "%.6ff" % _cfg_float(cfg, "rope_theta", default=10000.0)
         return None
@@ -1406,6 +1416,17 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     bridge_lowering = str(ir2.get("bridge_lowering", "legacy") or "legacy").strip().lower()
     bindings_doc = _load_json(DEFAULT_BINDINGS) if DEFAULT_BINDINGS.exists() else {}
     kernel_bindings = dict(bindings_doc.get("bindings") or {})
+    qk_eps = {}
+    for kid in ("qk_norm_forward", "qk_norm_backward_f32"):
+        if any(op.get("kernel_id") == kid for op in list(ir2.get("forward", [])) + list(ir2.get("backward", []))):
+            params = kernel_bindings.get(kid, {}).get("params", [])
+            sources = [p.get("source") for p in params if p.get("name") == "eps"]
+            if len(sources) != 1:
+                raise ValueError("Q/K normalization requires one declared epsilon binding")
+            expression = _scalar_expr_from_binding_source("float", sources[0], cfg)
+            if expression is None:
+                raise ValueError("unsupported Q/K normalization epsilon binding")
+            qk_eps[kid] = expression
     tensors = _collect_tensors(ir2)
     _validate_training_storage(ir2, tensors, manifest)
     tensor_numel, missing_numel = _tensor_numel_map(tensors)
@@ -2635,11 +2656,12 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
             if out_numel > 0:
                 ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (out_var, int(out_numel), op_id))
             ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, %s, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (in_var, head_var, pre_group))
-        ap("    qk_norm_forward(%s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, 1e-5f);" % (
+        ap("    qk_norm_forward(%s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, %s);" % (
             str(q_bridge.get("head_var") or "g_dummy_f32"),
             str(k_bridge.get("head_var") or "g_dummy_f32"),
             q_gamma_var,
             k_gamma_var,
+            qk_eps["qk_norm_forward"],
         ))
         for bridge in (q_bridge, k_bridge):
             head_var = str(bridge.get("head_var") or "g_dummy_f32")
@@ -2816,7 +2838,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
             str(k_in_bridge.get("head_var") or "g_dummy_f32"),
             _bridge_head_group_macro(k_in_bridge.get("pre_head_group")),
         ))
-        ap("    qk_norm_backward(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, 1e-5f);" % (
+        ap("    qk_norm_backward(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, %s);" % (
             str(dq_out_bridge.get("head_var") or "g_dummy_f32"),
             str(dk_out_bridge.get("head_var") or "g_dummy_f32"),
             str(q_in_bridge.get("head_var") or "g_dummy_f32"),
@@ -2827,6 +2849,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
             str(dk_bridge.get("head_var") or "g_dummy_f32"),
             dq_gamma_var,
             dk_gamma_var,
+            qk_eps["qk_norm_backward_f32"],
         ))
         ap("    ck_reorder_head_to_token_major(%s, %s, g_active_tokens, %s, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (
             str(dq_bridge.get("head_var") or "g_dummy_f32"),
@@ -3951,8 +3974,8 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                         ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (q_out_var, int(q_numel), op_id))
                     if k_numel > 0:
                         ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (k_out_var, int(k_numel), op_id))
-                    ap("    qk_norm_forward(%s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, 1e-5f);" % (
-                        q_out_var, k_out_var, q_gamma_var, k_gamma_var
+                    ap("    qk_norm_forward(%s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, %s);" % (
+                        q_out_var, k_out_var, q_gamma_var, k_gamma_var, qk_eps["qk_norm_forward"]
                     ))
                     ap("    call_count++;")
                 idx += 1

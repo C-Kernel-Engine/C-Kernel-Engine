@@ -2,6 +2,7 @@
 import ctypes
 import hashlib
 import json
+from itertools import accumulate
 import os
 from pathlib import Path
 import subprocess
@@ -14,7 +15,7 @@ import codegen_train_runtime_v7 as codegen
 import generate_train_layout_v7 as planner
 
 
-def certify_training(self, ir, registry, values, trainable, forward, *, integer_inputs=None, loss_function=None, finite_difference=True, precision_label="FP32", fresh_process=False, checked_runtime=False, check_evaluation=False, extra_sources=(), probe_parameter="up", gradient_check=None, token_ids=None, target_ids=None, output_tensor="act.score", loss_ratio=.2, gradient_floor=1e-5, initialization_evidence=None):
+def certify_training(self, ir, registry, values, trainable, forward, *, integer_inputs=None, loss_function=None, finite_difference=True, precision_label="FP32", fresh_process=False, checked_runtime=False, check_evaluation=False, extra_sources=(), probe_parameter="up", gradient_check=None, token_ids=None, target_ids=None, output_tensor="act.score", loss_ratio=.2, learning_rate=.03, updates=40, gradient_floor=1e-5, initialization_evidence=None):
     try:
         import numpy as np
         import torch
@@ -25,6 +26,10 @@ def certify_training(self, ir, registry, values, trainable, forward, *, integer_
     engine = ROOT / 'build/libckernel_engine.so'
     if not engine.exists():
         self.skipTest('build/libckernel_engine.so is required for native training')
+    if updates < 2:
+        raise ValueError('training certification requires at least two updates')
+    resume_at = updates // 2
+    evaluation_steps = {0, resume_at, updates - 1, *range(20, updates, 20)}
     torch.set_num_threads(1)
     ids = np.ascontiguousarray(np.arange(4) if token_ids is None else token_ids, dtype='int32')
     targets = np.ascontiguousarray(ids if target_ids is None else target_ids, dtype='int32')
@@ -52,9 +57,11 @@ def certify_training(self, ir, registry, values, trainable, forward, *, integer_
         ordered = summary['init_weight_order']
         packed = np.concatenate([values[n].ravel() for n in ordered])
         sizes = np.array(summary['init_weight_numel'], dtype='int32')
+        offsets = dict(zip(ordered, accumulate(map(int, sizes[:-1]), initial=0), strict=True))
+        frozen = set(values) - set(trainable)
         self.assertEqual(lib.ck_train_init(ptr(packed), sizes.ctypes.data_as(ip), len(sizes)), len(sizes))
         params = {n: torch.tensor(v, requires_grad=n in trainable) for n, v in values.items()}
-        opt = torch.optim.AdamW([params[n] for n in sorted(trainable)], lr=.03, weight_decay=.01, foreach=False)
+        opt = torch.optim.AdamW([params[n] for n in sorted(trainable)], lr=learning_rate, weight_decay=.01, foreach=False)
         metadata_inputs = np.ascontiguousarray(integer_inputs, dtype='int32') if integer_inputs is not None else None
         if metadata_inputs is None:
             native_step = lib.ck_train_step_ex
@@ -71,14 +78,14 @@ def certify_training(self, ir, registry, values, trainable, forward, *, integer_
         criterion = loss_function or (lambda logits: torch.nn.functional.cross_entropy(logits, labels))
         losses = []
         errors = dict(gradient=0.0, weight=0.0, moment=0.0)
-        config = dict(dtype='fp32', optimizer='AdamW', lr=.03, weight_decay=.01,
+        config = dict(dtype='fp32', optimizer='AdamW', lr=learning_rate, weight_decay=.01,
                       beta1=.9, beta2=.999, eps=1e-8, grad_accum=1)
         if precision_label != "FP32":
             config["precision_policy"] = precision_label
         metadata = dict(runtime_contract_sha256=summary['runtime_contract_sha256'],
                         training_config=config, training_config_sha256=workflow._json_sha256(config),
                         dataset_sha256=workflow._sha256_bytes(ids.tobytes() + targets.tobytes() + packed.tobytes() + (metadata_inputs.tobytes() if metadata_inputs is not None else b'')),
-                        next_microstep=20, total_microsteps=40, grad_accum=1)
+                        next_microstep=resume_at, total_microsteps=updates, grad_accum=1)
 
         def snapshot(kind, count):
             out = np.empty(count, dtype='float32')
@@ -92,26 +99,26 @@ def certify_training(self, ir, registry, values, trainable, forward, *, integer_
                 # Fixed-capacity rejection must not advance AdamW or alter weights.
                 rejected_loss = ctypes.c_float()
                 self.assertLess(native_step(ids.ctypes.data_as(ip), targets.ctypes.data_as(ip),
-                    count - 1, ctypes.byref(rejected_loss), .03), 0)
+                    count - 1, ctypes.byref(rejected_loss), learning_rate), 0)
                 self.assertEqual(lib.ck_train_get_opt_step(), 0)
                 np.testing.assert_array_equal(snapshot('weight', len(packed)), packed)
                 # Reject a bad master operand before any optimizer update, then
                 # reuse this loaded runtime after explicit reinitialization.
                 bad = packed.copy()
-                offset = sum(summary['init_weight_numel'][:ordered.index(probe_parameter)])
+                offset = offsets[probe_parameter]
                 bad[offset] = np.nan
                 lib.ck_train_import_weight_snapshot.argtypes = [fp, ctypes.c_int]
                 self.assertEqual(lib.ck_train_import_weight_snapshot(ptr(bad), len(bad)), len(bad))
                 self.assertLess(native_step(ids.ctypes.data_as(ip), targets.ctypes.data_as(ip),
-                    count, ctypes.byref(rejected_loss), .03), 0)
+                    count, ctypes.byref(rejected_loss), learning_rate), 0)
                 self.assertEqual(lib.ck_train_get_opt_step(), 0)
                 self.assertEqual(snapshot('weight', len(bad)).tobytes(), bad.tobytes())
                 self.assertEqual(lib.ck_train_import_weight_snapshot(ptr(packed), len(packed)), len(packed))
-            for step in range(40):
+            for step in range(updates):
                 opt.zero_grad()
                 logits = forward(params)
                 loss = criterion(logits)
-                if check_evaluation and step in (0, 20, 39):
+                if check_evaluation and step in evaluation_steps:
                     # Same declared entry must work for ordinary decoder CE and
                     # grouped decision loss without executing optimizer updates.
                     lib.ck_train_eval_step.argtypes = [fp]
@@ -125,7 +132,7 @@ def certify_training(self, ir, registry, values, trainable, forward, *, integer_
                         activations = workflow.CERT._activation_snapshot(lib, summary)
                         for name, expected_slot in getattr(forward, "slots", {}).items():
                             self.assertIn(name, activations, "missing named oracle checkpoint")
-                            np.testing.assert_allclose(activations[name], expected_slot, atol=3e-5, rtol=3e-4, err_msg=name)
+                            np.testing.assert_allclose(activations[name], expected_slot, atol=3e-5, rtol=3e-4, err_msg=f'step={step} {name}')
                     self.assertAlmostEqual(evaluated.value, loss.item(), delta=3e-5)
                     np.testing.assert_array_equal(snapshot('weight', summary['weight_snapshot_floats']), before_weights)
                     np.testing.assert_array_equal(workflow._array_export(lib, 'optimizer_state'), before_moments)
@@ -139,17 +146,17 @@ def certify_training(self, ir, registry, values, trainable, forward, *, integer_
                     self.assertGreater(float(params[probe_parameter].grad.abs().max()), gradient_floor)
                 native_loss = ctypes.c_float()
                 self.assertGreater(native_step(ids.ctypes.data_as(ip), targets.ctypes.data_as(ip),
-                                                       count, ctypes.byref(native_loss), .03), 0)
+                                                       count, ctypes.byref(native_loss), learning_rate), 0)
                 self.assertAlmostEqual(native_loss.value, loss.item(), delta=3e-5, msg=str(step))
                 actual = snapshot('weight', summary['weight_snapshot_floats'])
-                for n in set(values) - set(trainable):
-                    offset = sum(summary['init_weight_numel'][:ordered.index(n)])
+                for n in frozen:
+                    offset = offsets[n]
                     self.assertEqual(actual[offset:offset+values[n].size].tobytes(), values[n].tobytes())
                 self.assertEqual(summary['parameter_gradient_order'], sorted(trainable))
                 grads = snapshot('parameter_gradient', summary['parameter_gradient_snapshot_floats'])
                 expected = np.concatenate([params[n].grad.numpy().ravel() for n in summary['parameter_gradient_order']])
                 errors['gradient'] = max(errors['gradient'], float(np.max(np.abs(grads - expected))))
-                np.testing.assert_allclose(grads, expected, atol=3e-5, rtol=3e-4)
+                np.testing.assert_allclose(grads, expected, atol=3e-5, rtol=3e-4, err_msg=f'step={step} gradients')
                 if step == 0 and finite_difference:
                     # Independent central difference at an upstream parameter:
                     # detaching the frozen middle would lose this derivative.
@@ -171,10 +178,10 @@ def certify_training(self, ir, registry, values, trainable, forward, *, integer_
                 actual = snapshot('weight', summary['weight_snapshot_floats'])
                 expected = np.concatenate([params[n].detach().numpy().ravel() for n in ordered])
                 errors['weight'] = max(errors['weight'], float(np.max(np.abs(actual - expected))))
-                np.testing.assert_allclose(actual, expected, atol=3e-5, rtol=3e-4)
+                np.testing.assert_allclose(actual, expected, atol=3e-5, rtol=3e-4, err_msg=f'step={step} weights')
                 losses.append(native_loss.value)
-                if step == 19:
-                    checkpoint = workflow._checkpoint_write(path, 'step20', lib, metadata)
+                if step + 1 == resume_at:
+                    checkpoint = workflow._checkpoint_write(path, f'step{resume_at}', lib, metadata)
             self.assertLess(losses[-1], losses[0] * loss_ratio)
             final_weights = snapshot('weight', summary['weight_snapshot_floats'])
             final_moments = snapshot('optimizer_state', summary['optimizer_state_snapshot_floats'])
@@ -184,10 +191,10 @@ def certify_training(self, ir, registry, values, trainable, forward, *, integer_
             with self.assertRaisesRegex(RuntimeError, 'dataset_sha256 mismatch'):
                 workflow._checkpoint_load(checkpoint, lib, dict(metadata, dataset_sha256='wrong'))
             workflow._checkpoint_load(checkpoint, lib, metadata)
-            for step in range(20, 40):
+            for step in range(resume_at, updates):
                 native_loss = ctypes.c_float()
                 self.assertGreater(native_step(ids.ctypes.data_as(ip), targets.ctypes.data_as(ip),
-                                                       count, ctypes.byref(native_loss), .03), 0)
+                                                       count, ctypes.byref(native_loss), learning_rate), 0)
                 self.assertEqual(native_loss.value, losses[step])
             np.testing.assert_array_equal(snapshot('weight', len(final_weights)), final_weights)
             np.testing.assert_array_equal(snapshot('optimizer_state', len(final_moments)), final_moments)
@@ -197,13 +204,14 @@ def certify_training(self, ir, registry, values, trainable, forward, *, integer_
                     library_sha256=hashlib.sha256((path/'train.so').read_bytes()).hexdigest(),
                     sizes=sizes.tolist(), tokens=count, token_ids=ids.tolist(), target_ids=targets.tolist(),
                     integer_inputs=[] if metadata_inputs is None else metadata_inputs.tolist(),
-                    checkpoint=str(checkpoint), metadata=metadata, remaining_steps=20,
-                    learning_rate=.03, result=str(result_path))
+                    checkpoint=str(checkpoint), metadata=metadata, remaining_steps=updates - resume_at,
+                    learning_rate=learning_rate, result=str(result_path))
                 request_path=path/'fresh-request.json'
                 request_path.write_text(json.dumps(request))
                 subprocess.run([sys.executable, str(ROOT/'tests/clef_training_resume_worker.py'), str(request_path)],check=True)
                 resumed=json.loads(result_path.read_text())
-                self.assertEqual(resumed['losses'], losses[20:])
+                self.assertEqual(resumed['losses'], losses[resume_at:])
+                self.assertEqual(resumed['optimizer_step'], updates)
                 for kind, array in (('weight', final_weights), ('optimizer_state', final_moments)):
                     self.assertEqual(resumed[kind+'_sha256'], hashlib.sha256(array.astype('<f4').tobytes()).hexdigest())
             # Reload the trained weights for forward-only execution.
@@ -228,7 +236,7 @@ def certify_training(self, ir, registry, values, trainable, forward, *, integer_
                 self.assertEqual(inferred['optimizer_step'], 0)
                 self.assertEqual(inferred['weight_sha256'], request['weights_sha256'])
                 np.testing.assert_array_equal(inferred['logits'], activations[output_tensor].tolist())
-            print('%s native AdamW: loss %.8f -> %.8f; 40 gradient/update comparisons' % (precision_label, losses[0], losses[-1]))
+            print('%s native AdamW: loss %.8f -> %.8f; %d gradient/update comparisons' % (precision_label, losses[0], losses[-1], updates))
             print(json.dumps(dict(initialization=initialization_evidence or {"seed":837}, torch_version=torch.__version__, max_abs_errors=errors,
                                   runtime_contract_sha256=summary['runtime_contract_sha256'],
                                   generated_c_sha256=hashlib.sha256(source.encode()).hexdigest(),

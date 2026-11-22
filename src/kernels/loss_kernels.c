@@ -98,6 +98,7 @@ static void softmax_cross_entropy_loss_index_mean_impl(const float *logits,
             continue;
         }
 
+        const double target_logit = (double)row[target];
         if (strict) {
             double max_logit = (double)row[0];
             for (int v = 1; v < vocab_size; ++v) {
@@ -116,7 +117,11 @@ static void softmax_cross_entropy_loss_index_mean_impl(const float *logits,
                 drow[v] = (float)(exp((double)row[v] - max_logit) * inv_sum);
             }
 
-            total_loss += -(double)row[target] + max_logit + log(sum_exp);
+            /* Preserve a small negative target derivative when the FP32
+             * probability would round to one before subtraction. */
+            const double target_exp = exp(target_logit - max_logit);
+            drow[target] = (float)((target_exp - sum_exp) * inv_sum);
+            total_loss += max_logit - target_logit + log(sum_exp);
         } else {
             float max_logit = row[0];
             for (int v = 1; v < vocab_size; ++v) {
@@ -131,15 +136,16 @@ static void softmax_cross_entropy_loss_index_mean_impl(const float *logits,
                 drow[v] = e;
                 sum_exp += (double)e;
             }
+            const double target_gradient = ((double)drow[target] - sum_exp) / sum_exp;
             const float inv_sum = 1.0f / (float)sum_exp;
             for (int v = 0; v < vocab_size; ++v) {
                 drow[v] *= inv_sum;
             }
+            drow[target] = (float)target_gradient;
 
-            total_loss += -(double)row[target] + (double)max_logit + log(sum_exp);
+            total_loss += (double)max_logit - target_logit + log(sum_exp);
         }
 
-        drow[target] -= 1.0f;
         ++valid_tokens;
     }
 

@@ -33,6 +33,8 @@ lib.softmax_cross_entropy_loss.argtypes = [
     ctypes.POINTER(ctypes.c_float),  # loss_out
 ]
 lib.softmax_cross_entropy_loss.restype = None
+lib.softmax_cross_entropy_loss_ptref.argtypes = lib.softmax_cross_entropy_loss.argtypes
+lib.softmax_cross_entropy_loss_ptref.restype = None
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -43,12 +45,12 @@ def ptr_int32(arr: np.ndarray):
     return arr.ctypes.data_as(ctypes.POINTER(ctypes.c_int32))
 
 
-def run_c_cross_entropy(logits_np: np.ndarray, targets_np: np.ndarray):
+def run_c_cross_entropy(logits_np: np.ndarray, targets_np: np.ndarray, kernel=lib.softmax_cross_entropy_loss):
     """Run CK CE kernel and return (loss, d_logits)."""
     t, v = logits_np.shape
     dlogits_np = np.zeros_like(logits_np, dtype=np.float32)
     loss_c = ctypes.c_float(0.0)
-    lib.softmax_cross_entropy_loss(
+    kernel(
         numpy_to_ptr(logits_np),
         ptr_int32(targets_np),
         ctypes.c_int(t), ctypes.c_int(v),
@@ -225,12 +227,40 @@ def run_ignore_index_semantics_tests(T=96, V=503, warmup=10, iterations=500):
     return report
 
 
+def test_wide_vocabulary_reduction():
+    # A large, low-probability tail still contributes to the normalizer.
+    # Use an FP64 oracle for the reduction and match the kernel's FP32 input.
+    logits = np.full((4, 151936), -8.0, dtype=np.float32)
+    logits[0, :3] = [8.0, 7.0, 6.0]
+    logits[1, :4] = [8.0, 7.0, 6.0, 5.0]
+    # This target's probability rounds to 1.0 in FP32, but the
+    # target derivative is still representable after subtracting 1.
+    logits[3, :-1] = -22.0
+    logits[3, -1] = 8.0
+    targets = np.array([0, logits.shape[1] - 1, -100, logits.shape[1] - 1], dtype=np.int32)
+
+    values = torch.from_numpy(logits).double().requires_grad_(True)
+    labels = torch.from_numpy(targets.astype(np.int64))
+    expected_loss = F.cross_entropy(values, labels)
+    (expected_gradient,) = torch.autograd.grad(expected_loss, values)
+    for kernel in (lib.softmax_cross_entropy_loss, lib.softmax_cross_entropy_loss_ptref):
+        loss, gradient = run_c_cross_entropy(logits, targets, kernel)
+        np.testing.assert_allclose(loss, expected_loss.item(), rtol=0, atol=1e-6)
+        np.testing.assert_allclose(gradient, expected_gradient.numpy(), rtol=1e-6, atol=2e-8)
+        np.testing.assert_allclose(gradient[3, -1], expected_gradient[3, -1].item(), rtol=1e-6, atol=0)
+
+    eager_fp32_loss = F.cross_entropy(torch.from_numpy(logits), labels).item()
+    print(f"Wide-vocabulary cross-entropy FP64 oracle PASS. "
+          f"PyTorch eager FP32 loss delta {abs(eager_fp32_loss - expected_loss.item()):.3g}.")
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Main
 # ═══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
     print_system_info()
+    test_wide_vocabulary_reduction()
 
     # Run tests with different sizes
     small_report = run_tests(T=64, V=500, warmup=10, iterations=1000)
