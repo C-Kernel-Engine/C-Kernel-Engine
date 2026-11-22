@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 550,
+      "total": 551,
       "by_op": {
         "add_backward": 1,
         "add_rows_backward_train_f32": 1,
@@ -150,6 +150,7 @@
         "layout_transform": 1,
         "leaky_relu_strided_checked": 1,
         "linear_rows_backward_train_f32": 1,
+        "linear_rows_bf16_checked": 1,
         "linear_rows_checked": 1,
         "linear_rows_checked_no_bias": 1,
         "linear_rows_q8_0_checked": 2,
@@ -67870,6 +67871,215 @@
       "notes": "Reuses the existing native training VJP with compiler-validated contiguous spans and explicit per-operation extents. The function is not a checked public pointer API. Complete-head certification enables the existing strict-parity runtime; non-strict backend numerical behavior is not newly certified here.",
       "name": "linear_rows_backward_train_f32",
       "_source_file": "linear_rows_backward_train_f32.json"
+    },
+    {
+      "id": "linear_rows_bf16_checked",
+      "op": "linear_rows_bf16_checked",
+      "operation_interface": "projection.row_major.bf16.rne.checked.v1",
+      "variant": "scalar_fp64_sum_fp32_then_bf16_rne",
+      "quant": {
+        "weight": "bf16",
+        "activation": "bf16",
+        "output": "bf16"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "bf16",
+          "shape": [
+            "M",
+            "K"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "weight",
+          "dtype": "bf16",
+          "shape": [
+            "N",
+            "K"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "bf16",
+          "shape": [
+            "M",
+            "N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "staged",
+          "dtype": "bf16",
+          "shape": [
+            "M*N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read_write",
+          "storage_class": "scratch",
+          "consumption": "required",
+          "size_bytes": "2 * M * N",
+          "size_resolution": "required",
+          "lifetime": "kernel_call",
+          "alignment": 64
+        }
+      ],
+      "dims": [
+        "M",
+        "K",
+        "N"
+      ],
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "impl": {
+        "function": "ck_linear_rows_bf16_checked",
+        "c_declaration": "int ck_linear_rows_bf16_checked(const uint16_t *input, size_t input_elements, const uint16_t *weight, size_t weight_elements, uint16_t *output, size_t output_elements, uint16_t *staged, size_t staged_elements, size_t rows, size_t input_width, size_t output_width);",
+        "sources": [
+          "src/kernels/linear_rows_bf16_checked.c"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const uint16_t*",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "input_elements",
+            "source": "runtime:input_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "weight",
+            "source": "weight:weight",
+            "cast": "const uint16_t*",
+            "ports": [
+              "weight:weight"
+            ]
+          },
+          {
+            "name": "weight_elements",
+            "source": "runtime:weight_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "uint16_t*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "staged",
+            "source": "scratch:staged",
+            "cast": "uint16_t*"
+          },
+          {
+            "name": "staged_elements",
+            "source": "runtime:staged_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "input_width",
+            "source": "runtime:input_width",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output_width",
+            "source": "runtime:output_width",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "M": "rows",
+          "K": "input_width",
+          "N": "output_width"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "elements": "input_elements",
+            "rows": "rows",
+            "width": "input_width",
+            "element_bytes": 2,
+            "storage_dtype": "bf16"
+          },
+          {
+            "pointer": "weight",
+            "elements": "weight_elements",
+            "rows": "output_width",
+            "width": "input_width",
+            "element_bytes": 2,
+            "storage_dtype": "bf16"
+          },
+          {
+            "pointer": "output",
+            "elements": "output_elements",
+            "rows": "rows",
+            "width": "output_width",
+            "element_bytes": 2,
+            "storage_dtype": "bf16"
+          },
+          {
+            "pointer": "staged",
+            "elements": "staged_elements",
+            "rows": "rows",
+            "width": "output_width",
+            "element_bytes": 2
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_linear_rows_bf16_checked.py"
+        ],
+        "oracle": "PyTorch BF16 projection with independently rounded output and FP64 diagnostic oracle."
+      },
+      "notes": "Biasless row-major reference projection. Ascending FP64 accumulation, FP32 intermediate store, BF16 RNE output. No heap allocation. Output untouched on rejection. Temporary BF16 values occupy a checked byte span in caller-owned scratch.",
+      "name": "linear_rows_bf16_checked",
+      "_source_file": "linear_rows_bf16_checked.json"
     },
     {
       "id": "linear_rows_checked_f32",
