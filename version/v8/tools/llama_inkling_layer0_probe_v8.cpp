@@ -24,25 +24,30 @@ static bool capture_layer(ggml_tensor *tensor, bool ask, void *data) {
     const bool logits = name == "ffn_moe_logits-0";
     const bool q = name == "Qcur-0";
     auto &out = *static_cast<capture *>(data);
-    const bool q_dot = tensor->op == GGML_OP_MUL_MAT && tensor->src[0] &&
-                       std::strcmp(tensor->src[0]->name, "blk.0.attn_q.weight") == 0;
-    if (!final && !routes && !logits && !q && !q_dot) return !ask;
+    const std::string weight = tensor->op == GGML_OP_MUL_MAT && tensor->src[0] ? tensor->src[0]->name : "";
+    const bool q_dot = weight == "blk.0.attn_q.weight";
+    const bool ffn_dot = weight == "blk.0.ffn_gate_inp.weight";
+    const bool o_dot = weight == "blk.0.attn_output.weight";
+    const bool layer_stage = name == "ffn_inp-0" || name == "ffn_moe_out-0" || name == "ffn_out-0";
+    if (!final && !routes && !logits && !q && !q_dot && !ffn_dot && !o_dot && !layer_stage) return !ask;
     if (ask) return true;
-    if (q_dot) {
+    if (q_dot || ffn_dot || o_dot) {
         auto *operand = tensor->src[1];
+        const int width = o_dot ? 3072 : 2304;
         if (operand->type != GGML_TYPE_F32 || !ggml_is_contiguous(operand) ||
-            ggml_nelements(operand) != out.expected * 2304) std::abort();
-        std::vector<float> input(static_cast<size_t>(out.expected) * 2304);
+            ggml_nelements(operand) != out.expected * width) std::abort();
+        std::vector<float> input(static_cast<size_t>(out.expected) * width);
         ggml_backend_tensor_get(operand, input.data(), 0, ggml_nbytes(operand));
-        std::ofstream file(out.prefix + ".q-input.f32", std::ios::binary);
+        const char *suffix = q_dot ? ".q-input.f32" : o_dot ? ".o-input.f32" : ".ffn-input.f32";
+        std::ofstream file(out.prefix + suffix, std::ios::binary);
         file.write(reinterpret_cast<const char *>(input.data()), ggml_nbytes(operand));
         if (!file) std::abort();
     }
-    if (routes || logits || q || q_dot) {
-        const int64_t width = routes ? 8 : logits ? 128 : 3072;
+    if (routes || logits || q || q_dot || o_dot || layer_stage) {
+        const int64_t width = routes ? 8 : logits ? 128 : (layer_stage || o_dot) ? 2304 : 3072;
         if (tensor->type != (routes ? GGML_TYPE_I32 : GGML_TYPE_F32) ||
             ggml_nelements(tensor) != out.expected * width) std::abort();
-        std::ofstream file(out.prefix + "." + (q_dot ? "q-dot.f32" : name), std::ios::binary);
+        std::ofstream file(out.prefix + "." + (q_dot ? "q-dot.f32" : o_dot ? "o-dot.f32" : name), std::ios::binary);
         if (routes) {
             std::vector<int32_t> row(width);
             for (int i = 0; i < out.expected; ++i) {
@@ -130,5 +135,8 @@ int main(int argc, char **argv) {
                 !piece(ctx.get(), data, hidden.data(), 4, 1, prefix + ".append.f32")) return 1;
         } else if (!piece(ctx.get(), data, hidden.data(), 0, 5, prefix + ".full.f32")) return 1;
     }
-    return 0;
+    std::ofstream proof(prefix + ".input.f32", std::ios::binary);
+    proof.write(reinterpret_cast<const char *>(hidden.data()),
+                static_cast<std::streamsize>(hidden.size() * sizeof(float)));
+    return proof ? 0 : 1;
 }

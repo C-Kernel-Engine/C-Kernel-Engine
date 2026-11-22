@@ -11,21 +11,37 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 
-from version.v8.scripts.build_inkling2_decoder_block_v8 import first_block_weights, first_decoder_block
+from version.v8.scripts.build_inkling2_decoder_block_v8 import (
+    PACKED_PROJECTIONS, first_block_weights, first_decoder_block,
+)
 from version.v8.scripts.compile_checked_bundle_v8 import compile_checked_weight_graph
 from version.v8.scripts.replay_inkling2_mini_causal_kv import run
 from version.v8.scripts.replay_inkling2_mini_projections import digest
 from version.v8.scripts.replay_inkling2_routed_moe import (
     EXPERTS, GGML_TYPE_F32, GGML_TYPE_Q8_0, GGUF_FILES, GGUF_REPO, GGUF_REVISION, TOP_K, WIDTH,
-    fetch_gguf_range, from_gguf, gguf_tensor, read_gguf_header, unpack_gguf,
+    fetch_gguf_range, from_gguf, gguf_tensor, make_local_gguf_range_reader, read_gguf_header, unpack_gguf,
 )
 
 
-def attention_reference(torch, hidden, weights):
+def expand_packed_activations(torch, tensor):
+    """Independent expanded FP32 reference for nearest-even Q8_0 activation."""
+    blocks = tensor.reshape(*tensor.shape[:-1], -1, 32)
+    peak = blocks.abs().amax(dim=-1, keepdim=True)
+    scale = (peak / 127).half().float()
+    inverse = torch.where(scale > 0, torch.full_like(peak, 127) / peak, 0)
+    return ((blocks * inverse).round().clamp(-127, 127) * scale).reshape(tensor.shape)
+
+
+def attention_reference(torch, hidden, weights, *, q8_activations=False):
     F = torch.nn.functional
 
     def weight(name):
         return torch.tensor(weights["blk.0." + name])
+
+    def project(x, name):
+        if q8_activations and name in PACKED_PROJECTIONS:
+            x = expand_packed_activations(torch, x)
+        return F.linear(x, weight(name))
 
     def norm(x):
         return x * torch.rsqrt(x.square().mean(dim=-1, keepdim=True) + 1e-6)
@@ -41,27 +57,27 @@ def attention_reference(torch, hidden, weights):
     rows = hidden.shape[0]
     normalized = norm(hidden) * weight("attn_norm.weight")
     query = clip(
-        F.linear(normalized, weight("attn_q.weight")).view(rows, 24, 128) * weight("attn_q_clip.weight").view(24, 128),
+        project(normalized, "attn_q.weight").view(rows, 24, 128) * weight("attn_q_clip.weight").view(24, 128),
         22.627416610717773,
     )
-    raw_key = F.linear(normalized, weight("attn_k.weight"))
-    raw_value = F.linear(normalized, weight("attn_v.weight"))
+    raw_key = project(normalized, "attn_k.weight")
+    raw_value = project(normalized, "attn_v.weight")
     key = clip(conv(raw_key, "attn_k_conv.weight").reshape(rows, 8, 128), 22.627416610717773)
     value = norm(conv(raw_value, "attn_v_conv.weight").reshape(rows, 8, 128))
     relative = clip(
-        F.linear(normalized, weight("attn_rel.weight")).view(rows, 24, 16) * weight("attn_rel_clip.weight").view(24, 16),
+        project(normalized, "attn_rel.weight").view(rows, 24, 16) * weight("attn_rel_clip.weight").view(24, 16),
         8,
     )
     band = F.linear(relative, weight("attn_rel_bias.weight"))
-    sink = F.linear(normalized, weight("attn_sink_proj.weight"))
+    sink = project(normalized, "attn_sink_proj.weight")
     distance = torch.arange(rows)[:, None] - torch.arange(rows)[None, :]
     bias = band.gather(-1, distance.clamp(min=0)[:, None, :].expand(-1, 24, -1))
     scores = torch.einsum("thd,shd->ths", query, key.repeat_interleave(3, dim=1)) / np.sqrt(128)
     scores = (scores + bias).masked_fill(distance[:, None, :] < 0, -torch.inf)
     probabilities = torch.cat((scores, sink.unsqueeze(-1)), dim=-1).softmax(dim=-1)[..., :-1]
     attention = torch.einsum("ths,shd->thd", probabilities, value.repeat_interleave(3, dim=1)).reshape(rows, 3072)
-    gate = F.linear(normalized, weight("attn_gate.weight")).sigmoid()
-    projected = F.linear(attention * gate, weight("attn_output.weight"))
+    gate = project(normalized, "attn_gate.weight").sigmoid()
+    projected = project(attention * gate, "attn_output.weight")
     residual = conv(projected, "attn_post_conv.weight")
     states = norm(torch.stack((hidden, residual), dim=1))
     mix_weights = (F.linear(states, weight("ffn_res_query.weight").unsqueeze(0)).squeeze(-1) / np.sqrt(WIDTH))
@@ -77,12 +93,18 @@ def attention_reference(torch, hidden, weights):
     }, conv
 
 
-def replay(folder, torch):
+def replay(folder, torch, *, q8_activations=False, local_gguf=None):
+    read_range = make_local_gguf_range_reader(local_gguf) if local_gguf else fetch_gguf_range
     file = GGUF_FILES["q8_0"]
-    header, header_proof = fetch_gguf_range(file, 0, 16 * 1024 * 1024)
+    header, header_proof = read_range(file, 0, 16 * 1024 * 1024)
     tensors, data_start = read_gguf_header(header)
+    if local_gguf:
+        prior = json.loads((ROOT / "docs/notes/artifacts/inkling2_mini_q8_first_decoder_block.json").read_text())
+        directory_hash = prior["llama_cpp_cpu_comparison"]["artifact_header_sha256"]
+        if local_gguf.stat().st_size != file[1] or digest(header[:data_start]) != directory_hash:
+            raise ValueError("local GGUF file size or tensor directory differs from the pinned Q8_0 artifact")
     rows = 5
-    options = dict(slots=TOP_K)
+    options = dict(slots=TOP_K, q8_activations=q8_activations)
     shape_graph = first_decoder_block(prefill_tokens=rows, **options)
     declarations = first_block_weights(shape_graph)
     references = {}
@@ -94,19 +116,19 @@ def replay(folder, torch):
             gguf_dims = tuple(shape[::-1])
             if name in {"blk.0.attn_q_clip.weight", "blk.0.attn_rel_clip.weight"}:
                 gguf_dims = (shape[0] // 24, 24)
-            raw, sources[name] = gguf_tensor(file, tensors, data_start, name, gguf_dims, kind)
+            raw, sources[name] = gguf_tensor(file, tensors, data_start, name, gguf_dims, kind, read_range=read_range)
             if mode == "Q8_0":
                 weights[name] = np.frombuffer(raw, np.uint8)
                 references[name] = unpack_gguf(weights[name], shape, kind)
             else:
                 weights[name] = references[name] = np.frombuffer(raw, "<f4").reshape(shape)
 
-    (router, bias), bias_source = from_gguf(file, tensors, data_start, 0)
+    (router, bias), bias_source = from_gguf(file, tensors, data_start, 0, read_range=read_range)
     np.testing.assert_array_equal(router, weights["blk.0.ffn_gate_inp.weight"])
     sources["blk.0.exp_probs_b.bias"] = bias_source[-1]
     seed = 162
     hidden = torch.from_numpy(np.random.default_rng(seed).normal(0., .2, (rows, WIDTH)).astype(np.float32))
-    expected, expected_state, conv = attention_reference(torch, hidden, references)
+    expected, expected_state, conv = attention_reference(torch, hidden, references, q8_activations=q8_activations)
     F = torch.nn.functional
     ff = expected["ffn_norm"]
     scores = F.linear(ff, torch.tensor(router)).sigmoid()
@@ -120,16 +142,21 @@ def replay(folder, torch):
     mixture = torch.zeros_like(ff)
     active_ids = sorted(set(ids.flatten().tolist()))
     with ThreadPoolExecutor(max_workers=4) as pool:
-        bank = list(pool.map(lambda expert: from_gguf(file, tensors, data_start, 0, expert), active_ids))
+        bank = list(pool.map(lambda expert: from_gguf(file, tensors, data_start, 0, expert, read_range=read_range), active_ids))
     expert_map = np.full(EXPERTS, -1, dtype=np.int32)
     for slot, expert in enumerate(active_ids):
         expert_map[expert] = slot
         _, matrices, sources[f"expert_{expert}"] = bank[slot]
         row_indices, slot_indices = torch.where(ids == expert)
         g, u, d = (torch.tensor(mat) for mat in matrices)
-        g = F.linear(ff[row_indices], g)
-        u = F.linear(ff[row_indices], u)
+        ff_rows = ff[row_indices]
+        if q8_activations:
+            ff_rows = expand_packed_activations(torch, ff_rows)
+        g = F.linear(ff_rows, g)
+        u = F.linear(ff_rows, u)
         act = (4 * (g / 4).tanh() * g.sigmoid()) * (25 * (u / 25).tanh())
+        if q8_activations:
+            act = expand_packed_activations(torch, act)
         mixture[row_indices] += F.linear(act, d) * probs[row_indices, slot_indices, None]
     expected["mixture"] = mixture
     expected["ffn_post_conv"] = conv(mixture, "ffn_post_conv.weight")
@@ -140,11 +167,15 @@ def replay(folder, torch):
 
     report = {
         "status": "PASS", "physical_layer": 0, "state_slot": 0,
-        "contract": "packed Q8_0 weights, FP32 activations and state, ordered FP64 projection accumulation",
+        "contract": ("packed Q8_0 weights and nearest-even Q8_0 activations, eight-lane FP32 FMA reduction, FP32 state"
+                     if q8_activations else
+                     "packed Q8_0 weights, FP32 activations and state, ordered FP64 projection accumulation"),
         "scope": "synthetic layer inputs, compact bank of routed experts, no whole model load",
-        "oracle": f"PyTorch {torch.__version__} with FP32 expansion of the same GGUF weights",
+        "oracle": (f"PyTorch {torch.__version__} with FP32 expansion of the same GGUF weights"
+                   + (" and explicitly quantized activations" if q8_activations else "")),
         "source": {"repo": GGUF_REPO, "revision": GGUF_REVISION, "file": file[0],
-                   "header_range": header_proof, "ranges": sources},
+                   "header_range": header_proof, "ranges": sources,
+                   "read_mode": "local_ranges" if local_gguf else "publisher_http_ranges"},
         "seed": seed, "input_sha256": digest(hidden.numpy().tobytes()), "tokens": rows,
         "exact_route_ids": ids.tolist(), "minimum_route_margin": route_stability, "builds": {},
     }
@@ -152,7 +183,7 @@ def replay(folder, torch):
     for name, length in (("split", rows - 1), ("full", rows)):
         path = folder / name
         path.mkdir()
-        graph = first_decoder_block(prefill_tokens=length, slots=len(bank))
+        graph = first_decoder_block(prefill_tokens=length, slots=len(bank), q8_activations=q8_activations)
         bundle = compile_checked_weight_graph(path, graph, weights, first_block_weights(graph))
         view = bundle[2]
         view("router_bias")[:] = bias
@@ -172,10 +203,25 @@ def replay(folder, torch):
 
     def compare(name, a, b, oracle):
         np.testing.assert_array_equal(a, b, err_msg=name)
-        np.testing.assert_allclose(a, oracle.numpy(), atol=2e-5, rtol=5e-5, err_msg=name)
-        return {"split_exact": True, "max_abs_vs_oracle": float(np.abs(a - oracle.numpy()).max())}
+        ref = oracle.numpy()
+        if not np.isfinite(a).all() or not np.isfinite(ref).all():
+            raise ValueError(f"nonfinite data at {name}")
+        delta = np.abs(a - ref)
+        mismatches = int(np.count_nonzero(delta > 2e-5 + 5e-5 * np.abs(ref)))
+        return {"split_exact": True, "max_abs_vs_oracle": float(delta.max()),
+                "oracle_compare": "FAIL" if mismatches else "PASS",
+                "oracle_mismatched_elements": mismatches}
 
     split, full = views["split"], views["full"]
+    # Capture fixed logical rows before the comparisons so a failure can be replayed.
+    hidden.numpy().astype("<f4", copy=False).tofile(folder / "hidden.f32")
+    full("inkling2_prefill_slot0_layer_output").astype("<f4", copy=False).tofile(folder / "layer-output.f32")
+    full("inkling2_prefill_slot0_indices", np.int32).astype("<i4", copy=False).tofile(folder / "route-ids.i32")
+    if q8_activations:
+        trace_names = ("attn_norm", "query_raw", "query", "gated_attention", "projected_attention", "attn_post_conv",
+                       "depth_mix", "ffn_norm", "logits", "mixture", "ffn_post_conv")
+        np.savez(folder / "native-trace.npz",
+                 **{name: full("inkling2_prefill_slot0_" + name) for name in trace_names})
     report["activations"] = {}
     for name, target in expected.items():
         sequence = np.concatenate([split(f"inkling2_{phase}_slot0_{name}") for phase in ("prefill", "append")])
@@ -188,23 +234,32 @@ def replay(folder, torch):
         report["state"][name] = compare(name, *states, target)
     split_ids = np.concatenate([split(f"inkling2_{phase}_slot0_indices", np.int32) for phase in ("prefill", "append")])
     np.testing.assert_array_equal(split_ids, full("inkling2_prefill_slot0_indices", np.int32))
-    np.testing.assert_array_equal(split_ids, ids.numpy())
-    hidden.numpy().astype("<f4", copy=False).tofile(folder / "hidden.f32")
-    full("inkling2_prefill_slot0_layer_output").astype("<f4", copy=False).tofile(folder / "layer-output.f32")
+    exact_routes = np.array_equal(split_ids, ids.numpy())
+    comparisons = [*report["activations"].values(), *report["state"].values()]
+    report.update(
+        status="PASS" if exact_routes and all(c["oracle_compare"] == "PASS" for c in comparisons) else "FAIL",
+        native_split_continuity="PASS", route_oracle="PASS" if exact_routes else "FAIL",
+        oracle_tolerances={"atol": 2e-5, "rtol": 5e-5},
+        exact_route_ids=split_ids.tolist(),
+    )
     return report
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--q8-activations", action="store_true")
+    parser.add_argument("--gguf", type=Path, help="read pinned layer-zero ranges from a local GGUF")
     args = parser.parse_args()
     import torch
 
     torch.set_num_threads(2)
     torch.set_float32_matmul_precision("highest")
     args.output.mkdir(mode=0o700)
-    report = replay(args.output, torch)
+    report = replay(args.output, torch, q8_activations=args.q8_activations, local_gguf=args.gguf)
     (args.output / "report.json").write_text(json.dumps(report, indent=2) + "\n")
+    if report["status"] != "PASS":
+        parser.exit(1, "composed reference comparison failed; see report.json and captured rows\n")
 
 
 if __name__ == "__main__":

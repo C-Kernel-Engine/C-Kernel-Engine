@@ -2250,6 +2250,35 @@ python3 version/v8/scripts/compare_inkling2_llama_layer0_v8.py \
   at <code>l_out-0</code>. Later weights were absent from the sparse
   fixture.</p>
 
+  <h3 id="inkling2-mini-q8-activation">Inkling 2 Mini Q8_0 activation variant</h3>
+  <p>Selecting the opt-in variant packs FP32 operands into Q8_0 blocks
+  with FP16 scales and nearest-even integer codes. Its portable reference
+  implements the pinned x86 eight-lane FP32 FMA reduction for packed
+  projections and expert gate, up, and down products. The existing
+  FP32-activation providers remain the default reference.</p>
+  <p>The <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/docs/notes/artifacts/inkling2_mini_q8_activation_layer0.json">retained replay</a>
+  matches all 40 expert selections and the raw query projection against
+  the pinned llama.cpp CPU capture. Maximum layer-output error drops
+  from 1.9751 to 0.0144. Split native output, logical cache, and all four
+  convolution histories remain exact. The composed PyTorch check still
+  fails its original tolerance at the expert mixture and later boundaries.</p>
+  <p>The captured gated attention input differs by at most
+  9.54 &times; 10<sup>&minus;7</sup>, enough to change one FP16 scale
+  in the output projection's activation packing. The later FFN inputs
+  differ in two scale blocks and seven codes. Feeding llama.cpp's exact
+  captured FFN input to the generated CKE MoE matches every selected
+  expert and the mixture within 9.54 &times; 10<sup>&minus;7</sup>.</p>
+  <pre class="mb-code"><code>python3 version/v8/scripts/replay_inkling2_q8_decoder_block_v8.py \
+  --gguf "$GGUF" --q8-activations --output "$REPLAY"
+/tmp/inkling-layer0-probe "$GGUF" "$REPLAY/hidden.f32" "$REPLAY/llama-layer0"
+python3 version/v8/scripts/compare_inkling2_llama_layer0_v8.py \
+  --gguf "$GGUF" --native-replay "$REPLAY" --llama-prefix "$REPLAY/llama-layer0" \
+  --ffn-replay "$REPLAY/identical-ffn"</code></pre>
+  <p>The composed replay writes its report and exits unsuccessfully when
+  the fixed comparison fails. These are layer-zero results on synthetic
+  hidden rows. Native text generation and HTTP serving still require the
+  full decoder circuit.</p>
+
   <h2 id="lowering">9. Run lowering and inspect the generated C</h2>
   <p>The verified entry point is the wrapper <code>version/v8/scripts/cks-v8-run</code> (it selects a Python, checks requirements, and drives <code>ck_run_v8.py</code>). The full pipeline, exactly as run for this page <span class="tag tag-executed">executed</span>:</p>
   <pre class="mb-code"><code>version/v8/scripts/cks-v8-run run \
