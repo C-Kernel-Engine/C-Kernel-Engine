@@ -28,7 +28,7 @@
     "alignment": {"H": 16},
     "notes": "Validated for scalar state gates (S=1). Requires AVX-512 plus PyTorch's SLEEF exp/log1p symbols."
   },
-  "runtime_dependencies": ["sleef_expf16_u10"],
+  "runtime_dependencies": ["sleef_expf16_u10", "sleef_log1pf16_u10"],
   "impl": {
     "function": "recurrent_dt_gate_forward_pytorch_fp32",
     "c_declaration": "void recurrent_dt_gate_forward_pytorch_fp32(const float *alpha, const float *dt_bias, const float *a, float *gate, int rows, int num_heads, int state_dim);",

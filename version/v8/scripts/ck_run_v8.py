@@ -2240,6 +2240,16 @@ def run_pipeline(args: argparse.Namespace) -> int:
         log(f"  Library: {lib_path}")
         return 0
 
+    if __package__:
+        from .resolve_serving_bundle_v8 import resolve_runtime_dependencies
+    else:
+        from resolve_serving_bundle_v8 import resolve_runtime_dependencies
+    from server.serving_bundle import verify_runtime_dependencies
+
+    verify_runtime_dependencies(
+        {"runtime_dependencies": resolve_runtime_dependencies(work_dir)},
+        native_library=BUILD_DIR / "libckernel_engine.so",
+    )
     step_run_chat(work_dir, args, gguf_path=gguf_path)
     return 0
 
