@@ -1,6 +1,8 @@
-"""Author Inkling sliding decoder blocks through ordinary checked lowering."""
+"""Author Inkling decoder blocks through ordinary checked lowering."""
+import math
+
 from version.v8.scripts.build_inkling2_mini_projection_circuit import (
-    LAYER, routed_expert_mixture, sliding_attention_replay,
+    LAYER, _project, routed_expert_mixture, sliding_attention_replay,
 )
 
 from version.v8.scripts.build_inkling2_cross_pass_v8 import append_cross_pass_controls
@@ -26,6 +28,20 @@ PACKED_PROJECTIONS = {
 }
 
 
+def _bind_q8_projection(node, q8_activations):
+    p = node["params"]
+    width, channels, rows = p["K"], p["N"], p["M"]
+    node.update(op="linear_rows_q8_0_checked", kernel="linear_rows_q8_0_checked_f32")
+    p["call_constants"] = {
+        "rows": rows, "width": width, "channels": channels,
+        "input_elements": rows * width, "output_elements": rows * channels,
+        "weight_bytes": width // 32 * 34 * channels,
+    }
+    if q8_activations:
+        node["kernel"] = "linear_rows_q8_0_checked_q8_activation"
+        p["call_constants"]["activation_bytes"] = width // 32 * 34
+
+
 def first_decoder_block(prefill_tokens=4, width=2304, kv_heads=8, query_heads=24, dim=128,
                         relative_dim=16, band=1024, window=1024, inner=1152, experts=128,
                         top_k=8, slots=128, taps=4, epsilon=1e-6, q8_activations=False):
@@ -41,10 +57,25 @@ def sliding_decoder_block(prefill_tokens=4, width=2304, kv_heads=8, query_heads=
                           *, layer=0, state_slot=0, depth_states=0, previous_pass_states=0,
                           block_boundary=True, control_rank=64):
     """Compose one sliding block with explicit incoming residual and pass state."""
+    return decoder_block(prefill_tokens, width, kv_heads, query_heads, dim, relative_dim,
+                         band, window, inner, experts, top_k, slots, taps, epsilon, q8_activations,
+                         layer=layer, state_slot=state_slot, depth_states=depth_states,
+                         previous_pass_states=previous_pass_states, block_boundary=block_boundary,
+                         control_rank=control_rank)
+
+
+def decoder_block(prefill_tokens, width, kv_heads, query_heads, dim, relative_dim,
+                  band, window, inner, experts, top_k, slots, taps, epsilon, q8_activations,
+                  *, layer, state_slot, depth_states, previous_pass_states, block_boundary,
+                  control_rank, full_attention=False, log_floor=8192, log_alpha=0.1, cache_capacity=None):
+    """Select the attention topology before lowering a single decoder occurrence."""
+    if full_attention and (not layer or window or type(log_floor) is not int or log_floor < 1
+                           or not math.isfinite(log_alpha) or log_alpha < 0):
+        raise ValueError("invalid full-attention window or log position scale")
     if not (0 <= layer < 24 and 0 <= state_slot < 48 and 0 <= depth_states <= 5
             and 0 <= previous_pass_states <= 5
             and (not previous_pass_states or 1 <= control_rank <= width * 2)):
-        raise ValueError("invalid sliding block state or control geometry")
+        raise ValueError("invalid decoder state or control geometry")
     if (layer != 0 and depth_states == 0) or (layer == 0 and not block_boundary):
         raise ValueError("invalid incoming depth bank for sliding block")
     if previous_pass_states and not 6 <= layer < 18:
@@ -55,19 +86,21 @@ def sliding_decoder_block(prefill_tokens=4, width=2304, kv_heads=8, query_heads=
     graph = sliding_attention_replay(
         prefill_tokens=prefill_tokens, width=width, kv_width=kv_heads * dim, taps=taps,
         slots=(state_slot,), kv_heads=kv_heads, query_heads=query_heads, relative_dim=relative_dim,
-        band=band, window=window,
+        band=band, window=window, cache_capacity=cache_capacity,
     )
     body = graph["block_types"]["block"]["body"]
     exports = graph["semantic_checkpoints"]["exports"]
     graph["name"] = "inkling2_mini_first_q8_decoder_block"
     if layer or state_slot:
-        graph["name"] = f"inkling2_mini_sliding_layer{layer}_slot{state_slot}"
+        attention_kind = "full" if full_attention else "sliding"
+        graph["name"] = f"inkling2_mini_{attention_kind}_layer{layer}_slot{state_slot}"
     if q8_activations:
         graph["name"] += "_q8_activation"
     graph["native_entry"]["function"] = "ck_" + graph["name"]
     graph["contract"]["runtime_invariants"].update(
         inner=inner, physical_layer=layer, depth_states=depth_states, previous_pass_states=previous_pass_states,
-        block_boundary=block_boundary, scope="one sliding decoder layer with packed GGUF weights"
+        block_boundary=block_boundary, attention="full" if full_attention else "sliding",
+        scope="one decoder layer with packed GGUF weights"
     )
     for export in exports.values():
         for check in export["checkpoints"]:
@@ -162,46 +195,89 @@ def sliding_decoder_block(prefill_tokens=4, width=2304, kv_heads=8, query_heads=
             return controlled
 
         incoming = "external:" + resid
-        current = incoming
+        ports = ("q", "k", "v")
+        current = dict.fromkeys(ports, incoming)
         if depth_states:
             prior_depth = "external:" + buffer(entry + "_depth_bank", [rows, depth_states, width])
-            current = depth_mix("attention_depth_mix", prior_depth, incoming, depth_states, "attn_res_query.weight")
+            if full_attention:
+                current = {
+                    port: depth_mix(port + "_attention_depth_mix", prior_depth, incoming, depth_states,
+                                    "attn_res_query." + port)
+                    for port in ports
+                }
+            else:
+                mixed = depth_mix("attention_depth_mix", prior_depth, incoming, depth_states, "attn_res_query.weight")
+                current = dict.fromkeys(ports, mixed)
         if previous_pass_states:
             previous_bank = "external:" + buffer(entry + "_previous_bank", [rows, previous_pass_states, width])
             previous_out = "external:" + buffer(entry + "_previous_output", [rows, width])
-            controlled = control(current, ("q", "k", "v"))
-            normalized = {port: rms(port + "_attn_norm", controlled[port], "attn_norm.weight")
-                          for port in controlled}
+            if full_attention:
+                current = {port: control(current[port], (port,))[port] for port in ports}
+            else:
+                current = control(current["q"], ports)
+        if full_attention or previous_pass_states:
+            normalized = {
+                port: rms(port + "_attn_norm", source,
+                          f"attn_{port}_inp_norm.weight" if full_attention else "attn_norm.weight")
+                for port, source in current.items()
+            }
         else:
-            norm = rms("attn_norm", current, "attn_norm.weight")
-            normalized = dict.fromkeys(("q", "k", "v"), norm)
+            norm = rms("attn_norm", current["q"], "attn_norm.weight")
+            normalized = dict.fromkeys(ports, norm)
         replaces = {f"external:{entry}_{port}_input": normalized[branch]
                     for port, branch in (("query", "q"), ("k", "k"), ("v", "v"))}
         for old in replaces:
             graph["activation_buffers"].pop(old.removeprefix("external:"))
             graph["activation_bindings"].pop(old.removeprefix("external:"))
+        def log_scale(source, channels):
+            output = add(source.removeprefix(entry + "_") + "_log_scale", "log_position_scale_rows_checked",
+                         {"input": source}, shape=graph["activation_buffers"][source]["shape"], params={
+                             "R": rows, "C": channels, "alpha": log_alpha,
+                             "call_constants": {
+                                 "rows": rows, "width": channels, "floor": log_floor,
+                                 "position": 0 if phase == "prefill" else prefill_tokens,
+                                 "input_elements": rows * channels, "output_elements": rows * channels,
+                             }})["id"]
+            return output
+
+        scaled = {}
         for node in original[phase]:
             bind = node["graph_slots"]
-            bind["inputs"] = {port: replaces.get(source, source) for port, source in bind["inputs"].items()}
+            bind["inputs"] = {port: scaled.get(source, replaces.get(source, source))
+                              for port, source in bind["inputs"].items()}
+            if full_attention and node["op"] == "causal_depthwise_residual_checked":
+                kind = "k" if node["id"] == entry + "_k_output" else "v"
+                dynamic_width = kv_heads * taps
+                name = buffer(entry + f"_{kind}_dynamic", [rows, dynamic_width])
+                weight = f"attn_{kind}_conv_proj.weight"
+                projection = _project(name, normalized[kind], width, dynamic_width, rows,
+                                      weight, weight_prefix=area)
+                _bind_q8_projection(projection, q8_activations)
+                body["ops"].append(projection)
+                node.update(op="causal_dynamic_depthwise_residual_checked",
+                            kernel="causal_dynamic_depthwise_residual_checked_f32")
+                node["params"].update(A=dynamic_width, KV=kv_heads)
+                node["params"]["call_constants"].update(
+                    heads=kv_heads, dynamic_width=dynamic_width, dynamic_elements=rows * dynamic_width,
+                )
+                bind["inputs"]["dynamic"] = name
             for port, name in node.get("weight_refs", {}).items():
                 suffix = ATTENTION_WEIGHTS[name.removeprefix(LAYER)]
                 node["weight_refs"][port] = area + suffix
                 if suffix not in PACKED_PROJECTIONS:
                     continue
-                p = node["params"]
-                count_in, count_out, tokens = p["K"], p["N"], p["M"]
-                node.update(op="linear_rows_q8_0_checked", kernel="linear_rows_q8_0_checked_f32")
-                p["call_constants"] = {
-                    "rows": tokens, "width": count_in, "channels": count_out,
-                    "input_elements": tokens * count_in, "output_elements": tokens * count_out,
-                    "weight_bytes": count_in // 32 * 34 * count_out,
-                }
-                if q8_activations:
-                    node["kernel"] = "linear_rows_q8_0_checked_q8_activation"
-                    p["call_constants"]["activation_bytes"] = count_in // 32 * 34
+                _bind_q8_projection(node, q8_activations)
                 if node["id"] in exports:
                     exports[node["id"]]["op"] = node["op"]
             body["ops"].append(node)
+            if full_attention:
+                name = node["id"]
+                if name == entry + "_query":
+                    scaled[name] = log_scale(name, query_heads * dim)
+                elif name == entry + "_relative_scaled":
+                    scaled[name] = log_scale(name, query_heads * relative_dim)
+                if name in exports:
+                    exports[name]["op"] = node["op"]
 
         residual = conv("attn_post_conv", entry + "_projected_attention")
         bank_count = depth_states
@@ -253,12 +329,14 @@ def first_block_weights(graph):
     """Describe the logical tensors loaded into the bounded native block."""
     result = {}
     for op in graph["block_types"]["block"]["body"]["ops"]:
-        p = op["params"]
         for port, name in op.get("weight_refs", {}).items():
+            p = op["params"]
             mode = "F32"
             if op["op"] == "routed_softcapped_experts_checked":
                 shape = [p["S"], p["H"], p["I"]] if port == "down" else [p["S"], p["I"], p["H"]]
                 mode = "Q8_0"
+            elif op["op"] == "embedding_lookup_q8_0_checked":
+                shape, mode = [p["V"], p["C"]], "Q8_0"
             elif port in ("gamma", "query"):
                 shape = [p["C"]]
             else:

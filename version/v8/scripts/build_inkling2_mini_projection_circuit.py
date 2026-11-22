@@ -15,10 +15,12 @@ def _project(name, source, width, channels, tokens, weight, *, weight_prefix=LAY
     return op
 
 
-def _graph(kind, tokens, width, shapes, ops, *, layer=6, scope=None):
+def _graph(kind, tokens, width, shapes, ops, *, layer=6, scope=None, cache_capacity=None):
     if type(tokens) is not int or not 1 <= tokens <= 16:
         raise ValueError("expected 1..16 fixed token rows")
-    if any(type(n) is not int or not 1 <= n <= 8192 for shape in shapes.values() for n in shape):
+    if any(type(n) is not int or not 1 <= n <= (cache_capacity if cache_capacity and key.startswith("cache_")
+                                               and axis == 1 else 8192)
+           for key, shape in shapes.items() for axis, n in enumerate(shape)):
         raise ValueError("unsupported projection geometry")
     name = f"inkling2_mini_layer{layer}_{kind}_fp32"
     checks = {}
@@ -100,7 +102,7 @@ def controller_gates(tokens=8, width=2304, rank=64):
 
 
 def causal_kv_replay(prefill_tokens=8, width=2304, kv_width=1024, taps=4,
-                     slots=(6, 24, 36), kv_heads=8, key_clip=22.627416997969522):
+                     slots=(6, 24, 36), kv_heads=8, key_clip=22.627416997969522, *, cache_capacity=None):
     """K/V projections with independent caller-owned convolution histories."""
     if type(taps) is not int or not 2 <= taps <= 256:
         raise ValueError("unsupported convolution tap count")
@@ -110,7 +112,9 @@ def causal_kv_replay(prefill_tokens=8, width=2304, kv_width=1024, taps=4,
     if type(kv_heads) is not int or kv_heads < 1 or kv_width % kv_heads:
         raise ValueError("K/V widths must partition into whole heads")
     dim = kv_width // kv_heads
-    capacity = prefill_tokens + 1
+    capacity = prefill_tokens + 1 if cache_capacity is None else cache_capacity
+    if type(capacity) is not int or not prefill_tokens < capacity <= 65536:
+        raise ValueError("invalid Inkling KV capacity")
     ops, shapes, segments, state_buffers = [], {}, [], []
     for slot in slots:
         for kind in ("k", "v"):
@@ -164,7 +168,7 @@ def causal_kv_replay(prefill_tokens=8, width=2304, kv_width=1024, taps=4,
                 }},
             })
             segments.append({"function": f"ck_{entry}", "last_op": commit})
-    graph = _graph("causal_kv", prefill_tokens, width, shapes, ops)
+    graph = _graph("causal_kv", prefill_tokens, width, shapes, ops, cache_capacity=capacity)
     scope = graph["contract"]["runtime_invariants"]
     scope["scope"] = "supplied K/V input rows through FP32 projection, static convolution, normalization and KV storage"
     scope["state_slots"] = list(slots)
@@ -181,15 +185,16 @@ def causal_kv_replay(prefill_tokens=8, width=2304, kv_width=1024, taps=4,
 
 def relative_attention_replay(prefill_tokens=8, width=2304, kv_width=1024, taps=4,
                               slots=(6, 24, 36), kv_heads=8, query_heads=24,
-                              band=1024, window=1024):
+                              band=1024, window=1024, *, cache_capacity=None):
     """Read the generated cache through causal GQA with relative logits and sinks."""
     graph = causal_kv_replay(prefill_tokens=prefill_tokens, width=width, kv_width=kv_width,
-                             taps=taps, slots=slots, kv_heads=kv_heads)
+                             taps=taps, slots=slots, kv_heads=kv_heads, cache_capacity=cache_capacity)
     if (any(type(value) is not int for value in (query_heads, band, window))
             or not 1 <= query_heads <= 256 or query_heads % kv_heads
             or not 1 <= band <= 16384 or not 0 <= window <= 16384):
         raise ValueError("unsupported attention geometry")
-    dim, capacity = kv_width // kv_heads, prefill_tokens + 1
+    dim = kv_width // kv_heads
+    capacity = prefill_tokens + 1 if cache_capacity is None else cache_capacity
     ops, shapes, new_ops = graph["block_types"]["block"]["body"]["ops"], graph["activation_buffers"], {}
     for slot in slots:
         for phase, tokens in (("prefill", prefill_tokens), ("append", 1)):
@@ -374,10 +379,10 @@ def routed_expert_mixture(tokens, width, inner, experts, top_k, slots, *,
 def sliding_attention_replay(prefill_tokens=8, width=2304, kv_width=1024, taps=4,
                              slots=(6, 24, 36), kv_heads=8, query_heads=24,
                              relative_dim=16, band=1024, window=1024, q_clip=22.627416997969522,
-                             rel_clip=8.0):
+                             rel_clip=8.0, *, cache_capacity=None):
     """Connect the layer-6 sliding attention path from Q/K/V inputs to gated output."""
     graph = relative_attention_replay(prefill_tokens, width, kv_width, taps, slots, kv_heads,
-                                      query_heads, band, window)
+                                      query_heads, band, window, cache_capacity=cache_capacity)
     template = graph["block_types"]["block"]["body"]
     outputs, schedule = {}, []
     dim = kv_width // kv_heads
