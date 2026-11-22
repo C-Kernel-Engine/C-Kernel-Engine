@@ -15,6 +15,7 @@ enum expert_storage {
 };
 
 #define IQ4_NL_BLOCK_BYTES 18
+#define CHECKED_ROUTED_EXPERT_MAX_ROWS 64
 
 /* GGML IQ4_NL codebook and split-half nibble layout. */
 static const int8_t iq4_nl_values[16] = {
@@ -146,7 +147,7 @@ static void order_slots(const int32_t *ids, size_t experts, size_t top_k, size_t
 static int routed_softcapped_experts(ROUTED_EXPERT_ARGS, enum expert_storage storage, int quantize, int reference_moe)
 {
     /* Bounds keep workspace arithmetic valid on supported size_t widths. */
-    if (!rows || rows > 16 || !hidden_dim || hidden_dim > 8192 ||
+    if (!rows || rows > CHECKED_ROUTED_EXPERT_MAX_ROWS || !hidden_dim || hidden_dim > 8192 ||
         !inner || inner > 8192 || !experts || experts > 1024 || !slots ||
         slots > experts || !top_k || top_k > experts ||
         !isfinite(gate_cap) || gate_cap <= 0.0f || !isfinite(up_cap) || up_cap <= 0.0f)

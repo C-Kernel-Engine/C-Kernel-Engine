@@ -6,6 +6,7 @@ SOURCE_REVISION = "ed40e7da625f594fc9c4990f5f66be24873c22d7"
 TRANSFORMERS_REVISION = "046bdb8cc2cee29d233964bb77fe6fd37cfe4aa3"
 LAYER = "model.llm.layers.6."
 MAX_CONTEXT_CAPACITY = 131072
+MAX_FIXED_TOKEN_ROWS = 64
 
 
 def _project(name, source, width, channels, tokens, weight, *, weight_prefix=LAYER):
@@ -17,8 +18,8 @@ def _project(name, source, width, channels, tokens, weight, *, weight_prefix=LAY
 
 
 def _graph(kind, tokens, width, shapes, ops, *, layer=6, scope=None, cache_capacity=None):
-    if type(tokens) is not int or not 1 <= tokens <= 16:
-        raise ValueError("expected 1..16 fixed token rows")
+    if type(tokens) is not int or not 1 <= tokens <= MAX_FIXED_TOKEN_ROWS:
+        raise ValueError(f"expected 1..{MAX_FIXED_TOKEN_ROWS} fixed token rows")
     if any(type(n) is not int or not 1 <= n <= (cache_capacity if cache_capacity and key.startswith("cache_")
                                                and axis == 1 else 8192)
            for key, shape in shapes.items() for axis, n in enumerate(shape)):
