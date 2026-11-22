@@ -3135,6 +3135,14 @@ OP_DATAFLOW = {
         "outputs": {"expert_output": {"slot": "expert_output", "dtype": "fp32"},
                     "output": {"slot": "mixture", "dtype": "fp32"}},
     },
+    "linear_rows_q8_0_checked": {
+        "inputs": {"input": "external:input"},
+        "outputs": {"output": {"slot": "projected", "dtype": "fp32"}},
+    },
+    "depth_residual_mix_checked": {
+        "inputs": {"bank": "external:bank", "current": "external:current"},
+        "outputs": {"output": {"slot": "depth_mixed", "dtype": "fp32"}},
+    },
     "scaled_head_l2_clip_checked": {
         "inputs": {"input": "external:input"},
         "outputs": {"output": {"slot": "heads_clipped", "dtype": "fp32"}},
@@ -5564,6 +5572,8 @@ TEMPLATE_TO_KERNEL_OP = {
     "moe_router": "matmul",
     "full_softmax_topk_router": "full_softmax_topk_router",
     "routed_softcapped_experts_checked": "routed_softcapped_experts_checked",
+    "linear_rows_q8_0_checked": "linear_rows_q8_0_checked",
+    "depth_residual_mix_checked": "depth_residual_mix_checked",
     "scaled_head_l2_clip_checked": "scaled_head_l2_clip_checked",
     "sigmoid_gate_rows_checked": "sigmoid_gate_rows_checked",
     "sigmoid_topk_router_checked": "sigmoid_topk_router_checked",

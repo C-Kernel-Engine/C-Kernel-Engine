@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 534,
+      "total": 536,
       "by_op": {
         "add_backward": 1,
         "add_rows_backward_train_f32": 1,
@@ -85,6 +85,7 @@
         "copy_i32_span_checked": 1,
         "copy_last_logits": 1,
         "decoder_features_sequence": 1,
+        "depth_residual_mix_checked": 1,
         "embedding": 7,
         "embedding_backward": 1,
         "embedding_lookup_checked": 1,
@@ -146,6 +147,7 @@
         "linear_rows_backward_train_f32": 1,
         "linear_rows_checked": 1,
         "linear_rows_checked_no_bias": 1,
+        "linear_rows_q8_0_checked": 1,
         "logits_store_indexed": 1,
         "mamba_conv1d_state_update": 1,
         "mamba_dt_softplus": 1,
@@ -38008,6 +38010,222 @@
       "_source_file": "dense_embedding_lookup.json"
     },
     {
+      "id": "depth_residual_mix_checked_f32",
+      "op": "depth_residual_mix_checked",
+      "operation_interface": "residual.depth_rms_attention.checked.fp32.v1",
+      "variant": "fp32",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "phases": [
+          "prefill"
+        ],
+        "equivalence_group": "residual.depth_rms_attention.checked.fp32.v1"
+      },
+      "quant": {
+        "weight": "fp32",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "bank",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "S",
+            "C"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "current",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "C"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "query",
+          "dtype": "fp32",
+          "shape": [
+            "C"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "C"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "R",
+        "S",
+        "C"
+      ],
+      "impl": {
+        "function": "depth_residual_mix_checked_f32",
+        "c_declaration": "int depth_residual_mix_checked_f32(const float* bank, size_t bank_elements, const float* current, size_t current_elements, const float* query, size_t query_elements, float* output, size_t output_elements, size_t rows, size_t states, size_t width, float epsilon);",
+        "sources": [
+          "src/kernels/depth_residual_mix_checked.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "bank",
+            "source": "activation:bank",
+            "cast": "const float*",
+            "ports": [
+              "input:bank"
+            ]
+          },
+          {
+            "name": "bank_elements",
+            "source": "runtime:bank_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "current",
+            "source": "activation:current",
+            "cast": "const float*",
+            "ports": [
+              "input:current"
+            ]
+          },
+          {
+            "name": "current_elements",
+            "source": "runtime:current_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "query",
+            "source": "weight:query",
+            "cast": "const float*",
+            "ports": [
+              "weight:query"
+            ]
+          },
+          {
+            "name": "query_elements",
+            "source": "runtime:query_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "states",
+            "source": "runtime:states",
+            "value_type": "size_t"
+          },
+          {
+            "name": "width",
+            "source": "runtime:width",
+            "value_type": "size_t"
+          },
+          {
+            "name": "epsilon",
+            "source": "param:epsilon"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "R": "rows",
+          "S": "states",
+          "C": "width"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "bank",
+            "elements": "bank_elements",
+            "rows": 1,
+            "width": "bank_elements",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "current",
+            "elements": "current_elements",
+            "rows": "rows",
+            "width": "width",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "query",
+            "elements": "query_elements",
+            "rows": 1,
+            "width": "width",
+            "element_bytes": 4,
+            "storage_dtype": "fp32"
+          },
+          {
+            "pointer": "output",
+            "elements": "output_elements",
+            "rows": "rows",
+            "width": "width",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_q8_decoder_block.py"
+        ]
+      },
+      "name": "depth_residual_mix_checked_f32",
+      "_source_file": "depth_residual_mix_checked_f32.json"
+    },
+    {
       "id": "embedding_backward_f32",
       "op": "embedding_backward",
       "variant": "fp32",
@@ -67075,6 +67293,185 @@
       },
       "name": "linear_rows_checked_no_bias_f32",
       "_source_file": "linear_rows_checked_no_bias_f32.json"
+    },
+    {
+      "id": "linear_rows_q8_0_checked_f32",
+      "op": "linear_rows_q8_0_checked",
+      "operation_interface": "linear.row_major.checked.q8_0_fp32_ordered.v1",
+      "variant": "q8_0",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "phases": [
+          "prefill"
+        ],
+        "equivalence_group": "linear.row_major.checked.q8_0_fp32_ordered.v1"
+      },
+      "quant": {
+        "weight": "q8_0",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            "M",
+            "K"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "weight",
+          "dtype": "q8_0",
+          "shape": [
+            "N",
+            "K"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "M",
+            "N"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "M",
+        "K",
+        "N"
+      ],
+      "impl": {
+        "function": "linear_rows_q8_0_checked_f32",
+        "c_declaration": "int linear_rows_q8_0_checked_f32(const float* input, size_t input_elements, const void* weight, size_t weight_bytes, float* output, size_t output_elements, size_t rows, size_t width, size_t channels);",
+        "sources": [
+          "src/kernels/linear_rows_q8_0_checked.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const float*",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "input_elements",
+            "source": "runtime:input_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "weight",
+            "source": "weight:weight",
+            "cast": "const void*",
+            "ports": [
+              "weight:weight"
+            ]
+          },
+          {
+            "name": "weight_bytes",
+            "source": "runtime:weight_bytes",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "width",
+            "source": "runtime:width",
+            "value_type": "size_t"
+          },
+          {
+            "name": "channels",
+            "source": "runtime:channels",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "M": "rows",
+          "K": "width",
+          "N": "channels"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "elements": "input_elements",
+            "rows": "rows",
+            "width": "width",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "weight",
+            "elements": "weight_bytes",
+            "rows": 1,
+            "width": "weight_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q8_0"
+          },
+          {
+            "pointer": "output",
+            "elements": "output_elements",
+            "rows": "rows",
+            "width": "channels",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_q8_decoder_block.py"
+        ]
+      },
+      "name": "linear_rows_q8_0_checked_f32",
+      "_source_file": "linear_rows_q8_0_checked_f32.json"
     },
     {
       "id": "logits_copy_to_position",
