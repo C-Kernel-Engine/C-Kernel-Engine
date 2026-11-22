@@ -307,16 +307,28 @@ def gguf_ck_tensor_inventory_report(
         count = int(count_value)
         if count < 0:
             raise GGUFError(f"{arch}: invalid negative layer count for {count_key!r}")
+        first = metadata.get(group["start_metadata"]) if "start_metadata" in group else group.get("start_index", 0)
+        end = metadata.get(group["end_metadata"]) if "end_metadata" in group else count
+        if (type(first) is not int or type(end) is not int or not 0 <= first <= end <= count):
+            raise GGUFError(f"{arch}: invalid layer range for tensor inventory group {name!r}")
+        layers = range(first, end)
+        if "layer_mask_metadata" in group:
+            mask = metadata.get(group["layer_mask_metadata"])
+            selected = group.get("layer_mask_value", True)
+            if (not isinstance(mask, list) or len(mask) != count or type(selected) is not bool
+                    or any(type(value) is not bool for value in mask)):
+                raise GGUFError(f"{arch}: invalid layer mask for tensor inventory group {name!r}")
+            layers = [layer for layer in layers if mask[layer] is selected]
         group_expected = {
             f"{prefix.format(L=layer)}{suffix}"
-            for layer in range(count)
+            for layer in layers
             for suffix in suffixes
         }
         expected.update(group_expected)
         group_reports.append(
             {
                 "name": name,
-                "layers": count,
+                "layers": len(layers),
                 "tensors_per_layer": len(suffixes),
                 "expected_tensors": len(group_expected),
             }
@@ -1694,6 +1706,150 @@ def describe_layer_contract(tensors: Dict[str, "TensorInfo"], layer: int, arch: 
     return None
 
 
+def audit_inkling2_loop_gguf_contract(tensors, metadata, *, data_start=0, file_size=None):
+    """Resolve the fixed text schedule and verify its GGUF tensor directory."""
+    from audit_inkling2_mini_v8 import text_schedule
+
+    arch = "inkling2_loop"
+    keys = gguf_ck_arch_contract(arch)["metadata_map"]
+
+    def integer(name, maximum, *, minimum=1):
+        value = metadata.get(keys[name])
+        if type(value) is not int or not minimum <= value <= maximum:
+            raise GGUFError(f"{arch}: invalid {keys[name]}")
+        return value
+
+    depth = integer("block_count", 256)
+    width = integer("embedding_length", 32768)
+    ffn = integer("expert_feed_forward_length", 32768)
+    if integer("feed_forward_length", 32768) != ffn:
+        raise GGUFError(f"{arch}: dense and expert feed-forward extents disagree")
+    experts = integer("expert_count", 1024)
+    used = integer("expert_used_count", experts)
+    vocab = integer("vocab_size", 1 << 20)
+    integer("vocab_size_unpadded", vocab)
+    integer("context_length", 1 << 24)
+    integer("attention_sliding_window", 1 << 24)
+    taps = integer("conv_taps", 256, minimum=2)
+    rel_dim = integer("attention_relative_length", 1024)
+    rel_extent = integer("attention_relative_extent", 1 << 16)
+    dim = integer("attention_key_length", 1024)
+    for name in ("attention_value_length", "attention_key_length_swa", "attention_value_length_swa"):
+        if integer(name, 1024) != dim:
+            raise GGUFError(f"{arch}: distinct query, key or value head widths are unsupported")
+    integer("rope_dimension_count", 0, minimum=0)
+    for name in ("attention_layer_norm_rms_epsilon", "attention_qk_clip", "attention_relative_clip",
+                 "attention_log_scale_alpha", "expert_weights_scale", "gate_softcap", "up_softcap", "logit_softcap"):
+        value = metadata.get(keys[name])
+        if type(value) not in (int, float) or not np.isfinite(value) or value <= 0:
+            raise GGUFError(f"{arch}: invalid {keys[name]}")
+    integer("attention_log_scale_floor", 1 << 24)
+    block = integer("block_residual_size", depth)
+    rank = integer("loop_gate_rank", width)
+    start, end = (integer(key, depth) for key in ("loop_start", "loop_end"))
+
+    def head_count(name):
+        value = metadata.get(keys[name])
+        if (not isinstance(value, list) or len(value) != depth
+                or any(type(count) is not int or not 1 <= count <= 256 or count != value[0] for count in value)):
+            raise GGUFError(f"{arch}: expected uniform per-layer {name}")
+        return value[0]
+
+    heads, kv = (head_count(key) for key in ("attention_head_count", "attention_head_count_kv"))
+    if heads % kv:
+        raise GGUFError(f"{arch}: query heads must partition into KV groups")
+    inventory = gguf_ck_tensor_inventory_report(arch, metadata, tensors.keys())
+    if inventory["status"] != "complete":
+        raise GGUFError(f"{arch}: missing {inventory['missing_tensors'][:4]}; undeclared {inventory['undeclared_tensors'][:4]}")
+    sliding = metadata[keys["attention_sliding_window_pattern"]]
+    try:
+        execution = text_schedule({
+            "num_hidden_layers": depth, "n_layers_per_attn_res_block": block,
+            "local_layer_ids": [i for i, is_sliding in enumerate(sliding) if is_sliding],
+            "loop_config": {
+                "core_start": start, "core_end": end, "num_passes": integer("loop_count", 8, minimum=2),
+                "gate_rank": rank, "is_varloop": metadata.get(keys["loop_varying"]),
+            },
+        })
+    except ValueError as exc:
+        raise GGUFError(f"{arch}: {exc}") from exc
+
+    spans = []
+    matrix_types = {GGML_TYPE_F32, GGML_TYPE_BF16, GGML_TYPE_Q8_0}
+    expert_types = matrix_types | {GGML_TYPE_IQ4_NL}
+
+    def expect(name, shape, types=(GGML_TYPE_F32,)):
+        info = tensors[name]
+        if info.dims != shape or info.ggml_type not in types:
+            raise GGUFError(f"{arch}: unexpected shape or storage for {name}: {info.dims} {ggml_type_name(info.ggml_type)}")
+        size = ggml_tensor_bytes(info)
+        spans.append((info.offset, info.offset + size, name))
+
+    for name in ("token_embd.weight", "output.weight"):
+        expect(name, (width, vocab), matrix_types)
+    for name in ("token_embd_norm.weight", "output_norm.weight", "output_res_query.weight"):
+        expect(name, (width,))
+
+    quant = {}
+    for layer in range(depth):
+        def tensor(suffix, shape, types=(GGML_TYPE_F32,)):
+            expect(f"blk.{layer}.{suffix}", shape, types)
+
+        for proj, rows in (("q", heads * dim), ("k", kv * dim), ("v", kv * dim),
+                           ("gate", heads * dim), ("rel", heads * rel_dim), ("sink_proj", heads)):
+            tensor(f"attn_{proj}.weight", (width, rows), matrix_types)
+        tensor("attn_output.weight", (heads * dim, width), matrix_types)
+        tensor("attn_q_clip.weight", (dim, heads))
+        tensor("attn_rel_clip.weight", (rel_dim, heads))
+        tensor("attn_rel_bias.weight", (rel_dim, rel_extent))
+        tensor("attn_post_conv.weight", (taps, width))
+        tensor("ffn_post_conv.weight", (taps, width))
+        tensor("ffn_gate_inp.weight", (width, experts))
+        tensor("exp_probs_b.bias", (experts,))
+        tensor("ffn_norm.weight", (width,))
+        tensor("ffn_res_query.weight", (width,))
+        for port in ("k", "v"):
+            tensor(f"attn_{port}_conv.weight", (taps, kv * dim))
+            if not sliding[layer]:
+                tensor(f"attn_{port}_conv_proj.weight", (width, taps * kv), matrix_types)
+        if sliding[layer]:
+            tensor("attn_norm.weight", (width,))
+        else:
+            for port in ("q", "k", "v"):
+                tensor(f"attn_{port}_inp_norm.weight", (width,))
+        if layer:
+            tensor("attn_res_query.weight", (width,) if sliding[layer] else (width, 3))
+        if start <= layer < end:
+            tensor("loop_msg_query.weight", (width, 4))
+            for port in ("q", "k", "v", "ffn"):
+                tensor(f"loop_{port}_ctrl_down.weight", (2 * width, rank))
+                for name in ("forget", "gain"):
+                    tensor(f"loop_{port}_ctrl_{name}.weight", (rank, width))
+        gate_up, down = "ffn_gate_up_exps.weight", "ffn_down_exps.weight"
+        tensor(gate_up, (width, 2 * ffn, experts), expert_types)
+        tensor(down, (ffn, width, experts), expert_types)
+        quant[layer] = {port: ggml_type_name(tensors[f"blk.{layer}.{suffix}"].ggml_type)
+                        for port, suffix in (("gate_up", gate_up), ("down", down))}
+
+    alignment = metadata.get("general.alignment", 32)
+    if type(alignment) is not int or not 0 < alignment <= 4096 or alignment & (alignment - 1):
+        raise GGUFError(f"{arch}: invalid tensor alignment")
+    cursor = 0
+    for first, last, name in sorted(spans):
+        if first < cursor or first % alignment:
+            raise GGUFError(f"{arch}: overlapping or misaligned tensor: {name}")
+        cursor = last
+    return {
+        "architecture": arch, "physical_layers": depth, "text_schedule": execution,
+        "expert_feed_forward_length": ffn, "experts": experts, "experts_per_token": used,
+        "expert_storage_by_layer": quant,
+        "tensor_count": len(spans), "data_start": data_start, "minimum_file_bytes": data_start + cursor,
+        "payload_extent": ("unknown" if file_size is None else
+                           "complete_extent" if file_size >= data_start + cursor else "header_or_truncated"),
+        "execution": "NOT_TESTED",
+    }
+
+
 def audit_qwen35moe_gguf_contract(
     tensors: Dict[str, "TensorInfo"],
     meta: Dict[str, object],
@@ -2353,9 +2509,9 @@ def ggml_row_bytes(ggml_type: int, ne0: int) -> int:
         return ne0 * 2
     if ggml_type == GGML_TYPE_BF16:
         return ne0 * 2
-    if ggml_type == GGML_TYPE_Q4_0:
+    if ggml_type in (GGML_TYPE_Q4_0, GGML_TYPE_IQ4_NL):
         if ne0 % 32 != 0:
-            raise GGUFError(f"Q4_0 requires ne0 % 32 == 0 (got ne0={ne0})")
+            raise GGUFError(f"{ggml_type_name(ggml_type)} requires ne0 % 32 == 0 (got ne0={ne0})")
         return (ne0 // 32) * 18
     if ggml_type == GGML_TYPE_Q4_1:
         if ne0 % 32 != 0:
@@ -3639,6 +3795,8 @@ def main() -> None:
             dims = tuple(int(r.u64()) for _ in range(n_dims))
             ggml_type = r.u32()
             offset = r.u64()
+            if name in tensors:
+                raise GGUFError(f"duplicate tensor name: {name}")
             tensors[name] = TensorInfo(name=name, dims=dims, ggml_type=int(ggml_type), offset=int(offset))
 
         alignment = int(meta.get("general.alignment", 32))
@@ -3748,6 +3906,21 @@ def main() -> None:
                     if values:
                         print(f"  - {label}: {values[:10]}")
 
+            if arch == "inkling2_loop":
+                inkling = audit_inkling2_loop_gguf_contract(
+                    tensors, meta, data_start=data_start, file_size=r.file_size()
+                )
+                print("[gguf] Inkling text import contract:")
+                print(f"  - physical_layers={inkling['physical_layers']} "
+                      f"state_slots={len(inkling['text_schedule'])} "
+                      f"expert_width={inkling['expert_feed_forward_length']}")
+                print(f"  - payload_extent={inkling['payload_extent']} "
+                      f"minimum_file_bytes={inkling['minimum_file_bytes']} "
+                      f"execution={inkling['execution']}")
+                if args.inspect_layers:
+                    for layer, storage in inkling["expert_storage_by_layer"].items():
+                        print(f"  - layer {layer}: gate/up={storage['gate_up']} down={storage['down']}")
+
             if arch == "qwen35moe":
                 moe_audit = audit_qwen35moe_gguf_contract(tensors, meta)
                 quant = moe_audit["quant_by_role"]
@@ -3779,8 +3952,8 @@ def main() -> None:
                     f"down={','.join(quant['shared_down'])}"
                 )
 
-            # Show per-layer quant types if --inspect-layers is set
-            if args.inspect_layers:
+            # Inkling's fused gate/up tensor is shown by the contract above.
+            if args.inspect_layers and arch != "inkling2_loop":
                 # Count total layers
                 layer_ids = set()
                 for name in tensors:
