@@ -151,6 +151,30 @@ def test_create_response_with_instructions_prepends_system():
     assert resp.json()["output"][0]["content"][0]["text"] == "ok"
 
 
+def test_publisher_generation_blocks_preserve_rendered_history_and_prefix():
+    template = (
+        "{%- for m in messages -%}"
+        "{{ m.role }}:"
+        "{%- if m.role == 'assistant' -%}"
+        "{%- generation -%}{{ m.content }}{%- endgeneration -%}"
+        "{%- else -%}{{ m.content }}{%- endif -%}"
+        "{{ '\\n' }}"
+        "{%- endfor -%}"
+        "{%- if add_generation_prompt -%}assistant:{%- endif -%}"
+    )
+    client, session = make_client(chunks=("answer",), chat_template=template)
+    response = client.post("/v1/responses", json={
+        "model": "fake-model",
+        "input": [
+            {"role": "user", "content": "first"},
+            {"role": "assistant", "content": "previous answer"},
+            {"role": "user", "content": "second"},
+        ],
+    })
+    assert response.status_code == 200
+    assert session.last_user == "user:first\nassistant:previous answer\nuser:second\nassistant:"
+
+
 def test_selected_template_error_rejects_simple_user_request():
     client, session = make_client(chunks=("should not run",), chat_template="{{ missing_feature() }}")
     response = client.post("/v1/responses", json={"model": "fake-model", "input": "hello"})
