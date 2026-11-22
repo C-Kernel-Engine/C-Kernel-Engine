@@ -48,40 +48,6 @@ The opt-in flags, delivery limits, failure behavior and certification boundary
 are documented in the
 [v8 serving runbook](https://c-kernel-engine.github.io/C-Kernel-Engine/v8-runbook.html#experimental-batch-http).
 
-## Experimental image endpoint
-
-The separate loopback-only [vision endpoint](https://c-kernel-engine.github.io/C-Kernel-Engine/v8-vision-status.html#experimental-vision-http)
-accepts one PNG/JPEG as an inline data URL in a user message. It does not open
-paths sent in prompts or fetch remote images. The client must attach the
-image bytes. The rendered conversation, visual rows and requested output
-must fit the deployed bundle's compiled context.
-
-OpenAI-compatible clients can set `stream_options.include_usage` to `true`
-for a separate usage chunk before `[DONE]`. They may send a tool list only
-with explicit `tool_choice: "none"`. These declarations do not reach the
-native worker; this endpoint cannot execute tools or accept tool results.
-
-### Qwen Code image smoke test
-
-With Qwen Code 0.25.1 and a pinned `cke-qwen3-vl-8k` OpenAI-compatible vision
-service on port 8120, run from the directory containing the image:
-
-```bash
-QWEN_CODE_SYSTEM_SETTINGS_PATH=/path/to/CKE/server/qwen-code/vision-smoke.settings.json \
-CKE_LOCAL_VISION_KEY=local \
-qwen --auth-type openai --model cke-qwen3-vl-8k --safe-mode --advisor off \
-  --approval-mode default --max-tool-calls 0 --max-session-turns 1 \
-  --max-wall-time 10m --system-prompt 'Answer only the question about the attached image.' \
-  '@image.png What characters are printed in the image? Reply with the characters only.'
-```
-
-The smoke profile budgets the client at 32K to accommodate this Qwen Code
-version's conservative estimate padding. This is not an advertised server
-capacity: the tested bundle enforces 8192 compiled tokens and rejects longer
-requests. Use this profile only for a bounded turn. The 2K bundle did not
-have room for the harness prompt. `@image.png` is explicit approval to attach
-an image; a plain path in the prompt does not give the server file access.
-
 ## Qwen Code profiles
 
 The historical validated pilot used Qwen Code 0.21.5 and the Qwen3.8 27B Q4_K_M artifact.
