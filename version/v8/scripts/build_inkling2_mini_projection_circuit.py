@@ -226,7 +226,7 @@ def relative_attention_replay(prefill_tokens=8, width=2304, kv_width=1024, taps=
                         "query_elements": tokens * query_heads * dim,
                         "key_elements": capacity * kv_width, "value_elements": capacity * kv_width,
                         "relative_elements": tokens * query_heads * band, "sink_elements": tokens * query_heads,
-                        "output_elements": tokens * query_heads * dim, "work_elements": dim,
+                        "output_elements": tokens * query_heads * dim, "work_elements": tokens * query_heads * dim,
                         "tokens": tokens, "heads": query_heads, "kv_heads": kv_heads,
                         "dim": dim, "capacity": capacity, "position": 0 if phase == "prefill" else prefill_tokens,
                         "relative_extent": band, "window": window,

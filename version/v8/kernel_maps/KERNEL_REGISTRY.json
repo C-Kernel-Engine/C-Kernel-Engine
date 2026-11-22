@@ -56136,9 +56136,11 @@
           "name": "accumulator",
           "dtype": "fp64",
           "shape": [
+            "T",
+            "H",
             "D"
           ],
-          "size_bytes": "8 * D",
+          "size_bytes": "8 * T * H * D",
           "size_resolution": "required",
           "lifetime": "kernel_call",
           "alignment": 64,
@@ -56381,6 +56383,8 @@
             "width": "work_elements",
             "element_bytes": 8,
             "exact_elements_product": [
+              "tokens",
+              "heads",
               "dim"
             ]
           }
@@ -56392,7 +56396,7 @@
         ],
         "oracle": "Independent dense masked softmax including zero-value sink"
       },
-      "notes": "Causal and optionally windowed grouped-query attention with a bounded relative bias band and per-query zero-value sink. Reads a non-evicting cache from absolute position zero. Uses ordered FP64 online softmax and caller-owned scratch.",
+      "notes": "Causal and optionally windowed grouped-query attention with a bounded relative bias band and per-query zero-value sink. Reads a non-evicting cache from absolute position zero. Uses ordered FP64 online softmax and caller-owned per-query scratch. Direct callers may supply one accumulator for serial execution.",
       "name": "gqa_relative_sink_checked_f32",
       "_source_file": "gqa_relative_sink_checked_f32.json"
     },

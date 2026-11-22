@@ -51,6 +51,8 @@ def read_capture(directory: Path, token: int, layer: int = 0) -> tuple[dict[str,
     metadata = {}
     for role in _ROLES:
         tensors[role], metadata[role] = read_tensor(Path(str(stem) + f".nonflash_{role}"), role)
+    if metadata["q"].get("capture_stage") != "score_matmul":
+        raise BundleError("non-flash query must be captured at its score matmul")
     for role, name in (("scores", "kq"), ("softmax", "kq_soft_max")):
         stage = directory / f"{name}-{layer}-token-{token:06d}-occ-000"
         tensors[role], metadata[role] = read_tensor(stage, None)
