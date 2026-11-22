@@ -1,0 +1,176 @@
+{
+  "id": "diffusion_vp_ddpm_step_checked_f64",
+  "op": "diffusion_vp_ddpm_step_checked",
+  "operation_interface": "diffusion.vp_ddpm.explicit_noise.fp64.checked.v1",
+  "variant": "serial_fp64",
+  "quant": {
+    "weight": "none",
+    "activation": "fp64",
+    "output": "fp64"
+  },
+  "inputs": [
+    {
+      "name": "latent",
+      "dtype": "fp64",
+      "shape": [
+        "N"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "estimate",
+      "dtype": "fp64",
+      "shape": [
+        "N"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "noise",
+      "dtype": "fp64",
+      "shape": [
+        "N"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "output",
+      "dtype": "fp64",
+      "shape": [
+        "N"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "scratch": [],
+  "dims": [
+    "N"
+  ],
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
+  "impl": {
+    "function": "ck_diffusion_vp_ddpm_step_f64",
+    "c_declaration": "int ck_diffusion_vp_ddpm_step_f64(const double *latent, const double *estimate, const double *noise, double *output, size_t count, double gamma_from, double gamma_to);",
+    "sources": [
+      "src/kernels/diffusion_vp_step.c"
+    ]
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "latent",
+        "source": "activation:latent",
+        "cast": "const double*",
+        "ports": [
+          "input:latent"
+        ]
+      },
+      {
+        "name": "estimate",
+        "source": "activation:estimate",
+        "cast": "const double*",
+        "ports": [
+          "input:estimate"
+        ]
+      },
+      {
+        "name": "noise",
+        "source": "activation:noise",
+        "cast": "const double*",
+        "ports": [
+          "input:noise"
+        ]
+      },
+      {
+        "name": "output",
+        "source": "output:output",
+        "cast": "double*",
+        "ports": [
+          "output:output"
+        ]
+      },
+      {
+        "name": "count",
+        "source": "runtime:count",
+        "value_type": "size_t"
+      },
+      {
+        "name": "gamma_from",
+        "source": "param:gamma_from"
+      },
+      {
+        "name": "gamma_to",
+        "source": "param:gamma_to"
+      }
+    ]
+  },
+  "call_constant_contract": {
+    "shape_symbols": {
+      "N": "count"
+    },
+    "buffer_spans": [
+      {
+        "pointer": "latent",
+        "elements": "count",
+        "rows": 1,
+        "width": "count",
+        "element_bytes": 8,
+        "storage_dtype": "fp64"
+      },
+      {
+        "pointer": "estimate",
+        "elements": "count",
+        "rows": 1,
+        "width": "count",
+        "element_bytes": 8,
+        "storage_dtype": "fp64"
+      },
+      {
+        "pointer": "noise",
+        "elements": "count",
+        "rows": 1,
+        "width": "count",
+        "element_bytes": 8,
+        "storage_dtype": "fp64"
+      },
+      {
+        "pointer": "output",
+        "elements": "count",
+        "rows": 1,
+        "width": "count",
+        "element_bytes": 8,
+        "storage_dtype": "fp64"
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "tests/test_v8_diffusion_vp_step.py"
+    ],
+    "oracle": "PyTorch FP64 DDPM transition on identical latent, estimate, gamma and noise."
+  },
+  "notes": "FP64 latent storage and explicit external noise. Monotonically nonincreasing gamma. Staged validation prevents output mutation on rejection."
+}
