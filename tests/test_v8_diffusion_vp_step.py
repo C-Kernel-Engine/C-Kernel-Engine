@@ -1,5 +1,6 @@
 """Same-input property checks for the native FP64 DDPM update."""
 import ctypes
+import json
 from pathlib import Path
 import subprocess
 
@@ -56,10 +57,7 @@ def test_rejects_invalid_state_before_writing_and_recovers(step):
     assert step(z, x, noise, output, 4, -2) == 0
 
 
-def test_generated_ddpm_uses_typed_fp64_storage(tmp_path, step):
-    from version.v8.scripts.compile_checked_bundle_v8 import compile_checked_weight_graph
-
-    count = 17
+def declared_ddpm(count, gamma_from, gamma_to):
     names = ("latent", "estimate", "noise", "output")
     graph = {
         "version": 3, "name": "bounded_ddpm", "family": "bounded_graph",
@@ -81,7 +79,7 @@ def test_generated_ddpm_uses_typed_fp64_storage(tmp_path, step):
                 "kernel": "diffusion_vp_ddpm_step_checked_f64", "returns_status": True,
                 "graph_slots": {"inputs": {name: f"external:{name}" for name in names[:-1]},
                                 "outputs": {"output": "output"}},
-                "params": {"N": count, "gamma_from": 4.25, "gamma_to": -4.2,
+                "params": {"N": count, "gamma_from": gamma_from, "gamma_to": gamma_to,
                            "call_constants": {"count": count}},
             }]},
         }},
@@ -89,6 +87,14 @@ def test_generated_ddpm_uses_typed_fp64_storage(tmp_path, step):
     config = {"num_layers": 1, "embed_dim": 16, "num_heads": 1, "num_kv_heads": 1,
               "head_dim": 16, "intermediate_size": 16, "context_length": 1, "max_seq_len": 1,
               "activation_buffer_dtypes": dict.fromkeys(names, "fp64")}
+    return names, graph, config
+
+
+def test_generated_ddpm_uses_typed_fp64_storage(tmp_path, step):
+    from version.v8.scripts.compile_checked_bundle_v8 import compile_checked_weight_graph
+
+    count = 17
+    names, graph, config = declared_ddpm(count, 4.25, -4.2)
     run, arena, view, _ = compile_checked_weight_graph(tmp_path, graph, {}, {}, source_config=config)
     z, x, noise = np.random.default_rng(359).normal(size=(3, count))
     for name, data in zip(names[:-1], (z, x, noise), strict=True):
@@ -104,3 +110,27 @@ def test_generated_ddpm_uses_typed_fp64_storage(tmp_path, step):
         compile_checked_weight_graph(
             invalid, graph, {}, {}, source_config={**config, "activation_buffer_dtypes": {}}
         )
+
+
+def test_generated_ddpm_replays_sigma_reference_transitions(tmp_path):
+    from version.v8.scripts.compile_checked_bundle_v8 import compile_checked_weight_graph
+
+    fixture = ROOT / "tests/fixtures/diffusion/sigma3b_ddpm_bf16_reference.json"
+    trace = json.loads(fixture.read_text())
+    latent = np.array(trace["initial"], dtype=np.float64)
+    assert latent.size == np.prod(trace["shape"])
+    for index, transition in enumerate(trace["transitions"]):
+        names, graph, config = declared_ddpm(
+            latent.size, transition["gamma_from"], transition["gamma_to"]
+        )
+        folder = tmp_path / str(index)
+        folder.mkdir()
+        run, arena, view, _ = compile_checked_weight_graph(
+            folder, graph, {}, {}, source_config=config
+        )
+        operands = (latent, transition["estimate"], transition["noise"])
+        for name, values in zip(names[:-1], operands, strict=True):
+            view(name, np.float64)[:] = values
+        assert run(arena, len(arena)) == 0
+        latent = view("output", np.float64).copy()
+        np.testing.assert_allclose(latent, transition["expected"], atol=2e-15, rtol=2e-15)
