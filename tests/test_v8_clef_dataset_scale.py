@@ -5,6 +5,9 @@ import json
 import os
 from pathlib import Path
 import tempfile
+import time
+from types import SimpleNamespace
+from unittest.mock import patch
 import unittest
 import numpy as np
 from tests.test_v8_clef_training_recipe import fixture
@@ -148,7 +151,7 @@ class ScaleContracts(unittest.TestCase):
             Path(__file__).resolve().parents[1] / "build/libckernel_engine.so"
         ).exists():
             self.skipTest("native engine unavailable")
-        from version.v8.decision.train_clef_head import run
+        from version.v8.decision import train_clef_head
 
         with tempfile.TemporaryDirectory() as tmp:
             folder = Path(tmp)
@@ -171,7 +174,17 @@ class ScaleContracts(unittest.TestCase):
                 dict(copy.deepcopy(base), id=f"r{i}") for i in range(33)
             ] + [doc["records"][-1]]
             path.write_text(json.dumps(doc))
-            report = run(path, sha(path), folder / "run", epochs=41)
+            times = iter([0.0] * 499 + [0.25] * 854)
+            clock = SimpleNamespace(monotonic=lambda: next(times), perf_counter=time.perf_counter)
+            with patch.object(train_clef_head, "time", clock), patch.object(
+                train_clef_head, "write", wraps=train_clef_head.write
+            ) as write:
+                report = train_clef_head.run(path, sha(path), folder / "run", epochs=41)
+            progress = []
+            for (target, value), _ in write.call_args_list:
+                if target.name == "progress.json" and value["stage"] == "training":
+                    progress.append(value["completed_steps"])
+            self.assertEqual(progress, [1, 500, 1000, 1353])
             self.assertEqual(report["completed_steps"], 1353)
             self.assertEqual(len(report["inference_export_record_ids"]), 32)
             self.assertEqual(

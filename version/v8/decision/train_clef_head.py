@@ -225,6 +225,11 @@ class Runtime:
             self.slices[name] = slice(offset, offset + int(count))
             offset += int(count)
         self.frozen_embedding = initial[self.slices["output_embedding.weight"]].copy()
+        self._packed_weight_bytes = initial.nbytes
+        self._frozen_embedding_bytes = self.frozen_embedding.nbytes
+        self._integer_input_keys = tuple(
+            name.removeprefix("input.") for name in self.ir["config"]["training_integer_inputs"]
+        )
         require(
             hasattr(self.lib, "ck_train_compare_weight"),
             "runtime lacks native frozen-weight comparison; regenerate runtime",
@@ -259,8 +264,7 @@ class Runtime:
         )
         metadata = np.concatenate(
             [
-                arrays[n.removeprefix("input.")].ravel()
-                for n in self.ir["config"]["training_integer_inputs"]
+                arrays[name].ravel() for name in self._integer_input_keys
             ]
         ).astype("i4")
         return metadata
@@ -297,9 +301,9 @@ class Runtime:
         self.last_step_metrics = dict(
             native_step_seconds=native_finished - step_started,
             frozen_check_seconds=time.perf_counter() - native_finished,
-            frozen_comparison_bytes=int(self.frozen_embedding.nbytes),
+            frozen_comparison_bytes=self._frozen_embedding_bytes,
             host_weight_snapshot_bytes=0,
-            avoided_weight_snapshot_bytes=sum(int(n) for n in self.sizes) * 4,
+            avoided_weight_snapshot_bytes=self._packed_weight_bytes,
         )
         return loss.value
 
@@ -386,6 +390,7 @@ def run(
     start = 0
     periodic = []
     validation_history = []
+    next_progress_at = 0.0
     try:
         if resume:
             restored = workflow._checkpoint_load(Path(resume), rt.lib, meta)
@@ -400,21 +405,23 @@ def run(
         for step in range(start, total_steps):
             record = train[step % len(train)]
             losses.append(rt.step(record["arrays"], float(lr)))
-            write(
-                folder / "progress.json",
-                dict(
-                    stage="training",
-                    completed_steps=step + 1,
-                    total_steps=total_steps,
-                    record_id=record["id"],
-                    loss=losses[-1],
-                ),
-            )
-            if (
-                (step + 1) % 1000 == 0
-                and step + 1 < total_steps
-                and step + 1 != stop_after
-            ):
+            completed_step = step + 1
+            checkpoint_due = completed_step % 1000 == 0
+            boundary = completed_step in (total_steps, stop_after)
+            now = time.monotonic()
+            if checkpoint_due or boundary or now >= next_progress_at:
+                write(
+                    folder / "progress.json",
+                    dict(
+                        stage="training",
+                        completed_steps=completed_step,
+                        total_steps=total_steps,
+                        record_id=record["id"],
+                        loss=losses[-1],
+                    ),
+                )
+                next_progress_at = now + 0.25
+            if checkpoint_due and not boundary:
                 evaluated = {r["id"]: rt.evaluate(r["arrays"]) for r in validation}
                 validation_history.append(
                     dict(
@@ -442,7 +449,7 @@ def run(
                         evaluations=validation_history,
                     ),
                 )
-            if stop_after is not None and step + 1 == stop_after:
+            if completed_step == stop_after:
                 break
         completed = start + len(losses)
         checkpoint = workflow._checkpoint_write(
