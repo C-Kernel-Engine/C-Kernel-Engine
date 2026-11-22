@@ -28,6 +28,28 @@ def _load_converter():
     return module
 
 
+def test_unimplemented_checkpoint_overrides_fail_before_loading_weights(tmp_path: Path) -> None:
+    (tmp_path / "config.json").write_text(json.dumps({
+        "model_type": "gemma4",
+        "baseten_modeling_overrides": {"readout": "slot_lm"},
+    }))
+    for architecture in ("auto", "gemma4"):
+        result = subprocess.run(
+            [
+                sys.executable, str(CONVERTER_PATH), "--checkpoint", str(tmp_path),
+                "--arch", architecture, "--dry-run",
+                "--output", str(tmp_path / "weights.bump"),
+                "--config-out", str(tmp_path / "converted.json"),
+                "--manifest-out", str(tmp_path / "manifest.json"),
+            ],
+            capture_output=True, text=True,
+        )
+        assert result.returncode != 0
+        assert "baseten_modeling_overrides" in result.stderr
+        assert "attention and decision readout" in result.stderr
+        assert not (tmp_path / "converted.json").exists()
+
+
 def test_audio_runtime_policy_and_artifact_ownership_are_contract_driven() -> None:
     converter = _load_converter()
     contract = converter._safetensors_arch_contract("whisper_encoder")
