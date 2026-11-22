@@ -193,6 +193,8 @@ class InklingQ8DecoderBlockTests(unittest.TestCase):
                 '    return ck_q8_activation_dot_scalar(w, x, n);\n}\n'
                 'float dispatch_dot(const unsigned char *w, const unsigned char *x, size_t n) {\n'
                 '    return ck_q8_activation_dot(w, x, n);\n}\n'
+                'void pair_dot(const unsigned char *w, const unsigned char *u, const unsigned char *x, '
+                'size_t n, float *out) { ck_q8_activation_dot_pair(w, u, x, n, out, out + 1); }\n'
             )
             subprocess.run(["cc", "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror", "-shared", "-fPIC",
                             "-ffp-contract=off", "-I", str(root / "include"), str(source),
@@ -201,12 +203,22 @@ class InklingQ8DecoderBlockTests(unittest.TestCase):
             for fn in (loaded.scalar_dot, loaded.dispatch_dot):
                 fn.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_size_t]
                 fn.restype = ctypes.c_float
+            loaded.pair_dot.argtypes = [ctypes.c_void_p] * 3 + [ctypes.c_size_t, ctypes.POINTER(ctypes.c_float)]
+            loaded.pair_dot.restype = None
+            paired = (ctypes.c_float * 2)()
             rng = np.random.default_rng(2319)
             for width in (32, 96, 1152, 2304, 3072):
                 blocks = width // 32
                 weight, activation = (np.empty((blocks, 34), dtype=np.uint8) for _ in range(2))
-                for _ in range(100):
-                    scales = rng.uniform(.001, .6, (2, blocks)).astype("<f2").view("u1").reshape(2, blocks, 2)
+                for trial in range(100):
+                    if trial == 0:
+                        # Include signed zero, half subnormals, and the finite range endpoints.
+                        scales = np.resize(np.array(
+                            [0, 0x8000, 1, 0x83FF, 0x400, 0x7BFF, 0xFBFF], dtype="<u2"
+                        ), (2, blocks))
+                    else:
+                        scales = rng.uniform(.001, .6, (2, blocks)).astype("<f2")
+                    scales = scales.view("u1").reshape(2, blocks, 2)
                     weight[:, :2], activation[:, :2] = scales
                     weight[:, 2:] = rng.integers(-128, 128, (blocks, 32), dtype=np.int16).astype("i1").view("u1")
                     activation[:, 2:] = rng.integers(-127, 128, (blocks, 32), dtype=np.int16).astype("i1").view("u1")
@@ -214,6 +226,11 @@ class InklingQ8DecoderBlockTests(unittest.TestCase):
                     scalar = np.float32(loaded.scalar_dot(*args))
                     actual = np.float32(loaded.dispatch_dot(*args))
                     self.assertEqual(scalar.tobytes(), actual.tobytes())
+                    other = np.roll(weight, 1, axis=1).copy()
+                    other[:, :2] = weight[:, :2]
+                    loaded.pair_dot(weight.ctypes.data, other.ctypes.data, activation.ctypes.data, width, paired)
+                    expected_up = loaded.scalar_dot(other.ctypes.data, activation.ctypes.data, width)
+                    self.assertEqual(bytes(paired), np.array([scalar, expected_up], dtype="f4").tobytes())
 
     def test_checked_activation_rounds_ties_and_rejects_before_writes(self):
         root = Path(__file__).resolve().parents[1]
@@ -222,8 +239,11 @@ class InklingQ8DecoderBlockTests(unittest.TestCase):
             subprocess.run(["cc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-shared", "-fPIC",
                             "-I", str(root / "include"),
                             str(root / "src/kernels/linear_rows_q8_0_checked.c"),
-                            "-lm", "-o", str(library)], check=True)
-            probe = ctypes.CDLL(str(library)).linear_rows_q8_0_checked_q8_activation
+                            "-fopenmp", "-lm", "-o", str(library)], check=True)
+            loaded = ctypes.CDLL(str(library))
+            loaded.omp_set_dynamic(0)
+            loaded.omp_set_num_threads(2)
+            probe = loaded.linear_rows_q8_0_checked_q8_activation
             float_p = ctypes.POINTER(ctypes.c_float)
             byte_p = ctypes.POINTER(ctypes.c_ubyte)
             size = ctypes.c_size_t
@@ -235,7 +255,7 @@ class InklingQ8DecoderBlockTests(unittest.TestCase):
                 weights[row * 34 + 1] = 0x3C  # FP16 block scale 1.0.
                 weights[row * 34 + 2 + row] = 1
             output = (ctypes.c_float * 4)(42, 42, 42, 42)
-            scratch = (ctypes.c_ubyte * 34)()
+            scratch = (ctypes.c_ubyte * (34 + 4 * 4))()
 
             def run(capacity):
                 return probe(activation, len(activation), weights, len(weights), output, len(output),
@@ -243,13 +263,35 @@ class InklingQ8DecoderBlockTests(unittest.TestCase):
 
             self.assertNotEqual(run(33), 0)
             self.assertEqual(list(output), [42] * 4)
-            self.assertEqual(run(34), 0)
-            self.assertEqual(list(output), [0, 2, -2, -2])
-            activation[4] = 1e8
-            self.assertNotEqual(run(34), 0)
-            self.assertEqual(list(output), [0, 2, -2, -2])
-            activation[4] = 127
-            self.assertEqual(run(34), 0)
+            for capacity in (34, len(scratch)):
+                with self.subTest(capacity=capacity):
+                    self.assertEqual(run(capacity), 0)
+                    self.assertEqual(list(output), [0, 2, -2, -2])
+                    activation[4] = 1e8
+                    self.assertNotEqual(run(capacity), 0)
+                    self.assertEqual(list(output), [0, 2, -2, -2])
+                    activation[4] = 127
+                    self.assertEqual(run(capacity), 0)
+
+            channels = 8193
+            bank = (ctypes.c_ubyte * (34 * channels))()
+            expected = (ctypes.c_float * channels)()
+            result = (ctypes.c_float * channels)()
+            large_scratch = (ctypes.c_ubyte * (34 + channels * 4))()
+            for channel in range(channels):
+                bank[channel * 34 + 1] = 0x3C
+                bank[channel * 34 + 2 + channel % 32] = channel % 17
+
+            def project(dst, capacity):
+                return probe(activation, len(activation), bank, len(bank), dst, len(dst),
+                             1, 32, channels, large_scratch, capacity)
+
+            self.assertEqual(project(expected, 34), 0)
+            self.assertEqual(project(result, len(large_scratch)), 0)
+            self.assertEqual(bytes(expected), bytes(result))
+            bank[-33] = 0x7C  # Nonfinite scale in the final output channel.
+            self.assertNotEqual(project(result, len(large_scratch)), 0)
+            self.assertEqual(bytes(expected), bytes(result))
 
 
 if __name__ == "__main__":

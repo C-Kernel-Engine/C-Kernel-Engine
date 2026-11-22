@@ -39,7 +39,7 @@ def _bind_q8_projection(node, q8_activations):
     }
     if q8_activations:
         node["kernel"] = "linear_rows_q8_0_checked_q8_activation"
-        p["call_constants"]["activation_bytes"] = width // 32 * 34
+        p["call_constants"]["activation_bytes"] = rows * (width // 32 * 34 + channels * 4)
 
 
 def first_decoder_block(prefill_tokens=4, width=2304, kv_heads=8, query_heads=24, dim=128,

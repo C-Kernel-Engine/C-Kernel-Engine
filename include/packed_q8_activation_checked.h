@@ -3,10 +3,11 @@
 
 #include "ckernel_quant.h"
 #include <math.h>
+#include <string.h>
 
 #if defined(__x86_64__) && (defined(__GNUC__) || defined(__clang__))
 #include <immintrin.h>
-#define CK_Q8_X86_AVX2 1
+#define CK_Q8_X86_SIMD 1
 #endif
 
 /* Input rows are finite. Emit little-endian Q8_0 blocks with nearest-even codes. */
@@ -56,38 +57,95 @@ static inline float ck_q8_activation_dot_scalar(const unsigned char *weight, con
          + ((lanes[1] + lanes[5]) + (lanes[3] + lanes[7]));
 }
 
-#ifdef CK_Q8_X86_AVX2
-static __attribute__((target("avx2,fma"))) float
-ck_q8_activation_dot_avx2(const unsigned char *weight, const unsigned char *input, size_t width)
+#ifdef CK_Q8_X86_SIMD
+static inline __attribute__((target("avx2"))) __m256
+ck_q8_activation_products(const unsigned char *weight, __m256i activation)
+{
+    const __m256i w = _mm256_loadu_si256((const __m256i *)(weight + 2));
+    /* Packed activations are in [-127, 127], so the signed transfer and
+     * each pair sum are exact even for a weight code of -128. */
+    const __m256i pairs = _mm256_maddubs_epi16(_mm256_abs_epi8(w), _mm256_sign_epi8(activation, w));
+    return _mm256_cvtepi32_ps(_mm256_madd_epi16(pairs, _mm256_set1_epi16(1)));
+}
+
+static inline __attribute__((target("avx2"))) float
+ck_q8_activation_reduce(__m256 sum)
+{
+    const __m128 halves = _mm_add_ps(_mm256_castps256_ps128(sum), _mm256_extractf128_ps(sum, 1));
+    const __m128 pairs = _mm_add_ps(halves, _mm_movehl_ps(halves, halves));
+    return _mm_cvtss_f32(_mm_add_ss(pairs, _mm_movehdup_ps(pairs)));
+}
+
+static inline uint16_t ck_q8_x86_scale_bits(const unsigned char *block)
+{
+    uint16_t scale;
+    memcpy(&scale, block, sizeof(scale));
+    return scale;
+}
+
+static __attribute__((target("avx2,fma,f16c"))) float
+ck_q8_activation_dot_avx2_f16c(const unsigned char *weight, const unsigned char *input, size_t width)
 {
     __m256 sum = _mm256_setzero_ps();
-    const __m256i ones = _mm256_set1_epi16(1);
     for (size_t i = 0; i < width; i += QK8_0, weight += sizeof(block_q8_0), input += sizeof(block_q8_0)) {
-        const __m256i w = _mm256_loadu_si256((const __m256i *)(weight + 2));
         const __m256i x = _mm256_loadu_si256((const __m256i *)(input + 2));
-        /* Packed activations are in [-127, 127], so the signed transfer and
-         * each pair sum are exact even for a weight code of -128. */
-        const __m256i pairs = _mm256_maddubs_epi16(_mm256_abs_epi8(w), _mm256_sign_epi8(x, w));
-        const __m256 dots = _mm256_cvtepi32_ps(_mm256_madd_epi16(pairs, ones));
-        const float dw = ck_fp16_to_fp32_soft((uint16_t)(weight[0] | ((uint16_t)weight[1] << 8)));
-        const float dx = ck_fp16_to_fp32_soft((uint16_t)(input[0] | ((uint16_t)input[1] << 8)));
-        sum = _mm256_fmadd_ps(_mm256_set1_ps(dw * dx), dots, sum);
+        const uint32_t scales = ck_q8_x86_scale_bits(weight) | ((uint32_t)ck_q8_x86_scale_bits(input) << 16);
+        const __m128 decoded = _mm_cvtph_ps(_mm_cvtsi32_si128((int)scales));
+        const __m128 scale = _mm_mul_ss(decoded, _mm_shuffle_ps(decoded, decoded, _MM_SHUFFLE(1, 1, 1, 1)));
+        sum = _mm256_fmadd_ps(_mm256_broadcastss_ps(scale), ck_q8_activation_products(weight, x), sum);
     }
-    float lanes[8];
-    _mm256_storeu_ps(lanes, sum);
-    return ((lanes[0] + lanes[4]) + (lanes[2] + lanes[6]))
-         + ((lanes[1] + lanes[5]) + (lanes[3] + lanes[7]));
+    return ck_q8_activation_reduce(sum);
+}
+
+static __attribute__((target("avx2,fma,f16c"))) void
+ck_q8_activation_dot_pair_avx2_f16c(const unsigned char *gate, const unsigned char *up,
+                                    const unsigned char *input, size_t width, float *g, float *u)
+{
+    __m256 gate_sum = _mm256_setzero_ps(), up_sum = _mm256_setzero_ps();
+    for (size_t i = 0; i < width; i += QK8_0) {
+        const __m256i x = _mm256_loadu_si256((const __m256i *)(input + 2));
+        const uint32_t weights = ck_q8_x86_scale_bits(gate) | ((uint32_t)ck_q8_x86_scale_bits(up) << 16);
+        const __m128i halves = _mm_set_epi32(0, 0, ck_q8_x86_scale_bits(input), (int)weights);
+        const __m128 decoded = _mm_cvtph_ps(halves);
+        const __m128 scales = _mm_mul_ps(decoded, _mm_shuffle_ps(decoded, decoded, _MM_SHUFFLE(2, 2, 2, 2)));
+        const __m128 up_scale = _mm_shuffle_ps(scales, scales, _MM_SHUFFLE(1, 1, 1, 1));
+        gate_sum = _mm256_fmadd_ps(_mm256_broadcastss_ps(scales), ck_q8_activation_products(gate, x), gate_sum);
+        up_sum = _mm256_fmadd_ps(_mm256_broadcastss_ps(up_scale), ck_q8_activation_products(up, x), up_sum);
+        gate += sizeof(block_q8_0);
+        up += sizeof(block_q8_0);
+        input += sizeof(block_q8_0);
+    }
+    *g = ck_q8_activation_reduce(gate_sum);
+    *u = ck_q8_activation_reduce(up_sum);
+}
+
+static inline int ck_q8_activation_has_f16c(void)
+{
+    return __builtin_cpu_supports("avx2") && __builtin_cpu_supports("fma") && __builtin_cpu_supports("f16c");
 }
 #endif
 
 static inline float ck_q8_activation_dot(const unsigned char *weight, const unsigned char *input,
                                          size_t width)
 {
-#ifdef CK_Q8_X86_AVX2
-    if (__builtin_cpu_supports("avx2") && __builtin_cpu_supports("fma"))
-        return ck_q8_activation_dot_avx2(weight, input, width);
+#ifdef CK_Q8_X86_SIMD
+    if (ck_q8_activation_has_f16c())
+        return ck_q8_activation_dot_avx2_f16c(weight, input, width);
 #endif
     return ck_q8_activation_dot_scalar(weight, input, width);
+}
+
+static inline void ck_q8_activation_dot_pair(const unsigned char *gate, const unsigned char *up,
+                                             const unsigned char *input, size_t width, float *g, float *u)
+{
+#ifdef CK_Q8_X86_SIMD
+    if (ck_q8_activation_has_f16c()) {
+        ck_q8_activation_dot_pair_avx2_f16c(gate, up, input, width, g, u);
+        return;
+    }
+#endif
+    *g = ck_q8_activation_dot_scalar(gate, input, width);
+    *u = ck_q8_activation_dot_scalar(up, input, width);
 }
 
 #endif
