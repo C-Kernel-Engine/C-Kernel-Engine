@@ -48,6 +48,19 @@ The opt-in flags, delivery limits, failure behavior and certification boundary
 are documented in the
 [v8 serving runbook](https://c-kernel-engine.github.io/C-Kernel-Engine/v8-runbook.html#experimental-batch-http).
 
+## Experimental image endpoint
+
+The separate loopback-only [vision endpoint](https://c-kernel-engine.github.io/C-Kernel-Engine/v8-vision-status.html#experimental-vision-http)
+accepts one PNG/JPEG as an inline data URL in a user message. It does not open
+paths sent in prompts or fetch remote images. The client must attach the
+image bytes. The rendered conversation, visual rows and requested output
+must fit the deployed bundle's compiled context.
+
+OpenAI-compatible clients can set `stream_options.include_usage` to `true`
+for a separate usage chunk before `[DONE]`. They may send a tool list only
+with explicit `tool_choice: "none"`. These declarations do not reach the
+native worker; this endpoint cannot execute tools or accept tool results.
+
 ## Qwen Code profiles
 
 The historical validated pilot used Qwen Code 0.21.5 and the Qwen3.8 27B Q4_K_M artifact.

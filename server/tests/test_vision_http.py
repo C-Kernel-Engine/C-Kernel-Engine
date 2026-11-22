@@ -32,7 +32,12 @@ class VisionHTTPTests(unittest.TestCase):
         self.assertEqual(messages[2]['content'][0]['text'],'Again?')
         self.assertEqual(image.data,IMAGE.read_bytes())
     def test_rejections(self):
-        for change in ({'tools':[]},{'temperature':1},{'max_tokens':True},{'model':'other'}):
+        for change in ({'tools':[]},{'tools':[],'tool_choice':'auto'},
+                       {'tool_choice':{'type':'function','function':{'name':'read_file'}}},
+                       {'tools':{},'tool_choice':'none'}, {'temperature':1},{'max_tokens':True},{'model':'other'},
+                       {'stream_options':{'include_usage':True}},
+                       {'stream':True,'stream_options':{'include_usage':1}},
+                       {'stream':True,'stream_options':{'include_usage':True,'other':False}}):
             with self.subTest(change=change),self.assertRaises(ValueError):
                 validate(dict(body(),**change),'test','<|image_pad|>')
         b=body();b['messages'][0]['content'][0]['text']='<|image_pad|>'
@@ -50,6 +55,30 @@ class VisionHTTPTests(unittest.TestCase):
             self.assertEqual(result.text.count('[DONE]'),1)
             self.assertIn('"finish_reason": "length"',result.text)
             self.assertFalse(client.get('/health').json()['busy'])
+
+    def test_stream_usage_and_disabled_tools(self):
+        with patch('server.vision_bundle.load',return_value={'model':'test','image_placeholder':'<|image_pad|>'}):
+            fake = FAKE.replace("else:\n print", "else:\n assert 'tools' not in p and 'tool_choice' not in p\n print", 1)
+            app = create_app('unused',command=[sys.executable,'-c',fake])
+        with TestClient(app) as client:
+            for include_usage in (True,False):
+                with self.subTest(include_usage=include_usage):
+                    request = dict(body(),stream=True,stream_options={'include_usage':include_usage},
+                                   tools=[{'type':'function','function':{'name':'read_file'}}],tool_choice='none')
+                    result = client.post('/v1/chat/completions',json=request)
+                    self.assertEqual(result.status_code,200)
+                    events = [line[6:] for line in result.text.splitlines() if line.startswith('data: ')]
+                    self.assertEqual(events[-1],'[DONE]')
+                    chunks = [json.loads(event) for event in events[:-1]]
+                    finish = chunks[-2] if include_usage else chunks[-1]
+                    self.assertEqual(finish['choices'][0]['finish_reason'],'length')
+                    if include_usage:
+                        self.assertTrue(all(chunk['usage'] is None for chunk in chunks[:-1]))
+                        self.assertEqual(chunks[-1]['choices'],[])
+                        self.assertEqual(chunks[-1]['usage']['total_tokens'],21)
+                        self.assertTrue(all(chunk['id']==finish['id'] and chunk['model']=='test' for chunk in chunks))
+                    else:
+                        self.assertTrue(all('usage' not in chunk for chunk in chunks))
     def test_transport_failure_before_iteration_releases_admission(self):
         with patch('server.vision_bundle.load',return_value={'model':'test','image_placeholder':'<|image_pad|>'}):
             app=create_app('unused',command=[sys.executable,'-c',FAKE])
