@@ -26,15 +26,21 @@ int ck_gqa_relative_sink_checked_f32(
         rel_size > relative_elements || rows > sink_elements || dim > work_elements)
         return -2;
 
+    size_t workspace = dim;
+#ifdef _OPENMP
+    if (q_size <= SIZE_MAX / sizeof(double) && work_elements >= q_size)
+        workspace = q_size;
+#endif
+    const size_t scratch_bytes = workspace * sizeof(double);
     if (!work || (uintptr_t)work % _Alignof(double) ||
-        (uintptr_t)work > UINTPTR_MAX - dim * sizeof(double) ||
+        (uintptr_t)work > UINTPTR_MAX - scratch_bytes ||
         !ck_checked_region(output, q_size)) return -1;
     const float *inputs[] = {query, key, value, relative, sink, output};
     const size_t counts[] = {q_size, kv_size, kv_size, rel_size, rows, q_size};
     for (size_t i = 0; i < 6; ++i) {
         if (!ck_checked_region(inputs[i], counts[i])) return -1;
         const uintptr_t a = (uintptr_t)inputs[i], b = (uintptr_t)work;
-        if ((a < b + dim * sizeof(double) && b < a + counts[i] * sizeof(float)) ||
+        if ((a < b + scratch_bytes && b < a + counts[i] * sizeof(float)) ||
             (i != 5 && ck_checked_overlap(output, q_size, inputs[i], counts[i])))
             return -1;
     }
@@ -51,36 +57,38 @@ int ck_gqa_relative_sink_checked_f32(
 
     const double scale = 1.0 / sqrt((double)dim);
     const size_t group = heads / kv_heads;
-    for (size_t t = 0; t < tokens; ++t) {
-        const size_t qpos = position + t;
+#ifdef _OPENMP
+    const size_t visible = position + tokens - first;
+    const int parallel = workspace > dim && visible >= 128;
+#pragma omp parallel for if(parallel)
+#endif
+    for (size_t row = 0; row < rows; ++row) {
+        const size_t qpos = position + row / heads;
         const size_t begin = window && qpos >= window ? qpos - window + 1 : 0;
-        for (size_t h = 0; h < heads; ++h) {
-            const size_t row = t * heads + h;
-            const float *q = query + row * dim;
-            const float *rel = relative + row * relative_extent;
-            const size_t cache = (h / group) * capacity;
-            double max_logit = sink[row], denom = 1.0;
-            for (size_t d = 0; d < dim; ++d) work[d] = 0.0;
-            for (size_t k = begin; k <= qpos; ++k) {
-                const float *keys = key + (cache + k) * dim;
-                const float *values = value + (cache + k) * dim;
-                double dot = 0.0;
-                for (size_t d = 0; d < dim; ++d) {
-                    const volatile double product = (double)q[d] * keys[d];
-                    dot += product;
-                }
-                const size_t distance = qpos - k;
-                const double score = dot * scale + (distance < relative_extent ? rel[distance] : 0.0);
-                const double next_max = fmax(score, max_logit);
-                const double old_factor = exp(max_logit - next_max), new_factor = exp(score - next_max);
-                denom = denom * old_factor + new_factor;
-                for (size_t d = 0; d < dim; ++d)
-                    work[d] = work[d] * old_factor + (double)values[d] * new_factor;
-                max_logit = next_max;
-            }
+        const float *q = query + row * dim;
+        const float *rel = relative + row * relative_extent;
+        const size_t cache = ((row % heads) / group) * capacity;
+        double *accumulator = work + (workspace > dim ? row * dim : 0);
+        double max_logit = sink[row], denom = 1.0;
+        for (size_t d = 0; d < dim; ++d) accumulator[d] = 0.0;
+        for (size_t k = begin; k <= qpos; ++k) {
+            const float *keys = key + (cache + k) * dim;
+            const float *values = value + (cache + k) * dim;
+            double dot = 0.0;
+            /* Each product of finite FP32 operands is exact in FP64. */
+            for (size_t d = 0; d < dim; ++d) dot += (double)q[d] * (double)keys[d];
+            const size_t distance = qpos - k;
+            const double score = dot * scale + (distance < relative_extent ? rel[distance] : 0.0);
+            const double next_max = fmax(score, max_logit);
+            const double old_factor = max_logit == next_max ? 1.0 : exp(max_logit - next_max);
+            const double new_factor = score == next_max ? 1.0 : exp(score - next_max);
+            denom = denom * old_factor + new_factor;
             for (size_t d = 0; d < dim; ++d)
-                output[row * dim + d] = (float)(work[d] / denom);
+                accumulator[d] = accumulator[d] * old_factor + (double)values[d] * new_factor;
+            max_logit = next_max;
         }
+        for (size_t d = 0; d < dim; ++d)
+            output[row * dim + d] = (float)(accumulator[d] / denom);
     }
     return 0;
 }

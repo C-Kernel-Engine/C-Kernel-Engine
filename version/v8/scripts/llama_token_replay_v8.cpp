@@ -534,6 +534,11 @@ static bool should_dump_tensor(const DumpState * state, const ggml_tensor * t) {
     if (raw_name && raw_name[0] && state->names.find(raw_name) != state->names.end()) {
         return true;
     }
+    if (state->dump_nonflash_inputs && raw_name && t->op == GGML_OP_MUL_MAT &&
+        std::strncmp(raw_name, "kq-", 3) == 0 &&
+        state->names.count(std::string("kqv_out-") + (raw_name + 3))) {
+        return true;
+    }
     if (t->op == GGML_OP_MUL_MAT && t->src[0]) {
         const char * weight_name = ggml_get_name(t->src[0]);
         return weight_name && weight_name[0] &&
@@ -801,6 +806,40 @@ static bool dump_tensor_bytes(
     return output.good();
 }
 
+static bool dump_nonflash_operand(
+    const std::filesystem::path & directory,
+    const std::string & dump_name,
+    const char * role,
+    const ggml_tensor * tensor,
+    const char * capture_stage,
+    std::string & error
+) {
+    const std::filesystem::path file = directory / (dump_name + ".nonflash_" + role);
+    const size_t bytes = ggml_nbytes(tensor);
+    if (!bytes || bytes > 64u * 1024u * 1024u ||
+        !dump_tensor_bytes(file.string() + ".bin", tensor)) {
+        error = "non-flash attention operand is too large or could not be written for " + dump_name;
+        return false;
+    }
+    std::ofstream meta(file.string() + ".json", std::ios::binary | std::ios::trunc);
+    if (!meta) {
+        error = "failed writing non-flash attention metadata";
+        return false;
+    }
+    meta << "{\"role\":\"" << role << "\",\"capture_stage\":\"" << capture_stage
+         << "\",\"op\":\"" << json_escape(ggml_op_name(tensor->op))
+         << "\",\"type\":" << static_cast<int>(tensor->type) << ",\"nbytes\":" << bytes << ",\"ne\":";
+    append_tensor_shape(meta, tensor);
+    meta << ",\"nb\":";
+    append_tensor_strides(meta, tensor);
+    meta << "}\n";
+    if (!meta.good()) {
+        error = "failed writing non-flash attention metadata";
+        return false;
+    }
+    return true;
+}
+
 static bool dump_nonflash_attention_inputs(
     const std::filesystem::path & directory,
     const std::string & dump_name,
@@ -831,10 +870,18 @@ static bool dump_nonflash_attention_inputs(
         const ggml_tensor * tensor;
     };
     const Capture captures[] = {
-        {"q", q}, {"k", k}, {"v", v}, {"mask", softmax->src[1]},
+        {"k", k}, {"v", v}, {"mask", softmax->src[1]},
     };
+    if (!std::filesystem::is_regular_file(directory / (dump_name + ".nonflash_q.json"))) {
+        error = "non-flash attention Q was not captured at its score matmul for " + dump_name;
+        return false;
+    }
     constexpr size_t max_capture_bytes = 64u * 1024u * 1024u;
-    size_t total = 0;
+    size_t total = ggml_nbytes(q);
+    if (total > max_capture_bytes) {
+        error = "non-flash attention query extent exceeds diagnostic limit for " + dump_name;
+        return false;
+    }
     for (const Capture & capture : captures) {
         const size_t bytes = ggml_nbytes(capture.tensor);
         if (!bytes || bytes > max_capture_bytes - total) {
@@ -844,27 +891,8 @@ static bool dump_nonflash_attention_inputs(
         total += bytes;
     }
     for (const Capture & capture : captures) {
-        const std::filesystem::path base = directory /
-            (dump_name + ".nonflash_" + capture.role);
-        if (!dump_tensor_bytes(base.string() + ".bin", capture.tensor)) {
-            error = "failed capturing non-flash attention " + std::string(capture.role);
-            return false;
-        }
-        std::ofstream meta(base.string() + ".json", std::ios::binary | std::ios::trunc);
-        if (!meta) {
-            error = "failed writing non-flash attention metadata";
-            return false;
-        }
-        meta << "{\"role\":\"" << capture.role << "\",\"op\":\""
-             << json_escape(ggml_op_name(capture.tensor->op)) << "\",\"type\":"
-             << static_cast<int>(capture.tensor->type) << ",\"nbytes\":"
-             << ggml_nbytes(capture.tensor) << ",\"ne\":";
-        append_tensor_shape(meta, capture.tensor);
-        meta << ",\"nb\":";
-        append_tensor_strides(meta, capture.tensor);
-        meta << "}\n";
-        if (!meta.good()) {
-            error = "incomplete non-flash attention metadata";
+        if (!dump_nonflash_operand(directory, dump_name, capture.role, capture.tensor,
+                                  "attention_output", error)) {
             return false;
         }
     }
@@ -963,6 +991,15 @@ static bool dump_eval_callback(struct ggml_tensor * t, bool ask, void * user_dat
     const std::string dump_name = make_dump_name(base_name, mut->current_token_id, occurrence);
 
     std::filesystem::create_directories(mut->dump_dir);
+    if (mut->dump_nonflash_inputs && t->op == GGML_OP_MUL_MAT && t->src[1] &&
+        base_name.rfind("kq-", 0) == 0) {
+        const std::string output_name = make_dump_name(
+            "kqv_out-" + base_name.substr(3), mut->current_token_id, occurrence);
+        if (!dump_nonflash_operand(mut->dump_dir, output_name, "q", t->src[1],
+                                  "score_matmul", mut->capture_error)) {
+            return true;
+        }
+    }
     if (!mut->list_only) {
         std::vector<uint8_t> raw(static_cast<size_t>(nbytes));
         if (t->buffer && ggml_backend_buffer_is_host(t->buffer) && t->data) {
@@ -1032,9 +1069,15 @@ static bool dump_eval_callback(struct ggml_tensor * t, bool ask, void * user_dat
         }
     }
 
-    if (mut->dump_nonflash_inputs && base_name.rfind("kqv_out-", 0) == 0 &&
-        !dump_nonflash_attention_inputs(mut->dump_dir, dump_name, t, mut->capture_error)) {
-        return true;
+    if (mut->dump_nonflash_inputs && base_name.rfind("kqv_out-", 0) == 0) {
+        const auto score = mut->occurrences.find("kq-" + base_name.substr(8));
+        if (score == mut->occurrences.end() || score->second <= occurrence) {
+            mut->capture_error = "missing score matmul capture for " + dump_name;
+            return true;
+        }
+        if (!dump_nonflash_attention_inputs(mut->dump_dir, dump_name, t, mut->capture_error)) {
+            return true;
+        }
     }
 
     if (!append_index_entry(mut, dump_name, base_name, t, occurrence)) {
@@ -1323,7 +1366,7 @@ int main(int argc, char ** argv) {
     cparams.n_threads = n_threads;
     cparams.n_threads_batch = n_threads;
     cparams.embeddings = !args.embeddings_out_path.empty();
-    const bool dump_attention_internals = std::any_of(
+    const bool dump_attention_internals = args.dump_nonflash_inputs || std::any_of(
         args.dump_names.begin(),
         args.dump_names.end(),
         [](const std::string & name) {
