@@ -116,6 +116,18 @@
         "W"
       ],
       "extra_saved": [],
+      "frozen_input_only": {
+        "policy": "fp64_wide_v1",
+        "min_reduction": 16384,
+        "operation": {
+          "role": "core",
+          "kernel_id": "gemm_backward_input_accum64_f32",
+          "map_call": true,
+          "reads": ["grad:y", "saved_weight:W"],
+          "input_names": ["d_output", "weight"],
+          "writes": [{"name": "d_input", "kind": "grad_activation", "target_input": "input"}]
+        }
+      },
       "backward_ops": [
         {
           "role": "core",
@@ -153,6 +165,18 @@
         "W"
       ],
       "extra_saved": [],
+      "frozen_input_only": {
+        "policy": "fp64_wide_v1",
+        "min_reduction": 16384,
+        "operation": {
+          "role": "core",
+          "kernel_id": "gemm_backward_input_accum64_f32",
+          "map_call": true,
+          "reads": ["grad:y", "saved_weight:W"],
+          "input_names": ["d_output", "weight"],
+          "writes": [{"name": "d_input", "kind": "grad_activation", "target_input": "input"}]
+        }
+      },
       "backward_ops": [
         {
           "role": "core",

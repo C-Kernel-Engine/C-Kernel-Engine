@@ -797,3 +797,83 @@ void gemm_backward_f32_train_parallel_dispatch_v2(const float *d_output,
         }
     }
 }
+
+typedef struct {
+    const float *d_output;
+    const float *weight;
+    float *d_input;
+    size_t tokens;
+    size_t input_width;
+    int output_width;
+} ck_frozen_dx_args_t;
+
+enum { ck_frozen_dx_token_block = 4, ck_frozen_dx_feature_block = 128 };
+
+/* Every worker owns complete output columns, with the same ascending FP64
+ * reduction on any thread count. Four token rows reuse each weight tile. */
+static void ck_frozen_dx_work(int ith, int nth, void *arg)
+{
+    const ck_frozen_dx_args_t *a = arg;
+    for (size_t c0 = (size_t)ith * ck_frozen_dx_feature_block;
+         c0 < a->input_width; c0 += (size_t)nth * ck_frozen_dx_feature_block) {
+        size_t nc = a->input_width - c0;
+        if (nc > ck_frozen_dx_feature_block) {
+            nc = ck_frozen_dx_feature_block;
+        }
+        for (size_t t0 = 0; t0 < a->tokens; t0 += ck_frozen_dx_token_block) {
+            size_t nr = a->tokens - t0;
+            if (nr > ck_frozen_dx_token_block) {
+                nr = ck_frozen_dx_token_block;
+            }
+            double sums[ck_frozen_dx_token_block][ck_frozen_dx_feature_block] = {{0}};
+            for (int k = 0; k < a->output_width; ++k) {
+                const float *w = a->weight + (size_t)k * a->input_width + c0;
+                for (size_t r = 0; r < nr; ++r) {
+                    const double g = a->d_output[(t0 + r) * a->output_width + k];
+                    for (size_t c = 0; c < nc; ++c) {
+                        sums[r][c] += g * (double)w[c];
+                    }
+                }
+            }
+            for (size_t r = 0; r < nr; ++r) {
+                float *dest = a->d_input + (t0 + r) * a->input_width + c0;
+                for (size_t c = 0; c < nc; ++c) {
+                    dest[c] = (float)sums[r][c];
+                }
+            }
+        }
+    }
+}
+
+int ck_gemm_backward_input_accum64_f32(const float *d_output, const float *weight,
+                                       float *d_input, int tokens, int input_width,
+                                       int output_width)
+{
+    if (!d_output || !weight || !d_input || tokens <= 0 || input_width <= 0 || output_width <= 0 ||
+        (size_t)tokens > SIZE_MAX / sizeof(float) / (size_t)input_width ||
+        (size_t)tokens > SIZE_MAX / sizeof(float) / (size_t)output_width ||
+        (size_t)output_width > SIZE_MAX / sizeof(float) / (size_t)input_width) {
+        return -1;
+    }
+
+    ck_frozen_dx_args_t args = {
+        .d_output = d_output,
+        .weight = weight,
+        .d_input = d_input,
+        .tokens = (size_t)tokens,
+        .input_width = (size_t)input_width,
+        .output_width = output_width,
+    };
+    ck_threadpool_t *pool = ck_threadpool_global();
+    int active = 1;
+    if (pool && (size_t)input_width * output_width >= (size_t)2097152) {
+        active = ck_train_pick_active_threads(
+            ck_threadpool_n_threads(pool), (size_t)input_width, ck_frozen_dx_feature_block);
+    }
+    if (active > 1) {
+        ck_threadpool_dispatch_n(pool, active, ck_frozen_dx_work, &args);
+    } else {
+        ck_frozen_dx_work(0, 1, &args);
+    }
+    return 0;
+}

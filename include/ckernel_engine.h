@@ -339,6 +339,12 @@ void gemm_fine_grained_parallel(const float *A,
 	                                               int aligned_out,
 	                                               int num_threads);
 
+/* d_input[T,I] = d_output[T,O] @ weight[O,I].
+ * Buffers are contiguous and disjoint. FP64 accumulation, FP32 output. */
+int ck_gemm_backward_input_accum64_f32(const float *d_output, const float *weight,
+                                       float *d_input, int tokens, int input_width,
+                                       int output_width);
+
 /* Optimizer / gradient update kernels used by v7 train runtime. */
 void adamw_update_f32(const float *grad,
                       float *weight,
