@@ -39,10 +39,8 @@ int layernorm_rows_checked_f32(const float *input, size_t input_elements, size_t
     float *means = scratch + rows * channels;
     float *rstd = means + rows;
     for (size_t r = 0; r < rows; ++r) {
-        /* One row avoids signed token*channel indexing in the legacy ABI.
-         * Its existing reduction order is preserved; no arithmetic is duplicated. */
-        layernorm_naive_serial_matched_precision(input + r * input_stride, gamma, beta,
-            scratch + r * channels, means + r, rstd + r, 1, (int)channels, epsilon);
+        ck_layernorm_row_fixed_chunk4_f32(input + r * input_stride, gamma, beta,
+            scratch + r * channels, means + r, rstd + r, (int)channels, epsilon);
         if (!isfinite(means[r]) || !isfinite(rstd[r]) ||
             !ck_checked_finite(scratch + r * channels, channels)) return -4;
     }

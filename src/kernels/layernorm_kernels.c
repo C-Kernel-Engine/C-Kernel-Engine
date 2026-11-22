@@ -15,6 +15,7 @@
  */
 
 #include "ckernel_engine.h"
+#include "ckernel_normalization_checked.h"
 #include "bf16_utils.h"
 
 #if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__) || defined(__SSE2__)
@@ -54,7 +55,8 @@ static void layernorm_forward_ggml_exact(const float *input,
                                          int input_stride,
                                          int output_stride,
                                          int aligned_embed_dim,
-                                         float eps)
+                                         float eps,
+                                         int fixed_chunk4)
 {
     for (int t = 0; t < tokens; ++t) {
         const float *x = input + (size_t)t * (size_t)input_stride;
@@ -73,6 +75,26 @@ static void layernorm_forward_ggml_exact(const float *input,
 
         double var_acc = 0.0;
         int i = 0;
+        if (fixed_chunk4) {
+            /* Match the checked provider's baseline four-value variance
+             * reduction on all ISAs, including AVX2 and AVX-512 builds. */
+            for (; i + 3 < d_model; i += 4) {
+                const float a = x[i] - mean;
+                const float b = x[i + 1] - mean;
+                const float c = x[i + 2] - mean;
+                const float d = x[i + 3] - mean;
+                y[i] = a;
+                y[i + 1] = b;
+                y[i + 2] = c;
+                y[i + 3] = d;
+                /* Products round to FP32 before the pairwise sums. */
+                volatile float aa = a * a;
+                volatile float bb = b * b;
+                volatile float cc = c * c;
+                volatile float dd = d * d;
+                var_acc += (double)((aa + bb) + (cc + dd));
+            }
+        } else {
 #if defined(__AVX2__) && defined(__FMA__)
         /* This provider promises ggml's ordered AVX2 reduction. Keep that
          * arithmetic identity on AVX-512 hosts instead of widening it based
@@ -106,6 +128,7 @@ static void layernorm_forward_ggml_exact(const float *input,
             var_acc += (double)_mm_cvtss_f32(val);
         }
 #endif
+        }
 #if defined(__clang__)
 #pragma clang loop vectorize(disable)
 #pragma clang loop interleave(disable)
@@ -410,7 +433,7 @@ void layernorm_forward_rolled_slice(const float *__restrict input_slice_base,
         layernorm_forward_ggml_exact(input_slice_base, gamma, beta,
                                      output_slice_base, mean_cache_slice, rstd_cache_slice,
                                      num_tokens_in_slice, d_model,
-                                     aligned_embed_dim, aligned_embed_dim, aligned_embed_dim, eps);
+                                     aligned_embed_dim, aligned_embed_dim, aligned_embed_dim, eps, 0);
         return;
     }
 
@@ -741,7 +764,7 @@ void layernorm_forward_unrolled_slice(const float *__restrict input_slice_base,
         layernorm_forward_ggml_exact(input_slice_base, gamma, beta,
                                      output_slice_base, mean_cache_slice, rstd_cache_slice,
                                      num_tokens_in_slice, d_model,
-                                     d_model, d_model, d_model, eps);
+                                     d_model, d_model, d_model, eps, 0);
         return;
     }
 
@@ -772,7 +795,16 @@ void layernorm_naive_serial_matched_precision(const float *input,
     layernorm_forward_ggml_exact(input, gamma, beta,
                                  output, mean_cache, rstd_cache,
                                  tokens, d_model,
-                                 d_model, d_model, d_model, eps);
+                                 d_model, d_model, d_model, eps, 0);
+}
+
+void ck_layernorm_row_fixed_chunk4_f32(const float *input, const float *gamma,
+    const float *beta, float *output, float *mean, float *rstd, int channels,
+    float epsilon)
+{
+    layernorm_forward_ggml_exact(input, gamma, beta, output, mean, rstd,
+                                 1, channels, channels, channels, channels,
+                                 epsilon, 1);
 }
 
 /*
@@ -798,7 +830,7 @@ void layernorm_naive_serial_bf16_storage(const float *input,
     layernorm_forward_ggml_exact(output, gamma, beta,
                                  output, mean_cache, rstd_cache,
                                  tokens, d_model,
-                                 d_model, d_model, d_model, eps);
+                                 d_model, d_model, d_model, eps, 0);
     for (size_t i = 0; i < count; ++i) {
         output[i] = bf16_to_float(float_to_bf16(output[i]));
     }

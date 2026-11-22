@@ -300,5 +300,5 @@
     ],
     "oracle": "Pinned independent Kokoro/PyTorch 2.8 first-layer operation captures; live PyTorch at small widths and SIMD tails; bounds, padding, rejection and repeated calls"
   },
-  "notes": "Checked adapter preserves the existing arithmetic. Independent native-versus-PyTorch contract uses the existing FP32 LayerNorm family 1e-5 absolute bound; this is not the AdaLN reproducibility bound. Backward support is explicitly uncertified. Complete native model remains NOT_TESTED. This map variant binds epsilon per call from the circuit."
+  "notes": "The checked FP32 row uses the same four-value FP32 pairwise variance chunks and ascending FP64 merge on every compiler target. Independent native-versus-PyTorch contract uses the existing FP32 LayerNorm family 1e-5 absolute bound; this is not the AdaLN reproducibility bound. Backward support is explicitly uncertified. Complete native model remains NOT_TESTED. This map variant binds epsilon per call from the circuit."
 }
