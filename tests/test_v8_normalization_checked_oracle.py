@@ -2,6 +2,7 @@
 import ctypes
 import hashlib
 import json
+import platform
 import sys
 from pathlib import Path
 import subprocess
@@ -17,16 +18,21 @@ SZ=ctypes.c_size_t
 def ptr(a): return a.ctypes.data_as(PTR)
 
 class NormalizationCheckedOracleTest(unittest.TestCase):
+    @staticmethod
+    def build_library(library, *flags):
+        sources = ['src/kernels/layernorm_rows_checked.c', 'src/kernels/gelu_rows_tanh_checked.c',
+                   'src/kernels/layernorm_kernels.c', 'src/kernels/gelu_kernels.c',
+                   'src/ck_threadpool.c', 'src/ckernel_strict.c']
+        subprocess.run(['cc', '-std=c11', '-O2', '-ffp-contract=off', *flags,
+                        '-shared', '-fPIC', '-I', str(ROOT/'include'),
+                        *[str(ROOT/s) for s in sources], '-lm', '-lpthread', '-ldl',
+                        '-o', str(library)], check=True)
+        return ctypes.CDLL(str(library))
+
     @classmethod
     def setUpClass(cls):
         cls.temp=tempfile.TemporaryDirectory()
-        library=Path(cls.temp.name)/'checked.so'
-        sources=['src/kernels/layernorm_rows_checked.c','src/kernels/gelu_rows_tanh_checked.c',
-                 'src/kernels/layernorm_kernels.c','src/kernels/gelu_kernels.c',
-                 'src/ck_threadpool.c','src/ckernel_strict.c']
-        subprocess.run(['cc','-std=c11','-O2','-ffp-contract=off','-shared','-fPIC','-I',str(ROOT/'include'),
-                        *[str(ROOT/s) for s in sources],'-lm','-lpthread','-ldl','-o',str(library)],check=True)
-        cls.lib=ctypes.CDLL(str(library))
+        cls.lib=cls.build_library(Path(cls.temp.name)/'checked.so')
         cls.norm=cls.lib.layernorm_rows_checked_f32
         cls.norm.argtypes=[PTR,SZ,SZ,PTR,SZ,PTR,SZ,PTR,SZ,SZ,PTR,SZ,SZ,SZ,ctypes.c_float]
         cls.norm.restype=ctypes.c_int
@@ -79,6 +85,23 @@ class NormalizationCheckedOracleTest(unittest.TestCase):
                 error=np.abs(y[:,:768]-self.fixture[name+'_expected'])
                 self.evidence('layernorm_rows_checked_f32', name, y[:,:768],
                               self.fixture[name+'_expected'], 1e-5, self.meta['dependencies']['torch'])
+
+    @unittest.skipUnless(platform.machine() == 'x86_64', 'compares x86 compiler targets')
+    def test_layernorm_variance_order_is_identical_across_compiler_targets(self):
+        source = self.fixture['attention_norm_input']
+        gamma = self.fixture['weight__attention__LayerNorm__weight']
+        beta = self.fixture['weight__attention__LayerNorm__bias']
+        scratch = np.empty(source.shape[0] * (source.shape[1] + 2), dtype=np.float32)
+        outputs = []
+        for name, flag in [('baseline', '-march=x86-64'), ('native', '-march=native')]:
+            library = self.build_library(Path(self.temp.name) / f'{name}.so', flag)
+            normalize = library.layernorm_rows_checked_f32
+            normalize.argtypes = self.norm.argtypes
+            normalize.restype = self.norm.restype
+            output = np.empty_like(source)
+            self.assertEqual(normalize(*self.norm_args(source, gamma, beta, output, scratch)), 0)
+            outputs.append(output)
+        np.testing.assert_array_equal(outputs[0].view(np.uint32), outputs[1].view(np.uint32))
 
     def test_pinned_tanh_gelu(self):
         x=self.fixture['ffn_linear_expected'];y=np.full((36,2051),-777.,'f');scratch=np.empty(x.size,'f')
