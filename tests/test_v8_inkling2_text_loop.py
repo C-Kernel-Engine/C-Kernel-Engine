@@ -213,6 +213,72 @@ class InklingTextLoopTests(unittest.TestCase):
                     for cache, prior in zip(caches, cache_prefix):
                         self.assertEqual(hashlib.sha256(cache[:, :position]).digest(), prior)
 
+    def test_circular_sliding_preserves_logits_and_visible_state_over_wraps(self):
+        rng = np.random.default_rng(1674)
+        config = {**CONFIG, "sliding_window_size": 9}
+        graph = resident_text_loop(config, 2, 25)
+        specs = first_block_weights(graph)
+        weights = {
+            name: pack_quant(rng.integers(-3, 4, shape, dtype=np.int8), "q8_0")
+            if dtype == "Q8_0" else rng.normal(.025, .18, shape).astype("f4")
+            for name, (shape, dtype) in specs.items()
+        }
+        with TemporaryDirectory() as temp:
+            runners = {}
+            for circular in (False, True):
+                folder = Path(temp) / ("ring" if circular else "linear")
+                folder.mkdir()
+                graph = resident_text_loop(config, 2, 25, circular_sliding=circular)
+                _, arena, view, library = compile_checked_weight_graph(folder, graph, weights, specs)
+                bindings = load_exports(folder, library)
+                for layer in range(config["num_hidden_layers"]):
+                    view(f"router_bias_{layer}")[:] = [-.02, .04, .08, .01]
+                view("expert_slots", np.int32)[:] = np.arange(config["n_routed_experts"])
+                for slot in range(48):
+                    for kind in ("k", "v"):
+                        view(f"cache_{kind}_{slot}").fill(np.nan)
+                functions = {phase: getattr(library, name) for phase, name in bindings["entries"].items()}
+                for function in functions.values():
+                    function.argtypes = [ctypes.c_void_p, ctypes.c_size_t]
+                    function.restype = ctypes.c_int
+                runners[circular] = arena, view, functions, bindings["properties"]["circular_sliding_slots"]
+
+            linear, ring = runners[False], runners[True]
+            self.assertEqual(ring[3]["0"], 10)
+            self.assertNotIn("5", ring[3])
+            ids = rng.integers(config["vocab_size"], size=25, dtype=np.int32)
+            position = 0
+            for length in (2, 2, 2, 1, 2, 2, 1, 2, 2, 2, 2, 1, 2, 1, 1):
+                phase = "prefill" if length == 2 else "append"
+                outputs = []
+                for arena, view, functions, _ in (linear, ring):
+                    view(f"{phase}_request_position", np.int32)[:] = position
+                    view(f"{phase}_token_ids", np.int32)[:] = ids[position:position + length]
+                    self.assertEqual(functions[phase](arena, len(arena)), 0)
+                    outputs.append(view(f"{phase}_logits").copy())
+                self.assertTrue(np.isfinite(outputs[0]).all())
+                np.testing.assert_array_equal(outputs[0].view("u4"), outputs[1].view("u4"))
+                position += length
+                for slot in range(48):
+                    bounded = ring[3].get(str(slot))
+                    for kind in ("k", "v"):
+                        name = f"cache_{kind}_{slot}"
+                        first = max(0, position - config["sliding_window_size"]) if bounded else 0
+                        logical = np.arange(first, position)
+                        physical = logical % bounded if bounded else logical
+                        expected, actual = linear[1](name)[:, logical], ring[1](name)[:, physical]
+                        np.testing.assert_array_equal(expected.view("u4"), actual.view("u4"), err_msg=name)
+                    for kind in ("k", "v", "attn_post_conv", "ffn_post_conv"):
+                        name = f"history_{kind}_{slot}"
+                        np.testing.assert_array_equal(linear[1](name).view("u4"), ring[1](name).view("u4"))
+
+            self.assertEqual(position, 25)
+            arena, view, functions, _ = ring
+            before = view("cache_k_0").tobytes()
+            view("append_request_position", np.int32)[:] = position
+            self.assertEqual(functions["append"](arena, len(arena)), -1)
+            self.assertEqual(view("cache_k_0").tobytes(), before)
+
     def test_oracle_comparison_rejects_equal_argmax_with_different_logits(self):
         native = np.array([0.0, 2.0, -1.0], dtype="<f4")
         self.assertEqual(compare_oracle_row(native, native.copy(), 32767, "prefill")["status"], "PASS")

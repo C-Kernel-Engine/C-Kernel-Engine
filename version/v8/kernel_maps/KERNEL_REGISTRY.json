@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 553,
+      "total": 555,
       "by_op": {
         "add_backward": 1,
         "add_rows_backward_train_f32": 1,
@@ -121,7 +121,7 @@
         "gemma4_per_layer_embed": 1,
         "gemma4_per_layer_prepare": 2,
         "gemv": 15,
-        "gqa_relative_sink_checked": 1,
+        "gqa_relative_sink_checked": 2,
         "group_limited_topk_router": 2,
         "grouped_cross_entropy_checked": 1,
         "grouped_softmax_weighted_rows_checked": 1,
@@ -139,7 +139,7 @@
         "indexed_rows_train_f32": 1,
         "indexed_rows_weight_train_f32": 1,
         "indexed_sum_rows_checked": 1,
-        "kv_cache_l2_rms_append_checked": 1,
+        "kv_cache_l2_rms_append_checked": 2,
         "kv_cache_seed_checked": 1,
         "kv_cache_store": 4,
         "kv_cache_store_batch_bf16": 1,
@@ -56921,6 +56921,390 @@
       "_source_file": "gqa_relative_sink_checked_f32.json"
     },
     {
+      "id": "gqa_relative_sink_ring_checked_f32",
+      "op": "gqa_relative_sink_checked",
+      "operation_interface": "attention.gqa.relative_band_sink.checked.fp32.ring.v1",
+      "variant": "ordered_fp64_online_softmax_circular_head_major_fp32",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "equivalence_group": "attention.gqa.relative_band_sink.checked.fp32.ring.v1",
+        "phases": [
+          "prefill",
+          "decode"
+        ]
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "weights": [],
+      "dims": [
+        "T",
+        "H",
+        "KV",
+        "D",
+        "S",
+        "B"
+      ],
+      "inputs": [
+        {
+          "name": "query",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "H",
+            "D"
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "key",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "S",
+            "D"
+          ],
+          "layout": "head_major_capacity_stride",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "value",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "S",
+            "D"
+          ],
+          "layout": "head_major_capacity_stride",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "relative",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "H",
+            "B"
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "sink",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "H"
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "H",
+            "D"
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "accumulator",
+          "dtype": "fp64",
+          "shape": [
+            "T",
+            "H",
+            "D"
+          ],
+          "size_bytes": "8 * T * H * D",
+          "size_resolution": "required",
+          "lifetime": "kernel_call",
+          "alignment": 64,
+          "layout": "contiguous",
+          "access": "read_write",
+          "storage_class": "scratch",
+          "consumption": "required"
+        }
+      ],
+      "impl": {
+        "function": "ck_gqa_relative_sink_ring_checked_f32",
+        "sources": [
+          "src/kernels/gqa_relative_sink_checked.c"
+        ],
+        "c_declaration": "int ck_gqa_relative_sink_ring_checked_f32(const float *query, size_t query_elements, const float *key, size_t key_elements, const float *value, size_t value_elements, const float *relative, size_t relative_elements, const float *sink, size_t sink_elements, float *output, size_t output_elements, double *work, size_t work_elements, size_t tokens, size_t heads, size_t kv_heads, size_t dim, size_t capacity, size_t position, size_t relative_extent, size_t window);"
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "query",
+            "source": "activation:query",
+            "cast": "const float*",
+            "ports": [
+              "input:query"
+            ]
+          },
+          {
+            "name": "query_elements",
+            "source": "runtime:query_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "key",
+            "source": "activation:key",
+            "cast": "const float*",
+            "ports": [
+              "input:key"
+            ]
+          },
+          {
+            "name": "key_elements",
+            "source": "runtime:key_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "value",
+            "source": "activation:value",
+            "cast": "const float*",
+            "ports": [
+              "input:value"
+            ]
+          },
+          {
+            "name": "value_elements",
+            "source": "runtime:value_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "relative",
+            "source": "activation:relative",
+            "cast": "const float*",
+            "ports": [
+              "input:relative"
+            ]
+          },
+          {
+            "name": "relative_elements",
+            "source": "runtime:relative_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "sink",
+            "source": "activation:sink",
+            "cast": "const float*",
+            "ports": [
+              "input:sink"
+            ]
+          },
+          {
+            "name": "sink_elements",
+            "source": "runtime:sink_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "work",
+            "source": "scratch:accumulator",
+            "cast": "double*"
+          },
+          {
+            "name": "work_elements",
+            "source": "runtime:work_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "tokens",
+            "source": "runtime:tokens",
+            "value_type": "size_t"
+          },
+          {
+            "name": "heads",
+            "source": "runtime:heads",
+            "value_type": "size_t"
+          },
+          {
+            "name": "kv_heads",
+            "source": "runtime:kv_heads",
+            "value_type": "size_t"
+          },
+          {
+            "name": "dim",
+            "source": "runtime:dim",
+            "value_type": "size_t"
+          },
+          {
+            "name": "capacity",
+            "source": "runtime:capacity",
+            "value_type": "size_t"
+          },
+          {
+            "name": "position",
+            "source": "runtime:position",
+            "value_type": "size_t"
+          },
+          {
+            "name": "relative_extent",
+            "source": "runtime:relative_extent",
+            "value_type": "size_t"
+          },
+          {
+            "name": "window",
+            "source": "runtime:window",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "T": "tokens",
+          "H": "heads",
+          "KV": "kv_heads",
+          "D": "dim",
+          "S": "capacity",
+          "B": "relative_extent"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "query",
+            "elements": "query_elements",
+            "rows": 1,
+            "width": "query_elements",
+            "element_bytes": 4,
+            "exact_elements_product": [
+              "tokens",
+              "heads",
+              "dim"
+            ]
+          },
+          {
+            "pointer": "output",
+            "elements": "output_elements",
+            "rows": 1,
+            "width": "output_elements",
+            "element_bytes": 4,
+            "exact_elements_product": [
+              "tokens",
+              "heads",
+              "dim"
+            ]
+          },
+          {
+            "pointer": "key",
+            "elements": "key_elements",
+            "rows": 1,
+            "width": "key_elements",
+            "element_bytes": 4,
+            "exact_elements_product": [
+              "kv_heads",
+              "capacity",
+              "dim"
+            ]
+          },
+          {
+            "pointer": "value",
+            "elements": "value_elements",
+            "rows": 1,
+            "width": "value_elements",
+            "element_bytes": 4,
+            "exact_elements_product": [
+              "kv_heads",
+              "capacity",
+              "dim"
+            ]
+          },
+          {
+            "pointer": "relative",
+            "elements": "relative_elements",
+            "rows": 1,
+            "width": "relative_elements",
+            "element_bytes": 4,
+            "exact_elements_product": [
+              "tokens",
+              "heads",
+              "relative_extent"
+            ]
+          },
+          {
+            "pointer": "sink",
+            "elements": "sink_elements",
+            "rows": 1,
+            "width": "sink_elements",
+            "element_bytes": 4,
+            "exact_elements_product": [
+              "tokens",
+              "heads"
+            ]
+          },
+          {
+            "pointer": "work",
+            "elements": "work_elements",
+            "rows": 1,
+            "width": "work_elements",
+            "element_bytes": 8,
+            "exact_elements_product": [
+              "tokens",
+              "heads",
+              "dim"
+            ]
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_mini_relative_attention.py"
+        ],
+        "oracle": "Independent dense masked softmax including zero-value sink"
+      },
+      "notes": "Read an absolute causal window from circular KV in logical order. All queries in a chunk must fit after the complete chunk append.",
+      "name": "gqa_relative_sink_ring_checked_f32",
+      "_source_file": "gqa_relative_sink_ring_checked_f32.json"
+    },
+    {
       "id": "gradient_accumulate_f32",
       "op": "optimizer",
       "variant": "fp32_accumulate",
@@ -64137,6 +64521,289 @@
       "notes": "Token-major K/V input. Per-head L2 clipping on K and unweighted RMS on V, using ordered FP64 norms. The output overwrites exactly the caller-selected span of the head-major cache after complete validation.",
       "name": "kv_cache_l2_rms_append_checked_f32",
       "_source_file": "kv_cache_l2_rms_append_checked_f32.json"
+    },
+    {
+      "id": "kv_cache_l2_rms_append_ring_checked_f32",
+      "op": "kv_cache_l2_rms_append_checked",
+      "operation_interface": "kv.cache.append_l2_key_rms_value.checked.fp32.ring.v1",
+      "variant": "ordered_fp64_norm_circular_head_major_fp32",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "equivalence_group": "kv.cache.append_l2_key_rms_value.checked.fp32.ring.v1",
+        "phases": [
+          "prefill",
+          "decode"
+        ]
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "k",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "KV",
+            "D"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "v",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "KV",
+            "D"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "cache_k",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "S",
+            "D"
+          ],
+          "layout": "head_major_capacity_stride",
+          "access": "read",
+          "storage_class": "state",
+          "consumption": "required"
+        },
+        {
+          "name": "cache_v",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "S",
+            "D"
+          ],
+          "layout": "head_major_capacity_stride",
+          "access": "read",
+          "storage_class": "state",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "cache_k",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "S",
+            "D"
+          ],
+          "layout": "head_major_capacity_stride",
+          "access": "read_write",
+          "storage_class": "state",
+          "consumption": "required",
+          "alias_of": "input:cache_k"
+        },
+        {
+          "name": "cache_v",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "S",
+            "D"
+          ],
+          "layout": "head_major_capacity_stride",
+          "access": "read_write",
+          "storage_class": "state",
+          "consumption": "required",
+          "alias_of": "input:cache_v"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "KV",
+        "T",
+        "S",
+        "D"
+      ],
+      "impl": {
+        "function": "ck_kv_cache_l2_rms_append_ring_checked_f32",
+        "sources": [
+          "src/kernels/kv_cache_l2_rms_append_checked.c"
+        ],
+        "c_declaration": "int ck_kv_cache_l2_rms_append_ring_checked_f32(const float *key, size_t key_elements, const float *value, size_t value_elements, float *k_cache, size_t k_cache_elements, float *v_cache, size_t v_cache_elements, size_t tokens, size_t heads, size_t dim, size_t capacity, size_t position, float key_clip, float epsilon);"
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "key",
+            "source": "activation:k",
+            "cast": "const float*",
+            "ports": [
+              "input:k"
+            ]
+          },
+          {
+            "name": "key_elements",
+            "source": "runtime:key_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "value",
+            "source": "activation:v",
+            "cast": "const float*",
+            "ports": [
+              "input:v"
+            ]
+          },
+          {
+            "name": "value_elements",
+            "source": "runtime:value_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "k_cache",
+            "source": "activation:cache_k",
+            "cast": "float*",
+            "ports": [
+              "input:cache_k",
+              "output:cache_k"
+            ]
+          },
+          {
+            "name": "k_cache_elements",
+            "source": "runtime:k_cache_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "v_cache",
+            "source": "activation:cache_v",
+            "cast": "float*",
+            "ports": [
+              "input:cache_v",
+              "output:cache_v"
+            ]
+          },
+          {
+            "name": "v_cache_elements",
+            "source": "runtime:v_cache_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "tokens",
+            "source": "runtime:tokens",
+            "value_type": "size_t"
+          },
+          {
+            "name": "heads",
+            "source": "runtime:heads",
+            "value_type": "size_t"
+          },
+          {
+            "name": "dim",
+            "source": "runtime:dim",
+            "value_type": "size_t"
+          },
+          {
+            "name": "capacity",
+            "source": "runtime:capacity",
+            "value_type": "size_t"
+          },
+          {
+            "name": "position",
+            "source": "runtime:position",
+            "value_type": "size_t"
+          },
+          {
+            "name": "key_clip",
+            "source": "param:key_clip"
+          },
+          {
+            "name": "epsilon",
+            "source": "param:epsilon"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "T": "tokens",
+          "KV": "heads",
+          "D": "dim",
+          "S": "capacity"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "key",
+            "elements": "key_elements",
+            "rows": 1,
+            "width": "key_elements",
+            "element_bytes": 4,
+            "exact_elements_product": [
+              "tokens",
+              "heads",
+              "dim"
+            ]
+          },
+          {
+            "pointer": "value",
+            "elements": "value_elements",
+            "rows": 1,
+            "width": "value_elements",
+            "element_bytes": 4,
+            "exact_elements_product": [
+              "tokens",
+              "heads",
+              "dim"
+            ]
+          },
+          {
+            "pointer": "k_cache",
+            "elements": "k_cache_elements",
+            "rows": 1,
+            "width": "k_cache_elements",
+            "element_bytes": 4,
+            "exact_elements_product": [
+              "capacity",
+              "heads",
+              "dim"
+            ]
+          },
+          {
+            "pointer": "v_cache",
+            "elements": "v_cache_elements",
+            "rows": 1,
+            "width": "v_cache_elements",
+            "element_bytes": 4,
+            "exact_elements_product": [
+              "capacity",
+              "heads",
+              "dim"
+            ]
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_mini_causal_kv.py"
+        ],
+        "oracle": "PyTorch eager FP32 norms and independent exact state continuity"
+      },
+      "notes": "Uses absolute token positions and physical row modulo capacity. Rejects a chunk longer than the bounded circular KV allocation.",
+      "name": "kv_cache_l2_rms_append_ring_checked_f32",
+      "_source_file": "kv_cache_l2_rms_append_ring_checked_f32.json"
     },
     {
       "id": "kv_cache_seed_checked_f32",
