@@ -46,6 +46,8 @@ from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 
 try:
     import jinja2
+    import jinja2.ext
+    import jinja2.nodes
     import jinja2.sandbox
 
     _JINJA_AVAILABLE = True
@@ -891,6 +893,21 @@ def _gemma_template_tool(tool: Any) -> dict[str, Any]:
     }}
 
 
+if _JINJA_AVAILABLE:
+    class _TemplateGeneration(jinja2.ext.Extension):
+        """Render publisher generation blocks without recording assistant masks."""
+
+        tags = {"generation"}
+
+        def parse(self, parser):
+            lineno = next(parser.stream).lineno
+            body = parser.parse_statements(("name:endgeneration",), drop_needle=True)
+            return jinja2.nodes.CallBlock(self.call_method("_render_body"), [], [], body).set_lineno(lineno)
+
+        def _render_body(self, caller):
+            return caller()
+
+
 def _render_with_chat_templates(
     chat_template: str | None,
     chat_templates: dict[str, str] | None,
@@ -951,7 +968,7 @@ def _render_with_chat_templates(
 
         env = jinja2.sandbox.SandboxedEnvironment(
             undefined=jinja2.StrictUndefined, autoescape=False,
-            extensions=["jinja2.ext.loopcontrols"],
+            extensions=["jinja2.ext.loopcontrols", _TemplateGeneration],
             # Match the reference chat-template rendering semantics
             # (transformers' apply_chat_template): block tags consume their
             # surrounding whitespace, so e.g. a comment line before
