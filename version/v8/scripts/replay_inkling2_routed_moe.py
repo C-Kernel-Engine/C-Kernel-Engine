@@ -51,6 +51,20 @@ def fetch_gguf_range(file, first, count):
     return raw, {"sha256": digest(raw), "range_inclusive": [first, last]}
 
 
+def make_local_gguf_range_reader(path):
+    def read(file, offset, count):
+        if not 0 <= offset <= file[1] - count or not 0 < count <= 16 * 1024 * 1024:
+            raise ValueError("invalid bounded local GGUF range")
+        with path.open("rb") as handle:
+            handle.seek(offset)
+            payload = handle.read(count)
+        if len(payload) != count:
+            raise ValueError("local GGUF tensor range truncated")
+        return payload, {"sha256": digest(payload), "range_inclusive": [offset, offset + count - 1]}
+
+    return read
+
+
 def read_gguf_header(header):
     r = GGUFReader(io.BytesIO(header))
     if r._read_exact(4) != b"GGUF" or r.u32() != 3:
@@ -84,7 +98,7 @@ def read_gguf_header(header):
     return tensors, start
 
 
-def gguf_tensor(file, tensors, data_start, name, dims, kind, expert=None):
+def gguf_tensor(file, tensors, data_start, name, dims, kind, expert=None, *, read_range=fetch_gguf_range):
     info = tensors[name]
     if info.dims != dims or info.ggml_type != kind:
         raise ValueError(f"unexpected GGUF shape or dtype: {name}")
@@ -95,7 +109,7 @@ def gguf_tensor(file, tensors, data_start, name, dims, kind, expert=None):
         if len(dims) != 3 or not 0 <= expert < dims[2]:
             raise ValueError("expert outside GGUF tensor")
         offset += expert * count
-    raw, report = fetch_gguf_range(file, offset, count)
+    raw, report = read_range(file, offset, count)
     return raw, dict(report, name=name, ggml_type=kind)
 
 
@@ -120,11 +134,11 @@ def gguf_expert_type(tensors, layer):
     return kind
 
 
-def from_gguf(file, tensors, data_start, layer, expert=None):
+def from_gguf(file, tensors, data_start, layer, expert=None, *, read_range=fetch_gguf_range):
     prefix = f"blk.{layer}."
 
     def tensor(name, dims, kind):
-        return gguf_tensor(file, tensors, data_start, prefix + name, dims, kind, expert)
+        return gguf_tensor(file, tensors, data_start, prefix + name, dims, kind, expert, read_range=read_range)
 
     if expert is None:
         router, r = tensor("ffn_gate_inp.weight", (WIDTH, EXPERTS), GGML_TYPE_F32)

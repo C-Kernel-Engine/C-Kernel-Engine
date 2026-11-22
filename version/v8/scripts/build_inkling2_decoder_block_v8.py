@@ -26,7 +26,7 @@ PACKED_PROJECTIONS = {
 
 def first_decoder_block(prefill_tokens=4, width=2304, kv_heads=8, query_heads=24, dim=128,
                         relative_dim=16, band=1024, window=1024, inner=1152, experts=128,
-                        top_k=8, slots=128, taps=4, epsilon=1e-6):
+                        top_k=8, slots=128, taps=4, epsilon=1e-6, q8_activations=False):
     """Layer zero starts a residual block and owns four causal histories plus KV."""
     if width % 32 or query_heads * dim % 32:
         raise ValueError("packed Q8_0 projections require full input blocks")
@@ -38,6 +38,8 @@ def first_decoder_block(prefill_tokens=4, width=2304, kv_heads=8, query_heads=24
     body = graph["block_types"]["block"]["body"]
     exports = graph["semantic_checkpoints"]["exports"]
     graph["name"] = "inkling2_mini_first_q8_decoder_block"
+    if q8_activations:
+        graph["name"] += "_q8_activation"
     graph["native_entry"]["function"] = "ck_" + graph["name"]
     graph["contract"]["runtime_invariants"].update(
         inner=inner, scope="first sliding decoder layer from residual input through output with packed GGUF weights"
@@ -128,6 +130,9 @@ def first_decoder_block(prefill_tokens=4, width=2304, kv_heads=8, query_heads=24
                     "input_elements": tokens * count_in, "output_elements": tokens * count_out,
                     "weight_bytes": count_in // 32 * 34 * count_out,
                 }
+                if q8_activations:
+                    node["kernel"] = "linear_rows_q8_0_checked_q8_activation"
+                    p["call_constants"]["activation_bytes"] = count_in // 32 * 34
                 if node["id"] in exports:
                     exports[node["id"]]["op"] = node["op"]
             body["ops"].append(node)
@@ -143,7 +148,7 @@ def first_decoder_block(prefill_tokens=4, width=2304, kv_heads=8, query_heads=24
                       }}, checkpoint=True)["id"]
         mlp_input = rms("ffn_norm", mix, "ffn_norm.weight")
         moe = routed_expert_mixture(rows, width, inner, experts, top_k, slots,
-                                   layer=0, storage="q8_0")
+                                   layer=0, storage="q8_0", q8_activations=q8_activations)
         names = {"hidden": mlp_input, "expert_slots": "external:expert_slots",
                  "correction_bias": "external:router_bias"}
         for name, spec in moe["activation_buffers"].items():

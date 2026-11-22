@@ -307,12 +307,15 @@ def expert_router(tokens=4, width=2304, experts=128, top_k=8, *, layer=6, route_
 
 
 def routed_expert_mixture(tokens, width, inner, experts, top_k, slots, *,
-                          layer=6, storage="f32", route_scale=8.0, gate_cap=4.0, up_cap=25.0):
+                          layer=6, storage="f32", route_scale=8.0, gate_cap=4.0, up_cap=25.0,
+                          q8_activations=False):
     """Connect generated routing, checked expert dispatch and weighted mixture."""
     if (type(slots) is not int or not 1 <= slots <= experts
             or storage not in {"f32", "q8_0", "iq4_nl"}
             or storage != "f32" and (width % 32 or inner % 32)):
         raise ValueError("unsupported routed expert bank")
+    if q8_activations and storage != "q8_0":
+        raise ValueError("Q8_0 activation is only available with Q8_0 expert weights")
     graph = expert_router(tokens, width, experts, top_k, layer=layer, route_scale=route_scale)
     graph["name"] = f"inkling2_mini_layer{layer}_routed_experts_{storage}"
     graph["native_entry"]["function"] = "ck_" + graph["name"]
@@ -326,12 +329,15 @@ def routed_expert_mixture(tokens, width, inner, experts, top_k, slots, *,
     )
     graph["activation_bindings"].update({p: p for p in ("expert_slots", "expert_output", "mixture")})
     work = 3 * inner + tokens * (top_k + 1) * width
+    if q8_activations:
+        work += ((width + inner) // 32 * 34 + 3) // 4
     elements = slots * inner * width
     block_bytes = {"q8_0": 34, "iq4_nl": 18}
     prefix = f"model.llm.layers.{layer}.mlp.experts.bank."
     mixture = {
         "id": "mixture", "op": "routed_softcapped_experts_checked",
-        "kernel": f"routed_softcapped_experts_checked_{storage}", "returns_status": True,
+        "kernel": f"routed_softcapped_experts_checked_{storage}" + ("_q8_activation" if q8_activations else ""),
+        "returns_status": True,
         "graph_slots": {
             "inputs": {"hidden": "external:hidden", "ids": "indices",
                        "route_weights": "route_weights", "expert_slots": "external:expert_slots"},

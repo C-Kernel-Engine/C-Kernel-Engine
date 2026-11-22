@@ -1,5 +1,6 @@
 #include "checked_float_buffer.h"
 #include "packed_q8_dot_ordered.h"
+#include "packed_q8_activation_checked.h"
 #include "ckernel_transformer_rows_checked.h"
 
 #include <string.h>
@@ -25,8 +26,9 @@ static size_t packed_block_bytes(enum expert_storage storage)
 /* Packed blocks are read in GGUF byte order and expanded inside the dot.
  * The FP32 activation and ordered FP64 accumulation policy is shared. */
 static float expert_dot(const float *input, const unsigned char *weight,
-                        size_t width, enum expert_storage storage)
+                        size_t width, enum expert_storage storage, const unsigned char *activation)
 {
+    if (activation) return ck_q8_activation_dot(weight, activation, width);
     if (storage == EXPERT_Q8_0) return ck_packed_q8_dot_ordered(input, weight, width);
     double sum = 0.0;
     if (storage == EXPERT_F32) {
@@ -69,7 +71,7 @@ static int region(const void *p, size_t bytes)
     size_t expert_slot_elements, size_t expert_output_elements, size_t output_capacity, \
     size_t work_elements, float gate_cap, float up_cap
 
-static int routed_softcapped_experts(ROUTED_EXPERT_ARGS, enum expert_storage storage)
+static int routed_softcapped_experts(ROUTED_EXPERT_ARGS, enum expert_storage storage, int quantize)
 {
     /* Bounds keep workspace arithmetic valid on supported size_t widths. */
     if (!rows || rows > 16 || !hidden_dim || hidden_dim > 8192 ||
@@ -87,7 +89,9 @@ static int routed_softcapped_experts(ROUTED_EXPERT_ARGS, enum expert_storage sto
     const size_t route_count = rows * top_k;
     const size_t output_elements = rows * hidden_dim;
     const size_t row_outputs = route_count * hidden_dim;
-    const size_t scratch_elements = 3 * inner + row_outputs + output_elements;
+    const size_t float_elements = 3 * inner + row_outputs + output_elements;
+    const size_t packed_elements = quantize ? (gate_row + down_row + sizeof(float) - 1) / sizeof(float) : 0;
+    const size_t scratch_elements = float_elements + packed_elements;
     if (hidden_elements < output_elements || id_elements < route_count || route_elements < route_count ||
         expert_slot_elements < experts || expert_output_elements < row_outputs ||
         output_capacity < output_elements || work_elements < scratch_elements) return -1;
@@ -135,10 +139,13 @@ static int routed_softcapped_experts(ROUTED_EXPERT_ARGS, enum expert_storage sto
     float *activation = work + 2 * inner;
     float *staged_experts = work + 3 * inner;
     float *staged_output = staged_experts + row_outputs;
+    unsigned char *packed_hidden = quantize ? (unsigned char *)(work + float_elements) : NULL;
+    unsigned char *packed_activation = quantize ? packed_hidden + gate_row : NULL;
     memset(staged_output, 0, output_elements * sizeof(float));
     for (size_t row = 0; row < rows; ++row) {
         const float *x = hidden + row * hidden_dim;
         float *y = staged_output + row * hidden_dim;
+        if (quantize && ck_pack_q8_activation_rne(x, packed_hidden, hidden_dim)) return -3;
         /* The reference sums contributions in ascending expert-ID order. */
         for (size_t id = 0; id < experts; ++id) {
             for (size_t index = 0; index < top_k; ++index) {
@@ -149,13 +156,14 @@ static int routed_softcapped_experts(ROUTED_EXPERT_ARGS, enum expert_storage sto
                 const unsigned char *u = (const unsigned char *)up + offset;
                 const unsigned char *d = (const unsigned char *)down + offset;
                 for (size_t i = 0; i < inner; ++i) {
-                    gate_values[i] = expert_dot(x, g + i * gate_row, hidden_dim, storage);
-                    up_values[i] = expert_dot(x, u + i * gate_row, hidden_dim, storage);
+                    gate_values[i] = expert_dot(x, g + i * gate_row, hidden_dim, storage, packed_hidden);
+                    up_values[i] = expert_dot(x, u + i * gate_row, hidden_dim, storage, packed_hidden);
                 }
                 if (softcapped_swiglu_rows_checked_f32(gate_values, inner, up_values, inner,
                         activation, inner, inner, gate_cap, up_cap)) return -3;
+                if (quantize && ck_pack_q8_activation_rne(activation, packed_activation, inner)) return -3;
                 for (size_t i = 0; i < hidden_dim; ++i) {
-                    const float v = expert_dot(activation, d + i * down_row, inner, storage);
+                    const float v = expert_dot(activation, d + i * down_row, inner, storage, packed_activation);
                     staged_experts[route * hidden_dim + i] = v;
                     y[i] += v * route_weights[route];
                     if (!isfinite(v) || !isfinite(y[i])) return -3;
@@ -168,24 +176,30 @@ static int routed_softcapped_experts(ROUTED_EXPERT_ARGS, enum expert_storage sto
     return 0;
 }
 
-#define ROUTED_EXPERT_FORWARD(storage) \
+#define ROUTED_EXPERT_FORWARD(storage, quantize) \
     routed_softcapped_experts(hidden, ids, route_weights, expert_slots, gate, up, down, \
                              expert_output, output, work, rows, hidden_dim, inner, experts, \
                              slots, top_k, matrix_bytes, hidden_elements, id_elements, route_elements, \
                              expert_slot_elements, expert_output_elements, output_capacity, \
-                             work_elements, gate_cap, up_cap, storage)
+                             work_elements, gate_cap, up_cap, storage, quantize)
 
 int routed_softcapped_experts_checked_f32(ROUTED_EXPERT_ARGS)
 {
-    return ROUTED_EXPERT_FORWARD(EXPERT_F32);
+    return ROUTED_EXPERT_FORWARD(EXPERT_F32, 0);
 }
 
 int routed_softcapped_experts_checked_q8_0(ROUTED_EXPERT_ARGS)
 {
-    return ROUTED_EXPERT_FORWARD(EXPERT_Q8_0);
+    return ROUTED_EXPERT_FORWARD(EXPERT_Q8_0, 0);
 }
 
 int routed_softcapped_experts_checked_iq4_nl(ROUTED_EXPERT_ARGS)
 {
-    return ROUTED_EXPERT_FORWARD(EXPERT_IQ4_NL);
+    return ROUTED_EXPERT_FORWARD(EXPERT_IQ4_NL, 0);
+}
+
+
+int routed_softcapped_experts_checked_q8_0_q8_activation(ROUTED_EXPERT_ARGS)
+{
+    return ROUTED_EXPERT_FORWARD(EXPERT_Q8_0, 1);
 }

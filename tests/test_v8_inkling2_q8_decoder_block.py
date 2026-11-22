@@ -1,4 +1,6 @@
+import ctypes
 from pathlib import Path
+import subprocess
 from tempfile import TemporaryDirectory
 import unittest
 
@@ -12,9 +14,15 @@ from version.v8.scripts.compile_checked_bundle_v8 import compile_checked_weight_
 
 class InklingQ8DecoderBlockTests(unittest.TestCase):
     def test_first_q8_decoder_block_split_and_uninterrupted(self):
+        for quantized in (False, True):
+            with self.subTest(q8_activations=quantized):
+                self.check_split(q8_activations=quantized)
+
+    def check_split(self, *, q8_activations):
         rng = np.random.default_rng(141)
         spec = dict(width=32, kv_heads=1, query_heads=2, dim=16, relative_dim=2,
-                    band=3, window=4, inner=32, experts=4, top_k=2, slots=4, taps=4)
+                    band=3, window=4, inner=32, experts=4, top_k=2, slots=4, taps=4,
+                    q8_activations=q8_activations)
         hidden = rng.normal(0, .2, (5, 32)).astype(np.float32)
         bias = np.array([.2, -.1, .25, .05], dtype=np.float32)
         with TemporaryDirectory() as tmp:
@@ -64,6 +72,43 @@ class InklingQ8DecoderBlockTests(unittest.TestCase):
             self.assertGreater(float(abs(contribution).max()), 1e-3)
             np.testing.assert_array_equal(output, partial + contribution)
             self.assertGreater(float(abs(output - (hidden + partial + contribution)).max()), 1e-2)
+
+
+    def test_checked_activation_rounds_ties_and_rejects_before_writes(self):
+        root = Path(__file__).resolve().parents[1]
+        with TemporaryDirectory() as tmp:
+            library = Path(tmp) / "linear.so"
+            subprocess.run(["cc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-shared", "-fPIC",
+                            "-I", str(root / "include"),
+                            str(root / "src/kernels/linear_rows_q8_0_checked.c"),
+                            "-lm", "-o", str(library)], check=True)
+            probe = ctypes.CDLL(str(library)).linear_rows_q8_0_checked_q8_activation
+            float_p = ctypes.POINTER(ctypes.c_float)
+            byte_p = ctypes.POINTER(ctypes.c_ubyte)
+            size = ctypes.c_size_t
+            probe.argtypes = [float_p, size, byte_p, size, float_p, size, size, size, size, byte_p, size]
+            probe.restype = ctypes.c_int
+            activation = (ctypes.c_float * 32)(.5, 1.5, -1.5, -2.5, 127)
+            weights = (ctypes.c_ubyte * (34 * 4))()
+            for row in range(4):
+                weights[row * 34 + 1] = 0x3C  # FP16 block scale 1.0.
+                weights[row * 34 + 2 + row] = 1
+            output = (ctypes.c_float * 4)(42, 42, 42, 42)
+            scratch = (ctypes.c_ubyte * 34)()
+
+            def run(capacity):
+                return probe(activation, len(activation), weights, len(weights), output, len(output),
+                             1, 32, 4, scratch, capacity)
+
+            self.assertNotEqual(run(33), 0)
+            self.assertEqual(list(output), [42] * 4)
+            self.assertEqual(run(34), 0)
+            self.assertEqual(list(output), [0, 2, -2, -2])
+            activation[4] = 1e8
+            self.assertNotEqual(run(34), 0)
+            self.assertEqual(list(output), [0, 2, -2, -2])
+            activation[4] = 127
+            self.assertEqual(run(34), 0)
 
 
 if __name__ == "__main__":
