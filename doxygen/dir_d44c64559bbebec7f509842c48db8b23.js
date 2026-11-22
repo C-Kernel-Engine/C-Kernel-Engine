@@ -70,6 +70,7 @@ var dir_d44c64559bbebec7f509842c48db8b23 =
     [ "cpu_features.h", "cpu__features_8h.html", "cpu__features_8h" ],
     [ "fused_kernels.h", "fused__kernels_8h.html", "fused__kernels_8h" ],
     [ "mega_fused_attention.h", "mega__fused__attention_8h.html", "mega__fused__attention_8h" ],
+    [ "packed_q8_activation_checked.h", "packed__q8__activation__checked_8h.html", "packed__q8__activation__checked_8h" ],
     [ "packed_q8_dot_ordered.h", "packed__q8__dot__ordered_8h.html", "packed__q8__dot__ordered_8h" ],
     [ "system_topology.h", "system__topology_8h.html", "system__topology_8h" ]
 ];

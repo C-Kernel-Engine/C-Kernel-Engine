@@ -1,5 +1,12 @@
 var NAVTREEINDEX24 =
 {
+"structMemorySlot.html#af95b0bc9c39a80072ba71c88506125d3":[1,0,88,0],
+"structMemorySlot.html#afed85487a039a8b26e3e1b92453c6f59":[1,0,88,6],
+"structNUMANode.html":[1,0,91],
+"structNUMANode.html#a0c71fe04154d6a80d08829e547f5145d":[1,0,91,0],
+"structNUMANode.html#a11cae96c43efc187a78bb509aa86355b":[1,0,91,3],
+"structNUMANode.html#aad2dccb35d57507ce243031012618337":[1,0,91,4],
+"structNUMANode.html#abe328366c0632dadc801508c6bbc44df":[1,0,91,1],
 "structNUMANode.html#ad207fd0ff088689dc91e40729dc9c60a":[1,0,91,2],
 "structNUMATopology.html":[1,0,92],
 "structNUMATopology.html#a2a61e03ff57dd6feb35b92d1e03c0cdd":[1,0,92,0],
@@ -242,12 +249,5 @@ var NAVTREEINDEX24 =
 "structck__checked__latent__loop.html#a26d0d256933b5454580d6d8e6ff49397":[1,0,20,7],
 "structck__checked__latent__loop.html#a29e92c691d9284c879ebb570572a7501":[1,0,20,1],
 "structck__checked__latent__loop.html#a2a7889ccdbad04bedc61870c5f20b616":[1,0,20,21],
-"structck__checked__latent__loop.html#a316b16476031e7bce012aef5669b4a15":[1,0,20,30],
-"structck__checked__latent__loop.html#a44060cf8e9812368864a757ee86d633a":[1,0,20,0],
-"structck__checked__latent__loop.html#a491640da827132db2e91f7fdd3f241b5":[1,0,20,6],
-"structck__checked__latent__loop.html#a4a2d401d9f1cdcc23adc569d86101d78":[1,0,20,8],
-"structck__checked__latent__loop.html#a5abc9d19d6552f15bb24a6ed4a7efc98":[1,0,20,4],
-"structck__checked__latent__loop.html#a628af8fe739b4cdba19918473092fcff":[1,0,20,9],
-"structck__checked__latent__loop.html#a62c5c83e56fa46eb76759bc57d9d2f66":[1,0,20,12],
-"structck__checked__latent__loop.html#a66d332d22fd56de51124a95d6f088963":[1,0,20,17]
+"structck__checked__latent__loop.html#a316b16476031e7bce012aef5669b4a15":[1,0,20,30]
 };

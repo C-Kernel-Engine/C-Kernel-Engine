@@ -1,5 +1,12 @@
 var NAVTREEINDEX23 =
 {
+"structCKSection.html#aac276147ba6022404e73010f3ecd203b":[1,0,68,8],
+"structCKSection.html#aaccfd552f51b90a5aa47a76b0e4be4aa":[1,0,68,6],
+"structCKSection.html#aaf13683953b54b12a83a90251eb6a881":[1,0,68,26],
+"structCKSection.html#abd9ca87b9ad74cd97d0096872749fbc8":[1,0,68,27],
+"structCKSection.html#ac6da7ff6bd601c3b82ea4a5cebced72c":[1,0,68,4],
+"structCKSection.html#acd76a9f347cf9d4551e7c7cd33ca8f30":[1,0,68,13],
+"structCKSection.html#ad5514ab0802d55a8c9890b563467f25b":[1,0,68,19],
 "structCKSection.html#ada852daa4974ccedece03be2d141d1b2":[1,0,68,30],
 "structCKSection.html#adafbb43b1edb42a0adb1b97311b601a4":[1,0,68,12],
 "structCKSection.html#add9ec57d8f21293d2bf65a94a128fc9f":[1,0,68,28],
@@ -242,12 +249,5 @@ var NAVTREEINDEX23 =
 "structMemorySlot.html#a5c71e7350e86f396ab2912410be1a162":[1,0,88,4],
 "structMemorySlot.html#a6173783f7bdc94d89af5a150e3fdc7b3":[1,0,88,1],
 "structMemorySlot.html#a8db087de44e502b76946628000b9ce14":[1,0,88,2],
-"structMemorySlot.html#a9ac221e5878a5d6ce26d7c711fced364":[1,0,88,3],
-"structMemorySlot.html#af95b0bc9c39a80072ba71c88506125d3":[1,0,88,0],
-"structMemorySlot.html#afed85487a039a8b26e3e1b92453c6f59":[1,0,88,6],
-"structNUMANode.html":[1,0,91],
-"structNUMANode.html#a0c71fe04154d6a80d08829e547f5145d":[1,0,91,0],
-"structNUMANode.html#a11cae96c43efc187a78bb509aa86355b":[1,0,91,3],
-"structNUMANode.html#aad2dccb35d57507ce243031012618337":[1,0,91,4],
-"structNUMANode.html#abe328366c0632dadc801508c6bbc44df":[1,0,91,1]
+"structMemorySlot.html#a9ac221e5878a5d6ce26d7c711fced364":[1,0,88,3]
 };
