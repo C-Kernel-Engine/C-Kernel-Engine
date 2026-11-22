@@ -1,6 +1,7 @@
 """Connected cached attention with visible relative, window, and sink effects."""
 
 import ctypes
+import math
 from pathlib import Path
 import subprocess
 import tempfile
@@ -61,6 +62,53 @@ class RelativeAttentionTests(unittest.TestCase):
             self.assertEqual(fn(zero, 1, keys, capacity, values, capacity, zero, 1, zero, 1,
                                 result, 1, scratch, 1, 1, 1, 1, 1, capacity, capacity, 1, 1), -2)
             self.assertEqual(result[0], 21)
+
+    def test_ordered_tiles_match_scalar_recurrence_with_tails(self):
+        root = Path(__file__).resolve().parents[1]
+        rng = np.random.default_rng(291)
+        with tempfile.TemporaryDirectory() as temp:
+            library = Path(temp) / "attention.so"
+            subprocess.run(["cc", "-std=c11", "-O2", "-march=native", "-ffp-contract=fast",
+                            "-Wall", "-Wextra", "-Werror", "-shared", "-fPIC",
+                            str(root / "src/kernels/gqa_relative_sink_checked.c"), "-lm", "-o", str(library)],
+                           check=True)
+            fn = ctypes.CDLL(str(library)).ck_gqa_relative_sink_checked_f32
+            fn.argtypes = [ctypes.c_void_p, ctypes.c_size_t] * 7 + [ctypes.c_size_t] * 8
+            fn.restype = ctypes.c_int
+            tokens, heads, kv_heads, position, width = 4, 4, 2, 23, 5
+            capacity = position + tokens
+            for dim, window in ((19, 0), (16, 13)):
+                q = rng.standard_normal((tokens, heads, dim), dtype=np.float32)
+                k = rng.standard_normal((kv_heads, capacity, dim), dtype=np.float32)
+                v = rng.standard_normal(k.shape, dtype=np.float32)
+                bias = rng.standard_normal((tokens, heads, width), dtype=np.float32)
+                sink = rng.standard_normal((tokens, heads), dtype=np.float32)
+                output = np.empty_like(q)
+                work = np.empty(dim, dtype=np.float64)
+                spans = [arg for array in (q, k, v, bias, sink, output, work)
+                         for arg in (array.ctypes.data, array.size)]
+                self.assertEqual(fn(*spans, tokens, heads, kv_heads, dim, capacity, position, width, window), 0)
+                expected = np.empty_like(output)
+                for t, h in np.ndindex(tokens, heads):
+                    current = position + t
+                    first = max(0, current + 1 - window) if window else 0
+                    peak, denom = float(sink[t, h]), 1.0
+                    acc = [0.0] * dim
+                    for j in range(first, current + 1):
+                        dot = 0.0
+                        for channel in range(dim):
+                            dot += float(q[t, h, channel]) * float(k[h // 2, j, channel])
+                        score = dot * (1.0 / math.sqrt(dim))
+                        if current - j < width:
+                            score += float(bias[t, h, current - j])
+                        new_peak = max(score, peak)
+                        old = math.exp(peak - new_peak)
+                        new = math.exp(score - new_peak)
+                        denom = denom * old + new
+                        acc = [prior * old + float(value) * new for prior, value in zip(acc, v[h // 2, j])]
+                        peak = new_peak
+                    expected[t, h] = [element / denom for element in acc]
+                np.testing.assert_array_equal(output.view("u4"), expected.view("u4"))
 
     def test_connected_prefix_and_decode_match_with_bias_window_and_sink(self):
         rng = np.random.default_rng(276)

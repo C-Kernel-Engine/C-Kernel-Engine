@@ -1387,6 +1387,29 @@ python3 version/v8/scripts/xray_layer_output_sweep_v8.py \
   captured at the score matmul. Capturing the query at the final attention
   output can read temporary memory reused by a later operation.</p>
 
+  <h3 id="inkling2-mini-64k-tiles">Inkling Q8_0 attention tiles and 64K boundary</h3>
+  <p>On AVX2 the checked attention provider computes scores for four
+  independent keys together and updates the context in the original key
+  order. Each dot keeps its FP64 channel order. The portable path and
+  online softmax policy remain available at every supported extent.
+  A 16-token generated-C chunk at position 32752 ran in 3.30 seconds
+  versus 3.76 seconds on the prior build. The seeded trials matched
+  every logit and all 288 state regions. The full 32K timing is measured
+  separately.</p>
+  <p>The generated regression covers both sides of the 32K and 64K
+  boundaries, including prefill, decode and capacity rejection. The real
+  configuration compiled at 65544 positions, with eight positions reserved
+  after a 65536-token prompt. Its non-evicting cache plan uses 65.1 GB of
+  arena capacity. The full 64K prompt remains a separate run.</p>
+  <p>The layer-zero PyTorch replay accepts
+  <code>--q8-activations --torch-q8-block-contract</code> for an independent
+  model of the packed dot reduction. Both the whole-layer comparison
+  and the PyTorch replay on the generated C FFN inputs and routes are
+  reported. The same-input expert output matched all 11520 elements
+  bitwise. The whole-layer comparison still failed. One changed Q8
+  activation code differed at the input to the expert projections.
+  See the <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/docs/notes/artifacts/inkling2_mini_q8_attention_tiles.json">pinned replay data</a>.</p>
+
   <h3 id="inkling2-mini-continuation-replay">Inkling Q8_0 continuation replay</h3>
   <p>The layer 2 Q input contains one changed Q8 scale on the eight-token
   trace. Replacing the incoming layer 1 residual with the captured oracle

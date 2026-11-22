@@ -5,6 +5,7 @@ from version.v8.scripts.checked_circuit_authoring_v8 import linear
 SOURCE_REVISION = "ed40e7da625f594fc9c4990f5f66be24873c22d7"
 TRANSFORMERS_REVISION = "046bdb8cc2cee29d233964bb77fe6fd37cfe4aa3"
 LAYER = "model.llm.layers.6."
+MAX_CONTEXT_CAPACITY = 131072
 
 
 def _project(name, source, width, channels, tokens, weight, *, weight_prefix=LAYER):
@@ -113,7 +114,7 @@ def causal_kv_replay(prefill_tokens=8, width=2304, kv_width=1024, taps=4,
         raise ValueError("K/V widths must partition into whole heads")
     dim = kv_width // kv_heads
     capacity = prefill_tokens + 1 if cache_capacity is None else cache_capacity
-    if type(capacity) is not int or not prefill_tokens < capacity <= 65536:
+    if type(capacity) is not int or not prefill_tokens < capacity <= MAX_CONTEXT_CAPACITY:
         raise ValueError("invalid Inkling KV capacity")
     ops, shapes, segments, state_buffers = [], {}, [], []
     for slot in slots:

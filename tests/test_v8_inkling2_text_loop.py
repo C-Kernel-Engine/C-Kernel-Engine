@@ -142,10 +142,10 @@ class InklingTextLoopTests(unittest.TestCase):
             self.assertFalse(np.array_equal(full("cache_k_24"), full("cache_k_36")))
 
 
-    def test_generated_prefill_and_decode_at_32k_positions(self):
-        """Exercise 32K addressing from identical seeded state on generated C."""
+    def test_generated_prefill_and_decode_at_32k_and_64k_positions(self):
+        """Compare generated schedules around both long-context boundaries."""
         rng = np.random.default_rng(901)
-        position, capacity = 32766, 32770
+        capacity = 65538
         graph = resident_text_loop(CONFIG, 2, capacity, f64_norm_sum=True)
         specs = first_block_weights(graph)
         weights = {
@@ -168,47 +168,50 @@ class InklingTextLoopTests(unittest.TestCase):
             histories = [view(f"history_{kind}_{slot}") for slot in range(48)
                          for kind in ("k", "v", "attn_post_conv", "ffn_post_conv")]
             initial_histories = [rng.normal(0, .1, region.shape).astype("f4") for region in histories]
-            for cache in caches:
-                for index in (0, position - 4, position - 1):
-                    cache[:, index] = rng.normal(0, .1, cache[:, index].shape)
-            cache_prefix = [hashlib.sha256(cache[:, :position]).digest() for cache in caches]
+            for position in (32766, 65534):
+                with self.subTest(position=position):
+                    for cache in caches:
+                        cache.fill(0)
+                        for index in (0, position - 4, position - 1):
+                            cache[:, index] = rng.normal(0, .1, cache[:, index].shape)
+                    cache_prefix = [hashlib.sha256(cache[:, :position]).digest() for cache in caches]
 
-            def restore_seed():
-                for cache in caches:
-                    cache[:, position:] = np.nan
-                for region, initial in zip(histories, initial_histories):
-                    region[:] = initial
+                    def restore_seed():
+                        for cache in caches:
+                            cache[:, position:] = np.nan
+                        for region, initial in zip(histories, initial_histories):
+                            region[:] = initial
 
-            def run(phase, tokens, start, expected_status=0):
-                view(f"{phase}_request_position", np.int32)[:] = start
-                view(f"{phase}_token_ids", np.int32)[:] = tokens
-                native = getattr(lib, exports["entries"][phase])
-                native.argtypes = [ctypes.c_void_p, ctypes.c_size_t]
-                native.restype = ctypes.c_int
-                self.assertEqual(native(arena, len(arena)), expected_status)
-                return view(f"{phase}_logits").copy()
+                    def run(phase, tokens, start, expected_status=0):
+                        view(f"{phase}_request_position", np.int32)[:] = start
+                        view(f"{phase}_token_ids", np.int32)[:] = tokens
+                        native = getattr(lib, exports["entries"][phase])
+                        native.argtypes = [ctypes.c_void_p, ctypes.c_size_t]
+                        native.restype = ctypes.c_int
+                        self.assertEqual(native(arena, len(arena)), expected_status)
+                        return view(f"{phase}_logits").copy()
 
-            def state():
-                return [cache[:, position:].copy() for cache in caches] + [region.copy() for region in histories]
+                    def state():
+                        return [hashlib.sha256(cache[:, position:]).digest() for cache in caches] + [
+                            region.tobytes() for region in histories]
 
-            ids = [5, 11, 3, 14]
-            restore_seed()
-            prefill = run("prefill", ids[:2], position)
-            expected = np.concatenate((prefill, run("append", ids[2:3], position + 2),
-                                       run("append", ids[3:], position + 3)))
-            expected_state = state()
-            self.assertTrue(np.isfinite(expected).all())
-            self.assertGreater(float(np.max(np.abs(expected))), .01)
+                    ids = [5, 11, 3, 14]
+                    restore_seed()
+                    prefill = run("prefill", ids[:2], position)
+                    expected = np.concatenate((prefill, run("append", ids[2:3], position + 2),
+                                               run("append", ids[3:], position + 3)))
+                    expected_state = state()
+                    self.assertTrue(np.isfinite(expected).all())
+                    self.assertGreater(float(np.max(np.abs(expected))), .01)
 
-            restore_seed()
-            single = np.concatenate([run("append", [token], position + i) for i, token in enumerate(ids)])
-            np.testing.assert_array_equal(single.view("u4"), expected.view("u4"))
-            np.testing.assert_array_equal(run("append", [5], capacity, -1).view("u4"),
-                                          expected[-1:].view("u4"))
-            for actual, prior in zip(state(), expected_state):
-                np.testing.assert_array_equal(actual.view("u4"), prior.view("u4"))
-            for cache, prior in zip(caches, cache_prefix):
-                self.assertEqual(hashlib.sha256(cache[:, :position]).digest(), prior)
+                    restore_seed()
+                    single = np.concatenate([run("append", [token], position + i) for i, token in enumerate(ids)])
+                    np.testing.assert_array_equal(single.view("u4"), expected.view("u4"))
+                    np.testing.assert_array_equal(run("append", [5], capacity, -1).view("u4"),
+                                                  expected[-1:].view("u4"))
+                    self.assertEqual(state(), expected_state)
+                    for cache, prior in zip(caches, cache_prefix):
+                        self.assertEqual(hashlib.sha256(cache[:, :position]).digest(), prior)
 
     def test_oracle_comparison_rejects_equal_argmax_with_different_logits(self):
         native = np.array([0.0, 2.0, -1.0], dtype="<f4")
