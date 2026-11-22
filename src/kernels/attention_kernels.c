@@ -1806,7 +1806,7 @@ static void attention_flash_query_causal_avx512(const float *q_vec,
 // ============================================================================
 // AVX2 SIMD Flash Attention (8 floats per vector)
 // ============================================================================
-#if defined(__AVX2__)
+#if defined(__AVX2__) && !defined(__AVX512F__)
 static inline float hsum256_ps_flash(__m256 v) {
     __m128 hi = _mm256_extractf128_ps(v, 1);
     __m128 lo = _mm256_castps256_ps128(v);
@@ -1907,7 +1907,7 @@ static void attention_flash_query_causal_avx2(const float *q_vec,
         out_vec[d] = 0.0f;
     }
 }
-#endif // __AVX2__
+#endif // __AVX2__ && !__AVX512F__
 
 // ============================================================================
 // AVX SIMD Flash Attention (8 floats per vector, no FMA)
@@ -2020,6 +2020,7 @@ static void attention_flash_query_causal_avx(const float *q_vec,
 // ============================================================================
 // Scalar fallback (original implementation)
 // ============================================================================
+#if !defined(__AVX__)
 static void attention_flash_query_causal(const float *q_vec,
                                         const float *k_head,
                                         const float *v_head,
@@ -2077,6 +2078,8 @@ static void attention_flash_query_causal(const float *q_vec,
         out_vec[d] = 0.0f;
     }
 }
+
+#endif // !__AVX__
 
 // Strict parity reference for flash-style query path.
 // Uses a two-pass exact softmax formulation per query:
@@ -9143,23 +9146,6 @@ static ck_attention_status_t ck_attention_decode_bf16_pytorch_cpu_flash_masked(
     return CK_ATTENTION_STATUS_OK;
 }
 
-static ck_attention_status_t ck_attention_decode_bf16_pytorch_cpu_flash(
-    const float *q_token,
-    const uint16_t *k_cache,
-    const uint16_t *v_cache,
-    float *out_token,
-    int num_heads,
-    int num_kv_heads,
-    int kv_tokens,
-    int cache_capacity,
-    int head_dim,
-    int aligned_head_dim)
-{
-    return ck_attention_decode_bf16_pytorch_cpu_flash_masked(
-        q_token, k_cache, v_cache, out_token, NULL, 0,
-        num_heads, num_kv_heads, kv_tokens, cache_capacity,
-        head_dim, aligned_head_dim);
-}
 #endif
 
 void attention_forward_sparse_token_major_gqa_bf16cache_pytorch_cpu_flash_contract(
