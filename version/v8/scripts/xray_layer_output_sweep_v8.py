@@ -80,6 +80,7 @@ def build_report(
     oracle_pattern: str,
     phase: str = "prefill",
     comparison_mode: str = "full_replay",
+    ordered_capture: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if phase not in {"prefill", "decode"}:
         raise ValueError(f"unsupported phase: {phase}")
@@ -93,13 +94,28 @@ def build_report(
     comparisons: list[dict[str, Any]] = []
     selected_layers: list[int] = []
     source_artifacts: list[dict[str, Any]] = []
+    checkpoints = None
+    if ordered_capture is not None:
+        checkpoints = ordered_capture["checkpoints"]
+        recorded_phase = ordered_capture["phase"]
+        if (ordered_capture["position"] != logical_token or len(checkpoints) != layers
+                or recorded_phase not in {"prefill", "append"}
+                or (phase == "decode" and recorded_phase != "append")
+                or sorted(check["state_slot"] for check in checkpoints) != list(range(layers))
+                or [check["sequence_index"] for check in checkpoints] != list(range(layers))
+                or len({check["id"] for check in checkpoints}) != layers):
+            raise ValueError("ordered layer capture does not match the requested sweep")
 
     for layer in range(layers):
-        subject_path = subject_dir / subject_pattern.format(
-            layer=layer, token=logical_token
-        )
+        check = checkpoints[layer] if checkpoints is not None else None
+        oracle_slot = check["state_slot"] if check else layer
+        subject_filename = (check["filename"] if check else
+                            subject_pattern.format(layer=layer, token=logical_token))
+        if check and Path(subject_filename).name != subject_filename:
+            raise ValueError("ordered capture filename must name a local tensor")
+        subject_path = subject_dir / subject_filename
         oracle_path = oracle_dir / oracle_pattern.format(
-            layer=layer, token=logical_token
+            layer=oracle_slot, token=logical_token
         )
         if not subject_path.is_file() or not oracle_path.is_file():
             missing = [
@@ -111,7 +127,7 @@ def build_report(
         subject, subject_extent = _final_row(subject_path, token_count, hidden_size)
         oracle, oracle_extent = _final_row(oracle_path, token_count, hidden_size)
         metrics = _metrics(subject, oracle)
-        checkpoint_id = f"decoder.layer.{layer}.output.final_row"
+        checkpoint_id = check["id"] if check else f"decoder.layer.{layer}.output.final_row"
         comparisons.append({
             "sequence_index": layer,
             "checkpoint_id": checkpoint_id,
@@ -125,7 +141,8 @@ def build_report(
             "metrics": metrics,
             "resolved_execution": {
                 "phase": phase,
-                "layer": layer,
+                "layer": check["weight_layer"] if check else layer,
+                **({"state_slot": oracle_slot, "loop_pass": check["loop_pass"]} if check else {}),
                 "function": None,
                 "kernel_id": None,
                 "resolved_contract_id": None,
@@ -232,8 +249,8 @@ def build_report(
                 "identify the first offending primitive."
                 if comparison_mode == "production_decode"
                 else
-                "Full replay reproduces the production token flip, excluding persistent "
-                "KV state as the primary cause."
+                "This sweep compares replayed outputs. Identical-input operation replay "
+                "is needed to attribute a difference to the producer."
             ),
         },
         "first_non_exact_stop": (
@@ -280,6 +297,8 @@ def main() -> int:
     parser.add_argument("--subject-dir", type=Path, required=True)
     parser.add_argument("--oracle-dir", type=Path, required=True)
     parser.add_argument("--parity-report", type=Path, required=True)
+    parser.add_argument("--ordered-capture", action="store_true",
+                        help="use the subject index to align repeated layer occurrences")
     parser.add_argument("--production-report", type=Path)
     parser.add_argument("--model", required=True)
     parser.add_argument("--layers", type=int, required=True)
@@ -328,6 +347,7 @@ def main() -> int:
         oracle_pattern=args.oracle_pattern,
         phase=str(args.phase),
         comparison_mode=str(args.comparison_mode),
+        ordered_capture=_load_json(args.subject_dir / "index.json") if args.ordered_capture else None,
     )
     args.output_dir.mkdir(parents=True, exist_ok=True)
     output = args.output_dir / "xray_summary.json"

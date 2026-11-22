@@ -89,9 +89,14 @@ static int routed_softcapped_experts(ROUTED_EXPERT_ARGS, enum expert_storage sto
     const size_t route_count = rows * top_k;
     const size_t output_elements = rows * hidden_dim;
     const size_t row_outputs = route_count * hidden_dim;
-    const size_t float_elements = 3 * inner + row_outputs + output_elements;
     const size_t packed_elements = quantize ? (gate_row + down_row + sizeof(float) - 1) / sizeof(float) : 0;
-    const size_t scratch_elements = float_elements + packed_elements;
+    const size_t row_scratch = 3 * inner + packed_elements;
+    const size_t staged_elements = row_outputs + output_elements;
+    size_t scratch_rows = 1;
+#ifdef _OPENMP
+    if (work_elements >= staged_elements + rows * row_scratch) scratch_rows = rows;
+#endif
+    const size_t scratch_elements = staged_elements + scratch_rows * row_scratch;
     if (hidden_elements < output_elements || id_elements < route_count || route_elements < route_count ||
         expert_slot_elements < experts || expert_output_elements < row_outputs ||
         output_capacity < output_elements || work_elements < scratch_elements) return -1;
@@ -138,18 +143,23 @@ static int routed_softcapped_experts(ROUTED_EXPERT_ARGS, enum expert_storage sto
     const float up_reciprocal = reference_moe ? 1.0f / up_cap : 0.0f;
     if (!isfinite(gate_reciprocal) || !isfinite(up_reciprocal)) return -3;
 
-    float *gate_values = work;
-    float *up_values = work + inner;
-    float *activation = work + 2 * inner;
-    float *staged_experts = work + 3 * inner;
+    float *staged_experts = work;
     float *staged_output = staged_experts + row_outputs;
-    unsigned char *packed_hidden = quantize ? (unsigned char *)(work + float_elements) : NULL;
-    unsigned char *packed_activation = quantize ? packed_hidden + gate_row : NULL;
+    float *row_work = staged_output + output_elements;
     memset(staged_output, 0, output_elements * sizeof(float));
+    int failed = 0;
+#ifdef _OPENMP
+#pragma omp parallel for if(scratch_rows > 1) reduction(|:failed)
+#endif
     for (size_t row = 0; row < rows; ++row) {
+        float *gate_values = row_work + (scratch_rows > 1 ? row * row_scratch : 0);
+        float *up_values = gate_values + inner;
+        float *activation = up_values + inner;
+        unsigned char *packed_hidden = quantize ? (unsigned char *)(activation + inner) : NULL;
+        unsigned char *packed_activation = quantize ? packed_hidden + gate_row : NULL;
         const float *x = hidden + row * hidden_dim;
         float *y = staged_output + row * hidden_dim;
-        if (quantize && ck_pack_q8_activation_rne(x, packed_hidden, hidden_dim)) return -3;
+        if (quantize && ck_pack_q8_activation_rne(x, packed_hidden, hidden_dim)) goto row_failed;
         size_t ordered_slots[1024];
         if (!reference_moe) {
             size_t next = 0;
@@ -163,23 +173,30 @@ static int routed_softcapped_experts(ROUTED_EXPERT_ARGS, enum expert_storage sto
             const unsigned char *g = (const unsigned char *)gate + offset;
             const unsigned char *u = (const unsigned char *)up + offset;
             const unsigned char *d = (const unsigned char *)down + offset;
-            for (size_t i = 0; i < inner; ++i) {
-                gate_values[i] = expert_dot(x, g + i * gate_row, hidden_dim, storage, packed_hidden);
-                up_values[i] = expert_dot(x, u + i * gate_row, hidden_dim, storage, packed_hidden);
+            if (packed_hidden) {
+                for (size_t i = 0; i < inner; ++i) {
+                    ck_q8_activation_dot_pair(g + i * gate_row, u + i * gate_row, packed_hidden,
+                                              hidden_dim, gate_values + i, up_values + i);
+                }
+            } else {
+                for (size_t i = 0; i < inner; ++i) {
+                    gate_values[i] = expert_dot(x, g + i * gate_row, hidden_dim, storage, NULL);
+                    up_values[i] = expert_dot(x, u + i * gate_row, hidden_dim, storage, NULL);
+                }
             }
             if (reference_moe) {
                 for (size_t i = 0; i < inner; ++i) {
                     const float gate = gate_values[i], up = up_values[i];
-                    if (!isfinite(gate) || !isfinite(up)) return -3;
+                    if (!isfinite(gate) || !isfinite(up)) goto row_failed;
                     const float capped_gate = gate_cap * tanhf(gate * gate_reciprocal);
                     const float capped_up = up_cap * tanhf(up * up_reciprocal);
                     const float sigmoid = 1.0f / (1.0f + expf(-gate));
                     activation[i] = (capped_gate * sigmoid) * capped_up;
-                    if (!isfinite(activation[i])) return -3;
+                    if (!isfinite(activation[i])) goto row_failed;
                 }
             } else if (softcapped_swiglu_rows_checked_f32(gate_values, inner, up_values, inner,
-                       activation, inner, inner, gate_cap, up_cap)) return -3;
-            if (quantize && ck_pack_q8_activation_rne(activation, packed_activation, inner)) return -3;
+                       activation, inner, inner, gate_cap, up_cap)) goto row_failed;
+            if (quantize && ck_pack_q8_activation_rne(activation, packed_activation, inner)) goto row_failed;
             for (size_t i = 0; i < hidden_dim; ++i) {
                 const float v = expert_dot(activation, d + i * down_row, inner, storage, packed_activation);
                 staged_experts[route * hidden_dim + i] = v;
@@ -190,10 +207,14 @@ static int routed_softcapped_experts(ROUTED_EXPERT_ARGS, enum expert_storage sto
                 } else {
                     y[i] += v * route_weights[route];
                 }
-                if (!isfinite(v) || !isfinite(y[i])) return -3;
+                if (!isfinite(v) || !isfinite(y[i])) goto row_failed;
             }
         }
+        continue;
+row_failed:
+        failed = 1;
     }
+    if (failed) return -3;
     memcpy(expert_output, staged_experts, row_outputs * sizeof(float));
     memcpy(output, staged_output, output_elements * sizeof(float));
     return 0;

@@ -87,3 +87,29 @@ def test_layer_sweep_reports_production_decode_scope_truthfully(tmp_path):
         == "CK persistent decode vs llama.cpp production decode"
     )
     assert report["provenance"]["oracle"]["mode"] == "production_graph_tensor_dump"
+
+
+def test_ordered_capture_matches_oracle_slots_instead_of_execution_index(tmp_path):
+    subject_dir = tmp_path / "subject"
+    oracle_dir = tmp_path / "oracle"
+    subject_dir.mkdir()
+    oracle_dir.mkdir()
+    checkpoints = []
+    for sequence_index, slot in enumerate((1, 0)):
+        filename = f"actual-{sequence_index}.f32"
+        values = np.full(4, slot + 1, dtype="<f4")
+        values.tofile(subject_dir / filename)
+        values.tofile(oracle_dir / f"l_out-{slot}-token-000007-occ-000.bin")
+        checkpoints.append({
+            "id": f"fixture.slot{slot}", "sequence_index": sequence_index, "state_slot": slot,
+            "weight_layer": 0, "loop_pass": sequence_index, "filename": filename,
+        })
+    report = MODULE.build_report(
+        subject_dir=subject_dir, oracle_dir=oracle_dir, parity_report={}, production_report=None,
+        model="fixture", layers=2, token_count=1, hidden_size=4, logical_token=7,
+        phase="decode", subject_pattern="unused", oracle_pattern="l_out-{layer}-token-{token:06d}-occ-000.bin",
+        ordered_capture={"phase": "append", "position": 7, "checkpoints": checkpoints},
+    )
+    assert report["status"] == "pass"
+    assert [row["checkpoint_id"] for row in report["comparisons"]] == ["fixture.slot1", "fixture.slot0"]
+    assert [row["resolved_execution"]["state_slot"] for row in report["comparisons"]] == [1, 0]

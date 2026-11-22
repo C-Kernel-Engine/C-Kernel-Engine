@@ -97,6 +97,25 @@ def populate_arena(source, arena, layout_entries, manifest_entries, tensors, bas
                 arena[start:start + amount] = data
 
 
+def capture_layer_rows(directory, graph, view, phase, position, row):
+    """Write final causal rows in loop execution order for the X-Ray sweep."""
+    directory.mkdir(mode=0o700, exist_ok=True)
+    checkpoints = []
+    exports = graph["semantic_checkpoints"]["exports"]
+    schedule = graph["contract"]["runtime_invariants"]["layer_schedule"]
+    for index, occurrence in enumerate(schedule):
+        slot = occurrence["state_slot"]
+        port = f"inkling2_{phase}_slot{slot}_layer_output"
+        check, = exports[port]["checkpoints"]
+        filename = f"tok_{position:06d}_layer_{index:03d}_layer_out.f32"
+        values = np.asarray(view(check["tensor"])[row], dtype="<f4")
+        values.tofile(directory / filename)
+        checkpoints.append({**check, **occurrence, "sequence_index": index, "filename": filename})
+    (directory / "index.json").write_text(json.dumps({
+        "phase": phase, "position": position, "checkpoints": checkpoints,
+    }, indent=2) + "\n")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--gguf", type=Path, required=True)
@@ -114,8 +133,14 @@ def main():
                         help="use reciprocal-scaled SiTU and router-slot accumulation")
     parser.add_argument("--last-prefill-logit", action="store_true",
                         help="project only the final hidden row in each prefill chunk")
+    parser.add_argument("--threads", type=int, default=1,
+                        help="OpenMP worker count for independent Q8_0 rows")
+    parser.add_argument("--xray-token-position", type=int,
+                        help="capture layer outputs at this zero-based processed token")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
+    if not 1 <= args.threads <= 64:
+        parser.error("threads must be in 1..64")
     config_bytes = args.config.read_bytes()
     config = json.loads(config_bytes)["text_config"]
     with args.tokens_file.open("rb") as token_file:
@@ -136,11 +161,16 @@ def main():
             or len(ids) + args.greedy_tokens > capacity
             or any(not 0 <= token < config["unpadded_vocab_size"] for token in args.stop_id)):
         parser.error("greedy generation requires a resident capacity, valid stop IDs and room for output")
+    if args.xray_token_position is not None:
+        processed = len(ids) + (args.append_token is not None) + max(0, args.greedy_tokens - 1)
+        if not 0 <= args.xray_token_position < processed:
+            parser.error("X-Ray token position is outside the replay")
     args.output.mkdir(mode=0o700)
     report = {"status": "INCOMPLETE", "gguf_revision": GGUF_REVISION, "prompt_ids": ids,
               "append_token": args.append_token, "scope": "bounded native Q8_0 token replay",
               "config_sha256": hashlib.sha256(config_bytes).hexdigest(),
               "context_capacity": capacity, "chunk_tokens": chunk_tokens, "completed_prompt_tokens": 0,
+              "threads": args.threads,
               "f64_norm_sum": args.f64_norm_sum, "last_prefill_logit": args.last_prefill_logit,
               "reference_moe": args.reference_moe, "fp32_static_conv": args.fp32_static_conv}
     report_path = args.output / "report.json"
@@ -177,10 +207,22 @@ def main():
                 "max_seq_len": capacity, "vocab_size": config["vocab_size"],
             }}
             begin = time.monotonic()
-            layout, _, _, library, _ = compile_native_graph(args.output, source, circuit)
+            layout, _, _, library, _ = compile_native_graph(
+                args.output, source, circuit, openmp=args.threads > 1)
+            if args.threads > 1:
+                library.omp_set_dynamic.argtypes = [ctypes.c_int]
+                library.omp_set_dynamic.restype = None
+                library.omp_set_dynamic(0)
+                library.omp_set_num_threads.argtypes = [ctypes.c_int]
+                library.omp_set_num_threads.restype = None
+                library.omp_set_num_threads(args.threads)
             total = layout["memory"]["arena"]["total_size"]
             binding = load_exports(args.output, library)
             buffers = binding["ports"]
+            activation_offsets = {
+                entry["name"]: entry["abs_offset"]
+                for entry in layout["memory"]["activations"]["buffers"]
+            }
             report["build_seconds"] = time.monotonic() - begin
             report["arena_bytes"] = total
             report["build_identity"] = json.loads((args.output / "build-identity.json").read_text())
@@ -202,6 +244,10 @@ def main():
                         port = buffers[name]
                         dtype = {"fp32": np.float32, "i32": np.int32}[port["dtype"]]
                         return np.ndarray(tuple(port["shape"]), dtype, buffer=arena, offset=port["offset"])
+
+                    def view_checkpoint(name):
+                        return np.ndarray(tuple(graph["activation_buffers"][name]["shape"]),
+                                          dtype="<f4", buffer=arena, offset=activation_offsets[name])
 
                     view("expert_slots")[:] = np.arange(config["n_routed_experts"], dtype=np.int32)
                     for layer in range(config["num_hidden_layers"]):
@@ -228,6 +274,16 @@ def main():
                         logits = view(f"{phase}_logits").copy()
                         if not np.isfinite(logits).all():
                             raise ValueError(f"nonfinite {phase} logits")
+                        capture_position = args.xray_token_position
+                        if capture_position is not None and position <= capture_position < position + len(tokens):
+                            capture_dir = args.output / "xray"
+                            row = capture_position - position
+                            capture_layer_rows(capture_dir, graph, view_checkpoint, phase, capture_position, row)
+                            if logits.shape[0] == len(tokens):
+                                np.asarray(logits[row], dtype="<f4").tofile(capture_dir / "logits.f32")
+                            elif row == len(tokens) - 1:
+                                np.asarray(logits[-1], dtype="<f4").tofile(capture_dir / "logits.f32")
+                            report["xray_token_position"] = capture_position
                         return logits, elapsed
 
                     total_prefill, offset = 0.0, 0
@@ -262,6 +318,8 @@ def main():
                             save()
                         report.update(generated_ids=generated, generation_seconds=generation_seconds,
                                       finish_reason=finish_reason)
+        if args.xray_token_position is not None and "xray_token_position" not in report:
+            raise ValueError("the requested X-Ray token was not processed")
         report["status"] = "PASS"
     except Exception as error:
         report.update(status="FAIL", error=str(error))

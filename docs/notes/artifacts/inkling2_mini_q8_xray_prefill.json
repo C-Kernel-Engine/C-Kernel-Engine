@@ -1,0 +1,1325 @@
+{
+  "schema": "cke.inkling2.q8_xray_prefill.v1",
+  "scope": "Native generated CPU replay on P3. Execution timings exclude hashing, compilation and packing. This evidence covers bounded lengths and a teacher-forced append, with no HTTP run.",
+  "subject_base": "722245ec9",
+  "cpu": "Intel Core i7-14700T",
+  "gguf_revision": "e8a2cecf0e78914f07cc27b9be711a9b2c7561d9",
+  "gguf_sha256": "d57542f8aea5d7639beba5fc4ae7f584754916f63ac5d5a69328c27f652f45da",
+  "chunk_tokens": 16,
+  "context_capacity": 256,
+  "oracle_revision": "29b52d3",
+  "oracle_settings": {
+    "requested_context": 256,
+    "context": 256,
+    "batch": 32,
+    "ubatch": 32,
+    "decode_submission_limit": 16,
+    "prefix_submission_limit": 16,
+    "threads": 8,
+    "threads_batch": 8,
+    "cache_k": "f32",
+    "cache_v": "f32",
+    "cpu_only": true,
+    "repack_enabled": true,
+    "flash_attention": "disabled"
+  },
+  "compiled_runtime_identities": {
+    "prior": "91f2f567b66024ce47d617721c85c1cc052fbf6079e8053079a5e6be2d1008fe",
+    "optimized": "08e97040e0255cb7670189cd225855c883bf8ecf1e42a28a9aaf240cb6937caa",
+    "optimized_codegen_sha256": "57d2ffca0e9b8092e48a02917dddff0e993b8cae502f5dc3a9674e0a83671a00",
+    "optimized_packed_q8_header_sha256": "3a881852afa6799f0be392fa3d414f0a4f55b3c0edfcc220733719032ba8b5b0",
+    "optimized_projection_and_expert_source_sha256": {
+      "src/kernels/linear_rows_q8_0_checked.c": "a3dc3b22213c145064e629dba899ac9fc4cef6017baa8bc229ea2a283e9d9036",
+      "src/kernels/routed_softcapped_experts_checked.c": "a2f0b3a0c03e5e65e637b40a89b8223defcbd5a965048d7caf7a6a77d898d256"
+    }
+  },
+  "prefill_128": {
+    "prompt_ids_sha256": "0adf66c936eb01654349d9fb739f878c5721de39e1de795316feefc770ee5135",
+    "prior_cke_single_thread": [
+      {
+        "prefill_seconds": 98.84643375314772,
+        "append_seconds": 0.8281648084521294
+      }
+    ],
+    "optimized_cke": {
+      "one_thread": [
+        {
+          "prefill_seconds": 58.85648574307561,
+          "append_seconds": 0.5865082647651434
+        }
+      ],
+      "eight_threads_passive": [
+        {
+          "prefill_seconds": 23.651599941775203,
+          "append_seconds": 0.45414828695356846
+        },
+        {
+          "prefill_seconds": 17.94864920526743,
+          "append_seconds": 0.5161833539605141
+        }
+      ],
+      "eight_threads_active": [
+        {
+          "prefill_seconds": 19.017685955390334,
+          "append_seconds": 0.6423072852194309
+        },
+        {
+          "prefill_seconds": 18.93862534686923,
+          "append_seconds": 0.5812444388866425
+        }
+      ],
+      "sixteen_threads_passive": [
+        {
+          "prefill_seconds": 22.38471450842917,
+          "append_seconds": 0.5086515247821808
+        },
+        {
+          "prefill_seconds": 18.33314390666783,
+          "append_seconds": 0.46854024939239025
+        }
+      ]
+    },
+    "oracle_prompt_seconds": {
+      "one_thread": [
+        40.15908
+      ],
+      "eight_threads": [
+        11.663860000000001,
+        13.40625,
+        12.60837
+      ],
+      "sixteen_threads": [
+        10.91922
+      ]
+    },
+    "optimized_cke_eight_active_median_seconds": 18.978155651129782,
+    "oracle_eight_median_seconds": 12.60837,
+    "eight_thread_median_ratio_cke_over_oracle": 1.5052029446415183,
+    "one_thread_speedup_prior_over_optimized": 1.6794484499913738,
+    "unchanged_from_prior_cke": {
+      "prefill_logit_count": 200058,
+      "append_logit_count": 200058,
+      "state_regions": 288,
+      "prefill_logit_sha256": "5fd9906da735a82b31a9ac0def75bbc6d1ad7e2cda5b1f1d20fed8003446edfc",
+      "append_logit_sha256": "9cb4cba5fa3a415e5f47cdd7db34845deece17fffd5a39e6f947e2c57f583830",
+      "append_token": 200002
+    }
+  },
+  "prefill_240": {
+    "prompt_ids_sha256": "0d746e894c2b93fe455d5e3fea26b916fc6b27f2aa1b5c89581341c1ddd122b4",
+    "optimized_cke_eight_threads": [
+      {
+        "prefill_seconds": 43.129265401512384,
+        "append_seconds": 0.5278528444468975
+      }
+    ],
+    "oracle_eight_prompt_seconds": 20.47446,
+    "single_timing_per_runtime": true
+  },
+  "first_profile": {
+    "baseline_process_samples_in_packed_q8_dot_pct": 51.05,
+    "scope": "Includes other process work such as weight packing and setup.",
+    "cpu_clock_capture_sha256": "687cf4c231c22540a8db1327127d2d1987ef890a144ee03e22af78437d7e46d0"
+  },
+  "fixed_sixth_token": {
+    "prompt_ids_sha256": "cf543a01ebc74827253de8ae73fed1a8ce9d1f539a282b1a454d6c4c55e19b9e",
+    "same_first_five_ids": [
+      200001,
+      200008,
+      371,
+      150409,
+      171960
+    ],
+    "compared_layer_occurrences": 48,
+    "first_observed_layer_output": "inkling2.loop.append.slot0.layer_output",
+    "layer_sweep": [
+      {
+        "sequence_index": 0,
+        "checkpoint_id": "inkling2.loop.append.slot0.layer_output",
+        "layer": 0,
+        "state_slot": 0,
+        "loop_pass": null,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9999999999999952,
+          "exact_elements": 663,
+          "exact_ratio": 0.2877604166666667,
+          "finite": true,
+          "max_abs": 7.152557373046875e-07,
+          "mean_abs": 3.936010115366015e-08,
+          "relative_rmse": 1.1163888525644659e-07,
+          "rmse": 6.687539024797778e-08,
+          "total_elements": 2304
+        },
+        "subject_sha256": "8d3fba5b7eaaf8038c1b9c739480d3e25e62f21c19bdabdc0ebdd1064148d371",
+        "oracle_sha256": "8521af47eab3617215e50f25ac0edfaae63967fc4c0f26c06766c5cb5c8c5fc5"
+      },
+      {
+        "sequence_index": 1,
+        "checkpoint_id": "inkling2.loop.append.slot1.layer_output",
+        "layer": 1,
+        "state_slot": 1,
+        "loop_pass": null,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9999999999999964,
+          "exact_elements": 629,
+          "exact_ratio": 0.2730034722222222,
+          "finite": true,
+          "max_abs": 1.9073486328125e-06,
+          "mean_abs": 9.796551441670292e-08,
+          "relative_rmse": 9.491210559528233e-08,
+          "rmse": 1.6118914417222215e-07,
+          "total_elements": 2304
+        },
+        "subject_sha256": "a5e0e00de925c9f780dd633db36af8633e58e1e06a13414289df18547f51b3e5",
+        "oracle_sha256": "bc59c774fd286b0376b56b379dc3ada5c9ef4684e35f8b1aa114750056c79d94"
+      },
+      {
+        "sequence_index": 2,
+        "checkpoint_id": "inkling2.loop.append.slot2.layer_output",
+        "layer": 2,
+        "state_slot": 2,
+        "loop_pass": null,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9999999999999969,
+          "exact_elements": 564,
+          "exact_ratio": 0.24479166666666666,
+          "finite": true,
+          "max_abs": 3.814697265625e-06,
+          "mean_abs": 1.6104604583233595e-07,
+          "relative_rmse": 8.85495822461287e-08,
+          "rmse": 2.5898388905142626e-07,
+          "total_elements": 2304
+        },
+        "subject_sha256": "99e16b91e8c960ed3c0632606c5f9224b81797ac03324ccd0e3abdf6c35fd4da",
+        "oracle_sha256": "ead832cd02a327d6097424ed13e04557bf2c25f2d5d7f4160c584b9e13b24fcd"
+      },
+      {
+        "sequence_index": 3,
+        "checkpoint_id": "inkling2.loop.append.slot3.layer_output",
+        "layer": 3,
+        "state_slot": 3,
+        "loop_pass": null,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9999999958669071,
+          "exact_elements": 1,
+          "exact_ratio": 0.00043402777777777775,
+          "finite": true,
+          "max_abs": 0.0037078857421875,
+          "mean_abs": 0.00031833041187686223,
+          "relative_rmse": 9.108822327423576e-05,
+          "rmse": 0.0004599527300194003,
+          "total_elements": 2304
+        },
+        "subject_sha256": "edbf6521bcee957d2c27ff79a573ecfb676b1b36bdd61fd01ac4d6a5a41c08c6",
+        "oracle_sha256": "0eb164152e092dd56e4e6d1d4200a37bab17cc3fe7c4cc7805a21b249cfd6d3a"
+      },
+      {
+        "sequence_index": 4,
+        "checkpoint_id": "inkling2.loop.append.slot4.layer_output",
+        "layer": 4,
+        "state_slot": 4,
+        "loop_pass": null,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9999968534222646,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.21258544921875,
+          "mean_abs": 0.014961265677508587,
+          "relative_rmse": 0.002547761997982088,
+          "rmse": 0.01954644257296547,
+          "total_elements": 2304
+        },
+        "subject_sha256": "349e43722486bbaee0ba837240469e7f8d47270a8feb72d216d435266904bfd6",
+        "oracle_sha256": "6bbcfd8ec3b97e2784f4cded895448b71bb884cfa5534aa4a83d3d7c89e61cf5"
+      },
+      {
+        "sequence_index": 5,
+        "checkpoint_id": "inkling2.loop.append.slot5.layer_output",
+        "layer": 5,
+        "state_slot": 5,
+        "loop_pass": null,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9999953687757202,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.42913818359375,
+          "mean_abs": 0.029073304388374608,
+          "relative_rmse": 0.0030780826309519532,
+          "rmse": 0.03792731136764535,
+          "total_elements": 2304
+        },
+        "subject_sha256": "b3f000c7fb6d80fa1babe593a5b7c1000809b497ca225d54a9d8f6f992c9d1a2",
+        "oracle_sha256": "42796c9099127046c80e50d47e20448a70c153eca8563a38b549cce06fe2a776"
+      },
+      {
+        "sequence_index": 6,
+        "checkpoint_id": "inkling2.loop.append.slot6.layer_output",
+        "layer": 6,
+        "state_slot": 6,
+        "loop_pass": 0,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9999902474357389,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.017897367477416992,
+          "mean_abs": 0.0016424372819933018,
+          "relative_rmse": 0.004522903035018259,
+          "rmse": 0.00230435439979439,
+          "total_elements": 2304
+        },
+        "subject_sha256": "5de2ca444f4a816f985455ecdcb6fc4a3aae7e2a1ef7e1ba4e8e790b0cc46109",
+        "oracle_sha256": "48920dbc5bbe8aa846c2048cfc196773cb6051d67a7d3353e3866e3923572141"
+      },
+      {
+        "sequence_index": 7,
+        "checkpoint_id": "inkling2.loop.append.slot7.layer_output",
+        "layer": 7,
+        "state_slot": 7,
+        "loop_pass": 0,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.999987926613074,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.043265342712402344,
+          "mean_abs": 0.0033600902173323752,
+          "relative_rmse": 0.005056003920179774,
+          "rmse": 0.004579782777123443,
+          "total_elements": 2304
+        },
+        "subject_sha256": "40d7589f60b39753ceec85864032819ee25690ea316dbaeec36f2a6f5942330e",
+        "oracle_sha256": "a3916a1d4896ec21a775c4a138e1de8edb5f9a3916bf043487a38e4af5e41c10"
+      },
+      {
+        "sequence_index": 8,
+        "checkpoint_id": "inkling2.loop.append.slot8.layer_output",
+        "layer": 8,
+        "state_slot": 8,
+        "loop_pass": 0,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9999608882631249,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.10028457641601562,
+          "mean_abs": 0.009492832688920316,
+          "relative_rmse": 0.00931044515463492,
+          "rmse": 0.012351014889918849,
+          "total_elements": 2304
+        },
+        "subject_sha256": "7971d28ac29d73a42f926cafaf943c1ffc6f17516708b7c897199848da31f9c3",
+        "oracle_sha256": "eeca7ea93b9a4fca4bf45b7fb2e382d9f4f07a9e89226765224b9b34fb393c21"
+      },
+      {
+        "sequence_index": 9,
+        "checkpoint_id": "inkling2.loop.append.slot9.layer_output",
+        "layer": 9,
+        "state_slot": 9,
+        "loop_pass": 0,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9999432099289706,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.0897064208984375,
+          "mean_abs": 0.014671530478355836,
+          "relative_rmse": 0.010750826454670969,
+          "rmse": 0.018647267458603383,
+          "total_elements": 2304
+        },
+        "subject_sha256": "7e2191bd2a4ad918ecd62b676cd582c42365b746fc78937e297903d7ceb84bf9",
+        "oracle_sha256": "39445bc5421599395c96a9d6a96deeb90077d70d445feed70fe15074c492a6ca"
+      },
+      {
+        "sequence_index": 10,
+        "checkpoint_id": "inkling2.loop.append.slot10.layer_output",
+        "layer": 10,
+        "state_slot": 10,
+        "loop_pass": 0,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9999493507919712,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.24627625942230225,
+          "mean_abs": 0.023407410392893426,
+          "relative_rmse": 0.010330008314822345,
+          "rmse": 0.030613184819378796,
+          "total_elements": 2304
+        },
+        "subject_sha256": "c657a4e62fdd94374f831d5c5764a8cc59837598a88b9b1ea6b0156750ef8079",
+        "oracle_sha256": "aa395edb38de28570b841062772c8a2b876ffc037a39f244a007f83cbec29c86"
+      },
+      {
+        "sequence_index": 11,
+        "checkpoint_id": "inkling2.loop.append.slot11.layer_output",
+        "layer": 11,
+        "state_slot": 11,
+        "loop_pass": 0,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9999065238898908,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.38721466064453125,
+          "mean_abs": 0.04681166674284517,
+          "relative_rmse": 0.013930816225031464,
+          "rmse": 0.06002023670581077,
+          "total_elements": 2304
+        },
+        "subject_sha256": "01a81fbe91e6373dc4df737227c1d5f4c3ee604cb8da3f8514f0d1882b73104d",
+        "oracle_sha256": "4ef5c6f57228b697dd65646c0774545c8163adc7a063bcdc27e617463f1a3cba"
+      },
+      {
+        "sequence_index": 12,
+        "checkpoint_id": "inkling2.loop.append.slot12.layer_output",
+        "layer": 12,
+        "state_slot": 12,
+        "loop_pass": 0,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9997177810099416,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.05026745796203613,
+          "mean_abs": 0.004202884663199156,
+          "relative_rmse": 0.023823315387518158,
+          "rmse": 0.005630286101616665,
+          "total_elements": 2304
+        },
+        "subject_sha256": "c3fcdfa0711a54fe05240a4b9bba23c33b3b0e24e4e79acff37850594ba10d14",
+        "oracle_sha256": "6f3be4be73aa50ee4eb3073fa8532ac349420d8c2ff85e699df45203e4029a55"
+      },
+      {
+        "sequence_index": 13,
+        "checkpoint_id": "inkling2.loop.append.slot13.layer_output",
+        "layer": 13,
+        "state_slot": 13,
+        "loop_pass": 0,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9995819236872123,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.10845375061035156,
+          "mean_abs": 0.013395168922822146,
+          "relative_rmse": 0.029556981019525638,
+          "rmse": 0.01737198583745864,
+          "total_elements": 2304
+        },
+        "subject_sha256": "750973b77efc52d71e858885e397fddf928e6b14c11c68ba555ccacc5d09e381",
+        "oracle_sha256": "b9f630373cf88e6422a7c05e1d4b6c75ed9cc2210e4b61c28108c50119bdc5a9"
+      },
+      {
+        "sequence_index": 14,
+        "checkpoint_id": "inkling2.loop.append.slot14.layer_output",
+        "layer": 14,
+        "state_slot": 14,
+        "loop_pass": 0,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.999505279185518,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.1377277374267578,
+          "mean_abs": 0.02202239627270804,
+          "relative_rmse": 0.031613403210183355,
+          "rmse": 0.02817475119590116,
+          "total_elements": 2304
+        },
+        "subject_sha256": "56b1b25e5eb35d1b3773e3987e8a4751abe0d1e79e4d8792b16d397045c664ca",
+        "oracle_sha256": "cb6e7263b1a15038dbf21455c9e7f684a243abe010dbf65304416294f2055751"
+      },
+      {
+        "sequence_index": 15,
+        "checkpoint_id": "inkling2.loop.append.slot15.layer_output",
+        "layer": 15,
+        "state_slot": 15,
+        "loop_pass": 0,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9996561435828579,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.15811413526535034,
+          "mean_abs": 0.029290103365282347,
+          "relative_rmse": 0.026294070115684333,
+          "rmse": 0.037452973413881985,
+          "total_elements": 2304
+        },
+        "subject_sha256": "54a633f8974c42fc891adfbdc4a1aa3281d4790879c3f71824e8f3c71dceaa3e",
+        "oracle_sha256": "f158fc6cf95b5fb639e6b97bc5e683d86ba1896ac1ed8a37db0bd6bf1f07b695"
+      },
+      {
+        "sequence_index": 16,
+        "checkpoint_id": "inkling2.loop.append.slot16.layer_output",
+        "layer": 16,
+        "state_slot": 16,
+        "loop_pass": 0,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9997751567646476,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.2732582092285156,
+          "mean_abs": 0.038897751162747025,
+          "relative_rmse": 0.021372494069243044,
+          "rmse": 0.04939228852552404,
+          "total_elements": 2304
+        },
+        "subject_sha256": "b186dfc61e71eaf153028543a2bc61ef8a0edf282f66b02f51dad993dbeb349f",
+        "oracle_sha256": "f80a589087a40005b2ad8c34d4f5cccd0bd9f2ad6cfb1c7ce7818f29de28b1db"
+      },
+      {
+        "sequence_index": 17,
+        "checkpoint_id": "inkling2.loop.append.slot17.layer_output",
+        "layer": 17,
+        "state_slot": 17,
+        "loop_pass": 0,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9999035107746317,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.422210693359375,
+          "mean_abs": 0.0474149384859225,
+          "relative_rmse": 0.014321907686810402,
+          "rmse": 0.06113337205140963,
+          "total_elements": 2304
+        },
+        "subject_sha256": "89f61f2472576714eaf84600d824eac017d1d5bacb8bfe9b33a5e58de3745466",
+        "oracle_sha256": "44ad5b96fab9aa32ed8acc4d373a4114cb3108e0b3333ac009c229c237a4646c"
+      },
+      {
+        "sequence_index": 18,
+        "checkpoint_id": "inkling2.loop.append.slot24.layer_output",
+        "layer": 6,
+        "state_slot": 24,
+        "loop_pass": 1,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9998688771462213,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.20277786254882812,
+          "mean_abs": 0.008838378826011548,
+          "relative_rmse": 0.016467875808866717,
+          "rmse": 0.013180306150510456,
+          "total_elements": 2304
+        },
+        "subject_sha256": "44684f7d3902d2e134850c7a8d7eb46d324a6c89e6b9bf6b895e2e110cc68e3a",
+        "oracle_sha256": "0a05cc02dac71a7bfb3c6d3631f69a60c4abcede7fd1a4258f59fc473c57393d"
+      },
+      {
+        "sequence_index": 19,
+        "checkpoint_id": "inkling2.loop.append.slot25.layer_output",
+        "layer": 7,
+        "state_slot": 25,
+        "loop_pass": 1,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9984866246098052,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.40685558319091797,
+          "mean_abs": 0.05459285927402865,
+          "relative_rmse": 0.05528371609508063,
+          "rmse": 0.07058558796074103,
+          "total_elements": 2304
+        },
+        "subject_sha256": "e87486ca6775662c937c616279362b657be2a72da69ce9f717daf11330a920a9",
+        "oracle_sha256": "d62d23359d28c0a74114a1974f5205e399ec74e99c169ab67a374a8e352facae"
+      },
+      {
+        "sequence_index": 20,
+        "checkpoint_id": "inkling2.loop.append.slot26.layer_output",
+        "layer": 8,
+        "state_slot": 26,
+        "loop_pass": 1,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9984973282501935,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.49073028564453125,
+          "mean_abs": 0.06906845059711486,
+          "relative_rmse": 0.05525355171977637,
+          "rmse": 0.08914808896552585,
+          "total_elements": 2304
+        },
+        "subject_sha256": "8612815a6b4c8c6442697c86dfb35cd7707a608546fe12e0ee14c36a901a02a3",
+        "oracle_sha256": "56636becd08187f10df4a682884db911395256fefb09ae3e9a72f80f1535e088"
+      },
+      {
+        "sequence_index": 21,
+        "checkpoint_id": "inkling2.loop.append.slot27.layer_output",
+        "layer": 9,
+        "state_slot": 27,
+        "loop_pass": 1,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9986063399219894,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.5911064147949219,
+          "mean_abs": 0.08400731515070624,
+          "relative_rmse": 0.0530079236080493,
+          "rmse": 0.10707012412261195,
+          "total_elements": 2304
+        },
+        "subject_sha256": "4bbe244d7ca0f0206bcad67e1af4978915b45284bfe664143b332448eaac3c80",
+        "oracle_sha256": "d8c8baf50f420a7678366eb8f723f6a2f100dcc6e77eacdb78904b84b0952bcd"
+      },
+      {
+        "sequence_index": 22,
+        "checkpoint_id": "inkling2.loop.append.slot28.layer_output",
+        "layer": 10,
+        "state_slot": 28,
+        "loop_pass": 1,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9990317289791885,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.7698440551757812,
+          "mean_abs": 0.10418124523534465,
+          "relative_rmse": 0.04403349949587568,
+          "rmse": 0.13301269075828415,
+          "total_elements": 2304
+        },
+        "subject_sha256": "2df770a20406942d37666e24fabfa0d7d109b072c68fc7827bf0c42f39a7472b",
+        "oracle_sha256": "2f1a85a0e84a625e7be17a6d5d373736a641997a0fcd4abe0bfa8fa9324b1f2b"
+      },
+      {
+        "sequence_index": 23,
+        "checkpoint_id": "inkling2.loop.append.slot29.layer_output",
+        "layer": 11,
+        "state_slot": 29,
+        "loop_pass": 1,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9988377257376057,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.9501380920410156,
+          "mean_abs": 0.1535087558699565,
+          "relative_rmse": 0.04829686355262466,
+          "rmse": 0.1971218778239814,
+          "total_elements": 2304
+        },
+        "subject_sha256": "ea6002638fe84c0977c885b79589cb839fb0f4c6379bb2bece5f0ae69b57a3ff",
+        "oracle_sha256": "7c070b4481d062708500fa37651d63a82927620eda3456c1cf387e092771d909"
+      },
+      {
+        "sequence_index": 24,
+        "checkpoint_id": "inkling2.loop.append.slot30.layer_output",
+        "layer": 12,
+        "state_slot": 30,
+        "loop_pass": 1,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9957815588027636,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.22609549760818481,
+          "mean_abs": 0.020296332516409166,
+          "relative_rmse": 0.09186144829071803,
+          "rmse": 0.02687567333582707,
+          "total_elements": 2304
+        },
+        "subject_sha256": "b10372faa870486430194fa7b0e89dcaee4d8976862dbda755dcaf778d5d6dd1",
+        "oracle_sha256": "432da4759ef1565ada54cfdb1fcc6f37275a53617c2961e02e7aff16e993a55b"
+      },
+      {
+        "sequence_index": 25,
+        "checkpoint_id": "inkling2.loop.append.slot31.layer_output",
+        "layer": 13,
+        "state_slot": 31,
+        "loop_pass": 1,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9972867996801422,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.39669865369796753,
+          "mean_abs": 0.033612130281552605,
+          "relative_rmse": 0.07454519634660575,
+          "rmse": 0.04526373640180185,
+          "total_elements": 2304
+        },
+        "subject_sha256": "a4c54531400455f14e241ca79f00f242bec0cc808e03de0b58f6fa9c405d6766",
+        "oracle_sha256": "a919f20f1dd88a21e34ca5abf7745b08499e1170687211721960e1cc603122a0"
+      },
+      {
+        "sequence_index": 26,
+        "checkpoint_id": "inkling2.loop.append.slot32.layer_output",
+        "layer": 14,
+        "state_slot": 32,
+        "loop_pass": 1,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.998038919519941,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.5665903091430664,
+          "mean_abs": 0.05138503197263668,
+          "relative_rmse": 0.06280586821012285,
+          "rmse": 0.0673846136847381,
+          "total_elements": 2304
+        },
+        "subject_sha256": "5876c0de982067d4aa65ae3785b20515f9026170b93d867665e8e23925d63f54",
+        "oracle_sha256": "62f0d919dcc30d3726cfb5e6641c372676590166d9d6209f133b9029e6c6319d"
+      },
+      {
+        "sequence_index": 27,
+        "checkpoint_id": "inkling2.loop.append.slot33.layer_output",
+        "layer": 15,
+        "state_slot": 33,
+        "loop_pass": 1,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9988193770187497,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.6063652038574219,
+          "mean_abs": 0.06106148232680021,
+          "relative_rmse": 0.04858944526687843,
+          "rmse": 0.08029648171920252,
+          "total_elements": 2304
+        },
+        "subject_sha256": "9e7c7635a108d5b9c0dd37107a180a8fef5ea823944632744099421a2a83219b",
+        "oracle_sha256": "9329a83b022e6528ec6d17cae53974744b4bc7aca904a11f9a76c6e427d50710"
+      },
+      {
+        "sequence_index": 28,
+        "checkpoint_id": "inkling2.loop.append.slot34.layer_output",
+        "layer": 16,
+        "state_slot": 34,
+        "loop_pass": 1,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9993287144229542,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.6291618347167969,
+          "mean_abs": 0.07581897517876415,
+          "relative_rmse": 0.03700818795875528,
+          "rmse": 0.0979638040673252,
+          "total_elements": 2304
+        },
+        "subject_sha256": "658e5ae969ac1aea9979a5aa1ab10298e51f95e1e51b7c789a054af6e9e374a3",
+        "oracle_sha256": "dccbd521f1e3daa0fc74a43175dcb2ba1aa1e1e6aa3995239e9aa434c332c890"
+      },
+      {
+        "sequence_index": 29,
+        "checkpoint_id": "inkling2.loop.append.slot35.layer_output",
+        "layer": 17,
+        "state_slot": 35,
+        "loop_pass": 1,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.999697102728181,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 2.10552978515625,
+          "mean_abs": 0.09574039066905647,
+          "relative_rmse": 0.027159047526963877,
+          "rmse": 0.13125685349507388,
+          "total_elements": 2304
+        },
+        "subject_sha256": "f9b086f45ba8ac1a99a3741bd621fee8cdec729edd3a68fe4b1e3840f66a1d58",
+        "oracle_sha256": "9c90feb9d911c3ce5fa29ee9e477fe8f186a4644d8b0d85235dd21c03c222b32"
+      },
+      {
+        "sequence_index": 30,
+        "checkpoint_id": "inkling2.loop.append.slot36.layer_output",
+        "layer": 6,
+        "state_slot": 36,
+        "loop_pass": 2,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9998972982263166,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.17709827423095703,
+          "mean_abs": 0.010506658025911343,
+          "relative_rmse": 0.014899557127614187,
+          "rmse": 0.01564176329189713,
+          "total_elements": 2304
+        },
+        "subject_sha256": "95642ab406bb57c915c495c99e41c1a1abaf603361055d09185a350887c69449",
+        "oracle_sha256": "226a3d9b179598b3a851b45def73539806bcecae4c98e3d1de56423162b63c01"
+      },
+      {
+        "sequence_index": 31,
+        "checkpoint_id": "inkling2.loop.append.slot37.layer_output",
+        "layer": 7,
+        "state_slot": 37,
+        "loop_pass": 2,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9999140176451956,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.14005565643310547,
+          "mean_abs": 0.015507877047285647,
+          "relative_rmse": 0.013141955875571142,
+          "rmse": 0.021281958887194214,
+          "total_elements": 2304
+        },
+        "subject_sha256": "2fde28a1dff3397ea456e682f1a4ea3500b3c34b806d761f35fad27795211617",
+        "oracle_sha256": "d5728c4391831c20645bf2f2fcbd9d05d369879325f592e003a60108f5662395"
+      },
+      {
+        "sequence_index": 32,
+        "checkpoint_id": "inkling2.loop.append.slot38.layer_output",
+        "layer": 8,
+        "state_slot": 38,
+        "loop_pass": 2,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9998732566390911,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.27181029319763184,
+          "mean_abs": 0.025187438486884477,
+          "relative_rmse": 0.015974178189137076,
+          "rmse": 0.03297509806791348,
+          "total_elements": 2304
+        },
+        "subject_sha256": "1b9566a697fa01e0794aa866938b1d4a86ef9c43dee7309866ec7ff6e4d0fc4a",
+        "oracle_sha256": "440c2e2fba1627931b11c468e9e1aab96b2140587c9853c69388707d080c4be1"
+      },
+      {
+        "sequence_index": 33,
+        "checkpoint_id": "inkling2.loop.append.slot39.layer_output",
+        "layer": 9,
+        "state_slot": 39,
+        "loop_pass": 2,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9998819346784413,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.2728615999221802,
+          "mean_abs": 0.03007450661324482,
+          "relative_rmse": 0.01538960795942543,
+          "rmse": 0.038633770228341247,
+          "total_elements": 2304
+        },
+        "subject_sha256": "f267b865ef0e61a9942fe13ef83405515c95345cd84b3facc34960b1248e152c",
+        "oracle_sha256": "96e2ea084114afe08e29822c8b606cb7b108bf9440763f3cadca0727e75d0c7f"
+      },
+      {
+        "sequence_index": 34,
+        "checkpoint_id": "inkling2.loop.append.slot40.layer_output",
+        "layer": 10,
+        "state_slot": 40,
+        "loop_pass": 2,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9998873412863187,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.37577176094055176,
+          "mean_abs": 0.04302169353064124,
+          "relative_rmse": 0.015010419612971056,
+          "rmse": 0.05505566900426101,
+          "total_elements": 2304
+        },
+        "subject_sha256": "30012c5130d562ea58acf7152057e281c34bd81cd19a413949f4af435235ccdf",
+        "oracle_sha256": "fef9e3b7af473772b49d0b9277380c3b4f81c5c0ccd5a5dbcde3776d1e1b3c5e"
+      },
+      {
+        "sequence_index": 35,
+        "checkpoint_id": "inkling2.loop.append.slot41.layer_output",
+        "layer": 11,
+        "state_slot": 41,
+        "loop_pass": 2,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.999126301496513,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.9069924354553223,
+          "mean_abs": 0.16114283659812323,
+          "relative_rmse": 0.04194233031738787,
+          "rmse": 0.205440193277801,
+          "total_elements": 2304
+        },
+        "subject_sha256": "bf1ed0470528148899ed60115a83838b815b99e9f869e0a1803b76ddeec1d3d3",
+        "oracle_sha256": "9586de3e2d781e5046d005227ed24786cdebf038c661431c7913129c7491dc9b"
+      },
+      {
+        "sequence_index": 36,
+        "checkpoint_id": "inkling2.loop.append.slot42.layer_output",
+        "layer": 12,
+        "state_slot": 42,
+        "loop_pass": 2,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9995184688747031,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.083778977394104,
+          "mean_abs": 0.0064372216259269205,
+          "relative_rmse": 0.031718858820258045,
+          "rmse": 0.00854484024146369,
+          "total_elements": 2304
+        },
+        "subject_sha256": "5bd50e7a03489a883d4f9179c09494f07e3febaee7b0d73855709a5f22789145",
+        "oracle_sha256": "38b558359313c7ef745a01ca8bb63e3c13575e8b319ddc8d2bfeba4ab0979cee"
+      },
+      {
+        "sequence_index": 37,
+        "checkpoint_id": "inkling2.loop.append.slot43.layer_output",
+        "layer": 13,
+        "state_slot": 43,
+        "loop_pass": 2,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9995702140466594,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.1592257022857666,
+          "mean_abs": 0.01226863830763452,
+          "relative_rmse": 0.02947030150250582,
+          "rmse": 0.015890764063037903,
+          "total_elements": 2304
+        },
+        "subject_sha256": "05c0f9ea6af7683c5c041c556bc1d9adaaa264f020cb937457d039454c0e064e",
+        "oracle_sha256": "ec35eaf290f74d5ec610bf6c82d39e3bb477b13ea038147ab23ca0fd481ea372"
+      },
+      {
+        "sequence_index": 38,
+        "checkpoint_id": "inkling2.loop.append.slot44.layer_output",
+        "layer": 14,
+        "state_slot": 44,
+        "loop_pass": 2,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9996489526751313,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.2516818046569824,
+          "mean_abs": 0.02451782523975352,
+          "relative_rmse": 0.02731041297189694,
+          "rmse": 0.0319130649909549,
+          "total_elements": 2304
+        },
+        "subject_sha256": "1f045519206d2c27d30b6d6984d5beea44ea043c9548daa2409d07026a253472",
+        "oracle_sha256": "0a342e3dd6efe97dc33ea09698e353636e97df89e43e3f1b038872e81aca9ecd"
+      },
+      {
+        "sequence_index": 39,
+        "checkpoint_id": "inkling2.loop.append.slot45.layer_output",
+        "layer": 15,
+        "state_slot": 45,
+        "loop_pass": 2,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9996840751530428,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.4422788619995117,
+          "mean_abs": 0.03971975042481467,
+          "relative_rmse": 0.025900320029207738,
+          "rmse": 0.051947378204947395,
+          "total_elements": 2304
+        },
+        "subject_sha256": "a5f634bf06d59bb7202a74e329b988129a4d324f83077bcb772b7cedac3d4496",
+        "oracle_sha256": "81319b489826709ce7226f47c4f0531f91f8b3bc510383d93acc91dce8498249"
+      },
+      {
+        "sequence_index": 40,
+        "checkpoint_id": "inkling2.loop.append.slot46.layer_output",
+        "layer": 16,
+        "state_slot": 46,
+        "loop_pass": 2,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9997397678485468,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.36876869201660156,
+          "mean_abs": 0.05855333821414711,
+          "relative_rmse": 0.023273763729224656,
+          "rmse": 0.0752228302122953,
+          "total_elements": 2304
+        },
+        "subject_sha256": "3e141659e70ebb99772a680f91583d00c8d18588d7f36273e90d05060c6cdbde",
+        "oracle_sha256": "22c40e368ff918124bd65afb88d6088a9cbcd4cf4a5de35edcd9565b6d439ebd"
+      },
+      {
+        "sequence_index": 41,
+        "checkpoint_id": "inkling2.loop.append.slot47.layer_output",
+        "layer": 17,
+        "state_slot": 47,
+        "loop_pass": 2,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9997942441107074,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 1.0515022277832031,
+          "mean_abs": 0.08072085469514907,
+          "relative_rmse": 0.020471427087808462,
+          "rmse": 0.10622784532323583,
+          "total_elements": 2304
+        },
+        "subject_sha256": "4f2c5403fa97dced1b23077ac9a688f2c1d3b84bd0e0b2d6084b49bfb2d254c7",
+        "oracle_sha256": "c1d13dfd2722f271987b9c0362da7ab555ac6cc4eec1b3eef7adcfc8c147f9b9"
+      },
+      {
+        "sequence_index": 42,
+        "checkpoint_id": "inkling2.loop.append.slot18.layer_output",
+        "layer": 18,
+        "state_slot": 18,
+        "loop_pass": null,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.999338651704411,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.23170042037963867,
+          "mean_abs": 0.013611328749549203,
+          "relative_rmse": 0.036372208869471664,
+          "rmse": 0.018232546516881852,
+          "total_elements": 2304
+        },
+        "subject_sha256": "6ec3c15bd85b58ddf4ccf9467537bce2eca8f34d2b8352d9dc6a6fa18a60073e",
+        "oracle_sha256": "aba9bc2a2b83bc8ca6f42f5ecaca5c0a761007807851449ecbb4f8d6ba5e1a37"
+      },
+      {
+        "sequence_index": 43,
+        "checkpoint_id": "inkling2.loop.append.slot19.layer_output",
+        "layer": 19,
+        "state_slot": 19,
+        "loop_pass": null,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9995939351744564,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.26013515889644623,
+          "mean_abs": 0.0199516181734604,
+          "relative_rmse": 0.028497208396203892,
+          "rmse": 0.025835170267124195,
+          "total_elements": 2304
+        },
+        "subject_sha256": "d6161b944cb53653885cc631f0838f3055552247bbcd1b7be6f81b3cbce1493a",
+        "oracle_sha256": "cc41c23b3a4e142b89e381c5de48efca39ef53cbeac1517c1aed7bd08836064d"
+      },
+      {
+        "sequence_index": 44,
+        "checkpoint_id": "inkling2.loop.append.slot20.layer_output",
+        "layer": 20,
+        "state_slot": 20,
+        "loop_pass": null,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.999574628880082,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.27001047134399414,
+          "mean_abs": 0.027510629512107698,
+          "relative_rmse": 0.029188052100404892,
+          "rmse": 0.03583847830479447,
+          "total_elements": 2304
+        },
+        "subject_sha256": "01cf73a328e986a29b65706100e263ab2ca3d15391dc3364a9551c235a09233c",
+        "oracle_sha256": "8ff0fbfcf14e9c7a0cc8ec9fb22deee3781503195687703880fd4e2552fd3a37"
+      },
+      {
+        "sequence_index": 45,
+        "checkpoint_id": "inkling2.loop.append.slot21.layer_output",
+        "layer": 21,
+        "state_slot": 21,
+        "loop_pass": null,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.999552873373849,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.3746356964111328,
+          "mean_abs": 0.03363203505149512,
+          "relative_rmse": 0.030031997875665163,
+          "rmse": 0.04421548357081317,
+          "total_elements": 2304
+        },
+        "subject_sha256": "798da9f9175c0fd9e17db559da6a60d4bc53f2433dbe7f86fc9fae863ac9582a",
+        "oracle_sha256": "5cb57b428b64aa9a3c354bf0c5722ff77ac9f3fc0e6aa30d144382ece37b0d7f"
+      },
+      {
+        "sequence_index": 46,
+        "checkpoint_id": "inkling2.loop.append.slot22.layer_output",
+        "layer": 22,
+        "state_slot": 22,
+        "loop_pass": null,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9996509828845428,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.32272911071777344,
+          "mean_abs": 0.03904481230670677,
+          "relative_rmse": 0.02652517696395005,
+          "rmse": 0.05095928015454169,
+          "total_elements": 2304
+        },
+        "subject_sha256": "76ea83c7ecf90d7714ed71b6cc6a0586d417d1bee9893ab6e56527a4e75922fe",
+        "oracle_sha256": "d15c3e94a08702ae5e4cfd47a485015dca545787e0b7b8fcb6aec8c35a5ecbea"
+      },
+      {
+        "sequence_index": 47,
+        "checkpoint_id": "inkling2.loop.append.slot23.layer_output",
+        "layer": 23,
+        "state_slot": 23,
+        "loop_pass": null,
+        "metrics": {
+          "byte_exact": false,
+          "cosine": 0.9995478019987382,
+          "exact_elements": 0,
+          "exact_ratio": 0.0,
+          "finite": true,
+          "max_abs": 0.7376136779785156,
+          "mean_abs": 0.04731460022190327,
+          "relative_rmse": 0.030358841536349483,
+          "rmse": 0.06512192805058857,
+          "total_elements": 2304
+        },
+        "subject_sha256": "39ddd73e34cc70b3f6e093ec9101f1baecead3d1feb901219d50869fff634db8",
+        "oracle_sha256": "ec164813da720848a7ec1d1511cb52a4e3ab2fcc0c029ce0a55e36574bcd223f"
+      }
+    ],
+    "accelerated_cke": {
+      "positions": [
+        25,
+        26,
+        27,
+        28,
+        29,
+        30
+      ],
+      "argmax": [
+        200001,
+        200008,
+        371,
+        150409,
+        171960,
+        25
+      ],
+      "oracle_argmax": [
+        200001,
+        200008,
+        371,
+        150409,
+        171960,
+        149887
+      ],
+      "rmse": [
+        0.09038595317592202,
+        0.2486574801286215,
+        0.4639793693861032,
+        0.3182356524581182,
+        0.3253695446864396,
+        0.15519206259510937
+      ],
+      "max_abs": [
+        0.5048332214355469,
+        1.5597410202026367,
+        2.7470386028289795,
+        1.8681809902191162,
+        1.3079252243041992,
+        0.724614143371582
+      ],
+      "full_vocab": 200058,
+      "bitwise_equal_to_prior_cke_rows": true,
+      "runtime_sha256": "99ed091cc9100aa3e2c6fac186dd5c64a3c37ae3a5e3b75d88e1f6f5c6d41bb7",
+      "oracle_logits_sha256": "34ae91bcc5088475a622885462b58e1c1f63e951059b40f029713cceff910c1b"
+    },
+    "experimental_value_rms": {
+      "positions": [
+        25,
+        26,
+        27,
+        28,
+        29,
+        30
+      ],
+      "argmax": [
+        200001,
+        200008,
+        371,
+        150409,
+        171960,
+        25
+      ],
+      "oracle_argmax": [
+        200001,
+        200008,
+        371,
+        150409,
+        171960,
+        149887
+      ],
+      "rmse": [
+        0.21354706048484265,
+        0.5453147837814093,
+        0.2896194495255898,
+        0.29295556885336305,
+        0.30680279600493093,
+        0.18213523570156534
+      ],
+      "max_abs": [
+        1.053293228149414,
+        2.304445266723633,
+        1.7426977157592773,
+        1.7640433311462402,
+        1.7045289278030396,
+        0.8814545944333076
+      ],
+      "full_vocab": 200058,
+      "bitwise_equal_to_prior_cke_rows": false,
+      "runtime_sha256": "8f98cc71f3e0d57144eb8b1c75d77e48d1e3dc3bb3f0563e6330d4ac84fb3cbe",
+      "oracle_logits_sha256": "34ae91bcc5088475a622885462b58e1c1f63e951059b40f029713cceff910c1b"
+    }
+  },
+  "identical_input_replays": {
+    "layer2_q": {
+      "match": true,
+      "elements": 24576,
+      "threads": 8,
+      "checkpoint": "raw Q projection layer 2",
+      "manifest_sha256": "9295235e9955c66e31ea6137c61a9c671ccff12145165ee1656c78db34685174",
+      "library_sha256": "703b26abe5ffbca06aac194fa6284f4ba7655c39f9bd83276774547991eda22d"
+    },
+    "layer0_v_rms": [
+      {
+        "square": "fp64",
+        "exact_elements": 5254,
+        "count": 8192,
+        "rmse": 4.95738255172401e-08,
+        "max_abs": 9.5367431640625e-07,
+        "sha256": "51f8915eb7dfac8fd3408527910dcf75973db9bee4b37e21f7277405eeee9258"
+      },
+      {
+        "square": "fp32",
+        "exact_elements": 8192,
+        "count": 8192,
+        "rmse": 0.0,
+        "max_abs": 0.0,
+        "sha256": "5b08d8b4a212e656bf96ea4d03ecfbcb3f1999fdfbeb0a8b8e6ce0315cab2d18"
+      }
+    ],
+    "interpretation": "V RMS matches its oracle with the FP32-square contract at this boundary. The experimental provider increased sixth-position full-logit RMSE and is excluded from the runtime change.",
+    "fixed_sixth_layer3_q": {
+      "position": 30,
+      "state_slot": 3,
+      "physical_layer": 3,
+      "runtime_sha256": "703b26abe5ffbca06aac194fa6284f4ba7655c39f9bd83276774547991eda22d",
+      "manifest_sha256": "fab996bd4bf002e89b8d3d3afc65b0cca90e39ad0e736f091ed1842e682887ea",
+      "normalized_input": {
+        "count": 2304,
+        "exact_elements": 466,
+        "rmse": 1.4266549974574295e-07,
+        "max_abs": 1.430511474609375e-06
+      },
+      "changed_scale_blocks": 0,
+      "total_scale_blocks": 72,
+      "changed_codes": 0,
+      "raw_query": {
+        "count": 3072,
+        "exact_elements": 3072,
+        "rmse": 0.0,
+        "max_abs": 0.0
+      },
+      "native_input_replay": {
+        "count": 3072,
+        "exact_elements": 3072,
+        "rmse": 0.0,
+        "max_abs": 0.0
+      },
+      "identical_oracle_input_replay": {
+        "count": 3072,
+        "exact_elements": 3072,
+        "rmse": 0.0,
+        "max_abs": 0.0
+      },
+      "clipped_query": {
+        "count": 3072,
+        "exact_elements": 2968,
+        "rmse": 3.2479458071129806e-08,
+        "max_abs": 9.5367431640625e-07
+      },
+      "ffn_input_from_accumulated_attention_residual": {
+        "count": 2304,
+        "exact_elements": 34,
+        "rmse": 2.5935464767923384e-05,
+        "max_abs": 0.0005370378494262695
+      },
+      "inferred_ffn_delta_with_subtraction_rounding": {
+        "count": 2304,
+        "exact_elements": 2,
+        "rmse": 0.00045850153147928603,
+        "max_abs": 0.0037059783935546875
+      },
+      "layer_output": {
+        "count": 2304,
+        "exact_elements": 1,
+        "rmse": 0.0004599527300194003,
+        "max_abs": 0.0037078857421875
+      }
+    }
+  }
+}

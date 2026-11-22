@@ -333,9 +333,11 @@ def routed_expert_mixture(tokens, width, inner, experts, top_k, slots, *,
         mixture={"shape": [tokens, width]},
     )
     graph["activation_bindings"].update({p: p for p in ("expert_slots", "expert_output", "mixture")})
-    work = 3 * inner + tokens * (top_k + 1) * width
+    row_work = 3 * inner
+    staged = tokens * (top_k + 1) * width
     if q8_activations:
-        work += ((width + inner) // 32 * 34 + 3) // 4
+        row_work += ((width + inner) // 32 * 34 + 3) // 4
+    work = staged + row_work * (tokens if q8_activations else 1)
     elements = slots * inner * width
     block_bytes = {"q8_0": 34, "iq4_nl": 18}
     prefix = f"model.llm.layers.{layer}.mlp.experts.bank."
