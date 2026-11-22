@@ -2346,6 +2346,45 @@ python3 version/v8/scripts/compare_inkling2_llama_layer0_v8.py \
   and 47.8 GB arenas, respectively. The full workloads, native tokenizer
   integration and HTTP lifecycle remain to be verified.</p>
 
+  <h3 id="inkling2-mini-xray">Inkling Q8_0 X-Ray and threaded prefill</h3>
+  <p>The replay's <code>--threads</code> option enables OpenMP for packed Q8
+  projections and routed experts. The planner allocates packed input rows,
+  staged projection outputs and per-row expert scratch. Each route keeps its
+  selected Q8 reduction and accumulation order. On x86 with AVX2, FMA and F16C,
+  the dot routine converts packed half scales with hardware instructions.</p>
+  <p>Add <code>--xray-token-position</code> to capture all 48 layer outputs at
+  one zero-based processed token. The index records the execution sequence,
+  physical layer, loop pass and state slot. A generated token only acquires a
+  layer capture when that token is processed by an append.</p>
+  <pre class="mb-code"><code>python3 version/v8/scripts/replay_inkling2_text_loop_v8.py \
+  --config "$PUBLISHER_CONFIG" --gguf "$Q8_GGUF" --tokens-file "$TOKEN_IDS" \
+  --context-capacity 256 --chunk-tokens 16 --last-prefill-logit \
+  --threads 8 --xray-token-position 127 --output "$REPLAY"
+python3 version/v8/scripts/xray_layer_output_sweep_v8.py \
+  --subject-dir "$REPLAY/xray" --oracle-dir "$ORACLE_CAPTURES" \
+  --parity-report "$COMPARISON_METADATA" --ordered-capture \
+  --model inkling2-mini --layers 48 --token-count 128 --hidden-size 2304 \
+  --logical-token 127 --output-dir "$XRAY_REPORT"</code></pre>
+  <p>Provide oracle <code>l_out</code> tensors for the same position and
+  token history. The ordered sweep matches oracle state slots even when loop
+  execution jumps between slot ranges. A layer-output difference localizes
+  observed drift. Attribution to an individual kernel requires replay on
+  identical operands.</p>
+  <p>On P3 the 128-token matched single-thread replay fell from 98.85 to
+  58.86 seconds. The optimized eight-thread median was 18.98 seconds
+  across two trials, compared with 12.61 seconds across three llama.cpp
+  trials. At 240 tokens, a single eight-thread trial took 43.13 seconds
+  in CKE and 20.47 seconds in llama.cpp. These timings exclude setup.
+  Both native builds agreed bitwise on all prefill and append logits and
+  288 state regions in the 128-token replay.</p>
+  <p>The fixed sixth-token comparison still differs from llama.cpp.
+  X-Ray observed the first layer-output drift at slot 0, with much
+  larger errors at slots 3 and 4. Identical-input V normalization was
+  exact using the experimental FP32 square and scaling sequence. That
+  sequence increased full-logit error at the sixth token in the complete
+  graph, so the current runtime keeps the existing V provider. See the
+  <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/docs/notes/artifacts/inkling2_mini_q8_xray_prefill.json">artifact-bound measurements</a>.</p>
+
   <h3 id="inkling2-mini-continuation-replay">Inkling Q8_0 continuation replay</h3>
   <p>The layer 2 Q input contains one changed Q8 scale on the eight-token
   trace. Replacing the incoming layer 1 residual with the captured oracle
