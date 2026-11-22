@@ -2139,6 +2139,10 @@ OP_DATAFLOW = {
         "inputs": {"ids": "external:token_ids"},
         "outputs": {"output": {"slot": "embedding", "dtype": "fp32"}},
     },
+    "copy_last_row_checked": {
+        "inputs": {"input": "input"},
+        "outputs": {"output": {"slot": "last_row", "dtype": "fp32"}},
+    },
     "softcap_logits_checked": {
         "inputs": {"input": "logits"},
         "outputs": {"output": {"slot": "capped_logits", "dtype": "fp32"}},
@@ -5419,6 +5423,7 @@ TEMPLATE_TO_KERNEL_OP = {
     "attention_causal_bounded": "attention_causal_bounded",
     "rmsnorm_f32_square_f64_sum_rows_checked": "rmsnorm_f32_square_f64_sum_rows_checked",
     "embedding_lookup_q8_0_checked": "embedding_lookup_q8_0_checked",
+    "copy_last_row_checked": "copy_last_row_checked",
     "softcap_logits_checked": "softcap_logits_checked",
     "log_position_scale_rows_checked": "log_position_scale_rows_checked",
     "causal_dynamic_depthwise_residual_checked": "causal_dynamic_depthwise_residual_checked",

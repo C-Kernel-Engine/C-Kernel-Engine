@@ -108,6 +108,12 @@ def main():
     parser.add_argument("--stop-id", type=int, action="append", default=[])
     parser.add_argument("--context-capacity", type=int)
     parser.add_argument("--chunk-tokens", type=int, default=16)
+    parser.add_argument("--fp32-static-conv", action="store_true",
+                        help="use ordered FP32 arithmetic for static short convolutions")
+    parser.add_argument("--reference-moe", action="store_true",
+                        help="use reciprocal-scaled SiTU and router-slot accumulation")
+    parser.add_argument("--last-prefill-logit", action="store_true",
+                        help="project only the final hidden row in each prefill chunk")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     config_bytes = args.config.read_bytes()
@@ -135,7 +141,8 @@ def main():
               "append_token": args.append_token, "scope": "bounded native Q8_0 token replay",
               "config_sha256": hashlib.sha256(config_bytes).hexdigest(),
               "context_capacity": capacity, "chunk_tokens": chunk_tokens, "completed_prompt_tokens": 0,
-              "f64_norm_sum": args.f64_norm_sum}
+              "f64_norm_sum": args.f64_norm_sum, "last_prefill_logit": args.last_prefill_logit,
+              "reference_moe": args.reference_moe, "fp32_static_conv": args.fp32_static_conv}
     report_path = args.output / "report.json"
 
     def save():
@@ -151,10 +158,12 @@ def main():
                 raise ValueError("GGUF bytes differ from the pinned Q8_0 artifact")
             gguf.seek(0)
             tensors, base = read_gguf_header(gguf.read(16 * 1024 * 1024))
+            options = {"f64_norm_sum": args.f64_norm_sum, "last_prefill_logit": args.last_prefill_logit,
+                       "reference_moe": args.reference_moe, "fp32_static_conv": args.fp32_static_conv}
             if resident:
-                graph = resident_text_loop(config, chunk_tokens, capacity, f64_norm_sum=args.f64_norm_sum)
+                graph = resident_text_loop(config, chunk_tokens, capacity, **options)
             else:
-                graph = text_token_loop(config, len(ids), f64_norm_sum=args.f64_norm_sum)
+                graph = text_token_loop(config, len(ids), **options)
             entries = weight_entries(graph)
             for item in entries:
                 tuple(gguf_copy_spans(tensors, base, item, config))

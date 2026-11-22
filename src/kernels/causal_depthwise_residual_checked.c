@@ -22,6 +22,26 @@ static double evaluate(const float *input, const float *history, const float *we
     return (sum + (double)input[token * channels + channel]) / divisor;
 }
 
+static double evaluate_fp32(const float *input, const float *history, const float *weight,
+                            size_t token, size_t channel, size_t channels, size_t taps,
+                            double multiplier)
+{
+    const float *filter = weight + channel * taps;
+    float sum = 0.0f;
+    for (size_t tap = 0; tap < taps; ++tap) {
+        const size_t row = token + tap;
+        const float value = row < taps - 1
+            ? history[row * channels + channel]
+            : input[(row - (taps - 1)) * channels + channel];
+        const volatile float product = value * filter[tap];
+        sum += product;
+    }
+    return (sum + input[token * channels + channel]) * (float)multiplier;
+}
+
+typedef double (*EvaluateStatic)(const float *, const float *, const float *,
+                                 size_t, size_t, size_t, size_t, double);
+
 static void store_history(float *history, const float *input, size_t tokens, size_t taps,
                           size_t rows, size_t state)
 {
@@ -33,10 +53,11 @@ static void store_history(float *history, const float *input, size_t tokens, siz
     }
 }
 
-int ck_causal_depthwise_residual_checked_f32(
+static int causal_depthwise_residual(
     const float *input, size_t input_elements, const float *weight, size_t weight_elements,
     float *history, size_t history_elements, float *output, size_t output_elements,
-    size_t tokens, size_t channels, size_t taps, size_t history_rows)
+    size_t tokens, size_t channels, size_t taps, size_t history_rows,
+    int ordered_fp32)
 {
     if (taps < 2 || taps > 256 || history_rows != taps - 1 || tokens > SIZE_MAX - taps) return -2;
     size_t rows, weights, state;
@@ -56,17 +77,40 @@ int ck_causal_depthwise_residual_checked_f32(
     if (!ck_checked_finite(input, rows) || !ck_checked_finite(weight, weights) ||
         !ck_checked_finite(history, state)) return -3;
 
-    const double divisor = sqrt((double)taps + 1.0);
+    const EvaluateStatic compute = ordered_fp32 ? evaluate_fp32 : evaluate;
+    const double scale = ordered_fp32 ? (double)(1.0f / sqrtf((float)taps + 1.0f))
+                                      : sqrt((double)taps + 1.0);
+    for (size_t t = 0; t < tokens; ++t)
+        for (size_t c = 0; c < channels; ++c) {
+            const double value = compute(input, history, weight, t, c, channels, taps, scale);
+            if (!isfinite(value) || fabs(value) > FLT_MAX) return -3;
+        }
     for (size_t t = 0; t < tokens; ++t)
         for (size_t c = 0; c < channels; ++c)
-            if (fabs(evaluate(input, history, weight, t, c, channels, taps, divisor)) > FLT_MAX)
-                return -3;
-    for (size_t t = 0; t < tokens; ++t)
-        for (size_t c = 0; c < channels; ++c)
-            output[t * channels + c] = (float)evaluate(input, history, weight, t, c, channels, taps, divisor);
+            output[t * channels + c] = (float)compute(input, history, weight, t, c, channels, taps, scale);
 
     store_history(history, input, tokens, taps, rows, state);
     return 0;
+}
+
+int ck_causal_depthwise_residual_checked_f32(
+    const float *input, size_t input_elements, const float *weight, size_t weight_elements,
+    float *history, size_t history_elements, float *output, size_t output_elements,
+    size_t tokens, size_t channels, size_t taps, size_t history_rows)
+{
+    return causal_depthwise_residual(input, input_elements, weight, weight_elements, history,
+                                     history_elements, output, output_elements,
+                                     tokens, channels, taps, history_rows, 0);
+}
+
+int ck_causal_depthwise_residual_checked_ordered_f32(
+    const float *input, size_t input_elements, const float *weight, size_t weight_elements,
+    float *history, size_t history_elements, float *output, size_t output_elements,
+    size_t tokens, size_t channels, size_t taps, size_t history_rows)
+{
+    return causal_depthwise_residual(input, input_elements, weight, weight_elements, history,
+                                     history_elements, output, output_elements,
+                                     tokens, channels, taps, history_rows, 1);
 }
 
 /* GGUF static taps are oldest first; per-row dynamic taps start at lag zero. */

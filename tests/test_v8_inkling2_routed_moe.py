@@ -94,6 +94,39 @@ class RoutedMoeTests(unittest.TestCase):
                     )
 
 
+    def test_q8_router_order_is_bitwise_and_sensitive_to_slot_order(self):
+        tokens, width, experts, top_k = 4, 32, 5, 4
+        rng = np.random.default_rng(513)
+        graph = routed_expert_mixture(tokens, width, width, experts, top_k, experts,
+                                      storage="q8_0", q8_activations=True)
+        ops = graph["block_types"]["block"]["body"]["ops"]
+        ops[-1]["kernel"] += "_scaled_situ"
+        router = ops[0]["weight_refs"]["weight"]
+        weights = {router: rng.normal(0, .3, (experts, width)).astype(np.float32)}
+        specs = {router: ([experts, width], "F32")}
+        for name in ops[-1]["weight_refs"].values():
+            shape = [experts, width, width]
+            weights[name] = pack_quant(rng.integers(-12, 13, shape, dtype=np.int8), "q8_0")
+            specs[name] = (shape, "Q8_0")
+        with TemporaryDirectory() as temp:
+            run, arena, view, _ = compile_checked_weight_graph(Path(temp), graph, weights, specs)
+            view("hidden")[:] = rng.normal(0, .3, (tokens, width)).astype(np.float32)
+            view("correction_bias")[:] = [0.1, -.06, .2, .33, -.09]
+            view("expert_slots", np.int32)[:] = [3, 0, 1, 4, 2]
+            self.assertEqual(run(arena, len(arena)), 0)
+            contribution = view("expert_output").reshape(tokens, top_k, width)
+            weighted = contribution * view("route_weights")[:, :, None]
+            expected = weighted[:, 0].copy()
+            for slot in range(1, top_k):
+                expected += weighted[:, slot]
+            np.testing.assert_array_equal(view("mixture").view("u4"), expected.view("u4"))
+            ids = view("indices", np.int32)
+            ascending = np.take_along_axis(weighted, np.argsort(ids, axis=1)[:, :, None], axis=1)
+            incorrect = ascending[:, 0].copy()
+            for slot in range(1, top_k):
+                incorrect += ascending[:, slot]
+            self.assertFalse(np.array_equal(incorrect.view("u4"), expected.view("u4")))
+
     def test_routed_provider_rejects_wrong_storage_even_with_enough_bytes(self):
         graph = routed_expert_mixture(1, 32, 32, 1, 1, 1, storage="iq4_nl")
         ops = graph["block_types"]["block"]["body"]["ops"]
