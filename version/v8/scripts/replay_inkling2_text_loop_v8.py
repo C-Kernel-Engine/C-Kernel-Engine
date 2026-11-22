@@ -166,6 +166,8 @@ def main():
                         help="bound the sliding KV cache while retaining full-attention history")
     parser.add_argument("--last-prefill-logit", action="store_true",
                         help="project only the final hidden row in each prefill chunk")
+    parser.add_argument("--parallel-decode-experts", action="store_true",
+                        help="reserve independent scratch for the routed experts of each decode row")
     parser.add_argument("--threads", type=int, default=1,
                         help="OpenMP worker count for independent Q8_0 rows")
     parser.add_argument("--xray-token-position", type=int,
@@ -196,6 +198,8 @@ def main():
         parser.error("invalid prompt IDs, chunk size or context capacity")
     if args.circular_sliding and not resident:
         parser.error("circular sliding KV requires --context-capacity")
+    if args.parallel_decode_experts and (not resident or args.threads < 2):
+        parser.error("parallel decode experts require --context-capacity and at least two threads")
     if any(not 0 <= token < vocab for token in forced):
         parser.error("invalid continuation ID")
     if (args.greedy_tokens < 0 or (args.greedy_tokens and (not resident or forced))
@@ -225,7 +229,8 @@ def main():
               "threads": args.threads,
               "f64_norm_sum": args.f64_norm_sum, "last_prefill_logit": args.last_prefill_logit,
               "reference_moe": args.reference_moe, "fp32_static_conv": args.fp32_static_conv,
-              "circular_sliding": args.circular_sliding}
+              "circular_sliding": args.circular_sliding,
+              "parallel_decode_experts": args.parallel_decode_experts}
     if args.append_tokens_file is not None:
         report.update(append_ids=forced, completed_append_tokens=0)
     if oracle is not None:
@@ -257,7 +262,8 @@ def main():
                        "reference_moe": args.reference_moe, "fp32_static_conv": args.fp32_static_conv,
                        "circular_sliding": args.circular_sliding}
             if resident:
-                graph = resident_text_loop(config, chunk_tokens, capacity, **options)
+                graph = resident_text_loop(config, chunk_tokens, capacity,
+                                           parallel_decode_experts=args.parallel_decode_experts, **options)
             else:
                 graph = text_token_loop(config, len(ids), **options)
             entries = weight_entries(graph)

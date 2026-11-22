@@ -283,7 +283,8 @@ def text_token_loop(config, prefill_tokens=4, *, cache_capacity=None, f64_norm_s
 
 
 def resident_text_loop(config, chunk_tokens, context_capacity, *, f64_norm_sum=False, last_prefill_logit=False,
-                       reference_moe=False, fp32_static_conv=False, circular_sliding=False):
+                       reference_moe=False, fp32_static_conv=False, circular_sliding=False,
+                       parallel_decode_experts=False):
     """Generate repeated fixed-size prefill chunks and one-row decode over shared state."""
     graph = text_token_loop(config, chunk_tokens, cache_capacity=context_capacity, f64_norm_sum=f64_norm_sum,
                             last_prefill_logit=last_prefill_logit, reference_moe=reference_moe,
@@ -293,6 +294,7 @@ def resident_text_loop(config, chunk_tokens, context_capacity, *, f64_norm_sum=F
     graph["contract"]["runtime_invariants"].update(context_capacity=context_capacity, chunk_tokens=chunk_tokens)
     exports = graph["execution_exports"]
     exports["properties"]["supports_explicit_position"] = True
+    exports["properties"]["parallel_decode_experts"] = parallel_decode_experts
     graph["runtime_constants"] = {
         "value_elements": 1, "phoneme_count": 1,
         "max_duration": context_capacity - 1, "expanded_capacity": context_capacity - 1,
@@ -316,6 +318,11 @@ def resident_text_loop(config, chunk_tokens, context_capacity, *, f64_norm_sum=F
         for node in old_ops:
             if node["op"] in positioned:
                 bind_runtime_scalars(node, position=position)
+            if parallel_decode_experts and phase == "append" and node["op"] == "routed_softcapped_experts_checked":
+                params = node["params"]
+                staged = (params["K"] + 1) * params["H"]
+                params["W"] = staged + params["K"] * (params["W"] - staged)
+                params["call_constants"]["work_elements"] = params["W"]
             ops.append(node)
             if node["id"] == segment["last_op"]:
                 break

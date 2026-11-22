@@ -146,7 +146,7 @@ class InklingTextLoopTests(unittest.TestCase):
         """Compare generated schedules around both long-context boundaries."""
         rng = np.random.default_rng(901)
         capacity = 65538
-        graph = resident_text_loop(CONFIG, 2, capacity, f64_norm_sum=True)
+        graph = resident_text_loop(CONFIG, 2, capacity, f64_norm_sum=True, parallel_decode_experts=True)
         specs = first_block_weights(graph)
         weights = {
             name: pack_quant(rng.integers(-3, 4, shape, dtype=np.int8), "q8_0")
@@ -160,6 +160,7 @@ class InklingTextLoopTests(unittest.TestCase):
             lib.omp_set_dynamic(0)
             lib.omp_set_num_threads(2)
             self.assertEqual(exports["properties"]["context_capacity"], capacity)
+            self.assertTrue(exports["properties"]["parallel_decode_experts"])
 
             for layer in range(CONFIG["num_hidden_layers"]):
                 view(f"router_bias_{layer}")[:] = [-.02, .04, .08, .01]
@@ -209,6 +210,12 @@ class InklingTextLoopTests(unittest.TestCase):
                     np.testing.assert_array_equal(single.view("u4"), expected.view("u4"))
                     np.testing.assert_array_equal(run("append", [5], capacity, -1).view("u4"),
                                                   expected[-1:].view("u4"))
+                    self.assertEqual(state(), expected_state)
+                    restore_seed()
+                    lib.omp_set_num_threads(1)
+                    serial = np.concatenate([run("append", [token], position + i) for i, token in enumerate(ids)])
+                    lib.omp_set_num_threads(2)
+                    np.testing.assert_array_equal(serial.view("u4"), expected.view("u4"))
                     self.assertEqual(state(), expected_state)
                     for cache, prior in zip(caches, cache_prefix):
                         self.assertEqual(hashlib.sha256(cache[:, :position]).digest(), prior)
