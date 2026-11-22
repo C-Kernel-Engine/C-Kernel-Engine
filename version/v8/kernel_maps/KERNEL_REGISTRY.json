@@ -68755,7 +68755,7 @@
           "shape": [
             "K"
           ],
-          "size_bytes": "q8_0_row_bytes(K)",
+          "size_bytes": "M * (q8_0_row_bytes(K) + N * 4)",
           "alignment": 64,
           "lifetime": "kernel_call",
           "size_resolution": "required",
@@ -68887,7 +68887,7 @@
           "tests/test_v8_inkling2_q8_decoder_block.py"
         ]
       },
-      "notes": "FP32 input storage, nearest-even Q8_0 activations with FP16 scales, eight FP32 FMA lanes and a fixed horizontal reduction. Portable implementation of the pinned x86 arithmetic order.",
+      "notes": "FP32 input storage, nearest-even Q8_0 activations with FP16 scales, eight FP32 FMA lanes and a fixed horizontal reduction. Planner-owned packed and staged output rows allow independent row execution and atomic output publication. The minimum one-row packing scratch remains supported by direct callers.",
       "name": "linear_rows_q8_0_checked_q8_activation",
       "_source_file": "linear_rows_q8_0_checked_q8_activation.json"
     },

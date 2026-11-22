@@ -1,4 +1,5 @@
 import ctypes
+import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -9,6 +10,7 @@ from tests.test_v8_inkling2_routed_moe import pack_quant
 from version.v8.scripts.build_inkling2_decoder_block_v8 import first_block_weights
 from version.v8.scripts.build_inkling2_text_loop_v8 import resident_text_loop, text_token_loop
 from version.v8.scripts.checked_execution_exports_v8 import load_exports
+from version.v8.scripts.replay_inkling2_text_loop_v8 import capture_layer_rows
 from version.v8.scripts.compile_checked_bundle_v8 import compile_checked_weight_graph
 
 
@@ -49,7 +51,11 @@ class InklingTextLoopTests(unittest.TestCase):
 
                 folder = Path(directory) / label
                 folder.mkdir()
-                _, arena, view, lib = compile_checked_weight_graph(folder, graph, weights, specs)
+                _, arena, view, lib = compile_checked_weight_graph(
+                    folder, graph, weights, specs, openmp=label == "last")
+                if label == "last":
+                    lib.omp_set_dynamic(0)
+                    lib.omp_set_num_threads(2)
                 exports = load_exports(folder, lib)
                 self.assertEqual(exports["properties"]["supports_explicit_position"], label != "full")
                 self.assertEqual(exports["ports"]["prefill_token_ids"]["dtype"], "i32")
@@ -93,6 +99,17 @@ class InklingTextLoopTests(unittest.TestCase):
                     else:
                         np.testing.assert_array_equal(initial[0].view("u4"), first[-1].view("u4"))
                         np.testing.assert_array_equal(continuation[0].view("u4"), second[-1].view("u4"))
+                        archive = folder / "xray"
+                        capture_layer_rows(archive, graph, view, "append", 4, 0)
+                        index = json.loads((archive / "index.json").read_text())
+                        self.assertEqual(index["position"], 4)
+                        self.assertEqual([row["state_slot"] for row in index["checkpoints"]],
+                                         [row["state_slot"] for row in schedule])
+                        row = index["checkpoints"][18]
+                        self.assertEqual(row["state_slot"], 24)
+                        np.testing.assert_array_equal(
+                            np.fromfile(archive / row["filename"], dtype="<f4"),
+                            view(row["tensor"])[0])
                 else:
                     run("prefill", ids)
                     embedding = view("prefill_embeddings")

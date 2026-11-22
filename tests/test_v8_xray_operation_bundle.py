@@ -31,6 +31,8 @@ class OperationBundleTests(unittest.TestCase):
             tensors={
                 "input": (np.array([0x3f80, 0x4000], dtype=np.uint16),
                           "bf16_bits", ("reduction",)),
+                "packed_weight": (np.array([[0, 60, 128, 255]], dtype=np.uint8),
+                                  "u8", ("channel", "packed_byte")),
                 "output": (np.array([[1.0], [2.0]], dtype=np.float32),
                            "fp32", ("row", "channel")),
             },
@@ -44,7 +46,9 @@ class OperationBundleTests(unittest.TestCase):
         self.assertEqual((bundle.parent / 'input.bin').stat().st_mode & 0o777, 0o600)
         self.assertEqual(manifest["provider"], "test_provider")
         np.testing.assert_array_equal(tensors["input"], [0x3f80, 0x4000])
-        path = bundle.parent / "input.bin"
+        self.assertEqual(tensors["packed_weight"].dtype, np.dtype("u1"))
+        np.testing.assert_array_equal(tensors["packed_weight"], [[0, 60, 128, 255]])
+        path = bundle.parent / "packed_weight.bin"
         changed = bytearray(path.read_bytes())
         changed[0] ^= 1
         path.write_bytes(changed)

@@ -18,7 +18,10 @@ from typing import Any
 import numpy as np
 
 
-_DTYPES = {"fp32": np.dtype("<f4"), "fp16": np.dtype("<f2"), "bf16_bits": np.dtype("<u2")}
+_DTYPES = {
+    "fp32": np.dtype("<f4"), "fp16": np.dtype("<f2"),
+    "bf16_bits": np.dtype("<u2"), "u8": np.dtype("u1"),
+}
 _ROLE = re.compile(r"[A-Za-z][A-Za-z0-9_]{0,63}\Z")
 
 

@@ -87,6 +87,7 @@ def hidden_text_loop(config, prefill_tokens=4, *, cache_capacity=None):
                 "history_ffn_post_conv": f"external:history_ffn_post_conv_{slot}",
             }
             body = block["block_types"]["block"]["body"]["ops"]
+            current_output = entry + "_layer_output"
             for original in body:
                 if not original["id"].startswith(entry + "_"):
                     continue
@@ -109,7 +110,17 @@ def hidden_text_loop(config, prefill_tokens=4, *, cache_capacity=None):
                 ops.append(node)
             if layer % block_size == 0:
                 depth_bank = entry + "_next_depth_bank" if depth_bank is not None else current
-            current = entry + "_layer_output"
+            current = current_output
+            producer = next(op for op in body if op["id"] == current)
+            graph["semantic_checkpoints"]["exports"][current] = {
+                "section": "body", "template_op_id": current, "op": producer["op"],
+                "checkpoints": [{
+                    "id": f"inkling2.loop.{phase}.slot{slot}.layer_output",
+                    "producer": current, "tensor": current,
+                    "logical_layout": "token_major_contiguous",
+                    "axis_names": ["token", "channel"], "storage_dtype": "fp32",
+                }],
+            }
 
         count, states = rows * width, config["num_hidden_layers"] // block_size
         mixed = buffer(phase + "_final_depth_mix", [rows, width])
