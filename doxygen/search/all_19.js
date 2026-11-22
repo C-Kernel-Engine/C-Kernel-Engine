@@ -89,5 +89,9 @@ var searchData=
   ['vocab_5fstrings_86',['vocab_strings',['../structQWEN2__0__5B__DECODEHeaderOffsets.html#a60e3a70cccede22b6473dd0be408af24',1,'QWEN2_0_5B_DECODEHeaderOffsets']]],
   ['vocab_5ftrie_87',['vocab_trie',['../structCKTokenizer.html#a6ac6c2255e6c5ccf7dfc45ecf2be9456',1,'CKTokenizer']]],
   ['vocabulary_5fsize_88',['vocabulary_size',['../structCKDecoderFeatures.html#ab304219bf87b0d271ffdd9ab9b26db8c',1,'CKDecoderFeatures']]],
-  ['void_5ffunc_5ft_89',['void_func_t',['../ck__cli__v5_8c.html#a2425c2b3462f867da9fd2ab76d9d47b1',1,'void_func_t:&#160;ck_cli_v5.c'],['../ck__cli__v6_8c.html#a2425c2b3462f867da9fd2ab76d9d47b1',1,'void_func_t:&#160;ck_cli_v6.c']]]
+  ['void_5ffunc_5ft_89',['void_func_t',['../ck__cli__v5_8c.html#a2425c2b3462f867da9fd2ab76d9d47b1',1,'void_func_t:&#160;ck_cli_v5.c'],['../ck__cli__v6_8c.html#a2425c2b3462f867da9fd2ab76d9d47b1',1,'void_func_t:&#160;ck_cli_v6.c']]],
+  ['vp_5fblend_90',['vp_blend',['../diffusion__vp__step_8c.html#ace48aad3efe5a4a457c27acdc64244c1',1,'diffusion_vp_step.c']]],
+  ['vp_5foverlaps_91',['vp_overlaps',['../diffusion__vp__step_8c.html#a254b0f2e76181c73f94422cef68e7113',1,'diffusion_vp_step.c']]],
+  ['vp_5fregion_5fvalid_92',['vp_region_valid',['../diffusion__vp__step_8c.html#a2ca9765b46a02750d8b2debad8c1f37f',1,'diffusion_vp_step.c']]],
+  ['vp_5fsigmoid_93',['vp_sigmoid',['../diffusion__vp__step_8c.html#ac33c08aa7f3cd36db1fd04352826b48b',1,'diffusion_vp_step.c']]]
 ];
