@@ -1440,6 +1440,8 @@ python3 version/v8/scripts/xray_layer_output_sweep_v8.py \
 
   <h3 id="inkling2-mini-prefill-chunk64">Inkling Q8_0 64-row prefill chunks</h3>
   <p>The checked resident replay accepts up to 64 rows per prefill call.
+  Circuit authoring and the native routed provider use the limit declared
+  in <code>include/ckernel_transformer_rows_checked.h</code>.
   Set <code>--chunk-tokens 64</code> with the explicit context capacity.
   The planner accounts for each row's staging and the complete visible
   sliding KV span. Smaller chunks remain available.</p>

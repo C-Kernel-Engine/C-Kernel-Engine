@@ -15,7 +15,6 @@ enum expert_storage {
 };
 
 #define IQ4_NL_BLOCK_BYTES 18
-#define CHECKED_ROUTED_EXPERT_MAX_ROWS 64
 
 /* GGML IQ4_NL codebook and split-half nibble layout. */
 static const int8_t iq4_nl_values[16] = {

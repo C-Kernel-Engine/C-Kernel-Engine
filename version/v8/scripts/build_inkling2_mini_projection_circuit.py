@@ -1,12 +1,23 @@
 """Bounded Inkling layer-6 projection replay circuits using checked providers."""
 
+from pathlib import Path
+import re
+
 from version.v8.scripts.checked_circuit_authoring_v8 import linear
 
 SOURCE_REVISION = "ed40e7da625f594fc9c4990f5f66be24873c22d7"
 TRANSFORMERS_REVISION = "046bdb8cc2cee29d233964bb77fe6fd37cfe4aa3"
 LAYER = "model.llm.layers.6."
 MAX_CONTEXT_CAPACITY = 131072
-MAX_FIXED_TOKEN_ROWS = 64
+_PROVIDER_HEADER = Path(__file__).resolve().parents[3] / "include/ckernel_transformer_rows_checked.h"
+_row_bounds = re.findall(
+    r"^#define CHECKED_ROUTED_EXPERT_MAX_ROWS ([1-9][0-9]*)$",
+    _PROVIDER_HEADER.read_text(encoding="utf-8"),
+    re.MULTILINE,
+)
+if len(_row_bounds) != 1:
+    raise ValueError(f"expected one checked routed expert row limit in {_PROVIDER_HEADER}")
+MAX_FIXED_TOKEN_ROWS = int(_row_bounds[0])
 
 
 def _project(name, source, width, channels, tokens, weight, *, weight_prefix=LAYER):
