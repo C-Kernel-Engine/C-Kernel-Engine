@@ -1708,7 +1708,10 @@ def describe_layer_contract(tensors: Dict[str, "TensorInfo"], layer: int, arch: 
 
 def audit_inkling2_loop_gguf_contract(tensors, metadata, *, data_start=0, file_size=None):
     """Resolve the fixed text schedule and verify its GGUF tensor directory."""
-    from audit_inkling2_mini_v8 import text_schedule
+    if __package__:
+        from .audit_inkling2_mini_v8 import text_schedule
+    else:
+        from audit_inkling2_mini_v8 import text_schedule
 
     arch = "inkling2_loop"
     keys = gguf_ck_arch_contract(arch)["metadata_map"]
