@@ -2176,6 +2176,18 @@ TEST_SUITES = {
         ROOT / "tests" / "test_v8_replay_f16_patch_projection.py",
         timeout_sec=120,
     ),
+    "v8_instella_vl_host_geometry": TestSuite(
+        "Instella VL CPU Host Geometry",
+        "inference",
+        ROOT / "tests" / "test_v8_instella_vl_cpu.py",
+        timeout_sec=120,
+    ),
+    "v8_instella_vl_generated_clip": TestSuite(
+        "Instella VL Generated CLIP Composition",
+        "parity",
+        ROOT / "tests" / "test_v8_instella_vl_checked.py",
+        timeout_sec=120,
+    ),
     "v8_hidden_export_extents": TestSuite(
         "Generated Hidden Export Extents",
         "parity",
