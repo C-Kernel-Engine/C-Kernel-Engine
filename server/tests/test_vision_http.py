@@ -48,6 +48,8 @@ class VisionHTTPTests(unittest.TestCase):
         with TestClient(app) as client:
             self.assertTrue(client.get('/health').json()['ready'])
             self.assertEqual(client.post('/v1/chat/completions',json=dict(body(),tools=[])).status_code,400)
+            path_only = dict(body(),messages=[{'role':'user','content':'Read /tmp/image.png'}])
+            self.assertEqual(client.post('/v1/chat/completions',json=path_only).status_code,400)
             result=client.post('/v1/chat/completions',json=body())
             self.assertEqual(result.status_code,200)
             self.assertEqual(result.json()['choices'][0]['message']['content'],'Blue')
