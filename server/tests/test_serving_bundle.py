@@ -113,18 +113,37 @@ def _update_test_registry(setup, *, dependencies=None, function=None):
 
 
 def test_selected_native_dependency_fails_before_first_request(setup, monkeypatch, tmp_path):
-    _update_test_registry(setup, dependencies=["sleef_expf16_u10"])
+    dependencies = ["mkl_vsexp", "sleef_expf16_u10", "sleef_log1pf16_u10"]
+    _update_test_registry(setup, dependencies=dependencies)
     doc = resolve(setup)
-    assert doc["runtime_dependencies"] == ["sleef_expf16_u10"]
-    monkeypatch.setenv("CK_SLEEF_LIBRARY", str(tmp_path / "missing.so"))
-    with pytest.raises(ValueError, match="Sleef_expf16_u10"):
+    assert doc["runtime_dependencies"] == dependencies
+    missing = str(tmp_path / "missing.so")
+    monkeypatch.setenv("CK_SLEEF_LIBRARY", missing)
+    monkeypatch.setenv("CK_MKL_LIBRARY", missing)
+    with pytest.raises(ValueError, match="vsExp.*Sleef_expf16_u10.*Sleef_log1pf16_u10"):
         verify_runtime_dependencies(load_resolved_serving(setup[0]))
+
     source = tmp_path / "provider.c"
     source.write_text("float Sleef_expf16_u10(float x) { return x; }\n")
     library = tmp_path / "provider.so"
     subprocess.run(["cc", "-shared", "-fPIC", "-o", str(library), str(source)], check=True)
     monkeypatch.setenv("CK_SLEEF_LIBRARY", str(library))
+    monkeypatch.setenv("CK_MKL_LIBRARY", str(library))
+    with pytest.raises(ValueError, match="vsExp.*Sleef_log1pf16_u10") as error:
+        verify_runtime_dependencies(doc)
+    assert "Sleef_expf16_u10" not in str(error.value)
+
+    with source.open("a") as stream:
+        stream.write("float Sleef_log1pf16_u10(float x) { return x; }\n"
+                     "void vsExp(void) {}\n")
+    complete = tmp_path / "complete-provider.so"
+    subprocess.run(["cc", "-shared", "-fPIC", "-o", str(complete), str(source)], check=True)
+    monkeypatch.setenv("CK_SLEEF_LIBRARY", str(complete))
+    monkeypatch.setenv("CK_MKL_LIBRARY", str(complete))
     verify_runtime_dependencies(doc)
+    monkeypatch.delenv("CK_MKL_LIBRARY")
+    monkeypatch.delenv("CK_SLEEF_LIBRARY")
+    verify_runtime_dependencies(doc, native_library=complete)
 
 
 def test_selected_kernel_dependency_is_bound_to_compiled_call(setup):
