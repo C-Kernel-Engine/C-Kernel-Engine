@@ -1,7 +1,9 @@
-"""Author a first-layer Inkling GGUF replay through ordinary checked lowering."""
+"""Author Inkling sliding decoder blocks through ordinary checked lowering."""
 from version.v8.scripts.build_inkling2_mini_projection_circuit import (
     LAYER, routed_expert_mixture, sliding_attention_replay,
 )
+
+from version.v8.scripts.build_inkling2_cross_pass_v8 import append_cross_pass_controls
 
 ATTENTION_WEIGHTS = {
     "attn.wq_du.weight": "attn_q.weight",
@@ -27,26 +29,49 @@ PACKED_PROJECTIONS = {
 def first_decoder_block(prefill_tokens=4, width=2304, kv_heads=8, query_heads=24, dim=128,
                         relative_dim=16, band=1024, window=1024, inner=1152, experts=128,
                         top_k=8, slots=128, taps=4, epsilon=1e-6, q8_activations=False):
-    """Layer zero starts a residual block and owns four causal histories plus KV."""
+    """Keep the layer-zero entry available to the pinned replay."""
+    return sliding_decoder_block(prefill_tokens, width, kv_heads, query_heads, dim, relative_dim,
+                                 band, window, inner, experts, top_k, slots, taps, epsilon,
+                                 q8_activations)
+
+
+def sliding_decoder_block(prefill_tokens=4, width=2304, kv_heads=8, query_heads=24, dim=128,
+                          relative_dim=16, band=1024, window=1024, inner=1152, experts=128,
+                          top_k=8, slots=128, taps=4, epsilon=1e-6, q8_activations=False,
+                          *, layer=0, state_slot=0, depth_states=0, previous_pass_states=0,
+                          block_boundary=True, control_rank=64):
+    """Compose one sliding block with explicit incoming residual and pass state."""
+    if not (0 <= layer < 24 and 0 <= state_slot < 48 and 0 <= depth_states <= 5
+            and 0 <= previous_pass_states <= 5
+            and (not previous_pass_states or 1 <= control_rank <= width * 2)):
+        raise ValueError("invalid sliding block state or control geometry")
+    if (layer != 0 and depth_states == 0) or (layer == 0 and not block_boundary):
+        raise ValueError("invalid incoming depth bank for sliding block")
+    if previous_pass_states and not 6 <= layer < 18:
+        raise ValueError("cross-pass controls require a core layer")
+    area = f"blk.{layer}."
     if width % 32 or query_heads * dim % 32:
         raise ValueError("packed Q8_0 projections require full input blocks")
     graph = sliding_attention_replay(
         prefill_tokens=prefill_tokens, width=width, kv_width=kv_heads * dim, taps=taps,
-        slots=(0,), kv_heads=kv_heads, query_heads=query_heads, relative_dim=relative_dim,
+        slots=(state_slot,), kv_heads=kv_heads, query_heads=query_heads, relative_dim=relative_dim,
         band=band, window=window,
     )
     body = graph["block_types"]["block"]["body"]
     exports = graph["semantic_checkpoints"]["exports"]
     graph["name"] = "inkling2_mini_first_q8_decoder_block"
+    if layer or state_slot:
+        graph["name"] = f"inkling2_mini_sliding_layer{layer}_slot{state_slot}"
     if q8_activations:
         graph["name"] += "_q8_activation"
     graph["native_entry"]["function"] = "ck_" + graph["name"]
     graph["contract"]["runtime_invariants"].update(
-        inner=inner, scope="first sliding decoder layer from residual input through output with packed GGUF weights"
+        inner=inner, physical_layer=layer, depth_states=depth_states, previous_pass_states=previous_pass_states,
+        block_boundary=block_boundary, scope="one sliding decoder layer with packed GGUF weights"
     )
     for export in exports.values():
         for check in export["checkpoints"]:
-            check["id"] = check["id"].replace("inkling2.layer6.", "inkling2.layer0.", 1)
+            check["id"] = check["id"].replace("inkling2.layer6.", f"inkling2.layer{layer}.", 1)
 
     def buffer(name, shape, *, sequence=False):
         graph["activation_buffers"][name] = {"shape": shape}
@@ -60,16 +85,16 @@ def first_decoder_block(prefill_tokens=4, width=2304, kv_heads=8, query_heads=24
     for name in ("attn_post_conv", "ffn_post_conv"):
         buffer("history_" + name, [taps - 1, width], sequence=True)
 
-    original = {phase: [op for op in body["ops"] if op["id"].startswith(f"inkling2_{phase}_slot0_")]
+    original = {phase: [op for op in body["ops"] if op["id"].startswith(f"inkling2_{phase}_slot{state_slot}_")]
                 for phase in ("prefill", "append")}
     body["ops"] = []
     for phase, rows in (("prefill", prefill_tokens), ("append", 1)):
-        entry = f"inkling2_{phase}_slot0"
+        entry = f"inkling2_{phase}_slot{state_slot}"
         resid = buffer(entry + "_hidden", [rows, width])
         count = rows * width
 
-        def add(suffix, op, inputs, *, weights=None, params=None, checkpoint=False):
-            name = buffer(entry + "_" + suffix, [rows, width])
+        def add(suffix, op, inputs, *, weights=None, params=None, checkpoint=False, shape=None):
+            name = buffer(entry + "_" + suffix, shape or [rows, width])
             node = {
                 "id": name, "op": op, "kernel": op + "_f32", "returns_status": True,
                 "graph_slots": {"inputs": inputs, "outputs": {"output": name}},
@@ -81,7 +106,7 @@ def first_decoder_block(prefill_tokens=4, width=2304, kv_heads=8, query_heads=24
             if checkpoint:
                 exports[name] = {
                     "section": "body", "template_op_id": name, "op": op,
-                    "checkpoints": [{"id": f"inkling2.layer0.{name}", "producer": name, "tensor": name,
+                    "checkpoints": [{"id": f"inkling2.layer{layer}.{name}", "producer": name, "tensor": name,
                                      "logical_layout": "token_major_contiguous",
                                      "axis_names": ["token", "channel"], "storage_dtype": "fp32"}],
                 }
@@ -89,7 +114,7 @@ def first_decoder_block(prefill_tokens=4, width=2304, kv_heads=8, query_heads=24
 
         def rms(suffix, source, weight):
             return add(suffix, "rmsnorm_rows_checked", {"input": source},
-                       weights={"gamma": "blk.0." + weight}, params={
+                       weights={"gamma": area + weight}, params={
                            "R": rows, "C": width, "eps": epsilon, "call_constants": {
                                "rows": rows, "width": width, "gamma_elements": width,
                                "input_stride": width, "output_stride": width,
@@ -99,7 +124,7 @@ def first_decoder_block(prefill_tokens=4, width=2304, kv_heads=8, query_heads=24
         def conv(weight, source):
             history = "external:history_" + weight
             node = add(weight, "causal_depthwise_residual_checked", {"input": source, "history": history},
-                       weights={"weight": f"blk.0.{weight}.weight"}, params={
+                       weights={"weight": area + weight + ".weight"}, params={
                            "T": rows, "C": width, "K": taps, "H": taps - 1, "N": width,
                            "call_constants": {
                                "input_elements": count, "weight_elements": taps * width,
@@ -109,8 +134,49 @@ def first_decoder_block(prefill_tokens=4, width=2304, kv_heads=8, query_heads=24
             node["graph_slots"]["outputs"]["history"] = history
             return node["id"]
 
-        norm = rms("attn_norm", "external:" + resid, "attn_norm.weight")
-        replaces = {f"external:{entry}_{port}_input": norm for port in ("query", "k", "v")}
+        def depth_mix(suffix, bank, current, states, weight):
+            return add(suffix, "depth_residual_mix_checked", {"bank": bank, "current": current},
+                       weights={"query": area + weight}, params={
+                           "R": rows, "S": states, "C": width, "epsilon": epsilon,
+                           "call_constants": {
+                               "rows": rows, "states": states, "width": width, "bank_elements": states * count,
+                               "current_elements": count, "query_elements": width, "output_elements": count,
+                           }}, checkpoint=True)["id"]
+
+        def sum_rows(suffix, left, right):
+            return add(suffix, "add_rows_checked", {"left": left, "right": right},
+                       params={"N": count, "call_constants": {
+                           "left_elements": count, "right_elements": count,
+                           "output_elements": count, "elements": count,
+                       }}, checkpoint=True)["id"]
+
+        def control(source, ports):
+            shapes = {}
+            controlled = append_cross_pass_controls(
+                body["ops"], shapes, tokens=rows, width=width, rank=control_rank,
+                states=previous_pass_states, layer=layer, bank=previous_bank, previous=previous_out,
+                attention_input=source, ffn_input=source, ports=ports, prefix=entry + "_loop_", epsilon=epsilon,
+            )
+            for name, shape in shapes.items():
+                buffer(name, shape)
+            return controlled
+
+        incoming = "external:" + resid
+        current = incoming
+        if depth_states:
+            prior_depth = "external:" + buffer(entry + "_depth_bank", [rows, depth_states, width])
+            current = depth_mix("attention_depth_mix", prior_depth, incoming, depth_states, "attn_res_query.weight")
+        if previous_pass_states:
+            previous_bank = "external:" + buffer(entry + "_previous_bank", [rows, previous_pass_states, width])
+            previous_out = "external:" + buffer(entry + "_previous_output", [rows, width])
+            controlled = control(current, ("q", "k", "v"))
+            normalized = {port: rms(port + "_attn_norm", controlled[port], "attn_norm.weight")
+                          for port in controlled}
+        else:
+            norm = rms("attn_norm", current, "attn_norm.weight")
+            normalized = dict.fromkeys(("q", "k", "v"), norm)
+        replaces = {f"external:{entry}_{port}_input": normalized[branch]
+                    for port, branch in (("query", "q"), ("k", "k"), ("v", "v"))}
         for old in replaces:
             graph["activation_buffers"].pop(old.removeprefix("external:"))
             graph["activation_bindings"].pop(old.removeprefix("external:"))
@@ -119,7 +185,7 @@ def first_decoder_block(prefill_tokens=4, width=2304, kv_heads=8, query_heads=24
             bind["inputs"] = {port: replaces.get(source, source) for port, source in bind["inputs"].items()}
             for port, name in node.get("weight_refs", {}).items():
                 suffix = ATTENTION_WEIGHTS[name.removeprefix(LAYER)]
-                node["weight_refs"][port] = "blk.0." + suffix
+                node["weight_refs"][port] = area + suffix
                 if suffix not in PACKED_PROJECTIONS:
                     continue
                 p = node["params"]
@@ -138,17 +204,28 @@ def first_decoder_block(prefill_tokens=4, width=2304, kv_heads=8, query_heads=24
             body["ops"].append(node)
 
         residual = conv("attn_post_conv", entry + "_projected_attention")
-        mix = add("depth_mix", "depth_residual_mix_checked",
-                  {"bank": "external:" + resid, "current": residual},
-                  weights={"query": "blk.0.ffn_res_query.weight"}, params={
-                      "R": rows, "S": 1, "C": width, "epsilon": epsilon,
-                      "call_constants": {
-                          "rows": rows, "states": 1, "width": width, "bank_elements": count,
-                          "current_elements": count, "query_elements": width, "output_elements": count,
-                      }}, checkpoint=True)["id"]
+        bank_count = depth_states
+        if block_boundary:
+            bank = incoming
+            bank_count += 1
+            if depth_states:
+                left_width = depth_states * width
+                joined_width = bank_count * width
+                bank = add("next_depth_bank", "concat_feature_rows_checked", {"left": prior_depth, "right": incoming},
+                           params={"R": rows, "L": left_width, "C": width, "J": joined_width, "call_constants": {
+                               "rows": rows, "left_width": left_width, "right_width": width, "width": joined_width,
+                               "left_elements": rows * left_width, "right_elements": count,
+                               "output_elements": rows * joined_width,
+                           }}, shape=[rows, bank_count, width])["id"]
+        else:
+            bank = prior_depth
+            residual = sum_rows("attention_residual", incoming, residual)
+        mix = depth_mix("depth_mix", bank, residual, bank_count, "ffn_res_query.weight")
+        if previous_pass_states:
+            mix = control(mix, ("ffn",))["ffn"]
         mlp_input = rms("ffn_norm", mix, "ffn_norm.weight")
         moe = routed_expert_mixture(rows, width, inner, experts, top_k, slots,
-                                   layer=0, storage="q8_0", q8_activations=q8_activations)
+                                   layer=layer, storage="q8_0", q8_activations=q8_activations)
         names = {"hidden": mlp_input, "expert_slots": "external:expert_slots",
                  "correction_bias": "external:router_bias"}
         for name, spec in moe["activation_buffers"].items():
@@ -160,16 +237,12 @@ def first_decoder_block(prefill_tokens=4, width=2304, kv_heads=8, query_heads=24
                 for port, source in bindings.items():
                     bindings[port] = names[source.removeprefix("external:")]
             if node["op"] == "linear_rows_checked_no_bias":
-                node["weight_refs"]["weight"] = "blk.0.ffn_gate_inp.weight"
+                node["weight_refs"]["weight"] = area + "ffn_gate_inp.weight"
             elif node["op"] == "routed_softcapped_experts_checked":
-                node["weight_refs"] = {port: f"blk.0.expert_bank.{port}" for port in node["weight_refs"]}
+                node["weight_refs"] = {port: area + f"expert_bank.{port}" for port in node["weight_refs"]}
             body["ops"].append(node)
         mlp_output = conv("ffn_post_conv", names["mixture"])
-        out = add("layer_output", "add_rows_checked", {"left": residual, "right": mlp_output},
-                  params={"N": count, "call_constants": {
-                      "left_elements": count, "right_elements": count,
-                      "output_elements": count, "elements": count,
-                  }}, checkpoint=True)["id"]
+        out = sum_rows("layer_output", residual, mlp_output)
         for segment in graph["native_entry"]["segments"]:
             if segment["function"] == "ck_" + entry:
                 segment["last_op"] = out

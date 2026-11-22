@@ -1,0 +1,180 @@
+{
+  "id": "rms_pair_concat_rows_checked_f32",
+  "op": "rms_pair_concat_rows_checked",
+  "operation_interface": "tensor.rms_pair_concat.checked.fp32.v1",
+  "variant": "checked_ordered_fp32",
+  "selection": {
+    "status": "candidate",
+    "priority": 100,
+    "phases": [
+      "prefill"
+    ],
+    "equivalence_group": "tensor.rms_pair_concat.checked.fp32.v1"
+  },
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "left",
+      "dtype": "fp32",
+      "shape": [
+        "R",
+        "C"
+      ],
+      "layout": "row_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "right",
+      "dtype": "fp32",
+      "shape": [
+        "R",
+        "C"
+      ],
+      "layout": "row_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "output",
+      "dtype": "fp32",
+      "shape": [
+        "R",
+        "J"
+      ],
+      "layout": "row_major_contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "scratch": [],
+  "dims": [
+    "R",
+    "C",
+    "J"
+  ],
+  "impl": {
+    "function": "rms_pair_concat_rows_checked_f32",
+    "c_declaration": "int rms_pair_concat_rows_checked_f32(const float* left, size_t left_elements, const float* right, size_t right_elements, float* output, size_t output_elements, size_t rows, size_t width, size_t joined_width, float epsilon);",
+    "sources": [
+      "src/kernels/message_control_rows_checked.c"
+    ]
+  },
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "left",
+        "source": "activation:left",
+        "cast": "const float*",
+        "ports": [
+          "input:left"
+        ]
+      },
+      {
+        "name": "left_elements",
+        "source": "runtime:left_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "right",
+        "source": "activation:right",
+        "cast": "const float*",
+        "ports": [
+          "input:right"
+        ]
+      },
+      {
+        "name": "right_elements",
+        "source": "runtime:right_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "output",
+        "source": "output:output",
+        "cast": "float*",
+        "ports": [
+          "output:output"
+        ]
+      },
+      {
+        "name": "output_elements",
+        "source": "runtime:output_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "rows",
+        "source": "runtime:rows",
+        "value_type": "size_t"
+      },
+      {
+        "name": "width",
+        "source": "runtime:width",
+        "value_type": "size_t"
+      },
+      {
+        "name": "joined_width",
+        "source": "runtime:joined_width",
+        "value_type": "size_t"
+      },
+      {
+        "name": "epsilon",
+        "source": "param:epsilon"
+      }
+    ]
+  },
+  "call_constant_contract": {
+    "shape_symbols": {
+      "R": "rows",
+      "C": "width",
+      "J": "joined_width"
+    },
+    "buffer_spans": [
+      {
+        "pointer": "left",
+        "elements": "left_elements",
+        "rows": "rows",
+        "width": "width",
+        "element_bytes": 4
+      },
+      {
+        "pointer": "right",
+        "elements": "right_elements",
+        "rows": "rows",
+        "width": "width",
+        "element_bytes": 4
+      },
+      {
+        "pointer": "output",
+        "elements": "output_elements",
+        "rows": "rows",
+        "width": "joined_width",
+        "element_bytes": 4
+      }
+    ]
+  },
+  "notes": "Independently normalize two contiguous spans and concatenate per row.",
+  "tests": {
+    "unit": [
+      "tests/test_v8_inkling2_cross_pass.py"
+    ]
+  }
+}

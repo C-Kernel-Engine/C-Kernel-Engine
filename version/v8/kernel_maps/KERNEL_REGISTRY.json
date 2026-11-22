@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 538,
+      "total": 541,
       "by_op": {
         "add_backward": 1,
         "add_rows_backward_train_f32": 1,
@@ -81,6 +81,7 @@
         "causal_depthwise_residual_checked": 1,
         "channel_scale_rows_checked": 1,
         "clip_strided_checked": 1,
+        "concat_feature_rows_checked": 1,
         "concat_i32_checked": 1,
         "copy_i32_span_checked": 1,
         "copy_last_logits": 1,
@@ -155,6 +156,7 @@
         "mamba_rmsnorm_gate": 1,
         "mamba_selective_scan": 1,
         "mamba_selective_state_update_decode": 1,
+        "message_control_rows_checked": 1,
         "mla_attention": 4,
         "mla_kv_cache_batch_store": 1,
         "mla_kv_cache_store": 1,
@@ -197,6 +199,7 @@
         "repetition_penalty_last_row_checked": 1,
         "residual_add": 2,
         "residual_save": 1,
+        "rms_pair_concat_rows_checked": 1,
         "rmsnorm": 12,
         "rmsnorm_rows_checked": 1,
         "rope": 19,
@@ -35261,6 +35264,191 @@
       "_source_file": "clip_strided_f32_checked.json"
     },
     {
+      "id": "concat_feature_rows_checked_f32",
+      "op": "concat_feature_rows_checked",
+      "operation_interface": "tensor.concat_feature_rows.checked.fp32.v1",
+      "variant": "exact_copy_rows",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "phases": [
+          "prefill"
+        ],
+        "equivalence_group": "tensor.concat_feature_rows.checked.fp32.v1"
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "left",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "L"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "right",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "C"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "J"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "R",
+        "L",
+        "C",
+        "J"
+      ],
+      "impl": {
+        "function": "concat_feature_rows_checked_f32",
+        "c_declaration": "int concat_feature_rows_checked_f32(const float* left, size_t left_elements, const float* right, size_t right_elements, float* output, size_t output_elements, size_t rows, size_t left_width, size_t right_width, size_t width);",
+        "sources": [
+          "src/kernels/message_control_rows_checked.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "left",
+            "source": "activation:left",
+            "cast": "const float*",
+            "ports": [
+              "input:left"
+            ]
+          },
+          {
+            "name": "left_elements",
+            "source": "runtime:left_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "right",
+            "source": "activation:right",
+            "cast": "const float*",
+            "ports": [
+              "input:right"
+            ]
+          },
+          {
+            "name": "right_elements",
+            "source": "runtime:right_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "left_width",
+            "source": "runtime:left_width",
+            "value_type": "size_t"
+          },
+          {
+            "name": "right_width",
+            "source": "runtime:right_width",
+            "value_type": "size_t"
+          },
+          {
+            "name": "width",
+            "source": "runtime:width",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "R": "rows",
+          "L": "left_width",
+          "C": "right_width",
+          "J": "width"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "left",
+            "elements": "left_elements",
+            "rows": "rows",
+            "width": "left_width",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "right",
+            "elements": "right_elements",
+            "rows": "rows",
+            "width": "right_width",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "output",
+            "elements": "output_elements",
+            "rows": "rows",
+            "width": "width",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "notes": "Concatenate feature widths inside each contiguous token row without transposing depth state.",
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_cross_pass.py"
+        ]
+      },
+      "name": "concat_feature_rows_checked_f32",
+      "_source_file": "concat_feature_rows_checked_f32.json"
+    },
+    {
       "id": "concat_i32_checked",
       "op": "concat_i32_checked",
       "operation_interface": "tensor.concat.two_spans.checked.i32.v1",
@@ -70047,6 +70235,231 @@
       "_source_file": "memcpy.json"
     },
     {
+      "id": "message_control_rows_checked_f32",
+      "op": "message_control_rows_checked",
+      "operation_interface": "tensor.message_control.checked.fp32.v1",
+      "variant": "checked_ordered_fp32",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "phases": [
+          "prefill"
+        ],
+        "equivalence_group": "tensor.message_control.checked.fp32.v1"
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "message",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "forget",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "gain",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "N"
+      ],
+      "impl": {
+        "function": "message_control_rows_checked_f32",
+        "c_declaration": "int message_control_rows_checked_f32(const float* input, size_t input_elements, const float* message, size_t message_elements, const float* forget, size_t forget_elements, const float* gain, size_t gain_elements, float* output, size_t output_elements, size_t elements);",
+        "sources": [
+          "src/kernels/message_control_rows_checked.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const float*",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "input_elements",
+            "source": "runtime:input_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "message",
+            "source": "activation:message",
+            "cast": "const float*",
+            "ports": [
+              "input:message"
+            ]
+          },
+          {
+            "name": "message_elements",
+            "source": "runtime:message_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "forget",
+            "source": "activation:forget",
+            "cast": "const float*",
+            "ports": [
+              "input:forget"
+            ]
+          },
+          {
+            "name": "forget_elements",
+            "source": "runtime:forget_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "gain",
+            "source": "activation:gain",
+            "cast": "const float*",
+            "ports": [
+              "input:gain"
+            ]
+          },
+          {
+            "name": "gain_elements",
+            "source": "runtime:gain_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "elements",
+            "source": "runtime:elements",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "N": "elements"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "elements": "input_elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "message",
+            "elements": "message_elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "forget",
+            "elements": "forget_elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "gain",
+            "elements": "gain_elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "output",
+            "elements": "output_elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "notes": "Apply (1 - forget) * input + gain * message with checked tanh gate bounds.",
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_cross_pass.py"
+        ]
+      },
+      "name": "message_control_rows_checked_f32",
+      "_source_file": "message_control_rows_checked_f32.json"
+    },
+    {
       "id": "moe_relu2_expert_backward_f32",
       "op": "moe_relu2_expert_mlp",
       "variant": "fp32",
@@ -92136,6 +92549,188 @@
       "notes": "Residual-add backward split kernel for v7 training IR.",
       "name": "residual_add_backward_f32",
       "_source_file": "residual_add_backward_f32.json"
+    },
+    {
+      "id": "rms_pair_concat_rows_checked_f32",
+      "op": "rms_pair_concat_rows_checked",
+      "operation_interface": "tensor.rms_pair_concat.checked.fp32.v1",
+      "variant": "checked_ordered_fp32",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "phases": [
+          "prefill"
+        ],
+        "equivalence_group": "tensor.rms_pair_concat.checked.fp32.v1"
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "left",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "C"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "right",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "C"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "J"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "R",
+        "C",
+        "J"
+      ],
+      "impl": {
+        "function": "rms_pair_concat_rows_checked_f32",
+        "c_declaration": "int rms_pair_concat_rows_checked_f32(const float* left, size_t left_elements, const float* right, size_t right_elements, float* output, size_t output_elements, size_t rows, size_t width, size_t joined_width, float epsilon);",
+        "sources": [
+          "src/kernels/message_control_rows_checked.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "left",
+            "source": "activation:left",
+            "cast": "const float*",
+            "ports": [
+              "input:left"
+            ]
+          },
+          {
+            "name": "left_elements",
+            "source": "runtime:left_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "right",
+            "source": "activation:right",
+            "cast": "const float*",
+            "ports": [
+              "input:right"
+            ]
+          },
+          {
+            "name": "right_elements",
+            "source": "runtime:right_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "width",
+            "source": "runtime:width",
+            "value_type": "size_t"
+          },
+          {
+            "name": "joined_width",
+            "source": "runtime:joined_width",
+            "value_type": "size_t"
+          },
+          {
+            "name": "epsilon",
+            "source": "param:epsilon"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "R": "rows",
+          "C": "width",
+          "J": "joined_width"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "left",
+            "elements": "left_elements",
+            "rows": "rows",
+            "width": "width",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "right",
+            "elements": "right_elements",
+            "rows": "rows",
+            "width": "width",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "output",
+            "elements": "output_elements",
+            "rows": "rows",
+            "width": "joined_width",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "notes": "Independently normalize two contiguous spans and concatenate per row.",
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_cross_pass.py"
+        ]
+      },
+      "name": "rms_pair_concat_rows_checked_f32",
+      "_source_file": "rms_pair_concat_rows_checked_f32.json"
     },
     {
       "id": "rmsnorm_backward",

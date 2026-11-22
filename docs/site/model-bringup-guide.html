@@ -2279,6 +2279,19 @@ python3 version/v8/scripts/compare_inkling2_llama_layer0_v8.py \
   hidden rows. Native text generation and HTTP serving still require the
   full decoder circuit.</p>
 
+  <h3 id="inkling2-mini-cross-pass">Inkling 2 Mini cross-pass controls</h3>
+  <p>The generated sliding block accepts the current residual, the current pass depth bank,
+  and the previous pass bank and final output. Four learned message controllers feed Q, K, V,
+  and the expert input. Each occurrence owns its KV and convolution state. The native
+  fixture checks a later-pass block with nonzero weights, an exact split comparison,
+  and an output change when the previous-pass input is changed.</p>
+  <p>A separate <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/docs/notes/artifacts/inkling2_mini_cross_pass.json">pinned GGUF controller replay</a>
+  compares all four controls on synthetic input banks against PyTorch FP32 at physical layers
+  6 and 11. The maximum absolute difference across checkpoints was 2.72 &times; 10<sup>&minus;6</sup>.
+  This measurement covers bounded controller tensors, with packed Q8_0 used in the compiled
+  sliding-block fixture. Full attention, the 48-occurrence execution schedule and text
+  serving remain open.</p>
+
   <h2 id="lowering">9. Run lowering and inspect the generated C</h2>
   <p>The verified entry point is the wrapper <code>version/v8/scripts/cks-v8-run</code> (it selects a Python, checks requirements, and drives <code>ck_run_v8.py</code>). The full pipeline, exactly as run for this page <span class="tag tag-executed">executed</span>:</p>
   <pre class="mb-code"><code>version/v8/scripts/cks-v8-run run \

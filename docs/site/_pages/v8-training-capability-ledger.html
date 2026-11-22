@@ -1,10 +1,10 @@
 <!-- TITLE: v8 Training Kernel Capability Ledger -->
 <h1>v8 training kernel capability ledger</h1>
-<p>Generated from <code>version/v8/kernel_maps/*.json</code> by <code>version/v8/scripts/build_training_capability_ledger_v8.py</code>. Source digest: <code>60eb1a9048fd892134e9406f13dd8ba29252411f6f3326c900379782b06b9100</code>; provider maps: 538.</p>
+<p>Generated from <code>version/v8/kernel_maps/*.json</code> by <code>version/v8/scripts/build_training_capability_ledger_v8.py</code>. Source digest: <code>ecf2fc16b2645458109cda6c0a198f55a25e67525f9970364cf45b6f76bedefa</code>; provider maps: 541.</p>
 <p>This is a <strong>map inventory, not a training PASS</strong>. A backward declaration means a backward provider is registered; it does not prove matching geometry, selection by a generated circuit, or executed PyTorch parity. BF16-tagged includes storage or arithmetic tags. Quantized forward maps do not imply quantized-base gradients or QLoRA support. Direct executed evidence: <code>NOT_MEASURED_BY_MAP_INVENTORY</code>.</p>
 <p><strong>Authoring, lowering, and execution are separate.</strong> The public <code>cke.nn</code> module list below comes from its Python source. A class existing there does not establish that v8 can lower it, select a backward provider, or certify a generated training run. Exact kernel-map operation names are not automatically equivalent to Python modules.</p>
 <table class="table"><thead><tr><th>Dtype family</th><th>Provider maps</th><th>Forward or unspecified</th><th>Declared training forward</th><th>Declared backward</th><th>Backward-named without mode</th><th>Maps with registered tests</th></tr></thead><tbody>
-<tr><td>fp32-tagged</td><td>351</td><td>309</td><td>29</td><td>42</td><td>5</td><td>312</td></tr>
+<tr><td>fp32-tagged</td><td>354</td><td>312</td><td>29</td><td>42</td><td>5</td><td>315</td></tr>
 <tr><td>bf16-tagged</td><td>95</td><td>90</td><td>2</td><td>5</td><td>0</td><td>76</td></tr>
 <tr><td>quantized</td><td>69</td><td>69</td><td>0</td><td>0</td><td>0</td><td>49</td></tr>
 <tr><td>unspecified</td><td>23</td><td>23</td><td>1</td><td>0</td><td>0</td><td>17</td></tr>
@@ -149,6 +149,7 @@
 <tr><td>fp32-tagged</td><td>causal_depthwise_residual_checked</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>channel_scale_rows_checked</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>clip_strided_checked</td><td>1</td><td>—</td><td>—</td></tr>
+<tr><td>fp32-tagged</td><td>concat_feature_rows_checked</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>copy_last_logits</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>decoder_features_sequence</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>depth_residual_mix_checked</td><td>1</td><td>—</td><td>—</td></tr>
@@ -208,6 +209,7 @@
 <tr><td>fp32-tagged</td><td>mamba_rmsnorm_gate</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>mamba_selective_scan</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>mamba_selective_state_update_decode</td><td>1</td><td>—</td><td>—</td></tr>
+<tr><td>fp32-tagged</td><td>message_control_rows_checked</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>mla_attention</td><td>2</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>mla_kv_cache_batch_store</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>mla_kv_cache_store</td><td>1</td><td>—</td><td>—</td></tr>
@@ -236,6 +238,7 @@
 <tr><td>fp32-tagged</td><td>repetition_penalty_last_row_checked</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>residual_add</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>residual_save</td><td>1</td><td>—</td><td>—</td></tr>
+<tr><td>fp32-tagged</td><td>rms_pair_concat_rows_checked</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>rmsnorm</td><td>7</td><td>rmsnorm_backward</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>rmsnorm_rows_checked</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>fp32-tagged</td><td>rope</td><td>14</td><td>—</td><td>—</td></tr>
@@ -325,7 +328,7 @@
 <tr><td>unspecified</td><td>speculative_commit_or_reject</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>unspecified</td><td>tokenizer</td><td>1</td><td>—</td><td>—</td></tr>
 </tbody></table>
-<details><summary>All 538 provider maps</summary>
+<details><summary>All 541 provider maps</summary>
 <table class="table"><thead><tr><th>Map</th><th>Provider ID</th><th>Operation</th><th>Dtype family</th><th>Backward mode</th><th>Registered test</th></tr></thead><tbody>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/adamw_update_f32.json">version/v8/kernel_maps/adamw_update_f32.json</a></td><td>adamw_update_f32</td><td>optimizer</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/add_rows_backward_train_f32.json">version/v8/kernel_maps/add_rows_backward_train_f32.json</a></td><td>add_rows_backward_train_f32</td><td>add_rows_backward_train_f32</td><td>fp32-tagged</td><td>declared</td><td>registered</td></tr>
@@ -482,6 +485,7 @@
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/ck_residual_add_token_major.json">version/v8/kernel_maps/ck_residual_add_token_major.json</a></td><td>ck_residual_add_token_major</td><td>residual_add</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/ck_residual_add_token_major_bf16_storage.json">version/v8/kernel_maps/ck_residual_add_token_major_bf16_storage.json</a></td><td>ck_residual_add_token_major_bf16_storage</td><td>residual_add</td><td>bf16-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/clip_strided_f32_checked.json">version/v8/kernel_maps/clip_strided_f32_checked.json</a></td><td>clip_strided_f32_checked</td><td>clip_strided_checked</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/concat_feature_rows_checked_f32.json">version/v8/kernel_maps/concat_feature_rows_checked_f32.json</a></td><td>concat_feature_rows_checked_f32</td><td>concat_feature_rows_checked</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/concat_i32_checked.json">version/v8/kernel_maps/concat_i32_checked.json</a></td><td>concat_i32_checked</td><td>concat_i32_checked</td><td>unspecified</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/copy_i32_span_checked.json">version/v8/kernel_maps/copy_i32_span_checked.json</a></td><td>copy_i32_span_checked</td><td>copy_i32_span_checked</td><td>unspecified</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/copy_last_logits.json">version/v8/kernel_maps/copy_last_logits.json</a></td><td>copy_last_logits</td><td>copy_last_logits</td><td>fp32-tagged</td><td>not declared</td><td>not registered</td></tr>
@@ -664,6 +668,7 @@
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/mega_fused_attention_prefill.json">version/v8/kernel_maps/mega_fused_attention_prefill.json</a></td><td>mega_fused_attention_prefill</td><td>fused_attention_block</td><td>quantized</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/mega_fused_outproj_mlp_prefill.json">version/v8/kernel_maps/mega_fused_outproj_mlp_prefill.json</a></td><td>mega_fused_outproj_mlp_prefill</td><td>fused_mlp_block</td><td>quantized</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/memcpy.json">version/v8/kernel_maps/memcpy.json</a></td><td>memcpy</td><td>residual_save</td><td>fp32-tagged</td><td>not declared</td><td>not registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/message_control_rows_checked_f32.json">version/v8/kernel_maps/message_control_rows_checked_f32.json</a></td><td>message_control_rows_checked_f32</td><td>message_control_rows_checked</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/moe_relu2_expert_backward_f32.json">version/v8/kernel_maps/moe_relu2_expert_backward_f32.json</a></td><td>moe_relu2_expert_backward_f32</td><td>moe_relu2_expert_mlp</td><td>fp32-tagged</td><td>declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/moe_relu2_expert_forward_f32.json">version/v8/kernel_maps/moe_relu2_expert_forward_f32.json</a></td><td>moe_relu2_expert_forward_f32</td><td>moe_relu2_expert_mlp</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/moe_relu2_expert_forward_q5_0_q5_0.json">version/v8/kernel_maps/moe_relu2_expert_forward_q5_0_q5_0.json</a></td><td>moe_relu2_expert_forward_q5_0_q5_0</td><td>moe_relu2_expert_mlp</td><td>quantized</td><td>not declared</td><td>registered</td></tr>
@@ -771,6 +776,7 @@
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/relu2_forward.json">version/v8/kernel_maps/relu2_forward.json</a></td><td>relu2_forward</td><td>relu2</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/repetition_penalty_last_row_checked_f32.json">version/v8/kernel_maps/repetition_penalty_last_row_checked_f32.json</a></td><td>repetition_penalty_last_row_checked_f32</td><td>repetition_penalty_last_row_checked</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/residual_add_backward_f32.json">version/v8/kernel_maps/residual_add_backward_f32.json</a></td><td>residual_add_backward_f32</td><td>add_backward</td><td>fp32-tagged</td><td>declared</td><td>registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/rms_pair_concat_rows_checked_f32.json">version/v8/kernel_maps/rms_pair_concat_rows_checked_f32.json</a></td><td>rms_pair_concat_rows_checked_f32</td><td>rms_pair_concat_rows_checked</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/rmsnorm_backward.json">version/v8/kernel_maps/rmsnorm_backward.json</a></td><td>rmsnorm_backward</td><td>rmsnorm</td><td>fp32-tagged</td><td>declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/rmsnorm_forward.json">version/v8/kernel_maps/rmsnorm_forward.json</a></td><td>rmsnorm_forward</td><td>rmsnorm</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/rmsnorm_forward_fp64_sum.json">version/v8/kernel_maps/rmsnorm_forward_fp64_sum.json</a></td><td>rmsnorm_forward_fp64_sum</td><td>rmsnorm</td><td>fp32-tagged</td><td>not declared</td><td>not registered</td></tr>

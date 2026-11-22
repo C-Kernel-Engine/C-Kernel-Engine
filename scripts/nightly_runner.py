@@ -1346,9 +1346,9 @@ TEST_SUITES = {
         ROOT / "tests" / "test_v8_runtime_extent_contract.py",
     ),
     "inkling2_mini_q8_decoder_block": TestSuite(
-        "Inkling 2 Mini First Packed Q8 Decoder Block", "inference",
+        "Inkling 2 Mini Packed Q8 Sliding Decoder Blocks", "inference",
         ROOT / "tests" / "test_v8_inkling2_q8_decoder_block.py",
-        unittest_targets=("tests.test_v8_inkling2_q8_decoder_block",),
+        unittest_targets=("tests.test_v8_inkling2_q8_decoder_block", "tests.test_v8_inkling2_cross_pass"),
     ),
     "inkling2_mini_gguf_import_contract": TestSuite(
         "Inkling 2 Mini GGUF Tensor and Loop Contract", "inference",

@@ -3139,6 +3139,19 @@ OP_DATAFLOW = {
         "inputs": {"input": "external:input"},
         "outputs": {"output": {"slot": "projected", "dtype": "fp32"}},
     },
+    "concat_feature_rows_checked": {
+        "inputs": {"left": "external:left", "right": "external:right"},
+        "outputs": {"output": {"slot": "joined", "dtype": "fp32"}},
+    },
+    "rms_pair_concat_rows_checked": {
+        "inputs": {"left": "external:left", "right": "external:right"},
+        "outputs": {"output": {"slot": "joined", "dtype": "fp32"}},
+    },
+    "message_control_rows_checked": {
+        "inputs": {"input": "external:input", "message": "external:message",
+                   "forget": "external:forget", "gain": "external:gain"},
+        "outputs": {"output": {"slot": "controlled", "dtype": "fp32"}},
+    },
     "depth_residual_mix_checked": {
         "inputs": {"bank": "external:bank", "current": "external:current"},
         "outputs": {"output": {"slot": "depth_mixed", "dtype": "fp32"}},
@@ -5573,6 +5586,9 @@ TEMPLATE_TO_KERNEL_OP = {
     "full_softmax_topk_router": "full_softmax_topk_router",
     "routed_softcapped_experts_checked": "routed_softcapped_experts_checked",
     "linear_rows_q8_0_checked": "linear_rows_q8_0_checked",
+    "concat_feature_rows_checked": "concat_feature_rows_checked",
+    "rms_pair_concat_rows_checked": "rms_pair_concat_rows_checked",
+    "message_control_rows_checked": "message_control_rows_checked",
     "depth_residual_mix_checked": "depth_residual_mix_checked",
     "scaled_head_l2_clip_checked": "scaled_head_l2_clip_checked",
     "sigmoid_gate_rows_checked": "sigmoid_gate_rows_checked",
