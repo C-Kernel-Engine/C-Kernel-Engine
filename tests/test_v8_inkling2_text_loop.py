@@ -1,4 +1,5 @@
 import ctypes
+import hashlib
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -10,7 +11,7 @@ from tests.test_v8_inkling2_routed_moe import pack_quant
 from version.v8.scripts.build_inkling2_decoder_block_v8 import first_block_weights
 from version.v8.scripts.build_inkling2_text_loop_v8 import resident_text_loop, text_token_loop
 from version.v8.scripts.checked_execution_exports_v8 import load_exports
-from version.v8.scripts.replay_inkling2_text_loop_v8 import capture_layer_rows
+from version.v8.scripts.replay_inkling2_text_loop_v8 import capture_layer_rows, compare_oracle_row
 from version.v8.scripts.compile_checked_bundle_v8 import compile_checked_weight_graph
 
 
@@ -139,6 +140,85 @@ class InklingTextLoopTests(unittest.TestCase):
                     np.testing.assert_array_equal(last(name), split(name), err_msg=name)
             self.assertFalse(np.array_equal(full("cache_k_6"), full("cache_k_24")))
             self.assertFalse(np.array_equal(full("cache_k_24"), full("cache_k_36")))
+
+
+    def test_generated_prefill_and_decode_at_32k_positions(self):
+        """Exercise 32K addressing from identical seeded state on generated C."""
+        rng = np.random.default_rng(901)
+        position, capacity = 32766, 32770
+        graph = resident_text_loop(CONFIG, 2, capacity, f64_norm_sum=True)
+        specs = first_block_weights(graph)
+        weights = {
+            name: pack_quant(rng.integers(-3, 4, shape, dtype=np.int8), "q8_0")
+            if dtype == "Q8_0" else rng.normal(.02, .15, shape).astype(np.float32)
+            for name, (shape, dtype) in specs.items()
+        }
+        with TemporaryDirectory() as folder:
+            folder = Path(folder)
+            _, arena, view, lib = compile_checked_weight_graph(folder, graph, weights, specs, openmp=True)
+            exports = load_exports(folder, lib)
+            lib.omp_set_dynamic(0)
+            lib.omp_set_num_threads(2)
+            self.assertEqual(exports["properties"]["context_capacity"], capacity)
+
+            for layer in range(CONFIG["num_hidden_layers"]):
+                view(f"router_bias_{layer}")[:] = [-.02, .04, .08, .01]
+            view("expert_slots", np.int32)[:] = np.arange(CONFIG["n_routed_experts"])
+            caches = [view(f"cache_{kind}_{slot}") for slot in range(48) for kind in ("k", "v")]
+            histories = [view(f"history_{kind}_{slot}") for slot in range(48)
+                         for kind in ("k", "v", "attn_post_conv", "ffn_post_conv")]
+            initial_histories = [rng.normal(0, .1, region.shape).astype("f4") for region in histories]
+            for cache in caches:
+                for index in (0, position - 4, position - 1):
+                    cache[:, index] = rng.normal(0, .1, cache[:, index].shape)
+            cache_prefix = [hashlib.sha256(cache[:, :position]).digest() for cache in caches]
+
+            def restore_seed():
+                for cache in caches:
+                    cache[:, position:] = np.nan
+                for region, initial in zip(histories, initial_histories):
+                    region[:] = initial
+
+            def run(phase, tokens, start, expected_status=0):
+                view(f"{phase}_request_position", np.int32)[:] = start
+                view(f"{phase}_token_ids", np.int32)[:] = tokens
+                native = getattr(lib, exports["entries"][phase])
+                native.argtypes = [ctypes.c_void_p, ctypes.c_size_t]
+                native.restype = ctypes.c_int
+                self.assertEqual(native(arena, len(arena)), expected_status)
+                return view(f"{phase}_logits").copy()
+
+            def state():
+                return [cache[:, position:].copy() for cache in caches] + [region.copy() for region in histories]
+
+            ids = [5, 11, 3, 14]
+            restore_seed()
+            prefill = run("prefill", ids[:2], position)
+            expected = np.concatenate((prefill, run("append", ids[2:3], position + 2),
+                                       run("append", ids[3:], position + 3)))
+            expected_state = state()
+            self.assertTrue(np.isfinite(expected).all())
+            self.assertGreater(float(np.max(np.abs(expected))), .01)
+
+            restore_seed()
+            single = np.concatenate([run("append", [token], position + i) for i, token in enumerate(ids)])
+            np.testing.assert_array_equal(single.view("u4"), expected.view("u4"))
+            np.testing.assert_array_equal(run("append", [5], capacity, -1).view("u4"),
+                                          expected[-1:].view("u4"))
+            for actual, prior in zip(state(), expected_state):
+                np.testing.assert_array_equal(actual.view("u4"), prior.view("u4"))
+            for cache, prior in zip(caches, cache_prefix):
+                self.assertEqual(hashlib.sha256(cache[:, :position]).digest(), prior)
+
+    def test_oracle_comparison_rejects_equal_argmax_with_different_logits(self):
+        native = np.array([0.0, 2.0, -1.0], dtype="<f4")
+        self.assertEqual(compare_oracle_row(native, native.copy(), 32767, "prefill")["status"], "PASS")
+        oracle = native.copy()
+        oracle[-1] = -.75
+        row = compare_oracle_row(native, oracle, 32768, "decode")
+        self.assertEqual(row["native_argmax"], row["oracle_argmax"])
+        self.assertEqual(row["status"], "FAIL")
+        self.assertEqual(row["first_different_index"], 2)
 
 
 if __name__ == "__main__":

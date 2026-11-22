@@ -1,0 +1,138 @@
+{
+  "schema": "cke.inkling2.generated_32k_replay.v1",
+  "scope": "Pinned Q8_0 on P3, short full-model comparison and isolated 32K attention leaf execution. Full 32K model parity is open.",
+  "model_sha256": "d57542f8aea5d7639beba5fc4ae7f584754916f63ac5d5a69328c27f652f45da",
+  "oracle_revision": "29b52d3",
+  "short_generated_runtime": {
+    "library_sha256": "5c5439494eeb59cb3ec59c65c53746c29b5a1102bf8015f4d52f80bc8fea91a3",
+    "source_sha256": "f75fed41d11f0cba2aafee453f1e0c2445cdb132ccf3b29346f32a7b964481c6",
+    "entries": [
+      "ck_inkling2_loop_prefill",
+      "ck_inkling2_loop_append"
+    ],
+    "weight_sha256": "d57542f8aea5d7639beba5fc4ae7f584754916f63ac5d5a69328c27f652f45da",
+    "oracle_logits_sha256": "34ae91bcc5088475a622885462b58e1c1f63e951059b40f029713cceff910c1b",
+    "prompt_tokens": 26,
+    "forced_decode_tokens": 5,
+    "native_execution": "PASS",
+    "all_six_rows_bitwise_equal_to_prior_cke": true,
+    "full_vocabulary_oracle_comparison": {
+      "status": "FAIL",
+      "rows": [
+        {
+          "position": 25,
+          "phase": "prefill",
+          "elements": 200058,
+          "exact_elements": 3,
+          "first_different_index": 0,
+          "rmse": 0.09038595317592202,
+          "max_abs": 0.5048332214355469,
+          "native_argmax": 200001,
+          "oracle_argmax": 200001,
+          "status": "FAIL"
+        },
+        {
+          "position": 26,
+          "phase": "decode",
+          "elements": 200058,
+          "exact_elements": 1,
+          "first_different_index": 0,
+          "rmse": 0.2486574801286215,
+          "max_abs": 1.5597410202026367,
+          "native_argmax": 200008,
+          "oracle_argmax": 200008,
+          "status": "FAIL"
+        },
+        {
+          "position": 27,
+          "phase": "decode",
+          "elements": 200058,
+          "exact_elements": 2,
+          "first_different_index": 0,
+          "rmse": 0.4639793693861032,
+          "max_abs": 2.7470386028289795,
+          "native_argmax": 371,
+          "oracle_argmax": 371,
+          "status": "FAIL"
+        },
+        {
+          "position": 28,
+          "phase": "decode",
+          "elements": 200058,
+          "exact_elements": 0,
+          "first_different_index": 0,
+          "rmse": 0.3182356524581182,
+          "max_abs": 1.8681809902191162,
+          "native_argmax": 150409,
+          "oracle_argmax": 150409,
+          "status": "FAIL"
+        },
+        {
+          "position": 29,
+          "phase": "decode",
+          "elements": 200058,
+          "exact_elements": 0,
+          "first_different_index": 0,
+          "rmse": 0.3253695446864396,
+          "max_abs": 1.3079252243041992,
+          "native_argmax": 171960,
+          "oracle_argmax": 171960,
+          "status": "FAIL"
+        },
+        {
+          "position": 30,
+          "phase": "decode",
+          "elements": 200058,
+          "exact_elements": 0,
+          "first_different_index": 0,
+          "rmse": 0.15519206259510937,
+          "max_abs": 0.724614143371582,
+          "native_argmax": 25,
+          "oracle_argmax": 149887,
+          "status": "FAIL"
+        }
+      ]
+    }
+  },
+  "slot0_attention_identical_input": {
+    "bitwise_unchanged_by_optimization": true,
+    "exact_vs_oracle": 7073,
+    "elements": 24576,
+    "rmse_vs_oracle": 3.832369388383253e-08,
+    "max_abs_vs_oracle": 9.5367431640625e-07,
+    "packet_sha256": "24e1adf5d43a891503c8a9ab427c4b0be809d869ccabb125ae41629b777d5d6e",
+    "late_capture_q_max_abs_error": 17.731224060058594
+  },
+  "oracle_capture_lifetime_regression": {
+    "matched_query_elements": 24576,
+    "final_logits_bitwise_equal": true,
+    "oracle_report_sha256": "b9a3152f5ed9ba9e4f9d9d2739e00a7253ae98b6be3759777de0648a2d65cdc4",
+    "capture_stage": "score_matmul"
+  },
+  "seeded_32k_attention_leaf": {
+    "scope": "native full attention leaf, four queries per head against a seeded 32K cache on P3 E-cores",
+    "cache_positions": 32768,
+    "prior_serial_seconds": [
+      0.8584020063281059,
+      0.8970199897885323,
+      0.8797058276832104
+    ],
+    "updated_serial_seconds": [
+      0.8252302352339029,
+      0.8566400203853846,
+      0.8748716339468956
+    ],
+    "updated_four_workers_seconds": [
+      0.24283143691718578,
+      0.24551673792302608,
+      0.26612011156976223
+    ],
+    "bitwise_match": true,
+    "fp32_outputs": 12288
+  },
+  "long_prompt": {
+    "tokens": 32768,
+    "tokens_file_sha256": "9c60072ba95ba8596ba1a36e15e0967809c57285cf9aaa535b7320c336d577f1",
+    "coverage": "benchmark started separately. This report does not include completed 32K model outputs."
+  }
+}

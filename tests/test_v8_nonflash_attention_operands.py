@@ -77,9 +77,18 @@ class NonflashAttentionOperandsTests(unittest.TestCase):
                     "nbytes": array.nbytes, "token_id": 2}
         if role is not None:
             metadata["role"] = role
+            metadata["capture_stage"] = "score_matmul" if role == "q" else "attention_output"
         else:
             metadata["base_name"] = name.split("-token-", 1)[0]
         Path(str(base) + ".json").write_text(json.dumps(metadata), encoding="utf-8")
+
+    def test_query_captured_after_score_matmul_is_rejected(self):
+        path = self.capture / "kqv_out-0-token-000002-occ-000.nonflash_q.json"
+        metadata = json.loads(path.read_text())
+        metadata["capture_stage"] = "attention_output"
+        path.write_text(json.dumps(metadata))
+        with self.assertRaisesRegex(BundleError, "query must be captured at its score matmul"):
+            compare(self.bundle, self.capture, 2)
 
     def test_strided_v_and_mask_produce_aligned_comparison(self):
         result = compare(self.bundle, self.capture, 2)

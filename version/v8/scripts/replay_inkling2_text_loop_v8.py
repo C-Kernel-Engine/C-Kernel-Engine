@@ -116,12 +116,42 @@ def capture_layer_rows(directory, graph, view, phase, position, row):
     }, indent=2) + "\n")
 
 
+def read_token_ids(path):
+    with path.open("rb") as token_file:
+        raw_ids = token_file.read((1 << 20) + 1)
+    if len(raw_ids) > 1 << 20:
+        raise ValueError("token ID file exceeds 1 MiB")
+    return [int(token) for token in raw_ids.split()]
+
+
+def compare_oracle_row(actual, expected, position, phase):
+    """Compare one complete vocabulary row from each native runtime."""
+    if actual.shape != expected.shape or not np.isfinite(expected).all():
+        raise ValueError("oracle row has invalid geometry or nonfinite logits")
+    mismatches = np.flatnonzero(actual.view("<u4") != expected.view("<u4"))
+    delta = actual.astype(np.float64) - expected
+    return {
+        "position": position, "phase": phase, "elements": actual.size,
+        "exact_elements": actual.size - mismatches.size,
+        "first_different_index": int(mismatches[0]) if mismatches.size else None,
+        "rmse": float(np.sqrt(np.mean(delta * delta))),
+        "max_abs": float(np.max(np.abs(delta))),
+        "native_argmax": int(actual.argmax()), "oracle_argmax": int(expected.argmax()),
+        "status": "PASS" if not mismatches.size else "FAIL",
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--gguf", type=Path, required=True)
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--tokens-file", type=Path, required=True)
-    parser.add_argument("--append-token", type=int)
+    continuation = parser.add_mutually_exclusive_group()
+    continuation.add_argument("--append-token", type=int)
+    continuation.add_argument("--append-tokens-file", type=Path,
+                              help="whitespace-separated teacher-forced token IDs")
+    parser.add_argument("--oracle-logits", type=Path,
+                        help="little-endian FP32 final prompt row followed by one row per forced token")
     parser.add_argument("--f64-norm-sum", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--greedy-tokens", type=int, default=0)
     parser.add_argument("--stop-id", type=int, action="append", default=[])
@@ -143,28 +173,45 @@ def main():
         parser.error("threads must be in 1..64")
     config_bytes = args.config.read_bytes()
     config = json.loads(config_bytes)["text_config"]
-    with args.tokens_file.open("rb") as token_file:
-        raw_ids = token_file.read((1 << 20) + 1)
-    if len(raw_ids) > 1 << 20:
-        parser.error("token ID file exceeds 1 MiB")
-    ids = [int(token) for token in raw_ids.split()]
+    try:
+        ids = read_token_ids(args.tokens_file)
+        if args.append_tokens_file is not None:
+            forced = read_token_ids(args.append_tokens_file)
+            if not forced:
+                parser.error("empty teacher-forced token file")
+        else:
+            forced = [] if args.append_token is None else [args.append_token]
+    except (OSError, ValueError) as error:
+        parser.error(str(error))
     resident = args.context_capacity is not None
     capacity = args.context_capacity if resident else len(ids) + 1
+    vocab = config["unpadded_vocab_size"]
     chunk_tokens = args.chunk_tokens if resident else len(ids)
     if (not 1 <= chunk_tokens <= 16 or not chunk_tokens < capacity <= 65536 or not ids
-            or len(ids) + (args.append_token is not None) > capacity
-            or any(not 0 <= token < config["unpadded_vocab_size"] for token in ids)):
+            or len(ids) + len(forced) > capacity
+            or any(not 0 <= token < vocab for token in ids)):
         parser.error("invalid prompt IDs, chunk size or context capacity")
-    if args.append_token is not None and not 0 <= args.append_token < config["unpadded_vocab_size"]:
+    if any(not 0 <= token < vocab for token in forced):
         parser.error("invalid continuation ID")
-    if (args.greedy_tokens < 0 or (args.greedy_tokens and (not resident or args.append_token is not None))
+    if (args.greedy_tokens < 0 or (args.greedy_tokens and (not resident or forced))
             or len(ids) + args.greedy_tokens > capacity
             or any(not 0 <= token < config["unpadded_vocab_size"] for token in args.stop_id)):
         parser.error("greedy generation requires a resident capacity, valid stop IDs and room for output")
     if args.xray_token_position is not None:
-        processed = len(ids) + (args.append_token is not None) + max(0, args.greedy_tokens - 1)
+        processed = len(ids) + len(forced) + max(0, args.greedy_tokens - 1)
         if not 0 <= args.xray_token_position < processed:
             parser.error("X-Ray token position is outside the replay")
+    oracle = None
+    if args.oracle_logits is not None:
+        if args.greedy_tokens:
+            parser.error("oracle comparison requires teacher-forced decode")
+        expected_shape = (len(forced) + 1, vocab)
+        try:
+            if args.oracle_logits.stat().st_size != expected_shape[0] * expected_shape[1] * 4:
+                parser.error("oracle file size differs from the required complete logit rows")
+            oracle = np.memmap(args.oracle_logits, mode="r", dtype="<f4", shape=expected_shape)
+        except OSError as error:
+            parser.error(str(error))
     args.output.mkdir(mode=0o700)
     report = {"status": "INCOMPLETE", "gguf_revision": GGUF_REVISION, "prompt_ids": ids,
               "append_token": args.append_token, "scope": "bounded native Q8_0 token replay",
@@ -173,10 +220,22 @@ def main():
               "threads": args.threads,
               "f64_norm_sum": args.f64_norm_sum, "last_prefill_logit": args.last_prefill_logit,
               "reference_moe": args.reference_moe, "fp32_static_conv": args.fp32_static_conv}
+    if args.append_tokens_file is not None:
+        report.update(append_ids=forced, completed_append_tokens=0)
+    if oracle is not None:
+        with args.oracle_logits.open("rb") as file:
+            report["oracle_logits_sha256"] = hashlib.file_digest(file, "sha256").hexdigest()
+        report["oracle_comparison"] = {"status": "INCOMPLETE", "rows": []}
     report_path = args.output / "report.json"
 
     def save():
-        report_path.write_text(json.dumps(report, indent=2) + "\n")
+        temporary = report_path.with_suffix(".json.tmp")
+        temporary.write_text(json.dumps(report, indent=2) + "\n")
+        temporary.replace(report_path)
+
+    def compare(logits, index, position, phase):
+        if oracle is not None:
+            report["oracle_comparison"]["rows"].append(compare_oracle_row(logits, oracle[index], position, phase))
 
     save()
     try:
@@ -287,6 +346,7 @@ def main():
                         return logits, elapsed
 
                     total_prefill, offset = 0.0, 0
+                    last_report = time.monotonic()
                     while offset < len(ids):
                         use_chunk = len(ids) - offset >= chunk_tokens
                         piece = ids[offset:offset + (chunk_tokens if use_chunk else 1)]
@@ -294,13 +354,28 @@ def main():
                         offset += len(piece)
                         total_prefill += elapsed
                         report.update(prefill_seconds=total_prefill, completed_prompt_tokens=offset)
-                        save()
+                        now = time.monotonic()
+                        if offset == len(ids) or now - last_report >= 2.0:
+                            save()
+                            last_report = now
                     np.save(args.output / "prefill-logits.npy", logits if not resident else logits[-1:])
                     report["prefill_argmax"] = logits.argmax(axis=1).tolist()
-                    if args.append_token is not None:
-                        logits, elapsed = run("append", [args.append_token], len(ids))
-                        np.save(args.output / "append-logits.npy", logits)
-                        report.update(append_seconds=elapsed, append_argmax=logits.argmax(axis=1).tolist())
+                    compare(logits[-1], 0, len(ids) - 1, "prefill")
+                    if forced:
+                        append_rows = np.lib.format.open_memmap(
+                            args.output / "append-logits.npy", mode="w+", dtype="<f4", shape=(len(forced), vocab))
+                        append_seconds, append_argmax = 0.0, []
+                        for index, token in enumerate(forced):
+                            position = len(ids) + index
+                            logits, elapsed = run("append", [token], position)
+                            append_rows[index] = logits[-1]
+                            append_seconds += elapsed
+                            append_argmax.append(int(logits[-1].argmax()))
+                            compare(logits[-1], index + 1, position, "decode")
+                            report.update(append_seconds=append_seconds, append_argmax=append_argmax,
+                                          completed_append_tokens=index + 1)
+                            save()
+                        append_rows.flush()
                     if args.greedy_tokens:
                         generated, generation_seconds = [], 0.0
                         stop_ids = set(args.stop_id)
@@ -320,13 +395,21 @@ def main():
                                       finish_reason=finish_reason)
         if args.xray_token_position is not None and "xray_token_position" not in report:
             raise ValueError("the requested X-Ray token was not processed")
-        report["status"] = "PASS"
+        report["execution_status"] = "PASS"
+        if oracle is None:
+            report["status"] = "PASS"
+        else:
+            comparison = report["oracle_comparison"]
+            comparison["status"] = ("PASS" if all(row["status"] == "PASS" for row in comparison["rows"])
+                                    else "FAIL")
+            report["status"] = comparison["status"]
     except Exception as error:
-        report.update(status="FAIL", error=str(error))
+        report.update(status="FAIL", execution_status="FAIL", error=str(error))
         raise
     finally:
         save()
+    return 0 if report["status"] == "PASS" else 1
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
