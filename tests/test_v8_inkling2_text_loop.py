@@ -286,6 +286,55 @@ class InklingTextLoopTests(unittest.TestCase):
             self.assertEqual(functions["append"](arena, len(arena)), -1)
             self.assertEqual(view("cache_k_0").tobytes(), before)
 
+    def test_64_row_prefill_matches_four_16_row_calls_and_decode(self):
+        rng = np.random.default_rng(1644)
+        context = 72
+        ids = rng.integers(CONFIG["vocab_size"], size=65, dtype=np.int32)
+        graph = resident_text_loop(CONFIG, 64, context, last_prefill_logit=True)
+        specs = first_block_weights(graph)
+        weights = {
+            name: pack_quant(rng.integers(-3, 4, shape, dtype=np.int8), "q8_0")
+            if dtype == "Q8_0" else rng.normal(.01, .2, shape).astype("f4")
+            for name, (shape, dtype) in specs.items()
+        }
+        with self.assertRaisesRegex(ValueError, "fixed token rows"):
+            resident_text_loop(CONFIG, 65, context)
+        results = []
+        states = []
+        with TemporaryDirectory() as temp:
+            for chunk in (16, 64):
+                folder = Path(temp) / str(chunk)
+                folder.mkdir()
+                graph = resident_text_loop(CONFIG, chunk, context, last_prefill_logit=True)
+                _, arena, view, library = compile_checked_weight_graph(folder, graph, weights, specs, openmp=True)
+                library.omp_set_dynamic(0)
+                library.omp_set_num_threads(2)
+                bindings = load_exports(folder, library)
+                for layer in range(CONFIG["num_hidden_layers"]):
+                    view(f"router_bias_{layer}")[:] = [-.03, .07, .09, .01]
+                view("expert_slots", np.int32)[:] = np.arange(CONFIG["n_routed_experts"])
+                for phase, position, count in ([("prefill", pos, chunk) for pos in range(0, 64, chunk)]
+                                               + [("append", 64, 1)]):
+                    call = getattr(library, bindings["entries"][phase])
+                    call.argtypes = [ctypes.c_void_p, ctypes.c_size_t]
+                    call.restype = ctypes.c_int
+                    view(f"{phase}_request_position", np.int32)[:] = position
+                    view(f"{phase}_token_ids", np.int32)[:] = ids[position:position + count]
+                    self.assertEqual(call(arena, len(arena)), 0)
+                    if position + count >= 64:
+                        results.append(view(f"{phase}_logits").copy())
+                states.append({
+                    f"{kind}_{slot}": view(f"{kind}_{slot}").tobytes()
+                    for slot in range(48)
+                    for kind in ("cache_k", "cache_v", "history_k", "history_v",
+                                 "history_attn_post_conv", "history_ffn_post_conv")
+                })
+        for baseline, candidate in zip(results[:2], results[2:]):
+            self.assertTrue(np.isfinite(baseline).all())
+            self.assertGreater(float(np.abs(baseline).max()), 0.01)
+            np.testing.assert_array_equal(baseline.view("u4"), candidate.view("u4"))
+        self.assertEqual(states[0], states[1])
+
     def test_oracle_comparison_rejects_equal_argmax_with_different_logits(self):
         native = np.array([0.0, 2.0, -1.0], dtype="<f4")
         self.assertEqual(compare_oracle_row(native, native.copy(), 32767, "prefill")["status"], "PASS")

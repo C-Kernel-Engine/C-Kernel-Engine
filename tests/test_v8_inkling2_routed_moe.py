@@ -41,6 +41,27 @@ def reference_mixture(hidden, router, bias, gate, up, down, bank, top_k):
     return ids, weights, routed.reshape(-1, hidden.shape[1]), mixed
 
 
+def compile_q8_routed_provider(folder):
+    root = Path(__file__).resolve().parents[1]
+    output = folder / "routed.so"
+    exports = folder / "exports.map"
+    exports.write_text("{ global: routed_softcapped_experts_checked_q8_0_q8_activation*; local: *; };")
+    subprocess.run(["cc", "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror", "-shared",
+                    "-fPIC", "-ffp-contract=off", "-fopenmp", "-I", str(root / "include"),
+                    str(root / "src/kernels/routed_softcapped_experts_checked.c"),
+                    str(root / "src/kernels/transformer_rows_checked.c"),
+                    "-ffunction-sections", "-Wl,--gc-sections", "-Wl,--no-undefined",
+                    f"-Wl,--version-script={exports}", "-lm", "-o", str(output)], check=True)
+    library = ctypes.CDLL(str(output))
+    library.omp_set_dynamic(0)
+    library.omp_set_num_threads(3)
+    for suffix in ("", "_scaled_situ"):
+        provider = getattr(library, "routed_softcapped_experts_checked_q8_0_q8_activation" + suffix)
+        provider.argtypes = [ctypes.c_void_p] * 10 + [ctypes.c_size_t] * 14 + [ctypes.c_float] * 2
+        provider.restype = ctypes.c_int
+    return library
+
+
 class RoutedMoeTests(unittest.TestCase):
     def test_routing_drives_dispatch_for_each_weight_storage(self):
         hidden_dim, inner, experts, top_k, tokens = 32, 32, 4, 3, 2
@@ -141,26 +162,10 @@ class RoutedMoeTests(unittest.TestCase):
         pieces = (width + inner) // 32 * 34
         scratch_per_route = 3 * inner + (pieces + 3) // 4
         staged = (top_k + 1) * width
-        root = Path(__file__).resolve().parents[1]
-
         with TemporaryDirectory() as temp:
-            output = Path(temp) / "routed.so"
-            exports = Path(temp) / "exports.map"
-            exports.write_text("{ global: routed_softcapped_experts_checked_q8_0_q8_activation*; local: *; };")
-            subprocess.run(["cc", "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror", "-shared",
-                            "-fPIC", "-ffp-contract=off", "-fopenmp", "-I", str(root / "include"),
-                            str(root / "src/kernels/routed_softcapped_experts_checked.c"),
-                            str(root / "src/kernels/transformer_rows_checked.c"),
-                            "-ffunction-sections", "-Wl,--gc-sections", "-Wl,--no-undefined",
-                            f"-Wl,--version-script={exports}", "-lm", "-o", str(output)], check=True)
-            library = ctypes.CDLL(str(output))
-            library.omp_set_dynamic(0)
-            library.omp_set_num_threads(3)
-
+            library = compile_q8_routed_provider(Path(temp))
             for suffix in ("", "_scaled_situ"):
                 provider = getattr(library, "routed_softcapped_experts_checked_q8_0_q8_activation" + suffix)
-                provider.argtypes = [ctypes.c_void_p] * 10 + [ctypes.c_size_t] * 14 + [ctypes.c_float] * 2
-                provider.restype = ctypes.c_int
                 parts = np.full((top_k, width), -7, dtype=np.float32)
                 mixture = np.full(width, -8, dtype=np.float32)
 
@@ -187,6 +192,38 @@ class RoutedMoeTests(unittest.TestCase):
                 self.assertEqual(mixture.tobytes(), want_mix)
                 self.assertEqual(invoke(parallel), 0)
                 self.assertEqual(mixture.tobytes(), want_mix)
+
+    def test_q8_provider_accepts_64_rows_and_rejects_65_before_writes(self):
+        capacity, width = 65, 32
+        rng = np.random.default_rng(625)
+        hidden = rng.normal(0.0, 0.2, (capacity, width)).astype("f4")
+        ids = np.zeros(capacity, dtype="i4")
+        routing = np.ones(capacity, dtype="f4")
+        slots = np.zeros(1, dtype="i4")
+        matrices = [pack_quant(rng.integers(-8, 9, (1, width, width), dtype=np.int8), "q8_0")
+                    for _ in range(3)]
+        parts = np.full_like(hidden, np.nan)
+        mixture = np.full_like(hidden, np.nan)
+        packed_elements = (2 * 34 + 3) // 4
+        work = np.empty(capacity * (2 * width + 3 * width + packed_elements), dtype="f4")
+        arrays = (hidden, ids, routing, slots, *matrices, parts, mixture, work)
+
+        with TemporaryDirectory() as temp:
+            library = compile_q8_routed_provider(Path(temp))
+            provider = library.routed_softcapped_experts_checked_q8_0_q8_activation
+
+            def invoke(rows):
+                return provider(*(array.ctypes.data for array in arrays), rows, width, width,
+                                1, 1, 1, matrices[0].size, hidden.size, ids.size, routing.size,
+                                slots.size, parts.size, mixture.size, work.size, 4.0, 25.0)
+
+            self.assertEqual(invoke(64), 0)
+            self.assertTrue(np.isfinite(parts[:64]).all())
+            self.assertTrue(np.isfinite(mixture[:64]).all())
+            self.assertTrue(np.isnan(parts[64]).all() and np.isnan(mixture[64]).all())
+            before = (parts.tobytes(), mixture.tobytes())
+            self.assertEqual(invoke(65), -1)
+            self.assertEqual((parts.tobytes(), mixture.tobytes()), before)
 
     def test_routed_provider_rejects_wrong_storage_even_with_enough_bytes(self):
         graph = routed_expert_mixture(1, 32, 32, 1, 1, 1, storage="iq4_nl")

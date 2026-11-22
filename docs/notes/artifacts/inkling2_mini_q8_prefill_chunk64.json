@@ -1,0 +1,40 @@
+{
+  "schema": "cke.inkling2.q8.prefill_chunk.v1",
+  "gguf_sha256": "d57542f8aea5d7639beba5fc4ae7f584754916f63ac5d5a69328c27f652f45da",
+  "context_capacity": 32776,
+  "initial_position": 32704,
+  "processed_prompt_tokens": 64,
+  "processed_decode_tokens": 3,
+  "host": "P3 E-cores 16-23",
+  "threads": 8,
+  "concurrent_p_core_workload": "Full generated 32K attention benchmark",
+  "omp_wait_spin": 1000,
+  "trials_by_chunk_rows": {
+    "16": {
+      "library_sha256": "3d6f894da2175c58acb636f85db6b92fbccd57332cb4a0a1968deb9dff601b6d",
+      "arena_bytes": 36243484992,
+      "prefill_seconds": [
+        48.37289990670979,
+        47.356038339436054,
+        46.161074452102184
+      ],
+      "median_prefill_seconds": 47.356038339436054,
+      "median_decode_three_tokens_seconds": 10.231540026143193
+    },
+    "64": {
+      "library_sha256": "1251aae8de87500303f3614ee0db2dab884c49d5356f699bb0aa20b174d733c5",
+      "arena_bytes": 37440213504,
+      "prefill_seconds": [
+        37.96403721906245,
+        35.94422376900911,
+        36.2206070497632
+      ],
+      "median_prefill_seconds": 36.2206070497632,
+      "median_decode_three_tokens_seconds": 10.102170582860708
+    }
+  },
+  "comparison": "PASS_BIT_EXACT",
+  "logit_rows": 4,
+  "state_regions": 288,
+  "scope": "P3 generated C warmed 64-token chunk after seeded prefix. Full model and independent oracle remain separate."
+}
