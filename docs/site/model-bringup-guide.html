@@ -2344,6 +2344,32 @@ python3 version/v8/scripts/compare_inkling2_llama_layer0_v8.py \
   and 47.8 GB arenas, respectively. The full workloads, native tokenizer
   integration and HTTP lifecycle remain to be verified.</p>
 
+  <h3 id="inkling2-mini-continuation-replay">Inkling Q8_0 continuation replay</h3>
+  <p>The layer 2 Q input contains one changed Q8 scale on the eight-token
+  trace. Replacing the incoming layer 1 residual with the captured oracle
+  residual removes that scale difference. Identical-input layer 1 replay
+  also exposes separate differences in SiTU, weighted expert reduction,
+  and static convolution.</p>
+  <p>Use <code>--reference-moe</code> to select the reciprocal-scaled FP32
+  SiTU and router-slot reduction together. On captured layer 1 FFN inputs,
+  route IDs and routing weights, the composed provider matches the oracle's
+  raw expert and aggregate outputs exactly. <code>--fp32-static-conv</code>
+  selects ordered FP32 tap products, residual addition and scaling for
+  static convolutions. The layer 1 post-FFN convolution matches exactly on
+  captured input rows. Both switches are opt-in for numerical replay.
+  The complete short replay with both switches yields final-logit RMSE
+  0.194 at prefill and 0.278 after append, compared with 0.183 and 0.171
+  under the existing provider selection. The exact component results
+  expose remaining effects elsewhere in the composed trajectory. The
+  greedy short chat with both switches still diverges after five shared
+  tokens and reaches 128 output tokens without emitting an answer.</p>
+  <p><code>--last-prefill-logit</code> projects only the final hidden row
+  of a prefill chunk. On the identical 128-token SVG prefix the final
+  vocabulary row remains bitwise equal and the arena shrinks by 23 MiB.
+  The individual P3 timings were approximately 106 and 105 seconds.
+  Generated regression coverage also checks KV, all convolution histories,
+  and append after using the single-row export.</p>
+
   <h2 id="lowering">9. Run lowering and inspect the generated C</h2>
   <p>The verified entry point is the wrapper <code>version/v8/scripts/cks-v8-run</code> (it selects a Python, checks requirements, and drives <code>ck_run_v8.py</code>). The full pipeline, exactly as run for this page <span class="tag tag-executed">executed</span>:</p>
   <pre class="mb-code"><code>version/v8/scripts/cks-v8-run run \

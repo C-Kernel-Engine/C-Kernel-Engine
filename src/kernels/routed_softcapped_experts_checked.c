@@ -71,7 +71,7 @@ static int region(const void *p, size_t bytes)
     size_t expert_slot_elements, size_t expert_output_elements, size_t output_capacity, \
     size_t work_elements, float gate_cap, float up_cap
 
-static int routed_softcapped_experts(ROUTED_EXPERT_ARGS, enum expert_storage storage, int quantize)
+static int routed_softcapped_experts(ROUTED_EXPERT_ARGS, enum expert_storage storage, int quantize, int reference_moe)
 {
     /* Bounds keep workspace arithmetic valid on supported size_t widths. */
     if (!rows || rows > 16 || !hidden_dim || hidden_dim > 8192 ||
@@ -134,6 +134,10 @@ static int routed_softcapped_experts(ROUTED_EXPERT_ARGS, enum expert_storage sto
         }
     }
 
+    const float gate_reciprocal = reference_moe ? 1.0f / gate_cap : 0.0f;
+    const float up_reciprocal = reference_moe ? 1.0f / up_cap : 0.0f;
+    if (!isfinite(gate_reciprocal) || !isfinite(up_reciprocal)) return -3;
+
     float *gate_values = work;
     float *up_values = work + inner;
     float *activation = work + 2 * inner;
@@ -146,28 +150,47 @@ static int routed_softcapped_experts(ROUTED_EXPERT_ARGS, enum expert_storage sto
         const float *x = hidden + row * hidden_dim;
         float *y = staged_output + row * hidden_dim;
         if (quantize && ck_pack_q8_activation_rne(x, packed_hidden, hidden_dim)) return -3;
-        /* The reference sums contributions in ascending expert-ID order. */
-        for (size_t id = 0; id < experts; ++id) {
-            for (size_t index = 0; index < top_k; ++index) {
-                const size_t route = row * top_k + index;
-                if ((size_t)ids[route] != id) continue;
-                const size_t offset = (size_t)expert_slots[id] * expert_bytes;
-                const unsigned char *g = (const unsigned char *)gate + offset;
-                const unsigned char *u = (const unsigned char *)up + offset;
-                const unsigned char *d = (const unsigned char *)down + offset;
+        size_t ordered_slots[1024];
+        if (!reference_moe) {
+            size_t next = 0;
+            for (size_t id = 0; id < experts; ++id)
+                for (size_t slot = 0; slot < top_k; ++slot)
+                    if ((size_t)ids[row * top_k + slot] == id) ordered_slots[next++] = slot;
+        }
+        for (size_t index = 0; index < top_k; ++index) {
+            const size_t route = row * top_k + (reference_moe ? index : ordered_slots[index]);
+            const size_t offset = (size_t)expert_slots[ids[route]] * expert_bytes;
+            const unsigned char *g = (const unsigned char *)gate + offset;
+            const unsigned char *u = (const unsigned char *)up + offset;
+            const unsigned char *d = (const unsigned char *)down + offset;
+            for (size_t i = 0; i < inner; ++i) {
+                gate_values[i] = expert_dot(x, g + i * gate_row, hidden_dim, storage, packed_hidden);
+                up_values[i] = expert_dot(x, u + i * gate_row, hidden_dim, storage, packed_hidden);
+            }
+            if (reference_moe) {
                 for (size_t i = 0; i < inner; ++i) {
-                    gate_values[i] = expert_dot(x, g + i * gate_row, hidden_dim, storage, packed_hidden);
-                    up_values[i] = expert_dot(x, u + i * gate_row, hidden_dim, storage, packed_hidden);
+                    const float gate = gate_values[i], up = up_values[i];
+                    if (!isfinite(gate) || !isfinite(up)) return -3;
+                    const float capped_gate = gate_cap * tanhf(gate * gate_reciprocal);
+                    const float capped_up = up_cap * tanhf(up * up_reciprocal);
+                    const float sigmoid = 1.0f / (1.0f + expf(-gate));
+                    activation[i] = (capped_gate * sigmoid) * capped_up;
+                    if (!isfinite(activation[i])) return -3;
                 }
-                if (softcapped_swiglu_rows_checked_f32(gate_values, inner, up_values, inner,
-                        activation, inner, inner, gate_cap, up_cap)) return -3;
-                if (quantize && ck_pack_q8_activation_rne(activation, packed_activation, inner)) return -3;
-                for (size_t i = 0; i < hidden_dim; ++i) {
-                    const float v = expert_dot(activation, d + i * down_row, inner, storage, packed_activation);
-                    staged_experts[route * hidden_dim + i] = v;
+            } else if (softcapped_swiglu_rows_checked_f32(gate_values, inner, up_values, inner,
+                       activation, inner, inner, gate_cap, up_cap)) return -3;
+            if (quantize && ck_pack_q8_activation_rne(activation, packed_activation, inner)) return -3;
+            for (size_t i = 0; i < hidden_dim; ++i) {
+                const float v = expert_dot(activation, d + i * down_row, inner, storage, packed_activation);
+                staged_experts[route * hidden_dim + i] = v;
+                if (reference_moe) {
+                    /* A stored FP32 multiply precedes the ordered FP32 addition. */
+                    const volatile float weighted = v * route_weights[route];
+                    y[i] = index == 0 ? weighted : y[i] + weighted;
+                } else {
                     y[i] += v * route_weights[route];
-                    if (!isfinite(v) || !isfinite(y[i])) return -3;
                 }
+                if (!isfinite(v) || !isfinite(y[i])) return -3;
             }
         }
     }
@@ -176,30 +199,35 @@ static int routed_softcapped_experts(ROUTED_EXPERT_ARGS, enum expert_storage sto
     return 0;
 }
 
-#define ROUTED_EXPERT_FORWARD(storage, quantize) \
+#define ROUTED_EXPERT_FORWARD(storage, quantize, reference_moe) \
     routed_softcapped_experts(hidden, ids, route_weights, expert_slots, gate, up, down, \
                              expert_output, output, work, rows, hidden_dim, inner, experts, \
                              slots, top_k, matrix_bytes, hidden_elements, id_elements, route_elements, \
                              expert_slot_elements, expert_output_elements, output_capacity, \
-                             work_elements, gate_cap, up_cap, storage, quantize)
+                             work_elements, gate_cap, up_cap, storage, quantize, reference_moe)
 
 int routed_softcapped_experts_checked_f32(ROUTED_EXPERT_ARGS)
 {
-    return ROUTED_EXPERT_FORWARD(EXPERT_F32, 0);
+    return ROUTED_EXPERT_FORWARD(EXPERT_F32, 0, 0);
 }
 
 int routed_softcapped_experts_checked_q8_0(ROUTED_EXPERT_ARGS)
 {
-    return ROUTED_EXPERT_FORWARD(EXPERT_Q8_0, 0);
+    return ROUTED_EXPERT_FORWARD(EXPERT_Q8_0, 0, 0);
 }
 
 int routed_softcapped_experts_checked_iq4_nl(ROUTED_EXPERT_ARGS)
 {
-    return ROUTED_EXPERT_FORWARD(EXPERT_IQ4_NL, 0);
+    return ROUTED_EXPERT_FORWARD(EXPERT_IQ4_NL, 0, 0);
 }
 
 
 int routed_softcapped_experts_checked_q8_0_q8_activation(ROUTED_EXPERT_ARGS)
 {
-    return ROUTED_EXPERT_FORWARD(EXPERT_Q8_0, 1);
+    return ROUTED_EXPERT_FORWARD(EXPERT_Q8_0, 1, 0);
+}
+
+int routed_softcapped_experts_checked_q8_0_q8_activation_scaled_situ(ROUTED_EXPERT_ARGS)
+{
+    return ROUTED_EXPERT_FORWARD(EXPERT_Q8_0, 1, 1);
 }

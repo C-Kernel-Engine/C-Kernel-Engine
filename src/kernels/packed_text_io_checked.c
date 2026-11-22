@@ -1,6 +1,8 @@
 #include "checked_float_buffer.h"
 #include "ckernel_quant.h"
 
+#include <string.h>
+
 int embedding_lookup_q8_0_checked_f32(const int32_t *ids, size_t ids_elements,
                                       const void *table, size_t table_bytes, float *output,
                                       size_t output_elements, size_t tokens, size_t vocabulary,
@@ -53,5 +55,19 @@ int softcap_logits_checked_f32(const float *input, size_t input_elements, float 
     if (!ck_checked_finite(input, elements)) return -3;
     for (size_t i = 0; i < elements; ++i)
         output[i] = (float)((double)cap * tanh((double)input[i] / (double)cap));
+    return 0;
+}
+
+int copy_last_row_checked_f32(const float *input, size_t input_elements, float *output,
+                             size_t output_elements, size_t rows, size_t width)
+{
+    size_t extent;
+    if (!ck_checked_span(rows, width, width, &extent) ||
+        input_elements < extent || output_elements < width) return -2;
+    if (!ck_checked_region(input, extent) || !ck_checked_region(output, width) ||
+        ck_checked_overlap(input, extent, output, width)) return -1;
+    const float *row = input + extent - width;
+    if (!ck_checked_finite(row, width)) return -3;
+    memcpy(output, row, width * sizeof(float));
     return 0;
 }

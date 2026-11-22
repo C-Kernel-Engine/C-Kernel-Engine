@@ -31,9 +31,10 @@ class InklingTextLoopTests(unittest.TestCase):
         ids = np.array([5, 11, 3, 14, 5], dtype=np.int32)
         views = {}
         with TemporaryDirectory() as directory:
-            for label, count in (("split", 2), ("full", 5)):
-                graph = (resident_text_loop(CONFIG, count, 6, f64_norm_sum=True) if label == "split"
-                         else text_token_loop(CONFIG, count, f64_norm_sum=True))
+            for label, count in (("split", 2), ("last", 2), ("full", 5)):
+                graph = (text_token_loop(CONFIG, count, f64_norm_sum=True, reference_moe=True, fp32_static_conv=True) if label == "full"
+                         else resident_text_loop(CONFIG, count, 6, f64_norm_sum=True,
+                                                 last_prefill_logit=label == "last", reference_moe=True, fp32_static_conv=True))
                 specs = first_block_weights(graph)
                 if label == "split":
                     weights = {
@@ -50,9 +51,14 @@ class InklingTextLoopTests(unittest.TestCase):
                 folder.mkdir()
                 _, arena, view, lib = compile_checked_weight_graph(folder, graph, weights, specs)
                 exports = load_exports(folder, lib)
-                self.assertEqual(exports["properties"]["supports_explicit_position"], label == "split")
+                self.assertEqual(exports["properties"]["supports_explicit_position"], label != "full")
                 self.assertEqual(exports["ports"]["prefill_token_ids"]["dtype"], "i32")
-                self.assertEqual(exports["ports"]["prefill_logits"]["shape"], [count, CONFIG["vocab_size"]])
+                logit_rows = 1 if label == "last" else count
+                self.assertEqual(exports["ports"]["prefill_logits"]["shape"], [logit_rows, CONFIG["vocab_size"]])
+                self.assertEqual(exports["properties"]["expert_accumulation"], "router_slot")
+                self.assertEqual(exports["properties"]["static_conv_accumulator"], "fp32")
+                self.assertEqual(exports["properties"]["prefill_logits"],
+                                 "last_row" if label == "last" else "all_rows")
                 for layer in range(CONFIG["num_hidden_layers"]):
                     view(f"router_bias_{layer}")[:] = [-.02, .04, .08, .01]
                 view("expert_slots", np.int32)[:] = np.arange(CONFIG["n_routed_experts"])
@@ -72,16 +78,21 @@ class InklingTextLoopTests(unittest.TestCase):
                     run("prefill", invalid, expected=-3)
                     np.testing.assert_array_equal(view("cache_k_0"), 0)
                     np.testing.assert_array_equal(view("prefill_logits"), 0)
-                if label == "split":
+                if label != "full":
                     run("prefill", ids[:count], position=0)
-                    first = view("prefill_logits").copy()
+                    initial = view("prefill_logits").copy()
                     history = view("history_attn_post_conv_0").copy()
                     run("prefill", ids[count:4], expected=-2, position=5)
                     np.testing.assert_array_equal(view("history_attn_post_conv_0"), history)
-                    np.testing.assert_array_equal(view("prefill_logits"), first)
+                    np.testing.assert_array_equal(view("prefill_logits"), initial)
                     run("prefill", ids[count:4], position=2)
-                    second = view("prefill_logits").copy()
+                    continuation = view("prefill_logits").copy()
                     run("append", ids[4:], position=4)
+                    if label == "split":
+                        first, second = initial, continuation
+                    else:
+                        np.testing.assert_array_equal(initial[0].view("u4"), first[-1].view("u4"))
+                        np.testing.assert_array_equal(continuation[0].view("u4"), second[-1].view("u4"))
                 else:
                     run("prefill", ids)
                     embedding = view("prefill_embeddings")
@@ -98,13 +109,17 @@ class InklingTextLoopTests(unittest.TestCase):
             self.assertEqual(actual.shape, (5, CONFIG["vocab_size"]))
             np.testing.assert_allclose(actual, 30 * np.tanh(full("prefill_raw_logits") / 30), atol=1e-6)
             np.testing.assert_array_equal(actual, full("prefill_logits"))
+            last = views["last"]
+            np.testing.assert_array_equal(last("append_logits"), split("append_logits"))
             for slot in range(48):
                 for kind in ("k", "v"):
                     name = f"cache_{kind}_{slot}"
                     np.testing.assert_array_equal(split(name)[:, :5, :], full(name)[:, :5, :], err_msg=name)
+                    np.testing.assert_array_equal(last(name), split(name), err_msg=name)
                 for kind in ("k", "v", "attn_post_conv", "ffn_post_conv"):
                     name = f"history_{kind}_{slot}"
                     np.testing.assert_array_equal(split(name), full(name), err_msg=name)
+                    np.testing.assert_array_equal(last(name), split(name), err_msg=name)
             self.assertFalse(np.array_equal(full("cache_k_6"), full("cache_k_24")))
             self.assertFalse(np.array_equal(full("cache_k_24"), full("cache_k_36")))
 

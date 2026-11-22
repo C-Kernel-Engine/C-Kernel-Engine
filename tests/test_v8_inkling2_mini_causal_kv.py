@@ -30,6 +30,31 @@ def reference(x, projection, filters, history):
 
 
 class CausalKVTests(unittest.TestCase):
+    def test_ordered_fp32_provider_matches_per_tap_rounding(self):
+        rng = np.random.default_rng(362)
+        graph = causal_kv_replay(width=7, kv_width=5, kv_heads=1, slots=(6,))
+        for node in graph["block_types"]["block"]["body"]["ops"]:
+            if node["kernel"] == "causal_depthwise_residual_checked_f32":
+                node["kernel"] = "causal_depthwise_residual_checked_ordered_f32"
+        weights = {name: rng.normal(size=shape).astype("f4")
+                   for name, shape in declared_f32_weight_shapes(graph).items()}
+        with tempfile.TemporaryDirectory() as temp:
+            _, arena, view, lib = compile_declared_f32_graph(Path(temp), graph, weights)
+            for kind in ("k", "v"):
+                view(f"inkling2_prefill_slot6_{kind}_input")[:] = rng.normal(size=(8, 7))
+                view(f"history_{kind}_6")[:] = rng.normal(size=(3, 5))
+            history = view("history_k_6").copy()
+            self.assertEqual(entry(lib, "prefill", 6)(arena, len(arena)), 0)
+            raw = view("inkling2_prefill_slot6_k_projection")
+            filters = weights["model.llm.layers.6.attn.k_sconv.weight"]
+            span = np.concatenate((history, raw))
+            total = np.zeros_like(raw)
+            for tap in range(4):
+                total += span[tap:tap + len(raw)] * filters[:, tap]
+            expected = (total + raw) * np.float32(1 / np.sqrt(np.float32(5)))
+            np.testing.assert_array_equal(view("inkling2_prefill_slot6_k_output"), expected)
+            np.testing.assert_array_equal(view("history_k_6"), raw[-3:])
+
     def test_prefill_append_and_slot_alias_negative(self):
         rng = np.random.default_rng(414)
         graph = causal_kv_replay(width=7, kv_width=5, kv_heads=1, key_clip=.08)

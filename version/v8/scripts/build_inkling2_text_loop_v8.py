@@ -141,7 +141,7 @@ def hidden_text_loop(config, prefill_tokens=4, *, cache_capacity=None):
     return graph
 
 
-def text_token_loop(config, prefill_tokens=4, *, cache_capacity=None, f64_norm_sum=False):
+def text_token_loop(config, prefill_tokens=4, *, cache_capacity=None, f64_norm_sum=False, last_prefill_logit=False, reference_moe=False, fp32_static_conv=False):
     """Bind packed token lookup and capped full-vocabulary logits to the fixed loop."""
     graph = hidden_text_loop(config, prefill_tokens, cache_capacity=cache_capacity)
     width, vocab = config["hidden_size"], config["vocab_size"]
@@ -193,18 +193,30 @@ def text_token_loop(config, prefill_tokens=4, *, cache_capacity=None, f64_norm_s
             ops.append(node)
             if node["id"] == output:
                 break
-        raw = buffer(phase + "_raw_logits", [rows, logits_width])
-        project = _project(raw, output, width, logits_width, rows, "output.weight", weight_prefix="")
+        logit_rows = rows
+        if phase == "prefill" and last_prefill_logit and rows > 1:
+            last = buffer("prefill_last_hidden", [1, width])
+            ops.append({
+                "id": last, "op": "copy_last_row_checked", "kernel": "copy_last_row_checked_f32",
+                "returns_status": True,
+                "graph_slots": {"inputs": {"input": output}, "outputs": {"output": last}},
+                "params": {"R": rows, "C": width, "call_constants": {
+                    "rows": rows, "width": width, "input_elements": count, "output_elements": width,
+                }},
+            })
+            output, logit_rows = last, 1
+        raw = buffer(phase + "_raw_logits", [logit_rows, logits_width])
+        project = _project(raw, output, width, logits_width, logit_rows, "output.weight", weight_prefix="")
         _bind_q8_projection(project, True)
         ops.append(project)
-        logits = buffer(phase + "_logits", [rows, logits_width])
+        logits = buffer(phase + "_logits", [logit_rows, logits_width])
         ops.append({
             "id": logits, "op": "softcap_logits_checked", "kernel": "softcap_logits_checked_f32",
             "returns_status": True,
             "graph_slots": {"inputs": {"input": raw}, "outputs": {"output": logits}},
-            "params": {"N": rows * logits_width, "cap": cap, "call_constants": {
-                "elements": rows * logits_width, "input_elements": rows * logits_width,
-                "output_elements": rows * logits_width}},
+            "params": {"N": logit_rows * logits_width, "cap": cap, "call_constants": {
+                "elements": logit_rows * logits_width, "input_elements": logit_rows * logits_width,
+                "output_elements": logit_rows * logits_width}},
         })
         segments[index]["last_op"] = logits
     if f64_norm_sum:
@@ -215,6 +227,14 @@ def text_token_loop(config, prefill_tokens=4, *, cache_capacity=None, f64_norm_s
         for export in graph["semantic_checkpoints"]["exports"].values():
             if export["op"] == "rmsnorm_rows_checked":
                 export["op"] = norm
+    if reference_moe:
+        for node in ops:
+            if node["kernel"] == "routed_softcapped_experts_checked_q8_0_q8_activation":
+                node["kernel"] += "_scaled_situ"
+    if fp32_static_conv:
+        for node in ops:
+            if node["kernel"] == "causal_depthwise_residual_checked_f32":
+                node["kernel"] = "causal_depthwise_residual_checked_ordered_f32"
     public_ports = [
         "prefill_token_ids", "append_token_ids", "prefill_logits", "append_logits", "expert_slots",
         *(f"router_bias_{i}" for i in range(config["num_hidden_layers"])),
@@ -224,14 +244,19 @@ def text_token_loop(config, prefill_tokens=4, *, cache_capacity=None, f64_norm_s
         "entries": {phase: f"ck_inkling2_loop_{phase}" for phase in ("prefill", "append")},
         "ports": {name: execution_port(graph, name) for name in public_ports},
         "properties": {"context_capacity": cache_capacity or (prefill_tokens + 1),
-                       "chunk_tokens": prefill_tokens, "supports_explicit_position": False},
+                       "chunk_tokens": prefill_tokens, "supports_explicit_position": False,
+                       "prefill_logits": "last_row" if last_prefill_logit else "all_rows",
+                       "expert_accumulation": "router_slot" if reference_moe else "expert_id",
+                       "static_conv_accumulator": "fp32" if fp32_static_conv else "fp64"},
     }
     return graph
 
 
-def resident_text_loop(config, chunk_tokens, context_capacity, *, f64_norm_sum=False):
+def resident_text_loop(config, chunk_tokens, context_capacity, *, f64_norm_sum=False, last_prefill_logit=False, reference_moe=False, fp32_static_conv=False):
     """Generate repeated fixed-size prefill chunks and one-row decode over shared state."""
-    graph = text_token_loop(config, chunk_tokens, cache_capacity=context_capacity, f64_norm_sum=f64_norm_sum)
+    graph = text_token_loop(config, chunk_tokens, cache_capacity=context_capacity, f64_norm_sum=f64_norm_sum,
+                            last_prefill_logit=last_prefill_logit, reference_moe=reference_moe,
+                            fp32_static_conv=fp32_static_conv)
     graph["name"] = "inkling2_mini_resident_text_loop"
     graph["native_entry"]["function"] = "ck_inkling2_mini_resident_text_loop"
     graph["contract"]["runtime_invariants"].update(context_capacity=context_capacity, chunk_tokens=chunk_tokens)

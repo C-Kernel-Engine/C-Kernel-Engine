@@ -1,0 +1,137 @@
+{
+  "id": "copy_last_row_checked_f32",
+  "op": "copy_last_row_checked",
+  "operation_interface": "tensor.copy_last_row.checked.fp32.v1",
+  "variant": "exact_copy",
+  "selection": {
+    "status": "candidate",
+    "priority": 100,
+    "phases": [
+      "prefill",
+      "decode"
+    ],
+    "equivalence_group": "tensor.copy_last_row.checked.fp32.v1"
+  },
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "input",
+      "dtype": "fp32",
+      "shape": [
+        "R",
+        "C"
+      ],
+      "layout": "row_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "output",
+      "dtype": "fp32",
+      "shape": [
+        1,
+        "C"
+      ],
+      "layout": "row_major_contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "scratch": [],
+  "dims": [
+    "R",
+    "C"
+  ],
+  "impl": {
+    "function": "copy_last_row_checked_f32",
+    "c_declaration": "int copy_last_row_checked_f32(const float *input, size_t input_elements, float *output, size_t output_elements, size_t rows, size_t width);",
+    "sources": [
+      "src/kernels/packed_text_io_checked.c"
+    ]
+  },
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "input",
+        "source": "activation:input",
+        "cast": "const float*",
+        "ports": [
+          "input:input"
+        ]
+      },
+      {
+        "name": "input_elements",
+        "source": "runtime:input_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "output",
+        "source": "output:output",
+        "cast": "float*",
+        "ports": [
+          "output:output"
+        ]
+      },
+      {
+        "name": "output_elements",
+        "source": "runtime:output_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "rows",
+        "source": "runtime:rows",
+        "value_type": "size_t"
+      },
+      {
+        "name": "width",
+        "source": "runtime:width",
+        "value_type": "size_t"
+      }
+    ]
+  },
+  "call_constant_contract": {
+    "shape_symbols": {
+      "R": "rows",
+      "C": "width"
+    },
+    "buffer_spans": [
+      {
+        "pointer": "input",
+        "elements": "input_elements",
+        "rows": "rows",
+        "width": "width",
+        "element_bytes": 4
+      },
+      {
+        "pointer": "output",
+        "elements": "output_elements",
+        "rows": 1,
+        "width": "width",
+        "element_bytes": 4
+      }
+    ]
+  },
+  "notes": "Copy the final contiguous row. Validate the selected row and all buffer extents before publishing output.",
+  "tests": {
+    "unit": [
+      "tests/test_v8_inkling2_text_loop.py"
+    ]
+  }
+}
