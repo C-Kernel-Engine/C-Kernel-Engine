@@ -11,7 +11,11 @@ from typing import Any
 
 PROTOCOLS = frozenset({"none", "tagged_json", "bare_json", "qwen_xml", "qwen_code_xml", "qwen_code_xml_raw_v2", "gemma4_dsl_v1", "muse_atem_v1", "nemotron_toolcall_v1"})
 SCHEMA = "cke.resolved_serving.v1"
-RUNTIME_DEPENDENCIES = frozenset({"sleef_expf16_u10"})
+RUNTIME_DEPENDENCIES = {
+    "mkl_vsexp": ("CK_MKL_LIBRARY", "vsExp"),
+    "sleef_expf16_u10": ("CK_SLEEF_LIBRARY", "Sleef_expf16_u10"),
+    "sleef_log1pf16_u10": ("CK_SLEEF_LIBRARY", "Sleef_log1pf16_u10"),
+}
 
 
 def sha256_file(path: Path) -> str:
@@ -161,22 +165,31 @@ def load_resolved_serving(run_dir: Path, *, document: dict[str, Any] | None = No
         raise ValueError(f"invalid resolved serving bundle {sidecar}: {exc}") from exc
 
 
-def verify_runtime_dependencies(doc: dict[str, Any]) -> None:
-    """Reject missing lazy native dependencies before accepting HTTP traffic."""
+def verify_runtime_dependencies(doc: dict[str, Any], *, native_library: Path | None = None) -> None:
+    """Reject missing lazy native dependencies before starting inference."""
+    missing = []
+    libraries: dict[str | Path | None, ctypes.CDLL | None] = {}
+
+    def exports(path: str | Path | None, symbol: str) -> bool:
+        if path not in libraries:
+            try:
+                libraries[path] = ctypes.CDLL(path)
+            except OSError:
+                libraries[path] = None
+        return getattr(libraries[path], symbol, None) is not None
+
     for dependency in doc.get("runtime_dependencies", []):
-        if dependency != "sleef_expf16_u10":
-            raise ValueError(f"unsupported serving runtime dependency: {dependency}")
-        library_path = os.environ.get("CK_SLEEF_LIBRARY")
-        try:
-            library = ctypes.CDLL(library_path) if library_path else ctypes.CDLL(None)
-            symbol = getattr(library, "Sleef_expf16_u10")
-            if not ctypes.cast(symbol, ctypes.c_void_p).value:
-                raise ValueError("empty SLEEF symbol")
-        except (OSError, AttributeError, TypeError, ValueError) as exc:
-            raise ValueError(
-                "selected native kernels require Sleef_expf16_u10; set CK_SLEEF_LIBRARY "
-                "to a library exporting that symbol before starting the server"
-            ) from exc
+        if dependency not in RUNTIME_DEPENDENCIES:
+            raise ValueError(f"unsupported native runtime dependency: {dependency}")
+        variable, symbol = RUNTIME_DEPENDENCIES[dependency]
+        path = os.environ.get(variable) or None
+        if exports(path, symbol):
+            continue
+        if path is None and native_library is not None and exports(native_library, symbol):
+            continue
+        missing.append(f"{symbol} (set {variable} to a library that exports it)")
+    if missing:
+        raise ValueError("selected native kernels require " + ", ".join(missing))
 
 
 def resolved_templates(run_dir: Path, doc: dict[str, Any]) -> tuple[str, dict[str, str], dict[str, Any]]:

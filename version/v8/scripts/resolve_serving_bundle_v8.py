@@ -114,7 +114,7 @@ def _verify_compilation_lineage(run_dir: Path, circuit: dict, *, allow_serving_u
             "compiled_circuit_sha256": hashlib.sha256(json.dumps(compiled, sort_keys=True, separators=(",", ":")).encode()).hexdigest()}
 
 
-def _runtime_dependencies(run_dir: Path, v8_root: Path) -> list[str]:
+def resolve_runtime_dependencies(run_dir: Path, v8_root: Path = V8_ROOT) -> list[str]:
     """Resolve selected calls against the registry used for generated code."""
     registry_path = v8_root / "kernel_maps/KERNEL_REGISTRY.json"
     registry_hash = sha256_file(registry_path)
@@ -124,7 +124,7 @@ def _runtime_dependencies(run_dir: Path, v8_root: Path) -> list[str]:
     compiled_hashes = [digest for path, digest in sources.items()
                        if Path(path).name == "KERNEL_REGISTRY.json"]
     if compiled_hashes != [registry_hash]:
-        raise ValueError("kernel registry differs from compiled generated runtime; rebuild before serving")
+        raise ValueError("kernel registry differs from compiled generated runtime; rebuild before inference")
     registry = _json(registry_path)
     kernels = registry.get("kernels")
     if not isinstance(kernels, list) or any(not isinstance(item, dict) for item in kernels):
@@ -194,7 +194,7 @@ def resolve_serving_bundle(run_dir: Path, circuit_path: Path, *, variant: str | 
     if config.get("model") is None and _json(run_dir / "weights_manifest.json").get("model") != circuit.get("name"):
         raise ValueError("circuit does not match compiled manifest model")
     lineage = _verify_compilation_lineage(run_dir, circuit, allow_serving_update=allow_serving_update)
-    runtime_dependencies = _runtime_dependencies(run_dir, v8_root)
+    runtime_dependencies = resolve_runtime_dependencies(run_dir, v8_root)
     publisher = _publisher_templates(run_dir)
     assets: dict[str, dict] = {}
 
