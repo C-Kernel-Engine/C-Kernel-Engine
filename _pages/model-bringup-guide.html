@@ -1424,6 +1424,20 @@ python3 version/v8/scripts/xray_layer_output_sweep_v8.py \
   The full 64K model comparison and process memory measurement are pending.
   See the <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/docs/notes/artifacts/inkling2_mini_q8_sliding_kv.json">build and fixture evidence</a>.</p>
 
+  <h3 id="inkling2-mini-parallel-decode">Inkling Q8_0 parallel decode experts</h3>
+  <p>The resident replay can reserve independent per-route scratch for a single
+  decode row with <code>--parallel-decode-experts</code> and at least two
+  threads. The provider projects experts independently, then applies the
+  original ordered FP32 weighted reduction. It uses serial execution when
+  the parallel workspace or OpenMP support is unavailable.</p>
+  <p>In three paired generated-C trials on P3 E-cores, three forced decode
+  tokens near position 32768 took 5.98 seconds with parallel
+  expert projections versus 9.09 seconds with serial expert projections.
+  All four measured logit rows and 288 mutable state regions matched bitwise.
+  The prefix state was seeded. This comparison uses the same model weights
+  across generated variants while another workload runs on the P-cores.
+  See the <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/docs/notes/artifacts/inkling2_mini_q8_parallel_decode.json">matched replay evidence</a>.</p>
+
   <h3 id="inkling2-mini-continuation-replay">Inkling Q8_0 continuation replay</h3>
   <p>The layer 2 Q input contains one changed Q8 scale on the eight-token
   trace. Replacing the incoming layer 1 residual with the captured oracle

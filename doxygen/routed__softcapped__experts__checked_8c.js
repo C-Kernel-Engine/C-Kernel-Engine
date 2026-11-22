@@ -8,9 +8,12 @@ var routed__softcapped__experts__checked_8c =
       [ "EXPERT_Q8_0", "routed__softcapped__experts__checked_8c.html#a9215a77bd991b11391d98d0379a07c96a5eaa96d48c93163bc2846c2ea6d4b4c3", null ],
       [ "EXPERT_IQ4_NL", "routed__softcapped__experts__checked_8c.html#a9215a77bd991b11391d98d0379a07c96aa67db061b8ec54a4d8bf3d3530101ab0", null ]
     ] ],
+    [ "combine_expert", "routed__softcapped__experts__checked_8c.html#aebd45de7bc5d639ce6524c56aa71b1e3", null ],
     [ "contains_overlap", "routed__softcapped__experts__checked_8c.html#a58ff4d23678fb87afe4bdb501b07c054", null ],
     [ "expert_dot", "routed__softcapped__experts__checked_8c.html#a12058ac45a5ce809600c431dfa137986", null ],
+    [ "order_slots", "routed__softcapped__experts__checked_8c.html#a7574aa1207792345ea8d241703e85fa4", null ],
     [ "packed_block_bytes", "routed__softcapped__experts__checked_8c.html#a6abea59d88c3c9a752719519301cea7a", null ],
+    [ "project_expert", "routed__softcapped__experts__checked_8c.html#aad5dfe9f773dfae20fa74c6dfbf245b0", null ],
     [ "region", "routed__softcapped__experts__checked_8c.html#a0596a7029552c6390c8ec30dbba5d296", null ],
     [ "routed_softcapped_experts", "routed__softcapped__experts__checked_8c.html#a0aca1c0006bd2c840f46d998e94754d9", null ],
     [ "routed_softcapped_experts_checked_f32", "routed__softcapped__experts__checked_8c.html#a37bc165b431bb8b431fc6801ea12543f", null ],

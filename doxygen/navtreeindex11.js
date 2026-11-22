@@ -112,9 +112,10 @@ var NAVTREEINDEX11 =
 "ckernel__model__load__v4_8h.html#a216e94b7cc4499f2199a523bb2621022":[2,0,0,53,0],
 "ckernel__model__load__v4_8h_source.html":[2,0,0,53],
 "ckernel__normalization__checked_8h.html":[2,0,0,54],
-"ckernel__normalization__checked_8h.html#a23b2efa3c66802b08faf84629277c722":[2,0,0,54,1],
-"ckernel__normalization__checked_8h.html#a755ec1f1d7fe29363dc43fb6d2ea3173":[2,0,0,54,0],
-"ckernel__normalization__checked_8h.html#ada75ccba3f692924bba36d5aca4f73b9":[2,0,0,54,2],
+"ckernel__normalization__checked_8h.html#a23b2efa3c66802b08faf84629277c722":[2,0,0,54,2],
+"ckernel__normalization__checked_8h.html#a755ec1f1d7fe29363dc43fb6d2ea3173":[2,0,0,54,1],
+"ckernel__normalization__checked_8h.html#aa8be856b00a74c14fa4eae04a63fd77b":[2,0,0,54,0],
+"ckernel__normalization__checked_8h.html#ada75ccba3f692924bba36d5aca4f73b9":[2,0,0,54,3],
 "ckernel__normalization__checked_8h_source.html":[2,0,0,54],
 "ckernel__orchestration_8c.html":[2,0,1,25],
 "ckernel__orchestration_8c.html#a0020aef4ce512b3840b824a46e206dca":[2,0,1,25,0],
@@ -248,6 +249,5 @@ var NAVTREEINDEX11 =
 "ckernel__registry_8h_source.html":[2,0,0,57],
 "ckernel__repetition__penalty__checked_8h.html":[2,0,0,58],
 "ckernel__repetition__penalty__checked_8h.html#a14792d2a5d13a3d5e1ecd9114243fde3":[2,0,0,58,0],
-"ckernel__repetition__penalty__checked_8h_source.html":[2,0,0,58],
-"ckernel__runtime__extent_8h.html":[2,0,0,59]
+"ckernel__repetition__penalty__checked_8h_source.html":[2,0,0,58]
 };

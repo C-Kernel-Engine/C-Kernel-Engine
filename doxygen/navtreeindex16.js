@@ -1,5 +1,6 @@
 var NAVTREEINDEX16 =
 {
+"gemm__kernels__q8__0_8c.html#aea5f7a52ed3f21e0c6795766cfb28751":[2,0,1,1,91,24],
 "gemm__kernels__q8__0_8c.html#aeb957672a1aa94abab5a5aac111742d3":[2,0,1,1,91,10],
 "gemm__kernels__q8__0_8c.html#af81f5e920a8025d1f3034b56b43f42dc":[2,0,1,1,91,13],
 "gemm__kernels__q8__0_8c.html#af900f8a5b4172fadbb2342b63276e7c3":[2,0,1,1,91,4],
@@ -248,6 +249,5 @@ var NAVTREEINDEX16 =
 "grouped__cross__entropy_8c_source.html":[2,0,1,1,99],
 "grouped__weighted__rows_8c.html":[2,0,1,1,100],
 "grouped__weighted__rows_8c.html#a43a2bce256149887d9ed75bace12e37b":[2,0,1,1,100,2],
-"grouped__weighted__rows_8c.html#a663979e0a1a16cab1d8740fef930c64f":[2,0,1,1,100,3],
-"grouped__weighted__rows_8c.html#ab7af94539e0c32290ebe2af99ea46563":[2,0,1,1,100,0]
+"grouped__weighted__rows_8c.html#a663979e0a1a16cab1d8740fef930c64f":[2,0,1,1,100,3]
 };

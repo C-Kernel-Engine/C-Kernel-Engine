@@ -130,6 +130,7 @@ $(function(){initNavTree('layernorm__kernels_8c.html','',''); });
 <p>LayerNorm forward/backward kernels with SIMD (SSE/AVX/AVX512).  
 <a href="#details">More...</a></p>
 <div class="textblock"><code>#include &quot;<a class="el" href="ckernel__engine_8h_source.html">ckernel_engine.h</a>&quot;</code><br />
+<code>#include &quot;<a class="el" href="ckernel__normalization__checked_8h_source.html">ckernel_normalization_checked.h</a>&quot;</code><br />
 <code>#include &quot;<a class="el" href="bf16__utils_8h_source.html">bf16_utils.h</a>&quot;</code><br />
 <code>#include &lt;math.h&gt;</code><br />
 <code>#include &lt;stdlib.h&gt;</code><br />
@@ -138,8 +139,9 @@ $(function(){initNavTree('layernorm__kernels_8c.html','',''); });
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-func-members" class="groupheader"><a id="func-members" name="func-members"></a>
 Functions</h2></td></tr>
+<tr class="memitem:aa8be856b00a74c14fa4eae04a63fd77b" id="r_aa8be856b00a74c14fa4eae04a63fd77b"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#aa8be856b00a74c14fa4eae04a63fd77b">ck_layernorm_row_fixed_chunk4_f32</a> (const float *input, const float *gamma, const float *beta, float *output, float *mean, float *rstd, int channels, float epsilon)</td></tr>
 <tr class="memitem:a8d349f047d6654b3a351fb62e0b20e87" id="r_a8d349f047d6654b3a351fb62e0b20e87"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a8d349f047d6654b3a351fb62e0b20e87">layernorm_backward_kernel</a> (const float *d_output, const float *input, const float *gamma, const float *mean, const float *rstd, float *d_input, float *d_gamma, float *d_beta, int tokens, int d_model, int aligned_embed_dim)</td></tr>
-<tr class="memitem:a1af14e2cfa9e5ef4647d1701325f103e" id="r_a1af14e2cfa9e5ef4647d1701325f103e"><td class="memItemLeft" align="right" valign="top">static void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a1af14e2cfa9e5ef4647d1701325f103e">layernorm_forward_ggml_exact</a> (const float *input, const float *gamma, const float *beta, float *output, float *mean_cache, float *rstd_cache, int tokens, int d_model, int input_stride, int output_stride, int aligned_embed_dim, float eps)</td></tr>
+<tr class="memitem:ab7eb718238b03c5464550303af26bbad" id="r_ab7eb718238b03c5464550303af26bbad"><td class="memItemLeft" align="right" valign="top">static void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#ab7eb718238b03c5464550303af26bbad">layernorm_forward_ggml_exact</a> (const float *input, const float *gamma, const float *beta, float *output, float *mean_cache, float *rstd_cache, int tokens, int d_model, int input_stride, int output_stride, int aligned_embed_dim, float eps, int fixed_chunk4)</td></tr>
 <tr class="memitem:ace47573bf5278260d2652f4fb069bb9e" id="r_ace47573bf5278260d2652f4fb069bb9e"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#ace47573bf5278260d2652f4fb069bb9e">layernorm_forward_rolled_slice</a> (const float *__restrict input_slice_base, const float *__restrict gamma, const float *__restrict beta, float *__restrict output_slice_base, float *__restrict mean_cache_slice, float *__restrict rstd_cache_slice, int num_tokens_in_slice, int d_model, int aligned_embed_dim, float eps)</td></tr>
 <tr class="memitem:afd2e784d7b2b3ac7eb93e6f87c091fae" id="r_afd2e784d7b2b3ac7eb93e6f87c091fae"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#afd2e784d7b2b3ac7eb93e6f87c091fae">layernorm_forward_unrolled_slice</a> (const float *__restrict input_slice_base, const float *__restrict gamma, const float *__restrict beta, float *__restrict output_slice_base, float *__restrict mean_cache_slice, float *__restrict rstd_cache_slice, int num_tokens_in_slice, int d_model, float eps)</td></tr>
 <tr class="memitem:aabe13737d121479113ffd94b43e58087" id="r_aabe13737d121479113ffd94b43e58087"><td class="memItemLeft" align="right" valign="top">static void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#aabe13737d121479113ffd94b43e58087">layernorm_forward_unrolled_slice_scalar</a> (const float *__restrict input_slice_base, const float *__restrict gamma, const float *__restrict beta, float *__restrict output_slice_base, float *__restrict mean_cache_slice, float *__restrict rstd_cache_slice, int num_tokens_in_slice, int d_model, float eps)</td></tr>
@@ -164,6 +166,69 @@ CK-ENGINE KERNEL RULES:</h1>
 
 <p class="definition">Definition in file <a class="el" href="layernorm__kernels_8c_source.html">layernorm_kernels.c</a>.</p>
 </div><a name="doc-func-members" id="doc-func-members"></a><h2 id="header-doc-func-members" class="groupheader">Function Documentation</h2>
+<a id="aa8be856b00a74c14fa4eae04a63fd77b" name="aa8be856b00a74c14fa4eae04a63fd77b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aa8be856b00a74c14fa4eae04a63fd77b">&#9670;&#160;</a></span>ck_layernorm_row_fixed_chunk4_f32()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void ck_layernorm_row_fixed_chunk4_f32 </td>
+          <td>(</td>
+          <td class="paramtype">const float *</td>          <td class="paramname"><span class="paramname"><em>input</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *</td>          <td class="paramname"><span class="paramname"><em>gamma</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *</td>          <td class="paramname"><span class="paramname"><em>beta</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *</td>          <td class="paramname"><span class="paramname"><em>output</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *</td>          <td class="paramname"><span class="paramname"><em>mean</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *</td>          <td class="paramname"><span class="paramname"><em>rstd</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int</td>          <td class="paramname"><span class="paramname"><em>channels</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float</td>          <td class="paramname"><span class="paramname"><em>epsilon</em></span>&#160;)</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="layernorm__kernels_8c_source.html#l00801">801</a> of file <a class="el" href="layernorm__kernels_8c_source.html">layernorm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  804</span>{</div>
+<div class="line"><span class="lineno">  805</span>    <a class="code hl_function" href="#ab7eb718238b03c5464550303af26bbad">layernorm_forward_ggml_exact</a>(input, gamma, beta, output, mean, rstd,</div>
+<div class="line"><span class="lineno">  806</span>                                 1, channels, channels, channels, channels,</div>
+<div class="line"><span class="lineno">  807</span>                                 epsilon, 1);</div>
+<div class="line"><span class="lineno">  808</span>}</div>
+<div class="ttc" id="alayernorm__kernels_8c_html_ab7eb718238b03c5464550303af26bbad"><div class="ttname"><a href="#ab7eb718238b03c5464550303af26bbad">layernorm_forward_ggml_exact</a></div><div class="ttdeci">static void layernorm_forward_ggml_exact(const float *input, const float *gamma, const float *beta, float *output, float *mean_cache, float *rstd_cache, int tokens, int d_model, int input_stride, int output_stride, int aligned_embed_dim, float eps, int fixed_chunk4)</div><div class="ttdef"><b>Definition</b> <a href="layernorm__kernels_8c_source.html#l00047">layernorm_kernels.c:47</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="layernorm__kernels_8c_source.html#l00047">layernorm_forward_ggml_exact()</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="layernorm__rows__checked_8c_source.html#l00016">layernorm_rows_checked_f32()</a>.</p>
+
+</div>
+</div>
 <a id="a8d349f047d6654b3a351fb62e0b20e87" name="a8d349f047d6654b3a351fb62e0b20e87"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a8d349f047d6654b3a351fb62e0b20e87">&#9670;&#160;</a></span>layernorm_backward_kernel()</h2>
 
@@ -228,73 +293,73 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="layernorm__kernels_8c_source.html#l01007">1007</a> of file <a class="el" href="layernorm__kernels_8c_source.html">layernorm_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 1016</span>{</div>
-<div class="line"><span class="lineno"> 1017</span>    <span class="keywordtype">int</span> T = tokens;</div>
-<div class="line"><span class="lineno"> 1018</span>    <span class="keywordtype">int</span> D = d_model;</div>
-<div class="line"><span class="lineno"> 1019</span>    <span class="keywordtype">int</span> aligned_D = aligned_embed_dim;</div>
-<div class="line"><span class="lineno"> 1020</span> </div>
-<div class="line"><span class="lineno"> 1021</span>    <span class="comment">// Per-token input gradients</span></div>
-<div class="line"><span class="lineno"> 1022</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; T; ++t) {</div>
-<div class="line"><span class="lineno"> 1023</span>        <span class="keywordtype">float</span> mean_t = mean[t];</div>
-<div class="line"><span class="lineno"> 1024</span>        <span class="keywordtype">float</span> rstd_t = rstd[t];</div>
-<div class="line"><span class="lineno"> 1025</span> </div>
-<div class="line"><span class="lineno"> 1026</span>        <span class="keywordtype">float</span> d_y_gamma_sum = 0.0f;</div>
-<div class="line"><span class="lineno"> 1027</span>        <span class="keywordtype">float</span> d_y_gamma_xhat_sum = 0.0f;</div>
-<div class="line"><span class="lineno"> 1028</span> </div>
-<div class="line"><span class="lineno"> 1029</span>        <span class="comment">// First pass: compute sums</span></div>
-<div class="line"><span class="lineno"> 1030</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; D; ++d) {</div>
-<div class="line"><span class="lineno"> 1031</span>            <span class="keywordtype">float</span> x = input[t * aligned_D + d];</div>
-<div class="line"><span class="lineno"> 1032</span>            <span class="keywordtype">float</span> x_hat = (x - mean_t) * rstd_t;</div>
-<div class="line"><span class="lineno"> 1033</span>            <span class="keywordtype">float</span> d_y = d_output[t * aligned_D + d];</div>
-<div class="line"><span class="lineno"> 1034</span>            <span class="keywordtype">float</span> d_y_gamma = d_y * gamma[d];</div>
-<div class="line"><span class="lineno"> 1035</span> </div>
-<div class="line"><span class="lineno"> 1036</span>            d_y_gamma_sum += d_y_gamma;</div>
-<div class="line"><span class="lineno"> 1037</span>            d_y_gamma_xhat_sum += d_y_gamma * x_hat;</div>
-<div class="line"><span class="lineno"> 1038</span>        }</div>
-<div class="line"><span class="lineno"> 1039</span> </div>
-<div class="line"><span class="lineno"> 1040</span>        <span class="comment">// Second pass: compute input gradients</span></div>
-<div class="line"><span class="lineno"> 1041</span>        <span class="keywordtype">float</span> scale = rstd_t / (float)D;</div>
-<div class="line"><span class="lineno"> 1042</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; D; ++d) {</div>
-<div class="line"><span class="lineno"> 1043</span>            <span class="keywordtype">float</span> x = input[t * aligned_D + d];</div>
-<div class="line"><span class="lineno"> 1044</span>            <span class="keywordtype">float</span> x_hat = (x - mean_t) * rstd_t;</div>
-<div class="line"><span class="lineno"> 1045</span>            <span class="keywordtype">float</span> d_y = d_output[t * aligned_D + d];</div>
-<div class="line"><span class="lineno"> 1046</span> </div>
-<div class="line"><span class="lineno"> 1047</span>            d_input[t * aligned_D + d] =</div>
-<div class="line"><span class="lineno"> 1048</span>                scale * ((float)D * d_y * gamma[d] - d_y_gamma_sum - x_hat * d_y_gamma_xhat_sum);</div>
-<div class="line"><span class="lineno"> 1049</span>        }</div>
-<div class="line"><span class="lineno"> 1050</span> </div>
-<div class="line"><span class="lineno"> 1051</span>        <span class="comment">// Zero padding for aligned dimension beyond D</span></div>
-<div class="line"><span class="lineno"> 1052</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = D; d &lt; aligned_D; ++d) {</div>
-<div class="line"><span class="lineno"> 1053</span>            d_input[t * aligned_D + d] = 0.0f;</div>
-<div class="line"><span class="lineno"> 1054</span>        }</div>
-<div class="line"><span class="lineno"> 1055</span>    }</div>
-<div class="line"><span class="lineno"> 1056</span> </div>
-<div class="line"><span class="lineno"> 1057</span>    <span class="comment">// Parameter gradients (gamma, beta)</span></div>
-<div class="line"><span class="lineno"> 1058</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; D; ++d) {</div>
-<div class="line"><span class="lineno"> 1059</span>        <span class="keywordtype">float</span> gamma_grad = 0.0f;</div>
-<div class="line"><span class="lineno"> 1060</span>        <span class="keywordtype">float</span> beta_grad = 0.0f;</div>
-<div class="line"><span class="lineno"> 1061</span> </div>
-<div class="line"><span class="lineno"> 1062</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; T; ++t) {</div>
+<p class="definition">Definition at line <a class="el" href="layernorm__kernels_8c_source.html#l01039">1039</a> of file <a class="el" href="layernorm__kernels_8c_source.html">layernorm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 1048</span>{</div>
+<div class="line"><span class="lineno"> 1049</span>    <span class="keywordtype">int</span> T = tokens;</div>
+<div class="line"><span class="lineno"> 1050</span>    <span class="keywordtype">int</span> D = d_model;</div>
+<div class="line"><span class="lineno"> 1051</span>    <span class="keywordtype">int</span> aligned_D = aligned_embed_dim;</div>
+<div class="line"><span class="lineno"> 1052</span> </div>
+<div class="line"><span class="lineno"> 1053</span>    <span class="comment">// Per-token input gradients</span></div>
+<div class="line"><span class="lineno"> 1054</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; T; ++t) {</div>
+<div class="line"><span class="lineno"> 1055</span>        <span class="keywordtype">float</span> mean_t = mean[t];</div>
+<div class="line"><span class="lineno"> 1056</span>        <span class="keywordtype">float</span> rstd_t = rstd[t];</div>
+<div class="line"><span class="lineno"> 1057</span> </div>
+<div class="line"><span class="lineno"> 1058</span>        <span class="keywordtype">float</span> d_y_gamma_sum = 0.0f;</div>
+<div class="line"><span class="lineno"> 1059</span>        <span class="keywordtype">float</span> d_y_gamma_xhat_sum = 0.0f;</div>
+<div class="line"><span class="lineno"> 1060</span> </div>
+<div class="line"><span class="lineno"> 1061</span>        <span class="comment">// First pass: compute sums</span></div>
+<div class="line"><span class="lineno"> 1062</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; D; ++d) {</div>
 <div class="line"><span class="lineno"> 1063</span>            <span class="keywordtype">float</span> x = input[t * aligned_D + d];</div>
-<div class="line"><span class="lineno"> 1064</span>            <span class="keywordtype">float</span> x_hat = (x - mean[t]) * rstd[t];</div>
+<div class="line"><span class="lineno"> 1064</span>            <span class="keywordtype">float</span> x_hat = (x - mean_t) * rstd_t;</div>
 <div class="line"><span class="lineno"> 1065</span>            <span class="keywordtype">float</span> d_y = d_output[t * aligned_D + d];</div>
-<div class="line"><span class="lineno"> 1066</span> </div>
-<div class="line"><span class="lineno"> 1067</span>            gamma_grad += d_y * x_hat;</div>
-<div class="line"><span class="lineno"> 1068</span>            beta_grad += d_y;</div>
-<div class="line"><span class="lineno"> 1069</span>        }</div>
-<div class="line"><span class="lineno"> 1070</span> </div>
-<div class="line"><span class="lineno"> 1071</span>        d_gamma[d] += gamma_grad;</div>
-<div class="line"><span class="lineno"> 1072</span>        d_beta[d] += beta_grad;</div>
-<div class="line"><span class="lineno"> 1073</span>    }</div>
-<div class="line"><span class="lineno"> 1074</span>}</div>
+<div class="line"><span class="lineno"> 1066</span>            <span class="keywordtype">float</span> d_y_gamma = d_y * gamma[d];</div>
+<div class="line"><span class="lineno"> 1067</span> </div>
+<div class="line"><span class="lineno"> 1068</span>            d_y_gamma_sum += d_y_gamma;</div>
+<div class="line"><span class="lineno"> 1069</span>            d_y_gamma_xhat_sum += d_y_gamma * x_hat;</div>
+<div class="line"><span class="lineno"> 1070</span>        }</div>
+<div class="line"><span class="lineno"> 1071</span> </div>
+<div class="line"><span class="lineno"> 1072</span>        <span class="comment">// Second pass: compute input gradients</span></div>
+<div class="line"><span class="lineno"> 1073</span>        <span class="keywordtype">float</span> scale = rstd_t / (float)D;</div>
+<div class="line"><span class="lineno"> 1074</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; D; ++d) {</div>
+<div class="line"><span class="lineno"> 1075</span>            <span class="keywordtype">float</span> x = input[t * aligned_D + d];</div>
+<div class="line"><span class="lineno"> 1076</span>            <span class="keywordtype">float</span> x_hat = (x - mean_t) * rstd_t;</div>
+<div class="line"><span class="lineno"> 1077</span>            <span class="keywordtype">float</span> d_y = d_output[t * aligned_D + d];</div>
+<div class="line"><span class="lineno"> 1078</span> </div>
+<div class="line"><span class="lineno"> 1079</span>            d_input[t * aligned_D + d] =</div>
+<div class="line"><span class="lineno"> 1080</span>                scale * ((float)D * d_y * gamma[d] - d_y_gamma_sum - x_hat * d_y_gamma_xhat_sum);</div>
+<div class="line"><span class="lineno"> 1081</span>        }</div>
+<div class="line"><span class="lineno"> 1082</span> </div>
+<div class="line"><span class="lineno"> 1083</span>        <span class="comment">// Zero padding for aligned dimension beyond D</span></div>
+<div class="line"><span class="lineno"> 1084</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = D; d &lt; aligned_D; ++d) {</div>
+<div class="line"><span class="lineno"> 1085</span>            d_input[t * aligned_D + d] = 0.0f;</div>
+<div class="line"><span class="lineno"> 1086</span>        }</div>
+<div class="line"><span class="lineno"> 1087</span>    }</div>
+<div class="line"><span class="lineno"> 1088</span> </div>
+<div class="line"><span class="lineno"> 1089</span>    <span class="comment">// Parameter gradients (gamma, beta)</span></div>
+<div class="line"><span class="lineno"> 1090</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; D; ++d) {</div>
+<div class="line"><span class="lineno"> 1091</span>        <span class="keywordtype">float</span> gamma_grad = 0.0f;</div>
+<div class="line"><span class="lineno"> 1092</span>        <span class="keywordtype">float</span> beta_grad = 0.0f;</div>
+<div class="line"><span class="lineno"> 1093</span> </div>
+<div class="line"><span class="lineno"> 1094</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; T; ++t) {</div>
+<div class="line"><span class="lineno"> 1095</span>            <span class="keywordtype">float</span> x = input[t * aligned_D + d];</div>
+<div class="line"><span class="lineno"> 1096</span>            <span class="keywordtype">float</span> x_hat = (x - mean[t]) * rstd[t];</div>
+<div class="line"><span class="lineno"> 1097</span>            <span class="keywordtype">float</span> d_y = d_output[t * aligned_D + d];</div>
+<div class="line"><span class="lineno"> 1098</span> </div>
+<div class="line"><span class="lineno"> 1099</span>            gamma_grad += d_y * x_hat;</div>
+<div class="line"><span class="lineno"> 1100</span>            beta_grad += d_y;</div>
+<div class="line"><span class="lineno"> 1101</span>        }</div>
+<div class="line"><span class="lineno"> 1102</span> </div>
+<div class="line"><span class="lineno"> 1103</span>        d_gamma[d] += gamma_grad;</div>
+<div class="line"><span class="lineno"> 1104</span>        d_beta[d] += beta_grad;</div>
+<div class="line"><span class="lineno"> 1105</span>    }</div>
+<div class="line"><span class="lineno"> 1106</span>}</div>
 </div><!-- fragment -->
 <p class="reference">Referenced by <a class="el" href="layernorm__kernels__bf16_8c_source.html#l00084">layernorm_backward_kernel_bf16()</a>.</p>
 
 </div>
 </div>
-<a id="a1af14e2cfa9e5ef4647d1701325f103e" name="a1af14e2cfa9e5ef4647d1701325f103e"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a1af14e2cfa9e5ef4647d1701325f103e">&#9670;&#160;</a></span>layernorm_forward_ggml_exact()</h2>
+<a id="ab7eb718238b03c5464550303af26bbad" name="ab7eb718238b03c5464550303af26bbad"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ab7eb718238b03c5464550303af26bbad">&#9670;&#160;</a></span>layernorm_forward_ggml_exact()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -360,7 +425,12 @@ CK-ENGINE KERNEL RULES:</h1>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">float</td>          <td class="paramname"><span class="paramname"><em>eps</em></span>&#160;)</td>
+          <td class="paramtype">float</td>          <td class="paramname"><span class="paramname"><em>eps</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int</td>          <td class="paramname"><span class="paramname"><em>fixed_chunk4</em></span>&#160;)</td>
         </tr>
       </table>
   </td>
@@ -370,113 +440,134 @@ CK-ENGINE KERNEL RULES:</h1>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="layernorm__kernels_8c_source.html#l00046">46</a> of file <a class="el" href="layernorm__kernels_8c_source.html">layernorm_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   58</span>{</div>
-<div class="line"><span class="lineno">   59</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; tokens; ++t) {</div>
-<div class="line"><span class="lineno">   60</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *x = input + (size_t)t * (<span class="keywordtype">size_t</span>)input_stride;</div>
-<div class="line"><span class="lineno">   61</span>        <span class="keywordtype">float</span> *y = output + (size_t)t * (<span class="keywordtype">size_t</span>)output_stride;</div>
-<div class="line"><span class="lineno">   62</span> </div>
-<div class="line"><span class="lineno">   63</span>        <span class="keywordtype">double</span> sum_acc = 0.0;</div>
-<div class="line"><span class="lineno">   64</span><span class="preprocessor">#if defined(__clang__)</span></div>
-<div class="line"><span class="lineno">   65</span><span class="preprocessor">#pragma clang loop vectorize(disable)</span></div>
-<div class="line"><span class="lineno">   66</span><span class="preprocessor">#pragma clang loop interleave(disable)</span></div>
-<div class="line"><span class="lineno">   67</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">   68</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; d_model; ++i) {</div>
-<div class="line"><span class="lineno">   69</span>            sum_acc += (double)x[i];</div>
-<div class="line"><span class="lineno">   70</span>        }</div>
-<div class="line"><span class="lineno">   71</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> sum = (float)sum_acc;</div>
-<div class="line"><span class="lineno">   72</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> mean = sum / (float)d_model;</div>
-<div class="line"><span class="lineno">   73</span> </div>
-<div class="line"><span class="lineno">   74</span>        <span class="keywordtype">double</span> var_acc = 0.0;</div>
-<div class="line"><span class="lineno">   75</span>        <span class="keywordtype">int</span> i = 0;</div>
-<div class="line"><span class="lineno">   76</span><span class="preprocessor">#if defined(__AVX2__) &amp;&amp; defined(__FMA__)</span></div>
-<div class="line"><span class="lineno">   77</span>        <span class="comment">/* This provider promises ggml&#39;s ordered AVX2 reduction. Keep that</span></div>
-<div class="line"><span class="lineno">   78</span><span class="comment">         * arithmetic identity on AVX-512 hosts instead of widening it based</span></div>
-<div class="line"><span class="lineno">   79</span><span class="comment">         * on the compiler target. */</span></div>
-<div class="line"><span class="lineno">   80</span>        <span class="keywordflow">for</span> (; i + 7 &lt; d_model; i += 8) {</div>
-<div class="line"><span class="lineno">   81</span>            __m256 val = _mm256_sub_ps(_mm256_loadu_ps(x + i),</div>
-<div class="line"><span class="lineno">   82</span>                                       _mm256_set1_ps(mean));</div>
-<div class="line"><span class="lineno">   83</span>            _mm256_storeu_ps(y + i, val);</div>
-<div class="line"><span class="lineno">   84</span>            val = _mm256_mul_ps(val, val);</div>
-<div class="line"><span class="lineno">   85</span>            __m128 val2 = _mm_add_ps(_mm256_extractf128_ps(val, 1),</div>
-<div class="line"><span class="lineno">   86</span>                                     _mm256_castps256_ps128(val));</div>
-<div class="line"><span class="lineno">   87</span>            val2 = _mm_add_ps(val2, _mm_movehl_ps(val2, val2));</div>
-<div class="line"><span class="lineno">   88</span>            val2 = _mm_add_ss(val2, _mm_movehdup_ps(val2));</div>
-<div class="line"><span class="lineno">   89</span>            var_acc += (double)_mm_cvtss_f32(val2);</div>
-<div class="line"><span class="lineno">   90</span>        }</div>
-<div class="line"><span class="lineno">   91</span><span class="preprocessor">#elif defined(__SSE2__)</span></div>
-<div class="line"><span class="lineno">   92</span>        <span class="keywordflow">for</span> (; i + 3 &lt; d_model; i += 4) {</div>
-<div class="line"><span class="lineno">   93</span>            __m128 val = _mm_sub_ps(_mm_loadu_ps(x + i),</div>
-<div class="line"><span class="lineno">   94</span>                                    _mm_set1_ps(mean));</div>
-<div class="line"><span class="lineno">   95</span>            _mm_storeu_ps(y + i, val);</div>
-<div class="line"><span class="lineno">   96</span>            val = _mm_mul_ps(val, val);</div>
-<div class="line"><span class="lineno">   97</span><span class="preprocessor">#if defined(__AVX__) || defined(__AVX2__) || defined(__AVX512F__)</span></div>
-<div class="line"><span class="lineno">   98</span>            val = _mm_add_ps(val, _mm_movehl_ps(val, val));</div>
-<div class="line"><span class="lineno">   99</span>            val = _mm_add_ss(val, _mm_movehdup_ps(val));</div>
-<div class="line"><span class="lineno">  100</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno">  101</span>            __m128 tmp = _mm_shuffle_ps(val, val, _MM_SHUFFLE(2, 3, 0, 1));</div>
-<div class="line"><span class="lineno">  102</span>            val = _mm_add_ps(val, tmp);</div>
-<div class="line"><span class="lineno">  103</span>            tmp = _mm_movehl_ps(tmp, val);</div>
-<div class="line"><span class="lineno">  104</span>            val = _mm_add_ss(val, tmp);</div>
-<div class="line"><span class="lineno">  105</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  106</span>            var_acc += (double)_mm_cvtss_f32(val);</div>
-<div class="line"><span class="lineno">  107</span>        }</div>
-<div class="line"><span class="lineno">  108</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  109</span><span class="preprocessor">#if defined(__clang__)</span></div>
-<div class="line"><span class="lineno">  110</span><span class="preprocessor">#pragma clang loop vectorize(disable)</span></div>
-<div class="line"><span class="lineno">  111</span><span class="preprocessor">#pragma clang loop interleave(disable)</span></div>
-<div class="line"><span class="lineno">  112</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  113</span>        <span class="keywordflow">for</span> (; i &lt; d_model; ++i) {</div>
-<div class="line"><span class="lineno">  114</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> centered = x[i] - mean;</div>
-<div class="line"><span class="lineno">  115</span>            y[i] = centered;</div>
-<div class="line"><span class="lineno">  116</span>            var_acc += (double)(centered * centered);</div>
-<div class="line"><span class="lineno">  117</span>        }</div>
-<div class="line"><span class="lineno">  118</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> variance = (float)(var_acc / (<span class="keywordtype">double</span>)d_model);</div>
-<div class="line"><span class="lineno">  119</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> scale = 1.0f / sqrtf(variance + eps);</div>
-<div class="line"><span class="lineno">  120</span> </div>
-<div class="line"><span class="lineno">  121</span>        <span class="keywordflow">if</span> (mean_cache) {</div>
-<div class="line"><span class="lineno">  122</span>            mean_cache[t] = mean;</div>
-<div class="line"><span class="lineno">  123</span>        }</div>
-<div class="line"><span class="lineno">  124</span>        <span class="keywordflow">if</span> (rstd_cache) {</div>
-<div class="line"><span class="lineno">  125</span>            rstd_cache[t] = scale;</div>
-<div class="line"><span class="lineno">  126</span>        }</div>
-<div class="line"><span class="lineno">  127</span> </div>
-<div class="line"><span class="lineno">  128</span><span class="preprocessor">#if defined(__clang__)</span></div>
-<div class="line"><span class="lineno">  129</span><span class="preprocessor">#pragma clang loop vectorize(disable)</span></div>
-<div class="line"><span class="lineno">  130</span><span class="preprocessor">#pragma clang loop interleave(disable)</span></div>
-<div class="line"><span class="lineno">  131</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  132</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; d_model; ++i) {</div>
-<div class="line"><span class="lineno">  133</span>            y[i] *= scale;</div>
-<div class="line"><span class="lineno">  134</span>        }</div>
-<div class="line"><span class="lineno">  135</span>        <span class="keywordflow">if</span> (gamma) {</div>
-<div class="line"><span class="lineno">  136</span><span class="preprocessor">#if defined(__clang__)</span></div>
-<div class="line"><span class="lineno">  137</span><span class="preprocessor">#pragma clang loop vectorize(disable)</span></div>
-<div class="line"><span class="lineno">  138</span><span class="preprocessor">#pragma clang loop interleave(disable)</span></div>
-<div class="line"><span class="lineno">  139</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  140</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; d_model; ++i) {</div>
-<div class="line"><span class="lineno">  141</span>                y[i] *= gamma[i];</div>
-<div class="line"><span class="lineno">  142</span>            }</div>
-<div class="line"><span class="lineno">  143</span>        }</div>
-<div class="line"><span class="lineno">  144</span>        <span class="keywordflow">if</span> (beta) {</div>
-<div class="line"><span class="lineno">  145</span><span class="preprocessor">#if defined(__clang__)</span></div>
-<div class="line"><span class="lineno">  146</span><span class="preprocessor">#pragma clang loop vectorize(disable)</span></div>
-<div class="line"><span class="lineno">  147</span><span class="preprocessor">#pragma clang loop interleave(disable)</span></div>
-<div class="line"><span class="lineno">  148</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  149</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; d_model; ++i) {</div>
-<div class="line"><span class="lineno">  150</span>                y[i] += beta[i];</div>
-<div class="line"><span class="lineno">  151</span>            }</div>
-<div class="line"><span class="lineno">  152</span>        }</div>
-<div class="line"><span class="lineno">  153</span> </div>
-<div class="line"><span class="lineno">  154</span>        <span class="keywordflow">if</span> (aligned_embed_dim &gt; d_model) {</div>
-<div class="line"><span class="lineno">  155</span>            <a class="code hl_function" href="#a70f6e1d9794261350ce1a16212a4e0bb">zero_layernorm_padding</a>(y, d_model, aligned_embed_dim);</div>
-<div class="line"><span class="lineno">  156</span>        }</div>
-<div class="line"><span class="lineno">  157</span>    }</div>
-<div class="line"><span class="lineno">  158</span>}</div>
-<div class="ttc" id="alayernorm__kernels_8c_html_a70f6e1d9794261350ce1a16212a4e0bb"><div class="ttname"><a href="#a70f6e1d9794261350ce1a16212a4e0bb">zero_layernorm_padding</a></div><div class="ttdeci">static void zero_layernorm_padding(float *out_ptr, int d_model, int aligned_embed_dim)</div><div class="ttdef"><b>Definition</b> <a href="layernorm__kernels_8c_source.html#l00026">layernorm_kernels.c:26</a></div></div>
+<p class="definition">Definition at line <a class="el" href="layernorm__kernels_8c_source.html#l00047">47</a> of file <a class="el" href="layernorm__kernels_8c_source.html">layernorm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   60</span>{</div>
+<div class="line"><span class="lineno">   61</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; tokens; ++t) {</div>
+<div class="line"><span class="lineno">   62</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *x = input + (size_t)t * (<span class="keywordtype">size_t</span>)input_stride;</div>
+<div class="line"><span class="lineno">   63</span>        <span class="keywordtype">float</span> *y = output + (size_t)t * (<span class="keywordtype">size_t</span>)output_stride;</div>
+<div class="line"><span class="lineno">   64</span> </div>
+<div class="line"><span class="lineno">   65</span>        <span class="keywordtype">double</span> sum_acc = 0.0;</div>
+<div class="line"><span class="lineno">   66</span><span class="preprocessor">#if defined(__clang__)</span></div>
+<div class="line"><span class="lineno">   67</span><span class="preprocessor">#pragma clang loop vectorize(disable)</span></div>
+<div class="line"><span class="lineno">   68</span><span class="preprocessor">#pragma clang loop interleave(disable)</span></div>
+<div class="line"><span class="lineno">   69</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">   70</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; d_model; ++i) {</div>
+<div class="line"><span class="lineno">   71</span>            sum_acc += (double)x[i];</div>
+<div class="line"><span class="lineno">   72</span>        }</div>
+<div class="line"><span class="lineno">   73</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> sum = (float)sum_acc;</div>
+<div class="line"><span class="lineno">   74</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> mean = sum / (float)d_model;</div>
+<div class="line"><span class="lineno">   75</span> </div>
+<div class="line"><span class="lineno">   76</span>        <span class="keywordtype">double</span> var_acc = 0.0;</div>
+<div class="line"><span class="lineno">   77</span>        <span class="keywordtype">int</span> i = 0;</div>
+<div class="line"><span class="lineno">   78</span>        <span class="keywordflow">if</span> (fixed_chunk4) {</div>
+<div class="line"><span class="lineno">   79</span>            <span class="comment">/* Match the checked provider&#39;s baseline four-value variance</span></div>
+<div class="line"><span class="lineno">   80</span><span class="comment">             * reduction on all ISAs, including AVX2 and AVX-512 builds. */</span></div>
+<div class="line"><span class="lineno">   81</span>            <span class="keywordflow">for</span> (; i + 3 &lt; d_model; i += 4) {</div>
+<div class="line"><span class="lineno">   82</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> a = x[i] - mean;</div>
+<div class="line"><span class="lineno">   83</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> b = x[i + 1] - mean;</div>
+<div class="line"><span class="lineno">   84</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> c = x[i + 2] - mean;</div>
+<div class="line"><span class="lineno">   85</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> d = x[i + 3] - mean;</div>
+<div class="line"><span class="lineno">   86</span>                y[i] = a;</div>
+<div class="line"><span class="lineno">   87</span>                y[i + 1] = b;</div>
+<div class="line"><span class="lineno">   88</span>                y[i + 2] = c;</div>
+<div class="line"><span class="lineno">   89</span>                y[i + 3] = d;</div>
+<div class="line"><span class="lineno">   90</span>                <span class="comment">/* Products round to FP32 before the pairwise sums. */</span></div>
+<div class="line"><span class="lineno">   91</span>                <span class="keyword">volatile</span> <span class="keywordtype">float</span> aa = a * a;</div>
+<div class="line"><span class="lineno">   92</span>                <span class="keyword">volatile</span> <span class="keywordtype">float</span> bb = b * b;</div>
+<div class="line"><span class="lineno">   93</span>                <span class="keyword">volatile</span> <span class="keywordtype">float</span> cc = c * c;</div>
+<div class="line"><span class="lineno">   94</span>                <span class="keyword">volatile</span> <span class="keywordtype">float</span> dd = d * d;</div>
+<div class="line"><span class="lineno">   95</span>                var_acc += (double)((aa + bb) + (cc + dd));</div>
+<div class="line"><span class="lineno">   96</span>            }</div>
+<div class="line"><span class="lineno">   97</span>        } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno">   98</span><span class="preprocessor">#if defined(__AVX2__) &amp;&amp; defined(__FMA__)</span></div>
+<div class="line"><span class="lineno">   99</span>        <span class="comment">/* This provider promises ggml&#39;s ordered AVX2 reduction. Keep that</span></div>
+<div class="line"><span class="lineno">  100</span><span class="comment">         * arithmetic identity on AVX-512 hosts instead of widening it based</span></div>
+<div class="line"><span class="lineno">  101</span><span class="comment">         * on the compiler target. */</span></div>
+<div class="line"><span class="lineno">  102</span>        <span class="keywordflow">for</span> (; i + 7 &lt; d_model; i += 8) {</div>
+<div class="line"><span class="lineno">  103</span>            __m256 val = _mm256_sub_ps(_mm256_loadu_ps(x + i),</div>
+<div class="line"><span class="lineno">  104</span>                                       _mm256_set1_ps(mean));</div>
+<div class="line"><span class="lineno">  105</span>            _mm256_storeu_ps(y + i, val);</div>
+<div class="line"><span class="lineno">  106</span>            val = _mm256_mul_ps(val, val);</div>
+<div class="line"><span class="lineno">  107</span>            __m128 val2 = _mm_add_ps(_mm256_extractf128_ps(val, 1),</div>
+<div class="line"><span class="lineno">  108</span>                                     _mm256_castps256_ps128(val));</div>
+<div class="line"><span class="lineno">  109</span>            val2 = _mm_add_ps(val2, _mm_movehl_ps(val2, val2));</div>
+<div class="line"><span class="lineno">  110</span>            val2 = _mm_add_ss(val2, _mm_movehdup_ps(val2));</div>
+<div class="line"><span class="lineno">  111</span>            var_acc += (double)_mm_cvtss_f32(val2);</div>
+<div class="line"><span class="lineno">  112</span>        }</div>
+<div class="line"><span class="lineno">  113</span><span class="preprocessor">#elif defined(__SSE2__)</span></div>
+<div class="line"><span class="lineno">  114</span>        <span class="keywordflow">for</span> (; i + 3 &lt; d_model; i += 4) {</div>
+<div class="line"><span class="lineno">  115</span>            __m128 val = _mm_sub_ps(_mm_loadu_ps(x + i),</div>
+<div class="line"><span class="lineno">  116</span>                                    _mm_set1_ps(mean));</div>
+<div class="line"><span class="lineno">  117</span>            _mm_storeu_ps(y + i, val);</div>
+<div class="line"><span class="lineno">  118</span>            val = _mm_mul_ps(val, val);</div>
+<div class="line"><span class="lineno">  119</span><span class="preprocessor">#if defined(__AVX__) || defined(__AVX2__) || defined(__AVX512F__)</span></div>
+<div class="line"><span class="lineno">  120</span>            val = _mm_add_ps(val, _mm_movehl_ps(val, val));</div>
+<div class="line"><span class="lineno">  121</span>            val = _mm_add_ss(val, _mm_movehdup_ps(val));</div>
+<div class="line"><span class="lineno">  122</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno">  123</span>            __m128 tmp = _mm_shuffle_ps(val, val, _MM_SHUFFLE(2, 3, 0, 1));</div>
+<div class="line"><span class="lineno">  124</span>            val = _mm_add_ps(val, tmp);</div>
+<div class="line"><span class="lineno">  125</span>            tmp = _mm_movehl_ps(tmp, val);</div>
+<div class="line"><span class="lineno">  126</span>            val = _mm_add_ss(val, tmp);</div>
+<div class="line"><span class="lineno">  127</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  128</span>            var_acc += (double)_mm_cvtss_f32(val);</div>
+<div class="line"><span class="lineno">  129</span>        }</div>
+<div class="line"><span class="lineno">  130</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  131</span>        }</div>
+<div class="line"><span class="lineno">  132</span><span class="preprocessor">#if defined(__clang__)</span></div>
+<div class="line"><span class="lineno">  133</span><span class="preprocessor">#pragma clang loop vectorize(disable)</span></div>
+<div class="line"><span class="lineno">  134</span><span class="preprocessor">#pragma clang loop interleave(disable)</span></div>
+<div class="line"><span class="lineno">  135</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  136</span>        <span class="keywordflow">for</span> (; i &lt; d_model; ++i) {</div>
+<div class="line"><span class="lineno">  137</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> centered = x[i] - mean;</div>
+<div class="line"><span class="lineno">  138</span>            y[i] = centered;</div>
+<div class="line"><span class="lineno">  139</span>            var_acc += (double)(centered * centered);</div>
+<div class="line"><span class="lineno">  140</span>        }</div>
+<div class="line"><span class="lineno">  141</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> variance = (float)(var_acc / (<span class="keywordtype">double</span>)d_model);</div>
+<div class="line"><span class="lineno">  142</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> scale = 1.0f / sqrtf(variance + eps);</div>
+<div class="line"><span class="lineno">  143</span> </div>
+<div class="line"><span class="lineno">  144</span>        <span class="keywordflow">if</span> (mean_cache) {</div>
+<div class="line"><span class="lineno">  145</span>            mean_cache[t] = mean;</div>
+<div class="line"><span class="lineno">  146</span>        }</div>
+<div class="line"><span class="lineno">  147</span>        <span class="keywordflow">if</span> (rstd_cache) {</div>
+<div class="line"><span class="lineno">  148</span>            rstd_cache[t] = scale;</div>
+<div class="line"><span class="lineno">  149</span>        }</div>
+<div class="line"><span class="lineno">  150</span> </div>
+<div class="line"><span class="lineno">  151</span><span class="preprocessor">#if defined(__clang__)</span></div>
+<div class="line"><span class="lineno">  152</span><span class="preprocessor">#pragma clang loop vectorize(disable)</span></div>
+<div class="line"><span class="lineno">  153</span><span class="preprocessor">#pragma clang loop interleave(disable)</span></div>
+<div class="line"><span class="lineno">  154</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  155</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; d_model; ++i) {</div>
+<div class="line"><span class="lineno">  156</span>            y[i] *= scale;</div>
+<div class="line"><span class="lineno">  157</span>        }</div>
+<div class="line"><span class="lineno">  158</span>        <span class="keywordflow">if</span> (gamma) {</div>
+<div class="line"><span class="lineno">  159</span><span class="preprocessor">#if defined(__clang__)</span></div>
+<div class="line"><span class="lineno">  160</span><span class="preprocessor">#pragma clang loop vectorize(disable)</span></div>
+<div class="line"><span class="lineno">  161</span><span class="preprocessor">#pragma clang loop interleave(disable)</span></div>
+<div class="line"><span class="lineno">  162</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  163</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; d_model; ++i) {</div>
+<div class="line"><span class="lineno">  164</span>                y[i] *= gamma[i];</div>
+<div class="line"><span class="lineno">  165</span>            }</div>
+<div class="line"><span class="lineno">  166</span>        }</div>
+<div class="line"><span class="lineno">  167</span>        <span class="keywordflow">if</span> (beta) {</div>
+<div class="line"><span class="lineno">  168</span><span class="preprocessor">#if defined(__clang__)</span></div>
+<div class="line"><span class="lineno">  169</span><span class="preprocessor">#pragma clang loop vectorize(disable)</span></div>
+<div class="line"><span class="lineno">  170</span><span class="preprocessor">#pragma clang loop interleave(disable)</span></div>
+<div class="line"><span class="lineno">  171</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  172</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; d_model; ++i) {</div>
+<div class="line"><span class="lineno">  173</span>                y[i] += beta[i];</div>
+<div class="line"><span class="lineno">  174</span>            }</div>
+<div class="line"><span class="lineno">  175</span>        }</div>
+<div class="line"><span class="lineno">  176</span> </div>
+<div class="line"><span class="lineno">  177</span>        <span class="keywordflow">if</span> (aligned_embed_dim &gt; d_model) {</div>
+<div class="line"><span class="lineno">  178</span>            <a class="code hl_function" href="#a70f6e1d9794261350ce1a16212a4e0bb">zero_layernorm_padding</a>(y, d_model, aligned_embed_dim);</div>
+<div class="line"><span class="lineno">  179</span>        }</div>
+<div class="line"><span class="lineno">  180</span>    }</div>
+<div class="line"><span class="lineno">  181</span>}</div>
+<div class="ttc" id="alayernorm__kernels_8c_html_a70f6e1d9794261350ce1a16212a4e0bb"><div class="ttname"><a href="#a70f6e1d9794261350ce1a16212a4e0bb">zero_layernorm_padding</a></div><div class="ttdeci">static void zero_layernorm_padding(float *out_ptr, int d_model, int aligned_embed_dim)</div><div class="ttdef"><b>Definition</b> <a href="layernorm__kernels_8c_source.html#l00027">layernorm_kernels.c:27</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="layernorm__kernels_8c_source.html#l00026">zero_layernorm_padding()</a>.</p>
+<p class="reference">References <a class="el" href="layernorm__kernels_8c_source.html#l00027">zero_layernorm_padding()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="layernorm__kernels_8c_source.html#l00398">layernorm_forward_rolled_slice()</a>, <a class="el" href="layernorm__kernels_8c_source.html#l00730">layernorm_forward_unrolled_slice()</a>, <a class="el" href="layernorm__kernels_8c_source.html#l00786">layernorm_naive_serial_bf16_storage()</a>, and <a class="el" href="layernorm__kernels_8c_source.html#l00764">layernorm_naive_serial_matched_precision()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="layernorm__kernels_8c_source.html#l00801">ck_layernorm_row_fixed_chunk4_f32()</a>, <a class="el" href="layernorm__kernels_8c_source.html#l00421">layernorm_forward_rolled_slice()</a>, <a class="el" href="layernorm__kernels_8c_source.html#l00753">layernorm_forward_unrolled_slice()</a>, <a class="el" href="layernorm__kernels_8c_source.html#l00818">layernorm_naive_serial_bf16_storage()</a>, and <a class="el" href="layernorm__kernels_8c_source.html#l00787">layernorm_naive_serial_matched_precision()</a>.</p>
 
 </div>
 </div>
@@ -539,35 +630,34 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="layernorm__kernels_8c_source.html#l00398">398</a> of file <a class="el" href="layernorm__kernels_8c_source.html">layernorm_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  408</span>{</div>
-<div class="line"><span class="lineno">  409</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a>()) {</div>
-<div class="line"><span class="lineno">  410</span>        <a class="code hl_function" href="#a1af14e2cfa9e5ef4647d1701325f103e">layernorm_forward_ggml_exact</a>(input_slice_base, gamma, beta,</div>
-<div class="line"><span class="lineno">  411</span>                                     output_slice_base, mean_cache_slice, rstd_cache_slice,</div>
-<div class="line"><span class="lineno">  412</span>                                     num_tokens_in_slice, d_model,</div>
-<div class="line"><span class="lineno">  413</span>                                     aligned_embed_dim, aligned_embed_dim, aligned_embed_dim, eps);</div>
-<div class="line"><span class="lineno">  414</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  415</span>    }</div>
-<div class="line"><span class="lineno">  416</span> </div>
-<div class="line"><span class="lineno">  417</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
-<div class="line"><span class="lineno">  418</span>    layernorm_forward_rolled_slice_avx512(input_slice_base, gamma, beta,</div>
-<div class="line"><span class="lineno">  419</span>                                           output_slice_base, mean_cache_slice, rstd_cache_slice,</div>
-<div class="line"><span class="lineno">  420</span>                                           num_tokens_in_slice, d_model, aligned_embed_dim, eps);</div>
-<div class="line"><span class="lineno">  421</span><span class="preprocessor">#elif defined(__AVX2__) || defined(__AVX__)</span></div>
-<div class="line"><span class="lineno">  422</span>    layernorm_forward_rolled_slice_avx256(input_slice_base, gamma, beta,</div>
-<div class="line"><span class="lineno">  423</span>                                           output_slice_base, mean_cache_slice, rstd_cache_slice,</div>
-<div class="line"><span class="lineno">  424</span>                                           num_tokens_in_slice, d_model, aligned_embed_dim, eps);</div>
-<div class="line"><span class="lineno">  425</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno">  426</span>    <a class="code hl_function" href="#a72f2038f01b5790f7235b5371d1f4d72">layernorm_naive_serial</a>(input_slice_base, gamma, beta,</div>
-<div class="line"><span class="lineno">  427</span>                           output_slice_base, mean_cache_slice, rstd_cache_slice,</div>
-<div class="line"><span class="lineno">  428</span>                           num_tokens_in_slice, d_model, aligned_embed_dim, eps);</div>
-<div class="line"><span class="lineno">  429</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  430</span>}</div>
+<p class="definition">Definition at line <a class="el" href="layernorm__kernels_8c_source.html#l00421">421</a> of file <a class="el" href="layernorm__kernels_8c_source.html">layernorm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  431</span>{</div>
+<div class="line"><span class="lineno">  432</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a>()) {</div>
+<div class="line"><span class="lineno">  433</span>        <a class="code hl_function" href="#ab7eb718238b03c5464550303af26bbad">layernorm_forward_ggml_exact</a>(input_slice_base, gamma, beta,</div>
+<div class="line"><span class="lineno">  434</span>                                     output_slice_base, mean_cache_slice, rstd_cache_slice,</div>
+<div class="line"><span class="lineno">  435</span>                                     num_tokens_in_slice, d_model,</div>
+<div class="line"><span class="lineno">  436</span>                                     aligned_embed_dim, aligned_embed_dim, aligned_embed_dim, eps, 0);</div>
+<div class="line"><span class="lineno">  437</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  438</span>    }</div>
+<div class="line"><span class="lineno">  439</span> </div>
+<div class="line"><span class="lineno">  440</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
+<div class="line"><span class="lineno">  441</span>    layernorm_forward_rolled_slice_avx512(input_slice_base, gamma, beta,</div>
+<div class="line"><span class="lineno">  442</span>                                           output_slice_base, mean_cache_slice, rstd_cache_slice,</div>
+<div class="line"><span class="lineno">  443</span>                                           num_tokens_in_slice, d_model, aligned_embed_dim, eps);</div>
+<div class="line"><span class="lineno">  444</span><span class="preprocessor">#elif defined(__AVX2__) || defined(__AVX__)</span></div>
+<div class="line"><span class="lineno">  445</span>    layernorm_forward_rolled_slice_avx256(input_slice_base, gamma, beta,</div>
+<div class="line"><span class="lineno">  446</span>                                           output_slice_base, mean_cache_slice, rstd_cache_slice,</div>
+<div class="line"><span class="lineno">  447</span>                                           num_tokens_in_slice, d_model, aligned_embed_dim, eps);</div>
+<div class="line"><span class="lineno">  448</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno">  449</span>    <a class="code hl_function" href="#a72f2038f01b5790f7235b5371d1f4d72">layernorm_naive_serial</a>(input_slice_base, gamma, beta,</div>
+<div class="line"><span class="lineno">  450</span>                           output_slice_base, mean_cache_slice, rstd_cache_slice,</div>
+<div class="line"><span class="lineno">  451</span>                           num_tokens_in_slice, d_model, aligned_embed_dim, eps);</div>
+<div class="line"><span class="lineno">  452</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  453</span>}</div>
 <div class="ttc" id="ackernel__engine_8h_html_aef8c9a331116ff9c2d77b03152aa8004"><div class="ttname"><a href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a></div><div class="ttdeci">int ck_strict_parity_enabled(void)</div><div class="ttdef"><b>Definition</b> <a href="ckernel__strict_8c_source.html#l00043">ckernel_strict.c:43</a></div></div>
-<div class="ttc" id="alayernorm__kernels_8c_html_a1af14e2cfa9e5ef4647d1701325f103e"><div class="ttname"><a href="#a1af14e2cfa9e5ef4647d1701325f103e">layernorm_forward_ggml_exact</a></div><div class="ttdeci">static void layernorm_forward_ggml_exact(const float *input, const float *gamma, const float *beta, float *output, float *mean_cache, float *rstd_cache, int tokens, int d_model, int input_stride, int output_stride, int aligned_embed_dim, float eps)</div><div class="ttdef"><b>Definition</b> <a href="layernorm__kernels_8c_source.html#l00046">layernorm_kernels.c:46</a></div></div>
-<div class="ttc" id="alayernorm__kernels_8c_html_a72f2038f01b5790f7235b5371d1f4d72"><div class="ttname"><a href="#a72f2038f01b5790f7235b5371d1f4d72">layernorm_naive_serial</a></div><div class="ttdeci">void layernorm_naive_serial(const float *input, const float *gamma, const float *beta, float *output, float *mean_cache, float *rstd_cache, int tokens, int d_model, int aligned_embed_dim, float eps)</div><div class="ttdef"><b>Definition</b> <a href="layernorm__kernels_8c_source.html#l00175">layernorm_kernels.c:175</a></div></div>
+<div class="ttc" id="alayernorm__kernels_8c_html_a72f2038f01b5790f7235b5371d1f4d72"><div class="ttname"><a href="#a72f2038f01b5790f7235b5371d1f4d72">layernorm_naive_serial</a></div><div class="ttdeci">void layernorm_naive_serial(const float *input, const float *gamma, const float *beta, float *output, float *mean_cache, float *rstd_cache, int tokens, int d_model, int aligned_embed_dim, float eps)</div><div class="ttdef"><b>Definition</b> <a href="layernorm__kernels_8c_source.html#l00198">layernorm_kernels.c:198</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="ckernel__strict_8c_source.html#l00043">ck_strict_parity_enabled()</a>, <a class="el" href="layernorm__kernels_8c_source.html#l00046">layernorm_forward_ggml_exact()</a>, and <a class="el" href="layernorm__kernels_8c_source.html#l00175">layernorm_naive_serial()</a>.</p>
+<p class="reference">References <a class="el" href="ckernel__strict_8c_source.html#l00043">ck_strict_parity_enabled()</a>, <a class="el" href="layernorm__kernels_8c_source.html#l00047">layernorm_forward_ggml_exact()</a>, and <a class="el" href="layernorm__kernels_8c_source.html#l00198">layernorm_naive_serial()</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="layernorm__kernels__bf16_8c_source.html#l00030">layernorm_forward_rolled_slice_bf16()</a>.</p>
 
@@ -627,33 +717,33 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="layernorm__kernels_8c_source.html#l00730">730</a> of file <a class="el" href="layernorm__kernels_8c_source.html">layernorm_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  739</span>{</div>
-<div class="line"><span class="lineno">  740</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a>()) {</div>
-<div class="line"><span class="lineno">  741</span>        <a class="code hl_function" href="#a1af14e2cfa9e5ef4647d1701325f103e">layernorm_forward_ggml_exact</a>(input_slice_base, gamma, beta,</div>
-<div class="line"><span class="lineno">  742</span>                                     output_slice_base, mean_cache_slice, rstd_cache_slice,</div>
-<div class="line"><span class="lineno">  743</span>                                     num_tokens_in_slice, d_model,</div>
-<div class="line"><span class="lineno">  744</span>                                     d_model, d_model, d_model, eps);</div>
-<div class="line"><span class="lineno">  745</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  746</span>    }</div>
-<div class="line"><span class="lineno">  747</span> </div>
-<div class="line"><span class="lineno">  748</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
-<div class="line"><span class="lineno">  749</span>    layernorm_forward_unrolled_slice_avx512(input_slice_base, gamma, beta,</div>
-<div class="line"><span class="lineno">  750</span>                                             output_slice_base, mean_cache_slice, rstd_cache_slice,</div>
-<div class="line"><span class="lineno">  751</span>                                             num_tokens_in_slice, d_model, eps);</div>
-<div class="line"><span class="lineno">  752</span><span class="preprocessor">#elif defined(__AVX2__) || defined(__AVX__)</span></div>
-<div class="line"><span class="lineno">  753</span>    layernorm_forward_unrolled_slice_avx256(input_slice_base, gamma, beta,</div>
-<div class="line"><span class="lineno">  754</span>                                             output_slice_base, mean_cache_slice, rstd_cache_slice,</div>
-<div class="line"><span class="lineno">  755</span>                                             num_tokens_in_slice, d_model, eps);</div>
-<div class="line"><span class="lineno">  756</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno">  757</span>    <a class="code hl_function" href="#aabe13737d121479113ffd94b43e58087">layernorm_forward_unrolled_slice_scalar</a>(input_slice_base, gamma, beta,</div>
-<div class="line"><span class="lineno">  758</span>                                            output_slice_base, mean_cache_slice, rstd_cache_slice,</div>
-<div class="line"><span class="lineno">  759</span>                                            num_tokens_in_slice, d_model, eps);</div>
-<div class="line"><span class="lineno">  760</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  761</span>}</div>
-<div class="ttc" id="alayernorm__kernels_8c_html_aabe13737d121479113ffd94b43e58087"><div class="ttname"><a href="#aabe13737d121479113ffd94b43e58087">layernorm_forward_unrolled_slice_scalar</a></div><div class="ttdeci">static void layernorm_forward_unrolled_slice_scalar(const float *__restrict input_slice_base, const float *__restrict gamma, const float *__restrict beta, float *__restrict output_slice_base, float *__restrict mean_cache_slice, float *__restrict rstd_cache_slice, int num_tokens_in_slice, int d_model, float eps)</div><div class="ttdef"><b>Definition</b> <a href="layernorm__kernels_8c_source.html#l00714">layernorm_kernels.c:714</a></div></div>
+<p class="definition">Definition at line <a class="el" href="layernorm__kernels_8c_source.html#l00753">753</a> of file <a class="el" href="layernorm__kernels_8c_source.html">layernorm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  762</span>{</div>
+<div class="line"><span class="lineno">  763</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a>()) {</div>
+<div class="line"><span class="lineno">  764</span>        <a class="code hl_function" href="#ab7eb718238b03c5464550303af26bbad">layernorm_forward_ggml_exact</a>(input_slice_base, gamma, beta,</div>
+<div class="line"><span class="lineno">  765</span>                                     output_slice_base, mean_cache_slice, rstd_cache_slice,</div>
+<div class="line"><span class="lineno">  766</span>                                     num_tokens_in_slice, d_model,</div>
+<div class="line"><span class="lineno">  767</span>                                     d_model, d_model, d_model, eps, 0);</div>
+<div class="line"><span class="lineno">  768</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  769</span>    }</div>
+<div class="line"><span class="lineno">  770</span> </div>
+<div class="line"><span class="lineno">  771</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
+<div class="line"><span class="lineno">  772</span>    layernorm_forward_unrolled_slice_avx512(input_slice_base, gamma, beta,</div>
+<div class="line"><span class="lineno">  773</span>                                             output_slice_base, mean_cache_slice, rstd_cache_slice,</div>
+<div class="line"><span class="lineno">  774</span>                                             num_tokens_in_slice, d_model, eps);</div>
+<div class="line"><span class="lineno">  775</span><span class="preprocessor">#elif defined(__AVX2__) || defined(__AVX__)</span></div>
+<div class="line"><span class="lineno">  776</span>    layernorm_forward_unrolled_slice_avx256(input_slice_base, gamma, beta,</div>
+<div class="line"><span class="lineno">  777</span>                                             output_slice_base, mean_cache_slice, rstd_cache_slice,</div>
+<div class="line"><span class="lineno">  778</span>                                             num_tokens_in_slice, d_model, eps);</div>
+<div class="line"><span class="lineno">  779</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno">  780</span>    <a class="code hl_function" href="#aabe13737d121479113ffd94b43e58087">layernorm_forward_unrolled_slice_scalar</a>(input_slice_base, gamma, beta,</div>
+<div class="line"><span class="lineno">  781</span>                                            output_slice_base, mean_cache_slice, rstd_cache_slice,</div>
+<div class="line"><span class="lineno">  782</span>                                            num_tokens_in_slice, d_model, eps);</div>
+<div class="line"><span class="lineno">  783</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  784</span>}</div>
+<div class="ttc" id="alayernorm__kernels_8c_html_aabe13737d121479113ffd94b43e58087"><div class="ttname"><a href="#aabe13737d121479113ffd94b43e58087">layernorm_forward_unrolled_slice_scalar</a></div><div class="ttdeci">static void layernorm_forward_unrolled_slice_scalar(const float *__restrict input_slice_base, const float *__restrict gamma, const float *__restrict beta, float *__restrict output_slice_base, float *__restrict mean_cache_slice, float *__restrict rstd_cache_slice, int num_tokens_in_slice, int d_model, float eps)</div><div class="ttdef"><b>Definition</b> <a href="layernorm__kernels_8c_source.html#l00737">layernorm_kernels.c:737</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="ckernel__strict_8c_source.html#l00043">ck_strict_parity_enabled()</a>, <a class="el" href="layernorm__kernels_8c_source.html#l00046">layernorm_forward_ggml_exact()</a>, and <a class="el" href="layernorm__kernels_8c_source.html#l00714">layernorm_forward_unrolled_slice_scalar()</a>.</p>
+<p class="reference">References <a class="el" href="ckernel__strict_8c_source.html#l00043">ck_strict_parity_enabled()</a>, <a class="el" href="layernorm__kernels_8c_source.html#l00047">layernorm_forward_ggml_exact()</a>, and <a class="el" href="layernorm__kernels_8c_source.html#l00737">layernorm_forward_unrolled_slice_scalar()</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="layernorm__kernels__bf16_8c_source.html#l00057">layernorm_forward_unrolled_slice_bf16()</a>.</p>
 
@@ -721,17 +811,17 @@ CK-ENGINE KERNEL RULES:</h1>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="layernorm__kernels_8c_source.html#l00714">714</a> of file <a class="el" href="layernorm__kernels_8c_source.html">layernorm_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  723</span>{</div>
-<div class="line"><span class="lineno">  724</span>    <a class="code hl_function" href="#a3c0c758ac557839bfc06d1037d15b91e">layernorm_naive_serial_matched_precision</a>(input_slice_base, gamma, beta,</div>
-<div class="line"><span class="lineno">  725</span>                                             output_slice_base, mean_cache_slice, rstd_cache_slice,</div>
-<div class="line"><span class="lineno">  726</span>                                             num_tokens_in_slice, d_model, eps);</div>
-<div class="line"><span class="lineno">  727</span>}</div>
-<div class="ttc" id="alayernorm__kernels_8c_html_a3c0c758ac557839bfc06d1037d15b91e"><div class="ttname"><a href="#a3c0c758ac557839bfc06d1037d15b91e">layernorm_naive_serial_matched_precision</a></div><div class="ttdeci">void layernorm_naive_serial_matched_precision(const float *input, const float *gamma, const float *beta, float *output, float *mean_cache, float *rstd_cache, int tokens, int d_model, float eps)</div><div class="ttdef"><b>Definition</b> <a href="layernorm__kernels_8c_source.html#l00764">layernorm_kernels.c:764</a></div></div>
+<p class="definition">Definition at line <a class="el" href="layernorm__kernels_8c_source.html#l00737">737</a> of file <a class="el" href="layernorm__kernels_8c_source.html">layernorm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  746</span>{</div>
+<div class="line"><span class="lineno">  747</span>    <a class="code hl_function" href="#a3c0c758ac557839bfc06d1037d15b91e">layernorm_naive_serial_matched_precision</a>(input_slice_base, gamma, beta,</div>
+<div class="line"><span class="lineno">  748</span>                                             output_slice_base, mean_cache_slice, rstd_cache_slice,</div>
+<div class="line"><span class="lineno">  749</span>                                             num_tokens_in_slice, d_model, eps);</div>
+<div class="line"><span class="lineno">  750</span>}</div>
+<div class="ttc" id="alayernorm__kernels_8c_html_a3c0c758ac557839bfc06d1037d15b91e"><div class="ttname"><a href="#a3c0c758ac557839bfc06d1037d15b91e">layernorm_naive_serial_matched_precision</a></div><div class="ttdeci">void layernorm_naive_serial_matched_precision(const float *input, const float *gamma, const float *beta, float *output, float *mean_cache, float *rstd_cache, int tokens, int d_model, float eps)</div><div class="ttdef"><b>Definition</b> <a href="layernorm__kernels_8c_source.html#l00787">layernorm_kernels.c:787</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="layernorm__kernels_8c_source.html#l00764">layernorm_naive_serial_matched_precision()</a>.</p>
+<p class="reference">References <a class="el" href="layernorm__kernels_8c_source.html#l00787">layernorm_naive_serial_matched_precision()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="layernorm__kernels_8c_source.html#l00730">layernorm_forward_unrolled_slice()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="layernorm__kernels_8c_source.html#l00753">layernorm_forward_unrolled_slice()</a>.</p>
 
 </div>
 </div>
@@ -794,50 +884,50 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="layernorm__kernels_8c_source.html#l00175">175</a> of file <a class="el" href="layernorm__kernels_8c_source.html">layernorm_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  183</span>{</div>
-<div class="line"><span class="lineno">  184</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; tokens; ++t) {</div>
-<div class="line"><span class="lineno">  185</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *in_ptr = input + t * aligned_embed_dim;</div>
-<div class="line"><span class="lineno">  186</span>        <span class="keywordtype">float</span> *out_ptr = output + t * aligned_embed_dim;</div>
-<div class="line"><span class="lineno">  187</span> </div>
-<div class="line"><span class="lineno">  188</span>        <span class="keywordtype">float</span> sum_val = 0.0f;</div>
-<div class="line"><span class="lineno">  189</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; d_model; ++i) {</div>
-<div class="line"><span class="lineno">  190</span>            sum_val += in_ptr[i];</div>
-<div class="line"><span class="lineno">  191</span>        }</div>
-<div class="line"><span class="lineno">  192</span>        <span class="keywordtype">float</span> mean = sum_val / (float)d_model;</div>
-<div class="line"><span class="lineno">  193</span> </div>
-<div class="line"><span class="lineno">  194</span>        <span class="keywordtype">float</span> sum_sq_diff = 0.0f;</div>
-<div class="line"><span class="lineno">  195</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; d_model; ++i) {</div>
-<div class="line"><span class="lineno">  196</span>            <span class="keywordtype">float</span> diff = in_ptr[i] - mean;</div>
-<div class="line"><span class="lineno">  197</span>            sum_sq_diff += diff * diff;</div>
-<div class="line"><span class="lineno">  198</span>        }</div>
-<div class="line"><span class="lineno">  199</span>        <span class="keywordtype">float</span> variance = sum_sq_diff / (float)d_model + eps;</div>
-<div class="line"><span class="lineno">  200</span> </div>
-<div class="line"><span class="lineno">  201</span>        <span class="keywordtype">double</span> var_double = (double)variance;</div>
-<div class="line"><span class="lineno">  202</span>        <span class="keywordtype">float</span> inv_std = (float)(1.0 / sqrt(var_double));</div>
-<div class="line"><span class="lineno">  203</span> </div>
-<div class="line"><span class="lineno">  204</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; d_model; ++i) {</div>
-<div class="line"><span class="lineno">  205</span>            <span class="keywordtype">float</span> normalized_val = (in_ptr[i] - mean) * inv_std;</div>
-<div class="line"><span class="lineno">  206</span>            out_ptr[i] = normalized_val * gamma[i] + beta[i];</div>
-<div class="line"><span class="lineno">  207</span>        }</div>
-<div class="line"><span class="lineno">  208</span> </div>
-<div class="line"><span class="lineno">  209</span>        <span class="keywordflow">if</span> (mean_cache) {</div>
-<div class="line"><span class="lineno">  210</span>            mean_cache[t] = mean;</div>
-<div class="line"><span class="lineno">  211</span>        }</div>
-<div class="line"><span class="lineno">  212</span>        <span class="keywordflow">if</span> (rstd_cache) {</div>
-<div class="line"><span class="lineno">  213</span>            rstd_cache[t] = inv_std;</div>
+<p class="definition">Definition at line <a class="el" href="layernorm__kernels_8c_source.html#l00198">198</a> of file <a class="el" href="layernorm__kernels_8c_source.html">layernorm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  206</span>{</div>
+<div class="line"><span class="lineno">  207</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; tokens; ++t) {</div>
+<div class="line"><span class="lineno">  208</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *in_ptr = input + t * aligned_embed_dim;</div>
+<div class="line"><span class="lineno">  209</span>        <span class="keywordtype">float</span> *out_ptr = output + t * aligned_embed_dim;</div>
+<div class="line"><span class="lineno">  210</span> </div>
+<div class="line"><span class="lineno">  211</span>        <span class="keywordtype">float</span> sum_val = 0.0f;</div>
+<div class="line"><span class="lineno">  212</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; d_model; ++i) {</div>
+<div class="line"><span class="lineno">  213</span>            sum_val += in_ptr[i];</div>
 <div class="line"><span class="lineno">  214</span>        }</div>
-<div class="line"><span class="lineno">  215</span>        <span class="comment">/* Keep aligned padding quiet so future GEMMs see deterministic memory. */</span></div>
-<div class="line"><span class="lineno">  216</span>        <span class="keywordflow">if</span> (aligned_embed_dim &gt; d_model) {</div>
-<div class="line"><span class="lineno">  217</span>            <span class="comment">/* Keep padded lanes zeroed so subsequent GEMMs never read stale data. */</span></div>
-<div class="line"><span class="lineno">  218</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = d_model; i &lt; aligned_embed_dim; ++i) {</div>
-<div class="line"><span class="lineno">  219</span>                out_ptr[i] = 0.0f;</div>
-<div class="line"><span class="lineno">  220</span>            }</div>
+<div class="line"><span class="lineno">  215</span>        <span class="keywordtype">float</span> mean = sum_val / (float)d_model;</div>
+<div class="line"><span class="lineno">  216</span> </div>
+<div class="line"><span class="lineno">  217</span>        <span class="keywordtype">float</span> sum_sq_diff = 0.0f;</div>
+<div class="line"><span class="lineno">  218</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; d_model; ++i) {</div>
+<div class="line"><span class="lineno">  219</span>            <span class="keywordtype">float</span> diff = in_ptr[i] - mean;</div>
+<div class="line"><span class="lineno">  220</span>            sum_sq_diff += diff * diff;</div>
 <div class="line"><span class="lineno">  221</span>        }</div>
-<div class="line"><span class="lineno">  222</span>    }</div>
-<div class="line"><span class="lineno">  223</span>}</div>
+<div class="line"><span class="lineno">  222</span>        <span class="keywordtype">float</span> variance = sum_sq_diff / (float)d_model + eps;</div>
+<div class="line"><span class="lineno">  223</span> </div>
+<div class="line"><span class="lineno">  224</span>        <span class="keywordtype">double</span> var_double = (double)variance;</div>
+<div class="line"><span class="lineno">  225</span>        <span class="keywordtype">float</span> inv_std = (float)(1.0 / sqrt(var_double));</div>
+<div class="line"><span class="lineno">  226</span> </div>
+<div class="line"><span class="lineno">  227</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; d_model; ++i) {</div>
+<div class="line"><span class="lineno">  228</span>            <span class="keywordtype">float</span> normalized_val = (in_ptr[i] - mean) * inv_std;</div>
+<div class="line"><span class="lineno">  229</span>            out_ptr[i] = normalized_val * gamma[i] + beta[i];</div>
+<div class="line"><span class="lineno">  230</span>        }</div>
+<div class="line"><span class="lineno">  231</span> </div>
+<div class="line"><span class="lineno">  232</span>        <span class="keywordflow">if</span> (mean_cache) {</div>
+<div class="line"><span class="lineno">  233</span>            mean_cache[t] = mean;</div>
+<div class="line"><span class="lineno">  234</span>        }</div>
+<div class="line"><span class="lineno">  235</span>        <span class="keywordflow">if</span> (rstd_cache) {</div>
+<div class="line"><span class="lineno">  236</span>            rstd_cache[t] = inv_std;</div>
+<div class="line"><span class="lineno">  237</span>        }</div>
+<div class="line"><span class="lineno">  238</span>        <span class="comment">/* Keep aligned padding quiet so future GEMMs see deterministic memory. */</span></div>
+<div class="line"><span class="lineno">  239</span>        <span class="keywordflow">if</span> (aligned_embed_dim &gt; d_model) {</div>
+<div class="line"><span class="lineno">  240</span>            <span class="comment">/* Keep padded lanes zeroed so subsequent GEMMs never read stale data. */</span></div>
+<div class="line"><span class="lineno">  241</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = d_model; i &lt; aligned_embed_dim; ++i) {</div>
+<div class="line"><span class="lineno">  242</span>                out_ptr[i] = 0.0f;</div>
+<div class="line"><span class="lineno">  243</span>            }</div>
+<div class="line"><span class="lineno">  244</span>        }</div>
+<div class="line"><span class="lineno">  245</span>    }</div>
+<div class="line"><span class="lineno">  246</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="layernorm__kernels_8c_source.html#l00398">layernorm_forward_rolled_slice()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="layernorm__kernels_8c_source.html#l00421">layernorm_forward_rolled_slice()</a>.</p>
 
 </div>
 </div>
@@ -895,25 +985,25 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="layernorm__kernels_8c_source.html#l00786">786</a> of file <a class="el" href="layernorm__kernels_8c_source.html">layernorm_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  793</span>{</div>
-<div class="line"><span class="lineno">  794</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> <a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a> = (size_t)tokens * (<span class="keywordtype">size_t</span>)d_model;</div>
-<div class="line"><span class="lineno">  795</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; <a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a>; ++i) {</div>
-<div class="line"><span class="lineno">  796</span>        output[i] = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(input[i]));</div>
-<div class="line"><span class="lineno">  797</span>    }</div>
-<div class="line"><span class="lineno">  798</span>    <a class="code hl_function" href="#a1af14e2cfa9e5ef4647d1701325f103e">layernorm_forward_ggml_exact</a>(output, gamma, beta,</div>
-<div class="line"><span class="lineno">  799</span>                                 output, mean_cache, rstd_cache,</div>
-<div class="line"><span class="lineno">  800</span>                                 tokens, d_model,</div>
-<div class="line"><span class="lineno">  801</span>                                 d_model, d_model, d_model, eps);</div>
-<div class="line"><span class="lineno">  802</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; <a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a>; ++i) {</div>
-<div class="line"><span class="lineno">  803</span>        output[i] = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(output[i]));</div>
-<div class="line"><span class="lineno">  804</span>    }</div>
-<div class="line"><span class="lineno">  805</span>}</div>
+<p class="definition">Definition at line <a class="el" href="layernorm__kernels_8c_source.html#l00818">818</a> of file <a class="el" href="layernorm__kernels_8c_source.html">layernorm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  825</span>{</div>
+<div class="line"><span class="lineno">  826</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> <a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a> = (size_t)tokens * (<span class="keywordtype">size_t</span>)d_model;</div>
+<div class="line"><span class="lineno">  827</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; <a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a>; ++i) {</div>
+<div class="line"><span class="lineno">  828</span>        output[i] = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(input[i]));</div>
+<div class="line"><span class="lineno">  829</span>    }</div>
+<div class="line"><span class="lineno">  830</span>    <a class="code hl_function" href="#ab7eb718238b03c5464550303af26bbad">layernorm_forward_ggml_exact</a>(output, gamma, beta,</div>
+<div class="line"><span class="lineno">  831</span>                                 output, mean_cache, rstd_cache,</div>
+<div class="line"><span class="lineno">  832</span>                                 tokens, d_model,</div>
+<div class="line"><span class="lineno">  833</span>                                 d_model, d_model, d_model, eps, 0);</div>
+<div class="line"><span class="lineno">  834</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; <a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a>; ++i) {</div>
+<div class="line"><span class="lineno">  835</span>        output[i] = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(output[i]));</div>
+<div class="line"><span class="lineno">  836</span>    }</div>
+<div class="line"><span class="lineno">  837</span>}</div>
 <div class="ttc" id="abf16__utils_8h_html_a174b16a92b3a5972230d7519fc0c5aa3"><div class="ttname"><a href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a></div><div class="ttdeci">static uint16_t float_to_bf16(float f)</div><div class="ttdef"><b>Definition</b> <a href="bf16__utils_8h_source.html#l00090">bf16_utils.h:90</a></div></div>
 <div class="ttc" id="abf16__utils_8h_html_a314c3970fd5e2770d19b1bb49aefcf94"><div class="ttname"><a href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a></div><div class="ttdeci">static float bf16_to_float(uint16_t v)</div><div class="ttdef"><b>Definition</b> <a href="bf16__utils_8h_source.html#l00038">bf16_utils.h:38</a></div></div>
 <div class="ttc" id="atrue__bpe_8h_html_ac7f5fd4f55df36920bf0583c3516e72f"><div class="ttname"><a href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a></div><div class="ttdeci">const uint8_t size_t count</div><div class="ttdef"><b>Definition</b> <a href="true__bpe_8h_source.html#l00211">true_bpe.h:211</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="true__bpe_8h_source.html#l00211">count</a>, <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>, and <a class="el" href="layernorm__kernels_8c_source.html#l00046">layernorm_forward_ggml_exact()</a>.</p>
+<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="true__bpe_8h_source.html#l00211">count</a>, <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>, and <a class="el" href="layernorm__kernels_8c_source.html#l00047">layernorm_forward_ggml_exact()</a>.</p>
 
 </div>
 </div>
@@ -971,17 +1061,17 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="layernorm__kernels_8c_source.html#l00764">764</a> of file <a class="el" href="layernorm__kernels_8c_source.html">layernorm_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  771</span>{</div>
-<div class="line"><span class="lineno">  772</span>    <a class="code hl_function" href="#a1af14e2cfa9e5ef4647d1701325f103e">layernorm_forward_ggml_exact</a>(input, gamma, beta,</div>
-<div class="line"><span class="lineno">  773</span>                                 output, mean_cache, rstd_cache,</div>
-<div class="line"><span class="lineno">  774</span>                                 tokens, d_model,</div>
-<div class="line"><span class="lineno">  775</span>                                 d_model, d_model, d_model, eps);</div>
-<div class="line"><span class="lineno">  776</span>}</div>
+<p class="definition">Definition at line <a class="el" href="layernorm__kernels_8c_source.html#l00787">787</a> of file <a class="el" href="layernorm__kernels_8c_source.html">layernorm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  794</span>{</div>
+<div class="line"><span class="lineno">  795</span>    <a class="code hl_function" href="#ab7eb718238b03c5464550303af26bbad">layernorm_forward_ggml_exact</a>(input, gamma, beta,</div>
+<div class="line"><span class="lineno">  796</span>                                 output, mean_cache, rstd_cache,</div>
+<div class="line"><span class="lineno">  797</span>                                 tokens, d_model,</div>
+<div class="line"><span class="lineno">  798</span>                                 d_model, d_model, d_model, eps, 0);</div>
+<div class="line"><span class="lineno">  799</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="layernorm__kernels_8c_source.html#l00046">layernorm_forward_ggml_exact()</a>.</p>
+<p class="reference">References <a class="el" href="layernorm__kernels_8c_source.html#l00047">layernorm_forward_ggml_exact()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="audio__kernels_8c_source.html#l01928">audio_fastconformer_block_f32()</a>, <a class="el" href="layernorm__kernels_8c_source.html#l00714">layernorm_forward_unrolled_slice_scalar()</a>, and <a class="el" href="layernorm__rows__checked_8c_source.html#l00016">layernorm_rows_checked_f32()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="audio__kernels_8c_source.html#l01928">audio_fastconformer_block_f32()</a>, and <a class="el" href="layernorm__kernels_8c_source.html#l00737">layernorm_forward_unrolled_slice_scalar()</a>.</p>
 
 </div>
 </div>
@@ -1039,50 +1129,50 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="layernorm__kernels_8c_source.html#l00952">952</a> of file <a class="el" href="layernorm__kernels_8c_source.html">layernorm_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  961</span>{</div>
-<div class="line"><span class="lineno">  962</span><span class="preprocessor">#if !defined(__AVX2__) || !defined(__FMA__)</span></div>
-<div class="line"><span class="lineno">  963</span>    (void)input; (void)gamma; (void)beta; (void)output;</div>
-<div class="line"><span class="lineno">  964</span>    (void)mean_cache; (void)rstd_cache; (void)tokens; (void)d_model; (void)eps;</div>
-<div class="line"><span class="lineno">  965</span>    abort();</div>
-<div class="line"><span class="lineno">  966</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno">  967</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; tokens; ++t) {</div>
-<div class="line"><span class="lineno">  968</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *x = input + (size_t)t * (<span class="keywordtype">size_t</span>)d_model;</div>
-<div class="line"><span class="lineno">  969</span>        <span class="keywordtype">float</span> *y = output + (size_t)t * (<span class="keywordtype">size_t</span>)d_model;</div>
-<div class="line"><span class="lineno">  970</span>        <span class="keywordtype">float</span> mean;</div>
-<div class="line"><span class="lineno">  971</span>        <span class="keywordtype">float</span> variance;</div>
-<div class="line"><span class="lineno">  972</span>        layernorm_pytorch_bf16_rowwise_moments_avx2(x, d_model, &amp;mean, &amp;variance);</div>
-<div class="line"><span class="lineno">  973</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> rstd = 1.0f / sqrtf(variance + eps);</div>
-<div class="line"><span class="lineno">  974</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> bias = -rstd * mean;</div>
-<div class="line"><span class="lineno">  975</span>        <span class="keywordtype">int</span> i = 0;</div>
-<div class="line"><span class="lineno">  976</span>        <span class="keywordflow">for</span> (; i + 7 &lt; d_model; i += 8) {</div>
-<div class="line"><span class="lineno">  977</span>            <span class="keyword">const</span> __m256 x_vec = _mm256_loadu_ps(x + i);</div>
-<div class="line"><span class="lineno">  978</span>            <span class="keyword">const</span> __m256 gamma_vec = gamma ? _mm256_loadu_ps(gamma + i) : _mm256_set1_ps(1.0f);</div>
-<div class="line"><span class="lineno">  979</span>            <span class="keyword">const</span> __m256 beta_vec = beta ? _mm256_loadu_ps(beta + i) : _mm256_setzero_ps();</div>
-<div class="line"><span class="lineno">  980</span>            <span class="keyword">const</span> __m256 normalized = _mm256_fmadd_ps(</div>
-<div class="line"><span class="lineno">  981</span>                x_vec, _mm256_set1_ps(rstd), _mm256_set1_ps(bias));</div>
-<div class="line"><span class="lineno">  982</span>            <span class="keyword">const</span> __m256 transformed = _mm256_fmadd_ps(normalized, gamma_vec, beta_vec);</div>
-<div class="line"><span class="lineno">  983</span>            <span class="keywordtype">float</span> lanes[8];</div>
-<div class="line"><span class="lineno">  984</span>            _mm256_storeu_ps(lanes, transformed);</div>
-<div class="line"><span class="lineno">  985</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> lane = 0; lane &lt; 8; ++lane) {</div>
-<div class="line"><span class="lineno">  986</span>                y[i + lane] = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(lanes[lane]));</div>
-<div class="line"><span class="lineno">  987</span>            }</div>
-<div class="line"><span class="lineno">  988</span>        }</div>
-<div class="line"><span class="lineno">  989</span>        <span class="keywordflow">for</span> (; i &lt; d_model; ++i) {</div>
-<div class="line"><span class="lineno">  990</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> gamma_v = gamma ? gamma[i] : 1.0f;</div>
-<div class="line"><span class="lineno">  991</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> beta_v = beta ? beta[i] : 0.0f;</div>
-<div class="line"><span class="lineno">  992</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> value = fmaf(fmaf(x[i], rstd, bias), gamma_v, beta_v);</div>
-<div class="line"><span class="lineno">  993</span>            y[i] = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(value));</div>
-<div class="line"><span class="lineno">  994</span>        }</div>
-<div class="line"><span class="lineno">  995</span>        <span class="keywordflow">if</span> (mean_cache) {</div>
-<div class="line"><span class="lineno">  996</span>            mean_cache[t] = mean;</div>
-<div class="line"><span class="lineno">  997</span>        }</div>
-<div class="line"><span class="lineno">  998</span>        <span class="keywordflow">if</span> (rstd_cache) {</div>
-<div class="line"><span class="lineno">  999</span>            rstd_cache[t] = rstd;</div>
-<div class="line"><span class="lineno"> 1000</span>        }</div>
-<div class="line"><span class="lineno"> 1001</span>    }</div>
-<div class="line"><span class="lineno"> 1002</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno"> 1003</span>}</div>
+<p class="definition">Definition at line <a class="el" href="layernorm__kernels_8c_source.html#l00984">984</a> of file <a class="el" href="layernorm__kernels_8c_source.html">layernorm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  993</span>{</div>
+<div class="line"><span class="lineno">  994</span><span class="preprocessor">#if !defined(__AVX2__) || !defined(__FMA__)</span></div>
+<div class="line"><span class="lineno">  995</span>    (void)input; (void)gamma; (void)beta; (void)output;</div>
+<div class="line"><span class="lineno">  996</span>    (void)mean_cache; (void)rstd_cache; (void)tokens; (void)d_model; (void)eps;</div>
+<div class="line"><span class="lineno">  997</span>    abort();</div>
+<div class="line"><span class="lineno">  998</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno">  999</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; tokens; ++t) {</div>
+<div class="line"><span class="lineno"> 1000</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *x = input + (size_t)t * (<span class="keywordtype">size_t</span>)d_model;</div>
+<div class="line"><span class="lineno"> 1001</span>        <span class="keywordtype">float</span> *y = output + (size_t)t * (<span class="keywordtype">size_t</span>)d_model;</div>
+<div class="line"><span class="lineno"> 1002</span>        <span class="keywordtype">float</span> mean;</div>
+<div class="line"><span class="lineno"> 1003</span>        <span class="keywordtype">float</span> variance;</div>
+<div class="line"><span class="lineno"> 1004</span>        layernorm_pytorch_bf16_rowwise_moments_avx2(x, d_model, &amp;mean, &amp;variance);</div>
+<div class="line"><span class="lineno"> 1005</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> rstd = 1.0f / sqrtf(variance + eps);</div>
+<div class="line"><span class="lineno"> 1006</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> bias = -rstd * mean;</div>
+<div class="line"><span class="lineno"> 1007</span>        <span class="keywordtype">int</span> i = 0;</div>
+<div class="line"><span class="lineno"> 1008</span>        <span class="keywordflow">for</span> (; i + 7 &lt; d_model; i += 8) {</div>
+<div class="line"><span class="lineno"> 1009</span>            <span class="keyword">const</span> __m256 x_vec = _mm256_loadu_ps(x + i);</div>
+<div class="line"><span class="lineno"> 1010</span>            <span class="keyword">const</span> __m256 gamma_vec = gamma ? _mm256_loadu_ps(gamma + i) : _mm256_set1_ps(1.0f);</div>
+<div class="line"><span class="lineno"> 1011</span>            <span class="keyword">const</span> __m256 beta_vec = beta ? _mm256_loadu_ps(beta + i) : _mm256_setzero_ps();</div>
+<div class="line"><span class="lineno"> 1012</span>            <span class="keyword">const</span> __m256 normalized = _mm256_fmadd_ps(</div>
+<div class="line"><span class="lineno"> 1013</span>                x_vec, _mm256_set1_ps(rstd), _mm256_set1_ps(bias));</div>
+<div class="line"><span class="lineno"> 1014</span>            <span class="keyword">const</span> __m256 transformed = _mm256_fmadd_ps(normalized, gamma_vec, beta_vec);</div>
+<div class="line"><span class="lineno"> 1015</span>            <span class="keywordtype">float</span> lanes[8];</div>
+<div class="line"><span class="lineno"> 1016</span>            _mm256_storeu_ps(lanes, transformed);</div>
+<div class="line"><span class="lineno"> 1017</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> lane = 0; lane &lt; 8; ++lane) {</div>
+<div class="line"><span class="lineno"> 1018</span>                y[i + lane] = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(lanes[lane]));</div>
+<div class="line"><span class="lineno"> 1019</span>            }</div>
+<div class="line"><span class="lineno"> 1020</span>        }</div>
+<div class="line"><span class="lineno"> 1021</span>        <span class="keywordflow">for</span> (; i &lt; d_model; ++i) {</div>
+<div class="line"><span class="lineno"> 1022</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> gamma_v = gamma ? gamma[i] : 1.0f;</div>
+<div class="line"><span class="lineno"> 1023</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> beta_v = beta ? beta[i] : 0.0f;</div>
+<div class="line"><span class="lineno"> 1024</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> value = fmaf(fmaf(x[i], rstd, bias), gamma_v, beta_v);</div>
+<div class="line"><span class="lineno"> 1025</span>            y[i] = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(value));</div>
+<div class="line"><span class="lineno"> 1026</span>        }</div>
+<div class="line"><span class="lineno"> 1027</span>        <span class="keywordflow">if</span> (mean_cache) {</div>
+<div class="line"><span class="lineno"> 1028</span>            mean_cache[t] = mean;</div>
+<div class="line"><span class="lineno"> 1029</span>        }</div>
+<div class="line"><span class="lineno"> 1030</span>        <span class="keywordflow">if</span> (rstd_cache) {</div>
+<div class="line"><span class="lineno"> 1031</span>            rstd_cache[t] = rstd;</div>
+<div class="line"><span class="lineno"> 1032</span>        }</div>
+<div class="line"><span class="lineno"> 1033</span>    }</div>
+<div class="line"><span class="lineno"> 1034</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno"> 1035</span>}</div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, and <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>.</p>
 
@@ -1120,14 +1210,14 @@ CK-ENGINE KERNEL RULES:</h1>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="layernorm__kernels_8c_source.html#l00026">26</a> of file <a class="el" href="layernorm__kernels_8c_source.html">layernorm_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   29</span>{</div>
-<div class="line"><span class="lineno">   30</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> idx = d_model; idx &lt; aligned_embed_dim; ++idx) {</div>
-<div class="line"><span class="lineno">   31</span>        out_ptr[idx] = 0.0f;</div>
-<div class="line"><span class="lineno">   32</span>    }</div>
-<div class="line"><span class="lineno">   33</span>}</div>
+<p class="definition">Definition at line <a class="el" href="layernorm__kernels_8c_source.html#l00027">27</a> of file <a class="el" href="layernorm__kernels_8c_source.html">layernorm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   30</span>{</div>
+<div class="line"><span class="lineno">   31</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> idx = d_model; idx &lt; aligned_embed_dim; ++idx) {</div>
+<div class="line"><span class="lineno">   32</span>        out_ptr[idx] = 0.0f;</div>
+<div class="line"><span class="lineno">   33</span>    }</div>
+<div class="line"><span class="lineno">   34</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="layernorm__kernels_8c_source.html#l00046">layernorm_forward_ggml_exact()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="layernorm__kernels_8c_source.html#l00047">layernorm_forward_ggml_exact()</a>.</p>
 
 </div>
 </div>

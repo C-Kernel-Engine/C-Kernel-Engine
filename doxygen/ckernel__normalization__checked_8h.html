@@ -132,11 +132,75 @@ $(function(){initNavTree('ckernel__normalization__checked_8h.html','',''); });
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-func-members" class="groupheader"><a id="func-members" name="func-members"></a>
 Functions</h2></td></tr>
+<tr class="memitem:aa8be856b00a74c14fa4eae04a63fd77b" id="r_aa8be856b00a74c14fa4eae04a63fd77b"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#aa8be856b00a74c14fa4eae04a63fd77b">ck_layernorm_row_fixed_chunk4_f32</a> (const float *input, const float *gamma, const float *beta, float *output, float *mean, float *rstd, int channels, float epsilon)</td></tr>
 <tr class="memitem:a755ec1f1d7fe29363dc43fb6d2ea3173" id="r_a755ec1f1d7fe29363dc43fb6d2ea3173"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a755ec1f1d7fe29363dc43fb6d2ea3173">gelu_rows_tanh_checked_f32</a> (const float *input, size_t input_elements, size_t input_stride, float *output, size_t output_elements, size_t output_stride, float *scratch, size_t scratch_elements, size_t rows, size_t channels)</td></tr>
 <tr class="memitem:a23b2efa3c66802b08faf84629277c722" id="r_a23b2efa3c66802b08faf84629277c722"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a23b2efa3c66802b08faf84629277c722">layernorm_rows_checked_f32</a> (const float *input, size_t input_elements, size_t input_stride, const float *gamma, size_t gamma_elements, const float *beta, size_t beta_elements, float *output, size_t output_elements, size_t output_stride, float *scratch, size_t scratch_elements, size_t rows, size_t channels, float epsilon)</td></tr>
 <tr class="memitem:ada75ccba3f692924bba36d5aca4f73b9" id="r_ada75ccba3f692924bba36d5aca4f73b9"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#ada75ccba3f692924bba36d5aca4f73b9">layernorm_rows_checked_workspace</a> (size_t rows, size_t channels, size_t *elements)</td></tr>
 </table>
 <a name="doc-func-members" id="doc-func-members"></a><h2 id="header-doc-func-members" class="groupheader">Function Documentation</h2>
+<a id="aa8be856b00a74c14fa4eae04a63fd77b" name="aa8be856b00a74c14fa4eae04a63fd77b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aa8be856b00a74c14fa4eae04a63fd77b">&#9670;&#160;</a></span>ck_layernorm_row_fixed_chunk4_f32()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void ck_layernorm_row_fixed_chunk4_f32 </td>
+          <td>(</td>
+          <td class="paramtype">const float *</td>          <td class="paramname"><span class="paramname"><em>input</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *</td>          <td class="paramname"><span class="paramname"><em>gamma</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *</td>          <td class="paramname"><span class="paramname"><em>beta</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *</td>          <td class="paramname"><span class="paramname"><em>output</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *</td>          <td class="paramname"><span class="paramname"><em>mean</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *</td>          <td class="paramname"><span class="paramname"><em>rstd</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int</td>          <td class="paramname"><span class="paramname"><em>channels</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float</td>          <td class="paramname"><span class="paramname"><em>epsilon</em></span>&#160;)</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="layernorm__kernels_8c_source.html#l00801">801</a> of file <a class="el" href="layernorm__kernels_8c_source.html">layernorm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  804</span>{</div>
+<div class="line"><span class="lineno">  805</span>    <a class="code hl_function" href="layernorm__kernels_8c.html#ab7eb718238b03c5464550303af26bbad">layernorm_forward_ggml_exact</a>(input, gamma, beta, output, mean, rstd,</div>
+<div class="line"><span class="lineno">  806</span>                                 1, channels, channels, channels, channels,</div>
+<div class="line"><span class="lineno">  807</span>                                 epsilon, 1);</div>
+<div class="line"><span class="lineno">  808</span>}</div>
+<div class="ttc" id="alayernorm__kernels_8c_html_ab7eb718238b03c5464550303af26bbad"><div class="ttname"><a href="layernorm__kernels_8c.html#ab7eb718238b03c5464550303af26bbad">layernorm_forward_ggml_exact</a></div><div class="ttdeci">static void layernorm_forward_ggml_exact(const float *input, const float *gamma, const float *beta, float *output, float *mean_cache, float *rstd_cache, int tokens, int d_model, int input_stride, int output_stride, int aligned_embed_dim, float eps, int fixed_chunk4)</div><div class="ttdef"><b>Definition</b> <a href="layernorm__kernels_8c_source.html#l00047">layernorm_kernels.c:47</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="layernorm__kernels_8c_source.html#l00047">layernorm_forward_ggml_exact()</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="layernorm__rows__checked_8c_source.html#l00016">layernorm_rows_checked_f32()</a>.</p>
+
+</div>
+</div>
 <a id="a755ec1f1d7fe29363dc43fb6d2ea3173" name="a755ec1f1d7fe29363dc43fb6d2ea3173"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a755ec1f1d7fe29363dc43fb6d2ea3173">&#9670;&#160;</a></span>gelu_rows_tanh_checked_f32()</h2>
 
@@ -338,21 +402,19 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">   39</span>    <span class="keywordtype">float</span> *means = scratch + rows * channels;</div>
 <div class="line"><span class="lineno">   40</span>    <span class="keywordtype">float</span> *rstd = means + rows;</div>
 <div class="line"><span class="lineno">   41</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> r = 0; r &lt; rows; ++r) {</div>
-<div class="line"><span class="lineno">   42</span>        <span class="comment">/* One row avoids signed token*channel indexing in the legacy ABI.</span></div>
-<div class="line"><span class="lineno">   43</span><span class="comment">         * Its existing reduction order is preserved; no arithmetic is duplicated. */</span></div>
-<div class="line"><span class="lineno">   44</span>        <a class="code hl_function" href="ckernel__engine_8h.html#a3c0c758ac557839bfc06d1037d15b91e">layernorm_naive_serial_matched_precision</a>(input + r * input_stride, gamma, beta,</div>
-<div class="line"><span class="lineno">   45</span>            scratch + r * channels, means + r, rstd + r, 1, (<span class="keywordtype">int</span>)channels, epsilon);</div>
-<div class="line"><span class="lineno">   46</span>        <span class="keywordflow">if</span> (!isfinite(means[r]) || !isfinite(rstd[r]) ||</div>
-<div class="line"><span class="lineno">   47</span>            !<a class="code hl_function" href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a>(scratch + r * channels, channels)) <span class="keywordflow">return</span> -4;</div>
-<div class="line"><span class="lineno">   48</span>    }</div>
-<div class="line"><span class="lineno">   49</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> r = 0; r &lt; rows; ++r)</div>
-<div class="line"><span class="lineno">   50</span>        memcpy(output + r * output_stride, scratch + r * channels, channels * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">   51</span>    <span class="keywordflow">return</span> 0;</div>
-<div class="line"><span class="lineno">   52</span>}</div>
-<div class="ttc" id="ackernel__engine_8h_html_a3c0c758ac557839bfc06d1037d15b91e"><div class="ttname"><a href="ckernel__engine_8h.html#a3c0c758ac557839bfc06d1037d15b91e">layernorm_naive_serial_matched_precision</a></div><div class="ttdeci">void layernorm_naive_serial_matched_precision(const float *input, const float *gamma, const float *beta, float *output, float *mean_cache, float *rstd_cache, int tokens, int d_model, float eps)</div><div class="ttdef"><b>Definition</b> <a href="layernorm__kernels_8c_source.html#l00764">layernorm_kernels.c:764</a></div></div>
+<div class="line"><span class="lineno">   42</span>        <a class="code hl_function" href="#aa8be856b00a74c14fa4eae04a63fd77b">ck_layernorm_row_fixed_chunk4_f32</a>(input + r * input_stride, gamma, beta,</div>
+<div class="line"><span class="lineno">   43</span>            scratch + r * channels, means + r, rstd + r, (<span class="keywordtype">int</span>)channels, epsilon);</div>
+<div class="line"><span class="lineno">   44</span>        <span class="keywordflow">if</span> (!isfinite(means[r]) || !isfinite(rstd[r]) ||</div>
+<div class="line"><span class="lineno">   45</span>            !<a class="code hl_function" href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a>(scratch + r * channels, channels)) <span class="keywordflow">return</span> -4;</div>
+<div class="line"><span class="lineno">   46</span>    }</div>
+<div class="line"><span class="lineno">   47</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> r = 0; r &lt; rows; ++r)</div>
+<div class="line"><span class="lineno">   48</span>        memcpy(output + r * output_stride, scratch + r * channels, channels * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">   49</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">   50</span>}</div>
+<div class="ttc" id="ackernel__normalization__checked_8h_html_aa8be856b00a74c14fa4eae04a63fd77b"><div class="ttname"><a href="#aa8be856b00a74c14fa4eae04a63fd77b">ck_layernorm_row_fixed_chunk4_f32</a></div><div class="ttdeci">void ck_layernorm_row_fixed_chunk4_f32(const float *input, const float *gamma, const float *beta, float *output, float *mean, float *rstd, int channels, float epsilon)</div><div class="ttdef"><b>Definition</b> <a href="layernorm__kernels_8c_source.html#l00801">layernorm_kernels.c:801</a></div></div>
 <div class="ttc" id="alayernorm__rows__checked_8c_html_ada75ccba3f692924bba36d5aca4f73b9"><div class="ttname"><a href="layernorm__rows__checked_8c.html#ada75ccba3f692924bba36d5aca4f73b9">layernorm_rows_checked_workspace</a></div><div class="ttdeci">int layernorm_rows_checked_workspace(size_t rows, size_t channels, size_t *elements)</div><div class="ttdef"><b>Definition</b> <a href="layernorm__rows__checked_8c_source.html#l00007">layernorm_rows_checked.c:7</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="checked__float__buffer_8h_source.html#l00019">ck_checked_finite()</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00015">ck_checked_overlap()</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00011">ck_checked_region()</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00006">ck_checked_span()</a>, <a class="el" href="layernorm__kernels_8c_source.html#l00764">layernorm_naive_serial_matched_precision()</a>, and <a class="el" href="layernorm__rows__checked_8c_source.html#l00007">layernorm_rows_checked_workspace()</a>.</p>
+<p class="reference">References <a class="el" href="checked__float__buffer_8h_source.html#l00019">ck_checked_finite()</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00015">ck_checked_overlap()</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00011">ck_checked_region()</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00006">ck_checked_span()</a>, <a class="el" href="layernorm__kernels_8c_source.html#l00801">ck_layernorm_row_fixed_chunk4_f32()</a>, and <a class="el" href="layernorm__rows__checked_8c_source.html#l00007">layernorm_rows_checked_workspace()</a>.</p>
 
 </div>
 </div>
