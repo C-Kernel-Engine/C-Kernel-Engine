@@ -51,10 +51,11 @@ var searchData=
   ['eos_5fpattern_5freset_48',['eos_pattern_reset',['../ck__cli__v6_85_8c.html#ab79c3429e20c675fae7c60ad4037d8e2',1,'eos_pattern_reset(void):&#160;ck_cli_v6.5.c'],['../ck__cli__v6_86_8c.html#ab79c3429e20c675fae7c60ad4037d8e2',1,'eos_pattern_reset(void):&#160;ck_cli_v6.6.c']]],
   ['evaluate_49',['evaluate',['../causal__depthwise__residual__checked_8c.html#a6e4b216a602cb7f17b9eccbdcb044c17',1,'causal_depthwise_residual_checked.c']]],
   ['evaluate_5fdynamic_50',['evaluate_dynamic',['../causal__depthwise__residual__checked_8c.html#af31a1327a46032370e14a77c7a2e83d6',1,'causal_depthwise_residual_checked.c']]],
-  ['expand_51',['expand',['../head__backward__bf16_8c.html#a7e835f26c92176fbf5efcf68d2e36ecb',1,'head_backward_bf16.c']]],
-  ['expert_5fdot_52',['expert_dot',['../routed__softcapped__experts__checked_8c.html#a12058ac45a5ce809600c431dfa137986',1,'routed_softcapped_experts_checked.c']]],
-  ['explicit_5fmrope_5fapply_5fggml_5fexact_53',['explicit_mrope_apply_ggml_exact',['../rope__kernels_8c.html#a120d7d23796d5864335badbb717c594d',1,'rope_kernels.c']]],
-  ['explicit_5fmrope_5fapply_5fhead_54',['explicit_mrope_apply_head',['../rope__kernels_8c.html#a2a1b1783ea95630d700e8858205bbcbc',1,'rope_kernels.c']]],
-  ['extent_55',['extent',['../head__backward__bf16_8c.html#af2df54ac14f2de8b82e1ed69060c83ff',1,'head_backward_bf16.c']]],
-  ['extents_56',['extents',['../indexed__rows__train_8c.html#a671fb2bec1523668e4fff60461438023',1,'indexed_rows_train.c']]]
+  ['evaluate_5ffp32_51',['evaluate_fp32',['../causal__depthwise__residual__checked_8c.html#ad9e498c486ecb86f4c033028500a6fb6',1,'causal_depthwise_residual_checked.c']]],
+  ['expand_52',['expand',['../head__backward__bf16_8c.html#a7e835f26c92176fbf5efcf68d2e36ecb',1,'head_backward_bf16.c']]],
+  ['expert_5fdot_53',['expert_dot',['../routed__softcapped__experts__checked_8c.html#a12058ac45a5ce809600c431dfa137986',1,'routed_softcapped_experts_checked.c']]],
+  ['explicit_5fmrope_5fapply_5fggml_5fexact_54',['explicit_mrope_apply_ggml_exact',['../rope__kernels_8c.html#a120d7d23796d5864335badbb717c594d',1,'rope_kernels.c']]],
+  ['explicit_5fmrope_5fapply_5fhead_55',['explicit_mrope_apply_head',['../rope__kernels_8c.html#a2a1b1783ea95630d700e8858205bbcbc',1,'rope_kernels.c']]],
+  ['extent_56',['extent',['../head__backward__bf16_8c.html#af2df54ac14f2de8b82e1ed69060c83ff',1,'head_backward_bf16.c']]],
+  ['extents_57',['extents',['../indexed__rows__train_8c.html#a671fb2bec1523668e4fff60461438023',1,'indexed_rows_train.c']]]
 ];

@@ -1,5 +1,11 @@
 var NAVTREEINDEX23 =
 {
+"structCKPlanStepV2.html#a99fd1a750634dd8160937d173e7acf31":[1,0,66,3],
+"structCKPlanStepV2.html#acaaa916701cbcf1e9a5d35ff79e7c5bf":[1,0,66,0],
+"structCKPoolBlock.html":[1,0,67],
+"structCKPoolBlock.html#a28b34d622ad98214bd709675b430f459":[1,0,67,1],
+"structCKPoolBlock.html#a39f197d57191d7ab700d17ad918d03c5":[1,0,67,2],
+"structCKPoolBlock.html#ad15144404362a0676f0c46a5b5a8d0ba":[1,0,67,3],
 "structCKPoolBlock.html#ae3840902acd7df911c6273760f3c63d5":[1,0,67,0],
 "structCKSection.html":[1,0,68],
 "structCKSection.html#a0651f7c9b1f55618e1ed1285fc803eab":[1,0,68,15],
@@ -243,11 +249,5 @@ var NAVTREEINDEX23 =
 "structGEMMParams.html#a450121a9c76be4c90fe5326b1808eb1a":[1,0,85,3],
 "structGEMMParams.html#a6b0b003d129e3c027928ac6ad089e110":[1,0,85,2],
 "structGEMMParams.html#aa84a148f54c8ec49fec73e7b2354761c":[1,0,85,0],
-"structGEMMParams.html#adc0714de30284b4b62ecfac446979251":[1,0,85,4],
-"structMemoryInfo.html":[1,0,87],
-"structMemoryInfo.html#a0ff8aa8993baa2138de40490c4545fff":[1,0,87,10],
-"structMemoryInfo.html#a2409920ad9ccdec3d75c1d81f1a664d2":[1,0,87,11],
-"structMemoryInfo.html#a3f07269515a43e096aa98be0daa48f46":[1,0,87,7],
-"structMemoryInfo.html#a4a595e517746ef202bb268465dd605b4":[1,0,87,5],
-"structMemoryInfo.html#a53dbc361ce7012951ceff084c52b17b9":[1,0,87,15]
+"structGEMMParams.html#adc0714de30284b4b62ecfac446979251":[1,0,85,4]
 };

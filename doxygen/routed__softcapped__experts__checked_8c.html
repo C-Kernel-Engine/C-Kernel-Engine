@@ -138,7 +138,7 @@ $(function(){initNavTree('routed__softcapped__experts__checked_8c.html','',''); 
 Macros</h2></td></tr>
 <tr class="memitem:a275f2d8ed6d608c33fea912e0abab5aa" id="r_a275f2d8ed6d608c33fea912e0abab5aa"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a275f2d8ed6d608c33fea912e0abab5aa">IQ4_NL_BLOCK_BYTES</a>&#160;&#160;&#160;18</td></tr>
 <tr class="memitem:a0bd719ef28d932a7e818c7c599908d49" id="r_a0bd719ef28d932a7e818c7c599908d49"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a0bd719ef28d932a7e818c7c599908d49">ROUTED_EXPERT_ARGS</a></td></tr>
-<tr class="memitem:a74bd84d59924d981e0e1274b44885588" id="r_a74bd84d59924d981e0e1274b44885588"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a74bd84d59924d981e0e1274b44885588">ROUTED_EXPERT_FORWARD</a>(storage,  quantize)</td></tr>
+<tr class="memitem:ae5a9b748f29e4d7e6a2029e807b3abb5" id="r_ae5a9b748f29e4d7e6a2029e807b3abb5"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#ae5a9b748f29e4d7e6a2029e807b3abb5">ROUTED_EXPERT_FORWARD</a>(storage,  quantize,  reference_moe)</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-enum-members" class="groupheader"><a id="enum-members" name="enum-members"></a>
 Enumerations</h2></td></tr>
@@ -153,11 +153,12 @@ Functions</h2></td></tr>
 <tr class="memitem:a12058ac45a5ce809600c431dfa137986" id="r_a12058ac45a5ce809600c431dfa137986"><td class="memItemLeft" align="right" valign="top">static float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a12058ac45a5ce809600c431dfa137986">expert_dot</a> (const float *input, const unsigned char *weight, size_t width, enum <a class="el" href="#a9215a77bd991b11391d98d0379a07c96">expert_storage</a> storage, const unsigned char *activation)</td></tr>
 <tr class="memitem:a6abea59d88c3c9a752719519301cea7a" id="r_a6abea59d88c3c9a752719519301cea7a"><td class="memItemLeft" align="right" valign="top">static size_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a6abea59d88c3c9a752719519301cea7a">packed_block_bytes</a> (enum <a class="el" href="#a9215a77bd991b11391d98d0379a07c96">expert_storage</a> storage)</td></tr>
 <tr class="memitem:a0596a7029552c6390c8ec30dbba5d296" id="r_a0596a7029552c6390c8ec30dbba5d296"><td class="memItemLeft" align="right" valign="top">static int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a0596a7029552c6390c8ec30dbba5d296">region</a> (const void *p, size_t bytes)</td></tr>
-<tr class="memitem:ad5237859360783f0f10025c67f81169d" id="r_ad5237859360783f0f10025c67f81169d"><td class="memItemLeft" align="right" valign="top">static int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#ad5237859360783f0f10025c67f81169d">routed_softcapped_experts</a> (const float *hidden, const int32_t *<a class="el" href="tokenizer_8h.html#a115bba665e9d8c38fea5507a93c4749c">ids</a>, const float *route_weights, const int32_t *expert_slots, const void *gate, const void *up, const void *down, float *expert_output, float *output, float *work, size_t rows, size_t hidden_dim, size_t inner, size_t experts, size_t slots, size_t top_k, size_t matrix_bytes, size_t hidden_elements, size_t id_elements, size_t route_elements, size_t expert_slot_elements, size_t expert_output_elements, size_t output_capacity, size_t work_elements, float gate_cap, float up_cap, enum <a class="el" href="#a9215a77bd991b11391d98d0379a07c96">expert_storage</a> storage, int quantize)</td></tr>
+<tr class="memitem:a0aca1c0006bd2c840f46d998e94754d9" id="r_a0aca1c0006bd2c840f46d998e94754d9"><td class="memItemLeft" align="right" valign="top">static int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a0aca1c0006bd2c840f46d998e94754d9">routed_softcapped_experts</a> (const float *hidden, const int32_t *<a class="el" href="tokenizer_8h.html#a115bba665e9d8c38fea5507a93c4749c">ids</a>, const float *route_weights, const int32_t *expert_slots, const void *gate, const void *up, const void *down, float *expert_output, float *output, float *work, size_t rows, size_t hidden_dim, size_t inner, size_t experts, size_t slots, size_t top_k, size_t matrix_bytes, size_t hidden_elements, size_t id_elements, size_t route_elements, size_t expert_slot_elements, size_t expert_output_elements, size_t output_capacity, size_t work_elements, float gate_cap, float up_cap, enum <a class="el" href="#a9215a77bd991b11391d98d0379a07c96">expert_storage</a> storage, int quantize, int reference_moe)</td></tr>
 <tr class="memitem:a37bc165b431bb8b431fc6801ea12543f" id="r_a37bc165b431bb8b431fc6801ea12543f"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a37bc165b431bb8b431fc6801ea12543f">routed_softcapped_experts_checked_f32</a> (const float *hidden, const int32_t *<a class="el" href="tokenizer_8h.html#a115bba665e9d8c38fea5507a93c4749c">ids</a>, const float *route_weights, const int32_t *expert_slots, const void *gate, const void *up, const void *down, float *expert_output, float *output, float *work, size_t rows, size_t hidden_dim, size_t inner, size_t experts, size_t slots, size_t top_k, size_t matrix_bytes, size_t hidden_elements, size_t id_elements, size_t route_elements, size_t expert_slot_elements, size_t expert_output_elements, size_t output_capacity, size_t work_elements, float gate_cap, float up_cap)</td></tr>
 <tr class="memitem:a2b3f18d5770356ecbf1e8cb08691377b" id="r_a2b3f18d5770356ecbf1e8cb08691377b"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a2b3f18d5770356ecbf1e8cb08691377b">routed_softcapped_experts_checked_iq4_nl</a> (const float *hidden, const int32_t *<a class="el" href="tokenizer_8h.html#a115bba665e9d8c38fea5507a93c4749c">ids</a>, const float *route_weights, const int32_t *expert_slots, const void *gate, const void *up, const void *down, float *expert_output, float *output, float *work, size_t rows, size_t hidden_dim, size_t inner, size_t experts, size_t slots, size_t top_k, size_t matrix_bytes, size_t hidden_elements, size_t id_elements, size_t route_elements, size_t expert_slot_elements, size_t expert_output_elements, size_t output_capacity, size_t work_elements, float gate_cap, float up_cap)</td></tr>
 <tr class="memitem:a53759bf05388460d018bd68939449516" id="r_a53759bf05388460d018bd68939449516"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a53759bf05388460d018bd68939449516">routed_softcapped_experts_checked_q8_0</a> (const float *hidden, const int32_t *<a class="el" href="tokenizer_8h.html#a115bba665e9d8c38fea5507a93c4749c">ids</a>, const float *route_weights, const int32_t *expert_slots, const void *gate, const void *up, const void *down, float *expert_output, float *output, float *work, size_t rows, size_t hidden_dim, size_t inner, size_t experts, size_t slots, size_t top_k, size_t matrix_bytes, size_t hidden_elements, size_t id_elements, size_t route_elements, size_t expert_slot_elements, size_t expert_output_elements, size_t output_capacity, size_t work_elements, float gate_cap, float up_cap)</td></tr>
 <tr class="memitem:a0a86a84605dd1a7c7214a11d3d32ac58" id="r_a0a86a84605dd1a7c7214a11d3d32ac58"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a0a86a84605dd1a7c7214a11d3d32ac58">routed_softcapped_experts_checked_q8_0_q8_activation</a> (const float *hidden, const int32_t *<a class="el" href="tokenizer_8h.html#a115bba665e9d8c38fea5507a93c4749c">ids</a>, const float *route_weights, const int32_t *expert_slots, const void *gate, const void *up, const void *down, float *expert_output, float *output, float *work, size_t rows, size_t hidden_dim, size_t inner, size_t experts, size_t slots, size_t top_k, size_t matrix_bytes, size_t hidden_elements, size_t id_elements, size_t route_elements, size_t expert_slot_elements, size_t expert_output_elements, size_t output_capacity, size_t work_elements, float gate_cap, float up_cap)</td></tr>
+<tr class="memitem:afd7f2a2a53f9f485a1c4d64d0ae26be1" id="r_afd7f2a2a53f9f485a1c4d64d0ae26be1"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#afd7f2a2a53f9f485a1c4d64d0ae26be1">routed_softcapped_experts_checked_q8_0_q8_activation_scaled_situ</a> (const float *hidden, const int32_t *<a class="el" href="tokenizer_8h.html#a115bba665e9d8c38fea5507a93c4749c">ids</a>, const float *route_weights, const int32_t *expert_slots, const void *gate, const void *up, const void *down, float *expert_output, float *output, float *work, size_t rows, size_t hidden_dim, size_t inner, size_t experts, size_t slots, size_t top_k, size_t matrix_bytes, size_t hidden_elements, size_t id_elements, size_t route_elements, size_t expert_slot_elements, size_t expert_output_elements, size_t output_capacity, size_t work_elements, float gate_cap, float up_cap)</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-var-members" class="groupheader"><a id="var-members" name="var-members"></a>
 Variables</h2></td></tr>
@@ -212,12 +213,12 @@ Variables</h2></td></tr>
 <div class="line"><span class="lineno">   71</span><span class="preprocessor">    size_t expert_slot_elements, size_t expert_output_elements, size_t output_capacity, \</span></div>
 <div class="line"><span class="lineno">   72</span><span class="preprocessor">    size_t work_elements, float gate_cap, float up_cap</span></div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00074">routed_softcapped_experts()</a>, <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00186">routed_softcapped_experts_checked_f32()</a>, <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00196">routed_softcapped_experts_checked_iq4_nl()</a>, <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00191">routed_softcapped_experts_checked_q8_0()</a>, and <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00202">routed_softcapped_experts_checked_q8_0_q8_activation()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00074">routed_softcapped_experts()</a>, <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00209">routed_softcapped_experts_checked_f32()</a>, <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00219">routed_softcapped_experts_checked_iq4_nl()</a>, <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00214">routed_softcapped_experts_checked_q8_0()</a>, <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00225">routed_softcapped_experts_checked_q8_0_q8_activation()</a>, and <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00230">routed_softcapped_experts_checked_q8_0_q8_activation_scaled_situ()</a>.</p>
 
 </div>
 </div>
-<a id="a74bd84d59924d981e0e1274b44885588" name="a74bd84d59924d981e0e1274b44885588"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a74bd84d59924d981e0e1274b44885588">&#9670;&#160;</a></span>ROUTED_EXPERT_FORWARD</h2>
+<a id="ae5a9b748f29e4d7e6a2029e807b3abb5" name="ae5a9b748f29e4d7e6a2029e807b3abb5"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ae5a9b748f29e4d7e6a2029e807b3abb5">&#9670;&#160;</a></span>ROUTED_EXPERT_FORWARD</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -230,26 +231,31 @@ Variables</h2></td></tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype"></td>          <td class="paramname"><span class="paramname"><em>quantize</em></span>&#160;)</td>
+          <td class="paramtype"></td>          <td class="paramname"><span class="paramname"><em>quantize</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"></td>          <td class="paramname"><span class="paramname"><em>reference_moe</em></span>&#160;)</td>
         </tr>
       </table>
 </div><div class="memdoc">
-<b>Value:</b><div class="fragment"><div class="line">    <a class="code hl_function" href="#ad5237859360783f0f10025c67f81169d">routed_softcapped_experts</a>(hidden, <a class="code hl_variable" href="tokenizer_8h.html#a115bba665e9d8c38fea5507a93c4749c">ids</a>, route_weights, expert_slots, gate, up, down, \</div>
+<b>Value:</b><div class="fragment"><div class="line">    <a class="code hl_function" href="#a0aca1c0006bd2c840f46d998e94754d9">routed_softcapped_experts</a>(hidden, <a class="code hl_variable" href="tokenizer_8h.html#a115bba665e9d8c38fea5507a93c4749c">ids</a>, route_weights, expert_slots, gate, up, down, \</div>
 <div class="line">                             expert_output, output, work, rows, hidden_dim, inner, experts, \</div>
 <div class="line">                             slots, top_k, matrix_bytes, hidden_elements, id_elements, route_elements, \</div>
 <div class="line">                             expert_slot_elements, expert_output_elements, output_capacity, \</div>
-<div class="line">                             work_elements, gate_cap, up_cap, storage, quantize)</div>
-<div class="ttc" id="arouted__softcapped__experts__checked_8c_html_ad5237859360783f0f10025c67f81169d"><div class="ttname"><a href="#ad5237859360783f0f10025c67f81169d">routed_softcapped_experts</a></div><div class="ttdeci">static int routed_softcapped_experts(const float *hidden, const int32_t *ids, const float *route_weights, const int32_t *expert_slots, const void *gate, const void *up, const void *down, float *expert_output, float *output, float *work, size_t rows, size_t hidden_dim, size_t inner, size_t experts, size_t slots, size_t top_k, size_t matrix_bytes, size_t hidden_elements, size_t id_elements, size_t route_elements, size_t expert_slot_elements, size_t expert_output_elements, size_t output_capacity, size_t work_elements, float gate_cap, float up_cap, enum expert_storage storage, int quantize)</div><div class="ttdef"><b>Definition</b> <a href="routed__softcapped__experts__checked_8c_source.html#l00074">routed_softcapped_experts_checked.c:74</a></div></div>
+<div class="line">                             work_elements, gate_cap, up_cap, storage, quantize, reference_moe)</div>
+<div class="ttc" id="arouted__softcapped__experts__checked_8c_html_a0aca1c0006bd2c840f46d998e94754d9"><div class="ttname"><a href="#a0aca1c0006bd2c840f46d998e94754d9">routed_softcapped_experts</a></div><div class="ttdeci">static int routed_softcapped_experts(const float *hidden, const int32_t *ids, const float *route_weights, const int32_t *expert_slots, const void *gate, const void *up, const void *down, float *expert_output, float *output, float *work, size_t rows, size_t hidden_dim, size_t inner, size_t experts, size_t slots, size_t top_k, size_t matrix_bytes, size_t hidden_elements, size_t id_elements, size_t route_elements, size_t expert_slot_elements, size_t expert_output_elements, size_t output_capacity, size_t work_elements, float gate_cap, float up_cap, enum expert_storage storage, int quantize, int reference_moe)</div><div class="ttdef"><b>Definition</b> <a href="routed__softcapped__experts__checked_8c_source.html#l00074">routed_softcapped_experts_checked.c:74</a></div></div>
 </div><!-- fragment -->
-<p class="definition">Definition at line <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00179">179</a> of file <a class="el" href="routed__softcapped__experts__checked_8c_source.html">routed_softcapped_experts_checked.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  179</span><span class="preprocessor">#define ROUTED_EXPERT_FORWARD(storage, quantize) \</span></div>
-<div class="line"><span class="lineno">  180</span><span class="preprocessor">    routed_softcapped_experts(hidden, ids, route_weights, expert_slots, gate, up, down, \</span></div>
-<div class="line"><span class="lineno">  181</span><span class="preprocessor">                             expert_output, output, work, rows, hidden_dim, inner, experts, \</span></div>
-<div class="line"><span class="lineno">  182</span><span class="preprocessor">                             slots, top_k, matrix_bytes, hidden_elements, id_elements, route_elements, \</span></div>
-<div class="line"><span class="lineno">  183</span><span class="preprocessor">                             expert_slot_elements, expert_output_elements, output_capacity, \</span></div>
-<div class="line"><span class="lineno">  184</span><span class="preprocessor">                             work_elements, gate_cap, up_cap, storage, quantize)</span></div>
+<p class="definition">Definition at line <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00202">202</a> of file <a class="el" href="routed__softcapped__experts__checked_8c_source.html">routed_softcapped_experts_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  202</span><span class="preprocessor">#define ROUTED_EXPERT_FORWARD(storage, quantize, reference_moe) \</span></div>
+<div class="line"><span class="lineno">  203</span><span class="preprocessor">    routed_softcapped_experts(hidden, ids, route_weights, expert_slots, gate, up, down, \</span></div>
+<div class="line"><span class="lineno">  204</span><span class="preprocessor">                             expert_output, output, work, rows, hidden_dim, inner, experts, \</span></div>
+<div class="line"><span class="lineno">  205</span><span class="preprocessor">                             slots, top_k, matrix_bytes, hidden_elements, id_elements, route_elements, \</span></div>
+<div class="line"><span class="lineno">  206</span><span class="preprocessor">                             expert_slot_elements, expert_output_elements, output_capacity, \</span></div>
+<div class="line"><span class="lineno">  207</span><span class="preprocessor">                             work_elements, gate_cap, up_cap, storage, quantize, reference_moe)</span></div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00186">routed_softcapped_experts_checked_f32()</a>, <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00196">routed_softcapped_experts_checked_iq4_nl()</a>, <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00191">routed_softcapped_experts_checked_q8_0()</a>, and <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00202">routed_softcapped_experts_checked_q8_0_q8_activation()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00209">routed_softcapped_experts_checked_f32()</a>, <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00219">routed_softcapped_experts_checked_iq4_nl()</a>, <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00214">routed_softcapped_experts_checked_q8_0()</a>, <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00225">routed_softcapped_experts_checked_q8_0_q8_activation()</a>, and <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00230">routed_softcapped_experts_checked_q8_0_q8_activation_scaled_situ()</a>.</p>
 
 </div>
 </div>
@@ -482,8 +488,8 @@ Variables</h2></td></tr>
 
 </div>
 </div>
-<a id="ad5237859360783f0f10025c67f81169d" name="ad5237859360783f0f10025c67f81169d"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ad5237859360783f0f10025c67f81169d">&#9670;&#160;</a></span>routed_softcapped_experts()</h2>
+<a id="a0aca1c0006bd2c840f46d998e94754d9" name="a0aca1c0006bd2c840f46d998e94754d9"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a0aca1c0006bd2c840f46d998e94754d9">&#9670;&#160;</a></span>routed_softcapped_experts()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -629,7 +635,12 @@ Variables</h2></td></tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">int</td>          <td class="paramname"><span class="paramname"><em>quantize</em></span>&#160;)</td>
+          <td class="paramtype">int</td>          <td class="paramname"><span class="paramname"><em>quantize</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int</td>          <td class="paramname"><span class="paramname"><em>reference_moe</em></span>&#160;)</td>
         </tr>
       </table>
   </td>
@@ -702,47 +713,70 @@ Variables</h2></td></tr>
 <div class="line"><span class="lineno">  134</span>        }</div>
 <div class="line"><span class="lineno">  135</span>    }</div>
 <div class="line"><span class="lineno">  136</span> </div>
-<div class="line"><span class="lineno">  137</span>    <span class="keywordtype">float</span> *gate_values = work;</div>
-<div class="line"><span class="lineno">  138</span>    <span class="keywordtype">float</span> *up_values = work + inner;</div>
-<div class="line"><span class="lineno">  139</span>    <span class="keywordtype">float</span> *activation = work + 2 * inner;</div>
-<div class="line"><span class="lineno">  140</span>    <span class="keywordtype">float</span> *staged_experts = work + 3 * inner;</div>
-<div class="line"><span class="lineno">  141</span>    <span class="keywordtype">float</span> *staged_output = staged_experts + row_outputs;</div>
-<div class="line"><span class="lineno">  142</span>    <span class="keywordtype">unsigned</span> <span class="keywordtype">char</span> *packed_hidden = quantize ? (<span class="keywordtype">unsigned</span> <span class="keywordtype">char</span> *)(work + float_elements) : NULL;</div>
-<div class="line"><span class="lineno">  143</span>    <span class="keywordtype">unsigned</span> <span class="keywordtype">char</span> *packed_activation = quantize ? packed_hidden + gate_row : NULL;</div>
-<div class="line"><span class="lineno">  144</span>    memset(staged_output, 0, output_elements * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">  145</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> row = 0; row &lt; rows; ++row) {</div>
-<div class="line"><span class="lineno">  146</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *x = hidden + row * hidden_dim;</div>
-<div class="line"><span class="lineno">  147</span>        <span class="keywordtype">float</span> *y = staged_output + row * hidden_dim;</div>
-<div class="line"><span class="lineno">  148</span>        <span class="keywordflow">if</span> (quantize &amp;&amp; <a class="code hl_function" href="packed__q8__activation__checked_8h.html#aec8d230861e8245a5e7617a14073adba">ck_pack_q8_activation_rne</a>(x, packed_hidden, hidden_dim)) <span class="keywordflow">return</span> -3;</div>
-<div class="line"><span class="lineno">  149</span>        <span class="comment">/* The reference sums contributions in ascending expert-ID order. */</span></div>
-<div class="line"><span class="lineno">  150</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> <span class="keywordtype">id</span> = 0; <span class="keywordtype">id</span> &lt; experts; ++<a class="code hl_variable" href="tokenizer_8h.html#a2708c0bbb6f926149707c2c61fe43c3e">id</a>) {</div>
-<div class="line"><span class="lineno">  151</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> index = 0; index &lt; top_k; ++index) {</div>
-<div class="line"><span class="lineno">  152</span>                <span class="keyword">const</span> <span class="keywordtype">size_t</span> route = row * top_k + index;</div>
-<div class="line"><span class="lineno">  153</span>                <span class="keywordflow">if</span> ((<span class="keywordtype">size_t</span>)<a class="code hl_variable" href="tokenizer_8h.html#a115bba665e9d8c38fea5507a93c4749c">ids</a>[route] != <span class="keywordtype">id</span>) <span class="keywordflow">continue</span>;</div>
-<div class="line"><span class="lineno">  154</span>                <span class="keyword">const</span> <span class="keywordtype">size_t</span> offset = (size_t)expert_slots[<span class="keywordtype">id</span>] * expert_bytes;</div>
-<div class="line"><span class="lineno">  155</span>                <span class="keyword">const</span> <span class="keywordtype">unsigned</span> <span class="keywordtype">char</span> *g = (<span class="keyword">const</span> <span class="keywordtype">unsigned</span> <span class="keywordtype">char</span> *)gate + offset;</div>
-<div class="line"><span class="lineno">  156</span>                <span class="keyword">const</span> <span class="keywordtype">unsigned</span> <span class="keywordtype">char</span> *u = (<span class="keyword">const</span> <span class="keywordtype">unsigned</span> <span class="keywordtype">char</span> *)up + offset;</div>
-<div class="line"><span class="lineno">  157</span>                <span class="keyword">const</span> <span class="keywordtype">unsigned</span> <span class="keywordtype">char</span> *d = (<span class="keyword">const</span> <span class="keywordtype">unsigned</span> <span class="keywordtype">char</span> *)down + offset;</div>
-<div class="line"><span class="lineno">  158</span>                <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; inner; ++i) {</div>
-<div class="line"><span class="lineno">  159</span>                    gate_values[i] = <a class="code hl_function" href="#a12058ac45a5ce809600c431dfa137986">expert_dot</a>(x, g + i * gate_row, hidden_dim, storage, packed_hidden);</div>
-<div class="line"><span class="lineno">  160</span>                    up_values[i] = <a class="code hl_function" href="#a12058ac45a5ce809600c431dfa137986">expert_dot</a>(x, u + i * gate_row, hidden_dim, storage, packed_hidden);</div>
-<div class="line"><span class="lineno">  161</span>                }</div>
-<div class="line"><span class="lineno">  162</span>                <span class="keywordflow">if</span> (<a class="code hl_function" href="ckernel__transformer__rows__checked_8h.html#a211d8e1abd73f6cd7a88fbcad0602674">softcapped_swiglu_rows_checked_f32</a>(gate_values, inner, up_values, inner,</div>
-<div class="line"><span class="lineno">  163</span>                        activation, inner, inner, gate_cap, up_cap)) <span class="keywordflow">return</span> -3;</div>
-<div class="line"><span class="lineno">  164</span>                <span class="keywordflow">if</span> (quantize &amp;&amp; <a class="code hl_function" href="packed__q8__activation__checked_8h.html#aec8d230861e8245a5e7617a14073adba">ck_pack_q8_activation_rne</a>(activation, packed_activation, inner)) <span class="keywordflow">return</span> -3;</div>
-<div class="line"><span class="lineno">  165</span>                <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; hidden_dim; ++i) {</div>
-<div class="line"><span class="lineno">  166</span>                    <span class="keyword">const</span> <span class="keywordtype">float</span> v = <a class="code hl_function" href="#a12058ac45a5ce809600c431dfa137986">expert_dot</a>(activation, d + i * down_row, inner, storage, packed_activation);</div>
-<div class="line"><span class="lineno">  167</span>                    staged_experts[route * hidden_dim + i] = v;</div>
-<div class="line"><span class="lineno">  168</span>                    y[i] += v * route_weights[route];</div>
-<div class="line"><span class="lineno">  169</span>                    <span class="keywordflow">if</span> (!isfinite(v) || !isfinite(y[i])) <span class="keywordflow">return</span> -3;</div>
-<div class="line"><span class="lineno">  170</span>                }</div>
-<div class="line"><span class="lineno">  171</span>            }</div>
-<div class="line"><span class="lineno">  172</span>        }</div>
-<div class="line"><span class="lineno">  173</span>    }</div>
-<div class="line"><span class="lineno">  174</span>    memcpy(expert_output, staged_experts, row_outputs * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">  175</span>    memcpy(output, staged_output, output_elements * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">  176</span>    <span class="keywordflow">return</span> 0;</div>
-<div class="line"><span class="lineno">  177</span>}</div>
+<div class="line"><span class="lineno">  137</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> gate_reciprocal = reference_moe ? 1.0f / gate_cap : 0.0f;</div>
+<div class="line"><span class="lineno">  138</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> up_reciprocal = reference_moe ? 1.0f / up_cap : 0.0f;</div>
+<div class="line"><span class="lineno">  139</span>    <span class="keywordflow">if</span> (!isfinite(gate_reciprocal) || !isfinite(up_reciprocal)) <span class="keywordflow">return</span> -3;</div>
+<div class="line"><span class="lineno">  140</span> </div>
+<div class="line"><span class="lineno">  141</span>    <span class="keywordtype">float</span> *gate_values = work;</div>
+<div class="line"><span class="lineno">  142</span>    <span class="keywordtype">float</span> *up_values = work + inner;</div>
+<div class="line"><span class="lineno">  143</span>    <span class="keywordtype">float</span> *activation = work + 2 * inner;</div>
+<div class="line"><span class="lineno">  144</span>    <span class="keywordtype">float</span> *staged_experts = work + 3 * inner;</div>
+<div class="line"><span class="lineno">  145</span>    <span class="keywordtype">float</span> *staged_output = staged_experts + row_outputs;</div>
+<div class="line"><span class="lineno">  146</span>    <span class="keywordtype">unsigned</span> <span class="keywordtype">char</span> *packed_hidden = quantize ? (<span class="keywordtype">unsigned</span> <span class="keywordtype">char</span> *)(work + float_elements) : NULL;</div>
+<div class="line"><span class="lineno">  147</span>    <span class="keywordtype">unsigned</span> <span class="keywordtype">char</span> *packed_activation = quantize ? packed_hidden + gate_row : NULL;</div>
+<div class="line"><span class="lineno">  148</span>    memset(staged_output, 0, output_elements * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  149</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> row = 0; row &lt; rows; ++row) {</div>
+<div class="line"><span class="lineno">  150</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *x = hidden + row * hidden_dim;</div>
+<div class="line"><span class="lineno">  151</span>        <span class="keywordtype">float</span> *y = staged_output + row * hidden_dim;</div>
+<div class="line"><span class="lineno">  152</span>        <span class="keywordflow">if</span> (quantize &amp;&amp; <a class="code hl_function" href="packed__q8__activation__checked_8h.html#aec8d230861e8245a5e7617a14073adba">ck_pack_q8_activation_rne</a>(x, packed_hidden, hidden_dim)) <span class="keywordflow">return</span> -3;</div>
+<div class="line"><span class="lineno">  153</span>        <span class="keywordtype">size_t</span> ordered_slots[1024];</div>
+<div class="line"><span class="lineno">  154</span>        <span class="keywordflow">if</span> (!reference_moe) {</div>
+<div class="line"><span class="lineno">  155</span>            <span class="keywordtype">size_t</span> next = 0;</div>
+<div class="line"><span class="lineno">  156</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> <span class="keywordtype">id</span> = 0; <span class="keywordtype">id</span> &lt; experts; ++<a class="code hl_variable" href="tokenizer_8h.html#a2708c0bbb6f926149707c2c61fe43c3e">id</a>)</div>
+<div class="line"><span class="lineno">  157</span>                <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> slot = 0; slot &lt; top_k; ++slot)</div>
+<div class="line"><span class="lineno">  158</span>                    <span class="keywordflow">if</span> ((<span class="keywordtype">size_t</span>)<a class="code hl_variable" href="tokenizer_8h.html#a115bba665e9d8c38fea5507a93c4749c">ids</a>[row * top_k + slot] == <span class="keywordtype">id</span>) ordered_slots[next++] = slot;</div>
+<div class="line"><span class="lineno">  159</span>        }</div>
+<div class="line"><span class="lineno">  160</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> index = 0; index &lt; top_k; ++index) {</div>
+<div class="line"><span class="lineno">  161</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span> route = row * top_k + (reference_moe ? index : ordered_slots[index]);</div>
+<div class="line"><span class="lineno">  162</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span> offset = (size_t)expert_slots[<a class="code hl_variable" href="tokenizer_8h.html#a115bba665e9d8c38fea5507a93c4749c">ids</a>[route]] * expert_bytes;</div>
+<div class="line"><span class="lineno">  163</span>            <span class="keyword">const</span> <span class="keywordtype">unsigned</span> <span class="keywordtype">char</span> *g = (<span class="keyword">const</span> <span class="keywordtype">unsigned</span> <span class="keywordtype">char</span> *)gate + offset;</div>
+<div class="line"><span class="lineno">  164</span>            <span class="keyword">const</span> <span class="keywordtype">unsigned</span> <span class="keywordtype">char</span> *u = (<span class="keyword">const</span> <span class="keywordtype">unsigned</span> <span class="keywordtype">char</span> *)up + offset;</div>
+<div class="line"><span class="lineno">  165</span>            <span class="keyword">const</span> <span class="keywordtype">unsigned</span> <span class="keywordtype">char</span> *d = (<span class="keyword">const</span> <span class="keywordtype">unsigned</span> <span class="keywordtype">char</span> *)down + offset;</div>
+<div class="line"><span class="lineno">  166</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; inner; ++i) {</div>
+<div class="line"><span class="lineno">  167</span>                gate_values[i] = <a class="code hl_function" href="#a12058ac45a5ce809600c431dfa137986">expert_dot</a>(x, g + i * gate_row, hidden_dim, storage, packed_hidden);</div>
+<div class="line"><span class="lineno">  168</span>                up_values[i] = <a class="code hl_function" href="#a12058ac45a5ce809600c431dfa137986">expert_dot</a>(x, u + i * gate_row, hidden_dim, storage, packed_hidden);</div>
+<div class="line"><span class="lineno">  169</span>            }</div>
+<div class="line"><span class="lineno">  170</span>            <span class="keywordflow">if</span> (reference_moe) {</div>
+<div class="line"><span class="lineno">  171</span>                <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; inner; ++i) {</div>
+<div class="line"><span class="lineno">  172</span>                    <span class="keyword">const</span> <span class="keywordtype">float</span> gate = gate_values[i], up = up_values[i];</div>
+<div class="line"><span class="lineno">  173</span>                    <span class="keywordflow">if</span> (!isfinite(gate) || !isfinite(up)) <span class="keywordflow">return</span> -3;</div>
+<div class="line"><span class="lineno">  174</span>                    <span class="keyword">const</span> <span class="keywordtype">float</span> capped_gate = gate_cap * tanhf(gate * gate_reciprocal);</div>
+<div class="line"><span class="lineno">  175</span>                    <span class="keyword">const</span> <span class="keywordtype">float</span> capped_up = up_cap * tanhf(up * up_reciprocal);</div>
+<div class="line"><span class="lineno">  176</span>                    <span class="keyword">const</span> <span class="keywordtype">float</span> sigmoid = 1.0f / (1.0f + expf(-gate));</div>
+<div class="line"><span class="lineno">  177</span>                    activation[i] = (capped_gate * sigmoid) * capped_up;</div>
+<div class="line"><span class="lineno">  178</span>                    <span class="keywordflow">if</span> (!isfinite(activation[i])) <span class="keywordflow">return</span> -3;</div>
+<div class="line"><span class="lineno">  179</span>                }</div>
+<div class="line"><span class="lineno">  180</span>            } <span class="keywordflow">else</span> <span class="keywordflow">if</span> (<a class="code hl_function" href="ckernel__transformer__rows__checked_8h.html#a211d8e1abd73f6cd7a88fbcad0602674">softcapped_swiglu_rows_checked_f32</a>(gate_values, inner, up_values, inner,</div>
+<div class="line"><span class="lineno">  181</span>                       activation, inner, inner, gate_cap, up_cap)) <span class="keywordflow">return</span> -3;</div>
+<div class="line"><span class="lineno">  182</span>            <span class="keywordflow">if</span> (quantize &amp;&amp; <a class="code hl_function" href="packed__q8__activation__checked_8h.html#aec8d230861e8245a5e7617a14073adba">ck_pack_q8_activation_rne</a>(activation, packed_activation, inner)) <span class="keywordflow">return</span> -3;</div>
+<div class="line"><span class="lineno">  183</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; hidden_dim; ++i) {</div>
+<div class="line"><span class="lineno">  184</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> v = <a class="code hl_function" href="#a12058ac45a5ce809600c431dfa137986">expert_dot</a>(activation, d + i * down_row, inner, storage, packed_activation);</div>
+<div class="line"><span class="lineno">  185</span>                staged_experts[route * hidden_dim + i] = v;</div>
+<div class="line"><span class="lineno">  186</span>                <span class="keywordflow">if</span> (reference_moe) {</div>
+<div class="line"><span class="lineno">  187</span>                    <span class="comment">/* A stored FP32 multiply precedes the ordered FP32 addition. */</span></div>
+<div class="line"><span class="lineno">  188</span>                    <span class="keyword">const</span> <span class="keyword">volatile</span> <span class="keywordtype">float</span> weighted = v * route_weights[route];</div>
+<div class="line"><span class="lineno">  189</span>                    y[i] = index == 0 ? weighted : y[i] + weighted;</div>
+<div class="line"><span class="lineno">  190</span>                } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno">  191</span>                    y[i] += v * route_weights[route];</div>
+<div class="line"><span class="lineno">  192</span>                }</div>
+<div class="line"><span class="lineno">  193</span>                <span class="keywordflow">if</span> (!isfinite(v) || !isfinite(y[i])) <span class="keywordflow">return</span> -3;</div>
+<div class="line"><span class="lineno">  194</span>            }</div>
+<div class="line"><span class="lineno">  195</span>        }</div>
+<div class="line"><span class="lineno">  196</span>    }</div>
+<div class="line"><span class="lineno">  197</span>    memcpy(expert_output, staged_experts, row_outputs * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  198</span>    memcpy(output, staged_output, output_elements * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  199</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  200</span>}</div>
 <div class="ttc" id="achecked__float__buffer_8h_html_a1b266161b71bde9ca8d45c2fb5ac889a"><div class="ttname"><a href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a></div><div class="ttdeci">static int ck_checked_finite(const float *ptr, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00019">checked_float_buffer.h:19</a></div></div>
 <div class="ttc" id="ackernel__transformer__rows__checked_8h_html_a211d8e1abd73f6cd7a88fbcad0602674"><div class="ttname"><a href="ckernel__transformer__rows__checked_8h.html#a211d8e1abd73f6cd7a88fbcad0602674">softcapped_swiglu_rows_checked_f32</a></div><div class="ttdeci">int softcapped_swiglu_rows_checked_f32(const float *gate, size_t gate_elements, const float *up, size_t up_elements, float *output, size_t output_elements, size_t elements, float gate_cap, float up_cap)</div><div class="ttdef"><b>Definition</b> <a href="transformer__rows__checked_8c_source.html#l00191">transformer_rows_checked.c:191</a></div></div>
 <div class="ttc" id="adecision__tensor__ops_8c_html_a3b0f37e61a34f1e54a900bdf137a0484"><div class="ttname"><a href="decision__tensor__ops_8c.html#a3b0f37e61a34f1e54a900bdf137a0484">buffers</a></div><div class="ttdeci">static int buffers(const void **inputs, const size_t *sizes, size_t count, float *out, size_t on, float *scratch, size_t sn, size_t needed)</div><div class="ttdef"><b>Definition</b> <a href="decision__tensor__ops_8c_source.html#l00020">decision_tensor_ops.c:20</a></div></div>
@@ -895,13 +929,13 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00186">186</a> of file <a class="el" href="routed__softcapped__experts__checked_8c_source.html">routed_softcapped_experts_checked.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  187</span>{</div>
-<div class="line"><span class="lineno">  188</span>    <span class="keywordflow">return</span> <a class="code hl_define" href="#a74bd84d59924d981e0e1274b44885588">ROUTED_EXPERT_FORWARD</a>(<a class="code hl_enumvalue" href="#a9215a77bd991b11391d98d0379a07c96ad13cb5eca70fb9919ec3139400301f6c">EXPERT_F32</a>, 0);</div>
-<div class="line"><span class="lineno">  189</span>}</div>
-<div class="ttc" id="arouted__softcapped__experts__checked_8c_html_a74bd84d59924d981e0e1274b44885588"><div class="ttname"><a href="#a74bd84d59924d981e0e1274b44885588">ROUTED_EXPERT_FORWARD</a></div><div class="ttdeci">#define ROUTED_EXPERT_FORWARD(storage, quantize)</div><div class="ttdef"><b>Definition</b> <a href="routed__softcapped__experts__checked_8c_source.html#l00179">routed_softcapped_experts_checked.c:179</a></div></div>
+<p class="definition">Definition at line <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00209">209</a> of file <a class="el" href="routed__softcapped__experts__checked_8c_source.html">routed_softcapped_experts_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  210</span>{</div>
+<div class="line"><span class="lineno">  211</span>    <span class="keywordflow">return</span> <a class="code hl_define" href="#ae5a9b748f29e4d7e6a2029e807b3abb5">ROUTED_EXPERT_FORWARD</a>(<a class="code hl_enumvalue" href="#a9215a77bd991b11391d98d0379a07c96ad13cb5eca70fb9919ec3139400301f6c">EXPERT_F32</a>, 0, 0);</div>
+<div class="line"><span class="lineno">  212</span>}</div>
+<div class="ttc" id="arouted__softcapped__experts__checked_8c_html_ae5a9b748f29e4d7e6a2029e807b3abb5"><div class="ttname"><a href="#ae5a9b748f29e4d7e6a2029e807b3abb5">ROUTED_EXPERT_FORWARD</a></div><div class="ttdeci">#define ROUTED_EXPERT_FORWARD(storage, quantize, reference_moe)</div><div class="ttdef"><b>Definition</b> <a href="routed__softcapped__experts__checked_8c_source.html#l00202">routed_softcapped_experts_checked.c:202</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00009">EXPERT_F32</a>, <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00065">ROUTED_EXPERT_ARGS</a>, and <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00179">ROUTED_EXPERT_FORWARD</a>.</p>
+<p class="reference">References <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00009">EXPERT_F32</a>, <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00065">ROUTED_EXPERT_ARGS</a>, and <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00202">ROUTED_EXPERT_FORWARD</a>.</p>
 
 </div>
 </div>
@@ -1044,12 +1078,12 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00196">196</a> of file <a class="el" href="routed__softcapped__experts__checked_8c_source.html">routed_softcapped_experts_checked.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  197</span>{</div>
-<div class="line"><span class="lineno">  198</span>    <span class="keywordflow">return</span> <a class="code hl_define" href="#a74bd84d59924d981e0e1274b44885588">ROUTED_EXPERT_FORWARD</a>(<a class="code hl_enumvalue" href="#a9215a77bd991b11391d98d0379a07c96aa67db061b8ec54a4d8bf3d3530101ab0">EXPERT_IQ4_NL</a>, 0);</div>
-<div class="line"><span class="lineno">  199</span>}</div>
+<p class="definition">Definition at line <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00219">219</a> of file <a class="el" href="routed__softcapped__experts__checked_8c_source.html">routed_softcapped_experts_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  220</span>{</div>
+<div class="line"><span class="lineno">  221</span>    <span class="keywordflow">return</span> <a class="code hl_define" href="#ae5a9b748f29e4d7e6a2029e807b3abb5">ROUTED_EXPERT_FORWARD</a>(<a class="code hl_enumvalue" href="#a9215a77bd991b11391d98d0379a07c96aa67db061b8ec54a4d8bf3d3530101ab0">EXPERT_IQ4_NL</a>, 0, 0);</div>
+<div class="line"><span class="lineno">  222</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00011">EXPERT_IQ4_NL</a>, <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00065">ROUTED_EXPERT_ARGS</a>, and <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00179">ROUTED_EXPERT_FORWARD</a>.</p>
+<p class="reference">References <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00011">EXPERT_IQ4_NL</a>, <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00065">ROUTED_EXPERT_ARGS</a>, and <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00202">ROUTED_EXPERT_FORWARD</a>.</p>
 
 </div>
 </div>
@@ -1192,12 +1226,12 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00191">191</a> of file <a class="el" href="routed__softcapped__experts__checked_8c_source.html">routed_softcapped_experts_checked.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  192</span>{</div>
-<div class="line"><span class="lineno">  193</span>    <span class="keywordflow">return</span> <a class="code hl_define" href="#a74bd84d59924d981e0e1274b44885588">ROUTED_EXPERT_FORWARD</a>(<a class="code hl_enumvalue" href="#a9215a77bd991b11391d98d0379a07c96a5eaa96d48c93163bc2846c2ea6d4b4c3">EXPERT_Q8_0</a>, 0);</div>
-<div class="line"><span class="lineno">  194</span>}</div>
+<p class="definition">Definition at line <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00214">214</a> of file <a class="el" href="routed__softcapped__experts__checked_8c_source.html">routed_softcapped_experts_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  215</span>{</div>
+<div class="line"><span class="lineno">  216</span>    <span class="keywordflow">return</span> <a class="code hl_define" href="#ae5a9b748f29e4d7e6a2029e807b3abb5">ROUTED_EXPERT_FORWARD</a>(<a class="code hl_enumvalue" href="#a9215a77bd991b11391d98d0379a07c96a5eaa96d48c93163bc2846c2ea6d4b4c3">EXPERT_Q8_0</a>, 0, 0);</div>
+<div class="line"><span class="lineno">  217</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00010">EXPERT_Q8_0</a>, <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00065">ROUTED_EXPERT_ARGS</a>, and <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00179">ROUTED_EXPERT_FORWARD</a>.</p>
+<p class="reference">References <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00010">EXPERT_Q8_0</a>, <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00065">ROUTED_EXPERT_ARGS</a>, and <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00202">ROUTED_EXPERT_FORWARD</a>.</p>
 
 </div>
 </div>
@@ -1340,12 +1374,160 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00202">202</a> of file <a class="el" href="routed__softcapped__experts__checked_8c_source.html">routed_softcapped_experts_checked.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  203</span>{</div>
-<div class="line"><span class="lineno">  204</span>    <span class="keywordflow">return</span> <a class="code hl_define" href="#a74bd84d59924d981e0e1274b44885588">ROUTED_EXPERT_FORWARD</a>(<a class="code hl_enumvalue" href="#a9215a77bd991b11391d98d0379a07c96a5eaa96d48c93163bc2846c2ea6d4b4c3">EXPERT_Q8_0</a>, 1);</div>
-<div class="line"><span class="lineno">  205</span>}</div>
+<p class="definition">Definition at line <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00225">225</a> of file <a class="el" href="routed__softcapped__experts__checked_8c_source.html">routed_softcapped_experts_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  226</span>{</div>
+<div class="line"><span class="lineno">  227</span>    <span class="keywordflow">return</span> <a class="code hl_define" href="#ae5a9b748f29e4d7e6a2029e807b3abb5">ROUTED_EXPERT_FORWARD</a>(<a class="code hl_enumvalue" href="#a9215a77bd991b11391d98d0379a07c96a5eaa96d48c93163bc2846c2ea6d4b4c3">EXPERT_Q8_0</a>, 1, 0);</div>
+<div class="line"><span class="lineno">  228</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00010">EXPERT_Q8_0</a>, <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00065">ROUTED_EXPERT_ARGS</a>, and <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00179">ROUTED_EXPERT_FORWARD</a>.</p>
+<p class="reference">References <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00010">EXPERT_Q8_0</a>, <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00065">ROUTED_EXPERT_ARGS</a>, and <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00202">ROUTED_EXPERT_FORWARD</a>.</p>
+
+</div>
+</div>
+<a id="afd7f2a2a53f9f485a1c4d64d0ae26be1" name="afd7f2a2a53f9f485a1c4d64d0ae26be1"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#afd7f2a2a53f9f485a1c4d64d0ae26be1">&#9670;&#160;</a></span>routed_softcapped_experts_checked_q8_0_q8_activation_scaled_situ()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int routed_softcapped_experts_checked_q8_0_q8_activation_scaled_situ </td>
+          <td>(</td>
+          <td class="paramtype">const float *</td>          <td class="paramname"><span class="paramname"><em>hidden</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const int32_t *</td>          <td class="paramname"><span class="paramname"><em>ids</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *</td>          <td class="paramname"><span class="paramname"><em>route_weights</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const int32_t *</td>          <td class="paramname"><span class="paramname"><em>expert_slots</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const void *</td>          <td class="paramname"><span class="paramname"><em>gate</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const void *</td>          <td class="paramname"><span class="paramname"><em>up</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const void *</td>          <td class="paramname"><span class="paramname"><em>down</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *</td>          <td class="paramname"><span class="paramname"><em>expert_output</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *</td>          <td class="paramname"><span class="paramname"><em>output</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *</td>          <td class="paramname"><span class="paramname"><em>work</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>rows</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>hidden_dim</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>inner</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>experts</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>slots</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>top_k</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>matrix_bytes</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>hidden_elements</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>id_elements</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>route_elements</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>expert_slot_elements</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>expert_output_elements</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>output_capacity</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>work_elements</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float</td>          <td class="paramname"><span class="paramname"><em>gate_cap</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float</td>          <td class="paramname"><span class="paramname"><em>up_cap</em></span>&#160;)</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00230">230</a> of file <a class="el" href="routed__softcapped__experts__checked_8c_source.html">routed_softcapped_experts_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  231</span>{</div>
+<div class="line"><span class="lineno">  232</span>    <span class="keywordflow">return</span> <a class="code hl_define" href="#ae5a9b748f29e4d7e6a2029e807b3abb5">ROUTED_EXPERT_FORWARD</a>(<a class="code hl_enumvalue" href="#a9215a77bd991b11391d98d0379a07c96a5eaa96d48c93163bc2846c2ea6d4b4c3">EXPERT_Q8_0</a>, 1, 1);</div>
+<div class="line"><span class="lineno">  233</span>}</div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00010">EXPERT_Q8_0</a>, <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00065">ROUTED_EXPERT_ARGS</a>, and <a class="el" href="routed__softcapped__experts__checked_8c_source.html#l00202">ROUTED_EXPERT_FORWARD</a>.</p>
 
 </div>
 </div>

@@ -1,5 +1,9 @@
 var NAVTREEINDEX18 =
 {
+"mega__fused__attention__prefill_8c.html":[2,0,1,1,0,6],
+"mega__fused__attention__prefill_8c.html#a1bcc7ea2d222390ac04fd37f3d8081df":[2,0,1,1,0,6,4],
+"mega__fused__attention__prefill_8c.html#a27249851108497d6b5fb85c55450dcc1":[2,0,1,1,0,6,3],
+"mega__fused__attention__prefill_8c.html#a2945c133b2cc63cb2f516c55e359ffba":[2,0,1,1,0,6,0],
 "mega__fused__attention__prefill_8c.html#a3c0ac15e87fbf875bd91aad8288b7e7c":[2,0,1,1,0,6,2],
 "mega__fused__attention__prefill_8c.html#a6a5da63aac6821fd65ed403bb1546577":[2,0,1,1,0,6,5],
 "mega__fused__attention__prefill_8c.html#a883b9f36dd8db8e37e5df4037f25b86e":[2,0,1,1,0,6,6],
@@ -135,8 +139,9 @@ var NAVTREEINDEX18 =
 "packed__q8__dot__ordered_8h.html#a2a709c1ad8150f24c50b31b745edc4f6":[2,0,0,71,0],
 "packed__q8__dot__ordered_8h_source.html":[2,0,0,71],
 "packed__text__io__checked_8c.html":[2,0,1,1,126],
-"packed__text__io__checked_8c.html#a03a5122e43ff44d81d6913ab7337ca92":[2,0,1,1,126,1],
-"packed__text__io__checked_8c.html#af97373dda3c1173be3eb313781ce431e":[2,0,1,1,126,0],
+"packed__text__io__checked_8c.html#a03a5122e43ff44d81d6913ab7337ca92":[2,0,1,1,126,2],
+"packed__text__io__checked_8c.html#a3c70888005df4ccffe2734c3ccb68336":[2,0,1,1,126,0],
+"packed__text__io__checked_8c.html#af97373dda3c1173be3eb313781ce431e":[2,0,1,1,126,1],
 "packed__text__io__checked_8c_source.html":[2,0,1,1,126],
 "pages.html":[],
 "parallel__orchestration_8c.html":[2,0,1,8,7],
@@ -244,10 +249,5 @@ var NAVTREEINDEX18 =
 "qwen4__exp__kernels_8c.html#a24d0656a0cee28105fa21c8c09ddff12":[2,0,1,1,133,1],
 "qwen4__exp__kernels_8c.html#a40e3a3a9c5354ea8c84b5103595e1590":[2,0,1,1,133,5],
 "qwen4__exp__kernels_8c.html#a51532c3e94a93d44b3c0b927cc29eea4":[2,0,1,1,133,14],
-"qwen4__exp__kernels_8c.html#a7276c2723fa42467c00386fb439ee8a0":[2,0,1,1,133,3],
-"qwen4__exp__kernels_8c.html#a77f955fcd4b76fd8eb0d1b10d142be5b":[2,0,1,1,133,7],
-"qwen4__exp__kernels_8c.html#a8f4c53f7982731eb785340c2239e974f":[2,0,1,1,133,12],
-"qwen4__exp__kernels_8c.html#aa6007c71eb310b9879ff23628042d37d":[2,0,1,1,133,10],
-"qwen4__exp__kernels_8c.html#aaf9adeba09e7e9e853b68fbc3815b2c8":[2,0,1,1,133,4],
-"qwen4__exp__kernels_8c.html#ac2b597b15d2b313325bbbe2a805cc23f":[2,0,1,1,133,15]
+"qwen4__exp__kernels_8c.html#a7276c2723fa42467c00386fb439ee8a0":[2,0,1,1,133,3]
 };
