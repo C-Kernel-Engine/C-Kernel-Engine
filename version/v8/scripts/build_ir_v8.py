@@ -2131,6 +2131,27 @@ OP_DATAFLOW = {
         "inputs": {"q": "external:q", "k": "external:k", "v": "external:v"},
         "outputs": {"out": {"slot": "attention_output", "dtype": "fp32"}},
     },
+    "rmsnorm_f32_square_f64_sum_rows_checked": {
+        "inputs": {"input": "external:input"},
+        "outputs": {"output": {"slot": "normalized", "dtype": "fp32"}},
+    },
+    "embedding_lookup_q8_0_checked": {
+        "inputs": {"ids": "external:token_ids"},
+        "outputs": {"output": {"slot": "embedding", "dtype": "fp32"}},
+    },
+    "softcap_logits_checked": {
+        "inputs": {"input": "logits"},
+        "outputs": {"output": {"slot": "capped_logits", "dtype": "fp32"}},
+    },
+    "log_position_scale_rows_checked": {
+        "inputs": {"input": "external:input"},
+        "outputs": {"output": {"slot": "scaled", "dtype": "fp32"}},
+    },
+    "causal_dynamic_depthwise_residual_checked": {
+        "inputs": {"input": "external:input", "dynamic": "external:dynamic", "history": "external:history"},
+        "outputs": {"output": {"slot": "convolved", "dtype": "fp32"},
+                    "history": {"slot": "history", "dtype": "fp32"}},
+    },
     "causal_depthwise_residual_checked": {
         "inputs": {"input": "external:input", "history": "external:history"},
         "outputs": {"output": {"slot": "convolved", "dtype": "fp32"},
@@ -3138,6 +3159,19 @@ OP_DATAFLOW = {
     "linear_rows_q8_0_checked": {
         "inputs": {"input": "external:input"},
         "outputs": {"output": {"slot": "projected", "dtype": "fp32"}},
+    },
+    "concat_feature_rows_checked": {
+        "inputs": {"left": "external:left", "right": "external:right"},
+        "outputs": {"output": {"slot": "joined", "dtype": "fp32"}},
+    },
+    "rms_pair_concat_rows_checked": {
+        "inputs": {"left": "external:left", "right": "external:right"},
+        "outputs": {"output": {"slot": "joined", "dtype": "fp32"}},
+    },
+    "message_control_rows_checked": {
+        "inputs": {"input": "external:input", "message": "external:message",
+                   "forget": "external:forget", "gain": "external:gain"},
+        "outputs": {"output": {"slot": "controlled", "dtype": "fp32"}},
     },
     "depth_residual_mix_checked": {
         "inputs": {"bank": "external:bank", "current": "external:current"},
@@ -5383,6 +5417,11 @@ TEMPLATE_TO_KERNEL_OP = {
     "softcapped_swiglu_rows_checked": "softcapped_swiglu_rows_checked",
     "rope_qk_bounded": "rope_qk_bounded",
     "attention_causal_bounded": "attention_causal_bounded",
+    "rmsnorm_f32_square_f64_sum_rows_checked": "rmsnorm_f32_square_f64_sum_rows_checked",
+    "embedding_lookup_q8_0_checked": "embedding_lookup_q8_0_checked",
+    "softcap_logits_checked": "softcap_logits_checked",
+    "log_position_scale_rows_checked": "log_position_scale_rows_checked",
+    "causal_dynamic_depthwise_residual_checked": "causal_dynamic_depthwise_residual_checked",
     "causal_depthwise_residual_checked": "causal_depthwise_residual_checked",
     "kv_cache_l2_rms_append_checked": "kv_cache_l2_rms_append_checked",
     "gqa_relative_sink_checked": "gqa_relative_sink_checked",
@@ -5573,6 +5612,9 @@ TEMPLATE_TO_KERNEL_OP = {
     "full_softmax_topk_router": "full_softmax_topk_router",
     "routed_softcapped_experts_checked": "routed_softcapped_experts_checked",
     "linear_rows_q8_0_checked": "linear_rows_q8_0_checked",
+    "concat_feature_rows_checked": "concat_feature_rows_checked",
+    "rms_pair_concat_rows_checked": "rms_pair_concat_rows_checked",
+    "message_control_rows_checked": "message_control_rows_checked",
     "depth_residual_mix_checked": "depth_residual_mix_checked",
     "scaled_head_l2_clip_checked": "scaled_head_l2_clip_checked",
     "sigmoid_gate_rows_checked": "sigmoid_gate_rows_checked",

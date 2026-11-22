@@ -1,0 +1,177 @@
+{
+  "id": "embedding_lookup_q8_0_checked_f32",
+  "op": "embedding_lookup_q8_0_checked",
+  "operation_interface": "embedding.checked_token_major.q8_0.fp32.v1",
+  "variant": "checked_i32_ids_q8_0_table",
+  "selection": {
+    "status": "candidate",
+    "priority": 100,
+    "equivalence_group": "embedding.checked_token_major.q8_0.fp32.v1",
+    "phases": [
+      "prefill",
+      "decode"
+    ]
+  },
+  "quant": {
+    "weight": "q8_0",
+    "activation": "i32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "ids",
+      "dtype": "i32",
+      "shape": [
+        "T"
+      ],
+      "layout": "token_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [
+    {
+      "name": "table",
+      "dtype": "q8_0",
+      "shape": [
+        "V",
+        "C"
+      ],
+      "layout": "row_major_packed_q8_0",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "weight",
+      "consumption": "required"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "output",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "C"
+      ],
+      "layout": "row_major_contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "scratch": [],
+  "dims": [
+    "T",
+    "V",
+    "C"
+  ],
+  "impl": {
+    "function": "embedding_lookup_q8_0_checked_f32",
+    "c_declaration": "int embedding_lookup_q8_0_checked_f32(const int32_t *ids, size_t ids_elements, const void *table, size_t table_bytes, float *output, size_t output_elements, size_t tokens, size_t vocabulary, size_t width);",
+    "sources": [
+      "src/kernels/packed_text_io_checked.c"
+    ]
+  },
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "ids",
+        "source": "activation:ids",
+        "cast": "const int32_t*",
+        "ports": [
+          "input:ids"
+        ]
+      },
+      {
+        "name": "ids_elements",
+        "source": "runtime:ids_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "table",
+        "source": "weight:table",
+        "cast": "const void*",
+        "ports": [
+          "weight:table"
+        ]
+      },
+      {
+        "name": "table_bytes",
+        "source": "runtime:table_bytes",
+        "value_type": "size_t"
+      },
+      {
+        "name": "output",
+        "source": "output:output",
+        "cast": "float*",
+        "ports": [
+          "output:output"
+        ]
+      },
+      {
+        "name": "output_elements",
+        "source": "runtime:output_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "tokens",
+        "source": "runtime:tokens",
+        "value_type": "size_t"
+      },
+      {
+        "name": "vocabulary",
+        "source": "runtime:vocabulary",
+        "value_type": "size_t"
+      },
+      {
+        "name": "width",
+        "source": "runtime:width",
+        "value_type": "size_t"
+      }
+    ]
+  },
+  "call_constant_contract": {
+    "shape_symbols": {
+      "T": "tokens",
+      "V": "vocabulary",
+      "C": "width"
+    },
+    "buffer_spans": [
+      {
+        "pointer": "ids",
+        "elements": "ids_elements",
+        "rows": 1,
+        "width": "tokens",
+        "element_bytes": 4
+      },
+      {
+        "pointer": "table",
+        "elements": "table_bytes",
+        "element_bytes": 1,
+        "rows": 1,
+        "width": "table_bytes"
+      },
+      {
+        "pointer": "output",
+        "elements": "output_elements",
+        "rows": "tokens",
+        "width": "width",
+        "element_bytes": 4
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "tests/test_v8_inkling2_text_loop.py"
+    ]
+  },
+  "notes": "Checked token-major gather from packed Q8_0 rows. Reject invalid IDs and nonfinite block scales before writes."
+}

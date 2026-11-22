@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 538,
+      "total": 546,
       "by_op": {
         "add_backward": 1,
         "add_rows_backward_train_f32": 1,
@@ -79,8 +79,10 @@
         "bias_add": 1,
         "broadcast_add_rows_checked": 1,
         "causal_depthwise_residual_checked": 1,
+        "causal_dynamic_depthwise_residual_checked": 1,
         "channel_scale_rows_checked": 1,
         "clip_strided_checked": 1,
+        "concat_feature_rows_checked": 1,
         "concat_i32_checked": 1,
         "copy_i32_span_checked": 1,
         "copy_last_logits": 1,
@@ -89,6 +91,7 @@
         "embedding": 7,
         "embedding_backward": 1,
         "embedding_lookup_checked": 1,
+        "embedding_lookup_q8_0_checked": 1,
         "embedding_lookup_token_major_checked": 1,
         "embedding_three_table_layer_norm": 1,
         "equal_i32_scalar_checked": 1,
@@ -148,6 +151,7 @@
         "linear_rows_checked": 1,
         "linear_rows_checked_no_bias": 1,
         "linear_rows_q8_0_checked": 2,
+        "log_position_scale_rows_checked": 1,
         "logits_store_indexed": 1,
         "mamba_conv1d_state_update": 1,
         "mamba_dt_softplus": 1,
@@ -155,6 +159,7 @@
         "mamba_rmsnorm_gate": 1,
         "mamba_selective_scan": 1,
         "mamba_selective_state_update_decode": 1,
+        "message_control_rows_checked": 1,
         "mla_attention": 4,
         "mla_kv_cache_batch_store": 1,
         "mla_kv_cache_store": 1,
@@ -197,7 +202,9 @@
         "repetition_penalty_last_row_checked": 1,
         "residual_add": 2,
         "residual_save": 1,
+        "rms_pair_concat_rows_checked": 1,
         "rmsnorm": 12,
+        "rmsnorm_f32_square_f64_sum_rows_checked": 1,
         "rmsnorm_rows_checked": 1,
         "rope": 19,
         "rope_backward": 2,
@@ -235,6 +242,7 @@
         "silu_strided_checked": 1,
         "sinusoidal_constant_tables_checked": 1,
         "sinusoidal_features_checked": 1,
+        "softcap_logits_checked": 1,
         "softcapped_swiglu_rows_checked": 1,
         "softmax": 1,
         "spatial_merge": 3,
@@ -34144,6 +34152,310 @@
       "_source_file": "causal_depthwise_residual_checked_f32.json"
     },
     {
+      "id": "causal_dynamic_depthwise_residual_checked_f32",
+      "op": "causal_dynamic_depthwise_residual_checked",
+      "operation_interface": "conv.causal_dynamic_depthwise.residual_history.checked.fp32.v1",
+      "variant": "ordered_fp64_history_fp32",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "equivalence_group": "conv.causal_dynamic_depthwise.residual_history.checked.fp32.v1",
+        "phases": [
+          "prefill",
+          "decode"
+        ]
+      },
+      "quant": {
+        "weight": "fp32",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "C"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "dynamic",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "A"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "history",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "C"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "state",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "weight",
+          "dtype": "fp32",
+          "shape": [
+            "C",
+            "K"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "C"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "history",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "C"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read_write",
+          "storage_class": "state",
+          "consumption": "required",
+          "alias_of": "input:history"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "T",
+        "C",
+        "K",
+        "H",
+        "A",
+        "KV"
+      ],
+      "impl": {
+        "function": "causal_dynamic_depthwise_residual_checked_f32",
+        "sources": [
+          "src/kernels/causal_depthwise_residual_checked.c"
+        ],
+        "c_declaration": "int causal_dynamic_depthwise_residual_checked_f32(const float *input, size_t input_elements, const float *weight, size_t weight_elements, const float *dynamic, size_t dynamic_elements, float *history, size_t history_elements, float *output, size_t output_elements, size_t tokens, size_t channels, size_t heads, size_t taps, size_t history_rows, size_t dynamic_width);"
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const float*",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "input_elements",
+            "source": "runtime:input_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "weight",
+            "source": "weight:weight",
+            "cast": "const float*",
+            "ports": [
+              "weight:weight"
+            ]
+          },
+          {
+            "name": "weight_elements",
+            "source": "runtime:weight_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "dynamic",
+            "source": "activation:dynamic",
+            "cast": "const float*",
+            "ports": [
+              "input:dynamic"
+            ]
+          },
+          {
+            "name": "dynamic_elements",
+            "source": "runtime:dynamic_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "history",
+            "source": "activation:history",
+            "cast": "float*",
+            "ports": [
+              "input:history",
+              "output:history"
+            ]
+          },
+          {
+            "name": "history_elements",
+            "source": "runtime:history_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "tokens",
+            "source": "runtime:tokens",
+            "value_type": "size_t"
+          },
+          {
+            "name": "channels",
+            "source": "runtime:channels",
+            "value_type": "size_t"
+          },
+          {
+            "name": "heads",
+            "source": "runtime:heads",
+            "value_type": "size_t"
+          },
+          {
+            "name": "taps",
+            "source": "runtime:taps",
+            "value_type": "size_t"
+          },
+          {
+            "name": "history_rows",
+            "source": "runtime:history_rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "dynamic_width",
+            "source": "runtime:dynamic_width",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_q8_decoder_block.py"
+        ],
+        "oracle": "Independent lag-ordered dynamic convolution comparison"
+      },
+      "notes": "Ordered FP64 static and dynamic tap sums then add residual and divide by sqrt(2*K+1). Static taps are oldest first. Dynamic tiles are token, head, lag with lag zero first. History stores pre-convolution rows.",
+      "call_constant_contract": {
+        "shape_symbols": {
+          "T": "tokens",
+          "C": "channels",
+          "K": "taps",
+          "H": "history_rows",
+          "A": "dynamic_width",
+          "KV": "heads"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "elements": "input_elements",
+            "rows": "tokens",
+            "width": "channels",
+            "element_bytes": 4,
+            "exact_elements_product": [
+              "tokens",
+              "channels"
+            ]
+          },
+          {
+            "pointer": "weight",
+            "elements": "weight_elements",
+            "rows": "channels",
+            "width": "taps",
+            "element_bytes": 4,
+            "exact_elements_product": [
+              "channels",
+              "taps"
+            ]
+          },
+          {
+            "pointer": "history",
+            "elements": "history_elements",
+            "rows": "history_rows",
+            "width": "channels",
+            "element_bytes": 4,
+            "exact_elements_product": [
+              "history_rows",
+              "channels"
+            ]
+          },
+          {
+            "pointer": "output",
+            "elements": "output_elements",
+            "rows": "tokens",
+            "width": "channels",
+            "element_bytes": 4,
+            "exact_elements_product": [
+              "tokens",
+              "channels"
+            ]
+          },
+          {
+            "pointer": "dynamic",
+            "elements": "dynamic_elements",
+            "rows": "tokens",
+            "width": "dynamic_width",
+            "element_bytes": 4,
+            "exact_elements_product": [
+              "tokens",
+              "heads",
+              "taps"
+            ]
+          }
+        ]
+      },
+      "name": "causal_dynamic_depthwise_residual_checked_f32",
+      "_source_file": "causal_dynamic_depthwise_residual_checked_f32.json"
+    },
+    {
       "id": "channel_scale_rows_checked_f32",
       "op": "channel_scale_rows_checked",
       "operation_interface": "channel_scale.checked_rows.fp32.v1",
@@ -35259,6 +35571,191 @@
       },
       "name": "clip_strided_f32_checked",
       "_source_file": "clip_strided_f32_checked.json"
+    },
+    {
+      "id": "concat_feature_rows_checked_f32",
+      "op": "concat_feature_rows_checked",
+      "operation_interface": "tensor.concat_feature_rows.checked.fp32.v1",
+      "variant": "exact_copy_rows",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "phases": [
+          "prefill"
+        ],
+        "equivalence_group": "tensor.concat_feature_rows.checked.fp32.v1"
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "left",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "L"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "right",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "C"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "J"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "R",
+        "L",
+        "C",
+        "J"
+      ],
+      "impl": {
+        "function": "concat_feature_rows_checked_f32",
+        "c_declaration": "int concat_feature_rows_checked_f32(const float* left, size_t left_elements, const float* right, size_t right_elements, float* output, size_t output_elements, size_t rows, size_t left_width, size_t right_width, size_t width);",
+        "sources": [
+          "src/kernels/message_control_rows_checked.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "left",
+            "source": "activation:left",
+            "cast": "const float*",
+            "ports": [
+              "input:left"
+            ]
+          },
+          {
+            "name": "left_elements",
+            "source": "runtime:left_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "right",
+            "source": "activation:right",
+            "cast": "const float*",
+            "ports": [
+              "input:right"
+            ]
+          },
+          {
+            "name": "right_elements",
+            "source": "runtime:right_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "left_width",
+            "source": "runtime:left_width",
+            "value_type": "size_t"
+          },
+          {
+            "name": "right_width",
+            "source": "runtime:right_width",
+            "value_type": "size_t"
+          },
+          {
+            "name": "width",
+            "source": "runtime:width",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "R": "rows",
+          "L": "left_width",
+          "C": "right_width",
+          "J": "width"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "left",
+            "elements": "left_elements",
+            "rows": "rows",
+            "width": "left_width",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "right",
+            "elements": "right_elements",
+            "rows": "rows",
+            "width": "right_width",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "output",
+            "elements": "output_elements",
+            "rows": "rows",
+            "width": "width",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "notes": "Concatenate feature widths inside each contiguous token row without transposing depth state.",
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_cross_pass.py"
+        ]
+      },
+      "name": "concat_feature_rows_checked_f32",
+      "_source_file": "concat_feature_rows_checked_f32.json"
     },
     {
       "id": "concat_i32_checked",
@@ -39429,6 +39926,185 @@
       "notes": "Token embedding lookup with Q8_0 quantized weights. Simple table lookup operation.",
       "name": "embedding_forward_q8_0",
       "_source_file": "embedding_forward_q8_0.json"
+    },
+    {
+      "id": "embedding_lookup_q8_0_checked_f32",
+      "op": "embedding_lookup_q8_0_checked",
+      "operation_interface": "embedding.checked_token_major.q8_0.fp32.v1",
+      "variant": "checked_i32_ids_q8_0_table",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "equivalence_group": "embedding.checked_token_major.q8_0.fp32.v1",
+        "phases": [
+          "prefill",
+          "decode"
+        ]
+      },
+      "quant": {
+        "weight": "q8_0",
+        "activation": "i32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "ids",
+          "dtype": "i32",
+          "shape": [
+            "T"
+          ],
+          "layout": "token_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "table",
+          "dtype": "q8_0",
+          "shape": [
+            "V",
+            "C"
+          ],
+          "layout": "row_major_packed_q8_0",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "C"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "T",
+        "V",
+        "C"
+      ],
+      "impl": {
+        "function": "embedding_lookup_q8_0_checked_f32",
+        "c_declaration": "int embedding_lookup_q8_0_checked_f32(const int32_t *ids, size_t ids_elements, const void *table, size_t table_bytes, float *output, size_t output_elements, size_t tokens, size_t vocabulary, size_t width);",
+        "sources": [
+          "src/kernels/packed_text_io_checked.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "ids",
+            "source": "activation:ids",
+            "cast": "const int32_t*",
+            "ports": [
+              "input:ids"
+            ]
+          },
+          {
+            "name": "ids_elements",
+            "source": "runtime:ids_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "table",
+            "source": "weight:table",
+            "cast": "const void*",
+            "ports": [
+              "weight:table"
+            ]
+          },
+          {
+            "name": "table_bytes",
+            "source": "runtime:table_bytes",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "tokens",
+            "source": "runtime:tokens",
+            "value_type": "size_t"
+          },
+          {
+            "name": "vocabulary",
+            "source": "runtime:vocabulary",
+            "value_type": "size_t"
+          },
+          {
+            "name": "width",
+            "source": "runtime:width",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "T": "tokens",
+          "V": "vocabulary",
+          "C": "width"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "ids",
+            "elements": "ids_elements",
+            "rows": 1,
+            "width": "tokens",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "table",
+            "elements": "table_bytes",
+            "element_bytes": 1,
+            "rows": 1,
+            "width": "table_bytes"
+          },
+          {
+            "pointer": "output",
+            "elements": "output_elements",
+            "rows": "tokens",
+            "width": "width",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_text_loop.py"
+        ]
+      },
+      "notes": "Checked token-major gather from packed Q8_0 rows. Reject invalid IDs and nonfinite block scales before writes.",
+      "name": "embedding_lookup_q8_0_checked_f32",
+      "_source_file": "embedding_lookup_q8_0_checked_f32.json"
     },
     {
       "id": "embedding_three_table_layer_norm_f32",
@@ -67680,6 +68356,167 @@
       "_source_file": "linear_rows_q8_0_checked_q8_activation.json"
     },
     {
+      "id": "log_position_scale_rows_checked_f32",
+      "op": "log_position_scale_rows_checked",
+      "operation_interface": "tensor.log_position_scale_rows.checked.fp32.v1",
+      "variant": "fp64_log_scale_f32_storage",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "phases": [
+          "prefill",
+          "decode"
+        ],
+        "equivalence_group": "tensor.log_position_scale_rows.checked.fp32.v1"
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "C"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "C"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "R",
+        "C"
+      ],
+      "impl": {
+        "function": "log_position_scale_rows_checked_f32",
+        "c_declaration": "int log_position_scale_rows_checked_f32(const float *input, size_t input_elements, float *output, size_t output_elements, size_t rows, size_t width, size_t position, size_t floor, float alpha);",
+        "sources": [
+          "src/kernels/log_position_scale_rows_checked.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const float*",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "input_elements",
+            "source": "runtime:input_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "width",
+            "source": "runtime:width",
+            "value_type": "size_t"
+          },
+          {
+            "name": "position",
+            "source": "runtime:position",
+            "value_type": "size_t"
+          },
+          {
+            "name": "floor",
+            "source": "runtime:floor",
+            "value_type": "size_t"
+          },
+          {
+            "name": "alpha",
+            "source": "param:alpha"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "R": "rows",
+          "C": "width"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "elements": "input_elements",
+            "rows": "rows",
+            "width": "width",
+            "element_bytes": 4,
+            "exact_elements_product": [
+              "rows",
+              "width"
+            ]
+          },
+          {
+            "pointer": "output",
+            "elements": "output_elements",
+            "rows": "rows",
+            "width": "width",
+            "element_bytes": 4,
+            "exact_elements_product": [
+              "rows",
+              "width"
+            ]
+          }
+        ]
+      },
+      "notes": "Per-token scale 1+alpha*log(max(1,(position+token+1)/floor)); finite checked FP32 output.",
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_q8_decoder_block.py"
+        ]
+      },
+      "name": "log_position_scale_rows_checked_f32",
+      "_source_file": "log_position_scale_rows_checked_f32.json"
+    },
+    {
       "id": "logits_copy_to_position",
       "op": "logits_store_indexed",
       "operation_interface": "logits_store_indexed.fp32.v1",
@@ -70045,6 +70882,231 @@
       "notes": "Memory copy for saving residual before RMSNorm for skip connections. Pure byte copy; large prefill buffers use the shared thread pool.",
       "name": "memcpy",
       "_source_file": "memcpy.json"
+    },
+    {
+      "id": "message_control_rows_checked_f32",
+      "op": "message_control_rows_checked",
+      "operation_interface": "tensor.message_control.checked.fp32.v1",
+      "variant": "checked_ordered_fp32",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "phases": [
+          "prefill"
+        ],
+        "equivalence_group": "tensor.message_control.checked.fp32.v1"
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "message",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "forget",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "gain",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "N"
+      ],
+      "impl": {
+        "function": "message_control_rows_checked_f32",
+        "c_declaration": "int message_control_rows_checked_f32(const float* input, size_t input_elements, const float* message, size_t message_elements, const float* forget, size_t forget_elements, const float* gain, size_t gain_elements, float* output, size_t output_elements, size_t elements);",
+        "sources": [
+          "src/kernels/message_control_rows_checked.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const float*",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "input_elements",
+            "source": "runtime:input_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "message",
+            "source": "activation:message",
+            "cast": "const float*",
+            "ports": [
+              "input:message"
+            ]
+          },
+          {
+            "name": "message_elements",
+            "source": "runtime:message_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "forget",
+            "source": "activation:forget",
+            "cast": "const float*",
+            "ports": [
+              "input:forget"
+            ]
+          },
+          {
+            "name": "forget_elements",
+            "source": "runtime:forget_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "gain",
+            "source": "activation:gain",
+            "cast": "const float*",
+            "ports": [
+              "input:gain"
+            ]
+          },
+          {
+            "name": "gain_elements",
+            "source": "runtime:gain_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "elements",
+            "source": "runtime:elements",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "N": "elements"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "elements": "input_elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "message",
+            "elements": "message_elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "forget",
+            "elements": "forget_elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "gain",
+            "elements": "gain_elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "output",
+            "elements": "output_elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "notes": "Apply (1 - forget) * input + gain * message with checked tanh gate bounds.",
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_cross_pass.py"
+        ]
+      },
+      "name": "message_control_rows_checked_f32",
+      "_source_file": "message_control_rows_checked_f32.json"
     },
     {
       "id": "moe_relu2_expert_backward_f32",
@@ -92138,6 +93200,188 @@
       "_source_file": "residual_add_backward_f32.json"
     },
     {
+      "id": "rms_pair_concat_rows_checked_f32",
+      "op": "rms_pair_concat_rows_checked",
+      "operation_interface": "tensor.rms_pair_concat.checked.fp32.v1",
+      "variant": "checked_ordered_fp32",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "phases": [
+          "prefill"
+        ],
+        "equivalence_group": "tensor.rms_pair_concat.checked.fp32.v1"
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "left",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "C"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "right",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "C"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "J"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "R",
+        "C",
+        "J"
+      ],
+      "impl": {
+        "function": "rms_pair_concat_rows_checked_f32",
+        "c_declaration": "int rms_pair_concat_rows_checked_f32(const float* left, size_t left_elements, const float* right, size_t right_elements, float* output, size_t output_elements, size_t rows, size_t width, size_t joined_width, float epsilon);",
+        "sources": [
+          "src/kernels/message_control_rows_checked.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "left",
+            "source": "activation:left",
+            "cast": "const float*",
+            "ports": [
+              "input:left"
+            ]
+          },
+          {
+            "name": "left_elements",
+            "source": "runtime:left_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "right",
+            "source": "activation:right",
+            "cast": "const float*",
+            "ports": [
+              "input:right"
+            ]
+          },
+          {
+            "name": "right_elements",
+            "source": "runtime:right_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "width",
+            "source": "runtime:width",
+            "value_type": "size_t"
+          },
+          {
+            "name": "joined_width",
+            "source": "runtime:joined_width",
+            "value_type": "size_t"
+          },
+          {
+            "name": "epsilon",
+            "source": "param:epsilon"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "R": "rows",
+          "C": "width",
+          "J": "joined_width"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "left",
+            "elements": "left_elements",
+            "rows": "rows",
+            "width": "width",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "right",
+            "elements": "right_elements",
+            "rows": "rows",
+            "width": "width",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "output",
+            "elements": "output_elements",
+            "rows": "rows",
+            "width": "joined_width",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "notes": "Independently normalize two contiguous spans and concatenate per row.",
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_cross_pass.py"
+        ]
+      },
+      "name": "rms_pair_concat_rows_checked_f32",
+      "_source_file": "rms_pair_concat_rows_checked_f32.json"
+    },
+    {
       "id": "rmsnorm_backward",
       "op": "rmsnorm",
       "variant": "fp32_backward",
@@ -92261,6 +93505,201 @@
       "notes": "RMSNorm backward kernel for v7 training IR.",
       "name": "rmsnorm_backward",
       "_source_file": "rmsnorm_backward.json"
+    },
+    {
+      "id": "rmsnorm_f32_square_f64_sum_rows_checked",
+      "op": "rmsnorm_f32_square_f64_sum_rows_checked",
+      "operation_interface": "rmsnorm.checked_rows.f32_square_f64_sum.v1",
+      "variant": "f32_square_f64_sum_f32_scale",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "equivalence_group": "rmsnorm.checked_rows.f32_square_f64_sum.v1",
+        "phases": [
+          "prefill"
+        ]
+      },
+      "quant": {
+        "weight": "fp32",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "C"
+          ],
+          "layout": "row_major_strided",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "gamma",
+          "dtype": "fp32",
+          "shape": [
+            "C"
+          ],
+          "layout": "feature_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "C"
+          ],
+          "layout": "row_major_strided",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "R",
+        "C"
+      ],
+      "impl": {
+        "function": "rmsnorm_f32_square_f64_sum_rows_checked",
+        "c_declaration": "int rmsnorm_f32_square_f64_sum_rows_checked(const float *input, size_t input_elements, size_t input_stride, const float *gamma, size_t gamma_elements, float *output, size_t output_elements, size_t output_stride, size_t rows, size_t width, float eps);",
+        "sources": [
+          "src/kernels/transformer_rows_checked.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const float*",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "input_elements",
+            "source": "runtime:input_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "input_stride",
+            "source": "runtime:input_stride",
+            "value_type": "size_t"
+          },
+          {
+            "name": "gamma",
+            "source": "weight:gamma",
+            "cast": "const float*",
+            "ports": [
+              "weight:gamma"
+            ]
+          },
+          {
+            "name": "gamma_elements",
+            "source": "runtime:gamma_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output_stride",
+            "source": "runtime:output_stride",
+            "value_type": "size_t"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "width",
+            "source": "runtime:width",
+            "value_type": "size_t"
+          },
+          {
+            "name": "eps",
+            "source": "param:eps"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_text_loop.py"
+        ]
+      },
+      "notes": "FP32 rounded squares are summed in FP64. The mean, reciprocal square root and two output multiplies round to FP32.",
+      "call_constant_contract": {
+        "shape_symbols": {
+          "R": "rows",
+          "C": "width"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "elements": "input_elements",
+            "rows": "rows",
+            "width": "width",
+            "element_bytes": 4,
+            "stride": "input_stride",
+            "exact_elements_product": [
+              "rows",
+              "width"
+            ]
+          },
+          {
+            "pointer": "gamma",
+            "elements": "gamma_elements",
+            "rows": 1,
+            "width": "width",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "output",
+            "elements": "output_elements",
+            "rows": "rows",
+            "width": "width",
+            "element_bytes": 4,
+            "stride": "output_stride",
+            "exact_elements_product": [
+              "rows",
+              "width"
+            ]
+          }
+        ]
+      },
+      "name": "rmsnorm_f32_square_f64_sum_rows_checked",
+      "_source_file": "rmsnorm_f32_square_f64_sum_rows_checked.json"
     },
     {
       "id": "rmsnorm_forward",
@@ -105962,6 +107401,140 @@
       ],
       "name": "sinusoidal_features_f32_checked",
       "_source_file": "sinusoidal_features_f32_checked.json"
+    },
+    {
+      "id": "softcap_logits_checked_f32",
+      "op": "softcap_logits_checked",
+      "operation_interface": "tensor.softcap_logits.checked.fp32.v1",
+      "variant": "fp64_tanh_f32_storage",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "phases": [
+          "prefill",
+          "decode"
+        ],
+        "equivalence_group": "tensor.softcap_logits.checked.fp32.v1"
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "N"
+      ],
+      "impl": {
+        "function": "softcap_logits_checked_f32",
+        "c_declaration": "int softcap_logits_checked_f32(const float *input, size_t input_elements, float *output, size_t output_elements, size_t elements, float cap);",
+        "sources": [
+          "src/kernels/packed_text_io_checked.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const float*",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "input_elements",
+            "source": "runtime:input_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "elements",
+            "source": "runtime:elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "cap",
+            "source": "param:cap"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "N": "elements"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "elements": "input_elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "output",
+            "elements": "output_elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "notes": "Explicit positive cap times tanh(logits divided by cap), ordered FP64 and FP32 output.",
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_text_loop.py"
+        ]
+      },
+      "name": "softcap_logits_checked_f32",
+      "_source_file": "softcap_logits_checked_f32.json"
     },
     {
       "id": "softcapped_swiglu_rows_checked_f32",

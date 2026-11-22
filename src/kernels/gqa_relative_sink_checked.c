@@ -11,7 +11,7 @@ int ck_gqa_relative_sink_checked_f32(
     size_t dim, size_t capacity, size_t position, size_t relative_extent, size_t window)
 {
     if (!heads || heads > 256 || !kv_heads || heads % kv_heads ||
-        !dim || dim > 4096 || !capacity || capacity > 16384 ||
+        !dim || dim > 4096 || !capacity || capacity > 65536 ||
         !tokens || position >= capacity || tokens > capacity - position ||
         !relative_extent || relative_extent > 16384 || window > 16384)
         return -2;

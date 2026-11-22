@@ -1,6 +1,8 @@
 """Connected cached attention with visible relative, window, and sink effects."""
 
+import ctypes
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 
@@ -34,6 +36,32 @@ def dense_reference(query, key, value, relative, sink, window, position=0):
 
 
 class RelativeAttentionTests(unittest.TestCase):
+    def test_cache_capacity_above_32k(self):
+        root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as temp:
+            library = Path(temp) / "attention.so"
+            subprocess.run(["cc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-shared", "-fPIC",
+                            "-I", str(root / "include"), str(root / "src/kernels/gqa_relative_sink_checked.c"),
+                            "-lm", "-o", str(library)], check=True)
+            fn = ctypes.CDLL(str(library)).ck_gqa_relative_sink_checked_f32
+            pointer, size = ctypes.POINTER(ctypes.c_float), ctypes.c_size_t
+            fn.argtypes = [pointer, size] * 6 + [ctypes.POINTER(ctypes.c_double), size] + [size] * 8
+            fn.restype = ctypes.c_int
+            capacity = 34816
+            position = capacity - 1
+            zero = (ctypes.c_float * 1)(0)
+            keys = (ctypes.c_float * capacity)()
+            values = (ctypes.c_float * capacity)()
+            values[position] = 42
+            result = (ctypes.c_float * 1)(-1)
+            scratch = (ctypes.c_double * 1)()
+            self.assertEqual(fn(zero, 1, keys, capacity, values, capacity, zero, 1, zero, 1,
+                                result, 1, scratch, 1, 1, 1, 1, 1, capacity, position, 1, 1), 0)
+            self.assertEqual(result[0], 21)
+            self.assertEqual(fn(zero, 1, keys, capacity, values, capacity, zero, 1, zero, 1,
+                                result, 1, scratch, 1, 1, 1, 1, 1, capacity, capacity, 1, 1), -2)
+            self.assertEqual(result[0], 21)
+
     def test_connected_prefix_and_decode_match_with_bias_window_and_sink(self):
         rng = np.random.default_rng(276)
         with tempfile.TemporaryDirectory() as temp:

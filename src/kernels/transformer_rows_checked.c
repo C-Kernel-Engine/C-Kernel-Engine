@@ -5,14 +5,30 @@
 #include <float.h>
 #include <math.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <limits.h>
 #include <string.h>
 
-int rmsnorm_rows_checked_f32(const float *input, size_t input_elements,
+static float rmsnorm_scale(const float *x, size_t width, float eps, bool f64_sum)
+{
+    if (f64_sum) {
+        double sum = 0;
+        for (size_t col = 0; col < width; ++col) {
+            const float square = x[col] * x[col];
+            sum += (double)square;
+        }
+        return 1.0f / sqrtf((float)(sum / (double)width) + eps);
+    }
+    float sum = 0;
+    for (size_t col = 0; col < width; ++col) sum += x[col] * x[col];
+    return 1.0f / sqrtf(sum / (float)width + eps);
+}
+
+static int rmsnorm_rows_checked(const float *input, size_t input_elements,
                             size_t input_stride, const float *gamma,
                             size_t gamma_elements, float *output,
                             size_t output_elements, size_t output_stride,
-                            size_t rows, size_t width, float eps)
+                            size_t rows, size_t width, float eps, bool f64_sum)
 {
     size_t ni, no;
     if (!ck_checked_span(rows, width, input_stride, &ni) ||
@@ -28,23 +44,39 @@ int rmsnorm_rows_checked_f32(const float *input, size_t input_elements,
     for (size_t row = 0; row < rows; ++row) {
         const float *x = input + row * input_stride;
         if (!ck_checked_finite(x, width)) return -3;
-        float sum = 0;
-        for (size_t col = 0; col < width; ++col) sum += x[col] * x[col];
-        const float scale = 1.0f / sqrtf(sum / (float)width + eps);
-        if (!isfinite(scale)) return -3;
+        const float scale = rmsnorm_scale(x, width, eps, f64_sum);
+        if (!isfinite(scale) || (f64_sum && scale <= 0.0f)) return -3;
         for (size_t col = 0; col < width; ++col)
             if (!isfinite(x[col] * scale * gamma[col])) return -3;
     }
     for (size_t row = 0; row < rows; ++row) {
         const float *x = input + row * input_stride;
         float *y = output + row * output_stride;
-        float sum = 0;
-        for (size_t col = 0; col < width; ++col) sum += x[col] * x[col];
-        const float scale = 1.0f / sqrtf(sum / (float)width + eps);
+        const float scale = rmsnorm_scale(x, width, eps, f64_sum);
         for (size_t col = 0; col < width; ++col)
             y[col] = x[col] * scale * gamma[col];
     }
     return 0;
+}
+
+int rmsnorm_rows_checked_f32(const float *input, size_t input_elements,
+                            size_t input_stride, const float *gamma,
+                            size_t gamma_elements, float *output,
+                            size_t output_elements, size_t output_stride,
+                            size_t rows, size_t width, float eps)
+{
+    return rmsnorm_rows_checked(input, input_elements, input_stride, gamma, gamma_elements,
+                               output, output_elements, output_stride, rows, width, eps, false);
+}
+
+int rmsnorm_f32_square_f64_sum_rows_checked(const float *input, size_t input_elements,
+                            size_t input_stride, const float *gamma,
+                            size_t gamma_elements, float *output,
+                            size_t output_elements, size_t output_stride,
+                            size_t rows, size_t width, float eps)
+{
+    return rmsnorm_rows_checked(input, input_elements, input_stride, gamma, gamma_elements,
+                               output, output_elements, output_stride, rows, width, eps, true);
 }
 
 int token_head_layout_checked_f32(const float *input, size_t input_elements,

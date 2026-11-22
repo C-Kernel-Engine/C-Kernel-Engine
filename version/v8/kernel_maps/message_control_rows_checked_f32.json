@@ -1,0 +1,223 @@
+{
+  "id": "message_control_rows_checked_f32",
+  "op": "message_control_rows_checked",
+  "operation_interface": "tensor.message_control.checked.fp32.v1",
+  "variant": "checked_ordered_fp32",
+  "selection": {
+    "status": "candidate",
+    "priority": 100,
+    "phases": [
+      "prefill"
+    ],
+    "equivalence_group": "tensor.message_control.checked.fp32.v1"
+  },
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "input",
+      "dtype": "fp32",
+      "shape": [
+        "N"
+      ],
+      "layout": "row_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "message",
+      "dtype": "fp32",
+      "shape": [
+        "N"
+      ],
+      "layout": "row_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "forget",
+      "dtype": "fp32",
+      "shape": [
+        "N"
+      ],
+      "layout": "row_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "gain",
+      "dtype": "fp32",
+      "shape": [
+        "N"
+      ],
+      "layout": "row_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "output",
+      "dtype": "fp32",
+      "shape": [
+        "N"
+      ],
+      "layout": "row_major_contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "scratch": [],
+  "dims": [
+    "N"
+  ],
+  "impl": {
+    "function": "message_control_rows_checked_f32",
+    "c_declaration": "int message_control_rows_checked_f32(const float* input, size_t input_elements, const float* message, size_t message_elements, const float* forget, size_t forget_elements, const float* gain, size_t gain_elements, float* output, size_t output_elements, size_t elements);",
+    "sources": [
+      "src/kernels/message_control_rows_checked.c"
+    ]
+  },
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "input",
+        "source": "activation:input",
+        "cast": "const float*",
+        "ports": [
+          "input:input"
+        ]
+      },
+      {
+        "name": "input_elements",
+        "source": "runtime:input_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "message",
+        "source": "activation:message",
+        "cast": "const float*",
+        "ports": [
+          "input:message"
+        ]
+      },
+      {
+        "name": "message_elements",
+        "source": "runtime:message_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "forget",
+        "source": "activation:forget",
+        "cast": "const float*",
+        "ports": [
+          "input:forget"
+        ]
+      },
+      {
+        "name": "forget_elements",
+        "source": "runtime:forget_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "gain",
+        "source": "activation:gain",
+        "cast": "const float*",
+        "ports": [
+          "input:gain"
+        ]
+      },
+      {
+        "name": "gain_elements",
+        "source": "runtime:gain_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "output",
+        "source": "output:output",
+        "cast": "float*",
+        "ports": [
+          "output:output"
+        ]
+      },
+      {
+        "name": "output_elements",
+        "source": "runtime:output_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "elements",
+        "source": "runtime:elements",
+        "value_type": "size_t"
+      }
+    ]
+  },
+  "call_constant_contract": {
+    "shape_symbols": {
+      "N": "elements"
+    },
+    "buffer_spans": [
+      {
+        "pointer": "input",
+        "elements": "input_elements",
+        "rows": 1,
+        "width": "elements",
+        "element_bytes": 4
+      },
+      {
+        "pointer": "message",
+        "elements": "message_elements",
+        "rows": 1,
+        "width": "elements",
+        "element_bytes": 4
+      },
+      {
+        "pointer": "forget",
+        "elements": "forget_elements",
+        "rows": 1,
+        "width": "elements",
+        "element_bytes": 4
+      },
+      {
+        "pointer": "gain",
+        "elements": "gain_elements",
+        "rows": 1,
+        "width": "elements",
+        "element_bytes": 4
+      },
+      {
+        "pointer": "output",
+        "elements": "output_elements",
+        "rows": 1,
+        "width": "elements",
+        "element_bytes": 4
+      }
+    ]
+  },
+  "notes": "Apply (1 - forget) * input + gain * message with checked tanh gate bounds.",
+  "tests": {
+    "unit": [
+      "tests/test_v8_inkling2_cross_pass.py"
+    ]
+  }
+}
