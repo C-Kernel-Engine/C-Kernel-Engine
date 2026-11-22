@@ -23,16 +23,44 @@ from version.v8.scripts.replay_inkling2_routed_moe import (
 )
 
 
-def expand_packed_activations(torch, tensor):
-    """Independent expanded FP32 reference for nearest-even Q8_0 activation."""
+def quantized_activation(torch, tensor):
     blocks = tensor.reshape(*tensor.shape[:-1], -1, 32)
     peak = blocks.abs().amax(dim=-1, keepdim=True)
     scale = (peak / 127).half().float()
     inverse = torch.where(scale > 0, torch.full_like(peak, 127) / peak, 0)
-    return ((blocks * inverse).round().clamp(-127, 127) * scale).reshape(tensor.shape)
+    codes = (blocks * inverse).round().clamp(-127, 127).int()
+    return codes, scale.squeeze(-1)
 
 
-def attention_reference(torch, hidden, weights, *, q8_activations=False):
+def expand_packed_activations(torch, tensor):
+    """Independent expanded FP32 reference for nearest-even Q8_0 activation."""
+    codes, scale = quantized_activation(torch, tensor)
+    return (codes.float() * scale[..., None]).reshape_as(tensor)
+
+
+def packed_linear_reference(torch, values, packed):
+    """Model the Q8 block scales, integer dot groups, and FP32 lane reduction."""
+    codes, scales = quantized_activation(torch, values)
+    rows, blocks, _ = codes.shape
+    weight = packed.reshape(-1, blocks, 34)
+    weight_scales = torch.from_numpy(weight[:, :, :2].copy().view("<f2").squeeze(-1)).float()
+    weight_codes = torch.from_numpy(weight[:, :, 2:].copy().view("i1")).int()
+    products = torch.einsum(
+        "rblc,oblc->robl", codes.reshape(rows, blocks, 8, 4),
+        weight_codes.reshape(weight.shape[0], blocks, 8, 4),
+    )
+    scale = scales[:, None] * weight_scales[None, :]
+    lanes = torch.zeros((rows, weight.shape[0], 8), dtype=torch.float32)
+    for block in range(blocks):
+        # Widen the integer product and accumulator to model one FP32 rounding
+        # at the FMA boundary instead of an FP32 multiply followed by addition.
+        product = scale[:, :, block, None].double() * products[:, :, block].double()
+        lanes = (lanes.double() + product).float()
+    a, b, c, d, e, f, g, h = lanes.unbind(-1)
+    return ((a + e) + (c + g)) + ((b + f) + (d + h))
+
+
+def attention_reference(torch, hidden, weights, packed_weights, *, q8_activations=False, packed_oracle=False):
     F = torch.nn.functional
 
     def weight(name):
@@ -40,6 +68,8 @@ def attention_reference(torch, hidden, weights, *, q8_activations=False):
 
     def project(x, name):
         if q8_activations and name in PACKED_PROJECTIONS:
+            if packed_oracle:
+                return packed_linear_reference(torch, x, packed_weights["blk.0." + name])
             x = expand_packed_activations(torch, x)
         return F.linear(x, weight(name))
 
@@ -93,7 +123,7 @@ def attention_reference(torch, hidden, weights, *, q8_activations=False):
     }, conv
 
 
-def replay(folder, torch, *, q8_activations=False, local_gguf=None):
+def replay(folder, torch, *, q8_activations=False, packed_oracle=False, local_gguf=None):
     read_range = make_local_gguf_range_reader(local_gguf) if local_gguf else fetch_gguf_range
     file = GGUF_FILES["q8_0"]
     header, header_proof = read_range(file, 0, 16 * 1024 * 1024)
@@ -128,7 +158,8 @@ def replay(folder, torch, *, q8_activations=False, local_gguf=None):
     sources["blk.0.exp_probs_b.bias"] = bias_source[-1]
     seed = 162
     hidden = torch.from_numpy(np.random.default_rng(seed).normal(0., .2, (rows, WIDTH)).astype(np.float32))
-    expected, expected_state, conv = attention_reference(torch, hidden, references, q8_activations=q8_activations)
+    expected, expected_state, conv = attention_reference(
+        torch, hidden, references, weights, q8_activations=q8_activations, packed_oracle=packed_oracle)
     F = torch.nn.functional
     ff = expected["ffn_norm"]
     scores = F.linear(ff, torch.tensor(router)).sigmoid()
@@ -139,25 +170,35 @@ def replay(folder, torch, *, q8_activations=False, local_gguf=None):
         raise ValueError("oracle has a tied top-k boundary")
     probs = scores.gather(1, ids)
     probs = probs / (probs.sum(dim=-1, keepdim=True) + 1e-20) * 8
-    mixture = torch.zeros_like(ff)
     active_ids = sorted(set(ids.flatten().tolist()))
     with ThreadPoolExecutor(max_workers=4) as pool:
         bank = list(pool.map(lambda expert: from_gguf(file, tensors, data_start, 0, expert, read_range=read_range), active_ids))
     expert_map = np.full(EXPERTS, -1, dtype=np.int32)
     for slot, expert in enumerate(active_ids):
         expert_map[expert] = slot
-        _, matrices, sources[f"expert_{expert}"] = bank[slot]
-        row_indices, slot_indices = torch.where(ids == expert)
-        g, u, d = (torch.tensor(mat) for mat in matrices)
-        ff_rows = ff[row_indices]
-        if q8_activations:
-            ff_rows = expand_packed_activations(torch, ff_rows)
-        g = F.linear(ff_rows, g)
-        u = F.linear(ff_rows, u)
-        act = (4 * (g / 4).tanh() * g.sigmoid()) * (25 * (u / 25).tanh())
-        if q8_activations:
-            act = expand_packed_activations(torch, act)
-        mixture[row_indices] += F.linear(act, d) * probs[row_indices, slot_indices, None]
+        sources[f"expert_{expert}"] = bank[slot][2]
+
+    def expert_mixture(inputs, route_ids, routing):
+        mixture = torch.zeros_like(inputs)
+        for expert, (packed, matrices, _) in zip(active_ids, bank):
+            row_indices, slot_indices = torch.where(route_ids == expert)
+            if not row_indices.numel():
+                continue
+
+            def project(values, index):
+                if packed_oracle:
+                    return packed_linear_reference(torch, values, packed[index])
+                if q8_activations:
+                    values = expand_packed_activations(torch, values)
+                return F.linear(values, torch.tensor(matrices[index]))
+
+            ff_rows = inputs[row_indices]
+            g, u = project(ff_rows, 0), project(ff_rows, 1)
+            act = (4 * (g / 4).tanh() * g.sigmoid()) * (25 * (u / 25).tanh())
+            mixture[row_indices] += project(act, 2) * routing[row_indices, slot_indices, None]
+        return mixture
+
+    mixture = expert_mixture(ff, ids, probs)
     expected["mixture"] = mixture
     expected["ffn_post_conv"] = conv(mixture, "ffn_post_conv.weight")
     expected["layer_output"] = expected["attn_post_conv"] + expected["ffn_post_conv"]
@@ -171,8 +212,12 @@ def replay(folder, torch, *, q8_activations=False, local_gguf=None):
                      if q8_activations else
                      "packed Q8_0 weights, FP32 activations and state, ordered FP64 projection accumulation"),
         "scope": "synthetic layer inputs, compact bank of routed experts, no whole model load",
-        "oracle": (f"PyTorch {torch.__version__} with FP32 expansion of the same GGUF weights"
-                   + (" and explicitly quantized activations" if q8_activations else "")),
+        "oracle": (
+            f"PyTorch {torch.__version__} with ordered Q8 block-dot arithmetic"
+            if packed_oracle else
+            f"PyTorch {torch.__version__} with FP32 expansion of the same GGUF weights"
+            + (" and explicitly quantized activations" if q8_activations else "")
+        ),
         "source": {"repo": GGUF_REPO, "revision": GGUF_REVISION, "file": file[0],
                    "header_range": header_proof, "ranges": sources,
                    "read_mode": "local_ranges" if local_gguf else "publisher_http_ranges"},
@@ -222,6 +267,7 @@ def replay(folder, torch, *, q8_activations=False, local_gguf=None):
                        "depth_mix", "ffn_norm", "logits", "mixture", "ffn_post_conv")
         np.savez(folder / "native-trace.npz",
                  **{name: full("inkling2_prefill_slot0_" + name) for name in trace_names})
+        np.savez(folder / "oracle-trace.npz", **{name: value.numpy() for name, value in expected.items()})
     report["activations"] = {}
     for name, target in expected.items():
         sequence = np.concatenate([split(f"inkling2_{phase}_slot0_{name}") for phase in ("prefill", "append")])
@@ -235,6 +281,24 @@ def replay(folder, torch, *, q8_activations=False, local_gguf=None):
     split_ids = np.concatenate([split(f"inkling2_{phase}_slot0_indices", np.int32) for phase in ("prefill", "append")])
     np.testing.assert_array_equal(split_ids, full("inkling2_prefill_slot0_indices", np.int32))
     exact_routes = np.array_equal(split_ids, ids.numpy())
+    if q8_activations:
+        native_input = torch.from_numpy(full("inkling2_prefill_slot0_ffn_norm"))
+        native_codes, native_scales = quantized_activation(torch, native_input)
+        oracle_codes, oracle_scales = quantized_activation(torch, ff)
+        report["ffn_input_quantization"] = {
+            "different_scales": int((native_scales != oracle_scales).sum()),
+            "scales": native_scales.numel(),
+            "different_codes": int((native_codes != oracle_codes).sum()),
+            "codes": native_codes.numel(),
+        }
+        if exact_routes:
+            native_weights = torch.from_numpy(full("inkling2_prefill_slot0_route_weights"))
+            same_input = expert_mixture(native_input, torch.from_numpy(split_ids), native_weights)
+            native_mix = full("inkling2_prefill_slot0_mixture")
+            report["routed_experts_same_input"] = {
+                **compare("routed experts", native_mix, native_mix, same_input),
+                "bitwise_equal": native_mix.tobytes() == same_input.numpy().tobytes(),
+            }
     comparisons = [*report["activations"].values(), *report["state"].values()]
     report.update(
         status="PASS" if exact_routes and all(c["oracle_compare"] == "PASS" for c in comparisons) else "FAIL",
@@ -249,14 +313,19 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--q8-activations", action="store_true")
+    parser.add_argument("--torch-q8-block-contract", action="store_true",
+                        help="use the packed block and FP32 lane order in the PyTorch oracle")
     parser.add_argument("--gguf", type=Path, help="read pinned layer-zero ranges from a local GGUF")
     args = parser.parse_args()
+    if args.torch_q8_block_contract and not args.q8_activations:
+        parser.error("the PyTorch Q8 block contract requires --q8-activations")
     import torch
 
     torch.set_num_threads(2)
     torch.set_float32_matmul_precision("highest")
     args.output.mkdir(mode=0o700)
-    report = replay(args.output, torch, q8_activations=args.q8_activations, local_gguf=args.gguf)
+    report = replay(args.output, torch, q8_activations=args.q8_activations,
+                    packed_oracle=args.torch_q8_block_contract, local_gguf=args.gguf)
     (args.output / "report.json").write_text(json.dumps(report, indent=2) + "\n")
     if report["status"] != "PASS":
         parser.exit(1, "composed reference comparison failed; see report.json and captured rows\n")

@@ -1,0 +1,299 @@
+{
+  "schema": "cke.inkling2.attention_tiles.v1",
+  "model": {
+    "quantization": "Q8_0",
+    "gguf_sha256": "d57542f8aea5d7639beba5fc4ae7f584754916f63ac5d5a69328c27f652f45da"
+  },
+  "runtime_baseline_32k": {
+    "native_execution": "PASS",
+    "prompt_tokens": 32768,
+    "append_tokens": 3,
+    "native_prefill_seconds": 10511.247543325648,
+    "native_append_seconds": 5.4483468644320965,
+    "llama_prefill_seconds": 5983.26891,
+    "llama_append_seconds": 3.44233,
+    "llama_revision": "29b52d3",
+    "llama_comparison": {
+      "status": "FAIL",
+      "rows": [
+        {
+          "position": 32767,
+          "phase": "prefill",
+          "elements": 200058,
+          "exact_elements": 0,
+          "first_different_index": 0,
+          "rmse": 0.6130286802849466,
+          "max_abs": 1.9862656593322754,
+          "native_argmax": 200001,
+          "oracle_argmax": 200001,
+          "status": "FAIL"
+        },
+        {
+          "position": 32768,
+          "phase": "decode",
+          "elements": 200058,
+          "exact_elements": 0,
+          "first_different_index": 0,
+          "rmse": 0.5738792357817171,
+          "max_abs": 2.3243675231933594,
+          "native_argmax": 200008,
+          "oracle_argmax": 200008,
+          "status": "FAIL"
+        },
+        {
+          "position": 32769,
+          "phase": "decode",
+          "elements": 200058,
+          "exact_elements": 0,
+          "first_different_index": 0,
+          "rmse": 0.64178244076502,
+          "max_abs": 3.108416974544525,
+          "native_argmax": 371,
+          "oracle_argmax": 371,
+          "status": "FAIL"
+        },
+        {
+          "position": 32770,
+          "phase": "decode",
+          "elements": 200058,
+          "exact_elements": 0,
+          "first_different_index": 0,
+          "rmse": 0.6402388805814117,
+          "max_abs": 3.405745506286621,
+          "native_argmax": 150409,
+          "oracle_argmax": 150409,
+          "status": "FAIL"
+        }
+      ]
+    }
+  },
+  "generated_prefill_chunk_prototype": {
+    "scope": "Generated 16-token prefill at position 32752 on a seeded cache; existing pinned real model weights",
+    "baseline_seconds": [
+      3.778950221836567,
+      3.744002800434828
+    ],
+    "prototype_seconds": [
+      3.324308739975095,
+      3.282211873680353
+    ],
+    "baseline_median_seconds": 3.7614765111356974,
+    "prototype_median_seconds": 3.303260306827724,
+    "speedup": 1.1387163474101198,
+    "bitwise_match": true,
+    "state_regions_compared": 288
+  },
+  "leaf_trials": [
+    {
+      "dim": 128,
+      "position": 32752,
+      "window": 0,
+      "baseline": [
+        0.16788317635655403,
+        0.17096750624477863,
+        0.16630109399557114
+      ],
+      "prototype": [
+        0.13825155049562454,
+        0.13822722621262074,
+        0.1377926543354988
+      ],
+      "bitwise": true
+    },
+    {
+      "dim": 128,
+      "position": 32752,
+      "window": 1024,
+      "baseline": [
+        0.005357220768928528,
+        0.005120692774653435,
+        0.005118414759635925
+      ],
+      "prototype": [
+        0.003467107191681862,
+        0.003463495522737503,
+        0.0034620221704244614
+      ],
+      "bitwise": true
+    },
+    {
+      "dim": 19,
+      "position": 81,
+      "window": 23,
+      "baseline": [
+        0.00010462291538715363,
+        9.797699749469757e-05,
+        9.72449779510498e-05
+      ],
+      "prototype": [
+        7.9398974776268e-05,
+        7.692910730838776e-05,
+        7.648207247257233e-05
+      ],
+      "bitwise": true
+    },
+    {
+      "dim": 20,
+      "position": 11,
+      "window": 0,
+      "baseline": [
+        6.194226443767548e-05,
+        6.0774385929107666e-05,
+        6.037019193172455e-05
+      ],
+      "prototype": [
+        5.1131471991539e-05,
+        4.986859858036041e-05,
+        5.575455725193024e-05
+      ],
+      "bitwise": true
+    }
+  ],
+  "pytorch_layer0": {
+    "scope": "synthetic layer inputs, compact bank of routed experts, no whole model load",
+    "expanded_fp32": {
+      "status": "FAIL",
+      "mixture": {
+        "split_exact": true,
+        "max_abs_vs_oracle": 0.0009261369705200195,
+        "oracle_compare": "FAIL",
+        "oracle_mismatched_elements": 3208
+      }
+    },
+    "packed_oracle": {
+      "status": "FAIL",
+      "activations": {
+        "attn_norm": {
+          "split_exact": true,
+          "max_abs_vs_oracle": 7.62939453125e-06,
+          "oracle_compare": "PASS",
+          "oracle_mismatched_elements": 0
+        },
+        "projected_attention": {
+          "split_exact": true,
+          "max_abs_vs_oracle": 0.0,
+          "oracle_compare": "PASS",
+          "oracle_mismatched_elements": 0
+        },
+        "attn_post_conv": {
+          "split_exact": true,
+          "max_abs_vs_oracle": 4.76837158203125e-07,
+          "oracle_compare": "PASS",
+          "oracle_mismatched_elements": 0
+        },
+        "depth_mix": {
+          "split_exact": true,
+          "max_abs_vs_oracle": 1.430511474609375e-06,
+          "oracle_compare": "PASS",
+          "oracle_mismatched_elements": 0
+        },
+        "ffn_norm": {
+          "split_exact": true,
+          "max_abs_vs_oracle": 1.6689300537109375e-06,
+          "oracle_compare": "PASS",
+          "oracle_mismatched_elements": 0
+        },
+        "mixture": {
+          "split_exact": true,
+          "max_abs_vs_oracle": 0.011822700500488281,
+          "oracle_compare": "FAIL",
+          "oracle_mismatched_elements": 2269
+        },
+        "ffn_post_conv": {
+          "split_exact": true,
+          "max_abs_vs_oracle": 0.012211084365844727,
+          "oracle_compare": "FAIL",
+          "oracle_mismatched_elements": 4593
+        },
+        "layer_output": {
+          "split_exact": true,
+          "max_abs_vs_oracle": 0.012211084365844727,
+          "oracle_compare": "FAIL",
+          "oracle_mismatched_elements": 4496
+        }
+      },
+      "input_quantization": {
+        "different_scales": 0,
+        "scales": 360,
+        "different_codes": 1,
+        "codes": 11520
+      },
+      "same_input_routed_experts": {
+        "split_exact": true,
+        "max_abs_vs_oracle": 0.0,
+        "oracle_compare": "PASS",
+        "oracle_mismatched_elements": 0,
+        "bitwise_equal": true
+      }
+    },
+    "same_input_precision_comparison": {
+      "scope": "PyTorch expert replay on byte-identical CKE FFN input, route IDs and route weights, layer 0",
+      "expanded_fp32": {
+        "rmse": 0.00014159013517200947,
+        "max_abs": 0.0009261369705200195,
+        "mismatched_within_declared_tolerance": 3208,
+        "fp32_bitwise_equal": 790,
+        "elements": 11520
+      },
+      "modeled_q8_block_dot": {
+        "rmse": 0.0,
+        "max_abs": 0.0,
+        "mismatched_within_declared_tolerance": 0,
+        "fp32_bitwise_equal": 11520,
+        "elements": 11520
+      }
+    },
+    "same_input_rms_counterfactual": {
+      "scope": "Use each captured layer-zero depth mix as the same input to both C rmsnorm providers.",
+      "different_code_coordinates": [
+        [
+          2,
+          59,
+          16
+        ]
+      ],
+      "cases": {
+        "native:f32_sum": {
+          "different_codes_vs_pytorch": 1,
+          "different_scales_vs_pytorch": 0,
+          "different_codes_vs_native": 0,
+          "different_scales_vs_native": 0
+        },
+        "native:f64_sum": {
+          "different_codes_vs_pytorch": 1,
+          "different_scales_vs_pytorch": 0,
+          "different_codes_vs_native": 0,
+          "different_scales_vs_native": 0
+        },
+        "pytorch:f32_sum": {
+          "different_codes_vs_pytorch": 1,
+          "different_scales_vs_pytorch": 0,
+          "different_codes_vs_native": 0,
+          "different_scales_vs_native": 0
+        },
+        "pytorch:f64_sum": {
+          "different_codes_vs_pytorch": 1,
+          "different_scales_vs_pytorch": 0,
+          "different_codes_vs_native": 0,
+          "different_scales_vs_native": 0
+        }
+      }
+    }
+  },
+  "plan_64k": {
+    "status": "COMPILED_AND_ABI_VERIFIED",
+    "context_capacity": 65544,
+    "entries": {
+      "prefill": "ck_inkling2_loop_prefill",
+      "append": "ck_inkling2_loop_append"
+    },
+    "arena_bytes": 65050554688,
+    "runtime_sha256": "35212a1a973508aca2ee235c462dbd5e586950b7c654b1a359d96ea69d07f578",
+    "generated_source_sha256": "7be5f542ae6290e61f2ede660f820c31d9643ec1d237e78a3726249c5546961b"
+  },
+  "limitations": [
+    "32K optimized full run still in progress when recorded.",
+    "64K capacity compilation and seeded tests do not establish full 64K execution.",
+    "PyTorch coverage is one layer on synthetic hidden rows."
+  ]
+}

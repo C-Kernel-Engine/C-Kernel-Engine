@@ -1,5 +1,89 @@
 #include "checked_float_buffer.h"
 
+#if defined(__clang__)
+#pragma clang fp contract(off)
+#elif defined(__GNUC__)
+#pragma GCC push_options
+#pragma GCC optimize ("fp-contract=off")
+#endif
+
+#if defined(__x86_64__) && (defined(__GNUC__) || defined(__clang__))
+#include <immintrin.h>
+#define CK_GQA_X86_AVX2 1
+
+/* Each SIMD lane owns a key. Advance every lane in channel order. */
+static inline __attribute__((target("avx2"))) void scores_for_four_keys(
+    const float *query, const float *keys, size_t dim, double scores[4])
+{
+    __m256d sums = _mm256_setzero_pd();
+    size_t channel = 0;
+    for (; channel + 4 <= dim; channel += 4) {
+        __m128 k0 = _mm_loadu_ps(keys + channel);
+        __m128 k1 = _mm_loadu_ps(keys + dim + channel);
+        __m128 k2 = _mm_loadu_ps(keys + 2 * dim + channel);
+        __m128 k3 = _mm_loadu_ps(keys + 3 * dim + channel);
+        _MM_TRANSPOSE4_PS(k0, k1, k2, k3);
+        sums = _mm256_add_pd(sums, _mm256_mul_pd(_mm256_set1_pd(query[channel]), _mm256_cvtps_pd(k0)));
+        sums = _mm256_add_pd(sums, _mm256_mul_pd(_mm256_set1_pd(query[channel + 1]), _mm256_cvtps_pd(k1)));
+        sums = _mm256_add_pd(sums, _mm256_mul_pd(_mm256_set1_pd(query[channel + 2]), _mm256_cvtps_pd(k2)));
+        sums = _mm256_add_pd(sums, _mm256_mul_pd(_mm256_set1_pd(query[channel + 3]), _mm256_cvtps_pd(k3)));
+    }
+    for (; channel < dim; ++channel) {
+        const __m256d k = _mm256_setr_pd(keys[channel], keys[dim + channel],
+                                     keys[2 * dim + channel], keys[3 * dim + channel]);
+        sums = _mm256_add_pd(sums, _mm256_mul_pd(_mm256_set1_pd(query[channel]), k));
+    }
+    _mm256_storeu_pd(scores, sums);
+}
+
+static __attribute__((target("avx2"))) void attention_row_avx2(
+    const float *query, const float *key, const float *value, const float *relative, float sink,
+    float *output, double *accumulator, size_t dim, size_t begin, size_t position,
+    size_t relative_extent, double scale)
+{
+    double max_logit = sink, denom = 1.0;
+    for (size_t d = 0; d < dim; ++d) accumulator[d] = 0.0;
+    for (size_t first = begin; first <= position;) {
+        const size_t available = position - first + 1;
+        double dots[4];
+        if (available >= 4) {
+            scores_for_four_keys(query, key + first * dim, dim, dots);
+        } else {
+            for (size_t lane = 0; lane < available; ++lane) {
+                const float *keys = key + (first + lane) * dim;
+                double dot = 0.0;
+                for (size_t d = 0; d < dim; ++d) dot += (double)query[d] * keys[d];
+                dots[lane] = dot;
+            }
+        }
+        const size_t count = available < 4 ? available : 4;
+        for (size_t lane = 0; lane < count; ++lane) {
+            const size_t distance = position - first - lane;
+            const double score = dots[lane] * scale +
+                (distance < relative_extent ? relative[distance] : 0.0);
+            const double next_max = fmax(score, max_logit);
+            const double old_factor = max_logit == next_max ? 1.0 : exp(max_logit - next_max);
+            const double new_factor = score == next_max ? 1.0 : exp(score - next_max);
+            denom = denom * old_factor + new_factor;
+            const float *values = value + (first + lane) * dim;
+            const __m256d old_vector = _mm256_set1_pd(old_factor), new_vector = _mm256_set1_pd(new_factor);
+            size_t d = 0;
+            for (; d + 4 <= dim; d += 4) {
+                const __m256d previous = _mm256_loadu_pd(accumulator + d);
+                const __m256d current = _mm256_cvtps_pd(_mm_loadu_ps(values + d));
+                _mm256_storeu_pd(accumulator + d, _mm256_add_pd(
+                    _mm256_mul_pd(previous, old_vector), _mm256_mul_pd(current, new_vector)));
+            }
+            for (; d < dim; ++d)
+                accumulator[d] = accumulator[d] * old_factor + (double)values[d] * new_factor;
+            max_logit = next_max;
+        }
+        first += count;
+    }
+    for (size_t d = 0; d < dim; ++d) output[d] = (float)(accumulator[d] / denom);
+}
+#endif
+
 /* Read caller-owned K/V at absolute positions [0, position + tokens).
  * Relative bias is indexed by backward distance inside its supplied extent.
  * An extra sink logit contributes to the denominator with a zero value. */
@@ -11,7 +95,7 @@ int ck_gqa_relative_sink_checked_f32(
     size_t dim, size_t capacity, size_t position, size_t relative_extent, size_t window)
 {
     if (!heads || heads > 256 || !kv_heads || heads % kv_heads ||
-        !dim || dim > 4096 || !capacity || capacity > 65536 ||
+        !dim || dim > 4096 || !capacity || capacity > SIZE_MAX / kv_heads ||
         !tokens || position >= capacity || tokens > capacity - position ||
         !relative_extent || relative_extent > 16384 || window > 16384)
         return -2;
@@ -57,6 +141,9 @@ int ck_gqa_relative_sink_checked_f32(
 
     const double scale = 1.0 / sqrt((double)dim);
     const size_t group = heads / kv_heads;
+#ifdef CK_GQA_X86_AVX2
+    const int use_avx2 = dim >= 16 && __builtin_cpu_supports("avx2");
+#endif
 #ifdef _OPENMP
     const size_t visible = position + tokens - first;
     const int parallel = workspace > dim && visible >= 128;
@@ -69,6 +156,13 @@ int ck_gqa_relative_sink_checked_f32(
         const float *rel = relative + row * relative_extent;
         const size_t cache = ((row % heads) / group) * capacity;
         double *accumulator = work + (workspace > dim ? row * dim : 0);
+#ifdef CK_GQA_X86_AVX2
+        if (use_avx2 && qpos - begin >= 7) {
+            attention_row_avx2(q, key + cache * dim, value + cache * dim, rel, sink[row],
+                               output + row * dim, accumulator, dim, begin, qpos, relative_extent, scale);
+            continue;
+        }
+#endif
         double max_logit = sink[row], denom = 1.0;
         for (size_t d = 0; d < dim; ++d) accumulator[d] = 0.0;
         for (size_t k = begin; k <= qpos; ++k) {
@@ -92,3 +186,7 @@ int ck_gqa_relative_sink_checked_f32(
     }
     return 0;
 }
+
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC pop_options
+#endif

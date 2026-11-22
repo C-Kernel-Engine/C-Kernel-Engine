@@ -18,6 +18,7 @@ sys.path.insert(0, str(ROOT))
 
 from version.v8.scripts.build_inkling2_cross_pass_v8 import CONTROL_PORTS
 from version.v8.scripts.build_inkling2_decoder_block_v8 import first_block_weights
+from version.v8.scripts.build_inkling2_mini_projection_circuit import MAX_CONTEXT_CAPACITY
 from version.v8.scripts.build_inkling2_text_loop_v8 import resident_text_loop, text_token_loop
 from version.v8.scripts.checked_execution_exports_v8 import load_exports
 from version.v8.scripts.compile_checked_bundle_v8 import compile_native_graph
@@ -187,7 +188,7 @@ def main():
     capacity = args.context_capacity if resident else len(ids) + 1
     vocab = config["unpadded_vocab_size"]
     chunk_tokens = args.chunk_tokens if resident else len(ids)
-    if (not 1 <= chunk_tokens <= 16 or not chunk_tokens < capacity <= 65536 or not ids
+    if (not 1 <= chunk_tokens <= 16 or not chunk_tokens < capacity <= MAX_CONTEXT_CAPACITY or not ids
             or len(ids) + len(forced) > capacity
             or any(not 0 <= token < vocab for token in ids)):
         parser.error("invalid prompt IDs, chunk size or context capacity")
