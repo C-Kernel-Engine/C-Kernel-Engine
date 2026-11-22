@@ -8,6 +8,7 @@ from pathlib import Path
 import signal
 import sys
 import tempfile
+import time
 import uuid
 
 from fastapi import FastAPI, Request
@@ -16,10 +17,21 @@ from server.vision_input import prepare_vision_input, ImagePart, TextPart, Visio
 
 
 def validate(body, model, marker):
-    if not isinstance(body, dict) or set(body) - {'model','messages','max_tokens','stream','temperature'}:
+    if not isinstance(body, dict) or set(body) - {
+        'model','messages','max_tokens','stream','temperature','stream_options','tools','tool_choice',
+    }:
         raise ValueError('unsupported request fields; tools are not supported')
     if body.get('model') != model or type(body.get('stream',False)) is not bool:
         raise ValueError('invalid model or stream')
+    if ('tool_choice' in body and body['tool_choice'] != 'none') or (
+        'tools' in body and (body.get('tool_choice') != 'none' or not isinstance(body['tools'],list))
+    ):
+        raise ValueError('tool execution is not supported')
+    if 'stream_options' in body:
+        options = body['stream_options']
+        if (not body.get('stream') or not isinstance(options,dict)
+                or set(options) != {'include_usage'} or type(options['include_usage']) is not bool):
+            raise ValueError('invalid stream options')
     budget=body.get('max_tokens',64)
     if type(budget) is not int or not 1 <= budget <= 1024 or body.get('temperature',0) != 0:
         raise ValueError('greedy generation requires temperature zero and 1–1024 output tokens')
@@ -161,6 +173,7 @@ def create_app(profile, *, threads=4, memory=32<<30, command=None, verify_refere
         worker.cancelled=False
         worker.busy=True;worker.request_id='vision-'+uuid.uuid4().hex
         rid=worker.request_id;directory=None;transferred=False
+        created=int(time.time())
         async def release():
             with anyio.CancelScope(shield=True):
                 await worker.stop()
@@ -179,18 +192,28 @@ def create_app(profile, *, threads=4, memory=32<<30, command=None, verify_refere
             path.write_bytes(image.data)
             payload={'messages':messages,'image_path':str(path),'max_tokens':budget,'verify_reference':verify_reference}
             def completion(text,event):
-                return {'id':rid,'object':'chat.completion','model':pinned['model'],
+                return {'id':rid,'object':'chat.completion','model':pinned['model'],'created':created,
                     'choices':[{'index':0,'message':{'role':'assistant','content':text},'finish_reason':event['finish_reason']}],
                     'usage':event['usage'],'cke_evidence':event.get('evidence')}
             async def stream():
+                options = body.get('stream_options')
+                envelope = {'id':rid,'object':'chat.completion.chunk','model':pinned['model'],'created':created}
                 events=worker.events(payload)
                 try:
                     async for event in events:
                         if event['type']=='stage':yield ': native stage\n\n';continue
-                        if event['type']=='delta':value={'id':rid,'object':'chat.completion.chunk','model':pinned['model'],'choices':[{'index':0,'delta':{'content':event['text']},'finish_reason':None}]}
-                        elif event['type']=='complete':value={'id':rid,'object':'chat.completion.chunk','choices':[{'index':0,'delta':{},'finish_reason':event['finish_reason']}],'usage':event['usage'],'cke_evidence':event.get('evidence')}
+                        if event['type']=='delta':
+                            value=dict(envelope,choices=[{'index':0,'delta':{'content':event['text']},'finish_reason':None}])
+                        elif event['type']=='complete':
+                            value=dict(envelope,choices=[{'index':0,'delta':{},'finish_reason':event['finish_reason']}],
+                                       cke_evidence=event.get('evidence'))
+                            if options is None: value['usage']=event['usage']
                         else:value={'error':event}
+                        if options and options['include_usage'] and 'choices' in value:
+                            value['usage']=None
                         yield 'data: '+json.dumps(value)+'\n\n'
+                        if event['type']=='complete' and options and options['include_usage']:
+                            yield 'data: '+json.dumps(dict(envelope,choices=[],usage=event['usage']))+'\n\n'
                     yield 'data: [DONE]\n\n'
                 except Exception:
                     yield 'data: {"error":{"code":"worker_failed"}}\n\n'

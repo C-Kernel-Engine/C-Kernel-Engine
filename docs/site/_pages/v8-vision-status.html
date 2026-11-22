@@ -33,9 +33,13 @@
 <p>The separate <code>server.vision_http</code> service connects uploaded PNG/JPEG bytes to the
 existing generated encoder and visual native-session entry. Ordinary text serving remains unchanged.
 It binds only to loopback. Its supported surface is <code>/v1/chat/completions</code>, streamed or
-non-streamed, with exactly one image across the caller-supplied conversation. Tools, PDFs, remote
-image fetching and additional images are explicitly unsupported. A PDF must first be rendered into
-page images by the client; this first endpoint handles one page per request.</p>
+non-streamed, with exactly one image across the caller-supplied conversation. The client must attach
+the image bytes. The server does not open paths from prompts or fetch remote images. A PDF must first
+be rendered into page images by the client; this endpoint handles one page per request.</p>
+<p>OpenAI-compatible clients can set <code>stream_options.include_usage</code> to <code>true</code>
+to get a separate usage chunk before <code>[DONE]</code>. They can send a tool list only with
+explicit <code>tool_choice: "none"</code>. The server does not forward tool declarations to the
+native worker, execute tools, or accept tool results.</p>
 <p>One request owns admission before upload starts; other requests receive 429. Uploads are bounded
 at 12 MiB and 30 seconds, image bytes at 8 MiB, decoded pixels at 16 million, text at 64 KiB and
 output at 1,024 tokens, further restricted by the generated context capacity. Each request uses a
@@ -68,9 +72,24 @@ truncated output, not an answer-quality or normal-EOS pass. Rejection, busy admi
 and follow-up recovery were exercised separately. Cold request cost includes hashing and loading;
 these timings must not be presented as warm resident performance. See the
 <a href="assets/vision-http-20261114.json">retained scope and evidence</a>.</p>
-<p>Next gates: larger pinned context and image geometry, complete answers, repeated image/follow-up
-trajectories, disconnect stress, then a real harness task. Independent encoder accuracy remains a
-separate open gate. Stop this isolated service to roll back; it does not replace text or speech services.</p>
+<h3 id="qwen-code-image-smoke">Qwen Code image smoke test</h3>
+<p>For Qwen Code 0.25.1, pin the larger bundle under model name <code>cke-qwen3-vl-8k</code>
+and start the local vision service on port 8120. Run from the directory containing the image:</p>
+<pre><code>QWEN_CODE_SYSTEM_SETTINGS_PATH=/path/to/CKE/server/qwen-code/vision-smoke.settings.json \
+CKE_LOCAL_VISION_KEY=local \
+qwen --auth-type openai --model cke-qwen3-vl-8k --safe-mode --advisor off \
+  --approval-mode default --max-tool-calls 0 --max-session-turns 1 \
+  --max-wall-time 10m --system-prompt 'Answer only the question about the attached image.' \
+  '@image.png What characters are printed in the image? Reply with the characters only.'</code></pre>
+<p>The smoke profile uses a 32K client estimate to accommodate Qwen Code's conservative context
+padding. This is not an advertised server capacity: the tested bundle enforces 8192 compiled tokens.
+The 2K bundle could not fit the harness prompt. Use this profile only for a bounded turn.
+<code>@image.png</code> explicitly attaches the image; a plain path does not.</p>
+<p>On the pinned Qwen3-VL-8B Q4_K_M decoder and BF16 encoder at 224 by 128 pixels, Qwen Code
+read one synthetic image exactly and stopped normally. On a second image, both Qwen Code and direct
+HTTP dropped a digit; the direct JSON response also included Markdown fences. This verifies the
+attachment path, not broad OCR accuracy, numerical parity, or model-requested uploads.
+The isolated vision service does not replace text or speech serving.</p>
 </section>
 
 <section id="image-answer-acceptance">
