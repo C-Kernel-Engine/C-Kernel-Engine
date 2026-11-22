@@ -2385,6 +2385,36 @@ python3 version/v8/scripts/xray_layer_output_sweep_v8.py \
   graph, so the current runtime keeps the existing V provider. See the
   <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/docs/notes/artifacts/inkling2_mini_q8_xray_prefill.json">artifact-bound measurements</a>.</p>
 
+  <h3 id="inkling2-mini-32k">Inkling Q8_0 32K prefill and teacher-forced decode</h3>
+  <p>Run the generated prefill and append entries on the same 32,768 token
+  IDs and FP32 KV contract used by the oracle. Reserve room for the decode
+  tokens. The replay host loads caller-owned weights and token IDs and
+  invokes the generated C entry points. The oracle comparison reads a
+  little-endian FP32 file with the final prompt row followed by one complete
+  vocabulary row for each forced decode token.</p>
+  <pre class="mb-code"><code>python3 version/v8/scripts/replay_inkling2_text_loop_v8.py \
+  --config "$PUBLISHER_CONFIG" --gguf "$Q8_GGUF" --tokens-file "$PROMPT_IDS" \
+  --append-tokens-file "$FORCED_IDS" --oracle-logits "$ORACLE_LOGITS_F32" \
+  --context-capacity 32776 --chunk-tokens 16 --last-prefill-logit \
+  --threads 8 --xray-token-position 32767 --output "$REPLAY"</code></pre>
+  <p>The output separates native execution from numerical agreement. Any
+  differing logit makes the comparison fail even if both runtimes rank
+  the same token first. The generated regression seeds cache and history
+  before positions 32766 through 32769. It tests prefill, decode, and
+  capacity rejection at that boundary. A full 32K model run processes
+  the actual prefix to build that state.</p>
+  <p>The <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/docs/notes/artifacts/inkling2_mini_q8_32k_replay.json">pinned replay report</a>
+  records a real-weight, 26-token prefill followed by five forced decode
+  tokens. All six logit rows matched the earlier CKE runtime bit for bit.
+  Every row had a difference from llama.cpp. In an isolated attention
+  test with a 32K cached extent, four OpenMP workers produced the same
+  12,288 outputs as the prior serial implementation and lowered the
+  median time from 0.880 to 0.246 seconds. That timing covers the attention
+  call only.</p>
+  <p>For same-input non-flash attention replay, use the oracle query bytes
+  captured at the score matmul. Capturing the query at the final attention
+  output can read temporary memory reused by a later operation.</p>
+
   <h3 id="inkling2-mini-continuation-replay">Inkling Q8_0 continuation replay</h3>
   <p>The layer 2 Q input contains one changed Q8 scale on the eight-token
   trace. Replacing the incoming layer 1 residual with the captured oracle
