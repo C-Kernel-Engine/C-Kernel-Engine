@@ -338,6 +338,14 @@ def synthesize_ir2_backward(
         raise RuntimeError("Unsupported checkpoint policy: %s" % checkpoint_policy)
 
     config = _resolve_ir1_config(ir1)
+    frozen_policy = config.get("frozen_linear_dx")
+    if frozen_policy is not None:
+        supported = {rule["frozen_input_only"]["policy"] for rule in rules.values()
+                     if isinstance(rule, dict) and "frozen_input_only" in rule}
+        if not isinstance(frozen_policy, str) or frozen_policy not in supported:
+            raise ValueError("unsupported frozen linear input-gradient policy")
+        if config.get("train_batch_policy") != "fixed":
+            raise ValueError("frozen linear input-gradient policy requires a fixed training batch")
     activation_default_numel = _default_activation_numel(config)
 
     forward_ops = deepcopy(ir1.get("ops", []))
@@ -957,6 +965,20 @@ def synthesize_ir2_backward(
         fwd_outputs = fwd.get("dataflow", {}).get("outputs", {}) or {}
         fwd_weights = fwd.get("weights", {}) or {}
 
+        call_constants = None
+        frozen_variant = rule.get("frozen_input_only")
+        if frozen_variant and frozen_policy == frozen_variant["policy"]:
+            weight = fwd_weights.get("W", {}).get("tensor")
+            shape = tensors.get(weight, {}).get("shape")
+            if (isinstance(shape, list) and len(shape) == 2
+                    and all(type(d) is int and d > 0 for d in shape)
+                    and shape[0] >= frozen_variant["min_reduction"]
+                    and all(isinstance(ref, dict) and not weight_trainability.get(ref.get("tensor"), True)
+                            for ref in fwd_weights.values())):
+                call_constants = dict(tokens=config.get("train_tokens"), input_width=shape[1],
+                                      output_width=shape[0])
+                backward_specs = [frozen_variant["operation"]]
+
         for spec in backward_specs:
             kernel_id = _resolve_backward_kernel_id(spec, config)
             role = str(spec.get("role", "core"))
@@ -1204,6 +1226,8 @@ def synthesize_ir2_backward(
             if spec.get("map_call"):
                 core["map_call"] = True
                 core["params"] = deepcopy(fwd.get("params", {}))
+                if call_constants is not None:
+                    core["params"]["call_constants"] = call_constants
             attach_backward_bridge_plan(
                 core,
                 kernel_id=kernel_id,

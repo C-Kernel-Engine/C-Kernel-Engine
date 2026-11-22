@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 549,
+      "total": 550,
       "by_op": {
         "add_backward": 1,
         "add_rows_backward_train_f32": 1,
@@ -115,6 +115,7 @@
         "gelu_erf_backward_checked": 2,
         "gemm": 26,
         "gemm_backward": 1,
+        "gemm_backward_input_accum64_f32": 1,
         "gemma4_per_layer_embed": 1,
         "gemma4_per_layer_prepare": 2,
         "gemv": 15,
@@ -47474,6 +47475,148 @@
       "notes": "Generic fp32 GEMM backward binding used by v7 matmul grad-rule.",
       "name": "gemm_backward_f32",
       "_source_file": "gemm_backward_f32.json"
+    },
+    {
+      "id": "gemm_backward_input_accum64_f32",
+      "op": "gemm_backward_input_accum64_f32",
+      "operation_interface": "gemm_backward_input_accum64_f32.v1",
+      "variant": "frozen_projection_input_only_fp64_reduction",
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "d_output",
+          "shape": [
+            "R",
+            "O"
+          ],
+          "dtype": "fp32",
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "weight",
+          "shape": [
+            "O",
+            "I"
+          ],
+          "dtype": "fp32",
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "d_input",
+          "shape": [
+            "R",
+            "I"
+          ],
+          "dtype": "fp32",
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [],
+      "modes": {
+        "inference": false,
+        "training": true,
+        "backward": true
+      },
+      "impl": {
+        "function": "ck_gemm_backward_input_accum64_f32",
+        "c_declaration": "int ck_gemm_backward_input_accum64_f32(const float * d_output, const float * weight, float * d_input, int tokens, int input_width, int output_width);",
+        "sources": [
+          "src/ck_parallel_train.c"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "d_output",
+            "source": "activation:d_output",
+            "cast": "const float *",
+            "ports": [
+              "input:d_output"
+            ]
+          },
+          {
+            "name": "weight",
+            "source": "activation:weight",
+            "cast": "const float *",
+            "ports": [
+              "input:weight"
+            ]
+          },
+          {
+            "name": "d_input",
+            "source": "output:d_input",
+            "cast": "float *",
+            "ports": [
+              "output:d_input"
+            ]
+          },
+          {
+            "name": "tokens",
+            "source": "runtime:tokens"
+          },
+          {
+            "name": "input_width",
+            "source": "runtime:input_width"
+          },
+          {
+            "name": "output_width",
+            "source": "runtime:output_width"
+          }
+        ]
+      },
+      "training_contract": {
+        "version": 1,
+        "layout": "contiguous",
+        "batch_policy": "fixed",
+        "buffer_spans": [
+          {
+            "pointer": "d_output",
+            "rows": "tokens",
+            "width": "output_width"
+          },
+          {
+            "pointer": "weight",
+            "rows": "output_width",
+            "width": "input_width"
+          },
+          {
+            "pointer": "d_input",
+            "rows": "tokens",
+            "width": "input_width"
+          }
+        ],
+        "return_status": "zero_success"
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_wide_frozen_adjoint.py"
+        ],
+        "oracle": "Independent FP64 matrix product on identical FP32 operands with cancellation-sensitive tails."
+      },
+      "notes": "Uses only the incoming gradient and frozen weights. Reduction advances in ascending O order with FP64 accumulation and one FP32 output conversion. Matrix sizes and disjoint spans are caller-owned.",
+      "name": "gemm_backward_input_accum64_f32",
+      "_source_file": "gemm_backward_input_accum64_f32.json"
     },
     {
       "id": "gemm_blocked_serial",
