@@ -115,7 +115,7 @@ def _qwen35_layers(config: dict[str, Any]) -> list[str]:
 
 def _gemma4_layers(config: dict[str, Any]) -> list[str]:
     text = _text_config(config)
-    layer_kinds = text.get("layer_kinds") or config.get("layer_kinds")
+    layer_kinds = text.get("layer_kinds") or config.get("layer_kinds") or text.get("layer_types")
     if isinstance(layer_kinds, list):
         return [str(x) for x in layer_kinds]
     n = int(text.get("num_hidden_layers") or 0)
@@ -459,6 +459,8 @@ def inspect_config(config: dict[str, Any], *, model_root: Path | None = None, in
     layer_kinds = _layer_kinds(arch, config)
     required_ops = _required_ops(arch, config, layer_kinds)
     missing_ops = _missing_ops(arch, required_ops)
+    if "baseten_modeling_overrides" in config:
+        missing_ops.extend(["checkpoint_attention_override", "checkpoint_decision_readout"])
     kernel_report = _kernel_registry_report(required_ops)
     template_suggestion = suggest_template(config)
     status = "supported" if not missing_ops else "bringup_required"
@@ -479,6 +481,12 @@ def inspect_config(config: dict[str, Any], *, model_root: Path | None = None, in
         "template_suggestion": template_suggestion,
         "notes": _notes(arch, config, layer_kinds, missing_ops),
     }
+    if "baseten_modeling_overrides" in config:
+        report["checkpoint_modeling_overrides"] = config["baseten_modeling_overrides"]
+        report["notes"].append(
+            "The Gemma 4 backbone is a reuse candidate. The checkpoint declares "
+            "attention and readout semantics that require a separate execution contract."
+        )
     if include_weights:
         report["weights_audit"] = _weights_audit(model_root or Path("."), arch)
     return report

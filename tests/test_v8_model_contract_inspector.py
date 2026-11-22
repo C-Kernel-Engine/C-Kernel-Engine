@@ -446,6 +446,36 @@ class ModelContractInspectorTests(unittest.TestCase):
         self.assertEqual(report["status"], "fail")
         self.assertIn("language_model.model.layers.{L}.self_attn.kv_b_proj.weight", report["required_tensor_patterns"]["missing"])
 
+    def test_decision_checkpoint_does_not_inherit_gemma4_execution_support(self) -> None:
+        overrides = {
+            "attention": {"full_attention": "block_bidirectional", "sliding_attention": "causal"},
+            "readout": "slot_lm",
+            "head_dim": 256,
+            "n_slots": 256,
+        }
+        cfg = {
+            "architectures": ["Gemma4ForConditionalGeneration"],
+            "model_type": "gemma4",
+            "text_config": {
+                "model_type": "gemma4_text",
+                "num_hidden_layers": 2,
+                "layer_types": ["sliding_attention", "full_attention"],
+            },
+            "baseten_modeling_overrides": overrides,
+        }
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "config.json"
+            path.write_text(json.dumps(cfg), encoding="utf-8")
+            result = subprocess.run([sys.executable, str(SCRIPT), str(path)], capture_output=True)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["arch"], "gemma4")
+        self.assertEqual(report["status"], "bringup_required")
+        self.assertEqual(report["layer_kind_counts"], {"full_attention": 1, "sliding_attention": 1})
+        self.assertEqual(report["checkpoint_modeling_overrides"], overrides)
+        self.assertIn("checkpoint_attention_override", report["missing_ops"])
+        self.assertIn("checkpoint_decision_readout", report["missing_ops"])
+
     def test_qwen3_dense_config_is_supported_at_contract_level(self) -> None:
         cfg = {
             "architectures": ["Qwen3ForCausalLM"],
