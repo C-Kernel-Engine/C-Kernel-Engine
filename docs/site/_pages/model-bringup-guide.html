@@ -1334,7 +1334,9 @@ python3 version/v8/scripts/compare_inkling2_llama_layer0_v8.py \
   The complete short replay with both switches yields final-logit RMSE
   0.194 at prefill and 0.278 after append, compared with 0.183 and 0.171
   under the existing provider selection. The exact component results
-  expose remaining effects elsewhere in the composed trajectory.</p>
+  expose remaining effects elsewhere in the composed trajectory. The
+  greedy short chat with both switches still diverges after five shared
+  tokens and reaches 128 output tokens without emitting an answer.</p>
   <p><code>--last-prefill-logit</code> projects only the final hidden row
   of a prefill chunk. On the identical 128-token SVG prefix the final
   vocabulary row remains bitwise equal and the arena shrinks by 23 MiB.
