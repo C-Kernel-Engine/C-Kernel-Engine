@@ -1179,6 +1179,51 @@ python3 version/v8/scripts/replay_inkling2_routed_moe.py --gguf iq4_nl --layer 6
   cross-pass state, publisher activation quantization and text generation
   remain separate integration gates.</p>
 
+  <h3 id="inkling2-mini-q8-first-block">Inkling 2 Mini Q8_0 first decoder block</h3>
+  <p>One generated entry connects layer 0 from supplied residual rows
+  through RMS normalization, packed Q8_0 projections, causal K/V and
+  attention, output gating, depth-wise residual mixing, routed experts,
+  and the final residual addition. The block owns K/V plus K, V,
+  post-attention, and post-MoE convolution histories. Layer 0 starts
+  a depth block, so the input goes into the depth bank and the final
+  residual adds the post-attention and post-MoE outputs.</p>
+  <p>The <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/docs/notes/artifacts/inkling2_mini_q8_first_decoder_block.json">pinned replay</a>
+  uses the original GGUF bytes for packed tensors and loads a bounded
+  bank of experts needed by the input fixture. The native router still
+  calculates all selected IDs. Four tokens plus one append match five
+  uninterrupted tokens exactly at the layer output, K/V cache, and all
+  four convolution histories. The maximum output difference against
+  PyTorch with expanded copies of the same weights is 1.05 &times;
+  10<sup>&minus;5</sup>.</p>
+  <pre class="mb-code"><code>python3 version/v8/scripts/replay_inkling2_q8_decoder_block_v8.py \
+  --output /path/to/new-q8-block-replay</code></pre>
+  <p>This is a fixed-size, synthetic-hidden-state replay. It uses
+  FP32 activations and state with ordered FP64 packed-dot accumulation.
+  Token embeddings, full model conversion, later layers and cross-pass
+  messages remain outside this result. A failed segmented replay
+  requires state reset before reuse.</p>
+
+  <p>The CPU comparison builds llama.cpp at
+  <a href="https://github.com/ggml-org/llama.cpp/pull/32694">the Inkling
+  support revision</a> and captures its layer-0 output with the same
+  input rows and exact GGUF layer tensors. One near-cutoff route
+  changes expert 110 to expert 0 on row five. Maximum block-output
+  difference is 1.9751. Replaying the captured query dot on identical
+  weights and input gives a maximum error of 0.0382 with FP32
+  activations and 9.83 &times; 10<sup>&minus;7</sup> with Q8_0
+  activations. The report keeps this execution difference separate
+  from the FP32 arithmetic reference for the CKE provider.</p>
+  <pre class="mb-code"><code>c++ -std=c++17 -O2 -I"$LLAMA_SOURCE/include" -I"$LLAMA_SOURCE/ggml/include" \
+  version/v8/tools/llama_inkling_layer0_probe_v8.cpp -L"$LLAMA_BUILD/bin" \
+  -Wl,-rpath,"$LLAMA_BUILD/bin" -lllama -lggml -lggml-base -o /tmp/inkling-layer0-probe
+/tmp/inkling-layer0-probe "$GGUF" "$REPLAY/hidden.f32" "$REPLAY/llama-layer0"
+python3 version/v8/scripts/compare_inkling2_llama_layer0_v8.py \
+  --gguf "$GGUF" --native-replay "$REPLAY" --llama-prefix "$REPLAY/llama-layer0"</code></pre>
+  <p>Use a CPU-only llama.cpp build. The retained run backed every
+  layer-0 weight with the pinned source bytes and stopped evaluation
+  at <code>l_out-0</code>. Later weights were absent from the sparse
+  fixture.</p>
+
   <h2 id="lowering">9. Run lowering and inspect the generated C</h2>
   <p>The verified entry point is the wrapper <code>version/v8/scripts/cks-v8-run</code> (it selects a Python, checks requirements, and drives <code>ck_run_v8.py</code>). The full pipeline, exactly as run for this page <span class="tag tag-executed">executed</span>:</p>
   <pre class="mb-code"><code>version/v8/scripts/cks-v8-run run \

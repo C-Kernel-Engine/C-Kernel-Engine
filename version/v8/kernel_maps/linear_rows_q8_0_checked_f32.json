@@ -1,0 +1,177 @@
+{
+  "id": "linear_rows_q8_0_checked_f32",
+  "op": "linear_rows_q8_0_checked",
+  "operation_interface": "linear.row_major.checked.q8_0_fp32_ordered.v1",
+  "variant": "q8_0",
+  "selection": {
+    "status": "candidate",
+    "priority": 100,
+    "phases": [
+      "prefill"
+    ],
+    "equivalence_group": "linear.row_major.checked.q8_0_fp32_ordered.v1"
+  },
+  "quant": {
+    "weight": "q8_0",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "input",
+      "dtype": "fp32",
+      "shape": [
+        "M",
+        "K"
+      ],
+      "layout": "row_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [
+    {
+      "name": "weight",
+      "dtype": "q8_0",
+      "shape": [
+        "N",
+        "K"
+      ],
+      "layout": "row_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "weight",
+      "consumption": "required"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "output",
+      "dtype": "fp32",
+      "shape": [
+        "M",
+        "N"
+      ],
+      "layout": "row_major_contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "scratch": [],
+  "dims": [
+    "M",
+    "K",
+    "N"
+  ],
+  "impl": {
+    "function": "linear_rows_q8_0_checked_f32",
+    "c_declaration": "int linear_rows_q8_0_checked_f32(const float* input, size_t input_elements, const void* weight, size_t weight_bytes, float* output, size_t output_elements, size_t rows, size_t width, size_t channels);",
+    "sources": [
+      "src/kernels/linear_rows_q8_0_checked.c"
+    ]
+  },
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "input",
+        "source": "activation:input",
+        "cast": "const float*",
+        "ports": [
+          "input:input"
+        ]
+      },
+      {
+        "name": "input_elements",
+        "source": "runtime:input_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "weight",
+        "source": "weight:weight",
+        "cast": "const void*",
+        "ports": [
+          "weight:weight"
+        ]
+      },
+      {
+        "name": "weight_bytes",
+        "source": "runtime:weight_bytes",
+        "value_type": "size_t"
+      },
+      {
+        "name": "output",
+        "source": "output:output",
+        "cast": "float*",
+        "ports": [
+          "output:output"
+        ]
+      },
+      {
+        "name": "output_elements",
+        "source": "runtime:output_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "rows",
+        "source": "runtime:rows",
+        "value_type": "size_t"
+      },
+      {
+        "name": "width",
+        "source": "runtime:width",
+        "value_type": "size_t"
+      },
+      {
+        "name": "channels",
+        "source": "runtime:channels",
+        "value_type": "size_t"
+      }
+    ]
+  },
+  "call_constant_contract": {
+    "shape_symbols": {
+      "M": "rows",
+      "K": "width",
+      "N": "channels"
+    },
+    "buffer_spans": [
+      {
+        "pointer": "input",
+        "elements": "input_elements",
+        "rows": "rows",
+        "width": "width",
+        "element_bytes": 4
+      },
+      {
+        "pointer": "weight",
+        "elements": "weight_bytes",
+        "rows": 1,
+        "width": "weight_bytes",
+        "element_bytes": 1,
+        "storage_dtype": "q8_0"
+      },
+      {
+        "pointer": "output",
+        "elements": "output_elements",
+        "rows": "rows",
+        "width": "channels",
+        "element_bytes": 4
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "tests/test_v8_inkling2_q8_decoder_block.py"
+    ]
+  }
+}

@@ -1,5 +1,5 @@
 #include "checked_float_buffer.h"
-#include "ckernel_quant.h"
+#include "packed_q8_dot_ordered.h"
 #include "ckernel_transformer_rows_checked.h"
 
 #include <string.h>
@@ -27,6 +27,7 @@ static size_t packed_block_bytes(enum expert_storage storage)
 static float expert_dot(const float *input, const unsigned char *weight,
                         size_t width, enum expert_storage storage)
 {
+    if (storage == EXPERT_Q8_0) return ck_packed_q8_dot_ordered(input, weight, width);
     double sum = 0.0;
     if (storage == EXPERT_F32) {
         for (size_t i = 0; i < width; ++i) {
@@ -40,15 +41,8 @@ static float expert_dot(const float *input, const unsigned char *weight,
             const float scale = ck_fp16_to_fp32_soft(
                 (uint16_t)(weight[0] | ((uint16_t)weight[1] << 8)));
             for (size_t j = 0; j < QK8_0; ++j) {
-                int value;
-                if (storage == EXPERT_Q8_0) {
-                    value = weight[j + 2];
-                    if (value >= 128) value -= 256;
-                } else {
-                    const unsigned pair = weight[2 + j % 16];
-                    value = iq4_nl_values[j < 16 ? pair & 15 : pair >> 4];
-                }
-                const float expanded = scale * (float)value;
+                const unsigned pair = weight[2 + j % 16];
+                const float expanded = scale * (float)iq4_nl_values[j < 16 ? pair & 15 : pair >> 4];
                 sum += (double)input[i + j] * (double)expanded;
             }
         }
