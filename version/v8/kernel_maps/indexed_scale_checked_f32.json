@@ -1,0 +1,176 @@
+{
+  "id": "indexed_scale_checked_f32",
+  "op": "indexed_scale_checked",
+  "operation_interface": "indexed_scale.contiguous.fp32.checked.v1",
+  "variant": "serial_fp32",
+  "quant": {
+    "weight": "fp32",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "values",
+      "dtype": "fp32",
+      "shape": [
+        "N"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "ids",
+      "dtype": "i32",
+      "shape": [
+        "N"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [
+    {
+      "name": "scales",
+      "dtype": "fp32",
+      "shape": [
+        "V"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "weight",
+      "consumption": "required"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "output",
+      "dtype": "fp32",
+      "shape": [
+        "N"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "scratch": [],
+  "dims": [
+    "N",
+    "V"
+  ],
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
+  "impl": {
+    "function": "ck_indexed_scale_f32",
+    "c_declaration": "int ck_indexed_scale_f32(const float *values, const int32_t *ids, const float *scales, float *output, size_t count, size_t scale_count);",
+    "sources": [
+      "src/kernels/indexed_scale.c"
+    ]
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "values",
+        "source": "activation:values",
+        "cast": "const float*",
+        "ports": [
+          "input:values"
+        ]
+      },
+      {
+        "name": "ids",
+        "source": "activation:ids",
+        "cast": "const int32_t*",
+        "ports": [
+          "input:ids"
+        ]
+      },
+      {
+        "name": "scales",
+        "source": "weight:scales",
+        "cast": "const float*",
+        "ports": [
+          "weight:scales"
+        ]
+      },
+      {
+        "name": "output",
+        "source": "output:output",
+        "cast": "float*",
+        "ports": [
+          "output:output"
+        ]
+      },
+      {
+        "name": "count",
+        "source": "runtime:count",
+        "value_type": "size_t"
+      },
+      {
+        "name": "scale_count",
+        "source": "runtime:scale_count",
+        "value_type": "size_t"
+      }
+    ]
+  },
+  "call_constant_contract": {
+    "shape_symbols": {
+      "N": "count",
+      "V": "scale_count"
+    },
+    "buffer_spans": [
+      {
+        "pointer": "values",
+        "elements": "count",
+        "rows": 1,
+        "width": "count",
+        "element_bytes": 4,
+        "storage_dtype": "fp32"
+      },
+      {
+        "pointer": "ids",
+        "elements": "count",
+        "rows": 1,
+        "width": "count",
+        "element_bytes": 4,
+        "storage_dtype": "i32"
+      },
+      {
+        "pointer": "scales",
+        "elements": "scale_count",
+        "rows": 1,
+        "width": "scale_count",
+        "element_bytes": 4,
+        "storage_dtype": "fp32"
+      },
+      {
+        "pointer": "output",
+        "elements": "count",
+        "rows": 1,
+        "width": "count",
+        "element_bytes": 4,
+        "storage_dtype": "fp32"
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "tests/test_v8_indexed_scale_checked.py"
+    ],
+    "oracle": "PyTorch FP32 selected values multiplied by gathered scale entries."
+  },
+  "notes": "Apply one FP32 multiplication per valid index in input order. Reject invalid selected products or overlapping output before writing. Does not renormalize."
+}
