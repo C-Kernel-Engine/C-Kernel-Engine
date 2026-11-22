@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 
 from version.v8.scripts.build_inkling2_mini_projection_circuit import (  # noqa: E402
-    SOURCE_REVISION, TRANSFORMERS_REVISION, LAYER, causal_kv_replay, relative_attention_replay,
+    SOURCE_REVISION, TRANSFORMERS_REVISION, LAYER, causal_kv_replay, relative_attention_replay, sliding_attention_replay,
 )
 from version.v8.scripts.checked_circuit_authoring_v8 import declared_f32_weight_shapes  # noqa: E402
 from version.v8.scripts.compile_checked_bundle_v8 import compile_declared_f32_graph  # noqa: E402
@@ -33,8 +33,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--header", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--attention", action="store_true",
-                        help="connect scoped relative-bias and sink attention to the stored K/V")
+    scope = parser.add_mutually_exclusive_group()
+    scope.add_argument("--attention", action="store_true",
+                       help="connect scoped relative-bias and sink attention to the stored K/V")
+    scope.add_argument("--sliding-output", action="store_true",
+                       help="run the complete sliding-attention projection and gate path")
     args = parser.parse_args()
     header = args.header.read_bytes()
     if digest(header) != HEADER_HASH:
@@ -53,7 +56,10 @@ def main():
         "weights": {}, "comparisons": {},
     }
     builder = relative_attention_replay if args.attention else causal_kv_replay
-    if args.attention:
+    if args.sliding_output:
+        builder = sliding_attention_replay
+        report["scope"] += "; generated clipped query, relative bias, sinks, gate and output projection"
+    elif args.attention:
         report["scope"] += "; connected attention with supplied Q and sink plus a band from the publisher's bias table"
     target = args.output / "report.json"
     rng = np.random.default_rng(report["seed"])
@@ -62,7 +68,16 @@ def main():
         weights = {}
         for name, shape in declared_f32_weight_shapes(split_graph).items():
             source_shape = [shape[0], 1, shape[1]] if name.endswith("_sconv.weight") else shape
+            if args.sliding_output:
+                if name.endswith("q_l2_clip.scale"):
+                    source_shape = [24, 128]
+                elif name.endswith("rel_l2_clip.scale"):
+                    source_shape = [24, 16]
+                elif name.endswith("rel_logits_proj.proj"):
+                    source_shape = [16, 1024]
             weight, report["weights"][name] = read_bf16(header, name, source_shape)
+            if args.sliding_output and name.endswith("rel_logits_proj.proj"):
+                weight = weight.T
             weights[name] = weight.reshape(shape)
         bundles, identities = {}, {}
         if args.attention:
@@ -106,7 +121,29 @@ def main():
                 else:
                     scale = torch.rsqrt(heads.square().mean(dim=-1, keepdim=True) + 1e-6)
                 oracle_cache[slot, kind] = (heads * scale).transpose(0, 1).numpy()
-            if args.attention:
+            if args.sliding_output:
+                rows = rng.standard_normal((9, 2304), dtype=np.float32) * np.float32(0.2)
+                split_view(f"inkling2_prefill_slot{slot}_query_input")[:] = rows[:8]
+                split_view(f"inkling2_append_slot{slot}_query_input")[:] = rows[8:]
+                full_view(f"inkling2_prefill_slot{slot}_query_input")[:] = rows
+                hidden = torch.from_numpy(rows)
+
+                def project(name):
+                    return torch.nn.functional.linear(hidden, torch.from_numpy(weights[LAYER + "attn." + name]))
+
+                def clip(values, name, dim, threshold):
+                    gamma = torch.from_numpy(weights[LAYER + "attn." + name]).reshape(24, dim)
+                    scaled = values.reshape(9, 24, dim) * gamma
+                    norm = torch.linalg.vector_norm(scaled, dim=-1, keepdim=True)
+                    return scaled * (threshold / (norm + 1e-6)).clamp(max=1)
+
+                query = clip(project("wq_du.weight"), "q_l2_clip.scale", 128, 22.627416997969522)
+                relative_state = clip(project("wr_du.weight"), "rel_l2_clip.scale", 16, 8.0)
+                band = relative_state @ torch.from_numpy(weights[LAYER + "attn.rel_logits_proj.proj"]).T
+                sinks = project("attn_sink_proj.weight")
+                gate = project("gate_attn.weight").sigmoid()
+                query_inputs[slot] = (query.numpy(), band, sinks.numpy(), gate)
+            elif args.attention:
                 query = rng.standard_normal((9, 24, 128), dtype=np.float32) * 0.2
                 relative_state = rng.standard_normal((9, 24, 16), dtype=np.float32) * 0.2
                 band = torch.from_numpy(relative_state) @ torch.from_numpy(bias_table)
@@ -157,7 +194,7 @@ def main():
                     "oracle_cache_max_abs": float(abs(cache - oracle_cache[slot, kind]).max()),
                     "oracle_max_abs": float(abs(output - oracle[slot, kind]).max()),
                 }
-        if args.attention:
+        if args.attention or args.sliding_output:
             report["attention"] = {}
             positions = torch.arange(9)
             distance = positions[:, None] - positions[None, :]
@@ -168,7 +205,7 @@ def main():
                 split_output = np.concatenate((before, after))
                 if split_output.tobytes() != full.tobytes():
                     raise ValueError(f"split attention changed output in slot {slot}")
-                query, band, sinks = query_inputs[slot]
+                query, band, sinks = query_inputs[slot][:3]
                 key = torch.from_numpy(oracle_cache[slot, "k"]).repeat_interleave(3, dim=0)
                 value = torch.from_numpy(oracle_cache[slot, "v"]).repeat_interleave(3, dim=0)
                 score = torch.einsum("thd,hsd->ths", torch.from_numpy(query), key) / np.sqrt(128)
@@ -182,7 +219,23 @@ def main():
                     "split_exact": True,
                     "oracle_max_abs": float(abs(split_output - expected).max()),
                 }
-        report["status"] = "PASS_CACHED_ATTENTION_COMPONENT" if args.attention else "PASS_CAUSAL_KV_COMPONENT"
+                if args.sliding_output:
+                    name = "projected_attention"
+                    projected = np.concatenate((split_view(f"inkling2_prefill_slot{slot}_{name}"),
+                                                split_view(f"inkling2_append_slot{slot}_{name}")))
+                    np.testing.assert_array_equal(projected, full_view(f"inkling2_prefill_slot{slot}_{name}"))
+                    weight = torch.from_numpy(weights[LAYER + "attn.wo_ud.weight"])
+                    expected_gated = torch.from_numpy(expected.reshape(9, 3072)) * query_inputs[slot][3]
+                    expected_projected = torch.nn.functional.linear(expected_gated, weight).numpy()
+                    np.testing.assert_allclose(projected, expected_projected, rtol=4e-5, atol=1e-5)
+                    report["attention"][slot].update(
+                        projected_split_exact=True,
+                        projected_oracle_max_abs=float(abs(projected - expected_projected).max()),
+                    )
+        if args.sliding_output:
+            report["status"] = "PASS_SLIDING_ATTENTION_OUTPUT_COMPONENT"
+        else:
+            report["status"] = "PASS_CACHED_ATTENTION_COMPONENT" if args.attention else "PASS_CAUSAL_KV_COMPONENT"
     except Exception as error:
         report.update(status="FAIL", error=str(error))
         raise

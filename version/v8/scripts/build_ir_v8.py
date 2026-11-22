@@ -3135,6 +3135,14 @@ OP_DATAFLOW = {
         "outputs": {"expert_output": {"slot": "expert_output", "dtype": "fp32"},
                     "output": {"slot": "mixture", "dtype": "fp32"}},
     },
+    "scaled_head_l2_clip_checked": {
+        "inputs": {"input": "external:input"},
+        "outputs": {"output": {"slot": "heads_clipped", "dtype": "fp32"}},
+    },
+    "sigmoid_gate_rows_checked": {
+        "inputs": {"input": "external:input", "gate": "external:gate"},
+        "outputs": {"output": {"slot": "sigmoid_gated", "dtype": "fp32"}},
+    },
     "sigmoid_topk_router_checked": {
         "inputs": {"logits": "external:logits", "bias": "external:bias"},
         "outputs": {"indices": {"slot": "indices", "dtype": "i32"},
@@ -5556,6 +5564,8 @@ TEMPLATE_TO_KERNEL_OP = {
     "moe_router": "matmul",
     "full_softmax_topk_router": "full_softmax_topk_router",
     "routed_softcapped_experts_checked": "routed_softcapped_experts_checked",
+    "scaled_head_l2_clip_checked": "scaled_head_l2_clip_checked",
+    "sigmoid_gate_rows_checked": "sigmoid_gate_rows_checked",
     "sigmoid_topk_router_checked": "sigmoid_topk_router_checked",
     "group_limited_topk_router": "group_limited_topk_router",
     "moe_relu2_expert_mlp": "moe_relu2_expert_mlp",

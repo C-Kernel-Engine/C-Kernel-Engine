@@ -1,0 +1,158 @@
+{
+  "id": "sigmoid_gate_rows_checked_f32",
+  "op": "sigmoid_gate_rows_checked",
+  "operation_interface": "activation.sigmoid_gate.checked.fp32.v1",
+  "variant": "checked_scalar_fp32",
+  "selection": {
+    "status": "candidate",
+    "priority": 100,
+    "phases": [
+      "prefill"
+    ],
+    "equivalence_group": "activation.sigmoid_gate.checked.fp32.v1"
+  },
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "input",
+      "dtype": "fp32",
+      "shape": [
+        "N"
+      ],
+      "layout": "row_major",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "gate",
+      "dtype": "fp32",
+      "shape": [
+        "N"
+      ],
+      "layout": "row_major",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "output",
+      "dtype": "fp32",
+      "shape": [
+        "N"
+      ],
+      "layout": "row_major",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "scratch": [],
+  "dims": [
+    "N"
+  ],
+  "impl": {
+    "function": "sigmoid_gate_rows_checked_f32",
+    "c_declaration": "int sigmoid_gate_rows_checked_f32(const float* input, size_t input_elements, const float* gate, size_t gate_elements, float* output, size_t output_elements, size_t elements);",
+    "sources": [
+      "src/kernels/attention_rows_checked.c"
+    ]
+  },
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "input",
+        "source": "activation:input",
+        "cast": "const float*",
+        "ports": [
+          "input:input"
+        ]
+      },
+      {
+        "name": "input_elements",
+        "source": "runtime:input_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "gate",
+        "source": "activation:gate",
+        "cast": "const float*",
+        "ports": [
+          "input:gate"
+        ]
+      },
+      {
+        "name": "gate_elements",
+        "source": "runtime:gate_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "output",
+        "source": "output:output",
+        "cast": "float*",
+        "ports": [
+          "output:output"
+        ]
+      },
+      {
+        "name": "output_elements",
+        "source": "runtime:output_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "elements",
+        "source": "runtime:elements",
+        "value_type": "size_t"
+      }
+    ]
+  },
+  "call_constant_contract": {
+    "shape_symbols": {
+      "N": "elements"
+    },
+    "buffer_spans": [
+      {
+        "pointer": "input",
+        "elements": "input_elements",
+        "rows": 1,
+        "width": "elements",
+        "element_bytes": 4
+      },
+      {
+        "pointer": "gate",
+        "elements": "gate_elements",
+        "rows": 1,
+        "width": "elements",
+        "element_bytes": 4
+      },
+      {
+        "pointer": "output",
+        "elements": "output_elements",
+        "rows": 1,
+        "width": "elements",
+        "element_bytes": 4
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "tests/test_v8_inkling2_sliding_attention.py"
+    ]
+  }
+}

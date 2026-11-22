@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 532,
+      "total": 534,
       "by_op": {
         "add_backward": 1,
         "add_rows_backward_train_f32": 1,
@@ -223,9 +223,11 @@
         "scalar_sigmoid_checked": 1,
         "scale_vector_backward_checked": 1,
         "scale_vector_checked": 1,
+        "scaled_head_l2_clip_checked": 1,
         "select_next_id_checked": 1,
         "shared_relu2_expert_mlp": 1,
         "shared_swiglu_expert_mlp": 6,
+        "sigmoid_gate_rows_checked": 1,
         "sigmoid_topk_router_checked": 1,
         "silu_mul_rows_checked": 1,
         "silu_strided_checked": 1,
@@ -103346,6 +103348,198 @@
       "_source_file": "scale_vector_checked_f32.json"
     },
     {
+      "id": "scaled_head_l2_clip_checked_f32",
+      "op": "scaled_head_l2_clip_checked",
+      "operation_interface": "attention.scaled_l2.head_rows.checked.fp32.v1",
+      "variant": "checked_scalar_fp32",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "phases": [
+          "prefill"
+        ],
+        "equivalence_group": "attention.scaled_l2.head_rows.checked.fp32.v1"
+      },
+      "quant": {
+        "weight": "fp32",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "C"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "gamma",
+          "dtype": "fp32",
+          "shape": [
+            "C"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "C"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "R",
+        "C",
+        "H",
+        "D"
+      ],
+      "impl": {
+        "function": "scaled_head_l2_clip_checked_f32",
+        "c_declaration": "int scaled_head_l2_clip_checked_f32(const float* input, size_t input_elements, const float* gamma, size_t gamma_elements, float* output, size_t output_elements, size_t channels, size_t rows, size_t heads, size_t dim, float cap, float epsilon);",
+        "sources": [
+          "src/kernels/attention_rows_checked.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const float*",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "input_elements",
+            "source": "runtime:input_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "gamma",
+            "source": "weight:gamma",
+            "cast": "const float*",
+            "ports": [
+              "weight:gamma"
+            ]
+          },
+          {
+            "name": "gamma_elements",
+            "source": "runtime:gamma_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "channels",
+            "source": "runtime:channels",
+            "value_type": "size_t"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "heads",
+            "source": "runtime:heads",
+            "value_type": "size_t"
+          },
+          {
+            "name": "dim",
+            "source": "runtime:dim",
+            "value_type": "size_t"
+          },
+          {
+            "name": "cap",
+            "source": "param:cap"
+          },
+          {
+            "name": "epsilon",
+            "source": "param:epsilon"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "R": "rows",
+          "C": "channels",
+          "H": "heads",
+          "D": "dim"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "elements": "input_elements",
+            "rows": "rows",
+            "width": "channels",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "gamma",
+            "elements": "gamma_elements",
+            "rows": 1,
+            "width": "channels",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "output",
+            "elements": "output_elements",
+            "rows": "rows",
+            "width": "channels",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_sliding_attention.py"
+        ]
+      },
+      "name": "scaled_head_l2_clip_checked_f32",
+      "_source_file": "scaled_head_l2_clip_checked_f32.json"
+    },
+    {
       "id": "select_next_id_checked_f32",
       "op": "select_next_id_checked",
       "operation_interface": "tensor.argmax.last_row.stop_policy.checked.fp32.v1",
@@ -103553,6 +103747,166 @@
       "notes": "Return 0 for a non-stop ID, 1 for selected stop ID, 2 for frame-budget exhaustion, and negative for invalid input. A declared suppressed ID range excludes all IDs except the stop ID once min_frames is met. Generated checked calls propagate positive control status and skip dependents. Selection is unchanged on invalid input or budget exhaustion; EOS writes its ID.",
       "name": "select_next_id_checked_f32",
       "_source_file": "select_next_id_checked_f32.json"
+    },
+    {
+      "id": "sigmoid_gate_rows_checked_f32",
+      "op": "sigmoid_gate_rows_checked",
+      "operation_interface": "activation.sigmoid_gate.checked.fp32.v1",
+      "variant": "checked_scalar_fp32",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "phases": [
+          "prefill"
+        ],
+        "equivalence_group": "activation.sigmoid_gate.checked.fp32.v1"
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "gate",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "N"
+      ],
+      "impl": {
+        "function": "sigmoid_gate_rows_checked_f32",
+        "c_declaration": "int sigmoid_gate_rows_checked_f32(const float* input, size_t input_elements, const float* gate, size_t gate_elements, float* output, size_t output_elements, size_t elements);",
+        "sources": [
+          "src/kernels/attention_rows_checked.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const float*",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "input_elements",
+            "source": "runtime:input_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "gate",
+            "source": "activation:gate",
+            "cast": "const float*",
+            "ports": [
+              "input:gate"
+            ]
+          },
+          {
+            "name": "gate_elements",
+            "source": "runtime:gate_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "elements",
+            "source": "runtime:elements",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "N": "elements"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "elements": "input_elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "gate",
+            "elements": "gate_elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "output",
+            "elements": "output_elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_sliding_attention.py"
+        ]
+      },
+      "name": "sigmoid_gate_rows_checked_f32",
+      "_source_file": "sigmoid_gate_rows_checked_f32.json"
     },
     {
       "id": "sigmoid_topk_router_checked_f32",

@@ -1,0 +1,239 @@
+{
+  "status": "PASS_SLIDING_ATTENTION_OUTPUT_COMPONENT",
+  "source_revision": "ed40e7da625f594fc9c4990f5f66be24873c22d7",
+  "transformers_revision": "046bdb8cc2cee29d233964bb77fe6fd37cfe4aa3",
+  "header_sha256": "4b1fa8297cb1a0f6484c707bef69e7f0f81d08325ccf2c5b25b86d528f64acf2",
+  "scope": "Layer 6 K/V projections and static residual convolution and normalized KV storage, isolated FP32 with supplied synthetic rows; generated clipped query, relative bias, sinks, gate and output projection",
+  "oracle": "PyTorch 2.12.1+cpu eager FP32 linear, grouped conv1d and per-head norms",
+  "slots": [
+    6,
+    24,
+    36
+  ],
+  "prefill_tokens": 8,
+  "append_tokens": 1,
+  "seed": 491,
+  "weights": {
+    "model.llm.layers.6.attn.wk_dv.weight": {
+      "raw_bf16_sha256": "2d79a10075978f0327152a22e20238c4f814402bfb587fa94658ce38248ac4c1",
+      "bytes": 4718592,
+      "source_shape": [
+        1024,
+        2304
+      ],
+      "shard_byte_range_inclusive": [
+        2070281568,
+        2075000159
+      ]
+    },
+    "model.llm.layers.6.attn.k_sconv.weight": {
+      "raw_bf16_sha256": "cfdb1207102d3f5a41b88f292411fa2d8ecea936ecfe5f69e8e0c5219fc96438",
+      "bytes": 8192,
+      "source_shape": [
+        1024,
+        1,
+        4
+      ],
+      "shard_byte_range_inclusive": [
+        2070225504,
+        2070233695
+      ]
+    },
+    "model.llm.layers.6.attn.wv_dv.weight": {
+      "raw_bf16_sha256": "54827d4d957ea7b3e6177f72c92e071a9aa7d1e9434b1a556bf79961243bdaf2",
+      "bytes": 4718592,
+      "source_shape": [
+        1024,
+        2304
+      ],
+      "shard_byte_range_inclusive": [
+        2105081184,
+        2109799775
+      ]
+    },
+    "model.llm.layers.6.attn.v_sconv.weight": {
+      "raw_bf16_sha256": "f87495873866a7a66c9b89fade4e682b420061325264f1425fe5e277d3d4c7c1",
+      "bytes": 8192,
+      "source_shape": [
+        1024,
+        1,
+        4
+      ],
+      "shard_byte_range_inclusive": [
+        2070273376,
+        2070281567
+      ]
+    },
+    "model.llm.layers.6.attn.wq_du.weight": {
+      "raw_bf16_sha256": "6c84f646008730a3beb7fd113c353c04fca89795cb1c240b24b62b12374a33a8",
+      "bytes": 14155776,
+      "source_shape": [
+        3072,
+        2304
+      ],
+      "shard_byte_range_inclusive": [
+        2089155936,
+        2103311711
+      ]
+    },
+    "model.llm.layers.6.attn.q_l2_clip.scale": {
+      "raw_bf16_sha256": "dd3680f08f847f5fd8b63c52bc7a3574baf9cc8ba8bda76e5b09ce4f1d83b128",
+      "bytes": 6144,
+      "source_shape": [
+        24,
+        128
+      ],
+      "shard_byte_range_inclusive": [
+        2070233696,
+        2070239839
+      ]
+    },
+    "model.llm.layers.6.attn.wr_du.weight": {
+      "raw_bf16_sha256": "2d0eaeaa3b004ce378e65a1fe4ed491db946829e86d9b061ddc98fb95310b187",
+      "bytes": 1769472,
+      "source_shape": [
+        384,
+        2304
+      ],
+      "shard_byte_range_inclusive": [
+        2103311712,
+        2105081183
+      ]
+    },
+    "model.llm.layers.6.attn.rel_l2_clip.scale": {
+      "raw_bf16_sha256": "40eb8018890bf65dd5ee210ae129cda9682e92da6f09c5b8ff1814501fbe28db",
+      "bytes": 768,
+      "source_shape": [
+        24,
+        16
+      ],
+      "shard_byte_range_inclusive": [
+        2070239840,
+        2070240607
+      ]
+    },
+    "model.llm.layers.6.attn.rel_logits_proj.proj": {
+      "raw_bf16_sha256": "a81c6417259216117fb6274799dbfc414ed8e12e5a05eb48d30e9bbf09cef925",
+      "bytes": 32768,
+      "source_shape": [
+        16,
+        1024
+      ],
+      "shard_byte_range_inclusive": [
+        2070240608,
+        2070273375
+      ]
+    },
+    "model.llm.layers.6.attn.attn_sink_proj.weight": {
+      "raw_bf16_sha256": "65baec998e1b7dcaf1f2ed677ebd8ef4bc0899e10c185ee892341ee401967f82",
+      "bytes": 110592,
+      "source_shape": [
+        24,
+        2304
+      ],
+      "shard_byte_range_inclusive": [
+        2055959136,
+        2056069727
+      ]
+    },
+    "model.llm.layers.6.attn.gate_attn.weight": {
+      "raw_bf16_sha256": "0903f6467797743caf07302edc94a49ff27f62486c5a7e30b8f9c2e454d01564",
+      "bytes": 14155776,
+      "source_shape": [
+        3072,
+        2304
+      ],
+      "shard_byte_range_inclusive": [
+        2056069728,
+        2070225503
+      ]
+    },
+    "model.llm.layers.6.attn.wo_ud.weight": {
+      "raw_bf16_sha256": "7e4dfcd9bc5282ad5cd1bcf50e85deef446eb2b8012b974753d4f87e7dcb64b6",
+      "bytes": 14155776,
+      "source_shape": [
+        2304,
+        3072
+      ],
+      "shard_byte_range_inclusive": [
+        2075000160,
+        2089155935
+      ]
+    }
+  },
+  "comparisons": {
+    "36_k": {
+      "split_exact": true,
+      "history_exact": true,
+      "stored_kv_exact": true,
+      "oracle_cache_max_abs": 9.5367431640625e-07,
+      "oracle_max_abs": 9.5367431640625e-07
+    },
+    "36_v": {
+      "split_exact": true,
+      "history_exact": true,
+      "stored_kv_exact": true,
+      "oracle_cache_max_abs": 1.948792487382889e-06,
+      "oracle_max_abs": 4.183966666460037e-07
+    },
+    "6_k": {
+      "split_exact": true,
+      "history_exact": true,
+      "stored_kv_exact": true,
+      "oracle_cache_max_abs": 8.344650268554688e-07,
+      "oracle_max_abs": 8.344650268554688e-07
+    },
+    "6_v": {
+      "split_exact": true,
+      "history_exact": true,
+      "stored_kv_exact": true,
+      "oracle_cache_max_abs": 2.384185791015625e-06,
+      "oracle_max_abs": 4.76837158203125e-07
+    },
+    "24_k": {
+      "split_exact": true,
+      "history_exact": true,
+      "stored_kv_exact": true,
+      "oracle_cache_max_abs": 7.152557373046875e-07,
+      "oracle_max_abs": 7.152557373046875e-07
+    },
+    "24_v": {
+      "split_exact": true,
+      "history_exact": true,
+      "stored_kv_exact": true,
+      "oracle_cache_max_abs": 2.86102294921875e-06,
+      "oracle_max_abs": 8.344650268554688e-07
+    }
+  },
+  "builds": {
+    "split": {
+      "build_identity_sha256": "34331e605f2eeb827be975c2056c267fa951c02ccece4e4ff6c4f9a49ffe4e36",
+      "generated_library_sha256": "e71d98a70f2c72efe370867db1a205fb4b60f17d38ac9dc161d6821f2146ec2a"
+    },
+    "full": {
+      "build_identity_sha256": "39b6e213de28744ec70a16878c988a8234560875ac8ddc244f6b2338aaedf651",
+      "generated_library_sha256": "ecdd29ba7b776ceafe885605c9f6f4746e1fa48e956891c544d6a97746caa467"
+    }
+  },
+  "wrong_slot_max_abs": 2.7345924377441406,
+  "attention": {
+    "6": {
+      "split_exact": true,
+      "oracle_max_abs": 1.430511474609375e-06,
+      "projected_split_exact": true,
+      "projected_oracle_max_abs": 3.8743019104003906e-07
+    },
+    "24": {
+      "split_exact": true,
+      "oracle_max_abs": 1.430511474609375e-06,
+      "projected_split_exact": true,
+      "projected_oracle_max_abs": 3.725290298461914e-07
+    },
+    "36": {
+      "split_exact": true,
+      "oracle_max_abs": 1.0281801223754883e-06,
+      "projected_split_exact": true,
+      "projected_oracle_max_abs": 6.556510925292969e-07
+    }
+  }
+}

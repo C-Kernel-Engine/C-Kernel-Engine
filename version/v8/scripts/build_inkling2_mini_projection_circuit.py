@@ -363,3 +363,98 @@ def routed_expert_mixture(tokens, width, inner, experts, top_k, slots, *,
         ],
     }
     return graph
+
+
+def sliding_attention_replay(prefill_tokens=8, width=2304, kv_width=1024, taps=4,
+                             slots=(6, 24, 36), kv_heads=8, query_heads=24,
+                             relative_dim=16, band=1024, window=1024, q_clip=22.627416997969522,
+                             rel_clip=8.0):
+    """Connect the layer-6 sliding attention path from Q/K/V inputs to gated output."""
+    graph = relative_attention_replay(prefill_tokens, width, kv_width, taps, slots, kv_heads,
+                                      query_heads, band, window)
+    template = graph["block_types"]["block"]["body"]
+    outputs, schedule = {}, []
+    dim = kv_width // kv_heads
+    query_width = query_heads * dim
+    rel_width = query_heads * relative_dim
+    shapes = graph["activation_buffers"]
+
+    def buffer(name, shape):
+        shapes[name] = {"shape": shape}
+        graph["activation_bindings"][name] = name
+        return name
+
+    def clip(name, source, head_dim, tokens, limit, weight):
+        channels = query_heads * head_dim
+        return {
+            "id": name, "op": "scaled_head_l2_clip_checked",
+            "kernel": "scaled_head_l2_clip_checked_f32", "returns_status": True,
+            "weight_refs": {"gamma": LAYER + weight},
+            "graph_slots": {"inputs": {"input": source}, "outputs": {"output": name}},
+            "params": {"R": tokens, "C": channels, "H": query_heads, "D": head_dim,
+                       "cap": limit, "epsilon": 1e-6, "call_constants": {
+                "rows": tokens, "channels": channels, "heads": query_heads, "dim": head_dim,
+                "input_elements": tokens * channels, "output_elements": tokens * channels,
+                "gamma_elements": channels,
+            }},
+        }
+
+    for op in template["ops"]:
+        if op["op"] != "gqa_relative_sink_checked":
+            schedule.append(op)
+            continue
+        attention = op["id"]
+        entry = attention.removesuffix("_attention")
+        tokens = op["params"]["T"]
+        source = "external:" + buffer(entry + "_query_input", [tokens, width])
+        q, rel, sink = (entry + "_" + port for port in ("query", "relative_band", "sink"))
+        q_raw = buffer(entry + "_query_raw", [tokens, query_width])
+        rel_raw = buffer(entry + "_relative_raw", [tokens, rel_width])
+        rel_scaled = buffer(entry + "_relative_scaled", [tokens * query_heads, relative_dim])
+        gate = buffer(entry + "_gate", [tokens, query_width])
+        gated = buffer(entry + "_gated_attention", [tokens, query_width])
+        result = buffer(entry + "_projected_attention", [tokens, width])
+        schedule.extend((
+            _project(q_raw, source, width, query_width, tokens, "attn.wq_du.weight"),
+            clip(q, q_raw, dim, tokens, q_clip, "attn.q_l2_clip.scale"),
+            _project(rel_raw, source, width, rel_width, tokens, "attn.wr_du.weight"),
+            clip(rel_scaled, rel_raw, relative_dim, tokens, rel_clip, "attn.rel_l2_clip.scale"),
+            _project(rel, rel_scaled, relative_dim, band, tokens * query_heads, "attn.rel_logits_proj.proj"),
+            _project(sink, source, width, query_heads, tokens, "attn.attn_sink_proj.weight"),
+        ))
+        for port, name in (("query", q), ("relative", rel), ("sink", sink)):
+            op["graph_slots"]["inputs"][port] = name
+        count = tokens * query_width
+        schedule.extend((
+            op,
+            _project(gate, source, width, query_width, tokens, "attn.gate_attn.weight"),
+            {
+                "id": gated, "op": "sigmoid_gate_rows_checked",
+                "kernel": "sigmoid_gate_rows_checked_f32", "returns_status": True,
+                "graph_slots": {"inputs": {"input": attention, "gate": gate}, "outputs": {"output": gated}},
+                "params": {"N": count, "call_constants": {
+                    "input_elements": count, "gate_elements": count,
+                    "output_elements": count, "elements": count,
+                }},
+            },
+            _project(result, gated, query_width, width, tokens, "attn.wo_ud.weight"),
+        ))
+        outputs[attention] = result
+        boundary = schedule[-1]
+        graph["semantic_checkpoints"]["exports"][result] = {
+            "section": "body", "template_op_id": result, "op": boundary["op"],
+            "checkpoints": [{
+                "id": f"inkling2.layer6.{result}", "producer": result, "tensor": result,
+                "logical_layout": "token_major_contiguous", "axis_names": ["token", "channel"],
+                "storage_dtype": "fp32",
+            }],
+        }
+    for segment in graph["native_entry"]["segments"]:
+        segment["last_op"] = outputs[segment["last_op"]]
+    template["ops"] = schedule
+    graph["name"] = "inkling2_mini_layer6_sliding_attention_fp32"
+    graph["native_entry"]["function"] = "ck_" + graph["name"]
+    graph["contract"]["runtime_invariants"]["scope"] = (
+        "layer-6 sliding attention from supplied normalized Q/K/V rows through gated output"
+    )
+    return graph
