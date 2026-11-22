@@ -2131,6 +2131,15 @@ OP_DATAFLOW = {
         "inputs": {"q": "external:q", "k": "external:k", "v": "external:v"},
         "outputs": {"out": {"slot": "attention_output", "dtype": "fp32"}},
     },
+    "log_position_scale_rows_checked": {
+        "inputs": {"input": "external:input"},
+        "outputs": {"output": {"slot": "scaled", "dtype": "fp32"}},
+    },
+    "causal_dynamic_depthwise_residual_checked": {
+        "inputs": {"input": "external:input", "dynamic": "external:dynamic", "history": "external:history"},
+        "outputs": {"output": {"slot": "convolved", "dtype": "fp32"},
+                    "history": {"slot": "history", "dtype": "fp32"}},
+    },
     "causal_depthwise_residual_checked": {
         "inputs": {"input": "external:input", "history": "external:history"},
         "outputs": {"output": {"slot": "convolved", "dtype": "fp32"},
@@ -5396,6 +5405,8 @@ TEMPLATE_TO_KERNEL_OP = {
     "softcapped_swiglu_rows_checked": "softcapped_swiglu_rows_checked",
     "rope_qk_bounded": "rope_qk_bounded",
     "attention_causal_bounded": "attention_causal_bounded",
+    "log_position_scale_rows_checked": "log_position_scale_rows_checked",
+    "causal_dynamic_depthwise_residual_checked": "causal_dynamic_depthwise_residual_checked",
     "causal_depthwise_residual_checked": "causal_depthwise_residual_checked",
     "kv_cache_l2_rms_append_checked": "kv_cache_l2_rms_append_checked",
     "gqa_relative_sink_checked": "gqa_relative_sink_checked",

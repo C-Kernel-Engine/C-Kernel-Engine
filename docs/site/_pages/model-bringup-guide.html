@@ -1266,6 +1266,20 @@ python3 version/v8/scripts/compare_inkling2_llama_layer0_v8.py \
   sliding-block fixture. Full attention, the 48-occurrence execution schedule and text
   serving remain open.</p>
 
+  <h3 id="inkling2-mini-full-attention">Inkling 2 Mini generated full-attention block</h3>
+  <p>The bounded decoder authoring can also compose full causal attention with
+  distinct Q, K and V depth queries and input normalization weights. The
+  K/V convolutions add per-token, per-head learned taps to the static filters.
+  Full attention also applies the declared logarithmic position scale to
+  Q and relative features. Relative bias becomes zero beyond its extent;
+  older keys remain visible.</p>
+  <p>The asset-free generated regression covers independent convolution and
+  position-scale comparisons, state preservation on invalid calls, and
+  exact split versus uninterrupted logits-input rows, KV, and convolution
+  histories for one later-pass full-attention layer. The kernel variant uses
+  ordered FP64 arithmetic and FP32 storage. The full model, text output and
+  long-prompt serving still require connected execution and oracle evidence.</p>
+
   <h2 id="lowering">9. Run lowering and inspect the generated C</h2>
   <p>The verified entry point is the wrapper <code>version/v8/scripts/cks-v8-run</code> (it selects a Python, checks requirements, and drives <code>ck_run_v8.py</code>). The full pipeline, exactly as run for this page <span class="tag tag-executed">executed</span>:</p>
   <pre class="mb-code"><code>version/v8/scripts/cks-v8-run run \

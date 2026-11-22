@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 541,
+      "total": 543,
       "by_op": {
         "add_backward": 1,
         "add_rows_backward_train_f32": 1,
@@ -79,6 +79,7 @@
         "bias_add": 1,
         "broadcast_add_rows_checked": 1,
         "causal_depthwise_residual_checked": 1,
+        "causal_dynamic_depthwise_residual_checked": 1,
         "channel_scale_rows_checked": 1,
         "clip_strided_checked": 1,
         "concat_feature_rows_checked": 1,
@@ -149,6 +150,7 @@
         "linear_rows_checked": 1,
         "linear_rows_checked_no_bias": 1,
         "linear_rows_q8_0_checked": 2,
+        "log_position_scale_rows_checked": 1,
         "logits_store_indexed": 1,
         "mamba_conv1d_state_update": 1,
         "mamba_dt_softplus": 1,
@@ -34147,6 +34149,310 @@
       "_source_file": "causal_depthwise_residual_checked_f32.json"
     },
     {
+      "id": "causal_dynamic_depthwise_residual_checked_f32",
+      "op": "causal_dynamic_depthwise_residual_checked",
+      "operation_interface": "conv.causal_dynamic_depthwise.residual_history.checked.fp32.v1",
+      "variant": "ordered_fp64_history_fp32",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "equivalence_group": "conv.causal_dynamic_depthwise.residual_history.checked.fp32.v1",
+        "phases": [
+          "prefill",
+          "decode"
+        ]
+      },
+      "quant": {
+        "weight": "fp32",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "C"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "dynamic",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "A"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "history",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "C"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "state",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "weight",
+          "dtype": "fp32",
+          "shape": [
+            "C",
+            "K"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "C"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "history",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "C"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read_write",
+          "storage_class": "state",
+          "consumption": "required",
+          "alias_of": "input:history"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "T",
+        "C",
+        "K",
+        "H",
+        "A",
+        "KV"
+      ],
+      "impl": {
+        "function": "causal_dynamic_depthwise_residual_checked_f32",
+        "sources": [
+          "src/kernels/causal_depthwise_residual_checked.c"
+        ],
+        "c_declaration": "int causal_dynamic_depthwise_residual_checked_f32(const float *input, size_t input_elements, const float *weight, size_t weight_elements, const float *dynamic, size_t dynamic_elements, float *history, size_t history_elements, float *output, size_t output_elements, size_t tokens, size_t channels, size_t heads, size_t taps, size_t history_rows, size_t dynamic_width);"
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const float*",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "input_elements",
+            "source": "runtime:input_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "weight",
+            "source": "weight:weight",
+            "cast": "const float*",
+            "ports": [
+              "weight:weight"
+            ]
+          },
+          {
+            "name": "weight_elements",
+            "source": "runtime:weight_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "dynamic",
+            "source": "activation:dynamic",
+            "cast": "const float*",
+            "ports": [
+              "input:dynamic"
+            ]
+          },
+          {
+            "name": "dynamic_elements",
+            "source": "runtime:dynamic_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "history",
+            "source": "activation:history",
+            "cast": "float*",
+            "ports": [
+              "input:history",
+              "output:history"
+            ]
+          },
+          {
+            "name": "history_elements",
+            "source": "runtime:history_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "tokens",
+            "source": "runtime:tokens",
+            "value_type": "size_t"
+          },
+          {
+            "name": "channels",
+            "source": "runtime:channels",
+            "value_type": "size_t"
+          },
+          {
+            "name": "heads",
+            "source": "runtime:heads",
+            "value_type": "size_t"
+          },
+          {
+            "name": "taps",
+            "source": "runtime:taps",
+            "value_type": "size_t"
+          },
+          {
+            "name": "history_rows",
+            "source": "runtime:history_rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "dynamic_width",
+            "source": "runtime:dynamic_width",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_q8_decoder_block.py"
+        ],
+        "oracle": "Independent lag-ordered dynamic convolution comparison"
+      },
+      "notes": "Ordered FP64 static and dynamic tap sums then add residual and divide by sqrt(2*K+1). Static taps are oldest first. Dynamic tiles are token, head, lag with lag zero first. History stores pre-convolution rows.",
+      "call_constant_contract": {
+        "shape_symbols": {
+          "T": "tokens",
+          "C": "channels",
+          "K": "taps",
+          "H": "history_rows",
+          "A": "dynamic_width",
+          "KV": "heads"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "elements": "input_elements",
+            "rows": "tokens",
+            "width": "channels",
+            "element_bytes": 4,
+            "exact_elements_product": [
+              "tokens",
+              "channels"
+            ]
+          },
+          {
+            "pointer": "weight",
+            "elements": "weight_elements",
+            "rows": "channels",
+            "width": "taps",
+            "element_bytes": 4,
+            "exact_elements_product": [
+              "channels",
+              "taps"
+            ]
+          },
+          {
+            "pointer": "history",
+            "elements": "history_elements",
+            "rows": "history_rows",
+            "width": "channels",
+            "element_bytes": 4,
+            "exact_elements_product": [
+              "history_rows",
+              "channels"
+            ]
+          },
+          {
+            "pointer": "output",
+            "elements": "output_elements",
+            "rows": "tokens",
+            "width": "channels",
+            "element_bytes": 4,
+            "exact_elements_product": [
+              "tokens",
+              "channels"
+            ]
+          },
+          {
+            "pointer": "dynamic",
+            "elements": "dynamic_elements",
+            "rows": "tokens",
+            "width": "dynamic_width",
+            "element_bytes": 4,
+            "exact_elements_product": [
+              "tokens",
+              "heads",
+              "taps"
+            ]
+          }
+        ]
+      },
+      "name": "causal_dynamic_depthwise_residual_checked_f32",
+      "_source_file": "causal_dynamic_depthwise_residual_checked_f32.json"
+    },
+    {
       "id": "channel_scale_rows_checked_f32",
       "op": "channel_scale_rows_checked",
       "operation_interface": "channel_scale.checked_rows.fp32.v1",
@@ -67866,6 +68172,167 @@
       "notes": "FP32 input storage, nearest-even Q8_0 activations with FP16 scales, eight FP32 FMA lanes and a fixed horizontal reduction. Portable implementation of the pinned x86 arithmetic order.",
       "name": "linear_rows_q8_0_checked_q8_activation",
       "_source_file": "linear_rows_q8_0_checked_q8_activation.json"
+    },
+    {
+      "id": "log_position_scale_rows_checked_f32",
+      "op": "log_position_scale_rows_checked",
+      "operation_interface": "tensor.log_position_scale_rows.checked.fp32.v1",
+      "variant": "fp64_log_scale_f32_storage",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "phases": [
+          "prefill",
+          "decode"
+        ],
+        "equivalence_group": "tensor.log_position_scale_rows.checked.fp32.v1"
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "C"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "C"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "R",
+        "C"
+      ],
+      "impl": {
+        "function": "log_position_scale_rows_checked_f32",
+        "c_declaration": "int log_position_scale_rows_checked_f32(const float *input, size_t input_elements, float *output, size_t output_elements, size_t rows, size_t width, size_t position, size_t floor, float alpha);",
+        "sources": [
+          "src/kernels/log_position_scale_rows_checked.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const float*",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "input_elements",
+            "source": "runtime:input_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "width",
+            "source": "runtime:width",
+            "value_type": "size_t"
+          },
+          {
+            "name": "position",
+            "source": "runtime:position",
+            "value_type": "size_t"
+          },
+          {
+            "name": "floor",
+            "source": "runtime:floor",
+            "value_type": "size_t"
+          },
+          {
+            "name": "alpha",
+            "source": "param:alpha"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "R": "rows",
+          "C": "width"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "elements": "input_elements",
+            "rows": "rows",
+            "width": "width",
+            "element_bytes": 4,
+            "exact_elements_product": [
+              "rows",
+              "width"
+            ]
+          },
+          {
+            "pointer": "output",
+            "elements": "output_elements",
+            "rows": "rows",
+            "width": "width",
+            "element_bytes": 4,
+            "exact_elements_product": [
+              "rows",
+              "width"
+            ]
+          }
+        ]
+      },
+      "notes": "Per-token scale 1+alpha*log(max(1,(position+token+1)/floor)); finite checked FP32 output.",
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_q8_decoder_block.py"
+        ]
+      },
+      "name": "log_position_scale_rows_checked_f32",
+      "_source_file": "log_position_scale_rows_checked_f32.json"
     },
     {
       "id": "logits_copy_to_position",

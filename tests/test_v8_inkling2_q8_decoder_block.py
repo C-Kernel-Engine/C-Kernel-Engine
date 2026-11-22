@@ -9,7 +9,7 @@ import numpy as np
 from tests.test_v8_inkling2_mini_causal_kv import entry
 from tests.test_v8_inkling2_routed_moe import pack_quant
 from version.v8.scripts.build_inkling2_decoder_block_v8 import (
-    first_block_weights, first_decoder_block, sliding_decoder_block,
+    decoder_block, first_block_weights, first_decoder_block, sliding_decoder_block,
 )
 from version.v8.scripts.compile_checked_bundle_v8 import compile_checked_weight_graph
 
@@ -23,7 +23,10 @@ class InklingQ8DecoderBlockTests(unittest.TestCase):
     def test_controlled_sliding_block_split_and_uninterrupted(self):
         self.check_split(q8_activations=True, controlled=True)
 
-    def check_split(self, *, q8_activations, controlled=False):
+    def test_controlled_full_attention_split_and_reference(self):
+        self.check_split(q8_activations=True, controlled=True, full_attention=True)
+
+    def check_split(self, *, q8_activations, controlled=False, full_attention=False):
         rng = np.random.default_rng(141)
         spec = dict(width=32, kv_heads=1, query_heads=2, dim=16, relative_dim=2,
                     band=3, window=4, inner=32, experts=4, top_k=2, slots=4, taps=4,
@@ -41,6 +44,11 @@ class InklingQ8DecoderBlockTests(unittest.TestCase):
                 "previous_bank": rng.normal(0, .4, (5, 1, 32)).astype(np.float32),
                 "previous_output": rng.normal(0, .4, (5, 32)).astype(np.float32),
             }
+        if full_attention:
+            build_block = decoder_block
+            slot = 29
+            spec.update(layer=11, state_slot=slot, full_attention=True, block_boundary=False,
+                        window=0, epsilon=1e-6, log_floor=2, log_alpha=.1)
         prefill = f"inkling2_prefill_slot{slot}"
         append = f"inkling2_append_slot{slot}"
         bias = np.array([.2, -.1, .25, .05], dtype=np.float32)
@@ -78,10 +86,11 @@ class InklingQ8DecoderBlockTests(unittest.TestCase):
                             view(name).fill(0)
 
                     expected = view(prefill + "_layer_output").copy()
-                    np.testing.assert_array_equal(
-                        view(prefill + "_next_depth_bank"),
-                        np.concatenate((banks["depth_bank"], hidden[:, None, :]), axis=1),
-                    )
+                    if not full_attention:
+                        np.testing.assert_array_equal(
+                            view(prefill + "_next_depth_bank"),
+                            np.concatenate((banks["depth_bank"], hidden[:, None, :]), axis=1),
+                        )
                     reset_state()
                     view(prefill + "_previous_output")[:] = -banks["previous_output"]
                     self.assertEqual(entry(lib, "prefill", slot)(arena, len(arena)), 0)
@@ -100,6 +109,8 @@ class InklingQ8DecoderBlockTests(unittest.TestCase):
                 np.testing.assert_array_equal(split("history_" + kind), full("history_" + kind))
             for kind in ("k", "v"):
                 np.testing.assert_array_equal(split(f"cache_{kind}_{slot}"), full(f"cache_{kind}_{slot}")[:, :5])
+            if full_attention:
+                self.check_full_attention_boundaries(full, prefill, weights)
             if controlled:
                 return
             partial = full("inkling2_prefill_slot0_attn_post_conv")
@@ -117,6 +128,59 @@ class InklingQ8DecoderBlockTests(unittest.TestCase):
             np.testing.assert_array_equal(output, partial + contribution)
             self.assertGreater(float(abs(output - (hidden + partial + contribution)).max()), 1e-2)
 
+
+    def check_full_attention_boundaries(self, view, prefill, weights):
+        for kind in ("k", "v"):
+            projected = view(f"{prefill}_{kind}_projection").astype(np.float64)
+            dynamic = view(f"{prefill}_{kind}_dynamic").astype(np.float64)
+            filters = weights[f"blk.11.attn_{kind}_conv.weight"].astype(np.float64)
+            padded = np.pad(projected, ((3, 0), (0, 0)))
+            expected = np.stack([
+                (projected[token] + (padded[token:token+4].T *
+                                     (filters + dynamic[token, ::-1])).sum(axis=1)) / 3
+                for token in range(5)
+            ])
+            np.testing.assert_allclose(view(f"{prefill}_{kind}_output"), expected, rtol=2e-6, atol=2e-7)
+        scale = 1 + .1 * np.log(np.maximum(1, np.arange(1, 6) / 2))
+        for name in ("query", "relative_scaled"):
+            raw = view(f"{prefill}_{name}").reshape(5, -1)
+            scaled = view(f"{prefill}_{name}_log_scale").reshape(5, -1)
+            np.testing.assert_allclose(scaled, raw * scale[:, None], rtol=2e-6, atol=2e-7)
+        self.assertGreater(float(np.abs(view(prefill + "_attention_residual") -
+                                        view(prefill + "_attn_post_conv")).max()), .01)
+
+    def test_full_attention_kernels_reject_without_writes(self):
+        root = Path(__file__).resolve().parents[1]
+        with TemporaryDirectory() as tmp:
+            library = Path(tmp) / "full-attention.so"
+            subprocess.run(
+                ["cc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-shared", "-fPIC",
+                 "-I", str(root / "include"), str(root / "src/kernels/causal_depthwise_residual_checked.c"),
+                 str(root / "src/kernels/log_position_scale_rows_checked.c"), "-lm", "-o", str(library)],
+                check=True,
+            )
+            loaded = ctypes.CDLL(str(library))
+            conv = loaded.causal_dynamic_depthwise_residual_checked_f32
+            scale = loaded.log_position_scale_rows_checked_f32
+            pointer, size = ctypes.POINTER(ctypes.c_float), ctypes.c_size_t
+            conv.argtypes = [pointer, size] * 5 + [size] * 6
+            scale.argtypes = [pointer, size] * 2 + [size] * 4 + [ctypes.c_float]
+            src = (ctypes.c_float * 4)(1, 2, 3, 4)
+            history = (ctypes.c_float * 2)(5, 6)
+            static = (ctypes.c_float * 4)(.5, -.25, 1, -.5)
+            taps = (ctypes.c_float * 4)(.5, .1, .9, -.2)
+            out = (ctypes.c_float * 4)(42, 42, 42, 42)
+            self.assertNotEqual(conv(src, 4, static, 4, taps, 3, history, 2, out, 4,
+                                     2, 2, 1, 2, 1, 2), 0)
+            self.assertEqual(list(history), [5, 6])
+            self.assertEqual(list(out), [42] * 4)
+            self.assertNotEqual(scale(src, 4, out, 4, 2, 2, size(-1).value, 2, .1), 0)
+            self.assertEqual(list(out), [42] * 4)
+            self.assertEqual(conv(src, 4, static, 4, taps, 4, history, 2, out, 4,
+                                  2, 2, 1, 2, 1, 2), 0)
+            self.assertEqual(list(history), [3, 4])
+            self.assertEqual(scale(src, 4, out, 4, 2, 2, 0, 2, .1), 0)
+            self.assertEqual(list(out), [1, 2, 3, 4])
 
     def test_checked_activation_rounds_ties_and_rejects_before_writes(self):
         root = Path(__file__).resolve().parents[1]

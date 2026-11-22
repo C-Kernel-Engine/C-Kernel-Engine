@@ -22,6 +22,17 @@ static double evaluate(const float *input, const float *history, const float *we
     return (sum + (double)input[token * channels + channel]) / divisor;
 }
 
+static void store_history(float *history, const float *input, size_t tokens, size_t taps,
+                          size_t rows, size_t state)
+{
+    if (tokens >= taps - 1) {
+        memcpy(history, input + rows - state, state * sizeof(float));
+    } else {
+        memmove(history, history + rows, (state - rows) * sizeof(float));
+        memcpy(history + state - rows, input, rows * sizeof(float));
+    }
+}
+
 int ck_causal_depthwise_residual_checked_f32(
     const float *input, size_t input_elements, const float *weight, size_t weight_elements,
     float *history, size_t history_elements, float *output, size_t output_elements,
@@ -54,11 +65,78 @@ int ck_causal_depthwise_residual_checked_f32(
         for (size_t c = 0; c < channels; ++c)
             output[t * channels + c] = (float)evaluate(input, history, weight, t, c, channels, taps, divisor);
 
-    if (tokens >= taps - 1) {
-        memcpy(history, input + rows - state, state * sizeof(float));
-    } else {
-        memmove(history, history + rows, (state - rows) * sizeof(float));
-        memcpy(history + state - rows, input, rows * sizeof(float));
+    store_history(history, input, tokens, taps, rows, state);
+    return 0;
+}
+
+/* GGUF static taps are oldest first; per-row dynamic taps start at lag zero. */
+static double evaluate_dynamic(const float *input, const float *history, const float *weight,
+                               const float *dynamic, size_t token, size_t channel, size_t channels,
+                               size_t heads, size_t taps, double divisor)
+{
+    const float *filter = weight + channel * taps;
+    const size_t head = channel / (channels / heads);
+    const float *delta = dynamic + (token * heads + head) * taps;
+    double static_sum = 0.0, dynamic_sum = 0.0;
+    for (size_t tap = 0; tap < taps; ++tap) {
+        const size_t row = token + tap;
+        const float value = row < taps - 1
+            ? history[row * channels + channel]
+            : input[(row - (taps - 1)) * channels + channel];
+        const volatile double product = (double)value * (double)filter[tap];
+        static_sum += product;
     }
+    for (size_t lag = 0; lag < taps; ++lag) {
+        const size_t row = token + taps - 1 - lag;
+        const float value = row < taps - 1
+            ? history[row * channels + channel]
+            : input[(row - (taps - 1)) * channels + channel];
+        const volatile double product = (double)value * (double)delta[lag];
+        dynamic_sum += product;
+    }
+    return (static_sum + dynamic_sum + (double)input[token * channels + channel]) / divisor;
+}
+
+int causal_dynamic_depthwise_residual_checked_f32(
+    const float *input, size_t input_elements, const float *weight, size_t weight_elements,
+    const float *dynamic, size_t dynamic_elements, float *history, size_t history_elements,
+    float *output, size_t output_elements, size_t tokens, size_t channels, size_t heads,
+    size_t taps, size_t history_rows, size_t dynamic_width)
+{
+    if (!heads || channels % heads || taps < 2 || taps > 256 ||
+        history_rows != taps - 1 || tokens > SIZE_MAX - taps || heads > SIZE_MAX / taps ||
+        dynamic_width != heads * taps) return -2;
+
+    size_t rows, weights, state, dynamic_span;
+    if (!ck_checked_span(tokens, channels, channels, &rows) ||
+        !ck_checked_span(channels, taps, taps, &weights) ||
+        !ck_checked_span(history_rows, channels, channels, &state) ||
+        !ck_checked_span(tokens, dynamic_width, dynamic_width, &dynamic_span) ||
+        input_elements < rows || output_elements < rows || weight_elements < weights ||
+        history_elements < state || dynamic_elements < dynamic_span) return -2;
+
+    if (!ck_checked_region(history, state) || !ck_checked_region(output, rows) ||
+        ck_checked_overlap(history, state, output, rows)) return -1;
+    const float *reads[] = {input, weight, dynamic};
+    const size_t sizes[] = {rows, weights, dynamic_span};
+    for (size_t i = 0; i < sizeof(reads) / sizeof(reads[0]); ++i) {
+        if (!ck_checked_region(reads[i], sizes[i]) ||
+            ck_checked_overlap(reads[i], sizes[i], history, state) ||
+            ck_checked_overlap(reads[i], sizes[i], output, rows)) return -1;
+        if (!ck_checked_finite(reads[i], sizes[i])) return -3;
+    }
+    if (!ck_checked_finite(history, state)) return -3;
+
+    const double divisor = sqrt(2.0 * (double)taps + 1.0);
+    for (size_t t = 0; t < tokens; ++t)
+        for (size_t c = 0; c < channels; ++c)
+            if (fabs(evaluate_dynamic(input, history, weight, dynamic, t, c, channels, heads, taps, divisor)) > FLT_MAX)
+                return -3;
+    for (size_t t = 0; t < tokens; ++t)
+        for (size_t c = 0; c < channels; ++c)
+            output[t * channels + c] =
+                (float)evaluate_dynamic(input, history, weight, dynamic, t, c, channels, heads, taps, divisor);
+
+    store_history(history, input, tokens, taps, rows, state);
     return 0;
 }
