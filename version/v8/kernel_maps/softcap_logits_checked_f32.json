@@ -1,0 +1,132 @@
+{
+  "id": "softcap_logits_checked_f32",
+  "op": "softcap_logits_checked",
+  "operation_interface": "tensor.softcap_logits.checked.fp32.v1",
+  "variant": "fp64_tanh_f32_storage",
+  "selection": {
+    "status": "candidate",
+    "priority": 100,
+    "phases": [
+      "prefill",
+      "decode"
+    ],
+    "equivalence_group": "tensor.softcap_logits.checked.fp32.v1"
+  },
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "input",
+      "dtype": "fp32",
+      "shape": [
+        "N"
+      ],
+      "layout": "row_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "output",
+      "dtype": "fp32",
+      "shape": [
+        "N"
+      ],
+      "layout": "row_major_contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "scratch": [],
+  "dims": [
+    "N"
+  ],
+  "impl": {
+    "function": "softcap_logits_checked_f32",
+    "c_declaration": "int softcap_logits_checked_f32(const float *input, size_t input_elements, float *output, size_t output_elements, size_t elements, float cap);",
+    "sources": [
+      "src/kernels/packed_text_io_checked.c"
+    ]
+  },
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "input",
+        "source": "activation:input",
+        "cast": "const float*",
+        "ports": [
+          "input:input"
+        ]
+      },
+      {
+        "name": "input_elements",
+        "source": "runtime:input_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "output",
+        "source": "output:output",
+        "cast": "float*",
+        "ports": [
+          "output:output"
+        ]
+      },
+      {
+        "name": "output_elements",
+        "source": "runtime:output_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "elements",
+        "source": "runtime:elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "cap",
+        "source": "param:cap"
+      }
+    ]
+  },
+  "call_constant_contract": {
+    "shape_symbols": {
+      "N": "elements"
+    },
+    "buffer_spans": [
+      {
+        "pointer": "input",
+        "elements": "input_elements",
+        "rows": 1,
+        "width": "elements",
+        "element_bytes": 4
+      },
+      {
+        "pointer": "output",
+        "elements": "output_elements",
+        "rows": 1,
+        "width": "elements",
+        "element_bytes": 4
+      }
+    ]
+  },
+  "notes": "Explicit positive cap times tanh(logits divided by cap), ordered FP64 and FP32 output.",
+  "tests": {
+    "unit": [
+      "tests/test_v8_inkling2_text_loop.py"
+    ]
+  }
+}

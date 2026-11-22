@@ -1350,6 +1350,12 @@ TEST_SUITES = {
         ROOT / "tests" / "test_v8_inkling2_q8_decoder_block.py",
         unittest_targets=("tests.test_v8_inkling2_q8_decoder_block", "tests.test_v8_inkling2_cross_pass"),
     ),
+    "inkling2_mini_text_loop": TestSuite(
+        "Inkling 2 Mini Generated Packed Text Loop", "inference",
+        ROOT / "tests" / "test_v8_inkling2_text_loop.py",
+        unittest_targets=("tests.test_v8_inkling2_text_loop",),
+        timeout_sec=180,
+    ),
     "inkling2_mini_gguf_import_contract": TestSuite(
         "Inkling 2 Mini GGUF Tensor and Loop Contract", "inference",
         ROOT / "tests" / "test_v8_inkling2_gguf_import_contract.py",

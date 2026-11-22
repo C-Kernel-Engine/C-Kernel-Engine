@@ -1,0 +1,492 @@
+{
+  "scope": "Short packed Q8_0 native replay, GGUF vocabulary-only prompt preparation, and capacity builds.",
+  "gguf_sha256": "d57542f8aea5d7639beba5fc4ae7f584754916f63ac5d5a69328c27f652f45da",
+  "config_sha256": "a7a349601f0984c4abf999c480ef775d8567d21f5f84b4e8a3e035b44f288dc2",
+  "gguf_revision": "e8a2cecf0e78914f07cc27b9be711a9b2c7561d9",
+  "prompt_ids": [
+    100887,
+    150202,
+    149929,
+    146036,
+    150019,
+    2479,
+    82,
+    13
+  ],
+  "teacher_append_id": 198,
+  "oracle_revision": "29b52d3",
+  "oracle": {
+    "prefill": {
+      "effective_settings": {
+        "requested_context": 64,
+        "context": 256,
+        "batch": 32,
+        "ubatch": 32,
+        "decode_submission_limit": 32,
+        "prefix_submission_limit": 32,
+        "threads": 8,
+        "threads_batch": 8,
+        "cache_k": "f32",
+        "cache_v": "f32",
+        "cpu_only": true,
+        "repack_enabled": true,
+        "flash_attention": "disabled"
+      },
+      "full_logits_sha256": "c6337094886b444a7a4fe315ffa2648ba5a3cff8104e4d92760e31ee2d400855",
+      "libraries_sha256": {
+        "libggml-base.so": "2d38376a3ebe1145b5f051b74192658ff0b7060c8703b9160b07d0bf1cf8deaf",
+        "libggml-cpu.so": "1d54dc954a4a3e9d4d96661ef923b3a5fb0cec1a164ea636e25e78e5ef9422d8",
+        "libggml.so": "91e090f6a26011a8f54588ae5823fbace3add45762dde60b0f62903948d75682",
+        "libllama.so": "7bdfd4322097045fa4ffca824eca1a761021cee6cea49d80f8d40334f41717e2"
+      }
+    },
+    "append": {
+      "effective_settings": {
+        "requested_context": 64,
+        "context": 256,
+        "batch": 32,
+        "ubatch": 32,
+        "decode_submission_limit": 32,
+        "prefix_submission_limit": 32,
+        "threads": 8,
+        "threads_batch": 8,
+        "cache_k": "f32",
+        "cache_v": "f32",
+        "cpu_only": true,
+        "repack_enabled": true,
+        "flash_attention": "disabled"
+      },
+      "full_logits_sha256": "440b02e7d457f785b47543965fe750fe8c672485fb2d309f413b85c96e699822",
+      "libraries_sha256": {
+        "libggml-base.so": "2d38376a3ebe1145b5f051b74192658ff0b7060c8703b9160b07d0bf1cf8deaf",
+        "libggml-cpu.so": "1d54dc954a4a3e9d4d96661ef923b3a5fb0cec1a164ea636e25e78e5ef9422d8",
+        "libggml.so": "91e090f6a26011a8f54588ae5823fbace3add45762dde60b0f62903948d75682",
+        "libllama.so": "7bdfd4322097045fa4ffca824eca1a761021cee6cea49d80f8d40334f41717e2"
+      }
+    }
+  },
+  "native": [
+    {
+      "status": "PASS",
+      "arena_bytes": 28050494272,
+      "arena_pack_seconds": 21.057538161054254,
+      "prefill_seconds": 59.82312836125493,
+      "append_seconds": 7.432233074679971,
+      "configuration": "portable Q8_0 dot, one 8-row prefill, FP32 RMS sum",
+      "build_identity_sha256": "583bf5a2dffc0fc02f2bf813c0909efee32e76b0a38a812dc81bd13cdf1f3a6b",
+      "library_sha256": "e49941f8d0f26c770e4d17acd9048a65bd2aa57001b4d41fbb4c31fa4cafe413",
+      "comparison": {
+        "prefill": {
+          "elements": 200058,
+          "rmse": 0.4138398782781853,
+          "max_abs": 1.8441848754882812,
+          "bitwise_equal": false,
+          "native_argmax": 68014,
+          "oracle_argmax": 68014,
+          "native_sha256": "55592fa113d0e9d9bf298c4687bd7f6ec7e5b6fe33e22d8130141112cf097218"
+        },
+        "append": {
+          "elements": 200058,
+          "rmse": 0.3227133841497794,
+          "max_abs": 1.5176241397857666,
+          "bitwise_equal": false,
+          "native_argmax": 12,
+          "oracle_argmax": 12,
+          "native_sha256": "0405368bbbc06447b059ff08215eacbf39024dd2f7942ddbdb025394abd5362f"
+        }
+      }
+    },
+    {
+      "status": "PASS",
+      "arena_bytes": 27976575936,
+      "arena_pack_seconds": 24.017184974625707,
+      "prefill_seconds": 14.018704725429416,
+      "append_seconds": 1.3508765175938606,
+      "configuration": "AVX2 Q8_0 dot, 4+4 prefill, FP32 RMS sum",
+      "build_identity_sha256": "c3e8b12183e1f19e4f5b80ccafbc947f3cacad7933ce79a64cc6c40be68698fb",
+      "library_sha256": "c67902c6c1f8e3b4617433337d3d8188f3b66ba1eae766226eb86ae0a2ded36c",
+      "comparison": {
+        "prefill": {
+          "elements": 200058,
+          "rmse": 0.4138398782781853,
+          "max_abs": 1.8441848754882812,
+          "bitwise_equal": false,
+          "native_argmax": 68014,
+          "oracle_argmax": 68014,
+          "native_sha256": "e53401559995a9368c11294f1af406d8c1621ef407cbb1d4ca7b6081ebf376d7",
+          "bitwise_equal_to_portable_native": true
+        },
+        "append": {
+          "elements": 200058,
+          "rmse": 0.3227133841497794,
+          "max_abs": 1.5176241397857666,
+          "bitwise_equal": false,
+          "native_argmax": 12,
+          "oracle_argmax": 12,
+          "native_sha256": "0405368bbbc06447b059ff08215eacbf39024dd2f7942ddbdb025394abd5362f",
+          "bitwise_equal_to_portable_native": true
+        }
+      }
+    },
+    {
+      "status": "PASS",
+      "arena_bytes": 27976575936,
+      "arena_pack_seconds": 21.193438632413745,
+      "prefill_seconds": 8.027664756402373,
+      "append_seconds": 0.8943434860557318,
+      "configuration": "AVX2 Q8_0 dot, 4+4 prefill, FP64 sum of FP32 squares",
+      "build_identity_sha256": "6cab31c3b97230204946bb18de984e286a131ca31fb6b428230a73449f93977e",
+      "library_sha256": "d5bd2d00aa852d0d75ba68dc1cb2df1772a234e53872dbd754750c87618bb19c",
+      "comparison": {
+        "prefill": {
+          "elements": 200058,
+          "rmse": 0.18264347201455708,
+          "max_abs": 0.8714243173599243,
+          "bitwise_equal": false,
+          "native_argmax": 68014,
+          "oracle_argmax": 68014,
+          "native_sha256": "7ae100034fc69094dfdf73ac67da18fb9cb795e0379ec7701646400f022e5b32"
+        },
+        "append": {
+          "elements": 200058,
+          "rmse": 0.17131704058745703,
+          "max_abs": 0.6796526908874512,
+          "bitwise_equal": false,
+          "native_argmax": 12,
+          "oracle_argmax": 12,
+          "native_sha256": "0428feab76219be17a2eeff5bf630b95b49681d8053a4ca7692a5cd1ab83cd07"
+        }
+      }
+    }
+  ],
+  "native_f64_sum_captured_boundaries": {
+    "Qcur-0": {
+      "elements": 24576,
+      "rmse": 0.0,
+      "max_abs": 0.0,
+      "bitwise_equal": true
+    },
+    "Kcur-0": {
+      "elements": 8192,
+      "rmse": 5.472517448040623e-08,
+      "max_abs": 7.152557373046875e-07,
+      "bitwise_equal": false
+    },
+    "Vcur-0": {
+      "elements": 8192,
+      "rmse": 6.654804548063634e-08,
+      "max_abs": 9.5367431640625e-07,
+      "bitwise_equal": false
+    },
+    "ffn_inp-0": {
+      "elements": 18432,
+      "rmse": 1.2973476547716535e-08,
+      "max_abs": 4.76837158203125e-07,
+      "bitwise_equal": false
+    },
+    "ffn_out-0": {
+      "elements": 18432,
+      "rmse": 5.3140936802794016e-08,
+      "max_abs": 9.5367431640625e-07,
+      "bitwise_equal": false
+    },
+    "l_out-0": {
+      "elements": 18432,
+      "rmse": 5.743635159640347e-08,
+      "max_abs": 9.5367431640625e-07,
+      "bitwise_equal": false
+    },
+    "l_out-1": {
+      "elements": 18432,
+      "rmse": 8.184638149435268e-07,
+      "max_abs": 1.1444091796875e-05,
+      "bitwise_equal": false
+    },
+    "l_out-5": {
+      "elements": 18432,
+      "rmse": 0.029118951683603976,
+      "max_abs": 0.259033203125,
+      "bitwise_equal": false
+    },
+    "l_out-6": {
+      "elements": 18432,
+      "rmse": 0.0031786115407407864,
+      "max_abs": 0.08161735534667969,
+      "bitwise_equal": false
+    },
+    "l_out-24": {
+      "elements": 18432,
+      "rmse": 0.01606087965720449,
+      "max_abs": 0.7735996246337891,
+      "bitwise_equal": false
+    },
+    "l_out-36": {
+      "elements": 18432,
+      "rmse": 0.04210953444541641,
+      "max_abs": 1.2920913696289062,
+      "bitwise_equal": false
+    },
+    "l_out-23": {
+      "elements": 18432,
+      "rmse": 0.07248633856744893,
+      "max_abs": 1.4811649322509766,
+      "bitwise_equal": false
+    }
+  },
+  "short_greedy": {
+    "source": "Generated CKE Q8_0, FP64 RMS sum, greedy",
+    "prompt_ids": [
+      200002,
+      200004,
+      34182,
+      279,
+      154554,
+      150628,
+      25,
+      220,
+      15,
+      200010,
+      200000,
+      200004,
+      368,
+      150011,
+      150921,
+      156021,
+      11,
+      150161,
+      150441,
+      149916,
+      199659,
+      150019,
+      2479,
+      149906,
+      30,
+      200010
+    ],
+    "generated_ids": [
+      200001,
+      200008,
+      371,
+      150409,
+      171960,
+      25,
+      196980,
+      368,
+      150011,
+      150921,
+      156021,
+      11,
+      150161,
+      150441,
+      149916,
+      199659,
+      150019,
+      2479,
+      149906,
+      30,
+      1,
+      170289,
+      150893,
+      149911,
+      4123,
+      13,
+      170289,
+      151012,
+      150806,
+      13,
+      199659,
+      150019
+    ],
+    "finish_reason": "length",
+    "prefill_seconds": 23.599047653377056,
+    "wall_seconds": 50.3053991291672,
+    "build_identity_sha256": "6cab31c3b97230204946bb18de984e286a131ca31fb6b428230a73449f93977e",
+    "library_sha256": "d5bd2d00aa852d0d75ba68dc1cb2df1772a234e53872dbd754750c87618bb19c",
+    "assessment": "Generated the reasoning phase and reached the token budget before producing an answer."
+  },
+  "long_prompt_workload": {
+    "source_revision": "574727475",
+    "source_sha256": {
+      "docs/site/_pages/prefill-performance-roadmap.html": "a86e6442e16f2d3af4bec7aa59cc4729acb84d8053fed336c604c7d3d74d48d1",
+      "docs/site/_pages/harness-quickstart.html": "39682bcbc672270b15dd510fbbcb8a618315f0730eb4432573083517b2d91d88",
+      "server/runtime.py": "d5c957a4b34e88933f6caa5246c9d98cd91f9104608827df8b6da69599433e73",
+      "server/live.py": "a5201d15f74d77425825b4b1f9a98206fbc1b392d02efb95a17c68d876a6b137",
+      "version/v8/scripts/codegen_v8.py": "2316448285b295718acd826f5aa5412fe88509aceaced459b1c17e21ef730ecf"
+    },
+    "template_sha256": "53a9035f3255945704b5857657cfb00c1165090c0641c4f782a0cbf268cc16dc",
+    "tokenizer": "pinned GGUF vocabulary with llama.cpp 29b52d3; add_special and parse_special enabled",
+    "reasoning_effort": "none",
+    "decode_budget": 2048,
+    "cases": [
+      {
+        "rendered_tokens": 8192,
+        "minimum_context_with_decode_budget": 10240,
+        "rendered_sha256": "d087a712b23a43ce38005c048fa19bd6c6fd595021f1b874f89f5fc57ac68b0d",
+        "token_ids_file_sha256": "edd7203d9398b9c9179469ac206e748a3f743fe85f25b4fdfd065524fafa54b1"
+      },
+      {
+        "rendered_tokens": 32768,
+        "minimum_context_with_decode_budget": 34816,
+        "rendered_sha256": "6ee20833f75de3eabe5829ae997d089aff2a2901443a76d052dbe07d417e4ca7",
+        "token_ids_file_sha256": "9c60072ba95ba8596ba1a36e15e0967809c57285cf9aaa535b7320c336d577f1"
+      }
+    ]
+  },
+  "capacity_builds": [
+    {
+      "status": "COMPILED_ONLY",
+      "context_capacity": 10240,
+      "arena_bytes": 34007419712,
+      "kv_bytes": 4026531840,
+      "library_sha256": "389c7f50180725c0c2530914fc0c7f767258f22878332fdcb9bc899068816e90",
+      "build_identity_sha256": "5faec16e8fd66cff110ccef4f7619a236f8ff5a782ae77878f8a2e95f11a7bfe"
+    },
+    {
+      "status": "COMPILED_ONLY",
+      "context_capacity": 34816,
+      "arena_bytes": 47813036864,
+      "kv_bytes": 13690208256,
+      "library_sha256": "e85dcaab4e78d133eb0dc1b14ff450c6239067b8d547d1e78c537a076d52d7b4",
+      "build_identity_sha256": "ed4787e61f12e12158a37da559ac0d5511bb89d9f169896b25a7759c6fc4fd97"
+    }
+  ],
+  "long_prompt_serving_status": "NOT_TESTED",
+  "svg_prompt_prefix": {
+    "tokens": 128,
+    "status": "PASS",
+    "token_ids_sha256": "0adf66c936eb01654349d9fb739f878c5721de39e1de795316feefc770ee5135",
+    "prefill_seconds": 106.12509048171341,
+    "native_argmax": 149859,
+    "oracle_argmax": 149859,
+    "elements": 200058,
+    "rmse": 0.3476734726394149,
+    "max_abs": 1.1505595445632935,
+    "bitwise_equal": false,
+    "build_identity_sha256": "3872d7689e7ce12622925a383647485c710eaf34bb3783100ea813df62fd6f38",
+    "library_sha256": "c8da3948a6fb4d06fd3f7e7fdca63e503331f37716d599927128289294ffec88",
+    "oracle_logits_sha256": "d4c0c4b974421c93e5a6390451bf67e79b79b5d752cb2f84339a1ecf72dcba15"
+  },
+  "first_six_layer_boundaries": {
+    "Qcur-0": {
+      "rmse": 0.0,
+      "max_abs": 0.0
+    },
+    "ffn_inp-0": {
+      "rmse": 1.2973476547716535e-08,
+      "max_abs": 4.76837158203125e-07
+    },
+    "ffn_moe_topk-0": {
+      "different_expert_sets": 0,
+      "different_ordered_slots": 0
+    },
+    "ffn_out-0": {
+      "rmse": 5.3140936802794016e-08,
+      "max_abs": 9.5367431640625e-07
+    },
+    "l_out-0": {
+      "rmse": 5.743635159640347e-08,
+      "max_abs": 9.5367431640625e-07
+    },
+    "Qcur-1": {
+      "rmse": 2.2148970713184747e-08,
+      "max_abs": 4.76837158203125e-07
+    },
+    "ffn_inp-1": {
+      "rmse": 7.063875752538248e-08,
+      "max_abs": 1.9073486328125e-06
+    },
+    "ffn_moe_topk-1": {
+      "different_expert_sets": 0,
+      "different_ordered_slots": 0
+    },
+    "ffn_out-1": {
+      "rmse": 8.135402944279213e-07,
+      "max_abs": 1.1444091796875e-05
+    },
+    "l_out-1": {
+      "rmse": 8.184638149435268e-07,
+      "max_abs": 1.1444091796875e-05
+    },
+    "Qcur-2": {
+      "rmse": 3.593879179658045e-05,
+      "max_abs": 0.000743865966796875
+    },
+    "ffn_inp-2": {
+      "rmse": 0.0002986841244419428,
+      "max_abs": 0.0059757232666015625
+    },
+    "ffn_moe_topk-2": {
+      "different_expert_sets": 0,
+      "different_ordered_slots": 0
+    },
+    "ffn_out-2": {
+      "rmse": 0.0023282800760369014,
+      "max_abs": 0.039002418518066406
+    },
+    "l_out-2": {
+      "rmse": 0.0023486771821018874,
+      "max_abs": 0.03826141357421875
+    },
+    "Qcur-3": {
+      "rmse": 0.004220338076791324,
+      "max_abs": 0.06185626983642578
+    },
+    "ffn_inp-3": {
+      "rmse": 0.004502995110402973,
+      "max_abs": 0.09755706787109375
+    },
+    "ffn_moe_topk-3": {
+      "different_expert_sets": 0,
+      "different_ordered_slots": 2
+    },
+    "ffn_out-3": {
+      "rmse": 0.012321841969614482,
+      "max_abs": 0.14305615425109863
+    },
+    "l_out-3": {
+      "rmse": 0.013142587832447573,
+      "max_abs": 0.14607667922973633
+    },
+    "Qcur-4": {
+      "rmse": 0.005797009319881832,
+      "max_abs": 0.0441892147064209
+    },
+    "ffn_inp-4": {
+      "rmse": 0.016314762967956,
+      "max_abs": 0.17517852783203125
+    },
+    "ffn_moe_topk-4": {
+      "different_expert_sets": 0,
+      "different_ordered_slots": 0
+    },
+    "ffn_out-4": {
+      "rmse": 0.01311523716171674,
+      "max_abs": 0.2087116241455078
+    },
+    "l_out-4": {
+      "rmse": 0.020926073984448575,
+      "max_abs": 0.18603515625
+    },
+    "Qcur-5": {
+      "rmse": 0.009522823227024975,
+      "max_abs": 0.06899100542068481
+    },
+    "ffn_inp-5": {
+      "rmse": 0.022980111544747873,
+      "max_abs": 0.2104644775390625
+    },
+    "ffn_moe_topk-5": {
+      "different_expert_sets": 0,
+      "different_ordered_slots": 2
+    },
+    "ffn_out-5": {
+      "rmse": 0.017803854225015146,
+      "max_abs": 0.1784992218017578
+    },
+    "l_out-5": {
+      "rmse": 0.029118951683603976,
+      "max_abs": 0.259033203125
+    }
+  },
+  "remaining_gap": "On the eight-token trace the first substantial captured layer-output drift is at physical layer 2. The selected expert set matches there, and the Q and attention residual already differ. Identical-input replay is needed to attribute further amplification."
+}

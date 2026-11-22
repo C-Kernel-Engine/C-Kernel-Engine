@@ -2131,6 +2131,18 @@ OP_DATAFLOW = {
         "inputs": {"q": "external:q", "k": "external:k", "v": "external:v"},
         "outputs": {"out": {"slot": "attention_output", "dtype": "fp32"}},
     },
+    "rmsnorm_f32_square_f64_sum_rows_checked": {
+        "inputs": {"input": "external:input"},
+        "outputs": {"output": {"slot": "normalized", "dtype": "fp32"}},
+    },
+    "embedding_lookup_q8_0_checked": {
+        "inputs": {"ids": "external:token_ids"},
+        "outputs": {"output": {"slot": "embedding", "dtype": "fp32"}},
+    },
+    "softcap_logits_checked": {
+        "inputs": {"input": "logits"},
+        "outputs": {"output": {"slot": "capped_logits", "dtype": "fp32"}},
+    },
     "log_position_scale_rows_checked": {
         "inputs": {"input": "external:input"},
         "outputs": {"output": {"slot": "scaled", "dtype": "fp32"}},
@@ -5405,6 +5417,9 @@ TEMPLATE_TO_KERNEL_OP = {
     "softcapped_swiglu_rows_checked": "softcapped_swiglu_rows_checked",
     "rope_qk_bounded": "rope_qk_bounded",
     "attention_causal_bounded": "attention_causal_bounded",
+    "rmsnorm_f32_square_f64_sum_rows_checked": "rmsnorm_f32_square_f64_sum_rows_checked",
+    "embedding_lookup_q8_0_checked": "embedding_lookup_q8_0_checked",
+    "softcap_logits_checked": "softcap_logits_checked",
     "log_position_scale_rows_checked": "log_position_scale_rows_checked",
     "causal_dynamic_depthwise_residual_checked": "causal_dynamic_depthwise_residual_checked",
     "causal_depthwise_residual_checked": "causal_depthwise_residual_checked",

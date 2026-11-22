@@ -182,6 +182,39 @@ class InklingQ8DecoderBlockTests(unittest.TestCase):
             self.assertEqual(scale(src, 4, out, 4, 2, 2, 0, 2, .1), 0)
             self.assertEqual(list(out), [1, 2, 3, 4])
 
+    def test_q8_activation_dispatch_preserves_scalar_reduction(self):
+        root = Path(__file__).resolve().parents[1]
+        with TemporaryDirectory() as tmp:
+            source = Path(tmp) / "probe.c"
+            library = Path(tmp) / "probe.so"
+            source.write_text(
+                '#include "packed_q8_activation_checked.h"\n'
+                'float scalar_dot(const unsigned char *w, const unsigned char *x, size_t n) {\n'
+                '    return ck_q8_activation_dot_scalar(w, x, n);\n}\n'
+                'float dispatch_dot(const unsigned char *w, const unsigned char *x, size_t n) {\n'
+                '    return ck_q8_activation_dot(w, x, n);\n}\n'
+            )
+            subprocess.run(["cc", "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror", "-shared", "-fPIC",
+                            "-ffp-contract=off", "-I", str(root / "include"), str(source),
+                            "-lm", "-o", str(library)], check=True)
+            loaded = ctypes.CDLL(str(library))
+            for fn in (loaded.scalar_dot, loaded.dispatch_dot):
+                fn.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_size_t]
+                fn.restype = ctypes.c_float
+            rng = np.random.default_rng(2319)
+            for width in (32, 96, 1152, 2304, 3072):
+                blocks = width // 32
+                weight, activation = (np.empty((blocks, 34), dtype=np.uint8) for _ in range(2))
+                for _ in range(100):
+                    scales = rng.uniform(.001, .6, (2, blocks)).astype("<f2").view("u1").reshape(2, blocks, 2)
+                    weight[:, :2], activation[:, :2] = scales
+                    weight[:, 2:] = rng.integers(-128, 128, (blocks, 32), dtype=np.int16).astype("i1").view("u1")
+                    activation[:, 2:] = rng.integers(-127, 128, (blocks, 32), dtype=np.int16).astype("i1").view("u1")
+                    args = weight.ctypes.data, activation.ctypes.data, width
+                    scalar = np.float32(loaded.scalar_dot(*args))
+                    actual = np.float32(loaded.dispatch_dot(*args))
+                    self.assertEqual(scalar.tobytes(), actual.tobytes())
+
     def test_checked_activation_rounds_ties_and_rejects_before_writes(self):
         root = Path(__file__).resolve().parents[1]
         with TemporaryDirectory() as tmp:
