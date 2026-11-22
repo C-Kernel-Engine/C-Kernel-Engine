@@ -880,6 +880,10 @@ TEST_SUITES = {
         ROOT / "tests" / "test_v8_qwen3_tts_first_block.py",
         timeout_sec=180,
     ),
+    "indexed_scale_checked": TestSuite(
+        "Checked Indexed Scale and Generated Router Composition", "kernels",
+        ROOT / "tests" / "test_v8_indexed_scale_checked.py",
+    ),
     "tts_indexed_sum_rows_checked": TestSuite(
         "Checked Indexed Row Sum", "kernels",
         ROOT / "tests" / "test_v8_indexed_sum_rows_checked.py",
