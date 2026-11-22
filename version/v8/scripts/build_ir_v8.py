@@ -4851,7 +4851,7 @@ def _template_activation_buffer_specs(
         if not isinstance(dtype_overrides, dict):
             raise RuntimeError("HARD CIRCUIT BUFFER FAULT: activation_buffer_dtypes must be an object")
         dtype = str(dtype_overrides.get(name, declaration.get("dtype", "fp32")) or "fp32").strip().lower()
-        supported_dtypes = {"fp32", "f32", "bf16", "fp16", "f16", "i32", "int32", "q8_0", "q8_k"}
+        supported_dtypes = {"fp64", "fp32", "f32", "bf16", "fp16", "f16", "i32", "int32", "q8_0", "q8_k"}
         if dtype not in supported_dtypes:
             raise RuntimeError(
                 f"HARD CIRCUIT BUFFER FAULT: activation_buffers.{name}.dtype "
@@ -5473,6 +5473,8 @@ TEMPLATE_TO_KERNEL_OP = {
     "expand_group_row_indices_checked": "expand_group_row_indices_checked",
     "attention_cross_token_major_checked": "attention_cross_token_major_checked",
     "linear_rows_bf16_checked": "linear_rows_bf16_checked",
+    "attention_ranges_checked": "attention_ranges_checked",
+    "diffusion_vp_ddpm_step_checked": "diffusion_vp_ddpm_step_checked",
     "equal_i32_scalar_checked": "equal_i32_scalar_checked",
     "audio_duration_logits_to_frames": "audio_duration_logits_to_frames",
     "runtime_extent_sum": "runtime_extent_sum",
@@ -6362,6 +6364,7 @@ def _template_str_param(
 def _dtype_size_bytes(dtype: str) -> int:
     return {
         "u8": 1,
+        "fp64": 8,
         "fp32": 4,
         "f32": 4,
         "bf16": 2,

@@ -2,18 +2,7 @@
 import numpy as np
 
 
-def decode_e4m3fn(codes):
-    """Decode the Safetensors F8_E4M3 byte representation."""
-    if codes.dtype != np.uint8:
-        raise ValueError("E4M3FN requires byte codes")
-    magnitude = codes & 127
-    if np.any(magnitude == 127):
-        raise ValueError("invalid E4M3FN NaN code")
-    exponent = magnitude >> 3
-    fraction = (magnitude & 7).astype(np.float32) * np.float32(0.125)
-    normal = np.ldexp(1 + fraction, exponent.astype(np.int32) - 7)
-    value = np.where(exponent == 0, np.ldexp(fraction, -6), normal)
-    return np.where(codes & 128, -value, value)
+from version.v8.scripts.fp8_storage_v8 import decode_e4m3fn
 
 
 def decode_expert_rows(weights, scales, *, format_name, amax=None, denominator=None):

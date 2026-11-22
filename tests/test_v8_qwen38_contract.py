@@ -178,6 +178,27 @@ class Qwen38ContractTests(unittest.TestCase):
         self.assertEqual(contract["artifact_variant"], "qwen38-27b-standard")
         self.assertEqual(converter.gguf_ck_template_arch("qwen35", metadata), "qwen38")
 
+    def test_daisyrose_header_resolves_dense_qwen38_circuit(self) -> None:
+        metadata = {
+            "general.architecture": "qwen35",
+            "general.name": "Daisyrose 27B",
+            "general.basename": "Daisyrose",
+            "general.size_label": "27B",
+            "qwen35.block_count": 65,
+            "qwen35.nextn_predict_layers": 1,
+            "qwen35.embedding_length": 5120,
+            "qwen35.feed_forward_length": 17408,
+        }
+        contract = converter.gguf_ck_artifact_contract("qwen35", metadata)
+        self.assertEqual(contract["artifact_variant"], "qwen38-27b-daisyrose")
+        self.assertEqual(contract["runtime_arch"], "qwen38")
+        self.assertEqual(converter.load_template_for_arch("qwen35", metadata)["name"], "qwen38")
+        self.assertEqual(converter.qwen35_decoder_layer_count(65, 1), 64)
+        for key in ("general.basename", "qwen35.embedding_length", "qwen35.nextn_predict_layers"):
+            with self.subTest(key=key):
+                changed = {**metadata, key: None}
+                self.assertNotIn("artifact_variant", converter.gguf_ck_artifact_contract("qwen35", changed))
+
     def test_ambiguous_artifact_variants_fail_closed(self) -> None:
         original = converter._GGUF_CK_MAP_CACHE
         model_map = copy.deepcopy(converter.load_gguf_ck_map())

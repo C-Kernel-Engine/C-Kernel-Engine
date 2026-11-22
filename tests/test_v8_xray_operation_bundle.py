@@ -55,6 +55,29 @@ class OperationBundleTests(unittest.TestCase):
         with self.assertRaisesRegex(BundleError, "tensor bytes changed"):
             load_bundle(bundle)
 
+    def test_packed_storage_preserves_opaque_bytes(self):
+        packed = np.arange(2 * 34, dtype=np.uint8).reshape(2, 34)
+        packet = write_bundle(
+            self.root / "packed", operation="projection", provider="test",
+            contract="test_packed", runtime=self.runtime, context={},
+            tensors={"weight": (packed, "u8", ("row", "packed_byte"))},
+        )
+        manifest, tensors = load_bundle(packet)
+        self.assertEqual(manifest["tensors"]["weight"]["axes"], ["row", "packed_byte"])
+        self.assertEqual(tensors["weight"].dtype, np.uint8)
+        np.testing.assert_array_equal(tensors["weight"], packed)
+
+    def test_fp64_latent_retains_values_between_fp32_numbers(self):
+        latent = np.array([1.0, 1.0 + 2 ** -51], dtype=np.float64)
+        packet = write_bundle(
+            self.root / "latent", operation="ddpm_step", provider="test",
+            contract="fp64", runtime=self.runtime, context={},
+            tensors={"latent": (latent, "fp64", ("channel",))},
+        )
+        _, loaded = load_bundle(packet)
+        self.assertEqual(loaded["latent"].dtype, np.float64)
+        np.testing.assert_array_equal(loaded["latent"], latent)
+
     def test_stale_runtime_and_invalid_geometry(self):
         bundle = self.bundle()
         self.runtime.write_bytes(b"different runtime")

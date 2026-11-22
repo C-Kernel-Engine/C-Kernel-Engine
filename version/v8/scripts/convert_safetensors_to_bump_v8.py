@@ -3661,8 +3661,14 @@ def main() -> int:
 
     model_dir = args.checkpoint.resolve()
     args.output = _resolve_output_path(args.output, ram_output=bool(args.ram_output), ram_dir=args.ram_dir, checkpoint=model_dir)
-    headers = _load_safetensors_headers(model_dir)
     hf = _hf_config(model_dir)
+    if "baseten_modeling_overrides" in hf:
+        raise SystemExit(
+            "The checkpoint declares baseten_modeling_overrides. "
+            "Its attention and decision readout require an explicit circuit "
+            "before safetensors conversion."
+        )
+    headers = _load_safetensors_headers(model_dir)
     arch = args.arch
     if arch == "auto":
         arch = _infer_arch(hf)
