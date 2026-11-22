@@ -5472,6 +5472,7 @@ TEMPLATE_TO_KERNEL_OP = {
     "last_valid_row_checked": "last_valid_row_checked",
     "expand_group_row_indices_checked": "expand_group_row_indices_checked",
     "attention_cross_token_major_checked": "attention_cross_token_major_checked",
+    "linear_rows_bf16_checked": "linear_rows_bf16_checked",
     "attention_ranges_checked": "attention_ranges_checked",
     "diffusion_vp_ddpm_step_checked": "diffusion_vp_ddpm_step_checked",
     "equal_i32_scalar_checked": "equal_i32_scalar_checked",
