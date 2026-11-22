@@ -1,4 +1,6 @@
+import ctypes
 from pathlib import Path
+import subprocess
 from tempfile import TemporaryDirectory
 import unittest
 
@@ -126,6 +128,65 @@ class RoutedMoeTests(unittest.TestCase):
             for slot in range(1, top_k):
                 incorrect += ascending[:, slot]
             self.assertFalse(np.array_equal(incorrect.view("u4"), expected.view("u4")))
+
+    def test_single_row_parallel_workspace_matches_serial_and_preserves_failure_atomicity(self):
+        width, inner, experts, top_k = 64, 32, 6, 5
+        seed = np.random.default_rng(933)
+        hidden = seed.standard_normal(width, dtype=np.float32)
+        ids = np.array([3, 1, 5, 4, 0], dtype=np.int32)
+        slots = np.array([3, 4, 1, 5, 0, 2], dtype=np.int32)
+        routing = np.array([0.9, 0.15, 0.37, 0.02, 0.11], dtype=np.float32)
+        matrices = [pack_quant(seed.integers(-8, 9, shape, dtype=np.int8), "q8_0")
+                    for shape in ((experts, inner, width), (experts, inner, width), (experts, width, inner))]
+        pieces = (width + inner) // 32 * 34
+        scratch_per_route = 3 * inner + (pieces + 3) // 4
+        staged = (top_k + 1) * width
+        root = Path(__file__).resolve().parents[1]
+
+        with TemporaryDirectory() as temp:
+            output = Path(temp) / "routed.so"
+            exports = Path(temp) / "exports.map"
+            exports.write_text("{ global: routed_softcapped_experts_checked_q8_0_q8_activation*; local: *; };")
+            subprocess.run(["cc", "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror", "-shared",
+                            "-fPIC", "-ffp-contract=off", "-fopenmp", "-I", str(root / "include"),
+                            str(root / "src/kernels/routed_softcapped_experts_checked.c"),
+                            str(root / "src/kernels/transformer_rows_checked.c"),
+                            "-ffunction-sections", "-Wl,--gc-sections", "-Wl,--no-undefined",
+                            f"-Wl,--version-script={exports}", "-lm", "-o", str(output)], check=True)
+            library = ctypes.CDLL(str(output))
+            library.omp_set_dynamic(0)
+            library.omp_set_num_threads(3)
+
+            for suffix in ("", "_scaled_situ"):
+                provider = getattr(library, "routed_softcapped_experts_checked_q8_0_q8_activation" + suffix)
+                provider.argtypes = [ctypes.c_void_p] * 10 + [ctypes.c_size_t] * 14 + [ctypes.c_float] * 2
+                provider.restype = ctypes.c_int
+                parts = np.full((top_k, width), -7, dtype=np.float32)
+                mixture = np.full(width, -8, dtype=np.float32)
+
+                def invoke(work):
+                    arrays = (hidden, ids, routing, slots, *matrices, parts, mixture, work)
+                    return provider(*(array.ctypes.data for array in arrays), 1, width, inner,
+                                    experts, experts, top_k, matrices[0].size, hidden.size,
+                                    ids.size, routing.size, slots.size, parts.size, mixture.size,
+                                    work.size, 4.0, 25.0)
+
+                serial = np.zeros(staged + scratch_per_route, dtype=np.float32)
+                parallel = np.full(staged + top_k * scratch_per_route, np.nan, dtype=np.float32)
+                self.assertEqual(invoke(serial), 0)
+                want_parts, want_mix = parts.tobytes(), mixture.tobytes()
+                self.assertTrue(np.isfinite(mixture).all())
+                self.assertEqual(invoke(parallel), 0)
+                self.assertEqual(parts.tobytes(), want_parts)
+                self.assertEqual(mixture.tobytes(), want_mix)
+                # Every separately planned route scratch was used.
+                for index in range(top_k):
+                    self.assertTrue(np.isfinite(parallel[staged + index * scratch_per_route]))
+                self.assertEqual(invoke(serial[:-1]), -1)
+                self.assertEqual(parts.tobytes(), want_parts)
+                self.assertEqual(mixture.tobytes(), want_mix)
+                self.assertEqual(invoke(parallel), 0)
+                self.assertEqual(mixture.tobytes(), want_mix)
 
     def test_routed_provider_rejects_wrong_storage_even_with_enough_bytes(self):
         graph = routed_expert_mixture(1, 32, 32, 1, 1, 1, storage="iq4_nl")

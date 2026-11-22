@@ -4,6 +4,9 @@
 #include "ckernel_transformer_rows_checked.h"
 
 #include <string.h>
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 enum expert_storage {
     EXPERT_F32,
@@ -71,6 +74,75 @@ static int region(const void *p, size_t bytes)
     size_t expert_slot_elements, size_t expert_output_elements, size_t output_capacity, \
     size_t work_elements, float gate_cap, float up_cap
 
+struct routed_projection {
+    const unsigned char *gate, *up, *down;
+    size_t width, inner, gate_row, down_row, expert_bytes;
+    float gate_cap, up_cap, gate_reciprocal, up_reciprocal;
+    enum expert_storage storage;
+    int quantize, reference;
+};
+
+static int project_expert(const struct routed_projection *p, const float *input,
+                          const unsigned char *packed_hidden, size_t slot, float *scratch,
+                          float *output)
+{
+    const size_t offset = slot * p->expert_bytes;
+    const unsigned char *gate = p->gate + offset, *up = p->up + offset, *down = p->down + offset;
+    float *gate_values = scratch, *up_values = gate_values + p->inner, *activation = up_values + p->inner;
+    unsigned char *packed_activation = p->quantize ? (unsigned char *)(activation + p->inner) + p->gate_row : NULL;
+
+    for (size_t i = 0; i < p->inner; ++i) {
+        if (packed_hidden) {
+            ck_q8_activation_dot_pair(gate + i * p->gate_row, up + i * p->gate_row, packed_hidden,
+                                      p->width, gate_values + i, up_values + i);
+        } else {
+            gate_values[i] = expert_dot(input, gate + i * p->gate_row, p->width, p->storage, NULL);
+            up_values[i] = expert_dot(input, up + i * p->gate_row, p->width, p->storage, NULL);
+        }
+    }
+    if (p->reference) {
+        for (size_t i = 0; i < p->inner; ++i) {
+            const float g = gate_values[i], u = up_values[i];
+            if (!isfinite(g) || !isfinite(u)) return -3;
+            const float capped_gate = p->gate_cap * tanhf(g * p->gate_reciprocal);
+            const float capped_up = p->up_cap * tanhf(u * p->up_reciprocal);
+            const float sigmoid = 1.0f / (1.0f + expf(-g));
+            activation[i] = (capped_gate * sigmoid) * capped_up;
+            if (!isfinite(activation[i])) return -3;
+        }
+    } else if (softcapped_swiglu_rows_checked_f32(gate_values, p->inner, up_values, p->inner,
+                   activation, p->inner, p->inner, p->gate_cap, p->up_cap)) return -3;
+    if (packed_activation && ck_pack_q8_activation_rne(activation, packed_activation, p->inner)) return -3;
+    for (size_t i = 0; i < p->width; ++i) {
+        output[i] = expert_dot(activation, down + i * p->down_row, p->inner, p->storage, packed_activation);
+        if (!isfinite(output[i])) return -3;
+    }
+    return 0;
+}
+
+static inline int combine_expert(const float *expert, float *mixture, size_t width,
+                                 float weight, size_t index, int reference)
+{
+    for (size_t i = 0; i < width; ++i) {
+        if (reference) {
+            const volatile float weighted = expert[i] * weight;
+            mixture[i] = index == 0 ? weighted : mixture[i] + weighted;
+        } else {
+            mixture[i] += expert[i] * weight;
+        }
+        if (!isfinite(mixture[i])) return -3;
+    }
+    return 0;
+}
+
+static void order_slots(const int32_t *ids, size_t experts, size_t top_k, size_t *ordered_slots)
+{
+    size_t next = 0;
+    for (size_t id = 0; id < experts; ++id)
+        for (size_t slot = 0; slot < top_k; ++slot)
+            if ((size_t)ids[slot] == id) ordered_slots[next++] = slot;
+}
+
 static int routed_softcapped_experts(ROUTED_EXPERT_ARGS, enum expert_storage storage, int quantize, int reference_moe)
 {
     /* Bounds keep workspace arithmetic valid on supported size_t widths. */
@@ -96,7 +168,13 @@ static int routed_softcapped_experts(ROUTED_EXPERT_ARGS, enum expert_storage sto
 #ifdef _OPENMP
     if (work_elements >= staged_elements + rows * row_scratch) scratch_rows = rows;
 #endif
-    const size_t scratch_elements = staged_elements + scratch_rows * row_scratch;
+    size_t route_scratch = 0;
+#ifdef _OPENMP
+    if (quantize && rows == 1 && top_k > 1 && omp_get_max_threads() > 1 &&
+        work_elements >= staged_elements + top_k * row_scratch)
+        route_scratch = top_k;
+#endif
+    const size_t scratch_elements = staged_elements + (route_scratch ? route_scratch : scratch_rows) * row_scratch;
     if (hidden_elements < output_elements || id_elements < route_count || route_elements < route_count ||
         expert_slot_elements < experts || expert_output_elements < row_outputs ||
         output_capacity < output_elements || work_elements < scratch_elements) return -1;
@@ -147,74 +225,63 @@ static int routed_softcapped_experts(ROUTED_EXPERT_ARGS, enum expert_storage sto
     float *staged_output = staged_experts + row_outputs;
     float *row_work = staged_output + output_elements;
     memset(staged_output, 0, output_elements * sizeof(float));
+    const struct routed_projection projection = {
+        .gate = gate, .up = up, .down = down, .width = hidden_dim, .inner = inner,
+        .gate_row = gate_row, .down_row = down_row, .expert_bytes = expert_bytes,
+        .gate_cap = gate_cap, .up_cap = up_cap, .gate_reciprocal = gate_reciprocal, .up_reciprocal = up_reciprocal,
+        .storage = storage, .quantize = quantize, .reference = reference_moe,
+    };
     int failed = 0;
+#ifdef _OPENMP
+    if (route_scratch) {
+        unsigned char *packed_hidden = (unsigned char *)(row_work + 3 * inner);
+        if (ck_pack_q8_activation_rne(hidden, packed_hidden, hidden_dim)) return -3;
+        /* Each task writes its declared slot. Mixing below preserves the
+         * original expert-ID or router-slot FP32 order. */
+        const int max_threads = omp_get_max_threads();
+        const int threads = (size_t)max_threads < top_k ? max_threads : (int)top_k;
+#pragma omp parallel for num_threads(threads) reduction(|:failed)
+        for (size_t route = 0; route < top_k; ++route) {
+            failed |= project_expert(&projection, hidden, packed_hidden, expert_slots[ids[route]],
+                                     row_work + route * row_scratch, staged_experts + route * hidden_dim) != 0;
+        }
+        if (failed) return -3;
+        size_t ordered_slots[1024];
+        if (!reference_moe) order_slots(ids, experts, top_k, ordered_slots);
+        for (size_t index = 0; index < top_k; ++index) {
+            const size_t route = reference_moe ? index : ordered_slots[index];
+            if (combine_expert(staged_experts + route * hidden_dim, staged_output, hidden_dim,
+                               route_weights[route], index, reference_moe)) return -3;
+        }
+    } else
+#endif
+    {
 #ifdef _OPENMP
 #pragma omp parallel for if(scratch_rows > 1) reduction(|:failed)
 #endif
-    for (size_t row = 0; row < rows; ++row) {
-        float *gate_values = row_work + (scratch_rows > 1 ? row * row_scratch : 0);
-        float *up_values = gate_values + inner;
-        float *activation = up_values + inner;
-        unsigned char *packed_hidden = quantize ? (unsigned char *)(activation + inner) : NULL;
-        unsigned char *packed_activation = quantize ? packed_hidden + gate_row : NULL;
-        const float *x = hidden + row * hidden_dim;
-        float *y = staged_output + row * hidden_dim;
-        if (quantize && ck_pack_q8_activation_rne(x, packed_hidden, hidden_dim)) goto row_failed;
-        size_t ordered_slots[1024];
-        if (!reference_moe) {
-            size_t next = 0;
-            for (size_t id = 0; id < experts; ++id)
-                for (size_t slot = 0; slot < top_k; ++slot)
-                    if ((size_t)ids[row * top_k + slot] == id) ordered_slots[next++] = slot;
-        }
-        for (size_t index = 0; index < top_k; ++index) {
-            const size_t route = row * top_k + (reference_moe ? index : ordered_slots[index]);
-            const size_t offset = (size_t)expert_slots[ids[route]] * expert_bytes;
-            const unsigned char *g = (const unsigned char *)gate + offset;
-            const unsigned char *u = (const unsigned char *)up + offset;
-            const unsigned char *d = (const unsigned char *)down + offset;
-            if (packed_hidden) {
-                for (size_t i = 0; i < inner; ++i) {
-                    ck_q8_activation_dot_pair(g + i * gate_row, u + i * gate_row, packed_hidden,
-                                              hidden_dim, gate_values + i, up_values + i);
-                }
-            } else {
-                for (size_t i = 0; i < inner; ++i) {
-                    gate_values[i] = expert_dot(x, g + i * gate_row, hidden_dim, storage, NULL);
-                    up_values[i] = expert_dot(x, u + i * gate_row, hidden_dim, storage, NULL);
+        for (size_t row = 0; row < rows; ++row) {
+            float *scratch = row_work + (scratch_rows > 1 ? row * row_scratch : 0);
+            unsigned char *packed_hidden = quantize ? (unsigned char *)(scratch + 3 * inner) : NULL;
+            const float *input = hidden + row * hidden_dim;
+            if (packed_hidden && ck_pack_q8_activation_rne(input, packed_hidden, hidden_dim)) {
+                failed = 1;
+                continue;
+            }
+            size_t ordered_slots[1024];
+            if (!reference_moe) order_slots(ids + row * top_k, experts, top_k, ordered_slots);
+            for (size_t index = 0; index < top_k; ++index) {
+                const size_t route = row * top_k + (reference_moe ? index : ordered_slots[index]);
+                float *expert = staged_experts + route * hidden_dim;
+                if (project_expert(&projection, input, packed_hidden, expert_slots[ids[route]], scratch, expert) ||
+                    combine_expert(expert, staged_output + row * hidden_dim, hidden_dim,
+                                   route_weights[route], index, reference_moe)) {
+                    failed = 1;
+                    break;
                 }
             }
-            if (reference_moe) {
-                for (size_t i = 0; i < inner; ++i) {
-                    const float gate = gate_values[i], up = up_values[i];
-                    if (!isfinite(gate) || !isfinite(up)) goto row_failed;
-                    const float capped_gate = gate_cap * tanhf(gate * gate_reciprocal);
-                    const float capped_up = up_cap * tanhf(up * up_reciprocal);
-                    const float sigmoid = 1.0f / (1.0f + expf(-gate));
-                    activation[i] = (capped_gate * sigmoid) * capped_up;
-                    if (!isfinite(activation[i])) goto row_failed;
-                }
-            } else if (softcapped_swiglu_rows_checked_f32(gate_values, inner, up_values, inner,
-                       activation, inner, inner, gate_cap, up_cap)) goto row_failed;
-            if (quantize && ck_pack_q8_activation_rne(activation, packed_activation, inner)) goto row_failed;
-            for (size_t i = 0; i < hidden_dim; ++i) {
-                const float v = expert_dot(activation, d + i * down_row, inner, storage, packed_activation);
-                staged_experts[route * hidden_dim + i] = v;
-                if (reference_moe) {
-                    /* A stored FP32 multiply precedes the ordered FP32 addition. */
-                    const volatile float weighted = v * route_weights[route];
-                    y[i] = index == 0 ? weighted : y[i] + weighted;
-                } else {
-                    y[i] += v * route_weights[route];
-                }
-                if (!isfinite(v) || !isfinite(y[i])) goto row_failed;
-            }
         }
-        continue;
-row_failed:
-        failed = 1;
+        if (failed) return -3;
     }
-    if (failed) return -3;
     memcpy(expert_output, staged_experts, row_outputs * sizeof(float));
     memcpy(output, staged_output, output_elements * sizeof(float));
     return 0;

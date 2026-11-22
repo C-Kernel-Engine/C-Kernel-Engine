@@ -1,0 +1,60 @@
+{
+  "schema": "cke.inkling2.q8.parallel_decode.v1",
+  "scope": "Matched generated 16-token prefill plus three forced decode steps at position 32752 with seeded state",
+  "model_sha256": "d57542f8aea5d7639beba5fc4ae7f584754916f63ac5d5a69328c27f652f45da",
+  "threads": 8,
+  "affinity": "P3 E-cores 16-23",
+  "omp_policy": {
+    "dynamic": false,
+    "proc_bind": "close",
+    "places": "cores",
+    "gomp_spincount": 1000
+  },
+  "host_load": "Independent full 32K benchmark on the P-cores was active",
+  "trials": {
+    "attention-tiles": {
+      "runtime_sha256": "f589d5f326cfceffca69bd5ff78ee094c86d707937879f47e1fa6074953e2167",
+      "prefill_seconds": [
+        12.427982399240136,
+        12.792312743142247,
+        11.824060589075089
+      ],
+      "decode_three_tokens_seconds": [
+        9.090298488736153,
+        9.389015641063452,
+        8.414560126140714
+      ],
+      "median_prefill_seconds": 12.427982399240136,
+      "median_decode_three_tokens_seconds": 9.090298488736153
+    },
+    "parallel-decode": {
+      "runtime_sha256": "4fdb64dee9c00b2b79ca8934418770ee5451629543364a556efb48d18a5bcabd",
+      "prefill_seconds": [
+        12.357421424239874,
+        11.922493781894445,
+        12.69974209740758
+      ],
+      "decode_three_tokens_seconds": [
+        5.978622384369373,
+        5.81899437867105,
+        6.69503135420382
+      ],
+      "median_prefill_seconds": 12.357421424239874,
+      "median_decode_three_tokens_seconds": 5.978622384369373
+    }
+  },
+  "checked_logit_rows": 4,
+  "logits_sha256": [
+    "450873c50eb3b9fcddace924d15b81e61a705c05f5371c10c680ea13779c2b84",
+    "789b7d48373d97197e062457a31421b4dd2444a60c7edc68277483264b04fb22",
+    "416236ad67252d18df297c83737c0cf987967b68ad0a608e7376e1220e1a7e0c",
+    "c15b2370413b235b741360646b4f3bc34ec70c90c13c9fad921741f4555c94f7"
+  ],
+  "matching_mutable_state_regions": 288,
+  "generated_arena_bytes": 46643065152,
+  "comparison": "PASS_BIT_EXACT",
+  "limitations": [
+    "This is a seeded local A/B, not full-prompt timing or a speed comparison against llama.cpp.",
+    "The retained benchmark uses P3 E-cores while a different process runs on the P-cores."
+  ]
+}
