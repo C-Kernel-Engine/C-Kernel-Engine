@@ -1,4 +1,4 @@
-// Diagnostic only. Use a CPU-only llama.cpp build and stop the graph at layer zero.
+// Diagnostic only. Use a CPU-only llama.cpp build and stop at the selected layer.
 // The other model layers are outside the captured result.
 #include "llama.h"
 #include "ggml-backend.h"
@@ -15,15 +15,32 @@ struct capture {
     std::vector<float> rows;
     int expected;
     std::string prefix;
+    int layer;
 };
 
 static bool capture_layer(ggml_tensor *tensor, bool ask, void *data) {
     const std::string name = tensor->name;
+    auto &out = *static_cast<capture *>(data);
+    if (out.layer == 6) {
+        if (name != "l_out-5" && name != "l_out-6") return !ask;
+        if (ask) return true;
+        if (tensor->type != GGML_TYPE_F32 || !ggml_is_contiguous(tensor) ||
+            ggml_nelements(tensor) != out.expected * 2304) std::abort();
+        std::vector<float> rows(static_cast<size_t>(out.expected) * 2304);
+        ggml_backend_tensor_get(tensor, rows.data(), 0, ggml_nbytes(tensor));
+        if (name == "l_out-6") {
+            out.rows.swap(rows);
+            return false;
+        }
+        std::ofstream file(out.prefix + ".l_out-5", std::ios::binary);
+        file.write(reinterpret_cast<const char *>(rows.data()), ggml_nbytes(tensor));
+        if (!file) std::abort();
+        return true;
+    }
     const bool final = name == "l_out-0";
     const bool routes = name == "ffn_moe_topk-0";
     const bool logits = name == "ffn_moe_logits-0";
     const bool q = name == "Qcur-0";
-    auto &out = *static_cast<capture *>(data);
     const std::string weight = tensor->op == GGML_OP_MUL_MAT && tensor->src[0] ? tensor->src[0]->name : "";
     const bool q_dot = weight == "blk.0.attn_q.weight";
     const bool ffn_dot = weight == "blk.0.ffn_gate_inp.weight";
@@ -93,7 +110,7 @@ static bool piece(llama_context *ctx, capture &state, float *hidden, int pos, in
     batch.logits = logits.data();
     const int status = llama_decode(ctx, batch);
     if (status || state.rows.size() != static_cast<size_t>(count) * 2304) {
-        std::cerr << "layer0 capture failed " << status << '\n';
+        std::cerr << "layer " << state.layer << " capture failed " << status << '\n';
         return false;
     }
     std::ofstream file(output, std::ios::binary);
@@ -102,7 +119,8 @@ static bool piece(llama_context *ctx, capture &state, float *hidden, int pos, in
 }
 
 int main(int argc, char **argv) {
-    if (argc != 4) return 2;
+    if (argc != 4 && (argc != 5 || std::string(argv[4]) != "6")) return 2;
+    const int layer = argc == 5 ? 6 : 0;
     const std::string prefix = argv[3];
     std::vector<float> hidden(5 * 2304);
     std::ifstream input(argv[2], std::ios::binary);
@@ -118,6 +136,7 @@ int main(int argc, char **argv) {
     if (!model) return 1;
     for (bool split : {false, true}) {
         capture data{};
+        data.layer = layer;
         auto cp = llama_context_default_params();
         cp.n_ctx = 256;
         cp.n_batch = 16;

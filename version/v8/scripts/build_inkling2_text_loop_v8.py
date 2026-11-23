@@ -4,14 +4,15 @@ from copy import deepcopy
 import math
 
 from version.v8.scripts.audit_inkling2_mini_v8 import text_schedule
-from version.v8.scripts.build_inkling2_decoder_block_v8 import _bind_q8_projection, decoder_block
+from version.v8.scripts.build_inkling2_decoder_block_v8 import _bind_q8_projection, bind_mixed_decoder_weights, decoder_block
 from version.v8.scripts.build_inkling2_mini_projection_circuit import _graph, _project
 from version.v8.scripts.checked_circuit_authoring_v8 import (
     bind_runtime_scalars, execution_port, runtime_extent,
 )
 
 
-def hidden_text_loop(config, prefill_tokens=4, *, cache_capacity=None, circular_sliding=False):
+def hidden_text_loop(config, prefill_tokens=4, *, cache_capacity=None, circular_sliding=False,
+                     q8_activations=True):
     """Execute all occurrences for supplied hidden rows, with isolated slot state."""
     schedule = text_schedule(config)
     width = config["hidden_size"]
@@ -45,7 +46,7 @@ def hidden_text_loop(config, prefill_tokens=4, *, cache_capacity=None, circular_
             config["rel_extent"] if full else config["sliding_window_size"],
             window, config["intermediate_size"],
             experts, config["num_experts_per_tok"], experts, config["sconv_kernel_size"],
-            config["rms_norm_eps"], True,
+            config["rms_norm_eps"], q8_activations,
             layer=layer, state_slot=slot, depth_states=(layer + block_size - 1) // block_size,
             previous_pass_states=int(occurrence["takes_prior_pass_message"]),
             block_boundary=boundary, control_rank=loop["gate_rank"], full_attention=full,
@@ -169,10 +170,15 @@ def hidden_text_loop(config, prefill_tokens=4, *, cache_capacity=None, circular_
 
 
 def text_token_loop(config, prefill_tokens=4, *, cache_capacity=None, f64_norm_sum=False, last_prefill_logit=False,
-                    reference_moe=False, fp32_static_conv=False, circular_sliding=False):
+                    reference_moe=False, fp32_static_conv=False, circular_sliding=False, tensor_types=None,
+                    q8_k_hidden=False, q8_k_linear=False, q8_0_down=False, q8_k_q6_linear=False, group_experts=False, pair_expert_rows=False, dispatch_expert_pairs=False):
     """Bind packed token lookup and capped full-vocabulary logits to the fixed loop."""
     graph = hidden_text_loop(config, prefill_tokens, cache_capacity=cache_capacity,
-                             circular_sliding=circular_sliding)
+                             circular_sliding=circular_sliding, q8_activations=tensor_types is None)
+    if (q8_k_hidden or q8_k_linear or q8_0_down or q8_k_q6_linear or group_experts or pair_expert_rows or dispatch_expert_pairs) and tensor_types is None:
+        raise ValueError("Q8_K activations require mixed packed weights")
+    if tensor_types is not None and reference_moe:
+        raise ValueError("mixed packed weights require the FP32-activation expert contract")
     width, vocab = config["hidden_size"], config["vocab_size"]
     logits_width = config.get("unpadded_vocab_size", vocab)
     cap, eps = config["final_logit_softcapping"], config["rms_norm_eps"]
@@ -236,7 +242,7 @@ def text_token_loop(config, prefill_tokens=4, *, cache_capacity=None, f64_norm_s
             output, logit_rows = last, 1
         raw = buffer(phase + "_raw_logits", [logit_rows, logits_width])
         project = _project(raw, output, width, logits_width, logit_rows, "output.weight", weight_prefix="")
-        _bind_q8_projection(project, True)
+        _bind_q8_projection(project, tensor_types is None)
         ops.append(project)
         logits = buffer(phase + "_logits", [logit_rows, logits_width])
         ops.append({
@@ -279,16 +285,26 @@ def text_token_loop(config, prefill_tokens=4, *, cache_capacity=None, f64_norm_s
                        "static_conv_accumulator": "fp32" if fp32_static_conv else "fp64",
                        "circular_sliding_slots": graph["contract"]["runtime_invariants"]["circular_sliding_slots"]},
     }
+    if tensor_types is not None:
+        bind_mixed_decoder_weights(graph, tensor_types, q8_k_hidden=q8_k_hidden, q8_k_linear=q8_k_linear, q8_0_down=q8_0_down, q8_k_q6_linear=q8_k_q6_linear, group_experts=group_experts, pair_expert_rows=pair_expert_rows, dispatch_expert_pairs=dispatch_expert_pairs)
+        graph["execution_exports"]["properties"].update(
+            weight_format="q4_k_m", expert_hidden_format="q8_k" if q8_k_hidden else "fp32",
+            q4_k_linear_input_format="q8_k" if q8_k_linear else "fp32",
+            grouped_expert_prefill=group_experts, paired_expert_rows=pair_expert_rows,
+            dynamic_expert_pair_dispatch=dispatch_expert_pairs,
+            q6_k_linear_input_format="q8_k" if q8_k_q6_linear else "fp32",
+            expert_down_input_format="q8_0" if q8_0_down else "fp32")
     return graph
 
 
 def resident_text_loop(config, chunk_tokens, context_capacity, *, f64_norm_sum=False, last_prefill_logit=False,
                        reference_moe=False, fp32_static_conv=False, circular_sliding=False,
-                       parallel_decode_experts=False):
+                       parallel_decode_experts=False, tensor_types=None, q8_k_hidden=False, q8_k_linear=False, q8_0_down=False, q8_k_q6_linear=False, group_experts=False, pair_expert_rows=False, dispatch_expert_pairs=False):
     """Generate repeated fixed-size prefill chunks and one-row decode over shared state."""
     graph = text_token_loop(config, chunk_tokens, cache_capacity=context_capacity, f64_norm_sum=f64_norm_sum,
                             last_prefill_logit=last_prefill_logit, reference_moe=reference_moe,
-                            fp32_static_conv=fp32_static_conv, circular_sliding=circular_sliding)
+                            fp32_static_conv=fp32_static_conv, circular_sliding=circular_sliding,
+                            tensor_types=tensor_types, q8_k_hidden=q8_k_hidden, q8_k_linear=q8_k_linear, q8_0_down=q8_0_down, q8_k_q6_linear=q8_k_q6_linear, group_experts=group_experts, pair_expert_rows=pair_expert_rows, dispatch_expert_pairs=dispatch_expert_pairs)
     graph["name"] = "inkling2_mini_resident_text_loop"
     graph["native_entry"]["function"] = "ck_inkling2_mini_resident_text_loop"
     graph["contract"]["runtime_invariants"].update(context_capacity=context_capacity, chunk_tokens=chunk_tokens)

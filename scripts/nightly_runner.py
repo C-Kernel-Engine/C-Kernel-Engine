@@ -1369,7 +1369,8 @@ TEST_SUITES = {
     "inkling2_mini_q8_decoder_block": TestSuite(
         "Inkling 2 Mini Packed Q8 Decoder Blocks", "inference",
         ROOT / "tests" / "test_v8_inkling2_q8_decoder_block.py",
-        unittest_targets=("tests.test_v8_inkling2_q8_decoder_block", "tests.test_v8_inkling2_cross_pass"),
+        unittest_targets=("tests.test_v8_inkling2_q8_decoder_block", "tests.test_v8_inkling2_cross_pass",
+                          "tests.test_v8_inkling2_q4km_block"),
     ),
     "inkling2_mini_text_loop": TestSuite(
         "Inkling 2 Mini Generated Packed Text Loop", "inference",

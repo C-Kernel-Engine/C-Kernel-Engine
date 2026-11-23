@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the pinned Inkling Q8_0 text graph with real token IDs and a mapped arena."""
+"""Run a pinned Inkling GGUF text graph with real token IDs and a mapped arena."""
 
 import argparse
 import ctypes
@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 
 from version.v8.scripts.build_inkling2_cross_pass_v8 import CONTROL_PORTS
+from version.v8.scripts.convert_gguf_to_bump_v8 import GGML_TYPE_Q4_K, GGML_TYPE_Q5_0, GGML_TYPE_Q6_K, ggml_row_bytes
 from version.v8.scripts.build_inkling2_decoder_block_v8 import first_block_weights
 from version.v8.scripts.build_inkling2_mini_projection_circuit import MAX_CONTEXT_CAPACITY, MAX_FIXED_TOKEN_ROWS
 from version.v8.scripts.build_inkling2_text_loop_v8 import resident_text_loop, text_token_loop
@@ -28,14 +29,19 @@ from version.v8.scripts.replay_inkling2_routed_moe import (
 
 
 GGUF_SHA256 = "d57542f8aea5d7639beba5fc4ae7f584754916f63ac5d5a69328c27f652f45da"
+Q4_K_M_REVISION = "23c938b028945d4b0fa9f71fb603b5cd1a683e71"
+Q4_K_M_SHA256 = "dac3702abcb5684cbcb1fbd148d94b2d531283be974630ac61964d194db483de"
+Q4_K_M_BYTES = 17478094048
 TRANSFER_BYTES = 8 * 1024 * 1024
+GGUF_WEIGHT_TYPES = {"F32": GGML_TYPE_F32, "Q4_K": GGML_TYPE_Q4_K, "Q5_0": GGML_TYPE_Q5_0,
+                     "Q6_K": GGML_TYPE_Q6_K, "Q8_0": GGML_TYPE_Q8_0}
 
 
 def weight_entries(graph):
     entries, offset = [], 4096
     for name, (shape, dtype) in first_block_weights(graph).items():
-        elements = int(np.prod(shape, dtype=object))
-        size = elements * 4 if dtype == "F32" else elements // 32 * 34
+        rows = int(np.prod(shape[:-1], dtype=object))
+        size = rows * ggml_row_bytes(GGUF_WEIGHT_TYPES[dtype], shape[-1])
         offset = (offset + 63) & ~63
         entries.append(dict(name=name, shape=shape, dtype=dtype, size=size, file_offset=offset))
         offset += size
@@ -45,7 +51,7 @@ def weight_entries(graph):
 def gguf_copy_spans(tensors, data_start, entry, config):
     """Translate one compiled weight into exact GGUF payload spans."""
     name, shape, size = entry["name"], entry["shape"], entry["size"]
-    dtype = GGML_TYPE_F32 if entry["dtype"] == "F32" else GGML_TYPE_Q8_0
+    dtype = GGUF_WEIGHT_TYPES[entry["dtype"]]
     dims = tuple(reversed(shape))
     offset, stride, count, width = 0, size, 1, size
     if ".expert_bank." in name:
@@ -145,6 +151,7 @@ def compare_oracle_row(actual, expected, position, phase):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--gguf", type=Path, required=True)
+    parser.add_argument("--weight-format", choices=("q8_0", "q4_k_m"), default="q8_0")
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--tokens-file", type=Path, required=True)
     continuation = parser.add_mutually_exclusive_group()
@@ -160,6 +167,20 @@ def main():
     parser.add_argument("--chunk-tokens", type=int, default=16)
     parser.add_argument("--fp32-static-conv", action="store_true",
                         help="use ordered FP32 arithmetic for static short convolutions")
+    parser.add_argument("--q8-k-expert-hidden", action="store_true",
+                        help="pack Q4_K_M gate/up activations as Q8_K")
+    parser.add_argument("--q8-k-linear-input", action="store_true",
+                        help="pack Q4_K linear projection inputs as Q8_K")
+    parser.add_argument("--q8-0-expert-down", action="store_true",
+                        help="pack mixed expert down-projection inputs as Q8_0")
+    parser.add_argument("--q8-k-q6-input", action="store_true",
+                        help="pack Q6_K linear projection inputs as Q8_K")
+    parser.add_argument("--group-experts", action="store_true",
+                        help="group packed expert execution by expert during prefill")
+    parser.add_argument("--pair-expert-rows", action="store_true",
+                        help="share Q4_K gate/up unpacking for pairs of routed rows")
+    parser.add_argument("--dispatch-expert-pairs", action="store_true",
+                        help="dynamically claim individual expert pairs in prefill")
     parser.add_argument("--reference-moe", action="store_true",
                         help="use reciprocal-scaled SiTU and router-slot accumulation")
     parser.add_argument("--circular-sliding", action="store_true",
@@ -169,13 +190,30 @@ def main():
     parser.add_argument("--parallel-decode-experts", action="store_true",
                         help="reserve independent scratch for the routed experts of each decode row")
     parser.add_argument("--threads", type=int, default=1,
-                        help="OpenMP worker count for independent Q8_0 rows")
+                        help="CKE worker count for independent rows and expert work")
     parser.add_argument("--xray-token-position", type=int,
                         help="capture layer outputs at this zero-based processed token")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if not 1 <= args.threads <= 64:
         parser.error("threads must be in 1..64")
+    mixed = args.weight_format == "q4_k_m"
+    if (args.q8_k_expert_hidden or args.q8_k_linear_input or args.q8_k_q6_input) and not mixed:
+        parser.error("Q8_K activation options require --weight-format q4_k_m")
+    if args.dispatch_expert_pairs and not args.pair_expert_rows:
+        parser.error("--dispatch-expert-pairs requires --pair-expert-rows")
+    if args.pair_expert_rows and not args.group_experts:
+        parser.error("--pair-expert-rows requires --group-experts")
+    if args.group_experts and not args.q8_0_expert_down:
+        parser.error("--group-experts requires --q8-0-expert-down")
+    if args.q8_0_expert_down and not args.q8_k_expert_hidden:
+        parser.error("--q8-0-expert-down requires --q8-k-expert-hidden")
+    if mixed and args.reference_moe:
+        parser.error("Q4_K_M replay requires the default FP32-activation expert contract")
+    revision, expected_bytes, expected_sha256 = (
+        (Q4_K_M_REVISION, Q4_K_M_BYTES, Q4_K_M_SHA256) if mixed
+        else (GGUF_REVISION, GGUF_FILES["q8_0"][1], GGUF_SHA256)
+    )
     config_bytes = args.config.read_bytes()
     config = json.loads(config_bytes)["text_config"]
     try:
@@ -222,15 +260,17 @@ def main():
         except OSError as error:
             parser.error(str(error))
     args.output.mkdir(mode=0o700)
-    report = {"status": "INCOMPLETE", "gguf_revision": GGUF_REVISION, "prompt_ids": ids,
-              "append_token": args.append_token, "scope": "bounded native Q8_0 token replay",
+    report = {"status": "INCOMPLETE", "gguf_revision": revision, "weight_format": args.weight_format, "prompt_ids": ids,
+              "append_token": args.append_token, "scope": "bounded native GGUF token replay",
               "config_sha256": hashlib.sha256(config_bytes).hexdigest(),
               "context_capacity": capacity, "chunk_tokens": chunk_tokens, "completed_prompt_tokens": 0,
               "threads": args.threads,
               "f64_norm_sum": args.f64_norm_sum, "last_prefill_logit": args.last_prefill_logit,
               "reference_moe": args.reference_moe, "fp32_static_conv": args.fp32_static_conv,
               "circular_sliding": args.circular_sliding,
-              "parallel_decode_experts": args.parallel_decode_experts}
+              "parallel_decode_experts": args.parallel_decode_experts,
+              "q8_k_expert_hidden": args.q8_k_expert_hidden, "q8_k_linear_input": args.q8_k_linear_input,
+              "q8_0_expert_down": args.q8_0_expert_down}
     if args.append_tokens_file is not None:
         report.update(append_ids=forced, completed_append_tokens=0)
     if oracle is not None:
@@ -251,16 +291,25 @@ def main():
     save()
     try:
         with args.gguf.open("rb") as gguf:
-            if os.fstat(gguf.fileno()).st_size != GGUF_FILES["q8_0"][1]:
-                raise ValueError("GGUF file length differs from the pinned Q8_0 artifact")
+            if os.fstat(gguf.fileno()).st_size != expected_bytes:
+                raise ValueError("GGUF file length differs from the pinned artifact")
             report["gguf_sha256"] = hashlib.file_digest(gguf, "sha256").hexdigest()
-            if report["gguf_sha256"] != GGUF_SHA256:
-                raise ValueError("GGUF bytes differ from the pinned Q8_0 artifact")
+            if report["gguf_sha256"] != expected_sha256:
+                raise ValueError("GGUF bytes differ from the pinned artifact")
             gguf.seek(0)
             tensors, base = read_gguf_header(gguf.read(16 * 1024 * 1024))
             options = {"f64_norm_sum": args.f64_norm_sum, "last_prefill_logit": args.last_prefill_logit,
                        "reference_moe": args.reference_moe, "fp32_static_conv": args.fp32_static_conv,
                        "circular_sliding": args.circular_sliding}
+            if mixed:
+                options["q8_k_hidden"] = args.q8_k_expert_hidden
+                options["q8_k_linear"] = args.q8_k_linear_input
+                options["q8_0_down"] = args.q8_0_expert_down
+                options["group_experts"] = args.group_experts
+                options["pair_expert_rows"] = args.pair_expert_rows
+                options["dispatch_expert_pairs"] = args.dispatch_expert_pairs
+                options["q8_k_q6_linear"] = args.q8_k_q6_input
+                options["tensor_types"] = {name: info.ggml_type for name, info in tensors.items()}
             if resident:
                 graph = resident_text_loop(config, chunk_tokens, capacity,
                                            parallel_decode_experts=args.parallel_decode_experts, **options)
@@ -280,14 +329,10 @@ def main():
             }}
             begin = time.monotonic()
             layout, _, _, library, _ = compile_native_graph(
-                args.output, source, circuit, openmp=args.threads > 1)
-            if args.threads > 1:
-                library.omp_set_dynamic.argtypes = [ctypes.c_int]
-                library.omp_set_dynamic.restype = None
-                library.omp_set_dynamic(0)
-                library.omp_set_num_threads.argtypes = [ctypes.c_int]
-                library.omp_set_num_threads.restype = None
-                library.omp_set_num_threads(args.threads)
+                args.output, source, circuit, extra_exports=("ck_set_num_threads",))
+            library.ck_set_num_threads.argtypes = [ctypes.c_int]
+            library.ck_set_num_threads.restype = None
+            library.ck_set_num_threads(args.threads)
             total = layout["memory"]["arena"]["total_size"]
             binding = load_exports(args.output, library)
             buffers = binding["ports"]

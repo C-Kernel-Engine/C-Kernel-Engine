@@ -45,16 +45,18 @@ def compile_q8_routed_provider(folder):
     root = Path(__file__).resolve().parents[1]
     output = folder / "routed.so"
     exports = folder / "exports.map"
-    exports.write_text("{ global: routed_softcapped_experts_checked_q8_0_q8_activation*; local: *; };")
+    exports.write_text("{ global: ck_set_num_threads; routed_softcapped_experts_checked_q8_0_q8_activation*; local: *; };")
     subprocess.run(["cc", "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror", "-shared",
-                    "-fPIC", "-ffp-contract=off", "-fopenmp", "-I", str(root / "include"),
+                    "-fPIC", "-ffp-contract=off", "-I", str(root / "include"),
                     str(root / "src/kernels/routed_softcapped_experts_checked.c"),
                     str(root / "src/kernels/transformer_rows_checked.c"),
+                    str(root / "src/kernels/dequant_kernels.c"),
+                    str(root / "src/ck_threadpool.c"),
+                    str(root / "src/ckernel_strict.c"),
                     "-ffunction-sections", "-Wl,--gc-sections", "-Wl,--no-undefined",
-                    f"-Wl,--version-script={exports}", "-lm", "-o", str(output)], check=True)
+                    f"-Wl,--version-script={exports}", "-lm", "-lpthread", "-ldl", "-o", str(output)], check=True)
     library = ctypes.CDLL(str(output))
-    library.omp_set_dynamic(0)
-    library.omp_set_num_threads(3)
+    library.ck_set_num_threads(3)
     for suffix in ("", "_scaled_situ"):
         provider = getattr(library, "routed_softcapped_experts_checked_q8_0_q8_activation" + suffix)
         provider.argtypes = [ctypes.c_void_p] * 10 + [ctypes.c_size_t] * 14 + [ctypes.c_float] * 2

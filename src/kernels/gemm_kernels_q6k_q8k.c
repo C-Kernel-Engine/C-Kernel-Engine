@@ -37,8 +37,15 @@
 #include "ckernel_engine.h"
 #include "ckernel_quant.h"
 
+#if defined(__x86_64__) && (defined(__GNUC__) || defined(__clang__))
+#define CK_Q6_RUNTIME_AVX2 1
+#define CK_Q6_AVX2_TARGET __attribute__((target("avx2,fma,f16c")))
+#else
+#define CK_Q6_AVX2_TARGET
+#endif
+
 /* Include SIMD headers based on available extensions */
-#if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__) || defined(__SSE4_1__) || defined(__SSSE3__)
+#if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__) || defined(__SSE4_1__) || defined(__SSSE3__) || defined(CK_Q6_RUNTIME_AVX2)
 #include <immintrin.h>
 #endif
 #if defined(__ARM_NEON) || defined(__aarch64__)
@@ -662,11 +669,12 @@ void gemv_q6_k_q8_k_avx(float *y,
  * AVX2 Implementation (for modern CPUs with AVX2)
  * ============================================================================ */
 
-#if defined(__AVX2__)
+#if defined(__AVX2__) || defined(CK_Q6_RUNTIME_AVX2)
 
 /* Match ggml's x86 hsum_float_8 reduction tree exactly. Replacing the final
  * two additions with _mm_hadd_ps changes one FP32 ULP for realistic MLP-down
  * rows and can cross the absolute parity gate on AVX2/AVX-512 runners. */
+CK_Q6_AVX2_TARGET
 static inline float ck_q6k_hsum_float_8(const __m256 x)
 {
     __m128 res = _mm256_extractf128_ps(x, 1);
@@ -689,6 +697,7 @@ static inline float ck_q6k_hsum_float_8(const __m256 x)
  * tree differs by one FP32 ULP on realistic MLP-down rows.
  */
 
+CK_Q6_AVX2_TARGET
 static inline __m128i get_scale_shuffle_avx2(int i) {
     static const uint8_t patterns[8][16] = {
         { 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1 },
@@ -703,6 +712,7 @@ static inline __m128i get_scale_shuffle_avx2(int i) {
     return _mm_loadu_si128((const __m128i *)patterns[i]);
 }
 
+CK_Q6_AVX2_TARGET
 static float dot_q6_k_q8_k_avx2(const block_q6_K *w,
                                  const block_q8_K *x,
                                  int K)
@@ -714,7 +724,11 @@ static float dot_q6_k_q8_k_avx2(const block_q6_K *w,
     __m256 acc = _mm256_setzero_ps();
 
     for (int i = 0; i < nb; ++i) {
+#if defined(CK_Q6_RUNTIME_AVX2)
+        const float d = _cvtsh_ss(w[i].d) * x[i].d;
+#else
         const float d = GGML_FP16_TO_FP32(w[i].d) * x[i].d;
+#endif
 
         const uint8_t *q4 = w[i].ql;
         const uint8_t *qh = w[i].qh;
@@ -791,6 +805,24 @@ static float dot_q6_k_q8_k_avx2(const block_q6_K *w,
     return ck_q6k_hsum_float_8(acc);
 }
 
+#endif
+
+void gemv_q6_k_q8_k_checked_cpu(float *out, const void *weights, const void *input, int rows, int width)
+{
+#if defined(CK_Q6_RUNTIME_AVX2)
+    if (__builtin_cpu_supports("avx2") && __builtin_cpu_supports("fma") &&
+        __builtin_cpu_supports("f16c")) {
+        const block_q6_K *blocks = weights;
+        const size_t per_row = (size_t)width / QK_K;
+        for (int row = 0; row < rows; ++row)
+            out[row] = dot_q6_k_q8_k_avx2(blocks + (size_t)row * per_row, input, width);
+        return;
+    }
+#endif
+    gemv_q6_k_q8_k_ref(out, weights, input, rows, width);
+}
+
+#if defined(__AVX2__)
 /*
  * Four-token Q6_K x Q8_K microkernel.
  *
@@ -1469,7 +1501,9 @@ void gemv_q6_k_q8_k_parallel_simd(float *y,
     const block_q6_K *blocks = (const block_q6_K *)W;
     const block_q8_K *x = (const block_q8_K *)x_q8;
     const int blocks_per_row = K / QK_K;
+#if defined(__AVX2__) || defined(__AVX__) || defined(__SSE4_1__) || defined(__ARM_NEON) || defined(__aarch64__)
     const int strict = ck_strict_parity_enabled() || ck_q6k_q8k_force_ref();
+#endif
 
     for (int row = r0; row < r1; ++row) {
         const block_q6_K *w_row = blocks + (size_t)row * (size_t)blocks_per_row;

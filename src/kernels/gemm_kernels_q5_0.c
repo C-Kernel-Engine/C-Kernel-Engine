@@ -35,8 +35,20 @@
 #include "ckernel_quant.h"
 #include "ck_features.h"
 
+/* These checked callers can build the translation unit for a baseline ISA. */
+#if defined(__x86_64__) && (defined(__GNUC__) || defined(__clang__)) && \
+    (!defined(__AVX__) || defined(__FMA__))
+#define CK_Q5_RUNTIME_AVX2 1
+#define CK_Q5_TARGET_AVX __attribute__((target("avx,ssse3")))
+#define CK_Q5_TARGET_AVX2 __attribute__((target("avx2,fma,f16c")))
+#endif
+#ifndef CK_Q5_TARGET_AVX
+#define CK_Q5_TARGET_AVX
+#define CK_Q5_TARGET_AVX2
+#endif
+
 /* Include SIMD headers based on available extensions */
-#if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__) || defined(__SSE4_1__)
+#if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__) || defined(__SSE4_1__) || defined(CK_Q5_RUNTIME_AVX2)
 #include <immintrin.h>
 #endif
 #if defined(__ARM_NEON) || defined(__aarch64__)
@@ -635,11 +647,11 @@ void gemv_q5_0_parallel_simd(float *y,
 
     const int dr = (M + nth - 1) / nth;
     const int r0 = dr * ith;
-    const int r1 = (r0 + dr < M) ? (r0 + dr) : M;
 
     if (r0 >= M) return;
 
 #if defined(__AVX__) || defined(__SSE4_1__)
+    const int r1 = (r0 + dr < M) ? (r0 + dr) : M;
     const block_q5_0 *blocks = (const block_q5_0 *)W;
     const int blocks_per_row = K / QK5_0;
     /* Prefetch first few rows */
@@ -1150,11 +1162,11 @@ void vec_dot_q5_0_q8_0_avx512(int n, float *s, const void *vx, const void *vy)
 }
 #endif
 
-#if defined(__AVX2__)
-static inline __m256i bytes_from_bits_32_avx(const uint8_t *qh);
-static inline __m256i bytes_from_nibbles_32_avx(const uint8_t *qs);
-static inline __m256 mul_sum_i8_pairs_float_avx(const __m256i x, const __m256i y);
-static inline float hsum_float_8_avx(const __m256 x);
+#if defined(__AVX2__) || defined(CK_Q5_RUNTIME_AVX2)
+CK_Q5_TARGET_AVX static inline __m256i bytes_from_bits_32_avx(const uint8_t *qh);
+CK_Q5_TARGET_AVX static inline __m256i bytes_from_nibbles_32_avx(const uint8_t *qs);
+CK_Q5_TARGET_AVX static inline __m256 mul_sum_i8_pairs_float_avx(const __m256i x, const __m256i y);
+CK_Q5_TARGET_AVX static inline float hsum_float_8_avx(const __m256 x);
 
 /**
  * @brief Quantized dot product Q5_0 x Q8_0 (AVX2/FMA)
@@ -1163,6 +1175,7 @@ static inline float hsum_float_8_avx(const __m256 x);
  * Q5_0 into signed int8 lanes, multiply against Q8_0 int8 lanes, and fuse the
  * per-block scale into the FP32 accumulator.
  */
+CK_Q5_TARGET_AVX2
 void vec_dot_q5_0_q8_0_avx2(int n, float *s, const void *vx, const void *vy)
 {
     const int qk = QK5_0;
@@ -1174,8 +1187,13 @@ void vec_dot_q5_0_q8_0_avx2(int n, float *s, const void *vx, const void *vy)
     __m256 acc = _mm256_setzero_ps();
 
     for (int ib = 0; ib < nb; ++ib) {
-        const __m256 d =
-            _mm256_set1_ps(CK_FP16_TO_FP32(x[ib].d) * CK_FP16_TO_FP32(y[ib].d));
+#if defined(CK_Q5_RUNTIME_AVX2)
+        const __m128 scales = _mm_cvtph_ps(_mm_setr_epi16(x[ib].d, y[ib].d, 0, 0, 0, 0, 0, 0));
+        const __m256 d = _mm256_set1_ps(_mm_cvtss_f32(scales) *
+            _mm_cvtss_f32(_mm_shuffle_ps(scales, scales, _MM_SHUFFLE(1, 1, 1, 1))));
+#else
+        const __m256 d = _mm256_set1_ps(CK_FP16_TO_FP32(x[ib].d) * CK_FP16_TO_FP32(y[ib].d));
+#endif
 
         __m256i qx = bytes_from_nibbles_32_avx(x[ib].qs);
         __m256i bxhi = bytes_from_bits_32_avx(x[ib].qh);
@@ -1184,7 +1202,7 @@ void vec_dot_q5_0_q8_0_avx2(int n, float *s, const void *vx, const void *vy)
 
         const __m256i qy = _mm256_loadu_si256((const __m256i *)y[ib].qs);
         const __m256 q = mul_sum_i8_pairs_float_avx(qx, qy);
-#if defined(__FMA__)
+#if defined(__FMA__) || defined(CK_Q5_RUNTIME_AVX2)
         acc = _mm256_fmadd_ps(d, q, acc);
 #else
         acc = _mm256_add_ps(_mm256_mul_ps(d, q), acc);
@@ -1316,7 +1334,7 @@ void vec_dot_q5_0_q8_0_sse(int n, float *s, const void *vx, const void *vy)
 }
 #endif
 
-#if defined(__AVX__)
+#if defined(__AVX__) || defined(CK_Q5_RUNTIME_AVX2)
 
 /* Combine two __m128i into __m256i (AVX without AVX2) */
 #define MM256_SET_M128I(hi, lo) _mm256_insertf128_si256(_mm256_castsi128_si256(lo), (hi), 1)
@@ -1325,7 +1343,7 @@ void vec_dot_q5_0_q8_0_sse(int n, float *s, const void *vx, const void *vy)
  * @brief Spread 32 bits to 32 bytes using AVX
  * Returns __m256i with 0xFF where bit was set, 0x00 where not
  */
-static inline __m256i bytes_from_bits_32_avx(const uint8_t *qh)
+CK_Q5_TARGET_AVX static inline __m256i bytes_from_bits_32_avx(const uint8_t *qh)
 {
     uint32_t x32;
     memcpy(&x32, qh, sizeof(uint32_t));
@@ -1350,7 +1368,7 @@ static inline __m256i bytes_from_bits_32_avx(const uint8_t *qh)
 /**
  * @brief Unpack 32 4-bit nibbles to 32 bytes using AVX
  */
-static inline __m256i bytes_from_nibbles_32_avx(const uint8_t *qs)
+CK_Q5_TARGET_AVX static inline __m256i bytes_from_nibbles_32_avx(const uint8_t *qs)
 {
     __m128i tmpl = _mm_loadu_si128((const __m128i *)qs);
     __m128i tmph = _mm_srli_epi16(tmpl, 4);
@@ -1364,7 +1382,7 @@ static inline __m256i bytes_from_nibbles_32_avx(const uint8_t *qs)
  * @brief Multiply signed int8 pairs and return as float vector (AVX)
  * Uses 128-bit ops internally but returns 256-bit float result
  */
-static inline __m256 mul_sum_i8_pairs_float_avx(const __m256i x, const __m256i y)
+CK_Q5_TARGET_AVX static inline __m256 mul_sum_i8_pairs_float_avx(const __m256i x, const __m256i y)
 {
     const __m128i xl = _mm256_castsi256_si128(x);
     const __m128i xh = _mm256_extractf128_si256(x, 1);
@@ -1395,7 +1413,7 @@ static inline __m256 mul_sum_i8_pairs_float_avx(const __m256i x, const __m256i y
 /**
  * @brief Horizontal sum of 8 floats (AVX)
  */
-static inline float hsum_float_8_avx(const __m256 x)
+CK_Q5_TARGET_AVX static inline float hsum_float_8_avx(const __m256 x)
 {
     __m128 res = _mm256_extractf128_ps(x, 1);
     res = _mm_add_ps(res, _mm256_castps256_ps128(x));
@@ -1404,6 +1422,9 @@ static inline float hsum_float_8_avx(const __m256 x)
     return _mm_cvtss_f32(res);
 }
 
+#endif
+
+#if defined(__AVX__)
 /**
  * @brief Quantized dot product Q5_0 x Q8_0 (AVX) - Optimized with 2x unroll
  *
@@ -1719,6 +1740,18 @@ void vec_dot_q5_0_q8_0(int n, float *s, const void *vx, const void *vy)
 #else
     vec_dot_q5_0_q8_0_ref(n, s, vx, vy);
 #endif
+}
+
+void gemv_q5_0_q8_0_checked_cpu(float *out, const void *weights, const void *input, int rows, int width)
+{
+    const size_t blocks = (size_t)width / QK5_0;
+    void (*dot)(int, float *, const void *, const void *) = vec_dot_q5_0_q8_0_ref;
+#if defined(CK_Q5_RUNTIME_AVX2)
+    if (__builtin_cpu_supports("avx2") && __builtin_cpu_supports("fma") &&
+        __builtin_cpu_supports("f16c")) dot = vec_dot_q5_0_q8_0_avx2;
+#endif
+    for (int i = 0; i < rows; ++i)
+        dot(width, out + i, (const block_q5_0 *)weights + (size_t)i * blocks, input);
 }
 
 /* Truthful provider-name helper (same pattern as ck_q4_k_q8_k_provider_name):
