@@ -34,3 +34,11 @@ jobs:
 
       - name: Check root layout allowlist
         run: python3 scripts/check_root_layout.py
+
+      - name: Reject new OpenMP dependencies
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 -m unittest discover -s tests -p test_openmp_policy.py
+          python3 scripts/check_openmp_policy.py "$BASE_SHA" "$HEAD_SHA"
