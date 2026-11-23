@@ -1,5 +1,10 @@
 var NAVTREEINDEX24 =
 {
+"structCPUInfo.html#a660af436345a21868c7c6f0160cd7513":[1,0,84,7],
+"structCPUInfo.html#a675b39fcccd4eac9995984acbe5d3d15":[1,0,84,24],
+"structCPUInfo.html#a6981442ec8c03e3486d68e5011cbe02c":[1,0,84,10],
+"structCPUInfo.html#a703824b64f9035d0adf5641c9d20527e":[1,0,84,38],
+"structCPUInfo.html#a72c59fe4c03be35b475dd733bd17860c":[1,0,84,20],
 "structCPUInfo.html#a7983ac279a57f5d5992248d720452dfe":[1,0,84,5],
 "structCPUInfo.html#a7cb0183778ff279baa23ce4816b99089":[1,0,84,14],
 "structCPUInfo.html#a7fed58e4df275a215e37074b900e0f96":[1,0,84,19],
@@ -244,10 +249,5 @@ var NAVTREEINDEX24 =
 "structck__audio__conv1d__job.html#a767dd334f4d927ac4ed39831cd3f6b16":[1,0,12,0],
 "structck__audio__conv1d__job.html#a837df7de4a40a5200473c4dc1b59e259":[1,0,12,11],
 "structck__audio__conv1d__job.html#a83863b2fe2019979b935bbf3409040b1":[1,0,12,12],
-"structck__audio__conv1d__job.html#a9273f1c41c1b9665e166d604481df9b0":[1,0,12,1],
-"structck__audio__conv1d__job.html#aabbfe8492999ff35f54e6703d2295162":[1,0,12,5],
-"structck__audio__conv1d__job.html#aad4e0c1033545acc467d3fc09e635d90":[1,0,12,10],
-"structck__audio__conv1d__job.html#adb1ee5f398be656fcd480898ce01ede3":[1,0,12,3],
-"structck__audio__conv1d__job.html#ae454826123de0dbda577e250711a943c":[1,0,12,9],
-"structck__audio__conv1d__job.html#ae84102da8677850a8a77db8bc78e58d2":[1,0,12,14]
+"structck__audio__conv1d__job.html#a9273f1c41c1b9665e166d604481df9b0":[1,0,12,1]
 };
