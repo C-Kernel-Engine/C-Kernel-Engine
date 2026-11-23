@@ -61,18 +61,25 @@ jobs:
         # build enables __ARM_FEATURE_DOTPROD so the NEON parity assertions
         # below exercise the real SDOT path. An explicit -march is used
         # because gcc -march=native silently falls back to armv8-a on CPUs
-        # it does not recognize (e.g. Cortex-X925).
+        # it does not recognize (e.g. Cortex-X925). Use generic tuning to
+        # keep this build independent of host CPU identification.
         # This is the OPTIMIZED lane: verify the runner can execute SDOT
         # before running an ISA-targeted binary (compile-time flags are not
         # runtime dispatch), and fail - not skip - if the NEON provider is
         # not actually selected.
         run: |
-          if ! grep -qi asimddp /proc/cpuinfo; then
+          lscpu
+          gcc --version
+          if ! grep -qw asimddp /proc/cpuinfo; then
             echo "::error::optimized ARM lane requires an asimddp-capable runner (SDOT); this runner cannot execute it"
             exit 1
           fi
+          if ! gcc -march=armv8.2-a+dotprod -mtune=generic -dM -E -x c /dev/null | grep '^#define __ARM_FEATURE_DOTPROD 1$'; then
+            echo "::error::the compiler did not enable dot-product instructions for the requested ARM target"
+            exit 1
+          fi
           make clean
-          make CK_ARM_ARCH="armv8.2-a+dotprod" build/libckernel_engine.so
+          make CK_ARM_ARCH="armv8.2-a+dotprod" NATIVE_TUNE_FLAGS_SUPPORTED="-mtune=generic" build/libckernel_engine.so
           ldd -r build/libckernel_engine.so
           CK_REQUIRE_Q4K_NEON=1 CK_REQUIRE_Q5_0_NEON=1 CK_REQUIRE_Q5K_NEON=1 CK_REQUIRE_Q5_1_NEON=1 python -m pytest -q -rs \
             unittest/test_q6k_q8k_neon_parity.py \
