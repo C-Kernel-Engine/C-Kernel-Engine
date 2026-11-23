@@ -774,6 +774,10 @@ TEST_SUITES = {
         "Drama 3 Generated Semantic and Residual Codebook Reconstruction", "inference",
         ROOT / "tests" / "test_v8_drama3_codec_rvq.py",
     ),
+    "tts_drama3_codec_transformer": TestSuite(
+        "Drama 3 Generated Codebooks and Codec Transformer", "inference",
+        ROOT / "tests" / "test_v8_drama3_codec_transformer.py", timeout_sec=180,
+    ),
     "tts_ming3_generated_dit_fp32": TestSuite(
         "Ming3 Full Generated DiT FP32 Composition", "inference",
         ROOT / "tests" / "test_v8_ming3_dit.py",

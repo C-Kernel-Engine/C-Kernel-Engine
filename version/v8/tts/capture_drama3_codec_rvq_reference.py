@@ -28,7 +28,7 @@ def sha256(path):
         return hashlib.file_digest(file, "sha256").hexdigest()
 
 
-def capture(codec_path, publisher, folder):
+def capture(codec_path, publisher, folder, *, include_transformer=False):
     if sha256(codec_path) != CODEC_SHA256:
         raise ValueError("codec SHA-256 does not match the pinned release")
     for name, expected in PUBLISHER_HASHES.items():
@@ -60,6 +60,22 @@ def capture(codec_path, publisher, folder):
         folded[f"book{i}.bias"] = book.out_proj.bias.detach().float().numpy()
     np.savez(folder / "rvq_weights.npz", **folded)
 
+    post_module = codec.quantizer.post_module
+    transformer_weights = {}
+    if include_transformer:
+        for i, layer in enumerate(post_module.layers):
+            for name, value in layer.state_dict().items():
+                if value.dtype != torch.float32:
+                    raise ValueError(f"expected FP32 codec transformer parameter: {name}")
+                name = f"codec_layer{i}.{name}"
+                if name.endswith(".wqkv.weight"):
+                    for port, tensor in zip(("q", "k", "v"), value.chunk(3, dim=0), strict=True):
+                        transformer_weights[name.replace("wqkv", port)] = tensor.detach().numpy()
+                else:
+                    transformer_weights[name] = value.detach().numpy()
+        transformer_weights["codec_transformer_norm.weight"] = post_module.norm.weight.detach().numpy()
+        np.savez(folder / "transformer_weights.npz", **transformer_weights)
+
     frames = [1, 3, 8]
     results = []
     seen = {}
@@ -67,6 +83,11 @@ def capture(codec_path, publisher, folder):
     def capture_transformer(_module, inputs, output):
         seen["quantizer_pre_transformer"] = inputs[0].detach().float().numpy()
         seen["quantizer_post_transformer"] = output.detach().float().numpy()
+
+    def capture_layer(name):
+        def hook(_module, _inputs, output):
+            seen[name] = output.detach().float().numpy().copy()
+        return hook
 
     generator = torch.Generator().manual_seed(472)
     with torch.inference_mode():
@@ -76,15 +97,21 @@ def capture(codec_path, publisher, folder):
             codes = torch.cat([semantic, residual], dim=1)
             pristine = codes.clone()
             seen.clear()
-            handle = codec.quantizer.post_module.register_forward_hook(capture_transformer)
+            handles = [post_module.register_forward_hook(capture_transformer)]
+            if include_transformer:
+                rotary = post_module.freqs_cis[:length].float().numpy()
+                seen["rotary_cos"], seen["rotary_sin"] = rotary[..., 0], rotary[..., 1]
+                handles.extend(layer.register_forward_hook(capture_layer(f"codec_layer{i}_out"))
+                               for i, layer in enumerate(post_module.layers))
             try:
                 audio = codec.from_indices(codes)
             finally:
-                handle.remove()
+                for handle in handles:
+                    handle.remove()
             torch.testing.assert_close(pristine, codes, rtol=0, atol=0)
             if not torch.isfinite(audio).all() or audio.shape != (1, 1, length * codec.frame_length):
                 raise ValueError(f"invalid decoded samples for {length} code frames: {audio.shape}")
-            if len(seen) != 2:
+            if not {"quantizer_pre_transformer", "quantizer_post_transformer"} <= seen.keys():
                 raise ValueError("missing quantizer transformer capture")
             samples = audio.flatten().float().numpy()
             np.savez(folder / f"reference-codes-{length}.npz", codes=codes.numpy(),
@@ -103,7 +130,14 @@ def capture(codec_path, publisher, folder):
               "omitted_legacy_buffers": load.unexpected_keys,
               "samples_per_frame": int(codec.frame_length), "cases": results}
     report["replay_sha256"] = {}
-    for name in ("rvq_weights.npz", *(f"reference-codes-{length}.npz" for length in frames)):
+    artifacts = ["rvq_weights.npz", *(f"reference-codes-{length}.npz" for length in frames)]
+    if include_transformer:
+        artifacts.append("transformer_weights.npz")
+        report["transformer"] = dict(layers=len(post_module.layers), heads=post_module.config.n_head,
+                                     head_dim=post_module.config.head_dim,
+                                     intermediate=post_module.config.intermediate_size,
+                                     window=post_module.window_size)
+    for name in artifacts:
         report["replay_sha256"][name] = sha256(folder / name)
     (folder / "reference-result.json").write_text(json.dumps(report, indent=2) + "\n")
     return report
@@ -114,8 +148,11 @@ def main():
     parser.add_argument("--codec", type=Path, required=True)
     parser.add_argument("--publisher-root", type=Path, required=True)
     parser.add_argument("--out-dir", type=Path, required=True)
+    parser.add_argument("--include-transformer", action="store_true",
+                        help="Capture all codec transformer parameters and layer outputs")
     args = parser.parse_args()
-    print(json.dumps(capture(args.codec, args.publisher_root, args.out_dir)))
+    print(json.dumps(capture(args.codec, args.publisher_root, args.out_dir,
+                             include_transformer=args.include_transformer)))
 
 
 if __name__ == "__main__":
