@@ -50,9 +50,12 @@ def run_block(folder, stream, tensors, base, config, layer, input_rows, phases):
         "intermediate_size": 1152, "context_length": built_rows+1, "max_seq_len": built_rows+1,
         "vocab_size": 1,
     }}
-    layout, _, _, lib, _ = compile_native_graph(folder, source, path, openmp=True)
-    lib.omp_set_dynamic(0)
-    lib.omp_set_num_threads(4)
+    layout, _, _, lib, _ = compile_native_graph(
+        folder, source, path, extra_exports=("ck_set_num_threads",),
+    )
+    lib.ck_set_num_threads.argtypes = [ctypes.c_int]
+    lib.ck_set_num_threads.restype = None
+    lib.ck_set_num_threads(4)
     offsets = {item["name"]: item["abs_offset"] for item in layout["memory"]["activations"]["buffers"]}
     size = layout["memory"]["arena"]["total_size"]
     outputs = []

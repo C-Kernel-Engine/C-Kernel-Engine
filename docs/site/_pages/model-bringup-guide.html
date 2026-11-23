@@ -1077,8 +1077,10 @@ git diff --exit-code -- version/v8/kernel_maps/KERNEL_REGISTRY.json   <span clas
   <p><code>--q8-k-q6-input</code> selects packed Q8_K inputs for Q6_K
   projections, including the output head. <code>--group-experts</code>
   groups prefill rows by expert. With <code>--pair-expert-rows</code> two
-  routed rows can share the Q4_K weight unpacking. The grouped providers
-  mix results in each token's original expert order.</p>
+  routed rows can share the Q4_K weight unpacking.
+  <code>--dispatch-expert-pairs</code> lets workers take independent row
+  pairs from a shared queue. The grouped providers mix results in each
+  token's original expert order.</p>
   <pre class="mb-code"><code>python3 version/v8/scripts/replay_inkling2_text_loop_v8.py \
   --gguf /path/to/Inkling-2-Mini-Q4_K_M.gguf --weight-format q4_k_m \
   --config /path/to/config.json --tokens-file /path/to/prompt.ids \
