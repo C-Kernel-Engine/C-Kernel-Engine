@@ -16,14 +16,14 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / 'version/v8/scripts'))
 import build_ir_v8
 from checked_bundle_evidence_v8 import (
-    IDENTITY_SYMBOL, WARNING_POLICY, check_provider_warnings, digest_json,
+    IDENTITY_SYMBOL, WARNING_POLICY, check_provider_warnings, checked_target_flags, digest_json,
     load_verified_checked_bundle,
 )
 
 
 def compile_native_graph(root, source, circuit, extra_exports=(), mode="prefill", *,
                          runtime_sources=(), openmp=False, fp_contract="off",
-                         provider_warnings="error", c_standard="c11"):
+                         provider_warnings="error", c_standard="c11", target_isa="portable"):
     """Compile resolved providers, with explicit native-shell support and policy.
 
     Neural sources come exclusively from resolved maps. Extra sources are limited
@@ -33,6 +33,7 @@ def compile_native_graph(root, source, circuit, extra_exports=(), mode="prefill"
     root = Path(root)
     if type(openmp) is not bool or fp_contract not in ("off", "fast") or provider_warnings not in ("error", "report") or c_standard not in ("c11", "gnu11"):
         raise ValueError("invalid native build policy")
+    target_flags = checked_target_flags(target_isa)
     support = set()
     for name in runtime_sources:
         path = (ROOT / name).resolve()
@@ -92,7 +93,8 @@ def compile_native_graph(root, source, circuit, extra_exports=(), mode="prefill"
     if syntax.returncode:
         raise RuntimeError('generated graph syntax validation failed:\n' + syntax.stderr)
     compiler = subprocess.check_output(['cc', '--version'], text=True, env=compiler_env).splitlines()[0]
-    policy = dict(openmp=openmp, fp_contract=fp_contract, provider_warnings=provider_warnings, c_standard=c_standard)
+    policy = dict(openmp=openmp, fp_contract=fp_contract, provider_warnings=provider_warnings,
+                  c_standard=c_standard, target_isa=target_isa)
     identity_inputs = dict(
         schema="cke.checked-native-build.v1", compiler=compiler, build_policy=policy,
         compiler_executable_sha256=hashlib.sha256(Path(shutil.which("cc")).resolve().read_bytes()).hexdigest(),
@@ -118,7 +120,7 @@ def compile_native_graph(root, source, circuit, extra_exports=(), mode="prefill"
     staged_library = Path(staged_name)
     try:
         result = subprocess.run([
-            'cc', '-std=' + c_standard, '-O2', '-Wall', '-Wextra',
+            'cc', '-std=' + c_standard, '-O2', '-Wall', '-Wextra', *target_flags,
             *(['-Werror'] if provider_warnings == 'error' else []), '-shared', '-fPIC',
             '-ffp-contract=' + fp_contract, *(['-fopenmp'] if openmp else []), '-ffunction-sections', '-fdata-sections',
             '-Wl,--gc-sections', '-Wl,--no-undefined', '-Wl,--version-script=' + str(exports),
@@ -141,7 +143,7 @@ def compile_native_graph(root, source, circuit, extra_exports=(), mode="prefill"
         'identity_inputs': identity_inputs,
         'build_identity_sha256': build_digest,
         'accepted_provider_warnings': accepted_warnings,
-        'build_policy': dict(openmp=openmp, fp_contract=fp_contract, provider_warnings=provider_warnings, c_standard=c_standard),
+        'build_policy': policy,
         'selected_provider_sha256': selected,
         'runtime_support_sources': sorted(support),
         'exports': sorted(exported),

@@ -880,6 +880,10 @@ TEST_SUITES = {
         ROOT / "tests" / "test_v8_qwen3_tts_first_block.py",
         timeout_sec=180,
     ),
+    "sigma_bf16_attention_ingress": TestSuite(
+        "Sigma BF16 Generated Attention Ingress", "inference",
+        ROOT / "tests" / "test_v8_sigma_bf16_ingress.py",
+    ),
     "indexed_scale_checked": TestSuite(
         "Checked Indexed Scale and Generated Router Composition", "kernels",
         ROOT / "tests" / "test_v8_indexed_scale_checked.py",

@@ -16,6 +16,7 @@ class CheckedBundlePolicy(unittest.TestCase):
             {"fp_contract": "unsafe"},
             {"provider_warnings": "ignore"},
             {"c_standard": "c++"},
+            {"target_isa": "native; -ffast-math"},
             {"runtime_sources": ["src/kernels/linear_rows_checked.c"]},
             {"runtime_sources": ["src/runtime/../../tests/missing.c"]},
             {"runtime_sources": ["src/runtime/missing.c"]},
