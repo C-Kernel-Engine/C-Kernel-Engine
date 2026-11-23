@@ -25,8 +25,14 @@ static double dot_bias(const float *input, const float *weight,
 
 #if (defined(__x86_64__) || defined(__i386__)) && (defined(__GNUC__) || defined(__clang__))
 #include <immintrin.h>
-#ifdef _OPENMP
-#include <omp.h>
+#if defined(__ELF__)
+#include "checked_parallel.h"
+/* Standalone checked kernels can be built without a runtime pool. */
+#pragma weak ck_get_num_threads
+#pragma weak ck_threadpool_global
+#pragma weak ck_threadpool_in_dispatch
+#pragma weak ck_threadpool_n_threads
+#pragma weak ck_threadpool_parallel_for_n
 #endif
 /* Independent rows share weight loads; tail rows vectorize output channels.
  * Each lane preserves ordered FP64
@@ -181,53 +187,25 @@ static int validate_weight_rows(const float *weight, size_t stride,
     return 0;
 }
 
-#ifdef _OPENMP
-enum { projection_tile_channels = 128 };
+#if defined(__ELF__)
+enum { projection_tile_channels = 32 };
 
-static int projection_workers(size_t width, size_t channels)
-{
-    if (width < 256 || channels < 4 * projection_tile_channels || omp_in_parallel())
-        return 1;
-    const int available = omp_get_max_threads();
-    return available < 4 ? available : 4;
-}
+struct projection_tiles {
+    const float *input, *weight, *bias;
+    float *output;
+    size_t input_stride, weight_stride, output_stride, rows, width, channels;
+};
 
-static int validate_weight_tiles(const float *weight, size_t stride,
-                                 const float *bias, size_t width, size_t channels,
-                                 double *max_l1, double *max_bias, int workers)
+static void compute_projection_tiles(size_t begin, size_t end, void *opaque)
 {
-    double weight_bound = 0.0, bias_bound = 0.0;
-    int invalid = 0;
-    /* A tile starts on a four-channel boundary, so the SIMD validation
-     * processes the same independent rows and preserves each row's L1 sum. */
-    const size_t tiles = (channels - 1) / projection_tile_channels + 1;
-    #pragma omp parallel for num_threads(workers) schedule(static) reduction(max:weight_bound,bias_bound) reduction(|:invalid)
-    for (size_t tile = 0; tile < tiles; ++tile) {
+    const struct projection_tiles *p = opaque;
+    for (size_t tile = begin; tile < end; ++tile) {
         const size_t first = tile * projection_tile_channels;
-        size_t count = channels - first;
-        if (count > projection_tile_channels) count = projection_tile_channels;
-        invalid |= validate_weight_rows(weight + first * stride, stride,
-            bias ? bias + first : NULL, width, count, &weight_bound, &bias_bound) != 0;
-    }
-    *max_l1 = weight_bound;
-    *max_bias = bias_bound;
-    return invalid;
-}
-
-static void compute_projection_tiles(const float *input, size_t input_stride,
-                                     const float *weight, size_t weight_stride,
-                                     const float *bias, float *output, size_t output_stride,
-                                     size_t rows, size_t width, size_t channels, int workers)
-{
-    const size_t tiles = (channels - 1) / projection_tile_channels + 1;
-    #pragma omp parallel for num_threads(workers) schedule(static)
-    for (size_t tile = 0; tile < tiles; ++tile) {
-        const size_t first = tile * projection_tile_channels;
-        size_t count = channels - first;
-        if (count > projection_tile_channels) count = projection_tile_channels;
-        compute_independent_lanes(input, input_stride, weight + first * weight_stride,
-            weight_stride, bias ? bias + first : NULL, output + first, output_stride,
-            rows, width, count);
+        const size_t remaining = p->channels - first;
+        const size_t count = remaining < projection_tile_channels ? remaining : projection_tile_channels;
+        compute_independent_lanes(p->input, p->input_stride, p->weight + first * p->weight_stride,
+            p->weight_stride, p->bias ? p->bias + first : NULL, p->output + first,
+            p->output_stride, p->rows, p->width, count);
     }
 }
 #endif
@@ -272,17 +250,7 @@ int linear_rows_checked_f32(
         }
 #if (defined(__x86_64__) || defined(__i386__)) && (defined(__GNUC__) || defined(__clang__))
     __builtin_cpu_init();
-#ifdef _OPENMP
-    const int workers = projection_workers(input_channels, output_channels);
-#endif
     if (output_channels >= 4 && __builtin_cpu_supports("avx2")) {
-#ifdef _OPENMP
-        if (workers > 1) {
-            if (validate_weight_tiles(weight, weight_stride, bias, input_channels,
-                                      output_channels, &max_weight_l1, &max_bias, workers))
-                return -1;
-        } else
-#endif
         if (validate_weight_rows(weight, weight_stride, bias, input_channels,
                                  output_channels, &max_weight_l1, &max_bias))
             return -1;
@@ -312,11 +280,18 @@ int linear_rows_checked_f32(
             disjoint(output, output_elements, input, input_elements) &&
             disjoint(output, output_elements, weight, weight_elements) &&
             disjoint(output, output_elements, bias, bias_elements)) {
-#ifdef _OPENMP
-            if (workers > 1) {
-                compute_projection_tiles(input, input_stride, weight, weight_stride, bias,
-                                         output, output_stride, rows, input_channels,
-                                         output_channels, workers);
+#if defined(__ELF__)
+            if (rows >= 16 && input_channels >= 16 && output_channels >= 128 &&
+                ck_get_num_threads && ck_threadpool_global && ck_threadpool_in_dispatch &&
+                ck_threadpool_n_threads && ck_threadpool_parallel_for_n) {
+                struct projection_tiles work = {
+                    .input = input, .weight = weight, .bias = bias, .output = output,
+                    .input_stride = input_stride, .weight_stride = weight_stride,
+                    .output_stride = output_stride, .rows = rows, .width = input_channels,
+                    .channels = output_channels,
+                };
+                ck_checked_parallel_for((output_channels - 1) / projection_tile_channels + 1,
+                                        1, compute_projection_tiles, &work);
                 return 0;
             }
 #endif
