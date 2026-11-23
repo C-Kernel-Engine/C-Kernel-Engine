@@ -28,7 +28,10 @@ def sha256(path):
         return hashlib.file_digest(file, "sha256").hexdigest()
 
 
-def capture(codec_path, publisher, folder, *, include_transformer=False):
+def capture(codec_path, publisher, folder, *, include_transformer=False,
+            include_upsampler=False, include_waveform=False):
+    include_upsampler = include_upsampler or include_waveform
+    include_transformer = include_transformer or include_upsampler
     if sha256(codec_path) != CODEC_SHA256:
         raise ValueError("codec SHA-256 does not match the pinned release")
     for name, expected in PUBLISHER_HASHES.items():
@@ -76,6 +79,31 @@ def capture(codec_path, publisher, folder, *, include_transformer=False):
         transformer_weights["codec_transformer_norm.weight"] = post_module.norm.weight.detach().numpy()
         np.savez(folder / "transformer_weights.npz", **transformer_weights)
 
+    upsampler = codec.quantizer.upsample
+    if include_upsampler:
+        weights = {}
+        for name, value in upsampler.state_dict().items():
+            if value.dtype != torch.float32:
+                raise ValueError(f"expected FP32 codec upsampler parameter: {name}")
+            if name.endswith(".dwconv.conv.weight"):
+                value = value.squeeze(1)
+            weights[f"upsample.{name}"] = value.detach().numpy()
+        np.savez(folder / "upsampler_weights.npz", **weights)
+
+    decoder = codec.decoder
+    if include_waveform:
+        weights = {}
+        for name, value in decoder.state_dict().items():
+            if value.dtype != torch.float32:
+                raise ValueError(f"expected FP32 waveform decoder parameter: {name}")
+            if name.endswith(".alpha"):
+                value = value.flatten()
+                if (not torch.isfinite(value).all() or torch.any(value == 0) or
+                        not torch.equal(value + 1e-9, value)):
+                    raise ValueError(f"Snake denominator epsilon changes decoder parameter: {name}")
+            weights[f"decoder.{name}"] = value.detach().numpy()
+        np.savez(folder / "decoder_weights.npz", **weights)
+
     frames = [1, 3, 8]
     results = []
     seen = {}
@@ -103,6 +131,20 @@ def capture(codec_path, publisher, folder, *, include_transformer=False):
                 seen["rotary_cos"], seen["rotary_sin"] = rotary[..., 0], rotary[..., 1]
                 handles.extend(layer.register_forward_hook(capture_layer(f"codec_layer{i}_out"))
                                for i, layer in enumerate(post_module.layers))
+            if include_upsampler:
+                handles.append(upsampler.register_forward_hook(capture_layer("dac_input")))
+                for i, stage in enumerate(upsampler):
+                    handles.append(stage[0].register_forward_hook(capture_layer(f"upsample{i}_deconv")))
+                    if i == 0:
+                        handles.append(stage.register_forward_hook(capture_layer("upsample0_out")))
+            if include_waveform:
+                handles.append(decoder.model[0].register_forward_hook(capture_layer("decoder_input_conv")))
+                handles.append(decoder.model[6].register_forward_hook(capture_layer("decoder_pre_tanh")))
+                for i in range(1, 5):
+                    stage = decoder.model[i].block
+                    handles.append(stage[1].register_forward_hook(capture_layer(f"dec{i}_upsampled")))
+                    handles.extend(stage[j].register_forward_hook(capture_layer(f"dec{i}_res{j}"))
+                                   for j in range(2, 5))
             try:
                 audio = codec.from_indices(codes)
             finally:
@@ -137,6 +179,14 @@ def capture(codec_path, publisher, folder, *, include_transformer=False):
                                      head_dim=post_module.config.head_dim,
                                      intermediate=post_module.config.intermediate_size,
                                      window=post_module.window_size)
+    if include_upsampler:
+        artifacts.append("upsampler_weights.npz")
+        report["upsampler"] = {"strides": [stage[0].stride for stage in upsampler],
+                               "input_layout": "token_major", "output_layout": "channel_major"}
+    if include_waveform:
+        artifacts.append("decoder_weights.npz")
+        report["waveform"] = {"strides": [decoder.model[i].block[1].stride for i in range(1, 5)],
+                              "snake_epsilon_identity": True}
     for name in artifacts:
         report["replay_sha256"][name] = sha256(folder / name)
     (folder / "reference-result.json").write_text(json.dumps(report, indent=2) + "\n")
@@ -150,9 +200,15 @@ def main():
     parser.add_argument("--out-dir", type=Path, required=True)
     parser.add_argument("--include-transformer", action="store_true",
                         help="Capture all codec transformer parameters and layer outputs")
+    parser.add_argument("--include-upsampler", action="store_true",
+                        help="Capture both latent upsampling stages along with the transformer")
+    parser.add_argument("--include-waveform", action="store_true",
+                        help="Capture both latent stages and the complete PCM decoder")
     args = parser.parse_args()
     print(json.dumps(capture(args.codec, args.publisher_root, args.out_dir,
-                             include_transformer=args.include_transformer)))
+                             include_transformer=args.include_transformer,
+                             include_upsampler=args.include_upsampler,
+                             include_waveform=args.include_waveform)))
 
 
 if __name__ == "__main__":
