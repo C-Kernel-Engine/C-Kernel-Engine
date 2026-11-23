@@ -778,6 +778,10 @@ TEST_SUITES = {
         "Drama 3 Generated Codebooks and Codec Transformer", "inference",
         ROOT / "tests" / "test_v8_drama3_codec_transformer.py", timeout_sec=180,
     ),
+    "tts_drama3_codec_waveform": TestSuite(
+        "Drama 3 Generated Reference-Code PCM", "inference",
+        ROOT / "tests" / "test_v8_drama3_codec_waveform.py", timeout_sec=240,
+    ),
     "tts_ming3_generated_dit_fp32": TestSuite(
         "Ming3 Full Generated DiT FP32 Composition", "inference",
         ROOT / "tests" / "test_v8_ming3_dit.py",
