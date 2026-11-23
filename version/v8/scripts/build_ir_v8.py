@@ -5473,6 +5473,7 @@ TEMPLATE_TO_KERNEL_OP = {
     "expand_group_row_indices_checked": "expand_group_row_indices_checked",
     "attention_cross_token_major_checked": "attention_cross_token_major_checked",
     "linear_rows_bf16_checked": "linear_rows_bf16_checked",
+    "rmsnorm_rows_bf16_checked": "rmsnorm_rows_bf16_checked",
     "attention_ranges_checked": "attention_ranges_checked",
     "indexed_scale_checked": "indexed_scale_checked",
     "diffusion_vp_ddpm_step_checked": "diffusion_vp_ddpm_step_checked",

@@ -12,6 +12,22 @@ WARNING_POLICY = ROOT / "version/v8/contracts/checked_provider_warnings.json"
 IDENTITY_SYMBOL = "ck_checked_bundle_build_identity"
 
 
+def checked_target_flags(target_isa):
+    if target_isa == "portable":
+        return ()
+    if target_isa != "avx2":
+        raise ValueError("unsupported checked-bundle target ISA")
+    try:
+        cpuinfo = Path("/proc/cpuinfo").read_text().splitlines()
+    except OSError:
+        cpuinfo = []
+    targets = [value.split() for key, _, value in
+               (line.partition(":") for line in cpuinfo) if key.strip() == "flags"]
+    if not targets or not all("avx2" in flags for flags in targets):
+        raise ValueError("checked-bundle target AVX2 is unavailable on this host")
+    return ("-mavx2",)
+
+
 def digest_json(value):
     return hashlib.sha256(
         json.dumps(
@@ -91,6 +107,10 @@ def load_verified_checked_bundle(library_path, identity_path, expected_identity_
         "library_sha256"
     ):
         raise ValueError("checked-bundle library hash mismatch")
+    identity_inputs = identity["identity_inputs"]
+    if not isinstance(identity_inputs, dict) or not isinstance(identity_inputs.get("build_policy", {}), dict):
+        raise ValueError("invalid checked-bundle build policy metadata")
+    checked_target_flags(identity_inputs.get("build_policy", {}).get("target_isa", "portable"))
     loaded = ctypes.CDLL(str(library_path))
     verify_loaded_identity(loaded, expected)
     return loaded
