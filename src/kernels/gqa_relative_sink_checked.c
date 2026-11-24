@@ -21,6 +21,20 @@
 #include <immintrin.h>
 #define CK_GQA_X86_AVX2 1
 
+static __attribute__((target("avx2"))) int finite_cache_avx2(const float *data, size_t length)
+{
+    const __m256i magnitude_mask = _mm256_set1_epi32(0x7fffffff);
+    const __m256i largest_finite = _mm256_set1_epi32(0x7f7fffff);
+    size_t i = 0;
+    for (; length - i >= 8; i += 8) {
+        const __m256i values = _mm256_castps_si256(_mm256_loadu_ps(data + i));
+        const __m256i magnitude = _mm256_and_si256(values, magnitude_mask);
+        if (_mm256_movemask_epi8(_mm256_cmpgt_epi32(magnitude, largest_finite)))
+            return 0;
+    }
+    return ck_checked_finite(data + i, length - i);
+}
+
 /* Each SIMD lane owns a key. Advance every lane in channel order. */
 static inline __attribute__((target("avx2"))) void scores_for_four_keys(
     const float *query, const float *keys, size_t dim, double scores[4])
@@ -103,6 +117,15 @@ static __attribute__((target("avx2"))) void attention_row_avx2(
     const float *sink, size_t sink_elements, float *output, size_t output_elements, \
     double *work, size_t work_elements, size_t tokens, size_t heads, size_t kv_heads, \
     size_t dim, size_t capacity, size_t position, size_t relative_extent, size_t window
+
+static inline int finite_cache(const float *data, size_t length)
+{
+#ifdef CK_GQA_X86_AVX2
+    if (length >= 64 && __builtin_cpu_supports("avx2"))
+        return finite_cache_avx2(data, length);
+#endif
+    return ck_checked_finite(data, length);
+}
 
 struct gqa_rows {
     const float *query, *key, *value, *relative, *sink;
@@ -188,9 +211,17 @@ static int gqa_relative_sink_checked(GQA_RELATIVE_ARGS, int circular)
         rel_size > relative_elements || rows > sink_elements || dim > work_elements)
         return -2;
 
+    const size_t first = window && position >= window ? position - window + 1 : 0;
+    const size_t visible = position + tokens - first;
+    /* The writer commits the entire chunk first, so every query's visible key
+     * must fit at once. Otherwise the newest rows can evict an earlier query. */
+    if (circular && visible > capacity) return -2;
+
     size_t workspace = dim;
 #ifdef CK_GQA_OPTIONAL_POOL
-    const int parallel = tokens > 1 && rows >= 64 && position + tokens >= 64 &&
+    const int parallel_work = tokens == 1 ? rows >= 8 && visible >= 128
+                                         : rows >= 64 && position + tokens >= 64;
+    const int parallel = parallel_work &&
         q_size <= SIZE_MAX / sizeof(double) && work_elements >= q_size &&
         ck_get_num_threads && ck_threadpool_global && ck_threadpool_in_dispatch &&
         ck_threadpool_n_threads && ck_threadpool_parallel_for_n && ck_get_num_threads() > 1;
@@ -212,11 +243,6 @@ static int gqa_relative_sink_checked(GQA_RELATIVE_ARGS, int circular)
 
     if (!ck_checked_finite(query, q_size) || !ck_checked_finite(relative, rel_size) ||
         !ck_checked_finite(sink, rows)) return -3;
-    const size_t first = window && position >= window ? position - window + 1 : 0;
-    const size_t visible = position + tokens - first;
-    /* The writer commits the entire chunk first, so every query's visible key
-     * must fit at once. Otherwise the newest rows can evict an earlier query. */
-    if (circular && visible > capacity) return -2;
     const size_t physical = circular ? first % capacity : first;
     const size_t contiguous = visible < capacity - physical ? visible : capacity - physical;
     for (size_t h = 0; h < kv_heads; ++h) {
@@ -224,9 +250,9 @@ static int gqa_relative_sink_checked(GQA_RELATIVE_ARGS, int circular)
         const size_t prefix = contiguous * dim;
         const size_t suffix = (visible - contiguous) * dim;
         const size_t head_start = h * capacity * dim;
-        if (!ck_checked_finite(key + offset, prefix) || !ck_checked_finite(value + offset, prefix) ||
-            (suffix && (!ck_checked_finite(key + head_start, suffix) ||
-                        !ck_checked_finite(value + head_start, suffix))))
+        if (!finite_cache(key + offset, prefix) || !finite_cache(value + offset, prefix) ||
+            (suffix && (!finite_cache(key + head_start, suffix) ||
+                        !finite_cache(value + head_start, suffix))))
             return -3;
     }
 
@@ -242,7 +268,7 @@ static int gqa_relative_sink_checked(GQA_RELATIVE_ARGS, int circular)
     };
 #ifdef CK_GQA_OPTIONAL_POOL
     if (parallel)
-        ck_checked_parallel_for(rows, 4, evaluate_attention_rows, &work_rows);
+        ck_checked_parallel_for(rows, tokens == 1 ? 1 : 4, evaluate_attention_rows, &work_rows);
     else
 #endif
         evaluate_attention_rows(0, rows, &work_rows);
