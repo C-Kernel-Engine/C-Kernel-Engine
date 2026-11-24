@@ -325,6 +325,93 @@ def decoder_block(prefill_tokens, width, kv_heads, query_heads, dim, relative_di
     return graph
 
 
+def bind_mixed_decoder_weights(graph, tensor_types, *, q8_k_hidden=False, q8_k_linear=False, q8_0_down=False, q8_k_q6_linear=False, group_experts=False, pair_expert_rows=False, dispatch_expert_pairs=False):
+    """Bind the bounded FP32-activation decoder to the GGUF tensor directory."""
+    from version.v8.scripts.convert_gguf_to_bump_v8 import (
+        GGML_TYPE_Q4_K, GGML_TYPE_Q5_0, GGML_TYPE_Q6_K, GGML_TYPE_Q8_0, ggml_row_bytes,
+    )
+
+    if dispatch_expert_pairs and not pair_expert_rows:
+        raise ValueError("dynamic expert pair dispatch requires paired rows")
+    if pair_expert_rows and not group_experts:
+        raise ValueError("paired expert rows require grouped prefill")
+    if group_experts and not q8_0_down:
+        raise ValueError("grouped routing requires packed expert down projections")
+    if q8_0_down and not q8_k_hidden:
+        raise ValueError("packed down projections require the Q8_K expert path")
+    names = {GGML_TYPE_Q4_K: "Q4_K", GGML_TYPE_Q5_0: "Q5_0",
+             GGML_TYPE_Q6_K: "Q6_K", GGML_TYPE_Q8_0: "Q8_0"}
+    exports = graph["semantic_checkpoints"]["exports"]
+    for node in graph["block_types"]["block"]["body"]["ops"]:
+        params = node["params"]
+        if node["op"] == "embedding_lookup_q8_0_checked":
+            table = node["weight_refs"]["table"]
+            dtype = tensor_types[table]
+            if dtype != GGML_TYPE_Q4_K:
+                raise ValueError(f"unsupported mixed embedding dtype: {table} ({dtype})")
+            node.update(op="embedding_lookup_q4_k_checked", kernel="embedding_lookup_q4_k_checked_f32")
+            params["weight_storage"] = {"table": names[dtype]}
+            params["call_constants"]["table_bytes"] = params["V"] * ggml_row_bytes(dtype, params["C"])
+        elif node["op"] == "linear_rows_q8_0_checked":
+            if node["kernel"] != "linear_rows_q8_0_checked_f32":
+                raise ValueError("mixed packed weights require FP32 activations")
+            weight = node["weight_refs"]["weight"]
+            dtype = tensor_types[weight]
+            if dtype not in (GGML_TYPE_Q4_K, GGML_TYPE_Q6_K):
+                raise ValueError(f"unsupported mixed projection dtype: {weight} ({dtype})")
+            op = f"linear_rows_{names[dtype].lower()}_checked"
+            if (dtype == GGML_TYPE_Q4_K and q8_k_linear) or (dtype == GGML_TYPE_Q6_K and q8_k_q6_linear):
+                op = f"linear_rows_{names[dtype].lower()}_q8_k_checked"
+                params["W"] = params["M"] * (params["N"] + params["K"] // 256 * (292 // 4))
+                params["call_constants"]["work_elements"] = params["W"]
+            node.update(op=op, kernel=op + "_f32")
+            params["weight_storage"] = {"weight": names[dtype]}
+            params["call_constants"]["weight_bytes"] = params["N"] * ggml_row_bytes(dtype, params["K"])
+            if node["id"] in exports:
+                exports[node["id"]]["op"] = op
+        elif node["op"] == "routed_softcapped_experts_checked":
+            if node["kernel"] != "routed_softcapped_experts_checked_q8_0":
+                raise ValueError("mixed packed expert weights require FP32 activations")
+            prefix = node["weight_refs"]["down"].removesuffix("expert_bank.down")
+            gate_type = tensor_types[prefix + "ffn_gate_up_exps.weight"]
+            down_type = tensor_types[prefix + "ffn_down_exps.weight"]
+            if gate_type != GGML_TYPE_Q4_K or down_type not in (GGML_TYPE_Q5_0, GGML_TYPE_Q8_0):
+                raise ValueError(f"unsupported mixed packed expert dtypes: {gate_type}, {down_type}")
+            node["kernel"] = f"routed_softcapped_experts_checked_q4_k_{names[down_type].lower()}"
+            params["weight_storage"] = {"gate": names[gate_type], "up": names[gate_type], "down": names[down_type]}
+            row_scratch = 3 * params["I"]
+            if q8_k_hidden:
+                node["kernel"] += "_q8_k_hidden"
+                row_scratch += (params["H"] // 256) * (292 // 4)
+            if q8_0_down:
+                node["kernel"] += "_q8_0_down"
+                row_scratch += (ggml_row_bytes(GGML_TYPE_Q8_0, params["I"]) + 3) // 4
+            if group_experts and params["R"] > 1:
+                node["kernel"] = f"routed_softcapped_experts_checked_q4_k_{names[down_type].lower()}_grouped"
+                if pair_expert_rows:
+                    node["kernel"] += "_pair"
+                    row_scratch *= 2
+                grouped_pack = params["R"] * (params["H"] // 256) * (292 // 4)
+                if dispatch_expert_pairs:
+                    node["kernel"] = f"routed_softcapped_experts_checked_q4_k_{names[down_type].lower()}_pair_jobs"
+                    # The native pool caps worker IDs at 64. Each worker processes one pair at a time.
+                    expert_work = 64 * row_scratch
+                    job_entries = 2 * params["R"] * params["K"]
+                else:
+                    expert_work = params["E"] * row_scratch
+                    job_entries = 0
+                params["W"] = (params["R"] * (params["K"] + 1) * params["H"]
+                               + grouped_pack + expert_work + job_entries)
+            else:
+                params["W"] = params["R"] * ((params["K"] + 1) * params["H"] + row_scratch)
+            params["call_constants"].update(
+                work_elements=params["W"],
+                matrix_bytes=params["S"] * params["I"] * ggml_row_bytes(gate_type, params["H"]),
+                down_matrix_bytes=params["S"] * params["H"] * ggml_row_bytes(down_type, params["I"]),
+            )
+    return graph
+
+
 def first_block_weights(graph):
     """Describe the logical tensors loaded into the bounded native block."""
     result = {}
@@ -335,7 +422,7 @@ def first_block_weights(graph):
             if op["op"] == "routed_softcapped_experts_checked":
                 shape = [p["S"], p["H"], p["I"]] if port == "down" else [p["S"], p["I"], p["H"]]
                 mode = "Q8_0"
-            elif op["op"] == "embedding_lookup_q8_0_checked":
+            elif op["op"] in ("embedding_lookup_q8_0_checked", "embedding_lookup_q4_k_checked"):
                 shape, mode = [p["V"], p["C"]], "Q8_0"
             elif port in ("gamma", "query"):
                 shape = [p["C"]]
@@ -343,6 +430,7 @@ def first_block_weights(graph):
                 shape = [p["N"], p["K"]]
                 if op["op"] == "linear_rows_q8_0_checked":
                     mode = "Q8_0"
+            mode = p.get("weight_storage", {}).get(port, mode)
             previous = result.setdefault(name, (shape, mode))
             if previous != (shape, mode):
                 raise ValueError(f"inconsistent phase weight binding for {name}")

@@ -2139,6 +2139,10 @@ OP_DATAFLOW = {
         "inputs": {"ids": "external:token_ids"},
         "outputs": {"output": {"slot": "embedding", "dtype": "fp32"}},
     },
+    "embedding_lookup_q4_k_checked": {
+        "inputs": {"ids": "external:token_ids"},
+        "outputs": {"output": {"slot": "embedding", "dtype": "fp32"}},
+    },
     "copy_last_row_checked": {
         "inputs": {"input": "input"},
         "outputs": {"output": {"slot": "last_row", "dtype": "fp32"}},
@@ -3161,6 +3165,22 @@ OP_DATAFLOW = {
                     "output": {"slot": "mixture", "dtype": "fp32"}},
     },
     "linear_rows_q8_0_checked": {
+        "inputs": {"input": "external:input"},
+        "outputs": {"output": {"slot": "projected", "dtype": "fp32"}},
+    },
+    "linear_rows_q4_k_checked": {
+        "inputs": {"input": "external:input"},
+        "outputs": {"output": {"slot": "projected", "dtype": "fp32"}},
+    },
+    "linear_rows_q4_k_q8_k_checked": {
+        "inputs": {"input": "external:input"},
+        "outputs": {"output": {"slot": "projected", "dtype": "fp32"}},
+    },
+    "linear_rows_q6_k_q8_k_checked": {
+        "inputs": {"input": "external:input"},
+        "outputs": {"output": {"slot": "projected", "dtype": "fp32"}},
+    },
+    "linear_rows_q6_k_checked": {
         "inputs": {"input": "external:input"},
         "outputs": {"output": {"slot": "projected", "dtype": "fp32"}},
     },
@@ -5423,6 +5443,7 @@ TEMPLATE_TO_KERNEL_OP = {
     "attention_causal_bounded": "attention_causal_bounded",
     "rmsnorm_f32_square_f64_sum_rows_checked": "rmsnorm_f32_square_f64_sum_rows_checked",
     "embedding_lookup_q8_0_checked": "embedding_lookup_q8_0_checked",
+    "embedding_lookup_q4_k_checked": "embedding_lookup_q4_k_checked",
     "copy_last_row_checked": "copy_last_row_checked",
     "softcap_logits_checked": "softcap_logits_checked",
     "log_position_scale_rows_checked": "log_position_scale_rows_checked",
@@ -5622,6 +5643,10 @@ TEMPLATE_TO_KERNEL_OP = {
     "full_softmax_topk_router": "full_softmax_topk_router",
     "routed_softcapped_experts_checked": "routed_softcapped_experts_checked",
     "linear_rows_q8_0_checked": "linear_rows_q8_0_checked",
+    "linear_rows_q4_k_checked": "linear_rows_q4_k_checked",
+    "linear_rows_q4_k_q8_k_checked": "linear_rows_q4_k_q8_k_checked",
+    "linear_rows_q6_k_q8_k_checked": "linear_rows_q6_k_q8_k_checked",
+    "linear_rows_q6_k_checked": "linear_rows_q6_k_checked",
     "concat_feature_rows_checked": "concat_feature_rows_checked",
     "rms_pair_concat_rows_checked": "rms_pair_concat_rows_checked",
     "message_control_rows_checked": "message_control_rows_checked",

@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 557,
+      "total": 574,
       "by_op": {
         "add_backward": 1,
         "add_rows_backward_train_f32": 1,
@@ -94,6 +94,7 @@
         "embedding": 7,
         "embedding_backward": 1,
         "embedding_lookup_checked": 1,
+        "embedding_lookup_q4_k_checked": 1,
         "embedding_lookup_q8_0_checked": 1,
         "embedding_lookup_token_major_checked": 1,
         "embedding_three_table_layer_norm": 1,
@@ -156,6 +157,10 @@
         "linear_rows_bf16_checked": 1,
         "linear_rows_checked": 1,
         "linear_rows_checked_no_bias": 1,
+        "linear_rows_q4_k_checked": 1,
+        "linear_rows_q4_k_q8_k_checked": 1,
+        "linear_rows_q6_k_checked": 1,
+        "linear_rows_q6_k_q8_k_checked": 1,
         "linear_rows_q8_0_checked": 2,
         "log_position_scale_rows_checked": 1,
         "logits_store_indexed": 1,
@@ -218,7 +223,7 @@
         "rope_init": 3,
         "rope_pairwise_rows_checked": 1,
         "rope_qk_bounded": 1,
-        "routed_softcapped_experts_checked": 5,
+        "routed_softcapped_experts_checked": 17,
         "rowwise_bias_add": 1,
         "runtime_copy_valid": 1,
         "runtime_extent_affine": 1,
@@ -36897,7 +36902,8 @@
         "function": "copy_last_row_checked_f32",
         "c_declaration": "int copy_last_row_checked_f32(const float *input, size_t input_elements, float *output, size_t output_elements, size_t rows, size_t width);",
         "sources": [
-          "src/kernels/packed_text_io_checked.c"
+          "src/kernels/packed_text_io_checked.c",
+          "src/kernels/dequant_kernels.c"
         ]
       },
       "modes": {
@@ -40844,6 +40850,186 @@
       "_source_file": "embedding_forward_q8_0.json"
     },
     {
+      "id": "embedding_lookup_q4_k_checked_f32",
+      "op": "embedding_lookup_q4_k_checked",
+      "operation_interface": "embedding.checked_token_major.q4_k.fp32.v1",
+      "variant": "checked_i32_ids_q4_k_table",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "equivalence_group": "embedding.checked_token_major.q4_k.fp32.v1",
+        "phases": [
+          "prefill",
+          "decode"
+        ]
+      },
+      "quant": {
+        "weight": "q4_k",
+        "activation": "i32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "ids",
+          "dtype": "i32",
+          "shape": [
+            "T"
+          ],
+          "layout": "token_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "table",
+          "dtype": "q4_k",
+          "shape": [
+            "V",
+            "C"
+          ],
+          "layout": "row_major_packed_q4_k",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "C"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "T",
+        "V",
+        "C"
+      ],
+      "impl": {
+        "function": "embedding_lookup_q4_k_checked_f32",
+        "c_declaration": "int embedding_lookup_q4_k_checked_f32(const int32_t *ids, size_t ids_elements, const void *table, size_t table_bytes, float *output, size_t output_elements, size_t tokens, size_t vocabulary, size_t width);",
+        "sources": [
+          "src/kernels/packed_text_io_checked.c",
+          "src/kernels/dequant_kernels.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "ids",
+            "source": "activation:ids",
+            "cast": "const int32_t*",
+            "ports": [
+              "input:ids"
+            ]
+          },
+          {
+            "name": "ids_elements",
+            "source": "runtime:ids_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "table",
+            "source": "weight:table",
+            "cast": "const void*",
+            "ports": [
+              "weight:table"
+            ]
+          },
+          {
+            "name": "table_bytes",
+            "source": "runtime:table_bytes",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "tokens",
+            "source": "runtime:tokens",
+            "value_type": "size_t"
+          },
+          {
+            "name": "vocabulary",
+            "source": "runtime:vocabulary",
+            "value_type": "size_t"
+          },
+          {
+            "name": "width",
+            "source": "runtime:width",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "T": "tokens",
+          "V": "vocabulary",
+          "C": "width"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "ids",
+            "elements": "ids_elements",
+            "rows": 1,
+            "width": "tokens",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "table",
+            "elements": "table_bytes",
+            "element_bytes": 1,
+            "rows": 1,
+            "width": "table_bytes"
+          },
+          {
+            "pointer": "output",
+            "elements": "output_elements",
+            "rows": "tokens",
+            "width": "width",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_q4km_block.py"
+        ]
+      },
+      "notes": "Checked token-major gather from packed Q4_K rows. Reject invalid IDs and nonfinite block scales before writes.",
+      "name": "embedding_lookup_q4_k_checked_f32",
+      "_source_file": "embedding_lookup_q4_k_checked_f32.json"
+    },
+    {
       "id": "embedding_lookup_q8_0_checked_f32",
       "op": "embedding_lookup_q8_0_checked",
       "operation_interface": "embedding.checked_token_major.q8_0.fp32.v1",
@@ -40916,7 +41102,8 @@
         "function": "embedding_lookup_q8_0_checked_f32",
         "c_declaration": "int embedding_lookup_q8_0_checked_f32(const int32_t *ids, size_t ids_elements, const void *table, size_t table_bytes, float *output, size_t output_elements, size_t tokens, size_t vocabulary, size_t width);",
         "sources": [
-          "src/kernels/packed_text_io_checked.c"
+          "src/kernels/packed_text_io_checked.c",
+          "src/kernels/dequant_kernels.c"
         ]
       },
       "modes": {
@@ -70091,6 +70278,812 @@
       },
       "name": "linear_rows_checked_no_bias_f32",
       "_source_file": "linear_rows_checked_no_bias_f32.json"
+    },
+    {
+      "id": "linear_rows_q4_k_checked_f32",
+      "op": "linear_rows_q4_k_checked",
+      "operation_interface": "linear.row_major.checked.q4_k_fp32_ordered.v1",
+      "variant": "q4_k",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "phases": [
+          "prefill"
+        ],
+        "equivalence_group": "linear.row_major.checked.q4_k_fp32_ordered.v1"
+      },
+      "quant": {
+        "weight": "q4_k",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            "M",
+            "K"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "weight",
+          "dtype": "q4_k",
+          "shape": [
+            "N",
+            "K"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "M",
+            "N"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "M",
+        "K",
+        "N"
+      ],
+      "impl": {
+        "function": "linear_rows_q4_k_checked_f32",
+        "c_declaration": "int linear_rows_q4_k_checked_f32(const float* input, size_t input_elements, const void* weight, size_t weight_bytes, float* output, size_t output_elements, size_t rows, size_t width, size_t channels);",
+        "sources": [
+          "src/kernels/linear_rows_packed_k_checked.c",
+          "src/kernels/dequant_kernels.c",
+          "src/ck_threadpool.c",
+          "src/ckernel_strict.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const float*",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "input_elements",
+            "source": "runtime:input_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "weight",
+            "source": "weight:weight",
+            "cast": "const void*",
+            "ports": [
+              "weight:weight"
+            ]
+          },
+          {
+            "name": "weight_bytes",
+            "source": "runtime:weight_bytes",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "width",
+            "source": "runtime:width",
+            "value_type": "size_t"
+          },
+          {
+            "name": "channels",
+            "source": "runtime:channels",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "M": "rows",
+          "K": "width",
+          "N": "channels"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "elements": "input_elements",
+            "rows": "rows",
+            "width": "width",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "weight",
+            "elements": "weight_bytes",
+            "rows": 1,
+            "width": "weight_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q4_k"
+          },
+          {
+            "pointer": "output",
+            "elements": "output_elements",
+            "rows": "rows",
+            "width": "channels",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_q4km_block.py"
+        ]
+      },
+      "notes": "Packed GGUF weights. Each dot expands one block at a time and accumulates in channel order in FP64.",
+      "name": "linear_rows_q4_k_checked_f32",
+      "_source_file": "linear_rows_q4_k_checked_f32.json"
+    },
+    {
+      "id": "linear_rows_q4_k_q8_k_checked_f32",
+      "op": "linear_rows_q4_k_q8_k_checked",
+      "operation_interface": "linear.row_major.checked.q4_k_q8_k_internal.v1",
+      "variant": "q4_k_weight_with_q8_k_activation",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "phases": [
+          "prefill"
+        ],
+        "equivalence_group": "linear.row_major.checked.q4_k_q8_k_internal.v1"
+      },
+      "quant": {
+        "weight": "q4_k",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            "M",
+            "K"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "weight",
+          "dtype": "q4_k",
+          "shape": [
+            "N",
+            "K"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "M",
+            "N"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "work",
+          "dtype": "fp32",
+          "shape": [
+            "W"
+          ],
+          "size_bytes": "4 * W",
+          "size_resolution": "required",
+          "lifetime": "kernel_call",
+          "alignment": 64,
+          "layout": "contiguous",
+          "access": "read_write",
+          "storage_class": "scratch",
+          "consumption": "required"
+        }
+      ],
+      "dims": [
+        "M",
+        "K",
+        "N",
+        "W"
+      ],
+      "impl": {
+        "function": "linear_rows_q4_k_q8_k_checked_f32",
+        "c_declaration": "int linear_rows_q4_k_q8_k_checked_f32(const float* input, size_t input_elements, const void* weight, size_t weight_bytes, float* output, size_t output_elements, size_t rows, size_t width, size_t channels, float *work, size_t work_elements);",
+        "sources": [
+          "src/kernels/linear_rows_packed_k_checked.c",
+          "src/kernels/dequant_kernels.c",
+          "src/ck_threadpool.c",
+          "src/ckernel_strict.c",
+          "src/kernels/gemm_kernels_q4k_q8k.c",
+          "src/kernels/gemm_kernels_q4k_q8k_avx2.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const float*",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "input_elements",
+            "source": "runtime:input_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "weight",
+            "source": "weight:weight",
+            "cast": "const void*",
+            "ports": [
+              "weight:weight"
+            ]
+          },
+          {
+            "name": "weight_bytes",
+            "source": "runtime:weight_bytes",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "width",
+            "source": "runtime:width",
+            "value_type": "size_t"
+          },
+          {
+            "name": "channels",
+            "source": "runtime:channels",
+            "value_type": "size_t"
+          },
+          {
+            "name": "work",
+            "source": "scratch:work",
+            "cast": "float*"
+          },
+          {
+            "name": "work_elements",
+            "source": "runtime:work_elements",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "M": "rows",
+          "K": "width",
+          "N": "channels",
+          "W": "work_elements"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "elements": "input_elements",
+            "rows": "rows",
+            "width": "width",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "weight",
+            "elements": "weight_bytes",
+            "rows": 1,
+            "width": "weight_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q4_k"
+          },
+          {
+            "pointer": "output",
+            "elements": "output_elements",
+            "rows": "rows",
+            "width": "channels",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "work",
+            "elements": "work_elements",
+            "rows": 1,
+            "width": "work_elements",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_q4km_block.py"
+        ]
+      },
+      "notes": "Pack each FP32 activation row as Q8_K. Stage output in planned scratch and publish only finite results.",
+      "name": "linear_rows_q4_k_q8_k_checked_f32",
+      "_source_file": "linear_rows_q4_k_q8_k_checked_f32.json"
+    },
+    {
+      "id": "linear_rows_q6_k_checked_f32",
+      "op": "linear_rows_q6_k_checked",
+      "operation_interface": "linear.row_major.checked.q6_k_fp32_ordered.v1",
+      "variant": "q6_k",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "phases": [
+          "prefill"
+        ],
+        "equivalence_group": "linear.row_major.checked.q6_k_fp32_ordered.v1"
+      },
+      "quant": {
+        "weight": "q6_k",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            "M",
+            "K"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "weight",
+          "dtype": "q6_k",
+          "shape": [
+            "N",
+            "K"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "M",
+            "N"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "M",
+        "K",
+        "N"
+      ],
+      "impl": {
+        "function": "linear_rows_q6_k_checked_f32",
+        "c_declaration": "int linear_rows_q6_k_checked_f32(const float* input, size_t input_elements, const void* weight, size_t weight_bytes, float* output, size_t output_elements, size_t rows, size_t width, size_t channels);",
+        "sources": [
+          "src/kernels/linear_rows_packed_k_checked.c",
+          "src/kernels/dequant_kernels.c",
+          "src/ck_threadpool.c",
+          "src/ckernel_strict.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const float*",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "input_elements",
+            "source": "runtime:input_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "weight",
+            "source": "weight:weight",
+            "cast": "const void*",
+            "ports": [
+              "weight:weight"
+            ]
+          },
+          {
+            "name": "weight_bytes",
+            "source": "runtime:weight_bytes",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "width",
+            "source": "runtime:width",
+            "value_type": "size_t"
+          },
+          {
+            "name": "channels",
+            "source": "runtime:channels",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "M": "rows",
+          "K": "width",
+          "N": "channels"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "elements": "input_elements",
+            "rows": "rows",
+            "width": "width",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "weight",
+            "elements": "weight_bytes",
+            "rows": 1,
+            "width": "weight_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q6_k"
+          },
+          {
+            "pointer": "output",
+            "elements": "output_elements",
+            "rows": "rows",
+            "width": "channels",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_q4km_block.py"
+        ]
+      },
+      "notes": "Packed GGUF weights. Each dot expands one block at a time and accumulates in channel order in FP64.",
+      "name": "linear_rows_q6_k_checked_f32",
+      "_source_file": "linear_rows_q6_k_checked_f32.json"
+    },
+    {
+      "id": "linear_rows_q6_k_q8_k_checked_f32",
+      "op": "linear_rows_q6_k_q8_k_checked",
+      "operation_interface": "linear.row_major.checked.q6_k_q8_k_internal.v1",
+      "variant": "q6_k_weight_with_q8_k_activation",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "phases": [
+          "prefill"
+        ],
+        "equivalence_group": "linear.row_major.checked.q6_k_q8_k_internal.v1"
+      },
+      "quant": {
+        "weight": "q6_k",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            "M",
+            "K"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "weight",
+          "dtype": "q6_k",
+          "shape": [
+            "N",
+            "K"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "M",
+            "N"
+          ],
+          "layout": "row_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "work",
+          "dtype": "fp32",
+          "shape": [
+            "W"
+          ],
+          "size_bytes": "4 * W",
+          "size_resolution": "required",
+          "lifetime": "kernel_call",
+          "alignment": 64,
+          "layout": "contiguous",
+          "access": "read_write",
+          "storage_class": "scratch",
+          "consumption": "required"
+        }
+      ],
+      "dims": [
+        "M",
+        "K",
+        "N",
+        "W"
+      ],
+      "impl": {
+        "function": "linear_rows_q6_k_q8_k_checked_f32",
+        "c_declaration": "int linear_rows_q6_k_q8_k_checked_f32(const float* input, size_t input_elements, const void* weight, size_t weight_bytes, float* output, size_t output_elements, size_t rows, size_t width, size_t channels, float *work, size_t work_elements);",
+        "sources": [
+          "src/kernels/linear_rows_packed_k_checked.c",
+          "src/kernels/dequant_kernels.c",
+          "src/ck_threadpool.c",
+          "src/ckernel_strict.c",
+          "src/kernels/gemm_kernels_q4k_q8k.c",
+          "src/kernels/gemm_kernels_q6k_q8k.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const float*",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "input_elements",
+            "source": "runtime:input_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "weight",
+            "source": "weight:weight",
+            "cast": "const void*",
+            "ports": [
+              "weight:weight"
+            ]
+          },
+          {
+            "name": "weight_bytes",
+            "source": "runtime:weight_bytes",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "width",
+            "source": "runtime:width",
+            "value_type": "size_t"
+          },
+          {
+            "name": "channels",
+            "source": "runtime:channels",
+            "value_type": "size_t"
+          },
+          {
+            "name": "work",
+            "source": "scratch:work",
+            "cast": "float*"
+          },
+          {
+            "name": "work_elements",
+            "source": "runtime:work_elements",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "M": "rows",
+          "K": "width",
+          "N": "channels",
+          "W": "work_elements"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "elements": "input_elements",
+            "rows": "rows",
+            "width": "width",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "weight",
+            "elements": "weight_bytes",
+            "rows": 1,
+            "width": "weight_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q6_k"
+          },
+          {
+            "pointer": "output",
+            "elements": "output_elements",
+            "rows": "rows",
+            "width": "channels",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "work",
+            "elements": "work_elements",
+            "rows": 1,
+            "width": "work_elements",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_q4km_block.py"
+        ]
+      },
+      "notes": "Pack each FP32 activation row as Q8_K. Stage output in planned scratch and publish only finite results.",
+      "name": "linear_rows_q6_k_q8_k_checked_f32",
+      "_source_file": "linear_rows_q6_k_q8_k_checked_f32.json"
     },
     {
       "id": "linear_rows_q8_0_checked_f32",
@@ -102046,7 +103039,10 @@
         "c_declaration": "int routed_softcapped_experts_checked_f32(const float* hidden, const int32_t* ids, const float* route_weights, const int32_t* expert_slots, const void* gate, const void* up, const void* down, float* expert_output, float* output, float* work, size_t rows, size_t hidden_dim, size_t inner, size_t experts, size_t slots, size_t top_k, size_t matrix_bytes, size_t hidden_elements, size_t id_elements, size_t route_elements, size_t expert_slot_elements, size_t expert_output_elements, size_t output_capacity, size_t work_elements, float gate_cap, float up_cap);",
         "sources": [
           "src/kernels/routed_softcapped_experts_checked.c",
-          "src/kernels/transformer_rows_checked.c"
+          "src/kernels/transformer_rows_checked.c",
+          "src/kernels/dequant_kernels.c",
+          "src/ck_threadpool.c",
+          "src/ckernel_strict.c"
         ]
       },
       "modes": {
@@ -102477,7 +103473,10 @@
         "c_declaration": "int routed_softcapped_experts_checked_iq4_nl(const float* hidden, const int32_t* ids, const float* route_weights, const int32_t* expert_slots, const void* gate, const void* up, const void* down, float* expert_output, float* output, float* work, size_t rows, size_t hidden_dim, size_t inner, size_t experts, size_t slots, size_t top_k, size_t matrix_bytes, size_t hidden_elements, size_t id_elements, size_t route_elements, size_t expert_slot_elements, size_t expert_output_elements, size_t output_capacity, size_t work_elements, float gate_cap, float up_cap);",
         "sources": [
           "src/kernels/routed_softcapped_experts_checked.c",
-          "src/kernels/transformer_rows_checked.c"
+          "src/kernels/transformer_rows_checked.c",
+          "src/kernels/dequant_kernels.c",
+          "src/ck_threadpool.c",
+          "src/ckernel_strict.c"
         ]
       },
       "modes": {
@@ -102734,6 +103733,5302 @@
       "_source_file": "routed_softcapped_experts_checked_iq4_nl.json"
     },
     {
+      "id": "routed_softcapped_experts_checked_q4_k_q5_0",
+      "op": "routed_softcapped_experts_checked",
+      "operation_interface": "moe.routed_softcap.checked.q4_k_q5_0_fp32_ordered.v1",
+      "variant": "q4_k_q5_0",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "phases": [
+          "prefill"
+        ],
+        "equivalence_group": "moe.routed_softcap.checked.q4_k_q5_0_fp32_ordered.v1"
+      },
+      "quant": {
+        "weight": "q4_k",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "hidden",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "ids",
+          "dtype": "i32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "route_weights",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "expert_slots",
+          "dtype": "i32",
+          "shape": [
+            "E"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "gate",
+          "dtype": "q4_k",
+          "shape": [
+            "S",
+            "I",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "up",
+          "dtype": "q4_k",
+          "shape": [
+            "S",
+            "I",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "down",
+          "dtype": "q5_0",
+          "shape": [
+            "S",
+            "H",
+            "I"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "expert_output",
+          "dtype": "fp32",
+          "shape": [
+            "P",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "work",
+          "dtype": "fp32",
+          "shape": [
+            "W"
+          ],
+          "size_bytes": "4 * W",
+          "size_resolution": "required",
+          "lifetime": "kernel_call",
+          "alignment": 64,
+          "layout": "contiguous",
+          "access": "read_write",
+          "storage_class": "scratch",
+          "consumption": "required"
+        }
+      ],
+      "dims": [
+        "R",
+        "H",
+        "I",
+        "E",
+        "S",
+        "K",
+        "P",
+        "W"
+      ],
+      "impl": {
+        "function": "routed_softcapped_experts_checked_q4_k_q5_0",
+        "c_declaration": "int routed_softcapped_experts_checked_q4_k_q5_0(const float* hidden, const int32_t* ids, const float* route_weights, const int32_t* expert_slots, const void* gate, const void* up, const void* down, float* expert_output, float* output, float* work, size_t rows, size_t hidden_dim, size_t inner, size_t experts, size_t slots, size_t top_k, size_t matrix_bytes, size_t hidden_elements, size_t id_elements, size_t route_elements, size_t expert_slot_elements, size_t expert_output_elements, size_t output_capacity, size_t work_elements, float gate_cap, float up_cap, size_t down_matrix_bytes);",
+        "sources": [
+          "src/kernels/routed_softcapped_experts_checked.c",
+          "src/kernels/transformer_rows_checked.c",
+          "src/kernels/dequant_kernels.c",
+          "src/ck_threadpool.c",
+          "src/ckernel_strict.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "hidden",
+            "source": "activation:hidden",
+            "cast": "const float*",
+            "ports": [
+              "input:hidden"
+            ]
+          },
+          {
+            "name": "ids",
+            "source": "activation:ids",
+            "cast": "const int32_t*",
+            "ports": [
+              "input:ids"
+            ]
+          },
+          {
+            "name": "route_weights",
+            "source": "activation:route_weights",
+            "cast": "const float*",
+            "ports": [
+              "input:route_weights"
+            ]
+          },
+          {
+            "name": "expert_slots",
+            "source": "activation:expert_slots",
+            "cast": "const int32_t*",
+            "ports": [
+              "input:expert_slots"
+            ]
+          },
+          {
+            "name": "gate",
+            "source": "weight:gate",
+            "cast": "const void*",
+            "ports": [
+              "weight:gate"
+            ]
+          },
+          {
+            "name": "up",
+            "source": "weight:up",
+            "cast": "const void*",
+            "ports": [
+              "weight:up"
+            ]
+          },
+          {
+            "name": "down",
+            "source": "weight:down",
+            "cast": "const void*",
+            "ports": [
+              "weight:down"
+            ]
+          },
+          {
+            "name": "expert_output",
+            "source": "output:expert_output",
+            "cast": "float*",
+            "ports": [
+              "output:expert_output"
+            ]
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "work",
+            "source": "scratch:work",
+            "cast": "float*"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "hidden_dim",
+            "source": "runtime:hidden_dim",
+            "value_type": "size_t"
+          },
+          {
+            "name": "inner",
+            "source": "runtime:inner",
+            "value_type": "size_t"
+          },
+          {
+            "name": "experts",
+            "source": "runtime:experts",
+            "value_type": "size_t"
+          },
+          {
+            "name": "slots",
+            "source": "runtime:slots",
+            "value_type": "size_t"
+          },
+          {
+            "name": "top_k",
+            "source": "runtime:top_k",
+            "value_type": "size_t"
+          },
+          {
+            "name": "matrix_bytes",
+            "source": "runtime:matrix_bytes",
+            "value_type": "size_t"
+          },
+          {
+            "name": "hidden_elements",
+            "source": "runtime:hidden_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "id_elements",
+            "source": "runtime:id_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "route_elements",
+            "source": "runtime:route_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "expert_slot_elements",
+            "source": "runtime:expert_slot_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "expert_output_elements",
+            "source": "runtime:expert_output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output_capacity",
+            "source": "runtime:output_capacity",
+            "value_type": "size_t"
+          },
+          {
+            "name": "work_elements",
+            "source": "runtime:work_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "gate_cap",
+            "source": "param:gate_cap"
+          },
+          {
+            "name": "up_cap",
+            "source": "param:up_cap"
+          },
+          {
+            "name": "down_matrix_bytes",
+            "source": "runtime:down_matrix_bytes",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "R": "rows",
+          "H": "hidden_dim",
+          "I": "inner",
+          "E": "experts",
+          "S": "slots",
+          "K": "top_k",
+          "W": "work_elements"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "hidden",
+            "elements": "hidden_elements",
+            "rows": "rows",
+            "width": "hidden_dim",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "ids",
+            "elements": "id_elements",
+            "rows": "rows",
+            "width": "top_k",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "route_weights",
+            "elements": "route_elements",
+            "rows": "rows",
+            "width": "top_k",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "expert_slots",
+            "elements": "expert_slot_elements",
+            "rows": 1,
+            "width": "experts",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "output",
+            "elements": "output_capacity",
+            "rows": "rows",
+            "width": "hidden_dim",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "gate",
+            "elements": "matrix_bytes",
+            "rows": 1,
+            "width": "matrix_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q4_k"
+          },
+          {
+            "pointer": "up",
+            "elements": "matrix_bytes",
+            "rows": 1,
+            "width": "matrix_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q4_k"
+          },
+          {
+            "pointer": "down",
+            "elements": "down_matrix_bytes",
+            "rows": 1,
+            "width": "down_matrix_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q5_0"
+          },
+          {
+            "pointer": "expert_output",
+            "elements": "expert_output_elements",
+            "rows": 1,
+            "width": "expert_output_elements",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_q4km_block.py"
+        ]
+      },
+      "notes": "Independent packed strides for gate/up and down. FP32 activations, ordered FP64 dot products, and FP32 mixture accumulation by ascending expert ID.",
+      "name": "routed_softcapped_experts_checked_q4_k_q5_0",
+      "_source_file": "routed_softcapped_experts_checked_q4_k_q5_0.json"
+    },
+    {
+      "id": "routed_softcapped_experts_checked_q4_k_q5_0_grouped",
+      "op": "routed_softcapped_experts_checked",
+      "operation_interface": "moe.routed_softcap.checked.q4_k_q5_0_fp32_ordered.v1",
+      "variant": "grouped_rows_q4_k_q5_0_q8_k_hidden_q8_0_down",
+      "selection": {
+        "status": "candidate",
+        "priority": 70,
+        "phases": [
+          "prefill"
+        ],
+        "equivalence_group": "moe.routed_softcap.checked.q4_k_q5_0_q8_k_hidden_q8_0_down.v1"
+      },
+      "quant": {
+        "weight": "q4_k",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "hidden",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "ids",
+          "dtype": "i32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "route_weights",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "expert_slots",
+          "dtype": "i32",
+          "shape": [
+            "E"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "gate",
+          "dtype": "q4_k",
+          "shape": [
+            "S",
+            "I",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "up",
+          "dtype": "q4_k",
+          "shape": [
+            "S",
+            "I",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "down",
+          "dtype": "q5_0",
+          "shape": [
+            "S",
+            "H",
+            "I"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "expert_output",
+          "dtype": "fp32",
+          "shape": [
+            "P",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "work",
+          "dtype": "fp32",
+          "shape": [
+            "W"
+          ],
+          "size_bytes": "4 * W",
+          "size_resolution": "required",
+          "lifetime": "kernel_call",
+          "alignment": 64,
+          "layout": "contiguous",
+          "access": "read_write",
+          "storage_class": "scratch",
+          "consumption": "required"
+        }
+      ],
+      "dims": [
+        "R",
+        "H",
+        "I",
+        "E",
+        "S",
+        "K",
+        "P",
+        "W"
+      ],
+      "impl": {
+        "function": "routed_softcapped_experts_checked_q4_k_q5_0_grouped",
+        "c_declaration": "int routed_softcapped_experts_checked_q4_k_q5_0_grouped(const float* hidden, const int32_t* ids, const float* route_weights, const int32_t* expert_slots, const void* gate, const void* up, const void* down, float* expert_output, float* output, float* work, size_t rows, size_t hidden_dim, size_t inner, size_t experts, size_t slots, size_t top_k, size_t matrix_bytes, size_t hidden_elements, size_t id_elements, size_t route_elements, size_t expert_slot_elements, size_t expert_output_elements, size_t output_capacity, size_t work_elements, float gate_cap, float up_cap, size_t down_matrix_bytes);",
+        "sources": [
+          "src/kernels/routed_softcapped_experts_checked.c",
+          "src/kernels/transformer_rows_checked.c",
+          "src/kernels/dequant_kernels.c",
+          "src/ck_threadpool.c",
+          "src/ckernel_strict.c",
+          "src/kernels/gemm_kernels_q4k_q8k.c",
+          "src/kernels/gemm_kernels_q4k_q8k_avx2.c",
+          "src/kernels/gemm_kernels_q5_0.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "hidden",
+            "source": "activation:hidden",
+            "cast": "const float*",
+            "ports": [
+              "input:hidden"
+            ]
+          },
+          {
+            "name": "ids",
+            "source": "activation:ids",
+            "cast": "const int32_t*",
+            "ports": [
+              "input:ids"
+            ]
+          },
+          {
+            "name": "route_weights",
+            "source": "activation:route_weights",
+            "cast": "const float*",
+            "ports": [
+              "input:route_weights"
+            ]
+          },
+          {
+            "name": "expert_slots",
+            "source": "activation:expert_slots",
+            "cast": "const int32_t*",
+            "ports": [
+              "input:expert_slots"
+            ]
+          },
+          {
+            "name": "gate",
+            "source": "weight:gate",
+            "cast": "const void*",
+            "ports": [
+              "weight:gate"
+            ]
+          },
+          {
+            "name": "up",
+            "source": "weight:up",
+            "cast": "const void*",
+            "ports": [
+              "weight:up"
+            ]
+          },
+          {
+            "name": "down",
+            "source": "weight:down",
+            "cast": "const void*",
+            "ports": [
+              "weight:down"
+            ]
+          },
+          {
+            "name": "expert_output",
+            "source": "output:expert_output",
+            "cast": "float*",
+            "ports": [
+              "output:expert_output"
+            ]
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "work",
+            "source": "scratch:work",
+            "cast": "float*"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "hidden_dim",
+            "source": "runtime:hidden_dim",
+            "value_type": "size_t"
+          },
+          {
+            "name": "inner",
+            "source": "runtime:inner",
+            "value_type": "size_t"
+          },
+          {
+            "name": "experts",
+            "source": "runtime:experts",
+            "value_type": "size_t"
+          },
+          {
+            "name": "slots",
+            "source": "runtime:slots",
+            "value_type": "size_t"
+          },
+          {
+            "name": "top_k",
+            "source": "runtime:top_k",
+            "value_type": "size_t"
+          },
+          {
+            "name": "matrix_bytes",
+            "source": "runtime:matrix_bytes",
+            "value_type": "size_t"
+          },
+          {
+            "name": "hidden_elements",
+            "source": "runtime:hidden_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "id_elements",
+            "source": "runtime:id_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "route_elements",
+            "source": "runtime:route_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "expert_slot_elements",
+            "source": "runtime:expert_slot_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "expert_output_elements",
+            "source": "runtime:expert_output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output_capacity",
+            "source": "runtime:output_capacity",
+            "value_type": "size_t"
+          },
+          {
+            "name": "work_elements",
+            "source": "runtime:work_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "gate_cap",
+            "source": "param:gate_cap"
+          },
+          {
+            "name": "up_cap",
+            "source": "param:up_cap"
+          },
+          {
+            "name": "down_matrix_bytes",
+            "source": "runtime:down_matrix_bytes",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "R": "rows",
+          "H": "hidden_dim",
+          "I": "inner",
+          "E": "experts",
+          "S": "slots",
+          "K": "top_k",
+          "W": "work_elements"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "hidden",
+            "elements": "hidden_elements",
+            "rows": "rows",
+            "width": "hidden_dim",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "ids",
+            "elements": "id_elements",
+            "rows": "rows",
+            "width": "top_k",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "route_weights",
+            "elements": "route_elements",
+            "rows": "rows",
+            "width": "top_k",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "expert_slots",
+            "elements": "expert_slot_elements",
+            "rows": 1,
+            "width": "experts",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "output",
+            "elements": "output_capacity",
+            "rows": "rows",
+            "width": "hidden_dim",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "gate",
+            "elements": "matrix_bytes",
+            "rows": 1,
+            "width": "matrix_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q4_k"
+          },
+          {
+            "pointer": "up",
+            "elements": "matrix_bytes",
+            "rows": 1,
+            "width": "matrix_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q4_k"
+          },
+          {
+            "pointer": "down",
+            "elements": "down_matrix_bytes",
+            "rows": 1,
+            "width": "down_matrix_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q5_0"
+          },
+          {
+            "pointer": "expert_output",
+            "elements": "expert_output_elements",
+            "rows": 1,
+            "width": "expert_output_elements",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_q4km_block.py"
+        ]
+      },
+      "notes": "Pack gate and up activation rows as Q8_K and down inputs as Q8_0. Accumulate weighted expert outputs by ascending expert ID. Prefill groups tokens by expert ID and writes each result to its original route slot before mixing.",
+      "name": "routed_softcapped_experts_checked_q4_k_q5_0_grouped",
+      "_source_file": "routed_softcapped_experts_checked_q4_k_q5_0_grouped.json"
+    },
+    {
+      "id": "routed_softcapped_experts_checked_q4_k_q5_0_grouped_pair",
+      "op": "routed_softcapped_experts_checked",
+      "operation_interface": "moe.routed_softcap.checked.q4_k_q5_0_fp32_ordered.v1",
+      "variant": "grouped_rows_q4_k_q5_0_q8_k_hidden_q8_0_down_pair",
+      "selection": {
+        "status": "candidate",
+        "priority": 65,
+        "phases": [
+          "prefill"
+        ],
+        "equivalence_group": "moe.routed_softcap.checked.q4_k_q5_0_q8_k_hidden_q8_0_down.v1"
+      },
+      "quant": {
+        "weight": "q4_k",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "hidden",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "ids",
+          "dtype": "i32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "route_weights",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "expert_slots",
+          "dtype": "i32",
+          "shape": [
+            "E"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "gate",
+          "dtype": "q4_k",
+          "shape": [
+            "S",
+            "I",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "up",
+          "dtype": "q4_k",
+          "shape": [
+            "S",
+            "I",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "down",
+          "dtype": "q5_0",
+          "shape": [
+            "S",
+            "H",
+            "I"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "expert_output",
+          "dtype": "fp32",
+          "shape": [
+            "P",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "work",
+          "dtype": "fp32",
+          "shape": [
+            "W"
+          ],
+          "size_bytes": "4 * W",
+          "size_resolution": "required",
+          "lifetime": "kernel_call",
+          "alignment": 64,
+          "layout": "contiguous",
+          "access": "read_write",
+          "storage_class": "scratch",
+          "consumption": "required"
+        }
+      ],
+      "dims": [
+        "R",
+        "H",
+        "I",
+        "E",
+        "S",
+        "K",
+        "P",
+        "W"
+      ],
+      "impl": {
+        "function": "routed_softcapped_experts_checked_q4_k_q5_0_grouped_pair",
+        "c_declaration": "int routed_softcapped_experts_checked_q4_k_q5_0_grouped_pair(const float* hidden, const int32_t* ids, const float* route_weights, const int32_t* expert_slots, const void* gate, const void* up, const void* down, float* expert_output, float* output, float* work, size_t rows, size_t hidden_dim, size_t inner, size_t experts, size_t slots, size_t top_k, size_t matrix_bytes, size_t hidden_elements, size_t id_elements, size_t route_elements, size_t expert_slot_elements, size_t expert_output_elements, size_t output_capacity, size_t work_elements, float gate_cap, float up_cap, size_t down_matrix_bytes);",
+        "sources": [
+          "src/kernels/routed_softcapped_experts_checked.c",
+          "src/kernels/transformer_rows_checked.c",
+          "src/kernels/dequant_kernels.c",
+          "src/ck_threadpool.c",
+          "src/ckernel_strict.c",
+          "src/kernels/gemm_kernels_q4k_q8k.c",
+          "src/kernels/gemm_kernels_q4k_q8k_avx2.c",
+          "src/kernels/gemm_kernels_q5_0.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "hidden",
+            "source": "activation:hidden",
+            "cast": "const float*",
+            "ports": [
+              "input:hidden"
+            ]
+          },
+          {
+            "name": "ids",
+            "source": "activation:ids",
+            "cast": "const int32_t*",
+            "ports": [
+              "input:ids"
+            ]
+          },
+          {
+            "name": "route_weights",
+            "source": "activation:route_weights",
+            "cast": "const float*",
+            "ports": [
+              "input:route_weights"
+            ]
+          },
+          {
+            "name": "expert_slots",
+            "source": "activation:expert_slots",
+            "cast": "const int32_t*",
+            "ports": [
+              "input:expert_slots"
+            ]
+          },
+          {
+            "name": "gate",
+            "source": "weight:gate",
+            "cast": "const void*",
+            "ports": [
+              "weight:gate"
+            ]
+          },
+          {
+            "name": "up",
+            "source": "weight:up",
+            "cast": "const void*",
+            "ports": [
+              "weight:up"
+            ]
+          },
+          {
+            "name": "down",
+            "source": "weight:down",
+            "cast": "const void*",
+            "ports": [
+              "weight:down"
+            ]
+          },
+          {
+            "name": "expert_output",
+            "source": "output:expert_output",
+            "cast": "float*",
+            "ports": [
+              "output:expert_output"
+            ]
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "work",
+            "source": "scratch:work",
+            "cast": "float*"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "hidden_dim",
+            "source": "runtime:hidden_dim",
+            "value_type": "size_t"
+          },
+          {
+            "name": "inner",
+            "source": "runtime:inner",
+            "value_type": "size_t"
+          },
+          {
+            "name": "experts",
+            "source": "runtime:experts",
+            "value_type": "size_t"
+          },
+          {
+            "name": "slots",
+            "source": "runtime:slots",
+            "value_type": "size_t"
+          },
+          {
+            "name": "top_k",
+            "source": "runtime:top_k",
+            "value_type": "size_t"
+          },
+          {
+            "name": "matrix_bytes",
+            "source": "runtime:matrix_bytes",
+            "value_type": "size_t"
+          },
+          {
+            "name": "hidden_elements",
+            "source": "runtime:hidden_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "id_elements",
+            "source": "runtime:id_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "route_elements",
+            "source": "runtime:route_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "expert_slot_elements",
+            "source": "runtime:expert_slot_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "expert_output_elements",
+            "source": "runtime:expert_output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output_capacity",
+            "source": "runtime:output_capacity",
+            "value_type": "size_t"
+          },
+          {
+            "name": "work_elements",
+            "source": "runtime:work_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "gate_cap",
+            "source": "param:gate_cap"
+          },
+          {
+            "name": "up_cap",
+            "source": "param:up_cap"
+          },
+          {
+            "name": "down_matrix_bytes",
+            "source": "runtime:down_matrix_bytes",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "R": "rows",
+          "H": "hidden_dim",
+          "I": "inner",
+          "E": "experts",
+          "S": "slots",
+          "K": "top_k",
+          "W": "work_elements"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "hidden",
+            "elements": "hidden_elements",
+            "rows": "rows",
+            "width": "hidden_dim",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "ids",
+            "elements": "id_elements",
+            "rows": "rows",
+            "width": "top_k",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "route_weights",
+            "elements": "route_elements",
+            "rows": "rows",
+            "width": "top_k",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "expert_slots",
+            "elements": "expert_slot_elements",
+            "rows": 1,
+            "width": "experts",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "output",
+            "elements": "output_capacity",
+            "rows": "rows",
+            "width": "hidden_dim",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "gate",
+            "elements": "matrix_bytes",
+            "rows": 1,
+            "width": "matrix_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q4_k"
+          },
+          {
+            "pointer": "up",
+            "elements": "matrix_bytes",
+            "rows": 1,
+            "width": "matrix_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q4_k"
+          },
+          {
+            "pointer": "down",
+            "elements": "down_matrix_bytes",
+            "rows": 1,
+            "width": "down_matrix_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q5_0"
+          },
+          {
+            "pointer": "expert_output",
+            "elements": "expert_output_elements",
+            "rows": 1,
+            "width": "expert_output_elements",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_q4km_block.py"
+        ]
+      },
+      "notes": "Pack gate and up activation rows as Q8_K and down inputs as Q8_0. Accumulate weighted expert outputs by ascending expert ID. Prefill groups tokens by expert ID and writes each result to its original route slot before mixing. Two routed rows share Q4_K weight unpacking. Each retains its own reduction and lone rows use the single-row provider.",
+      "name": "routed_softcapped_experts_checked_q4_k_q5_0_grouped_pair",
+      "_source_file": "routed_softcapped_experts_checked_q4_k_q5_0_grouped_pair.json"
+    },
+    {
+      "id": "routed_softcapped_experts_checked_q4_k_q5_0_pair_jobs",
+      "op": "routed_softcapped_experts_checked",
+      "operation_interface": "moe.routed_softcap.checked.q4_k_q5_0_fp32_ordered.v1",
+      "variant": "dynamic_expert_pair_jobs",
+      "selection": {
+        "status": "candidate",
+        "priority": 60,
+        "phases": [
+          "prefill"
+        ],
+        "equivalence_group": "moe.routed_softcap.checked.q4_k_q5_0_q8_k_hidden_q8_0_down.v1"
+      },
+      "quant": {
+        "weight": "q4_k",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "hidden",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "ids",
+          "dtype": "i32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "route_weights",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "expert_slots",
+          "dtype": "i32",
+          "shape": [
+            "E"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "gate",
+          "dtype": "q4_k",
+          "shape": [
+            "S",
+            "I",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "up",
+          "dtype": "q4_k",
+          "shape": [
+            "S",
+            "I",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "down",
+          "dtype": "q5_0",
+          "shape": [
+            "S",
+            "H",
+            "I"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "expert_output",
+          "dtype": "fp32",
+          "shape": [
+            "P",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "work",
+          "dtype": "fp32",
+          "shape": [
+            "W"
+          ],
+          "size_bytes": "4 * W",
+          "size_resolution": "required",
+          "lifetime": "kernel_call",
+          "alignment": 64,
+          "layout": "contiguous",
+          "access": "read_write",
+          "storage_class": "scratch",
+          "consumption": "required"
+        }
+      ],
+      "dims": [
+        "R",
+        "H",
+        "I",
+        "E",
+        "S",
+        "K",
+        "P",
+        "W"
+      ],
+      "impl": {
+        "function": "routed_softcapped_experts_checked_q4_k_q5_0_pair_jobs",
+        "c_declaration": "int routed_softcapped_experts_checked_q4_k_q5_0_pair_jobs(const float* hidden, const int32_t* ids, const float* route_weights, const int32_t* expert_slots, const void* gate, const void* up, const void* down, float* expert_output, float* output, float* work, size_t rows, size_t hidden_dim, size_t inner, size_t experts, size_t slots, size_t top_k, size_t matrix_bytes, size_t hidden_elements, size_t id_elements, size_t route_elements, size_t expert_slot_elements, size_t expert_output_elements, size_t output_capacity, size_t work_elements, float gate_cap, float up_cap, size_t down_matrix_bytes);",
+        "sources": [
+          "src/kernels/routed_softcapped_experts_checked.c",
+          "src/kernels/transformer_rows_checked.c",
+          "src/kernels/dequant_kernels.c",
+          "src/ck_threadpool.c",
+          "src/ckernel_strict.c",
+          "src/kernels/gemm_kernels_q4k_q8k.c",
+          "src/kernels/gemm_kernels_q4k_q8k_avx2.c",
+          "src/kernels/gemm_kernels_q5_0.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "hidden",
+            "source": "activation:hidden",
+            "cast": "const float*",
+            "ports": [
+              "input:hidden"
+            ]
+          },
+          {
+            "name": "ids",
+            "source": "activation:ids",
+            "cast": "const int32_t*",
+            "ports": [
+              "input:ids"
+            ]
+          },
+          {
+            "name": "route_weights",
+            "source": "activation:route_weights",
+            "cast": "const float*",
+            "ports": [
+              "input:route_weights"
+            ]
+          },
+          {
+            "name": "expert_slots",
+            "source": "activation:expert_slots",
+            "cast": "const int32_t*",
+            "ports": [
+              "input:expert_slots"
+            ]
+          },
+          {
+            "name": "gate",
+            "source": "weight:gate",
+            "cast": "const void*",
+            "ports": [
+              "weight:gate"
+            ]
+          },
+          {
+            "name": "up",
+            "source": "weight:up",
+            "cast": "const void*",
+            "ports": [
+              "weight:up"
+            ]
+          },
+          {
+            "name": "down",
+            "source": "weight:down",
+            "cast": "const void*",
+            "ports": [
+              "weight:down"
+            ]
+          },
+          {
+            "name": "expert_output",
+            "source": "output:expert_output",
+            "cast": "float*",
+            "ports": [
+              "output:expert_output"
+            ]
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "work",
+            "source": "scratch:work",
+            "cast": "float*"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "hidden_dim",
+            "source": "runtime:hidden_dim",
+            "value_type": "size_t"
+          },
+          {
+            "name": "inner",
+            "source": "runtime:inner",
+            "value_type": "size_t"
+          },
+          {
+            "name": "experts",
+            "source": "runtime:experts",
+            "value_type": "size_t"
+          },
+          {
+            "name": "slots",
+            "source": "runtime:slots",
+            "value_type": "size_t"
+          },
+          {
+            "name": "top_k",
+            "source": "runtime:top_k",
+            "value_type": "size_t"
+          },
+          {
+            "name": "matrix_bytes",
+            "source": "runtime:matrix_bytes",
+            "value_type": "size_t"
+          },
+          {
+            "name": "hidden_elements",
+            "source": "runtime:hidden_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "id_elements",
+            "source": "runtime:id_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "route_elements",
+            "source": "runtime:route_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "expert_slot_elements",
+            "source": "runtime:expert_slot_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "expert_output_elements",
+            "source": "runtime:expert_output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output_capacity",
+            "source": "runtime:output_capacity",
+            "value_type": "size_t"
+          },
+          {
+            "name": "work_elements",
+            "source": "runtime:work_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "gate_cap",
+            "source": "param:gate_cap"
+          },
+          {
+            "name": "up_cap",
+            "source": "param:up_cap"
+          },
+          {
+            "name": "down_matrix_bytes",
+            "source": "runtime:down_matrix_bytes",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "R": "rows",
+          "H": "hidden_dim",
+          "I": "inner",
+          "E": "experts",
+          "S": "slots",
+          "K": "top_k",
+          "W": "work_elements"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "hidden",
+            "elements": "hidden_elements",
+            "rows": "rows",
+            "width": "hidden_dim",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "ids",
+            "elements": "id_elements",
+            "rows": "rows",
+            "width": "top_k",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "route_weights",
+            "elements": "route_elements",
+            "rows": "rows",
+            "width": "top_k",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "expert_slots",
+            "elements": "expert_slot_elements",
+            "rows": 1,
+            "width": "experts",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "output",
+            "elements": "output_capacity",
+            "rows": "rows",
+            "width": "hidden_dim",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "gate",
+            "elements": "matrix_bytes",
+            "rows": 1,
+            "width": "matrix_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q4_k"
+          },
+          {
+            "pointer": "up",
+            "elements": "matrix_bytes",
+            "rows": 1,
+            "width": "matrix_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q4_k"
+          },
+          {
+            "pointer": "down",
+            "elements": "down_matrix_bytes",
+            "rows": 1,
+            "width": "down_matrix_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q5_0"
+          },
+          {
+            "pointer": "expert_output",
+            "elements": "expert_output_elements",
+            "rows": 1,
+            "width": "expert_output_elements",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_q4km_block.py"
+        ]
+      },
+      "notes": "Pack gate and up activation rows as Q8_K and down inputs as Q8_0. Accumulate weighted expert outputs by ascending expert ID. Prefill groups tokens by expert ID and writes each result to its original route slot before mixing. Two routed rows share Q4_K weight unpacking. Each retains its own reduction and lone rows use the single-row provider. Workers dynamically claim individual pairs or tail rows and use private temporary storage.",
+      "name": "routed_softcapped_experts_checked_q4_k_q5_0_pair_jobs",
+      "_source_file": "routed_softcapped_experts_checked_q4_k_q5_0_pair_jobs.json"
+    },
+    {
+      "id": "routed_softcapped_experts_checked_q4_k_q5_0_q8_k_hidden",
+      "op": "routed_softcapped_experts_checked",
+      "operation_interface": "moe.routed_softcap.checked.q4_k_q5_0_fp32_ordered.v1",
+      "variant": "q4_k_q5_0_q8_k_hidden",
+      "selection": {
+        "status": "candidate",
+        "priority": 90,
+        "phases": [
+          "prefill"
+        ],
+        "equivalence_group": "moe.routed_softcap.checked.q4_k_q5_0_q8_k_hidden.v1"
+      },
+      "quant": {
+        "weight": "q4_k",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "hidden",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "ids",
+          "dtype": "i32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "route_weights",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "expert_slots",
+          "dtype": "i32",
+          "shape": [
+            "E"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "gate",
+          "dtype": "q4_k",
+          "shape": [
+            "S",
+            "I",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "up",
+          "dtype": "q4_k",
+          "shape": [
+            "S",
+            "I",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "down",
+          "dtype": "q5_0",
+          "shape": [
+            "S",
+            "H",
+            "I"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "expert_output",
+          "dtype": "fp32",
+          "shape": [
+            "P",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "work",
+          "dtype": "fp32",
+          "shape": [
+            "W"
+          ],
+          "size_bytes": "4 * W",
+          "size_resolution": "required",
+          "lifetime": "kernel_call",
+          "alignment": 64,
+          "layout": "contiguous",
+          "access": "read_write",
+          "storage_class": "scratch",
+          "consumption": "required"
+        }
+      ],
+      "dims": [
+        "R",
+        "H",
+        "I",
+        "E",
+        "S",
+        "K",
+        "P",
+        "W"
+      ],
+      "impl": {
+        "function": "routed_softcapped_experts_checked_q4_k_q5_0_q8_k_hidden",
+        "c_declaration": "int routed_softcapped_experts_checked_q4_k_q5_0_q8_k_hidden(const float* hidden, const int32_t* ids, const float* route_weights, const int32_t* expert_slots, const void* gate, const void* up, const void* down, float* expert_output, float* output, float* work, size_t rows, size_t hidden_dim, size_t inner, size_t experts, size_t slots, size_t top_k, size_t matrix_bytes, size_t hidden_elements, size_t id_elements, size_t route_elements, size_t expert_slot_elements, size_t expert_output_elements, size_t output_capacity, size_t work_elements, float gate_cap, float up_cap, size_t down_matrix_bytes);",
+        "sources": [
+          "src/kernels/routed_softcapped_experts_checked.c",
+          "src/kernels/transformer_rows_checked.c",
+          "src/kernels/dequant_kernels.c",
+          "src/ck_threadpool.c",
+          "src/ckernel_strict.c",
+          "src/kernels/gemm_kernels_q4k_q8k.c",
+          "src/kernels/gemm_kernels_q4k_q8k_avx2.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "hidden",
+            "source": "activation:hidden",
+            "cast": "const float*",
+            "ports": [
+              "input:hidden"
+            ]
+          },
+          {
+            "name": "ids",
+            "source": "activation:ids",
+            "cast": "const int32_t*",
+            "ports": [
+              "input:ids"
+            ]
+          },
+          {
+            "name": "route_weights",
+            "source": "activation:route_weights",
+            "cast": "const float*",
+            "ports": [
+              "input:route_weights"
+            ]
+          },
+          {
+            "name": "expert_slots",
+            "source": "activation:expert_slots",
+            "cast": "const int32_t*",
+            "ports": [
+              "input:expert_slots"
+            ]
+          },
+          {
+            "name": "gate",
+            "source": "weight:gate",
+            "cast": "const void*",
+            "ports": [
+              "weight:gate"
+            ]
+          },
+          {
+            "name": "up",
+            "source": "weight:up",
+            "cast": "const void*",
+            "ports": [
+              "weight:up"
+            ]
+          },
+          {
+            "name": "down",
+            "source": "weight:down",
+            "cast": "const void*",
+            "ports": [
+              "weight:down"
+            ]
+          },
+          {
+            "name": "expert_output",
+            "source": "output:expert_output",
+            "cast": "float*",
+            "ports": [
+              "output:expert_output"
+            ]
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "work",
+            "source": "scratch:work",
+            "cast": "float*"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "hidden_dim",
+            "source": "runtime:hidden_dim",
+            "value_type": "size_t"
+          },
+          {
+            "name": "inner",
+            "source": "runtime:inner",
+            "value_type": "size_t"
+          },
+          {
+            "name": "experts",
+            "source": "runtime:experts",
+            "value_type": "size_t"
+          },
+          {
+            "name": "slots",
+            "source": "runtime:slots",
+            "value_type": "size_t"
+          },
+          {
+            "name": "top_k",
+            "source": "runtime:top_k",
+            "value_type": "size_t"
+          },
+          {
+            "name": "matrix_bytes",
+            "source": "runtime:matrix_bytes",
+            "value_type": "size_t"
+          },
+          {
+            "name": "hidden_elements",
+            "source": "runtime:hidden_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "id_elements",
+            "source": "runtime:id_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "route_elements",
+            "source": "runtime:route_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "expert_slot_elements",
+            "source": "runtime:expert_slot_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "expert_output_elements",
+            "source": "runtime:expert_output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output_capacity",
+            "source": "runtime:output_capacity",
+            "value_type": "size_t"
+          },
+          {
+            "name": "work_elements",
+            "source": "runtime:work_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "gate_cap",
+            "source": "param:gate_cap"
+          },
+          {
+            "name": "up_cap",
+            "source": "param:up_cap"
+          },
+          {
+            "name": "down_matrix_bytes",
+            "source": "runtime:down_matrix_bytes",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "R": "rows",
+          "H": "hidden_dim",
+          "I": "inner",
+          "E": "experts",
+          "S": "slots",
+          "K": "top_k",
+          "W": "work_elements"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "hidden",
+            "elements": "hidden_elements",
+            "rows": "rows",
+            "width": "hidden_dim",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "ids",
+            "elements": "id_elements",
+            "rows": "rows",
+            "width": "top_k",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "route_weights",
+            "elements": "route_elements",
+            "rows": "rows",
+            "width": "top_k",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "expert_slots",
+            "elements": "expert_slot_elements",
+            "rows": 1,
+            "width": "experts",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "output",
+            "elements": "output_capacity",
+            "rows": "rows",
+            "width": "hidden_dim",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "gate",
+            "elements": "matrix_bytes",
+            "rows": 1,
+            "width": "matrix_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q4_k"
+          },
+          {
+            "pointer": "up",
+            "elements": "matrix_bytes",
+            "rows": 1,
+            "width": "matrix_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q4_k"
+          },
+          {
+            "pointer": "down",
+            "elements": "down_matrix_bytes",
+            "rows": 1,
+            "width": "down_matrix_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q5_0"
+          },
+          {
+            "pointer": "expert_output",
+            "elements": "expert_output_elements",
+            "rows": 1,
+            "width": "expert_output_elements",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_q4km_block.py"
+        ]
+      },
+      "notes": "Pack each FP32 input row to Q8_K once for Q4_K gate/up integer dots. Down projection uses ordered FP64 dots and expert mixture preserves ascending expert-ID order.",
+      "name": "routed_softcapped_experts_checked_q4_k_q5_0_q8_k_hidden",
+      "_source_file": "routed_softcapped_experts_checked_q4_k_q5_0_q8_k_hidden.json"
+    },
+    {
+      "id": "routed_softcapped_experts_checked_q4_k_q5_0_q8_k_hidden_q8_0_down",
+      "op": "routed_softcapped_experts_checked",
+      "operation_interface": "moe.routed_softcap.checked.q4_k_q5_0_fp32_ordered.v1",
+      "variant": "q4_k_q5_0_q8_k_hidden_q8_0_down",
+      "selection": {
+        "status": "candidate",
+        "priority": 80,
+        "phases": [
+          "prefill"
+        ],
+        "equivalence_group": "moe.routed_softcap.checked.q4_k_q5_0_q8_k_hidden_q8_0_down.v1"
+      },
+      "quant": {
+        "weight": "q4_k",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "hidden",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "ids",
+          "dtype": "i32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "route_weights",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "expert_slots",
+          "dtype": "i32",
+          "shape": [
+            "E"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "gate",
+          "dtype": "q4_k",
+          "shape": [
+            "S",
+            "I",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "up",
+          "dtype": "q4_k",
+          "shape": [
+            "S",
+            "I",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "down",
+          "dtype": "q5_0",
+          "shape": [
+            "S",
+            "H",
+            "I"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "expert_output",
+          "dtype": "fp32",
+          "shape": [
+            "P",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "work",
+          "dtype": "fp32",
+          "shape": [
+            "W"
+          ],
+          "size_bytes": "4 * W",
+          "size_resolution": "required",
+          "lifetime": "kernel_call",
+          "alignment": 64,
+          "layout": "contiguous",
+          "access": "read_write",
+          "storage_class": "scratch",
+          "consumption": "required"
+        }
+      ],
+      "dims": [
+        "R",
+        "H",
+        "I",
+        "E",
+        "S",
+        "K",
+        "P",
+        "W"
+      ],
+      "impl": {
+        "function": "routed_softcapped_experts_checked_q4_k_q5_0_q8_k_hidden_q8_0_down",
+        "c_declaration": "int routed_softcapped_experts_checked_q4_k_q5_0_q8_k_hidden_q8_0_down(const float* hidden, const int32_t* ids, const float* route_weights, const int32_t* expert_slots, const void* gate, const void* up, const void* down, float* expert_output, float* output, float* work, size_t rows, size_t hidden_dim, size_t inner, size_t experts, size_t slots, size_t top_k, size_t matrix_bytes, size_t hidden_elements, size_t id_elements, size_t route_elements, size_t expert_slot_elements, size_t expert_output_elements, size_t output_capacity, size_t work_elements, float gate_cap, float up_cap, size_t down_matrix_bytes);",
+        "sources": [
+          "src/kernels/routed_softcapped_experts_checked.c",
+          "src/kernels/transformer_rows_checked.c",
+          "src/kernels/dequant_kernels.c",
+          "src/ck_threadpool.c",
+          "src/ckernel_strict.c",
+          "src/kernels/gemm_kernels_q4k_q8k.c",
+          "src/kernels/gemm_kernels_q4k_q8k_avx2.c",
+          "src/kernels/gemm_kernels_q5_0.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "hidden",
+            "source": "activation:hidden",
+            "cast": "const float*",
+            "ports": [
+              "input:hidden"
+            ]
+          },
+          {
+            "name": "ids",
+            "source": "activation:ids",
+            "cast": "const int32_t*",
+            "ports": [
+              "input:ids"
+            ]
+          },
+          {
+            "name": "route_weights",
+            "source": "activation:route_weights",
+            "cast": "const float*",
+            "ports": [
+              "input:route_weights"
+            ]
+          },
+          {
+            "name": "expert_slots",
+            "source": "activation:expert_slots",
+            "cast": "const int32_t*",
+            "ports": [
+              "input:expert_slots"
+            ]
+          },
+          {
+            "name": "gate",
+            "source": "weight:gate",
+            "cast": "const void*",
+            "ports": [
+              "weight:gate"
+            ]
+          },
+          {
+            "name": "up",
+            "source": "weight:up",
+            "cast": "const void*",
+            "ports": [
+              "weight:up"
+            ]
+          },
+          {
+            "name": "down",
+            "source": "weight:down",
+            "cast": "const void*",
+            "ports": [
+              "weight:down"
+            ]
+          },
+          {
+            "name": "expert_output",
+            "source": "output:expert_output",
+            "cast": "float*",
+            "ports": [
+              "output:expert_output"
+            ]
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "work",
+            "source": "scratch:work",
+            "cast": "float*"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "hidden_dim",
+            "source": "runtime:hidden_dim",
+            "value_type": "size_t"
+          },
+          {
+            "name": "inner",
+            "source": "runtime:inner",
+            "value_type": "size_t"
+          },
+          {
+            "name": "experts",
+            "source": "runtime:experts",
+            "value_type": "size_t"
+          },
+          {
+            "name": "slots",
+            "source": "runtime:slots",
+            "value_type": "size_t"
+          },
+          {
+            "name": "top_k",
+            "source": "runtime:top_k",
+            "value_type": "size_t"
+          },
+          {
+            "name": "matrix_bytes",
+            "source": "runtime:matrix_bytes",
+            "value_type": "size_t"
+          },
+          {
+            "name": "hidden_elements",
+            "source": "runtime:hidden_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "id_elements",
+            "source": "runtime:id_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "route_elements",
+            "source": "runtime:route_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "expert_slot_elements",
+            "source": "runtime:expert_slot_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "expert_output_elements",
+            "source": "runtime:expert_output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output_capacity",
+            "source": "runtime:output_capacity",
+            "value_type": "size_t"
+          },
+          {
+            "name": "work_elements",
+            "source": "runtime:work_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "gate_cap",
+            "source": "param:gate_cap"
+          },
+          {
+            "name": "up_cap",
+            "source": "param:up_cap"
+          },
+          {
+            "name": "down_matrix_bytes",
+            "source": "runtime:down_matrix_bytes",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "R": "rows",
+          "H": "hidden_dim",
+          "I": "inner",
+          "E": "experts",
+          "S": "slots",
+          "K": "top_k",
+          "W": "work_elements"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "hidden",
+            "elements": "hidden_elements",
+            "rows": "rows",
+            "width": "hidden_dim",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "ids",
+            "elements": "id_elements",
+            "rows": "rows",
+            "width": "top_k",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "route_weights",
+            "elements": "route_elements",
+            "rows": "rows",
+            "width": "top_k",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "expert_slots",
+            "elements": "expert_slot_elements",
+            "rows": 1,
+            "width": "experts",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "output",
+            "elements": "output_capacity",
+            "rows": "rows",
+            "width": "hidden_dim",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "gate",
+            "elements": "matrix_bytes",
+            "rows": 1,
+            "width": "matrix_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q4_k"
+          },
+          {
+            "pointer": "up",
+            "elements": "matrix_bytes",
+            "rows": 1,
+            "width": "matrix_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q4_k"
+          },
+          {
+            "pointer": "down",
+            "elements": "down_matrix_bytes",
+            "rows": 1,
+            "width": "down_matrix_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q5_0"
+          },
+          {
+            "pointer": "expert_output",
+            "elements": "expert_output_elements",
+            "rows": 1,
+            "width": "expert_output_elements",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_q4km_block.py"
+        ]
+      },
+      "notes": "Pack gate and up activation rows as Q8_K and down inputs as Q8_0. Accumulate weighted expert outputs by ascending expert ID.",
+      "name": "routed_softcapped_experts_checked_q4_k_q5_0_q8_k_hidden_q8_0_down",
+      "_source_file": "routed_softcapped_experts_checked_q4_k_q5_0_q8_k_hidden_q8_0_down.json"
+    },
+    {
+      "id": "routed_softcapped_experts_checked_q4_k_q8_0",
+      "op": "routed_softcapped_experts_checked",
+      "operation_interface": "moe.routed_softcap.checked.q4_k_q8_0_fp32_ordered.v1",
+      "variant": "q4_k_q8_0",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "phases": [
+          "prefill"
+        ],
+        "equivalence_group": "moe.routed_softcap.checked.q4_k_q8_0_fp32_ordered.v1"
+      },
+      "quant": {
+        "weight": "q4_k",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "hidden",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "ids",
+          "dtype": "i32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "route_weights",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "expert_slots",
+          "dtype": "i32",
+          "shape": [
+            "E"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "gate",
+          "dtype": "q4_k",
+          "shape": [
+            "S",
+            "I",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "up",
+          "dtype": "q4_k",
+          "shape": [
+            "S",
+            "I",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "down",
+          "dtype": "q8_0",
+          "shape": [
+            "S",
+            "H",
+            "I"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "expert_output",
+          "dtype": "fp32",
+          "shape": [
+            "P",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "work",
+          "dtype": "fp32",
+          "shape": [
+            "W"
+          ],
+          "size_bytes": "4 * W",
+          "size_resolution": "required",
+          "lifetime": "kernel_call",
+          "alignment": 64,
+          "layout": "contiguous",
+          "access": "read_write",
+          "storage_class": "scratch",
+          "consumption": "required"
+        }
+      ],
+      "dims": [
+        "R",
+        "H",
+        "I",
+        "E",
+        "S",
+        "K",
+        "P",
+        "W"
+      ],
+      "impl": {
+        "function": "routed_softcapped_experts_checked_q4_k_q8_0",
+        "c_declaration": "int routed_softcapped_experts_checked_q4_k_q8_0(const float* hidden, const int32_t* ids, const float* route_weights, const int32_t* expert_slots, const void* gate, const void* up, const void* down, float* expert_output, float* output, float* work, size_t rows, size_t hidden_dim, size_t inner, size_t experts, size_t slots, size_t top_k, size_t matrix_bytes, size_t hidden_elements, size_t id_elements, size_t route_elements, size_t expert_slot_elements, size_t expert_output_elements, size_t output_capacity, size_t work_elements, float gate_cap, float up_cap, size_t down_matrix_bytes);",
+        "sources": [
+          "src/kernels/routed_softcapped_experts_checked.c",
+          "src/kernels/transformer_rows_checked.c",
+          "src/kernels/dequant_kernels.c",
+          "src/ck_threadpool.c",
+          "src/ckernel_strict.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "hidden",
+            "source": "activation:hidden",
+            "cast": "const float*",
+            "ports": [
+              "input:hidden"
+            ]
+          },
+          {
+            "name": "ids",
+            "source": "activation:ids",
+            "cast": "const int32_t*",
+            "ports": [
+              "input:ids"
+            ]
+          },
+          {
+            "name": "route_weights",
+            "source": "activation:route_weights",
+            "cast": "const float*",
+            "ports": [
+              "input:route_weights"
+            ]
+          },
+          {
+            "name": "expert_slots",
+            "source": "activation:expert_slots",
+            "cast": "const int32_t*",
+            "ports": [
+              "input:expert_slots"
+            ]
+          },
+          {
+            "name": "gate",
+            "source": "weight:gate",
+            "cast": "const void*",
+            "ports": [
+              "weight:gate"
+            ]
+          },
+          {
+            "name": "up",
+            "source": "weight:up",
+            "cast": "const void*",
+            "ports": [
+              "weight:up"
+            ]
+          },
+          {
+            "name": "down",
+            "source": "weight:down",
+            "cast": "const void*",
+            "ports": [
+              "weight:down"
+            ]
+          },
+          {
+            "name": "expert_output",
+            "source": "output:expert_output",
+            "cast": "float*",
+            "ports": [
+              "output:expert_output"
+            ]
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "work",
+            "source": "scratch:work",
+            "cast": "float*"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "hidden_dim",
+            "source": "runtime:hidden_dim",
+            "value_type": "size_t"
+          },
+          {
+            "name": "inner",
+            "source": "runtime:inner",
+            "value_type": "size_t"
+          },
+          {
+            "name": "experts",
+            "source": "runtime:experts",
+            "value_type": "size_t"
+          },
+          {
+            "name": "slots",
+            "source": "runtime:slots",
+            "value_type": "size_t"
+          },
+          {
+            "name": "top_k",
+            "source": "runtime:top_k",
+            "value_type": "size_t"
+          },
+          {
+            "name": "matrix_bytes",
+            "source": "runtime:matrix_bytes",
+            "value_type": "size_t"
+          },
+          {
+            "name": "hidden_elements",
+            "source": "runtime:hidden_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "id_elements",
+            "source": "runtime:id_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "route_elements",
+            "source": "runtime:route_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "expert_slot_elements",
+            "source": "runtime:expert_slot_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "expert_output_elements",
+            "source": "runtime:expert_output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output_capacity",
+            "source": "runtime:output_capacity",
+            "value_type": "size_t"
+          },
+          {
+            "name": "work_elements",
+            "source": "runtime:work_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "gate_cap",
+            "source": "param:gate_cap"
+          },
+          {
+            "name": "up_cap",
+            "source": "param:up_cap"
+          },
+          {
+            "name": "down_matrix_bytes",
+            "source": "runtime:down_matrix_bytes",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "R": "rows",
+          "H": "hidden_dim",
+          "I": "inner",
+          "E": "experts",
+          "S": "slots",
+          "K": "top_k",
+          "W": "work_elements"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "hidden",
+            "elements": "hidden_elements",
+            "rows": "rows",
+            "width": "hidden_dim",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "ids",
+            "elements": "id_elements",
+            "rows": "rows",
+            "width": "top_k",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "route_weights",
+            "elements": "route_elements",
+            "rows": "rows",
+            "width": "top_k",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "expert_slots",
+            "elements": "expert_slot_elements",
+            "rows": 1,
+            "width": "experts",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "output",
+            "elements": "output_capacity",
+            "rows": "rows",
+            "width": "hidden_dim",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "gate",
+            "elements": "matrix_bytes",
+            "rows": 1,
+            "width": "matrix_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q4_k"
+          },
+          {
+            "pointer": "up",
+            "elements": "matrix_bytes",
+            "rows": 1,
+            "width": "matrix_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q4_k"
+          },
+          {
+            "pointer": "down",
+            "elements": "down_matrix_bytes",
+            "rows": 1,
+            "width": "down_matrix_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q8_0"
+          },
+          {
+            "pointer": "expert_output",
+            "elements": "expert_output_elements",
+            "rows": 1,
+            "width": "expert_output_elements",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_q4km_block.py"
+        ]
+      },
+      "notes": "Independent packed strides for gate/up and down. FP32 activations, ordered FP64 dot products, and FP32 mixture accumulation by ascending expert ID.",
+      "name": "routed_softcapped_experts_checked_q4_k_q8_0",
+      "_source_file": "routed_softcapped_experts_checked_q4_k_q8_0.json"
+    },
+    {
+      "id": "routed_softcapped_experts_checked_q4_k_q8_0_grouped",
+      "op": "routed_softcapped_experts_checked",
+      "operation_interface": "moe.routed_softcap.checked.q4_k_q8_0_fp32_ordered.v1",
+      "variant": "grouped_rows_q4_k_q8_0_q8_k_hidden_q8_0_down",
+      "selection": {
+        "status": "candidate",
+        "priority": 70,
+        "phases": [
+          "prefill"
+        ],
+        "equivalence_group": "moe.routed_softcap.checked.q4_k_q8_0_q8_k_hidden_q8_0_down.v1"
+      },
+      "quant": {
+        "weight": "q4_k",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "hidden",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "ids",
+          "dtype": "i32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "route_weights",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "expert_slots",
+          "dtype": "i32",
+          "shape": [
+            "E"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "gate",
+          "dtype": "q4_k",
+          "shape": [
+            "S",
+            "I",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "up",
+          "dtype": "q4_k",
+          "shape": [
+            "S",
+            "I",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "down",
+          "dtype": "q8_0",
+          "shape": [
+            "S",
+            "H",
+            "I"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "expert_output",
+          "dtype": "fp32",
+          "shape": [
+            "P",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "work",
+          "dtype": "fp32",
+          "shape": [
+            "W"
+          ],
+          "size_bytes": "4 * W",
+          "size_resolution": "required",
+          "lifetime": "kernel_call",
+          "alignment": 64,
+          "layout": "contiguous",
+          "access": "read_write",
+          "storage_class": "scratch",
+          "consumption": "required"
+        }
+      ],
+      "dims": [
+        "R",
+        "H",
+        "I",
+        "E",
+        "S",
+        "K",
+        "P",
+        "W"
+      ],
+      "impl": {
+        "function": "routed_softcapped_experts_checked_q4_k_q8_0_grouped",
+        "c_declaration": "int routed_softcapped_experts_checked_q4_k_q8_0_grouped(const float* hidden, const int32_t* ids, const float* route_weights, const int32_t* expert_slots, const void* gate, const void* up, const void* down, float* expert_output, float* output, float* work, size_t rows, size_t hidden_dim, size_t inner, size_t experts, size_t slots, size_t top_k, size_t matrix_bytes, size_t hidden_elements, size_t id_elements, size_t route_elements, size_t expert_slot_elements, size_t expert_output_elements, size_t output_capacity, size_t work_elements, float gate_cap, float up_cap, size_t down_matrix_bytes);",
+        "sources": [
+          "src/kernels/routed_softcapped_experts_checked.c",
+          "src/kernels/transformer_rows_checked.c",
+          "src/kernels/dequant_kernels.c",
+          "src/ck_threadpool.c",
+          "src/ckernel_strict.c",
+          "src/kernels/gemm_kernels_q4k_q8k.c",
+          "src/kernels/gemm_kernels_q4k_q8k_avx2.c",
+          "src/kernels/gemm_kernels_q5_0.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "hidden",
+            "source": "activation:hidden",
+            "cast": "const float*",
+            "ports": [
+              "input:hidden"
+            ]
+          },
+          {
+            "name": "ids",
+            "source": "activation:ids",
+            "cast": "const int32_t*",
+            "ports": [
+              "input:ids"
+            ]
+          },
+          {
+            "name": "route_weights",
+            "source": "activation:route_weights",
+            "cast": "const float*",
+            "ports": [
+              "input:route_weights"
+            ]
+          },
+          {
+            "name": "expert_slots",
+            "source": "activation:expert_slots",
+            "cast": "const int32_t*",
+            "ports": [
+              "input:expert_slots"
+            ]
+          },
+          {
+            "name": "gate",
+            "source": "weight:gate",
+            "cast": "const void*",
+            "ports": [
+              "weight:gate"
+            ]
+          },
+          {
+            "name": "up",
+            "source": "weight:up",
+            "cast": "const void*",
+            "ports": [
+              "weight:up"
+            ]
+          },
+          {
+            "name": "down",
+            "source": "weight:down",
+            "cast": "const void*",
+            "ports": [
+              "weight:down"
+            ]
+          },
+          {
+            "name": "expert_output",
+            "source": "output:expert_output",
+            "cast": "float*",
+            "ports": [
+              "output:expert_output"
+            ]
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "work",
+            "source": "scratch:work",
+            "cast": "float*"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "hidden_dim",
+            "source": "runtime:hidden_dim",
+            "value_type": "size_t"
+          },
+          {
+            "name": "inner",
+            "source": "runtime:inner",
+            "value_type": "size_t"
+          },
+          {
+            "name": "experts",
+            "source": "runtime:experts",
+            "value_type": "size_t"
+          },
+          {
+            "name": "slots",
+            "source": "runtime:slots",
+            "value_type": "size_t"
+          },
+          {
+            "name": "top_k",
+            "source": "runtime:top_k",
+            "value_type": "size_t"
+          },
+          {
+            "name": "matrix_bytes",
+            "source": "runtime:matrix_bytes",
+            "value_type": "size_t"
+          },
+          {
+            "name": "hidden_elements",
+            "source": "runtime:hidden_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "id_elements",
+            "source": "runtime:id_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "route_elements",
+            "source": "runtime:route_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "expert_slot_elements",
+            "source": "runtime:expert_slot_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "expert_output_elements",
+            "source": "runtime:expert_output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output_capacity",
+            "source": "runtime:output_capacity",
+            "value_type": "size_t"
+          },
+          {
+            "name": "work_elements",
+            "source": "runtime:work_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "gate_cap",
+            "source": "param:gate_cap"
+          },
+          {
+            "name": "up_cap",
+            "source": "param:up_cap"
+          },
+          {
+            "name": "down_matrix_bytes",
+            "source": "runtime:down_matrix_bytes",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "R": "rows",
+          "H": "hidden_dim",
+          "I": "inner",
+          "E": "experts",
+          "S": "slots",
+          "K": "top_k",
+          "W": "work_elements"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "hidden",
+            "elements": "hidden_elements",
+            "rows": "rows",
+            "width": "hidden_dim",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "ids",
+            "elements": "id_elements",
+            "rows": "rows",
+            "width": "top_k",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "route_weights",
+            "elements": "route_elements",
+            "rows": "rows",
+            "width": "top_k",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "expert_slots",
+            "elements": "expert_slot_elements",
+            "rows": 1,
+            "width": "experts",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "output",
+            "elements": "output_capacity",
+            "rows": "rows",
+            "width": "hidden_dim",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "gate",
+            "elements": "matrix_bytes",
+            "rows": 1,
+            "width": "matrix_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q4_k"
+          },
+          {
+            "pointer": "up",
+            "elements": "matrix_bytes",
+            "rows": 1,
+            "width": "matrix_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q4_k"
+          },
+          {
+            "pointer": "down",
+            "elements": "down_matrix_bytes",
+            "rows": 1,
+            "width": "down_matrix_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q8_0"
+          },
+          {
+            "pointer": "expert_output",
+            "elements": "expert_output_elements",
+            "rows": 1,
+            "width": "expert_output_elements",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_q4km_block.py"
+        ]
+      },
+      "notes": "Pack gate and up activation rows as Q8_K and down inputs as Q8_0. Accumulate weighted expert outputs by ascending expert ID. Prefill groups tokens by expert ID and writes each result to its original route slot before mixing.",
+      "name": "routed_softcapped_experts_checked_q4_k_q8_0_grouped",
+      "_source_file": "routed_softcapped_experts_checked_q4_k_q8_0_grouped.json"
+    },
+    {
+      "id": "routed_softcapped_experts_checked_q4_k_q8_0_grouped_pair",
+      "op": "routed_softcapped_experts_checked",
+      "operation_interface": "moe.routed_softcap.checked.q4_k_q8_0_fp32_ordered.v1",
+      "variant": "grouped_rows_q4_k_q8_0_q8_k_hidden_q8_0_down_pair",
+      "selection": {
+        "status": "candidate",
+        "priority": 65,
+        "phases": [
+          "prefill"
+        ],
+        "equivalence_group": "moe.routed_softcap.checked.q4_k_q8_0_q8_k_hidden_q8_0_down.v1"
+      },
+      "quant": {
+        "weight": "q4_k",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "hidden",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "ids",
+          "dtype": "i32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "route_weights",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "expert_slots",
+          "dtype": "i32",
+          "shape": [
+            "E"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "gate",
+          "dtype": "q4_k",
+          "shape": [
+            "S",
+            "I",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "up",
+          "dtype": "q4_k",
+          "shape": [
+            "S",
+            "I",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "down",
+          "dtype": "q8_0",
+          "shape": [
+            "S",
+            "H",
+            "I"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "expert_output",
+          "dtype": "fp32",
+          "shape": [
+            "P",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "work",
+          "dtype": "fp32",
+          "shape": [
+            "W"
+          ],
+          "size_bytes": "4 * W",
+          "size_resolution": "required",
+          "lifetime": "kernel_call",
+          "alignment": 64,
+          "layout": "contiguous",
+          "access": "read_write",
+          "storage_class": "scratch",
+          "consumption": "required"
+        }
+      ],
+      "dims": [
+        "R",
+        "H",
+        "I",
+        "E",
+        "S",
+        "K",
+        "P",
+        "W"
+      ],
+      "impl": {
+        "function": "routed_softcapped_experts_checked_q4_k_q8_0_grouped_pair",
+        "c_declaration": "int routed_softcapped_experts_checked_q4_k_q8_0_grouped_pair(const float* hidden, const int32_t* ids, const float* route_weights, const int32_t* expert_slots, const void* gate, const void* up, const void* down, float* expert_output, float* output, float* work, size_t rows, size_t hidden_dim, size_t inner, size_t experts, size_t slots, size_t top_k, size_t matrix_bytes, size_t hidden_elements, size_t id_elements, size_t route_elements, size_t expert_slot_elements, size_t expert_output_elements, size_t output_capacity, size_t work_elements, float gate_cap, float up_cap, size_t down_matrix_bytes);",
+        "sources": [
+          "src/kernels/routed_softcapped_experts_checked.c",
+          "src/kernels/transformer_rows_checked.c",
+          "src/kernels/dequant_kernels.c",
+          "src/ck_threadpool.c",
+          "src/ckernel_strict.c",
+          "src/kernels/gemm_kernels_q4k_q8k.c",
+          "src/kernels/gemm_kernels_q4k_q8k_avx2.c",
+          "src/kernels/gemm_kernels_q5_0.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "hidden",
+            "source": "activation:hidden",
+            "cast": "const float*",
+            "ports": [
+              "input:hidden"
+            ]
+          },
+          {
+            "name": "ids",
+            "source": "activation:ids",
+            "cast": "const int32_t*",
+            "ports": [
+              "input:ids"
+            ]
+          },
+          {
+            "name": "route_weights",
+            "source": "activation:route_weights",
+            "cast": "const float*",
+            "ports": [
+              "input:route_weights"
+            ]
+          },
+          {
+            "name": "expert_slots",
+            "source": "activation:expert_slots",
+            "cast": "const int32_t*",
+            "ports": [
+              "input:expert_slots"
+            ]
+          },
+          {
+            "name": "gate",
+            "source": "weight:gate",
+            "cast": "const void*",
+            "ports": [
+              "weight:gate"
+            ]
+          },
+          {
+            "name": "up",
+            "source": "weight:up",
+            "cast": "const void*",
+            "ports": [
+              "weight:up"
+            ]
+          },
+          {
+            "name": "down",
+            "source": "weight:down",
+            "cast": "const void*",
+            "ports": [
+              "weight:down"
+            ]
+          },
+          {
+            "name": "expert_output",
+            "source": "output:expert_output",
+            "cast": "float*",
+            "ports": [
+              "output:expert_output"
+            ]
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "work",
+            "source": "scratch:work",
+            "cast": "float*"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "hidden_dim",
+            "source": "runtime:hidden_dim",
+            "value_type": "size_t"
+          },
+          {
+            "name": "inner",
+            "source": "runtime:inner",
+            "value_type": "size_t"
+          },
+          {
+            "name": "experts",
+            "source": "runtime:experts",
+            "value_type": "size_t"
+          },
+          {
+            "name": "slots",
+            "source": "runtime:slots",
+            "value_type": "size_t"
+          },
+          {
+            "name": "top_k",
+            "source": "runtime:top_k",
+            "value_type": "size_t"
+          },
+          {
+            "name": "matrix_bytes",
+            "source": "runtime:matrix_bytes",
+            "value_type": "size_t"
+          },
+          {
+            "name": "hidden_elements",
+            "source": "runtime:hidden_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "id_elements",
+            "source": "runtime:id_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "route_elements",
+            "source": "runtime:route_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "expert_slot_elements",
+            "source": "runtime:expert_slot_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "expert_output_elements",
+            "source": "runtime:expert_output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output_capacity",
+            "source": "runtime:output_capacity",
+            "value_type": "size_t"
+          },
+          {
+            "name": "work_elements",
+            "source": "runtime:work_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "gate_cap",
+            "source": "param:gate_cap"
+          },
+          {
+            "name": "up_cap",
+            "source": "param:up_cap"
+          },
+          {
+            "name": "down_matrix_bytes",
+            "source": "runtime:down_matrix_bytes",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "R": "rows",
+          "H": "hidden_dim",
+          "I": "inner",
+          "E": "experts",
+          "S": "slots",
+          "K": "top_k",
+          "W": "work_elements"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "hidden",
+            "elements": "hidden_elements",
+            "rows": "rows",
+            "width": "hidden_dim",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "ids",
+            "elements": "id_elements",
+            "rows": "rows",
+            "width": "top_k",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "route_weights",
+            "elements": "route_elements",
+            "rows": "rows",
+            "width": "top_k",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "expert_slots",
+            "elements": "expert_slot_elements",
+            "rows": 1,
+            "width": "experts",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "output",
+            "elements": "output_capacity",
+            "rows": "rows",
+            "width": "hidden_dim",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "gate",
+            "elements": "matrix_bytes",
+            "rows": 1,
+            "width": "matrix_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q4_k"
+          },
+          {
+            "pointer": "up",
+            "elements": "matrix_bytes",
+            "rows": 1,
+            "width": "matrix_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q4_k"
+          },
+          {
+            "pointer": "down",
+            "elements": "down_matrix_bytes",
+            "rows": 1,
+            "width": "down_matrix_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q8_0"
+          },
+          {
+            "pointer": "expert_output",
+            "elements": "expert_output_elements",
+            "rows": 1,
+            "width": "expert_output_elements",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_q4km_block.py"
+        ]
+      },
+      "notes": "Pack gate and up activation rows as Q8_K and down inputs as Q8_0. Accumulate weighted expert outputs by ascending expert ID. Prefill groups tokens by expert ID and writes each result to its original route slot before mixing. Two routed rows share Q4_K weight unpacking. Each retains its own reduction and lone rows use the single-row provider.",
+      "name": "routed_softcapped_experts_checked_q4_k_q8_0_grouped_pair",
+      "_source_file": "routed_softcapped_experts_checked_q4_k_q8_0_grouped_pair.json"
+    },
+    {
+      "id": "routed_softcapped_experts_checked_q4_k_q8_0_pair_jobs",
+      "op": "routed_softcapped_experts_checked",
+      "operation_interface": "moe.routed_softcap.checked.q4_k_q8_0_fp32_ordered.v1",
+      "variant": "dynamic_expert_pair_jobs",
+      "selection": {
+        "status": "candidate",
+        "priority": 60,
+        "phases": [
+          "prefill"
+        ],
+        "equivalence_group": "moe.routed_softcap.checked.q4_k_q8_0_q8_k_hidden_q8_0_down.v1"
+      },
+      "quant": {
+        "weight": "q4_k",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "hidden",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "ids",
+          "dtype": "i32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "route_weights",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "expert_slots",
+          "dtype": "i32",
+          "shape": [
+            "E"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "gate",
+          "dtype": "q4_k",
+          "shape": [
+            "S",
+            "I",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "up",
+          "dtype": "q4_k",
+          "shape": [
+            "S",
+            "I",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "down",
+          "dtype": "q8_0",
+          "shape": [
+            "S",
+            "H",
+            "I"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "expert_output",
+          "dtype": "fp32",
+          "shape": [
+            "P",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "work",
+          "dtype": "fp32",
+          "shape": [
+            "W"
+          ],
+          "size_bytes": "4 * W",
+          "size_resolution": "required",
+          "lifetime": "kernel_call",
+          "alignment": 64,
+          "layout": "contiguous",
+          "access": "read_write",
+          "storage_class": "scratch",
+          "consumption": "required"
+        }
+      ],
+      "dims": [
+        "R",
+        "H",
+        "I",
+        "E",
+        "S",
+        "K",
+        "P",
+        "W"
+      ],
+      "impl": {
+        "function": "routed_softcapped_experts_checked_q4_k_q8_0_pair_jobs",
+        "c_declaration": "int routed_softcapped_experts_checked_q4_k_q8_0_pair_jobs(const float* hidden, const int32_t* ids, const float* route_weights, const int32_t* expert_slots, const void* gate, const void* up, const void* down, float* expert_output, float* output, float* work, size_t rows, size_t hidden_dim, size_t inner, size_t experts, size_t slots, size_t top_k, size_t matrix_bytes, size_t hidden_elements, size_t id_elements, size_t route_elements, size_t expert_slot_elements, size_t expert_output_elements, size_t output_capacity, size_t work_elements, float gate_cap, float up_cap, size_t down_matrix_bytes);",
+        "sources": [
+          "src/kernels/routed_softcapped_experts_checked.c",
+          "src/kernels/transformer_rows_checked.c",
+          "src/kernels/dequant_kernels.c",
+          "src/ck_threadpool.c",
+          "src/ckernel_strict.c",
+          "src/kernels/gemm_kernels_q4k_q8k.c",
+          "src/kernels/gemm_kernels_q4k_q8k_avx2.c",
+          "src/kernels/gemm_kernels_q5_0.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "hidden",
+            "source": "activation:hidden",
+            "cast": "const float*",
+            "ports": [
+              "input:hidden"
+            ]
+          },
+          {
+            "name": "ids",
+            "source": "activation:ids",
+            "cast": "const int32_t*",
+            "ports": [
+              "input:ids"
+            ]
+          },
+          {
+            "name": "route_weights",
+            "source": "activation:route_weights",
+            "cast": "const float*",
+            "ports": [
+              "input:route_weights"
+            ]
+          },
+          {
+            "name": "expert_slots",
+            "source": "activation:expert_slots",
+            "cast": "const int32_t*",
+            "ports": [
+              "input:expert_slots"
+            ]
+          },
+          {
+            "name": "gate",
+            "source": "weight:gate",
+            "cast": "const void*",
+            "ports": [
+              "weight:gate"
+            ]
+          },
+          {
+            "name": "up",
+            "source": "weight:up",
+            "cast": "const void*",
+            "ports": [
+              "weight:up"
+            ]
+          },
+          {
+            "name": "down",
+            "source": "weight:down",
+            "cast": "const void*",
+            "ports": [
+              "weight:down"
+            ]
+          },
+          {
+            "name": "expert_output",
+            "source": "output:expert_output",
+            "cast": "float*",
+            "ports": [
+              "output:expert_output"
+            ]
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "work",
+            "source": "scratch:work",
+            "cast": "float*"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "hidden_dim",
+            "source": "runtime:hidden_dim",
+            "value_type": "size_t"
+          },
+          {
+            "name": "inner",
+            "source": "runtime:inner",
+            "value_type": "size_t"
+          },
+          {
+            "name": "experts",
+            "source": "runtime:experts",
+            "value_type": "size_t"
+          },
+          {
+            "name": "slots",
+            "source": "runtime:slots",
+            "value_type": "size_t"
+          },
+          {
+            "name": "top_k",
+            "source": "runtime:top_k",
+            "value_type": "size_t"
+          },
+          {
+            "name": "matrix_bytes",
+            "source": "runtime:matrix_bytes",
+            "value_type": "size_t"
+          },
+          {
+            "name": "hidden_elements",
+            "source": "runtime:hidden_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "id_elements",
+            "source": "runtime:id_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "route_elements",
+            "source": "runtime:route_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "expert_slot_elements",
+            "source": "runtime:expert_slot_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "expert_output_elements",
+            "source": "runtime:expert_output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output_capacity",
+            "source": "runtime:output_capacity",
+            "value_type": "size_t"
+          },
+          {
+            "name": "work_elements",
+            "source": "runtime:work_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "gate_cap",
+            "source": "param:gate_cap"
+          },
+          {
+            "name": "up_cap",
+            "source": "param:up_cap"
+          },
+          {
+            "name": "down_matrix_bytes",
+            "source": "runtime:down_matrix_bytes",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "R": "rows",
+          "H": "hidden_dim",
+          "I": "inner",
+          "E": "experts",
+          "S": "slots",
+          "K": "top_k",
+          "W": "work_elements"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "hidden",
+            "elements": "hidden_elements",
+            "rows": "rows",
+            "width": "hidden_dim",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "ids",
+            "elements": "id_elements",
+            "rows": "rows",
+            "width": "top_k",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "route_weights",
+            "elements": "route_elements",
+            "rows": "rows",
+            "width": "top_k",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "expert_slots",
+            "elements": "expert_slot_elements",
+            "rows": 1,
+            "width": "experts",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "output",
+            "elements": "output_capacity",
+            "rows": "rows",
+            "width": "hidden_dim",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "gate",
+            "elements": "matrix_bytes",
+            "rows": 1,
+            "width": "matrix_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q4_k"
+          },
+          {
+            "pointer": "up",
+            "elements": "matrix_bytes",
+            "rows": 1,
+            "width": "matrix_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q4_k"
+          },
+          {
+            "pointer": "down",
+            "elements": "down_matrix_bytes",
+            "rows": 1,
+            "width": "down_matrix_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q8_0"
+          },
+          {
+            "pointer": "expert_output",
+            "elements": "expert_output_elements",
+            "rows": 1,
+            "width": "expert_output_elements",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_q4km_block.py"
+        ]
+      },
+      "notes": "Pack gate and up activation rows as Q8_K and down inputs as Q8_0. Accumulate weighted expert outputs by ascending expert ID. Prefill groups tokens by expert ID and writes each result to its original route slot before mixing. Two routed rows share Q4_K weight unpacking. Each retains its own reduction and lone rows use the single-row provider. Workers dynamically claim individual pairs or tail rows and use private temporary storage.",
+      "name": "routed_softcapped_experts_checked_q4_k_q8_0_pair_jobs",
+      "_source_file": "routed_softcapped_experts_checked_q4_k_q8_0_pair_jobs.json"
+    },
+    {
+      "id": "routed_softcapped_experts_checked_q4_k_q8_0_q8_k_hidden",
+      "op": "routed_softcapped_experts_checked",
+      "operation_interface": "moe.routed_softcap.checked.q4_k_q8_0_fp32_ordered.v1",
+      "variant": "q4_k_q8_0_q8_k_hidden",
+      "selection": {
+        "status": "candidate",
+        "priority": 90,
+        "phases": [
+          "prefill"
+        ],
+        "equivalence_group": "moe.routed_softcap.checked.q4_k_q8_0_q8_k_hidden.v1"
+      },
+      "quant": {
+        "weight": "q4_k",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "hidden",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "ids",
+          "dtype": "i32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "route_weights",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "expert_slots",
+          "dtype": "i32",
+          "shape": [
+            "E"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "gate",
+          "dtype": "q4_k",
+          "shape": [
+            "S",
+            "I",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "up",
+          "dtype": "q4_k",
+          "shape": [
+            "S",
+            "I",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "down",
+          "dtype": "q8_0",
+          "shape": [
+            "S",
+            "H",
+            "I"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "expert_output",
+          "dtype": "fp32",
+          "shape": [
+            "P",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "work",
+          "dtype": "fp32",
+          "shape": [
+            "W"
+          ],
+          "size_bytes": "4 * W",
+          "size_resolution": "required",
+          "lifetime": "kernel_call",
+          "alignment": 64,
+          "layout": "contiguous",
+          "access": "read_write",
+          "storage_class": "scratch",
+          "consumption": "required"
+        }
+      ],
+      "dims": [
+        "R",
+        "H",
+        "I",
+        "E",
+        "S",
+        "K",
+        "P",
+        "W"
+      ],
+      "impl": {
+        "function": "routed_softcapped_experts_checked_q4_k_q8_0_q8_k_hidden",
+        "c_declaration": "int routed_softcapped_experts_checked_q4_k_q8_0_q8_k_hidden(const float* hidden, const int32_t* ids, const float* route_weights, const int32_t* expert_slots, const void* gate, const void* up, const void* down, float* expert_output, float* output, float* work, size_t rows, size_t hidden_dim, size_t inner, size_t experts, size_t slots, size_t top_k, size_t matrix_bytes, size_t hidden_elements, size_t id_elements, size_t route_elements, size_t expert_slot_elements, size_t expert_output_elements, size_t output_capacity, size_t work_elements, float gate_cap, float up_cap, size_t down_matrix_bytes);",
+        "sources": [
+          "src/kernels/routed_softcapped_experts_checked.c",
+          "src/kernels/transformer_rows_checked.c",
+          "src/kernels/dequant_kernels.c",
+          "src/ck_threadpool.c",
+          "src/ckernel_strict.c",
+          "src/kernels/gemm_kernels_q4k_q8k.c",
+          "src/kernels/gemm_kernels_q4k_q8k_avx2.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "hidden",
+            "source": "activation:hidden",
+            "cast": "const float*",
+            "ports": [
+              "input:hidden"
+            ]
+          },
+          {
+            "name": "ids",
+            "source": "activation:ids",
+            "cast": "const int32_t*",
+            "ports": [
+              "input:ids"
+            ]
+          },
+          {
+            "name": "route_weights",
+            "source": "activation:route_weights",
+            "cast": "const float*",
+            "ports": [
+              "input:route_weights"
+            ]
+          },
+          {
+            "name": "expert_slots",
+            "source": "activation:expert_slots",
+            "cast": "const int32_t*",
+            "ports": [
+              "input:expert_slots"
+            ]
+          },
+          {
+            "name": "gate",
+            "source": "weight:gate",
+            "cast": "const void*",
+            "ports": [
+              "weight:gate"
+            ]
+          },
+          {
+            "name": "up",
+            "source": "weight:up",
+            "cast": "const void*",
+            "ports": [
+              "weight:up"
+            ]
+          },
+          {
+            "name": "down",
+            "source": "weight:down",
+            "cast": "const void*",
+            "ports": [
+              "weight:down"
+            ]
+          },
+          {
+            "name": "expert_output",
+            "source": "output:expert_output",
+            "cast": "float*",
+            "ports": [
+              "output:expert_output"
+            ]
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "work",
+            "source": "scratch:work",
+            "cast": "float*"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "hidden_dim",
+            "source": "runtime:hidden_dim",
+            "value_type": "size_t"
+          },
+          {
+            "name": "inner",
+            "source": "runtime:inner",
+            "value_type": "size_t"
+          },
+          {
+            "name": "experts",
+            "source": "runtime:experts",
+            "value_type": "size_t"
+          },
+          {
+            "name": "slots",
+            "source": "runtime:slots",
+            "value_type": "size_t"
+          },
+          {
+            "name": "top_k",
+            "source": "runtime:top_k",
+            "value_type": "size_t"
+          },
+          {
+            "name": "matrix_bytes",
+            "source": "runtime:matrix_bytes",
+            "value_type": "size_t"
+          },
+          {
+            "name": "hidden_elements",
+            "source": "runtime:hidden_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "id_elements",
+            "source": "runtime:id_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "route_elements",
+            "source": "runtime:route_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "expert_slot_elements",
+            "source": "runtime:expert_slot_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "expert_output_elements",
+            "source": "runtime:expert_output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output_capacity",
+            "source": "runtime:output_capacity",
+            "value_type": "size_t"
+          },
+          {
+            "name": "work_elements",
+            "source": "runtime:work_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "gate_cap",
+            "source": "param:gate_cap"
+          },
+          {
+            "name": "up_cap",
+            "source": "param:up_cap"
+          },
+          {
+            "name": "down_matrix_bytes",
+            "source": "runtime:down_matrix_bytes",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "R": "rows",
+          "H": "hidden_dim",
+          "I": "inner",
+          "E": "experts",
+          "S": "slots",
+          "K": "top_k",
+          "W": "work_elements"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "hidden",
+            "elements": "hidden_elements",
+            "rows": "rows",
+            "width": "hidden_dim",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "ids",
+            "elements": "id_elements",
+            "rows": "rows",
+            "width": "top_k",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "route_weights",
+            "elements": "route_elements",
+            "rows": "rows",
+            "width": "top_k",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "expert_slots",
+            "elements": "expert_slot_elements",
+            "rows": 1,
+            "width": "experts",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "output",
+            "elements": "output_capacity",
+            "rows": "rows",
+            "width": "hidden_dim",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "gate",
+            "elements": "matrix_bytes",
+            "rows": 1,
+            "width": "matrix_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q4_k"
+          },
+          {
+            "pointer": "up",
+            "elements": "matrix_bytes",
+            "rows": 1,
+            "width": "matrix_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q4_k"
+          },
+          {
+            "pointer": "down",
+            "elements": "down_matrix_bytes",
+            "rows": 1,
+            "width": "down_matrix_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q8_0"
+          },
+          {
+            "pointer": "expert_output",
+            "elements": "expert_output_elements",
+            "rows": 1,
+            "width": "expert_output_elements",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_q4km_block.py"
+        ]
+      },
+      "notes": "Pack each FP32 input row to Q8_K once for Q4_K gate/up integer dots. Down projection uses ordered FP64 dots and expert mixture preserves ascending expert-ID order.",
+      "name": "routed_softcapped_experts_checked_q4_k_q8_0_q8_k_hidden",
+      "_source_file": "routed_softcapped_experts_checked_q4_k_q8_0_q8_k_hidden.json"
+    },
+    {
+      "id": "routed_softcapped_experts_checked_q4_k_q8_0_q8_k_hidden_q8_0_down",
+      "op": "routed_softcapped_experts_checked",
+      "operation_interface": "moe.routed_softcap.checked.q4_k_q8_0_fp32_ordered.v1",
+      "variant": "q4_k_q8_0_q8_k_hidden_q8_0_down",
+      "selection": {
+        "status": "candidate",
+        "priority": 80,
+        "phases": [
+          "prefill"
+        ],
+        "equivalence_group": "moe.routed_softcap.checked.q4_k_q8_0_q8_k_hidden_q8_0_down.v1"
+      },
+      "quant": {
+        "weight": "q4_k",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "hidden",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "ids",
+          "dtype": "i32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "route_weights",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "expert_slots",
+          "dtype": "i32",
+          "shape": [
+            "E"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "gate",
+          "dtype": "q4_k",
+          "shape": [
+            "S",
+            "I",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "up",
+          "dtype": "q4_k",
+          "shape": [
+            "S",
+            "I",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "down",
+          "dtype": "q8_0",
+          "shape": [
+            "S",
+            "H",
+            "I"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "expert_output",
+          "dtype": "fp32",
+          "shape": [
+            "P",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "row_major",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "work",
+          "dtype": "fp32",
+          "shape": [
+            "W"
+          ],
+          "size_bytes": "4 * W",
+          "size_resolution": "required",
+          "lifetime": "kernel_call",
+          "alignment": 64,
+          "layout": "contiguous",
+          "access": "read_write",
+          "storage_class": "scratch",
+          "consumption": "required"
+        }
+      ],
+      "dims": [
+        "R",
+        "H",
+        "I",
+        "E",
+        "S",
+        "K",
+        "P",
+        "W"
+      ],
+      "impl": {
+        "function": "routed_softcapped_experts_checked_q4_k_q8_0_q8_k_hidden_q8_0_down",
+        "c_declaration": "int routed_softcapped_experts_checked_q4_k_q8_0_q8_k_hidden_q8_0_down(const float* hidden, const int32_t* ids, const float* route_weights, const int32_t* expert_slots, const void* gate, const void* up, const void* down, float* expert_output, float* output, float* work, size_t rows, size_t hidden_dim, size_t inner, size_t experts, size_t slots, size_t top_k, size_t matrix_bytes, size_t hidden_elements, size_t id_elements, size_t route_elements, size_t expert_slot_elements, size_t expert_output_elements, size_t output_capacity, size_t work_elements, float gate_cap, float up_cap, size_t down_matrix_bytes);",
+        "sources": [
+          "src/kernels/routed_softcapped_experts_checked.c",
+          "src/kernels/transformer_rows_checked.c",
+          "src/kernels/dequant_kernels.c",
+          "src/ck_threadpool.c",
+          "src/ckernel_strict.c",
+          "src/kernels/gemm_kernels_q4k_q8k.c",
+          "src/kernels/gemm_kernels_q4k_q8k_avx2.c",
+          "src/kernels/gemm_kernels_q5_0.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "hidden",
+            "source": "activation:hidden",
+            "cast": "const float*",
+            "ports": [
+              "input:hidden"
+            ]
+          },
+          {
+            "name": "ids",
+            "source": "activation:ids",
+            "cast": "const int32_t*",
+            "ports": [
+              "input:ids"
+            ]
+          },
+          {
+            "name": "route_weights",
+            "source": "activation:route_weights",
+            "cast": "const float*",
+            "ports": [
+              "input:route_weights"
+            ]
+          },
+          {
+            "name": "expert_slots",
+            "source": "activation:expert_slots",
+            "cast": "const int32_t*",
+            "ports": [
+              "input:expert_slots"
+            ]
+          },
+          {
+            "name": "gate",
+            "source": "weight:gate",
+            "cast": "const void*",
+            "ports": [
+              "weight:gate"
+            ]
+          },
+          {
+            "name": "up",
+            "source": "weight:up",
+            "cast": "const void*",
+            "ports": [
+              "weight:up"
+            ]
+          },
+          {
+            "name": "down",
+            "source": "weight:down",
+            "cast": "const void*",
+            "ports": [
+              "weight:down"
+            ]
+          },
+          {
+            "name": "expert_output",
+            "source": "output:expert_output",
+            "cast": "float*",
+            "ports": [
+              "output:expert_output"
+            ]
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "work",
+            "source": "scratch:work",
+            "cast": "float*"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "hidden_dim",
+            "source": "runtime:hidden_dim",
+            "value_type": "size_t"
+          },
+          {
+            "name": "inner",
+            "source": "runtime:inner",
+            "value_type": "size_t"
+          },
+          {
+            "name": "experts",
+            "source": "runtime:experts",
+            "value_type": "size_t"
+          },
+          {
+            "name": "slots",
+            "source": "runtime:slots",
+            "value_type": "size_t"
+          },
+          {
+            "name": "top_k",
+            "source": "runtime:top_k",
+            "value_type": "size_t"
+          },
+          {
+            "name": "matrix_bytes",
+            "source": "runtime:matrix_bytes",
+            "value_type": "size_t"
+          },
+          {
+            "name": "hidden_elements",
+            "source": "runtime:hidden_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "id_elements",
+            "source": "runtime:id_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "route_elements",
+            "source": "runtime:route_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "expert_slot_elements",
+            "source": "runtime:expert_slot_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "expert_output_elements",
+            "source": "runtime:expert_output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output_capacity",
+            "source": "runtime:output_capacity",
+            "value_type": "size_t"
+          },
+          {
+            "name": "work_elements",
+            "source": "runtime:work_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "gate_cap",
+            "source": "param:gate_cap"
+          },
+          {
+            "name": "up_cap",
+            "source": "param:up_cap"
+          },
+          {
+            "name": "down_matrix_bytes",
+            "source": "runtime:down_matrix_bytes",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "R": "rows",
+          "H": "hidden_dim",
+          "I": "inner",
+          "E": "experts",
+          "S": "slots",
+          "K": "top_k",
+          "W": "work_elements"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "hidden",
+            "elements": "hidden_elements",
+            "rows": "rows",
+            "width": "hidden_dim",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "ids",
+            "elements": "id_elements",
+            "rows": "rows",
+            "width": "top_k",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "route_weights",
+            "elements": "route_elements",
+            "rows": "rows",
+            "width": "top_k",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "expert_slots",
+            "elements": "expert_slot_elements",
+            "rows": 1,
+            "width": "experts",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "output",
+            "elements": "output_capacity",
+            "rows": "rows",
+            "width": "hidden_dim",
+            "element_bytes": 4
+          },
+          {
+            "pointer": "gate",
+            "elements": "matrix_bytes",
+            "rows": 1,
+            "width": "matrix_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q4_k"
+          },
+          {
+            "pointer": "up",
+            "elements": "matrix_bytes",
+            "rows": 1,
+            "width": "matrix_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q4_k"
+          },
+          {
+            "pointer": "down",
+            "elements": "down_matrix_bytes",
+            "rows": 1,
+            "width": "down_matrix_bytes",
+            "element_bytes": 1,
+            "storage_dtype": "q8_0"
+          },
+          {
+            "pointer": "expert_output",
+            "elements": "expert_output_elements",
+            "rows": 1,
+            "width": "expert_output_elements",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_inkling2_q4km_block.py"
+        ]
+      },
+      "notes": "Pack gate and up activation rows as Q8_K and down inputs as Q8_0. Accumulate weighted expert outputs by ascending expert ID.",
+      "name": "routed_softcapped_experts_checked_q4_k_q8_0_q8_k_hidden_q8_0_down",
+      "_source_file": "routed_softcapped_experts_checked_q4_k_q8_0_q8_k_hidden_q8_0_down.json"
+    },
+    {
       "id": "routed_softcapped_experts_checked_q8_0",
       "op": "routed_softcapped_experts_checked",
       "operation_interface": "moe.routed_softcapped_swiglu.checked.q8_0.v1",
@@ -102908,7 +109203,10 @@
         "c_declaration": "int routed_softcapped_experts_checked_q8_0(const float* hidden, const int32_t* ids, const float* route_weights, const int32_t* expert_slots, const void* gate, const void* up, const void* down, float* expert_output, float* output, float* work, size_t rows, size_t hidden_dim, size_t inner, size_t experts, size_t slots, size_t top_k, size_t matrix_bytes, size_t hidden_elements, size_t id_elements, size_t route_elements, size_t expert_slot_elements, size_t expert_output_elements, size_t output_capacity, size_t work_elements, float gate_cap, float up_cap);",
         "sources": [
           "src/kernels/routed_softcapped_experts_checked.c",
-          "src/kernels/transformer_rows_checked.c"
+          "src/kernels/transformer_rows_checked.c",
+          "src/kernels/dequant_kernels.c",
+          "src/ck_threadpool.c",
+          "src/ckernel_strict.c"
         ]
       },
       "modes": {
@@ -103339,7 +109637,10 @@
         "c_declaration": "int routed_softcapped_experts_checked_q8_0_q8_activation(const float* hidden, const int32_t* ids, const float* route_weights, const int32_t* expert_slots, const void* gate, const void* up, const void* down, float* expert_output, float* output, float* work, size_t rows, size_t hidden_dim, size_t inner, size_t experts, size_t slots, size_t top_k, size_t matrix_bytes, size_t hidden_elements, size_t id_elements, size_t route_elements, size_t expert_slot_elements, size_t expert_output_elements, size_t output_capacity, size_t work_elements, float gate_cap, float up_cap);",
         "sources": [
           "src/kernels/routed_softcapped_experts_checked.c",
-          "src/kernels/transformer_rows_checked.c"
+          "src/kernels/transformer_rows_checked.c",
+          "src/kernels/dequant_kernels.c",
+          "src/ck_threadpool.c",
+          "src/ckernel_strict.c"
         ]
       },
       "modes": {
@@ -103770,7 +110071,10 @@
         "c_declaration": "int routed_softcapped_experts_checked_q8_0_q8_activation_scaled_situ(const float* hidden, const int32_t* ids, const float* route_weights, const int32_t* expert_slots, const void* gate, const void* up, const void* down, float* expert_output, float* output, float* work, size_t rows, size_t hidden_dim, size_t inner, size_t experts, size_t slots, size_t top_k, size_t matrix_bytes, size_t hidden_elements, size_t id_elements, size_t route_elements, size_t expert_slot_elements, size_t expert_output_elements, size_t output_capacity, size_t work_elements, float gate_cap, float up_cap);",
         "sources": [
           "src/kernels/routed_softcapped_experts_checked.c",
-          "src/kernels/transformer_rows_checked.c"
+          "src/kernels/transformer_rows_checked.c",
+          "src/kernels/dequant_kernels.c",
+          "src/ck_threadpool.c",
+          "src/ckernel_strict.c"
         ]
       },
       "modes": {
@@ -110220,7 +116524,8 @@
         "function": "softcap_logits_checked_f32",
         "c_declaration": "int softcap_logits_checked_f32(const float *input, size_t input_elements, float *output, size_t output_elements, size_t elements, float cap);",
         "sources": [
-          "src/kernels/packed_text_io_checked.c"
+          "src/kernels/packed_text_io_checked.c",
+          "src/kernels/dequant_kernels.c"
         ]
       },
       "modes": {
