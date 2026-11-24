@@ -114,14 +114,14 @@ class LinearRowsOracleTest(unittest.TestCase):
         pool = runtime.ck_threadpool_global()
         self.assertTrue(pool)
         try:
-            for rows in (16, 17, 19):
-                with self.subTest(rows=rows):
+            for rows, channels in ((16, 515), (17, 515), (19, 515), (19, 67)):
+                with self.subTest(rows=rows, channels=channels):
                     inputs = rng.normal(size=(rows, 261)).astype(np.float32)
-                    weights = rng.normal(size=(515, 259)).astype(np.float32)
-                    bias = rng.normal(size=515).astype(np.float32)
-                    expected = np.full((rows, 519), -777, np.float32)
+                    weights = rng.normal(size=(channels, 259)).astype(np.float32)
+                    bias = rng.normal(size=channels).astype(np.float32)
+                    expected = np.full((rows, channels + 4), -777, np.float32)
                     output = expected.copy()
-                    dims = dict(m=rows, k=257, n=515, xs=261, ws=259, ys=519)
+                    dims = dict(m=rows, k=257, n=channels, xs=261, ws=259, ys=channels + 4)
                     self.assertEqual(self.call(inputs, weights, bias, expected, **dims), 0)
                     self.fn = threaded
                     try:
@@ -131,7 +131,7 @@ class LinearRowsOracleTest(unittest.TestCase):
                         runtime.ck_threadpool_profile_snapshot(pool, counters)
                         self.assertGreater(counters[0], 0)
                         np.testing.assert_array_equal(output.view(np.uint32), expected.view(np.uint32))
-                        self.assertTrue(np.all(output[:, 515:] == -777))
+                        self.assertTrue(np.all(output[:, channels:] == -777))
                         weights[-1, 256] = np.nan
                         output.fill(-777)
                         self.assertNotEqual(self.call(inputs, weights, bias, output, **dims), 0)

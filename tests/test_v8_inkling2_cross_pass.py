@@ -1,4 +1,7 @@
+import ctypes
 from pathlib import Path
+import platform
+import subprocess
 from tempfile import TemporaryDirectory
 import unittest
 
@@ -9,6 +12,56 @@ from version.v8.scripts.compile_checked_bundle_v8 import compile_checked_weight_
 
 
 class InklingCrossPassTests(unittest.TestCase):
+    @unittest.skipUnless(platform.system() == "Linux", "optional CKE pool uses ELF linkage")
+    def test_depth_rows_keep_exact_reduction_order_in_pool(self):
+        root = Path(__file__).resolve().parents[1]
+        with TemporaryDirectory() as tmp:
+            library = Path(tmp) / "depth-pool.so"
+            subprocess.run([
+                "cc", "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror", "-shared", "-fPIC",
+                "-I", str(root / "include"), str(root / "src/kernels/depth_residual_mix_checked.c"),
+                str(root / "src/ck_threadpool.c"), str(root / "src/ckernel_strict.c"),
+                "-lm", "-lpthread", "-ldl", "-o", str(library),
+            ], check=True)
+            lib = ctypes.CDLL(str(library))
+            fn = lib.depth_residual_mix_checked_f32
+            fn.argtypes = [ctypes.c_void_p, ctypes.c_size_t] * 4 + [ctypes.c_size_t] * 3 + [ctypes.c_float]
+            fn.restype = ctypes.c_int
+            lib.ck_threadpool_global.restype = ctypes.c_void_p
+            lib.ck_threadpool_profile_reset.argtypes = [ctypes.c_void_p]
+            lib.ck_threadpool_profile_snapshot.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint64)]
+            lib.ck_set_num_threads(2)
+            pool = lib.ck_threadpool_global()
+            try:
+                rng = np.random.default_rng(6202)
+                rows, states, width = 19, 3, 133
+                bank = rng.standard_normal((rows, states, width), dtype=np.float32)
+                current = rng.standard_normal((rows, width), dtype=np.float32)
+                query = rng.standard_normal(width, dtype=np.float32)
+                output = np.empty_like(current)
+
+                def run():
+                    tensors = [value for array in (bank, current, query, output)
+                               for value in (array.ctypes.data, array.size)]
+                    return fn(*tensors, rows, states, width, 1e-6)
+
+                lib.ck_set_num_threads(1)
+                self.assertEqual(run(), 0)
+                expected = output.view("u4").copy()
+                lib.ck_set_num_threads(2)
+                counts = (ctypes.c_uint64 * 4)()
+                lib.ck_threadpool_profile_reset(pool)
+                self.assertEqual(run(), 0)
+                lib.ck_threadpool_profile_snapshot(pool, counts)
+                self.assertGreater(counts[0], 0)
+                np.testing.assert_array_equal(output.view("u4"), expected)
+                bank[-1, -1, -1] = np.nan
+                output.fill(-5)
+                self.assertEqual(run(), -3)
+                self.assertTrue(np.all(output == -5))
+            finally:
+                lib.ck_threadpool_global_destroy()
+
     def test_prev_pass_messages_run_all_four_controllers(self):
         rows, states, width, rank = 3, 2, 7, 4
         rng = np.random.default_rng(437)
