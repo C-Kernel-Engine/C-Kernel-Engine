@@ -3,6 +3,7 @@
 import ctypes
 import math
 from pathlib import Path
+import platform
 import subprocess
 import tempfile
 import unittest
@@ -70,8 +71,8 @@ class RelativeAttentionTests(unittest.TestCase):
             library = Path(temp) / "attention.so"
             subprocess.run(["cc", "-std=c11", "-O2", "-march=native", "-ffp-contract=fast",
                             "-Wall", "-Wextra", "-Werror", "-shared", "-fPIC",
-                            str(root / "src/kernels/gqa_relative_sink_checked.c"), "-lm", "-o", str(library)],
-                           check=True)
+                            "-I", str(root / "include"), str(root / "src/kernels/gqa_relative_sink_checked.c"),
+                            "-lm", "-o", str(library)], check=True)
             handle = ctypes.CDLL(str(library))
             fn = handle.ck_gqa_relative_sink_checked_f32
             ring = handle.ck_gqa_relative_sink_ring_checked_f32
@@ -131,6 +132,59 @@ class RelativeAttentionTests(unittest.TestCase):
                         else:
                             self.assertEqual(rc, -2)
                             self.assertTrue(np.isnan(output).all())
+
+    @unittest.skipUnless(platform.system() == "Linux", "optional CKE pool uses ELF linkage")
+    def test_pool_preserves_order_and_rejects_invalid_operand_before_writing(self):
+        root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as temp:
+            library = Path(temp) / "attention-pool.so"
+            subprocess.run(["cc", "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror",
+                            "-shared", "-fPIC", "-I", str(root / "include"),
+                            str(root / "src/kernels/gqa_relative_sink_checked.c"),
+                            str(root / "src/ck_threadpool.c"), str(root / "src/ckernel_strict.c"),
+                            "-lm", "-lpthread", "-ldl", "-o", str(library)], check=True)
+            lib = ctypes.CDLL(str(library))
+            lib.ck_threadpool_global.restype = ctypes.c_void_p
+            lib.ck_threadpool_profile_reset.argtypes = [ctypes.c_void_p]
+            lib.ck_threadpool_profile_snapshot.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint64)]
+            fn = lib.ck_gqa_relative_sink_ring_checked_f32
+            fn.argtypes = [ctypes.c_void_p, ctypes.c_size_t] * 7 + [ctypes.c_size_t] * 8
+            fn.restype = ctypes.c_int
+            lib.ck_set_num_threads(2)
+            pool = lib.ck_threadpool_global()
+            self.assertTrue(pool)
+            try:
+                rng = np.random.default_rng(95)
+                tokens, heads, kv_heads, dim, position, window, band = 17, 4, 2, 19, 54, 13, 5
+                capacity = tokens + window - 1
+                shape = (tokens, heads, dim)
+                q = rng.standard_normal(shape, dtype=np.float32)
+                k = rng.standard_normal((kv_heads, capacity, dim), dtype=np.float32)
+                v = rng.standard_normal(k.shape, dtype=np.float32)
+                rel = rng.standard_normal((tokens, heads, band), dtype=np.float32)
+                sink = rng.standard_normal((tokens, heads), dtype=np.float32)
+                output = np.empty(shape, dtype=np.float32)
+
+                def run(scratch):
+                    args = [value for array in (q, k, v, rel, sink, output, scratch)
+                            for value in (array.ctypes.data, array.size)]
+                    return fn(*args, tokens, heads, kv_heads, dim, capacity, position, band, window)
+
+                scratch = np.empty(q.size, dtype=np.float64)
+                self.assertEqual(run(scratch[:dim]), 0)
+                expected = output.view("u4").copy()
+                counts = (ctypes.c_uint64 * 4)()
+                lib.ck_threadpool_profile_reset(pool)
+                self.assertEqual(run(scratch), 0)
+                lib.ck_threadpool_profile_snapshot(pool, counts)
+                self.assertGreater(counts[0], 0)
+                np.testing.assert_array_equal(output.view("u4"), expected)
+                v[-1, (position + tokens - 1) % capacity, -1] = np.nan
+                output.fill(np.nan)
+                self.assertEqual(run(scratch), -3)
+                self.assertTrue(np.isnan(output).all())
+            finally:
+                lib.ck_threadpool_global_destroy()
 
     def test_connected_prefix_and_decode_match_with_bias_window_and_sink(self):
         rng = np.random.default_rng(276)
