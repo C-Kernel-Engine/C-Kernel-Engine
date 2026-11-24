@@ -429,6 +429,47 @@ size_t ck_rwkv7_channelmix_scratch_elems(int dim, int hidden_dim) {
     return (size_t)dim + (size_t)hidden_dim;
 }
 
+void ck_rwkv7_channelmix_hidden_rows(const float *xk,
+                                     const float *Wk,
+                                     float *hidden,
+                                     int dim,
+                                     int hidden_dim,
+                                     int row_begin,
+                                     int row_end) {
+    if (!xk || !Wk || !hidden || dim <= 0 || hidden_dim <= 0) return;
+    if (row_begin < 0) row_begin = 0;
+    if (row_end > hidden_dim) row_end = hidden_dim;
+    for (int j = row_begin; j < row_end; ++j) {
+        const float *row = Wk + (size_t)j * (size_t)dim;
+        float acc = 0.0f;
+        for (int i = 0; i < dim; ++i) {
+            acc += row[i] * xk[i];
+        }
+        const float rel = acc > 0.0f ? acc : 0.0f;
+        hidden[j] = rel * rel;
+    }
+}
+
+void ck_rwkv7_channelmix_out_rows(const float *hidden,
+                                  const float *Wv,
+                                  float *out,
+                                  int dim,
+                                  int hidden_dim,
+                                  int row_begin,
+                                  int row_end) {
+    if (!hidden || !Wv || !out || dim <= 0 || hidden_dim <= 0) return;
+    if (row_begin < 0) row_begin = 0;
+    if (row_end > dim) row_end = dim;
+    for (int i = row_begin; i < row_end; ++i) {
+        const float *row = Wv + (size_t)i * (size_t)hidden_dim;
+        float acc = 0.0f;
+        for (int j = 0; j < hidden_dim; ++j) {
+            acc += row[j] * hidden[j];
+        }
+        out[i] = acc;
+    }
+}
+
 int ck_rwkv7_channelmix_decode(const float *x,
                                const float *shift_in,
                                const float *mu,
@@ -479,25 +520,10 @@ int ck_rwkv7_channelmix_decode(const float *x,
         shift_out[i] = x[i];
     }
     /* hidden[j] = relu(Wk[j,:] @ xk)^2, Wk [K,C] row-major. */
-    for (int j = 0; j < hidden_dim; ++j) {
-        const float *row = Wk + (size_t)j * (size_t)dim;
-        float acc = 0.0f;
-        for (int i = 0; i < dim; ++i) {
-            acc += row[i] * xk[i];
-        }
-        const float rel = acc > 0.0f ? acc : 0.0f;
-        hidden[j] = rel * rel;
-    }
+    ck_rwkv7_channelmix_hidden_rows(xk, Wk, hidden, dim, hidden_dim, 0, hidden_dim);
     /* out = Wv @ hidden, Wv [C,K] row-major; runs after the last xk read,
      * so out == x aliasing is safe. */
-    for (int i = 0; i < dim; ++i) {
-        const float *row = Wv + (size_t)i * (size_t)hidden_dim;
-        float acc = 0.0f;
-        for (int j = 0; j < hidden_dim; ++j) {
-            acc += row[j] * hidden[j];
-        }
-        out[i] = acc;
-    }
+    ck_rwkv7_channelmix_out_rows(hidden, Wv, out, dim, hidden_dim, 0, dim);
     return 0;
 }
 

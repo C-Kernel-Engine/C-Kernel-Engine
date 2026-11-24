@@ -2724,7 +2724,16 @@ Examples:
     run_parser = subparsers.add_parser("run", help="Run model")
     run_parser.add_argument("model", help="GGUF source: hf://repo/file.gguf, local GGUF, or local runtime dir")
     run_parser.add_argument("--run", dest="run_dir", default=None, help="Optional explicit run directory")
-    run_parser.add_argument("--context-len", type=int, default=None, help="Context length override")
+    run_parser.add_argument(
+        "--context-len",
+        type=int,
+        default=None,
+        help=(
+            "Context length override (default: the manifest's declared "
+            "context_length). Circuits with a recurrent runtime window may allow "
+            "more, up to their declared hard_context_limit."
+        ),
+    )
     run_parser.add_argument(
         "--prefill-chunk-len",
         type=int,

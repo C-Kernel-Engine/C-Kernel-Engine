@@ -264,7 +264,10 @@
     },
     "runtime_defaults": {
       "external_activation_slots": ["att_shift", "ffn_shift", "wkv", "v_first"],
-      "require_declared_activation_slots": true
+      "require_declared_activation_slots": true,
+      "context_capacity_policy": "recurrent_runtime_window",
+      "hard_context_limit": 1048576,
+      "prefill_chunk_length": 1
     },
     "runtime_invariants": {
       "required_call_args": {}

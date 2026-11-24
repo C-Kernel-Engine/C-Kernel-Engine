@@ -315,6 +315,10 @@ def emit_memory_layout(layout: Dict, config: Dict) -> str:
     rotary_dim = config["rotary_dim"]
     rope_scaling_type = config["rope_scaling_type"]
     rope_scaling_factor = config["rope_scaling_factor"]
+    # Models without RoPE (e.g. RWKV-7) must not allocate a context-sized
+    # fallback table; at the recurrent-window ceiling that would be hundreds
+    # of MiB of never-read memory.
+    model_uses_rope = bool(config.get("_template_uses_rope", True))
 
     lines.append(f'''
 /* ============================================================================
@@ -329,6 +333,7 @@ def emit_memory_layout(layout: Dict, config: Dict) -> str:
 #define NUM_LAYERS {num_layers}
 #define VOCAB_SIZE {config["vocab_size"]}
 #define MAX_SEQ_LEN {config["context_length"]}
+#define MODEL_USES_ROPE {1 if model_uses_rope else 0}
 /* RoPE scaling: type={rope_scaling_type}, factor={rope_scaling_factor} */
 
 /* Memory sizes */
@@ -3898,7 +3903,7 @@ static int do_init(const char *weights_path) {{
 #endif
 #if defined(A_ROPE_CACHE) && A_ROPE_CACHE > 0
     g_model->rope_cos = (float*)(g_model->bump + A_ROPE_CACHE);
-#else
+#elif MODEL_USES_ROPE
     size_t rope_cache_elems = (size_t)MAX_SEQ_LEN * (size_t)ROTARY_DIM;
     g_model->rope_cos = (float*)calloc(rope_cache_elems, sizeof(float));
     if (!g_model->rope_cos) {{
@@ -3908,8 +3913,14 @@ static int do_init(const char *weights_path) {{
         g_model = NULL;
         return -1;
     }}
+#else
+    g_model->rope_cos = NULL;
 #endif
-    g_model->rope_sin = g_model->rope_cos + MAX_SEQ_LEN * ROTARY_DIM / 2;
+#if (defined(A_ROPE_CACHE) && A_ROPE_CACHE > 0) || MODEL_USES_ROPE
+    g_model->rope_sin = g_model->rope_cos + (size_t)MAX_SEQ_LEN * ROTARY_DIM / 2;
+#else
+    g_model->rope_sin = NULL;
+#endif
 #if defined(A_LOGITS) && A_LOGITS > 0
     g_model->logits = (float*)(g_model->bump + A_LOGITS);
 #else
