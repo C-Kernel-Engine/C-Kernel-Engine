@@ -1,5 +1,7 @@
 var NAVTREEINDEX21 =
 {
+"strided__unary__checked_8c.html#ab48429adec8e00c200e6545217fa4496":[2,0,1,1,165,3],
+"strided__unary__checked_8c.html#ace8266af93c1b83cc605aee00ae5817b":[2,0,1,1,165,2],
 "strided__unary__checked_8c_source.html":[2,0,1,1,165],
 "structAffinityInfo.html":[1,0,0],
 "structAffinityInfo.html#a335a14b8b3b93f722ef8e2b6455122f5":[1,0,0,3],
@@ -247,7 +249,5 @@ var NAVTREEINDEX21 =
 "structCKLayerBackwardParams.html#ad6bb7e7d63201723843d2eeba8139147":[1,0,47,31],
 "structCKLayerBackwardParams.html#ad725b9991eca276996a97b04f5a7095f":[1,0,47,5],
 "structCKLayerBackwardParams.html#ada3ee32dfad069f78687e2632f024837":[1,0,47,62],
-"structCKLayerBackwardParams.html#add2ab7c4a1a702cabb893466e5d7803f":[1,0,47,1],
-"structCKLayerBackwardParams.html#ae589cf1fe9b8972084f31ac77c0bb5f1":[1,0,47,2],
-"structCKLayerBackwardParams.html#aef7a8891a18f2c6a7457375d0c0ed870":[1,0,47,64]
+"structCKLayerBackwardParams.html#add2ab7c4a1a702cabb893466e5d7803f":[1,0,47,1]
 };

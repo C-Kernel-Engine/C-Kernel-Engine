@@ -133,6 +133,7 @@ $(function(){initNavTree('depth__residual__mix__checked_8c.html','',''); });
 <tr class="heading"><td colspan="2"><h2 id="header-func-members" class="groupheader"><a id="func-members" name="func-members"></a>
 Functions</h2></td></tr>
 <tr class="memitem:a5f56a2aae18ac5abc965cdee0e5cf75d" id="r_a5f56a2aae18ac5abc965cdee0e5cf75d"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a5f56a2aae18ac5abc965cdee0e5cf75d">depth_residual_mix_checked_f32</a> (const float *bank, size_t bank_elements, const float *current, size_t current_elements, const float *query, size_t query_elements, float *output, size_t output_elements, size_t rows, size_t states, size_t width, float epsilon)</td></tr>
+<tr class="memitem:abd5bfa891283b1bc99a31a53f638aea8" id="r_abd5bfa891283b1bc99a31a53f638aea8"><td class="memItemLeft" align="right" valign="top">static void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#abd5bfa891283b1bc99a31a53f638aea8">mix_depth_rows</a> (size_t begin, size_t <a class="el" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a>, void *opaque)</td></tr>
 <tr class="memitem:a85e47ff5d5b66b07317ca15daf33c397" id="r_a85e47ff5d5b66b07317ca15daf33c397"><td class="memItemLeft" align="right" valign="top">static double&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a85e47ff5d5b66b07317ca15daf33c397">rms_scale</a> (const float *x, size_t width, double epsilon)</td></tr>
 </table>
 <a name="doc-func-members" id="doc-func-members"></a><h2 id="header-doc-func-members" class="groupheader">Function Documentation</h2>
@@ -205,62 +206,128 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="depth__residual__mix__checked_8c_source.html#l00010">10</a> of file <a class="el" href="depth__residual__mix__checked_8c_source.html">depth_residual_mix_checked.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   15</span>{</div>
-<div class="line"><span class="lineno">   16</span>    <span class="keywordtype">size_t</span> present, prior;</div>
-<div class="line"><span class="lineno">   17</span>    <span class="keywordflow">if</span> (!states || states &gt; 64 || !isfinite(epsilon) || epsilon &lt;= 0.0f ||</div>
-<div class="line"><span class="lineno">   18</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#a80fa111d42598d70e6c6728193a1f8dc">ck_checked_span</a>(rows, width, width, &amp;present) ||</div>
-<div class="line"><span class="lineno">   19</span>        present &gt; SIZE_MAX / states ||</div>
-<div class="line"><span class="lineno">   20</span>        (prior = present * states) &gt; SIZE_MAX / <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>) ||</div>
-<div class="line"><span class="lineno">   21</span>        bank_elements &lt; prior || current_elements &lt; present ||</div>
-<div class="line"><span class="lineno">   22</span>        output_elements &lt; present || query_elements &lt; width) <span class="keywordflow">return</span> -2;</div>
-<div class="line"><span class="lineno">   23</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(bank, prior) || !<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(current, present) ||</div>
-<div class="line"><span class="lineno">   24</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(query, width) || !<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(output, present) ||</div>
-<div class="line"><span class="lineno">   25</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(output, present, bank, prior) ||</div>
-<div class="line"><span class="lineno">   26</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(output, present, current, present) ||</div>
-<div class="line"><span class="lineno">   27</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(output, present, query, width)) <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">   28</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a>(bank, prior) || !<a class="code hl_function" href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a>(current, present) ||</div>
-<div class="line"><span class="lineno">   29</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a>(query, width)) <span class="keywordflow">return</span> -3;</div>
-<div class="line"><span class="lineno">   30</span> </div>
-<div class="line"><span class="lineno">   31</span>    <span class="keyword">const</span> <span class="keywordtype">double</span> temperature = 1.0 / sqrt((<span class="keywordtype">double</span>)width);</div>
-<div class="line"><span class="lineno">   32</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> r = 0; r &lt; rows; ++r) {</div>
-<div class="line"><span class="lineno">   33</span>        <span class="keywordtype">double</span> scale[65], logits[65], max_logit = -INFINITY;</div>
-<div class="line"><span class="lineno">   34</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> s = 0; s &lt;= states; ++s) {</div>
-<div class="line"><span class="lineno">   35</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *x = s == states ? current + r * width : bank + (r * states + s) * width;</div>
-<div class="line"><span class="lineno">   36</span>            scale[s] = <a class="code hl_function" href="#a85e47ff5d5b66b07317ca15daf33c397">rms_scale</a>(x, width, epsilon);</div>
-<div class="line"><span class="lineno">   37</span>            <span class="keywordtype">double</span> <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> = 0.0;</div>
-<div class="line"><span class="lineno">   38</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> c = 0; c &lt; width; ++c) {</div>
-<div class="line"><span class="lineno">   39</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> normalized = (float)(x[c] * scale[s]);</div>
-<div class="line"><span class="lineno">   40</span>                <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> += (double)query[c] * normalized;</div>
-<div class="line"><span class="lineno">   41</span>            }</div>
-<div class="line"><span class="lineno">   42</span>            logits[s] = <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> * temperature;</div>
-<div class="line"><span class="lineno">   43</span>            max_logit = fmax(max_logit, logits[s]);</div>
-<div class="line"><span class="lineno">   44</span>        }</div>
-<div class="line"><span class="lineno">   45</span>        <span class="keywordtype">double</span> denominator = 0.0;</div>
-<div class="line"><span class="lineno">   46</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> s = 0; s &lt;= states; ++s) {</div>
-<div class="line"><span class="lineno">   47</span>            logits[s] = exp(logits[s] - max_logit);</div>
-<div class="line"><span class="lineno">   48</span>            denominator += logits[s];</div>
-<div class="line"><span class="lineno">   49</span>        }</div>
-<div class="line"><span class="lineno">   50</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> c = 0; c &lt; width; ++c) {</div>
-<div class="line"><span class="lineno">   51</span>            <span class="keywordtype">double</span> sum = 0.0;</div>
-<div class="line"><span class="lineno">   52</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> s = 0; s &lt;= states; ++s) {</div>
-<div class="line"><span class="lineno">   53</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> *x = s == states ? current + r * width : bank + (r * states + s) * width;</div>
-<div class="line"><span class="lineno">   54</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> normalized = (float)(x[c] * scale[s]);</div>
-<div class="line"><span class="lineno">   55</span>                sum += logits[s] * normalized;</div>
-<div class="line"><span class="lineno">   56</span>            }</div>
-<div class="line"><span class="lineno">   57</span>            output[r * width + c] = (float)(sum / denominator);</div>
-<div class="line"><span class="lineno">   58</span>        }</div>
-<div class="line"><span class="lineno">   59</span>    }</div>
-<div class="line"><span class="lineno">   60</span>    <span class="keywordflow">return</span> 0;</div>
-<div class="line"><span class="lineno">   61</span>}</div>
-<div class="ttc" id="aattention__cross__token__major__checked_8c_html_a8645ebc14bd224f816fa123347a1e15e"><div class="ttname"><a href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a></div><div class="ttdeci">static double dot(const float *a, const float *b, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="attention__cross__token__major__checked_8c_source.html#l00021">attention_cross_token_major_checked.c:21</a></div></div>
+<p class="definition">Definition at line <a class="el" href="depth__residual__mix__checked_8c_source.html#l00065">65</a> of file <a class="el" href="depth__residual__mix__checked_8c_source.html">depth_residual_mix_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   70</span>{</div>
+<div class="line"><span class="lineno">   71</span>    <span class="keywordtype">size_t</span> present, prior;</div>
+<div class="line"><span class="lineno">   72</span>    <span class="keywordflow">if</span> (!states || states &gt; 64 || !isfinite(epsilon) || epsilon &lt;= 0.0f ||</div>
+<div class="line"><span class="lineno">   73</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#a80fa111d42598d70e6c6728193a1f8dc">ck_checked_span</a>(rows, width, width, &amp;present) ||</div>
+<div class="line"><span class="lineno">   74</span>        present &gt; SIZE_MAX / states ||</div>
+<div class="line"><span class="lineno">   75</span>        (prior = present * states) &gt; SIZE_MAX / <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>) ||</div>
+<div class="line"><span class="lineno">   76</span>        bank_elements &lt; prior || current_elements &lt; present ||</div>
+<div class="line"><span class="lineno">   77</span>        output_elements &lt; present || query_elements &lt; width) <span class="keywordflow">return</span> -2;</div>
+<div class="line"><span class="lineno">   78</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(bank, prior) || !<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(current, present) ||</div>
+<div class="line"><span class="lineno">   79</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(query, width) || !<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(output, present) ||</div>
+<div class="line"><span class="lineno">   80</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(output, present, bank, prior) ||</div>
+<div class="line"><span class="lineno">   81</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(output, present, current, present) ||</div>
+<div class="line"><span class="lineno">   82</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(output, present, query, width)) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">   83</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a>(bank, prior) || !<a class="code hl_function" href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a>(current, present) ||</div>
+<div class="line"><span class="lineno">   84</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a>(query, width)) <span class="keywordflow">return</span> -3;</div>
+<div class="line"><span class="lineno">   85</span> </div>
+<div class="line"><span class="lineno">   86</span>    <span class="keyword">struct </span>depth_mix_rows work = {</div>
+<div class="line"><span class="lineno">   87</span>        .bank = bank, .current = current, .query = query, .output = output,</div>
+<div class="line"><span class="lineno">   88</span>        .states = states, .width = width, .epsilon = epsilon,</div>
+<div class="line"><span class="lineno">   89</span>    };</div>
+<div class="line"><span class="lineno">   90</span><span class="preprocessor">#ifdef CK_DEPTH_OPTIONAL_POOL</span></div>
+<div class="line"><span class="lineno">   91</span>    <span class="keywordflow">if</span> (rows &gt;= 16 &amp;&amp; width &gt;= 128 &amp;&amp; <a class="code hl_function" href="ckernel__engine_8h.html#aedf852ec498fe7db175f59f810886b9f">ck_get_num_threads</a> &amp;&amp; <a class="code hl_function" href="ck__threadpool_8h.html#a4597badcb0a5a6c31549f2b6bc6a88a7">ck_threadpool_global</a> &amp;&amp;</div>
+<div class="line"><span class="lineno">   92</span>        <a class="code hl_function" href="ck__threadpool_8h.html#a92ab47612f4b24d3ce156ad737bdd955">ck_threadpool_in_dispatch</a> &amp;&amp; <a class="code hl_function" href="ck__threadpool_8h.html#aef9103ab0a271feb7fdc74c915a78d10">ck_threadpool_n_threads</a> &amp;&amp; <a class="code hl_function" href="ck__threadpool_8h.html#a201c68c915e80d824c95721b55c5ab83">ck_threadpool_parallel_for_n</a>)</div>
+<div class="line"><span class="lineno">   93</span>        <a class="code hl_function" href="checked__parallel_8h.html#a7081faaa75564b9eb08d0e433cd84f9b">ck_checked_parallel_for</a>(rows, 4, <a class="code hl_function" href="#abd5bfa891283b1bc99a31a53f638aea8">mix_depth_rows</a>, &amp;work);</div>
+<div class="line"><span class="lineno">   94</span>    <span class="keywordflow">else</span></div>
+<div class="line"><span class="lineno">   95</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">   96</span>        <a class="code hl_function" href="#abd5bfa891283b1bc99a31a53f638aea8">mix_depth_rows</a>(0, rows, &amp;work);</div>
+<div class="line"><span class="lineno">   97</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">   98</span>}</div>
 <div class="ttc" id="achecked__float__buffer_8h_html_a1b266161b71bde9ca8d45c2fb5ac889a"><div class="ttname"><a href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a></div><div class="ttdeci">static int ck_checked_finite(const float *ptr, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00019">checked_float_buffer.h:19</a></div></div>
 <div class="ttc" id="achecked__float__buffer_8h_html_a80fa111d42598d70e6c6728193a1f8dc"><div class="ttname"><a href="checked__float__buffer_8h.html#a80fa111d42598d70e6c6728193a1f8dc">ck_checked_span</a></div><div class="ttdeci">static int ck_checked_span(size_t rows, size_t width, size_t stride, size_t *span)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00006">checked_float_buffer.h:6</a></div></div>
 <div class="ttc" id="achecked__float__buffer_8h_html_ada07e31487d86edb37408386003ac841"><div class="ttname"><a href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a></div><div class="ttdeci">static int ck_checked_region(const float *ptr, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00011">checked_float_buffer.h:11</a></div></div>
 <div class="ttc" id="achecked__float__buffer_8h_html_af87b7012571dc9a40b8e31c52e773abe"><div class="ttname"><a href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a></div><div class="ttdeci">static int ck_checked_overlap(const float *a, size_t na, const float *b, size_t nb)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00015">checked_float_buffer.h:15</a></div></div>
-<div class="ttc" id="adepth__residual__mix__checked_8c_html_a85e47ff5d5b66b07317ca15daf33c397"><div class="ttname"><a href="#a85e47ff5d5b66b07317ca15daf33c397">rms_scale</a></div><div class="ttdeci">static double rms_scale(const float *x, size_t width, double epsilon)</div><div class="ttdef"><b>Definition</b> <a href="depth__residual__mix__checked_8c_source.html#l00003">depth_residual_mix_checked.c:3</a></div></div>
+<div class="ttc" id="achecked__parallel_8h_html_a7081faaa75564b9eb08d0e433cd84f9b"><div class="ttname"><a href="checked__parallel_8h.html#a7081faaa75564b9eb08d0e433cd84f9b">ck_checked_parallel_for</a></div><div class="ttdeci">static void ck_checked_parallel_for(size_t count, int grain, ck_checked_range_fn fn, void *args)</div><div class="ttdef"><b>Definition</b> <a href="checked__parallel_8h_source.html#l00024">checked_parallel.h:24</a></div></div>
+<div class="ttc" id="ack__threadpool_8h_html_a201c68c915e80d824c95721b55c5ab83"><div class="ttname"><a href="ck__threadpool_8h.html#a201c68c915e80d824c95721b55c5ab83">ck_threadpool_parallel_for_n</a></div><div class="ttdeci">void ck_threadpool_parallel_for_n(ck_threadpool_t *pool, int active_threads, int begin, int end, int grain_size, ck_range_fn_t fn, void *args)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00576">ck_threadpool.c:576</a></div></div>
+<div class="ttc" id="ack__threadpool_8h_html_a4597badcb0a5a6c31549f2b6bc6a88a7"><div class="ttname"><a href="ck__threadpool_8h.html#a4597badcb0a5a6c31549f2b6bc6a88a7">ck_threadpool_global</a></div><div class="ttdeci">ck_threadpool_t * ck_threadpool_global(void)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00743">ck_threadpool.c:743</a></div></div>
+<div class="ttc" id="ack__threadpool_8h_html_a92ab47612f4b24d3ce156ad737bdd955"><div class="ttname"><a href="ck__threadpool_8h.html#a92ab47612f4b24d3ce156ad737bdd955">ck_threadpool_in_dispatch</a></div><div class="ttdeci">int ck_threadpool_in_dispatch(const ck_threadpool_t *pool)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00647">ck_threadpool.c:647</a></div></div>
+<div class="ttc" id="ack__threadpool_8h_html_aef9103ab0a271feb7fdc74c915a78d10"><div class="ttname"><a href="ck__threadpool_8h.html#aef9103ab0a271feb7fdc74c915a78d10">ck_threadpool_n_threads</a></div><div class="ttdeci">int ck_threadpool_n_threads(const ck_threadpool_t *pool)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00637">ck_threadpool.c:637</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_aedf852ec498fe7db175f59f810886b9f"><div class="ttname"><a href="ckernel__engine_8h.html#aedf852ec498fe7db175f59f810886b9f">ck_get_num_threads</a></div><div class="ttdeci">int ck_get_num_threads(void)</div><div class="ttdef"><b>Definition</b> <a href="ckernel__strict_8c_source.html#l00310">ckernel_strict.c:310</a></div></div>
+<div class="ttc" id="adepth__residual__mix__checked_8c_html_abd5bfa891283b1bc99a31a53f638aea8"><div class="ttname"><a href="#abd5bfa891283b1bc99a31a53f638aea8">mix_depth_rows</a></div><div class="ttdeci">static void mix_depth_rows(size_t begin, size_t end, void *opaque)</div><div class="ttdef"><b>Definition</b> <a href="depth__residual__mix__checked_8c_source.html#l00027">depth_residual_mix_checked.c:27</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="checked__float__buffer_8h_source.html#l00019">ck_checked_finite()</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00015">ck_checked_overlap()</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00011">ck_checked_region()</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00006">ck_checked_span()</a>, <a class="el" href="attention__cross__token__major__checked_8c_source.html#l00021">dot()</a>, and <a class="el" href="depth__residual__mix__checked_8c_source.html#l00003">rms_scale()</a>.</p>
+<p class="reference">References <a class="el" href="checked__float__buffer_8h_source.html#l00019">ck_checked_finite()</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00015">ck_checked_overlap()</a>, <a class="el" href="checked__parallel_8h_source.html#l00024">ck_checked_parallel_for()</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00011">ck_checked_region()</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00006">ck_checked_span()</a>, <a class="el" href="ckernel__strict_8c_source.html#l00310">ck_get_num_threads()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00743">ck_threadpool_global()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00647">ck_threadpool_in_dispatch()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00637">ck_threadpool_n_threads()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00576">ck_threadpool_parallel_for_n()</a>, and <a class="el" href="depth__residual__mix__checked_8c_source.html#l00027">mix_depth_rows()</a>.</p>
+
+</div>
+</div>
+<a id="abd5bfa891283b1bc99a31a53f638aea8" name="abd5bfa891283b1bc99a31a53f638aea8"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#abd5bfa891283b1bc99a31a53f638aea8">&#9670;&#160;</a></span>mix_depth_rows()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void mix_depth_rows </td>
+          <td>(</td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>begin</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>end</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">void *</td>          <td class="paramname"><span class="paramname"><em>opaque</em></span>&#160;)</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel static">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="depth__residual__mix__checked_8c_source.html#l00027">27</a> of file <a class="el" href="depth__residual__mix__checked_8c_source.html">depth_residual_mix_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   28</span>{</div>
+<div class="line"><span class="lineno">   29</span>    <span class="keyword">const</span> <span class="keyword">struct </span>depth_mix_rows *work = opaque;</div>
+<div class="line"><span class="lineno">   30</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> *bank = work-&gt;bank, *current = work-&gt;current, *query = work-&gt;query;</div>
+<div class="line"><span class="lineno">   31</span>    <span class="keywordtype">float</span> *output = work-&gt;output;</div>
+<div class="line"><span class="lineno">   32</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> states = work-&gt;states, width = work-&gt;width;</div>
+<div class="line"><span class="lineno">   33</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> epsilon = work-&gt;epsilon;</div>
+<div class="line"><span class="lineno">   34</span>    <span class="keyword">const</span> <span class="keywordtype">double</span> temperature = 1.0 / sqrt((<span class="keywordtype">double</span>)width);</div>
+<div class="line"><span class="lineno">   35</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> r = begin; r &lt; <a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a>; ++r) {</div>
+<div class="line"><span class="lineno">   36</span>        <span class="keywordtype">double</span> scale[65], logits[65], max_logit = -INFINITY;</div>
+<div class="line"><span class="lineno">   37</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> s = 0; s &lt;= states; ++s) {</div>
+<div class="line"><span class="lineno">   38</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *x = s == states ? current + r * width : bank + (r * states + s) * width;</div>
+<div class="line"><span class="lineno">   39</span>            scale[s] = <a class="code hl_function" href="#a85e47ff5d5b66b07317ca15daf33c397">rms_scale</a>(x, width, epsilon);</div>
+<div class="line"><span class="lineno">   40</span>            <span class="keywordtype">double</span> <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> = 0.0;</div>
+<div class="line"><span class="lineno">   41</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> c = 0; c &lt; width; ++c) {</div>
+<div class="line"><span class="lineno">   42</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> normalized = (float)(x[c] * scale[s]);</div>
+<div class="line"><span class="lineno">   43</span>                <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> += (double)query[c] * normalized;</div>
+<div class="line"><span class="lineno">   44</span>            }</div>
+<div class="line"><span class="lineno">   45</span>            logits[s] = <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> * temperature;</div>
+<div class="line"><span class="lineno">   46</span>            max_logit = fmax(max_logit, logits[s]);</div>
+<div class="line"><span class="lineno">   47</span>        }</div>
+<div class="line"><span class="lineno">   48</span>        <span class="keywordtype">double</span> denominator = 0.0;</div>
+<div class="line"><span class="lineno">   49</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> s = 0; s &lt;= states; ++s) {</div>
+<div class="line"><span class="lineno">   50</span>            logits[s] = exp(logits[s] - max_logit);</div>
+<div class="line"><span class="lineno">   51</span>            denominator += logits[s];</div>
+<div class="line"><span class="lineno">   52</span>        }</div>
+<div class="line"><span class="lineno">   53</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> c = 0; c &lt; width; ++c) {</div>
+<div class="line"><span class="lineno">   54</span>            <span class="keywordtype">double</span> sum = 0.0;</div>
+<div class="line"><span class="lineno">   55</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> s = 0; s &lt;= states; ++s) {</div>
+<div class="line"><span class="lineno">   56</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> *x = s == states ? current + r * width : bank + (r * states + s) * width;</div>
+<div class="line"><span class="lineno">   57</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> normalized = (float)(x[c] * scale[s]);</div>
+<div class="line"><span class="lineno">   58</span>                sum += logits[s] * normalized;</div>
+<div class="line"><span class="lineno">   59</span>            }</div>
+<div class="line"><span class="lineno">   60</span>            output[r * width + c] = (float)(sum / denominator);</div>
+<div class="line"><span class="lineno">   61</span>        }</div>
+<div class="line"><span class="lineno">   62</span>    }</div>
+<div class="line"><span class="lineno">   63</span>}</div>
+<div class="ttc" id="aattention__cross__token__major__checked_8c_html_a8645ebc14bd224f816fa123347a1e15e"><div class="ttname"><a href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a></div><div class="ttdeci">static double dot(const float *a, const float *b, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="attention__cross__token__major__checked_8c_source.html#l00021">attention_cross_token_major_checked.c:21</a></div></div>
+<div class="ttc" id="adepth__residual__mix__checked_8c_html_a85e47ff5d5b66b07317ca15daf33c397"><div class="ttname"><a href="#a85e47ff5d5b66b07317ca15daf33c397">rms_scale</a></div><div class="ttdeci">static double rms_scale(const float *x, size_t width, double epsilon)</div><div class="ttdef"><b>Definition</b> <a href="depth__residual__mix__checked_8c_source.html#l00013">depth_residual_mix_checked.c:13</a></div></div>
+<div class="ttc" id="autf8_8c_html_a204a3f4fa39b9c007f9784d3e4af4667"><div class="ttname"><a href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a></div><div class="ttdeci">uint32_t end</div><div class="ttdef"><b>Definition</b> <a href="utf8_8c_source.html#l00215">utf8.c:215</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="attention__cross__token__major__checked_8c_source.html#l00021">dot()</a>, <a class="el" href="utf8_8c_source.html#l00215">end</a>, and <a class="el" href="depth__residual__mix__checked_8c_source.html#l00013">rms_scale()</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="depth__residual__mix__checked_8c_source.html#l00065">depth_residual_mix_checked_f32()</a>.</p>
 
 </div>
 </div>
@@ -296,14 +363,14 @@ Functions</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="depth__residual__mix__checked_8c_source.html#l00003">3</a> of file <a class="el" href="depth__residual__mix__checked_8c_source.html">depth_residual_mix_checked.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">    4</span>{</div>
-<div class="line"><span class="lineno">    5</span>    <span class="keywordtype">double</span> sum = 0.0;</div>
-<div class="line"><span class="lineno">    6</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> c = 0; c &lt; width; ++c) sum += (<span class="keywordtype">double</span>)x[c] * x[c];</div>
-<div class="line"><span class="lineno">    7</span>    <span class="keywordflow">return</span> 1.0 / sqrt(sum / (<span class="keywordtype">double</span>)width + epsilon);</div>
-<div class="line"><span class="lineno">    8</span>}</div>
+<p class="definition">Definition at line <a class="el" href="depth__residual__mix__checked_8c_source.html#l00013">13</a> of file <a class="el" href="depth__residual__mix__checked_8c_source.html">depth_residual_mix_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   14</span>{</div>
+<div class="line"><span class="lineno">   15</span>    <span class="keywordtype">double</span> sum = 0.0;</div>
+<div class="line"><span class="lineno">   16</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> c = 0; c &lt; width; ++c) sum += (<span class="keywordtype">double</span>)x[c] * x[c];</div>
+<div class="line"><span class="lineno">   17</span>    <span class="keywordflow">return</span> 1.0 / sqrt(sum / (<span class="keywordtype">double</span>)width + epsilon);</div>
+<div class="line"><span class="lineno">   18</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="attention__mlp__fused_8c_source.html#l00153">attention_mlp_fused_fp32()</a>, <a class="el" href="attention__mlp__fused_8c_source.html#l00720">attention_mlp_fused_q4k()</a>, <a class="el" href="attention__mlp__fused_8c_source.html#l01062">attention_mlp_separate_fp32()</a>, <a class="el" href="depth__residual__mix__checked_8c_source.html#l00010">depth_residual_mix_checked_f32()</a>, <a class="el" href="attention__mlp__fused_8c_source.html#l00879">layer_fused_attn_mlp_qkv_q4k()</a>, <a class="el" href="attention__mlp__fused_8c_source.html#l00385">mlp_fused_fp32_v2()</a>, <a class="el" href="attention__mlp__fused_8c_source.html#l00542">mlp_fused_fp32_v3()</a>, and <a class="el" href="attention__mlp__fused_8c_source.html#l00657">mlp_separate_fp32()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="attention__mlp__fused_8c_source.html#l00153">attention_mlp_fused_fp32()</a>, <a class="el" href="attention__mlp__fused_8c_source.html#l00720">attention_mlp_fused_q4k()</a>, <a class="el" href="attention__mlp__fused_8c_source.html#l01062">attention_mlp_separate_fp32()</a>, <a class="el" href="attention__mlp__fused_8c_source.html#l00879">layer_fused_attn_mlp_qkv_q4k()</a>, <a class="el" href="depth__residual__mix__checked_8c_source.html#l00027">mix_depth_rows()</a>, <a class="el" href="attention__mlp__fused_8c_source.html#l00385">mlp_fused_fp32_v2()</a>, <a class="el" href="attention__mlp__fused_8c_source.html#l00542">mlp_fused_fp32_v3()</a>, and <a class="el" href="attention__mlp__fused_8c_source.html#l00657">mlp_separate_fp32()</a>.</p>
 
 </div>
 </div>

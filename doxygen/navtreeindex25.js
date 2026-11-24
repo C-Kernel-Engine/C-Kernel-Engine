@@ -1,5 +1,7 @@
 var NAVTREEINDEX25 =
 {
+"structRecommendation.html#ad4009263d6f5d6e3feeab261f071beaf":[1,0,102,0],
+"structRecommendationList.html":[1,0,103],
 "structRecommendationList.html#a07a86874728786aa76e45da00a7f5af9":[1,0,103,0],
 "structRecommendationList.html#a63246ddf4369acfa638cf19f1de2cf3e":[1,0,103,1],
 "structSystemTopology.html":[1,0,104],
@@ -247,7 +249,5 @@ var NAVTREEINDEX25 =
 "swiglu__kernels__bf16_8c.html#a77fb89fc5fa2dcc73d9d37ccf9c50322":[2,0,1,1,167,0],
 "swiglu__kernels__bf16_8c_source.html":[2,0,1,1,167],
 "system__topology_8c.html":[2,0,1,30],
-"system__topology_8c.html#a089e974347ad9291cc98080f85392a57":[2,0,1,30,19],
-"system__topology_8c.html#a314b4992493c6b32bcb3258fca5f5eca":[2,0,1,30,9],
-"system__topology_8c.html#a349f2755a1cb7361bbbe5c729985136d":[2,0,1,30,15]
+"system__topology_8c.html#a089e974347ad9291cc98080f85392a57":[2,0,1,30,19]
 };
