@@ -155,36 +155,48 @@ class RelativeAttentionTests(unittest.TestCase):
             self.assertTrue(pool)
             try:
                 rng = np.random.default_rng(95)
-                tokens, heads, kv_heads, dim, position, window, band = 17, 4, 2, 19, 54, 13, 5
-                capacity = tokens + window - 1
-                shape = (tokens, heads, dim)
-                q = rng.standard_normal(shape, dtype=np.float32)
-                k = rng.standard_normal((kv_heads, capacity, dim), dtype=np.float32)
-                v = rng.standard_normal(k.shape, dtype=np.float32)
-                rel = rng.standard_normal((tokens, heads, band), dtype=np.float32)
-                sink = rng.standard_normal((tokens, heads), dtype=np.float32)
-                output = np.empty(shape, dtype=np.float32)
-
-                def run(scratch):
-                    args = [value for array in (q, k, v, rel, sink, output, scratch)
-                            for value in (array.ctypes.data, array.size)]
-                    return fn(*args, tokens, heads, kv_heads, dim, capacity, position, band, window)
-
-                scratch = np.empty(q.size, dtype=np.float64)
-                self.assertEqual(run(scratch[:dim]), 0)
-                expected = output.view("u4").copy()
-                counts = (ctypes.c_uint64 * 4)()
-                lib.ck_threadpool_profile_reset(pool)
-                self.assertEqual(run(scratch), 0)
-                lib.ck_threadpool_profile_snapshot(pool, counts)
-                self.assertGreater(counts[0], 0)
-                np.testing.assert_array_equal(output.view("u4"), expected)
-                v[-1, (position + tokens - 1) % capacity, -1] = np.nan
-                output.fill(np.nan)
-                self.assertEqual(run(scratch), -3)
-                self.assertTrue(np.isnan(output).all())
+                for tokens, heads, position, window in ((17, 4, 54, 13), (1, 8, 311, 128)):
+                    with self.subTest(tokens=tokens):
+                        self._check_pool_attention_case(lib, pool, fn, rng, tokens, heads, position, window)
             finally:
                 lib.ck_threadpool_global_destroy()
+
+    def _check_pool_attention_case(self, lib, pool, fn, rng, tokens, heads, position, window):
+        kv_heads, dim, band = 2, 19, 5
+        capacity = tokens + window - 1
+        shape = (tokens, heads, dim)
+        q = rng.standard_normal(shape, dtype=np.float32)
+        k = rng.standard_normal((kv_heads, capacity, dim), dtype=np.float32)
+        v = rng.standard_normal(k.shape, dtype=np.float32)
+        rel = rng.standard_normal((tokens, heads, band), dtype=np.float32)
+        sink = rng.standard_normal((tokens, heads), dtype=np.float32)
+        output = np.empty(shape, dtype=np.float32)
+
+        def run(scratch):
+            args = [value for array in (q, k, v, rel, sink, output, scratch)
+                    for value in (array.ctypes.data, array.size)]
+            return fn(*args, tokens, heads, kv_heads, dim, capacity, position, band, window)
+
+        scratch = np.empty(q.size, dtype=np.float64)
+        self.assertEqual(run(scratch[:dim]), 0)
+        expected = output.view("u4").copy()
+        counts = (ctypes.c_uint64 * 4)()
+        lib.ck_threadpool_profile_reset(pool)
+        self.assertEqual(run(scratch), 0)
+        lib.ck_threadpool_profile_snapshot(pool, counts)
+        self.assertGreater(counts[0], 0)
+        np.testing.assert_array_equal(output.view("u4"), expected)
+        first = (position - window + 1) % capacity
+        last = (position + tokens - 1) % capacity
+        for index, invalid in (((0, first, 0), -np.inf), ((-1, last, -1), np.nan)):
+            original = v[index]
+            v[index] = invalid
+            output.fill(np.nan)
+            self.assertEqual(run(scratch), -3)
+            self.assertTrue(np.isnan(output).all())
+            v[index] = original
+        self.assertEqual(run(scratch), 0)
+        np.testing.assert_array_equal(output.view("u4"), expected)
 
     def test_connected_prefix_and_decode_match_with_bias_window_and_sink(self):
         rng = np.random.default_rng(276)
