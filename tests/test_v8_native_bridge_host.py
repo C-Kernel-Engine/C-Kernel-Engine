@@ -1067,7 +1067,7 @@ class V8NativeBridgeHostTests(unittest.TestCase):
                  mock.patch.object(ck_run_v8, "run_cmd", side_effect=fake_run_cmd), \
                  mock.patch.object(ck_run_v8, "_sync_runtime_lib", side_effect=fake_sync_runtime_lib), \
                  mock.patch.object(ck_run_v8, "_validate_runtime_bundle"), \
-                 mock.patch.object(ck_run_v8, "_compiler_supports_openmp", return_value=True), \
+                 mock.patch.object(ck_run_v8, "_compiler_supports_openmp", return_value=True) as omp_probe, \
                  mock.patch.object(ck_run_v8.shutil, "which", side_effect=fake_which), \
                  mock.patch.dict(ck_run_v8.os.environ, {}, clear=True):
                 lib_path = ck_run_v8.step_compile(model_c, out_dir, force=False)
@@ -1077,9 +1077,11 @@ class V8NativeBridgeHostTests(unittest.TestCase):
         self.assertEqual(calls[0][0], "make")
         cmd = calls[1]
         self.assertEqual(cmd[0], "gcc")
-        self.assertIn("-fopenmp", cmd)
+        self.assertFalse(any(arg.startswith(("-f", "-q")) and "openmp" in arg for arg in cmd))
+        self.assertIn("CK_ENABLE_OPENMP=0", calls[0])
+        omp_probe.assert_not_called()
 
-    def test_ck_run_v8_step_compile_accepts_explicit_icx(self) -> None:
+    def test_ck_run_v8_step_compile_accepts_explicit_icx_and_openmp(self) -> None:
         with tempfile.TemporaryDirectory(prefix="v8_step_compile_explicit_icx_") as tmpdir:
             tmp = Path(tmpdir)
             build_dir = tmp / "build"
@@ -1107,10 +1109,12 @@ class V8NativeBridgeHostTests(unittest.TestCase):
                  mock.patch.object(ck_run_v8, "_sync_runtime_lib", side_effect=fake_sync_runtime_lib), \
                  mock.patch.object(ck_run_v8, "_validate_runtime_bundle"), \
                  mock.patch.object(ck_run_v8.shutil, "which", return_value="/opt/intel/bin/icx"), \
-                 mock.patch.dict(ck_run_v8.os.environ, {"CK_V8_COMPILER": "icx"}, clear=True):
+                 mock.patch.object(ck_run_v8, "_compiler_supports_openmp", return_value=True), \
+                 mock.patch.dict(ck_run_v8.os.environ, {"CK_V8_COMPILER": "icx", "CK_ENABLE_OPENMP": "1"}, clear=True):
                 ck_run_v8.step_compile(model_c, out_dir, force=False)
 
         self.assertEqual(calls[0][0], "make")
+        self.assertIn("CK_ENABLE_OPENMP=1", calls[0])
         self.assertEqual(calls[1][0], "icx")
         self.assertIn("-qopenmp", calls[1])
 

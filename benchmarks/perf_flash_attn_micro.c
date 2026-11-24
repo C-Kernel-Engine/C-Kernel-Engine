@@ -2,7 +2,7 @@
  * Flash Attention decode microbenchmark for perf profiling.
  *
  * Build:
- *   gcc -O3 -g -fno-omit-frame-pointer -march=native -fopenmp \
+ *   gcc -O3 -g -fno-omit-frame-pointer -march=native \
  *       benchmarks/perf_flash_attn_micro.c \
  *       -Iinclude -Lbuild -lckernel_engine -lm -o build/perf_flash_attn_micro
  *
@@ -23,7 +23,6 @@
  */
 
 #include <math.h>
-#include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -129,7 +128,7 @@ int main(int argc, char **argv) {
     printf("Heads: %d  KV Heads: %d\n", num_heads, num_kv_heads);
     printf("Head dim: %d  Aligned: %d\n", head_dim, aligned_head_dim);
     printf("Iterations: %d  Warmup: %d\n", iters, warmup);
-    printf("Threads: %d\n", omp_get_max_threads());
+    printf("Threads: %d\n", ck_get_num_threads());
     printf("Tile_k: %d  Fast exp kind: %d\n",
            ck_flash_attn_choose_tile_k(head_dim),
            ck_flash_attn_fast_exp_kind());
