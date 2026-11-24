@@ -1,5 +1,6 @@
 var NAVTREEINDEX26 =
 {
+"swiglu__kernels__bf16_8c.html#a41a1dfc5976b7c2e2539a2811dc0b07f":[2,0,1,1,167,1],
 "swiglu__kernels__bf16_8c.html#a77fb89fc5fa2dcc73d9d37ccf9c50322":[2,0,1,1,167,0],
 "swiglu__kernels__bf16_8c_source.html":[2,0,1,1,167],
 "system__topology_8c.html":[2,0,1,30],
@@ -248,6 +249,5 @@ var NAVTREEINDEX26 =
 "true__bpe_8c.html":[2,0,1,3,6],
 "true__bpe_8c.html#a03f513f94a3f4171cfc80b568df3073e":[2,0,1,3,6,36],
 "true__bpe_8c.html#a0789466d184924de5d95ef2725aacb2c":[2,0,1,3,6,28],
-"true__bpe_8c.html#a08f555c94935c343bcfb7ec35a88a7b6":[2,0,1,3,6,51],
-"true__bpe_8c.html#a09465c383cd23828e94d37fdbccd498c":[2,0,1,3,6,31]
+"true__bpe_8c.html#a08f555c94935c343bcfb7ec35a88a7b6":[2,0,1,3,6,51]
 };
