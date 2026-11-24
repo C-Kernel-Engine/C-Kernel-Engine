@@ -1,5 +1,15 @@
 #include "checked_float_buffer.h"
 
+#if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
+#include "checked_parallel.h"
+#define CK_GQA_OPTIONAL_POOL 1
+#pragma weak ck_get_num_threads
+#pragma weak ck_threadpool_global
+#pragma weak ck_threadpool_in_dispatch
+#pragma weak ck_threadpool_n_threads
+#pragma weak ck_threadpool_parallel_for_n
+#endif
+
 #if defined(__clang__)
 #pragma clang fp contract(off)
 #elif defined(__GNUC__)
@@ -94,6 +104,70 @@ static __attribute__((target("avx2"))) void attention_row_avx2(
     double *work, size_t work_elements, size_t tokens, size_t heads, size_t kv_heads, \
     size_t dim, size_t capacity, size_t position, size_t relative_extent, size_t window
 
+struct gqa_rows {
+    const float *query, *key, *value, *relative, *sink;
+    float *output;
+    double *work;
+    size_t heads, group, dim, capacity, position, relative_extent, window;
+    double scale;
+    int circular, use_row_work;
+#ifdef CK_GQA_X86_AVX2
+    int use_avx2;
+#endif
+};
+
+static void evaluate_attention_rows(size_t start, size_t stop, void *opaque)
+{
+    const struct gqa_rows *task = opaque;
+    const float *query = task->query, *key = task->key, *value = task->value;
+    const float *relative = task->relative, *sink = task->sink;
+    float *output = task->output;
+    const size_t heads = task->heads, group = task->group, dim = task->dim;
+    const size_t capacity = task->capacity, position = task->position;
+    const size_t relative_extent = task->relative_extent, window = task->window;
+    const double scale = task->scale;
+    const int circular = task->circular;
+#ifdef CK_GQA_X86_AVX2
+    const int use_avx2 = task->use_avx2;
+#endif
+    for (size_t row = start; row < stop; ++row) {
+        const size_t qpos = position + row / heads;
+        const size_t begin = window && qpos >= window ? qpos - window + 1 : 0;
+        const float *q = query + row * dim;
+        const float *rel = relative + row * relative_extent;
+        const size_t cache = ((row % heads) / group) * capacity;
+        double *accumulator = task->work + (task->use_row_work ? row * dim : 0);
+#ifdef CK_GQA_X86_AVX2
+        if (use_avx2 && qpos - begin >= 7) {
+            attention_row_avx2(q, key + cache * dim, value + cache * dim, rel, sink[row],
+                               output + row * dim, accumulator, dim, begin, qpos, relative_extent, scale, circular ? capacity : 0);
+            continue;
+        }
+#endif
+        double max_logit = sink[row], denom = 1.0;
+        for (size_t d = 0; d < dim; ++d) accumulator[d] = 0.0;
+        for (size_t k = begin; k <= qpos; ++k) {
+            const size_t row_index = circular ? k % capacity : k;
+            const float *keys = key + (cache + row_index) * dim;
+            const float *values = value + (cache + row_index) * dim;
+            double dot = 0.0;
+            /* Each product of finite FP32 operands is exact in FP64. */
+            for (size_t d = 0; d < dim; ++d) dot += (double)q[d] * (double)keys[d];
+            const size_t distance = qpos - k;
+            const double score = dot * scale + (distance < relative_extent ? rel[distance] : 0.0);
+            const double next_max = fmax(score, max_logit);
+            const double old_factor = max_logit == next_max ? 1.0 : exp(max_logit - next_max);
+            const double new_factor = score == next_max ? 1.0 : exp(score - next_max);
+            denom = denom * old_factor + new_factor;
+            for (size_t d = 0; d < dim; ++d)
+                accumulator[d] = accumulator[d] * old_factor + (double)values[d] * new_factor;
+            max_logit = next_max;
+        }
+        for (size_t d = 0; d < dim; ++d)
+            output[row * dim + d] = (float)(accumulator[d] / denom);
+    }
+}
+
 /* Read the causal span in absolute order, including across a ring wrap. */
 static int gqa_relative_sink_checked(GQA_RELATIVE_ARGS, int circular)
 {
@@ -115,9 +189,12 @@ static int gqa_relative_sink_checked(GQA_RELATIVE_ARGS, int circular)
         return -2;
 
     size_t workspace = dim;
-#ifdef _OPENMP
-    if (q_size <= SIZE_MAX / sizeof(double) && work_elements >= q_size)
-        workspace = q_size;
+#ifdef CK_GQA_OPTIONAL_POOL
+    const int parallel = tokens > 1 && rows >= 64 && position + tokens >= 64 &&
+        q_size <= SIZE_MAX / sizeof(double) && work_elements >= q_size &&
+        ck_get_num_threads && ck_threadpool_global && ck_threadpool_in_dispatch &&
+        ck_threadpool_n_threads && ck_threadpool_parallel_for_n && ck_get_num_threads() > 1;
+    if (parallel) workspace = q_size;
 #endif
     const size_t scratch_bytes = workspace * sizeof(double);
     if (!work || (uintptr_t)work % _Alignof(double) ||
@@ -153,51 +230,22 @@ static int gqa_relative_sink_checked(GQA_RELATIVE_ARGS, int circular)
             return -3;
     }
 
-    const double scale = 1.0 / sqrt((double)dim);
-    const size_t group = heads / kv_heads;
+    struct gqa_rows work_rows = {
+        .query = query, .key = key, .value = value, .relative = relative, .sink = sink,
+        .output = output, .work = work, .heads = heads, .group = heads / kv_heads,
+        .dim = dim, .capacity = capacity, .position = position, .relative_extent = relative_extent,
+        .window = window, .scale = 1.0 / sqrt((double)dim), .circular = circular,
+        .use_row_work = workspace > dim,
 #ifdef CK_GQA_X86_AVX2
-    const int use_avx2 = dim >= 16 && __builtin_cpu_supports("avx2");
+        .use_avx2 = dim >= 16 && __builtin_cpu_supports("avx2"),
 #endif
-#ifdef _OPENMP
-    const int parallel = workspace > dim && visible >= 128;
-#pragma omp parallel for if(parallel)
+    };
+#ifdef CK_GQA_OPTIONAL_POOL
+    if (parallel)
+        ck_checked_parallel_for(rows, 4, evaluate_attention_rows, &work_rows);
+    else
 #endif
-    for (size_t row = 0; row < rows; ++row) {
-        const size_t qpos = position + row / heads;
-        const size_t begin = window && qpos >= window ? qpos - window + 1 : 0;
-        const float *q = query + row * dim;
-        const float *rel = relative + row * relative_extent;
-        const size_t cache = ((row % heads) / group) * capacity;
-        double *accumulator = work + (workspace > dim ? row * dim : 0);
-#ifdef CK_GQA_X86_AVX2
-        if (use_avx2 && qpos - begin >= 7) {
-            attention_row_avx2(q, key + cache * dim, value + cache * dim, rel, sink[row],
-                               output + row * dim, accumulator, dim, begin, qpos, relative_extent, scale, circular ? capacity : 0);
-            continue;
-        }
-#endif
-        double max_logit = sink[row], denom = 1.0;
-        for (size_t d = 0; d < dim; ++d) accumulator[d] = 0.0;
-        for (size_t k = begin; k <= qpos; ++k) {
-            const size_t row_index = circular ? k % capacity : k;
-            const float *keys = key + (cache + row_index) * dim;
-            const float *values = value + (cache + row_index) * dim;
-            double dot = 0.0;
-            /* Each product of finite FP32 operands is exact in FP64. */
-            for (size_t d = 0; d < dim; ++d) dot += (double)q[d] * (double)keys[d];
-            const size_t distance = qpos - k;
-            const double score = dot * scale + (distance < relative_extent ? rel[distance] : 0.0);
-            const double next_max = fmax(score, max_logit);
-            const double old_factor = max_logit == next_max ? 1.0 : exp(max_logit - next_max);
-            const double new_factor = score == next_max ? 1.0 : exp(score - next_max);
-            denom = denom * old_factor + new_factor;
-            for (size_t d = 0; d < dim; ++d)
-                accumulator[d] = accumulator[d] * old_factor + (double)values[d] * new_factor;
-            max_logit = next_max;
-        }
-        for (size_t d = 0; d < dim; ++d)
-            output[row * dim + d] = (float)(accumulator[d] / denom);
-    }
+        evaluate_attention_rows(0, rows, &work_rows);
     return 0;
 }
 
