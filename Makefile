@@ -4589,6 +4589,7 @@ test-rwkv-world-tokenizer: $(LIB_TOKENIZER)
 test-v8-rwkv7-lowering:
 	@$(PYTHON) -c "import torch, safetensors"
 	@$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_safetensors_to_bump.py -k "rwkv7 or declared_layer_scope"
+	@$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_context_capacity_override.py tests/test_v8_rwkv7_channelmix_parallel.py tests/test_v8_rwkv7_context_memory_invariance.py tests/test_v8_rwkv7_context_resolution.py tests/test_v8_rwkv7_generated_rope_allocation.py
 
 test-v8-dsl-policy: test-source-integrity test-v8-rwkv7-lowering
 	@echo "Running v8 zero-hardcoding DSL policy tests..."

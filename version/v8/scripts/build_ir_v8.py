@@ -8361,6 +8361,213 @@ def _normalize_manifest_config(config: Dict) -> Dict:
     return out
 
 
+def _resolve_declared_context(manifest: Dict[str, Any]) -> int:
+    """Return the model's declared context capacity, failing closed if absent.
+
+    The manifest is the single source of truth. Config aliases must agree with
+    each other and with any top-level declaration; a disagreement means the
+    artifact was hand-edited or written by two different converters.
+    """
+    config = manifest.get("config") if isinstance(manifest.get("config"), dict) else {}
+    fields = {f"config.{key}": config.get(key) for key in ("context_length", "max_seq_len")}
+    fields["context_length"] = manifest.get("context_length")
+    declared = {}
+    for field, value in fields.items():
+        if value is None:
+            continue
+        if type(value) is not int or value <= 0:
+            raise BuildDiagnosticError(
+                f"{field} must be a positive integer",
+                code="CKE-V8-CONTEXT-UNDECLARED", stage="input_validation",
+                category="user_configuration", summary="invalid declared context length",
+                remediation="Regenerate the manifest with an integer capacity.",
+                observed={"field": field, "value": value},
+            )
+        declared[field] = value
+
+    if not declared:
+        raise BuildDiagnosticError(
+            "manifest declares no context capacity",
+            code="CKE-V8-CONTEXT-UNDECLARED",
+            stage="input_validation",
+            category="user_configuration",
+            summary="the manifest does not declare config.context_length or max_seq_len",
+            remediation=(
+                "Regenerate the manifest with the converter so that "
+                "context_length is written from release metadata, or add an "
+                "explicit config.context_length."
+            ),
+            observed={"config_keys": sorted(str(k) for k in config.keys())},
+        )
+
+    distinct = sorted({value for value in declared.values()})
+    if len(distinct) != 1:
+        raise BuildDiagnosticError(
+            f"manifest declares conflicting context capacities: {declared}",
+            code="CKE-V8-CONTEXT-CONFLICT",
+            stage="input_validation",
+            category="user_configuration",
+            summary="manifest context length declarations disagree",
+            remediation=(
+                "Regenerate the manifest with the converter; config.context_length, "
+                "config.max_seq_len, and top-level context_length must match."
+            ),
+            observed={"declared": declared},
+        )
+    return distinct[0]
+
+
+def _resolve_context_capacity(
+    manifest: Dict[str, Any], requested: Optional[int]
+) -> Dict[str, Any]:
+    """Validate the requested context against the manifest and canonicalize it.
+
+    The manifest's declared capacity is the default and the only source of
+    truth. Circuits may opt into a wider runtime window via
+    ``context_capacity_policy='recurrent_runtime_window'`` plus an explicit
+    ``hard_context_limit`` ceiling.
+    """
+    config = manifest.get("config")
+    if not isinstance(config, dict):
+        config = {}
+        manifest["config"] = config
+    declared_context = _resolve_declared_context(manifest)
+    defaults = manifest.get("template", {}).get("contract", {}).get("runtime_defaults", {})
+    for field, default in (("context_capacity_policy", "declared"), ("hard_context_limit", None)):
+        if field in config and config[field] != defaults.get(field, default):
+            raise RuntimeError(f"context policy mismatch: config.{field} disagrees with circuit")
+
+    context_policy = str(
+        config.get("context_capacity_policy") or "declared"
+    ).strip().lower()
+    if context_policy not in {"declared", "recurrent_runtime_window"}:
+        raise RuntimeError(
+            "HARD CONTEXT POLICY FAULT: unsupported context_capacity_policy "
+            f"{context_policy!r}; expected 'declared' or 'recurrent_runtime_window'"
+        )
+    hard_context_limit = config.get("hard_context_limit")
+    if hard_context_limit is not None:
+        try:
+            hard_context_limit = int(hard_context_limit)
+        except (TypeError, ValueError):
+            raise RuntimeError(
+                "HARD CONTEXT POLICY FAULT: hard_context_limit must be an integer, "
+                f"got {config.get('hard_context_limit')!r}"
+            ) from None
+        if hard_context_limit <= 0:
+            raise RuntimeError(
+                "HARD CONTEXT POLICY FAULT: hard_context_limit must be positive"
+            )
+    if context_policy == "recurrent_runtime_window" and hard_context_limit is None:
+        raise RuntimeError(
+            "HARD CONTEXT POLICY FAULT: context_capacity_policy="
+            "'recurrent_runtime_window' requires contract.runtime_defaults."
+            "hard_context_limit"
+        )
+    if hard_context_limit is not None and declared_context > hard_context_limit:
+        raise BuildDiagnosticError(
+            "manifest declares a context capacity above the hard runtime limit",
+            code="CKE-V8-CONTEXT-CAPACITY",
+            stage="input_validation",
+            category="user_configuration",
+            summary="declared context length exceeds the declared hard context limit",
+            remediation=(
+                "Regenerate the manifest with a context length no greater than "
+                "the circuit's hard_context_limit, or raise that limit deliberately."
+            ),
+            observed={
+                "declared_context_length": declared_context,
+                "hard_context_limit": hard_context_limit,
+                "context_capacity_policy": context_policy,
+            },
+        )
+
+    requested_context = int(requested) if requested is not None else None
+    if requested_context is None:
+        effective_context = declared_context
+        context_source = "manifest"
+    elif requested_context <= 0:
+        observed = {
+            "requested_context_len": requested_context,
+            "declared_context_length": declared_context,
+        }
+        if hard_context_limit is not None:
+            observed["hard_context_limit"] = hard_context_limit
+        raise BuildDiagnosticError(
+            "requested context length is outside the declared model capacity",
+            code="CKE-V8-CONTEXT-CAPACITY",
+            stage="input_validation",
+            category="user_configuration",
+            summary="requested context length must be positive",
+            remediation=(
+                "Choose a positive --context-len, or omit the flag to use the "
+                "manifest's declared context_length."
+            ),
+            observed=observed,
+        )
+    else:
+        context_source = "cli_override"
+        if context_policy == "recurrent_runtime_window":
+            if requested_context > int(hard_context_limit):
+                raise BuildDiagnosticError(
+                    "requested context length exceeds the hard runtime limit",
+                    code="CKE-V8-CONTEXT-CAPACITY",
+                    stage="input_validation",
+                    category="user_configuration",
+                    summary="requested context length cannot be represented by the runtime",
+                    remediation=(
+                        "Choose --context-len no greater than the circuit's "
+                        f"hard_context_limit ({hard_context_limit}), or omit the flag "
+                        f"to use the manifest's trained capacity ({declared_context})."
+                    ),
+                    observed={
+                        "requested_context_len": requested_context,
+                        "declared_context_length": declared_context,
+                        "hard_context_limit": int(hard_context_limit),
+                        "context_capacity_policy": context_policy,
+                    },
+                )
+            if requested_context > declared_context:
+                print(
+                    f"Warning: --context-len {requested_context} exceeds the trained "
+                    f"context capacity {declared_context}; "
+                    f"the hard runtime limit is {hard_context_limit}."
+                )
+        elif requested_context > declared_context:
+            raise BuildDiagnosticError(
+                "requested context length is outside the declared model capacity",
+                code="CKE-V8-CONTEXT-CAPACITY",
+                stage="input_validation",
+                category="user_configuration",
+                summary="requested context length cannot be represented by the model manifest",
+                remediation=(
+                    "Choose a positive --context-len no greater than the manifest's "
+                    "context_length, or regenerate the manifest for the intended capacity."
+                ),
+                observed={
+                    "requested_context_len": requested_context,
+                    "declared_context_length": declared_context,
+                },
+            )
+        effective_context = requested_context
+
+    config["declared_context_length"] = declared_context
+    config["context_length"] = effective_context
+    config["context_len"] = effective_context
+    config["max_seq_len"] = effective_context
+    config["context_capacity_source"] = context_source
+    config["context_capacity_policy"] = context_policy
+    if hard_context_limit is not None:
+        config["hard_context_limit"] = hard_context_limit
+    return {
+        "effective": effective_context,
+        "declared": declared_context,
+        "policy": context_policy,
+        "hard_limit": hard_context_limit,
+        "source": context_source,
+    }
+
+
 def _template_sequence(template: Dict[str, Any]) -> List[str]:
     sequence = template.get("sequence", [])
     if not isinstance(sequence, list):
@@ -14858,11 +15065,13 @@ def generate_memory_layout_packed(
         num_layers_override=layer_limit,
         template=template_doc,
     )
-    seq_len = 1 if mode == "decode" else int(
-        min(
-            context_len if context_len is not None else config.get("context_length", 32768),
-            config.get("context_length", 32768),
-        )
+    seq_len = 1 if mode == "decode" else _resolve_prefill_extent(
+        config,
+        int(
+            context_len
+            if context_len is not None
+            else config.get("context_length", 32768)
+        ),
     )
     provider_scratch_reserve = _required_kernel_call_arena_bytes(
         ir_lower_1_ops, config, seq_len
@@ -19050,8 +19259,10 @@ def main(args: List[str]) -> int:
         type=int,
         default=None,
         help=(
-            "Context length for buffer allocation (default: from model config); "
-            "must not exceed the manifest's declared context_length"
+            "Context length for buffer allocation. Defaults to the manifest's "
+            "declared context_length. Requests above that value are allowed only "
+            "for circuits declaring context_capacity_policy="
+            "'recurrent_runtime_window', and never above their hard_context_limit."
         )
     )
     parser.add_argument(
@@ -19164,31 +19375,19 @@ def main(args: List[str]) -> int:
     _hydrate_manifest_template(manifest)
     _backfill_template_runtime_flags(manifest)
     manifest["config"] = _normalize_manifest_config(manifest.get("config", {}))
-    if parsed_args.context_len is not None:
-        requested_context = int(parsed_args.context_len)
-        declared_context = int(
-            manifest["config"].get("context_length")
-            or manifest["config"].get("max_seq_len")
-            or 0
+    resolved_context = _resolve_context_capacity(manifest, parsed_args.context_len)
+    parsed_args.context_len = resolved_context["effective"]
+    print(
+        f"Context capacity: {resolved_context['effective']} "
+        f"({resolved_context['source']}); "
+        f"declared={resolved_context['declared']}, "
+        f"policy={resolved_context['policy']}"
+        + (
+            f", hard_limit={resolved_context['hard_limit']}"
+            if resolved_context["hard_limit"] is not None
+            else ""
         )
-        if requested_context <= 0 or (
-            declared_context > 0 and requested_context > declared_context
-        ):
-            raise BuildDiagnosticError(
-                "requested context length is outside the declared model capacity",
-                code="CKE-V8-CONTEXT-CAPACITY",
-                stage="input_validation",
-                category="user_configuration",
-                summary="requested context length cannot be represented by the model manifest",
-                remediation=(
-                    "Choose a positive --context-len no greater than the manifest's "
-                    "context_length, or regenerate the manifest for the intended capacity."
-                ),
-                observed={
-                    "requested_context_len": requested_context,
-                    "declared_context_length": declared_context,
-                },
-            )
+    )
     _apply_prefill_policy_override(manifest, parsed_args.prefill_policy_override)
     if parsed_args.prefer_q8_activation:
         manifest.setdefault("config", {})["prefer_q8_activation"] = True

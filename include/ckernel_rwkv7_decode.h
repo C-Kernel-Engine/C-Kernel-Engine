@@ -262,6 +262,28 @@ int ck_rwkv7_channelmix_decode(const float *x,
                                float *scratch,
                                size_t scratch_elems);
 
+/* Row-range primitives for the two channelmix GEMVs. They are the exact loops
+ * the serial provider runs, so any caller that partitions rows (for example a
+ * thread-pool dispatcher) produces bitwise-identical output and can be checked
+ * against the serial path without a tolerance. Rows are the only split axis:
+ * every output element keeps its own reduction order. Out-of-range rows are
+ * clamped; the callers validate pointers before use. */
+void ck_rwkv7_channelmix_hidden_rows(const float *xk,
+                                     const float *Wk,
+                                     float *hidden,
+                                     int dim,
+                                     int hidden_dim,
+                                     int row_begin,
+                                     int row_end);
+
+void ck_rwkv7_channelmix_out_rows(const float *hidden,
+                                  const float *Wv,
+                                  float *out,
+                                  int dim,
+                                  int hidden_dim,
+                                  int row_begin,
+                                  int row_end);
+
 /* GEMV/LayerNorm callbacks for ck_rwkv7_time_mix_block. GEMV computes
  * y = W x with W [dim,dim] row-major (one row per output channel), matching
  * the engine's NT decode path; LayerNorm computes y = norm(x;gamma,beta).

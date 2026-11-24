@@ -197,7 +197,16 @@ def add_build_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     build = parser.add_argument_group(
         "build / tokenizer flags (mirrors cks-v8-run run)"
     )
-    build.add_argument("--context-len", type=int, default=None)
+    build.add_argument(
+        "--context-len",
+        type=int,
+        default=None,
+        help=(
+            "Context length override (default: the manifest's declared "
+            "context_length; recurrent-window circuits may allow more up to "
+            "their hard_context_limit)"
+        ),
+    )
     build.add_argument(
         "--logits-layout", choices=["auto", "last", "full"], default=None
     )

@@ -3095,6 +3095,7 @@ def test_rwkv7_config_builder_normalizes_upstream_rank_and_norm_names(
         "head_dim": 64,
         "hidden_ratio": 4,
         "vocab_size": 65536,
+        "context_length": 4096,
         "layer_norm_epsilon": 2e-5,
         "hidden_act": "sqrelu",
         "decay_low_rank_dim": 96,
@@ -3128,6 +3129,7 @@ def test_rwkv7_config_builder_derives_ranks_from_tensor_shapes(
         "num_heads": 4,
         "hidden_ratio": 4,
         "vocab_size": 16,
+        "context_length": 4096,
     }
     (tmp_path / "config.json").write_text(json.dumps(hf_config), encoding="utf-8")
 
@@ -3165,6 +3167,7 @@ def test_rwkv7_config_builder_rejects_rank_shape_mismatch(tmp_path: Path) -> Non
         "num_heads": 4,
         "hidden_ratio": 4,
         "vocab_size": 16,
+        "context_length": 4096,
         "decay_rank": 6,
     }
     (tmp_path / "config.json").write_text(json.dumps(hf_config), encoding="utf-8")
@@ -3600,7 +3603,8 @@ def test_rwkv7_index_audit_attributes_blocks_to_layers(tmp_path: Path) -> None:
 ])
 def test_rwkv7_rejects_config_incompatible_with_circuit(tmp_path, override, message):
     config = dict(model_type="rwkv7", num_hidden_layers=2, hidden_size=8,
-                  head_size=4, num_heads=2, hidden_ratio=4, vocab_size=16)
+                  head_size=4, num_heads=2, hidden_ratio=4, vocab_size=16,
+                  context_length=4096)
     config.update(override)
     (tmp_path / "config.json").write_text(json.dumps(config))
     with pytest.raises(SystemExit, match=message):
@@ -3616,6 +3620,7 @@ def test_rwkv7_real_conversion_preserves_nonzero_weights(tmp_path):
     output.mkdir()
     config = dict(model_type="rwkv7", num_hidden_layers=2, hidden_size=8,
                   head_size=4, num_heads=2, hidden_ratio=4, vocab_size=16,
+                  context_length=4096,
                   decay_rank=2, key_rank=2, value_rank=2, gate_rank=2)
     (checkpoint / "config.json").write_text(json.dumps(config))
     _write_rwkv7_synthetic_tokenizer(checkpoint, 16)
@@ -3757,6 +3762,7 @@ def _write_rwkv7_synthetic_checkpoint(
         num_heads=heads,
         hidden_ratio=4,
         vocab_size=vocab,
+        context_length=4096,
         decay_rank=ranks[0],
         key_rank=ranks[1],
         value_rank=ranks[2],

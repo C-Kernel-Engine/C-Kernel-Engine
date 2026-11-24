@@ -268,6 +268,115 @@ def _hf_config(model_dir: Path) -> dict[str, Any]:
     return json.loads(p.read_text(encoding="utf-8"))
 
 
+def _positive_int_field(value: Any, label: str) -> int:
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        raise SystemExit(f"RWKV-7 {label} must be a positive integer") from None
+    if (
+        isinstance(value, bool)
+        or not math.isfinite(numeric)
+        or int(numeric) != numeric
+        or int(numeric) <= 0
+    ):
+        raise SystemExit(f"RWKV-7 {label} must be a positive integer")
+    return int(numeric)
+
+
+def _rwkv7_release_context(model_dir: Path) -> tuple[int, str] | None:
+    """Read the trained context capacity from HF release metadata."""
+    path = model_dir / "release-manifest.json"
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, ValueError) as exc:
+        raise SystemExit(f"RWKV-7 release-manifest.json is unreadable: {exc}") from None
+    metadata = payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
+    identity = payload.get("identity") if isinstance(payload.get("identity"), dict) else {}
+    for label, value in (
+        ("release-manifest.metadata.context_length", metadata.get("context_length")),
+        (
+            "release-manifest.identity.training_context_length",
+            identity.get("training_context_length"),
+        ),
+    ):
+        if value is None:
+            continue
+        return _positive_int_field(value, label), label
+    return None
+
+
+def _rwkv7_hard_context_limit(arch: str) -> int | None:
+    """Read the circuit-declared hard context ceiling for RWKV-7."""
+    template_name = str(
+        _safetensors_arch_contract(arch).get("template") or arch
+    ).strip()
+    if not template_name:
+        return None
+    path = REPO_ROOT / "version" / "v8" / "circuits" / f"{template_name}.json"
+    if not path.exists():
+        return None
+    try:
+        circuit = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, ValueError) as exc:
+        raise SystemExit(f"RWKV-7 circuit is unreadable ({path}): {exc}") from None
+    contract = circuit.get("contract")
+    defaults = contract.get("runtime_defaults") if isinstance(contract, dict) else None
+    if not isinstance(defaults, dict) or defaults.get("hard_context_limit") is None:
+        return None
+    return _positive_int_field(
+        defaults.get("hard_context_limit"), "circuit hard_context_limit"
+    )
+
+
+def _rwkv7_resolve_context(
+    model_dir: Path,
+    text: dict[str, Any],
+    hf: dict[str, Any],
+    arch: str,
+) -> tuple[int, str, int | None]:
+    """Resolve the trained context capacity without guessing.
+
+    Precedence: agreeing checkpoint config fields, then HF release metadata.
+    A conflict or an entirely missing declaration is a hard failure.
+    """
+    declared_context: dict[str, int] = {}
+    for key in ("inference_ctx_len", "context_length", "max_position_embeddings"):
+        raw_value = text.get(key)
+        if raw_value is None:
+            raw_value = hf.get(key)
+        if raw_value is None:
+            continue
+        declared_context[key] = _positive_int_field(raw_value, f"config field {key}")
+    distinct = sorted(set(declared_context.values()))
+    if len(distinct) > 1:
+        raise SystemExit(
+            "RWKV-7 checkpoint config declares conflicting context lengths: "
+            f"{declared_context}"
+        )
+    if distinct:
+        context_length = distinct[0]
+        context_source = f"config:{next(iter(declared_context))}"
+    else:
+        release = _rwkv7_release_context(model_dir)
+        if release is None:
+            raise SystemExit(
+                "RWKV-7 checkpoint declares no context length: config.json has no "
+                "inference_ctx_len/context_length/max_position_embeddings and "
+                "release-manifest.json is missing or has no context metadata. "
+                "Refusing to guess a capacity."
+            )
+        context_length, context_source = release
+    hard_limit = _rwkv7_hard_context_limit(arch)
+    if hard_limit is not None and context_length > hard_limit:
+        raise SystemExit(
+            f"RWKV-7 declared context {context_length} exceeds the circuit "
+            f"hard_context_limit {hard_limit}"
+        )
+    return context_length, context_source, hard_limit
+
+
 def _load_runtime_config_template(path: Path | None) -> dict[str, Any]:
     if path is None:
         return {}
@@ -2916,15 +3025,9 @@ def _build_config(
         vocab_size = int(text.get("vocab_size") or hf.get("vocab_size") or 0)
         if vocab_size <= 0:
             raise SystemExit("RWKV-7 config missing vocab_size")
-        context_length = int(
-            text.get("context_length")
-            or text.get("max_position_embeddings")
-            or text.get("inference_ctx_len")
-            or hf.get("context_length")
-            or 0
+        context_length, context_source, hard_limit = _rwkv7_resolve_context(
+            model_dir, text, hf, arch
         )
-        if context_length <= 0:
-            context_length = 4096
         layer_kinds = ["layer_0"] + ["layer_gt0"] * max(0, num_layers - 1)
         layer_eps_value = _first_config_value(
             text, hf, ("layer_norm_eps", "layer_norm_epsilon", "norm_eps")
@@ -2949,6 +3052,7 @@ def _build_config(
             "n_vocab": vocab_size,
             "context_length": context_length,
             "max_seq_len": context_length,
+            "context_length_source": context_source,
             "layer_kinds": layer_kinds,
             "layer_types": ["rwkv7_dense"] * num_layers,
             "hybrid_block_pattern": layer_kinds[:],
@@ -2961,6 +3065,8 @@ def _build_config(
             "rms_eps": layer_eps,
             "rms_norm_eps": layer_eps,
         })
+        if hard_limit is not None:
+            cfg["hard_context_limit"] = hard_limit
         _resolve_rwkv7_ranks(cfg, text, hf, headers, num_layers)
     cfg = _inject_runtime_config_defaults(cfg, arch)
     if arch == "gemma4" and "layer_kinds" not in cfg:
@@ -3812,6 +3918,11 @@ def main() -> int:
     }
 
     print(f"[safetensors->bump] arch={arch} tensors={len(refs)} entries={len(entries_preview)} dry_run={args.dry_run}")
+    if config.get("context_length_source"):
+        print(
+            f"[safetensors->bump] context_length={config.get('context_length')} "
+            f"source={config.get('context_length_source')}"
+        )
     estimated_bytes = int(offset - DATA_START)
     print(f"[safetensors->bump] output={args.output}")
     if args.ram_output:

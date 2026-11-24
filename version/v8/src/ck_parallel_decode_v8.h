@@ -114,6 +114,30 @@ void gemv_q8_0_q8_0_contract_parallel_dispatch(
 void gemv_fused_q5_0_bias_parallel_dispatch(
     float *y, const void *W, const float *x, const float *bias, int M, int K);
 
+/**
+ * Parallel RWKV-7 channelmix decode (T=1):
+ *   hidden[j] = relu(Wk[j,:] @ xk)^2, out[i] = Wv[i,:] @ hidden
+ * Row-splits both GEMVs across the global thread pool using the serial
+ * provider's own row primitives, so output is bitwise identical.
+ */
+int ck_rwkv7_channelmix_decode_parallel(
+    const float *x, const float *shift_in, const float *mu,
+    const float *Wk, const float *Wv,
+    float *shift_out, float *out,
+    int dim, int hidden_dim,
+    float *scratch, size_t scratch_elems);
+
+/**
+ * Reports whether a channelmix binding may use the row-parallel dispatcher.
+ * True exactly for the bindings the serial provider accepts (including the
+ * in-place carries shift_out == shift_in, shift_out == x, out == x).
+ */
+int ck_rwkv7_channelmix_parallel_binding_ok(
+    const float *x, const float *shift_in, const float *mu,
+    const float *Wk, const float *Wv,
+    float *shift_out, float *out,
+    float *scratch, int dim, int hidden_dim);
+
 /* ============================================================================
  * Macro overrides for generated code
  *
@@ -133,6 +157,8 @@ void gemv_fused_q5_0_bias_parallel_dispatch(
     gemv_q8_0_q8_0_contract_parallel_dispatch(y, W, x, M, K)
 #define gemv_fused_q5_0_bias_dispatch(y, W, x, bias, M, K) \
     gemv_fused_q5_0_bias_parallel_dispatch(y, W, x, bias, M, K)
+#define ck_rwkv7_channelmix_decode(...) \
+    ck_rwkv7_channelmix_decode_parallel(__VA_ARGS__)
 
 #endif /* CK_PARALLEL_DECODE */
 
