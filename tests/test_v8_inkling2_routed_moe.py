@@ -195,8 +195,8 @@ class RoutedMoeTests(unittest.TestCase):
                 self.assertEqual(invoke(parallel), 0)
                 self.assertEqual(mixture.tobytes(), want_mix)
 
-    def test_q8_provider_accepts_64_rows_and_rejects_65_before_writes(self):
-        capacity, width = 65, 32
+    def test_q8_provider_accepts_128_rows_and_rejects_129_before_writes(self):
+        capacity, width = 129, 32
         rng = np.random.default_rng(625)
         hidden = rng.normal(0.0, 0.2, (capacity, width)).astype("f4")
         ids = np.zeros(capacity, dtype="i4")
@@ -219,12 +219,12 @@ class RoutedMoeTests(unittest.TestCase):
                                 1, 1, 1, matrices[0].size, hidden.size, ids.size, routing.size,
                                 slots.size, parts.size, mixture.size, work.size, 4.0, 25.0)
 
-            self.assertEqual(invoke(64), 0)
-            self.assertTrue(np.isfinite(parts[:64]).all())
-            self.assertTrue(np.isfinite(mixture[:64]).all())
-            self.assertTrue(np.isnan(parts[64]).all() and np.isnan(mixture[64]).all())
+            self.assertEqual(invoke(128), 0)
+            self.assertTrue(np.isfinite(parts[:128]).all())
+            self.assertTrue(np.isfinite(mixture[:128]).all())
+            self.assertTrue(np.isnan(parts[128]).all() and np.isnan(mixture[128]).all())
             before = (parts.tobytes(), mixture.tobytes())
-            self.assertEqual(invoke(65), -1)
+            self.assertEqual(invoke(129), -1)
             self.assertEqual((parts.tobytes(), mixture.tobytes()), before)
 
     def test_routed_provider_rejects_wrong_storage_even_with_enough_bytes(self):
