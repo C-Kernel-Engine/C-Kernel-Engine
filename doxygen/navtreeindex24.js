@@ -1,5 +1,9 @@
 var NAVTREEINDEX24 =
 {
+"structCKTokenizer.html#a8668f96025566da654689955d9407400":[1,0,76,1],
+"structCKTokenizer.html#a8ae88982a816f207e8d9a2b40289fc98":[1,0,76,15],
+"structCKTokenizer.html#a8c14da1e0de0f92cbea9714f8c42d4cd":[1,0,76,5],
+"structCKTokenizer.html#a9b7a80f60b651e50d40ffb9b1130eccc":[1,0,76,11],
 "structCKTokenizer.html#a9fbb827cf89c461569b0dfc2b8ef5fe9":[1,0,76,16],
 "structCKTokenizer.html#aae750e70d66be065e2c8679036f5b86d":[1,0,76,12],
 "structCKTokenizer.html#ab44021bc477d697cf1680b42d2d2604e":[1,0,76,6],
@@ -245,9 +249,5 @@ var NAVTREEINDEX24 =
 "structQWEN2__0__5B__DECODEModel.html":[1,0,101],
 "structQWEN2__0__5B__DECODEModel.html#a07e198cd09baeda89471f687bf5ac3b7":[1,0,101,0],
 "structQWEN2__0__5B__DECODEModel.html#a60fe84f331aa220d10a5335f16d02fe5":[1,0,101,1],
-"structRecommendation.html":[1,0,102],
-"structRecommendation.html#a2dea715a398d739605559094647c11eb":[1,0,102,3],
-"structRecommendation.html#aa8cbf25679d19f8407ac276b25c1b1bf":[1,0,102,1],
-"structRecommendation.html#ab10fd7bc5c1c6eee44e39a537f53cc51":[1,0,102,4],
-"structRecommendation.html#ac691a32118bd2279bf9536d183329119":[1,0,102,2]
+"structRecommendation.html":[1,0,102]
 };

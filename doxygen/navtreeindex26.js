@@ -1,5 +1,9 @@
 var NAVTREEINDEX26 =
 {
+"swiglu__kernels__bf16_8c.html#a77fb89fc5fa2dcc73d9d37ccf9c50322":[2,0,1,1,167,0],
+"swiglu__kernels__bf16_8c_source.html":[2,0,1,1,167],
+"system__topology_8c.html":[2,0,1,30],
+"system__topology_8c.html#a089e974347ad9291cc98080f85392a57":[2,0,1,30,19],
 "system__topology_8c.html#a314b4992493c6b32bcb3258fca5f5eca":[2,0,1,30,9],
 "system__topology_8c.html#a349f2755a1cb7361bbbe5c729985136d":[2,0,1,30,15],
 "system__topology_8c.html#a34a4d2fcf0318c8d64e4ff73e1f2e6e5":[2,0,1,30,1],
@@ -245,9 +249,5 @@ var NAVTREEINDEX26 =
 "true__bpe_8c.html#a03f513f94a3f4171cfc80b568df3073e":[2,0,1,3,6,36],
 "true__bpe_8c.html#a0789466d184924de5d95ef2725aacb2c":[2,0,1,3,6,28],
 "true__bpe_8c.html#a08f555c94935c343bcfb7ec35a88a7b6":[2,0,1,3,6,51],
-"true__bpe_8c.html#a09465c383cd23828e94d37fdbccd498c":[2,0,1,3,6,31],
-"true__bpe_8c.html#a11af45a409593cf28602d2cbfb3df00e":[2,0,1,3,6,11],
-"true__bpe_8c.html#a136114a1da9e0646aff5e045c91cffff":[2,0,1,3,6,39],
-"true__bpe_8c.html#a2575ccc3febd74fd764ead2153ac9c11":[2,0,1,3,6,13],
-"true__bpe_8c.html#a2661d3a5aec088c75126c08a32e355d1":[2,0,1,3,6,40]
+"true__bpe_8c.html#a09465c383cd23828e94d37fdbccd498c":[2,0,1,3,6,31]
 };
