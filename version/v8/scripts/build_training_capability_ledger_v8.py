@@ -9,6 +9,7 @@ import hashlib
 import html
 import json
 import re
+import sys
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
@@ -173,7 +174,12 @@ def main() -> int:
     ledger = inventory()
     rendered = render_html(ledger)
     if args.check:
-        return 0 if args.out.read_text(encoding="utf-8") == rendered else 1
+        if args.out.is_file() and args.out.read_text(encoding="utf-8") == rendered:
+            return 0
+        print(f"Missing or stale training capability ledger: {args.out}", file=sys.stderr)
+        print("Regenerate with python3 version/v8/scripts/build_training_capability_ledger_v8.py"
+              " (pass --out if checking a custom path).", file=sys.stderr)
+        return 1
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(rendered, encoding="utf-8")
     if args.json_out:

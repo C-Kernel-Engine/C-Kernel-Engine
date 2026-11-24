@@ -35,6 +35,9 @@ jobs:
       - name: Check root layout allowlist
         run: python3 scripts/check_root_layout.py
 
+      - name: Check v8 training capability ledger freshness
+        run: python3 version/v8/scripts/build_training_capability_ledger_v8.py --check
+
       - name: Reject new OpenMP dependencies
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
