@@ -190,7 +190,7 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="audio__spectral__head_8c_source.html#l00006">product()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="linear__rows__checked_8c_source.html#l00245">linear_rows_checked_f32()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="linear__rows__checked_8c_source.html#l00223">linear_rows_checked_f32()</a>.</p>
 
 </div>
 </div>
@@ -273,111 +273,114 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="linear__rows__checked_8c_source.html#l00245">245</a> of file <a class="el" href="linear__rows__checked_8c_source.html">linear_rows_checked.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  251</span>{</div>
-<div class="line"><span class="lineno">  252</span>    <span class="keywordflow">if</span> (!input || !weight || !output ||</div>
-<div class="line"><span class="lineno">  253</span>        !<a class="code hl_function" href="#a43a2bce256149887d9ed75bace12e37b">span_fits</a>(rows, input_stride, input_channels, input_elements) ||</div>
-<div class="line"><span class="lineno">  254</span>        !<a class="code hl_function" href="#a43a2bce256149887d9ed75bace12e37b">span_fits</a>(output_channels, weight_stride, input_channels, weight_elements) ||</div>
-<div class="line"><span class="lineno">  255</span>        !<a class="code hl_function" href="#a43a2bce256149887d9ed75bace12e37b">span_fits</a>(rows, output_stride, output_channels, output_elements) ||</div>
-<div class="line"><span class="lineno">  256</span>        (bias ? bias_elements &lt; output_channels : bias_elements != 0))</div>
-<div class="line"><span class="lineno">  257</span>        <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  258</span> </div>
-<div class="line"><span class="lineno">  259</span>    <span class="comment">/* Validate every accessed value before the first write. A conservative</span></div>
-<div class="line"><span class="lineno">  260</span><span class="comment">     * absolute bound permits one compute pass for ordinary model values.</span></div>
-<div class="line"><span class="lineno">  261</span><span class="comment">     * Values near the FP32 limit retain the exact two-pass staging path. */</span></div>
-<div class="line"><span class="lineno">  262</span>    <span class="keywordtype">double</span> max_input = 0.0;</div>
-<div class="line"><span class="lineno">  263</span>    <span class="keywordtype">double</span> max_weight_l1 = 0.0;</div>
-<div class="line"><span class="lineno">  264</span>    <span class="keywordtype">double</span> max_bias = 0.0;</div>
-<div class="line"><span class="lineno">  265</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> r = 0; r &lt; rows; ++r)</div>
-<div class="line"><span class="lineno">  266</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> c = 0; c &lt; input_channels; ++c)</div>
-<div class="line"><span class="lineno">  267</span>        {</div>
-<div class="line"><span class="lineno">  268</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> value = input[r * input_stride + c];</div>
-<div class="line"><span class="lineno">  269</span>            <span class="keywordflow">if</span> (!isfinite(value)) <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  270</span>            <span class="keyword">const</span> <span class="keywordtype">double</span> absolute = fabs((<span class="keywordtype">double</span>)value);</div>
-<div class="line"><span class="lineno">  271</span>            <span class="keywordflow">if</span> (absolute &gt; max_input) max_input = absolute;</div>
-<div class="line"><span class="lineno">  272</span>        }</div>
-<div class="line"><span class="lineno">  273</span><span class="preprocessor">#if (defined(__x86_64__) || defined(__i386__)) &amp;&amp; (defined(__GNUC__) || defined(__clang__))</span></div>
-<div class="line"><span class="lineno">  274</span>    __builtin_cpu_init();</div>
-<div class="line"><span class="lineno">  275</span><span class="preprocessor">#ifdef _OPENMP</span></div>
-<div class="line"><span class="lineno">  276</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> workers = projection_workers(input_channels, output_channels);</div>
-<div class="line"><span class="lineno">  277</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  278</span>    <span class="keywordflow">if</span> (output_channels &gt;= 4 &amp;&amp; __builtin_cpu_supports(<span class="stringliteral">&quot;avx2&quot;</span>)) {</div>
-<div class="line"><span class="lineno">  279</span><span class="preprocessor">#ifdef _OPENMP</span></div>
-<div class="line"><span class="lineno">  280</span>        <span class="keywordflow">if</span> (workers &gt; 1) {</div>
-<div class="line"><span class="lineno">  281</span>            <span class="keywordflow">if</span> (validate_weight_tiles(weight, weight_stride, bias, input_channels,</div>
-<div class="line"><span class="lineno">  282</span>                                      output_channels, &amp;max_weight_l1, &amp;max_bias, workers))</div>
-<div class="line"><span class="lineno">  283</span>                <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  284</span>        } <span class="keywordflow">else</span></div>
-<div class="line"><span class="lineno">  285</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  286</span>        <span class="keywordflow">if</span> (validate_weight_rows(weight, weight_stride, bias, input_channels,</div>
-<div class="line"><span class="lineno">  287</span>                                 output_channels, &amp;max_weight_l1, &amp;max_bias))</div>
-<div class="line"><span class="lineno">  288</span>            <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  289</span>    } <span class="keywordflow">else</span></div>
-<div class="line"><span class="lineno">  290</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  291</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> o = 0; o &lt; output_channels; ++o) {</div>
-<div class="line"><span class="lineno">  292</span>        <span class="keywordflow">if</span> (bias &amp;&amp; !isfinite(bias[o])) <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  293</span>        <span class="keywordflow">if</span> (bias &amp;&amp; fabs((<span class="keywordtype">double</span>)bias[o]) &gt; max_bias)</div>
-<div class="line"><span class="lineno">  294</span>            max_bias = fabs((<span class="keywordtype">double</span>)bias[o]);</div>
-<div class="line"><span class="lineno">  295</span>        <span class="keywordtype">double</span> weight_l1 = 0.0;</div>
-<div class="line"><span class="lineno">  296</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> c = 0; c &lt; input_channels; ++c)</div>
-<div class="line"><span class="lineno">  297</span>        {</div>
-<div class="line"><span class="lineno">  298</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> value = weight[o * weight_stride + c];</div>
-<div class="line"><span class="lineno">  299</span>            <span class="keywordflow">if</span> (!isfinite(value)) <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  300</span>            weight_l1 += fabs((<span class="keywordtype">double</span>)value);</div>
-<div class="line"><span class="lineno">  301</span>        }</div>
-<div class="line"><span class="lineno">  302</span>        <span class="keywordflow">if</span> (weight_l1 &gt; max_weight_l1) max_weight_l1 = weight_l1;</div>
-<div class="line"><span class="lineno">  303</span>    }</div>
-<div class="line"><span class="lineno">  304</span>    <span class="comment">/* At most UINT32_MAX positive terms keep FP64 summation error far below</span></div>
-<div class="line"><span class="lineno">  305</span><span class="comment">     * the 4x guard, including error in the L1 bound. Every result therefore</span></div>
-<div class="line"><span class="lineno">  306</span><span class="comment">     * fits FP32 and publishing cannot fail after the first output write. */</span></div>
-<div class="line"><span class="lineno">  307</span>    <span class="keywordflow">if</span> (input_channels &lt;= (SIZE_MAX / 4) &amp;&amp; input_channels &lt;= UINT32_MAX &amp;&amp;</div>
-<div class="line"><span class="lineno">  308</span>        max_input * max_weight_l1 + max_bias &lt;= (<span class="keywordtype">double</span>)FLT_MAX / 4.0) {</div>
-<div class="line"><span class="lineno">  309</span><span class="preprocessor">#if (defined(__x86_64__) || defined(__i386__)) &amp;&amp; (defined(__GNUC__) || defined(__clang__))</span></div>
-<div class="line"><span class="lineno">  310</span>        __builtin_cpu_init();</div>
-<div class="line"><span class="lineno">  311</span>        <span class="keywordflow">if</span> ((rows &gt;= 4 || output_channels &gt;= 4) &amp;&amp; __builtin_cpu_supports(<span class="stringliteral">&quot;avx2&quot;</span>) &amp;&amp;</div>
-<div class="line"><span class="lineno">  312</span>            <a class="code hl_function" href="checked__frame__codec_8c.html#a63638d1dbb9346f9360a1035d0fece08">disjoint</a>(output, output_elements, input, input_elements) &amp;&amp;</div>
-<div class="line"><span class="lineno">  313</span>            <a class="code hl_function" href="checked__frame__codec_8c.html#a63638d1dbb9346f9360a1035d0fece08">disjoint</a>(output, output_elements, weight, weight_elements) &amp;&amp;</div>
-<div class="line"><span class="lineno">  314</span>            <a class="code hl_function" href="checked__frame__codec_8c.html#a63638d1dbb9346f9360a1035d0fece08">disjoint</a>(output, output_elements, bias, bias_elements)) {</div>
-<div class="line"><span class="lineno">  315</span><span class="preprocessor">#ifdef _OPENMP</span></div>
-<div class="line"><span class="lineno">  316</span>            <span class="keywordflow">if</span> (workers &gt; 1) {</div>
-<div class="line"><span class="lineno">  317</span>                compute_projection_tiles(input, input_stride, weight, weight_stride, bias,</div>
-<div class="line"><span class="lineno">  318</span>                                         output, output_stride, rows, input_channels,</div>
-<div class="line"><span class="lineno">  319</span>                                         output_channels, workers);</div>
-<div class="line"><span class="lineno">  320</span>                <span class="keywordflow">return</span> 0;</div>
-<div class="line"><span class="lineno">  321</span>            }</div>
-<div class="line"><span class="lineno">  322</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  323</span>            compute_independent_lanes(input, input_stride, weight, weight_stride, bias,</div>
-<div class="line"><span class="lineno">  324</span>                                      output, output_stride, rows, input_channels,</div>
-<div class="line"><span class="lineno">  325</span>                                      output_channels);</div>
-<div class="line"><span class="lineno">  326</span>            <span class="keywordflow">return</span> 0;</div>
-<div class="line"><span class="lineno">  327</span>        }</div>
-<div class="line"><span class="lineno">  328</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  329</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> r = 0; r &lt; rows; ++r)</div>
-<div class="line"><span class="lineno">  330</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> o = 0; o &lt; output_channels; ++o)</div>
-<div class="line"><span class="lineno">  331</span>                output[r * output_stride + o] = (<span class="keywordtype">float</span>)<a class="code hl_function" href="#ae7816c3478a9999aad8dddcdce467cc7">dot_bias</a>(</div>
-<div class="line"><span class="lineno">  332</span>                    input + r * input_stride, weight + o * weight_stride,</div>
-<div class="line"><span class="lineno">  333</span>                    input_channels, bias ? bias[o] : 0.0f);</div>
-<div class="line"><span class="lineno">  334</span>        <span class="keywordflow">return</span> 0;</div>
-<div class="line"><span class="lineno">  335</span>    }</div>
-<div class="line"><span class="lineno">  336</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> r = 0; r &lt; rows; ++r)</div>
-<div class="line"><span class="lineno">  337</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> o = 0; o &lt; output_channels; ++o) {</div>
-<div class="line"><span class="lineno">  338</span>            <span class="keyword">const</span> <span class="keywordtype">double</span> result = <a class="code hl_function" href="#ae7816c3478a9999aad8dddcdce467cc7">dot_bias</a>(input + r * input_stride,</div>
-<div class="line"><span class="lineno">  339</span>                                           weight + o * weight_stride,</div>
-<div class="line"><span class="lineno">  340</span>                                           input_channels, bias ? bias[o] : 0.0f);</div>
-<div class="line"><span class="lineno">  341</span>            <span class="keywordflow">if</span> (!isfinite(result) || fabs(result) &gt; FLT_MAX) <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  342</span>        }</div>
-<div class="line"><span class="lineno">  343</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> r = 0; r &lt; rows; ++r)</div>
-<div class="line"><span class="lineno">  344</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> o = 0; o &lt; output_channels; ++o)</div>
-<div class="line"><span class="lineno">  345</span>            output[r * output_stride + o] = (<span class="keywordtype">float</span>)<a class="code hl_function" href="#ae7816c3478a9999aad8dddcdce467cc7">dot_bias</a>(</div>
-<div class="line"><span class="lineno">  346</span>                input + r * input_stride, weight + o * weight_stride,</div>
-<div class="line"><span class="lineno">  347</span>                input_channels, bias ? bias[o] : 0.0f);</div>
-<div class="line"><span class="lineno">  348</span>    <span class="keywordflow">return</span> 0;</div>
-<div class="line"><span class="lineno">  349</span>}</div>
+<p class="definition">Definition at line <a class="el" href="linear__rows__checked_8c_source.html#l00223">223</a> of file <a class="el" href="linear__rows__checked_8c_source.html">linear_rows_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  229</span>{</div>
+<div class="line"><span class="lineno">  230</span>    <span class="keywordflow">if</span> (!input || !weight || !output ||</div>
+<div class="line"><span class="lineno">  231</span>        !<a class="code hl_function" href="#a43a2bce256149887d9ed75bace12e37b">span_fits</a>(rows, input_stride, input_channels, input_elements) ||</div>
+<div class="line"><span class="lineno">  232</span>        !<a class="code hl_function" href="#a43a2bce256149887d9ed75bace12e37b">span_fits</a>(output_channels, weight_stride, input_channels, weight_elements) ||</div>
+<div class="line"><span class="lineno">  233</span>        !<a class="code hl_function" href="#a43a2bce256149887d9ed75bace12e37b">span_fits</a>(rows, output_stride, output_channels, output_elements) ||</div>
+<div class="line"><span class="lineno">  234</span>        (bias ? bias_elements &lt; output_channels : bias_elements != 0))</div>
+<div class="line"><span class="lineno">  235</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  236</span> </div>
+<div class="line"><span class="lineno">  237</span>    <span class="comment">/* Validate every accessed value before the first write. A conservative</span></div>
+<div class="line"><span class="lineno">  238</span><span class="comment">     * absolute bound permits one compute pass for ordinary model values.</span></div>
+<div class="line"><span class="lineno">  239</span><span class="comment">     * Values near the FP32 limit retain the exact two-pass staging path. */</span></div>
+<div class="line"><span class="lineno">  240</span>    <span class="keywordtype">double</span> max_input = 0.0;</div>
+<div class="line"><span class="lineno">  241</span>    <span class="keywordtype">double</span> max_weight_l1 = 0.0;</div>
+<div class="line"><span class="lineno">  242</span>    <span class="keywordtype">double</span> max_bias = 0.0;</div>
+<div class="line"><span class="lineno">  243</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> r = 0; r &lt; rows; ++r)</div>
+<div class="line"><span class="lineno">  244</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> c = 0; c &lt; input_channels; ++c)</div>
+<div class="line"><span class="lineno">  245</span>        {</div>
+<div class="line"><span class="lineno">  246</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> value = input[r * input_stride + c];</div>
+<div class="line"><span class="lineno">  247</span>            <span class="keywordflow">if</span> (!isfinite(value)) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  248</span>            <span class="keyword">const</span> <span class="keywordtype">double</span> absolute = fabs((<span class="keywordtype">double</span>)value);</div>
+<div class="line"><span class="lineno">  249</span>            <span class="keywordflow">if</span> (absolute &gt; max_input) max_input = absolute;</div>
+<div class="line"><span class="lineno">  250</span>        }</div>
+<div class="line"><span class="lineno">  251</span><span class="preprocessor">#if (defined(__x86_64__) || defined(__i386__)) &amp;&amp; (defined(__GNUC__) || defined(__clang__))</span></div>
+<div class="line"><span class="lineno">  252</span>    __builtin_cpu_init();</div>
+<div class="line"><span class="lineno">  253</span>    <span class="keywordflow">if</span> (output_channels &gt;= 4 &amp;&amp; __builtin_cpu_supports(<span class="stringliteral">&quot;avx2&quot;</span>)) {</div>
+<div class="line"><span class="lineno">  254</span>        <span class="keywordflow">if</span> (validate_weight_rows(weight, weight_stride, bias, input_channels,</div>
+<div class="line"><span class="lineno">  255</span>                                 output_channels, &amp;max_weight_l1, &amp;max_bias))</div>
+<div class="line"><span class="lineno">  256</span>            <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  257</span>    } <span class="keywordflow">else</span></div>
+<div class="line"><span class="lineno">  258</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  259</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> o = 0; o &lt; output_channels; ++o) {</div>
+<div class="line"><span class="lineno">  260</span>        <span class="keywordflow">if</span> (bias &amp;&amp; !isfinite(bias[o])) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  261</span>        <span class="keywordflow">if</span> (bias &amp;&amp; fabs((<span class="keywordtype">double</span>)bias[o]) &gt; max_bias)</div>
+<div class="line"><span class="lineno">  262</span>            max_bias = fabs((<span class="keywordtype">double</span>)bias[o]);</div>
+<div class="line"><span class="lineno">  263</span>        <span class="keywordtype">double</span> weight_l1 = 0.0;</div>
+<div class="line"><span class="lineno">  264</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> c = 0; c &lt; input_channels; ++c)</div>
+<div class="line"><span class="lineno">  265</span>        {</div>
+<div class="line"><span class="lineno">  266</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> value = weight[o * weight_stride + c];</div>
+<div class="line"><span class="lineno">  267</span>            <span class="keywordflow">if</span> (!isfinite(value)) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  268</span>            weight_l1 += fabs((<span class="keywordtype">double</span>)value);</div>
+<div class="line"><span class="lineno">  269</span>        }</div>
+<div class="line"><span class="lineno">  270</span>        <span class="keywordflow">if</span> (weight_l1 &gt; max_weight_l1) max_weight_l1 = weight_l1;</div>
+<div class="line"><span class="lineno">  271</span>    }</div>
+<div class="line"><span class="lineno">  272</span>    <span class="comment">/* At most UINT32_MAX positive terms keep FP64 summation error far below</span></div>
+<div class="line"><span class="lineno">  273</span><span class="comment">     * the 4x guard, including error in the L1 bound. Every result therefore</span></div>
+<div class="line"><span class="lineno">  274</span><span class="comment">     * fits FP32 and publishing cannot fail after the first output write. */</span></div>
+<div class="line"><span class="lineno">  275</span>    <span class="keywordflow">if</span> (input_channels &lt;= (SIZE_MAX / 4) &amp;&amp; input_channels &lt;= UINT32_MAX &amp;&amp;</div>
+<div class="line"><span class="lineno">  276</span>        max_input * max_weight_l1 + max_bias &lt;= (<span class="keywordtype">double</span>)FLT_MAX / 4.0) {</div>
+<div class="line"><span class="lineno">  277</span><span class="preprocessor">#if (defined(__x86_64__) || defined(__i386__)) &amp;&amp; (defined(__GNUC__) || defined(__clang__))</span></div>
+<div class="line"><span class="lineno">  278</span>        __builtin_cpu_init();</div>
+<div class="line"><span class="lineno">  279</span>        <span class="keywordflow">if</span> ((rows &gt;= 4 || output_channels &gt;= 4) &amp;&amp; __builtin_cpu_supports(<span class="stringliteral">&quot;avx2&quot;</span>) &amp;&amp;</div>
+<div class="line"><span class="lineno">  280</span>            <a class="code hl_function" href="checked__frame__codec_8c.html#a63638d1dbb9346f9360a1035d0fece08">disjoint</a>(output, output_elements, input, input_elements) &amp;&amp;</div>
+<div class="line"><span class="lineno">  281</span>            <a class="code hl_function" href="checked__frame__codec_8c.html#a63638d1dbb9346f9360a1035d0fece08">disjoint</a>(output, output_elements, weight, weight_elements) &amp;&amp;</div>
+<div class="line"><span class="lineno">  282</span>            <a class="code hl_function" href="checked__frame__codec_8c.html#a63638d1dbb9346f9360a1035d0fece08">disjoint</a>(output, output_elements, bias, bias_elements)) {</div>
+<div class="line"><span class="lineno">  283</span><span class="preprocessor">#if defined(__ELF__)</span></div>
+<div class="line"><span class="lineno">  284</span>            <span class="keywordflow">if</span> (rows &gt;= 16 &amp;&amp; input_channels &gt;= 16 &amp;&amp; output_channels &gt;= 128 &amp;&amp;</div>
+<div class="line"><span class="lineno">  285</span>                <a class="code hl_function" href="ckernel__engine_8h.html#aedf852ec498fe7db175f59f810886b9f">ck_get_num_threads</a> &amp;&amp; <a class="code hl_function" href="ck__threadpool_8h.html#a4597badcb0a5a6c31549f2b6bc6a88a7">ck_threadpool_global</a> &amp;&amp; <a class="code hl_function" href="ck__threadpool_8h.html#a92ab47612f4b24d3ce156ad737bdd955">ck_threadpool_in_dispatch</a> &amp;&amp;</div>
+<div class="line"><span class="lineno">  286</span>                <a class="code hl_function" href="ck__threadpool_8h.html#aef9103ab0a271feb7fdc74c915a78d10">ck_threadpool_n_threads</a> &amp;&amp; <a class="code hl_function" href="ck__threadpool_8h.html#a201c68c915e80d824c95721b55c5ab83">ck_threadpool_parallel_for_n</a>) {</div>
+<div class="line"><span class="lineno">  287</span>                <span class="keyword">struct </span>projection_tiles work = {</div>
+<div class="line"><span class="lineno">  288</span>                    .input = input, .weight = weight, .bias = bias, .output = output,</div>
+<div class="line"><span class="lineno">  289</span>                    .input_stride = input_stride, .weight_stride = weight_stride,</div>
+<div class="line"><span class="lineno">  290</span>                    .output_stride = output_stride, .rows = rows, .width = input_channels,</div>
+<div class="line"><span class="lineno">  291</span>                    .channels = output_channels,</div>
+<div class="line"><span class="lineno">  292</span>                };</div>
+<div class="line"><span class="lineno">  293</span>                <a class="code hl_function" href="checked__parallel_8h.html#a7081faaa75564b9eb08d0e433cd84f9b">ck_checked_parallel_for</a>((output_channels - 1) / projection_tile_channels + 1,</div>
+<div class="line"><span class="lineno">  294</span>                                        1, compute_projection_tiles, &amp;work);</div>
+<div class="line"><span class="lineno">  295</span>                <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  296</span>            }</div>
+<div class="line"><span class="lineno">  297</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  298</span>            compute_independent_lanes(input, input_stride, weight, weight_stride, bias,</div>
+<div class="line"><span class="lineno">  299</span>                                      output, output_stride, rows, input_channels,</div>
+<div class="line"><span class="lineno">  300</span>                                      output_channels);</div>
+<div class="line"><span class="lineno">  301</span>            <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  302</span>        }</div>
+<div class="line"><span class="lineno">  303</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  304</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> r = 0; r &lt; rows; ++r)</div>
+<div class="line"><span class="lineno">  305</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> o = 0; o &lt; output_channels; ++o)</div>
+<div class="line"><span class="lineno">  306</span>                output[r * output_stride + o] = (<span class="keywordtype">float</span>)<a class="code hl_function" href="#ae7816c3478a9999aad8dddcdce467cc7">dot_bias</a>(</div>
+<div class="line"><span class="lineno">  307</span>                    input + r * input_stride, weight + o * weight_stride,</div>
+<div class="line"><span class="lineno">  308</span>                    input_channels, bias ? bias[o] : 0.0f);</div>
+<div class="line"><span class="lineno">  309</span>        <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  310</span>    }</div>
+<div class="line"><span class="lineno">  311</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> r = 0; r &lt; rows; ++r)</div>
+<div class="line"><span class="lineno">  312</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> o = 0; o &lt; output_channels; ++o) {</div>
+<div class="line"><span class="lineno">  313</span>            <span class="keyword">const</span> <span class="keywordtype">double</span> result = <a class="code hl_function" href="#ae7816c3478a9999aad8dddcdce467cc7">dot_bias</a>(input + r * input_stride,</div>
+<div class="line"><span class="lineno">  314</span>                                           weight + o * weight_stride,</div>
+<div class="line"><span class="lineno">  315</span>                                           input_channels, bias ? bias[o] : 0.0f);</div>
+<div class="line"><span class="lineno">  316</span>            <span class="keywordflow">if</span> (!isfinite(result) || fabs(result) &gt; FLT_MAX) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  317</span>        }</div>
+<div class="line"><span class="lineno">  318</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> r = 0; r &lt; rows; ++r)</div>
+<div class="line"><span class="lineno">  319</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> o = 0; o &lt; output_channels; ++o)</div>
+<div class="line"><span class="lineno">  320</span>            output[r * output_stride + o] = (<span class="keywordtype">float</span>)<a class="code hl_function" href="#ae7816c3478a9999aad8dddcdce467cc7">dot_bias</a>(</div>
+<div class="line"><span class="lineno">  321</span>                input + r * input_stride, weight + o * weight_stride,</div>
+<div class="line"><span class="lineno">  322</span>                input_channels, bias ? bias[o] : 0.0f);</div>
+<div class="line"><span class="lineno">  323</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  324</span>}</div>
 <div class="ttc" id="achecked__frame__codec_8c_html_a63638d1dbb9346f9360a1035d0fece08"><div class="ttname"><a href="checked__frame__codec_8c.html#a63638d1dbb9346f9360a1035d0fece08">disjoint</a></div><div class="ttdeci">static int disjoint(uintptr_t a, size_t a_bytes, uintptr_t b, size_t b_bytes)</div><div class="ttdef"><b>Definition</b> <a href="checked__frame__codec_8c_source.html#l00011">checked_frame_codec.c:11</a></div></div>
+<div class="ttc" id="achecked__parallel_8h_html_a7081faaa75564b9eb08d0e433cd84f9b"><div class="ttname"><a href="checked__parallel_8h.html#a7081faaa75564b9eb08d0e433cd84f9b">ck_checked_parallel_for</a></div><div class="ttdeci">static void ck_checked_parallel_for(size_t count, int grain, ck_checked_range_fn fn, void *args)</div><div class="ttdef"><b>Definition</b> <a href="checked__parallel_8h_source.html#l00024">checked_parallel.h:24</a></div></div>
+<div class="ttc" id="ack__threadpool_8h_html_a201c68c915e80d824c95721b55c5ab83"><div class="ttname"><a href="ck__threadpool_8h.html#a201c68c915e80d824c95721b55c5ab83">ck_threadpool_parallel_for_n</a></div><div class="ttdeci">void ck_threadpool_parallel_for_n(ck_threadpool_t *pool, int active_threads, int begin, int end, int grain_size, ck_range_fn_t fn, void *args)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00576">ck_threadpool.c:576</a></div></div>
+<div class="ttc" id="ack__threadpool_8h_html_a4597badcb0a5a6c31549f2b6bc6a88a7"><div class="ttname"><a href="ck__threadpool_8h.html#a4597badcb0a5a6c31549f2b6bc6a88a7">ck_threadpool_global</a></div><div class="ttdeci">ck_threadpool_t * ck_threadpool_global(void)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00743">ck_threadpool.c:743</a></div></div>
+<div class="ttc" id="ack__threadpool_8h_html_a92ab47612f4b24d3ce156ad737bdd955"><div class="ttname"><a href="ck__threadpool_8h.html#a92ab47612f4b24d3ce156ad737bdd955">ck_threadpool_in_dispatch</a></div><div class="ttdeci">int ck_threadpool_in_dispatch(const ck_threadpool_t *pool)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00647">ck_threadpool.c:647</a></div></div>
+<div class="ttc" id="ack__threadpool_8h_html_aef9103ab0a271feb7fdc74c915a78d10"><div class="ttname"><a href="ck__threadpool_8h.html#aef9103ab0a271feb7fdc74c915a78d10">ck_threadpool_n_threads</a></div><div class="ttdeci">int ck_threadpool_n_threads(const ck_threadpool_t *pool)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00637">ck_threadpool.c:637</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_aedf852ec498fe7db175f59f810886b9f"><div class="ttname"><a href="ckernel__engine_8h.html#aedf852ec498fe7db175f59f810886b9f">ck_get_num_threads</a></div><div class="ttdeci">int ck_get_num_threads(void)</div><div class="ttdef"><b>Definition</b> <a href="ckernel__strict_8c_source.html#l00310">ckernel_strict.c:310</a></div></div>
 <div class="ttc" id="alinear__rows__checked_8c_html_a43a2bce256149887d9ed75bace12e37b"><div class="ttname"><a href="#a43a2bce256149887d9ed75bace12e37b">span_fits</a></div><div class="ttdeci">static int span_fits(size_t rows, size_t stride, size_t width, size_t elements)</div><div class="ttdef"><b>Definition</b> <a href="linear__rows__checked_8c_source.html#l00007">linear_rows_checked.c:7</a></div></div>
 <div class="ttc" id="alinear__rows__checked_8c_html_ae7816c3478a9999aad8dddcdce467cc7"><div class="ttname"><a href="#ae7816c3478a9999aad8dddcdce467cc7">dot_bias</a></div><div class="ttdeci">static double dot_bias(const float *input, const float *weight, size_t width, float bias)</div><div class="ttdef"><b>Definition</b> <a href="linear__rows__checked_8c_source.html#l00014">linear_rows_checked.c:14</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="checked__frame__codec_8c_source.html#l00011">disjoint()</a>, <a class="el" href="linear__rows__checked_8c_source.html#l00014">dot_bias()</a>, and <a class="el" href="linear__rows__checked_8c_source.html#l00007">span_fits()</a>.</p>
+<p class="reference">References <a class="el" href="checked__parallel_8h_source.html#l00024">ck_checked_parallel_for()</a>, <a class="el" href="ckernel__strict_8c_source.html#l00310">ck_get_num_threads()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00743">ck_threadpool_global()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00647">ck_threadpool_in_dispatch()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00637">ck_threadpool_n_threads()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00576">ck_threadpool_parallel_for_n()</a>, <a class="el" href="checked__frame__codec_8c_source.html#l00011">disjoint()</a>, <a class="el" href="linear__rows__checked_8c_source.html#l00014">dot_bias()</a>, and <a class="el" href="linear__rows__checked_8c_source.html#l00007">span_fits()</a>.</p>
 
 </div>
 </div>
@@ -425,7 +428,7 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">   11</span>           (rows - 1) * stride + width &lt;= elements;</div>
 <div class="line"><span class="lineno">   12</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="linear__rows__checked_8c_source.html#l00245">linear_rows_checked_f32()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="linear__rows__checked_8c_source.html#l00223">linear_rows_checked_f32()</a>.</p>
 
 </div>
 </div>
