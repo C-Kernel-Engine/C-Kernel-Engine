@@ -450,7 +450,8 @@ static int routed_softcapped_experts(ROUTED_EXPERT_ARGS, size_t down_matrix_byte
     const size_t scratch_elements = staged_elements + grouped_pack_elements + jobs_elements + scratch_count * row_scratch;
     if (hidden_elements < output_elements || id_elements < route_count || route_elements < route_count ||
         expert_slot_elements < experts || expert_output_elements < row_outputs ||
-        output_capacity < output_elements || work_elements < scratch_elements) return -1;
+        output_capacity < output_elements || work_elements < scratch_elements ||
+        scratch_elements > SIZE_MAX / sizeof(float)) return -1;
     if (gate_expert_bytes > SIZE_MAX / slots || down_expert_bytes > SIZE_MAX / slots ||
         matrix_bytes != gate_expert_bytes * slots ||
         down_matrix_bytes != down_expert_bytes * slots) return -1;

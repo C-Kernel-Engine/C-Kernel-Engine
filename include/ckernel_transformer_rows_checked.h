@@ -4,7 +4,7 @@
 #include <stddef.h>
 
 /* Shared row bound for the checked routed expert providers and their circuit authoring. */
-#define CHECKED_ROUTED_EXPERT_MAX_ROWS 64
+#define CHECKED_ROUTED_EXPERT_MAX_ROWS 128
 
 #ifdef __cplusplus
 extern "C" {

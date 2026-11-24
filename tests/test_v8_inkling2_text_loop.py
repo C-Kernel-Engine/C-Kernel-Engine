@@ -286,11 +286,11 @@ class InklingTextLoopTests(unittest.TestCase):
             self.assertEqual(functions["append"](arena, len(arena)), -1)
             self.assertEqual(view("cache_k_0").tobytes(), before)
 
-    def test_64_row_prefill_matches_four_16_row_calls_and_decode(self):
+    def test_128_row_prefill_matches_two_64_row_calls_and_decode(self):
         rng = np.random.default_rng(1644)
-        context = 72
-        ids = rng.integers(CONFIG["vocab_size"], size=65, dtype=np.int32)
-        graph = resident_text_loop(CONFIG, 64, context, last_prefill_logit=True)
+        context = 144
+        ids = rng.integers(CONFIG["vocab_size"], size=129, dtype=np.int32)
+        graph = resident_text_loop(CONFIG, 128, context, last_prefill_logit=True, circular_sliding=True)
         specs = first_block_weights(graph)
         weights = {
             name: pack_quant(rng.integers(-3, 4, shape, dtype=np.int8), "q8_0")
@@ -298,37 +298,46 @@ class InklingTextLoopTests(unittest.TestCase):
             for name, (shape, dtype) in specs.items()
         }
         with self.assertRaisesRegex(ValueError, "fixed token rows"):
-            resident_text_loop(CONFIG, 65, context)
+            resident_text_loop(CONFIG, 129, context)
         results = []
         states = []
         with TemporaryDirectory() as temp:
-            for chunk in (16, 64):
+            for chunk in (64, 128):
                 folder = Path(temp) / str(chunk)
                 folder.mkdir()
-                graph = resident_text_loop(CONFIG, chunk, context, last_prefill_logit=True)
-                _, arena, view, library = compile_checked_weight_graph(folder, graph, weights, specs, openmp=True)
-                library.omp_set_dynamic(0)
-                library.omp_set_num_threads(2)
+                graph = resident_text_loop(CONFIG, chunk, context, last_prefill_logit=True, circular_sliding=True)
+                _, arena, view, library = compile_checked_weight_graph(
+                    folder, graph, weights, specs, extra_exports=("ck_set_num_threads",),
+                )
+                library.ck_set_num_threads(2)
                 bindings = load_exports(folder, library)
+                rings = bindings["properties"]["circular_sliding_slots"]
+                self.assertEqual(rings["0"], CONFIG["sliding_window_size"] + chunk - 1)
                 for layer in range(CONFIG["num_hidden_layers"]):
                     view(f"router_bias_{layer}")[:] = [-.03, .07, .09, .01]
                 view("expert_slots", np.int32)[:] = np.arange(CONFIG["n_routed_experts"])
-                for phase, position, count in ([("prefill", pos, chunk) for pos in range(0, 64, chunk)]
-                                               + [("append", 64, 1)]):
+                for phase, position, count in ([("prefill", pos, chunk) for pos in range(0, 128, chunk)]
+                                               + [("append", 128, 1)]):
                     call = getattr(library, bindings["entries"][phase])
                     call.argtypes = [ctypes.c_void_p, ctypes.c_size_t]
                     call.restype = ctypes.c_int
                     view(f"{phase}_request_position", np.int32)[:] = position
                     view(f"{phase}_token_ids", np.int32)[:] = ids[position:position + count]
                     self.assertEqual(call(arena, len(arena)), 0)
-                    if position + count >= 64:
+                    if position + count >= 128:
                         results.append(view(f"{phase}_logits").copy())
-                states.append({
-                    f"{kind}_{slot}": view(f"{kind}_{slot}").tobytes()
-                    for slot in range(48)
-                    for kind in ("cache_k", "cache_v", "history_k", "history_v",
-                                 "history_attn_post_conv", "history_ffn_post_conv")
-                })
+                state = {}
+                for slot in range(48):
+                    ring = rings.get(str(slot))
+                    for kind in ("cache_k", "cache_v"):
+                        name = f"{kind}_{slot}"
+                        logical = np.arange(len(ids) - CONFIG["sliding_window_size"] if ring else 0, len(ids))
+                        physical = logical % ring if ring else logical
+                        state[name] = view(name)[:, physical].tobytes()
+                    for kind in ("history_k", "history_v", "history_attn_post_conv", "history_ffn_post_conv"):
+                        name = f"{kind}_{slot}"
+                        state[name] = view(name).tobytes()
+                states.append(state)
         for baseline, candidate in zip(results[:2], results[2:]):
             self.assertTrue(np.isfinite(baseline).all())
             self.assertGreater(float(np.abs(baseline).max()), 0.01)
