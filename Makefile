@@ -4980,7 +4980,7 @@ FLASH_ATTN_THREADS ?= $(shell nproc 2>/dev/null || echo 1)
 
 profile-memory: $(BUILD_DIR)
 	@echo "Building with debug symbols..."
-	$(MAKE) -B $(LIB) CFLAGS="$(PROFILE_CFLAGS) -fPIC -fopenmp -Wall $(AVX_FLAGS) $(INCLUDES)"
+	$(MAKE) -B $(LIB) CFLAGS="$(PROFILE_CFLAGS) -fPIC $(OPENMP_FLAG) $(WARNING_FLAGS) $(AVX_FLAGS) $(INCLUDES)"
 	$(MAKE) tiny-e2e
 	@echo "Running Valgrind memcheck..."
 	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
@@ -4990,7 +4990,7 @@ profile-memory: $(BUILD_DIR)
 
 profile-heap: $(BUILD_DIR)
 	@echo "Building with debug symbols..."
-	$(MAKE) -B $(LIB) CFLAGS="$(PROFILE_CFLAGS) -fPIC -fopenmp -Wall $(AVX_FLAGS) $(INCLUDES)"
+	$(MAKE) -B $(LIB) CFLAGS="$(PROFILE_CFLAGS) -fPIC $(OPENMP_FLAG) $(WARNING_FLAGS) $(AVX_FLAGS) $(INCLUDES)"
 	$(MAKE) tiny-e2e
 	@echo "Running Valgrind massif..."
 	valgrind --tool=massif --pages-as-heap=yes --massif-out-file=$(BUILD_DIR)/massif.out \
@@ -5001,7 +5001,7 @@ profile-heap: $(BUILD_DIR)
 
 profile-cpu: $(BUILD_DIR)
 	@echo "Building with frame pointers..."
-	$(MAKE) -B $(LIB) CFLAGS="$(PROFILE_PERF_CFLAGS) -fPIC -fopenmp -Wall $(AVX_FLAGS) $(INCLUDES)"
+	$(MAKE) -B $(LIB) CFLAGS="$(PROFILE_PERF_CFLAGS) -fPIC $(OPENMP_FLAG) $(WARNING_FLAGS) $(AVX_FLAGS) $(INCLUDES)"
 	$(MAKE) tiny-e2e
 	@echo "Recording with perf..."
 	perf record -g -F 99 -o $(BUILD_DIR)/perf.data \
@@ -5012,13 +5012,13 @@ profile-cpu: $(BUILD_DIR)
 
 profile-flash-attn: $(BUILD_DIR)
 	@echo "Building with frame pointers..."
-	$(MAKE) -B $(LIB) CFLAGS="$(PROFILE_PERF_CFLAGS) -fPIC -fopenmp -Wall $(AVX_FLAGS) $(INCLUDES)"
+	$(MAKE) -B $(LIB) CFLAGS="$(PROFILE_PERF_CFLAGS) -fPIC $(OPENMP_FLAG) $(WARNING_FLAGS) $(AVX_FLAGS) $(INCLUDES)"
 	@echo "Building flash attention microbenchmark..."
-	$(CC) $(PROFILE_PERF_CFLAGS) -march=native -fopenmp $(AVX_FLAGS) $(SSSE3_FLAGS) -Iinclude \
+	$(CC) $(PROFILE_PERF_CFLAGS) -march=native $(AVX_FLAGS) $(SSSE3_FLAGS) -Iinclude \
 		benchmarks/perf_flash_attn_micro.c -L$(BUILD_DIR) -lckernel_engine -lm \
 		-o $(BUILD_DIR)/perf_flash_attn_micro
 	@echo "Recording with perf..."
-	OMP_NUM_THREADS=$(FLASH_ATTN_THREADS) LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH \
+	CK_NUM_THREADS=$(FLASH_ATTN_THREADS) LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH \
 		perf record -g -F 99 -o $(BUILD_DIR)/perf_flash_attn.perf \
 		$(BUILD_DIR)/perf_flash_attn_micro $(FLASH_ATTN_TK) $(FLASH_ATTN_H) $(FLASH_ATTN_HKV) \
 		$(FLASH_ATTN_DH) $(FLASH_ATTN_ITERS) $(FLASH_ATTN_WARMUP)
@@ -5068,7 +5068,7 @@ flamegraph: $(BUILD_DIR)/perf.data
 
 profile-cache: $(BUILD_DIR)
 	@echo "Building with debug symbols..."
-	$(MAKE) -B $(LIB) CFLAGS="$(PROFILE_CFLAGS) -fPIC -fopenmp -Wall $(AVX_FLAGS) $(INCLUDES)"
+	$(MAKE) -B $(LIB) CFLAGS="$(PROFILE_CFLAGS) -fPIC $(OPENMP_FLAG) $(WARNING_FLAGS) $(AVX_FLAGS) $(INCLUDES)"
 	$(MAKE) tiny-e2e
 	@echo "Running Valgrind cachegrind..."
 	valgrind --tool=cachegrind --cachegrind-out-file=$(BUILD_DIR)/cachegrind.out \

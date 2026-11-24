@@ -1695,6 +1695,11 @@ def step_compile(
 
     machine = _host_machine()
     omp_flag = "-qopenmp" if compiler == "icx" else "-fopenmp"
+    if os.environ.get("CK_ENABLE_OPENMP") != "1":
+        omp_flag = None
+    elif not _compiler_supports_openmp(compiler, omp_flag):
+        log_error(f"{compiler} does not support the requested CK_ENABLE_OPENMP=1")
+        sys.exit(1)
     extra_cflags = (os.environ.get("CK_V8_EXTRA_CFLAGS", "") or os.environ.get("CK_V7_EXTRA_CFLAGS", "")).strip()
     extra_ldflags = (os.environ.get("CK_V8_EXTRA_LDFLAGS", "") or os.environ.get("CK_V7_EXTRA_LDFLAGS", "")).strip()
     kernel_build_args = _selected_kernel_build_args(output_dir)
@@ -1765,12 +1770,12 @@ def step_compile(
         f"CC={compiler}",
         *kernel_build_args,
         *arm_engine_args,
+        f"CK_ENABLE_OPENMP={int(omp_flag is not None)}",
     ]
     run_cmd([*make_cmd, *targets], cwd=PROJECT_ROOT)
 
     include_dir = PROJECT_ROOT / "include"
     v8_src = V8_ROOT / "src"
-    use_openmp = _compiler_supports_openmp(compiler, omp_flag)
     output_dir.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(
         dir=output_dir,
@@ -1805,7 +1810,7 @@ def step_compile(
         ]
         if _is_x86_machine(machine):
             cmd.insert(3, "-mcmodel=large")
-        if use_openmp:
+        if omp_flag is not None:
             cmd.insert(8 if _is_x86_machine(machine) else 7, omp_flag)
         if profile:
             cmd.append("-DCK_PROFILE=1")
