@@ -2,6 +2,8 @@ var rwkv7__decode_8c =
 [
     [ "ck_rwkv7_apply_kk_factor", "rwkv7__decode_8c.html#a11b2eaaf160fb24734d3b5374a55496c", null ],
     [ "ck_rwkv7_channelmix_decode", "rwkv7__decode_8c.html#a64973642226e4f40eb884878288013ab", null ],
+    [ "ck_rwkv7_channelmix_hidden_rows", "rwkv7__decode_8c.html#a58ae6fc3429064198e0530af3e5a4cc0", null ],
+    [ "ck_rwkv7_channelmix_out_rows", "rwkv7__decode_8c.html#ab5aafe3e8d6e8fab287e5b3b813182ea", null ],
     [ "ck_rwkv7_channelmix_scratch_elems", "rwkv7__decode_8c.html#ab965315ad8f64e7fc5c60b1743feac19", null ],
     [ "ck_rwkv7_lora_gates", "rwkv7__decode_8c.html#a06cd318c6cd148188cafec9975688063", null ],
     [ "ck_rwkv7_norm_kk", "rwkv7__decode_8c.html#aeee676bb3d2786be1ab4ff5f72d8aae2", null ],

@@ -1,5 +1,9 @@
 var NAVTREEINDEX23 =
 {
+"structCKLayerOptimizerOffsets.html#ae52782e743a205ddc4638286e0828993":[1,0,53,16],
+"structCKLayerOptimizerOffsets.html#af930f5e076e326272b26fb52cc4162d4":[1,0,53,37],
+"structCKMathBackend.html":[1,0,54],
+"structCKMathBackend.html#a7e59ba4baa9c776241287338a219d9c4":[1,0,54,0],
 "structCKMemPlan.html":[1,0,55],
 "structCKMemPlan.html#a2eafa236d6d9a88944d798cdbd43737d":[1,0,55,2],
 "structCKMemPlan.html#a7c1dd8cbe777a1f0a40af32a417fdc37":[1,0,55,1],
@@ -245,9 +249,5 @@ var NAVTREEINDEX23 =
 "structCKTokenizer.html#a8c14da1e0de0f92cbea9714f8c42d4cd":[1,0,76,5],
 "structCKTokenizer.html#a9b7a80f60b651e50d40ffb9b1130eccc":[1,0,76,11],
 "structCKTokenizer.html#a9fbb827cf89c461569b0dfc2b8ef5fe9":[1,0,76,16],
-"structCKTokenizer.html#aae750e70d66be065e2c8679036f5b86d":[1,0,76,12],
-"structCKTokenizer.html#ab44021bc477d697cf1680b42d2d2604e":[1,0,76,6],
-"structCKTokenizer.html#ab6541ede40f4da3f746f4c45920dd26c":[1,0,76,27],
-"structCKTokenizer.html#abb547a25be3e435baaaa4eb1047b5d56":[1,0,76,24],
-"structCKTokenizer.html#ac429a4c7fcc505d94281488fa9aaa8c9":[1,0,76,28]
+"structCKTokenizer.html#aae750e70d66be065e2c8679036f5b86d":[1,0,76,12]
 };
