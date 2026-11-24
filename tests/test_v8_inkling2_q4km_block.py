@@ -4,6 +4,8 @@ import ctypes
 from itertools import product
 import json
 from pathlib import Path
+import platform
+import subprocess
 from tempfile import TemporaryDirectory
 import unittest
 
@@ -42,6 +44,59 @@ def packed_weights(rng, shape, dtype):
 
 
 class MixedInklingBlockTests(unittest.TestCase):
+    def test_q5_quantized_avx2_lane_reduction(self):
+        if platform.system() != "Linux" or platform.machine() != "x86_64":
+            self.skipTest("AVX2 native dot regression requires x86 Linux")
+        flags = next((line.split(":", 1)[1].split() for line in
+                      Path("/proc/cpuinfo").read_text().splitlines() if line.startswith("flags")), ())
+        if not {"avx2", "fma", "f16c"}.issubset(flags):
+            self.skipTest("AVX2, FMA and F16C execution unavailable")
+
+        root = Path(__file__).resolve().parents[1]
+        rng = np.random.default_rng(55408)
+        rows, blocks = 5, 3
+        codes = rng.integers(-16, 16, (rows, blocks, 32), dtype=np.int16)
+        inputs = rng.integers(-127, 128, (blocks, 32), dtype=np.int16)
+        scales = np.array([2**-8, -2**-10, 3 * 2**-11], dtype="<f2")
+        input_scales = np.array([2**-5, 3 * 2**-7, 2**-6], dtype="<f2")
+        encoded = (codes + 16).astype(np.uint8)
+        weights = np.empty((rows, blocks, 22), dtype=np.uint8)
+        weights[..., :2] = scales.view("u1").reshape(blocks, 2)
+        weights[..., 2:6] = np.packbits(encoded >> 4, axis=-1, bitorder="little")
+        weights[..., 6:] = (encoded[..., :16] & 15) | (encoded[..., 16:] << 4)
+        activation = np.empty((blocks, 34), dtype=np.uint8)
+        activation[:, :2] = input_scales.view("u1").reshape(blocks, 2)
+        activation[:, 2:] = inputs.astype(np.int8).view("u1")
+
+        lanes = np.zeros((rows, 8), dtype=np.float32)
+        dots = (codes.astype(np.int32) * inputs).reshape(rows, blocks, 8, 4).sum(axis=-1)
+        for block in range(blocks):
+            # These binary scales and integer dots permit exact FP64 evaluation
+            # of the product and sum before the single FP32 FMA rounding.
+            scale = float(scales[block]) * float(input_scales[block])
+            lanes[:] = lanes.astype(np.float64) + scale * dots[:, block]
+        halves = lanes[:, :4] + lanes[:, 4:]
+        pairs = halves[:, :2] + halves[:, 2:]
+        expected = pairs[:, 0] + pairs[:, 1]
+
+        with TemporaryDirectory() as temp:
+            path = Path(temp) / "libq5-check.so"
+            exports = Path(temp) / "exports.map"
+            exports.write_text("{ global: gemv_q5_0_q8_0_checked_cpu; local: *; };")
+            subprocess.run([
+                "cc", "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror",
+                "-shared", "-fPIC", "-ffp-contract=off", "-ffunction-sections",
+                "-Wl,--gc-sections", "-Wl,--no-undefined", f"-Wl,--version-script={exports}",
+                "-I", str(root / "include"), str(root / "src/kernels/gemm_kernels_q5_0.c"),
+                "-lm", "-o", str(path),
+            ], check=True)
+            gemv = ctypes.CDLL(str(path)).gemv_q5_0_q8_0_checked_cpu
+            gemv.argtypes = [ctypes.c_void_p] * 3 + [ctypes.c_int] * 2
+            gemv.restype = None
+            actual = np.full(rows, np.nan, dtype=np.float32)
+            gemv(actual.ctypes.data, weights.ctypes.data, activation.ctypes.data, rows, blocks * 32)
+            np.testing.assert_array_equal(actual.view("u4"), expected.view("u4"))
+
     def test_mixed_packed_block_shapes_and_continuation(self):
         rng = np.random.default_rng(1744)
         options = dict(width=256, kv_heads=1, query_heads=2, dim=128, relative_dim=2,

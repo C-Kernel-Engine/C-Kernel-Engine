@@ -81,6 +81,11 @@ static inline __attribute__((always_inline)) void dot_q4_k_q8_k_rows_avx2(
         const float wm = -_mm_cvtss_f32(_mm_shuffle_ps(scales_fp32, scales_fp32, _MM_SHUFFLE(1, 1, 1, 1)));
         __m256i block_sum[2] = {_mm256_setzero_si256(), _mm256_setzero_si256()};
 
+#if defined(__clang__)
+#pragma clang loop unroll(full)
+#elif defined(__GNUC__)
+#pragma GCC unroll 4
+#endif
         for (int group = 0; group < QK_K / 64; ++group) {
             const __m256i codes = _mm256_loadu_si256((const __m256i *)&w[i].qs[group * 32]);
             const __m256i q4_lo = _mm256_and_si256(codes, nibble_mask);
