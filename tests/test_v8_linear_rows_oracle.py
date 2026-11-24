@@ -85,48 +85,61 @@ class LinearRowsOracleTest(unittest.TestCase):
         self.assertEqual(self.call(x, w, bias, out, 1, 4, 5), -1)
         self.assertTrue(np.all(out == -777.))
 
-    @unittest.skipUnless(platform.machine().lower() in {"x86_64", "amd64"},
-                         "threaded SIMD projection dispatch is x86-specific")
+    @unittest.skipUnless(platform.system() == "Linux" and
+                         platform.machine().lower() in {"x86_64", "amd64"},
+                         "optional threaded SIMD dispatch requires an x86 ELF build")
     def test_threaded_channel_tiles_preserve_bits_and_reject_late_nonfinite(self):
-        lib = Path(self.temp.name) / "linear-openmp.so"
+        if "avx2" not in Path("/proc/cpuinfo").read_text().split():
+            self.skipTest("AVX2 execution unavailable")
+        lib = Path(self.temp.name) / "linear-threadpool.so"
         subprocess.run([
-            "cc", "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror", "-pedantic",
-            "-march=native", "-fopenmp", "-shared", "-fPIC",
-            str(ROOT / "src/kernels/linear_rows_checked.c"),
-            "-I", str(ROOT / "include"), "-lm", "-o", str(lib),
+            "cc", "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror",
+            "-shared", "-fPIC", str(ROOT / "src/kernels/linear_rows_checked.c"),
+            str(ROOT / "src/ck_threadpool.c"), str(ROOT / "src/ckernel_strict.c"),
+            "-I", str(ROOT / "include"), "-lm", "-lpthread", "-ldl", "-o", str(lib),
         ], check=True)
         runtime = ctypes.CDLL(str(lib))
-        runtime.omp_set_num_threads.argtypes = [ctypes.c_int]
-        runtime.omp_set_num_threads.restype = None
-        runtime.omp_get_max_threads.restype = ctypes.c_int
+        runtime.ck_set_num_threads.argtypes = [ctypes.c_int]
+        runtime.ck_set_num_threads.restype = None
+        runtime.ck_threadpool_global.restype = ctypes.c_void_p
+        runtime.ck_threadpool_profile_reset.argtypes = [ctypes.c_void_p]
+        runtime.ck_threadpool_profile_snapshot.argtypes = [
+            ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint64),
+        ]
+        runtime.ck_threadpool_global_destroy.restype = None
         threaded = runtime.linear_rows_checked_f32
         threaded.argtypes, threaded.restype = self.fn.argtypes, self.fn.restype
         rng = np.random.default_rng(281)
-        for rows in (1, 3, 7):
-            with self.subTest(rows=rows):
-                inputs = rng.normal(size=(rows, 261)).astype(np.float32)
-                weights = rng.normal(size=(515, 259)).astype(np.float32)
-                bias = rng.normal(size=515).astype(np.float32)
-                expected = np.full((rows, 519), -777, np.float32)
-                output = expected.copy()
-                dims = dict(m=rows, k=257, n=515, xs=261, ws=259, ys=519)
-                original = runtime.omp_get_max_threads()
-                try:
-                    # Run the same compiled provider with the serial and tiled schedules.
-                    self.fn = threaded
-                    runtime.omp_set_num_threads(1)
+        runtime.ck_set_num_threads(2)
+        pool = runtime.ck_threadpool_global()
+        self.assertTrue(pool)
+        try:
+            for rows in (16, 17, 19):
+                with self.subTest(rows=rows):
+                    inputs = rng.normal(size=(rows, 261)).astype(np.float32)
+                    weights = rng.normal(size=(515, 259)).astype(np.float32)
+                    bias = rng.normal(size=515).astype(np.float32)
+                    expected = np.full((rows, 519), -777, np.float32)
+                    output = expected.copy()
+                    dims = dict(m=rows, k=257, n=515, xs=261, ws=259, ys=519)
                     self.assertEqual(self.call(inputs, weights, bias, expected, **dims), 0)
-                    runtime.omp_set_num_threads(2)
-                    self.assertEqual(self.call(inputs, weights, bias, output, **dims), 0)
-                    np.testing.assert_array_equal(output.view(np.uint32), expected.view(np.uint32))
-                    self.assertTrue(np.all(output[:, 515:] == -777))
-                    weights[-1, 256] = np.nan
-                    output.fill(-777)
-                    self.assertNotEqual(self.call(inputs, weights, bias, output, **dims), 0)
-                    self.assertTrue(np.all(output == -777))
-                finally:
-                    del self.fn
-                    runtime.omp_set_num_threads(original)
+                    self.fn = threaded
+                    try:
+                        counters = (ctypes.c_uint64 * 4)()
+                        runtime.ck_threadpool_profile_reset(pool)
+                        self.assertEqual(self.call(inputs, weights, bias, output, **dims), 0)
+                        runtime.ck_threadpool_profile_snapshot(pool, counters)
+                        self.assertGreater(counters[0], 0)
+                        np.testing.assert_array_equal(output.view(np.uint32), expected.view(np.uint32))
+                        self.assertTrue(np.all(output[:, 515:] == -777))
+                        weights[-1, 256] = np.nan
+                        output.fill(-777)
+                        self.assertNotEqual(self.call(inputs, weights, bias, output, **dims), 0)
+                        self.assertTrue(np.all(output == -777))
+                    finally:
+                        del self.fn
+        finally:
+            runtime.ck_threadpool_global_destroy()
 
     def test_pinned_kokoro_projection_against_pytorch(self):
         x, w, b, expected = (self.fixture[key] for key in ("input", "weight", "bias", "expected"))
