@@ -203,6 +203,13 @@ def compile_checked_weight_graph(folder, graph, weights, declarations, *, source
     """Compile a checked graph with explicit logical shapes and stored tensor types."""
     import numpy as np
 
+    from version.v8.scripts.convert_gguf_to_bump_v8 import (
+        GGUFError, GGML_TYPE_IQ4_NL, GGML_TYPE_Q4_K, GGML_TYPE_Q5_0,
+        GGML_TYPE_Q6_K, GGML_TYPE_Q8_0, ggml_row_bytes,
+    )
+
+    packed_types = {"Q4_K": GGML_TYPE_Q4_K, "Q5_0": GGML_TYPE_Q5_0, "Q6_K": GGML_TYPE_Q6_K,
+                    "IQ4_NL": GGML_TYPE_IQ4_NL, "Q8_0": GGML_TYPE_Q8_0}
     if weights.keys() != declarations.keys():
         raise ValueError("weight declarations and payloads disagree")
     entries = []
@@ -212,10 +219,13 @@ def compile_checked_weight_graph(folder, graph, weights, declarations, *, source
         if dtype in {"F32", "BF16"}:
             storage_dtype = np.float32 if dtype == "F32" else np.uint16
             valid = list(w.shape) == shape and w.dtype == storage_dtype
-        elif dtype in {"Q8_0", "IQ4_NL"}:
-            elements = int(np.prod(shape, dtype=object))
-            valid = (shape[-1] % 32 == 0 and w.ndim == 1 and w.dtype == np.uint8
-                     and w.nbytes == elements // 32 * (34 if dtype == "Q8_0" else 18))
+        elif dtype in packed_types:
+            try:
+                row_bytes = ggml_row_bytes(packed_types[dtype], shape[-1])
+            except GGUFError as error:
+                raise ValueError(f"weight storage disagrees with declaration: {name}") from error
+            rows = int(np.prod(shape[:-1], dtype=object))
+            valid = w.ndim == 1 and w.dtype == np.uint8 and w.nbytes == rows * row_bytes
         else:
             raise ValueError(f"unknown weight storage: {name} ({dtype})")
         if not valid:
