@@ -1183,6 +1183,27 @@ static inline __m256i unpack_q5_0_avx2(const block_q5_0 *block)
                            _mm256_andnot_si256(high_set, _mm256_set1_epi8((char)0xf0)));
 }
 
+CK_Q5_TARGET_AVX2
+static inline __m256 q5_0_q8_0_accumulate_avx2(__m256 accum, __m256i q5,
+                                                float weight_scale, const block_q8_0 *x)
+{
+#if defined(CK_Q5_RUNTIME_AVX2)
+    const __m256 d = _mm256_set1_ps(weight_scale * _cvtsh_ss(x->d));
+#else
+    const __m256 d = _mm256_set1_ps(weight_scale * CK_FP16_TO_FP32(x->d));
+#endif
+    const __m256i q8 = _mm256_loadu_si256((const __m256i *)x->qs);
+    const __m256i products = _mm256_maddubs_epi16(
+        _mm256_abs_epi8(q5), _mm256_sign_epi8(q8, q5));
+    const __m256 q = _mm256_cvtepi32_ps(
+        _mm256_madd_epi16(products, _mm256_set1_epi16(1)));
+#if defined(__FMA__) || defined(CK_Q5_RUNTIME_AVX2)
+    return _mm256_fmadd_ps(d, q, accum);
+#else
+    return _mm256_add_ps(_mm256_mul_ps(d, q), accum);
+#endif
+}
+
 /**
  * @brief Quantized dot product Q5_0 x Q8_0 (AVX2/FMA)
  *
@@ -1203,22 +1224,11 @@ void vec_dot_q5_0_q8_0_avx2(int n, float *s, const void *vx, const void *vy)
 
     for (int ib = 0; ib < nb; ++ib) {
 #if defined(CK_Q5_RUNTIME_AVX2)
-        const __m256 d = _mm256_set1_ps(_cvtsh_ss(x[ib].d) * _cvtsh_ss(y[ib].d));
+        const float scale = _cvtsh_ss(x[ib].d);
 #else
-        const __m256 d = _mm256_set1_ps(CK_FP16_TO_FP32(x[ib].d) * CK_FP16_TO_FP32(y[ib].d));
+        const float scale = CK_FP16_TO_FP32(x[ib].d);
 #endif
-
-        const __m256i q5 = unpack_q5_0_avx2(x + ib);
-        const __m256i q8 = _mm256_loadu_si256((const __m256i *)y[ib].qs);
-        const __m256i products = _mm256_maddubs_epi16(
-            _mm256_abs_epi8(q5), _mm256_sign_epi8(q8, q5));
-        const __m256 q = _mm256_cvtepi32_ps(
-            _mm256_madd_epi16(products, _mm256_set1_epi16(1)));
-#if defined(__FMA__) || defined(CK_Q5_RUNTIME_AVX2)
-        acc = _mm256_fmadd_ps(d, q, acc);
-#else
-        acc = _mm256_add_ps(_mm256_mul_ps(d, q), acc);
-#endif
+        acc = q5_0_q8_0_accumulate_avx2(acc, unpack_q5_0_avx2(x + ib), scale, y + ib);
     }
 
     *s = hsum_float_8_avx(acc);
@@ -1767,6 +1777,41 @@ void gemv_q5_0_q8_0_checked_cpu(float *out, const void *weights, const void *inp
 #endif
     for (int i = 0; i < rows; ++i)
         dot(width, out + i, (const block_q5_0 *)weights + (size_t)i * blocks, input);
+}
+
+#if defined(CK_Q5_RUNTIME_AVX2)
+CK_Q5_TARGET_AVX2
+static void gemv_q5_0_q8_0_pair_avx2(float *out0, float *out1,
+                                     const block_q5_0 *weights, const block_q8_0 *x0,
+                                     const block_q8_0 *x1, int rows, size_t blocks)
+{
+    for (int row = 0; row < rows; ++row) {
+        const block_q5_0 *w = weights + (size_t)row * blocks;
+        __m256 acc0 = _mm256_setzero_ps(), acc1 = _mm256_setzero_ps();
+        for (size_t ib = 0; ib < blocks; ++ib) {
+            const __m256i q5 = unpack_q5_0_avx2(w + ib);
+            const float scale = _cvtsh_ss(w[ib].d);
+            acc0 = q5_0_q8_0_accumulate_avx2(acc0, q5, scale, x0 + ib);
+            acc1 = q5_0_q8_0_accumulate_avx2(acc1, q5, scale, x1 + ib);
+        }
+        out0[row] = hsum_float_8_avx(acc0);
+        out1[row] = hsum_float_8_avx(acc1);
+    }
+}
+#endif
+
+void gemv_q5_0_q8_0_pair_checked_cpu(float *out0, float *out1, const void *weights,
+                                     const void *x0, const void *x1, int rows, int width)
+{
+#if defined(CK_Q5_RUNTIME_AVX2)
+    if (__builtin_cpu_supports("avx2") && __builtin_cpu_supports("fma") &&
+        __builtin_cpu_supports("f16c")) {
+        gemv_q5_0_q8_0_pair_avx2(out0, out1, weights, x0, x1, rows, (size_t)width / QK5_0);
+        return;
+    }
+#endif
+    gemv_q5_0_q8_0_checked_cpu(out0, weights, x0, rows, width);
+    gemv_q5_0_q8_0_checked_cpu(out1, weights, x1, rows, width);
 }
 
 /* Truthful provider-name helper (same pattern as ck_q4_k_q8_k_provider_name):

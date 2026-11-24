@@ -82,7 +82,9 @@ class MixedInklingBlockTests(unittest.TestCase):
         with TemporaryDirectory() as temp:
             path = Path(temp) / "libq5-check.so"
             exports = Path(temp) / "exports.map"
-            exports.write_text("{ global: gemv_q5_0_q8_0_checked_cpu; local: *; };")
+            exports.write_text(
+                "{ global: gemv_q5_0_q8_0_checked_cpu; gemv_q5_0_q8_0_pair_checked_cpu; local: *; };"
+            )
             subprocess.run([
                 "cc", "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror",
                 "-shared", "-fPIC", "-ffp-contract=off", "-ffunction-sections",
@@ -90,12 +92,26 @@ class MixedInklingBlockTests(unittest.TestCase):
                 "-I", str(root / "include"), str(root / "src/kernels/gemm_kernels_q5_0.c"),
                 "-lm", "-o", str(path),
             ], check=True)
-            gemv = ctypes.CDLL(str(path)).gemv_q5_0_q8_0_checked_cpu
+            library = ctypes.CDLL(str(path))
+            gemv = library.gemv_q5_0_q8_0_checked_cpu
             gemv.argtypes = [ctypes.c_void_p] * 3 + [ctypes.c_int] * 2
             gemv.restype = None
             actual = np.full(rows, np.nan, dtype=np.float32)
             gemv(actual.ctypes.data, weights.ctypes.data, activation.ctypes.data, rows, blocks * 32)
             np.testing.assert_array_equal(actual.view("u4"), expected.view("u4"))
+            gemv_pair = library.gemv_q5_0_q8_0_pair_checked_cpu
+            gemv_pair.argtypes = [ctypes.c_void_p] * 5 + [ctypes.c_int] * 2
+            gemv_pair.restype = None
+            second_input = np.ascontiguousarray(activation[::-1])
+            second_expected = np.full(rows, np.nan, dtype=np.float32)
+            gemv(second_expected.ctypes.data, weights.ctypes.data, second_input.ctypes.data, rows, blocks * 32)
+            self.assertFalse(np.array_equal(second_expected, expected))
+            second_actual = np.full(rows, np.nan, dtype=np.float32)
+            actual.fill(np.nan)
+            gemv_pair(actual.ctypes.data, second_actual.ctypes.data, weights.ctypes.data,
+                      activation.ctypes.data, second_input.ctypes.data, rows, blocks * 32)
+            np.testing.assert_array_equal(actual.view("u4"), expected.view("u4"))
+            np.testing.assert_array_equal(second_actual.view("u4"), second_expected.view("u4"))
 
     def test_mixed_packed_block_shapes_and_continuation(self):
         rng = np.random.default_rng(1744)
