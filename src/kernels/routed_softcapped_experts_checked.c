@@ -99,6 +99,7 @@ struct q4_hidden_ops {
     int (*pack)(const float *, unsigned char *, size_t);
     void (*matvec)(float *, const void *, const void *, int, int);
     void (*down_q5)(float *, const void *, const void *, int, int);
+    void (*down_q5_pair)(float *, float *, const void *, const void *, const void *, int, int);
     void (*matvec_pair)(float *, float *, const void *, const void *, const void *, int, int);
     int group_rows;
     int dispatch_pairs;
@@ -110,6 +111,7 @@ static const struct q4_hidden_ops q4_hidden = {
 };
 
 void gemv_q5_0_q8_0_checked_cpu(float *, const void *, const void *, int, int);
+void gemv_q5_0_q8_0_pair_checked_cpu(float *, float *, const void *, const void *, const void *, int, int);
 static const struct q4_hidden_ops q4_hidden_and_down = {
     .pack = ck_pack_q4_input_q8_k,
     .matvec = gemv_q4_k_q8_k_avx2,
@@ -127,6 +129,7 @@ static const struct q4_hidden_ops q4_grouped_pairs = {
     .pack = ck_pack_q4_input_q8_k,
     .matvec = gemv_q4_k_q8_k_avx2,
     .down_q5 = gemv_q5_0_q8_0_checked_cpu,
+    .down_q5_pair = gemv_q5_0_q8_0_pair_checked_cpu,
     .matvec_pair = gemv_q4_k_q8_k_pair_checked_cpu,
     .group_rows = 1,
 };
@@ -135,6 +138,7 @@ static const struct q4_hidden_ops q4_pair_jobs = {
     .pack = ck_pack_q4_input_q8_k,
     .matvec = gemv_q4_k_q8_k_avx2,
     .down_q5 = gemv_q5_0_q8_0_checked_cpu,
+    .down_q5_pair = gemv_q5_0_q8_0_pair_checked_cpu,
     .matvec_pair = gemv_q4_k_q8_k_pair_checked_cpu,
     .group_rows = 1,
     .dispatch_pairs = 1,
@@ -149,14 +153,18 @@ struct routed_projection {
     const struct q4_hidden_ops *packed_q4;
 };
 
-static int finish_expert(const struct routed_projection *p, size_t slot, float *scratch, float *output)
+static unsigned char *expert_packed_activation(const struct routed_projection *p, float *scratch)
 {
-    const unsigned char *down = p->down + slot * p->down_expert_bytes;
-    float *gate_values = scratch, *up_values = gate_values + p->inner, *activation = up_values + p->inner;
-    unsigned char *packed_activation = p->quantize ? (unsigned char *)(activation + p->inner) + p->gate_row : NULL;
+    unsigned char *after_activation = (unsigned char *)(scratch + 3 * p->inner);
     if (p->packed_q4 && p->packed_q4->down_q5)
-        packed_activation = (unsigned char *)(activation + p->inner) + p->width / QK_K * sizeof(block_q8_K);
+        return after_activation + p->width / QK_K * sizeof(block_q8_K);
+    return p->quantize ? after_activation + p->gate_row : NULL;
+}
 
+static int prepare_expert_activation(const struct routed_projection *p, float *scratch,
+                                     unsigned char *packed_activation)
+{
+    float *gate_values = scratch, *up_values = gate_values + p->inner, *activation = up_values + p->inner;
     if (p->reference) {
         for (size_t i = 0; i < p->inner; ++i) {
             const float g = gate_values[i], u = up_values[i];
@@ -169,7 +177,15 @@ static int finish_expert(const struct routed_projection *p, size_t slot, float *
         }
     } else if (softcapped_swiglu_rows_checked_f32(gate_values, p->inner, up_values, p->inner,
                    activation, p->inner, p->inner, p->gate_cap, p->up_cap)) return -3;
-    if (packed_activation && ck_pack_q8_activation_rne(activation, packed_activation, p->inner)) return -3;
+    return packed_activation ? ck_pack_q8_activation_rne(activation, packed_activation, p->inner) : 0;
+}
+
+static int finish_expert(const struct routed_projection *p, size_t slot, float *scratch, float *output)
+{
+    const unsigned char *down = p->down + slot * p->down_expert_bytes;
+    const float *activation = scratch + 2 * p->inner;
+    unsigned char *packed_activation = expert_packed_activation(p, scratch);
+    if (prepare_expert_activation(p, scratch, packed_activation)) return -3;
     if (p->packed_q4 && p->packed_q4->down_q5 && p->down_storage == EXPERT_Q5_0) {
         p->packed_q4->down_q5(output, down, packed_activation, (int)p->width, (int)p->inner);
         if (!ck_checked_finite(output, p->width)) return -3;
@@ -214,6 +230,15 @@ static int project_expert_pair(const struct routed_projection *p, size_t slot,
     p->packed_q4->matvec_pair(work0, work1, p->gate + offset, x0, x1, (int)p->inner, (int)p->width);
     p->packed_q4->matvec_pair(work0 + p->inner, work1 + p->inner, p->up + offset,
                             x0, x1, (int)p->inner, (int)p->width);
+    if (p->packed_q4->down_q5_pair && p->down_storage == EXPERT_Q5_0) {
+        unsigned char *packed0 = expert_packed_activation(p, work0);
+        unsigned char *packed1 = expert_packed_activation(p, work1);
+        if (prepare_expert_activation(p, work0, packed0) || prepare_expert_activation(p, work1, packed1))
+            return -3;
+        p->packed_q4->down_q5_pair(out0, out1, p->down + slot * p->down_expert_bytes,
+                                       packed0, packed1, (int)p->width, (int)p->inner);
+        return ck_checked_finite(out0, p->width) && ck_checked_finite(out1, p->width) ? 0 : -3;
+    }
     if (finish_expert(p, slot, work0, out0)) return -3;
     return finish_expert(p, slot, work1, out1);
 }
