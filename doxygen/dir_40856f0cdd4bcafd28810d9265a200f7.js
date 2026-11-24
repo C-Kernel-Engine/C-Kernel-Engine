@@ -118,6 +118,7 @@ var dir_40856f0cdd4bcafd28810d9265a200f7 =
     [ "layout_kernels.c", "layout__kernels_8c.html", "layout__kernels_8c" ],
     [ "linear_rows_bf16_checked.c", "linear__rows__bf16__checked_8c.html", "linear__rows__bf16__checked_8c" ],
     [ "linear_rows_checked.c", "linear__rows__checked_8c.html", "linear__rows__checked_8c" ],
+    [ "linear_rows_packed_k_checked.c", "linear__rows__packed__k__checked_8c.html", "linear__rows__packed__k__checked_8c" ],
     [ "linear_rows_q8_0_checked.c", "linear__rows__q8__0__checked_8c.html", "linear__rows__q8__0__checked_8c" ],
     [ "log_position_scale_rows_checked.c", "log__position__scale__rows__checked_8c.html", "log__position__scale__rows__checked_8c" ],
     [ "logit_kernels.c", "logit__kernels_8c.html", "logit__kernels_8c" ],

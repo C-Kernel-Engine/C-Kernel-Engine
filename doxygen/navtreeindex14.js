@@ -1,5 +1,16 @@
 var NAVTREEINDEX14 =
 {
+"gelu__kernels__bf16_8c.html":[2,0,1,1,63],
+"gelu__kernels__bf16_8c.html#a6dc372b7ca52037556aaaa6c8aadf642":[2,0,1,1,63,1],
+"gelu__kernels__bf16_8c.html#a79b99577c3b4e080aa37e41ffa43c46f":[2,0,1,1,63,0],
+"gelu__kernels__bf16_8c.html#a9f5d586b285fab4efe8b7223748f9d00":[2,0,1,1,63,2],
+"gelu__kernels__bf16_8c_source.html":[2,0,1,1,63],
+"gelu__rows__erf__checked_8c.html":[2,0,1,1,64],
+"gelu__rows__erf__checked_8c.html#a523f06c5c29a7ef9b63be0ae2c016785":[2,0,1,1,64,0],
+"gelu__rows__erf__checked_8c_source.html":[2,0,1,1,64],
+"gelu__rows__tanh__checked_8c.html":[2,0,1,1,65],
+"gelu__rows__tanh__checked_8c.html#a755ec1f1d7fe29363dc43fb6d2ea3173":[2,0,1,1,65,0],
+"gelu__rows__tanh__checked_8c_source.html":[2,0,1,1,65],
 "gemm__batch__int8_8c.html":[2,0,1,1,66],
 "gemm__batch__int8_8c.html#a01fd96c19126075d365d10748fb254ac":[2,0,1,1,66,4],
 "gemm__batch__int8_8c.html#a1a3684c8ac558a07b0e8721c29a71403":[2,0,1,1,66,3],
@@ -238,16 +249,5 @@ var NAVTREEINDEX14 =
 "gemm__kernels__q4k__q8k_8c.html#aaded34941ab8fd3ab697bcf9699fef6e":[2,0,1,1,78,7],
 "gemm__kernels__q4k__q8k_8c.html#ab5a6ee098afcfc17f8e2da12535945aa":[2,0,1,1,78,0],
 "gemm__kernels__q4k__q8k_8c.html#ab9e702b60341c1566dff759f806faaa9":[2,0,1,1,78,18],
-"gemm__kernels__q4k__q8k_8c.html#abd2ce09c06d448b502b30fac01bc1d30":[2,0,1,1,78,9],
-"gemm__kernels__q4k__q8k_8c.html#ac01f8caf84e100f3c72919c71217010e":[2,0,1,1,78,13],
-"gemm__kernels__q4k__q8k_8c.html#ac52baba628268303f41c01413c445024":[2,0,1,1,78,6],
-"gemm__kernels__q4k__q8k_8c.html#ace727c2f0c5983d654876de95c85f10f":[2,0,1,1,78,1],
-"gemm__kernels__q4k__q8k_8c.html#ad29d5db776f07b458d83c11d252874dc":[2,0,1,1,78,2],
-"gemm__kernels__q4k__q8k_8c.html#ad7e06cf75a392131f6bd7ad0ddc86cd5":[2,0,1,1,78,3],
-"gemm__kernels__q4k__q8k_8c.html#ad7fa7d735b58b52c90cbd6160676e86f":[2,0,1,1,78,22],
-"gemm__kernels__q4k__q8k_8c.html#adfa872f261f44f596eaf4e25599b0e3c":[2,0,1,1,78,4],
-"gemm__kernels__q4k__q8k_8c.html#ae41de9e5bc98f95e12187a8f23195fca":[2,0,1,1,78,8],
-"gemm__kernels__q4k__q8k_8c.html#ae72e9986548705a72b1891fe7ffe00e5":[2,0,1,1,78,21],
-"gemm__kernels__q4k__q8k_8c.html#ae73d24e96a48e8e4b3af9e658b3360fd":[2,0,1,1,78,10],
-"gemm__kernels__q4k__q8k_8c.html#afae7b0ff0904761e59897e996ddd862f":[2,0,1,1,78,14]
+"gemm__kernels__q4k__q8k_8c.html#abd2ce09c06d448b502b30fac01bc1d30":[2,0,1,1,78,9]
 };

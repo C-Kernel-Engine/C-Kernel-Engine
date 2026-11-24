@@ -1029,13 +1029,13 @@
     </header>
     <main>
 <h1>v8 training kernel capability ledger</h1>
-<p>Generated from <code>version/v8/kernel_maps/*.json</code> by <code>version/v8/scripts/build_training_capability_ledger_v8.py</code>. Source digest: <code>262893579cb433960eca09d164ff38f184fa576c9794749dbf941e012ea85456</code>; provider maps: 557.</p>
+<p>Generated from <code>version/v8/kernel_maps/*.json</code> by <code>version/v8/scripts/build_training_capability_ledger_v8.py</code>. Source digest: <code>160d8bc3869459524cfacdb8b26ff91338b56390c4233c81f9eb20b483462248</code>; provider maps: 574.</p>
 <p>This is a <strong>map inventory, not a training PASS</strong>. A backward declaration means a backward provider is registered; it does not prove matching geometry, selection by a generated circuit, or executed PyTorch parity. BF16-tagged includes storage or arithmetic tags. Quantized forward maps do not imply quantized-base gradients or QLoRA support. Direct executed evidence: <code>NOT_MEASURED_BY_MAP_INVENTORY</code>.</p>
 <p><strong>Authoring, lowering, and execution are separate.</strong> The public <code>cke.nn</code> module list below comes from its Python source. A class existing there does not establish that v8 can lower it, select a backward provider, or certify a generated training run. Exact kernel-map operation names are not automatically equivalent to Python modules.</p>
 <table class="table"><thead><tr><th>Dtype family</th><th>Provider maps</th><th>Forward or unspecified</th><th>Declared training forward</th><th>Declared backward</th><th>Backward-named without mode</th><th>Maps with registered tests</th></tr></thead><tbody>
 <tr><td>fp32-tagged</td><td>365</td><td>322</td><td>29</td><td>43</td><td>5</td><td>326</td></tr>
 <tr><td>bf16-tagged</td><td>97</td><td>92</td><td>2</td><td>5</td><td>0</td><td>78</td></tr>
-<tr><td>quantized</td><td>71</td><td>71</td><td>0</td><td>0</td><td>0</td><td>51</td></tr>
+<tr><td>quantized</td><td>88</td><td>88</td><td>0</td><td>0</td><td>0</td><td>68</td></tr>
 <tr><td>unspecified</td><td>24</td><td>24</td><td>1</td><td>0</td><td>0</td><td>18</td></tr>
 </tbody></table>
 <h2>Python authoring modules</h2>
@@ -1332,6 +1332,7 @@
 <tr><td>fp32-tagged</td><td>yarn_rope_init</td><td>2</td><td>—</td><td>—</td></tr>
 <tr><td>quantized</td><td>attention_projection</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>quantized</td><td>embedding</td><td>4</td><td>—</td><td>—</td></tr>
+<tr><td>quantized</td><td>embedding_lookup_q4_k_checked</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>quantized</td><td>embedding_lookup_q8_0_checked</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>quantized</td><td>fused_attention_block</td><td>2</td><td>—</td><td>—</td></tr>
 <tr><td>quantized</td><td>fused_linear_bias</td><td>3</td><td>—</td><td>—</td></tr>
@@ -1343,13 +1344,17 @@
 <tr><td>quantized</td><td>gemv</td><td>13</td><td>—</td><td>—</td></tr>
 <tr><td>quantized</td><td>hyper_connection_final_mix</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>quantized</td><td>hyper_connection_mix</td><td>2</td><td>—</td><td>—</td></tr>
+<tr><td>quantized</td><td>linear_rows_q4_k_checked</td><td>1</td><td>—</td><td>—</td></tr>
+<tr><td>quantized</td><td>linear_rows_q4_k_q8_k_checked</td><td>1</td><td>—</td><td>—</td></tr>
+<tr><td>quantized</td><td>linear_rows_q6_k_checked</td><td>1</td><td>—</td><td>—</td></tr>
+<tr><td>quantized</td><td>linear_rows_q6_k_q8_k_checked</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>quantized</td><td>linear_rows_q8_0_checked</td><td>2</td><td>—</td><td>—</td></tr>
 <tr><td>quantized</td><td>moe_relu2_expert_mlp</td><td>2</td><td>—</td><td>—</td></tr>
 <tr><td>quantized</td><td>moe_swiglu_expert_mlp</td><td>9</td><td>—</td><td>—</td></tr>
 <tr><td>quantized</td><td>ple_ngram_embed</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>quantized</td><td>quantize</td><td>3</td><td>—</td><td>—</td></tr>
 <tr><td>quantized</td><td>quantize_batch</td><td>2</td><td>—</td><td>—</td></tr>
-<tr><td>quantized</td><td>routed_softcapped_experts_checked</td><td>3</td><td>—</td><td>—</td></tr>
+<tr><td>quantized</td><td>routed_softcapped_experts_checked</td><td>15</td><td>—</td><td>—</td></tr>
 <tr><td>quantized</td><td>shared_relu2_expert_mlp</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>quantized</td><td>shared_swiglu_expert_mlp</td><td>3</td><td>—</td><td>—</td></tr>
 <tr><td>unspecified</td><td>attention</td><td>7</td><td>—</td><td>—</td></tr>
@@ -1369,7 +1374,7 @@
 <tr><td>unspecified</td><td>speculative_commit_or_reject</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>unspecified</td><td>tokenizer</td><td>1</td><td>—</td><td>—</td></tr>
 </tbody></table>
-<details><summary>All 557 provider maps</summary>
+<details><summary>All 574 provider maps</summary>
 <table class="table"><thead><tr><th>Map</th><th>Provider ID</th><th>Operation</th><th>Dtype family</th><th>Backward mode</th><th>Registered test</th></tr></thead><tbody>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/adamw_update_f32.json">version/v8/kernel_maps/adamw_update_f32.json</a></td><td>adamw_update_f32</td><td>optimizer</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/add_rows_backward_train_f32.json">version/v8/kernel_maps/add_rows_backward_train_f32.json</a></td><td>add_rows_backward_train_f32</td><td>add_rows_backward_train_f32</td><td>fp32-tagged</td><td>declared</td><td>registered</td></tr>
@@ -1556,6 +1561,7 @@
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/embedding_forward_q5_0.json">version/v8/kernel_maps/embedding_forward_q5_0.json</a></td><td>embedding_forward_q5_0</td><td>embedding</td><td>quantized</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/embedding_forward_q6_k.json">version/v8/kernel_maps/embedding_forward_q6_k.json</a></td><td>embedding_forward_q6_k</td><td>embedding</td><td>quantized</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/embedding_forward_q8_0.json">version/v8/kernel_maps/embedding_forward_q8_0.json</a></td><td>embedding_forward_q8_0</td><td>embedding</td><td>quantized</td><td>not declared</td><td>registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/embedding_lookup_q4_k_checked_f32.json">version/v8/kernel_maps/embedding_lookup_q4_k_checked_f32.json</a></td><td>embedding_lookup_q4_k_checked_f32</td><td>embedding_lookup_q4_k_checked</td><td>quantized</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/embedding_lookup_q8_0_checked_f32.json">version/v8/kernel_maps/embedding_lookup_q8_0_checked_f32.json</a></td><td>embedding_lookup_q8_0_checked_f32</td><td>embedding_lookup_q8_0_checked</td><td>quantized</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/embedding_three_table_layer_norm_f32.json">version/v8/kernel_maps/embedding_three_table_layer_norm_f32.json</a></td><td>embedding_three_table_layer_norm_f32</td><td>embedding_three_table_layer_norm</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/equal_i32_scalar_checked.json">version/v8/kernel_maps/equal_i32_scalar_checked.json</a></td><td>equal_i32_scalar_checked</td><td>equal_i32_scalar_checked</td><td>unspecified</td><td>not declared</td><td>registered</td></tr>
@@ -1706,6 +1712,10 @@
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/linear_rows_bf16_checked.json">version/v8/kernel_maps/linear_rows_bf16_checked.json</a></td><td>linear_rows_bf16_checked</td><td>linear_rows_bf16_checked</td><td>bf16-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/linear_rows_checked_f32.json">version/v8/kernel_maps/linear_rows_checked_f32.json</a></td><td>linear_rows_checked_f32</td><td>linear_rows_checked</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/linear_rows_checked_no_bias_f32.json">version/v8/kernel_maps/linear_rows_checked_no_bias_f32.json</a></td><td>linear_rows_checked_no_bias_f32</td><td>linear_rows_checked_no_bias</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/linear_rows_q4_k_checked_f32.json">version/v8/kernel_maps/linear_rows_q4_k_checked_f32.json</a></td><td>linear_rows_q4_k_checked_f32</td><td>linear_rows_q4_k_checked</td><td>quantized</td><td>not declared</td><td>registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/linear_rows_q4_k_q8_k_checked_f32.json">version/v8/kernel_maps/linear_rows_q4_k_q8_k_checked_f32.json</a></td><td>linear_rows_q4_k_q8_k_checked_f32</td><td>linear_rows_q4_k_q8_k_checked</td><td>quantized</td><td>not declared</td><td>registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/linear_rows_q6_k_checked_f32.json">version/v8/kernel_maps/linear_rows_q6_k_checked_f32.json</a></td><td>linear_rows_q6_k_checked_f32</td><td>linear_rows_q6_k_checked</td><td>quantized</td><td>not declared</td><td>registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/linear_rows_q6_k_q8_k_checked_f32.json">version/v8/kernel_maps/linear_rows_q6_k_q8_k_checked_f32.json</a></td><td>linear_rows_q6_k_q8_k_checked_f32</td><td>linear_rows_q6_k_q8_k_checked</td><td>quantized</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/linear_rows_q8_0_checked_f32.json">version/v8/kernel_maps/linear_rows_q8_0_checked_f32.json</a></td><td>linear_rows_q8_0_checked_f32</td><td>linear_rows_q8_0_checked</td><td>quantized</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/linear_rows_q8_0_checked_q8_activation.json">version/v8/kernel_maps/linear_rows_q8_0_checked_q8_activation.json</a></td><td>linear_rows_q8_0_checked_q8_activation</td><td>linear_rows_q8_0_checked</td><td>quantized</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/log_position_scale_rows_checked_f32.json">version/v8/kernel_maps/log_position_scale_rows_checked_f32.json</a></td><td>log_position_scale_rows_checked_f32</td><td>log_position_scale_rows_checked</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
@@ -1866,6 +1876,18 @@
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/rope_qk_split_bounded_f32.json">version/v8/kernel_maps/rope_qk_split_bounded_f32.json</a></td><td>rope_qk_split_bounded_f32</td><td>rope_qk_bounded</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/routed_softcapped_experts_checked_f32.json">version/v8/kernel_maps/routed_softcapped_experts_checked_f32.json</a></td><td>routed_softcapped_experts_checked_f32</td><td>routed_softcapped_experts_checked</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/routed_softcapped_experts_checked_iq4_nl.json">version/v8/kernel_maps/routed_softcapped_experts_checked_iq4_nl.json</a></td><td>routed_softcapped_experts_checked_iq4_nl</td><td>routed_softcapped_experts_checked</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/routed_softcapped_experts_checked_q4_k_q5_0.json">version/v8/kernel_maps/routed_softcapped_experts_checked_q4_k_q5_0.json</a></td><td>routed_softcapped_experts_checked_q4_k_q5_0</td><td>routed_softcapped_experts_checked</td><td>quantized</td><td>not declared</td><td>registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/routed_softcapped_experts_checked_q4_k_q5_0_grouped.json">version/v8/kernel_maps/routed_softcapped_experts_checked_q4_k_q5_0_grouped.json</a></td><td>routed_softcapped_experts_checked_q4_k_q5_0_grouped</td><td>routed_softcapped_experts_checked</td><td>quantized</td><td>not declared</td><td>registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/routed_softcapped_experts_checked_q4_k_q5_0_grouped_pair.json">version/v8/kernel_maps/routed_softcapped_experts_checked_q4_k_q5_0_grouped_pair.json</a></td><td>routed_softcapped_experts_checked_q4_k_q5_0_grouped_pair</td><td>routed_softcapped_experts_checked</td><td>quantized</td><td>not declared</td><td>registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/routed_softcapped_experts_checked_q4_k_q5_0_pair_jobs.json">version/v8/kernel_maps/routed_softcapped_experts_checked_q4_k_q5_0_pair_jobs.json</a></td><td>routed_softcapped_experts_checked_q4_k_q5_0_pair_jobs</td><td>routed_softcapped_experts_checked</td><td>quantized</td><td>not declared</td><td>registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/routed_softcapped_experts_checked_q4_k_q5_0_q8_k_hidden.json">version/v8/kernel_maps/routed_softcapped_experts_checked_q4_k_q5_0_q8_k_hidden.json</a></td><td>routed_softcapped_experts_checked_q4_k_q5_0_q8_k_hidden</td><td>routed_softcapped_experts_checked</td><td>quantized</td><td>not declared</td><td>registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/routed_softcapped_experts_checked_q4_k_q5_0_q8_k_hidden_q8_0_down.json">version/v8/kernel_maps/routed_softcapped_experts_checked_q4_k_q5_0_q8_k_hidden_q8_0_down.json</a></td><td>routed_softcapped_experts_checked_q4_k_q5_0_q8_k_hidden_q8_0_down</td><td>routed_softcapped_experts_checked</td><td>quantized</td><td>not declared</td><td>registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/routed_softcapped_experts_checked_q4_k_q8_0.json">version/v8/kernel_maps/routed_softcapped_experts_checked_q4_k_q8_0.json</a></td><td>routed_softcapped_experts_checked_q4_k_q8_0</td><td>routed_softcapped_experts_checked</td><td>quantized</td><td>not declared</td><td>registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/routed_softcapped_experts_checked_q4_k_q8_0_grouped.json">version/v8/kernel_maps/routed_softcapped_experts_checked_q4_k_q8_0_grouped.json</a></td><td>routed_softcapped_experts_checked_q4_k_q8_0_grouped</td><td>routed_softcapped_experts_checked</td><td>quantized</td><td>not declared</td><td>registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/routed_softcapped_experts_checked_q4_k_q8_0_grouped_pair.json">version/v8/kernel_maps/routed_softcapped_experts_checked_q4_k_q8_0_grouped_pair.json</a></td><td>routed_softcapped_experts_checked_q4_k_q8_0_grouped_pair</td><td>routed_softcapped_experts_checked</td><td>quantized</td><td>not declared</td><td>registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/routed_softcapped_experts_checked_q4_k_q8_0_pair_jobs.json">version/v8/kernel_maps/routed_softcapped_experts_checked_q4_k_q8_0_pair_jobs.json</a></td><td>routed_softcapped_experts_checked_q4_k_q8_0_pair_jobs</td><td>routed_softcapped_experts_checked</td><td>quantized</td><td>not declared</td><td>registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/routed_softcapped_experts_checked_q4_k_q8_0_q8_k_hidden.json">version/v8/kernel_maps/routed_softcapped_experts_checked_q4_k_q8_0_q8_k_hidden.json</a></td><td>routed_softcapped_experts_checked_q4_k_q8_0_q8_k_hidden</td><td>routed_softcapped_experts_checked</td><td>quantized</td><td>not declared</td><td>registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/routed_softcapped_experts_checked_q4_k_q8_0_q8_k_hidden_q8_0_down.json">version/v8/kernel_maps/routed_softcapped_experts_checked_q4_k_q8_0_q8_k_hidden_q8_0_down.json</a></td><td>routed_softcapped_experts_checked_q4_k_q8_0_q8_k_hidden_q8_0_down</td><td>routed_softcapped_experts_checked</td><td>quantized</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/routed_softcapped_experts_checked_q8_0.json">version/v8/kernel_maps/routed_softcapped_experts_checked_q8_0.json</a></td><td>routed_softcapped_experts_checked_q8_0</td><td>routed_softcapped_experts_checked</td><td>quantized</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/routed_softcapped_experts_checked_q8_0_q8_activation.json">version/v8/kernel_maps/routed_softcapped_experts_checked_q8_0_q8_activation.json</a></td><td>routed_softcapped_experts_checked_q8_0_q8_activation</td><td>routed_softcapped_experts_checked</td><td>quantized</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/routed_softcapped_experts_checked_q8_0_q8_activation_scaled_situ.json">version/v8/kernel_maps/routed_softcapped_experts_checked_q8_0_q8_activation_scaled_situ.json</a></td><td>routed_softcapped_experts_checked_q8_0_q8_activation_scaled_situ</td><td>routed_softcapped_experts_checked</td><td>quantized</td><td>not declared</td><td>registered</td></tr>
@@ -2179,7 +2201,7 @@
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-11-23</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-11-24</p>
             </div>
         </div>
     </footer>

@@ -3,6 +3,8 @@ var dir_d44c64559bbebec7f509842c48db8b23 =
     [ "data_structures", "dir_ebed218ca042e0cae3861bf18b14f766.html", "dir_ebed218ca042e0cae3861bf18b14f766" ],
     [ "tokenizer", "dir_018f648cfdb036060b96c3c119d2a3f6.html", "dir_018f648cfdb036060b96c3c119d2a3f6" ],
     [ "bf16_utils.h", "bf16__utils_8h.html", "bf16__utils_8h" ],
+    [ "checked_parallel.h", "checked__parallel_8h.html", "checked__parallel_8h" ],
+    [ "checked_q4_k_activation.h", "checked__q4__k__activation_8h.html", "checked__q4__k__activation_8h" ],
     [ "ck_decoder_features.h", "ck__decoder__features_8h.html", "ck__decoder__features_8h" ],
     [ "ck_features.h", "ck__features_8h.html", "ck__features_8h" ],
     [ "ck_metrics.h", "ck__metrics_8h.html", "ck__metrics_8h" ],
@@ -70,6 +72,7 @@ var dir_d44c64559bbebec7f509842c48db8b23 =
     [ "cpu_features.h", "cpu__features_8h.html", "cpu__features_8h" ],
     [ "fused_kernels.h", "fused__kernels_8h.html", "fused__kernels_8h" ],
     [ "mega_fused_attention.h", "mega__fused__attention_8h.html", "mega__fused__attention_8h" ],
+    [ "packed_k_dot_ordered.h", "packed__k__dot__ordered_8h.html", "packed__k__dot__ordered_8h" ],
     [ "packed_q8_activation_checked.h", "packed__q8__activation__checked_8h.html", "packed__q8__activation__checked_8h" ],
     [ "packed_q8_dot_ordered.h", "packed__q8__dot__ordered_8h.html", "packed__q8__dot__ordered_8h" ],
     [ "system_topology.h", "system__topology_8h.html", "system__topology_8h" ]

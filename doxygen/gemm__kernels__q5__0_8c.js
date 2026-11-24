@@ -1,5 +1,7 @@
 var gemm__kernels__q5__0_8c =
 [
+    [ "CK_Q5_TARGET_AVX", "gemm__kernels__q5__0_8c.html#a1b32b83c87d583521732e54995bbc343", null ],
+    [ "CK_Q5_TARGET_AVX2", "gemm__kernels__q5__0_8c.html#ad8f7d8cf1a8e9eba1b43c5e822e7ebf8", null ],
     [ "ck_q5_0_q8_0_force_ref", "gemm__kernels__q5__0_8c.html#a59efd99d9223b8153b44b2a8962a4283", null ],
     [ "ck_q5_0_q8_0_provider_name", "gemm__kernels__q5__0_8c.html#a5b9c85c0df8d866b02260c12b180f453", null ],
     [ "dequant_q5_0_block", "gemm__kernels__q5__0_8c.html#a22c4a007b8fe9fe8a1a9e4c3f4c3e04a", null ],
@@ -21,6 +23,7 @@ var gemm__kernels__q5__0_8c =
     [ "gemv_q5_0_parallel", "gemm__kernels__q5__0_8c.html#abda2acfb31d844af99447ee60dbe5c2a", null ],
     [ "gemv_q5_0_parallel_simd", "gemm__kernels__q5__0_8c.html#ae8f7ef45b1d165688f611a3d5549c61d", null ],
     [ "gemv_q5_0_q8_0", "gemm__kernels__q5__0_8c.html#a4fb9cf343ac07a0868c55f25bd201ca3", null ],
+    [ "gemv_q5_0_q8_0_checked_cpu", "gemm__kernels__q5__0_8c.html#aee47f9f121aea7c4dfc09cd0f3d24c26", null ],
     [ "gemv_q5_0_q8_0_parallel_simd", "gemm__kernels__q5__0_8c.html#ad110eca9145b24f8d6936a3d17d7d42e", null ],
     [ "gemv_q5_0_ref", "gemm__kernels__q5__0_8c.html#a4c1add4b1c01915769b02ded8605c55c", null ],
     [ "vec_dot_q5_0_q8_0", "gemm__kernels__q5__0_8c.html#a8744a3b1e4d1dc928fce050f111414a6", null ],

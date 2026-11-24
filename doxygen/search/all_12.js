@@ -1,6 +1,6 @@
 var searchData=
 [
-  ['offset_0',['offset',['../structQWEN2__0__5B__DECODECanary.html#aef48257f4afe7c0a5e13668d907fcc89',1,'QWEN2_0_5B_DECODECanary']]],
+  ['offset_0',['offset',['../structck__checked__range.html#a07f9a54215b528595f58cc67ac5ce4db',1,'ck_checked_range::offset'],['../structQWEN2__0__5B__DECODECanary.html#aef48257f4afe7c0a5e13668d907fcc89',1,'QWEN2_0_5B_DECODECanary::offset']]],
   ['offset_5fbytes_1',['offset_bytes',['../structCKMemSpan.html#af281883bfadbea82697819bbf12aa759',1,'CKMemSpan']]],
   ['offsets_2',['offsets',['../true__bpe_8h.html#ab366d3078c02b7305089770c9de837b9',1,'true_bpe.h']]],
   ['omp_5fnum_5fthreads_3',['omp_num_threads',['../structAffinityInfo.html#a335a14b8b3b93f722ef8e2b6455122f5',1,'AffinityInfo']]],

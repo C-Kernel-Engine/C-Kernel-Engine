@@ -2078,6 +2078,44 @@ git diff --exit-code -- version/v8/kernel_maps/KERNEL_REGISTRY.json   <span clas
   below test selected expert-layer computation. Complete native conversion
   and generation remain unavailable for all three files.</p>
 
+  <h3 id="inkling2-mini-q4km-block">Inkling 2 Mini Q4_K_M mixed decoder blocks</h3>
+  <p>The bounded decoder probe reads the stored type of each projection from
+  the pinned GGUF tensor directory. It keeps Q4_K and Q6_K attention weights
+  packed and selects the expert provider for Q4_K gate/up with Q5_0 or Q8_0 down.
+  Projections currently use FP32 inputs and ordered FP64 accumulation.</p>
+  <p>The asset-free regression uses both down formats and checks generated
+  provider selection, prefill/append outputs, KV, and convolution history.
+  The real-weight probe replays physical layers 0 and 6. Layer 6 receives the
+  captured layer-5 output and the original depth-bank row for each position.
+  It reports full-block error against the pinned llama.cpp capture under that
+  runtime's arithmetic.</p>
+  <p>The generated token replay also accepts the pinned Q4_K_M file. It
+  selects storage per tensor, including the Q4_K token embedding and Q6_K
+  output projection, and invokes the same prefill and append entries used by
+  the Q8_0 lane. The mixed path uses ordered FP64 accumulation. On x86,
+  AVX2 and F16C accelerate Q4_K unpacking and products while preserving
+  the accumulation order. Independent expert work uses the CKE worker pool.</p>
+  <p>For the opt-in packed activation experiments, pass
+  <code>--q8-k-expert-hidden</code> to select Q8_K inputs to routed Q4_K gate
+  and up projections, or <code>--q8-k-linear-input</code> to select Q8_K inputs
+  to dense Q4_K projections. Combine <code>--q8-0-expert-down</code> with
+  <code>--q8-k-expert-hidden</code> to pack down-projection inputs as Q8_0.
+  The compiler plans checked scratch for the selected providers. These flags
+  change the activation arithmetic.</p>
+  <p><code>--q8-k-q6-input</code> selects packed Q8_K inputs for Q6_K
+  projections, including the output head. <code>--group-experts</code>
+  groups prefill rows by expert. With <code>--pair-expert-rows</code> two
+  routed rows can share the Q4_K weight unpacking.
+  <code>--dispatch-expert-pairs</code> lets workers take independent row
+  pairs from a shared queue. The grouped providers mix results in each
+  token's original expert order.</p>
+  <pre class="mb-code"><code>python3 version/v8/scripts/replay_inkling2_text_loop_v8.py \
+  --gguf /path/to/Inkling-2-Mini-Q4_K_M.gguf --weight-format q4_k_m \
+  --config /path/to/config.json --tokens-file /path/to/prompt.ids \
+  --append-tokens-file /path/to/continuation.ids --context-capacity 64 \
+  --chunk-tokens 4 --circular-sliding --last-prefill-logit \
+  --output /path/to/new-q4km-replay</code></pre>
+
   <h3 id="inkling2-mini-layer6">Inkling 2 Mini layer 6 projection replay</h3>
   <p>The generated checked graphs replay layer 6 Q, K, V, relative-logit and sink
   projections, plus the query controller's forget and gain projections and tanh.
@@ -3152,7 +3190,7 @@ prefill 32 tok 49.2 ms | decode 1 tok 24.4 ms</code></pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-11-23</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-11-24</p>
             </div>
         </div>
     </footer>
