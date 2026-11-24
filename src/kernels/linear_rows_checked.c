@@ -194,18 +194,21 @@ struct projection_tiles {
     const float *input, *weight, *bias;
     float *output;
     size_t input_stride, weight_stride, output_stride, rows, width, channels;
+    size_t row_tile, channel_tiles;
 };
 
 static void compute_projection_tiles(size_t begin, size_t end, void *opaque)
 {
     const struct projection_tiles *p = opaque;
     for (size_t tile = begin; tile < end; ++tile) {
-        const size_t first = tile * projection_tile_channels;
-        const size_t remaining = p->channels - first;
-        const size_t count = remaining < projection_tile_channels ? remaining : projection_tile_channels;
-        compute_independent_lanes(p->input, p->input_stride, p->weight + first * p->weight_stride,
-            p->weight_stride, p->bias ? p->bias + first : NULL, p->output + first,
-            p->output_stride, p->rows, p->width, count);
+        const size_t row = tile / p->channel_tiles * p->row_tile;
+        const size_t first = tile % p->channel_tiles * projection_tile_channels;
+        const size_t channels_left = p->channels - first, rows_left = p->rows - row;
+        const size_t channels = channels_left < projection_tile_channels ? channels_left : projection_tile_channels;
+        const size_t rows = rows_left < p->row_tile ? rows_left : p->row_tile;
+        compute_independent_lanes(p->input + row * p->input_stride, p->input_stride,
+            p->weight + first * p->weight_stride, p->weight_stride, p->bias ? p->bias + first : NULL,
+            p->output + row * p->output_stride + first, p->output_stride, rows, p->width, channels);
     }
 }
 #endif
@@ -281,17 +284,19 @@ int linear_rows_checked_f32(
             disjoint(output, output_elements, weight, weight_elements) &&
             disjoint(output, output_elements, bias, bias_elements)) {
 #if defined(__ELF__)
-            if (rows >= 16 && input_channels >= 16 && output_channels >= 128 &&
+            const int narrow = output_channels < 128 && output_channels >= 16 && input_channels >= 256;
+            if (rows >= 16 && input_channels >= 16 && (output_channels >= 128 || narrow) &&
                 ck_get_num_threads && ck_threadpool_global && ck_threadpool_in_dispatch &&
                 ck_threadpool_n_threads && ck_threadpool_parallel_for_n) {
                 struct projection_tiles work = {
                     .input = input, .weight = weight, .bias = bias, .output = output,
                     .input_stride = input_stride, .weight_stride = weight_stride,
                     .output_stride = output_stride, .rows = rows, .width = input_channels,
-                    .channels = output_channels,
+                    .channels = output_channels, .row_tile = narrow ? 4 : rows,
+                    .channel_tiles = (output_channels - 1) / projection_tile_channels + 1,
                 };
-                ck_checked_parallel_for((output_channels - 1) / projection_tile_channels + 1,
-                                        1, compute_projection_tiles, &work);
+                const size_t row_tiles = (rows - 1) / work.row_tile + 1;
+                ck_checked_parallel_for(row_tiles * work.channel_tiles, 1, compute_projection_tiles, &work);
                 return 0;
             }
 #endif
