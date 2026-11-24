@@ -1163,10 +1163,25 @@ void vec_dot_q5_0_q8_0_avx512(int n, float *s, const void *vx, const void *vy)
 #endif
 
 #if defined(__AVX2__) || defined(CK_Q5_RUNTIME_AVX2)
-CK_Q5_TARGET_AVX static inline __m256i bytes_from_bits_32_avx(const uint8_t *qh);
-CK_Q5_TARGET_AVX static inline __m256i bytes_from_nibbles_32_avx(const uint8_t *qs);
-CK_Q5_TARGET_AVX static inline __m256 mul_sum_i8_pairs_float_avx(const __m256i x, const __m256i y);
 CK_Q5_TARGET_AVX static inline float hsum_float_8_avx(const __m256 x);
+
+CK_Q5_TARGET_AVX2
+static inline __m256i unpack_q5_0_avx2(const block_q5_0 *block)
+{
+    uint32_t high_bits;
+    memcpy(&high_bits, block->qh, sizeof(high_bits));
+    const __m256i byte_index = _mm256_set_epi64x(
+        0x0303030303030303LL, 0x0202020202020202LL,
+        0x0101010101010101LL, 0x0000000000000000LL);
+    const __m256i bit_test = _mm256_set1_epi64x(0x7fbfdfeff7fbfdfeLL);
+    const __m256i bit_bytes = _mm256_shuffle_epi8(_mm256_set1_epi32((int)high_bits), byte_index);
+    const __m256i high_set = _mm256_cmpeq_epi8(_mm256_or_si256(bit_bytes, bit_test),
+                                              _mm256_set1_epi8(-1));
+    const __m128i packed = _mm_loadu_si128((const __m128i *)block->qs);
+    const __m256i nibbles = _mm256_set_m128i(_mm_srli_epi16(packed, 4), packed);
+    return _mm256_or_si256(_mm256_and_si256(nibbles, _mm256_set1_epi8(0x0f)),
+                           _mm256_andnot_si256(high_set, _mm256_set1_epi8((char)0xf0)));
+}
 
 /**
  * @brief Quantized dot product Q5_0 x Q8_0 (AVX2/FMA)
@@ -1188,20 +1203,17 @@ void vec_dot_q5_0_q8_0_avx2(int n, float *s, const void *vx, const void *vy)
 
     for (int ib = 0; ib < nb; ++ib) {
 #if defined(CK_Q5_RUNTIME_AVX2)
-        const __m128 scales = _mm_cvtph_ps(_mm_setr_epi16(x[ib].d, y[ib].d, 0, 0, 0, 0, 0, 0));
-        const __m256 d = _mm256_set1_ps(_mm_cvtss_f32(scales) *
-            _mm_cvtss_f32(_mm_shuffle_ps(scales, scales, _MM_SHUFFLE(1, 1, 1, 1))));
+        const __m256 d = _mm256_set1_ps(_cvtsh_ss(x[ib].d) * _cvtsh_ss(y[ib].d));
 #else
         const __m256 d = _mm256_set1_ps(CK_FP16_TO_FP32(x[ib].d) * CK_FP16_TO_FP32(y[ib].d));
 #endif
 
-        __m256i qx = bytes_from_nibbles_32_avx(x[ib].qs);
-        __m256i bxhi = bytes_from_bits_32_avx(x[ib].qh);
-        bxhi = _mm256_andnot_si256(bxhi, _mm256_set1_epi8((char)0xF0));
-        qx = _mm256_or_si256(qx, bxhi);
-
-        const __m256i qy = _mm256_loadu_si256((const __m256i *)y[ib].qs);
-        const __m256 q = mul_sum_i8_pairs_float_avx(qx, qy);
+        const __m256i q5 = unpack_q5_0_avx2(x + ib);
+        const __m256i q8 = _mm256_loadu_si256((const __m256i *)y[ib].qs);
+        const __m256i products = _mm256_maddubs_epi16(
+            _mm256_abs_epi8(q5), _mm256_sign_epi8(q8, q5));
+        const __m256 q = _mm256_cvtepi32_ps(
+            _mm256_madd_epi16(products, _mm256_set1_epi16(1)));
 #if defined(__FMA__) || defined(CK_Q5_RUNTIME_AVX2)
         acc = _mm256_fmadd_ps(d, q, acc);
 #else
@@ -1336,6 +1348,7 @@ void vec_dot_q5_0_q8_0_sse(int n, float *s, const void *vx, const void *vy)
 
 #if defined(__AVX__) || defined(CK_Q5_RUNTIME_AVX2)
 
+#if defined(__AVX__)
 /* Combine two __m128i into __m256i (AVX without AVX2) */
 #define MM256_SET_M128I(hi, lo) _mm256_insertf128_si256(_mm256_castsi128_si256(lo), (hi), 1)
 
@@ -1413,6 +1426,8 @@ CK_Q5_TARGET_AVX static inline __m256 mul_sum_i8_pairs_float_avx(const __m256i x
 /**
  * @brief Horizontal sum of 8 floats (AVX)
  */
+#endif
+
 CK_Q5_TARGET_AVX static inline float hsum_float_8_avx(const __m256 x)
 {
     __m128 res = _mm256_extractf128_ps(x, 1);
