@@ -61,6 +61,7 @@ var dir_40856f0cdd4bcafd28810d9265a200f7 =
     [ "expand_group_row_indices_checked.c", "expand__group__row__indices__checked_8c.html", "expand__group__row__indices__checked_8c" ],
     [ "feature_concat_broadcast_rows.c", "feature__concat__broadcast__rows_8c.html", "feature__concat__broadcast__rows_8c" ],
     [ "fp16_convert.c", "fp16__convert_8c.html", "fp16__convert_8c" ],
+    [ "gather_rows_bf16_checked.c", "gather__rows__bf16__checked_8c.html", "gather__rows__bf16__checked_8c" ],
     [ "geglu_kernels.c", "geglu__kernels_8c.html", "geglu__kernels_8c" ],
     [ "gelu_kernels.c", "gelu__kernels_8c.html", "gelu__kernels_8c" ],
     [ "gelu_kernels_bf16.c", "gelu__kernels__bf16_8c.html", "gelu__kernels__bf16_8c" ],

@@ -130,19 +130,23 @@ $(function(){initNavTree('attention__ranges__checked_8c.html','',''); });
 <code>#include &lt;math.h&gt;</code><br />
 <code>#include &lt;stddef.h&gt;</code><br />
 <code>#include &lt;stdint.h&gt;</code><br />
+<code>#include &quot;<a class="el" href="bf16__utils_8h_source.html">bf16_utils.h</a>&quot;</code><br />
 </div>
 <p><a href="attention__ranges__checked_8c_source.html">Go to the source code of this file.</a></p>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-func-members" class="groupheader"><a id="func-members" name="func-members"></a>
 Functions</h2></td></tr>
-<tr class="memitem:acbb3615bf1ea658e9958eec34a500f9e" id="r_acbb3615bf1ea658e9958eec34a500f9e"><td class="memItemLeft" align="right" valign="top">static double&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#acbb3615bf1ea658e9958eec34a500f9e">attention_dot</a> (const float *q, const float *k, size_t width)</td></tr>
+<tr class="memitem:af265f627e095668f28f83547050887ca" id="r_af265f627e095668f28f83547050887ca"><td class="memItemLeft" align="right" valign="top">static double&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#af265f627e095668f28f83547050887ca">attention_dot</a> (const void *q, const void *k, size_t q_offset, size_t k_offset, size_t width, int bf16)</td></tr>
+<tr class="memitem:a32a8497eb68a6b518f598eb9abdcb723" id="r_a32a8497eb68a6b518f598eb9abdcb723"><td class="memItemLeft" align="right" valign="top">static int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a32a8497eb68a6b518f598eb9abdcb723">attention_ranges_checked</a> (const void *query, size_t query_elements, const void *key, size_t key_elements, const void *value, size_t value_elements, const int32_t *ranges, size_t range_elements, void *output, size_t output_elements, float *scratch, size_t scratch_elements, size_t query_tokens, size_t memory_tokens, size_t heads, size_t kv_heads, size_t head_dim, float scale, int bf16)</td></tr>
+<tr class="memitem:a6093d1c4f57f29e5aa07ba35eae38c32" id="r_a6093d1c4f57f29e5aa07ba35eae38c32"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a6093d1c4f57f29e5aa07ba35eae38c32">ck_attention_ranges_checked_bf16</a> (const uint16_t *query, size_t query_elements, const uint16_t *key, size_t key_elements, const uint16_t *value, size_t value_elements, const int32_t *ranges, size_t range_elements, uint16_t *output, size_t output_elements, float *scratch, size_t scratch_elements, size_t query_tokens, size_t memory_tokens, size_t heads, size_t kv_heads, size_t head_dim, float scale)</td></tr>
 <tr class="memitem:a0f4ca4e6a1b4dbbfde85deb9da5dff2a" id="r_a0f4ca4e6a1b4dbbfde85deb9da5dff2a"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a0f4ca4e6a1b4dbbfde85deb9da5dff2a">ck_attention_ranges_checked_f32</a> (const float *query, size_t query_elements, const float *key, size_t key_elements, const float *value, size_t value_elements, const int32_t *ranges, size_t range_elements, float *output, size_t output_elements, float *scratch, size_t scratch_elements, size_t query_tokens, size_t memory_tokens, size_t heads, size_t kv_heads, size_t head_dim, float scale)</td></tr>
+<tr class="memitem:aa031ba3083f4f9fc437b6665050e62e3" id="r_aa031ba3083f4f9fc437b6665050e62e3"><td class="memItemLeft" align="right" valign="top">static float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#aa031ba3083f4f9fc437b6665050e62e3">read_element</a> (const void *buffer, size_t index, int bf16)</td></tr>
 <tr class="memitem:aa754cec1155df070fe8c56b837c0c5ec" id="r_aa754cec1155df070fe8c56b837c0c5ec"><td class="memItemLeft" align="right" valign="top">static int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#aa754cec1155df070fe8c56b837c0c5ec">region_valid</a> (const void *ptr, size_t <a class="el" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a>, size_t width)</td></tr>
 <tr class="memitem:a69d0b26f9824627188b7e836c870ac5f" id="r_a69d0b26f9824627188b7e836c870ac5f"><td class="memItemLeft" align="right" valign="top">static int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a69d0b26f9824627188b7e836c870ac5f">regions_overlap</a> (const void *a, size_t a_bytes, const void *b, size_t b_bytes)</td></tr>
 </table>
 <a name="doc-func-members" id="doc-func-members"></a><h2 id="header-doc-func-members" class="groupheader">Function Documentation</h2>
-<a id="acbb3615bf1ea658e9958eec34a500f9e" name="acbb3615bf1ea658e9958eec34a500f9e"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#acbb3615bf1ea658e9958eec34a500f9e">&#9670;&#160;</a></span>attention_dot()</h2>
+<a id="af265f627e095668f28f83547050887ca" name="af265f627e095668f28f83547050887ca"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#af265f627e095668f28f83547050887ca">&#9670;&#160;</a></span>attention_dot()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -153,17 +157,32 @@ Functions</h2></td></tr>
         <tr>
           <td class="memname">double attention_dot </td>
           <td>(</td>
-          <td class="paramtype">const float *</td>          <td class="paramname"><span class="paramname"><em>q</em></span>, </td>
+          <td class="paramtype">const void *</td>          <td class="paramname"><span class="paramname"><em>q</em></span>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">const float *</td>          <td class="paramname"><span class="paramname"><em>k</em></span>, </td>
+          <td class="paramtype">const void *</td>          <td class="paramname"><span class="paramname"><em>k</em></span>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>width</em></span>&#160;)</td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>q_offset</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>k_offset</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>width</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int</td>          <td class="paramname"><span class="paramname"><em>bf16</em></span>&#160;)</td>
         </tr>
       </table>
   </td>
@@ -173,20 +192,356 @@ Functions</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="attention__ranges__checked_8c_source.html#l00018">18</a> of file <a class="el" href="attention__ranges__checked_8c_source.html">attention_ranges_checked.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   19</span>{</div>
-<div class="line"><span class="lineno">   20</span>    <span class="keywordtype">double</span> sum = 0.0;</div>
-<div class="line"><span class="lineno">   21</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; width; ++i) {</div>
-<div class="line"><span class="lineno">   22</span>        <span class="keyword">volatile</span> <span class="keywordtype">double</span> <a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a> = (double)q[i] * k[i];</div>
-<div class="line"><span class="lineno">   23</span>        sum += <a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a>;</div>
-<div class="line"><span class="lineno">   24</span>    }</div>
-<div class="line"><span class="lineno">   25</span>    <span class="keywordflow">return</span> sum;</div>
-<div class="line"><span class="lineno">   26</span>}</div>
+<p class="definition">Definition at line <a class="el" href="attention__ranges__checked_8c_source.html#l00025">25</a> of file <a class="el" href="attention__ranges__checked_8c_source.html">attention_ranges_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   27</span>{</div>
+<div class="line"><span class="lineno">   28</span>    <span class="keywordtype">double</span> sum = 0.0;</div>
+<div class="line"><span class="lineno">   29</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; width; ++i) {</div>
+<div class="line"><span class="lineno">   30</span>        <span class="keyword">volatile</span> <span class="keywordtype">double</span> <a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a> = (double)<a class="code hl_function" href="#aa031ba3083f4f9fc437b6665050e62e3">read_element</a>(q, q_offset + i, bf16) *</div>
+<div class="line"><span class="lineno">   31</span>                                  <a class="code hl_function" href="#aa031ba3083f4f9fc437b6665050e62e3">read_element</a>(k, k_offset + i, bf16);</div>
+<div class="line"><span class="lineno">   32</span>        sum += <a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a>;</div>
+<div class="line"><span class="lineno">   33</span>    }</div>
+<div class="line"><span class="lineno">   34</span>    <span class="keywordflow">return</span> sum;</div>
+<div class="line"><span class="lineno">   35</span>}</div>
+<div class="ttc" id="aattention__ranges__checked_8c_html_aa031ba3083f4f9fc437b6665050e62e3"><div class="ttname"><a href="#aa031ba3083f4f9fc437b6665050e62e3">read_element</a></div><div class="ttdeci">static float read_element(const void *buffer, size_t index, int bf16)</div><div class="ttdef"><b>Definition</b> <a href="attention__ranges__checked_8c_source.html#l00020">attention_ranges_checked.c:20</a></div></div>
 <div class="ttc" id="aaudio__spectral__head_8c_html_a6cbb018b1e755f86de9d2dd05d164a53"><div class="ttname"><a href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a></div><div class="ttdeci">static int product(size_t a, size_t b, size_t *out)</div><div class="ttdef"><b>Definition</b> <a href="audio__spectral__head_8c_source.html#l00006">audio_spectral_head.c:6</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="audio__spectral__head_8c_source.html#l00006">product()</a>.</p>
+<p class="reference">References <a class="el" href="audio__spectral__head_8c_source.html#l00006">product()</a>, and <a class="el" href="attention__ranges__checked_8c_source.html#l00020">read_element()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="attention__ranges__checked_8c_source.html#l00030">ck_attention_ranges_checked_f32()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="attention__ranges__checked_8c_source.html#l00039">attention_ranges_checked()</a>.</p>
+
+</div>
+</div>
+<a id="a32a8497eb68a6b518f598eb9abdcb723" name="a32a8497eb68a6b518f598eb9abdcb723"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a32a8497eb68a6b518f598eb9abdcb723">&#9670;&#160;</a></span>attention_ranges_checked()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">int attention_ranges_checked </td>
+          <td>(</td>
+          <td class="paramtype">const void *</td>          <td class="paramname"><span class="paramname"><em>query</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>query_elements</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const void *</td>          <td class="paramname"><span class="paramname"><em>key</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>key_elements</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const void *</td>          <td class="paramname"><span class="paramname"><em>value</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>value_elements</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const int32_t *</td>          <td class="paramname"><span class="paramname"><em>ranges</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>range_elements</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">void *</td>          <td class="paramname"><span class="paramname"><em>output</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>output_elements</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *</td>          <td class="paramname"><span class="paramname"><em>scratch</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>scratch_elements</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>query_tokens</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>memory_tokens</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>heads</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>kv_heads</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>head_dim</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float</td>          <td class="paramname"><span class="paramname"><em>scale</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int</td>          <td class="paramname"><span class="paramname"><em>bf16</em></span>&#160;)</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel static">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="attention__ranges__checked_8c_source.html#l00039">39</a> of file <a class="el" href="attention__ranges__checked_8c_source.html">attention_ranges_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   48</span>{</div>
+<div class="line"><span class="lineno">   49</span>    <span class="keywordflow">if</span> (!query_tokens || !memory_tokens || memory_tokens &gt; INT32_MAX ||</div>
+<div class="line"><span class="lineno">   50</span>        !heads || !kv_heads || heads % kv_heads || !head_dim ||</div>
+<div class="line"><span class="lineno">   51</span>        heads &gt; SIZE_MAX / head_dim || query_tokens &gt; SIZE_MAX / 4 ||</div>
+<div class="line"><span class="lineno">   52</span>        !isfinite(scale) || scale &lt;= 0.0f) <span class="keywordflow">return</span> -2;</div>
+<div class="line"><span class="lineno">   53</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> qw = heads * head_dim;</div>
+<div class="line"><span class="lineno">   54</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> kw = kv_heads * head_dim;</div>
+<div class="line"><span class="lineno">   55</span>    <span class="keywordflow">if</span> (query_tokens &gt; SIZE_MAX / qw || memory_tokens &gt; SIZE_MAX / kw) <span class="keywordflow">return</span> -2;</div>
+<div class="line"><span class="lineno">   56</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> q = query_tokens * qw;</div>
+<div class="line"><span class="lineno">   57</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> k = memory_tokens * kw;</div>
+<div class="line"><span class="lineno">   58</span>    <span class="keywordflow">if</span> (q &gt; SIZE_MAX - memory_tokens || range_elements &lt; 4 * query_tokens ||</div>
+<div class="line"><span class="lineno">   59</span>        query_elements &lt; q || key_elements &lt; k || value_elements &lt; k ||</div>
+<div class="line"><span class="lineno">   60</span>        output_elements &lt; q || scratch_elements &lt; q + memory_tokens) <span class="keywordflow">return</span> -2;</div>
+<div class="line"><span class="lineno">   61</span> </div>
+<div class="line"><span class="lineno">   62</span>    <span class="keyword">const</span> <span class="keywordtype">void</span> *inputs[] = {query, key, value, ranges};</div>
+<div class="line"><span class="lineno">   63</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> counts[] = {query_elements, key_elements, value_elements, range_elements};</div>
+<div class="line"><span class="lineno">   64</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> element_width = bf16 ? <span class="keyword">sizeof</span>(uint16_t) : sizeof(float);</div>
+<div class="line"><span class="lineno">   65</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> widths[] = {element_width, element_width, element_width, <span class="keyword">sizeof</span>(int32_t)};</div>
+<div class="line"><span class="lineno">   66</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="#aa754cec1155df070fe8c56b837c0c5ec">region_valid</a>(output, output_elements, element_width) ||</div>
+<div class="line"><span class="lineno">   67</span>        !<a class="code hl_function" href="#aa754cec1155df070fe8c56b837c0c5ec">region_valid</a>(scratch, scratch_elements, <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>))) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">   68</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> output_bytes = output_elements * element_width;</div>
+<div class="line"><span class="lineno">   69</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> scratch_bytes = scratch_elements * <span class="keyword">sizeof</span>(float);</div>
+<div class="line"><span class="lineno">   70</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="#a69d0b26f9824627188b7e836c870ac5f">regions_overlap</a>(output, output_bytes, scratch, scratch_bytes)) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">   71</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; 4; ++i) {</div>
+<div class="line"><span class="lineno">   72</span>        <span class="keywordflow">if</span> (!<a class="code hl_function" href="#aa754cec1155df070fe8c56b837c0c5ec">region_valid</a>(inputs[i], counts[i], widths[i])) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">   73</span>        <span class="keyword">const</span> <span class="keywordtype">size_t</span> bytes = counts[i] * widths[i];</div>
+<div class="line"><span class="lineno">   74</span>        <span class="keywordflow">if</span> (<a class="code hl_function" href="#a69d0b26f9824627188b7e836c870ac5f">regions_overlap</a>(output, output_bytes, inputs[i], bytes) ||</div>
+<div class="line"><span class="lineno">   75</span>            <a class="code hl_function" href="#a69d0b26f9824627188b7e836c870ac5f">regions_overlap</a>(scratch, scratch_bytes, inputs[i], bytes)) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">   76</span>    }</div>
+<div class="line"><span class="lineno">   77</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> t = 0; t &lt; query_tokens; ++t) {</div>
+<div class="line"><span class="lineno">   78</span>        <span class="keyword">const</span> int32_t *r = ranges + 4 * t;</div>
+<div class="line"><span class="lineno">   79</span>        <span class="keywordflow">if</span> (r[0] &lt; 0 || r[0] &gt; r[1] || r[1] &gt; r[2] ||</div>
+<div class="line"><span class="lineno">   80</span>            r[2] &gt; r[3] || (<span class="keywordtype">size_t</span>)r[3] &gt; memory_tokens ||</div>
+<div class="line"><span class="lineno">   81</span>            (r[0] == r[1] &amp;&amp; r[2] == r[3])) <span class="keywordflow">return</span> -2;</div>
+<div class="line"><span class="lineno">   82</span>    }</div>
+<div class="line"><span class="lineno">   83</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; q; ++i)</div>
+<div class="line"><span class="lineno">   84</span>        <span class="keywordflow">if</span> (!isfinite(<a class="code hl_function" href="#aa031ba3083f4f9fc437b6665050e62e3">read_element</a>(query, i, bf16))) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">   85</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; k; ++i)</div>
+<div class="line"><span class="lineno">   86</span>        <span class="keywordflow">if</span> (!isfinite(<a class="code hl_function" href="#aa031ba3083f4f9fc437b6665050e62e3">read_element</a>(key, i, bf16)) || !isfinite(<a class="code hl_function" href="#aa031ba3083f4f9fc437b6665050e62e3">read_element</a>(value, i, bf16))) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">   87</span> </div>
+<div class="line"><span class="lineno">   88</span>    <span class="keywordtype">float</span> *scores = scratch;</div>
+<div class="line"><span class="lineno">   89</span>    <span class="keywordtype">float</span> *staged = scratch + memory_tokens;</div>
+<div class="line"><span class="lineno">   90</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> t = 0; t &lt; query_tokens; ++t) {</div>
+<div class="line"><span class="lineno">   91</span>        <span class="keyword">const</span> int32_t *r = ranges + 4 * t;</div>
+<div class="line"><span class="lineno">   92</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> h = 0; h &lt; heads; ++h) {</div>
+<div class="line"><span class="lineno">   93</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span> query_head = t * qw + h * head_dim;</div>
+<div class="line"><span class="lineno">   94</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span> head_offset = (h / (heads / kv_heads)) * head_dim;</div>
+<div class="line"><span class="lineno">   95</span>            <span class="keywordtype">float</span> largest = -INFINITY;</div>
+<div class="line"><span class="lineno">   96</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> <a class="code hl_function" href="head__backward_8c.html#a41e4893704ee738b286ee68e99ce9c31">span</a> = 0; <a class="code hl_function" href="head__backward_8c.html#a41e4893704ee738b286ee68e99ce9c31">span</a> &lt; 4; <a class="code hl_function" href="head__backward_8c.html#a41e4893704ee738b286ee68e99ce9c31">span</a> += 2) {</div>
+<div class="line"><span class="lineno">   97</span>                <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> j = (<span class="keywordtype">size_t</span>)r[<a class="code hl_function" href="head__backward_8c.html#a41e4893704ee738b286ee68e99ce9c31">span</a>]; j &lt; (size_t)r[<a class="code hl_function" href="head__backward_8c.html#a41e4893704ee738b286ee68e99ce9c31">span</a> + 1]; ++j) {</div>
+<div class="line"><span class="lineno">   98</span>                    <span class="keywordtype">double</span> <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> = <a class="code hl_function" href="#af265f627e095668f28f83547050887ca">attention_dot</a>(query, key, query_head, j * kw + head_offset, head_dim, bf16);</div>
+<div class="line"><span class="lineno">   99</span>                    <span class="keywordflow">if</span> (bf16) <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>((<span class="keywordtype">float</span>)<a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a>));</div>
+<div class="line"><span class="lineno">  100</span>                    <span class="keyword">const</span> <span class="keywordtype">double</span> s = <a class="code hl_function" href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a> * scale;</div>
+<div class="line"><span class="lineno">  101</span>                    <span class="keywordflow">if</span> (!isfinite(s) || fabs(s) &gt; FLT_MAX) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  102</span>                    scores[j] = bf16 ? <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>((<span class="keywordtype">float</span>)s)) : (float)s;</div>
+<div class="line"><span class="lineno">  103</span>                    <span class="keywordflow">if</span> (!isfinite(scores[j])) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  104</span>                    <span class="keywordflow">if</span> (scores[j] &gt; largest) largest = scores[j];</div>
+<div class="line"><span class="lineno">  105</span>                }</div>
+<div class="line"><span class="lineno">  106</span>            }</div>
+<div class="line"><span class="lineno">  107</span>            <span class="keywordtype">double</span> denom = 0.0;</div>
+<div class="line"><span class="lineno">  108</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> <a class="code hl_function" href="head__backward_8c.html#a41e4893704ee738b286ee68e99ce9c31">span</a> = 0; <a class="code hl_function" href="head__backward_8c.html#a41e4893704ee738b286ee68e99ce9c31">span</a> &lt; 4; <a class="code hl_function" href="head__backward_8c.html#a41e4893704ee738b286ee68e99ce9c31">span</a> += 2) {</div>
+<div class="line"><span class="lineno">  109</span>                <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> j = (<span class="keywordtype">size_t</span>)r[<a class="code hl_function" href="head__backward_8c.html#a41e4893704ee738b286ee68e99ce9c31">span</a>]; j &lt; (size_t)r[<a class="code hl_function" href="head__backward_8c.html#a41e4893704ee738b286ee68e99ce9c31">span</a> + 1]; ++j) {</div>
+<div class="line"><span class="lineno">  110</span>                    scores[j] = (float)exp((<span class="keywordtype">double</span>)scores[j] - largest);</div>
+<div class="line"><span class="lineno">  111</span>                    denom += scores[j];</div>
+<div class="line"><span class="lineno">  112</span>                }</div>
+<div class="line"><span class="lineno">  113</span>            }</div>
+<div class="line"><span class="lineno">  114</span>            <span class="keywordflow">if</span> (bf16) {</div>
+<div class="line"><span class="lineno">  115</span>                <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> <a class="code hl_function" href="head__backward_8c.html#a41e4893704ee738b286ee68e99ce9c31">span</a> = 0; <a class="code hl_function" href="head__backward_8c.html#a41e4893704ee738b286ee68e99ce9c31">span</a> &lt; 4; <a class="code hl_function" href="head__backward_8c.html#a41e4893704ee738b286ee68e99ce9c31">span</a> += 2) {</div>
+<div class="line"><span class="lineno">  116</span>                    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> j = (<span class="keywordtype">size_t</span>)r[<a class="code hl_function" href="head__backward_8c.html#a41e4893704ee738b286ee68e99ce9c31">span</a>]; j &lt; (size_t)r[<a class="code hl_function" href="head__backward_8c.html#a41e4893704ee738b286ee68e99ce9c31">span</a> + 1]; ++j) {</div>
+<div class="line"><span class="lineno">  117</span>                        scores[j] = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>((<span class="keywordtype">float</span>)(scores[j] / denom)));</div>
+<div class="line"><span class="lineno">  118</span>                    }</div>
+<div class="line"><span class="lineno">  119</span>                }</div>
+<div class="line"><span class="lineno">  120</span>            }</div>
+<div class="line"><span class="lineno">  121</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> d = 0; d &lt; head_dim; ++d) {</div>
+<div class="line"><span class="lineno">  122</span>                <span class="keywordtype">double</span> sum = 0.0;</div>
+<div class="line"><span class="lineno">  123</span>                <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> <a class="code hl_function" href="head__backward_8c.html#a41e4893704ee738b286ee68e99ce9c31">span</a> = 0; <a class="code hl_function" href="head__backward_8c.html#a41e4893704ee738b286ee68e99ce9c31">span</a> &lt; 4; <a class="code hl_function" href="head__backward_8c.html#a41e4893704ee738b286ee68e99ce9c31">span</a> += 2) {</div>
+<div class="line"><span class="lineno">  124</span>                    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> j = (<span class="keywordtype">size_t</span>)r[<a class="code hl_function" href="head__backward_8c.html#a41e4893704ee738b286ee68e99ce9c31">span</a>]; j &lt; (size_t)r[<a class="code hl_function" href="head__backward_8c.html#a41e4893704ee738b286ee68e99ce9c31">span</a> + 1]; ++j) {</div>
+<div class="line"><span class="lineno">  125</span>                        <span class="keyword">volatile</span> <span class="keywordtype">double</span> <a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a> = (double)scores[j] *</div>
+<div class="line"><span class="lineno">  126</span>                            <a class="code hl_function" href="#aa031ba3083f4f9fc437b6665050e62e3">read_element</a>(value, j * kw + head_offset + d, bf16);</div>
+<div class="line"><span class="lineno">  127</span>                        sum += <a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a>;</div>
+<div class="line"><span class="lineno">  128</span>                    }</div>
+<div class="line"><span class="lineno">  129</span>                }</div>
+<div class="line"><span class="lineno">  130</span>                <span class="keywordtype">float</span> v = (float)(bf16 ? sum : sum / denom);</div>
+<div class="line"><span class="lineno">  131</span>                <span class="keywordflow">if</span> (bf16) v = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(v));</div>
+<div class="line"><span class="lineno">  132</span>                <span class="keywordflow">if</span> (!isfinite(v)) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  133</span>                staged[t * qw + h * head_dim + d] = v;</div>
+<div class="line"><span class="lineno">  134</span>            }</div>
+<div class="line"><span class="lineno">  135</span>        }</div>
+<div class="line"><span class="lineno">  136</span>    }</div>
+<div class="line"><span class="lineno">  137</span>    <span class="keywordflow">if</span> (bf16) {</div>
+<div class="line"><span class="lineno">  138</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; q; ++i) ((uint16_t *)output)[i] = <a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(staged[i]);</div>
+<div class="line"><span class="lineno">  139</span>    } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno">  140</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; q; ++i) ((<span class="keywordtype">float</span> *)output)[i] = staged[i];</div>
+<div class="line"><span class="lineno">  141</span>    }</div>
+<div class="line"><span class="lineno">  142</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  143</span>}</div>
+<div class="ttc" id="aattention__cross__token__major__checked_8c_html_a8645ebc14bd224f816fa123347a1e15e"><div class="ttname"><a href="attention__cross__token__major__checked_8c.html#a8645ebc14bd224f816fa123347a1e15e">dot</a></div><div class="ttdeci">static double dot(const float *a, const float *b, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="attention__cross__token__major__checked_8c_source.html#l00021">attention_cross_token_major_checked.c:21</a></div></div>
+<div class="ttc" id="aattention__ranges__checked_8c_html_a69d0b26f9824627188b7e836c870ac5f"><div class="ttname"><a href="#a69d0b26f9824627188b7e836c870ac5f">regions_overlap</a></div><div class="ttdeci">static int regions_overlap(const void *a, size_t a_bytes, const void *b, size_t b_bytes)</div><div class="ttdef"><b>Definition</b> <a href="attention__ranges__checked_8c_source.html#l00014">attention_ranges_checked.c:14</a></div></div>
+<div class="ttc" id="aattention__ranges__checked_8c_html_aa754cec1155df070fe8c56b837c0c5ec"><div class="ttname"><a href="#aa754cec1155df070fe8c56b837c0c5ec">region_valid</a></div><div class="ttdeci">static int region_valid(const void *ptr, size_t count, size_t width)</div><div class="ttdef"><b>Definition</b> <a href="attention__ranges__checked_8c_source.html#l00008">attention_ranges_checked.c:8</a></div></div>
+<div class="ttc" id="aattention__ranges__checked_8c_html_af265f627e095668f28f83547050887ca"><div class="ttname"><a href="#af265f627e095668f28f83547050887ca">attention_dot</a></div><div class="ttdeci">static double attention_dot(const void *q, const void *k, size_t q_offset, size_t k_offset, size_t width, int bf16)</div><div class="ttdef"><b>Definition</b> <a href="attention__ranges__checked_8c_source.html#l00025">attention_ranges_checked.c:25</a></div></div>
+<div class="ttc" id="abf16__utils_8h_html_a174b16a92b3a5972230d7519fc0c5aa3"><div class="ttname"><a href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a></div><div class="ttdeci">static uint16_t float_to_bf16(float f)</div><div class="ttdef"><b>Definition</b> <a href="bf16__utils_8h_source.html#l00090">bf16_utils.h:90</a></div></div>
+<div class="ttc" id="abf16__utils_8h_html_a314c3970fd5e2770d19b1bb49aefcf94"><div class="ttname"><a href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a></div><div class="ttdeci">static float bf16_to_float(uint16_t v)</div><div class="ttdef"><b>Definition</b> <a href="bf16__utils_8h_source.html#l00038">bf16_utils.h:38</a></div></div>
+<div class="ttc" id="ahead__backward_8c_html_a41e4893704ee738b286ee68e99ce9c31"><div class="ttname"><a href="head__backward_8c.html#a41e4893704ee738b286ee68e99ce9c31">span</a></div><div class="ttdeci">static int span(size_t rows, size_t cols, size_t stride, size_t elements)</div><div class="ttdef"><b>Definition</b> <a href="head__backward_8c_source.html#l00011">head_backward.c:11</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="attention__ranges__checked_8c_source.html#l00025">attention_dot()</a>, <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="attention__cross__token__major__checked_8c_source.html#l00021">dot()</a>, <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>, <a class="el" href="audio__spectral__head_8c_source.html#l00006">product()</a>, <a class="el" href="attention__ranges__checked_8c_source.html#l00020">read_element()</a>, <a class="el" href="attention__ranges__checked_8c_source.html#l00008">region_valid()</a>, <a class="el" href="attention__ranges__checked_8c_source.html#l00014">regions_overlap()</a>, and <a class="el" href="head__backward_8c_source.html#l00011">span()</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="attention__ranges__checked_8c_source.html#l00156">ck_attention_ranges_checked_bf16()</a>, and <a class="el" href="attention__ranges__checked_8c_source.html#l00145">ck_attention_ranges_checked_f32()</a>.</p>
+
+</div>
+</div>
+<a id="a6093d1c4f57f29e5aa07ba35eae38c32" name="a6093d1c4f57f29e5aa07ba35eae38c32"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a6093d1c4f57f29e5aa07ba35eae38c32">&#9670;&#160;</a></span>ck_attention_ranges_checked_bf16()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int ck_attention_ranges_checked_bf16 </td>
+          <td>(</td>
+          <td class="paramtype">const uint16_t *</td>          <td class="paramname"><span class="paramname"><em>query</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>query_elements</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const uint16_t *</td>          <td class="paramname"><span class="paramname"><em>key</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>key_elements</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const uint16_t *</td>          <td class="paramname"><span class="paramname"><em>value</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>value_elements</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const int32_t *</td>          <td class="paramname"><span class="paramname"><em>ranges</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>range_elements</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">uint16_t *</td>          <td class="paramname"><span class="paramname"><em>output</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>output_elements</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *</td>          <td class="paramname"><span class="paramname"><em>scratch</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>scratch_elements</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>query_tokens</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>memory_tokens</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>heads</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>kv_heads</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>head_dim</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float</td>          <td class="paramname"><span class="paramname"><em>scale</em></span>&#160;)</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="attention__ranges__checked_8c_source.html#l00156">156</a> of file <a class="el" href="attention__ranges__checked_8c_source.html">attention_ranges_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  161</span>{</div>
+<div class="line"><span class="lineno">  162</span>    <span class="keywordflow">return</span> <a class="code hl_function" href="#a32a8497eb68a6b518f598eb9abdcb723">attention_ranges_checked</a>(query, query_elements, key, key_elements, value, value_elements,</div>
+<div class="line"><span class="lineno">  163</span>        ranges, range_elements, output, output_elements, scratch, scratch_elements,</div>
+<div class="line"><span class="lineno">  164</span>        query_tokens, memory_tokens, heads, kv_heads, head_dim, scale, 1);</div>
+<div class="line"><span class="lineno">  165</span>}</div>
+<div class="ttc" id="aattention__ranges__checked_8c_html_a32a8497eb68a6b518f598eb9abdcb723"><div class="ttname"><a href="#a32a8497eb68a6b518f598eb9abdcb723">attention_ranges_checked</a></div><div class="ttdeci">static int attention_ranges_checked(const void *query, size_t query_elements, const void *key, size_t key_elements, const void *value, size_t value_elements, const int32_t *ranges, size_t range_elements, void *output, size_t output_elements, float *scratch, size_t scratch_elements, size_t query_tokens, size_t memory_tokens, size_t heads, size_t kv_heads, size_t head_dim, float scale, int bf16)</div><div class="ttdef"><b>Definition</b> <a href="attention__ranges__checked_8c_source.html#l00039">attention_ranges_checked.c:39</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="attention__ranges__checked_8c_source.html#l00039">attention_ranges_checked()</a>.</p>
 
 </div>
 </div>
@@ -289,94 +644,57 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="attention__ranges__checked_8c_source.html#l00030">30</a> of file <a class="el" href="attention__ranges__checked_8c_source.html">attention_ranges_checked.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   39</span>{</div>
-<div class="line"><span class="lineno">   40</span>    <span class="keywordflow">if</span> (!query_tokens || !memory_tokens || memory_tokens &gt; INT32_MAX ||</div>
-<div class="line"><span class="lineno">   41</span>        !heads || !kv_heads || heads % kv_heads || !head_dim ||</div>
-<div class="line"><span class="lineno">   42</span>        heads &gt; SIZE_MAX / head_dim || query_tokens &gt; SIZE_MAX / 4 ||</div>
-<div class="line"><span class="lineno">   43</span>        !isfinite(scale) || scale &lt;= 0.0f) <span class="keywordflow">return</span> -2;</div>
-<div class="line"><span class="lineno">   44</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> qw = heads * head_dim;</div>
-<div class="line"><span class="lineno">   45</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> kw = kv_heads * head_dim;</div>
-<div class="line"><span class="lineno">   46</span>    <span class="keywordflow">if</span> (query_tokens &gt; SIZE_MAX / qw || memory_tokens &gt; SIZE_MAX / kw) <span class="keywordflow">return</span> -2;</div>
-<div class="line"><span class="lineno">   47</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> q = query_tokens * qw;</div>
-<div class="line"><span class="lineno">   48</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> k = memory_tokens * kw;</div>
-<div class="line"><span class="lineno">   49</span>    <span class="keywordflow">if</span> (q &gt; SIZE_MAX - memory_tokens || range_elements &lt; 4 * query_tokens ||</div>
-<div class="line"><span class="lineno">   50</span>        query_elements &lt; q || key_elements &lt; k || value_elements &lt; k ||</div>
-<div class="line"><span class="lineno">   51</span>        output_elements &lt; q || scratch_elements &lt; q + memory_tokens) <span class="keywordflow">return</span> -2;</div>
-<div class="line"><span class="lineno">   52</span> </div>
-<div class="line"><span class="lineno">   53</span>    <span class="keyword">const</span> <span class="keywordtype">void</span> *inputs[] = {query, key, value, ranges};</div>
-<div class="line"><span class="lineno">   54</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> counts[] = {query_elements, key_elements, value_elements, range_elements};</div>
-<div class="line"><span class="lineno">   55</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> widths[] = {<span class="keyword">sizeof</span>(float), <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>), <span class="keyword">sizeof</span>(float), <span class="keyword">sizeof</span>(int32_t)};</div>
-<div class="line"><span class="lineno">   56</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="#aa754cec1155df070fe8c56b837c0c5ec">region_valid</a>(output, output_elements, <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>)) ||</div>
-<div class="line"><span class="lineno">   57</span>        !<a class="code hl_function" href="#aa754cec1155df070fe8c56b837c0c5ec">region_valid</a>(scratch, scratch_elements, <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>))) <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">   58</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> output_bytes = output_elements * <span class="keyword">sizeof</span>(float);</div>
-<div class="line"><span class="lineno">   59</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> scratch_bytes = scratch_elements * <span class="keyword">sizeof</span>(float);</div>
-<div class="line"><span class="lineno">   60</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="#a69d0b26f9824627188b7e836c870ac5f">regions_overlap</a>(output, output_bytes, scratch, scratch_bytes)) <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">   61</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; 4; ++i) {</div>
-<div class="line"><span class="lineno">   62</span>        <span class="keywordflow">if</span> (!<a class="code hl_function" href="#aa754cec1155df070fe8c56b837c0c5ec">region_valid</a>(inputs[i], counts[i], widths[i])) <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">   63</span>        <span class="keyword">const</span> <span class="keywordtype">size_t</span> bytes = counts[i] * widths[i];</div>
-<div class="line"><span class="lineno">   64</span>        <span class="keywordflow">if</span> (<a class="code hl_function" href="#a69d0b26f9824627188b7e836c870ac5f">regions_overlap</a>(output, output_bytes, inputs[i], bytes) ||</div>
-<div class="line"><span class="lineno">   65</span>            <a class="code hl_function" href="#a69d0b26f9824627188b7e836c870ac5f">regions_overlap</a>(scratch, scratch_bytes, inputs[i], bytes)) <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">   66</span>    }</div>
-<div class="line"><span class="lineno">   67</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> t = 0; t &lt; query_tokens; ++t) {</div>
-<div class="line"><span class="lineno">   68</span>        <span class="keyword">const</span> int32_t *r = ranges + 4 * t;</div>
-<div class="line"><span class="lineno">   69</span>        <span class="keywordflow">if</span> (r[0] &lt; 0 || r[0] &gt; r[1] || r[1] &gt; r[2] ||</div>
-<div class="line"><span class="lineno">   70</span>            r[2] &gt; r[3] || (<span class="keywordtype">size_t</span>)r[3] &gt; memory_tokens ||</div>
-<div class="line"><span class="lineno">   71</span>            (r[0] == r[1] &amp;&amp; r[2] == r[3])) <span class="keywordflow">return</span> -2;</div>
-<div class="line"><span class="lineno">   72</span>    }</div>
-<div class="line"><span class="lineno">   73</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; q; ++i)</div>
-<div class="line"><span class="lineno">   74</span>        <span class="keywordflow">if</span> (!isfinite(query[i])) <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">   75</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; k; ++i)</div>
-<div class="line"><span class="lineno">   76</span>        <span class="keywordflow">if</span> (!isfinite(key[i]) || !isfinite(value[i])) <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">   77</span> </div>
-<div class="line"><span class="lineno">   78</span>    <span class="keywordtype">float</span> *scores = scratch;</div>
-<div class="line"><span class="lineno">   79</span>    <span class="keywordtype">float</span> *staged = scratch + memory_tokens;</div>
-<div class="line"><span class="lineno">   80</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> t = 0; t &lt; query_tokens; ++t) {</div>
-<div class="line"><span class="lineno">   81</span>        <span class="keyword">const</span> int32_t *r = ranges + 4 * t;</div>
-<div class="line"><span class="lineno">   82</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> h = 0; h &lt; heads; ++h) {</div>
-<div class="line"><span class="lineno">   83</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *query_head = query + t * qw + h * head_dim;</div>
-<div class="line"><span class="lineno">   84</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span> head_offset = (h / (heads / kv_heads)) * head_dim;</div>
-<div class="line"><span class="lineno">   85</span>            <span class="keywordtype">float</span> largest = -INFINITY;</div>
-<div class="line"><span class="lineno">   86</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> <a class="code hl_function" href="head__backward_8c.html#a41e4893704ee738b286ee68e99ce9c31">span</a> = 0; <a class="code hl_function" href="head__backward_8c.html#a41e4893704ee738b286ee68e99ce9c31">span</a> &lt; 4; <a class="code hl_function" href="head__backward_8c.html#a41e4893704ee738b286ee68e99ce9c31">span</a> += 2) {</div>
-<div class="line"><span class="lineno">   87</span>                <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> j = (<span class="keywordtype">size_t</span>)r[<a class="code hl_function" href="head__backward_8c.html#a41e4893704ee738b286ee68e99ce9c31">span</a>]; j &lt; (size_t)r[<a class="code hl_function" href="head__backward_8c.html#a41e4893704ee738b286ee68e99ce9c31">span</a> + 1]; ++j) {</div>
-<div class="line"><span class="lineno">   88</span>                    <span class="keyword">const</span> <span class="keywordtype">double</span> s = <a class="code hl_function" href="#acbb3615bf1ea658e9958eec34a500f9e">attention_dot</a>(query_head, key + j * kw + head_offset,</div>
-<div class="line"><span class="lineno">   89</span>                                                   head_dim) * scale;</div>
-<div class="line"><span class="lineno">   90</span>                    <span class="keywordflow">if</span> (!isfinite(s) || fabs(s) &gt; FLT_MAX) <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">   91</span>                    scores[j] = (float)s;</div>
-<div class="line"><span class="lineno">   92</span>                    <span class="keywordflow">if</span> (scores[j] &gt; largest) largest = scores[j];</div>
-<div class="line"><span class="lineno">   93</span>                }</div>
-<div class="line"><span class="lineno">   94</span>            }</div>
-<div class="line"><span class="lineno">   95</span>            <span class="keywordtype">double</span> denom = 0.0;</div>
-<div class="line"><span class="lineno">   96</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> <a class="code hl_function" href="head__backward_8c.html#a41e4893704ee738b286ee68e99ce9c31">span</a> = 0; <a class="code hl_function" href="head__backward_8c.html#a41e4893704ee738b286ee68e99ce9c31">span</a> &lt; 4; <a class="code hl_function" href="head__backward_8c.html#a41e4893704ee738b286ee68e99ce9c31">span</a> += 2) {</div>
-<div class="line"><span class="lineno">   97</span>                <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> j = (<span class="keywordtype">size_t</span>)r[<a class="code hl_function" href="head__backward_8c.html#a41e4893704ee738b286ee68e99ce9c31">span</a>]; j &lt; (size_t)r[<a class="code hl_function" href="head__backward_8c.html#a41e4893704ee738b286ee68e99ce9c31">span</a> + 1]; ++j) {</div>
-<div class="line"><span class="lineno">   98</span>                    scores[j] = (float)exp((<span class="keywordtype">double</span>)scores[j] - largest);</div>
-<div class="line"><span class="lineno">   99</span>                    denom += scores[j];</div>
-<div class="line"><span class="lineno">  100</span>                }</div>
-<div class="line"><span class="lineno">  101</span>            }</div>
-<div class="line"><span class="lineno">  102</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> d = 0; d &lt; head_dim; ++d) {</div>
-<div class="line"><span class="lineno">  103</span>                <span class="keywordtype">double</span> sum = 0.0;</div>
-<div class="line"><span class="lineno">  104</span>                <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> <a class="code hl_function" href="head__backward_8c.html#a41e4893704ee738b286ee68e99ce9c31">span</a> = 0; <a class="code hl_function" href="head__backward_8c.html#a41e4893704ee738b286ee68e99ce9c31">span</a> &lt; 4; <a class="code hl_function" href="head__backward_8c.html#a41e4893704ee738b286ee68e99ce9c31">span</a> += 2) {</div>
-<div class="line"><span class="lineno">  105</span>                    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> j = (<span class="keywordtype">size_t</span>)r[<a class="code hl_function" href="head__backward_8c.html#a41e4893704ee738b286ee68e99ce9c31">span</a>]; j &lt; (size_t)r[<a class="code hl_function" href="head__backward_8c.html#a41e4893704ee738b286ee68e99ce9c31">span</a> + 1]; ++j) {</div>
-<div class="line"><span class="lineno">  106</span>                        <span class="keyword">volatile</span> <span class="keywordtype">double</span> <a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a> = (double)scores[j] *</div>
-<div class="line"><span class="lineno">  107</span>                            value[j * kw + head_offset + d];</div>
-<div class="line"><span class="lineno">  108</span>                        sum += <a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a>;</div>
-<div class="line"><span class="lineno">  109</span>                    }</div>
-<div class="line"><span class="lineno">  110</span>                }</div>
-<div class="line"><span class="lineno">  111</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> v = (float)(sum / denom);</div>
-<div class="line"><span class="lineno">  112</span>                <span class="keywordflow">if</span> (!isfinite(v)) <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  113</span>                staged[t * qw + h * head_dim + d] = v;</div>
-<div class="line"><span class="lineno">  114</span>            }</div>
-<div class="line"><span class="lineno">  115</span>        }</div>
-<div class="line"><span class="lineno">  116</span>    }</div>
-<div class="line"><span class="lineno">  117</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; q; ++i) output[i] = staged[i];</div>
-<div class="line"><span class="lineno">  118</span>    <span class="keywordflow">return</span> 0;</div>
-<div class="line"><span class="lineno">  119</span>}</div>
-<div class="ttc" id="aattention__ranges__checked_8c_html_a69d0b26f9824627188b7e836c870ac5f"><div class="ttname"><a href="#a69d0b26f9824627188b7e836c870ac5f">regions_overlap</a></div><div class="ttdeci">static int regions_overlap(const void *a, size_t a_bytes, const void *b, size_t b_bytes)</div><div class="ttdef"><b>Definition</b> <a href="attention__ranges__checked_8c_source.html#l00012">attention_ranges_checked.c:12</a></div></div>
-<div class="ttc" id="aattention__ranges__checked_8c_html_aa754cec1155df070fe8c56b837c0c5ec"><div class="ttname"><a href="#aa754cec1155df070fe8c56b837c0c5ec">region_valid</a></div><div class="ttdeci">static int region_valid(const void *ptr, size_t count, size_t width)</div><div class="ttdef"><b>Definition</b> <a href="attention__ranges__checked_8c_source.html#l00006">attention_ranges_checked.c:6</a></div></div>
-<div class="ttc" id="aattention__ranges__checked_8c_html_acbb3615bf1ea658e9958eec34a500f9e"><div class="ttname"><a href="#acbb3615bf1ea658e9958eec34a500f9e">attention_dot</a></div><div class="ttdeci">static double attention_dot(const float *q, const float *k, size_t width)</div><div class="ttdef"><b>Definition</b> <a href="attention__ranges__checked_8c_source.html#l00018">attention_ranges_checked.c:18</a></div></div>
-<div class="ttc" id="ahead__backward_8c_html_a41e4893704ee738b286ee68e99ce9c31"><div class="ttname"><a href="head__backward_8c.html#a41e4893704ee738b286ee68e99ce9c31">span</a></div><div class="ttdeci">static int span(size_t rows, size_t cols, size_t stride, size_t elements)</div><div class="ttdef"><b>Definition</b> <a href="head__backward_8c_source.html#l00011">head_backward.c:11</a></div></div>
+<p class="definition">Definition at line <a class="el" href="attention__ranges__checked_8c_source.html#l00145">145</a> of file <a class="el" href="attention__ranges__checked_8c_source.html">attention_ranges_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  150</span>{</div>
+<div class="line"><span class="lineno">  151</span>    <span class="keywordflow">return</span> <a class="code hl_function" href="#a32a8497eb68a6b518f598eb9abdcb723">attention_ranges_checked</a>(query, query_elements, key, key_elements, value, value_elements,</div>
+<div class="line"><span class="lineno">  152</span>        ranges, range_elements, output, output_elements, scratch, scratch_elements,</div>
+<div class="line"><span class="lineno">  153</span>        query_tokens, memory_tokens, heads, kv_heads, head_dim, scale, 0);</div>
+<div class="line"><span class="lineno">  154</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__ranges__checked_8c_source.html#l00018">attention_dot()</a>, <a class="el" href="audio__spectral__head_8c_source.html#l00006">product()</a>, <a class="el" href="attention__ranges__checked_8c_source.html#l00006">region_valid()</a>, <a class="el" href="attention__ranges__checked_8c_source.html#l00012">regions_overlap()</a>, and <a class="el" href="head__backward_8c_source.html#l00011">span()</a>.</p>
+<p class="reference">References <a class="el" href="attention__ranges__checked_8c_source.html#l00039">attention_ranges_checked()</a>.</p>
+
+</div>
+</div>
+<a id="aa031ba3083f4f9fc437b6665050e62e3" name="aa031ba3083f4f9fc437b6665050e62e3"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aa031ba3083f4f9fc437b6665050e62e3">&#9670;&#160;</a></span>read_element()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">float read_element </td>
+          <td>(</td>
+          <td class="paramtype">const void *</td>          <td class="paramname"><span class="paramname"><em>buffer</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>index</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int</td>          <td class="paramname"><span class="paramname"><em>bf16</em></span>&#160;)</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel static">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="attention__ranges__checked_8c_source.html#l00020">20</a> of file <a class="el" href="attention__ranges__checked_8c_source.html">attention_ranges_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   21</span>{</div>
+<div class="line"><span class="lineno">   22</span>    <span class="keywordflow">return</span> bf16 ? <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(((<span class="keyword">const</span> uint16_t *)buffer)[index]) : ((const float *)buffer)[index];</div>
+<div class="line"><span class="lineno">   23</span>}</div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="attention__ranges__checked_8c_source.html#l00025">attention_dot()</a>, and <a class="el" href="attention__ranges__checked_8c_source.html#l00039">attention_ranges_checked()</a>.</p>
 
 </div>
 </div>
@@ -412,16 +730,16 @@ Functions</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="attention__ranges__checked_8c_source.html#l00006">6</a> of file <a class="el" href="attention__ranges__checked_8c_source.html">attention_ranges_checked.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">    7</span>{</div>
-<div class="line"><span class="lineno">    8</span>    <span class="keywordflow">return</span> ptr &amp;&amp; (uintptr_t)ptr % width == 0 &amp;&amp; <a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a> &lt;= SIZE_MAX / width &amp;&amp;</div>
-<div class="line"><span class="lineno">    9</span>           (uintptr_t)ptr &lt;= UINTPTR_MAX - <a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a> * width;</div>
-<div class="line"><span class="lineno">   10</span>}</div>
+<p class="definition">Definition at line <a class="el" href="attention__ranges__checked_8c_source.html#l00008">8</a> of file <a class="el" href="attention__ranges__checked_8c_source.html">attention_ranges_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">    9</span>{</div>
+<div class="line"><span class="lineno">   10</span>    <span class="keywordflow">return</span> ptr &amp;&amp; (uintptr_t)ptr % width == 0 &amp;&amp; <a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a> &lt;= SIZE_MAX / width &amp;&amp;</div>
+<div class="line"><span class="lineno">   11</span>           (uintptr_t)ptr &lt;= UINTPTR_MAX - <a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a> * width;</div>
+<div class="line"><span class="lineno">   12</span>}</div>
 <div class="ttc" id="atrue__bpe_8h_html_ac7f5fd4f55df36920bf0583c3516e72f"><div class="ttname"><a href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a></div><div class="ttdeci">const uint8_t size_t count</div><div class="ttdef"><b>Definition</b> <a href="true__bpe_8h_source.html#l00211">true_bpe.h:211</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="true__bpe_8h_source.html#l00211">count</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="attention__ranges__checked_8c_source.html#l00030">ck_attention_ranges_checked_f32()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="attention__ranges__checked_8c_source.html#l00039">attention_ranges_checked()</a>.</p>
 
 </div>
 </div>
@@ -462,13 +780,13 @@ Functions</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="attention__ranges__checked_8c_source.html#l00012">12</a> of file <a class="el" href="attention__ranges__checked_8c_source.html">attention_ranges_checked.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   13</span>{</div>
-<div class="line"><span class="lineno">   14</span>    <span class="keywordflow">return</span> (uintptr_t)a &lt; (uintptr_t)b + b_bytes &amp;&amp;</div>
-<div class="line"><span class="lineno">   15</span>           (uintptr_t)b &lt; (uintptr_t)a + a_bytes;</div>
-<div class="line"><span class="lineno">   16</span>}</div>
+<p class="definition">Definition at line <a class="el" href="attention__ranges__checked_8c_source.html#l00014">14</a> of file <a class="el" href="attention__ranges__checked_8c_source.html">attention_ranges_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   15</span>{</div>
+<div class="line"><span class="lineno">   16</span>    <span class="keywordflow">return</span> (uintptr_t)a &lt; (uintptr_t)b + b_bytes &amp;&amp;</div>
+<div class="line"><span class="lineno">   17</span>           (uintptr_t)b &lt; (uintptr_t)a + a_bytes;</div>
+<div class="line"><span class="lineno">   18</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="attention__ranges__checked_8c_source.html#l00030">ck_attention_ranges_checked_f32()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="attention__ranges__checked_8c_source.html#l00039">attention_ranges_checked()</a>.</p>
 
 </div>
 </div>

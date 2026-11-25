@@ -1,5 +1,13 @@
 var NAVTREEINDEX23 =
 {
+"structCKLayerOptimizerOffsets.html#a81a1fb827541ffdfe7096eb1bbc9595e":[1,0,53,7],
+"structCKLayerOptimizerOffsets.html#a8204947d283c11186d8b38a0a6971e5a":[1,0,53,29],
+"structCKLayerOptimizerOffsets.html#a821ddf375173a7d11f8694c177a63d93":[1,0,53,6],
+"structCKLayerOptimizerOffsets.html#a83172b4b805ba80fb3e5807329912d25":[1,0,53,9],
+"structCKLayerOptimizerOffsets.html#a921f17f301a5fefcd8eec05f43374b24":[1,0,53,11],
+"structCKLayerOptimizerOffsets.html#a9dec06808a0e417685225e98d95ff37a":[1,0,53,12],
+"structCKLayerOptimizerOffsets.html#aa562f5efd6173858cf43d57551e53a34":[1,0,53,1],
+"structCKLayerOptimizerOffsets.html#aa94d07c14ed486b3784ca75ec9b1de27":[1,0,53,22],
 "structCKLayerOptimizerOffsets.html#aaed37ef9a87c641294a6598ba1166f7f":[1,0,53,31],
 "structCKLayerOptimizerOffsets.html#abb647ae7c60c93c7ee61deeabc9d8562":[1,0,53,25],
 "structCKLayerOptimizerOffsets.html#abeb389a924018bda89771dc56a70c2c0":[1,0,53,33],
@@ -241,13 +249,5 @@ var NAVTREEINDEX23 =
 "structCKTokenizer.html#a121603ec2a9e2cbd377932d783dde05d":[1,0,76,25],
 "structCKTokenizer.html#a1ef21faeef58ae6154e1f03fe76e3377":[1,0,76,14],
 "structCKTokenizer.html#a2993f4ea714c7d2996caccf32eb9ddef":[1,0,76,32],
-"structCKTokenizer.html#a2c76d620f385ed5352621a9e8a0bfaec":[1,0,76,3],
-"structCKTokenizer.html#a3020b1dc0fb08152293a842448998ca5":[1,0,76,21],
-"structCKTokenizer.html#a32688c8d51853200d766b68f9e27b3e4":[1,0,76,20],
-"structCKTokenizer.html#a35f73551a504361ab117452f40fe81bf":[1,0,76,26],
-"structCKTokenizer.html#a52c39349a30ea0dfb6ab48fa975e6fed":[1,0,76,29],
-"structCKTokenizer.html#a64d0be7dac3d476548e873e3f2d05d50":[1,0,76,18],
-"structCKTokenizer.html#a6ac6c2255e6c5ccf7dfc45ecf2be9456":[1,0,76,33],
-"structCKTokenizer.html#a70622f7babd13c77a93825497fdf2c5f":[1,0,76,7],
-"structCKTokenizer.html#a71ab9d27f84fa6c73736eea530f8a192":[1,0,76,13]
+"structCKTokenizer.html#a2c76d620f385ed5352621a9e8a0bfaec":[1,0,76,3]
 };

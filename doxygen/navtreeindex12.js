@@ -1,5 +1,8 @@
 var NAVTREEINDEX12 =
 {
+"ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50":[2,0,0,58,25],
+"ckernel__quant_8h_source.html":[2,0,0,58],
+"ckernel__registry_8c.html":[2,0,1,26],
 "ckernel__registry_8c.html#a099423d6ff299adc431de6513f61c7e9":[2,0,1,26,0],
 "ckernel__registry_8c.html#a34455ff3579fffe6c7c006a92e8987d9":[2,0,1,26,1],
 "ckernel__registry_8c.html#a4178dea993cf3973166fd2dc9d1f2223":[2,0,1,26,2],
@@ -246,8 +249,5 @@ var NAVTREEINDEX12 =
 "deepseek__kernels_8c.html#af054a20437d37717f2cd75a4c36d2773":[2,0,1,1,49,16],
 "deepseek__kernels_8c.html#af52344a3c0bc29040c11c6c0a2b8fbcc":[2,0,1,1,49,22],
 "deepseek__kernels_8c.html#af8e7b32339783784b69f72bb8c9d2023":[2,0,1,1,49,30],
-"deepseek__kernels_8c.html#afde5ed3a0c7b1d8fc34069038c6f482f":[2,0,1,1,49,26],
-"deepseek__kernels_8c_source.html":[2,0,1,1,49],
-"deltanet__kernels_8c.html":[2,0,1,1,50],
-"deltanet__kernels_8c.html#a07d3fe27a8dc9dda88a30039edd6cfbb":[2,0,1,1,50,2]
+"deepseek__kernels_8c.html#afde5ed3a0c7b1d8fc34069038c6f482f":[2,0,1,1,49,26]
 };
