@@ -113,8 +113,9 @@ def followup(label: str) -> dict:
     return result
 
 
-def run_cancel(label: str, prompt: str, *, wait_for: str, delay: float = 0.0) -> dict:
-    messages, done, state, thread = stream_request(prompt, max_tokens=512)
+def run_cancel(label: str, prompt: str, *, wait_for: str, delay: float = 0.0,
+               max_tokens: int = 512) -> dict:
+    messages, done, state, thread = stream_request(prompt, max_tokens=max_tokens)
     response_id = response_id_from_created(messages)
     if wait_for != "response.created":
         wait_event(messages, wait_for, timeout=30.0)
@@ -150,8 +151,8 @@ def run_cancel(label: str, prompt: str, *, wait_for: str, delay: float = 0.0) ->
     return row
 
 
-def run_disconnect(label: str, prompt: str) -> dict:
-    messages, done, state, thread = stream_request(prompt, max_tokens=512,
+def run_disconnect(label: str, prompt: str, *, max_tokens: int = 512) -> dict:
+    messages, done, state, thread = stream_request(prompt, max_tokens=max_tokens,
                                                    disconnect_at="response.in_progress",
                                                    disconnect_delay=3.0)
     response_id = response_id_from_created(messages)
@@ -178,8 +179,8 @@ def run_disconnect(label: str, prompt: str) -> dict:
     raise RuntimeError(f"{label}: no follow-up recovery within 30s: {errors[-2:]}")
 
 
-def run_client_timeout(label: str, prompt: str) -> dict:
-    payload = json.dumps({"model": MODEL, "input": prompt, "max_output_tokens": 512,
+def run_client_timeout(label: str, prompt: str, *, max_tokens: int = 512) -> dict:
+    payload = json.dumps({"model": MODEL, "input": prompt, "max_output_tokens": max_tokens,
                           "stream": True, "store": True}).encode()
     connection = socket.create_connection((HOST, PORT), timeout=30.0)
     try:
@@ -510,6 +511,8 @@ def main() -> int:
     parser.add_argument("--expected-session-library-sha256", required=True)
     parser.add_argument("--output", type=Path, required=True, help="New JSON report path")
     parser.add_argument("--prefill-lines", type=int, default=1500)
+    parser.add_argument("--lifecycle-max-tokens", type=int, default=512,
+                        help="Output budget for cancellation and disconnection probes")
     parser.add_argument("--suite", choices=("lifecycle", "plain-chat", "budget-boundary", "recovery-replay"),
                         default="lifecycle")
     parser.add_argument("--oversized-prompt-file", type=Path,
@@ -522,6 +525,8 @@ def main() -> int:
         parser.error("endpoint must be an HTTP URL with /v1 as its path")
     if args.prefill_lines < 1:
         parser.error("prefill-lines must be positive")
+    if args.lifecycle_max_tokens < 1:
+        parser.error("lifecycle-max-tokens must be positive")
     if not re.fullmatch(r"[A-Za-z]{1,32}", args.expected_reply):
         parser.error("expected-reply must be one ASCII word of at most 32 letters")
     if args.suite == "recovery-replay" and args.oversized_prompt_file is None:
@@ -564,6 +569,7 @@ def main() -> int:
                              "requests_per_side_per_route": 3}
                             if args.suite == "recovery-replay" else None),
         "prefill_lines": PREFILL_LINES,
+        "lifecycle_max_tokens": args.lifecycle_max_tokens if args.suite == "lifecycle" else None,
         "identity_before": None,
         "identity_after": None, "cases": [], "status": "fail",
     }
@@ -583,14 +589,15 @@ def main() -> int:
             run_recovery_replay(oversized_prompt, report["cases"])
         else:
             long_prompt = "Test data follows.\n" + "alpha beta gamma delta\n" * PREFILL_LINES
+            budget = args.lifecycle_max_tokens
             report["cases"].append(run_cancel(
                 "long-input-timed-cancel", long_prompt,
-                wait_for="response.in_progress", delay=3.0))
+                wait_for="response.in_progress", delay=3.0, max_tokens=budget))
             report["cases"].append(run_cancel(
                 "decode", "Count upward forever, one number per line, beginning at one.",
-                wait_for="response.output_text.delta"))
-            report["cases"].append(run_disconnect("stream-disconnect", long_prompt))
-            report["cases"].append(run_client_timeout("client-read-timeout", long_prompt))
+                wait_for="response.output_text.delta", max_tokens=budget))
+            report["cases"].append(run_disconnect("stream-disconnect", long_prompt, max_tokens=budget))
+            report["cases"].append(run_client_timeout("client-read-timeout", long_prompt, max_tokens=budget))
         after = request("GET", "/cke/loaded-identity")
         after.raise_for_status()
         report["identity_after"] = after.json()

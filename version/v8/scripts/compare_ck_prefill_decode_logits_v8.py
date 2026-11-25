@@ -17,7 +17,10 @@ from typing import Any
 
 import numpy as np
 
-from compare_first_token_logits_v8 import compare_logits, discover_ck_model_dir, parse_tokens_csv  # type: ignore
+if __package__:
+    from .compare_first_token_logits_v8 import compare_logits, discover_ck_model_dir, parse_tokens_csv
+else:
+    from compare_first_token_logits_v8 import compare_logits, discover_ck_model_dir, parse_tokens_csv
 
 
 def _init_model(lib: ctypes.CDLL, model_dir: Path) -> str:

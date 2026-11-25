@@ -27,6 +27,22 @@ def _load_runner():
 
 
 class NightlyArtifactStatusTests(unittest.TestCase):
+    def test_pytest_registry_preserves_case_verdicts_and_rejects_noop_success(self) -> None:
+        runner = _load_runner()
+        suite = runner.TestSuite("Scoped pytest", "inference", SCRIPT, pytest=True)
+        for output, returncode, expected in (
+            ("model.py::test_real SKIPPED (assets) [100%]\n", 0, "skip"),
+            ("model.py::test_contract PASSED [ 50%]\nmodel.py::test_real SKIPPED [100%]\n", 0, "pass"),
+            ("model.py::test_contract FAILED [100%]\n", 1, "fail"),
+            ("", 0, "fail"),
+        ):
+            with self.subTest(expected=expected, output=output):
+                completed = subprocess.CompletedProcess([], returncode, stdout=output, stderr="")
+                with mock.patch.object(runner.subprocess, "run", return_value=completed) as run:
+                    result = runner.run_python_test(suite)
+                self.assertEqual(run.call_args.args[0][2:4], ["-m", "pytest"])
+                self.assertEqual(result.status, expected)
+
     def test_local_prepare_records_build_failure_and_physical_affinity_jobs(self) -> None:
         runner = _load_runner()
         completed = subprocess.CompletedProcess(
