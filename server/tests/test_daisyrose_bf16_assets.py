@@ -14,7 +14,9 @@ def test_real_served_daisyrose_bf16(tmp_path):
         pytest.skip("CK_DAISYROSE_BF16_ACCEPTANCE is not configured")
     options = json.loads(Path(configuration).read_text())
     required = {"bundle", "checkpoint", "endpoint", "session-library", "max-abs", "max-rmse"}
-    if not required <= options.keys() or options.keys() - (required | {"model", "oracle-threads"}):
+    if not required <= options.keys() or options.keys() - (
+        required | {"model", "oracle-threads", "oracle-attention"}
+    ):
         pytest.fail("invalid DaisyRose acceptance configuration")
     output = tmp_path / "evidence"
     command = [sys.executable, "-m", "server.daisyrose_bf16_acceptance",

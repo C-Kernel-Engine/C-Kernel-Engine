@@ -331,6 +331,9 @@ python version/v8/scripts/ck_serve_v8.py &quot;$bundle&quot; --no-build \
 Declare the absolute and RMSE logit limits before running. The command writes
 full native and PyTorch logits, checkpoint and runtime identities, and separate
 HTTP and numerical verdicts to a new output directory.</p>
+<p>The oracle defaults to PyTorch math SDPA, which the BF16 circuit declares for full attention.
+Use <code>--oracle-attention eager</code> to compare a separate PyTorch attention implementation.
+The report records the selected arithmetic.</p>
 <pre>python -m server.daisyrose_bf16_acceptance --bundle &quot;$bundle&quot; \
   --checkpoint &quot;$checkpoint&quot; --endpoint http://127.0.0.1:8391/v1 \
   --session-library build/libck_session_v8.so --output-dir &quot;$evidence&quot; \

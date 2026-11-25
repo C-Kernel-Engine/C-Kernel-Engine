@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 from collections import defaultdict
+from contextlib import nullcontext
 import ctypes as C
 import json
 from pathlib import Path
@@ -70,11 +71,12 @@ def verify_checkpoint(checkpoint):
     return pin
 
 
-def publisher_logits(checkpoint, cases, threads):
+def publisher_logits(checkpoint, cases, threads, *, attention="math-sdpa"):
     """Use publisher modules and cache with at most one layer mapped at a time."""
     import torch
     import transformers
     from safetensors import safe_open
+    from torch.nn.attention import SDPBackend, sdpa_kernel
     from transformers.cache_utils import DynamicCache
     from transformers.models.qwen3_5.configuration_qwen3_5 import Qwen3_5TextConfig
     from transformers.models.qwen3_5.modeling_qwen3_5 import (
@@ -84,7 +86,14 @@ def publisher_logits(checkpoint, cases, threads):
     index = json.loads((checkpoint / "model.safetensors.index.json").read_text())["weight_map"]
     prefix = "model.language_model."
     config = Qwen3_5TextConfig.from_dict(json.loads((checkpoint / "config.json").read_text())["text_config"])
-    config._attn_implementation = "eager"
+    if attention == "math-sdpa":
+        config._attn_implementation = "sdpa"
+        attention_context = sdpa_kernel(SDPBackend.MATH)
+    elif attention == "eager":
+        config._attn_implementation = "eager"
+        attention_context = nullcontext()
+    else:
+        raise ValueError(f"unsupported PyTorch attention oracle: {attention}")
     torch.set_num_threads(threads)
 
     def weights(names):
@@ -101,7 +110,7 @@ def publisher_logits(checkpoint, cases, threads):
                     tensors[key] = tensor
         return tensors
 
-    with torch.inference_mode():
+    with torch.inference_mode(), attention_context:
         embed = weights([prefix + "embed_tokens.weight"])[prefix + "embed_tokens.weight"]
         rope = Qwen3_5TextRotaryEmbedding(config)
         sequences = []
@@ -142,7 +151,10 @@ def publisher_logits(checkpoint, cases, threads):
             .float().numpy()
             for frames, _ in sequences
         ]
-    return results, {"torch": torch.__version__, "transformers": transformers.__version__, "threads": threads}
+    return results, {
+        "torch": torch.__version__, "transformers": transformers.__version__,
+        "threads": threads, "attention": attention,
+    }
 
 
 def native_logits(bundle, contract, checkpoint):
@@ -267,6 +279,8 @@ def main():
     parser.add_argument("--session-library", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--oracle-threads", type=int, default=4)
+    parser.add_argument("--oracle-attention", choices=("math-sdpa", "eager"), default="math-sdpa",
+                        help="PyTorch attention arithmetic for the full-attention layers")
     parser.add_argument("--max-abs", type=float, required=True, help="Predeclared maximum BF16 logit error")
     parser.add_argument("--max-rmse", type=float, required=True, help="Predeclared BF16 logit RMSE bound")
     args = parser.parse_args()
@@ -295,7 +309,9 @@ def main():
             report["http_error"] = f"{type(exc).__name__}: {exc}"
 
         cases, actual = native_logits(args.bundle, contract, args.checkpoint)
-        expected, oracle = publisher_logits(args.checkpoint, cases, args.oracle_threads)
+        expected, oracle = publisher_logits(
+            args.checkpoint, cases, args.oracle_threads, attention=args.oracle_attention,
+        )
         report.update(oracle=oracle, native_reset_repeat="bit_exact", cases=cases)
         eos = json.loads((args.checkpoint / "generation_config.json").read_text())["eos_token_id"]
         eos = eos if isinstance(eos, list) else [eos]
