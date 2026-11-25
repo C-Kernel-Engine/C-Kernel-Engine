@@ -220,6 +220,17 @@ def check_http(args, contract, report):
     session_hash = sha256_file(args.session_library)
     endpoint = args.endpoint.rstrip("/")
     with httpx.Client(timeout=60.0) as client:
+        def chat_case(messages, answer):
+            response = client.post(endpoint + "/chat/completions", json={
+                "model": args.model, "messages": messages, "temperature": 0, "max_tokens": 16,
+            })
+            response.raise_for_status()
+            choice, = response.json()["choices"]
+            return {
+                "answer": choice["message"]["content"], "finish_reason": choice["finish_reason"],
+                "pass": choice["message"]["content"] == answer and choice["finish_reason"] == "stop",
+            }
+
         response = client.get(endpoint + "/cke/loaded-identity")
         response.raise_for_status()
         before = response.json()
@@ -228,15 +239,7 @@ def check_http(args, contract, report):
         report["loaded_identity"] = before
         report["http"] = {}
         for name, messages, answer in CASES:
-            response = client.post(endpoint + "/chat/completions", json={
-                "model": args.model, "messages": messages, "temperature": 0, "max_tokens": 16,
-            })
-            response.raise_for_status()
-            choice, = response.json()["choices"]
-            report["http"][name] = {
-                "answer": choice["message"]["content"], "finish_reason": choice["finish_reason"],
-                "pass": choice["message"]["content"] == answer and choice["finish_reason"] == "stop",
-            }
+            report["http"][name] = chat_case(messages, answer)
         for suite in ("plain-chat", "lifecycle"):
             process = subprocess.run([
                 sys.executable, "-m", "server.http_lifecycle_acceptance", "--suite", suite,
@@ -247,6 +250,8 @@ def check_http(args, contract, report):
                 "--output", str(args.output_dir / f"{suite}.json"),
             ], check=False)
             report["http"][suite] = {"pass": process.returncode == 0}
+        name, messages, answer = CASES[0]
+        report["http"][f"{name}-after-lifecycle"] = chat_case(messages, answer)
         after = client.get(endpoint + "/cke/loaded-identity")
         after.raise_for_status()
         if after.json() != before:
