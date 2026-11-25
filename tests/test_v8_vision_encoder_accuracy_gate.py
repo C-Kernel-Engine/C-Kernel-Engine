@@ -13,6 +13,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 SCRIPT = ROOT / "version/v8/scripts/vision_encoder_accuracy_gate_v8.py"
 SUITE = ROOT / "version/v8/scripts/qwen3vl_encoder_prefix_parity_suite_v8.py"
 
