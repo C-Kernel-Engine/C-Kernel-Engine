@@ -17,7 +17,7 @@ REVISION = "bf8350b2c59eb6c36e95d02a2af870aec18724a7"
 PREFIX = "model.language_model."
 
 
-def capture(checkpoint, request, threads):
+def capture(checkpoint, request, threads, *, readout_inputs=None):
     import torch
     import transformers
     from safetensors import safe_open
@@ -60,6 +60,7 @@ def capture(checkpoint, request, threads):
                     values[key] = tensor
         return values
 
+    capture_sha256 = None
     with torch.inference_mode():
         embed_key = PREFIX + "embed_tokens.weight"
         embed = weights([embed_key])[embed_key]
@@ -106,12 +107,17 @@ def capture(checkpoint, request, threads):
         norm.load_state_dict({"weight": weights([PREFIX + "norm.weight"])[PREFIX + "norm.weight"]}, assign=True)
         head = weights(["lm_head.weight"])["lm_head.weight"]
         outputs = []
-        for (hidden, _, _, _), question in zip(
+        packed_hidden = []
+        for index, ((hidden, _, _, _), question) in enumerate(zip(
             branches, [*request["questions"], request["questions"][-1]], strict=True,
-        ):
+        )):
             # The stock publisher Gemma module applies the logit softcap to BF16 logits.
             slots = [token for _, token in question["options"]]
-            logits = torch.nn.functional.linear(norm(hidden[0, -2:]), head[slots])
+            if readout_inputs is not None and index < len(request["questions"]):
+                start = len(prefix) if index else 0
+                packed_hidden.append(norm(hidden[0, start:]).clone())
+            raw_logits = torch.nn.functional.linear(norm(hidden[0, -2:]), head[slots])
+            logits = raw_logits
             softcap = config.final_logit_softcapping
             if softcap is not None:
                 logits = softcap * torch.tanh(logits / softcap)
@@ -120,13 +126,22 @@ def capture(checkpoint, request, threads):
             outputs.append({
                 "name": question["name"],
                 "option_scores": dict(zip([label for label, _ in question["options"]], logits[-1].tolist(), strict=True)),
+                "raw_option_scores": dict(zip([label for label, _ in question["options"]], raw_logits[-1].tolist(), strict=True)),
                 "previous_row_scores": logits[-2].tolist(),
             })
+        if readout_inputs is not None:
+            import numpy as np
+
+            with readout_inputs.open("xb") as stream:
+                np.save(stream, torch.cat(packed_hidden).view(torch.uint16).numpy(), allow_pickle=False)
+            with readout_inputs.open("rb") as stream:
+                capture_sha256 = hashlib.file_digest(stream, "sha256").hexdigest()
     correct = outputs[:-1]
     return {
         "checkpoint": REVISION, "renderer_revision": request["renderer_revision"],
         "torch": torch.__version__, "transformers": transformers.__version__,
         "scope": "PyTorch BF16 with explicit block-bidirectional and causal sliding masks",
+        "readout_inputs_sha256": capture_sha256,
         "questions": correct,
         "wrong_mask_changes_scores": outputs[-1]["option_scores"] != correct[-1]["option_scores"],
         "wrong_row_changes_scores": all(
@@ -140,9 +155,13 @@ def main():
     argp.add_argument("--checkpoint", required=True, type=Path)
     argp.add_argument("--request", required=True, type=Path)
     argp.add_argument("--out", required=True, type=Path)
+    argp.add_argument("--readout-inputs", type=Path,
+                      help="optional new NPY file containing the oracle's packed BF16 final hidden rows")
     argp.add_argument("--threads", default=4, type=int)
     args = argp.parse_args()
-    if args.threads < 1 or args.out.exists():
+    if args.threads < 1 or args.out.exists() or (args.readout_inputs is not None and (
+        args.readout_inputs.exists() or args.readout_inputs.resolve() == args.out.resolve()
+    )):
         argp.error("threads must be positive and output must be new")
     request = json.loads(args.request.read_text())
     if request.get("checkpoint") != REVISION or len(request.get("questions", ())) != 2:
@@ -151,7 +170,7 @@ def main():
         with (args.checkpoint / name).open("rb") as stream:
             if hashlib.file_digest(stream, "sha256").hexdigest() != expected:
                 raise ValueError(f"publisher digest mismatch: {name}")
-    report = capture(args.checkpoint, request, args.threads)
+    report = capture(args.checkpoint, request, args.threads, readout_inputs=args.readout_inputs)
     with args.out.open("x") as stream:
         json.dump(report, stream, indent=2)
         stream.write("\n")

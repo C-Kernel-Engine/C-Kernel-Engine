@@ -7,9 +7,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from version.v8.decision.build_packed_option_readout import option_readout_graph
 from version.v8.decision.packed_question_layout import Question, pack_questions
 from version.v8.scripts.compile_checked_bundle_v8 import compile_checked_weight_graph
-from version.v8.scripts.replay_bf16_projection_bundle_v8 import projection_graph
 
 
 def test_window_keeps_branch_local_positions_and_rejects_bad_slots():
@@ -24,6 +24,42 @@ def test_window_keeps_branch_local_positions_and_rejects_bad_slots():
     invalid = (Question("wrong", (5,), (("a", 8), ("b", 8))),)
     with pytest.raises(ValueError, match="distinct"):
         pack_questions((2, 3, 4), invalid, vocab_size=10, sliding_window=3, capacity=8)
+
+
+def _build_readout(folder, hidden, weights):
+    folder.mkdir(exist_ok=True)
+    rows, width = hidden.shape
+    labels = weights.shape[0]
+    invoke, arena, view, _ = compile_checked_weight_graph(
+        folder, option_readout_graph(rows, 2, width, labels),
+        {"option.weight": weights}, {"option.weight": ([labels, width], "BF16")},
+        source_config={"num_layers": 1, "embed_dim": width, "num_heads": 1,
+                       "num_kv_heads": 1, "head_dim": width, "intermediate_size": width,
+                       "context_length": rows, "max_seq_len": rows,
+                       "activation_buffer_dtypes": {"hidden": "bf16", "selected": "bf16",
+                                                    "answer_rows": "i32", "scores": "bf16"}},
+    )
+    view("hidden", np.uint16)[:] = hidden
+
+    def run(indices):
+        view("answer_rows", np.int32)[:] = indices
+        return invoke(arena, len(arena))
+
+    return view("scores", np.uint16), run
+
+
+def test_generated_readout_rejects_out_of_range_rows_without_publishing(tmp_path):
+    # Exact BF16 representations of [[1, 2], [2, 3], [3, 4]] and an identity projection.
+    hidden = np.array([[0x3F80, 0x4000], [0x4000, 0x4040], [0x4040, 0x4080]], dtype=np.uint16)
+    weights = np.array([[0x3F80, 0], [0, 0x3F80]], dtype=np.uint16)
+    output, run = _build_readout(tmp_path, hidden, weights)
+    assert run([2, 0]) == 0
+    np.testing.assert_array_equal(output, hidden[[2, 0]])
+    assert run([0, 3]) == -2
+    assert run([-1, 2]) == -2
+    np.testing.assert_array_equal(output, hidden[[2, 0]])
+    assert run([1, 1]) == 0
+    np.testing.assert_array_equal(output, hidden[[1, 1]])
 
 
 def test_pinned_bison_readout_rows_preserve_option_mapping(tmp_path):
@@ -47,27 +83,23 @@ def test_pinned_bison_readout_rows_preserve_option_mapping(tmp_path):
                             sliding_window=1024, capacity=256)
     slot_ids = [236776, 236799, 236780]
     width = weights.shape[-1]
-    hidden = torch.randn(
-        len(layout.token_ids), width, generator=torch.Generator().manual_seed(185)
-    ).bfloat16()
+    oracle_capture = os.environ.get("CK_BLOCK_DECISION_BISON_ORACLE")
+    if oracle_capture:
+        capture_dir = Path(oracle_capture)
+        hidden_bits = np.load(capture_dir / "bison-readout-inputs.npy", allow_pickle=False)
+        assert hidden_bits.dtype == np.uint16 and hidden_bits.shape == (len(layout.token_ids), width)
+        hidden = torch.from_numpy(hidden_bits).view(torch.bfloat16)
+    else:
+        hidden = torch.randn(
+            len(layout.token_ids), width, generator=torch.Generator().manual_seed(185)
+        ).bfloat16()
     readout = hidden[[row for _, row, _ in layout.answers]]
-    invoke, arena, view, _ = compile_checked_weight_graph(
-        tmp_path, projection_graph(2, width, 3),
-        {"projection.weight": weights}, {"projection.weight": ([3, width], "BF16")},
-        source_config={"num_layers": 1, "embed_dim": width, "num_heads": 1,
-                       "num_kv_heads": 1, "head_dim": width, "intermediate_size": width,
-                       "context_length": 2, "max_seq_len": 2,
-                       "activation_buffer_dtypes": {"input": "bf16", "output": "bf16"}},
-    )
-
-    def run(rows):
-        view("input", np.uint16)[:] = rows.view(torch.uint16).numpy()
-        assert invoke(arena, len(arena)) == 0
-        return view("output", np.uint16).copy()
-
+    rows = np.array([row for _, row, _ in layout.answers], dtype=np.int32)
+    output, run = _build_readout(tmp_path, hidden.view(torch.uint16).numpy(), weights)
+    assert run(rows) == 0
     expected = torch.nn.functional.linear(readout, torch.from_numpy(weights).view(torch.bfloat16))
-    output = run(readout)
     np.testing.assert_array_equal(output, expected.view(torch.uint16).numpy())
+    before = output.copy()
     scores = {
         name: {option: int(output[i, slot_ids.index(slot)]) for option, slot in options}
         for i, (name, _, options) in enumerate(layout.answers)
@@ -75,9 +107,23 @@ def test_pinned_bison_readout_rows_preserve_option_mapping(tmp_path):
     assert list(scores["refund"]) == ["yes", "no"]
     assert list(scores["team"]) == ["billing", "technical", "fraud"]
     assert scores["refund"]["yes"] != scores["refund"]["no"]
-    wrong_row = run(hidden[[layout.answers[0][1] - 1, layout.answers[1][1]]])
-    assert not np.array_equal(wrong_row[0, :2], output[0, :2])
-    np.testing.assert_array_equal(wrong_row[1], output[1])
+    if oracle_capture:
+        report = json.loads((capture_dir / "bison-oracle.json").read_text())
+        assert report["checkpoint"] == fixture["checkpoint"]
+        assert report["renderer_revision"] == fixture["renderer_revision"]
+        assert report["readout_inputs_sha256"] == hashlib.sha256(
+            (capture_dir / "bison-readout-inputs.npy").read_bytes()
+        ).hexdigest()
+        assert report["wrong_mask_changes_scores"] and report["wrong_row_changes_scores"]
+        for i, (_, _, options) in enumerate(layout.answers):
+            values = output[i, [slot_ids.index(slot) for _, slot in options]]
+            raw = torch.from_numpy(values).view(torch.bfloat16).float().tolist()
+            assert raw == list(report["questions"][i]["raw_option_scores"].values())
+    changed_rows = rows.copy()
+    changed_rows[0] -= 1
+    assert run(changed_rows) == 0
+    assert not np.array_equal(output[0, :2], before[0, :2])
+    np.testing.assert_array_equal(output[1], before[1])
 
 
 def test_bison_oracle_runs_both_masks_and_reaches_readout(tmp_path):
@@ -116,10 +162,20 @@ def test_bison_oracle_runs_both_masks_and_reaches_readout(tmp_path):
     (tmp_path / "model.safetensors.index.json").write_text(json.dumps({
         "weight_map": dict.fromkeys(weights, "tiny.safetensors"),
     }))
+    readout_inputs = tmp_path / "readout_inputs.npy"
     result = capture(tmp_path, {
         "prefix": [2, 3, 4], "renderer_revision": "test",
         "questions": [{"name": "first", "tokens": [5, 6], "options": [["yes", 7], ["no", 8]]},
                       {"name": "second", "tokens": [10, 11, 12], "options": [["a", 7], ["b", 8], ["c", 9]]}],
-    }, threads=1)
+    }, threads=1, readout_inputs=readout_inputs)
     assert [list(q["option_scores"]) for q in result["questions"]] == [["yes", "no"], ["a", "b", "c"]]
     assert result["wrong_mask_changes_scores"] and result["wrong_row_changes_scores"]
+    hidden = np.load(readout_inputs, allow_pickle=False)
+    assert hidden.dtype == np.uint16 and hidden.shape == (8, 16)
+    weight_rows = weights["lm_head.weight"][[7, 8, 9]].view(torch.uint16).numpy()
+    output, run = _build_readout(tmp_path / "native", hidden, weight_rows)
+    assert run([4, 7]) == 0
+    raw = torch.from_numpy(output).view(torch.bfloat16).float().tolist()
+    for scores, question in zip(raw, result["questions"], strict=True):
+        expected = list(question["raw_option_scores"].values())
+        assert scores[:len(expected)] == expected
