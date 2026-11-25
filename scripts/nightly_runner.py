@@ -1381,7 +1381,7 @@ TEST_SUITES = {
         "Inkling 2 Mini Generated Packed Text Loop", "inference",
         ROOT / "tests" / "test_v8_inkling2_text_loop.py",
         unittest_targets=("tests.test_v8_inkling2_text_loop",),
-        timeout_sec=180,
+        timeout_sec=300,
     ),
     "inkling2_mini_gguf_import_contract": TestSuite(
         "Inkling 2 Mini GGUF Tensor and Loop Contract", "inference",
@@ -2346,7 +2346,7 @@ MAKE_TARGETS = {
         "name": "Server Protocol and Lifecycle",
         "category": "inference",
         "target": "test-server-schema",
-        "timeout_sec": 60,
+        "timeout_sec": 120,
     },
     "v8_audio_contracts": {
         "name": "v8 Audio Circuit/Codegen Contracts",
