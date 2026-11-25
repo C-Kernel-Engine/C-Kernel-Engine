@@ -636,6 +636,7 @@ class TestSuite:
     ci_skip: bool = False  # Skip in CI mode (tests requiring full shared library)
     unittest_targets: tuple[str, ...] = ()
     explicit_only: bool = False
+    pytest: bool = False
 
 
 def prepare_local_build() -> TestResult:
@@ -772,15 +773,15 @@ TEST_SUITES = {
     ),
     "tts_drama3_codec_rvq": TestSuite(
         "Drama 3 Generated Semantic and Residual Codebook Reconstruction", "inference",
-        ROOT / "tests" / "test_v8_drama3_codec_rvq.py",
+        ROOT / "tests" / "test_v8_drama3_codec_rvq.py", pytest=True,
     ),
     "tts_drama3_codec_transformer": TestSuite(
         "Drama 3 Generated Codebooks and Codec Transformer", "inference",
-        ROOT / "tests" / "test_v8_drama3_codec_transformer.py", timeout_sec=180,
+        ROOT / "tests" / "test_v8_drama3_codec_transformer.py", timeout_sec=180, pytest=True,
     ),
     "tts_drama3_codec_waveform": TestSuite(
         "Drama 3 Generated Reference-Code PCM", "inference",
-        ROOT / "tests" / "test_v8_drama3_codec_waveform.py", timeout_sec=240,
+        ROOT / "tests" / "test_v8_drama3_codec_waveform.py", timeout_sec=240, pytest=True,
     ),
     "tts_ming3_generated_dit_fp32": TestSuite(
         "Ming3 Full Generated DiT FP32 Composition", "inference",
@@ -888,9 +889,17 @@ TEST_SUITES = {
         ROOT / "tests" / "test_v8_qwen3_tts_first_block.py",
         timeout_sec=180,
     ),
+    "daisyrose_bf16_acceptance": TestSuite(
+        "DaisyRose BF16 Logit Acceptance Contract", "inference",
+        ROOT / "server" / "tests" / "test_daisyrose_bf16_acceptance.py", pytest=True,
+    ),
+    "daisyrose_bf16_assets": TestSuite(
+        "DaisyRose BF16 Pinned Serving and PyTorch Comparison", "inference",
+        ROOT / "server" / "tests" / "test_daisyrose_bf16_assets.py", timeout_sec=3600, pytest=True,
+    ),
     "sigma_bf16_attention_ingress": TestSuite(
         "Sigma BF16 Generated Attention Ingress", "inference",
-        ROOT / "tests" / "test_v8_sigma_bf16_ingress.py",
+        ROOT / "tests" / "test_v8_sigma_bf16_ingress.py", pytest=True,
     ),
     "indexed_scale_checked": TestSuite(
         "Checked Indexed Scale and Generated Router Composition", "kernels",
@@ -2988,6 +2997,20 @@ def parse_unittest_cases(stderr: str) -> list[SubTestResult]:
     return cases
 
 
+def parse_pytest_cases(stdout: str) -> list[SubTestResult]:
+    cases = []
+    for match in re.finditer(
+        r"^([^\n]+\.py::[^\n]+?)\s+(PASSED|FAILED|ERROR|SKIPPED|XFAIL|XPASS)(?:\s+|$)",
+        stdout,
+        re.MULTILINE,
+    ):
+        identity, outcome = match.groups()
+        status = "pass" if outcome == "PASSED" else "fail" if outcome in {"FAILED", "ERROR"} else "not_tested"
+        cases.append(SubTestResult(name=identity, case_id=identity, status=status,
+                                   evidence_kind="test_execution", metadata={"outcome": outcome}))
+    return cases
+
+
 def select_kernel_map_tests(map_paths: list[str]) -> list[str]:
     paths = set()
     for name in map_paths:
@@ -3286,9 +3309,15 @@ def run_python_test(suite: TestSuite, verbose: bool = False) -> TestResult:
 
     start = time.time()
     try:
+        command = [sys.executable, "-u"]
+        if suite.pytest:
+            command += ["-m", "pytest", "-v", "-rs", "--color=no", str(suite.test_file)]
+        elif suite.unittest_targets:
+            command += ["-m", "unittest", *suite.unittest_targets, "-v"]
+        else:
+            command.append(str(suite.test_file))
         result = subprocess.run(
-            ([sys.executable, "-u", "-m", "unittest", *suite.unittest_targets, "-v"]
-             if suite.unittest_targets else [sys.executable, "-u", str(suite.test_file)]),
+            command,
             cwd=str(ROOT),
             capture_output=True,
             text=True,
@@ -3320,6 +3349,20 @@ def run_python_test(suite: TestSuite, verbose: bool = False) -> TestResult:
         counts = re.search(r"Ran (\d+) tests?", combined_output)
         skips = re.search(r"OK \(skipped=(\d+)\)", combined_output)
         execution_cases = [case for case in sub_tests if case.evidence_kind == "test_execution"]
+        if suite.pytest:
+            pytest_cases = parse_pytest_cases(result.stdout)
+            sub_tests.extend(pytest_cases)
+            all_cases_skipped = pytest_cases and all(case.status == "not_tested" for case in pytest_cases)
+            collection_skipped = not pytest_cases and re.search(
+                r"^=+ .*\b\d+ skipped\b.* in [\d.]+s =+$", result.stdout, re.MULTILINE,
+            )
+            if all_cases_skipped or collection_skipped:
+                reasons = [line for line in result.stdout.splitlines() if line.startswith("SKIPPED ")]
+                explicit_skip = "; ".join(reasons) or "all selected pytest cases skipped"
+            elif not pytest_cases and result.returncode == 0:
+                return TestResult(name=suite.name, category=suite.category, status="fail",
+                                  duration_sec=duration, stdout=result.stdout, stderr=result.stderr,
+                                  error_msg="registered pytest suite produced no case results")
         if counts and skips and (counts.group(1) == skips.group(1) or (execution_cases and all(case.status == "not_tested" for case in execution_cases))):
             reasons = [case.metadata["outcome"] for case in sub_tests if case.status == "not_tested" and case.evidence_kind == "test_execution"]
             explicit_skip = "all selected unittest cases skipped: " + ("; ".join(reasons) if reasons else skips.group(0))
@@ -3378,6 +3421,8 @@ def run_python_test(suite: TestSuite, verbose: bool = False) -> TestResult:
         error_msg = f"Test timed out after {suite.timeout_sec}s"
         try:
             sub_tests = parse_sub_tests(stdout) + parse_unittest_cases(stderr)
+            if suite.pytest:
+                sub_tests.extend(parse_pytest_cases(stdout))
         except (ValueError, TypeError) as parse_error:
             sub_tests = []
             error_msg += f"; partial-output parsing failed: {parse_error}"

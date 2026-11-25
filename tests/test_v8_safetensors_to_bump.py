@@ -4186,3 +4186,37 @@ def test_concatenation_rejects_inconsistent_shapes_and_types():
     wrong = converter.TensorRef('projection', ('a','b'), shape=(2,3))
     with pytest.raises(ValueError, match='source extent'):
         converter._entry_size_from_header(wrong, headers, 'fp32')
+
+
+def test_gemma4_per_layer_gqa_geometry_survives_import_and_lowering():
+    from version.v8.scripts.build_ir_v8 import _materialize_compact_kv_layout, apply_layer_attention_dims
+
+    converter = _load_converter()
+    raw = {
+        "num_hidden_layers": 2, "num_attention_heads": 32, "num_key_value_heads": 16,
+        "head_dim": 256, "sliding_window": 1024, "layer_types": ["sliding_attention", "full_attention"],
+        "per_layer_config": {"01": {"head_dim": 512, "num_key_value_heads": 4}},
+    }
+    stem = "model.language_model.layers.1.self_attn."
+    widths = {"q_proj": 16384, "k_proj": 2048}
+    headers = {
+        stem + name + ".weight": converter.HeaderTensor(name, "BF16", [width, 5376], Path("weights"))
+        for name, width in widths.items()
+    }
+    config = {"num_layers": 2, "num_heads": 32, "num_kv_heads": 16, "head_dim": 256, "embed_dim": 5376}
+    config.update(converter._build_gemma4_attention_plan_from_hf(raw, headers))
+    assert config["layer_num_kv_heads"] == [16, 4]
+    assert config["layer_k_head_dim"] == [256, 512]
+    assert config["layer_k_cache_offset"] == [0, 8192]
+    assert config["layer_v_cache_offset"] == [4096, 10240]
+    assert config["kv_cache_token_stride_total"] == 12288
+    _materialize_compact_kv_layout(config)
+    for name in ("k_proj", "v_proj", "kv_cache_store", "rope_qk", "attn"):
+        params = {}
+        apply_layer_attention_dims(name, params, 1, config)
+        assert params["num_kv_heads"] == 4
+        assert params.get("k_dim", params.get("output_dim")) == 2048
+
+    headers[stem + "k_proj.weight"].shape[0] = 4096
+    with pytest.raises(SystemExit, match="declared head geometry differs"):
+        converter._build_gemma4_attention_plan_from_hf(raw, headers)
