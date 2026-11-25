@@ -1323,37 +1323,30 @@ class NumericalExecutionContractTests(unittest.TestCase):
                     semantics["reduction"]["order"], "left_to_right"
                 )
 
-    def test_qwen35_circuit_resolves_pytorch_bf16_grouped_deltanet(self):
-        circuit_doc = resolver.load_json(
-            ROOT / "version" / "v8" / "circuits" / "qwen35.json"
-        )
+    def test_qwen_bf16_deltanet_resolves_by_execution_phase(self):
         expected = {
-            "prefill": "gated_deltanet_pytorch_grouped_bf16_prefill_forward",
-            "decode": "gated_deltanet_pytorch_grouped_bf16_forward",
+            "prefill": (
+                "gated_deltanet_chunked_bf16_prefill_forward",
+                "gated_deltanet_grouped_chunk64_fp32_state_bf16_output",
+            ),
+            "decode": (
+                "gated_deltanet_pytorch_grouped_bf16_forward",
+                "gated_deltanet_pytorch_grouped_qk_fp32_state_bf16_output",
+            ),
         }
-        for phase, kernel_id in expected.items():
-            with self.subTest(phase=phase):
-                plan = resolver.resolve_contract(
-                    circuit_doc,
-                    self.contracts,
-                    self.kernels,
-                    "decoder.recurrent_core_bf16_pytorch",
-                    phase,
-                    mode="production",
-                )
-                self.assertEqual(
-                    plan["contract"]["id"],
-                    "gated_deltanet_pytorch_grouped_qk_fp32_state_bf16_output",
-                )
-                self.assertEqual(plan["kernel"]["id"], kernel_id)
-                self.assertEqual(plan["kernel"]["function"], kernel_id)
-                self.assertEqual(
-                    plan["contract"]["semantics"]["compute"]["evaluation_order"],
-                    "ascending_token_grouped_qk_repeat_interleave_then_mkl_vml_"
-                    "exp_then_materialized_multiply_pytorch_cpu_vectorized_outer_"
-                    "cascade_sum_then_materialized_state_outer_product_add_then_"
-                    "bf16_output_store",
-                )
+        for name in ("qwen35", "qwen38"):
+            circuit_doc = resolver.load_json(
+                ROOT / "version" / "v8" / "circuits" / f"{name}.json"
+            )
+            for phase, (kernel_id, contract_id) in expected.items():
+                with self.subTest(circuit=name, phase=phase):
+                    plan = resolver.resolve_contract(
+                        circuit_doc, self.contracts, self.kernels,
+                        "decoder.recurrent_core_bf16_pytorch", phase, mode="production",
+                    )
+                    self.assertEqual(plan["contract"]["id"], contract_id)
+                    self.assertEqual(plan["kernel"]["id"], kernel_id)
+                    self.assertEqual(plan["kernel"]["function"], kernel_id)
 
     def test_qwen35_circuit_resolves_pytorch_bf16_recurrent_qk_l2(self):
         circuit_doc = resolver.load_json(

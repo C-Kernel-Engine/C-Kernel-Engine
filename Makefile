@@ -498,6 +498,7 @@ SRCS    := src/backend_native.c \
 	           src/kernels/recurrent_norm_kernels.c \
 	           src/kernels/mamba2_kernels.c \
 	           src/kernels/deltanet_kernels.c \
+	           src/kernels/deltanet_chunked_bf16.c \
 	           src/kernels/rwkv7_decode.c \
 	           src/kernels/deepseek_kernels.c \
 	           src/kernels/gemma4_per_layer_embed.c \
@@ -4416,6 +4417,7 @@ test-numerical-contracts: $(LIB)
 	@$(PYTHON) unittest/bf16/test_layernorm_storage_contract_bf16.py
 	@$(PYTHON) unittest/bf16/test_rmsnorm_pytorch_storage_bf16.py
 	@$(PYTHON) unittest/bf16/test_qk_norm_pytorch_storage_bf16.py
+	@$(PYTHON) -m pytest -q -rs tests/test_v8_deltanet_chunked_bf16.py
 	@$(PYTHON) unittest/bf16/test_gemm_storage_contract_bf16.py
 	@$(CC) -O3 -Iinclude -ffunction-sections -fdata-sections \
 		src/kernels/gemm_kernels_bf16.c unittest/bf16/test_gemm_nt_bf16_scalar.c \

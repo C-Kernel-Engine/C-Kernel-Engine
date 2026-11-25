@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 574,
+      "total": 575,
       "by_op": {
         "add_backward": 1,
         "add_rows_backward_train_f32": 1,
@@ -111,7 +111,7 @@
         "fused_linear_bias": 3,
         "fused_mlp_block": 1,
         "fused_qkv_block": 1,
-        "gated_deltanet": 7,
+        "gated_deltanet": 8,
         "gated_shared_swiglu_expert_mlp": 4,
         "geglu": 7,
         "gelu": 10,
@@ -44196,6 +44196,334 @@
       "notes": "Gated DeltaNet single-token recurrent update used by qwen3next/Qwen3.5 linear attention blocks.",
       "name": "gated_deltanet_autoregressive_forward",
       "_source_file": "gated_deltanet_autoregressive_forward.json"
+    },
+    {
+      "id": "gated_deltanet_chunked_bf16_prefill_forward",
+      "runtime_dependencies": [
+        "mkl_sgemm",
+        "mkl_vsexp"
+      ],
+      "op": "gated_deltanet",
+      "operation_interface": "gated_deltanet.grouped_qk.chunk64.prefill.bf16_output.v1",
+      "variant": "pytorch_cpu_grouped_qk_chunk64_bf16_output",
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32_bf16_values",
+        "output": "fp32_bf16_values"
+      },
+      "inputs": [
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "G",
+            "D"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "k",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "G",
+            "D"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "v",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H",
+            "D"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "packed_qkv",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "(2*G+H)*D"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "g",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "beta",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "state_in",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "D",
+            "D"
+          ],
+          "layout": "head_major_contiguous",
+          "access": "read",
+          "storage_class": "state",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "state_out",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "D",
+            "D"
+          ],
+          "layout": "head_major_contiguous",
+          "access": "write",
+          "storage_class": "state",
+          "consumption": "required"
+        },
+        {
+          "name": "out",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H",
+            "D"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "dims": [
+        "R",
+        "H",
+        "G",
+        "D"
+      ],
+      "params": [
+        {
+          "name": "norm_eps",
+          "dtype": "float32"
+        }
+      ],
+      "impl": {
+        "function": "gated_deltanet_chunked_bf16_prefill_forward",
+        "c_declaration": "void gated_deltanet_chunked_bf16_prefill_forward(const float *q, const float *k, const float *v, const float *packed_qkv, const float *g, const float *beta, const float *state_in, float *state_out, float *out, void *workspace, int rows, int num_heads, int group_count, int state_dim, float norm_eps);",
+        "sources": [
+          "src/kernels/deltanet_chunked_bf16.c",
+          "src/kernels/recurrent_qk_norm_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "avx2",
+            "requires": [
+              "avx2"
+            ],
+            "compile_flags": [
+              "-mavx2"
+            ]
+          }
+        ]
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "gated_deltanet_grouped_chunk64_fp32_state_bf16_output",
+          "status": "validated",
+          "phases": [
+            "prefill"
+          ],
+          "function": "gated_deltanet_chunked_bf16_prefill_forward",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "compile_time",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "contract_defined"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp32",
+            "merge_order": "hierarchical_cascade",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": true,
+            "split_strategy": "serial"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "q",
+            "source": "activation:q",
+            "cast": "const float*",
+            "ports": [
+              "input:q"
+            ]
+          },
+          {
+            "name": "k",
+            "source": "activation:k",
+            "cast": "const float*",
+            "ports": [
+              "input:k"
+            ]
+          },
+          {
+            "name": "v",
+            "source": "activation:v",
+            "cast": "const float*",
+            "ports": [
+              "input:v"
+            ]
+          },
+          {
+            "name": "packed_qkv",
+            "source": "activation:packed_qkv",
+            "cast": "const float*",
+            "ports": [
+              "input:packed_qkv"
+            ]
+          },
+          {
+            "name": "g",
+            "source": "activation:g",
+            "cast": "const float*",
+            "ports": [
+              "input:g"
+            ]
+          },
+          {
+            "name": "beta",
+            "source": "activation:beta",
+            "cast": "const float*",
+            "ports": [
+              "input:beta"
+            ]
+          },
+          {
+            "name": "state_in",
+            "source": "activation:state_in",
+            "cast": "const float*",
+            "ports": [
+              "input:state_in"
+            ]
+          },
+          {
+            "name": "state_out",
+            "source": "output:state_out",
+            "cast": "float*",
+            "ports": [
+              "output:state_out"
+            ]
+          },
+          {
+            "name": "out",
+            "source": "output:out",
+            "cast": "float*",
+            "ports": [
+              "output:out"
+            ]
+          },
+          {
+            "name": "workspace",
+            "source": "scratch:chunk_workspace",
+            "cast": "void*"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:seq_len"
+          },
+          {
+            "name": "num_heads",
+            "source": "dim:ssm_time_step_rank"
+          },
+          {
+            "name": "group_count",
+            "source": "dim:ssm_group_count"
+          },
+          {
+            "name": "state_dim",
+            "source": "dim:recurrent_head_dim"
+          },
+          {
+            "name": "norm_eps",
+            "source": "dim:rms_eps"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_deltanet_chunked_bf16.py"
+        ],
+        "oracle": "PyTorch CPU chunk64 BF16 Gated DeltaNet with independently expanded Q/K and FP32 state."
+      },
+      "scratch": [
+        {
+          "name": "chunk_workspace",
+          "dtype": "u8",
+          "shape": [
+            558080
+          ],
+          "size_bytes": 558080,
+          "size_resolution": "required",
+          "alignment": 64,
+          "lifetime": "kernel_call",
+          "access": "read_write",
+          "storage_class": "scratch",
+          "consumption": "required"
+        }
+      ],
+      "notes": "D=128. Serial heads and 64-token blocks, double cumulative gates cast to FP32, FP32 BLAS products, explicit triangular reduction tree, compact Q/K plus raw Q/K for the straddling scalar tail head, BF16 output RNE. BLAS arithmetic is certified with MKL_NUM_THREADS=1.",
+      "name": "gated_deltanet_chunked_bf16_prefill_forward",
+      "_source_file": "gated_deltanet_chunked_bf16_prefill_forward.json"
     },
     {
       "id": "gated_deltanet_llama_avx2_forward",

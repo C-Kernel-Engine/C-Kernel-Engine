@@ -3334,6 +3334,12 @@ void gated_deltanet_pytorch_grouped_bf16_forward(const float *q,
                                                   int state_dim,
                                                   float norm_eps);
 
+void gated_deltanet_chunked_bf16_prefill_forward(
+    const float *q, const float *k, const float *v, const float *packed_qkv,
+    const float *g, const float *beta, const float *state_in, float *state_out,
+    float *out, void *workspace, int rows, int num_heads, int group_count,
+    int state_dim, float norm_eps);
+
 void gated_deltanet_pytorch_grouped_bf16_prefill_forward(
                                                const float *q,
                                                const float *k,

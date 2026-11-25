@@ -324,9 +324,9 @@
       },
       "phases": {
         "prefill": {
-          "contract_id": "gated_deltanet_pytorch_grouped_qk_fp32_state_bf16_output",
+          "contract_id": "gated_deltanet_grouped_chunk64_fp32_state_bf16_output",
           "validation": "validated",
-          "evidence": "Qwen3.6 stores 16 compact Q/K groups for 48 value heads; each Q/K group is repeated across three value heads before the DeltaNet update."
+          "evidence": "Match the PyTorch CPU chunk-64 prefill schedule, including the repeated-head BF16 normalization tail."
         },
         "decode": {
           "contract_id": "gated_deltanet_pytorch_grouped_qk_fp32_state_bf16_output",
@@ -1008,7 +1008,51 @@
             "recurrent_silu",
             "recurrent_split_conv_qkv",
             "recurrent_qk_l2_norm",
-            "recurrent_core",
+            {
+              "op": "recurrent_core",
+              "when": {
+                "config_key": "recurrent_qkv_weight_dtype",
+                "not_equals": "bf16"
+              }
+            },
+            {
+              "op": "recurrent_core",
+              "when": {
+                "config_key": "recurrent_qkv_weight_dtype",
+                "equals": "bf16"
+              },
+              "graph_slots_by_phase": {
+                "prefill": {
+                  "inputs": {
+                    "q": "recurrent_q",
+                    "k": "recurrent_k",
+                    "v": "recurrent_v",
+                    "g": "recurrent_g",
+                    "beta": "recurrent_beta",
+                    "state_in": "external:recurrent_ssm_state",
+                    "packed_qkv": "recurrent_conv_qkv"
+                  },
+                  "outputs": {
+                    "out": "recurrent_attn_out",
+                    "state_out": "recurrent_ssm_state_out"
+                  }
+                },
+                "decode": {
+                  "inputs": {
+                    "q": "recurrent_q",
+                    "k": "recurrent_k",
+                    "v": "recurrent_v",
+                    "g": "recurrent_g",
+                    "beta": "recurrent_beta",
+                    "state_in": "external:recurrent_ssm_state"
+                  },
+                  "outputs": {
+                    "out": "recurrent_attn_out",
+                    "state_out": "recurrent_ssm_state_out"
+                  }
+                }
+              }
+            },
             "recurrent_norm_gate",
             "recurrent_out_proj",
             "residual_add",
