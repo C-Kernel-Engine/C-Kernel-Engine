@@ -593,7 +593,7 @@ int main(void) {
             )
             subprocess.run([str(path / "fixture")], check=True, capture_output=True)
 
-    def test_compact_kv_export_executes_with_mixed_head_widths(self) -> None:
+    def test_compact_kv_export_executes_with_mixed_head_counts_and_widths(self) -> None:
         compiler = shutil.which("cc")
         if compiler is None:
             self.skipTest("C compiler unavailable")
@@ -604,15 +604,16 @@ int main(void) {
                 "num_kv_heads": 2,
                 "head_dim": 4,
                 "decode_kv_cache_dtype": "fp16",
+                "layer_num_kv_heads": [2, 1],
                 "layer_k_cache_offset": [0, 8],
-                "layer_v_cache_offset": [4, 16],
+                "layer_v_cache_offset": [4, 12],
                 "layer_k_head_dim": [2, 4],
                 "layer_v_head_dim": [2, 4],
             },
         )
         declarations = source[
             source.index("static const int64_t g_layer_k_cache_offset") :
-            source.index("};", source.index("static const int32_t g_layer_v_head_dim")) + 2
+            source.index("};", source.index("static const int32_t g_layer_num_kv_heads")) + 2
         ]
         exporter = source[
             source.index("CK_EXPORT int ck_model_debug_export_kv(") :
@@ -631,13 +632,14 @@ static TestModel *g_model;
 """ + declarations + "\n" + exporter + r"""
 int main(int argc, char **argv) {
     if (argc != 3) return 10;
-    uint16_t cache[24 * MAX_SEQ_LEN];
+    uint16_t cache[16 * MAX_SEQ_LEN];
     for (size_t i = 0; i < sizeof(cache) / sizeof(cache[0]); ++i) cache[i] = 0xeeee;
     const int widths[2] = {2, 4};
-    const int offsets[2][2] = {{0, 4}, {8, 16}};
+    const int head_counts[2] = {2, 1};
+    const int offsets[2][2] = {{0, 4}, {8, 12}};
     for (int layer = 0; layer < 2; ++layer)
         for (int kind = 0; kind < 2; ++kind)
-            for (int head = 0; head < 2; ++head)
+            for (int head = 0; head < head_counts[layer]; ++head)
                 for (int token = 0; token < 3; ++token)
                     for (int channel = 0; channel < widths[layer]; ++channel)
                         cache[offsets[layer][kind] * MAX_SEQ_LEN
@@ -662,18 +664,18 @@ int main(int argc, char **argv) {
             )
             paths = [base / "layer0.bin", base / "layer1.bin"]
             subprocess.run([str(executable), *(str(path) for path in paths)], check=True)
-            for layer, (path, width) in enumerate(zip(paths, (2, 4))):
+            for layer, (path, width, heads) in enumerate(zip(paths, (2, 4), (2, 1))):
                 payload = path.read_bytes()
-                self.assertEqual(len(payload), 32 + 2 * 2 * 3 * width * 2)
+                self.assertEqual(len(payload), 32 + 2 * heads * 3 * width * 2)
                 self.assertEqual(
                     struct.unpack_from("<8I", payload),
-                    (0x564B5843, 2, layer, 3, 2, 4, width, 1),
+                    (0x564B5843, 2, layer, 3, heads, 4, width, 1),
                 )
-                values = struct.unpack_from(f"<{2 * 2 * 3 * width}H", payload, 32)
+                values = struct.unpack_from(f"<{2 * heads * 3 * width}H", payload, 32)
                 expected = tuple(
                     1000 * layer + 400 * kind + 100 * head + 10 * token + channel
                     for kind in range(2)
-                    for head in range(2)
+                    for head in range(heads)
                     for token in range(3)
                     for channel in range(width)
                 )

@@ -1,0 +1,337 @@
+{
+  "id": "attention_ranges_checked_bf16",
+  "op": "attention_ranges_checked",
+  "operation_interface": "attention.two_ranges.token_major.gqa.bf16.checked.v1",
+  "variant": "scalar_fp64_reduction_bf16_eager_boundaries",
+  "selection": {
+    "status": "candidate",
+    "priority": 100,
+    "equivalence_group": "attention.two_ranges.token_major.gqa.bf16.checked.v1",
+    "phases": [
+      "prefill"
+    ]
+  },
+  "quant": {
+    "weight": "none",
+    "activation": "bf16",
+    "output": "bf16"
+  },
+  "inputs": [
+    {
+      "name": "query",
+      "dtype": "bf16",
+      "shape": [
+        "Q",
+        "H*D"
+      ],
+      "layout": "token_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "key",
+      "dtype": "bf16",
+      "shape": [
+        "S",
+        "G*D"
+      ],
+      "layout": "token_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "value",
+      "dtype": "bf16",
+      "shape": [
+        "S",
+        "G*D"
+      ],
+      "layout": "token_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "ranges",
+      "dtype": "i32",
+      "shape": [
+        "Q",
+        4
+      ],
+      "layout": "token_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "output",
+      "dtype": "bf16",
+      "shape": [
+        "Q",
+        "H*D"
+      ],
+      "layout": "token_major_contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "scratch": [
+    {
+      "name": "scratch",
+      "dtype": "fp32",
+      "shape": [
+        "X"
+      ],
+      "size_bytes": "4 * X",
+      "size_resolution": "required",
+      "lifetime": "kernel_call",
+      "alignment": 64,
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read_write",
+      "storage_class": "scratch",
+      "consumption": "required"
+    }
+  ],
+  "dims": [
+    "Q",
+    "S",
+    "H",
+    "G",
+    "D",
+    "X"
+  ],
+  "constraints": {
+    "notes": "Batch one. Each query selects up to two ordered nonoverlapping half-open key ranges. Q heads must be a multiple of KV heads. Visible keys reduce in ascending order. Output unchanged on rejection."
+  },
+  "impl": {
+    "function": "ck_attention_ranges_checked_bf16",
+    "c_declaration": "int ck_attention_ranges_checked_bf16(const uint16_t *query, size_t query_elements, const uint16_t *key, size_t key_elements, const uint16_t *value, size_t value_elements, const int32_t *ranges, size_t range_elements, uint16_t *output, size_t output_elements, float *scratch, size_t scratch_elements, size_t query_tokens, size_t memory_tokens, size_t heads, size_t kv_heads, size_t head_dim, float scale);",
+    "sources": [
+      "src/kernels/attention_ranges_checked.c"
+    ]
+  },
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
+  "numerical_capabilities": [
+    {
+      "contract_id": "attention_ranges_scalar_fp64_reduction_bf16_eager_boundaries",
+      "status": "validated",
+      "phases": [
+        "prefill"
+      ],
+      "function": "ck_attention_ranges_checked_bf16",
+      "explicit_selector": true,
+      "implementation": {
+        "isa_dispatch": "scalar",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": [
+            "serial"
+          ],
+          "dispatch": [
+            "inline"
+          ],
+          "reduction_order_effect": "none"
+        }
+      },
+      "arithmetic": {
+        "partial_accumulator": "fp64",
+        "merge_order": "none",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false,
+        "split_strategy": "serial"
+      }
+    }
+  ],
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "query",
+        "source": "activation:query",
+        "cast": "const uint16_t*",
+        "ports": [
+          "input:query"
+        ]
+      },
+      {
+        "name": "query_elements",
+        "source": "runtime:query_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "key",
+        "source": "activation:key",
+        "cast": "const uint16_t*",
+        "ports": [
+          "input:key"
+        ]
+      },
+      {
+        "name": "key_elements",
+        "source": "runtime:key_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "value",
+        "source": "activation:value",
+        "cast": "const uint16_t*",
+        "ports": [
+          "input:value"
+        ]
+      },
+      {
+        "name": "value_elements",
+        "source": "runtime:value_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "ranges",
+        "source": "activation:ranges",
+        "cast": "const int32_t*",
+        "ports": [
+          "input:ranges"
+        ]
+      },
+      {
+        "name": "range_elements",
+        "source": "runtime:range_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "output",
+        "source": "output:output",
+        "cast": "uint16_t*",
+        "ports": [
+          "output:output"
+        ]
+      },
+      {
+        "name": "output_elements",
+        "source": "runtime:output_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "scratch",
+        "source": "scratch:scratch",
+        "cast": "float*"
+      },
+      {
+        "name": "scratch_elements",
+        "source": "runtime:scratch_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "query_tokens",
+        "source": "runtime:query_tokens",
+        "value_type": "size_t"
+      },
+      {
+        "name": "memory_tokens",
+        "source": "runtime:memory_tokens",
+        "value_type": "size_t"
+      },
+      {
+        "name": "heads",
+        "source": "runtime:heads",
+        "value_type": "size_t"
+      },
+      {
+        "name": "kv_heads",
+        "source": "runtime:kv_heads",
+        "value_type": "size_t"
+      },
+      {
+        "name": "head_dim",
+        "source": "runtime:head_dim",
+        "value_type": "size_t"
+      },
+      {
+        "name": "scale",
+        "source": "param:scale"
+      }
+    ]
+  },
+  "call_constant_contract": {
+    "shape_symbols": {
+      "Q": "query_tokens",
+      "S": "memory_tokens",
+      "H": "heads",
+      "D": "head_dim",
+      "X": "scratch_elements",
+      "G": "kv_heads"
+    },
+    "buffer_spans": [
+      {
+        "pointer": "query",
+        "elements": "query_elements",
+        "rows": "query_elements",
+        "width": 1,
+        "element_bytes": 2,
+        "storage_dtype": "bf16"
+      },
+      {
+        "pointer": "key",
+        "elements": "key_elements",
+        "rows": "key_elements",
+        "width": 1,
+        "element_bytes": 2,
+        "storage_dtype": "bf16"
+      },
+      {
+        "pointer": "value",
+        "elements": "value_elements",
+        "rows": "value_elements",
+        "width": 1,
+        "element_bytes": 2,
+        "storage_dtype": "bf16"
+      },
+      {
+        "pointer": "output",
+        "elements": "output_elements",
+        "rows": "output_elements",
+        "width": 1,
+        "element_bytes": 2,
+        "storage_dtype": "bf16"
+      },
+      {
+        "pointer": "scratch",
+        "elements": "scratch_elements",
+        "rows": 1,
+        "width": "scratch_elements",
+        "element_bytes": 4,
+        "storage_dtype": "fp32"
+      },
+      {
+        "pointer": "ranges",
+        "elements": "range_elements",
+        "rows": "query_tokens",
+        "width": 4,
+        "element_bytes": 4,
+        "storage_dtype": "i32"
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "tests/test_v8_attention_ranges_checked.py"
+    ],
+    "oracle": "Independent PyTorch eager attention with explicit boolean visibility, ordered GQA groups, and compact BF16 operands."
+  },
+  "notes": "Checked BF16 query, key, value, and output. Round dot products, scaled scores, normalization probabilities, and final values to BF16 RNE. Dot products, the softmax denominator, and value sums accumulate in FP64 ascending key or feature order. Scratch is memory_tokens + query_tokens * heads * head_dim FP32 elements."
+}

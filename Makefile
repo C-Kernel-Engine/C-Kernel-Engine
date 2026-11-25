@@ -6986,6 +6986,10 @@ test-kernel-maps:
 		tests/test_v8_rope_split_direct_parallel.py \
 		tests/test_v8_numerical_execution_contracts.py
 	@$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_gemma4_provider_contracts.py
+	@$(PYTHON) $(PYTHONFLAGS) -m pytest -q -rs \
+		tests/test_v8_attention_ranges_checked.py \
+		tests/test_v8_packed_question_layout.py \
+		tests/test_v8_safetensors_to_bump.py::test_gemma4_per_layer_gqa_geometry_survives_import_and_lowering
 	@$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_gemm_f16_clipped_n8.py
 	@$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_gemma4_bf16_reduction_oracle.py
 	@$(MAKE) --no-print-directory v8-kernel-registry-freshness

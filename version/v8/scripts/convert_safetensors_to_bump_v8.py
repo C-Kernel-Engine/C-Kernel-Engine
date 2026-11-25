@@ -1598,6 +1598,22 @@ def _build_gemma4_attention_plan_from_hf(text: dict[str, Any], headers: dict[str
     num_kv_heads = int(text.get("num_key_value_heads") or 0)
     default_head_dim = int(text.get("head_dim") or 0)
 
+    overrides = text.get("per_layer_config") or {}
+    if not isinstance(overrides, dict):
+        raise SystemExit("Gemma4 per_layer_config must be keyed by layer index")
+    head_overrides: dict[int, tuple[int, int]] = {}
+    for key, record in overrides.items():
+        if not str(key).isascii() or not str(key).isdigit():
+            raise SystemExit(f"invalid Gemma4 attention layer index {key!r}")
+        layer = int(key)
+        if layer >= num_layers or layer in head_overrides or not isinstance(record, dict):
+            raise SystemExit(f"invalid or duplicate Gemma4 attention layer override {key!r}")
+        dim = record.get("head_dim", default_head_dim)
+        heads = record.get("num_key_value_heads", num_kv_heads)
+        if type(dim) is not int or dim < 1 or type(heads) is not int or heads < 1 or num_heads % heads:
+            raise SystemExit(f"invalid Gemma4 head geometry at layer {layer}")
+        head_overrides[layer] = (dim, heads)
+
     rope_params = text.get("rope_parameters") if isinstance(text.get("rope_parameters"), dict) else {}
     full_rope = rope_params.get("full_attention") if isinstance(rope_params.get("full_attention"), dict) else {}
     sliding_rope = rope_params.get("sliding_attention") if isinstance(rope_params.get("sliding_attention"), dict) else {}
@@ -1615,6 +1631,7 @@ def _build_gemma4_attention_plan_from_hf(text: dict[str, Any], headers: dict[str
     layer_rotary_dim: list[int] = []
     layer_q_dim: list[int] = []
     layer_kv_dim: list[int] = []
+    layer_num_kv_heads: list[int] = []
     layer_attention_plan: list[dict[str, Any]] = []
 
     for layer, raw_kind in enumerate(layer_types):
@@ -1633,12 +1650,17 @@ def _build_gemma4_attention_plan_from_hf(text: dict[str, Any], headers: dict[str
         q = headers.get(f"{prefix}.q_proj.weight")
         k = headers.get(f"{prefix}.k_proj.weight")
         v = headers.get(f"{prefix}.v_proj.weight")
-        q_dim = int(q.shape[0]) if q and q.shape else num_heads * default_head_dim
-        k_dim = int(k.shape[0]) if k and k.shape else num_kv_heads * default_head_dim
+        declared_dim, kv_heads = head_overrides.get(layer, (default_head_dim, num_kv_heads))
+        q_dim = int(q.shape[0]) if q and q.shape else num_heads * declared_dim
+        k_dim = int(k.shape[0]) if k and k.shape else kv_heads * declared_dim
         v_dim = int(v.shape[0]) if v and v.shape else k_dim
-        q_head_dim = int(q_dim // max(1, num_heads)) if q_dim else default_head_dim
-        k_head_dim = int(k_dim // max(1, num_kv_heads)) if k_dim else default_head_dim
-        v_head_dim = int(v_dim // max(1, num_kv_heads)) if v_dim else k_head_dim
+        if layer in head_overrides and (
+            q_dim != num_heads * declared_dim or k_dim != kv_heads * declared_dim or v_dim != k_dim
+        ):
+            raise SystemExit(f"Gemma4 declared head geometry differs from projection widths at layer {layer}")
+        q_head_dim = int(q_dim // max(1, num_heads)) if q_dim else declared_dim
+        k_head_dim = int(k_dim // max(1, kv_heads)) if k_dim else declared_dim
+        v_head_dim = int(v_dim // max(1, kv_heads)) if v_dim else k_head_dim
         partial = full_partial if attention_kind == "full" else sliding_partial
         rotary_dim = int(q_head_dim * partial)
 
@@ -1654,6 +1676,7 @@ def _build_gemma4_attention_plan_from_hf(text: dict[str, Any], headers: dict[str
         layer_rotary_dim.append(rotary_dim)
         layer_q_dim.append(q_dim)
         layer_kv_dim.append(k_dim)
+        layer_num_kv_heads.append(kv_heads)
         layer_attention_plan.append({
             "layer": layer,
             "kind": kind,
@@ -1668,14 +1691,15 @@ def _build_gemma4_attention_plan_from_hf(text: dict[str, Any], headers: dict[str
             "rotary_dim": rotary_dim,
             "q_dim": q_dim,
             "kv_dim": k_dim,
+            **({"num_kv_heads": kv_heads} if head_overrides else {}),
         })
 
     layer_k_cache_offset: list[int] = []
     layer_v_cache_offset: list[int] = []
     kv_cache_token_stride_total = 0
-    for k_head, v_head in zip(layer_k_head_dim, layer_v_head_dim):
-        k_elems = num_kv_heads * int(k_head)
-        v_elems = num_kv_heads * int(v_head)
+    for heads, k_head, v_head in zip(layer_num_kv_heads, layer_k_head_dim, layer_v_head_dim, strict=True):
+        k_elems = heads * int(k_head)
+        v_elems = heads * int(v_head)
         layer_k_cache_offset.append(kv_cache_token_stride_total)
         kv_cache_token_stride_total += k_elems
         layer_v_cache_offset.append(kv_cache_token_stride_total)
@@ -1696,6 +1720,7 @@ def _build_gemma4_attention_plan_from_hf(text: dict[str, Any], headers: dict[str
         "layer_rotary_dim": layer_rotary_dim,
         "layer_q_dim": layer_q_dim,
         "layer_kv_dim": layer_kv_dim,
+        **({"layer_num_kv_heads": layer_num_kv_heads} if head_overrides else {}),
         "layer_k_cache_offset": layer_k_cache_offset,
         "layer_v_cache_offset": layer_v_cache_offset,
         "kv_cache_layer_stride_variable": True,
