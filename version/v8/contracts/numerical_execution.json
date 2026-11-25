@@ -2930,7 +2930,7 @@
         "thread_count_changes_arithmetic_order": true
       },
       "position_transform": null,
-      "description": "CPU chunk64 gated DeltaNet. FP64 cumulative gate sum rounded to FP32, then FP32 VML decay, ordered triangular transform and FP32 BLAS. Split BF16 vector/scalar rsqrt at the expanded Q/K head boundary. Preserve the FP32 state across chunks. The standalone C reduction disables contraction. External FP32 BLAS uses the selected MKL implementation, certified with MKL_NUM_THREADS=1."
+      "description": "CPU chunk64 gated DeltaNet matching the Transformers 5.13.0 Qwen3.5 CPU fallback. Q/K normalization is BF16 before FP32 chunk arithmetic. FP64 cumulative gate sum rounded to FP32, then FP32 VML decay, ordered triangular transform and FP32 BLAS. Split BF16 vector/scalar rsqrt at the expanded Q/K head boundary. Preserve the FP32 state across chunks. The standalone C reduction disables contraction. External FP32 BLAS uses the selected MKL implementation, certified with MKL_NUM_THREADS=1."
     },
     "gated_deltanet_pytorch_grouped_qk_fp32_state_bf16_output": {
       "operator_family": "gated_deltanet",

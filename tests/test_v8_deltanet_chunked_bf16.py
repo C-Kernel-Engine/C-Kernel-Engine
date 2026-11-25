@@ -29,6 +29,55 @@ def native_chunk():
     return kernel
 
 
+def _bf16_l2_norm(tensor):
+    return tensor * (tensor.square().sum(dim=-1, keepdim=True) + 1e-6).rsqrt()
+
+
+def _chunk64_pytorch_oracle(q, k, value, decay, beta, initial):
+    # Math contract from the Transformers 5.13.0 Qwen3.5 CPU fallback.
+    # Later releases normalize Q/K in FP32 and use a triangular solver.
+    import torch
+    from torch.nn.functional import pad
+
+    chunk = 64
+    rows, width = q.shape[1], q.shape[-1]
+    padding = (-rows) % chunk
+    q, k, value = [
+        pad(x.transpose(1, 2).contiguous().float(), (0, 0, 0, padding))
+        .unflatten(-2, (-1, chunk))
+        for x in (q, k, value)
+    ]
+    q = q * (width ** -0.5)
+    decay, beta = [
+        pad(x.transpose(1, 2).contiguous().float(), (0, padding))
+        .unflatten(-1, (-1, chunk))
+        for x in (decay, beta)
+    ]
+    cumulative = decay.cumsum(dim=-1)
+    pairwise_decay = (cumulative.unsqueeze(-1) - cumulative.unsqueeze(-2)).tril().exp().tril()
+    key_beta = k * beta.unsqueeze(-1)
+    transform = -(key_beta @ k.transpose(-1, -2) * pairwise_decay).tril(-1)
+    for row in range(1, chunk):
+        coeff = transform[..., row, :row].clone()
+        transform[..., row, :row] = coeff + (coeff.unsqueeze(-1) * transform[..., :row, :row]).sum(-2)
+    transform = transform + torch.eye(chunk, dtype=q.dtype)
+    new_values = transform @ (value * beta.unsqueeze(-1))
+    cumulative_keys = transform @ (key_beta * cumulative.exp().unsqueeze(-1))
+
+    state = initial
+    output = []
+    for block in range(q.shape[-3]):
+        query, key = q[:, :, block], k[:, :, block]
+        step = cumulative[:, :, block]
+        residual = new_values[:, :, block] - cumulative_keys[:, :, block] @ state
+        inter = (query * step.exp().unsqueeze(-1)) @ state
+        intra = (query @ key.transpose(-1, -2)) * pairwise_decay[:, :, block]
+        output.append(inter + intra @ residual)
+        final_key = key * (step[..., -1:] - step).exp().unsqueeze(-1)
+        state = state * step[..., -1].exp()[..., None, None] + final_key.transpose(-1, -2) @ residual
+    return torch.cat(output, dim=-2)[:, :, :rows].transpose(1, 2).bfloat16(), state
+
+
 @pytest.mark.parametrize(("rows", "groups", "heads"), (
     (1, 2, 6),
     (17, 16, 48),
@@ -39,7 +88,6 @@ def native_chunk():
 ))
 def test_chunked_prefill_matches_pytorch_state_and_output(native_chunk, rows, groups, heads):
     import torch
-    module = pytest.importorskip("transformers.models.qwen3_5.modeling_qwen3_5")
 
     torch.set_num_threads(1)
     width = 128
@@ -54,12 +102,13 @@ def test_chunked_prefill_matches_pytorch_state_and_output(native_chunk, rows, gr
     packed = torch.cat([a.reshape(rows, -1) for a in (q, k, v)], dim=-1)
     expanded_q = q.repeat_interleave(repeat, dim=2)
     expanded_k = k.repeat_interleave(repeat, dim=2)
-    compact_q = module.l2norm(expanded_q)[:, :, ::repeat]
-    compact_k = module.l2norm(expanded_k)[:, :, ::repeat]
+    normalized_q = _bf16_l2_norm(expanded_q)
+    normalized_k = _bf16_l2_norm(expanded_k)
+    compact_q = normalized_q[:, :, ::repeat]
+    compact_k = normalized_k[:, :, ::repeat]
     initial = torch.randn((1, heads, width, width), generator=generator) * 0.01
-    expected, expected_state = module.torch_chunk_gated_delta_rule(
-        expanded_q, expanded_k, v, g, beta.sigmoid(),
-        initial_state=initial, output_final_state=True, use_qk_l2norm_in_kernel=True,
+    expected, expected_state = _chunk64_pytorch_oracle(
+        normalized_q, normalized_k, v, g, beta.sigmoid(), initial,
     )
 
     def array(tensor):
