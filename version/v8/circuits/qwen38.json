@@ -270,14 +270,14 @@
       },
       "phases": {
         "prefill": {
-          "contract_id": "rmsnorm_pytorch_avx2_cascade_bf16_storage",
+          "contract_id": "rmsnorm_qwen3next_pytorch_avx2_bf16_storage",
           "validation": "validated",
-          "evidence": "Qwen3Next full-attention Q/K normalization uses PyTorch BF16 per-head RMSNorm storage and AVX2 cascade reduction."
+          "evidence": "PyTorch multiplies by the FP32 shifted gain before a single BF16 output round."
         },
         "decode": {
-          "contract_id": "rmsnorm_pytorch_avx2_cascade_bf16_storage",
+          "contract_id": "rmsnorm_qwen3next_pytorch_avx2_bf16_storage",
           "validation": "validated",
-          "evidence": "Single-token decode retains the same BF16 per-head Q/K normalization contract."
+          "evidence": "PyTorch multiplies by the FP32 shifted gain before a single BF16 output round."
         }
       },
       "checkpoint": {

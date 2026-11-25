@@ -149,7 +149,7 @@ class NumericalExecutionContractTests(unittest.TestCase):
             ),
             "decoder.qk_norm_bf16_pytorch": (
                 "qk_norm.fp32_bf16_values_inplace.v1",
-                "qk_norm_forward_pytorch_bf16_storage",
+                "qk_norm_forward_qwen4_pytorch_bf16_storage",
             ),
         }
         for operation, (interface_id, kernel_id) in expected.items():
@@ -1074,35 +1074,36 @@ class NumericalExecutionContractTests(unittest.TestCase):
                     else "qk_norm_forward_llama_production",
                 )
 
-    def test_qwen35_full_attention_qk_norm_resolves_pytorch_bf16_provider(self):
-        circuit_doc = resolver.load_json(
-            ROOT / "version" / "v8" / "circuits" / "qwen35.json"
-        )
-        required = circuit_doc["required_numerical_contracts"]
-        selector_key = "decoder_qk_norm_reduction_policy"
-        selector_value = "pytorch_avx2_cascade_exact"
-        self.assertEqual(
-            required["decoder.qk_norm"]["selector"],
-            {"config_not_equals": {selector_key: selector_value}},
-        )
-        self.assertEqual(
-            required["decoder.qk_norm_bf16_pytorch"]["selector"],
-            {"config_equals": {selector_key: selector_value}},
-        )
-        for phase in ("prefill", "decode"):
-            with self.subTest(phase=phase):
-                plan = resolver.resolve_contract(
-                    circuit_doc,
-                    self.contracts,
-                    self.kernels,
-                    "decoder.qk_norm_bf16_pytorch",
-                    phase,
-                    mode="production",
-                )
-                self.assertEqual(
-                    plan["kernel"]["function"],
-                    "qk_norm_forward_pytorch_bf16_storage",
-                )
+    def test_qwen_full_attention_qk_norm_resolves_pytorch_bf16_provider(self):
+        for name in ("qwen35", "qwen38"):
+            circuit_doc = resolver.load_json(
+                ROOT / "version" / "v8" / "circuits" / f"{name}.json"
+            )
+            required = circuit_doc["required_numerical_contracts"]
+            selector_key = "decoder_qk_norm_reduction_policy"
+            selector_value = "pytorch_avx2_cascade_exact"
+            self.assertEqual(
+                required["decoder.qk_norm"]["selector"],
+                {"config_not_equals": {selector_key: selector_value}},
+            )
+            self.assertEqual(
+                required["decoder.qk_norm_bf16_pytorch"]["selector"],
+                {"config_equals": {selector_key: selector_value}},
+            )
+            for phase in ("prefill", "decode"):
+                with self.subTest(circuit=name, phase=phase):
+                    plan = resolver.resolve_contract(
+                        circuit_doc,
+                        self.contracts,
+                        self.kernels,
+                        "decoder.qk_norm_bf16_pytorch",
+                        phase,
+                        mode="production",
+                    )
+                    self.assertEqual(
+                        plan["kernel"]["function"],
+                        "qk_norm_forward_qwen4_pytorch_bf16_storage",
+                    )
 
     def test_qwen35_recurrent_norm_gate_resolves_exact_composed_provider(self):
         circuit_doc = resolver.load_json(

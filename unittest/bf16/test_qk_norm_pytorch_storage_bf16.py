@@ -97,8 +97,8 @@ def run_case(num_heads: int, num_kv_heads: int, tokens: int, seed: int) -> None:
     )
 
 
-def run_qwen4_case(tokens: int, seed: int) -> None:
-    num_heads, num_kv_heads, head_dim = 8, 2, 256
+def run_single_round_case(num_heads: int, num_kv_heads: int, tokens: int, seed: int) -> None:
+    head_dim = 256
     rng = np.random.default_rng(seed)
     q = bf16_values(
         rng.standard_normal((num_heads, tokens, head_dim), dtype=np.float32) * 0.03
@@ -115,6 +115,10 @@ def run_qwen4_case(tokens: int, seed: int) -> None:
     expected_q = pytorch_qwen4_qk_norm(q, q_gamma)
     expected_k = pytorch_qwen4_qk_norm(k, k_gamma)
 
+    # A separately rounded normalization and gain fails on this fixture.
+    assert np.any(pytorch_qk_norm(q, q_gamma) != expected_q)
+    assert np.any(pytorch_qk_norm(k, k_gamma) != expected_k)
+
     QWEN4_KERNEL(
         q.ctypes.data_as(FLOAT_P),
         k.ctypes.data_as(FLOAT_P),
@@ -130,7 +134,7 @@ def run_qwen4_case(tokens: int, seed: int) -> None:
     np.testing.assert_array_equal(q, expected_q)
     np.testing.assert_array_equal(k, expected_k)
     print(
-        f"Qwen4 H={num_heads} KV={num_kv_heads} T={tokens} D={head_dim} "
+        f"Single round H={num_heads} KV={num_kv_heads} T={tokens} D={head_dim} "
         f"exact={q.size + k.size}/{q.size + k.size}"
     )
 
@@ -141,9 +145,10 @@ def main() -> int:
         return 0
     run_case(4, 2, 3, 41)
     run_case(32, 8, 177, 42)
-    run_qwen4_case(1, 43)
-    run_qwen4_case(64, 44)
-    print("PyTorch BF16 Q/K RMSNorm contracts: 4/4 exact")
+    run_single_round_case(8, 2, 1, 43)
+    run_single_round_case(8, 2, 64, 44)
+    run_single_round_case(24, 4, 17, 45)
+    print("PyTorch BF16 Q/K RMSNorm contracts: 5/5 exact")
     return 0
 
 
