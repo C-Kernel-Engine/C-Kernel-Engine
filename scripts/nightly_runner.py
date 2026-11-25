@@ -1369,8 +1369,13 @@ TEST_SUITES = {
     "inkling2_mini_q8_decoder_block": TestSuite(
         "Inkling 2 Mini Packed Q8 Decoder Blocks", "inference",
         ROOT / "tests" / "test_v8_inkling2_q8_decoder_block.py",
-        unittest_targets=("tests.test_v8_inkling2_q8_decoder_block", "tests.test_v8_inkling2_cross_pass",
-                          "tests.test_v8_inkling2_q4km_block"),
+        unittest_targets=("tests.test_v8_inkling2_q8_decoder_block", "tests.test_v8_inkling2_cross_pass"),
+    ),
+    "inkling2_mini_q4km_decoder_block": TestSuite(
+        "Inkling 2 Mini Mixed Q4_K_M Decoder Blocks", "inference",
+        ROOT / "tests" / "test_v8_inkling2_q4km_block.py",
+        unittest_targets=("tests.test_v8_inkling2_q4km_block",),
+        timeout_sec=360,
     ),
     "inkling2_mini_text_loop": TestSuite(
         "Inkling 2 Mini Generated Packed Text Loop", "inference",

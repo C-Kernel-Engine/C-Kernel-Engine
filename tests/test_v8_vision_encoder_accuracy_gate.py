@@ -92,6 +92,28 @@ class VisionEncoderAccuracyGateTests(unittest.TestCase):
             summary.write_text(json.dumps({"failures": [reason]}), encoding="utf-8")
             self.assertEqual(gate._suite_failure_reason(summary, "fallback"), reason)
 
+    def test_image_geometry_reconciles_all_runtime_context_aliases(self) -> None:
+        from version.v8.scripts import build_ir_v8
+        from version.v8.scripts import numeric_parity_qwen3vl_mmproj_v8 as parity
+
+        overrides = {"context_length": 4032, "max_seq_len": 4032, "vision_num_patches": 4032}
+        for initial in (2304, 4032):
+            with self.subTest(initial=initial), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                cfg = {"arch": "qwen3vl_vision", **dict.fromkeys(overrides, initial)}
+                manifest_path = root / "weights_manifest.runtime.json"
+                manifest_path.write_text(json.dumps({"context_length": 2304, "config": cfg}))
+                stale = root / "weights_manifest.map"
+                stale.touch()
+                with mock.patch.object(parity, "_qwen3vl_geometry_overrides", return_value=overrides):
+                    self.assertTrue(parity._apply_qwen3vl_geometry_to_runtime_manifest(
+                        root, root / "fixture.ppm", None, 1024))
+                    self.assertFalse(parity._apply_qwen3vl_geometry_to_runtime_manifest(
+                        root, root / "fixture.ppm", None, 1024))
+                manifest = json.loads(manifest_path.read_text())
+                self.assertEqual(build_ir_v8._resolve_declared_context(manifest), 4032)
+                self.assertFalse(stale.exists())
+
     def test_mtmd_shim_fingerprint_and_link_reject_stale_oracle_library(self) -> None:
         source = (
             ROOT / "version/v8/scripts/numeric_parity_qwen3vl_mmproj_v8.py"

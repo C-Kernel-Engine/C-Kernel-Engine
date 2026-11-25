@@ -11,6 +11,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def _q4_dispatch_policies():
+    path = ROOT / "version/v8/kernel_maps/gemm_nt_q4_k_q8_k.json"
+    return json.loads(path.read_text(encoding="utf-8"))["implementation"]["runtime_dispatch"]["policies"]
+
+
 def _load_nightly_runner():
     path = ROOT / "scripts" / "nightly_runner.py"
     spec = importlib.util.spec_from_file_location("nightly_runner_q4k_perf_test", path)
@@ -146,16 +151,14 @@ class Q4KLlamaPerformanceGateTests(unittest.TestCase):
             ROOT / "version" / "v8" / "src" / "ck_parallel_prefill_v8.c"
         ).read_text(encoding="utf-8")
         self.assertIn("ck_get_q4k_packed_vnni_x16_cached", dispatcher)
-        self.assertIn("ck_should_use_qwen36_q4k_avx512_x16", dispatcher)
-        for shape_guard in (
-            "N == 1024",
-            "N == 6144",
-            "N == 12288",
-            "N == 34816",
-            "N == 5120 && (K == 6144 || K == 17408)",
-        ):
-            self.assertIn(shape_guard, dispatcher)
-        self.assertIn("if (K == 5120)", dispatcher)
+        self.assertIn("ck_q4k_avx512_x16_prefill_route", dispatcher)
+        self.assertIn("ck_policy_gemm_nt_q4_k_q8_k_avx512_vnni_x16_prefill", dispatcher)
+        prefill = _q4_dispatch_policies()["avx512_vnni_x16_prefill"]
+        self.assertEqual(prefill["status"], "candidate")
+        self.assertEqual({(r["min_m"], r["n"], r["k"]) for r in prefill["routes"]}, {
+            (16, 1024, 5120), (16, 6144, 5120), (16, 12288, 5120),
+            (16, 34816, 5120), (16, 5120, 6144), (16, 5120, 17408),
+        })
         self.assertIn("CK_ENABLE_Q4K_AVX512_X16_EXPERIMENTAL", dispatcher)
         self.assertIn("CK_V8_FORCE_BATCHED_PREFILL", dispatcher)
         self.assertIn("CK_DISABLE_Q4K_AVX512_X16_PREFILL", dispatcher)
@@ -178,9 +181,12 @@ class Q4KLlamaPerformanceGateTests(unittest.TestCase):
             worker.group(0),
         )
 
-        self.assertIn("packed_vnni_x16 && N == 6144", dispatcher)
+        routes = _q4_dispatch_policies()["avx512_vnni_x16_prefill"]["routes"]
+        self.assertEqual([(r["n"], r["k"]) for r in routes if "batched_tail" in r.get("flags", [])],
+                         [(6144, 5120)])
+        self.assertIn("packed_vnni_x16 && x16_route", dispatcher)
+        self.assertIn("x16_route->flags & CK_GEMM_ROUTE_BATCHED_TAIL", dispatcher)
         self.assertIn("CK_DISABLE_Q4K_X16_BATCHED_TAIL", dispatcher)
-        self.assertNotIn("packed_vnni_x16 && N == 34816", dispatcher)
 
     def test_qwen36_x16_decode_reuses_only_prepared_weight_views(self) -> None:
         source = (ROOT / "version/v8/src/ck_parallel_prefill_v8.c").read_text(
@@ -194,10 +200,12 @@ class Q4KLlamaPerformanceGateTests(unittest.TestCase):
         self.assertIsNotNone(dispatcher)
         body = dispatcher.group(0)
         self.assertNotIn("CK_ENABLE_QWEN36_Q4K_X16_DECODE", source)
-        self.assertIn("qwen36_decode_shape", body)
-        self.assertIn("N == 17408", body)
-        self.assertIn("N == 5120 && (K == 6144 || K == 17408)", body)
-        self.assertNotIn("N == 1024 ||", body)
+        self.assertIn("ck_policy_gemm_nt_q4_k_q8_k_avx512_vnni_x16_decode_prepared", body)
+        routes = _q4_dispatch_policies()["avx512_vnni_x16_decode_prepared"]["routes"]
+        self.assertEqual({(r["m"], r["n"], r["k"]) for r in routes}, {
+            (1, 6144, 5120), (1, 12288, 5120), (1, 17408, 5120),
+            (1, 5120, 6144), (1, 5120, 17408),
+        })
         self.assertIn("run_gemv_q4_k_q8_k_repacked_x16_parallel", body)
         self.assertIn("ck_find_prepared_q4k_packed_vnni_x16", body)
         self.assertLess(
