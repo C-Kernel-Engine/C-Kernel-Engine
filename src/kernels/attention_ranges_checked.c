@@ -3,6 +3,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "bf16_utils.h"
+
 static int region_valid(const void *ptr, size_t count, size_t width)
 {
     return ptr && (uintptr_t)ptr % width == 0 && count <= SIZE_MAX / width &&
@@ -15,11 +17,18 @@ static int regions_overlap(const void *a, size_t a_bytes, const void *b, size_t 
            (uintptr_t)b < (uintptr_t)a + a_bytes;
 }
 
-static double attention_dot(const float *q, const float *k, size_t width)
+static float read_element(const void *buffer, size_t index, int bf16)
+{
+    return bf16 ? bf16_to_float(((const uint16_t *)buffer)[index]) : ((const float *)buffer)[index];
+}
+
+static double attention_dot(const void *q, const void *k, size_t q_offset,
+                            size_t k_offset, size_t width, int bf16)
 {
     double sum = 0.0;
     for (size_t i = 0; i < width; ++i) {
-        volatile double product = (double)q[i] * k[i];
+        volatile double product = (double)read_element(q, q_offset + i, bf16) *
+                                  read_element(k, k_offset + i, bf16);
         sum += product;
     }
     return sum;
@@ -27,15 +36,15 @@ static double attention_dot(const float *q, const float *k, size_t width)
 
 /* Per-query visibility is two ordered, disjoint half-open key ranges.
  * An empty second range means one interval. Output commits atomically. */
-int ck_attention_ranges_checked_f32(
-    const float *query, size_t query_elements,
-    const float *key, size_t key_elements,
-    const float *value, size_t value_elements,
+static int attention_ranges_checked(
+    const void *query, size_t query_elements,
+    const void *key, size_t key_elements,
+    const void *value, size_t value_elements,
     const int32_t *ranges, size_t range_elements,
-    float *output, size_t output_elements,
+    void *output, size_t output_elements,
     float *scratch, size_t scratch_elements,
     size_t query_tokens, size_t memory_tokens,
-    size_t heads, size_t kv_heads, size_t head_dim, float scale)
+    size_t heads, size_t kv_heads, size_t head_dim, float scale, int bf16)
 {
     if (!query_tokens || !memory_tokens || memory_tokens > INT32_MAX ||
         !heads || !kv_heads || heads % kv_heads || !head_dim ||
@@ -52,10 +61,11 @@ int ck_attention_ranges_checked_f32(
 
     const void *inputs[] = {query, key, value, ranges};
     const size_t counts[] = {query_elements, key_elements, value_elements, range_elements};
-    const size_t widths[] = {sizeof(float), sizeof(float), sizeof(float), sizeof(int32_t)};
-    if (!region_valid(output, output_elements, sizeof(float)) ||
+    const size_t element_width = bf16 ? sizeof(uint16_t) : sizeof(float);
+    const size_t widths[] = {element_width, element_width, element_width, sizeof(int32_t)};
+    if (!region_valid(output, output_elements, element_width) ||
         !region_valid(scratch, scratch_elements, sizeof(float))) return -1;
-    const size_t output_bytes = output_elements * sizeof(float);
+    const size_t output_bytes = output_elements * element_width;
     const size_t scratch_bytes = scratch_elements * sizeof(float);
     if (regions_overlap(output, output_bytes, scratch, scratch_bytes)) return -1;
     for (size_t i = 0; i < 4; ++i) {
@@ -71,24 +81,26 @@ int ck_attention_ranges_checked_f32(
             (r[0] == r[1] && r[2] == r[3])) return -2;
     }
     for (size_t i = 0; i < q; ++i)
-        if (!isfinite(query[i])) return -1;
+        if (!isfinite(read_element(query, i, bf16))) return -1;
     for (size_t i = 0; i < k; ++i)
-        if (!isfinite(key[i]) || !isfinite(value[i])) return -1;
+        if (!isfinite(read_element(key, i, bf16)) || !isfinite(read_element(value, i, bf16))) return -1;
 
     float *scores = scratch;
     float *staged = scratch + memory_tokens;
     for (size_t t = 0; t < query_tokens; ++t) {
         const int32_t *r = ranges + 4 * t;
         for (size_t h = 0; h < heads; ++h) {
-            const float *query_head = query + t * qw + h * head_dim;
+            const size_t query_head = t * qw + h * head_dim;
             const size_t head_offset = (h / (heads / kv_heads)) * head_dim;
             float largest = -INFINITY;
             for (size_t span = 0; span < 4; span += 2) {
                 for (size_t j = (size_t)r[span]; j < (size_t)r[span + 1]; ++j) {
-                    const double s = attention_dot(query_head, key + j * kw + head_offset,
-                                                   head_dim) * scale;
+                    double dot = attention_dot(query, key, query_head, j * kw + head_offset, head_dim, bf16);
+                    if (bf16) dot = bf16_to_float(float_to_bf16((float)dot));
+                    const double s = dot * scale;
                     if (!isfinite(s) || fabs(s) > FLT_MAX) return -1;
-                    scores[j] = (float)s;
+                    scores[j] = bf16 ? bf16_to_float(float_to_bf16((float)s)) : (float)s;
+                    if (!isfinite(scores[j])) return -1;
                     if (scores[j] > largest) largest = scores[j];
                 }
             }
@@ -99,21 +111,55 @@ int ck_attention_ranges_checked_f32(
                     denom += scores[j];
                 }
             }
+            if (bf16) {
+                for (size_t span = 0; span < 4; span += 2) {
+                    for (size_t j = (size_t)r[span]; j < (size_t)r[span + 1]; ++j) {
+                        scores[j] = bf16_to_float(float_to_bf16((float)(scores[j] / denom)));
+                    }
+                }
+            }
             for (size_t d = 0; d < head_dim; ++d) {
                 double sum = 0.0;
                 for (size_t span = 0; span < 4; span += 2) {
                     for (size_t j = (size_t)r[span]; j < (size_t)r[span + 1]; ++j) {
                         volatile double product = (double)scores[j] *
-                            value[j * kw + head_offset + d];
+                            read_element(value, j * kw + head_offset + d, bf16);
                         sum += product;
                     }
                 }
-                const float v = (float)(sum / denom);
+                float v = (float)(bf16 ? sum : sum / denom);
+                if (bf16) v = bf16_to_float(float_to_bf16(v));
                 if (!isfinite(v)) return -1;
                 staged[t * qw + h * head_dim + d] = v;
             }
         }
     }
-    for (size_t i = 0; i < q; ++i) output[i] = staged[i];
+    if (bf16) {
+        for (size_t i = 0; i < q; ++i) ((uint16_t *)output)[i] = float_to_bf16(staged[i]);
+    } else {
+        for (size_t i = 0; i < q; ++i) ((float *)output)[i] = staged[i];
+    }
     return 0;
+}
+
+int ck_attention_ranges_checked_f32(
+    const float *query, size_t query_elements, const float *key, size_t key_elements,
+    const float *value, size_t value_elements, const int32_t *ranges, size_t range_elements,
+    float *output, size_t output_elements, float *scratch, size_t scratch_elements,
+    size_t query_tokens, size_t memory_tokens, size_t heads, size_t kv_heads, size_t head_dim, float scale)
+{
+    return attention_ranges_checked(query, query_elements, key, key_elements, value, value_elements,
+        ranges, range_elements, output, output_elements, scratch, scratch_elements,
+        query_tokens, memory_tokens, heads, kv_heads, head_dim, scale, 0);
+}
+
+int ck_attention_ranges_checked_bf16(
+    const uint16_t *query, size_t query_elements, const uint16_t *key, size_t key_elements,
+    const uint16_t *value, size_t value_elements, const int32_t *ranges, size_t range_elements,
+    uint16_t *output, size_t output_elements, float *scratch, size_t scratch_elements,
+    size_t query_tokens, size_t memory_tokens, size_t heads, size_t kv_heads, size_t head_dim, float scale)
+{
+    return attention_ranges_checked(query, query_elements, key, key_elements, value, value_elements,
+        ranges, range_elements, output, output_elements, scratch, scratch_elements,
+        query_tokens, memory_tokens, heads, kv_heads, head_dim, scale, 1);
 }

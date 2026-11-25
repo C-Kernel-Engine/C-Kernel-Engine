@@ -15,30 +15,33 @@ def runtime(tmp_path_factory):
     return build_runtime(tmp_path_factory.mktemp("attention_ranges"), 4, 8)
 
 
-def build_runtime(folder, queries, memory):
+def build_runtime(folder, queries, memory, *, heads=4, kv_heads=2, head_dim=3, scale=0.5, bf16=False):
+    q_width, kv_width = heads * head_dim, kv_heads * head_dim
+    q_elements, kv_elements = queries * q_width, memory * kv_width
+    scratch = q_elements + memory
+    provider = "attention_ranges_checked_bf16" if bf16 else "attention_ranges_checked_f32"
     buffers = {
-        "query": {"shape": [queries, 12]},
-        "key": {"shape": [memory, 6]},
-        "value": {"shape": [memory, 6]},
+        "query": {"shape": [queries, q_width]},
+        "key": {"shape": [memory, kv_width]},
+        "value": {"shape": [memory, kv_width]},
         "ranges": {"shape": [queries, 4]},
-        "output": {"shape": [queries, 12]},
+        "output": {"shape": [queries, q_width]},
     }
     op = {
         "id": "attend", "op": "attention_ranges_checked",
-        "kernel": "attention_ranges_checked_f32", "returns_status": True,
+        "kernel": provider, "returns_status": True,
         "graph_slots": {
             "inputs": {name: f"external:{name}" for name in ("query", "key", "value", "ranges")},
             "outputs": {"output": "output"},
         },
         "params": {
-            "Q": queries, "S": memory, "H": 4, "G": 2, "D": 3,
-            "X": queries * 12 + memory, "scale": 0.5,
+            "Q": queries, "S": memory, "H": heads, "G": kv_heads, "D": head_dim,
+            "X": scratch, "scale": scale,
             "call_constants": {
-                "query_elements": queries * 12, "key_elements": memory * 6, "value_elements": memory * 6,
-                "range_elements": queries * 4, "output_elements": queries * 12,
-                "scratch_elements": queries * 12 + memory,
-                "query_tokens": queries, "memory_tokens": memory, "heads": 4, "kv_heads": 2,
-                "head_dim": 3,
+                "query_elements": q_elements, "key_elements": kv_elements, "value_elements": kv_elements,
+                "range_elements": queries * 4, "output_elements": q_elements, "scratch_elements": scratch,
+                "query_tokens": queries, "memory_tokens": memory, "heads": heads, "kv_heads": kv_heads,
+                "head_dim": head_dim,
             },
         },
     }
@@ -59,32 +62,36 @@ def build_runtime(folder, queries, memory):
             "body": {"type": "dense", "ops": [op]}, "footer": [],
         }},
     }
+    dtypes = {"ranges": "i32"}
+    if bf16:
+        dtypes.update(dict.fromkeys(("query", "key", "value", "output"), "bf16"))
     source = {
-        "config": {"num_layers": 1, "embed_dim": 12, "num_heads": 4, "num_kv_heads": 2,
-                   "head_dim": 3, "intermediate_size": 24, "context_length": memory,
-                   "max_seq_len": memory, "activation_buffer_dtypes": {"ranges": "i32"}},
+        "config": {"num_layers": 1, "embed_dim": q_width, "num_heads": heads, "num_kv_heads": kv_heads,
+                   "head_dim": head_dim, "intermediate_size": q_width * 2, "context_length": memory,
+                   "max_seq_len": memory, "activation_buffer_dtypes": dtypes},
         "entries": [], "quant_summary": {}, "template": graph,
     }
     path = folder / "circuit.json"
     path.write_text(json.dumps(graph))
     layout, calls, _, lib, invoke = compile_native_graph(folder, source, path)
-    assert [row["function"] for row in calls["operations"]] == ["ck_attention_ranges_checked_f32"]
+    assert [row["function"] for row in calls["operations"]] == [f"ck_{provider}"]
     offsets = {row["name"]: row["abs_offset"] for row in layout["memory"]["activations"]["buffers"]}
     return buffers, offsets, layout["memory"]["arena"]["total_size"], lib, invoke
 
 
-def put_request(runtime):
+def put_request(runtime, *, bf16=False):
     buffers, offsets, size, _lib, invoke = runtime
     storage = (C.c_uint8 * (size + 63))()
     arena = (C.c_uint8 * size).from_buffer(storage, (-C.addressof(storage)) & 63)
     arrays = {
-        name: np.ndarray(spec["shape"], dtype="i4" if name == "ranges" else "f4",
+        name: np.ndarray(spec["shape"], dtype="i4" if name == "ranges" else "u2" if bf16 else "f4",
                          offset=offsets[name], buffer=arena)
         for name, spec in buffers.items()
     }
-    rng = np.random.default_rng(611)
-    for name in ("query", "key", "value"):
-        arrays[name][:] = rng.normal(size=arrays[name].shape)
+    if not bf16:
+        rng = np.random.default_rng(611)
+        for name in ("query", "key", "value"):
+            arrays[name][:] = rng.normal(size=arrays[name].shape)
     return arena, arrays, invoke
 
 
@@ -193,3 +200,35 @@ def test_publisher_token_blocks_against_separate_branch_oracle(tmp_path):
     a["ranges"][row] = [0, total, total, total]
     assert invoke(arena, len(arena)) == 0
     assert not np.allclose(a["output"][row], reference(row - len(questions[1].tokens) + 1, total, False)[-1])
+
+
+def test_generated_bf16_rounds_scores_and_probabilities_against_eager_pytorch(tmp_path):
+    torch = pytest.importorskip("torch")
+    folder = tmp_path / "bf16"
+    folder.mkdir()
+    arena, arrays, invoke = put_request(
+        build_runtime(folder, 5, 8, head_dim=7, bf16=True), bf16=True,
+    )
+    generator = torch.Generator().manual_seed(37)
+    inputs = {}
+    for name in ("query", "key", "value"):
+        inputs[name] = torch.randn(arrays[name].shape, generator=generator).bfloat16()
+        arrays[name][:] = inputs[name].view(torch.uint16).numpy()
+    arrays["ranges"][:] = [[0, 3, 3, 3], [0, 3, 3, 5], [0, 3, 3, 5], [0, 3, 5, 8], [0, 3, 5, 8]]
+    q = inputs["query"].reshape(5, 4, 7).transpose(0, 1)
+    k = inputs["key"].reshape(8, 2, 7).transpose(0, 1).repeat_interleave(2, dim=0)
+    v = inputs["value"].reshape(8, 2, 7).transpose(0, 1).repeat_interleave(2, dim=0)
+    mask = torch.zeros((5, 8), dtype=torch.bool)
+    mask[0, :3] = True
+    mask[1:3, :5] = True
+    mask[3:, :3] = True
+    mask[3:, 5:] = True
+    scores = (q @ k.transpose(-1, -2) * 0.5).masked_fill(~mask, -torch.inf)
+    probs = torch.softmax(scores, dim=-1, dtype=torch.float32).bfloat16()
+    expected = (probs @ v).transpose(0, 1).reshape(5, 28)
+    assert invoke(arena, len(arena)) == 0
+    np.testing.assert_array_equal(arrays["output"], expected.view(torch.uint16).numpy())
+    before = arrays["output"].copy()
+    arrays["key"][0, 0] = 0x7F80
+    assert invoke(arena, len(arena)) != 0
+    np.testing.assert_array_equal(arrays["output"], before)
