@@ -167,6 +167,12 @@ def _apply_qwen3vl_geometry_to_runtime_manifest(
             image_max_tokens=image_max_tokens,
         )
     changed = any(cfg.get(k) != v for k, v in overrides.items())
+    # Older packed encoder manifests also carry a top-level context alias.
+    # Keep that declaration synchronized with the image-derived patch count.
+    if ("context_length" in runtime_manifest and "context_length" in overrides
+            and runtime_manifest["context_length"] != overrides["context_length"]):
+        runtime_manifest["context_length"] = overrides["context_length"]
+        changed = True
     if not changed:
         return False
     cfg.update(overrides)
