@@ -1,22 +1,27 @@
 """Compile a checked GQA entry and compare explicit key visibility."""
 import ctypes as C
 import json
+from pathlib import Path
 
 import numpy as np
 import pytest
 
 from version.v8.scripts.compile_checked_bundle_v8 import compile_native_graph
+from version.v8.decision.packed_question_layout import Question, pack_questions
 
 
 @pytest.fixture(scope="module")
 def runtime(tmp_path_factory):
-    folder = tmp_path_factory.mktemp("attention_ranges")
+    return build_runtime(tmp_path_factory.mktemp("attention_ranges"), 4, 8)
+
+
+def build_runtime(folder, queries, memory):
     buffers = {
-        "query": {"shape": [4, 12]},
-        "key": {"shape": [8, 6]},
-        "value": {"shape": [8, 6]},
-        "ranges": {"shape": [4, 4]},
-        "output": {"shape": [4, 12]},
+        "query": {"shape": [queries, 12]},
+        "key": {"shape": [memory, 6]},
+        "value": {"shape": [memory, 6]},
+        "ranges": {"shape": [queries, 4]},
+        "output": {"shape": [queries, 12]},
     }
     op = {
         "id": "attend", "op": "attention_ranges_checked",
@@ -26,11 +31,13 @@ def runtime(tmp_path_factory):
             "outputs": {"output": "output"},
         },
         "params": {
-            "Q": 4, "S": 8, "H": 4, "G": 2, "D": 3, "X": 56, "scale": 0.5,
+            "Q": queries, "S": memory, "H": 4, "G": 2, "D": 3,
+            "X": queries * 12 + memory, "scale": 0.5,
             "call_constants": {
-                "query_elements": 48, "key_elements": 48, "value_elements": 48,
-                "range_elements": 16, "output_elements": 48, "scratch_elements": 56,
-                "query_tokens": 4, "memory_tokens": 8, "heads": 4, "kv_heads": 2,
+                "query_elements": queries * 12, "key_elements": memory * 6, "value_elements": memory * 6,
+                "range_elements": queries * 4, "output_elements": queries * 12,
+                "scratch_elements": queries * 12 + memory,
+                "query_tokens": queries, "memory_tokens": memory, "heads": 4, "kv_heads": 2,
                 "head_dim": 3,
             },
         },
@@ -54,8 +61,8 @@ def runtime(tmp_path_factory):
     }
     source = {
         "config": {"num_layers": 1, "embed_dim": 12, "num_heads": 4, "num_kv_heads": 2,
-                   "head_dim": 3, "intermediate_size": 24, "context_length": 8,
-                   "max_seq_len": 8, "activation_buffer_dtypes": {"ranges": "i32"}},
+                   "head_dim": 3, "intermediate_size": 24, "context_length": memory,
+                   "max_seq_len": memory, "activation_buffer_dtypes": {"ranges": "i32"}},
         "entries": [], "quant_summary": {}, "template": graph,
     }
     path = folder / "circuit.json"
@@ -128,3 +135,61 @@ def test_generated_clean_prefix_and_active_block_against_pytorch(runtime):
         attn_mask=torch.tensor(mask), scale=0.5,
     ).transpose(0, 1).reshape(4, 12)
     np.testing.assert_allclose(a["output"], t.numpy(), rtol=1e-6, atol=1e-6)
+
+
+def test_publisher_token_blocks_against_separate_branch_oracle(tmp_path):
+    torch = pytest.importorskip("torch")
+    fixture = json.loads(
+        (Path(__file__).parent / "fixtures/decision/block_packed_bison_request.json").read_text()
+    )
+    prefix = tuple(fixture["prefix"])
+    questions = tuple(
+        Question(row["name"], tuple(row["tokens"]), tuple(map(tuple, row["options"])))
+        for row in fixture["questions"]
+    )
+    prefix_len = len(prefix)
+    total = prefix_len + sum(len(q.tokens) for q in questions)
+    # Use a smaller window to exercise expiry within this short request.
+    window = 24
+    packed = pack_questions(prefix, questions, vocab_size=262144, sliding_window=window, capacity=total)
+    assert packed.position_ids == tuple(range(prefix_len)) + tuple(
+        position for q in questions for position in range(prefix_len, prefix_len + len(q.tokens))
+    )
+    assert packed.answers == (
+        ("refund", prefix_len + len(questions[0].tokens) - 1, (("yes", 236776), ("no", 236799))),
+        ("team", total - 1, (("billing", 236776), ("technical", 236799), ("fraud", 236780))),
+    )
+    with pytest.raises(ValueError, match="exceeds token capacity"):
+        pack_questions(prefix, questions, vocab_size=262144, sliding_window=window, capacity=total - 1)
+
+    arena, a, invoke = put_request(build_runtime(tmp_path, total, total))
+    q = torch.from_numpy(a["query"]).reshape(total, 4, 3).transpose(0, 1)
+    k = torch.from_numpy(a["key"]).reshape(total, 2, 3).transpose(0, 1).repeat_interleave(2, dim=0)
+    v = torch.from_numpy(a["value"]).reshape(total, 2, 3).transpose(0, 1).repeat_interleave(2, dim=0)
+
+    def reference(start, end, sliding):
+        memory = list(range(prefix_len)) + list(range(start, end)) if start else list(range(end))
+        local_q = torch.arange(len(memory) - (end - start), len(memory))[:, None]
+        local_k = torch.arange(len(memory))[None, :]
+        mask = (local_k <= local_q) & (local_k > local_q - window) if sliding else None
+        out = torch.nn.functional.scaled_dot_product_attention(
+            q[:, start:end], k[:, memory], v[:, memory], attn_mask=mask, scale=0.5,
+        )
+        return out.transpose(0, 1).reshape(end - start, 12).numpy()
+
+    for sliding, ranges in [(False, packed.full_ranges), (True, packed.sliding_ranges)]:
+        expected = [reference(0, prefix_len, sliding)]
+        start = prefix_len
+        for question in questions:
+            end = start + len(question.tokens)
+            expected.append(reference(start, end, sliding))
+            start = end
+        a["ranges"][:] = ranges
+        assert invoke(arena, len(arena)) == 0
+        np.testing.assert_allclose(a["output"], np.concatenate(expected), rtol=1e-6, atol=1e-6)
+
+    a["ranges"][:] = packed.full_ranges
+    row = packed.answers[1][1]
+    a["ranges"][row] = [0, total, total, total]
+    assert invoke(arena, len(arena)) == 0
+    assert not np.allclose(a["output"][row], reference(row - len(questions[1].tokens) + 1, total, False)[-1])

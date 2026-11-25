@@ -4988,6 +4988,10 @@ def _materialize_compact_kv_layout(config: Dict[str, Any]) -> None:
         raise RuntimeError(
             "HARD MEMORY PLAN FAULT: per-layer KV dimensions must match num_layers"
         )
+    layer_kv_heads = config.get("layer_num_kv_heads", [num_kv_heads] * num_layers)
+    if (not isinstance(layer_kv_heads, list) or len(layer_kv_heads) != num_layers
+            or any(type(heads) is not int or heads <= 0 for heads in layer_kv_heads)):
+        raise RuntimeError("HARD MEMORY PLAN FAULT: per-layer KV head counts must be positive integers")
     config["layer_k_head_dim"] = layer_k_dims[:]
     config["layer_v_head_dim"] = layer_v_dims[:]
 
@@ -5019,8 +5023,8 @@ def _materialize_compact_kv_layout(config: Dict[str, Any]) -> None:
             k_dim = int(layer_k_dims[layer] or default_dim)
             v_dim = int(layer_v_dims[layer] or default_dim)
             if (
-                k_offset + num_kv_heads * k_dim > explicit_stride
-                or v_offset + num_kv_heads * v_dim > explicit_stride
+                k_offset + layer_kv_heads[layer] * k_dim > explicit_stride
+                or v_offset + layer_kv_heads[layer] * v_dim > explicit_stride
             ):
                 raise RuntimeError(
                     "HARD MEMORY PLAN FAULT: compact KV interval exceeds token stride; "
@@ -5070,9 +5074,9 @@ def _materialize_compact_kv_layout(config: Dict[str, Any]) -> None:
                 f"HARD MEMORY PLAN FAULT: invalid KV dimensions at layer {layer}"
             )
         k_offsets[layer] = stride
-        stride += num_kv_heads * k_dim
+        stride += layer_kv_heads[layer] * k_dim
         v_offsets[layer] = stride
-        stride += num_kv_heads * v_dim
+        stride += layer_kv_heads[layer] * v_dim
 
     if stride <= 0:
         raise RuntimeError(
@@ -5135,6 +5139,7 @@ def build_activation_specs(
     uses_rope = bool(config.get("_template_uses_rope", True))
     has_logits = bool(config.get("_template_has_logits", True))
     _materialize_compact_kv_layout(config)
+    max_kv_heads = max([num_kv_heads, *config.get("layer_num_kv_heads", [])])
     kv_cache_dtype = _resolve_kv_cache_dtype(config)
     kv_elem_bytes = _dtype_size_bytes(kv_cache_dtype)
 
@@ -5261,8 +5266,8 @@ def build_activation_specs(
 
     # Scratch buffers
     q_size = num_heads * seq_len * max_q_head_dim * 4
-    k_size = num_kv_heads * seq_len * max_k_head_dim * 4
-    v_size = num_kv_heads * seq_len * max_v_head_dim * 4
+    k_size = max_kv_heads * seq_len * max_k_head_dim * 4
+    v_size = max_kv_heads * seq_len * max_v_head_dim * 4
     attn_out_size = num_heads * seq_len * max_q_head_dim * 4
     q_gate_proj_dim = int(config.get("q_gate_proj_dim", config.get("attn_q_gate_proj_dim", 0)) or 0)
     if q_gate_proj_dim <= 0:
@@ -5273,8 +5278,8 @@ def build_activation_specs(
     attn_q_gate_packed_size = seq_len * q_gate_proj_dim * 4
     attn_gate_size = seq_len * attn_gate_dim * 4
     add("q_scratch", q_size, f"[{num_heads}, {seq_len}, {max_q_head_dim}]")
-    add("k_scratch", k_size, f"[{num_kv_heads}, {seq_len}, {max_k_head_dim}]")
-    add("v_scratch", v_size, f"[{num_kv_heads}, {seq_len}, {max_v_head_dim}]")
+    add("k_scratch", k_size, f"[{max_kv_heads}, {seq_len}, {max_k_head_dim}]")
+    add("v_scratch", v_size, f"[{max_kv_heads}, {seq_len}, {max_v_head_dim}]")
     add("attn_q_gate_packed", attn_q_gate_packed_size, f"[{seq_len}, {q_gate_proj_dim}]")
     add("attn_gate", attn_gate_size, f"[{seq_len}, {attn_gate_dim}]")
     add("attn_scratch", attn_out_size, f"[{num_heads}, {seq_len}, {max_q_head_dim}]")
@@ -5303,7 +5308,7 @@ def build_activation_specs(
 
     # Generated prefill transposes reuse this allocation as their destination.
     layer_out_width = _layer_output_width_for_transpose(
-        embed_dim, num_heads, num_kv_heads,
+        embed_dim, num_heads, max_kv_heads,
         max_q_head_dim, max_k_head_dim, max_v_head_dim,
     )
     layer_out_size = seq_len * layer_out_width * 4
@@ -7849,14 +7854,15 @@ def apply_layer_attention_dims(op_name: str, params: Dict, layer: int, config: D
         layer,
         int(config.get("num_heads", config.get("num_attention_heads", 1)) or 1),
     )
-    num_kv_heads = int(config.get("num_kv_heads", config.get("num_key_value_heads", num_heads)) or num_heads)
+    default_kv_heads = int(config.get("num_kv_heads", config.get("num_key_value_heads", num_heads)) or num_heads)
+    num_kv_heads = _config_layer_int(config, "layer_num_kv_heads", layer, default_kv_heads)
     has_declared_kv_source = isinstance(config.get("layer_kv_source"), list)
     kv_source_layer = _config_layer_int(config, "layer_kv_source", layer, layer)
     source_num_kv_heads = _config_layer_int(
         config,
         "layer_num_kv_heads",
         kv_source_layer,
-        num_kv_heads,
+        default_kv_heads,
     )
     q_head_dim = _config_layer_int(config, "layer_q_head_dim", layer, int(config.get("head_dim", 0) or 0))
     k_head_dim = _config_layer_int(config, "layer_k_head_dim", layer, q_head_dim)
