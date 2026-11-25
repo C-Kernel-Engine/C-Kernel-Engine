@@ -93,7 +93,6 @@ class VisionEncoderAccuracyGateTests(unittest.TestCase):
             self.assertEqual(gate._suite_failure_reason(summary, "fallback"), reason)
 
     def test_image_geometry_reconciles_all_runtime_context_aliases(self) -> None:
-        from version.v8.scripts import build_ir_v8
         from version.v8.scripts import numeric_parity_qwen3vl_mmproj_v8 as parity
 
         overrides = {"context_length": 4032, "max_seq_len": 4032, "vision_num_patches": 4032}
@@ -111,7 +110,7 @@ class VisionEncoderAccuracyGateTests(unittest.TestCase):
                     self.assertFalse(parity._apply_qwen3vl_geometry_to_runtime_manifest(
                         root, root / "fixture.ppm", None, 1024))
                 manifest = json.loads(manifest_path.read_text())
-                self.assertEqual(build_ir_v8._resolve_declared_context(manifest), 4032)
+                self.assertEqual(parity.build_ir_v8._resolve_declared_context(manifest), 4032)
                 self.assertFalse(stale.exists())
 
     def test_mtmd_shim_fingerprint_and_link_reject_stale_oracle_library(self) -> None:
