@@ -36,8 +36,10 @@ from version.v8.tts.build_qwen3_tts_runtime_loop_codec_circuit import (
 from version.v8.tts.build_qwen3_tts_prompt_first_block_circuit import prompt_plan
 from version.v8.tts.build_qwen3_tts_talker_predictor_frame_circuit import bridge_plan
 from version.v8.tts.capture_qwen3_tts_customvoice_oracle import (
-    DEFAULT_TEXT, MODEL_REVISION, verify_model_dir,
+    DEFAULT_TEXT, MODEL_REVISION, BASE_MODEL_REVISION, verify_model_dir,
 )
+
+from version.v8.tts.qwen3_tts_base_prompt import add_base_speaker, bind_base_speaker, check_speaker
 
 CODE_FRAMES = 46
 CODEBOOKS = 16
@@ -169,6 +171,7 @@ def _compile(folder: Path, graph: dict, shapes: dict):
         "activation_buffer_dtypes": {
             name: "i32" for name in (
                 "text_ids", "codec_ids", "left_indices", "right_indices",
+                "voice_left_indices", "voice_right_indices",
                 "step_index_input", "step_index_checked", "position_checked",
                 "request_context_tokens", "valid_context_tokens",
                 "valid_text_rows", "valid_prompt_rows",
@@ -197,7 +200,7 @@ def _view(arena, acts, name, dtype, shape):
 
 
 def _prompt_ids(model_dir: Path, text: str, tokenizer=None,
-                context_tokens: int | None = CONTEXT_TOKENS):
+                context_tokens: int | None = CONTEXT_TOKENS, *, base=False):
     if not isinstance(text, str) or not text.strip() or any(ord(c) < 32 for c in text):
         raise ValueError("text must be nonempty and contain no control characters")
     if "<|" in text or "|>" in text:
@@ -223,7 +226,7 @@ def _prompt_ids(model_dir: Path, text: str, tokenizer=None,
     codec_values = [
         talker["codec_think_id"], talker["codec_think_bos_id"],
         talker["codec_language_id"]["english"],
-        talker["codec_think_eos_id"], talker["spk_id"]["ryan"],
+        talker["codec_think_eos_id"], talker["codec_pad_id"] if base else talker["spk_id"]["ryan"],
         talker["codec_pad_id"], talker["codec_bos_id"],
     ]
     for label, values in (("text", text_values), ("codec", codec_values)):
@@ -272,12 +275,14 @@ class PinnedQwenSession:
     """Keep one generated library and one weight arena loaded across calls."""
 
     def __init__(self, model_dir: Path, build_dir: Path,
-                 provider: str = "avx2_fma", *, runtime_prompts: bool = False):
+                 provider: str = "avx2_fma", *, runtime_prompts: bool = False,
+                 speaker_vector: np.ndarray | None = None):
         from safetensors import safe_open
         from transformers import AutoTokenizer
 
         self.model_dir = Path(model_dir)
-        self.model_hashes = verify_model_dir(self.model_dir)
+        self._speaker = check_speaker(speaker_vector) if speaker_vector is not None else None
+        self.model_hashes = verify_model_dir(self.model_dir, base=self._speaker is not None)
         self._runtime_prompts = runtime_prompts
         circuit_builder = build_runtime_circuit if runtime_prompts else build_circuit
         options = {"frames": CODE_FRAMES, "max_generated_frames": MAX_FRAMES,
@@ -285,6 +290,8 @@ class PinnedQwenSession:
         if runtime_prompts:
             options["context_capacity"] = RUNTIME_CONTEXT_CAPACITY
         self.graph = circuit_builder(**options)
+        if self._speaker is not None:
+            add_base_speaker(self.graph)
         started = time.monotonic()
         with safe_open(self.model_dir / "model.safetensors", framework="pt", device="cpu") as main, \
              safe_open(self.model_dir / "speech_tokenizer/model.safetensors",
@@ -336,7 +343,7 @@ class PinnedQwenSession:
             lambda _context: int(self._cancel_requested.is_set()))
         self._tokenizer = AutoTokenizer.from_pretrained(str(self.model_dir), local_files_only=True)
         self.text_ids, self.codec_ids = _prompt_ids(
-            self.model_dir, DEFAULT_TEXT, self._tokenizer)
+            self.model_dir, DEFAULT_TEXT, self._tokenizer, base=self._speaker is not None)
         self.load_seconds = time.monotonic() - started
         self.load_count = 1
         self._lock = threading.Lock()
@@ -346,7 +353,7 @@ class PinnedQwenSession:
             self._cancel_requested.clear()
             text_ids, codec_ids = _prompt_ids(
                 self.model_dir, text, self._tokenizer,
-                context_tokens=None if self._runtime_prompts else CONTEXT_TOKENS)
+                context_tokens=None if self._runtime_prompts else CONTEXT_TOKENS, base=self._speaker is not None)
             context_tokens = len(text_ids) - 6
             samples, metric = self._synthesize_checked(text_ids, codec_ids)
             metric["text_sha256"] = hashlib.sha256(text.encode("utf-8")).hexdigest()
@@ -364,6 +371,8 @@ class PinnedQwenSession:
         ctypes.memset(ctypes.addressof(self.arena) + self.activation_base, 0,
                       self.arena_bytes - self.activation_base)
         _set_inputs(self.arena, self.acts, text_ids, codec_ids)
+        if self._speaker is not None:
+            bind_base_speaker(self.arena, self.acts, self._speaker)
         first = ["talker_first_code_id", "pred_predictor_codebook0_selected_id"] + [
             f"pred_step{i}_selected_id" for i in range(1, 15)]
         later = ["second_talker_first_code_id",
@@ -406,6 +415,8 @@ class PinnedQwenSession:
             if valid.value != 0:
                 raise RuntimeError("cancelled synthesis published an output extent")
             raise SynthesisCancelled("native Qwen synthesis was cancelled")
+        if status == 2 and valid.value == 0:
+            raise RuntimeError(f"native Qwen synthesis reached its {MAX_FRAMES}-frame budget before EOS")
         if status != 0 or not 0 < frames.value <= CODE_FRAMES or \
                 valid.value != frames.value * (SAMPLES // CODE_FRAMES):
             if valid.value != 0:
@@ -437,25 +448,32 @@ def main() -> int:
                         default="avx2_fma")
     parser.add_argument("--repeat", type=int, default=1,
                         help="run the same request repeatedly on one loaded model")
+    parser.add_argument("--speaker-vector", type=Path, help="use the pinned 0.6B Base with a local FP32 x-vector .npy")
     args = parser.parse_args()
+    speaker = None
     if not 1 <= args.repeat <= 8:
         parser.error("--repeat must be in 1..8")
     try:
+        if args.speaker_vector is not None:
+            if args.speaker_vector.stat().st_size > 8192:
+                raise ValueError("oversized speaker vector file")
+            speaker = check_speaker(np.load(args.speaker_vector, allow_pickle=False, mmap_mode="r"))
         if args.runtime_prompts:
             from transformers import AutoTokenizer
             tokenizer = AutoTokenizer.from_pretrained(str(args.model_dir),
                                                        local_files_only=True)
-            _prompt_ids(args.model_dir, args.text, tokenizer, context_tokens=None)
+            _prompt_ids(args.model_dir, args.text, tokenizer, context_tokens=None, base=speaker is not None)
         else:
-            _prompt_ids(args.model_dir, args.text)
+            _prompt_ids(args.model_dir, args.text, base=speaker is not None)
     except ValueError as exc:
         parser.error(str(exc))
     with tempfile.TemporaryDirectory(prefix="cke-qwen3tts-") as temp:
         session = PinnedQwenSession(args.model_dir, Path(temp),
                                     args.codec_conv_provider,
-                                    runtime_prompts=args.runtime_prompts)
+                                    runtime_prompts=args.runtime_prompts, speaker_vector=speaker)
         print("QWEN3_TTS_PINNED_LOAD " + json.dumps({
-            "model_revision": MODEL_REVISION,
+            "model_revision": BASE_MODEL_REVISION if speaker is not None else MODEL_REVISION,
+            "voice_mode": "base_xvector" if speaker is not None else "custom_voice_ryan",
             "model_sha256": session.model_hashes["model.safetensors"],
             "library_sha256": session.library_sha256,
             "codec_conv_provider": args.codec_conv_provider,

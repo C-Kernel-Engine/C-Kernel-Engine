@@ -61,18 +61,29 @@ def validate_request(text: str, max_new_tokens: int) -> None:
         raise ValueError("max_new_tokens must be between 2 and 4096")
 
 
-def verify_model_dir(model_dir: Path) -> dict[str, str]:
-    required = tuple(MODEL_FILE_SHA256)
+BASE_MODEL_REVISION = "5d83992436eae1d760afd27aff78a71d676296fc"
+BASE_MODEL_FILE_SHA256 = {
+    **MODEL_FILE_SHA256,
+    "config.json": "2e714c787c8edb98b05432685cddb634add2de4d4e645f653d68251ef72ba011",
+    "model.safetensors": "180b3b10eb1c9f1b4db7806d5475bae3071c0243c299d49926bab1da3b6946f6",
+}
+
+
+def verify_model_dir(model_dir: Path, *, base: bool = False) -> dict[str, str]:
+    expected_files = BASE_MODEL_FILE_SHA256 if base else MODEL_FILE_SHA256
+    revision = BASE_MODEL_REVISION if base else MODEL_REVISION
+    kind = "base" if base else "custom_voice"
+    required = tuple(expected_files)
     missing = [name for name in required if not (model_dir / name).is_file()]
     if missing:
         raise FileNotFoundError(f"missing pinned model files: {', '.join(missing)}")
     config = json.loads((model_dir / "config.json").read_text(encoding="utf-8"))
-    if config.get("tts_model_size") != "0b6" or config.get("tts_model_type") != "custom_voice":
-        raise ValueError("model is not Qwen3-TTS 0.6B CustomVoice")
-    if model_dir.parent.name == "snapshots" and model_dir.name != MODEL_REVISION:
+    if config.get("tts_model_size") != "0b6" or config.get("tts_model_type") != kind:
+        raise ValueError(f"expected Qwen3-TTS 0.6B {kind}")
+    if model_dir.parent.name == "snapshots" and model_dir.name != revision:
         raise ValueError("Hugging Face snapshot revision differs from the pinned revision")
     hashes = {name: sha256_file(model_dir / name) for name in required}
-    for name, expected in MODEL_FILE_SHA256.items():
+    for name, expected in expected_files.items():
         if hashes[name] != expected:
             raise ValueError(f"pinned model checksum mismatch: {name}")
     return hashes
