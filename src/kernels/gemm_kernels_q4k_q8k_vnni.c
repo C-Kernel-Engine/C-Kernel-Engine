@@ -26,6 +26,7 @@
 #include <stdint.h>
 #include <math.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "ckernel_engine.h"
@@ -2773,18 +2774,17 @@ static void gemm_q4_packed_meta_x8_split_min_4m_thread_fn(
     }
 }
 
-static void gemm_q4_packed_meta_x8_split_min_8m_thread_fn(
-        int ith, int nth, void *args)
+static void gemm_q4_packed_meta_x8_split_min_8m_range(
+        int begin, int end, int step, void *args)
 {
     gemm_q4_packed_meta_x8_thread_work_t *a =
             (gemm_q4_packed_meta_x8_thread_work_t *)args;
-    if (!a || ith < 0 || nth <= 0 || ith >= nth) {
+    if (!a || begin >= end) {
         return;
     }
 
     const int row_tiles = (a->M + 7) / 8;
-    const int total = row_tiles * a->groups;
-    for (int job = ith; job < total; job += nth) {
+    for (int job = begin; job < end; job += step) {
         const int g = job / row_tiles;
         const int row_tile = job - g * row_tiles;
         const int m0 = row_tile * 8;
@@ -2879,29 +2879,75 @@ static inline void gemm_q4_packed_vnni_x8_q8k_4m_job(
     }
 }
 
-static void gemm_q4_packed_vnni_x8_q8k_4m_thread_fn(
-        int ith, int nth, void *args)
+static void gemm_q4_packed_vnni_x8_q8k_4m_range(
+        int begin, int end, int step, void *args)
 {
-    gemm_q4_packed_vnni_x8_thread_work_t *a =
-            (gemm_q4_packed_vnni_x8_thread_work_t *)args;
-    if (!a || ith < 0 || nth <= 0 || ith >= nth) return;
-
+    gemm_q4_packed_vnni_x8_thread_work_t *a = args;
     const int row_tiles = (a->M + 3) / 4;
-    const int total = row_tiles * a->groups;
-    for (int job = ith; job < total; job += nth) {
+    for (int job = begin; job < end; job += step) {
         gemm_q4_packed_vnni_x8_q8k_4m_job(a, job, row_tiles);
     }
 }
 
-static void gemm_q4_packed_vnni_x8_q8k_4m_range_fn(
-        int begin, int end, void *args)
+/* Keep work placement independent of each tile's arithmetic. All four lanes
+ * traverse the same numbered output tiles and write disjoint results. */
+typedef struct {
+    void (*tiles)(int begin, int end, int step, void *args);
+    void *args;
+    int jobs;
+    int contiguous;
+} ck_q4k_tile_work_t;
+
+static void ck_q4k_tile_worker(int ith, int nth, void *opaque)
 {
-    gemm_q4_packed_vnni_x8_thread_work_t *a =
-            (gemm_q4_packed_vnni_x8_thread_work_t *)args;
-    if (!a || begin < 0 || begin >= end) return;
-    const int row_tiles = (a->M + 3) / 4;
-    for (int job = begin; job < end; ++job) {
-        gemm_q4_packed_vnni_x8_q8k_4m_job(a, job, row_tiles);
+    const ck_q4k_tile_work_t *work = opaque;
+    if (work->contiguous) {
+        const int begin = (int)((int64_t)work->jobs * ith / nth);
+        const int end = (int)((int64_t)work->jobs * (ith + 1) / nth);
+        work->tiles(begin, end, 1, work->args);
+    } else {
+        work->tiles(ith, work->jobs, nth, work->args);
+    }
+}
+
+static void ck_q4k_tile_claim(int begin, int end, void *opaque)
+{
+    const ck_q4k_tile_work_t *work = opaque;
+    work->tiles(begin, end, 1, work->args);
+}
+
+static void ck_q4k_dispatch_tiles(ck_threadpool_t *pool, int active,
+                                  int jobs, int row_tiles, int default_grain,
+                                  const char *provider,
+                                  void (*tiles)(int, int, int, void *), void *args)
+{
+    int grain = default_grain;
+    int contiguous = 0;
+    const char *policy = getenv("CK_EXPERIMENT_Q4K_TILE_SCHEDULE");
+    if (policy && strcmp(policy, "contiguous") == 0) {
+        contiguous = 1;
+        grain = 0;
+    } else if (policy && strcmp(policy, "grain4") == 0) {
+        grain = 4;
+    } else if (policy && strcmp(policy, "whole-group") == 0) {
+        grain = row_tiles;
+    }
+
+    const int serial = active <= 1 || !pool;
+    const char *debug = getenv("CK_DEBUG_Q4K_PREFILL_DISPATCH");
+    if (debug && *debug && strcmp(debug, "0") != 0) {
+        fprintf(stderr, "[CK q4k schedule] provider=%s schedule=%s active=%d grain=%d jobs=%d row_tiles=%d\n",
+                provider, serial ? "serial" : (grain ? "dynamic" : (contiguous ? "contiguous" : "cyclic")),
+                serial ? 1 : active, serial ? 0 : grain, jobs, row_tiles);
+    }
+
+    ck_q4k_tile_work_t work = {tiles, args, jobs, contiguous};
+    if (serial) {
+        tiles(0, jobs, 1, args);
+    } else if (grain > 0) {
+        ck_threadpool_parallel_for_n(pool, active, 0, jobs, grain, ck_q4k_tile_claim, &work);
+    } else {
+        ck_threadpool_dispatch_n(pool, active, ck_q4k_tile_worker, &work);
     }
 }
 
@@ -3144,7 +3190,8 @@ void gemm_nt_q4_k_packed_meta_x8_q8_k_split_min_threaded_8m(
     ck_threadpool_t *pool = ck_threadpool_global();
     const int pool_threads = pool ? ck_threadpool_n_threads(pool) : 1;
     const int groups = (N + 7) / 8;
-    const int jobs = ((M + 7) / 8) * groups;
+    const int row_tiles = (M + 7) / 8;
+    const int jobs = row_tiles * groups;
     if (active_threads <= 0 || active_threads > pool_threads) {
         active_threads = pool_threads;
     }
@@ -3164,13 +3211,9 @@ void gemm_nt_q4_k_packed_meta_x8_q8_k_split_min_threaded_8m(
         .tile_m = 8,
         .jobs = jobs,
     };
-    if (active_threads <= 1 || !pool) {
-        gemm_q4_packed_meta_x8_split_min_8m_thread_fn(0, 1, &work);
-        return;
-    }
-    ck_threadpool_dispatch_n(
-            pool, active_threads,
-            gemm_q4_packed_meta_x8_split_min_8m_thread_fn, &work);
+    ck_q4k_dispatch_tiles(pool, active_threads, jobs, row_tiles,
+                          0, "pairwise_x8_8m",
+                          gemm_q4_packed_meta_x8_split_min_8m_range, &work);
 }
 
 void gemm_nt_q4_k_packed_vnni_x8_q8_k_split_min_threaded_4m(
@@ -3184,7 +3227,8 @@ void gemm_nt_q4_k_packed_vnni_x8_q8_k_split_min_threaded_4m(
     ck_threadpool_t *pool = ck_threadpool_global();
     const int pool_threads = pool ? ck_threadpool_capacity(pool) : 1;
     const int groups = (N + 7) / 8;
-    const int jobs = ((M + 3) / 4) * groups;
+    const int row_tiles = (M + 3) / 4;
+    const int jobs = row_tiles * groups;
     if (active_threads <= 0 || active_threads > pool_threads) {
         active_threads = pool_threads;
     }
@@ -3200,20 +3244,9 @@ void gemm_nt_q4_k_packed_vnni_x8_q8_k_split_min_threaded_4m(
         .blocks_per_row = K / QK_K,
         .groups = groups,
     };
-    if (active_threads <= 1 || !pool) {
-        gemm_q4_packed_vnni_x8_q8k_4m_thread_fn(0, 1, &work);
-        return;
-    }
-    if (ck_gemm_dynamic_schedule_enabled()) {
-        const int grain = 4;
-        ck_threadpool_parallel_for_n(
-            pool, active_threads, 0, jobs, grain,
-            gemm_q4_packed_vnni_x8_q8k_4m_range_fn, &work);
-    } else {
-        ck_threadpool_dispatch_n(
-                pool, active_threads,
-                gemm_q4_packed_vnni_x8_q8k_4m_thread_fn, &work);
-    }
+    ck_q4k_dispatch_tiles(pool, active_threads, jobs, row_tiles,
+                          ck_gemm_dynamic_schedule_enabled() ? 4 : 0, "vnni_x8_4m",
+                          gemm_q4_packed_vnni_x8_q8k_4m_range, &work);
 }
 
 void gemm_nt_q4_k_packed_vnni_x16_q8_k_split_min_threaded_16m(

@@ -925,6 +925,7 @@ make test-v8-arm-model-smoke CK_ARM_MODEL_DIR=/path/to/generated-v8-model</pre><
   --temperature 0.0</pre>
     </div>
     <p class="mini-note">Use this as the current Gemma4 GGUF coherence smoke. A healthy run should produce a normal long answer and stop by EOS or <code>--max-tokens</code>, not by prompt-marker echo or language corruption. The tested local Q4_K_M run generated 1024 coherent C-code tokens; performance work remains separate.</p>
+    <p class="mini-note">For packed-Q4 prefill experiments, set <code>CK_EXPERIMENT_Q4K_TILE_SCHEDULE</code> to <code>contiguous</code>, <code>grain4</code>, or <code>whole-group</code> before launching the runtime. The override applies to the eight-output AVX2 and VNNI tiled prefill providers. Unset the variable for the existing schedule. Use <code>CK_DEBUG_Q4K_PREFILL_DISPATCH=1</code> in a separate untimed run to verify the selected provider, active worker count, and claim size.</p>
 
     <h3>Gemma 4 Assistant / MTP Drafter</h3>
     <div class="cmd-block">

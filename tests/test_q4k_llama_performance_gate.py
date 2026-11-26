@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import re
+import shutil
+import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -27,6 +31,37 @@ def _load_nightly_runner():
 
 
 class Q4KLlamaPerformanceGateTests(unittest.TestCase):
+    def test_packed_q4_tile_schedules_cover_each_output_exactly_once(self) -> None:
+        compiler = shutil.which("cc")
+        taskset = shutil.which("taskset")
+        if compiler is None or taskset is None or sys.platform != "linux":
+            self.skipTest("Linux C toolchain and taskset required for the native pool probe")
+        fixture = ROOT / "tests/fixtures/q4k_tile_schedule/probe.c"
+        cpus = sorted(os.sched_getaffinity(0))
+        isa_flags = []
+        cpu_flags = set(Path("/proc/cpuinfo").read_text().split())
+        if {"avx2", "fma", "f16c"} <= cpu_flags:
+            isa_flags = ["-mavx2", "-mfma", "-mf16c"]
+        if {"avx512f", "avx512bw", "avx512vl", "avx512_vnni"} <= cpu_flags:
+            isa_flags += ["-mavx512f", "-mavx512bw", "-mavx512vl", "-mavx512vnni"]
+        with tempfile.TemporaryDirectory() as directory:
+            binary = Path(directory) / "probe"
+            subprocess.run([
+                compiler, "-std=gnu11", "-O2", *isa_flags,
+                "-ffunction-sections", "-fdata-sections",
+                "-I", str(ROOT / "include"), "-I", str(ROOT / "src/kernels"),
+                str(fixture), str(ROOT / "src/ck_threadpool.c"), str(ROOT / "src/ckernel_strict.c"),
+                "-Wl,--gc-sections", "-pthread", "-lm", "-o", str(binary),
+            ], check=True, capture_output=True, text=True)
+            for count in sorted({1, min(4, len(cpus))}):
+                with self.subTest(workers=count):
+                    env = {**os.environ, "CK_NUM_THREADS": str(count), "OMP_NUM_THREADS": "1"}
+                    env.pop("CK_THREADPOOL_CAPACITY", None)
+                    subprocess.run(
+                        [taskset, "-c", ",".join(map(str, cpus[:count])), str(binary)],
+                        env=env, check=True, capture_output=True, text=True,
+                    )
+
     def test_nightly_registers_comparative_benchmark(self) -> None:
         nightly = _load_nightly_runner()
         entry = nightly.MAKE_TARGETS["q4k_q8k_llama_performance"]
