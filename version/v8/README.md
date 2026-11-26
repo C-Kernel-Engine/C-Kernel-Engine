@@ -169,3 +169,27 @@ Automated headless perfscope timeline export can be added later without changing
 the normalized summary or plot-artifact contract.
 
 That keeps `v8` small and honest: the version split now includes the inference runner, local kernel registry/maps, multimodal bridge entrypoint, and the `v8`-named operator tooling surface used by the visualizer, hub, and regression entrypoints.
+
+### Pinned Bison BF16 decision replay
+
+Use the checked-in packed two-question fixture and the pinned Bison safetensors.
+The host validates the request, prepares the embedding rows and weights, and
+loads one generated C entry. That entry executes the packed backbone and returns
+raw option scores. The replay uses a temporary file-backed arena. Allow enough
+free disk space for the reported bundle size in addition to the checkpoint.
+
+```bash
+request=tests/fixtures/decision/block_packed_bison_request.json
+python -m version.v8.decision.capture_bison_block_oracle \
+  --checkpoint "$checkpoint" --request "$request" --out "$oracle"
+CK_BLAS_LIBRARY="$lp64_blas_library" MKL_NUM_THREADS=8 OMP_NUM_THREADS=8 \
+  python -m version.v8.decision.run_bison_backbone \
+  --checkpoint "$checkpoint" --request "$request" --output "$run" \
+  --oracle "$oracle" --max-abs 0.5 --max-rmse 0.25
+```
+
+Use an LP64 BLAS library exporting `dgemm_`. `--scalar` selects the slower
+ordered FP64 reference provider. `--layers 1` runs only the first layer and saves
+its hidden output for diagnosis. `--keep-arena` retains the runtime arena for
+replay. Use a fresh output path for each run. The comparison checks raw scores
+and winner identities. The harness expects pretokenized requests.

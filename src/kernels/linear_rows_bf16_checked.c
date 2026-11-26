@@ -1,3 +1,8 @@
+#include <dlfcn.h>
+#include <limits.h>
+#include <pthread.h>
+#include <stdlib.h>
+#include <string.h>
 #include <math.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -62,5 +67,79 @@ int ck_linear_rows_bf16_checked(
         }
     }
     for (size_t i = 0; i < out_count; ++i) output[i] = staged[i];
+    return 0;
+}
+
+typedef void (*ck_dgemm_fn)(const char *, const char *, const int *, const int *, const int *,
+                           const double *, const double *, const int *, const double *,
+                           const int *, const double *, double *, const int *);
+
+static pthread_once_t dgemm_once = PTHREAD_ONCE_INIT;
+static ck_dgemm_fn dgemm;
+
+static void bind_dgemm(void)
+{
+    const char *path = getenv("CK_BLAS_LIBRARY");
+    void *library = path && *path ? dlopen(path, RTLD_NOW | RTLD_LOCAL) : RTLD_DEFAULT;
+    if (path && *path && !library)
+        return;
+    void *symbol = dlsym(library, "dgemm_");
+    _Static_assert(sizeof(symbol) == sizeof(dgemm), "dgemm_ function pointer size");
+    memcpy(&dgemm, &symbol, sizeof(dgemm));
+}
+
+int ck_linear_rows_bf16_blas_checked(
+    const uint16_t *input, size_t input_elements, const uint16_t *weight, size_t weight_elements,
+    uint16_t *output, size_t output_elements, uint16_t *staged, size_t staged_elements,
+    double *work, size_t work_elements, size_t rows, size_t input_width, size_t output_width)
+{
+    if (!rows || !input_width || !output_width || rows > INT_MAX ||
+        input_width > INT_MAX || output_width > INT_MAX ||
+        rows > SIZE_MAX / input_width || output_width > SIZE_MAX / input_width ||
+        rows > SIZE_MAX / output_width)
+        return -2;
+    const size_t a = rows * input_width, b = output_width * input_width, c = rows * output_width;
+    if (a > SIZE_MAX - b || a + b > SIZE_MAX - c)
+        return -2;
+    const size_t work_count = a + b + c;
+    if (a > input_elements || b > weight_elements || c > output_elements ||
+        c > staged_elements || work_count > work_elements || !work ||
+        (uintptr_t)work % _Alignof(double) || work_count > SIZE_MAX / sizeof(double))
+        return -2;
+    const size_t work_bits = work_count * (sizeof(double) / sizeof(uint16_t));
+    const uint16_t *work_region = (const uint16_t*)work;
+    if (!region_valid(input, a) || !region_valid(weight, b) ||
+        !region_valid(output, c) || !region_valid(staged, c) ||
+        !region_valid(work_region, work_bits) ||
+        overlap(output, c, input, a) || overlap(output, c, weight, b) ||
+        overlap(staged, c, input, a) || overlap(staged, c, weight, b) ||
+        overlap(output, c, staged, c) ||
+        overlap(work_region, work_bits, input, a) || overlap(work_region, work_bits, weight, b) ||
+        overlap(work_region, work_bits, staged, c) || overlap(work_region, work_bits, output, c))
+        return -1;
+    pthread_once(&dgemm_once, bind_dgemm);
+    if (!dgemm)
+        return -4;
+    double *matrix_a = work, *matrix_b = work + a, *matrix_c = work + a + b;
+    for (size_t i = 0; i < a; ++i) {
+        matrix_a[i] = bf16_to_float(input[i]);
+        if (!isfinite(matrix_a[i]))
+            return -3;
+    }
+    for (size_t i = 0; i < b; ++i) {
+        matrix_b[i] = bf16_to_float(weight[i]);
+        if (!isfinite(matrix_b[i]))
+            return -3;
+    }
+    const char trans = 'T', no_trans = 'N';
+    const int m = (int)rows, n = (int)output_width, k = (int)input_width;
+    const double one = 1.0, zero = 0.0;
+    dgemm(&trans, &no_trans, &n, &m, &k, &one, matrix_b, &k, matrix_a, &k, &zero, matrix_c, &n);
+    for (size_t i = 0; i < c; ++i) {
+        staged[i] = float_to_bf16((float)matrix_c[i]);
+        if (!isfinite(bf16_to_float(staged[i])))
+            return -3;
+    }
+    memcpy(output, staged, c * sizeof(*output));
     return 0;
 }
