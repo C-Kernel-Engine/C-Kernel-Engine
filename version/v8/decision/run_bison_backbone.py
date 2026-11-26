@@ -14,8 +14,10 @@ import time
 
 import numpy as np
 
+from version.v8.decision import groundhog_checkpoint
 from version.v8.decision.build_bison_backbone import Backbone, Layer
-from version.v8.decision.capture_bison_block_oracle import CHECKPOINT_FILES, PREFIX, REVISION
+from version.v8.decision.build_groundhog_moe import Experts
+from version.v8.decision.capture_bison_block_oracle import PREFIX, checkpoint_hashes
 from version.v8.decision.packed_question_layout import Question, pack_questions
 from version.v8.scripts.compile_checked_bundle_v8 import compile_native_graph
 
@@ -35,8 +37,9 @@ def widen(bits):
 
 
 class Checkpoint:
-    def __init__(self, directory):
+    def __init__(self, directory, expected_hashes):
         self.directory = directory
+        self.expected_hashes = expected_hashes
         self.index = json.loads((directory / "model.safetensors.index.json").read_text())["weight_map"]
         self.shards = {}
         self.verified = {}
@@ -60,7 +63,7 @@ class Checkpoint:
     def verify(self, name):
         if name not in self.verified:
             digest = file_sha256(self.directory / name)
-            if digest != CHECKPOINT_FILES[name]:
+            if digest != self.expected_hashes[name]:
                 raise ValueError(f"publisher digest mismatch: {name}")
             self.verified[name] = digest
 
@@ -82,9 +85,9 @@ def rotary_frequencies(text, layer):
 
 
 def layer_geometry(text):
-    if (text["enable_moe_block"] or text["num_kv_shared_layers"] or text["hidden_size_per_layer_input"]
+    if (text["num_kv_shared_layers"] or text["hidden_size_per_layer_input"]
         or text["attention_bias"] or text["hidden_activation"] != "gelu_pytorch_tanh"):
-        raise ValueError("expected a dense biasless graph with independent layer state and tanh GELU")
+        raise ValueError("expected a biasless graph with independent layer state and tanh GELU")
     kinds = text["layer_types"]
     overrides = {int(index): record for index, record in text["per_layer_config"].items()}
     if len(kinds) != text["num_hidden_layers"]:
@@ -117,21 +120,26 @@ def manifest(graph):
 def run(checkpoint, request_path, output, *, blas=True, limit=None, keep_arena=False,
         oracle_path=None, max_abs=None, max_rmse=None):
     request = json.loads(request_path.read_text())
-    if request.get("checkpoint") != REVISION:
-        raise ValueError("request does not name the pinned checkpoint")
+    revision = request.get("checkpoint")
+    hashes = checkpoint_hashes(revision)
     request_sha = file_sha256(request_path)
     expected = None
     if oracle_path is not None:
         expected = json.loads(oracle_path.read_text())
-        if (limit is not None or expected.get("checkpoint") != REVISION or
+        if (limit is not None or expected.get("checkpoint") != revision or
             expected.get("request_sha256") != request_sha or
             any(value is None or not math.isfinite(value) or value < 0 for value in (max_abs, max_rmse))):
             raise ValueError("oracle requires a matching full request and finite nonnegative error limits")
-    weights = Checkpoint(checkpoint)
+    weights = Checkpoint(checkpoint, hashes)
     weights.verify("config.json")
     weights.verify("model.safetensors.index.json")
     text = json.loads((checkpoint / "config.json").read_text())["text_config"]
     layers = layer_geometry(text)
+    if text["enable_moe_block"] != (revision == groundhog_checkpoint.REVISION):
+        raise ValueError("checkpoint expert configuration differs from its pinned policy")
+    experts = None
+    if text["enable_moe_block"]:
+        experts = Experts(text["num_experts"], text["top_k_experts"], text["moe_intermediate_size"])
     full = limit is None
     if limit is not None:
         if not 1 <= limit < len(layers):
@@ -151,7 +159,7 @@ def run(checkpoint, request_path, output, *, blas=True, limit=None, keep_arena=F
     frequencies = {}
     for index, layer in enumerate(layers):
         frequencies.setdefault(f"rope.{layer.visibility}.{layer.head_dim}", rotary_frequencies(text, layer))
-        hidden = graph.layer(index, layer, hidden)
+        hidden = graph.layer(index, layer, hidden, moe=experts)
     if full:
         graph.readout(hidden, len(questions), len(option_ids))
     output.mkdir(parents=True)
@@ -183,7 +191,8 @@ def run(checkpoint, request_path, output, *, blas=True, limit=None, keep_arena=F
                         elif name == "option.weight":
                             target[:] = weights.tensor("lm_head.weight", [text["vocab_size"], width])[option_ids]
                         else:
-                            target[:] = weights.tensor(name, shape)
+                            stored = weights.tensor(name, shape)
+                            target[:] = widen(stored) if dtype == "F32" else stored
                     finally:
                         del target
 
@@ -216,7 +225,7 @@ def run(checkpoint, request_path, output, *, blas=True, limit=None, keep_arena=F
         if not keep_arena:
             arena_path.unlink()
     report = {
-        "checkpoint": REVISION, "verified_files": weights.verified, "request_sha256": request_sha,
+        "checkpoint": revision, "verified_files": weights.verified, "request_sha256": request_sha,
         "layers": len(layers), "tokens": len(packed.token_ids), "library_sha256": file_sha256(library),
         "projection": "fp64_blas" if blas else "fp64_ordered_scalar", "native_seconds": seconds,
     }

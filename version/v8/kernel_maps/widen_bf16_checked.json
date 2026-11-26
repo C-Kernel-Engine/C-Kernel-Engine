@@ -1,0 +1,111 @@
+{
+  "id": "widen_bf16_checked",
+  "op": "widen_bf16_checked",
+  "operation_interface": "tensor.widen_bf16_checked.v1",
+  "variant": "ordered_bf16_storage",
+  "quant": {
+    "weight": "none",
+    "activation": "bf16",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "input",
+      "dtype": "bf16",
+      "shape": [
+        "N"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "out",
+      "dtype": "fp32",
+      "shape": [
+        "N"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "output",
+      "consumption": "required"
+    }
+  ],
+  "scratch": [],
+  "dims": [
+    "N"
+  ],
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
+  "impl": {
+    "function": "ck_widen_bf16_checked",
+    "c_declaration": "int ck_widen_bf16_checked(const uint16_t *input, float *out, size_t elements);",
+    "sources": [
+      "src/kernels/bf16_checked_tensor_ops.c"
+    ]
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "input",
+        "source": "activation:input",
+        "cast": "const uint16_t*",
+        "ports": [
+          "input:input"
+        ]
+      },
+      {
+        "name": "out",
+        "source": "output:out",
+        "cast": "float*",
+        "ports": [
+          "output:out"
+        ]
+      },
+      {
+        "name": "elements",
+        "source": "runtime:elements",
+        "value_type": "size_t"
+      }
+    ]
+  },
+  "call_constant_contract": {
+    "shape_symbols": {
+      "N": "elements"
+    },
+    "buffer_spans": [
+      {
+        "pointer": "input",
+        "elements": "elements",
+        "rows": 1,
+        "width": "elements",
+        "element_bytes": 2,
+        "storage_dtype": "bf16"
+      },
+      {
+        "pointer": "out",
+        "elements": "elements",
+        "rows": 1,
+        "width": "elements",
+        "element_bytes": 4,
+        "storage_dtype": "fp32"
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "tests/test_v8_groundhog_moe.py"
+    ]
+  },
+  "notes": "Exact BF16 to FP32 widening for finite contiguous input values. Invalid input leaves the output unchanged."
+}

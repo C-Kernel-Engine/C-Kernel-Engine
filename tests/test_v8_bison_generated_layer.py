@@ -3,13 +3,17 @@ import numpy as np
 import pytest
 
 from version.v8.decision.build_bison_backbone import Backbone, Layer
+from version.v8.decision.build_groundhog_moe import Experts
 from version.v8.decision.packed_question_layout import Question, pack_questions
 from version.v8.scripts.checked_bundle_evidence_v8 import checked_target_flags
 from version.v8.scripts.compile_checked_bundle_v8 import compile_checked_weight_graph
 
 
-@pytest.mark.parametrize(("blas", "target_isa"), [(False, "portable"), (True, "portable"), (False, "avx2")])
-def test_generated_mixed_backbone_scores_and_recovers(tmp_path, monkeypatch, blas, target_isa):
+@pytest.mark.parametrize(("blas", "target_isa", "moe"), [
+    (False, "portable", False), (True, "portable", False), (False, "avx2", False),
+    (False, "portable", True),
+])
+def test_generated_mixed_backbone_scores_and_recovers(tmp_path, monkeypatch, blas, target_isa, moe):
     try:
         checked_target_flags(target_isa)
     except ValueError as error:
@@ -36,7 +40,7 @@ def test_generated_mixed_backbone_scores_and_recovers(tmp_path, monkeypatch, bla
         head_dim=4, global_head_dim=8, num_global_key_value_heads=1, attention_k_eq_v=True,
         num_hidden_layers=2, layer_types=["sliding_attention", "full_attention"],
         num_kv_shared_layers=0, hidden_size_per_layer_input=0, sliding_window=3,
-        rms_norm_eps=1e-6,
+        rms_norm_eps=1e-6, enable_moe_block=moe, num_experts=8, top_k_experts=2, moe_intermediate_size=12,
         rope_parameters={
             "sliding_attention": {"rope_type": "default", "rope_theta": 10000.0},
             "full_attention": {"rope_type": "proportional", "rope_theta": 1000000.0,
@@ -45,14 +49,20 @@ def test_generated_mixed_backbone_scores_and_recovers(tmp_path, monkeypatch, bla
     )
     config._attn_implementation = "eager"
     layers = [reference.Gemma4TextDecoderLayer(config, i).eval().bfloat16() for i in range(2)]
+    if moe:
+        with torch.no_grad():
+            for layer in layers:
+                layer.experts.gate_up_proj.normal_(std=0.3)
+                layer.experts.down_proj.normal_(std=0.3)
     rope = reference.Gemma4TextRotaryEmbedding(config)
     assert (rope.full_attention_inv_freq == 0).any()
     table = torch.randn((8, 16)).bfloat16()
     options = torch.randn((3, 16)).bfloat16()
     final = reference.Gemma4RMSNorm(16).bfloat16()
     graph = Backbone(8, 8, 16, 4, 20, 1e-6, blas=blas)
-    hidden = graph.layer(0, Layer(2, 4, "sliding"), "input")
-    hidden = graph.layer(1, Layer(1, 8, "full", True), hidden)
+    geometry = Experts(8, 2, 12) if moe else None
+    hidden = graph.layer(0, Layer(2, 4, "sliding"), "input", moe=geometry)
+    hidden = graph.layer(1, Layer(1, 8, "full", True), hidden, moe=geometry)
     graph.readout(hidden, 2, 3)
 
     def bits(value):
@@ -66,7 +76,11 @@ def test_generated_mixed_backbone_scores_and_recovers(tmp_path, monkeypatch, bla
                "option.weight": bits(options)}
     for i, layer in enumerate(layers):
         for name, tensor in layer.state_dict().items():
-            weights[f"model.language_model.layers.{i}.{name}"] = bits(tensor)
+            weights[f"model.language_model.layers.{i}.{name}"] = (
+                tensor.detach().float().numpy() if name == "router.per_expert_scale" else bits(tensor)
+            )
+    if moe:
+        weights["unit.16"] = bits(torch.ones(16, dtype=torch.bfloat16))
     invoke, arena, view, _ = compile_checked_weight_graph(
         tmp_path, graph.graph, weights, graph.weights, source_config=graph.config, target_isa=target_isa,
     )

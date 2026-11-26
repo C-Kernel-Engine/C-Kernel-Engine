@@ -1,0 +1,175 @@
+{
+  "id": "scale_rows_bf16_checked",
+  "op": "scale_rows_bf16_checked",
+  "operation_interface": "tensor.scale_rows_bf16_checked.v1",
+  "variant": "ordered_bf16_storage",
+  "quant": {
+    "weight": "bf16",
+    "activation": "bf16",
+    "output": "bf16"
+  },
+  "inputs": [
+    {
+      "name": "input",
+      "dtype": "bf16",
+      "shape": [
+        "N"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [
+    {
+      "name": "weight",
+      "dtype": "bf16",
+      "shape": [
+        "D"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "weight",
+      "consumption": "required"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "out",
+      "dtype": "bf16",
+      "shape": [
+        "N"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "output",
+      "consumption": "required"
+    }
+  ],
+  "scratch": [
+    {
+      "name": "stage",
+      "dtype": "bf16",
+      "shape": [
+        "N"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read_write",
+      "consumption": "required",
+      "size_bytes": "2 * N",
+      "size_resolution": "required",
+      "lifetime": "kernel_call",
+      "alignment": 64
+    }
+  ],
+  "dims": [
+    "N",
+    "D"
+  ],
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
+  "impl": {
+    "function": "ck_scale_rows_bf16_checked",
+    "c_declaration": "int ck_scale_rows_bf16_checked(const uint16_t *input, const uint16_t *weight, uint16_t *out, uint16_t *stage, size_t elements, size_t gain_elements);",
+    "sources": [
+      "src/kernels/bf16_checked_tensor_ops.c"
+    ]
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "input",
+        "source": "activation:input",
+        "cast": "const uint16_t*",
+        "ports": [
+          "input:input"
+        ]
+      },
+      {
+        "name": "weight",
+        "source": "weight:weight",
+        "cast": "const uint16_t*",
+        "ports": [
+          "weight:weight"
+        ]
+      },
+      {
+        "name": "out",
+        "source": "output:out",
+        "cast": "uint16_t*",
+        "ports": [
+          "output:out"
+        ]
+      },
+      {
+        "name": "stage",
+        "source": "scratch:stage",
+        "cast": "uint16_t*"
+      },
+      {
+        "name": "elements",
+        "source": "runtime:elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "gain_elements",
+        "source": "runtime:gain_elements",
+        "value_type": "size_t"
+      }
+    ]
+  },
+  "call_constant_contract": {
+    "shape_symbols": {
+      "N": "elements",
+      "D": "gain_elements"
+    },
+    "buffer_spans": [
+      {
+        "pointer": "input",
+        "elements": "elements",
+        "rows": 1,
+        "width": "elements",
+        "element_bytes": 2,
+        "storage_dtype": "bf16"
+      },
+      {
+        "pointer": "weight",
+        "elements": "gain_elements",
+        "rows": 1,
+        "width": "gain_elements",
+        "element_bytes": 2,
+        "storage_dtype": "bf16"
+      },
+      {
+        "pointer": "out",
+        "elements": "elements",
+        "rows": 1,
+        "width": "elements",
+        "element_bytes": 2,
+        "storage_dtype": "bf16"
+      },
+      {
+        "pointer": "stage",
+        "elements": "elements",
+        "rows": 1,
+        "width": "elements",
+        "element_bytes": 2
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "tests/test_v8_groundhog_moe.py"
+    ]
+  },
+  "notes": "Multiply contiguous BF16 rows by a BF16 feature vector. One BF16 store. All spans are checked and invalid inputs leave the output unchanged."
+}

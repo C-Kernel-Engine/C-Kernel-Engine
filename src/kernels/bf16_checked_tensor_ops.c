@@ -21,7 +21,7 @@ static int overlaps(const void *a, size_t abytes, const void *b, size_t bbytes)
 static int binary_bf16(const uint16_t *left, const uint16_t *right, size_t rhs_count,
                        uint16_t *out, uint16_t *stage, size_t n, int multiply)
 {
-    if (!n || (rhs_count != n && rhs_count != 1) ||
+    if (!n || !rhs_count || n % rhs_count ||
         !valid_span(left, n, 2) || !valid_span(right, rhs_count, 2) ||
         !valid_span(out, n, 2) || !valid_span(stage, n, 2))
         return -2;
@@ -31,8 +31,11 @@ static int binary_bf16(const uint16_t *left, const uint16_t *right, size_t rhs_c
         overlaps(out, bytes, right, rhs_count * 2))
         return -2;
 
+    size_t column = 0;
     for (size_t i = 0; i < n; ++i) {
-        const float a = bf16_to_float(left[i]), b = bf16_to_float(right[rhs_count == 1 ? 0 : i]);
+        const float a = bf16_to_float(left[i]), b = bf16_to_float(right[column]);
+        if (++column == rhs_count)
+            column = 0;
         const uint16_t value = float_to_bf16(multiply ? a * b : a + b);
         if (!isfinite(a) || !isfinite(b) || !isfinite(bf16_to_float(value)))
             return -3;
@@ -54,6 +57,26 @@ int ck_scale_bf16_checked(const uint16_t *input, const uint16_t *weight,
     if (gain_elements != 1)
         return -2;
     return binary_bf16(input, weight, 1, out, stage, elements, 1);
+}
+
+int ck_scale_rows_bf16_checked(const uint16_t *input, const uint16_t *weight,
+                              uint16_t *out, uint16_t *stage, size_t elements, size_t gain_elements)
+{
+    return binary_bf16(input, weight, gain_elements, out, stage, elements, 1);
+}
+
+int ck_widen_bf16_checked(const uint16_t *input, float *out, size_t elements)
+{
+    if (!elements || !valid_span(input, elements, sizeof(*input)) ||
+        !valid_span(out, elements, sizeof(*out)) ||
+        overlaps(input, elements * sizeof(*input), out, elements * sizeof(*out)))
+        return -2;
+    for (size_t i = 0; i < elements; ++i)
+        if (!isfinite(bf16_to_float(input[i])))
+            return -3;
+    for (size_t i = 0; i < elements; ++i)
+        out[i] = bf16_to_float(input[i]);
+    return 0;
 }
 
 static int gated_bf16(const uint16_t *gate, const uint16_t *up, uint16_t *out,
@@ -215,6 +238,26 @@ int ck_rope_interleaved_partial_bf16_checked(const uint16_t *input, const int32_
                 stage[i + 1] = odd;
             }
         }
+    }
+    memcpy(out, stage, bytes);
+    return 0;
+}
+
+int ck_scale_scalar_f32_bf16_checked(const uint16_t *input, uint16_t *out,
+                                    uint16_t *stage, size_t elements, float scale)
+{
+    if (!elements || !isfinite(scale) || !valid_span(input, elements, 2) ||
+        !valid_span(out, elements, 2) || !valid_span(stage, elements, 2))
+        return -2;
+    const size_t bytes = elements * 2;
+    if (overlaps(input, bytes, out, bytes) || overlaps(input, bytes, stage, bytes) ||
+        overlaps(stage, bytes, out, bytes))
+        return -2;
+    for (size_t i = 0; i < elements; ++i) {
+        const float value = bf16_to_float(input[i]);
+        stage[i] = float_to_bf16(value * scale);
+        if (!isfinite(value) || !isfinite(bf16_to_float(stage[i])))
+            return -3;
     }
     memcpy(out, stage, bytes);
     return 0;

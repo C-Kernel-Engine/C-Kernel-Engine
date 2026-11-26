@@ -7,6 +7,8 @@ import hashlib
 import json
 from pathlib import Path
 
+from version.v8.decision import groundhog_checkpoint
+
 CHECKPOINT_FILES = {
     "config.json": "bfabc4abdd51bc421188332d28eb1de468ae21f1c1ccf35f07de9506d62b67e2",
     "model.safetensors.index.json": "06e580553feed4e5d7285eed764b19f2b38c1cd2be28cb041dab036aa0db5ae2",
@@ -17,7 +19,16 @@ REVISION = "bf8350b2c59eb6c36e95d02a2af870aec18724a7"
 PREFIX = "model.language_model."
 
 
+def checkpoint_hashes(revision):
+    if revision == REVISION:
+        return CHECKPOINT_FILES
+    if revision == groundhog_checkpoint.REVISION:
+        return groundhog_checkpoint.CHECKPOINT_FILES
+    raise ValueError(f"unknown pinned decision checkpoint {revision!r}")
+
+
 def capture(checkpoint, request, threads, *, readout_inputs=None):
+    revision = request.get("checkpoint", REVISION)
     import torch
     import transformers
     from safetensors import safe_open
@@ -42,8 +53,10 @@ def capture(checkpoint, request, threads, *, readout_inputs=None):
         **text_config, "global_head_dim": head_dim, "num_global_key_value_heads": kv_heads,
     })
     config._attn_implementation = "eager"
-    if config.hidden_size_per_layer_input or config.num_kv_shared_layers or config.enable_moe_block:
-        raise ValueError("pinned dense Bison oracle only supports independent K/V and no PLE or experts")
+    if config.hidden_size_per_layer_input or config.num_kv_shared_layers:
+        raise ValueError("pinned decision oracle requires independent layer state and no PLE")
+    if config.enable_moe_block and revision != groundhog_checkpoint.REVISION:
+        raise ValueError("unexpected routed expert checkpoint")
     weight_map = json.loads((checkpoint / "model.safetensors.index.json").read_text())["weight_map"]
 
     def weights(names):
@@ -138,7 +151,7 @@ def capture(checkpoint, request, threads, *, readout_inputs=None):
                 capture_sha256 = hashlib.file_digest(stream, "sha256").hexdigest()
     correct = outputs[:-1]
     return {
-        "checkpoint": REVISION, "renderer_revision": request["renderer_revision"],
+        "checkpoint": revision, "renderer_revision": request["renderer_revision"],
         "torch": torch.__version__, "transformers": transformers.__version__,
         "scope": "PyTorch BF16 with explicit block-bidirectional and causal sliding masks",
         "readout_inputs_sha256": capture_sha256,
@@ -164,9 +177,9 @@ def main():
     )):
         argp.error("threads must be positive and output must be new")
     request = json.loads(args.request.read_text())
-    if request.get("checkpoint") != REVISION or len(request.get("questions", ())) != 2:
-        argp.error("expected the pinned Bison two-question fixture")
-    for name, expected in CHECKPOINT_FILES.items():
+    if len(request.get("questions", ())) != 2:
+        argp.error("expected a pinned two-question decision fixture")
+    for name, expected in checkpoint_hashes(request.get("checkpoint")).items():
         with (args.checkpoint / name).open("rb") as stream:
             if hashlib.file_digest(stream, "sha256").hexdigest() != expected:
                 raise ValueError(f"publisher digest mismatch: {name}")
