@@ -194,6 +194,16 @@ its hidden output for diagnosis. `--keep-arena` retains the runtime arena for
 replay. Use a fresh output path for each run. The comparison checks raw scores
 and winner identities. The harness expects pretokenized requests.
 
+The runner also accepts Groundhog-1 at the revision declared by
+`tests/fixtures/decision/block_packed_groundhog_request.json`. Set `request`
+to that fixture and `checkpoint` to the pinned Groundhog-1 checkpoint. The
+generated graph includes both MLP branches and the routed GeGLU experts. For
+diagnosis, the checked MoE fragment retains the router logits, selected IDs,
+scaled routing weights and unweighted expert outputs in the replay report.
+Equal-logit cutoff ties can select different experts in the publisher's
+PyTorch implementation. Compare selected IDs together with weights and inspect
+ties before attributing a residual mismatch to expert arithmetic.
+
 ### Sigma BF16 denoiser block replay
 
 The generated entry uses explicit positions and key ranges for a nonempty

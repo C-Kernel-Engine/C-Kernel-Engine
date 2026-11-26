@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 589,
+      "total": 593,
       "by_op": {
         "add_backward": 1,
         "add_bf16_checked": 1,
@@ -229,6 +229,7 @@
         "rope_pairwise_rows_checked": 1,
         "rope_qk_bounded": 1,
         "rope_split_positions_bf16_checked": 1,
+        "routed_geglu_bf16_checked": 1,
         "routed_softcapped_experts_checked": 17,
         "rowwise_bias_add": 1,
         "runtime_copy_valid": 1,
@@ -248,7 +249,8 @@
         "scalar_exp_clamped_checked": 1,
         "scalar_sigmoid_backward_checked": 1,
         "scalar_sigmoid_checked": 1,
-        "scale_bf16_checked": 1,
+        "scale_bf16_checked": 2,
+        "scale_rows_bf16_checked": 1,
         "scale_vector_backward_checked": 1,
         "scale_vector_checked": 1,
         "scaled_head_l2_clip_checked": 1,
@@ -284,6 +286,7 @@
         "unweighted_rmsnorm": 1,
         "v_norm": 1,
         "vision_patchify": 2,
+        "widen_bf16_checked": 1,
         "yarn_rope_init": 3
       }
     }
@@ -105716,6 +105719,380 @@
       "_source_file": "rope_split_positions_bf16_checked.json"
     },
     {
+      "id": "routed_geglu_bf16_checked",
+      "op": "routed_geglu_bf16_checked",
+      "operation_interface": "moe.geglu.bf16.expert_major_index_add.checked.v1",
+      "variant": "bf16_gelu_then_bf16_weighted_expert_ordered_merge",
+      "quant": {
+        "weight": "bf16",
+        "activation": "bf16",
+        "output": "bf16"
+      },
+      "dims": [
+        "R",
+        "H",
+        "I",
+        "E",
+        "K"
+      ],
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "bf16",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "ids",
+          "dtype": "i32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "scores",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "gate_up",
+          "dtype": "bf16",
+          "shape": [
+            "E",
+            "2*I",
+            "H"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "down",
+          "dtype": "bf16",
+          "shape": [
+            "E",
+            "H",
+            "I"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "out",
+          "dtype": "bf16",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "output",
+          "consumption": "required"
+        },
+        {
+          "name": "routes",
+          "dtype": "bf16",
+          "shape": [
+            "R",
+            "K",
+            "H"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "output",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "work",
+          "dtype": "fp32",
+          "alignment": 64,
+          "lifetime": "kernel_call",
+          "size_resolution": "required",
+          "size_bytes": "8 * (R*H + 2*H*I + 2*R*I) + 4*I + 2 * (4*R*H + 5*R*I + R*K*H)"
+        }
+      ],
+      "impl": {
+        "function": "ck_routed_geglu_bf16_checked",
+        "c_declaration": "int ck_routed_geglu_bf16_checked(const uint16_t *input, const int32_t *ids, const float *scores, const uint16_t *gate_up, const uint16_t *down, uint16_t *out, uint16_t *routes, void *workspace, size_t workspace_bytes, size_t rows, size_t width, size_t inner, size_t experts, size_t top_k, int use_blas, size_t hidden_elements, size_t selected_elements, size_t route_elements, size_t gate_elements, size_t down_elements);",
+        "sources": [
+          "src/kernels/routed_geglu_bf16_checked.c",
+          "src/kernels/bf16_checked_tensor_ops.c",
+          "src/kernels/linear_rows_bf16_checked.c",
+          "src/kernels/gelu_kernels.c"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const uint16_t*",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "ids",
+            "source": "activation:ids",
+            "cast": "const int32_t*",
+            "ports": [
+              "input:ids"
+            ]
+          },
+          {
+            "name": "scores",
+            "source": "activation:scores",
+            "cast": "const float*",
+            "ports": [
+              "input:scores"
+            ]
+          },
+          {
+            "name": "gate_up",
+            "source": "weight:gate_up",
+            "cast": "const uint16_t*",
+            "ports": [
+              "weight:gate_up"
+            ]
+          },
+          {
+            "name": "down",
+            "source": "weight:down",
+            "cast": "const uint16_t*",
+            "ports": [
+              "weight:down"
+            ]
+          },
+          {
+            "name": "out",
+            "source": "output:out",
+            "cast": "uint16_t*",
+            "ports": [
+              "output:out"
+            ]
+          },
+          {
+            "name": "routes",
+            "source": "output:routes",
+            "cast": "uint16_t*",
+            "ports": [
+              "output:routes"
+            ]
+          },
+          {
+            "name": "workspace",
+            "source": "scratch:work",
+            "cast": "void*"
+          },
+          {
+            "name": "workspace_bytes",
+            "source": "scratch_size:work"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "width",
+            "source": "runtime:width",
+            "value_type": "size_t"
+          },
+          {
+            "name": "inner",
+            "source": "runtime:inner",
+            "value_type": "size_t"
+          },
+          {
+            "name": "experts",
+            "source": "runtime:experts",
+            "value_type": "size_t"
+          },
+          {
+            "name": "top_k",
+            "source": "runtime:top_k",
+            "value_type": "size_t"
+          },
+          {
+            "name": "use_blas",
+            "source": "param:use_blas"
+          },
+          {
+            "name": "hidden_elements",
+            "source": "runtime:hidden_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "selected_elements",
+            "source": "runtime:selected_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "route_elements",
+            "source": "runtime:route_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "gate_elements",
+            "source": "runtime:gate_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "down_elements",
+            "source": "runtime:down_elements",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "R": "rows",
+          "H": "width",
+          "I": "inner",
+          "E": "experts",
+          "K": "top_k"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "elements": "hidden_elements",
+            "rows": 1,
+            "width": "hidden_elements",
+            "element_bytes": 2,
+            "storage_dtype": "bf16",
+            "exact_elements_product": [
+              "rows",
+              "width"
+            ]
+          },
+          {
+            "pointer": "ids",
+            "elements": "selected_elements",
+            "rows": 1,
+            "width": "selected_elements",
+            "element_bytes": 4,
+            "storage_dtype": "i32",
+            "exact_elements_product": [
+              "rows",
+              "top_k"
+            ]
+          },
+          {
+            "pointer": "scores",
+            "elements": "selected_elements",
+            "rows": 1,
+            "width": "selected_elements",
+            "element_bytes": 4,
+            "storage_dtype": "fp32",
+            "exact_elements_product": [
+              "rows",
+              "top_k"
+            ]
+          },
+          {
+            "pointer": "gate_up",
+            "elements": "gate_elements",
+            "rows": 1,
+            "width": "gate_elements",
+            "element_bytes": 2,
+            "storage_dtype": "bf16",
+            "exact_elements_product": [
+              "experts",
+              2,
+              "inner",
+              "width"
+            ]
+          },
+          {
+            "pointer": "down",
+            "elements": "down_elements",
+            "rows": 1,
+            "width": "down_elements",
+            "element_bytes": 2,
+            "storage_dtype": "bf16",
+            "exact_elements_product": [
+              "experts",
+              "width",
+              "inner"
+            ]
+          },
+          {
+            "pointer": "out",
+            "elements": "hidden_elements",
+            "rows": 1,
+            "width": "hidden_elements",
+            "element_bytes": 2,
+            "storage_dtype": "bf16",
+            "exact_elements_product": [
+              "rows",
+              "width"
+            ]
+          },
+          {
+            "pointer": "routes",
+            "elements": "route_elements",
+            "rows": 1,
+            "width": "route_elements",
+            "element_bytes": 2,
+            "storage_dtype": "bf16",
+            "exact_elements_product": [
+              "rows",
+              "top_k",
+              "width"
+            ]
+          }
+        ]
+      },
+      "notes": "Experts execute in ascending ID order. FP64 gate/up and down projections store BF16. Preserve BF16 GELU, multiply and per-expert accumulation boundaries. The route output contains the unweighted down projections keyed by input row and selected slot. Caller declares scalar or LP64 BLAS projection. Both outputs publish only on success.",
+      "tests": {
+        "unit": [
+          "tests/test_v8_groundhog_moe.py"
+        ]
+      },
+      "name": "routed_geglu_bf16_checked",
+      "_source_file": "routed_geglu_bf16_checked.json"
+    },
+    {
       "id": "routed_softcapped_experts_checked_f32",
       "op": "routed_softcapped_experts_checked",
       "operation_interface": "moe.routed_softcapped_swiglu.checked.fp32.v1",
@@ -117367,6 +117744,334 @@
       "_source_file": "scale_bf16_checked.json"
     },
     {
+      "id": "scale_rows_bf16_checked",
+      "op": "scale_rows_bf16_checked",
+      "operation_interface": "tensor.scale_rows_bf16_checked.v1",
+      "variant": "ordered_bf16_storage",
+      "quant": {
+        "weight": "bf16",
+        "activation": "bf16",
+        "output": "bf16"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "bf16",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "weight",
+          "dtype": "bf16",
+          "shape": [
+            "D"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "out",
+          "dtype": "bf16",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "output",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "stage",
+          "dtype": "bf16",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read_write",
+          "consumption": "required",
+          "size_bytes": "2 * N",
+          "size_resolution": "required",
+          "lifetime": "kernel_call",
+          "alignment": 64
+        }
+      ],
+      "dims": [
+        "N",
+        "D"
+      ],
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "impl": {
+        "function": "ck_scale_rows_bf16_checked",
+        "c_declaration": "int ck_scale_rows_bf16_checked(const uint16_t *input, const uint16_t *weight, uint16_t *out, uint16_t *stage, size_t elements, size_t gain_elements);",
+        "sources": [
+          "src/kernels/bf16_checked_tensor_ops.c"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const uint16_t*",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "weight",
+            "source": "weight:weight",
+            "cast": "const uint16_t*",
+            "ports": [
+              "weight:weight"
+            ]
+          },
+          {
+            "name": "out",
+            "source": "output:out",
+            "cast": "uint16_t*",
+            "ports": [
+              "output:out"
+            ]
+          },
+          {
+            "name": "stage",
+            "source": "scratch:stage",
+            "cast": "uint16_t*"
+          },
+          {
+            "name": "elements",
+            "source": "runtime:elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "gain_elements",
+            "source": "runtime:gain_elements",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "N": "elements",
+          "D": "gain_elements"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "elements": "elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 2,
+            "storage_dtype": "bf16"
+          },
+          {
+            "pointer": "weight",
+            "elements": "gain_elements",
+            "rows": 1,
+            "width": "gain_elements",
+            "element_bytes": 2,
+            "storage_dtype": "bf16"
+          },
+          {
+            "pointer": "out",
+            "elements": "elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 2,
+            "storage_dtype": "bf16"
+          },
+          {
+            "pointer": "stage",
+            "elements": "elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 2
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_groundhog_moe.py"
+        ]
+      },
+      "notes": "Multiply contiguous BF16 rows by a BF16 feature vector. One BF16 store. All spans are checked and invalid inputs leave the output unchanged.",
+      "name": "scale_rows_bf16_checked",
+      "_source_file": "scale_rows_bf16_checked.json"
+    },
+    {
+      "id": "scale_scalar_f32_bf16_checked",
+      "op": "scale_bf16_checked",
+      "operation_interface": "tensor.scale_bf16_by_f32_scalar.checked.v1",
+      "variant": "ordered_bf16_storage",
+      "quant": {
+        "weight": "none",
+        "activation": "bf16",
+        "output": "bf16"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "bf16",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "out",
+          "dtype": "bf16",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "output",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "stage",
+          "dtype": "bf16",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read_write",
+          "consumption": "required",
+          "size_bytes": "2 * N",
+          "size_resolution": "required",
+          "lifetime": "kernel_call",
+          "alignment": 64
+        }
+      ],
+      "dims": [
+        "N"
+      ],
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "impl": {
+        "function": "ck_scale_scalar_f32_bf16_checked",
+        "c_declaration": "int ck_scale_scalar_f32_bf16_checked(const uint16_t *input, uint16_t *out, uint16_t *stage, size_t elements, float scale);",
+        "sources": [
+          "src/kernels/bf16_checked_tensor_ops.c"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const uint16_t*",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "out",
+            "source": "output:out",
+            "cast": "uint16_t*",
+            "ports": [
+              "output:out"
+            ]
+          },
+          {
+            "name": "stage",
+            "source": "scratch:stage",
+            "cast": "uint16_t*"
+          },
+          {
+            "name": "elements",
+            "source": "runtime:elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "scale",
+            "source": "param:scale"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "N": "elements"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "elements": "elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 2,
+            "storage_dtype": "bf16"
+          },
+          {
+            "pointer": "out",
+            "elements": "elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 2,
+            "storage_dtype": "bf16"
+          },
+          {
+            "pointer": "stage",
+            "elements": "elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 2
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_groundhog_moe.py"
+        ]
+      },
+      "notes": "Multiply BF16 values by a FP32 scalar and round the result to BF16. The scalar is kept in FP32 until after multiplication.",
+      "params": [
+        {
+          "name": "scale",
+          "dtype": "fp32"
+        }
+      ],
+      "name": "scale_scalar_f32_bf16_checked",
+      "_source_file": "scale_scalar_f32_bf16_checked.json"
+    },
+    {
       "id": "scale_vector_backward_checked_f32",
       "op": "scale_vector_backward_checked",
       "operation_interface": "tensor.scale_vector_backward_checked.fp32.v1",
@@ -123868,6 +124573,119 @@
       "notes": "Build merged vision position IDs for 2D M-RoPE style encoders.",
       "name": "vision_position_ids_2d_merge",
       "_source_file": "vision_position_ids_2d_merge.json"
+    },
+    {
+      "id": "widen_bf16_checked",
+      "op": "widen_bf16_checked",
+      "operation_interface": "tensor.widen_bf16_checked.v1",
+      "variant": "ordered_bf16_storage",
+      "quant": {
+        "weight": "none",
+        "activation": "bf16",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "bf16",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "out",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "output",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "N"
+      ],
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "impl": {
+        "function": "ck_widen_bf16_checked",
+        "c_declaration": "int ck_widen_bf16_checked(const uint16_t *input, float *out, size_t elements);",
+        "sources": [
+          "src/kernels/bf16_checked_tensor_ops.c"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const uint16_t*",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "out",
+            "source": "output:out",
+            "cast": "float*",
+            "ports": [
+              "output:out"
+            ]
+          },
+          {
+            "name": "elements",
+            "source": "runtime:elements",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "N": "elements"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "elements": "elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 2,
+            "storage_dtype": "bf16"
+          },
+          {
+            "pointer": "out",
+            "elements": "elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 4,
+            "storage_dtype": "fp32"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_groundhog_moe.py"
+        ]
+      },
+      "notes": "Exact BF16 to FP32 widening for finite contiguous input values. Invalid input leaves the output unchanged.",
+      "name": "widen_bf16_checked",
+      "_source_file": "widen_bf16_checked.json"
     },
     {
       "id": "yarn_rope_cache_contiguous_positions_f32",

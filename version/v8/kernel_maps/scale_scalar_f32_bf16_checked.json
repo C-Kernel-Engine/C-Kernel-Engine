@@ -1,0 +1,149 @@
+{
+  "id": "scale_scalar_f32_bf16_checked",
+  "op": "scale_bf16_checked",
+  "operation_interface": "tensor.scale_bf16_by_f32_scalar.checked.v1",
+  "variant": "ordered_bf16_storage",
+  "quant": {
+    "weight": "none",
+    "activation": "bf16",
+    "output": "bf16"
+  },
+  "inputs": [
+    {
+      "name": "input",
+      "dtype": "bf16",
+      "shape": [
+        "N"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "out",
+      "dtype": "bf16",
+      "shape": [
+        "N"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "output",
+      "consumption": "required"
+    }
+  ],
+  "scratch": [
+    {
+      "name": "stage",
+      "dtype": "bf16",
+      "shape": [
+        "N"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read_write",
+      "consumption": "required",
+      "size_bytes": "2 * N",
+      "size_resolution": "required",
+      "lifetime": "kernel_call",
+      "alignment": 64
+    }
+  ],
+  "dims": [
+    "N"
+  ],
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
+  "impl": {
+    "function": "ck_scale_scalar_f32_bf16_checked",
+    "c_declaration": "int ck_scale_scalar_f32_bf16_checked(const uint16_t *input, uint16_t *out, uint16_t *stage, size_t elements, float scale);",
+    "sources": [
+      "src/kernels/bf16_checked_tensor_ops.c"
+    ]
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "input",
+        "source": "activation:input",
+        "cast": "const uint16_t*",
+        "ports": [
+          "input:input"
+        ]
+      },
+      {
+        "name": "out",
+        "source": "output:out",
+        "cast": "uint16_t*",
+        "ports": [
+          "output:out"
+        ]
+      },
+      {
+        "name": "stage",
+        "source": "scratch:stage",
+        "cast": "uint16_t*"
+      },
+      {
+        "name": "elements",
+        "source": "runtime:elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "scale",
+        "source": "param:scale"
+      }
+    ]
+  },
+  "call_constant_contract": {
+    "shape_symbols": {
+      "N": "elements"
+    },
+    "buffer_spans": [
+      {
+        "pointer": "input",
+        "elements": "elements",
+        "rows": 1,
+        "width": "elements",
+        "element_bytes": 2,
+        "storage_dtype": "bf16"
+      },
+      {
+        "pointer": "out",
+        "elements": "elements",
+        "rows": 1,
+        "width": "elements",
+        "element_bytes": 2,
+        "storage_dtype": "bf16"
+      },
+      {
+        "pointer": "stage",
+        "elements": "elements",
+        "rows": 1,
+        "width": "elements",
+        "element_bytes": 2
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "tests/test_v8_groundhog_moe.py"
+    ]
+  },
+  "notes": "Multiply BF16 values by a FP32 scalar and round the result to BF16. The scalar is kept in FP32 until after multiplication.",
+  "params": [
+    {
+      "name": "scale",
+      "dtype": "fp32"
+    }
+  ]
+}

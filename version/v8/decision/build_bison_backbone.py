@@ -101,7 +101,7 @@ class Backbone:
         return self.emit(name, op, inputs, {"N": count, "call_constants": constants},
                          [self.rows, width], weights=weights, output="out")
 
-    def layer(self, index, layer, source):
+    def layer(self, index, layer, source, *, moe=None):
         if (layer.visibility not in {"sliding", "full"} or type(layer.kv_heads) is not int or
             layer.kv_heads < 1 or self.heads % layer.kv_heads or type(layer.head_dim) is not int or
             layer.head_dim < 2 or layer.head_dim % 2 or type(layer.tied_kv) is not bool):
@@ -144,6 +144,13 @@ class Backbone:
         up = self.project(prefix + "up", norm, weight + "mlp.up_proj.weight", width, inner)
         product = self.pointwise(prefix + "geglu", "geglu_tanh_bf16_checked", {"gate": gate, "up": up}, inner)
         mlp = self.project(prefix + "down", product, weight + "mlp.down_proj.weight", inner, width)
+        if moe is not None:
+            from version.v8.decision.build_groundhog_moe import add_moe
+
+            dense = hidden_norm("dense_norm", mlp, "post_feedforward_layernorm_1.weight")
+            expert = add_moe(self, index, moe, residual)
+            expert = hidden_norm("expert_out_norm", expert, "post_feedforward_layernorm_2.weight")
+            mlp = self.pointwise(prefix + "branch_sum", "add_bf16_checked", {"left": dense, "right": expert}, width)
         mlp = hidden_norm("down_norm", mlp, "post_feedforward_layernorm.weight")
         result = self.pointwise(prefix + "sum", "add_bf16_checked",
                                 {"left": residual, "right": mlp}, width)
