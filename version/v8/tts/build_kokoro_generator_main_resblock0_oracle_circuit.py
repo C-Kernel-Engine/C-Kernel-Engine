@@ -10,7 +10,7 @@ from build_kokoro_generator_main_resblock0_circuit import (
     build_circuit as connected_circuit, ROOT, CAPACITY)
 
 
-OUTPUT = ROOT / 'version/v8/circuits/kokoro_generator_main_resblock0_oracle_input_bounded.json'
+OUTPUT = ROOT / 'build/kokoro-diagnostics/kokoro_generator_main_resblock0_oracle_input_bounded.json'
 
 
 def build_circuit():
@@ -80,7 +80,8 @@ def main():
         if args.output.read_text() != content:
             raise SystemExit('main generator oracle-input circuit differs')
     else:
-        args.output.write_text(content)
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(content, encoding='utf-8')
 
 
 if __name__ == '__main__':

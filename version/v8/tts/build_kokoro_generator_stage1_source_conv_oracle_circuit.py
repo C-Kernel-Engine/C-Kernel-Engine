@@ -12,7 +12,7 @@ from build_kokoro_generator_stage1_source_conv_circuit import (
 )
 
 
-OUTPUT = ROOT / 'version/v8/circuits/kokoro_generator_stage1_source_conv_oracle_input_bounded.json'
+OUTPUT = ROOT / 'build/kokoro-diagnostics/kokoro_generator_stage1_source_conv_oracle_input_bounded.json'
 
 
 def build_circuit():
@@ -85,7 +85,8 @@ def main():
         if args.output.read_text() != content:
             raise SystemExit('source convolution oracle circuit differs from authoring')
     else:
-        args.output.write_text(content)
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(content, encoding='utf-8')
 
 
 if __name__ == '__main__':

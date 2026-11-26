@@ -11,6 +11,7 @@ import unittest
 import numpy as np
 
 from tests.v8_checked_graph_test_support import compile_native_graph
+from tests.v8_kokoro_oracle_circuit_support import compile_oracle_graph
 from tests.v8_kokoro_duration_fixture_support import (
     populated_duration_arena, prepare_duration_fixture)
 from tests.test_v8_kokoro_generator_stage0_join import (
@@ -83,7 +84,7 @@ class KokoroGeneratorStage1JoinTest(unittest.TestCase):
         direct = root / 'direct'
         direct.mkdir()
         cls.direct_layout, cls.direct_calls, _, _, cls.direct_fn = \
-            compile_native_graph(direct, diagnostic, direct_author.OUTPUT)
+            compile_oracle_graph(direct, diagnostic)
         cls.direct_fn.argtypes = [
             ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t,
             ctypes.POINTER(ctypes.c_int32)]
@@ -145,8 +146,6 @@ class KokoroGeneratorStage1JoinTest(unittest.TestCase):
     def test_circuit_and_selected_providers(self):
         self.assertEqual(json.loads(connected_author.OUTPUT.read_text()),
                          connected_author.build_circuit())
-        self.assertEqual(json.loads(direct_author.OUTPUT.read_text()),
-                         direct_author.build_circuit())
         self.assertEqual(self.connected_calls['errors'], [])
         self.assertEqual(self.direct_calls['errors'], [])
         self.assertEqual(self.connected_calls['operations'][-1]['function'],

@@ -14,6 +14,24 @@ The builder must stay architecture-agnostic:
 - Kernel maps declare the complete numerical contracts each implementation
   supports. The resolver must find exactly one provider before lowering.
 
+## Kokoro oracle-input diagnostics
+
+The connected Kokoro runtime and waveform circuits remain in this directory.
+Diagnostic graphs that take captured inputs at intermediate stages are built
+by `version/v8/tts/build_kokoro_*_oracle_circuit.py` instead of being stored
+here. Tests materialize those graphs in their temporary build directories and
+compare the JSON bytes to the original snapshot hashes before lowering them.
+
+To inspect one yourself:
+
+```sh
+python3 version/v8/tts/build_kokoro_waveform_oracle_circuit.py
+python3 version/v8/tts/build_kokoro_waveform_oracle_circuit.py --check
+```
+
+The default output directory is `build/kokoro-diagnostics/`; use
+`--output PATH` to choose another location.
+
 ## Overview: The Three-Stage Pipeline
 
 ```

@@ -10,6 +10,7 @@ import unittest
 import numpy as np
 
 from tests.v8_checked_graph_test_support import compile_native_graph
+from tests.v8_kokoro_oracle_circuit_support import compile_oracle_graph
 from tests.v8_kokoro_duration_fixture_support import (
     populated_duration_arena, prepare_duration_fixture)
 from tests.test_v8_kokoro_generator_stage0_join import join_weights_and_references
@@ -86,8 +87,7 @@ class KokoroGeneratorMainResblock0Test(unittest.TestCase):
         oracle_dir = root / 'oracle-input'
         oracle_dir.mkdir()
         (cls.oracle_layout, cls.oracle_calls, _, cls.oracle_loaded,
-         cls.oracle_fn) = compile_native_graph(
-            oracle_dir, diagnostic, oracle_author.OUTPUT)
+         cls.oracle_fn) = compile_oracle_graph(oracle_dir, diagnostic)
         cls.oracle_fn.argtypes = [ctypes.POINTER(ctypes.c_uint8),
             ctypes.c_size_t, ctypes.POINTER(ctypes.c_int32)]
 
@@ -144,8 +144,6 @@ class KokoroGeneratorMainResblock0Test(unittest.TestCase):
     def test_circuit_and_selected_providers(self):
         self.assertEqual(json.loads(connected_author.OUTPUT.read_text()),
                          connected_author.build_circuit())
-        self.assertEqual(json.loads(oracle_author.OUTPUT.read_text()),
-                         oracle_author.build_circuit())
         self.assertEqual(self.connected_calls['errors'], [])
         self.assertEqual(self.oracle_calls['errors'], [])
         selected = [op['function'] for op in self.connected_calls['operations'][-27:]]
