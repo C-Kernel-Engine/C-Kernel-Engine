@@ -171,6 +171,7 @@ def main():
             if hashlib.file_digest(stream, "sha256").hexdigest() != expected:
                 raise ValueError(f"publisher digest mismatch: {name}")
     report = capture(args.checkpoint, request, args.threads, readout_inputs=args.readout_inputs)
+    report["request_sha256"] = hashlib.sha256(args.request.read_bytes()).hexdigest()
     with args.out.open("x") as stream:
         json.dump(report, stream, indent=2)
         stream.write("\n")

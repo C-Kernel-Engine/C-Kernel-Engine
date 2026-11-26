@@ -186,7 +186,7 @@ static inline __m512 tanh512_fast(__m512 x) {
 }
 #endif
 
-#if defined(__AVX2__)
+#if defined(__AVX2__) && defined(__FMA__)
 static inline __m256 exp256_fast(__m256 x) {
     x = _mm256_max_ps(x, _mm256_set1_ps(-88.0f));
     x = _mm256_min_ps(x, _mm256_set1_ps(88.0f));
@@ -277,7 +277,7 @@ void gelu_fast_inplace(float *data, size_t n)
         data[i] = 0.5f * x * (1.0f + tanhf(inner));
     }
 
-#elif defined(__AVX2__)
+#elif defined(__AVX2__) && defined(__FMA__)
     const __m256 sqrt_2_pi_vec = _mm256_set1_ps(sqrt_2_over_pi);
     const __m256 coeff_vec = _mm256_set1_ps(coeff);
     const __m256 half_vec = _mm256_set1_ps(0.5f);
@@ -423,7 +423,7 @@ void gelu_backward_exact(const float *input,
         d_input[i] = d_output[i] * gelu_derivative;
     }
 
-#elif defined(__AVX2__)
+#elif defined(__AVX2__) && defined(__FMA__)
     const __m256 sqrt_2_pi_vec = _mm256_set1_ps(sqrt_2_over_pi);
     const __m256 coeff_vec = _mm256_set1_ps(coeff);
     const __m256 coeff3_vec = _mm256_set1_ps(3.0f * coeff);
@@ -941,7 +941,7 @@ void gelu_backward_fast(const float *input,
         d_input[i] = d_output[i] * gelu_derivative;
     }
 
-#elif defined(__AVX2__)
+#elif defined(__AVX2__) && defined(__FMA__)
     const __m256 beta_vec = _mm256_set1_ps(beta);
     const __m256 one_vec = _mm256_set1_ps(1.0f);
     const __m256 neg_beta_vec = _mm256_set1_ps(-beta);
