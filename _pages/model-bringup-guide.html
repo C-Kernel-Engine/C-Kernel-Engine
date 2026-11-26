@@ -1630,6 +1630,16 @@ python3 version/v8/scripts/export_llama_hidden_v8.py \
   </div>
   <div class="svg-expand-hint">click / tap the diagram to expand</div>
 
+  <h3 id="sigma-denoiser-replay">Sigma-3B BF16 denoiser replay</h3>
+  <p>The generated entry runs 26 denoiser layers and the output projection.
+     The pinned comparison supplies the hidden input and attention mask and checks
+     all 131,072 vocabulary scores per row against PyTorch. Guidance, noise updates
+     and token selection require separate end-to-end tests.</p>
+  <p>Set <code>CK_SIGMA_BF16_CHECKPOINT</code> to the pinned safetensors and
+     <code>CK_BLAS_LIBRARY</code> to an LP64 library exporting <code>dgemm_</code>.
+     Allow about 12 GiB of additional available RAM for the weight-backed replay.</p>
+  <pre><code>python -m pytest -q tests/test_v8_sigma_bf16_denoiser_stack.py</code></pre>
+
   <h2 id="xray-diagnosis">11. Diagnose divergence with X-Ray</h2>
   <p>When parity fails, do not poke at tolerances. Walk the decision tree &mdash; each branch names an owner, and the fix lands in that owner's artifact (see <a href="xray.html">the X-Ray page</a> for the full evidence model and capture-neutrality gates):</p>
   <div class="mb-table"><table><thead><tr><th>Observation</th><th>Diagnosis</th><th>Repair</th></tr></thead><tbody>

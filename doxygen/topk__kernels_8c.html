@@ -148,14 +148,18 @@ Functions</h2></td></tr>
 <tr class="memitem:afa77249829b65634e0e0a03ee5b4d3c3" id="r_afa77249829b65634e0e0a03ee5b4d3c3"><td class="memItemLeft" align="right" valign="top">static void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#afa77249829b65634e0e0a03ee5b4d3c3">group_limited_topk_router_f32_impl</a> (const float *scores, const float *correction_bias, int *indices, float *weights, int rows, int n_experts, int top_k, int n_group, int topk_group, int norm_topk_prob, float routed_scaling_factor, int apply_sigmoid)</td></tr>
 <tr class="memitem:a5d8341d6bceeb7209f19bf99f1720b77" id="r_a5d8341d6bceeb7209f19bf99f1720b77"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a5d8341d6bceeb7209f19bf99f1720b77">group_limited_topk_router_sigmoid_f32</a> (const float *logits, const float *correction_bias, int *indices, float *weights, int rows, int n_experts, int top_k, int n_group, int topk_group, int norm_topk_prob, float routed_scaling_factor)</td></tr>
 <tr class="memitem:a5f3477ab2e309912c261704e62b0923b" id="r_a5f3477ab2e309912c261704e62b0923b"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a5f3477ab2e309912c261704e62b0923b">moe_softmax_topk_router_llama_f32_workspace</a> (const float *logits, int *indices, float *weights, int rows, int n_experts, int top_k, float routed_scaling_factor, void *workspace, size_t workspace_bytes)</td></tr>
+<tr class="memitem:a6762b18207a995f8a1db38fc16f63f51" id="r_a6762b18207a995f8a1db38fc16f63f51"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a6762b18207a995f8a1db38fc16f63f51">moe_softmax_topk_router_partition_f32_workspace</a> (const float *logits, int *indices, float *weights, int rows, int n_experts, int top_k, float routed_scaling_factor, void *workspace, size_t workspace_bytes)</td></tr>
 <tr class="memitem:aef6f6d076d35008ec1e385829b11d92f" id="r_aef6f6d076d35008ec1e385829b11d92f"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#aef6f6d076d35008ec1e385829b11d92f">moe_softmax_topk_router_pytorch_bf16_workspace</a> (const float *logits, int *indices, float *weights, int rows, int n_experts, int top_k, float routed_scaling_factor, void *workspace, size_t workspace_bytes)</td></tr>
 <tr class="memitem:aa39a6196baec8d9bf9e3eeca3687c41c" id="r_aa39a6196baec8d9bf9e3eeca3687c41c"><td class="memItemLeft" align="right" valign="top">size_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#aa39a6196baec8d9bf9e3eeca3687c41c">moe_softmax_topk_router_workspace_bytes</a> (int n_experts)</td></tr>
 <tr class="memitem:ab9b2fb1513e1e2f6ac7637be48021ff1" id="r_ab9b2fb1513e1e2f6ac7637be48021ff1"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#ab9b2fb1513e1e2f6ac7637be48021ff1">nemotron_group_limited_topk_router_f32</a> (const float *scores, const float *correction_bias, int *indices, float *weights, int rows, int n_experts, int top_k, int n_group, int topk_group, int norm_topk_prob, float routed_scaling_factor)</td></tr>
+<tr class="memitem:ad5cdcf7a082f0137b8bbfb1b41325dbc" id="r_ad5cdcf7a082f0137b8bbfb1b41325dbc"><td class="memItemLeft" align="right" valign="top">static void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#ad5cdcf7a082f0137b8bbfb1b41325dbc">partition_topk_routes</a> (const float *prob, int *order, int <a class="el" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a>, int k)</td></tr>
 <tr class="memitem:a0c870763edbf064894ac684abc820ed1" id="r_a0c870763edbf064894ac684abc820ed1"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a0c870763edbf064894ac684abc820ed1">sigmoid_topk_router_checked_f32</a> (const float *logits, size_t logits_elements, const float *bias, size_t bias_elements, int32_t *indices, size_t indices_elements, float *weights, size_t weights_elements, size_t rows, size_t experts, size_t top_k, float route_scale)</td></tr>
+<tr class="memitem:aa6b49a006dfdac906c457af21f11cd2a" id="r_aa6b49a006dfdac906c457af21f11cd2a"><td class="memItemLeft" align="right" valign="top">static void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#aa6b49a006dfdac906c457af21f11cd2a">sort_routes</a> (const float *prob, int *order, int first, int <a class="el" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a>)</td></tr>
 <tr class="memitem:ae9070cfb82f7058378d853e59fddc89c" id="r_ae9070cfb82f7058378d853e59fddc89c"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#ae9070cfb82f7058378d853e59fddc89c">speculative_commit_one_i32</a> (int accepted, int verified_token, int *token_buffer, int *token_count, int max_tokens, int *target_position, int *draft_position, int *accepted_count, int *rejected_count)</td></tr>
 <tr class="memdesc:ae9070cfb82f7058378d853e59fddc89c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Commit one verified speculative token and update decode counters.  <br /></td></tr>
 <tr class="memitem:add5a945b527fa38fbc30c72bf93cae1c" id="r_add5a945b527fa38fbc30c72bf93cae1c"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#add5a945b527fa38fbc30c72bf93cae1c">speculative_verify_greedy_f32</a> (const float *target_logits, int <a class="el" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a>, int draft_token, int *accepted, int *verified_token)</td></tr>
 <tr class="memdesc:add5a945b527fa38fbc30c72bf93cae1c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Greedy one-token speculative verification.  <br /></td></tr>
+<tr class="memitem:a559424098821dde264a3eadf38ee2fce" id="r_a559424098821dde264a3eadf38ee2fce"><td class="memItemLeft" align="right" valign="top">static void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a559424098821dde264a3eadf38ee2fce">swap_route</a> (int *a, int *b)</td></tr>
 <tr class="memitem:a3ced6292072f7fb17630a298120e04d2" id="r_a3ced6292072f7fb17630a298120e04d2"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a3ced6292072f7fb17630a298120e04d2">topk_batched_f32</a> (const float *scores, int num_tokens, int n_experts, int k, int *indices, float *weights)</td></tr>
 <tr class="memdesc:a3ced6292072f7fb17630a298120e04d2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Batched top-K selection for multiple tokens.  <br /></td></tr>
 <tr class="memitem:adcd797bc726d0f95fd659787fad1db52" id="r_adcd797bc726d0f95fd659787fad1db52"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#adcd797bc726d0f95fd659787fad1db52">topk_f32</a> (const float *scores, int n, int k, int *indices, float *values)</td></tr>
@@ -352,7 +356,7 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno">  315</span>    <span class="keywordflow">return</span> sum;</div>
 <div class="line"><span class="lineno">  316</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="topk__kernels_8c_source.html#l00318">moe_softmax_topk_router_llama_f32_workspace()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="topk__kernels_8c_source.html#l00318">moe_softmax_topk_router_llama_f32_workspace()</a>, and <a class="el" href="topk__kernels_8c_source.html#l00908">moe_softmax_topk_router_partition_f32_workspace()</a>.</p>
 
 </div>
 </div>
@@ -780,6 +784,122 @@ CK-ENGINE KERNEL RULES:</h1>
 
 </div>
 </div>
+<a id="a6762b18207a995f8a1db38fc16f63f51" name="a6762b18207a995f8a1db38fc16f63f51"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a6762b18207a995f8a1db38fc16f63f51">&#9670;&#160;</a></span>moe_softmax_topk_router_partition_f32_workspace()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int moe_softmax_topk_router_partition_f32_workspace </td>
+          <td>(</td>
+          <td class="paramtype">const float *</td>          <td class="paramname"><span class="paramname"><em>logits</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int *</td>          <td class="paramname"><span class="paramname"><em>indices</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *</td>          <td class="paramname"><span class="paramname"><em>weights</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int</td>          <td class="paramname"><span class="paramname"><em>rows</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int</td>          <td class="paramname"><span class="paramname"><em>n_experts</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int</td>          <td class="paramname"><span class="paramname"><em>top_k</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float</td>          <td class="paramname"><span class="paramname"><em>routed_scaling_factor</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">void *</td>          <td class="paramname"><span class="paramname"><em>workspace</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>workspace_bytes</em></span>&#160;)</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="topk__kernels_8c_source.html#l00908">908</a> of file <a class="el" href="topk__kernels_8c_source.html">topk_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  911</span>{</div>
+<div class="line"><span class="lineno">  912</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> row_bytes = (size_t)n_experts * (<span class="keyword">sizeof</span>(<span class="keywordtype">float</span>) + <span class="keyword">sizeof</span>(<span class="keywordtype">int</span>));</div>
+<div class="line"><span class="lineno">  913</span>    <span class="keywordflow">if</span> (!logits || !indices || !weights || !workspace || rows &lt;= 0 || n_experts &lt;= 0 ||</div>
+<div class="line"><span class="lineno">  914</span>        top_k &lt;= n_experts / 64 || top_k &gt; n_experts ||</div>
+<div class="line"><span class="lineno">  915</span>        (<span class="keywordtype">size_t</span>)n_experts &gt; SIZE_MAX / (<span class="keyword">sizeof</span>(<span class="keywordtype">float</span>) + <span class="keyword">sizeof</span>(<span class="keywordtype">int</span>)) || workspace_bytes &lt; row_bytes ||</div>
+<div class="line"><span class="lineno">  916</span>        (uintptr_t)workspace % _Alignof(<span class="keywordtype">float</span>) || !isfinite(routed_scaling_factor))</div>
+<div class="line"><span class="lineno">  917</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  918</span>    <span class="keywordflow">if</span> ((<span class="keywordtype">size_t</span>)rows &gt; SIZE_MAX / (<span class="keywordtype">size_t</span>)n_experts)</div>
+<div class="line"><span class="lineno">  919</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  920</span>    <span class="keyword">_Static_assert</span>(<span class="keyword">sizeof</span>(float) == <span class="keyword">sizeof</span>(int), <span class="stringliteral">&quot;route workspace slot size&quot;</span>);</div>
+<div class="line"><span class="lineno">  921</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> inputs = (size_t)rows * n_experts;</div>
+<div class="line"><span class="lineno">  922</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> outputs = (size_t)rows * top_k;</div>
+<div class="line"><span class="lineno">  923</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> scratch = (size_t)n_experts * 2;</div>
+<div class="line"><span class="lineno">  924</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> *index_region = (<span class="keyword">const</span> <span class="keywordtype">float</span> *)indices;</div>
+<div class="line"><span class="lineno">  925</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(logits, inputs) || !<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(index_region, outputs) ||</div>
+<div class="line"><span class="lineno">  926</span>        !<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(weights, outputs) || !<a class="code hl_function" href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a>(workspace, scratch) ||</div>
+<div class="line"><span class="lineno">  927</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(index_region, outputs, weights, outputs) ||</div>
+<div class="line"><span class="lineno">  928</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(index_region, outputs, logits, inputs) ||</div>
+<div class="line"><span class="lineno">  929</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(weights, outputs, logits, inputs) ||</div>
+<div class="line"><span class="lineno">  930</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(workspace, scratch, index_region, outputs) ||</div>
+<div class="line"><span class="lineno">  931</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(workspace, scratch, weights, outputs) ||</div>
+<div class="line"><span class="lineno">  932</span>        <a class="code hl_function" href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a>(workspace, scratch, logits, inputs))</div>
+<div class="line"><span class="lineno">  933</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  934</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a>(logits, inputs))</div>
+<div class="line"><span class="lineno">  935</span>        <span class="keywordflow">return</span> -2;</div>
+<div class="line"><span class="lineno">  936</span> </div>
+<div class="line"><span class="lineno">  937</span>    <span class="keywordtype">float</span> *prob = workspace;</div>
+<div class="line"><span class="lineno">  938</span>    <span class="keywordtype">int</span> *order = (<span class="keywordtype">int</span> *)(prob + n_experts);</div>
+<div class="line"><span class="lineno">  939</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; rows; ++r) {</div>
+<div class="line"><span class="lineno">  940</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *row = logits + (size_t)r * n_experts;</div>
+<div class="line"><span class="lineno">  941</span>        <span class="keywordtype">float</span> max_value = row[0];</div>
+<div class="line"><span class="lineno">  942</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 1; j &lt; n_experts; ++j) {</div>
+<div class="line"><span class="lineno">  943</span>            <span class="keywordflow">if</span> (row[j] &gt; max_value)</div>
+<div class="line"><span class="lineno">  944</span>                max_value = row[j];</div>
+<div class="line"><span class="lineno">  945</span>        }</div>
+<div class="line"><span class="lineno">  946</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> inverse = (float)(1.0 / <a class="code hl_function" href="#a8f02c6bc26ffec1216c99bc1287ca92a">ck_moe_llama_softmax_row</a>(prob, row, n_experts, max_value));</div>
+<div class="line"><span class="lineno">  947</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; n_experts; ++j) {</div>
+<div class="line"><span class="lineno">  948</span>            prob[j] *= inverse;</div>
+<div class="line"><span class="lineno">  949</span>            order[j] = j;</div>
+<div class="line"><span class="lineno">  950</span>        }</div>
+<div class="line"><span class="lineno">  951</span>        <a class="code hl_function" href="#ad5cdcf7a082f0137b8bbfb1b41325dbc">partition_topk_routes</a>(prob, order, n_experts, top_k);</div>
+<div class="line"><span class="lineno">  952</span>        <span class="keywordtype">double</span> sum = 0.0;</div>
+<div class="line"><span class="lineno">  953</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> slot = 0; slot &lt; top_k; ++slot)</div>
+<div class="line"><span class="lineno">  954</span>            sum += prob[order[slot]];</div>
+<div class="line"><span class="lineno">  955</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> denominator = fmaxf((<span class="keywordtype">float</span>)sum, 6.103515625e-5f);</div>
+<div class="line"><span class="lineno">  956</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> slot = 0; slot &lt; top_k; ++slot) {</div>
+<div class="line"><span class="lineno">  957</span>            indices[(size_t)r * top_k + slot] = order[slot];</div>
+<div class="line"><span class="lineno">  958</span>            weights[(size_t)r * top_k + slot] = (prob[order[slot]] / denominator) * routed_scaling_factor;</div>
+<div class="line"><span class="lineno">  959</span>        }</div>
+<div class="line"><span class="lineno">  960</span>    }</div>
+<div class="line"><span class="lineno">  961</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  962</span>}</div>
+<div class="ttc" id="achecked__float__buffer_8h_html_a1b266161b71bde9ca8d45c2fb5ac889a"><div class="ttname"><a href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a></div><div class="ttdeci">static int ck_checked_finite(const float *ptr, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00019">checked_float_buffer.h:19</a></div></div>
+<div class="ttc" id="achecked__float__buffer_8h_html_ada07e31487d86edb37408386003ac841"><div class="ttname"><a href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a></div><div class="ttdeci">static int ck_checked_region(const float *ptr, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00011">checked_float_buffer.h:11</a></div></div>
+<div class="ttc" id="achecked__float__buffer_8h_html_af87b7012571dc9a40b8e31c52e773abe"><div class="ttname"><a href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a></div><div class="ttdeci">static int ck_checked_overlap(const float *a, size_t na, const float *b, size_t nb)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00015">checked_float_buffer.h:15</a></div></div>
+<div class="ttc" id="atopk__kernels_8c_html_ad5cdcf7a082f0137b8bbfb1b41325dbc"><div class="ttname"><a href="#ad5cdcf7a082f0137b8bbfb1b41325dbc">partition_topk_routes</a></div><div class="ttdeci">static void partition_topk_routes(const float *prob, int *order, int count, int k)</div><div class="ttdef"><b>Definition</b> <a href="topk__kernels_8c_source.html#l00874">topk_kernels.c:874</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="checked__float__buffer_8h_source.html#l00019">ck_checked_finite()</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00015">ck_checked_overlap()</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00011">ck_checked_region()</a>, <a class="el" href="topk__kernels_8c_source.html#l00284">ck_moe_llama_softmax_row()</a>, and <a class="el" href="topk__kernels_8c_source.html#l00874">partition_topk_routes()</a>.</p>
+
+</div>
+</div>
 <a id="aef6f6d076d35008ec1e385829b11d92f" name="aef6f6d076d35008ec1e385829b11d92f"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#aef6f6d076d35008ec1e385829b11d92f">&#9670;&#160;</a></span>moe_softmax_topk_router_pytorch_bf16_workspace()</h2>
 
@@ -958,6 +1078,89 @@ CK-ENGINE KERNEL RULES:</h1>
 
 </div>
 </div>
+<a id="ad5cdcf7a082f0137b8bbfb1b41325dbc" name="ad5cdcf7a082f0137b8bbfb1b41325dbc"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ad5cdcf7a082f0137b8bbfb1b41325dbc">&#9670;&#160;</a></span>partition_topk_routes()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void partition_topk_routes </td>
+          <td>(</td>
+          <td class="paramtype">const float *</td>          <td class="paramname"><span class="paramname"><em>prob</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int *</td>          <td class="paramname"><span class="paramname"><em>order</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int</td>          <td class="paramname"><span class="paramname"><em>count</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int</td>          <td class="paramname"><span class="paramname"><em>k</em></span>&#160;)</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel static">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="topk__kernels_8c_source.html#l00874">874</a> of file <a class="el" href="topk__kernels_8c_source.html">topk_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  875</span>{</div>
+<div class="line"><span class="lineno">  876</span>    <span class="keywordtype">int</span> first = 0, <a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a> = <a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a>, budget = 0;</div>
+<div class="line"><span class="lineno">  877</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = <a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a>; n &gt; 1; n /= 2)</div>
+<div class="line"><span class="lineno">  878</span>        budget += 2;</div>
+<div class="line"><span class="lineno">  879</span>    <span class="keywordflow">while</span> (<a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a> - first &gt; 3 &amp;&amp; budget-- &gt; 0) {</div>
+<div class="line"><span class="lineno">  880</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> a = first + 1, b = first + (<a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a> - first) / 2, c = <a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a> - 1;</div>
+<div class="line"><span class="lineno">  881</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> va = prob[order[a]], vb = prob[order[b]], vc = prob[order[c]];</div>
+<div class="line"><span class="lineno">  882</span>        <span class="keywordtype">int</span> median;</div>
+<div class="line"><span class="lineno">  883</span>        <span class="keywordflow">if</span> (va &gt; vb) {</div>
+<div class="line"><span class="lineno">  884</span>            median = vb &gt; vc ? b : va &gt; vc ? c : a;</div>
+<div class="line"><span class="lineno">  885</span>        } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno">  886</span>            median = va &gt; vc ? a : vb &gt; vc ? c : b;</div>
+<div class="line"><span class="lineno">  887</span>        }</div>
+<div class="line"><span class="lineno">  888</span>        <a class="code hl_function" href="#a559424098821dde264a3eadf38ee2fce">swap_route</a>(&amp;order[first], &amp;order[median]);</div>
+<div class="line"><span class="lineno">  889</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> pivot = prob[order[first]];</div>
+<div class="line"><span class="lineno">  890</span>        <span class="keywordtype">int</span> <a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a> = first + 1, <a class="code hl_variable" href="true__bpe_8h.html#afb60251d57a9ee3324fbc011e4be71e9">right</a> = <a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a>;</div>
+<div class="line"><span class="lineno">  891</span>        <span class="keywordflow">for</span> (;;) {</div>
+<div class="line"><span class="lineno">  892</span>            <span class="keywordflow">while</span> (prob[order[<a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a>]] &gt; pivot) ++<a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a>;</div>
+<div class="line"><span class="lineno">  893</span>            <span class="keywordflow">do</span> { --<a class="code hl_variable" href="true__bpe_8h.html#afb60251d57a9ee3324fbc011e4be71e9">right</a>; } <span class="keywordflow">while</span> (pivot &gt; prob[order[<a class="code hl_variable" href="true__bpe_8h.html#afb60251d57a9ee3324fbc011e4be71e9">right</a>]]);</div>
+<div class="line"><span class="lineno">  894</span>            <span class="keywordflow">if</span> (<a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a> &gt;= <a class="code hl_variable" href="true__bpe_8h.html#afb60251d57a9ee3324fbc011e4be71e9">right</a>)</div>
+<div class="line"><span class="lineno">  895</span>                <span class="keywordflow">break</span>;</div>
+<div class="line"><span class="lineno">  896</span>            <a class="code hl_function" href="#a559424098821dde264a3eadf38ee2fce">swap_route</a>(&amp;order[<a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a>], &amp;order[<a class="code hl_variable" href="true__bpe_8h.html#afb60251d57a9ee3324fbc011e4be71e9">right</a>]);</div>
+<div class="line"><span class="lineno">  897</span>            ++<a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a>;</div>
+<div class="line"><span class="lineno">  898</span>        }</div>
+<div class="line"><span class="lineno">  899</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a> &lt;= k - 1)</div>
+<div class="line"><span class="lineno">  900</span>            first = <a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a>;</div>
+<div class="line"><span class="lineno">  901</span>        <span class="keywordflow">else</span></div>
+<div class="line"><span class="lineno">  902</span>            <a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a> = <a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a>;</div>
+<div class="line"><span class="lineno">  903</span>    }</div>
+<div class="line"><span class="lineno">  904</span>    <a class="code hl_function" href="#aa6b49a006dfdac906c457af21f11cd2a">sort_routes</a>(prob, order, first, <a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a>);</div>
+<div class="line"><span class="lineno">  905</span>    <a class="code hl_function" href="#aa6b49a006dfdac906c457af21f11cd2a">sort_routes</a>(prob, order, 0, k - 1);</div>
+<div class="line"><span class="lineno">  906</span>}</div>
+<div class="ttc" id="atopk__kernels_8c_html_a559424098821dde264a3eadf38ee2fce"><div class="ttname"><a href="#a559424098821dde264a3eadf38ee2fce">swap_route</a></div><div class="ttdeci">static void swap_route(int *a, int *b)</div><div class="ttdef"><b>Definition</b> <a href="topk__kernels_8c_source.html#l00851">topk_kernels.c:851</a></div></div>
+<div class="ttc" id="atopk__kernels_8c_html_aa6b49a006dfdac906c457af21f11cd2a"><div class="ttname"><a href="#aa6b49a006dfdac906c457af21f11cd2a">sort_routes</a></div><div class="ttdeci">static void sort_routes(const float *prob, int *order, int first, int end)</div><div class="ttdef"><b>Definition</b> <a href="topk__kernels_8c_source.html#l00858">topk_kernels.c:858</a></div></div>
+<div class="ttc" id="atrue__bpe_8h_html_abf33d3f8e74eb48d5a4394c67ac4f1cd"><div class="ttname"><a href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a></div><div class="ttdeci">const char * left</div><div class="ttdef"><b>Definition</b> <a href="true__bpe_8h_source.html#l00140">true_bpe.h:140</a></div></div>
+<div class="ttc" id="atrue__bpe_8h_html_ac7f5fd4f55df36920bf0583c3516e72f"><div class="ttname"><a href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a></div><div class="ttdeci">const uint8_t size_t count</div><div class="ttdef"><b>Definition</b> <a href="true__bpe_8h_source.html#l00211">true_bpe.h:211</a></div></div>
+<div class="ttc" id="atrue__bpe_8h_html_afb60251d57a9ee3324fbc011e4be71e9"><div class="ttname"><a href="true__bpe_8h.html#afb60251d57a9ee3324fbc011e4be71e9">right</a></div><div class="ttdeci">const char const char * right</div><div class="ttdef"><b>Definition</b> <a href="true__bpe_8h_source.html#l00141">true_bpe.h:141</a></div></div>
+<div class="ttc" id="autf8_8c_html_a204a3f4fa39b9c007f9784d3e4af4667"><div class="ttname"><a href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a></div><div class="ttdeci">uint32_t end</div><div class="ttdef"><b>Definition</b> <a href="utf8_8c_source.html#l00215">utf8.c:215</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="true__bpe_8h_source.html#l00211">count</a>, <a class="el" href="utf8_8c_source.html#l00215">end</a>, <a class="el" href="true__bpe_8h_source.html#l00140">left</a>, <a class="el" href="true__bpe_8h_source.html#l00141">right</a>, <a class="el" href="topk__kernels_8c_source.html#l00858">sort_routes()</a>, and <a class="el" href="topk__kernels_8c_source.html#l00851">swap_route()</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="topk__kernels_8c_source.html#l00908">moe_softmax_topk_router_partition_f32_workspace()</a>.</p>
+
+</div>
+</div>
 <a id="a0c870763edbf064894ac684abc820ed1" name="a0c870763edbf064894ac684abc820ed1"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a0c870763edbf064894ac684abc820ed1">&#9670;&#160;</a></span>sigmoid_topk_router_checked_f32()</h2>
 
@@ -1054,13 +1257,66 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno">  847</span>    );</div>
 <div class="line"><span class="lineno">  848</span>    <span class="keywordflow">return</span> 0;</div>
 <div class="line"><span class="lineno">  849</span>}</div>
-<div class="ttc" id="achecked__float__buffer_8h_html_a1b266161b71bde9ca8d45c2fb5ac889a"><div class="ttname"><a href="checked__float__buffer_8h.html#a1b266161b71bde9ca8d45c2fb5ac889a">ck_checked_finite</a></div><div class="ttdeci">static int ck_checked_finite(const float *ptr, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00019">checked_float_buffer.h:19</a></div></div>
 <div class="ttc" id="achecked__float__buffer_8h_html_a80fa111d42598d70e6c6728193a1f8dc"><div class="ttname"><a href="checked__float__buffer_8h.html#a80fa111d42598d70e6c6728193a1f8dc">ck_checked_span</a></div><div class="ttdeci">static int ck_checked_span(size_t rows, size_t width, size_t stride, size_t *span)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00006">checked_float_buffer.h:6</a></div></div>
-<div class="ttc" id="achecked__float__buffer_8h_html_ada07e31487d86edb37408386003ac841"><div class="ttname"><a href="checked__float__buffer_8h.html#ada07e31487d86edb37408386003ac841">ck_checked_region</a></div><div class="ttdeci">static int ck_checked_region(const float *ptr, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00011">checked_float_buffer.h:11</a></div></div>
-<div class="ttc" id="achecked__float__buffer_8h_html_af87b7012571dc9a40b8e31c52e773abe"><div class="ttname"><a href="checked__float__buffer_8h.html#af87b7012571dc9a40b8e31c52e773abe">ck_checked_overlap</a></div><div class="ttdeci">static int ck_checked_overlap(const float *a, size_t na, const float *b, size_t nb)</div><div class="ttdef"><b>Definition</b> <a href="checked__float__buffer_8h_source.html#l00015">checked_float_buffer.h:15</a></div></div>
 <div class="ttc" id="atopk__kernels_8c_html_a5d8341d6bceeb7209f19bf99f1720b77"><div class="ttname"><a href="#a5d8341d6bceeb7209f19bf99f1720b77">group_limited_topk_router_sigmoid_f32</a></div><div class="ttdeci">void group_limited_topk_router_sigmoid_f32(const float *logits, const float *correction_bias, int *indices, float *weights, int rows, int n_experts, int top_k, int n_group, int topk_group, int norm_topk_prob, float routed_scaling_factor)</div><div class="ttdef"><b>Definition</b> <a href="topk__kernels_8c_source.html#l00800">topk_kernels.c:800</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="checked__float__buffer_8h_source.html#l00019">ck_checked_finite()</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00015">ck_checked_overlap()</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00011">ck_checked_region()</a>, <a class="el" href="checked__float__buffer_8h_source.html#l00006">ck_checked_span()</a>, and <a class="el" href="topk__kernels_8c_source.html#l00800">group_limited_topk_router_sigmoid_f32()</a>.</p>
+
+</div>
+</div>
+<a id="aa6b49a006dfdac906c457af21f11cd2a" name="aa6b49a006dfdac906c457af21f11cd2a"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aa6b49a006dfdac906c457af21f11cd2a">&#9670;&#160;</a></span>sort_routes()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void sort_routes </td>
+          <td>(</td>
+          <td class="paramtype">const float *</td>          <td class="paramname"><span class="paramname"><em>prob</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int *</td>          <td class="paramname"><span class="paramname"><em>order</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int</td>          <td class="paramname"><span class="paramname"><em>first</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int</td>          <td class="paramname"><span class="paramname"><em>end</em></span>&#160;)</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel static">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="topk__kernels_8c_source.html#l00858">858</a> of file <a class="el" href="topk__kernels_8c_source.html">topk_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  859</span>{</div>
+<div class="line"><span class="lineno">  860</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = first + 1; i &lt; <a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a>; ++i) {</div>
+<div class="line"><span class="lineno">  861</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> current = order[i];</div>
+<div class="line"><span class="lineno">  862</span>        <span class="keywordtype">int</span> j = i;</div>
+<div class="line"><span class="lineno">  863</span>        <span class="keywordflow">while</span> (j &gt; first &amp;&amp; prob[order[j - 1]] &lt; prob[current]) {</div>
+<div class="line"><span class="lineno">  864</span>            order[j] = order[j - 1];</div>
+<div class="line"><span class="lineno">  865</span>            --j;</div>
+<div class="line"><span class="lineno">  866</span>        }</div>
+<div class="line"><span class="lineno">  867</span>        order[j] = current;</div>
+<div class="line"><span class="lineno">  868</span>    }</div>
+<div class="line"><span class="lineno">  869</span>}</div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="utf8_8c_source.html#l00215">end</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="topk__kernels_8c_source.html#l00874">partition_topk_routes()</a>.</p>
 
 </div>
 </div>
@@ -1215,6 +1471,44 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="ttc" id="atrue__bpe_8h_html_aa47c8f70dd1f7e8ed4d6c282015f9697"><div class="ttname"><a href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a></div><div class="ttdeci">int vocab_size</div><div class="ttdef"><b>Definition</b> <a href="true__bpe_8h_source.html#l00199">true_bpe.h:199</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="topk__kernels_8c_source.html#l00502">argmax_f32()</a>, and <a class="el" href="true__bpe_8h_source.html#l00199">vocab_size</a>.</p>
+
+</div>
+</div>
+<a id="a559424098821dde264a3eadf38ee2fce" name="a559424098821dde264a3eadf38ee2fce"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a559424098821dde264a3eadf38ee2fce">&#9670;&#160;</a></span>swap_route()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void swap_route </td>
+          <td>(</td>
+          <td class="paramtype">int *</td>          <td class="paramname"><span class="paramname"><em>a</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int *</td>          <td class="paramname"><span class="paramname"><em>b</em></span>&#160;)</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel static">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="topk__kernels_8c_source.html#l00851">851</a> of file <a class="el" href="topk__kernels_8c_source.html">topk_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  852</span>{</div>
+<div class="line"><span class="lineno">  853</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> temp = *a;</div>
+<div class="line"><span class="lineno">  854</span>    *a = *b;</div>
+<div class="line"><span class="lineno">  855</span>    *b = temp;</div>
+<div class="line"><span class="lineno">  856</span>}</div>
+</div><!-- fragment -->
+<p class="reference">Referenced by <a class="el" href="topk__kernels_8c_source.html#l00874">partition_topk_routes()</a>.</p>
 
 </div>
 </div>
