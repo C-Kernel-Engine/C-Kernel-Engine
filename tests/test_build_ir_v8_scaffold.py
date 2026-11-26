@@ -103,7 +103,39 @@ class BuildIrV8ScaffoldTests(unittest.TestCase):
                     v8_doc.get("projection_inputs"),
                     {op: {"x": "main_stream_q8"} for op in projections},
                 )
+                if name == "qwen35":
+                    # Compare the inherited path with BF16 extensions inactive.
+                    ops_by_kind = v8_doc["block_types"]["decoder"]["body"]["ops_by_kind"]
+                    legacy_recurrent = []
+                    config = {"recurrent_qkv_weight_dtype": "q6_k"}
+                    for item in ops_by_kind["recurrent"]:
+                        if isinstance(item, dict) and item.get("op") == "recurrent_core":
+                            if build_ir_v8._template_item_is_active(item, config):
+                                self.assertEqual(set(item), {"op", "when"})
+                                legacy_recurrent.append(item["op"])
+                        else:
+                            legacy_recurrent.append(item)
+                    ops_by_kind["recurrent"] = legacy_recurrent
                 self.assertEqual(_normalized_template_doc(v8_doc), _normalized_template_doc(v7_doc))
+
+    def test_qwen_recurrent_packed_qkv_is_bound_only_for_bf16_prefill(self) -> None:
+        for name in ("qwen35", "qwen38"):
+            path = ROOT / "version" / "v8" / "circuits" / f"{name}.json"
+            circuit = json.loads(path.read_text(encoding="utf-8"))
+            section = circuit["block_types"]["decoder"]["body"]["ops_by_kind"]["recurrent"]
+            for dtype in ("q6_k", "bf16"):
+                config = {"recurrent_qkv_weight_dtype": dtype}
+                active = build_ir_v8._normalize_template_op_items(section, config=config)
+                with self.subTest(circuit=name, dtype=dtype):
+                    cores = [item for item in active if item["op"] == "recurrent_core"]
+                    self.assertEqual(len(cores), 1)
+                    for phase in ("prefill", "decode"):
+                        slots = build_ir_v8._template_graph_slots(cores[0], phase)
+                        inputs = slots.get("inputs", {})
+                        if dtype == "bf16" and phase == "prefill":
+                            self.assertEqual(inputs.get("packed_qkv"), "recurrent_conv_qkv")
+                        else:
+                            self.assertNotIn("packed_qkv", inputs)
 
     def test_qwen35_serving_profile_is_declared_separately_from_graph(self) -> None:
         circuit = json.loads((ROOT / "version" / "v8" / "circuits" / "qwen35.json").read_text(encoding="utf-8"))
