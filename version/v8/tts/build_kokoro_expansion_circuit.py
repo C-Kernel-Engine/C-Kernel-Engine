@@ -11,7 +11,7 @@ from pathlib import Path
 from build_kokoro_duration_circuit import build_circuit as duration_circuit
 
 ROOT = Path(__file__).resolve().parents[3]
-OUTPUT = ROOT / 'version/v8/circuits/kokoro_duration_expansion_bounded.json'
+OUTPUT = ROOT / 'build/kokoro-diagnostics/kokoro_duration_expansion_bounded.json'
 TOKENS = 36
 CAPACITY = 128
 
@@ -79,6 +79,7 @@ def main():
         if args.output.read_text() != contents:
             raise SystemExit('expansion circuit differs from authoring source')
     else:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(contents)
 
 

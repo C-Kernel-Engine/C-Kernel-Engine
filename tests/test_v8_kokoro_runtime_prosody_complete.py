@@ -17,7 +17,7 @@ from tests import test_v8_kokoro_generated_albert_layer as xray_support
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'version/v8/tts'))
 from build_kokoro_runtime_prosody_complete_circuit import (
-    build_circuit, OUTPUT, DOUBLED_FRAMES, FRAMES)
+    build_circuit, DOUBLED_FRAMES, FRAMES)
 
 CAPACITY = 64
 PAD = -91.0
@@ -30,8 +30,6 @@ class KokoroRuntimeProsodyCompleteTest(unittest.TestCase):
         root = Path(cls.temp.name)
         cls.root = root
         graph = build_circuit()
-        if OUTPUT.read_text() != json.dumps(graph, indent=2) + '\n':
-            raise RuntimeError('committed circuit differs from authoring')
         circuit = root / 'circuit.json'
         circuit.write_text(json.dumps(graph))
         weights, cls.direct, cls.direct_meta = complete_prosody_weights()

@@ -13,7 +13,7 @@ from build_kokoro_duration_circuit import build_circuit as runtime_duration
 from build_kokoro_text_encoder_circuit import build_circuit as fixed_text_encoder
 
 ROOT = Path(__file__).resolve().parents[3]
-OUTPUT = ROOT / 'version/v8/circuits/kokoro_runtime_text_expansion_bounded.json'
+OUTPUT = ROOT / 'build/kokoro-diagnostics/kokoro_runtime_text_expansion_bounded.json'
 TOKENS = 64
 FRAMES = TOKENS * 50
 CHANNELS = 512
@@ -134,6 +134,7 @@ def main():
         if args.output.read_text() != contents:
             raise SystemExit('runtime text expansion circuit differs from authoring source')
     else:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(contents)
 
 

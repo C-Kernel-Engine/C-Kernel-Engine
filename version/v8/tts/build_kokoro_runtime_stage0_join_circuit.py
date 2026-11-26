@@ -13,7 +13,7 @@ from build_kokoro_runtime_source_stft_conv_circuit import (
 
 
 ROOT = Path(__file__).resolve().parents[3]
-OUTPUT = ROOT / 'version/v8/circuits/kokoro_runtime_stage0_join_bounded.json'
+OUTPUT = ROOT / 'build/kokoro-diagnostics/kokoro_runtime_stage0_join_bounded.json'
 JOIN_BLOCKS = ('source_residual_prefix', 'source_residual_first_pair',
                'source_residual_pair1', 'source_residual_pair2',
                'generator_stage0_join')
@@ -77,6 +77,7 @@ def main():
         if args.output.read_text() != content:
             raise SystemExit('runtime stage0 join differs from authoring')
     else:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(content)
 
 

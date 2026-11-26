@@ -19,7 +19,7 @@ CAPACITY = 64
 PAD = -91.0
 sys.path.insert(0, str(ROOT / 'version/v8/tts'))
 from build_kokoro_runtime_decoder_encode_circuit import (
-    build_circuit, OUTPUT, FRAMES)
+    build_circuit, FRAMES)
 
 CHECKPOINTS = {
     'decoder_encode_norm0': ('decoder_encode_norm1', 514, 6e-5),
@@ -37,8 +37,6 @@ class KokoroRuntimeDecoderEncodeTest(unittest.TestCase):
         cls.temp = tempfile.TemporaryDirectory()
         cls.root = Path(cls.temp.name)
         graph = build_circuit()
-        if OUTPUT.read_text() != json.dumps(graph, indent=2) + '\n':
-            raise RuntimeError('committed circuit differs from authoring')
         circuit = cls.root / 'circuit.json'
         circuit.write_text(json.dumps(graph))
         weights, _, prosody_meta = complete_prosody_weights()

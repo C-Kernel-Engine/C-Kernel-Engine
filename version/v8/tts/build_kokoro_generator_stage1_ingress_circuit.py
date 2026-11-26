@@ -11,7 +11,7 @@ from build_kokoro_generator_stage0_pool_circuit import (
 from build_kokoro_prosody_second_block_circuit import declared
 
 
-OUTPUT = ROOT / 'version/v8/circuits/kokoro_generator_stage1_ingress_bounded.json'
+OUTPUT = ROOT / 'build/kokoro-diagnostics/kokoro_generator_stage1_ingress_bounded.json'
 INPUT_CHANNELS = 256
 OUTPUT_CHANNELS = 128
 INPUT_CAPACITY = 2560
@@ -173,6 +173,7 @@ def main():
         if args.output.read_text() != content:
             raise SystemExit('stage1 ingress circuit differs from authoring')
     else:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(content)
 
 

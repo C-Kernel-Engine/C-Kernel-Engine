@@ -10,7 +10,7 @@ from build_kokoro_runtime_text_expansion_circuit import (
 from build_kokoro_prosody_shared_circuit import build_circuit as fixed_shared
 
 ROOT = Path(__file__).resolve().parents[3]
-OUTPUT = ROOT / 'version/v8/circuits/kokoro_runtime_prosody_shared_bounded.json'
+OUTPUT = ROOT / 'build/kokoro-diagnostics/kokoro_runtime_prosody_shared_bounded.json'
 
 
 def build_circuit():
@@ -55,6 +55,7 @@ def main():
         if args.output.read_text() != content:
             raise SystemExit('runtime prosody circuit differs from authoring source')
     else:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(content)
 
 

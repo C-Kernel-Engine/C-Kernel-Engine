@@ -8,7 +8,7 @@ from pathlib import Path
 from build_kokoro_prosody_norm_circuit import build_circuit as norm_circuit
 
 ROOT = Path(__file__).resolve().parents[3]
-OUTPUT = ROOT / 'version/v8/circuits/kokoro_prosody_first_block_bounded.json'
+OUTPUT = ROOT / 'build/kokoro-diagnostics/kokoro_prosody_first_block_bounded.json'
 CHANNELS = 512
 CAPACITY = 128
 STYLE = 128
@@ -177,6 +177,7 @@ def main():
         if args.output.read_text() != content:
             raise SystemExit('first block circuit differs from authoring')
     else:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(content)
 
 

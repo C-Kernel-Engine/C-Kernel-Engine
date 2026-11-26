@@ -9,7 +9,7 @@ from build_kokoro_runtime_prosody_complete_circuit import (
 from build_kokoro_decoder_ingress_circuit import add_decoder_ingress
 
 ROOT = Path(__file__).resolve().parents[3]
-OUTPUT = ROOT / 'version/v8/circuits/kokoro_runtime_decoder_ingress_bounded.json'
+OUTPUT = ROOT / 'build/kokoro-diagnostics/kokoro_runtime_decoder_ingress_bounded.json'
 
 
 def build_circuit():
@@ -32,6 +32,7 @@ def main():
         if args.output.read_text() != content:
             raise SystemExit('runtime decoder ingress differs from authoring')
     else:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(content)
 
 

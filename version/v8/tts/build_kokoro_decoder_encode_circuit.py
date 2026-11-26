@@ -12,7 +12,7 @@ from build_kokoro_prosody_second_block_circuit import (
 
 
 ROOT = Path(__file__).resolve().parents[3]
-OUTPUT = ROOT / 'version/v8/circuits/kokoro_decoder_encode_bounded.json'
+OUTPUT = ROOT / 'build/kokoro-diagnostics/kokoro_decoder_encode_bounded.json'
 FRAMES = 128
 STYLE = 128
 INPUT_CHANNELS = 514
@@ -131,6 +131,7 @@ def main():
         if args.output.read_text() != content:
             raise SystemExit('decoder encode circuit differs from authoring')
     else:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(content)
 
 

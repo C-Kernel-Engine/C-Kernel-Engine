@@ -12,7 +12,7 @@ from build_kokoro_runtime_decoder_complete_circuit import (
 
 
 ROOT = Path(__file__).resolve().parents[3]
-OUTPUT = ROOT / 'version/v8/circuits/kokoro_runtime_generator_stage0_bounded.json'
+OUTPUT = ROOT / 'build/kokoro-diagnostics/kokoro_runtime_generator_stage0_bounded.json'
 
 
 def build_circuit():
@@ -39,6 +39,7 @@ def main():
         if args.output.read_text() != content:
             raise SystemExit('runtime generator stage0 differs from authoring')
     else:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(content)
 
 

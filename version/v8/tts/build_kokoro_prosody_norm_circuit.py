@@ -11,7 +11,7 @@ from pathlib import Path
 from build_kokoro_prosody_shared_circuit import build_circuit as shared_circuit
 
 ROOT = Path(__file__).resolve().parents[3]
-OUTPUT = ROOT / 'version/v8/circuits/kokoro_prosody_norm_bounded.json'
+OUTPUT = ROOT / 'build/kokoro-diagnostics/kokoro_prosody_norm_bounded.json'
 CAPACITY = 128
 CHANNELS = 512
 STYLE = 128
@@ -125,6 +125,7 @@ def main():
         if args.output.read_text() != content:
             raise SystemExit('prosody norm circuit differs from authoring')
     else:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(content)
 
 

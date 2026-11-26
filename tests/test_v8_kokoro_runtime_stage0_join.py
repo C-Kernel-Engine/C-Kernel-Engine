@@ -22,7 +22,7 @@ from tests import test_v8_kokoro_generated_albert_layer as xray_support
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'version/v8/tts'))
-from build_kokoro_runtime_stage0_join_circuit import OUTPUT, build_circuit
+from build_kokoro_runtime_stage0_join_circuit import build_circuit
 
 
 class KokoroRuntimeStage0JoinTest(unittest.TestCase):
@@ -31,8 +31,6 @@ class KokoroRuntimeStage0JoinTest(unittest.TestCase):
         cls.temp = tempfile.TemporaryDirectory()
         cls.root = Path(cls.temp.name)
         graph = build_circuit()
-        if OUTPUT.read_text() != json.dumps(graph, indent=2) + '\n':
-            raise RuntimeError('committed runtime stage0 join differs')
         cls.circuit = cls.root / 'circuit.json'
         cls.circuit.write_text(json.dumps(graph))
         cls.refs = join_weights_and_references()

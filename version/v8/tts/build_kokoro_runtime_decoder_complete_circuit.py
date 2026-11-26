@@ -14,7 +14,7 @@ from build_kokoro_runtime_decoder_encode_circuit import (
 
 
 ROOT = Path(__file__).resolve().parents[3]
-OUTPUT = ROOT / 'version/v8/circuits/kokoro_runtime_decoder_complete_bounded.json'
+OUTPUT = ROOT / 'build/kokoro-diagnostics/kokoro_runtime_decoder_complete_bounded.json'
 UPSAMPLED_FRAMES = 2 * FRAMES
 
 
@@ -48,6 +48,7 @@ def main():
         if args.output.read_text() != content:
             raise SystemExit('runtime complete decoder differs from authoring')
     else:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(content)
 
 

@@ -1921,7 +1921,7 @@ TEST_SUITES = {
         timeout_sec=300,
     ),
     "tts_kokoro_oracle_circuit_inventory": TestSuite(
-        "Kokoro Oracle-Input Circuit Regeneration", "inference",
+        "Kokoro Diagnostic Circuit Regeneration", "inference",
         ROOT / "tests" / "test_v8_kokoro_oracle_circuit_inventory.py",
         unittest_targets=("tests.test_v8_kokoro_oracle_circuit_inventory",),
     ),

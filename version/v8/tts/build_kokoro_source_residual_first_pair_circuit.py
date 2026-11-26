@@ -10,7 +10,7 @@ from build_kokoro_source_residual_prefix_circuit import (
     build_circuit as prefix_circuit, CAPACITY, CHANNELS, ROOT)
 
 
-OUTPUT = ROOT / 'version/v8/circuits/kokoro_source_residual_first_pair_bounded.json'
+OUTPUT = ROOT / 'build/kokoro-diagnostics/kokoro_source_residual_first_pair_bounded.json'
 
 
 def build_circuit(tokens=36):
@@ -86,6 +86,7 @@ def main():
         if args.output.read_text() != content:
             raise SystemExit('source residual first-pair circuit differs from authoring')
     else:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(content)
 
 

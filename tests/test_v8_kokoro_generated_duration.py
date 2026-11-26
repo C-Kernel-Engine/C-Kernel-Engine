@@ -16,6 +16,7 @@ import numpy as np
 
 from tests.v8_checked_graph_test_support import compile_native_graph
 from tests.v8_checked_graph_test_support import build_ir_v8
+from tests.v8_kokoro_stage_circuit_support import materialize_stage_circuit
 from tests.v8_kokoro_duration_fixture_support import (
     prepare_duration_fixture, populated_duration_arena)
 from tests import test_v8_kokoro_generated_albert_layer as first_layer
@@ -36,7 +37,7 @@ class KokoroGeneratedDurationTest(unittest.TestCase):
         else:
             cls.temp=tempfile.TemporaryDirectory()
             root=Path(cls.temp.name)
-        circuit = author.OUTPUT
+        circuit = materialize_stage_circuit(root, author)
         fixture = prepare_duration_fixture(root, circuit)
         for key, value in vars(fixture).items():
             setattr(cls, key, value)

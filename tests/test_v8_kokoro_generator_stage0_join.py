@@ -11,6 +11,7 @@ from types import SimpleNamespace
 import numpy as np
 
 from tests.v8_checked_graph_test_support import compile_native_graph
+from tests.v8_kokoro_stage_circuit_support import materialize_stage_circuit
 from tests.v8_kokoro_duration_fixture_support import (
     populated_duration_arena, prepare_duration_fixture)
 from tests.test_v8_kokoro_generated_prosody_complete import verified_fixture
@@ -92,13 +93,14 @@ class KokoroGeneratorStage0JoinTest(unittest.TestCase):
         for name, value in vars(refs).items():
             if name != 'weights':
                 setattr(cls, name, value)
-        fixture = prepare_duration_fixture(root, author.OUTPUT, refs.weights)
+        circuit = materialize_stage_circuit(root, author)
+        fixture = prepare_duration_fixture(root, circuit, refs.weights)
         cls.encoder = fixture.encoder
         cls.duration = fixture.duration
         cls.entries = fixture.entries
         cls.bump = fixture.bump
         cls.layout, cls.calls, cls.library, cls.loaded, cls.fn = \
-            compile_native_graph(root, fixture.source, author.OUTPUT)
+            compile_native_graph(root, fixture.source, circuit)
         cls.fn.argtypes = [ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t] + \
             [ctypes.POINTER(ctypes.c_int32)] * 5
         cls.buffers = {item['name']: item for item in
@@ -136,8 +138,6 @@ class KokoroGeneratorStage0JoinTest(unittest.TestCase):
         return status, tuple(item.value for item in lengths)
 
     def test_circuit_selection_and_shared_runtime_length(self):
-        self.assertEqual(json.loads(author.OUTPUT.read_text()),
-                         author.build_circuit())
         self.assertEqual(self.calls['errors'], [])
         operations = self.calls['operations']
         self.assertEqual(operations[-1]['function'],
