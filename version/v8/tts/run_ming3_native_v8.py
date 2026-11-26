@@ -32,7 +32,7 @@ class IncompleteSynthesis(RuntimeError):pass
 class CancelledSynthesis(RuntimeError):pass
 
 
-def prepare_tokens(text,checkpoint,publisher_root):
+def _prepare_prompt(text,checkpoint,publisher_root,*,with_speaker):
     """Pinned publisher's pure prompt contract; no model import or execution."""
     rev=subprocess.check_output(['git','-C',str(publisher_root),'rev-parse','HEAD'],text=True).strip()
     dirty=subprocess.check_output(['git','-C',str(publisher_root),'status','--porcelain','--untracked-files=no'],text=True)
@@ -49,14 +49,25 @@ def prepare_tokens(text,checkpoint,publisher_root):
         def __init__(self):self.tokenizer=Tokenizer.from_file(str(checkpoint/'tokenizer.json'))
         def encode(self,text,add_special_tokens=False):return self.tokenizer.encode(text,add_special_tokens=add_special_tokens).ids
         def convert_tokens_to_ids(self,text):return self.tokenizer.token_to_id(text)
-    request=tts_tasks.build_task_generation_kwargs('IP',text=text,language_id='en',controls={'ip':'UK_George'})
-    ids,positions,latent=prompt_contract.build_input_ids(TokenizerAdapter(),'dense',request['prompt'],request['text'],instruction=request['instruction'])
-    if positions or latent!=-1:raise ValueError('this runner supports built-in voice without reference audio')
-    return ids
+    if with_speaker:
+        request = tts_tasks.build_task_generation_kwargs('TTS', text=text, language_id='en')
+    else:
+        request = tts_tasks.build_task_generation_kwargs('IP', text=text, language_id='en', controls={'ip':'UK_George'})
+    ids, positions, latent = prompt_contract.build_input_ids(
+        TokenizerAdapter(), 'dense', request['prompt'], request['text'],
+        instruction=request['instruction'], num_speakers=int(with_speaker))
+    if len(positions) != int(with_speaker) or latent != -1:
+        raise ValueError('unexpected speaker or latent prompt slots')
+    return ids, positions[0] if positions else None
+
+
+def prepare_tokens(text, checkpoint, publisher_root):
+    return _prepare_prompt(text, checkpoint, publisher_root, with_speaker=False)[0]
+
 
 class NativeMingSession:
     """Request-serialized resident arenas. Cancellation never publishes partial audio."""
-    def __init__(self,checkpoint,build_root,*,capacity=256,max_frames=100,cached_backbone=False):
+    def __init__(self,checkpoint,build_root,*,capacity=256,max_frames=100,cached_backbone=False,speaker_prompt=False):
         self.descriptor=load_profile(cached=cached_backbone)
         shell=native_shell_spec(self.descriptor)
         minimum=self.descriptor['minimum_frames']
@@ -72,6 +83,10 @@ class NativeMingSession:
         else:selected_backbone=backbone
         self.graphs={'backbone':selected_backbone(capacity=capacity),'aggregator':aggregator(),'dit':dit(),
                      'decoder':decoder(capacity=max_frames)}
+        self.speaker_prompt = speaker_prompt
+        if speaker_prompt:
+            from version.v8.tts.ming3_speaker_prompt import add_speaker_prompt
+            add_speaker_prompt(self.graphs['backbone'])
         latent=self.graphs['dit']['activation_buffers']['latent']['shape'][-1]
         steps=len(self.descriptor['sampling']['times'])-1
         self.graphs['update']=update(latent,steps)
@@ -104,12 +119,19 @@ class NativeMingSession:
         self.driver=getattr(self.bundles[self.plan['components']['flow_update']['artifact']][3],self.plan['shell_entry'])
         self.driver.argtypes=[C.POINTER(LatentLoop)];self.driver.restype=C.c_int
 
-    def synthesize(self,token_ids,*,seed=731,should_cancel=None):
+    def synthesize(self,token_ids,*,seed=731,should_cancel=None,speaker=None,speaker_position=None):
         if type(seed) is not int or not 0<=seed<2**64:raise ValueError('seed must be uint64')
         if not isinstance(token_ids,(list,tuple)) or not token_ids or any(type(i) is not int or not 0<=i<self.vocabulary for i in token_ids):
             raise ValueError('invalid token IDs')
         if len(token_ids)+self.plan['minimum_frames']-1>self.plan['capacity']:raise ValueError('prompt leaves insufficient minimum generation capacity')
-        with self.lock:return self._synthesize(token_ids,seed,should_cancel)
+        if self.speaker_prompt != (speaker is not None) or self.speaker_prompt != (speaker_position is not None):
+            raise ValueError('speaker vector and position must match the loaded prompt mode')
+        with self.lock:
+            if self.speaker_prompt:
+                from version.v8.tts.ming3_speaker_prompt import bind_speaker
+                bind_speaker(self.exports['backbone']['ports'], self.bundles['backbone'][1],
+                             token_ids, speaker_position, speaker)
+            return self._synthesize(token_ids,seed,should_cancel)
 
     def _synthesize(self,ids,seed,should_cancel):
         errors=[]
@@ -153,6 +175,7 @@ def main():
     for key in ('checkpoint','publisher-root','output'):p.add_argument('--'+key,type=Path,required=True)
     p.add_argument('--cached-backbone',action='store_true');p.add_argument('--text',required=True);p.add_argument('--capacity',type=int,default=256)
     p.add_argument('--max-frames',type=int,default=100);p.add_argument('--threads',type=int,default=2);p.add_argument('--seed',type=int,default=731)
+    p.add_argument('--speaker-vector', type=Path, help='private .npy file, 192 FP32 CAM++ values')
     args=p.parse_args()
     if not 1<=args.threads<=64:p.error('threads must be 1..64')
     args.output.mkdir(parents=True,exist_ok=False)
@@ -164,13 +187,21 @@ def main():
         os.environ['OMP_NUM_THREADS']=str(args.threads)
         import torch
         torch.set_num_threads(args.threads)
-        ids=prepare_tokens(args.text,args.checkpoint,args.publisher_root)
+        speaker = None
+        if args.speaker_vector is not None:
+            if args.speaker_vector.stat().st_size > 8192:
+                raise ValueError('oversized speaker vector file')
+            from version.v8.tts.ming3_speaker_prompt import check_vector
+            speaker = np.load(args.speaker_vector, allow_pickle=False, mmap_mode='r')
+            check_vector(speaker)
+        ids, position = _prepare_prompt(args.text, args.checkpoint, args.publisher_root, with_speaker=speaker is not None)
+        report['voice_mode'] = 'speaker_embedding' if speaker is not None else 'UK_George'
         if len(ids)+load_profile(cached=args.cached_backbone)['minimum_frames']-1>args.capacity:raise ValueError('prompt leaves insufficient generation capacity')
         report['tokens']=ids;report['checkpoint_sha256']=digest(args.checkpoint/'model.safetensors')
         report['tokenizer_sha256']=digest(args.checkpoint/'tokenizer.json');save()
-        start=time.monotonic();session=NativeMingSession(args.checkpoint,args.output/'native',capacity=args.capacity,max_frames=args.max_frames,cached_backbone=args.cached_backbone)
+        start=time.monotonic();session=NativeMingSession(args.checkpoint,args.output/'native',capacity=args.capacity,max_frames=args.max_frames,cached_backbone=args.cached_backbone,speaker_prompt=speaker is not None)
         report.update(load_seconds=time.monotonic()-start,artifacts=session.identities);save()
-        audio,measurements,latents=session.synthesize(ids,seed=args.seed)
+        audio,measurements,latents=session.synthesize(ids,seed=args.seed,speaker=speaker,speaker_position=position)
         np.save(args.output/'waveform.npy',audio);np.save(args.output/'latents.npy',latents)
         with wave.open(str(args.output/'speech.wav'),'wb') as wav:
             wav.setnchannels(1);wav.setsampwidth(2);wav.setframerate(measurements['sample_rate'])

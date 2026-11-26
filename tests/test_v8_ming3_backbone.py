@@ -34,6 +34,47 @@ def reference(x,w,heads,kv_heads,depth):
     hidden=norm(x,'model.norm');return hidden,linear(hidden,'stop_head')
 
 class BackboneTests(unittest.TestCase):
+    def test_native_speaker_replaces_exactly_one_prompt_row(self):
+        from version.v8.tts.ming3_speaker_prompt import add_speaker_prompt, bind_speaker
+        from version.v8.scripts.checked_execution_exports_v8 import load_exports
+        graph = build_circuit(capacity=5, width=8, heads=2, kv_heads=1, depth=1, inner=12, vocab=8)
+        add_speaker_prompt(graph)
+        # This regression exercises the native embedding entry in isolation.
+        graph['sequence'] = ['embedding']
+        del graph['block_types']['block']
+        exports = graph['semantic_checkpoints']['exports']
+        graph['semantic_checkpoints']['exports'] = {'embeddings': exports['embeddings']}
+        graph['native_entry']['function'] = graph['native_entry'].pop('segments')[0]['function']
+        graph['runtime_lengths'] = {'embed_rows': graph['runtime_lengths']['embed_rows']}
+        del graph['execution_exports']['entries']['prefill']
+        for port in ('hidden', 'stop_logits'):
+            del graph['execution_exports']['ports'][port]
+        rng = np.random.default_rng(29)
+        weights = {key: rng.normal(0, .1, shape).astype('f4')
+                   for key, shape in weight_shapes(graph).items()}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)
+            _, arena, view, library = compile_block(path, graph, weights,
+                                                     c_standard='gnu11', provider_warnings='report')
+            ports = load_exports(path, library)['ports']
+            embed = ENTRY(('ck_ming3_backbone_embed', library))
+            ids = [1, 3, 5, 7]
+            view('prompt_ids', np.int32)[:4] = ids
+            view('request_rows', np.int32)[:] = 4
+            for position in (1, 2, 1):
+                prompt = [1] * 4
+                prompt[position-1:position+2] = [151652, 151654, 151653]
+                speaker = rng.normal(size=192).astype('f4')
+                bind_speaker(ports, arena, prompt, position, speaker)
+                self.assertEqual(embed(arena, len(arena)), 0)
+                expected = weights['model.embed_tokens.weight'][ids].copy()
+                expected[position] = weights['spk_head.weight'] @ speaker + weights['spk_head.bias']
+                np.testing.assert_allclose(view('embeddings')[:4], expected, atol=2e-6)
+            for pos, value in [(4, speaker), (True, speaker), (1, speaker[:-1]),
+                               (1, speaker.astype('f8')), (1, np.full(192, np.nan, 'f4'))]:
+                with self.assertRaises(ValueError):
+                    bind_speaker(ports, arena, prompt, pos, value)
+
     def test_prefix_append_independent_math_and_recovery(self):
         g=build_circuit(capacity=8,width=8,heads=2,kv_heads=1,depth=2,inner=12,vocab=16)
         rng=np.random.default_rng(731);w={k:rng.normal(0,.2,s).astype('f4') for k,s in weight_shapes(g).items()}
