@@ -209,6 +209,13 @@ the weight-backed comparison. The test verifies tensor hashes, compares
 against PyTorch's math attention backend, and reports each checkpoint when
 invoked with `-o junit_family=xunit1 --junitxml sigma-block.xml`.
 
+Use the same checkpoint and BLAS settings with
+`python -m pytest -q tests/test_v8_sigma_bf16_denoiser_stack.py` to compare
+the full 26-layer denoiser and 131,072-token BF16 readout against PyTorch.
+Allow about 12 GiB of additional available RAM for generating this replay
+bundle. This fixture supplies the hidden input and mask directly. Guidance,
+noise transitions, and token commit belong to the surrounding sampling path.
+
 ### Drama 3 BF16 shared codebook tower replay
 
 The first layer accepts teacher-forced code rows, backbone hidden rows and the
